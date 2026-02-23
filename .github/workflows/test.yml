@@ -1,0 +1,113 @@
+name: KelionAI CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  # Scheduled health check — every 6 hours
+  schedule:
+    - cron: '0 */6 * * *'
+  # Manual trigger
+  workflow_dispatch:
+
+jobs:
+  # ─── STEP 1: Test ────────────────────────────
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      test-result: ${{ steps.test.outcome }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run E2E tests
+        id: test
+        continue-on-error: true
+        run: npx playwright test --project=chromium
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+
+      - name: Upload test report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 30
+
+      - name: Upload failure screenshots
+        uses: actions/upload-artifact@v4
+        if: steps.test.outcome == 'failure'
+        with:
+          name: test-screenshots
+          path: test-results/
+          retention-days: 30
+
+      - name: Create issue on failure
+        if: steps.test.outcome == 'failure' && github.event_name != 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const runUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
+            await github.rest.issues.create({
+              owner, repo,
+              title: `🔴 E2E Tests Failed — ${new Date().toISOString().split('T')[0]}`,
+              body: `## Test Failure Report\n\n**Run:** ${runUrl}\n**Branch:** ${context.ref}\n**Triggered by:** ${context.eventName}\n\nCheck the [test report](${runUrl}) for details.\n\nDownload screenshots from the artifacts.`,
+              labels: ['bug', 'automated']
+            });
+
+  # ─── STEP 2: Deploy (only if tests pass) ─────
+  deploy:
+    needs: test
+    if: needs.test.outputs.test-result == 'success' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to Netlify
+        uses: nwtgck/actions-netlify@v3
+        with:
+          publish-dir: './app'
+          functions-dir: './netlify/functions'
+          production-deploy: true
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+
+  # ─── STEP 3: Notify ──────────────────────────
+  notify:
+    needs: [test, deploy]
+    if: always()
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Send Sentry release
+        if: needs.test.outputs.test-result == 'success'
+        run: |
+          curl -sL https://sentry.io/api/0/organizations/kelion-ai/releases/ \
+            -H "Authorization: Bearer ${{ secrets.SENTRY_AUTH_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"version\": \"${{ github.sha }}\", \"projects\": [\"kelionai-v2\"]}" || true
