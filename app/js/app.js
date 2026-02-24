@@ -7,8 +7,48 @@
 
     const API_BASE = window.location.origin;
     let chatHistory = [];
-    let textInputVisible = false;
-    let savedFiles = []; // in/out file list
+    let textInputVisible = true;
+    let storedFiles = [];
+    let audioUnlocked = false;
+
+    // Unlock audio on first user interaction (Chrome autoplay policy)
+    function unlockAudio() {
+        if (audioUnlocked) return;
+        audioUnlocked = true;
+        try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const buf = ctx.createBuffer(1, 1, 22050);
+            const src = ctx.createBufferSource();
+            src.buffer = buf;
+            src.connect(ctx.destination);
+            src.start(0);
+            ctx.resume();
+            console.log('[App] Audio unlocked');
+        } catch (e) { console.warn('[App] Audio unlock failed:', e); }
+    }
+
+    // Show content on monitor panel
+    function showOnMonitor(content, type) {
+        const displayContent = document.getElementById('display-content');
+        if (!displayContent) return;
+        KAvatar.setPresenting(true);
+        if (type === 'image') {
+            displayContent.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;padding:20px;"><img src="${content}" style="max-width:100%;max-height:100%;border-radius:12px;box-shadow:0 4px 30px rgba(0,0,0,0.5);" alt="Generated image"></div>`;
+        } else if (type === 'map') {
+            displayContent.innerHTML = `<iframe src="${content}" style="width:100%;height:100%;border:none;border-radius:12px;"></iframe>`;
+        } else if (type === 'html') {
+            displayContent.innerHTML = content;
+        } else {
+            displayContent.innerHTML = `<div style="padding:30px;color:rgba(255,255,255,0.8);font-size:1rem;line-height:1.6;">${content}</div>`;
+        }
+    }
+
+    function clearMonitor() {
+        const displayContent = document.getElementById('display-content');
+        if (!displayContent) return;
+        KAvatar.setPresenting(false);
+        displayContent.innerHTML = `<div id="drop-zone-passive"><div class="welcome-icon">🎯</div><p>Monitor de prezentare</p><small>Trage fișiere aici sau cere o hartă, imagine, rută</small></div>`;
+    }
 
     // ─── Vision trigger phrases ──────────────────────────────
     const VISION_TRIGGERS = [
@@ -60,6 +100,11 @@
     // ─── Initialize ──────────────────────────────────────────
     function init() {
         KAvatar.init();
+
+        // Unlock audio on ANY user interaction
+        ['click', 'touchstart', 'keydown'].forEach(evt => {
+            document.addEventListener(evt, unlockAudio, { once: false, passive: true });
+        });
 
         // Controls
         document.getElementById('btn-mic').addEventListener('mousedown', onMicDown);
@@ -284,6 +329,9 @@
         document.querySelectorAll('.avatar-pill').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.avatar === name);
         });
+        // Update header
+        const nameEl = document.getElementById('avatar-name');
+        if (nameEl) nameEl.textContent = name.charAt(0).toUpperCase() + name.slice(1);
     }
 
     // ─── Microphone ──────────────────────────────────────────
