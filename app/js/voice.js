@@ -194,9 +194,6 @@
             currentAudio = new Audio(audioUrl);
             currentAudio.volume = 1;
 
-            // Use text-based lip sync ONLY (FFT/createMediaElementSource breaks audio)
-            fallbackTextLipSync(text);
-
             KAvatar.setExpression('happy', 0.3);
 
             currentAudio.addEventListener('ended', () => {
@@ -217,8 +214,18 @@
                 resumeWakeDetection();
             });
 
-            await currentAudio.play();
-            console.log('[Voice] Audio playing');
+            try {
+                await currentAudio.play();
+                console.log('[Voice] Audio playing');
+                // Start lip sync ONLY after audio actually plays
+                fallbackTextLipSync(text);
+            } catch (playErr) {
+                console.error('[Voice] Play failed:', playErr);
+                // Audio didn't play — do NOT start lip sync
+                stopAllLipSync();
+                isSpeaking = false;
+                resumeWakeDetection();
+            }
         } catch (e) {
             console.error('[Voice] Speak error:', e);
             stopAllLipSync();
