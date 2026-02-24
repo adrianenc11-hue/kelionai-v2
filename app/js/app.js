@@ -26,7 +26,8 @@
         document.getElementById('btn-mic').addEventListener('mouseup', onMicUp);
         document.getElementById('btn-mic').addEventListener('touchstart', (e) => { e.preventDefault(); onMicDown(); });
         document.getElementById('btn-mic').addEventListener('touchend', (e) => { e.preventDefault(); onMicUp(); });
-        document.getElementById('btn-keyboard').addEventListener('click', toggleTextInput);
+        const btnKeyboard = document.getElementById('btn-keyboard');
+        if (btnKeyboard) btnKeyboard.addEventListener('click', toggleTextInput);
         document.getElementById('btn-files').addEventListener('click', toggleFilesPanel);
         document.getElementById('btn-send').addEventListener('click', onSendText);
 
