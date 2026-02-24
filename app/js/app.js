@@ -12,10 +12,50 @@
 
     // ─── Vision trigger phrases ──────────────────────────────
     const VISION_TRIGGERS = [
+        'ce e în față', 'ce e in fata', 'ce este în față', 'ce este in fata',
+        'ce ai în față', 'ce ai in fata', 'ce se vede', 'ce e acolo',
         'mă vezi', 'ma vezi', 'ce vezi', 'uită-te', 'uita-te',
         'arată-mi', 'arata-mi', 'privește', 'priveste', 'see me',
-        'look at', 'what do you see', 'can you see', 'vezi ceva'
+        'look at', 'what do you see', 'can you see', 'vezi ceva',
+        'ce e în jurul meu', 'ce e in jurul meu', 'descrie ce vezi',
+        'spune-mi ce vezi', 'spunemi ce vezi', 'ce observi',
+        'sunt în siguranță', 'sunt in siguranta', 'e periculos',
+        'ce e pe stradă', 'ce e pe strada'
     ];
+
+    // Check if text matches a vision trigger
+    function isVisionRequest(text) {
+        const lower = text.toLowerCase();
+        return VISION_TRIGGERS.some(t => lower.includes(t));
+    }
+
+    // Auto-activate camera + real-time detection
+    async function triggerVision() {
+        showThinking(false);
+        if (typeof RealtimeVision === 'undefined') {
+            addMessage('assistant', 'Modulul de viziune nu este disponibil.');
+            return;
+        }
+
+        if (!RealtimeVision.active) {
+            addMessage('assistant', 'Activez camera... Un moment.');
+            const ok = await RealtimeVision.start(1000);
+            if (ok) {
+                addMessage('assistant', '👁️ Viziunea în timp real este activată. Îți spun ce văd.');
+                // Update button state if exists
+                const btn = document.getElementById('btn-vision');
+                if (btn) {
+                    btn.classList.add('active-vision');
+                    btn.textContent = '👁️‍🗨️';
+                }
+            } else {
+                addMessage('assistant', 'Nu am putut accesa camera. Te rog să permiți accesul.');
+            }
+        } else {
+            // Already running — just confirm
+            addMessage('assistant', '👁️ Viziunea este deja activă. Îți descriu ce văd.');
+        }
+    }
 
     // ─── Initialize ──────────────────────────────────────────
     function init() {
@@ -58,7 +98,7 @@
             addMessage('user', text);
             showThinking(true);
 
-            // Check if it's a vision request
+            // Check if it's a vision request — auto-activate camera
             if (isVisionRequest(text)) {
                 triggerVision();
             } else {
