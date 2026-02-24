@@ -1,461 +1,182 @@
-// ═══════════════════════════════════════════════════════════════
-// KelionAI v2 — Voice Module
-// Handles: TTS, STT, wake words, continuous listening, camera
-// ═══════════════════════════════════════════════════════════════
+// KelionAI v2 — Voice Module (AudioContext — FIXED)
 (function () {
     'use strict';
-
     const API_BASE = window.location.origin;
-    let mediaRecorder = null;
-    let audioChunks = [];
-    let isRecording = false;
-    let isSpeaking = false;
-    let currentAudio = null;
-    let currentSourceNode = null;
-    let sharedAudioCtx = null;
-    let detectedLanguage = 'ro'; // default Romanian
+    let mediaRecorder = null, audioChunks = [], isRecording = false, isSpeaking = false;
+    let currentSourceNode = null, sharedAudioCtx = null, detectedLanguage = 'ro';
+    let recognition = null, isListeningForWake = false, isProcessing = false;
 
-    // Shared AudioContext — survives autoplay policy because it's
-    // resumed on the very first user gesture (click/touch/keydown)
     function getAudioContext() {
-        if (!sharedAudioCtx) {
-            sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        }
-        if (sharedAudioCtx.state === 'suspended') {
-            sharedAudioCtx.resume();
-        }
+        if (!sharedAudioCtx) sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (sharedAudioCtx.state === 'suspended') sharedAudioCtx.resume();
         return sharedAudioCtx;
     }
 
-    // Called by app.js unlockAudio on first user interaction
     function ensureAudioUnlocked() {
         const ctx = getAudioContext();
-        if (ctx.state === 'suspended') ctx.resume();
-        // Play a tiny silent buffer to fully unlock
-        try {
-            const buf = ctx.createBuffer(1, 1, 22050);
-            const src = ctx.createBufferSource();
-            src.buffer = buf;
-            src.connect(ctx.destination);
-            src.start(0);
-        } catch (e) { /* ok */ }
+        try { const b = ctx.createBuffer(1,1,22050), s = ctx.createBufferSource(); s.buffer = b; s.connect(ctx.destination); s.start(0); } catch(e){}
     }
 
-    // ─── Wake Word Detection (always-on mic) ─────────────────
-    let recognition = null;
-    let isListeningForWake = false;
-    let isProcessing = false;
-
+    // ─── Wake Word (always-on mic) ───────────────────────────
     function startWakeWordDetection() {
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!SpeechRecognition) {
-            console.warn('[Voice] SpeechRecognition not supported — use mic button');
-            return;
-        }
-
-        recognition = new SpeechRecognition();
-        recognition.continuous = true;
-        recognition.interimResults = true;
-        recognition.maxAlternatives = 3;
-        // Don't set language — let it auto-detect
+        const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SR) return;
+        recognition = new SR();
+        recognition.continuous = true; recognition.interimResults = true; recognition.maxAlternatives = 3;
 
         recognition.onresult = (event) => {
             if (isProcessing || isSpeaking) return;
-
             for (let i = event.resultIndex; i < event.results.length; i++) {
-                const transcript = event.results[i][0].transcript.toLowerCase().trim();
-                const confidence = event.results[i][0].confidence;
+                const t = event.results[i][0].transcript.toLowerCase().trim();
+                const c = event.results[i][0].confidence;
+                if (c < 0.6 && event.results[i].isFinal) continue;
+                const hasKelion = t.includes('kelion') || t.includes('chelion');
+                const hasKira = t.includes('kira') || t.includes('chira');
+                const hasK = t === 'k' || t.startsWith('k ');
 
-                // Skip low confidence results (background noise)
-                if (confidence < 0.6 && event.results[i].isFinal) continue;
+                if ((hasKelion || hasKira || hasK) && event.results[i].isFinal) {
+                    if (hasKira) { window.KAvatar.loadAvatar('kira'); document.querySelectorAll('.avatar-pill').forEach(b => b.classList.toggle('active', b.dataset.avatar === 'kira')); }
+                    else { window.KAvatar.loadAvatar('kelion'); document.querySelectorAll('.avatar-pill').forEach(b => b.classList.toggle('active', b.dataset.avatar === 'kelion')); }
 
-                // Detect wake words
-                const hasKelion = transcript.includes('kelion') || transcript.includes('chelion') || transcript.includes('kelian');
-                const hasKira = transcript.includes('kira') || transcript.includes('chira');
-                const hasK = transcript === 'k' || transcript.startsWith('k ') || transcript.includes(' k ');
+                    let msg = t;
+                    if (hasKelion) msg = t.split(/kelion|chelion/i).pop().trim();
+                    else if (hasKira) msg = t.split(/kira|chira/i).pop().trim();
+                    else if (hasK) msg = t.replace(/^\s*k\s+/, '').trim();
 
-                if (hasKelion || hasKira || hasK) {
-                    if (event.results[i].isFinal) {
-                        // Switch avatar if needed
-                        if (hasKira) {
-                            window.KAvatar.loadAvatar('kira');
-                            document.querySelectorAll('.avatar-pill').forEach(btn => {
-                                btn.classList.toggle('active', btn.dataset.avatar === 'kira');
-                            });
-                        } else {
-                            window.KAvatar.loadAvatar('kelion');
-                            document.querySelectorAll('.avatar-pill').forEach(btn => {
-                                btn.classList.toggle('active', btn.dataset.avatar === 'kelion');
-                            });
-                        }
-
-                        // Extract the message after the wake word
-                        let message = transcript;
-                        if (hasKelion) message = transcript.split(/kelion|chelion|kelian/i).pop().trim();
-                        else if (hasKira) message = transcript.split(/kira|chira/i).pop().trim();
-                        else if (hasK) message = transcript.replace(/^\s*k\s+/, '').trim();
-
-                        if (message.length > 1) {
-                            detectLanguage(transcript);
-
-                            isProcessing = true;
-                            window.KAvatar.setAttentive(true);
-                            console.log(`[Voice] Wake word detected! Message: "${message}", Language: ${detectedLanguage}`);
-
-                            // Dispatch event for app.js to handle
-                            window.dispatchEvent(new CustomEvent('wake-message', {
-                                detail: { text: message, language: detectedLanguage }
-                            }));
-                        } else {
-                            window.KAvatar.setAttentive(true);
-                            console.log('[Voice] Wake word heard, listening for message...');
-                        }
-                    }
+                    if (msg.length > 1) {
+                        detectLanguage(t); isProcessing = true; window.KAvatar.setAttentive(true);
+                        window.dispatchEvent(new CustomEvent('wake-message', { detail: { text: msg, language: detectedLanguage } }));
+                    } else { window.KAvatar.setAttentive(true); }
                 }
             }
         };
-
-        recognition.onend = () => {
-            // Restart continuously unless we're processing
-            if (isListeningForWake && !isProcessing) {
-                try { recognition.start(); } catch (e) { /* already started */ }
-            }
-        };
-
-        recognition.onerror = (e) => {
-            if (e.error === 'not-allowed') {
-                console.error('[Voice] Mic permission denied');
-                return;
-            }
-            // Auto-restart on other errors
-            if (isListeningForWake) {
-                setTimeout(() => {
-                    try { recognition.start(); } catch (e) { /* ok */ }
-                }, 1000);
-            }
-        };
-
-        try {
-            recognition.start();
-            isListeningForWake = true;
-            console.log('[Voice] Wake word detection active — say "Kelion" or "Kira"');
-        } catch (e) {
-            console.error('[Voice] Could not start wake detection:', e);
-        }
+        recognition.onend = () => { if (isListeningForWake && !isProcessing) try { recognition.start(); } catch(e){} };
+        recognition.onerror = (e) => { if (e.error !== 'not-allowed' && isListeningForWake) setTimeout(() => { try { recognition.start(); } catch(e){} }, 1000); };
+        try { recognition.start(); isListeningForWake = true; console.log('[Voice] Wake word activ'); } catch(e){}
     }
 
     function resumeWakeDetection() {
-        isProcessing = false;
-        window.KAvatar.setAttentive(false);
-        if (isListeningForWake && recognition) {
-            try { recognition.start(); } catch (e) { /* already running */ }
-        }
+        isProcessing = false; window.KAvatar.setAttentive(false);
+        if (isListeningForWake && recognition) try { recognition.start(); } catch(e){}
     }
 
-    // ─── Language Detection ──────────────────────────────────
     function detectLanguage(text) {
-        // Simple heuristic based on common words
-        const lowerText = text.toLowerCase();
-
-        // Romanian indicators
-        if (/\b(și|sau|este|sunt|pentru|care|cum|unde|când|dacă|ești|vreau|poți|te rog|bună|salut|mulțumesc)\b/.test(lowerText)) {
-            detectedLanguage = 'ro';
-            return;
-        }
-        // English indicators
-        if (/\b(the|is|are|and|what|where|how|can|you|please|hello|thank|want|need|tell)\b/.test(lowerText)) {
-            detectedLanguage = 'en';
-            return;
-        }
-        // Spanish
-        if (/\b(el|la|los|las|es|son|para|como|donde|cuando|por favor|hola|gracias)\b/.test(lowerText)) {
-            detectedLanguage = 'es';
-            return;
-        }
-        // French
-        if (/\b(le|la|les|est|sont|pour|comment|où|quand|bonjour|merci|s'il vous plaît)\b/.test(lowerText)) {
-            detectedLanguage = 'fr';
-            return;
-        }
-        // German
-        if (/\b(der|die|das|ist|sind|für|wie|wo|wann|hallo|danke|bitte)\b/.test(lowerText)) {
-            detectedLanguage = 'de';
-            return;
-        }
-        // Italian
-        if (/\b(il|la|gli|le|è|sono|per|come|dove|quando|ciao|grazie|per favore)\b/.test(lowerText)) {
-            detectedLanguage = 'it';
-            return;
-        }
-        // Default: keep current
+        const t = text.toLowerCase();
+        if (/\b(și|sau|este|sunt|pentru|care|cum|unde|vreau|poți)\b/.test(t)) { detectedLanguage = 'ro'; return; }
+        if (/\b(the|is|are|what|where|how|can|you|please)\b/.test(t)) { detectedLanguage = 'en'; return; }
     }
 
-    // ─── SPEAK — TTS with lip sync (AudioContext-based) ──────
+    // ─── SPEAK — AudioContext (bypass autoplay!) ─────────────
     async function speak(text, avatar) {
         if (isSpeaking) stopSpeaking();
-        if (!text || text.trim().length === 0) return;
-
+        if (!text || !text.trim()) return;
         isSpeaking = true;
 
         try {
-            const resp = await fetch(`${API_BASE}/api/speak`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    text,
-                    avatar: avatar || KAvatar.getCurrentAvatar(),
-                    language: detectedLanguage
-                })
-            });
+            const resp = await fetch(API_BASE + '/api/speak', { method: 'POST',
+                headers: { 'Content-Type': 'application/json', ...(window.KAuth ? KAuth.getAuthHeaders() : {}) },
+                body: JSON.stringify({ text, avatar: avatar || KAvatar.getCurrentAvatar(), language: detectedLanguage }) });
 
-            if (!resp.ok) {
-                console.error('[Voice] TTS failed:', resp.status);
-                fallbackTextLipSync(text);
-                isSpeaking = false;
-                resumeWakeDetection();
-                return;
-            }
+            if (!resp.ok) { fallbackTextLipSync(text); isSpeaking = false; resumeWakeDetection(); return; }
 
-            // Use AudioContext (already unlocked on first click) instead of new Audio()
-            // This bypasses Chrome autoplay policy completely
             const arrayBuf = await resp.arrayBuffer();
             const ctx = getAudioContext();
+            let audioBuf;
+            try { audioBuf = await ctx.decodeAudioData(arrayBuf.slice(0)); }
+            catch(e) { fallbackTextLipSync(text); isSpeaking = false; resumeWakeDetection(); return; }
 
-            let audioBuffer;
-            try {
-                audioBuffer = await ctx.decodeAudioData(arrayBuf.slice(0));
-            } catch (decodeErr) {
-                console.error('[Voice] Audio decode failed:', decodeErr);
-                // Still do text lip sync as fallback
-                fallbackTextLipSync(text);
-                isSpeaking = false;
-                resumeWakeDetection();
-                return;
-            }
-
-            // Create source node for this playback
             currentSourceNode = ctx.createBufferSource();
-            currentSourceNode.buffer = audioBuffer;
+            currentSourceNode.buffer = audioBuf;
 
-            // Wire up FFT lip sync: source → analyser → destination
-            const lipSync = KAvatar.getLipSync();
-            let analyserConnected = false;
-            if (lipSync && lipSync.connectToContext) {
+            // Wire FFT lip sync
+            const ls = KAvatar.getLipSync();
+            let fftOk = false;
+            if (ls && ls.connectToContext) {
                 try {
-                    const analyserNode = lipSync.connectToContext(ctx);
-                    if (analyserNode) {
-                        currentSourceNode.connect(analyserNode);
-                        analyserNode.connect(ctx.destination);
-                        analyserConnected = true;
-                        lipSync.start();
-                        console.log('[Voice] FFT lip sync active');
-                    }
-                } catch (e) {
-                    console.warn('[Voice] FFT lip sync connect failed:', e);
-                }
+                    const an = ls.connectToContext(ctx);
+                    if (an) { currentSourceNode.connect(an); an.connect(ctx.destination); fftOk = true; ls.start(); }
+                } catch(e){}
             }
-
-            // If FFT lip sync didn't connect, connect directly + use text fallback
-            if (!analyserConnected) {
-                currentSourceNode.connect(ctx.destination);
-                fallbackTextLipSync(text);
-            }
+            if (!fftOk) { currentSourceNode.connect(ctx.destination); fallbackTextLipSync(text); }
 
             KAvatar.setExpression('happy', 0.3);
-
-            currentSourceNode.onended = () => {
-                stopAllLipSync();
-                isSpeaking = false;
-                currentSourceNode = null;
-                KAvatar.setExpression('neutral');
-                resumeWakeDetection();
-                console.log('[Voice] Audio finished');
-            };
-
-            try {
-                currentSourceNode.start(0);
-                console.log('[Voice] ✅ Audio playing via AudioContext (' + arrayBuf.byteLength + ' bytes)');
-            } catch (playErr) {
-                console.error('[Voice] Play failed:', playErr);
-                stopAllLipSync();
-                isSpeaking = false;
-                currentSourceNode = null;
-                resumeWakeDetection();
-            }
-        } catch (e) {
-            console.error('[Voice] Speak error:', e);
-            stopAllLipSync();
-            isSpeaking = false;
-            resumeWakeDetection();
-        }
+            currentSourceNode.onended = () => { stopAllLipSync(); isSpeaking = false; currentSourceNode = null; KAvatar.setExpression('neutral'); resumeWakeDetection(); };
+            currentSourceNode.start(0);
+            console.log('[Voice] ✅ Audio playing (' + arrayBuf.byteLength + 'B)');
+        } catch(e) { console.error('[Voice]', e); stopAllLipSync(); isSpeaking = false; resumeWakeDetection(); }
     }
 
-    // Force-close mouth — stops BOTH lip syncs
     function stopAllLipSync() {
-        var ls = KAvatar.getLipSync();
-        var ts = KAvatar.getTextLipSync();
-        if (ls) try { ls.stop(); } catch (e) { }
-        if (ts) try { ts.stop(); } catch (e) { }
-        // Force Smile morph to 0
+        var ls = KAvatar.getLipSync(), ts = KAvatar.getTextLipSync();
+        if (ls) try { ls.stop(); } catch(e){}
+        if (ts) try { ts.stop(); } catch(e){}
         KAvatar.setMorph('Smile', 0);
     }
 
     function fallbackTextLipSync(text) {
-        const textSync = KAvatar.getTextLipSync();
-        if (textSync) {
-            textSync.speak(text);
-            const duration = text.length * 55;
-            setTimeout(() => {
-                textSync.stop();
-                KAvatar.setExpression('neutral');
-            }, duration + 500);
-        }
+        const ts = KAvatar.getTextLipSync();
+        if (ts) { ts.speak(text); setTimeout(() => { ts.stop(); KAvatar.setExpression('neutral'); }, text.length * 55 + 500); }
     }
 
     function stopSpeaking() {
-        if (currentSourceNode) {
-            try { currentSourceNode.stop(); } catch (e) { /* already stopped */ }
-            currentSourceNode = null;
-        }
-        if (currentAudio) {
-            currentAudio.pause();
-            currentAudio.currentTime = 0;
-            currentAudio = null;
-        }
-        const lipSync = KAvatar.getLipSync();
-        if (lipSync) lipSync.stop();
-        const textSync = KAvatar.getTextLipSync();
-        if (textSync) textSync.stop();
-        isSpeaking = false;
-        KAvatar.setExpression('neutral');
+        if (currentSourceNode) try { currentSourceNode.stop(); } catch(e){} currentSourceNode = null;
+        stopAllLipSync(); isSpeaking = false; KAvatar.setExpression('neutral');
     }
 
-    // ─── MANUAL LISTEN (button press) ────────────────────────
+    // ─── Manual record ───────────────────────────────────────
     async function startListening() {
         if (isRecording) return;
-        // Pause wake detection while manually recording
-        if (recognition) try { recognition.stop(); } catch (e) { }
-
+        if (recognition) try { recognition.stop(); } catch(e){}
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({
-                audio: {
-                    echoCancellation: true,
-                    noiseSuppression: true,
-                    autoGainControl: true,
-                    channelCount: 1,
-                    sampleRate: 16000
-                }
-            });
-
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 } });
             audioChunks = [];
-            mediaRecorder = new MediaRecorder(stream, {
-                mimeType: MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-                    ? 'audio/webm;codecs=opus' : 'audio/webm'
-            });
-
-            mediaRecorder.ondataavailable = (e) => {
-                if (e.data.size > 0) audioChunks.push(e.data);
-            };
-
-            mediaRecorder.start(100);
-            isRecording = true;
-            KAvatar.setExpression('thinking', 0.4);
+            mediaRecorder = new MediaRecorder(stream, { mimeType: MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/webm' });
+            mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunks.push(e.data); };
+            mediaRecorder.start(100); isRecording = true; KAvatar.setExpression('thinking', 0.4);
             return true;
-        } catch (e) {
-            console.error('[Voice] Mic denied:', e);
-            resumeWakeDetection();
-            return false;
-        }
+        } catch(e) { resumeWakeDetection(); return false; }
     }
 
     function stopListening() {
         return new Promise((resolve) => {
             if (!isRecording || !mediaRecorder) { resolve(null); return; }
-
             mediaRecorder.onstop = async () => {
-                isRecording = false;
-                mediaRecorder.stream.getTracks().forEach(t => t.stop());
-
-                if (audioChunks.length === 0) { resolve(null); resumeWakeDetection(); return; }
-
-                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                audioChunks = [];
-
+                isRecording = false; mediaRecorder.stream.getTracks().forEach(t => t.stop());
+                if (!audioChunks.length) { resolve(null); resumeWakeDetection(); return; }
+                const blob = new Blob(audioChunks, { type: 'audio/webm' }); audioChunks = [];
                 const reader = new FileReader();
                 reader.onloadend = async () => {
-                    const base64 = reader.result.split(',')[1];
+                    const b64 = reader.result.split(',')[1];
                     try {
-                        const resp = await fetch(`${API_BASE}/api/listen`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ audio: base64 })
-                        });
-                        const data = await resp.json();
-                        if (data.text) detectLanguage(data.text);
-                        resolve(data.text || null);
-                    } catch (e) {
-                        console.error('[Voice] STT error:', e);
-                        resolve(null);
-                    }
+                        const r = await fetch(API_BASE + '/api/listen', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ audio: b64 }) });
+                        const d = await r.json(); if (d.text) detectLanguage(d.text); resolve(d.text || null);
+                    } catch(e) { resolve(null); }
                 };
-                reader.readAsDataURL(audioBlob);
+                reader.readAsDataURL(blob);
             };
-
             mediaRecorder.stop();
         });
     }
 
-    // ─── CAMERA ──────────────────────────────────────────────
+    // ─── Camera auto ─────────────────────────────────────────
     async function captureAndAnalyze() {
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: 'user', width: 1280, height: 720 }
-            });
-
-            const video = document.createElement('video');
-            video.srcObject = stream;
-            video.setAttribute('playsinline', '');
-            await video.play();
-            await new Promise(r => setTimeout(r, 800)); // more time for camera to adjust exposure
-
-            const canvas = document.createElement('canvas');
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            canvas.getContext('2d').drawImage(video, 0, 0);
-            stream.getTracks().forEach(t => t.stop());
-
-            const base64 = canvas.toDataURL('image/jpeg', 0.95).split(',')[1];
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: 1280, height: 720 } });
+            const v = document.createElement('video'); v.srcObject = stream; v.setAttribute('playsinline', '');
+            await v.play(); await new Promise(r => setTimeout(r, 800));
+            const c = document.createElement('canvas'); c.width = v.videoWidth; c.height = v.videoHeight;
+            c.getContext('2d').drawImage(v, 0, 0); stream.getTracks().forEach(t => t.stop());
+            const b64 = c.toDataURL('image/jpeg', 0.95).split(',')[1];
             KAvatar.setExpression('thinking', 0.5);
-
-            const resp = await fetch(`${API_BASE}/api/vision`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ image: base64, avatar: KAvatar.getCurrentAvatar(), language: detectedLanguage })
-            });
-
-            const data = await resp.json();
-            return data.description || 'Nu am putut analiza imaginea.';
-        } catch (e) {
-            console.error('[Voice] Camera error:', e);
-            return e.name === 'NotAllowedError'
-                ? 'Nu am acces la cameră. Te rog să permiți accesul.'
-                : 'Eroare la accesarea camerei.';
-        }
+            const r = await fetch(API_BASE + '/api/vision', { method: 'POST',
+                headers: { 'Content-Type': 'application/json', ...(window.KAuth ? KAuth.getAuthHeaders() : {}) },
+                body: JSON.stringify({ image: b64, avatar: KAvatar.getCurrentAvatar(), language: detectedLanguage }) });
+            const d = await r.json(); return d.description || 'Nu am putut analiza.';
+        } catch(e) { return e.name === 'NotAllowedError' ? 'Permite accesul la cameră.' : 'Eroare cameră.'; }
     }
 
-    // ─── Public API ──────────────────────────────────────────
-    window.KVoice = {
-        speak,
-        stopSpeaking,
-        startListening,
-        stopListening,
-        captureAndAnalyze,
-        startWakeWordDetection,
-        resumeWakeDetection,
-        ensureAudioUnlocked,
-        isRecording: () => isRecording,
-        isSpeaking: () => isSpeaking,
-        getLanguage: () => detectedLanguage,
-        setLanguage: (lang) => { detectedLanguage = lang; }
-    };
+    window.KVoice = { speak, stopSpeaking, startListening, stopListening, captureAndAnalyze,
+        startWakeWordDetection, resumeWakeDetection, ensureAudioUnlocked,
+        isRecording: () => isRecording, isSpeaking: () => isSpeaking,
+        getLanguage: () => detectedLanguage, setLanguage: (l) => { detectedLanguage = l; } };
 })();
