@@ -440,10 +440,15 @@
                 try {
                     const cityMatch = message.match(/(?:în|in|la|din|for|at)\s+(\w+)/i);
                     const city = cityMatch ? cityMatch[1] : 'Bucharest';
-                    const wResp = await fetch(`${API_BASE}/api/weather?city=${encodeURIComponent(city)}`);
+                    const wResp = await fetch(`${API_BASE}/api/weather`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ city })
+                    });
                     if (wResp.ok) {
                         const wData = await wResp.json();
-                        extraContext = `\n[DATE METEO REALE pentru ${city}: ${JSON.stringify(wData)}]\nFolosește aceste date reale în răspuns.`;
+                        extraContext = `\n[DATE METEO REALE pentru ${wData.city}: ${wData.description}]\nFolosește aceste date reale în răspuns.`;
+                        showOnMonitor(`<div style="padding:40px;text-align:center;"><h2 style="color:#fff;margin-bottom:20px;">${wData.city}, ${wData.country}</h2><div style="font-size:4rem;">${wData.condition}</div><div style="font-size:2.5rem;color:#00ffff;margin:15px 0;">${wData.temperature}°C</div><div style="color:rgba(255,255,255,0.6);">Umiditate: ${wData.humidity}% | Vânt: ${wData.wind} km/h</div></div>`, 'html');
                         console.log('[App] Weather data fetched for', city);
                     }
                 } catch (e) { console.warn('[App] Weather fetch failed:', e); }
@@ -469,16 +474,16 @@
             if (isImageGenRequest(message)) {
                 try {
                     addMessage('ai', '🎨 Generez imaginea...');
-                    const iResp = await fetch(`${API_BASE}/api/generate-image`, {
+                    const iResp = await fetch(`${API_BASE}/api/imagine`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ prompt: message })
                     });
                     if (iResp.ok) {
                         const iData = await iResp.json();
-                        if (iData.url) {
-                            showOnMonitor(iData.url, 'image');
-                            extraContext = `\n[Am generat imaginea și am afișat-o pe monitor. URL: ${iData.url}]`;
+                        if (iData.image) {
+                            showOnMonitor(iData.image, 'image');
+                            extraContext = `\n[Am generat imaginea și am afișat-o pe monitor.]`;
                         }
                     }
                 } catch (e) { console.warn('[App] Image gen failed:', e); }
