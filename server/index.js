@@ -407,7 +407,7 @@ app.get('*', (req, res) => {
 });
 
 // ─── START ───────────────────────────────────────────────────
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
     console.log(`\n══════════════════════════════════════════`);
     console.log(`  KelionAI v2 — Server running`);
     console.log(`  http://localhost:${PORT}`);
