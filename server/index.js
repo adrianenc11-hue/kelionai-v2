@@ -230,38 +230,47 @@ app.post('/api/speak', async (req, res) => {
     }
 });
 
-// ─── 3. LISTEN — Speech to Text (Whisper) ───────────────────
+// ─── 3. LISTEN — Speech to Text (Browser Web Speech API) ────
+// STT is handled client-side via Web Speech API (zero dependency)
+// This endpoint is kept as fallback/proxy if needed
 app.post('/api/listen', async (req, res) => {
     try {
-        const { audio } = req.body; // base64 encoded audio
-        if (!audio) return res.status(400).json({ error: 'Audio lipsă' });
-        if (!process.env.OPENAI_API_KEY) return res.status(503).json({ error: 'OpenAI neconfigurat' });
+        const { text } = req.body; // text from browser Web Speech API
+        if (text) {
+            return res.json({ text, language: 'ro', engine: 'WebSpeechAPI' });
+        }
 
-        const audioBuffer = Buffer.from(audio, 'base64');
-        const form = new FormData();
-        form.append('file', audioBuffer, { filename: 'audio.webm', contentType: 'audio/webm' });
-        form.append('model', 'whisper-1');
-        // Don't force language — let Whisper auto-detect
+        // Groq Whisper fallback (if key available)
+        const { audio } = req.body;
+        if (!audio) return res.status(400).json({ error: 'Audio sau text lipsă' });
 
-        const resp = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
-            body: form
-        });
-        const data = await resp.json();
-        res.json({ text: data.text || '', language: 'ro' });
+        if (process.env.GROQ_API_KEY) {
+            const audioBuffer = Buffer.from(audio, 'base64');
+            const form = new FormData();
+            form.append('file', audioBuffer, { filename: 'audio.webm', contentType: 'audio/webm' });
+            form.append('model', 'whisper-large-v3');
+            const resp = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${process.env.GROQ_API_KEY}` },
+                body: form
+            });
+            const data = await resp.json();
+            return res.json({ text: data.text || '', language: 'ro', engine: 'Groq' });
+        }
+
+        return res.status(503).json({ error: 'STT: folosește Web Speech API din browser' });
     } catch (e) {
         console.error('[LISTEN] Error:', e.message);
         res.status(500).json({ error: 'Eroare STT' });
     }
 });
 
-// ─── 4. VISION — Camera Analysis ────────────────────────────
+// ─── 4. VISION — Camera Analysis (Claude Vision) ───────────
 app.post('/api/vision', async (req, res) => {
     try {
-        const { image, avatar = 'kelion' } = req.body; // base64 image
+        const { image, avatar = 'kelion' } = req.body;
         if (!image) return res.status(400).json({ error: 'Imagine lipsă' });
-        if (!process.env.OPENAI_API_KEY) return res.status(503).json({ error: 'OpenAI neconfigurat' });
+        if (!process.env.ANTHROPIC_API_KEY) return res.status(503).json({ error: 'Claude neconfigurat' });
 
         const visionPrompt = `Ești OCHII unei persoane. Fă o analiză completă a ce vezi în imagine.
 Descrie: obiecte, persoane, text vizibil, culori, distanțe aproximative.
@@ -269,27 +278,28 @@ Dacă observi ORICE risc de navigație (trepte, obstacole, mașini, denivelări)
 începe OBLIGATORIU cu: "ATENȚIE:" sau "PERICOL:"
 Răspunde în limba română, clar și detaliat.`;
 
-        const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+        const resp = await fetch('https://api.anthropic.com/v1/messages', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
+                'x-api-key': process.env.ANTHROPIC_API_KEY,
+                'anthropic-version': '2023-06-01'
             },
             body: JSON.stringify({
-                model: 'gpt-4o',
+                model: 'claude-sonnet-4-20250514',
                 max_tokens: 1024,
                 messages: [{
                     role: 'user',
                     content: [
-                        { type: 'text', text: visionPrompt },
-                        { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${image}` } }
+                        { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: image } },
+                        { type: 'text', text: visionPrompt }
                     ]
                 }]
             })
         });
         const data = await resp.json();
-        const description = data.choices?.[0]?.message?.content || 'Nu am putut analiza imaginea.';
-        res.json({ description, avatar });
+        const description = data.content?.[0]?.text || 'Nu am putut analiza imaginea.';
+        res.json({ description, avatar, engine: 'Claude' });
     } catch (e) {
         console.error('[VISION] Error:', e.message);
         res.status(500).json({ error: 'Eroare viziune' });
