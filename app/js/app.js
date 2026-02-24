@@ -337,14 +337,14 @@
 
         // Wake word detection from text
         const lower = text.toLowerCase();
-        if (/^(kira|chira)\b/i.test(lower)) {
+        if (/^(kira|chira)[,.\s]/i.test(lower) || /^(kira|chira)$/i.test(lower)) {
             switchAvatar('kira');
-            text = text.replace(/^(kira|chira)\s*/i, '').trim();
-        } else if (/^(kelion|chelion|kelian)\b/i.test(lower)) {
+            text = text.replace(/^(kira|chira)[,.\s]*/i, '').trim();
+        } else if (/^(kelion|chelion|kelian)[,.\s]/i.test(lower) || /^(kelion|chelion|kelian)$/i.test(lower)) {
             switchAvatar('kelion');
-            text = text.replace(/^(kelion|chelion|kelian)\s*/i, '').trim();
-        } else if (/^k\s+/i.test(lower)) {
-            text = text.replace(/^k\s+/i, '').trim();
+            text = text.replace(/^(kelion|chelion|kelian)[,.\s]*/i, '').trim();
+        } else if (/^k[,.\s]+/i.test(lower)) {
+            text = text.replace(/^k[,.\s]+/i, '').trim();
         }
 
         if (!text) return;

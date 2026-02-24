@@ -244,11 +244,17 @@ app.post('/api/vision', async (req, res) => {
         if (!image) return res.status(400).json({ error: 'Imagine lipsă' });
         if (!process.env.ANTHROPIC_API_KEY) return res.status(503).json({ error: 'Claude neconfigurat' });
 
-        const visionPrompt = `Ești OCHII unei persoane. Fă o analiză completă a ce vezi în imagine.
-Descrie: obiecte, persoane, text vizibil, culori, distanțe aproximative.
-Dacă observi ORICE risc de navigație (trepte, obstacole, mașini, denivelări), 
-începe OBLIGATORIU cu: "ATENȚIE:" sau "PERICOL:"
-Răspunde în limba română, clar și detaliat.`;
+        const visionPrompt = `Ești OCHII unei persoane nevăzătoare. Descrie EXACT ce vezi, cu PRECIZIE MAXIMĂ:
+
+OBLIGATORIU descrie:
+1. PERSOANE: vârstă estimată, sex, culoarea EXACTĂ a hainelor (nu "deschisă/închisă" ci "albastru royal", "gri antracit", "roșu bordo"), ochelari, bijuterii, expresia feței, gesturile mâinilor, postura corpului
+2. OBIECTE: fiecare obiect vizibil, culoarea lui exactă, dimensiunea estimată, distanța față de persoană
+3. TEXT VIZIBIL: citește ORICE text vizibil (etichete, logo-uri, ecrane, semne)
+4. GESTURI: descrie ce face persoana cu mâinile, dacă ține ceva, dacă arată spre ceva, dacă face un semn
+5. SPAȚIU: descrie mediul (interior/exterior), iluminarea, culorile pereților, mobilierul
+6. PERICOLE: dacă există obstacole, trepte, obiecte pe jos, muchii, mașini → începe cu "ATENȚIE:" sau "PERICOL:"
+
+Răspunde în limba română, clar, concis dar detaliat. Fii PRECIS la culori — spune exact nuanța.`;
 
         const resp = await fetch('https://api.anthropic.com/v1/messages', {
             method: 'POST',
