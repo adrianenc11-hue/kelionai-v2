@@ -23,6 +23,24 @@
         morphMeshes = meshes;
     };
 
+    // Connect to an existing AudioContext (for AudioBufferSourceNode playback)
+    // Returns the analyser node so the caller can wire: source → analyser → destination
+    SimpleLipSync.prototype.connectToContext = function (ctx) {
+        try {
+            audioCtx = ctx;
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
+            analyser = audioCtx.createAnalyser();
+            analyser.fftSize = 256;
+            analyser.smoothingTimeConstant = 0.6;
+            dataArray = new Uint8Array(analyser.frequencyBinCount);
+            return analyser;
+        } catch (e) {
+            console.error('[LipSync] connectToContext error:', e);
+            return null;
+        }
+    };
+
     SimpleLipSync.prototype.connectToElement = function (audioEl) {
         try {
             if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
