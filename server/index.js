@@ -344,26 +344,42 @@ app.post('/api/weather', async (req, res) => {
     }
 });
 
-// ─── 6. IMAGINE — Generate Image (Pollinations AI — free) ────
+// ─── 6. IMAGINE — Generate Image (Hugging Face SDXL — free) ──
 app.post('/api/imagine', async (req, res) => {
     try {
         const { prompt } = req.body;
         if (!prompt) return res.status(400).json({ error: 'Prompt lipsă' });
 
-        const encodedPrompt = encodeURIComponent(prompt);
-        const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1024&height=1024&nologo=true`;
-
-        // Verify the image is accessible
-        const check = await fetch(imageUrl, { method: 'HEAD' });
-        if (!check.ok) {
-            return res.status(502).json({ error: 'Generarea imaginii a eșuat' });
+        const HF_TOKEN = process.env.HF_TOKEN;
+        if (!HF_TOKEN) {
+            return res.status(503).json({ error: 'HF_TOKEN nu este configurat' });
         }
 
+        const model = 'stabilityai/stable-diffusion-xl-base-1.0';
+        const response = await fetch(`https://api-inference.huggingface.co/models/${model}`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${HF_TOKEN}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ inputs: prompt })
+        });
+
+        if (!response.ok) {
+            const err = await response.text();
+            console.error('[IMAGINE] HF error:', response.status, err);
+            return res.status(response.status).json({ error: 'Generarea imaginii a eșuat', details: err });
+        }
+
+        // HF returns binary image data
+        const imageBuffer = Buffer.from(await response.arrayBuffer());
+        const base64 = imageBuffer.toString('base64');
+
         res.json({
-            url: imageUrl,
+            image: `data:image/png;base64,${base64}`,
             prompt,
-            engine: 'Pollinations AI',
-            note: 'Imagine generată gratuit via Pollinations AI'
+            engine: 'Stable Diffusion XL (Hugging Face)',
+            size: imageBuffer.length
         });
     } catch (e) {
         console.error('[IMAGINE] Error:', e.message);
