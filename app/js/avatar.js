@@ -169,7 +169,7 @@
     function setExpression(name, intensity) {
         intensity = intensity || 0.5;
         var expressions = {
-            happy: { 'Smile': 0.6, 'mouthSmileLeft': 0.4, 'mouthSmileRight': 0.4 },
+            happy: { 'cheekSquintLeft': 0.3, 'cheekSquintRight': 0.3, 'mouthSmileLeft': 0.2, 'mouthSmileRight': 0.2 },
             thinking: { 'browInnerUp': 0.3, 'eyeSquintLeft': 0.15, 'eyeSquintRight': 0.15 },
             concerned: { 'browInnerUp': 0.4, 'mouthFrownLeft': 0.2, 'mouthFrownRight': 0.2 },
             neutral: {}
