@@ -355,14 +355,14 @@
     async function captureAndAnalyze() {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: 'environment', width: 1280, height: 720 }
+                video: { facingMode: 'user', width: 1280, height: 720 }
             });
 
             const video = document.createElement('video');
             video.srcObject = stream;
             video.setAttribute('playsinline', '');
             await video.play();
-            await new Promise(r => setTimeout(r, 500));
+            await new Promise(r => setTimeout(r, 800)); // more time for camera to adjust exposure
 
             const canvas = document.createElement('canvas');
             canvas.width = video.videoWidth;
@@ -370,7 +370,7 @@
             canvas.getContext('2d').drawImage(video, 0, 0);
             stream.getTracks().forEach(t => t.stop());
 
-            const base64 = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
+            const base64 = canvas.toDataURL('image/jpeg', 0.95).split(',')[1];
             KAvatar.setExpression('thinking', 0.5);
 
             const resp = await fetch(`${API_BASE}/api/vision`, {
