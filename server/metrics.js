@@ -10,6 +10,30 @@ const register = new client.Registry();
 // Default Node.js metrics (CPU, memory, event loop)
 client.collectDefaultMetrics({ register });
 
+// ─── Push to Grafana Cloud (every 15s) ──────────────────────
+if (process.env.GRAFANA_PROM_URL) {
+    const pushInterval = 15000;
+    setInterval(async () => {
+        try {
+            const metricsData = await register.metrics();
+            const resp = await fetch(process.env.GRAFANA_PROM_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'text/plain',
+                    'Authorization': 'Basic ' + Buffer.from(
+                        `${process.env.GRAFANA_PROM_USER}:${process.env.GRAFANA_PROM_PASS}`
+                    ).toString('base64')
+                },
+                body: metricsData
+            });
+            if (!resp.ok) console.warn('[METRICS] Grafana push failed:', resp.status);
+        } catch (e) {
+            console.warn('[METRICS] Grafana push error:', e.message);
+        }
+    }, pushInterval);
+    console.log('[METRICS] Grafana Cloud push enabled (every 15s)');
+}
+
 // ─── Custom Metrics ───────────────────────────────────────────
 
 // HTTP request duration
