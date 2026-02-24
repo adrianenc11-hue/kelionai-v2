@@ -194,21 +194,8 @@
             currentAudio = new Audio(audioUrl);
             currentAudio.volume = 1;
 
-            // Connect lip sync BEFORE playing
-            const lipSync = KAvatar.getLipSync();
-            let lipSyncConnected = false;
-            if (lipSync) {
-                try {
-                    lipSyncConnected = lipSync.connectToElement(currentAudio);
-                    if (lipSyncConnected) lipSync.start();
-                } catch (e) {
-                    console.warn('[Voice] LipSync connect failed, using text fallback');
-                    fallbackTextLipSync(text);
-                }
-            }
-            if (!lipSyncConnected) {
-                fallbackTextLipSync(text);
-            }
+            // Use text-based lip sync ONLY (FFT/createMediaElementSource breaks audio)
+            fallbackTextLipSync(text);
 
             KAvatar.setExpression('happy', 0.3);
 
