@@ -26,10 +26,21 @@
         document.getElementById('btn-mic').addEventListener('mouseup', onMicUp);
         document.getElementById('btn-mic').addEventListener('touchstart', (e) => { e.preventDefault(); onMicDown(); });
         document.getElementById('btn-mic').addEventListener('touchend', (e) => { e.preventDefault(); onMicUp(); });
-        const btnKeyboard = document.getElementById('btn-keyboard');
-        if (btnKeyboard) btnKeyboard.addEventListener('click', toggleTextInput);
+        document.getElementById('btn-keyboard').addEventListener('click', toggleTextInput);
         document.getElementById('btn-files').addEventListener('click', toggleFilesPanel);
         document.getElementById('btn-send').addEventListener('click', onSendText);
+
+        // Real-time vision toggle
+        const visionBtn = document.getElementById('btn-vision');
+        if (visionBtn) {
+            visionBtn.addEventListener('click', async () => {
+                if (typeof RealtimeVision !== 'undefined') {
+                    const started = await RealtimeVision.toggle(1000);
+                    visionBtn.classList.toggle('active-vision', RealtimeVision.active);
+                    visionBtn.textContent = RealtimeVision.active ? '👁️‍🗨️' : '👁️';
+                }
+            });
+        }
 
         document.getElementById('text-input').addEventListener('keydown', (e) => {
             if (e.key === 'Enter') onSendText();
