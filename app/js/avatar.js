@@ -107,14 +107,93 @@
 
             currentModel.traverse((child) => {
                 if (child.isMesh) {
+                    child.visible = true;
+                    child.frustumCulled = false;
                     if (child.material) child.material.needsUpdate = true;
+
+                    // Morph targets
                     if (child.morphTargetInfluences && child.morphTargetDictionary) {
                         morphMeshes.push(child);
                         child.morphTargetInfluences.fill(0);
                         console.log('[Avatar] Morph:', child.name, Object.keys(child.morphTargetDictionary).join(', '));
                     }
+
+                    // Z-fighting fix for eyebrows/lashes (from v1)
+                    var nm = (child.name || '').toLowerCase();
+                    var matNm = (child.material && child.material.name) ? child.material.name.toLowerCase() : '';
+                    var isHead = (nm.indexOf('head') !== -1 && nm.indexOf('eye') === -1) || matNm === 'head';
+                    var isBrow = nm.indexOf('brow') !== -1 || matNm.indexOf('brow') !== -1;
+                    var isLash = nm.indexOf('lash') !== -1 || matNm.indexOf('lash') !== -1;
+
+                    if (isHead && child.material) {
+                        child.renderOrder = 0;
+                        child.material.polygonOffset = true;
+                        child.material.polygonOffsetFactor = 4;
+                        child.material.polygonOffsetUnits = 4;
+                    }
+                    if ((isBrow || isLash) && child.material) {
+                        child.renderOrder = 2;
+                        child.material.side = THREE.DoubleSide;
+                        child.material.depthTest = false;
+                        child.material.depthWrite = false;
+                        child.material.transparent = true;
+                        child.material.opacity = 1.0;
+                    }
                 }
             });
+
+            // MIRROR FIX for k-female.glb — Blender mirror modifier not applied
+            // Brows and lashes only have geometry on one side, clone + flip X
+            if (name === 'kira') {
+                var meshesToMirror = [];
+                currentModel.traverse(function (child) {
+                    if (!child.isMesh) return;
+                    var nmLow = (child.name || '').toLowerCase();
+                    if (nmLow.indexOf('brow') !== -1 || nmLow.indexOf('lash') !== -1) {
+                        meshesToMirror.push(child);
+                    }
+                });
+                meshesToMirror.forEach(function (origMesh) {
+                    var mirrorGeo = origMesh.geometry.clone();
+                    var pos = mirrorGeo.attributes.position;
+                    var nrm = mirrorGeo.attributes.normal;
+                    for (var vi = 0; vi < pos.count; vi++) {
+                        pos.setX(vi, -pos.getX(vi));
+                        if (nrm) nrm.setX(vi, -nrm.getX(vi));
+                    }
+                    pos.needsUpdate = true;
+                    if (nrm) nrm.needsUpdate = true;
+                    var idx = mirrorGeo.index;
+                    if (idx) {
+                        var arr = idx.array;
+                        for (var ti = 0; ti < arr.length; ti += 3) {
+                            var tmp = arr[ti]; arr[ti] = arr[ti + 2]; arr[ti + 2] = tmp;
+                        }
+                        idx.needsUpdate = true;
+                    }
+                    var mirrorMat = origMesh.material.clone();
+                    mirrorMat.side = THREE.DoubleSide;
+                    mirrorMat.depthTest = false;
+                    mirrorMat.depthWrite = false;
+                    mirrorMat.transparent = true;
+                    mirrorMat.opacity = 1.0;
+                    var mirrorMesh;
+                    if (origMesh.isSkinnedMesh && origMesh.skeleton) {
+                        mirrorMesh = new THREE.SkinnedMesh(mirrorGeo, mirrorMat);
+                        mirrorMesh.bind(origMesh.skeleton, origMesh.bindMatrix);
+                    } else {
+                        mirrorMesh = new THREE.Mesh(mirrorGeo, mirrorMat);
+                    }
+                    mirrorMesh.renderOrder = 2;
+                    mirrorMesh.name = origMesh.name + '_mirror';
+                    mirrorMesh.frustumCulled = false;
+                    mirrorMesh.position.copy(origMesh.position);
+                    mirrorMesh.rotation.copy(origMesh.rotation);
+                    mirrorMesh.scale.copy(origMesh.scale);
+                    origMesh.parent.add(mirrorMesh);
+                });
+                console.log('[Avatar] Kira mirror fix applied to', meshesToMirror.length, 'meshes');
+            }
 
             scene.add(currentModel);
 
