@@ -25,6 +25,10 @@
             ctx.resume();
             console.log('[App] Audio unlocked');
         } catch (e) { console.warn('[App] Audio unlock failed:', e); }
+        // Also unlock the Voice module's shared AudioContext
+        if (window.KVoice && KVoice.ensureAudioUnlocked) {
+            KVoice.ensureAudioUnlocked();
+        }
     }
 
     // Show content on monitor panel
@@ -332,6 +336,10 @@
         // Update header
         const nameEl = document.getElementById('avatar-name');
         if (nameEl) nameEl.textContent = name.charAt(0).toUpperCase() + name.slice(1);
+        // Clear chat on switch
+        chatHistory = [];
+        const overlay = document.getElementById('chat-overlay');
+        if (overlay) overlay.innerHTML = '';
     }
 
     // ─── Microphone ──────────────────────────────────────────

@@ -11,7 +11,35 @@
     let isRecording = false;
     let isSpeaking = false;
     let currentAudio = null;
+    let currentSourceNode = null;
+    let sharedAudioCtx = null;
     let detectedLanguage = 'ro'; // default Romanian
+
+    // Shared AudioContext — survives autoplay policy because it's
+    // resumed on the very first user gesture (click/touch/keydown)
+    function getAudioContext() {
+        if (!sharedAudioCtx) {
+            sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (sharedAudioCtx.state === 'suspended') {
+            sharedAudioCtx.resume();
+        }
+        return sharedAudioCtx;
+    }
+
+    // Called by app.js unlockAudio on first user interaction
+    function ensureAudioUnlocked() {
+        const ctx = getAudioContext();
+        if (ctx.state === 'suspended') ctx.resume();
+        // Play a tiny silent buffer to fully unlock
+        try {
+            const buf = ctx.createBuffer(1, 1, 22050);
+            const src = ctx.createBufferSource();
+            src.buffer = buf;
+            src.connect(ctx.destination);
+            src.start(0);
+        } catch (e) { /* ok */ }
+    }
 
     // ─── Wake Word Detection (always-on mic) ─────────────────
     let recognition = null;
@@ -162,7 +190,7 @@
         // Default: keep current
     }
 
-    // ─── SPEAK — TTS with lip sync ───────────────────────────
+    // ─── SPEAK — TTS with lip sync (AudioContext-based) ──────
     async function speak(text, avatar) {
         if (isSpeaking) stopSpeaking();
         if (!text || text.trim().length === 0) return;
@@ -188,42 +216,70 @@
                 return;
             }
 
-            const audioBlob = await resp.blob();
-            const audioUrl = URL.createObjectURL(audioBlob);
+            // Use AudioContext (already unlocked on first click) instead of new Audio()
+            // This bypasses Chrome autoplay policy completely
+            const arrayBuf = await resp.arrayBuffer();
+            const ctx = getAudioContext();
 
-            currentAudio = new Audio(audioUrl);
-            currentAudio.volume = 1;
+            let audioBuffer;
+            try {
+                audioBuffer = await ctx.decodeAudioData(arrayBuf.slice(0));
+            } catch (decodeErr) {
+                console.error('[Voice] Audio decode failed:', decodeErr);
+                // Still do text lip sync as fallback
+                fallbackTextLipSync(text);
+                isSpeaking = false;
+                resumeWakeDetection();
+                return;
+            }
+
+            // Create source node for this playback
+            currentSourceNode = ctx.createBufferSource();
+            currentSourceNode.buffer = audioBuffer;
+
+            // Wire up FFT lip sync: source → analyser → destination
+            const lipSync = KAvatar.getLipSync();
+            let analyserConnected = false;
+            if (lipSync && lipSync.connectToContext) {
+                try {
+                    const analyserNode = lipSync.connectToContext(ctx);
+                    if (analyserNode) {
+                        currentSourceNode.connect(analyserNode);
+                        analyserNode.connect(ctx.destination);
+                        analyserConnected = true;
+                        lipSync.start();
+                        console.log('[Voice] FFT lip sync active');
+                    }
+                } catch (e) {
+                    console.warn('[Voice] FFT lip sync connect failed:', e);
+                }
+            }
+
+            // If FFT lip sync didn't connect, connect directly + use text fallback
+            if (!analyserConnected) {
+                currentSourceNode.connect(ctx.destination);
+                fallbackTextLipSync(text);
+            }
 
             KAvatar.setExpression('happy', 0.3);
 
-            currentAudio.addEventListener('ended', () => {
-                stopAllLipSync();
-                URL.revokeObjectURL(audioUrl);
-                isSpeaking = false;
-                currentAudio = null;
-                KAvatar.setExpression('neutral');
-                resumeWakeDetection();
-            });
-
-            currentAudio.addEventListener('error', (e) => {
-                console.error('[Voice] Audio error:', e);
+            currentSourceNode.onended = () => {
                 stopAllLipSync();
                 isSpeaking = false;
-                currentAudio = null;
+                currentSourceNode = null;
                 KAvatar.setExpression('neutral');
                 resumeWakeDetection();
-            });
+                console.log('[Voice] Audio finished');
+            };
 
             try {
-                await currentAudio.play();
-                console.log('[Voice] Audio playing');
-                // Start lip sync ONLY after audio actually plays
-                fallbackTextLipSync(text);
+                currentSourceNode.start(0);
+                console.log('[Voice] ✅ Audio playing via AudioContext (' + arrayBuf.byteLength + ' bytes)');
             } catch (playErr) {
                 console.error('[Voice] Play failed:', playErr);
-                // Audio didn't play — do NOT start lip sync
                 stopAllLipSync();
                 isSpeaking = false;
+                currentSourceNode = null;
                 resumeWakeDetection();
             }
         } catch (e) {
@@ -257,6 +313,10 @@
     }
 
     function stopSpeaking() {
+        if (currentSourceNode) {
+            try { currentSourceNode.stop(); } catch (e) { /* already stopped */ }
+            currentSourceNode = null;
+        }
         if (currentAudio) {
             currentAudio.pause();
             currentAudio.currentTime = 0;
@@ -392,6 +452,7 @@
         captureAndAnalyze,
         startWakeWordDetection,
         resumeWakeDetection,
+        ensureAudioUnlocked,
         isRecording: () => isRecording,
         isSpeaking: () => isSpeaking,
         getLanguage: () => detectedLanguage,
