@@ -344,9 +344,31 @@ app.post('/api/weather', async (req, res) => {
     }
 });
 
-// ─── 6. IMAGINE — Generate Image (Phase 3) ──────────────────
+// ─── 6. IMAGINE — Generate Image (Pollinations AI — free) ────
 app.post('/api/imagine', async (req, res) => {
-    res.status(503).json({ error: 'Generarea de imagini va fi disponibilă în Faza 3.' });
+    try {
+        const { prompt } = req.body;
+        if (!prompt) return res.status(400).json({ error: 'Prompt lipsă' });
+
+        const encodedPrompt = encodeURIComponent(prompt);
+        const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1024&height=1024&nologo=true`;
+
+        // Verify the image is accessible
+        const check = await fetch(imageUrl, { method: 'HEAD' });
+        if (!check.ok) {
+            return res.status(502).json({ error: 'Generarea imaginii a eșuat' });
+        }
+
+        res.json({
+            url: imageUrl,
+            prompt,
+            engine: 'Pollinations AI',
+            note: 'Imagine generată gratuit via Pollinations AI'
+        });
+    } catch (e) {
+        console.error('[IMAGINE] Error:', e.message);
+        res.status(500).json({ error: 'Eroare la generare imagine' });
+    }
 });
 
 // ─── 7. MEMORY — Save/Load user memory (local for now) ──────
