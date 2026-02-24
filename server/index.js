@@ -335,6 +335,43 @@ app.post('/api/search', async (req, res) => {
     }
 });
 
+// ─── 5b. WEATHER — Meteo real-time (Open-Meteo, gratuit, fără cheie) ─────
+app.post('/api/weather', async (req, res) => {
+    try {
+        const { city } = req.body;
+        if (!city) return res.status(400).json({ error: 'Oraș lipsă' });
+
+        // Geocode city name → lat/lon
+        const geoResp = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=ro`);
+        const geoData = await geoResp.json();
+        if (!geoData.results || !geoData.results[0]) {
+            return res.status(404).json({ error: `Orașul "${city}" nu a fost găsit` });
+        }
+        const { latitude, longitude, name, country } = geoData.results[0];
+
+        // Get weather
+        const wxResp = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&timezone=auto`);
+        const wxData = await wxResp.json();
+        const current = wxData.current;
+
+        const weatherCodes = { 0: 'Senin ☀️', 1: 'Parțial senin 🌤️', 2: 'Parțial noros ⛅', 3: 'Noros ☁️', 45: 'Ceață 🌫️', 48: 'Ceață 🌫️', 51: 'Burniță 🌦️', 53: 'Burniță 🌦️', 55: 'Burniță 🌦️', 61: 'Ploaie 🌧️', 63: 'Ploaie 🌧️', 65: 'Ploaie abundentă 🌧️', 71: 'Ninsoare 🌨️', 73: 'Ninsoare 🌨️', 75: 'Ninsoare abundentă ❄️', 80: 'Averse 🌦️', 95: 'Furtună ⛈️' };
+        const condition = weatherCodes[current.weather_code] || 'Necunoscut';
+
+        res.json({
+            city: name,
+            country,
+            temperature: current.temperature_2m,
+            humidity: current.relative_humidity_2m,
+            wind: current.wind_speed_10m,
+            condition,
+            description: `${name}, ${country}: ${current.temperature_2m}°C, ${condition}, umiditate ${current.relative_humidity_2m}%, vânt ${current.wind_speed_10m} km/h`
+        });
+    } catch (e) {
+        console.error('[WEATHER] Error:', e.message);
+        res.status(500).json({ error: 'Eroare meteo' });
+    }
+});
+
 // ─── 6. IMAGINE — Generate Image (DALL-E 3) ─────────────────
 app.post('/api/imagine', async (req, res) => {
     try {
