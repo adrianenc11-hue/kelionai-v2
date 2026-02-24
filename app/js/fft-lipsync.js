@@ -161,37 +161,42 @@
             var ch = self.text[self.charIndex].toLowerCase();
             var mouthVal = PHONEME_MAP[ch];
             if (mouthVal === undefined) {
-                // Unknown char — small mouth
                 mouthVal = (ch >= 'a' && ch <= 'z') ? 0.15 : 0;
             }
 
-            // Add natural variation
+            // Add natural variation only for speech sounds
             if (mouthVal > 0.05) {
                 mouthVal += (Math.random() - 0.5) * 0.1;
                 mouthVal = Math.max(0, Math.min(1, mouthVal));
             }
 
-            SimpleLipSync.prototype._setMouth.call(null, mouthVal);
-            // Actually call with proper context
+            // Set mouth directly on morphs
+            var isPause = (ch === '.' || ch === '!' || ch === '?' || ch === ',' || ch === ' ' || ch === '\n');
             for (var m = 0; m < morphMeshes.length; m++) {
                 var mesh = morphMeshes[m];
                 if (!mesh.morphTargetDictionary || !mesh.morphTargetInfluences) continue;
                 for (var i = 0; i < MOUTH_MORPHS.length; i++) {
                     var idx = mesh.morphTargetDictionary[MOUTH_MORPHS[i]];
                     if (idx !== undefined) {
-                        var current = mesh.morphTargetInfluences[idx];
-                        mesh.morphTargetInfluences[idx] = current + (mouthVal - current) * 0.4;
+                        if (isPause) {
+                            // IMMEDIATE close at pauses
+                            mesh.morphTargetInfluences[idx] = 0;
+                        } else {
+                            // Smooth open for speech
+                            var current = mesh.morphTargetInfluences[idx];
+                            mesh.morphTargetInfluences[idx] = current + (mouthVal - current) * 0.5;
+                        }
                     }
                 }
             }
 
             self.charIndex++;
 
-            // Vary speed slightly for natural cadence
+            // Vary speed for natural cadence
             var delay = self.msPerChar;
-            if (ch === '.' || ch === '!' || ch === '?') delay = 200; // pause at sentence end
-            else if (ch === ',') delay = 100; // short pause at comma
-            else if (ch === ' ') delay = 30; // quick space
+            if (ch === '.' || ch === '!' || ch === '?') delay = 300; // longer pause at sentence end
+            else if (ch === ',') delay = 150; // pause at comma
+            else if (ch === ' ') delay = 20; // quick space
 
             self.timer = setTimeout(tick, delay);
         }
