@@ -1,101 +1,76 @@
 <!DOCTYPE html>
 <html lang="ro">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>KelionAI</title>
     <link rel="stylesheet" href="/css/app.css">
-    <!-- TensorFlow.js + COCO-SSD for real-time vision -->
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
-    <!-- Sentry Browser SDK -->
     <script src="https://browser.sentry-cdn.com/8.46.0/bundle.tracing.replay.min.js" crossorigin="anonymous"></script>
     <script>
-        if (window.Sentry) {
-            Sentry.init({
-                dsn: "https://5c261710f7055bef0cdcdb50239b5519@o4510937317834752.ingest.us.sentry.io/4510937323012096",
-                integrations: [
-                    Sentry.browserTracingIntegration(),
-                    Sentry.replayIntegration(),
-                ],
-                tracesSampleRate: 1.0,
-                replaysSessionSampleRate: 0.1,
-                replaysOnErrorSampleRate: 1.0,
-            });
-            console.log('[Sentry] ✅ Browser monitoring active');
-        }
+        if (window.Sentry) Sentry.init({ dsn: "https://5c261710f7055bef0cdcdb50239b5519@o4510937317834752.ingest.us.sentry.io/4510937323012096",
+            integrations: [Sentry.browserTracingIntegration(), Sentry.replayIntegration()], tracesSampleRate: 1.0 });
     </script>
 </head>
-
 <body>
+    <!-- AUTH SCREEN -->
+    <div id="auth-screen">
+        <div id="auth-container">
+            <div id="auth-logo"><div class="auth-avatar-icon">🤖</div><h1>KelionAI</h1><p class="auth-subtitle">Asistentul tău AI inteligent</p></div>
+            <form id="auth-form">
+                <h2 id="auth-title">Autentificare</h2>
+                <div id="auth-name-group" style="display:none"><input type="text" id="auth-name" placeholder="Numele tău" autocomplete="name"></div>
+                <div><input type="email" id="auth-email" placeholder="Email" autocomplete="email" required></div>
+                <div><input type="password" id="auth-password" placeholder="Parolă" autocomplete="current-password" required></div>
+                <div id="auth-error"></div>
+                <button type="submit" id="auth-submit">Intră</button>
+                <a href="#" id="auth-toggle">Nu am cont → Creează</a>
+            </form>
+            <button id="auth-guest" class="auth-guest-btn">Continuă fără cont</button>
+        </div>
+    </div>
 
-    <div id="app-layout">
-
-        <!-- LEFT: Avatar + Chat underneath -->
+    <!-- MAIN APP -->
+    <div id="app-layout" class="hidden">
         <div id="left-panel">
-            <!-- Avatar area -->
             <div id="avatar-area">
                 <canvas id="avatar-canvas"></canvas>
                 <div id="avatar-label">
                     <span id="avatar-name">Kelion</span>
-                    <div id="status-indicator">
-                        <div id="status-dot"></div>
-                        <span id="status-text">Online</span>
-                    </div>
+                    <div id="status-indicator"><div id="status-dot"></div><span id="status-text">Online</span></div>
                 </div>
                 <div id="avatar-switcher">
                     <button class="avatar-pill active" data-avatar="kelion">Kelion</button>
                     <button class="avatar-pill" data-avatar="kira">Kira</button>
+                    <span id="user-name" class="user-badge">Guest</span>
+                    <button class="ctrl-btn-sm" id="btn-auth" title="Login">🔑</button>
                 </div>
             </div>
-
-            <!-- Chat area (under avatar) -->
             <div id="chat-area">
                 <div id="chat-overlay"></div>
-                <div id="thinking">
-                    <div class="thinking-dots"><span></span><span></span><span></span></div>
-                    <span>Se gândește...</span>
-                </div>
+                <div id="thinking"><div class="thinking-dots"><span></span><span></span><span></span></div><span>Se gândește...</span></div>
                 <div id="input-row">
-                    <button class="ctrl-btn-sm" id="btn-files" title="Fișiere" style="display:none">📁</button>
                     <button class="ctrl-btn-sm active-mic" id="btn-mic" title="Microfon">🎤</button>
-                    <input type="text" id="text-input" placeholder="Scrie un mesaj..." autocomplete="off">
+                    <button class="ctrl-btn-sm" id="btn-vision" title="Cameră">👁️</button>
+                    <input type="text" id="text-input" placeholder="Scrie sau vorbește..." autocomplete="off">
                     <button id="btn-send">➤</button>
                 </div>
             </div>
         </div>
-
-        <!-- RIGHT: Monitor (prezentări, hărți, imagini, fișiere) -->
         <div id="display-panel">
-            <div id="display-header">
-                <span id="display-title">Monitor</span>
-            </div>
-            <div id="display-content">
-                <div id="drop-zone-passive">
-                    <div class="welcome-icon">🎯</div>
-                    <p>Monitor de prezentare</p>
-                    <small>Trage fișiere aici sau cere o hartă, imagine, rută</small>
-                </div>
-            </div>
+            <div id="display-header"><span id="display-title">Monitor</span></div>
+            <div id="display-content"><div id="drop-zone-passive"><div class="welcome-icon">🎯</div><p>Monitor de prezentare</p><small>Trage fișiere aici sau spune "ce e în fața mea"</small></div></div>
         </div>
     </div>
+    <div id="drop-zone" class="hidden"><div class="drop-zone-content"><div class="drop-icon">📂</div><p>Trage fișierul aici</p></div></div>
 
-    <!-- Drop overlay -->
-    <div id="drop-zone" class="hidden">
-        <div class="drop-zone-content">
-            <div class="drop-icon">📂</div>
-            <p>Trage fișierul aici</p>
-        </div>
-    </div>
-
-    <!-- Scripts -->
     <script src="/lib/three.bundle.js"></script>
     <script src="/js/fft-lipsync.js"></script>
     <script src="/js/avatar.js"></script>
     <script src="/js/voice.js"></script>
     <script src="/js/realtime-vision.js"></script>
+    <script src="/js/auth.js"></script>
     <script src="/js/app.js"></script>
 </body>
-
 </html>
