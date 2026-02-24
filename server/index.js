@@ -188,35 +188,7 @@ app.post('/api/speak', async (req, res) => {
             }
         }
 
-        // Fallback to OpenAI TTS
-        if (!audioBuffer && process.env.OPENAI_API_KEY) {
-            try {
-                const voice = avatar === 'kira' ? 'nova' : 'onyx';
-                const resp = await fetch('https://api.openai.com/v1/audio/speech', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
-                    },
-                    body: JSON.stringify({
-                        model: 'tts-1',
-                        input: text,
-                        voice: voice,
-                        response_format: 'mp3'
-                    })
-                });
-
-                if (resp.ok) {
-                    audioBuffer = await resp.buffer();
-                    console.log('[SPEAK] OpenAI TTS OK —', audioBuffer.length, 'bytes');
-                } else {
-                    const errText = await resp.text();
-                    console.error('[SPEAK] OpenAI TTS failed:', resp.status, errText);
-                }
-            } catch (e) {
-                console.error('[SPEAK] OpenAI TTS error:', e.message);
-            }
-        }
+        // ElevenLabs is the only TTS provider — OpenAI removed
 
         if (!audioBuffer) {
             return res.status(503).json({ error: 'TTS indisponibil' });
@@ -372,33 +344,9 @@ app.post('/api/weather', async (req, res) => {
     }
 });
 
-// ─── 6. IMAGINE — Generate Image (DALL-E 3) ─────────────────
+// ─── 6. IMAGINE — Generate Image (Phase 3) ──────────────────
 app.post('/api/imagine', async (req, res) => {
-    try {
-        const { prompt } = req.body;
-        if (!prompt) return res.status(400).json({ error: 'Prompt lipsă' });
-        if (!process.env.OPENAI_API_KEY) return res.status(503).json({ error: 'OpenAI neconfigurat' });
-
-        const resp = await fetch('https://api.openai.com/v1/images/generations', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
-            },
-            body: JSON.stringify({
-                model: 'dall-e-3',
-                prompt,
-                n: 1,
-                size: '1024x1024',
-                quality: 'standard'
-            })
-        });
-        const data = await resp.json();
-        res.json({ url: data.data?.[0]?.url || null });
-    } catch (e) {
-        console.error('[IMAGINE] Error:', e.message);
-        res.status(500).json({ error: 'Eroare generare imagine' });
-    }
+    res.status(503).json({ error: 'Generarea de imagini va fi disponibilă în Faza 3.' });
 });
 
 // ─── 7. MEMORY — Save/Load user memory (local for now) ──────
@@ -441,11 +389,13 @@ app.get('/api/health', (req, res) => {
         version: '2.0.0',
         timestamp: new Date().toISOString(),
         services: {
-            ai: !!(process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY),
+            ai_claude: !!process.env.ANTHROPIC_API_KEY,
+            ai_deepseek: !!process.env.DEEPSEEK_API_KEY,
             tts: !!process.env.ELEVENLABS_API_KEY,
-            stt: !!process.env.OPENAI_API_KEY,
-            vision: !!process.env.OPENAI_API_KEY,
-            search: !!process.env.TAVILY_API_KEY,
+            stt: true, // Web Speech API (browser)
+            vision: !!process.env.ANTHROPIC_API_KEY, // Claude Vision
+            search: true, // DuckDuckGo (free)
+            weather: true, // Open-Meteo (free)
             memory: true
         }
     });
@@ -462,8 +412,10 @@ app.listen(PORT, () => {
     console.log(`  KelionAI v2 — Server running`);
     console.log(`  http://localhost:${PORT}`);
     console.log(`══════════════════════════════════════════`);
-    console.log(`  AI:     ${process.env.ANTHROPIC_API_KEY ? '✅ Claude' : '❌'} | ${process.env.OPENAI_API_KEY ? '✅ GPT-4o' : '❌'}`);
-    console.log(`  TTS:    ${process.env.ELEVENLABS_API_KEY ? '✅ ElevenLabs' : '❌'}`);
-    console.log(`  Search: ${process.env.TAVILY_API_KEY ? '✅ Tavily' : '❌'}`);
+    console.log(`  AI:      ${process.env.ANTHROPIC_API_KEY ? '✅ Claude' : '❌'} | ${process.env.DEEPSEEK_API_KEY ? '✅ DeepSeek' : '❌'}`);
+    console.log(`  TTS:     ${process.env.ELEVENLABS_API_KEY ? '✅ ElevenLabs' : '❌'}`);
+    console.log(`  Vision:  ${process.env.ANTHROPIC_API_KEY ? '✅ Claude Vision' : '❌'}`);
+    console.log(`  Search:  ✅ DuckDuckGo (free)`);
+    console.log(`  Weather: ✅ Open-Meteo (free)`);
     console.log(`══════════════════════════════════════════\n`);
 });
