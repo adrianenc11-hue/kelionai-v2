@@ -344,42 +344,51 @@ app.post('/api/weather', async (req, res) => {
     }
 });
 
-// ─── 6. IMAGINE — Generate Image (Hugging Face SDXL — free) ──
+// ─── 6. IMAGINE — Generate Image (Together AI FLUX) ──────────
 app.post('/api/imagine', async (req, res) => {
     try {
         const { prompt } = req.body;
         if (!prompt) return res.status(400).json({ error: 'Prompt lipsă' });
 
-        const HF_TOKEN = process.env.HF_TOKEN;
-        if (!HF_TOKEN) {
-            return res.status(503).json({ error: 'HF_TOKEN nu este configurat' });
+        const TOGETHER_KEY = process.env.TOGETHER_API_KEY;
+        if (!TOGETHER_KEY) {
+            return res.status(503).json({ error: 'TOGETHER_API_KEY nu este configurat' });
         }
 
-        const model = 'stabilityai/stable-diffusion-xl-base-1.0';
-        const response = await fetch(`https://api-inference.huggingface.co/models/${model}`, {
+        const response = await fetch('https://api.together.xyz/v1/images/generations', {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${HF_TOKEN}`,
+                'Authorization': `Bearer ${TOGETHER_KEY}`,
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ inputs: prompt })
+            body: JSON.stringify({
+                model: 'black-forest-labs/FLUX.1-schnell',
+                prompt: prompt,
+                width: 1024,
+                height: 1024,
+                steps: 4,
+                n: 1,
+                response_format: 'b64_json'
+            })
         });
 
         if (!response.ok) {
             const err = await response.text();
-            console.error('[IMAGINE] HF error:', response.status, err);
+            console.error('[IMAGINE] Together error:', response.status, err);
             return res.status(response.status).json({ error: 'Generarea imaginii a eșuat', details: err });
         }
 
-        // HF returns binary image data
-        const imageBuffer = Buffer.from(await response.arrayBuffer());
-        const base64 = imageBuffer.toString('base64');
+        const data = await response.json();
+        const b64 = data.data?.[0]?.b64_json;
+
+        if (!b64) {
+            return res.status(500).json({ error: 'Nu s-a generat imagine' });
+        }
 
         res.json({
-            image: `data:image/png;base64,${base64}`,
+            image: `data:image/png;base64,${b64}`,
             prompt,
-            engine: 'Stable Diffusion XL (Hugging Face)',
-            size: imageBuffer.length
+            engine: 'FLUX.1 Schnell (Together AI)'
         });
     } catch (e) {
         console.error('[IMAGINE] Error:', e.message);
