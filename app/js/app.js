@@ -414,16 +414,94 @@
         if (w) w.classList.add('hidden');
     }
 
-    // ─── Send to AI ──────────────────────────────────────────
+    // ─── Detect request types ────────────────────────────────
+    function isWeatherRequest(text) {
+        return /\b(vreme|meteo|temperatură|temperatura|grad|ploaie|soare|ninge|vânt|prognoz|weather|forecast)\b/i.test(text);
+    }
+    function isSearchRequest(text) {
+        return /\b(caută|cauta|search|găsește|gaseste|informații|informatii|știri|stiri|ce e|cine e|cât costă|cat costa|când|cand|unde|how|what|who|when)\b/i.test(text);
+    }
+    function isImageGenRequest(text) {
+        return /\b(generează|genereaza|creează|creeaza|desenează|deseneaza|imagine|picture|draw|generate|fa-mi o|fă-mi o|arată-mi|arata-mi)\b/i.test(text) &&
+            /\b(imagine|poza|foto|poză|picture|image|desen)\b/i.test(text);
+    }
+    function isMapRequest(text) {
+        return /\b(hartă|harta|map|rută|ruta|drum|direcți|directi|navigare|navigate|unde e|unde se|locație|locatie)\b/i.test(text);
+    }
+
+    // ─── Send to AI (with real API integration) ──────────────
     async function sendToAI(message, language) {
         KAvatar.setExpression('thinking', 0.5);
+        let extraContext = '';
 
         try {
+            // 1. Weather — call real API, inject result
+            if (isWeatherRequest(message)) {
+                try {
+                    const cityMatch = message.match(/(?:în|in|la|din|for|at)\s+(\w+)/i);
+                    const city = cityMatch ? cityMatch[1] : 'Bucharest';
+                    const wResp = await fetch(`${API_BASE}/api/weather?city=${encodeURIComponent(city)}`);
+                    if (wResp.ok) {
+                        const wData = await wResp.json();
+                        extraContext = `\n[DATE METEO REALE pentru ${city}: ${JSON.stringify(wData)}]\nFolosește aceste date reale în răspuns.`;
+                        console.log('[App] Weather data fetched for', city);
+                    }
+                } catch (e) { console.warn('[App] Weather fetch failed:', e); }
+            }
+
+            // 2. Search — call real API, inject result
+            if (isSearchRequest(message) && !isWeatherRequest(message)) {
+                try {
+                    const sResp = await fetch(`${API_BASE}/api/search`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ query: message })
+                    });
+                    if (sResp.ok) {
+                        const sData = await sResp.json();
+                        extraContext = `\n[REZULTATE CĂUTARE WEB REALE: ${JSON.stringify(sData).substring(0, 2000)}]\nFolosește aceste rezultate reale în răspuns. Citează sursele.`;
+                        console.log('[App] Search results fetched');
+                    }
+                } catch (e) { console.warn('[App] Search failed:', e); }
+            }
+
+            // 3. Image generation
+            if (isImageGenRequest(message)) {
+                try {
+                    addMessage('ai', '🎨 Generez imaginea...');
+                    const iResp = await fetch(`${API_BASE}/api/generate-image`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ prompt: message })
+                    });
+                    if (iResp.ok) {
+                        const iData = await iResp.json();
+                        if (iData.url) {
+                            showOnMonitor(iData.url, 'image');
+                            extraContext = `\n[Am generat imaginea și am afișat-o pe monitor. URL: ${iData.url}]`;
+                        }
+                    }
+                } catch (e) { console.warn('[App] Image gen failed:', e); }
+            }
+
+            // 4. Map request — show on monitor
+            if (isMapRequest(message)) {
+                const placeMatch = message.match(/(?:hartă|harta|map|unde e|unde se află|locație|drag)\s+(.+)/i);
+                if (placeMatch) {
+                    const place = placeMatch[1].replace(/[?.!]/g, '').trim();
+                    const mapUrl = `https://www.google.com/maps/embed/v1/place?key=AIzaSyBFw0Qbyq9zTFTd-tUY6dZWTgaQzuU17R8&q=${encodeURIComponent(place)}`;
+                    showOnMonitor(mapUrl, 'map');
+                    extraContext += `\n[Am afișat harta pentru "${place}" pe monitor.]`;
+                }
+            }
+
+            // 5. Send to AI with enriched context
+            const enrichedMessage = extraContext ? message + extraContext : message;
             const resp = await fetch(`${API_BASE}/api/chat`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    message,
+                    message: enrichedMessage,
                     avatar: KAvatar.getCurrentAvatar(),
                     history: chatHistory.slice(-20),
                     language: language || 'ro'
@@ -447,6 +525,10 @@
             chatHistory.push({ role: 'user', content: message });
             chatHistory.push({ role: 'assistant', content: reply });
             addMessage('ai', reply);
+
+            // Check if reply contains image URLs — show on monitor
+            const imgMatch = reply.match(/https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp)/i);
+            if (imgMatch) showOnMonitor(imgMatch[0], 'image');
 
             console.log(`[App] ${data.engine} | lang: ${language || 'ro'}`);
 
