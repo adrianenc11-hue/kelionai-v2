@@ -111,8 +111,8 @@
                     child.frustumCulled = false;
                     if (child.material) child.material.needsUpdate = true;
 
-                    // Morph targets
-                    if (child.morphTargetInfluences && child.morphTargetDictionary) {
+                    // Morph targets — traverse ALL meshes regardless of name
+                    if (child.isMesh && child.morphTargetDictionary) {
                         morphMeshes.push(child);
                         child.morphTargetInfluences.fill(0);
                         console.log('[Avatar] Morph:', child.name, Object.keys(child.morphTargetDictionary).join(', '));
@@ -279,6 +279,7 @@
         if (mixer) mixer.update(dt);
         updateBlink(dt);
         updateExpression(dt);
+        if (lipSync) lipSync.update();
         if (currentModel) {
             var targetY = 0;
             var targetX = 0;
