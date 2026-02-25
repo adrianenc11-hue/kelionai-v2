@@ -21,7 +21,6 @@ test('page loads with avatar and layout', async ({ page }) => {
     await expect(page.locator('#text-input')).toBeVisible();
     await expect(page.locator('#btn-send')).toBeVisible();
     await expect(page.locator('#btn-mic')).toBeVisible();
-    await expect(page.locator('#btn-files')).toBeVisible();
 
     // Switcher buttons exist
     await expect(page.locator('[data-avatar="kelion"]')).toBeVisible();
@@ -141,19 +140,18 @@ test('avatar switches between Kelion and Kira', async ({ page }) => {
 });
 
 // ═══════════════════════════════════════════
-// TEST 7 — File button opens file picker
+// TEST 7 — Drag & drop zone exists
 // ═══════════════════════════════════════════
-test('file button triggers file input', async ({ page }) => {
+test('drag and drop zone exists in display panel', async ({ page }) => {
     await page.goto('/');
     await page.waitForTimeout(3000);
 
-    // Listen for file chooser event
-    const [fileChooser] = await Promise.all([
-        page.waitForEvent('filechooser', { timeout: 3000 }),
-        page.locator('#btn-files').click(),
-    ]);
+    // Drop zone exists (hidden by default, shown on dragover)
+    const dropZone = page.locator('#drop-zone');
+    await expect(dropZone).toBeAttached();
 
-    expect(fileChooser).toBeTruthy();
+    // Display panel exists for file drop target
+    await expect(page.locator('#display-panel')).toBeVisible();
 });
 
 // ═══════════════════════════════════════════
