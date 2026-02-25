@@ -1,6 +1,6 @@
 {
     "name": "kelionai-v2",
-    "version": "2.1.0",
+    "version": "2.3.0",
     "description": "KelionAI — Asistent AI accesibil cu avatari 3D",
     "main": "server/index.js",
     "scripts": {
@@ -22,6 +22,7 @@
         "node-fetch": "^2.7.0",
         "pg": "^8.18.0",
         "prom-client": "^15.1.3",
+        "stripe": "^17.0.0",
         "three": "^0.160.0"
     },
     "engines": {
