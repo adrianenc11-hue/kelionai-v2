@@ -14,6 +14,7 @@
 
     function ensureAudioUnlocked() {
         const ctx = getAudioContext();
+        if (ctx.state === 'suspended') ctx.resume();
         try { const b = ctx.createBuffer(1,1,22050), s = ctx.createBufferSource(); s.buffer = b; s.connect(ctx.destination); s.start(0); } catch(e){}
     }
 
@@ -35,8 +36,14 @@
                 const hasK = t === 'k' || t.startsWith('k ');
 
                 if ((hasKelion || hasKira || hasK) && event.results[i].isFinal) {
-                    if (hasKira) { window.KAvatar.loadAvatar('kira'); document.querySelectorAll('.avatar-pill').forEach(b => b.classList.toggle('active', b.dataset.avatar === 'kira')); }
-                    else { window.KAvatar.loadAvatar('kelion'); document.querySelectorAll('.avatar-pill').forEach(b => b.classList.toggle('active', b.dataset.avatar === 'kelion')); }
+                    const targetAvatar = hasKira ? 'kira' : 'kelion';
+                    const currentAvatar = window.KAvatar.getCurrentAvatar();
+                    if (targetAvatar !== currentAvatar) {
+                        window.KAvatar.loadAvatar(targetAvatar);
+                        document.querySelectorAll('.avatar-pill').forEach(b => b.classList.toggle('active', b.dataset.avatar === targetAvatar));
+                        document.getElementById('avatar-name').textContent = targetAvatar === 'kira' ? 'Kira' : 'Kelion';
+                        var chatOverlay = document.getElementById('chat-overlay'); if (chatOverlay) chatOverlay.innerHTML = '';
+                    }
 
                     let msg = t;
                     if (hasKelion) msg = t.split(/kelion|chelion/i).pop().trim();
