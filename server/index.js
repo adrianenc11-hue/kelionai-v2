@@ -92,6 +92,15 @@ app.get('/api/auth/me', async (req, res) => {
     if (!u) return res.status(401).json({ error: 'Neautentificat' });
     res.json({ user: { id: u.id, email: u.email, name: u.user_metadata?.full_name } });
 });
+app.post('/api/auth/refresh', async (req, res) => {
+    try {
+        const { refresh_token } = req.body;
+        if (!refresh_token || !supabase) return res.status(400).json({ error: 'Token lipsă' });
+        const { data, error } = await supabase.auth.refreshSession({ refresh_token });
+        if (error) return res.status(401).json({ error: error.message });
+        res.json({ user: { id: data.user.id, email: data.user.email, name: data.user.user_metadata?.full_name }, session: data.session });
+    } catch (e) { res.status(500).json({ error: 'Eroare refresh' }); }
+});
 
 // ═══════════════════════════════════════════════════════════════
 // CHAT — BRAIN-POWERED (the core)
@@ -160,14 +169,17 @@ app.post('/api/chat', chatLimiter, async (req, res) => {
 
         if (!reply) return res.status(503).json({ error: 'AI indisponibil' });
 
-        // ── ASYNC: Save conversation + Learn ──
-        if (supabaseAdmin) saveConv(user?.id, avatar, message, reply, conversationId, language).catch(()=>{});
+        // ── Save conversation (sync to get ID) + Learn async ──
+        let savedConvId = conversationId;
+        if (supabaseAdmin) {
+            try { savedConvId = await saveConv(user?.id, avatar, message, reply, conversationId, language); } catch(e){ console.warn('[CHAT] saveConv:', e.message); }
+        }
         brain.learnFromConversation(user?.id, message, reply).catch(()=>{});
 
         console.log(`[CHAT] ${engine} | ${avatar} | ${language} | tools:[${thought.toolsUsed.join(',')}] | CoT:${!!thought.chainOfThought} | ${thought.thinkTime}ms think | ${reply.length}c`);
 
         // ── RESPONSE with monitor content + brain metadata ──
-        const response = { reply, avatar, engine, language, thinkTime: thought.thinkTime };
+        const response = { reply, avatar, engine, language, thinkTime: thought.thinkTime, conversationId: savedConvId };
         if (thought.monitor.content) {
             response.monitor = thought.monitor;
         }
@@ -273,12 +285,16 @@ app.post('/api/chat/stream', chatLimiter, async (req, res) => {
             } catch(e) {}
         }
 
+        // Save conversation (sync to get ID) then end stream
+        let savedConvId = conversationId;
+        if (fullReply && supabaseAdmin) {
+            try { savedConvId = await saveConv(user?.id, avatar, message, fullReply, conversationId, language); } catch(e){ console.warn('[STREAM] saveConv:', e.message); }
+        }
+
         // End stream
-        res.write(`data: ${JSON.stringify({ type: 'done', reply: fullReply, thinkTime: thought.thinkTime })}\n\n`);
+        res.write(`data: ${JSON.stringify({ type: 'done', reply: fullReply, thinkTime: thought.thinkTime, conversationId: savedConvId })}\n\n`);
         res.end();
 
-        // Async: save + learn
-        if (fullReply && supabaseAdmin) saveConv(user?.id, avatar, message, fullReply, conversationId, language).catch(()=>{});
         if (fullReply) brain.learnFromConversation(user?.id, message, fullReply).catch(()=>{});
         console.log(`[STREAM] ${avatar} | ${language} | ${fullReply.length}c`);
 
