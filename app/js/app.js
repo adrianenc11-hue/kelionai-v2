@@ -387,6 +387,13 @@
         var vb = document.getElementById('btn-vision');
         if (vb) vb.addEventListener('click', function() { hideWelcome(); addMessage('user', 'Ce e în fața mea?'); showThinking(true); triggerVision(); });
 
+        var fileInput = document.getElementById('file-input');
+        var btnFiles = document.getElementById('btn-files');
+        if (btnFiles && fileInput) {
+            btnFiles.addEventListener('click', function() { fileInput.click(); });
+            fileInput.addEventListener('change', function(e) { if (e.target.files && e.target.files.length) { hideWelcome(); handleFiles(e.target.files); } fileInput.value = ''; });
+        }
+
         document.getElementById('btn-send').addEventListener('click', onSendText);
         document.getElementById('text-input').addEventListener('keydown', function(e) { if (e.key === 'Enter') onSendText(); });
 

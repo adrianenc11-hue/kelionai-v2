@@ -81,6 +81,7 @@
 
             const arrayBuf = await resp.arrayBuffer();
             const ctx = getAudioContext();
+            if (ctx.state === 'suspended') await ctx.resume();
             let audioBuf;
             try { audioBuf = await ctx.decodeAudioData(arrayBuf.slice(0)); }
             catch(e) { fallbackTextLipSync(text); isSpeaking = false; resumeWakeDetection(); return; }
