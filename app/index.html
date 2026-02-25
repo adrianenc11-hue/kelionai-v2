@@ -43,6 +43,16 @@
 
     <!-- MAIN APP -->
     <div id="app-layout" class="hidden">
+        <!-- CONVERSATION HISTORY SIDEBAR -->
+        <div id="history-sidebar" class="hidden">
+            <div id="history-header">
+                <h3>Conversații</h3>
+                <button id="btn-new-chat" title="Chat nou">＋</button>
+                <button id="btn-close-history" title="Închide">✕</button>
+            </div>
+            <div id="history-list"></div>
+        </div>
+
         <div id="left-panel">
             <div id="avatar-area">
                 <canvas id="avatar-canvas"></canvas>
@@ -56,6 +66,7 @@
                 <div id="avatar-switcher">
                     <button class="avatar-pill active" data-avatar="kelion">Kelion</button>
                     <button class="avatar-pill" data-avatar="kira">Kira</button>
+                    <button class="ctrl-btn-sm" id="btn-history" title="Istoric conversații">📋</button>
                     <span id="user-name" class="user-badge">Guest</span>
                     <button class="ctrl-btn-sm" id="btn-auth" title="Autentificare">🔑</button>
                 </div>
