@@ -38,15 +38,16 @@ echo.
 
 :: Create .env if missing
 if not exist ".env" (
-    echo 📝 Creez fișierul .env cu cheile tale...
+    echo 📝 Copiez .env.example în .env...
+    echo    ⚠️  IMPORTANT: Deschide .env și completează cu cheile tale reale!
     (
-        echo ANTHROPIC_API_KEY=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
-        echo ELEVENLABS_API_KEY=sk_efc8ed68faf56c39f7badcaac4d42a57d61852931ef147a2
-        echo SUPABASE_URL=https://nqlobybfwmtkmsqadqqr.supabase.co
-        echo SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5xbG9ieWJmd210a21zcWFkcXFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE4NzMwMjIsImV4cCI6MjA4NzQ0OTAyMn0.JEZJyCH6zO8RPVvSpsy9BMW92BuopprZPSSI2jB8CK0
-        echo SUPABASE_SERVICE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5xbG9ieWJmd210a21zcWFkcXFyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTg3MzAyMiwiZXhwIjoyMDg3NDQ5MDIyfQ.AngYdhgIOXas4UssEP1ENLiZCW9CYPgecvYej3PvLOQ
+        echo ANTHROPIC_API_KEY=your-anthropic-key-here
+        echo ELEVENLABS_API_KEY=your-elevenlabs-key-here
+        echo SUPABASE_URL=https://your-project.supabase.co
+        echo SUPABASE_ANON_KEY=your-supabase-anon-key-here
+        echo SUPABASE_SERVICE_KEY=your-supabase-service-key-here
     ) > .env
-    echo ✅ .env creat
+    echo ✅ .env creat — deschide-l și completează cu cheile tale!
 ) else (
     echo ✅ .env deja există
 )
