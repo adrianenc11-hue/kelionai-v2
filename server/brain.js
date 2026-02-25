@@ -228,9 +228,9 @@ Raspunde STRICT cu JSON:
         }
 
         // ── WEATHER ──
-        if (/\b(vreme|meteo|temperatur|grad[eu]|ploaie|ploua|soare|ninge|vant|prognoz|weather|forecast|afara|frig|cald)\b/i.test(lower)) {
+        if (/\b(vreme[ai]?|meteo|temperatur|grad[eu]|ploai[ea]|ploua|soare|ning[ea]|ninsoare|vant|prognoz|weather|forecast|afar[a]|fri[gk]|cald[a]?)\b/i.test(lower)) {
             result.needsWeather = true;
-            const m = text.match(/(?:in|la|din|pentru|from|for|at)\s+([A-Z][a-zA-Z\u0100-\u024F]+(?:\s+[A-Z][a-zA-Z\u0100-\u024F]+)?)/);
+            const m = text.match(/(?:î[n]|in|la|din|pentru|from|for|at)\s+([A-Z\u0100-\u024F][a-zA-Z\u0100-\u024F]+(?:\s+[A-Z\u0100-\u024F][a-zA-Z\u0100-\u024F]+)?)/);
             result.weatherCity = m ? m[1] : (text.match(/(?:in|la|din|pentru)\s+(\w+)/i)?.[1] || 'Bucharest');
         }
 
@@ -263,7 +263,7 @@ Raspunde STRICT cu JSON:
         // ── EMOTION (multi-signal) ──
         const emotionMap = {
             sad: { pattern: /\b(trist|deprimat|singur|plang|suparat|nefericit|sad|depressed|lonely|pierdut|dor)\b/i, weight: 0.9 },
-            happy: { pattern: /\b(fericit|bucuros|minunat|super|genial|happy|great|awesome|multumesc|mersi)\b/i, weight: 0.7 },
+            happy: { pattern: /\b(fericit|bucuros|minunat|super|genial|happy|great|awesome|amazing)\b/i, weight: 0.7 },
             angry: { pattern: /\b(nervos|furios|enervat|angry|furious|frustrated|urasc|hate)\b/i, weight: 0.9 },
             anxious: { pattern: /\b(anxios|stresat|ingrijorat|worried|anxious|stressed|teama|frica|panica)\b/i, weight: 0.9 },
             confused: { pattern: /\b(nu inteleg|confuz|confused|nu stiu|habar|pierdut|lost)\b/i, weight: 0.6 },
@@ -301,7 +301,7 @@ Raspunde STRICT cu JSON:
             { pattern: /\b(programare|code|coding|software|app|web|python|java|react)\b/i, topic: 'tech' },
             { pattern: /\b(sanatate|health|doctor|medical|boala|tratament|medicament)\b/i, topic: 'health' },
             { pattern: /\b(mancare|food|reteta|recipe|gatit|cooking|restaurant)\b/i, topic: 'food' },
-            { pattern: /\b(calatorie|travel|vacanta|hotel|zbor|flight|destinat)\b/i, topic: 'travel' },
+            { pattern: /\b(calatori|calatoresc|calatorie|travel|vacanta|hotel|zbor|flight|destinat|excursie|turism)\b/i, topic: 'travel' },
             { pattern: /\b(bani|money|investitie|economie|salariu|buget|finante)\b/i, topic: 'finance' },
             { pattern: /\b(muzica|music|film|movie|carte|book|joc|game)\b/i, topic: 'entertainment' },
             { pattern: /\b(sport|fitness|antrenament|exercitiu|gym|alergare)\b/i, topic: 'fitness' },
