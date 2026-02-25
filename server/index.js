@@ -10,6 +10,7 @@ const fetch = require('node-fetch');
 const FormData = require('form-data');
 const path = require('path');
 const { supabase, supabaseAdmin } = require('./supabase');
+const { runMigration } = require('./migrate');
 
 const app = express();
 if (process.env.SENTRY_DSN) Sentry.setupExpressErrorHandler(app);
@@ -103,6 +104,15 @@ app.post('/api/chat', async (req, res) => {
                 const d = await r.json(); reply = d.content?.[0]?.text; if (reply) engine = 'Claude';
             } catch(e){ console.warn('[CHAT] Claude:', e.message); }
         }
+        // GPT-4o fallback
+        if (!reply && process.env.OPENAI_API_KEY) {
+            try {
+                const r = await fetch('https://api.openai.com/v1/chat/completions', { method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + process.env.OPENAI_API_KEY },
+                    body: JSON.stringify({ model: 'gpt-4o', max_tokens: 2048, messages: [{ role: 'system', content: sys }, ...msgs] }) });
+                const d = await r.json(); reply = d.choices?.[0]?.message?.content; if (reply) engine = 'GPT-4o';
+            } catch(e){ console.warn('[CHAT] GPT-4o:', e.message); }
+        }
         // DeepSeek
         if (!reply && process.env.DEEPSEEK_API_KEY) {
             try {
@@ -190,6 +200,24 @@ app.post('/api/search', async (req, res) => {
     try {
         const { query } = req.body;
         if (!query) return res.status(400).json({ error: 'Query lipsă' });
+
+        // Tavily primary (much better results)
+        if (process.env.TAVILY_API_KEY) {
+            try {
+                const tr = await fetch('https://api.tavily.com/search', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ api_key: process.env.TAVILY_API_KEY, query, search_depth: 'basic', max_results: 5, include_answer: true })
+                });
+                if (tr.ok) {
+                    const td = await tr.json();
+                    const results = (td.results || []).map(x => ({ title: x.title, content: x.content, url: x.url }));
+                    console.log('[SEARCH] Tavily —', results.length, 'results');
+                    return res.json({ results, answer: td.answer || '', engine: 'Tavily' });
+                }
+            } catch (e) { console.warn('[SEARCH] Tavily:', e.message); }
+        }
+
+        // DuckDuckGo fallback
         const r = await fetch('https://api.duckduckgo.com/?q=' + encodeURIComponent(query) + '&format=json&no_html=1&skip_disambig=1');
         const d = await r.json();
         const results = [];
@@ -266,18 +294,28 @@ app.get('/api/conversations/:id/messages', async (req, res) => {
 // ═══ HEALTH ═══
 app.get('/api/health', (req, res) => {
     res.json({ status: 'online', version: '2.1.0', timestamp: new Date().toISOString(),
-        services: { ai_claude: !!process.env.ANTHROPIC_API_KEY, ai_deepseek: !!process.env.DEEPSEEK_API_KEY,
+        services: { ai_claude: !!process.env.ANTHROPIC_API_KEY, ai_gpt4o: !!process.env.OPENAI_API_KEY,
+            ai_deepseek: !!process.env.DEEPSEEK_API_KEY,
             tts: !!process.env.ELEVENLABS_API_KEY, stt: true, vision: !!process.env.ANTHROPIC_API_KEY,
-            search: true, weather: true, images: !!process.env.TOGETHER_API_KEY,
+            search_tavily: !!process.env.TAVILY_API_KEY, search_ddg: true, weather: true,
+            images: !!process.env.TOGETHER_API_KEY,
             auth: !!supabase, database: !!supabaseAdmin } });
 });
 
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, '..', 'app', 'index.html')));
-app.listen(PORT, '0.0.0.0', () => {
-    console.log('\n══════════════════════════════════════════');
-    console.log('  KelionAI v2.1 — http://localhost:' + PORT);
-    console.log('  AI: ' + (process.env.ANTHROPIC_API_KEY ? '✅ Claude' : '❌') + ' | ' + (process.env.DEEPSEEK_API_KEY ? '✅ DeepSeek' : '❌'));
-    console.log('  TTS: ' + (process.env.ELEVENLABS_API_KEY ? '✅ ElevenLabs' : '❌'));
-    console.log('  DB: ' + (supabaseAdmin ? '✅ Supabase' : '⚠️ In-memory'));
-    console.log('══════════════════════════════════════════\n');
+
+// Run migration then start server
+runMigration().then(migrated => {
+    app.listen(PORT, '0.0.0.0', () => {
+        console.log('\n══════════════════════════════════════════');
+        console.log('  KelionAI v2.1 — http://localhost:' + PORT);
+        console.log('  AI: ' + (process.env.ANTHROPIC_API_KEY ? '✅ Claude' : '❌') + ' | ' + (process.env.DEEPSEEK_API_KEY ? '✅ DeepSeek' : '❌'));
+        console.log('  TTS: ' + (process.env.ELEVENLABS_API_KEY ? '✅ ElevenLabs' : '❌'));
+        console.log('  DB: ' + (supabaseAdmin ? '✅ Supabase' : '⚠️ In-memory'));
+        console.log('  Migration: ' + (migrated ? '✅ Tables ready' : '⚠️ Skipped'));
+        console.log('══════════════════════════════════════════\n');
+    });
+}).catch(e => {
+    console.error('[Startup] Migration error:', e.message);
+    app.listen(PORT, '0.0.0.0', () => console.log('KelionAI v2.1 on port ' + PORT + ' (migration failed)'));
 });
