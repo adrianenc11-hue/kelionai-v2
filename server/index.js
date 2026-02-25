@@ -92,6 +92,15 @@ app.get('/api/auth/me', async (req, res) => {
     if (!u) return res.status(401).json({ error: 'Neautentificat' });
     res.json({ user: { id: u.id, email: u.email, name: u.user_metadata?.full_name } });
 });
+app.post('/api/auth/refresh', async (req, res) => {
+    try {
+        const { refresh_token } = req.body;
+        if (!refresh_token || !supabase) return res.status(400).json({ error: 'Token lipsă' });
+        const { data, error } = await supabase.auth.refreshSession({ refresh_token });
+        if (error) return res.status(401).json({ error: error.message });
+        res.json({ user: { id: data.user.id, email: data.user.email, name: data.user.user_metadata?.full_name }, session: data.session });
+    } catch (e) { res.status(500).json({ error: 'Eroare refresh' }); }
+});
 
 // ═══════════════════════════════════════════════════════════════
 // CHAT — BRAIN-POWERED (the core)
