@@ -11,7 +11,7 @@
 
 ### Initial Analysis
 - Copilot analyzed entire kelionai-v2 repository
-- Found ~45% Supabase interconnection, multiple bugs, exposed secrets
+- Found: ~45% Supabase interconnection, multiple bugs, exposed secrets
 - 11 initial PRs launched for basics (security, auth, audio, lip sync)
 
 ### Architecture Decisions
@@ -48,7 +48,7 @@
 - NO camera button (auto-activates)
 - NO send button (subtle text input)
 - ONLY button: In/Out file manager
-- Wake word: "Kelion"/"K"/"Kira" at START of sentence
+- Wake word: Kelion/K/Kira at START of sentence
 
 #### Present-Only Chat
 - Shows ONLY current exchange
@@ -74,7 +74,7 @@
 ### Auto-Greet
 - Camera captures on open (silent)
 - Face recognized: greet by name
-- Face unknown: "Hello! I'm Kelion."
+- Face unknown: Hello! I'm Kelion.
 - Adapts to time of day
 
 ### Memory System
@@ -91,7 +91,7 @@
 - 6 levels: Child, Teen, Adult, Professional, Expert, Docent
 - Auto-detects from vocabulary and topics
 - Gradual transition (70% previous + 30% new)
-- User override: "explain simply" or "expert mode"
+- User override: explain simply or expert mode
 
 ### GPS and Geolocation
 - Mobile: native GPS
@@ -104,7 +104,7 @@
 - face-api.js client-side
 - Auto-recognize returning users
 - Detect appearance changes
-- GDPR: "forget my face" deletes it
+- GDPR: forget my face deletes it
 
 ### File Manager
 - Import: PDF, DOC, CSV, images, code
@@ -130,7 +130,7 @@
 - Never reveals other users data
 
 ### Business Model
-- Free: 10 msgs/day, 1 avatar, text only
+- Free EUR 0: 10 msgs/day, 1 avatar, text only
 - Pro EUR 9.99/mo: 100 msgs, voice, memory
 - Premium EUR 19.99/mo: unlimited, everything
 - Referral: 7 days Premium for both parties
@@ -141,36 +141,31 @@
 - Technical + Fundamental analysis
 - NEVER executes trades
 - Always includes disclaimer
-- Sources: CoinGecko, Alpha Vantage, Yahoo Finance
 
 ### Sports Bot (ADMIN ONLY)
 - All major sports
 - Stats, pre-match analysis, live scores
-- Betting info INFORMATIVE ONLY with gambling awareness
+- Betting info INFORMATIVE ONLY
 - NEVER says guaranteed winner
 
-### News Bot (ADMIN ONLY, publishes to FB/IG/Telegram)
+### News Bot (ADMIN ONLY)
 - Schedule: 5AM morning, 12PM midday, after 6PM evening
-- Breaking: INSTANT when confirmed by 2+ sources
+- Breaking: INSTANT when 2+ sources confirm
 - Language: Romanian
-- Sources ALL FREE: NewsAPI, GNews, Guardian, Currents, MediaStack, RSS feeds
+- Sources ALL FREE: NewsAPI, GNews, Guardian, Currents, MediaStack, RSS
 - Display: title list, click for full article, back button
 - ZERO fake news, ZERO click-bait
-- Always includes sources
 
 ### Messenger Bot (ADMIN ONLY)
 - Auto-responds on Facebook Messenger
 - Product info, pricing, FAQ, support
-- Redirects to app for full experience
 
 ### Admin Panel (INVISIBLE to users)
 - Dashboard with REAL data only (zero hard-coded)
 - Every number = live database query
 - Revenue from Stripe API direct
 - If data unavailable: shows N/A not 0
-- Source shown for each metric
 - Auto-refresh 30 seconds
-- Users, AI credits, ticker, revenue, referrals, bots, system, logs
 
 ### Anti-Copy Protection (7 Layers)
 1. Code obfuscation
@@ -186,143 +181,58 @@
 - News: title list then click then full article then back
 - Auth guards: /admin only for super_admin
 - Admin JS bundle separate (not loaded for users)
-- Logout: confirmation dialog then redirect to /
+- Logout: confirmation then redirect to /
 
 ### Ticker/Teletext
 - Scrolling bar at bottom
-- Free users: see ads, Pro: no ads, Premium: can disable
-- Managed from admin panel
+- Free: see ads, Pro: no ads, Premium: can disable
 
 ### User Manual
 - 26 chapters covering all user-facing features
 - NO mention of: admin panel, trading bot, sports bot, news bot, messenger bot
-- Available in user preferred language (Kelion translates)
-- Accessible: "Kelion, show me the manual" or Settings then Help
+- Available in user preferred language
 - Exportable as PDF
 
-### New Features (Approved by Adrian)
+### New Features Phase 2
 
 #### Contextual Backgrounds
-- Mood-based: happy=gold, sad=blue, energetic=vibrant
-- Context-based: teacher=classroom, chemistry=lab, coding=office
-- Auto-detects from conversation after 15 min on topic
-- Kelion/Kira appearance adapts (glasses for teacher, lab coat for chemistry)
+- Mood-based and context-based
+- Auto-detects from conversation
+- Avatar appearance adapts
 
 #### Email Assistant (Full)
 - Gmail/Outlook via OAuth2
-- Morning briefing: who sent, about what, urgency
-- Reply by voice: dictate, review on monitor, approve
-- Compose by voice
-- Auto-detect tone (formal/casual)
-- Follow-up reminders
-- Attachment awareness
+- Morning briefing, reply by voice, compose, follow-up reminders
 
 #### Workout Buddy
-- Guided exercises with timer
-- Camera form checking
-- HIIT, strength, yoga, stretching
-- Progress and personal records
+- Guided exercises, camera form checking, progress tracking
 
 #### Birthday and Events Tracker
-- Memorizes dates from conversations
-- 3-day advance reminder
-- Day-of reminder
-- Gift suggestions based on past info
-
-#### Smart Home Ready (future)
-- MQTT/Home Assistant integration prepared
-- Voice control: lights, thermostat, locks, alarm
+- Memorizes dates, advance reminders, gift suggestions
 
 #### Learning Academy (Full)
-- ANY language, ANY subject
-- Structured courses with sessions
-- Project-based learning
-- Teacher mode: Kelion becomes professor
-- Background changes to match subject
-- Pronunciation checking via Whisper
-- Spaced repetition for vocabulary
-- Quiz per session
-- Certificate at completion (PDF)
-
-#### Focus and Meditation Mode
-- Pomodoro 25/5 with ambient sounds
-- Guided breathing
-- Minimal UI, no notifications
-- Session tracking
-
-#### Daily Journal
-- Evening guided reflection
-- Mood rating, best moment, improvements, goals
-- Mood trends over time
-- Private and exportable
+- ANY language, ANY subject, structured courses
+- Pronunciation checking, spaced repetition, quizzes, certificates
 
 #### Family Hub (Full)
-- Family group with admin (parent)
-- Live location map on monitor
-- Geofencing: home, school, work, custom zones
-- Child mode: age-appropriate, parent sees activity topics
-- Teen mode: private conversations, parent sees status only
-- Crisis keywords trigger instant parent alert
-- Shared shopping list, family calendar
-- SOS button with location
-- Smart notifications ("Alex left school, home in 15 min")
-
-#### QR Code Sharing
-- Referral code as QR on monitor
-- Friend scans to register with code
+- GPS tracking, geofencing, child mode, teen mode, SOS, shared lists
 
 #### Emergency SOS (Full)
-- Panic detection from voice tone
-- Shows location + emergency numbers
-- Auto-alert emergency contact after 60s no response
-- SMS with location to emergency contact
+- Panic detection, location sharing, auto-alert after 60s
+
+#### Developer API (Cost x2 pricing)
+- Chat, Vision, Image Gen, TTS, STT, Search, Weather, Face endpoints
+- Starter $49, Business $199, Enterprise $999
 
 #### Multi-Device Sync
-- Start on phone, continue on laptop
-- Supabase sync: conversation follows USER not device
-- Face recognition on each device
-
-#### Marketplace (Future)
-- Custom personalities, prompt packs, themes, voice packs, mini-games
-- Creator economy: creator 70%, AE Design 30%
-- Stripe Connect for payouts
-
-#### Time Capsule
-- Record message for future self
-- Includes mood snapshot, current topics, goals
-- Opens on set date (1 month, 1 year, etc.)
-
-#### Developer API (Pricing: Our Cost x2)
-- Chat, Vision, Image Gen, TTS, STT, Search, Weather, Face Recognition
-- Starter $49/mo (5K calls), Business $199/mo (25K), Enterprise $999/mo (200K)
-- Real cost tracking in admin
-- Alert if client cost approaches 50% of plan price
-- White-label option for Enterprise
-
-#### Achievement System (Gamification)
-- Badges: First Week, 100 Conversations, 3 Languages, etc.
-- Displayed on monitor
-- Motivates return and engagement
-
-### Auto-Save Rule
-- Save every 2 minutes
-- Overwrite previous save
-- Note what is new in change log section
+- Conversation follows USER not device
 
 ---
 
 ## Change Log
 
-### Save 1 — 25 Feb 2026
-- INITIAL SAVE — Complete conversation documented
-- All architecture decisions
-- All feature specifications
-- All ethics rules
-- All business logic
-- News display: title list then click then full article then back
-- User manual: 26 chapters, no admin/bot/media info
-- Contextual backgrounds with avatar appearance changes
-- Email assistant full spec
-- Family hub with GPS tracking and child safety
-- Developer API with cost x2 pricing model
-- Anti-copy 7 layer protection
+### Save 1 - 25 Feb 2026
+- INITIAL SAVE - Complete conversation documented
+- All architecture, features, ethics, business logic
+- User manual: 26 chapters, no admin/bot/media content
+- Both files pushed to master branch
