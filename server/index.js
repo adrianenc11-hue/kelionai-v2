@@ -19,9 +19,15 @@ const { runMigration } = require('./migrate');
 const { KelionBrain } = require('./brain');
 const { buildSystemPrompt } = require('./persona');
 
+const { router: paymentsRouter, checkUsage, incrementUsage } = require('./payments');
+const legalRouter = require('./legal');
+
 const app = express();
 if (process.env.SENTRY_DSN) Sentry.setupExpressErrorHandler(app);
 app.use(cors());
+
+// Stripe webhook needs raw body — must be before express.json()
+app.use('/api/payments/webhook', express.raw({ type: 'application/json' }));
 app.use(express.json({ limit: '50mb' }));
 
 // ═══ RATE LIMITING ═══
@@ -562,11 +568,19 @@ load();setInterval(load,5000);
 </script></body></html>`);
 });
 
+// ═══ SHARE HELPERS VIA app.locals (for payments/legal routers) ═══
+app.locals.getUserFromToken = getUserFromToken;
+app.locals.supabaseAdmin = supabaseAdmin;
+
+// ═══ PAYMENTS & LEGAL ROUTES ═══
+app.use('/api/payments', paymentsRouter);
+app.use('/api/legal', legalRouter);
+
 // ═══ HEALTH ═══
 app.get('/api/health', (req, res) => {
     const diag = brain.getDiagnostics();
     res.json({
-        status: 'online', version: '2.2.1', timestamp: new Date().toISOString(),
+        status: 'online', version: '2.3.0', timestamp: new Date().toISOString(),
         brain: diag.status,
         conversations: diag.conversations,
         services: {
@@ -576,6 +590,7 @@ app.get('/api/health', (req, res) => {
             search_perplexity: !!process.env.PERPLEXITY_API_KEY, search_tavily: !!process.env.TAVILY_API_KEY,
             search_serper: !!process.env.SERPER_API_KEY, search_ddg: true, weather: true,
             images: !!process.env.TOGETHER_API_KEY,
+            payments: !!process.env.STRIPE_SECRET_KEY,
             auth: !!supabase, database: !!supabaseAdmin
         }
     });
@@ -587,12 +602,13 @@ app.get('*', (req, res) => res.sendFile(path.join(__dirname, '..', 'app', 'index
 runMigration().then(migrated => {
     app.listen(PORT, '0.0.0.0', () => {
         console.log('\n══════════════════════════════════════════');
-        console.log('  KelionAI v2.2 — BRAIN v2 EDITION');
+        console.log('  KelionAI v2.3 — PAYMENTS + LEGAL EDITION');
         console.log('  http://localhost:' + PORT);
         console.log('  Dashboard: http://localhost:' + PORT + '/dashboard');
         console.log('  AI: ' + (process.env.ANTHROPIC_API_KEY ? '✅ Claude' : '❌') + ' | ' + (process.env.OPENAI_API_KEY ? '✅ GPT-4o' : '❌') + ' | ' + (process.env.DEEPSEEK_API_KEY ? '✅ DeepSeek' : '❌'));
         console.log('  TTS: ' + (process.env.ELEVENLABS_API_KEY ? '✅ ElevenLabs' : '❌'));
         console.log('  Brain: 🧠 v2 — CoT + Decompose + SelfRepair + AutoLearn');
+        console.log('  Payments: ' + (process.env.STRIPE_SECRET_KEY ? '✅ Stripe' : '❌ Not configured'));
         console.log('  DB: ' + (supabaseAdmin ? '✅ Supabase' : '⚠️ In-memory'));
         console.log('  Migration: ' + (migrated ? '✅ Tables ready' : '⚠️ Skipped'));
         console.log('══════════════════════════════════════════\n');
