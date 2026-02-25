@@ -88,9 +88,14 @@
         <div id="display-panel">
             <div id="display-header"><span id="display-title">Monitor</span></div>
             <div id="display-content">
-                <div id="drop-zone-passive">
+                <div id="monitor-image" style="display:none"></div>
+                <div id="monitor-map" style="display:none"></div>
+                <div id="monitor-text" style="display:none"></div>
+                <div id="monitor-search" style="display:none"></div>
+                <div id="monitor-weather" style="display:none"></div>
+                <div id="monitor-default">
                     <div class="welcome-icon">🎯</div>
-                    <p>Monitor de prezentare</p>
+                    <p>Monitorul va afișa conținut când asistentul AI partajează informații.</p>
                     <small>Spune "ce e în față" sau "arată-mi o hartă"</small>
                 </div>
             </div>
@@ -107,6 +112,7 @@
     <script src="/js/voice.js"></script>
     <script src="/js/realtime-vision.js"></script>
     <script src="/js/auth.js"></script>
+    <script src="/js/monitor.js"></script>
     <script src="/js/app.js"></script>
 </body>
 </html>

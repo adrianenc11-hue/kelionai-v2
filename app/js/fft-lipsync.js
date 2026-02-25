@@ -12,6 +12,7 @@
     var dataArray = null;
     var animFrame = null;
     var isRunning = false;
+    var fftActive = false; // Driven by main Three.js animate loop
     var connectedElements = new WeakSet(); // Track connected elements
 
     // Morph targets that control mouth
@@ -34,6 +35,7 @@
             analyser.fftSize = 256;
             analyser.smoothingTimeConstant = 0.6;
             dataArray = new Uint8Array(analyser.frequencyBinCount);
+            console.log('[LipSync] Analyser connected to AudioContext, fftSize=256, bins=' + analyser.frequencyBinCount);
             return analyser;
         } catch (e) {
             console.error('[LipSync] connectToContext error:', e);
@@ -76,43 +78,41 @@
     };
 
     SimpleLipSync.prototype.start = function () {
-        if (isRunning) return;
+        fftActive = true;
         isRunning = true;
+        console.log('[LipSync] FFT lip sync started');
+    };
 
-        var self = this;
-        function tick() {
-            if (!isRunning) return;
-            animFrame = requestAnimationFrame(tick);
+    // Called each frame from the main Three.js animate loop
+    SimpleLipSync.prototype.update = function () {
+        if (!fftActive || !analyser || !dataArray) return;
+        analyser.getByteFrequencyData(dataArray);
 
-            if (!analyser || !dataArray) return;
-            analyser.getByteFrequencyData(dataArray);
-
-            // Voice frequencies (100-3000Hz)
-            var sum = 0;
-            var count = 0;
-            var startBin = 2;
-            var endBin = Math.min(dataArray.length, 40);
-            for (var i = startBin; i < endBin; i++) {
-                sum += dataArray[i];
-                count++;
-            }
-            var avg = count > 0 ? sum / count : 0;
-
-            // Normalize to 0-1 with sensitivity
-            var mouthOpen = Math.min(1, Math.max(0, (avg - 15) / 70));
-
-            // Add slight variation for natural look
-            if (mouthOpen > 0.05) {
-                mouthOpen += (Math.random() - 0.5) * 0.05;
-                mouthOpen = Math.max(0, Math.min(1, mouthOpen));
-            }
-
-            self._setMouth(mouthOpen);
+        // Voice frequencies (100-3000Hz)
+        var sum = 0;
+        var count = 0;
+        var startBin = 2;
+        var endBin = Math.min(dataArray.length, 40);
+        for (var i = startBin; i < endBin; i++) {
+            sum += dataArray[i];
+            count++;
         }
-        tick();
+        var avg = count > 0 ? sum / count : 0;
+
+        // Normalize to 0-1 with sensitivity
+        var mouthOpen = Math.min(1, Math.max(0, (avg - 15) / 70));
+
+        // Add slight variation for natural look
+        if (mouthOpen > 0.05) {
+            mouthOpen += (Math.random() - 0.5) * 0.05;
+            mouthOpen = Math.max(0, Math.min(1, mouthOpen));
+        }
+
+        this._setMouth(mouthOpen);
     };
 
     SimpleLipSync.prototype.stop = function () {
+        fftActive = false;
         isRunning = false;
         if (animFrame) cancelAnimationFrame(animFrame);
         animFrame = null;
