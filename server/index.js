@@ -1,3 +1,7 @@
+// ═══════════════════════════════════════════════════════════════
+// KelionAI v2.2 — BRAIN-POWERED SERVER
+// Autonomous thinking, self-repair, auto-learning
+// ═══════════════════════════════════════════════════════════════
 require('dotenv').config();
 const Sentry = require('@sentry/node');
 if (process.env.SENTRY_DSN) {
@@ -11,6 +15,8 @@ const FormData = require('form-data');
 const path = require('path');
 const { supabase, supabaseAdmin } = require('./supabase');
 const { runMigration } = require('./migrate');
+const { KelionBrain } = require('./brain');
+const { buildSystemPrompt } = require('./persona');
 
 const app = express();
 if (process.env.SENTRY_DSN) Sentry.setupExpressErrorHandler(app);
@@ -24,6 +30,17 @@ app.use(express.static(path.join(__dirname, '..', 'app')));
 const PORT = process.env.PORT || 3000;
 const memFallback = {};
 
+// ═══ BRAIN INITIALIZATION ═══
+const brain = new KelionBrain({
+    anthropicKey: process.env.ANTHROPIC_API_KEY,
+    openaiKey: process.env.OPENAI_API_KEY,
+    tavilyKey: process.env.TAVILY_API_KEY,
+    togetherKey: process.env.TOGETHER_API_KEY,
+    supabaseAdmin
+});
+console.log('[Brain] 🧠 Engine initialized');
+
+// ═══ AUTH HELPER ═══
 async function getUserFromToken(req) {
     const h = req.headers.authorization;
     if (!h || !h.startsWith('Bearer ') || !supabase) return null;
@@ -31,19 +48,7 @@ async function getUserFromToken(req) {
     catch (e) { return null; }
 }
 
-const KELION_PROMPT = `Ești Kelion, un asistent AI inteligent, prietenos și onest. Vorbești natural, clar și direct.
-Personalitate masculină, caldă, profesională. Răspunzi la ORICE. Nu inventezi fapte.
-Dacă utilizatorul e nevăzător, descrie totul verbal — ești ochii și urechile lui.
-CAPACITĂȚI: Viziune cameră, Voce naturală, Monitor prezentare, Meteo, Căutare web, Generare imagini AI, Analiză fișiere, Memorie persistentă.
-Nu spune NICIODATĂ "nu pot face asta".`;
-
-const KIRA_PROMPT = `Ești Kira, o asistentă AI inteligentă, caldă și empatică. Vorbești natural, clar și grijuliu.
-Personalitate feminină, blândă, profesională. Răspunzi la ORICE. Nu inventezi fapte.
-Dacă utilizatorul e nevăzător, descrie totul verbal — ești ochii și urechile lui.
-CAPACITĂȚI: Viziune cameră, Voce naturală feminină, Monitor prezentare, Meteo, Căutare web, Generare imagini AI, Analiză fișiere, Memorie persistentă.
-Nu spune NICIODATĂ "nu pot face asta".`;
-
-// ═══ AUTH ═══
+// ═══ AUTH ENDPOINTS ═══
 app.post('/api/auth/register', async (req, res) => {
     try {
         const { email, password, name } = req.body;
@@ -73,71 +78,100 @@ app.get('/api/auth/me', async (req, res) => {
     res.json({ user: { id: u.id, email: u.email, name: u.user_metadata?.full_name } });
 });
 
-// ═══ CHAT — Claude → DeepSeek (NO OpenAI) ═══
+// ═══════════════════════════════════════════════════════════════
+// CHAT — BRAIN-POWERED (the core)
+// Brain decides tools → executes in parallel → builds deep prompt → AI responds → learns
+// ═══════════════════════════════════════════════════════════════
 app.post('/api/chat', async (req, res) => {
     try {
         const { message, avatar = 'kelion', history = [], language = 'ro', conversationId } = req.body;
         if (!message) return res.status(400).json({ error: 'Mesaj lipsă' });
         const user = await getUserFromToken(req);
-        const LANGS = { ro:'română', en:'English', es:'español', fr:'français', de:'Deutsch', it:'italiano' };
-        let sys = (avatar === 'kira' ? KIRA_PROMPT : KELION_PROMPT);
-        sys += `\nRĂSPUNDE în ${LANGS[language] || language}. Poți face roleplay.`;
 
-        // Inject memory
+        // ── BRAIN THINKS: analyze → plan → execute tools ──
+        const thought = await brain.think(message, avatar, history, language, user?.id);
+
+        // ── BUILD DEEP PERSONA PROMPT ──
+        const diagnostics = brain.getDiagnostics();
+        let memoryContext = '';
         if (user && supabaseAdmin) {
             try {
-                const { data: prefs } = await supabaseAdmin.from('user_preferences').select('key, value').eq('user_id', user.id).limit(20);
-                if (prefs?.length > 0) sys += `\n[MEMORIE]: ${prefs.map(p => p.key + ': ' + JSON.stringify(p.value)).join('; ')}`;
+                const { data: prefs } = await supabaseAdmin.from('user_preferences').select('key, value').eq('user_id', user.id).limit(30);
+                if (prefs?.length > 0) memoryContext = prefs.map(p => `${p.key}: ${JSON.stringify(p.value)}`).join('; ');
             } catch(e){}
         }
+        const systemPrompt = buildSystemPrompt(avatar, language, memoryContext, { failedTools: thought.failedTools });
 
+        // ── CONVERSATION HISTORY ──
         const msgs = history.slice(-20).map(h => ({ role: h.role === 'ai' ? 'assistant' : h.role, content: h.content }));
-        msgs.push({ role: 'user', content: message });
+        msgs.push({ role: 'user', content: thought.enrichedMessage });
+
+        // ── AI CALL (Claude → GPT-4o → DeepSeek) ──
         let reply = null, engine = null;
 
-        // Claude
+        // Claude (primary)
         if (!reply && process.env.ANTHROPIC_API_KEY) {
             try {
                 const r = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
-                    body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 2048, system: sys, messages: msgs }) });
-                const d = await r.json(); reply = d.content?.[0]?.text; if (reply) engine = 'Claude';
-            } catch(e){ console.warn('[CHAT] Claude:', e.message); }
+                    body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 2048, system: systemPrompt, messages: msgs }) });
+                const d = await r.json();
+                reply = d.content?.[0]?.text;
+                if (reply) engine = 'Claude';
+            } catch(e) { console.warn('[CHAT] Claude:', e.message); }
         }
-        // GPT-4o fallback
+        // GPT-4o (fallback)
         if (!reply && process.env.OPENAI_API_KEY) {
             try {
                 const r = await fetch('https://api.openai.com/v1/chat/completions', { method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + process.env.OPENAI_API_KEY },
-                    body: JSON.stringify({ model: 'gpt-4o', max_tokens: 2048, messages: [{ role: 'system', content: sys }, ...msgs] }) });
-                const d = await r.json(); reply = d.choices?.[0]?.message?.content; if (reply) engine = 'GPT-4o';
-            } catch(e){ console.warn('[CHAT] GPT-4o:', e.message); }
+                    body: JSON.stringify({ model: 'gpt-4o', max_tokens: 2048, messages: [{ role: 'system', content: systemPrompt }, ...msgs] }) });
+                const d = await r.json();
+                reply = d.choices?.[0]?.message?.content;
+                if (reply) engine = 'GPT-4o';
+            } catch(e) { console.warn('[CHAT] GPT-4o:', e.message); }
         }
-        // DeepSeek
+        // DeepSeek (tertiary)
         if (!reply && process.env.DEEPSEEK_API_KEY) {
             try {
                 const r = await fetch('https://api.deepseek.com/v1/chat/completions', { method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + process.env.DEEPSEEK_API_KEY },
-                    body: JSON.stringify({ model: 'deepseek-chat', max_tokens: 2048, messages: [{ role: 'system', content: sys }, ...msgs] }) });
-                const d = await r.json(); reply = d.choices?.[0]?.message?.content; if (reply) engine = 'DeepSeek';
-            } catch(e){ console.warn('[CHAT] DeepSeek:', e.message); }
+                    body: JSON.stringify({ model: 'deepseek-chat', max_tokens: 2048, messages: [{ role: 'system', content: systemPrompt }, ...msgs] }) });
+                const d = await r.json();
+                reply = d.choices?.[0]?.message?.content;
+                if (reply) engine = 'DeepSeek';
+            } catch(e) { console.warn('[CHAT] DeepSeek:', e.message); }
         }
+
         if (!reply) return res.status(503).json({ error: 'AI indisponibil' });
 
-        // Save to DB async
+        // ── ASYNC: Save conversation + Learn ──
         if (supabaseAdmin) saveConv(user?.id, avatar, message, reply, conversationId, language).catch(()=>{});
-        console.log(`[CHAT] ${engine} | ${avatar} | ${language} | ${reply.length}c`);
-        res.json({ reply, avatar, engine, language });
+        brain.learnFromConversation(user?.id, message, reply).catch(()=>{});
+
+        console.log(`[CHAT] ${engine} | ${avatar} | ${language} | tools:[${thought.toolsUsed.join(',')}] | ${reply.length}c`);
+
+        // ── RESPONSE with monitor content ──
+        const response = { reply, avatar, engine, language };
+        if (thought.monitor.content) {
+            response.monitor = thought.monitor;
+        }
+        res.json(response);
+
     } catch(e) { console.error('[CHAT]', e.message); res.status(500).json({ error: 'Eroare AI' }); }
 });
 
+// ═══ SAVE CONVERSATION ═══
 async function saveConv(uid, avatar, userMsg, aiReply, convId, lang) {
     if (!supabaseAdmin) return;
     if (!convId) {
-        const { data } = await supabaseAdmin.from('conversations').insert({ user_id: uid||null, avatar, title: userMsg.substring(0,80) }).select('id').single();
+        const { data } = await supabaseAdmin.from('conversations').insert({ user_id: uid || null, avatar, title: userMsg.substring(0, 80) }).select('id').single();
         convId = data?.id;
     } else { await supabaseAdmin.from('conversations').update({ updated_at: new Date().toISOString() }).eq('id', convId); }
-    if (convId) await supabaseAdmin.from('messages').insert([{ conversation_id: convId, role: 'user', content: userMsg, language: lang }, { conversation_id: convId, role: 'assistant', content: aiReply, language: lang }]);
+    if (convId) await supabaseAdmin.from('messages').insert([
+        { conversation_id: convId, role: 'user', content: userMsg, language: lang },
+        { conversation_id: convId, role: 'assistant', content: aiReply, language: lang }
+    ]);
     return convId;
 }
 
@@ -195,29 +229,18 @@ Răspunde în ${LANGS[language] || 'română'}, concis dar detaliat.`;
     } catch(e) { res.status(500).json({ error: 'Eroare viziune' }); }
 });
 
-// ═══ SEARCH — DuckDuckGo (gratuit, fără cheie) ═══
+// ═══ SEARCH — Tavily + DuckDuckGo ═══
 app.post('/api/search', async (req, res) => {
     try {
         const { query } = req.body;
         if (!query) return res.status(400).json({ error: 'Query lipsă' });
-
-        // Tavily primary (much better results)
         if (process.env.TAVILY_API_KEY) {
             try {
-                const tr = await fetch('https://api.tavily.com/search', {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ api_key: process.env.TAVILY_API_KEY, query, search_depth: 'basic', max_results: 5, include_answer: true })
-                });
-                if (tr.ok) {
-                    const td = await tr.json();
-                    const results = (td.results || []).map(x => ({ title: x.title, content: x.content, url: x.url }));
-                    console.log('[SEARCH] Tavily —', results.length, 'results');
-                    return res.json({ results, answer: td.answer || '', engine: 'Tavily' });
-                }
+                const tr = await fetch('https://api.tavily.com/search', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ api_key: process.env.TAVILY_API_KEY, query, search_depth: 'basic', max_results: 5, include_answer: true }) });
+                if (tr.ok) { const td = await tr.json(); return res.json({ results: (td.results || []).map(x => ({ title: x.title, content: x.content, url: x.url })), answer: td.answer || '', engine: 'Tavily' }); }
             } catch (e) { console.warn('[SEARCH] Tavily:', e.message); }
         }
-
-        // DuckDuckGo fallback
         const r = await fetch('https://api.duckduckgo.com/?q=' + encodeURIComponent(query) + '&format=json&no_html=1&skip_disambig=1');
         const d = await r.json();
         const results = [];
@@ -227,7 +250,7 @@ app.post('/api/search', async (req, res) => {
     } catch(e) { res.status(500).json({ error: 'Eroare căutare' }); }
 });
 
-// ═══ WEATHER — Open-Meteo (gratuit) ═══
+// ═══ WEATHER — Open-Meteo ═══
 app.post('/api/weather', async (req, res) => {
     try {
         const { city } = req.body;
@@ -259,7 +282,7 @@ app.post('/api/imagine', async (req, res) => {
     } catch(e) { res.status(500).json({ error: 'Eroare imagine' }); }
 });
 
-// ═══ MEMORY — Supabase + fallback ═══
+// ═══ MEMORY ═══
 app.post('/api/memory', async (req, res) => {
     try {
         const { action, key, value } = req.body;
@@ -291,31 +314,51 @@ app.get('/api/conversations/:id/messages', async (req, res) => {
     res.json({ messages: data || [] });
 });
 
+// ═══ BRAIN DIAGNOSTICS ═══
+app.get('/api/brain', (req, res) => {
+    res.json(brain.getDiagnostics());
+});
+app.post('/api/brain/reset', (req, res) => {
+    const { tool } = req.body;
+    if (tool) brain.resetTool(tool);
+    else brain.resetAll();
+    res.json({ success: true, diagnostics: brain.getDiagnostics() });
+});
+
 // ═══ HEALTH ═══
 app.get('/api/health', (req, res) => {
-    res.json({ status: 'online', version: '2.1.0', timestamp: new Date().toISOString(),
-        services: { ai_claude: !!process.env.ANTHROPIC_API_KEY, ai_gpt4o: !!process.env.OPENAI_API_KEY,
+    const diag = brain.getDiagnostics();
+    res.json({
+        status: 'online', version: '2.2.0', timestamp: new Date().toISOString(),
+        brain: diag.status,
+        conversations: diag.conversations,
+        services: {
+            ai_claude: !!process.env.ANTHROPIC_API_KEY, ai_gpt4o: !!process.env.OPENAI_API_KEY,
             ai_deepseek: !!process.env.DEEPSEEK_API_KEY,
             tts: !!process.env.ELEVENLABS_API_KEY, stt: true, vision: !!process.env.ANTHROPIC_API_KEY,
             search_tavily: !!process.env.TAVILY_API_KEY, search_ddg: true, weather: true,
             images: !!process.env.TOGETHER_API_KEY,
-            auth: !!supabase, database: !!supabaseAdmin } });
+            auth: !!supabase, database: !!supabaseAdmin
+        }
+    });
 });
 
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, '..', 'app', 'index.html')));
 
-// Run migration then start server
+// ═══ STARTUP ═══
 runMigration().then(migrated => {
     app.listen(PORT, '0.0.0.0', () => {
         console.log('\n══════════════════════════════════════════');
-        console.log('  KelionAI v2.1 — http://localhost:' + PORT);
-        console.log('  AI: ' + (process.env.ANTHROPIC_API_KEY ? '✅ Claude' : '❌') + ' | ' + (process.env.DEEPSEEK_API_KEY ? '✅ DeepSeek' : '❌'));
+        console.log('  KelionAI v2.2 — BRAIN EDITION');
+        console.log('  http://localhost:' + PORT);
+        console.log('  AI: ' + (process.env.ANTHROPIC_API_KEY ? '✅ Claude' : '❌') + ' | ' + (process.env.OPENAI_API_KEY ? '✅ GPT-4o' : '❌') + ' | ' + (process.env.DEEPSEEK_API_KEY ? '✅ DeepSeek' : '❌'));
         console.log('  TTS: ' + (process.env.ELEVENLABS_API_KEY ? '✅ ElevenLabs' : '❌'));
+        console.log('  Brain: 🧠 ACTIVE — Analyze→Plan→Execute→Verify→Learn');
         console.log('  DB: ' + (supabaseAdmin ? '✅ Supabase' : '⚠️ In-memory'));
         console.log('  Migration: ' + (migrated ? '✅ Tables ready' : '⚠️ Skipped'));
         console.log('══════════════════════════════════════════\n');
     });
 }).catch(e => {
     console.error('[Startup] Migration error:', e.message);
-    app.listen(PORT, '0.0.0.0', () => console.log('KelionAI v2.1 on port ' + PORT + ' (migration failed)'));
+    app.listen(PORT, '0.0.0.0', () => console.log('KelionAI v2.2 on port ' + PORT + ' (migration failed)'));
 });
