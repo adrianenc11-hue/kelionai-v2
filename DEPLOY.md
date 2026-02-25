@@ -41,7 +41,7 @@ SERPER_API_KEY=xxx
 TOGETHER_API_KEY=xxx
 
 # Database
-SUPABASE_URL=https://nqlobybfwmtkmsqadqqr.supabase.co
+SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_ANON_KEY=xxx
 SUPABASE_SERVICE_KEY=xxx
 

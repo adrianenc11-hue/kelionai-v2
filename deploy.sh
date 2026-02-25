@@ -72,7 +72,7 @@ SUPABASE_EOF
 echo "📝 Creez server/schema.sql..."
 cat > server/schema.sql << 'SQL_EOF'
 -- KelionAI v2 — Supabase Schema
--- Rulează în: https://supabase.com/dashboard/project/nqlobybfwmtkmsqadqqr/sql
+-- Rulează în: https://supabase.com/dashboard/project/YOUR_PROJECT_REF/sql
 
 CREATE TABLE IF NOT EXISTS conversations (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -955,7 +955,7 @@ cat > app/index.html << 'HTML_EOF'
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
     <script src="https://browser.sentry-cdn.com/8.46.0/bundle.tracing.replay.min.js" crossorigin="anonymous"></script>
     <script>
-        if (window.Sentry) Sentry.init({ dsn: "https://5c261710f7055bef0cdcdb50239b5519@o4510937317834752.ingest.us.sentry.io/4510937323012096",
+        if (window.Sentry) Sentry.init({ dsn: "YOUR_SENTRY_DSN",
             integrations: [Sentry.browserTracingIntegration(), Sentry.replayIntegration()], tracesSampleRate: 1.0 });
     </script>
 </head>
@@ -1103,7 +1103,7 @@ echo ""
 echo "  PASUL FINAL (o singură dată):"
 echo ""
 echo "  1. Mergi la Supabase SQL Editor:"
-echo "     https://supabase.com/dashboard/project/nqlobybfwmtkmsqadqqr/sql"
+echo "     https://supabase.com/dashboard/project/YOUR_PROJECT_REF/sql"
 echo ""
 echo "  2. Copiază conținutul din server/schema.sql"
 echo "     și apasă RUN"

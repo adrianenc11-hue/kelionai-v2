@@ -1,5 +1,5 @@
 -- KelionAI v2 — Supabase Schema
--- Rulează în: https://supabase.com/dashboard/project/nqlobybfwmtkmsqadqqr/sql
+-- Rulează în: https://supabase.com/dashboard/project/YOUR_PROJECT_REF/sql
 
 CREATE TABLE IF NOT EXISTS conversations (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,

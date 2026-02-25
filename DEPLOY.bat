@@ -125,7 +125,7 @@ echo   💻 Local:   http://localhost:3000
 echo.
 echo   ⚠️  ULTIMUL PAS (o singură dată):
 echo   Dacă tabelele Supabase nu s-au creat automat:
-echo   1. Deschide: https://supabase.com/dashboard/project/nqlobybfwmtkmsqadqqr/sql
+echo   1. Deschide: https://supabase.com/dashboard/project/YOUR_PROJECT_REF/sql
 echo   2. Copiază conținutul din server/schema.sql
 echo   3. Apasă "Run"
 echo ══════════════════════════════════════════════════
