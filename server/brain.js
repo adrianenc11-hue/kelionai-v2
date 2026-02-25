@@ -19,7 +19,9 @@ class KelionBrain {
     constructor(config) {
         this.anthropicKey = config.anthropicKey;
         this.openaiKey = config.openaiKey;
+        this.perplexityKey = config.perplexityKey;
         this.tavilyKey = config.tavilyKey;
+        this.serperKey = config.serperKey;
         this.togetherKey = config.togetherKey;
         this.supabaseAdmin = config.supabaseAdmin;
 
@@ -523,14 +525,73 @@ Raspunde STRICT cu JSON:
     // TOOL IMPLEMENTATIONS
     // ═══════════════════════════════════════════════════════════
     async _search(query) {
-        if (!this.tavilyKey) throw new Error('No key');
         this.toolStats.search++;
-        const r = await fetch('https://api.tavily.com/search', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ api_key: this.tavilyKey, query, search_depth: 'basic', max_results: 5, include_answer: true }) });
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        const d = await r.json();
-        const sources = (d.results || []).slice(0, 4).map(x => `- ${x.title}: ${x.content?.substring(0, 200)}`).join('\n');
-        return (d.answer || '') + (sources ? '\n\nSurse:\n' + sources : '');
+        let result = null, engine = null;
+
+        // 1️⃣ PERPLEXITY SONAR — Best: returns synthesized answer + citations
+        if (!result && this.perplexityKey) {
+            try {
+                const r = await fetch('https://api.perplexity.ai/chat/completions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.perplexityKey}` },
+                    body: JSON.stringify({ model: 'sonar', messages: [{ role: 'user', content: query }], max_tokens: 500 })
+                });
+                if (r.ok) {
+                    const d = await r.json();
+                    const answer = d.choices?.[0]?.message?.content;
+                    const citations = (d.citations || []).slice(0, 4).map(url => `- ${url}`).join('\n');
+                    if (answer) { result = answer + (citations ? '\n\nSurse:\n' + citations : ''); engine = 'Perplexity'; }
+                }
+            } catch (e) { console.warn('[Brain] Perplexity:', e.message); }
+        }
+
+        // 2️⃣ TAVILY — Good: aggregated + parsed for LLM
+        if (!result && this.tavilyKey) {
+            try {
+                const r = await fetch('https://api.tavily.com/search', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ api_key: this.tavilyKey, query, search_depth: 'basic', max_results: 5, include_answer: true }) });
+                if (r.ok) {
+                    const d = await r.json();
+                    const sources = (d.results || []).slice(0, 4).map(x => `- ${x.title}: ${x.content?.substring(0, 200)}`).join('\n');
+                    if (d.answer || sources) { result = (d.answer || '') + (sources ? '\n\nSurse:\n' + sources : ''); engine = 'Tavily'; }
+                }
+            } catch (e) { console.warn('[Brain] Tavily:', e.message); }
+        }
+
+        // 3️⃣ SERPER — Fast: raw Google results, very cheap
+        if (!result && this.serperKey) {
+            try {
+                const r = await fetch('https://google.serper.dev/search', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-API-KEY': this.serperKey },
+                    body: JSON.stringify({ q: query, num: 5 })
+                });
+                if (r.ok) {
+                    const d = await r.json();
+                    const answer = d.answerBox?.answer || d.answerBox?.snippet || d.knowledgeGraph?.description || '';
+                    const organic = (d.organic || []).slice(0, 4).map(x => `- ${x.title}: ${x.snippet?.substring(0, 200)}`).join('\n');
+                    if (answer || organic) { result = answer + (organic ? '\n\nSurse:\n' + organic : ''); engine = 'Serper'; }
+                }
+            } catch (e) { console.warn('[Brain] Serper:', e.message); }
+        }
+
+        // 4️⃣ DUCKDUCKGO — Free fallback, no key needed
+        if (!result) {
+            try {
+                const r = await fetch('https://api.duckduckgo.com/?q=' + encodeURIComponent(query) + '&format=json&no_html=1&skip_disambig=1');
+                if (r.ok) {
+                    const d = await r.json();
+                    const parts = [];
+                    if (d.Abstract) parts.push(d.Abstract);
+                    if (d.RelatedTopics) for (const t of d.RelatedTopics.slice(0, 4)) if (t.Text) parts.push(`- ${t.Text.substring(0, 150)}`);
+                    if (parts.length > 0) { result = parts.join('\n'); engine = 'DuckDuckGo'; }
+                }
+            } catch (e) { console.warn('[Brain] DuckDuckGo:', e.message); }
+        }
+
+        if (!result) throw new Error('All search engines failed');
+        console.log(`[Brain] \u{1F50D} Search via ${engine}`);
+        return result;
     }
 
     async _weather(city) {
