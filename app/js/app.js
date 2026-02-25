@@ -11,9 +11,11 @@
 
     function authHeaders() { return { 'Content-Type': 'application/json', ...(window.KAuth ? KAuth.getAuthHeaders() : {}) }; }
 
+    function persistConvId(id) { currentConversationId = id; try { if (id) localStorage.setItem('kelion_conv_id', id); else localStorage.removeItem('kelion_conv_id'); } catch(e){ console.warn('[App] localStorage write:', e.message); } }
+    function restoreConvId() { try { return localStorage.getItem('kelion_conv_id') || null; } catch(e){ console.warn('[App] localStorage read:', e.message); return null; } }
+
     function unlockAudio() {
         if (audioUnlocked) return; audioUnlocked = true;
-        try { const c = new (window.AudioContext || window.webkitAudioContext)(), b = c.createBuffer(1,1,22050), s = c.createBufferSource(); s.buffer = b; s.connect(c.destination); s.start(0); c.resume(); } catch(e){}
         if (window.KVoice) KVoice.ensureAudioUnlocked();
     }
 
@@ -108,6 +110,7 @@
                                 fullReply = data.reply;
                                 msgEl.textContent = fullReply;
                             }
+                            if (data.conversationId) persistConvId(data.conversationId);
                         }
                     } catch(e) { /* skip parse errors */ }
                 }
@@ -165,6 +168,7 @@
             }
 
             const data = await resp.json();
+            if (data.conversationId) persistConvId(data.conversationId);
             chatHistory.push({ role: 'user', content: message });
             chatHistory.push({ role: 'assistant', content: data.reply });
             addMessage('assistant', data.reply);
@@ -240,7 +244,7 @@
     async function resumeConversation(convId, avatar) {
         try {
             if (avatar && avatar !== KAvatar.getCurrentAvatar()) switchAvatar(avatar);
-            currentConversationId = convId;
+            persistConvId(convId);
 
             const r = await fetch(API_BASE + '/api/conversations/' + convId + '/messages', { headers: authHeaders() });
             if (!r.ok) throw new Error('Eroare');
@@ -265,7 +269,7 @@
     }
 
     function startNewChat() {
-        currentConversationId = null;
+        persistConvId(null);
         chatHistory = [];
         var overlay = document.getElementById('chat-overlay');
         if (overlay) overlay.innerHTML = '';
@@ -311,7 +315,7 @@
         KVoice.stopSpeaking(); KAvatar.loadAvatar(name);
         document.querySelectorAll('.avatar-pill').forEach(function(b) { b.classList.toggle('active', b.dataset.avatar === name); });
         var n = document.getElementById('avatar-name'); if (n) n.textContent = name.charAt(0).toUpperCase() + name.slice(1);
-        chatHistory = []; currentConversationId = null;
+        chatHistory = []; persistConvId(null);
         var o = document.getElementById('chat-overlay'); if (o) o.innerHTML = '';
     }
 
@@ -420,6 +424,30 @@
         setupDragDrop();
         KVoice.startWakeWordDetection();
         checkHealth();
+
+        // Restore last conversation from localStorage
+        var savedConvId = restoreConvId();
+        if (savedConvId) {
+            currentConversationId = savedConvId;
+            fetch(API_BASE + '/api/conversations/' + savedConvId + '/messages', { headers: authHeaders() })
+                .then(function(r) { return r.ok ? r.json() : null; })
+                .then(function(data) {
+                    if (!data) return;
+                    var msgs = data.messages || data || [];
+                    if (msgs.length === 0) return;
+                    hideWelcome();
+                    var overlay = document.getElementById('chat-overlay');
+                    overlay.innerHTML = '';
+                    chatHistory = [];
+                    for (var i = 0; i < msgs.length; i++) {
+                        var role = msgs[i].role === 'assistant' ? 'assistant' : 'user';
+                        addMessage(role, msgs[i].content);
+                        chatHistory.push({ role: role, content: msgs[i].content });
+                    }
+                })
+                .catch(function(e) { console.warn('[App] restore conversation:', e.message); persistConvId(null); });
+        }
+
         console.log('[App] ✅ KelionAI v2.3 — STREAMING + HISTORY');
     }
 
