@@ -11,21 +11,16 @@
 
     function authHeaders() { return { 'Content-Type': 'application/json', ...(window.KAuth ? KAuth.getAuthHeaders() : {}) }; }
 
+    function persistConvId(id) { currentConversationId = id; try { if (id) localStorage.setItem('kelion_conv_id', id); else localStorage.removeItem('kelion_conv_id'); } catch(e){ console.warn('[App] localStorage write:', e.message); } }
+    function restoreConvId() { try { return localStorage.getItem('kelion_conv_id') || null; } catch(e){ console.warn('[App] localStorage read:', e.message); return null; } }
+
     function unlockAudio() {
-        if (!audioUnlocked) {
-            audioUnlocked = true;
-            try { const c = new (window.AudioContext || window.webkitAudioContext)(), b = c.createBuffer(1,1,22050), s = c.createBufferSource(); s.buffer = b; s.connect(c.destination); s.start(0); c.resume(); } catch(e){}
-        }
+        if (!audioUnlocked) { audioUnlocked = true; }
         if (window.KVoice) KVoice.ensureAudioUnlocked();
     }
 
     function showOnMonitor(content, type) {
-        const dc = document.getElementById('display-content'); if (!dc) return;
-        KAvatar.setPresenting(true);
-        if (type === 'image') dc.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;padding:20px"><img src="'+content+'" style="max-width:100%;max-height:100%;border-radius:12px;box-shadow:0 4px 30px rgba(0,0,0,0.5)"></div>';
-        else if (type === 'map') dc.innerHTML = '<iframe src="'+content+'" style="width:100%;height:100%;border:none;border-radius:12px"></iframe>';
-        else if (type === 'html') dc.innerHTML = content;
-        else dc.innerHTML = '<div style="padding:30px;color:rgba(255,255,255,0.8);font-size:1rem;line-height:1.6">'+content+'</div>';
+        if (window.MonitorManager) MonitorManager.show(content, type);
     }
 
     // ─── Vision (client-side camera) ────────────────────────
@@ -101,6 +96,10 @@
 
                         if (data.type === 'monitor') {
                             showOnMonitor(data.content, data.monitorType);
+                        } else if (data.type === 'search_results') {
+                            if (window.MonitorManager) MonitorManager.showSearchResults(data.results);
+                        } else if (data.type === 'weather') {
+                            if (window.MonitorManager) MonitorManager.showWeather(data.data);
                         } else if (data.type === 'chunk') {
                             fullReply += data.text;
                             msgEl.textContent = fullReply;
@@ -111,6 +110,7 @@
                                 fullReply = data.reply;
                                 msgEl.textContent = fullReply;
                             }
+                            if (data.conversationId) persistConvId(data.conversationId);
                         }
                     } catch(e) { /* skip parse errors */ }
                 }
@@ -122,6 +122,13 @@
 
             const imgMatch = fullReply.match(/https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp)/i);
             if (imgMatch) showOnMonitor(imgMatch[0], 'image');
+
+            const coordMatch = fullReply.match(/(-?\d+\.?\d*)[°\s,]+([NS])?\s*,?\s*(-?\d+\.?\d*)[°\s,]+([EW])?/i);
+            if (!imgMatch && coordMatch) {
+                const lat = parseFloat(coordMatch[1]);
+                const lng = parseFloat(coordMatch[3]);
+                if (!isNaN(lat) && !isNaN(lng) && window.MonitorManager) MonitorManager.showMap(lat, lng);
+            }
 
             KAvatar.setExpression('happy', 0.3);
             await KVoice.speak(fullReply, KAvatar.getCurrentAvatar());
@@ -161,16 +168,28 @@
             }
 
             const data = await resp.json();
+            if (data.conversationId) persistConvId(data.conversationId);
             chatHistory.push({ role: 'user', content: message });
             chatHistory.push({ role: 'assistant', content: data.reply });
             addMessage('assistant', data.reply);
 
             if (data.monitor && data.monitor.content) {
                 showOnMonitor(data.monitor.content, data.monitor.type);
+            } else if (data.monitor && data.monitor.search_results) {
+                if (window.MonitorManager) MonitorManager.showSearchResults(data.monitor.search_results);
+            } else if (data.monitor && data.monitor.weather) {
+                if (window.MonitorManager) MonitorManager.showWeather(data.monitor.weather);
             }
 
             const imgMatch = data.reply.match(/https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp)/i);
             if (imgMatch && !data.monitor?.content) showOnMonitor(imgMatch[0], 'image');
+
+            const coordMatch2 = data.reply.match(/(-?\d+\.?\d*)[°\s,]+([NS])?\s*,?\s*(-?\d+\.?\d*)[°\s,]+([EW])?/i);
+            if (!imgMatch && !data.monitor?.content && coordMatch2) {
+                const lat2 = parseFloat(coordMatch2[1]);
+                const lng2 = parseFloat(coordMatch2[3]);
+                if (!isNaN(lat2) && !isNaN(lng2) && window.MonitorManager) MonitorManager.showMap(lat2, lng2);
+            }
 
             KAvatar.setExpression('happy', 0.3);
             await KVoice.speak(data.reply, data.avatar);
@@ -225,7 +244,7 @@
     async function resumeConversation(convId, avatar) {
         try {
             if (avatar && avatar !== KAvatar.getCurrentAvatar()) switchAvatar(avatar);
-            currentConversationId = convId;
+            persistConvId(convId);
 
             const r = await fetch(API_BASE + '/api/conversations/' + convId + '/messages', { headers: authHeaders() });
             if (!r.ok) throw new Error('Eroare');
@@ -250,7 +269,7 @@
     }
 
     function startNewChat() {
-        currentConversationId = null;
+        persistConvId(null);
         chatHistory = [];
         var overlay = document.getElementById('chat-overlay');
         if (overlay) overlay.innerHTML = '';
@@ -296,7 +315,7 @@
         KVoice.stopSpeaking(); KAvatar.loadAvatar(name);
         document.querySelectorAll('.avatar-pill').forEach(function(b) { b.classList.toggle('active', b.dataset.avatar === name); });
         var n = document.getElementById('avatar-name'); if (n) n.textContent = name.charAt(0).toUpperCase() + name.slice(1);
-        chatHistory = []; currentConversationId = null;
+        chatHistory = []; persistConvId(null);
         var o = document.getElementById('chat-overlay'); if (o) o.innerHTML = '';
     }
 
@@ -405,6 +424,30 @@
         setupDragDrop();
         KVoice.startWakeWordDetection();
         checkHealth();
+
+        // Restore last conversation from localStorage
+        var savedConvId = restoreConvId();
+        if (savedConvId) {
+            currentConversationId = savedConvId;
+            fetch(API_BASE + '/api/conversations/' + savedConvId + '/messages', { headers: authHeaders() })
+                .then(function(r) { return r.ok ? r.json() : null; })
+                .then(function(data) {
+                    if (!data) return;
+                    var msgs = data.messages || data || [];
+                    if (msgs.length === 0) return;
+                    hideWelcome();
+                    var overlay = document.getElementById('chat-overlay');
+                    overlay.innerHTML = '';
+                    chatHistory = [];
+                    for (var i = 0; i < msgs.length; i++) {
+                        var role = msgs[i].role === 'assistant' ? 'assistant' : 'user';
+                        addMessage(role, msgs[i].content);
+                        chatHistory.push({ role: role, content: msgs[i].content });
+                    }
+                })
+                .catch(function(e) { console.warn('[App] restore conversation:', e.message); persistConvId(null); });
+        }
+
         console.log('[App] ✅ KelionAI v2.3 — STREAMING + HISTORY');
     }
 
