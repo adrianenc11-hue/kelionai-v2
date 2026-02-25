@@ -160,14 +160,17 @@ app.post('/api/chat', chatLimiter, async (req, res) => {
 
         if (!reply) return res.status(503).json({ error: 'AI indisponibil' });
 
-        // ── ASYNC: Save conversation + Learn ──
-        if (supabaseAdmin) saveConv(user?.id, avatar, message, reply, conversationId, language).catch(()=>{});
+        // ── Save conversation (sync to get ID) + Learn async ──
+        let savedConvId = conversationId;
+        if (supabaseAdmin) {
+            try { savedConvId = await saveConv(user?.id, avatar, message, reply, conversationId, language); } catch(e){ console.warn('[CHAT] saveConv:', e.message); }
+        }
         brain.learnFromConversation(user?.id, message, reply).catch(()=>{});
 
         console.log(`[CHAT] ${engine} | ${avatar} | ${language} | tools:[${thought.toolsUsed.join(',')}] | CoT:${!!thought.chainOfThought} | ${thought.thinkTime}ms think | ${reply.length}c`);
 
         // ── RESPONSE with monitor content + brain metadata ──
-        const response = { reply, avatar, engine, language, thinkTime: thought.thinkTime };
+        const response = { reply, avatar, engine, language, thinkTime: thought.thinkTime, conversationId: savedConvId };
         if (thought.monitor.content) {
             response.monitor = thought.monitor;
         }
@@ -273,12 +276,16 @@ app.post('/api/chat/stream', chatLimiter, async (req, res) => {
             } catch(e) {}
         }
 
+        // Save conversation (sync to get ID) then end stream
+        let savedConvId = conversationId;
+        if (fullReply && supabaseAdmin) {
+            try { savedConvId = await saveConv(user?.id, avatar, message, fullReply, conversationId, language); } catch(e){ console.warn('[STREAM] saveConv:', e.message); }
+        }
+
         // End stream
-        res.write(`data: ${JSON.stringify({ type: 'done', reply: fullReply, thinkTime: thought.thinkTime })}\n\n`);
+        res.write(`data: ${JSON.stringify({ type: 'done', reply: fullReply, thinkTime: thought.thinkTime, conversationId: savedConvId })}\n\n`);
         res.end();
 
-        // Async: save + learn
-        if (fullReply && supabaseAdmin) saveConv(user?.id, avatar, message, fullReply, conversationId, language).catch(()=>{});
         if (fullReply) brain.learnFromConversation(user?.id, message, fullReply).catch(()=>{});
         console.log(`[STREAM] ${avatar} | ${language} | ${fullReply.length}c`);
 
