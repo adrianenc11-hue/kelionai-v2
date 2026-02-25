@@ -34,7 +34,9 @@ const memFallback = {};
 const brain = new KelionBrain({
     anthropicKey: process.env.ANTHROPIC_API_KEY,
     openaiKey: process.env.OPENAI_API_KEY,
+    perplexityKey: process.env.PERPLEXITY_API_KEY,
     tavilyKey: process.env.TAVILY_API_KEY,
+    serperKey: process.env.SERPER_API_KEY,
     togetherKey: process.env.TOGETHER_API_KEY,
     supabaseAdmin
 });
@@ -229,18 +231,63 @@ Răspunde în ${LANGS[language] || 'română'}, concis dar detaliat.`;
     } catch(e) { res.status(500).json({ error: 'Eroare viziune' }); }
 });
 
-// ═══ SEARCH — Tavily + DuckDuckGo ═══
+// ═══ SEARCH — Perplexity Sonar → Tavily → Serper → DuckDuckGo ═══
 app.post('/api/search', async (req, res) => {
     try {
         const { query } = req.body;
         if (!query) return res.status(400).json({ error: 'Query lipsă' });
+
+        // 1. Perplexity Sonar (best — synthesized answer + citations)
+        if (process.env.PERPLEXITY_API_KEY) {
+            try {
+                const r = await fetch('https://api.perplexity.ai/chat/completions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + process.env.PERPLEXITY_API_KEY },
+                    body: JSON.stringify({ model: 'sonar', messages: [{ role: 'user', content: query }], max_tokens: 500 })
+                });
+                if (r.ok) {
+                    const d = await r.json();
+                    const answer = d.choices?.[0]?.message?.content || '';
+                    const citations = d.citations || [];
+                    const results = citations.slice(0, 5).map(url => ({ title: url, content: '', url }));
+                    console.log('[SEARCH] Perplexity Sonar —', answer.length, 'chars');
+                    return res.json({ results, answer, engine: 'Perplexity' });
+                }
+            } catch (e) { console.warn('[SEARCH] Perplexity:', e.message); }
+        }
+
+        // 2. Tavily (good — aggregated + parsed)
         if (process.env.TAVILY_API_KEY) {
             try {
                 const tr = await fetch('https://api.tavily.com/search', { method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ api_key: process.env.TAVILY_API_KEY, query, search_depth: 'basic', max_results: 5, include_answer: true }) });
-                if (tr.ok) { const td = await tr.json(); return res.json({ results: (td.results || []).map(x => ({ title: x.title, content: x.content, url: x.url })), answer: td.answer || '', engine: 'Tavily' }); }
+                if (tr.ok) {
+                    const td = await tr.json();
+                    console.log('[SEARCH] Tavily —', (td.results || []).length, 'results');
+                    return res.json({ results: (td.results || []).map(x => ({ title: x.title, content: x.content, url: x.url })), answer: td.answer || '', engine: 'Tavily' });
+                }
             } catch (e) { console.warn('[SEARCH] Tavily:', e.message); }
         }
+
+        // 3. Serper (fast — raw Google results, cheap)
+        if (process.env.SERPER_API_KEY) {
+            try {
+                const sr = await fetch('https://google.serper.dev/search', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-API-KEY': process.env.SERPER_API_KEY },
+                    body: JSON.stringify({ q: query, num: 5 })
+                });
+                if (sr.ok) {
+                    const sd = await sr.json();
+                    const answer = sd.answerBox?.answer || sd.answerBox?.snippet || sd.knowledgeGraph?.description || '';
+                    const results = (sd.organic || []).slice(0, 5).map(x => ({ title: x.title, content: x.snippet, url: x.link }));
+                    console.log('[SEARCH] Serper —', results.length, 'results');
+                    return res.json({ results, answer, engine: 'Serper' });
+                }
+            } catch (e) { console.warn('[SEARCH] Serper:', e.message); }
+        }
+
+        // 4. DuckDuckGo (free fallback)
         const r = await fetch('https://api.duckduckgo.com/?q=' + encodeURIComponent(query) + '&format=json&no_html=1&skip_disambig=1');
         const d = await r.json();
         const results = [];
@@ -410,7 +457,8 @@ app.get('/api/health', (req, res) => {
             ai_claude: !!process.env.ANTHROPIC_API_KEY, ai_gpt4o: !!process.env.OPENAI_API_KEY,
             ai_deepseek: !!process.env.DEEPSEEK_API_KEY,
             tts: !!process.env.ELEVENLABS_API_KEY, stt: true, vision: !!process.env.ANTHROPIC_API_KEY,
-            search_tavily: !!process.env.TAVILY_API_KEY, search_ddg: true, weather: true,
+            search_perplexity: !!process.env.PERPLEXITY_API_KEY, search_tavily: !!process.env.TAVILY_API_KEY,
+            search_serper: !!process.env.SERPER_API_KEY, search_ddg: true, weather: true,
             images: !!process.env.TOGETHER_API_KEY,
             auth: !!supabase, database: !!supabaseAdmin
         }

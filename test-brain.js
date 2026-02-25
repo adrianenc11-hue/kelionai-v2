@@ -268,9 +268,11 @@ test('Does NOT add memory without userId', () => {
 // ═══════════════════════════════════════════════════════════════
 console.log('\n\x1b[1m─── 8. TOOL EXECUTION (graceful failures) ───\x1b[0m');
 
-await testAsync('Search fails gracefully without API key', async () => {
-    try { await brain._search('test'); return false; }
-    catch (e) { return e.message === 'No key'; }
+await testAsync('Search falls back to DuckDuckGo without API keys', async () => {
+    // With no API keys, _search falls through all tiers to DuckDuckGo
+    // DuckDuckGo may return empty results but shouldn't crash
+    try { const r = await brain._search('test'); return typeof r === 'string'; }
+    catch (e) { return e.message === 'All search engines failed'; }
 });
 
 await testAsync('Imagine fails gracefully without API key', async () => {
