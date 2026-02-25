@@ -13,6 +13,7 @@ const cors = require('cors');
 const fetch = require('node-fetch');
 const FormData = require('form-data');
 const path = require('path');
+const rateLimit = require('express-rate-limit');
 const { supabase, supabaseAdmin } = require('./supabase');
 const { runMigration } = require('./migrate');
 const { KelionBrain } = require('./brain');
@@ -22,6 +23,12 @@ const app = express();
 if (process.env.SENTRY_DSN) Sentry.setupExpressErrorHandler(app);
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
+
+// ═══ RATE LIMITING ═══
+const chatLimiter = rateLimit({ windowMs: 60 * 1000, max: 20, message: { error: 'Prea multe cereri. Așteaptă un minut.' }, standardHeaders: true, legacyHeaders: false });
+const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10, message: { error: 'Prea multe încercări. Așteaptă 15 minute.' } });
+const searchLimiter = rateLimit({ windowMs: 60 * 1000, max: 15, message: { error: 'Prea multe căutări. Așteaptă un minut.' } });
+const imageLimiter = rateLimit({ windowMs: 60 * 1000, max: 5, message: { error: 'Prea multe imagini. Așteaptă un minut.' } });
 
 const metrics = require('./metrics');
 app.use(metrics.metricsMiddleware);
@@ -51,7 +58,7 @@ async function getUserFromToken(req) {
 }
 
 // ═══ AUTH ENDPOINTS ═══
-app.post('/api/auth/register', async (req, res) => {
+app.post('/api/auth/register', authLimiter, async (req, res) => {
     try {
         const { email, password, name } = req.body;
         if (!email || !password) return res.status(400).json({ error: 'Email și parolă obligatorii' });
@@ -62,7 +69,7 @@ app.post('/api/auth/register', async (req, res) => {
     } catch (e) { res.status(500).json({ error: 'Eroare înregistrare' }); }
 });
 
-app.post('/api/auth/login', async (req, res) => {
+app.post('/api/auth/login', authLimiter, async (req, res) => {
     try {
         const { email, password } = req.body;
         if (!email || !password) return res.status(400).json({ error: 'Email și parolă obligatorii' });
@@ -84,7 +91,7 @@ app.get('/api/auth/me', async (req, res) => {
 // CHAT — BRAIN-POWERED (the core)
 // Brain decides tools → executes in parallel → builds deep prompt → AI responds → learns
 // ═══════════════════════════════════════════════════════════════
-app.post('/api/chat', async (req, res) => {
+app.post('/api/chat', chatLimiter, async (req, res) => {
     try {
         const { message, avatar = 'kelion', history = [], language = 'ro', conversationId } = req.body;
         if (!message) return res.status(400).json({ error: 'Mesaj lipsă' });
@@ -163,6 +170,115 @@ app.post('/api/chat', async (req, res) => {
     } catch(e) { console.error('[CHAT]', e.message); res.status(500).json({ error: 'Eroare AI' }); }
 });
 
+// ═══════════════════════════════════════════════════════════════
+// CHAT STREAM — Server-Sent Events (word-by-word response)
+// ═══════════════════════════════════════════════════════════════
+app.post('/api/chat/stream', chatLimiter, async (req, res) => {
+    try {
+        const { message, avatar = 'kelion', history = [], language = 'ro', conversationId } = req.body;
+        if (!message) return res.status(400).json({ error: 'Mesaj lipsă' });
+        const user = await getUserFromToken(req);
+
+        // SSE headers
+        res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive', 'X-Accel-Buffering': 'no' });
+
+        // Brain thinks (tools in parallel)
+        const thought = await brain.think(message, avatar, history, language, user?.id, conversationId);
+
+        // Send monitor content immediately if available
+        if (thought.monitor.content) {
+            res.write(`data: ${JSON.stringify({ type: 'monitor', content: thought.monitor.content, monitorType: thought.monitor.type })}\n\n`);
+        }
+
+        // Build prompt
+        let memoryContext = '';
+        if (user && supabaseAdmin) {
+            try {
+                const { data: prefs } = await supabaseAdmin.from('user_preferences').select('key, value').eq('user_id', user.id).limit(30);
+                if (prefs?.length > 0) memoryContext = prefs.map(p => `${p.key}: ${JSON.stringify(p.value)}`).join('; ');
+            } catch(e){}
+        }
+        const systemPrompt = buildSystemPrompt(avatar, language, memoryContext, { failedTools: thought.failedTools }, thought.chainOfThought);
+        const compressedHist = thought.compressedHistory || history.slice(-20);
+        const msgs = compressedHist.map(h => ({ role: h.role === 'ai' ? 'assistant' : h.role, content: h.content }));
+        msgs.push({ role: 'user', content: thought.enrichedMessage });
+
+        let fullReply = '';
+
+        // Try Claude streaming
+        if (process.env.ANTHROPIC_API_KEY) {
+            try {
+                const r = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
+                    body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 2048, system: systemPrompt, messages: msgs, stream: true }) });
+
+                if (r.ok && r.body) {
+                    res.write(`data: ${JSON.stringify({ type: 'start', engine: 'Claude' })}\n\n`);
+                    const reader = r.body;
+                    let buffer = '';
+
+                    await new Promise((resolve, reject) => {
+                        reader.on('data', (chunk) => {
+                            buffer += chunk.toString();
+                            const lines = buffer.split('\n');
+                            buffer = lines.pop() || '';
+
+                            for (const line of lines) {
+                                if (!line.startsWith('data: ')) continue;
+                                const data = line.slice(6).trim();
+                                if (data === '[DONE]') continue;
+                                try {
+                                    const parsed = JSON.parse(data);
+                                    if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
+                                        fullReply += parsed.delta.text;
+                                        res.write(`data: ${JSON.stringify({ type: 'chunk', text: parsed.delta.text })}\n\n`);
+                                    }
+                                } catch (e) { /* skip parse errors */ }
+                            }
+                        });
+                        reader.on('end', resolve);
+                        reader.on('error', reject);
+                    });
+                }
+            } catch (e) { console.warn('[STREAM] Claude:', e.message); }
+        }
+
+        // Fallback: non-streaming GPT-4o or DeepSeek (send as single chunk)
+        if (!fullReply) {
+            if (process.env.OPENAI_API_KEY) {
+                try {
+                    const r = await fetch('https://api.openai.com/v1/chat/completions', { method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + process.env.OPENAI_API_KEY },
+                        body: JSON.stringify({ model: 'gpt-4o', max_tokens: 2048, messages: [{ role: 'system', content: systemPrompt }, ...msgs] }) });
+                    const d = await r.json();
+                    fullReply = d.choices?.[0]?.message?.content || '';
+                    if (fullReply) { res.write(`data: ${JSON.stringify({ type: 'start', engine: 'GPT-4o' })}\n\n`); res.write(`data: ${JSON.stringify({ type: 'chunk', text: fullReply })}\n\n`); }
+                } catch(e) {}
+            }
+        }
+        if (!fullReply && process.env.DEEPSEEK_API_KEY) {
+            try {
+                const r = await fetch('https://api.deepseek.com/v1/chat/completions', { method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + process.env.DEEPSEEK_API_KEY },
+                    body: JSON.stringify({ model: 'deepseek-chat', max_tokens: 2048, messages: [{ role: 'system', content: systemPrompt }, ...msgs] }) });
+                const d = await r.json();
+                fullReply = d.choices?.[0]?.message?.content || '';
+                if (fullReply) { res.write(`data: ${JSON.stringify({ type: 'start', engine: 'DeepSeek' })}\n\n`); res.write(`data: ${JSON.stringify({ type: 'chunk', text: fullReply })}\n\n`); }
+            } catch(e) {}
+        }
+
+        // End stream
+        res.write(`data: ${JSON.stringify({ type: 'done', reply: fullReply, thinkTime: thought.thinkTime })}\n\n`);
+        res.end();
+
+        // Async: save + learn
+        if (fullReply && supabaseAdmin) saveConv(user?.id, avatar, message, fullReply, conversationId, language).catch(()=>{});
+        if (fullReply) brain.learnFromConversation(user?.id, message, fullReply).catch(()=>{});
+        console.log(`[STREAM] ${avatar} | ${language} | ${fullReply.length}c`);
+
+    } catch(e) { console.error('[STREAM]', e.message); if (!res.headersSent) res.status(500).json({ error: 'Eroare stream' }); else res.end(); }
+});
+
 // ═══ SAVE CONVERSATION ═══
 async function saveConv(uid, avatar, userMsg, aiReply, convId, lang) {
     if (!supabaseAdmin) return;
@@ -232,7 +348,7 @@ Răspunde în ${LANGS[language] || 'română'}, concis dar detaliat.`;
 });
 
 // ═══ SEARCH — Perplexity Sonar → Tavily → Serper → DuckDuckGo ═══
-app.post('/api/search', async (req, res) => {
+app.post('/api/search', searchLimiter, async (req, res) => {
     try {
         const { query } = req.body;
         if (!query) return res.status(400).json({ error: 'Query lipsă' });
@@ -315,7 +431,7 @@ app.post('/api/weather', async (req, res) => {
 });
 
 // ═══ IMAGINE — Together FLUX ═══
-app.post('/api/imagine', async (req, res) => {
+app.post('/api/imagine', imageLimiter, async (req, res) => {
     try {
         const { prompt } = req.body;
         if (!prompt || !process.env.TOGETHER_API_KEY) return res.status(503).json({ error: 'Imagine indisponibil' });
