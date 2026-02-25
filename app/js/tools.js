@@ -27,17 +27,6 @@ const KelionTools = (function () {
         return m ? m[1] : null;
     }
 
-    function showOnMonitor(content, type) {
-        const dc = document.getElementById('display-content');
-        if (!dc) return;
-        if (window.KAvatar) KAvatar.setPresenting(true);
-        if (type === 'image') {
-            dc.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;padding:20px"><img src="' + content + '" style="max-width:100%;max-height:100%;border-radius:12px;box-shadow:0 4px 30px rgba(0,0,0,0.5)"></div>';
-        } else if (type === 'html') {
-            dc.innerHTML = content;
-        }
-    }
-
     async function search(query) {
         const res = await fetch('/api/search', {
             method: 'POST',
@@ -75,15 +64,7 @@ const KelionTools = (function () {
                 const w = await weather(city);
                 if (w && !w.error) {
                     extraContext += '\n[METEO REAL ' + w.city + ': ' + w.description + ']';
-                    showOnMonitor(
-                        '<div style="padding:40px;text-align:center">' +
-                        '<h2 style="color:#fff;margin-bottom:20px">' + w.city + ', ' + w.country + '</h2>' +
-                        '<div style="font-size:4rem">' + w.condition + '</div>' +
-                        '<div style="font-size:2.5rem;color:#00ffff;margin:15px 0">' + w.temperature + '°C</div>' +
-                        '<div style="color:rgba(255,255,255,0.6)">Umiditate: ' + w.humidity + '% | Vânt: ' + w.wind + ' km/h</div>' +
-                        '</div>',
-                        'html'
-                    );
+                    if (window.MonitorManager) MonitorManager.showWeather(w);
                 }
             } catch (e) { /* ignore — AI will still respond */ }
         }
@@ -94,6 +75,7 @@ const KelionTools = (function () {
                 const s = await search(message);
                 if (s && !s.error) {
                     extraContext += '\n[CĂUTARE WEB: ' + JSON.stringify(s).substring(0, 2000) + ']';
+                    if (window.MonitorManager && s.results && s.results.length) MonitorManager.showSearchResults(s.results);
                 }
             } catch (e) { /* ignore */ }
         }
@@ -103,7 +85,7 @@ const KelionTools = (function () {
             try {
                 const i = await generateImage(message);
                 if (i && i.image) {
-                    showOnMonitor(i.image, 'image');
+                    if (window.MonitorManager) MonitorManager.showImage(i.image, message);
                     extraContext += '\n[Imagine generată pe monitor.]';
                 }
             } catch (e) { /* ignore */ }
