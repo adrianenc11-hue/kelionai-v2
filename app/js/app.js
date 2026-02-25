@@ -16,17 +16,11 @@
 
     function unlockAudio() {
         if (audioUnlocked) return; audioUnlocked = true;
-        try { const c = new (window.AudioContext || window.webkitAudioContext)(), b = c.createBuffer(1,1,22050), s = c.createBufferSource(); s.buffer = b; s.connect(c.destination); s.start(0); c.resume(); } catch(e){}
         if (window.KVoice) KVoice.ensureAudioUnlocked();
     }
 
     function showOnMonitor(content, type) {
-        const dc = document.getElementById('display-content'); if (!dc) return;
-        KAvatar.setPresenting(true);
-        if (type === 'image') dc.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;padding:20px"><img src="'+content+'" style="max-width:100%;max-height:100%;border-radius:12px;box-shadow:0 4px 30px rgba(0,0,0,0.5)"></div>';
-        else if (type === 'map') dc.innerHTML = '<iframe src="'+content+'" style="width:100%;height:100%;border:none;border-radius:12px"></iframe>';
-        else if (type === 'html') dc.innerHTML = content;
-        else dc.innerHTML = '<div style="padding:30px;color:rgba(255,255,255,0.8);font-size:1rem;line-height:1.6">'+content+'</div>';
+        if (window.MonitorManager) MonitorManager.show(content, type);
     }
 
     // ─── Vision (client-side camera) ────────────────────────
@@ -102,6 +96,10 @@
 
                         if (data.type === 'monitor') {
                             showOnMonitor(data.content, data.monitorType);
+                        } else if (data.type === 'search_results') {
+                            if (window.MonitorManager) MonitorManager.showSearchResults(data.results);
+                        } else if (data.type === 'weather') {
+                            if (window.MonitorManager) MonitorManager.showWeather(data.data);
                         } else if (data.type === 'chunk') {
                             fullReply += data.text;
                             msgEl.textContent = fullReply;
@@ -124,6 +122,13 @@
 
             const imgMatch = fullReply.match(/https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp)/i);
             if (imgMatch) showOnMonitor(imgMatch[0], 'image');
+
+            const coordMatch = fullReply.match(/(-?\d+\.?\d*)[°\s,]+([NS])?\s*,?\s*(-?\d+\.?\d*)[°\s,]+([EW])?/i);
+            if (!imgMatch && coordMatch) {
+                const lat = parseFloat(coordMatch[1]);
+                const lng = parseFloat(coordMatch[3]);
+                if (!isNaN(lat) && !isNaN(lng) && window.MonitorManager) MonitorManager.showMap(lat, lng);
+            }
 
             KAvatar.setExpression('happy', 0.3);
             await KVoice.speak(fullReply, KAvatar.getCurrentAvatar());
@@ -170,10 +175,21 @@
 
             if (data.monitor && data.monitor.content) {
                 showOnMonitor(data.monitor.content, data.monitor.type);
+            } else if (data.monitor && data.monitor.search_results) {
+                if (window.MonitorManager) MonitorManager.showSearchResults(data.monitor.search_results);
+            } else if (data.monitor && data.monitor.weather) {
+                if (window.MonitorManager) MonitorManager.showWeather(data.monitor.weather);
             }
 
             const imgMatch = data.reply.match(/https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp)/i);
             if (imgMatch && !data.monitor?.content) showOnMonitor(imgMatch[0], 'image');
+
+            const coordMatch2 = data.reply.match(/(-?\d+\.?\d*)[°\s,]+([NS])?\s*,?\s*(-?\d+\.?\d*)[°\s,]+([EW])?/i);
+            if (!imgMatch && !data.monitor?.content && coordMatch2) {
+                const lat2 = parseFloat(coordMatch2[1]);
+                const lng2 = parseFloat(coordMatch2[3]);
+                if (!isNaN(lat2) && !isNaN(lng2) && window.MonitorManager) MonitorManager.showMap(lat2, lng2);
+            }
 
             KAvatar.setExpression('happy', 0.3);
             await KVoice.speak(data.reply, data.avatar);
