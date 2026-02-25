@@ -10,7 +10,7 @@
     <script src="https://browser.sentry-cdn.com/8.46.0/bundle.tracing.replay.min.js" crossorigin="anonymous"></script>
     <script>
         if (window.Sentry) Sentry.init({
-            dsn: "https://5c261710f7055bef0cdcdb50239b5519@o4510937317834752.ingest.us.sentry.io/4510937323012096",
+            dsn: "YOUR_SENTRY_DSN",
             integrations: [Sentry.browserTracingIntegration(), Sentry.replayIntegration()],
             tracesSampleRate: 1.0, replaysOnErrorSampleRate: 1.0
         });

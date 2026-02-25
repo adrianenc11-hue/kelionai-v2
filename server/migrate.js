@@ -66,7 +66,11 @@ async function runMigration() {
         const match = process.env.SUPABASE_URL.match(/https:\/\/([^.]+)\.supabase\.co/);
         if (match) {
             const ref = match[1];
-            const password = process.env.SUPABASE_DB_PASSWORD || process.env.DB_PASSWORD || 'K3l10n-AI-2026!';
+            const password = process.env.SUPABASE_DB_PASSWORD || process.env.DB_PASSWORD;
+            if (!password) {
+                console.log('[Migration] ⚠️ No DB password configured — skipping migration');
+                return false;
+            }
             connectionString = `postgresql://postgres:${encodeURIComponent(password)}@db.${ref}.supabase.co:5432/postgres`;
         }
     }
