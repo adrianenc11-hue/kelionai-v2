@@ -88,11 +88,10 @@ app.post('/api/chat', async (req, res) => {
         if (!message) return res.status(400).json({ error: 'Mesaj lipsă' });
         const user = await getUserFromToken(req);
 
-        // ── BRAIN THINKS: analyze → plan → execute tools ──
-        const thought = await brain.think(message, avatar, history, language, user?.id);
+        // ── BRAIN v2 THINKS: analyze → decompose → plan → execute → CoT ──
+        const thought = await brain.think(message, avatar, history, language, user?.id, conversationId);
 
-        // ── BUILD DEEP PERSONA PROMPT ──
-        const diagnostics = brain.getDiagnostics();
+        // ── BUILD DEEP PERSONA PROMPT (with CoT guidance) ──
         let memoryContext = '';
         if (user && supabaseAdmin) {
             try {
@@ -100,10 +99,11 @@ app.post('/api/chat', async (req, res) => {
                 if (prefs?.length > 0) memoryContext = prefs.map(p => `${p.key}: ${JSON.stringify(p.value)}`).join('; ');
             } catch(e){}
         }
-        const systemPrompt = buildSystemPrompt(avatar, language, memoryContext, { failedTools: thought.failedTools });
+        const systemPrompt = buildSystemPrompt(avatar, language, memoryContext, { failedTools: thought.failedTools }, thought.chainOfThought);
 
-        // ── CONVERSATION HISTORY ──
-        const msgs = history.slice(-20).map(h => ({ role: h.role === 'ai' ? 'assistant' : h.role, content: h.content }));
+        // ── COMPRESSED CONVERSATION HISTORY (auto-summarized if >20 msgs) ──
+        const compressedHist = thought.compressedHistory || history.slice(-20);
+        const msgs = compressedHist.map(h => ({ role: h.role === 'ai' ? 'assistant' : h.role, content: h.content }));
         msgs.push({ role: 'user', content: thought.enrichedMessage });
 
         // ── AI CALL (Claude → GPT-4o → DeepSeek) ──
@@ -149,10 +149,10 @@ app.post('/api/chat', async (req, res) => {
         if (supabaseAdmin) saveConv(user?.id, avatar, message, reply, conversationId, language).catch(()=>{});
         brain.learnFromConversation(user?.id, message, reply).catch(()=>{});
 
-        console.log(`[CHAT] ${engine} | ${avatar} | ${language} | tools:[${thought.toolsUsed.join(',')}] | ${reply.length}c`);
+        console.log(`[CHAT] ${engine} | ${avatar} | ${language} | tools:[${thought.toolsUsed.join(',')}] | CoT:${!!thought.chainOfThought} | ${thought.thinkTime}ms think | ${reply.length}c`);
 
-        // ── RESPONSE with monitor content ──
-        const response = { reply, avatar, engine, language };
+        // ── RESPONSE with monitor content + brain metadata ──
+        const response = { reply, avatar, engine, language, thinkTime: thought.thinkTime };
         if (thought.monitor.content) {
             response.monitor = thought.monitor;
         }
@@ -325,11 +325,85 @@ app.post('/api/brain/reset', (req, res) => {
     res.json({ success: true, diagnostics: brain.getDiagnostics() });
 });
 
+// ═══ BRAIN DASHBOARD (live monitoring) ═══
+app.get('/dashboard', (req, res) => {
+    res.send(`<!DOCTYPE html>
+<html><head><title>KelionAI Brain Dashboard</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a1a;color:#e0e0e0;font-family:system-ui,sans-serif;padding:20px}
+h1{color:#00ffff;margin-bottom:20px;font-size:1.5rem}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+.card{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:20px}
+.card h2{color:#888;font-size:0.85rem;text-transform:uppercase;margin-bottom:12px;letter-spacing:1px}
+.stat{font-size:2rem;font-weight:bold;color:#00ffff}
+.stat.warn{color:#ffaa00}
+.stat.bad{color:#ff4444}
+.stat.good{color:#00ff88}
+.row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.05)}
+.row:last-child{border:none}
+.label{color:#888}
+.val{font-weight:bold}
+.bar{height:6px;background:rgba(255,255,255,0.1);border-radius:3px;margin-top:4px}
+.bar-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,#00ffff,#00ff88)}
+.journal{font-size:0.8rem;color:#aaa;margin-top:8px}
+.journal-entry{padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.03)}
+.refresh{position:fixed;top:15px;right:15px;background:#00ffff;color:#000;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-weight:bold}
+</style></head>
+<body>
+<h1>\u{1F9E0} KelionAI Brain Dashboard</h1>
+<button class="refresh" onclick="load()">Refresh</button>
+<div class="grid" id="grid"></div>
+<script>
+async function load(){
+  try{
+    const r=await fetch('/api/brain');
+    const d=await r.json();
+    const g=document.getElementById('grid');
+    const statusClass=d.status==='healthy'?'good':d.status==='degraded'?'bad':'warn';
+    g.innerHTML=\`
+    <div class="card"><h2>Status</h2><div class="stat \${statusClass}">\${d.status.toUpperCase()}</div>
+    <div class="row"><span class="label">Version</span><span class="val">\${d.version}</span></div>
+    <div class="row"><span class="label">Uptime</span><span class="val">\${Math.round(d.uptime/60)}m</span></div>
+    <div class="row"><span class="label">Memory</span><span class="val">\${d.memory.rss} / \${d.memory.heap}</span></div></div>
+    
+    <div class="card"><h2>Conversations</h2><div class="stat">\${d.conversations}</div>
+    <div class="row"><span class="label">Learnings</span><span class="val">\${d.learningsExtracted}</span></div>
+    <div class="row"><span class="label">Errors (1h)</span><span class="val \${d.recentErrors>5?'bad':''}">\${d.recentErrors}</span></div></div>
+    
+    <div class="card"><h2>Tool Usage</h2>
+    \${Object.entries(d.toolStats).map(([k,v])=>\`<div class="row"><span class="label">\${k}</span><span class="val">\${v}</span></div>\`).join('')}</div>
+    
+    <div class="card"><h2>Tool Health</h2>
+    \${Object.entries(d.toolErrors).map(([k,v])=>{
+      const cls=v>=5?'bad':v>0?'warn':'good';
+      return \`<div class="row"><span class="label">\${k}</span><span class="val \${cls}">\${v>=5?'DEGRADED':v>0?v+' errors':'OK'}</span></div>\`;
+    }).join('')}</div>
+    
+    <div class="card"><h2>Latency (avg)</h2>
+    \${Object.entries(d.avgLatency).map(([k,v])=>\`<div class="row"><span class="label">\${k}</span><span class="val">\${v}ms</span>
+    <div class="bar"><div class="bar-fill" style="width:\${Math.min(100,v/100*100)}%"></div></div></div>\`).join('')||'<div style="color:#888">No data yet</div>'}</div>
+    
+    <div class="card"><h2>Strategies</h2>
+    <div class="row"><span class="label">Search refinements</span><span class="val">\${d.strategies.searchRefinements}</span></div>
+    <div class="row"><span class="label">Failure recoveries</span><span class="val">\${d.strategies.failureRecoveries}</span></div>
+    \${Object.entries(d.strategies.toolCombinations).map(([k,v])=>\`<div class="row"><span class="label">\${k}</span><span class="val">\${v}</span></div>\`).join('')}</div>
+    
+    <div class="card" style="grid-column:1/-1"><h2>Journal (last 10)</h2>
+    <div class="journal">\${(d.journal||[]).map(j=>\`<div class="journal-entry">\${new Date(j.time).toLocaleTimeString()} — <strong>\${j.event}</strong>: \${j.lesson}</div>\`).join('')||'Empty'}</div></div>
+    \`;
+  }catch(e){document.getElementById('grid').innerHTML='<div class="card"><div class="stat bad">OFFLINE</div></div>';}
+}
+load();setInterval(load,5000);
+</script></body></html>`);
+});
+
 // ═══ HEALTH ═══
 app.get('/api/health', (req, res) => {
     const diag = brain.getDiagnostics();
     res.json({
-        status: 'online', version: '2.2.0', timestamp: new Date().toISOString(),
+        status: 'online', version: '2.2.1', timestamp: new Date().toISOString(),
         brain: diag.status,
         conversations: diag.conversations,
         services: {
@@ -349,11 +423,12 @@ app.get('*', (req, res) => res.sendFile(path.join(__dirname, '..', 'app', 'index
 runMigration().then(migrated => {
     app.listen(PORT, '0.0.0.0', () => {
         console.log('\n══════════════════════════════════════════');
-        console.log('  KelionAI v2.2 — BRAIN EDITION');
+        console.log('  KelionAI v2.2 — BRAIN v2 EDITION');
         console.log('  http://localhost:' + PORT);
+        console.log('  Dashboard: http://localhost:' + PORT + '/dashboard');
         console.log('  AI: ' + (process.env.ANTHROPIC_API_KEY ? '✅ Claude' : '❌') + ' | ' + (process.env.OPENAI_API_KEY ? '✅ GPT-4o' : '❌') + ' | ' + (process.env.DEEPSEEK_API_KEY ? '✅ DeepSeek' : '❌'));
         console.log('  TTS: ' + (process.env.ELEVENLABS_API_KEY ? '✅ ElevenLabs' : '❌'));
-        console.log('  Brain: 🧠 ACTIVE — Analyze→Plan→Execute→Verify→Learn');
+        console.log('  Brain: 🧠 v2 — CoT + Decompose + SelfRepair + AutoLearn');
         console.log('  DB: ' + (supabaseAdmin ? '✅ Supabase' : '⚠️ In-memory'));
         console.log('  Migration: ' + (migrated ? '✅ Tables ready' : '⚠️ Skipped'));
         console.log('══════════════════════════════════════════\n');
