@@ -181,8 +181,12 @@
 
     // ─── Route to streaming or regular ─────────────────────
     async function sendToAI(message, language) {
-        if (useStreaming) await sendToAI_Stream(message, language);
-        else await sendToAI_Regular(message, language);
+        let msg = message;
+        if (window.KelionTools) {
+            try { const ctx = await KelionTools.preprocessMessage(message); if (ctx) msg = message + ctx; } catch(e) {}
+        }
+        if (useStreaming) await sendToAI_Stream(msg, language);
+        else await sendToAI_Regular(msg, language);
     }
 
     // ═══════════════════════════════════════════════════════════
