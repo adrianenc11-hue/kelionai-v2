@@ -15,6 +15,24 @@ CYAN='\033[0;36m'
 BOLD='\033[1m'
 NC='\033[0m'
 
+# ─── Guard: avertizare deploy.sh DEPRECAT din root ────────────
+ROOT_DEPLOY="$PROJECT_DIR/deploy.sh"
+if [ -f "$ROOT_DEPLOY" ]; then
+    echo ""
+    echo -e "${RED}╔══════════════════════════════════════════════════╗${NC}"
+    echo -e "${RED}║  ⚠️  PERICOL: deploy.sh din ROOT detectat!       ║${NC}"
+    echo -e "${RED}║  Acel script SUPRASCRIE codul sursă și este      ║${NC}"
+    echo -e "${RED}║  DEPRECAT. Redenumește-l imediat:                ║${NC}"
+    echo -e "${RED}║  mv deploy.sh deploy.sh.legacy                   ║${NC}"
+    echo -e "${RED}╚══════════════════════════════════════════════════╝${NC}"
+    echo ""
+    read -r -p "  Continuă oricum cu scripts/deploy.sh? (yes/no): " _guard_confirm
+    if [ "$_guard_confirm" != "yes" ]; then
+        echo -e "${RED}Deploy anulat pentru siguranță.${NC}"
+        exit 1
+    fi
+fi
+
 ok()   { echo -e "${GREEN}✅ $1${NC}"; }
 err()  { echo -e "${RED}❌ $1${NC}"; }
 warn() { echo -e "${YELLOW}⚠️  $1${NC}"; }
