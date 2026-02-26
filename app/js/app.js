@@ -119,6 +119,7 @@
                                 msgEl.textContent = fullReply;
                             }
                             if (data.conversationId) persistConvId(data.conversationId);
+                            if (data.isEmergency && window.KSOS && !KSOS.isActive()) KSOS.trigger();
                         }
                     } catch(e) { /* skip parse errors */ }
                 }
@@ -185,6 +186,7 @@
             chatHistory.push({ role: 'user', content: message });
             chatHistory.push({ role: 'assistant', content: data.reply });
             addMessage('assistant', data.reply);
+            if (data.isEmergency && window.KSOS && !KSOS.isActive()) KSOS.trigger();
 
             if (data.monitor && data.monitor.content) {
                 showOnMonitor(data.monitor.content, data.monitor.type);
@@ -215,6 +217,13 @@
 
     // ─── Route to streaming or regular ─────────────────────
     async function sendToAI(message, language) {
+        // Emergency detection — trigger SOS immediately
+        if (window.KSOS && KSOS.containsEmergencyWord(message) && !KSOS.isActive()) KSOS.trigger();
+        // Background context detection
+        if (window.KBackgrounds) {
+            var ctx = KBackgrounds.detect(message);
+            if (ctx !== 'default') KBackgrounds.set(ctx);
+        }
         let msg = message;
         if (window.KelionTools) {
             try {
@@ -347,6 +356,12 @@
         return /(kelion|chelion)[,.\s]+(upgrade|abonament)|vreau\s+(pro|premium)|upgrade\s+plan/.test(l);
     }
 
+    // ─── Focus / Meditation trigger detection ────────────────
+    var FOCUS_TRIGGERS = ['focus mode', 'start pomodoro', 'mod focus', 'concentrare', 'pomodoro'];
+    var MEDITATION_TRIGGERS = ['meditate', 'meditation', 'breathing exercise', 'meditație', 'meditatie', 'respirație', 'respiratie'];
+    function isFocusRequest(t) { var l = t.toLowerCase(); return FOCUS_TRIGGERS.some(function(k) { return l.indexOf(k) !== -1; }); }
+    function isMeditationRequest(t) { var l = t.toLowerCase(); return MEDITATION_TRIGGERS.some(function(k) { return l.indexOf(k) !== -1; }); }
+
     // ─── Input handlers ──────────────────────────────────────
     async function onMicDown() { var b = document.getElementById('btn-mic'); if (await KVoice.startListening()) { b.classList.add('recording'); b.textContent = '⏹'; } }
     async function onMicUp() {
@@ -355,6 +370,8 @@
         var text = await KVoice.stopListening();
         if (text && text.trim()) { hideWelcome(); addMessage('user', text);
             if (isUpgradeRequest(text)) { showThinking(false); if (window.KPayments) KPayments.showUpgradePrompt(); }
+            else if (isFocusRequest(text)) { showThinking(false); if (window.KFocus) KFocus.startPomodoro(); }
+            else if (isMeditationRequest(text)) { showThinking(false); if (window.KFocus) KFocus.startMeditation(5); }
             else if (isVisionRequest(text)) triggerVision(); else await sendToAI(text, KVoice.getLanguage());
         } else { showThinking(false); KVoice.resumeWakeDetection(); }
     }
@@ -366,6 +383,8 @@
         else if (/^(kelion|chelion)[,.\s]/i.test(l)) { switchAvatar('kelion'); text = text.replace(/^(kelion|chelion)[,.\s]*/i, '').trim(); }
         if (!text) return;
         if (isUpgradeRequest(text)) { if (window.KPayments) KPayments.showUpgradePrompt(); return; }
+        if (isFocusRequest(text)) { hideWelcome(); addMessage('user', text); if (window.KFocus) KFocus.startPomodoro(); return; }
+        if (isMeditationRequest(text)) { hideWelcome(); addMessage('user', text); if (window.KFocus) KFocus.startMeditation(5); return; }
         hideWelcome(); KAvatar.setAttentive(true); addMessage('user', text); showThinking(true);
         if (isVisionRequest(text)) triggerVision(); else await sendToAI(text, KVoice.getLanguage());
     }
@@ -455,6 +474,7 @@
         KVoice.startWakeWordDetection();
         checkHealth();
         if (window.KPayments) KPayments.showUsageBar();
+        if (window.KSync) KSync.start();
 
         // Restore last conversation from localStorage
         var savedConvId = restoreConvId();
@@ -479,7 +499,7 @@
                 .catch(function(e) { console.warn('[App] restore conversation:', e.message); persistConvId(null); });
         }
 
-        console.log('[App] ✅ KelionAI v2.3 — STREAMING + HISTORY');
+        console.log('[App] ✅ KelionAI v2.4 — STREAMING + HISTORY + SOS + BACKGROUNDS + FOCUS + SYNC');
     }
 
     window.KApp = { loadConversations: loadConversations, toggleHistory: toggleHistory, startNewChat: startNewChat };

@@ -109,6 +109,7 @@ const globalLimiter = rateLimit({
 
 const memoryLimiter = rateLimit({ windowMs: 60 * 1000, max: 30, message: { error: 'Prea multe cereri memorie.' }, standardHeaders: true, legacyHeaders: false });
 const weatherLimiter = rateLimit({ windowMs: 60 * 1000, max: 10, message: { error: 'Prea multe cereri meteo.' }, standardHeaders: true, legacyHeaders: false });
+const sosLimiter = rateLimit({ windowMs: 60 * 1000, max: 5, message: { error: 'Prea multe cereri SOS.' }, standardHeaders: true, legacyHeaders: false });
 
 const asyncHandler = (fn) => (req, res, next) => {
     Promise.resolve(fn(req, res, next)).catch(next);
@@ -276,7 +277,7 @@ app.post('/api/chat', chatLimiter, validate(chatSchema), async (req, res) => {
         logger.info({ component: 'Chat', engine, avatar, language, tools: thought.toolsUsed, chainOfThought: !!thought.chainOfThought, thinkTime: thought.thinkTime, replyLength: reply.length }, `${engine} | ${avatar} | ${language} | tools:[${thought.toolsUsed.join(',')}] | CoT:${!!thought.chainOfThought} | ${thought.thinkTime}ms think | ${reply.length}c`);
 
         // ── RESPONSE with monitor content + brain metadata ──
-        const response = { reply, avatar, engine, language, thinkTime: thought.thinkTime, conversationId: savedConvId };
+        const response = { reply, avatar, engine, language, thinkTime: thought.thinkTime, conversationId: savedConvId, isEmergency: thought.analysis.isEmergency || false };
         if (thought.monitor.content) {
             response.monitor = thought.monitor;
         }
@@ -393,7 +394,7 @@ app.post('/api/chat/stream', chatLimiter, validate(chatSchema), async (req, res)
         }
 
         // End stream
-        res.write(`data: ${JSON.stringify({ type: 'done', reply: fullReply, thinkTime: thought.thinkTime, conversationId: savedConvId })}\n\n`);
+        res.write(`data: ${JSON.stringify({ type: 'done', reply: fullReply, thinkTime: thought.thinkTime, conversationId: savedConvId, isEmergency: thought.analysis.isEmergency || false })}\n\n`);
         res.end();
 
         if (fullReply) brain.learnFromConversation(user?.id, message, fullReply).catch(()=>{});
@@ -616,6 +617,38 @@ app.post('/api/memory', memoryLimiter, validate(memorySchema), async (req, res) 
         else res.status(400).json({ error: 'Acțiune: save, load, list' });
     } catch(e) { res.status(500).json({ error: 'Eroare memorie' }); }
 });
+
+// ═══ SOS ENDPOINTS ═══
+app.post('/api/sos/alert', sosLimiter, asyncHandler(async (req, res) => {
+    const user = await getUserFromToken(req);
+    const { location, timestamp } = req.body;
+    logger.error({ component: 'SOS', userId: user?.id, location, timestamp }, '🆘 EMERGENCY ALERT TRIGGERED');
+    if (user && supabaseAdmin) {
+        await supabaseAdmin.from('user_preferences').upsert({
+            user_id: user.id, key: 'last_sos_alert',
+            value: { location, timestamp, resolved: false }
+        }, { onConflict: 'user_id,key' }).catch(() => {});
+    }
+    res.json({ received: true, message: 'Emergency services: call 112 immediately if in danger' });
+}));
+
+app.post('/api/sos/cancel', sosLimiter, asyncHandler(async (req, res) => {
+    const user = await getUserFromToken(req);
+    if (user && supabaseAdmin) {
+        await supabaseAdmin.from('user_preferences').upsert({
+            user_id: user.id, key: 'last_sos_alert',
+            value: { resolved: true, resolvedAt: new Date().toISOString() }
+        }, { onConflict: 'user_id,key' }).catch(() => {});
+    }
+    res.json({ cancelled: true });
+}));
+
+app.get('/api/sos/contact', asyncHandler(async (req, res) => {
+    const user = await getUserFromToken(req);
+    if (!user || !supabaseAdmin) return res.json({ contact: null });
+    const { data } = await supabaseAdmin.from('user_preferences').select('value').eq('user_id', user.id).eq('key', 'emergency_contact').single();
+    res.json({ contact: data?.value || null });
+}));
 
 // ═══ CONVERSATIONS ═══
 app.get('/api/conversations', asyncHandler(async (req, res) => {

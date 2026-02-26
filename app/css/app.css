@@ -220,6 +220,7 @@ body {
     justify-content: center;
     transition: all 0.2s;
     flex-shrink: 0;
+    position: relative;
 }
 
 .ctrl-btn-sm:hover {
@@ -950,3 +951,86 @@ body {
     transition: background 0.2s;
 }
 .usage-upgrade-badge:hover { background: rgba(255,68,68,0.35); }
+
+/* ═══ SOS Overlay ═══ */
+.sos-overlay {
+    position: fixed; inset: 0; z-index: 99999;
+    background: rgba(120, 0, 0, 0.97);
+    display: flex; align-items: center; justify-content: center;
+    animation: sos-pulse 1s ease-in-out infinite alternate;
+}
+.sos-overlay.hidden { display: none; }
+@keyframes sos-pulse {
+    from { background: rgba(120, 0, 0, 0.97); }
+    to   { background: rgba(180, 0, 0, 0.99); }
+}
+.sos-content {
+    text-align: center; color: #fff; padding: 32px;
+    max-width: 480px; width: 90%;
+}
+.sos-icon { font-size: 5rem; margin-bottom: 12px; }
+.sos-content h1 {
+    font-size: 2rem; font-weight: 700; letter-spacing: 2px;
+    text-shadow: 0 0 20px rgba(255,100,100,0.8); margin-bottom: 16px;
+}
+#sos-countdown {
+    font-size: 1.4rem; margin-bottom: 12px; opacity: 0.9;
+}
+#sos-countdown span { font-weight: 700; font-size: 1.8rem; color: #ffaaaa; }
+#sos-location {
+    font-size: 0.9rem; opacity: 0.75; margin-bottom: 20px;
+}
+.sos-numbers {
+    display: flex; flex-wrap: wrap; justify-content: center; gap: 12px;
+    margin-bottom: 28px; font-size: 1rem; font-weight: 600;
+}
+.sos-numbers span {
+    background: rgba(255,255,255,0.15); border-radius: 8px;
+    padding: 6px 14px;
+}
+#sos-safe-btn {
+    background: #00cc55; color: #fff; border: none;
+    font-size: 1.2rem; font-weight: 700; padding: 16px 40px;
+    border-radius: 50px; cursor: pointer; letter-spacing: 1px;
+    box-shadow: 0 0 24px rgba(0,200,80,0.5);
+    transition: transform 0.1s, box-shadow 0.2s;
+}
+#sos-safe-btn:hover { transform: scale(1.05); box-shadow: 0 0 36px rgba(0,200,80,0.7); }
+#sos-safe-btn:active { transform: scale(0.97); }
+
+/* ═══ Focus Timer (rendered in Monitor) ═══ */
+.focus-timer {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; height: 100%; padding: 24px;
+    color: #e8e8f0; text-align: center;
+}
+.focus-title { font-size: 1.1rem; font-weight: 600; margin-bottom: 12px; opacity: 0.8; }
+.focus-time {
+    font-size: 4rem; font-weight: 700; letter-spacing: 2px;
+    color: #00ccff; text-shadow: 0 0 20px rgba(0,204,255,0.4);
+    margin-bottom: 12px;
+}
+.focus-subtitle { font-size: 0.95rem; opacity: 0.7; margin-bottom: 20px; }
+.focus-progress {
+    width: 80%; height: 6px; background: rgba(255,255,255,0.1);
+    border-radius: 3px; overflow: hidden; margin-bottom: 24px;
+}
+.focus-bar {
+    height: 100%; background: linear-gradient(90deg, #00ccff, #8855ff);
+    border-radius: 3px; transition: width 1s linear;
+}
+.focus-stop {
+    background: rgba(255,255,255,0.08); color: #aaa;
+    border: 1px solid rgba(255,255,255,0.12); border-radius: 8px;
+    padding: 8px 20px; font-size: 0.85rem; cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+}
+.focus-stop:hover { background: rgba(255,100,100,0.15); color: #ff6666; }
+
+/* ═══ Sync notification dot ═══ */
+.sync-dot {
+    position: absolute; top: 2px; right: 2px;
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #00ff88; box-shadow: 0 0 6px rgba(0,255,136,0.7);
+    pointer-events: none;
+}
