@@ -24,6 +24,7 @@ const { buildSystemPrompt } = require('./persona');
 const logger = require('./logger');
 const { router: paymentsRouter, checkUsage, incrementUsage } = require('./payments');
 const legalRouter = require('./legal');
+const protectRouter = require('./protect');
 const { validate, registerSchema, loginSchema, refreshSchema, chatSchema, speakSchema, listenSchema, visionSchema, searchSchema, weatherSchema, imagineSchema, memorySchema } = require('./validation');
 
 const app = express();
@@ -33,18 +34,31 @@ app.use(helmet({
     contentSecurityPolicy: {
         directives: {
             defaultSrc: ["'self'"],
-            scriptSrc: ["'self'", "'unsafe-inline'"],
+            scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://browser.sentry-cdn.com"],
             styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
             fontSrc: ["'self'", "https://fonts.gstatic.com"],
-            imgSrc: ["'self'", "data:", "blob:"],
-            connectSrc: ["'self'", "https://api.openai.com", "https://generativelanguage.googleapis.com", "https://api.anthropic.com", "https://api.elevenlabs.io", "https://api.groq.com", "https://api.perplexity.ai", "https://api.tavily.com", "https://google.serper.dev", "https://api.duckduckgo.com", "https://api.together.xyz", "https://api.deepseek.com", "https://geocoding-api.open-meteo.com", "https://api.open-meteo.com"],
+            imgSrc: ["'self'", "data:", "blob:", "https:"],
+            connectSrc: ["'self'"],
             mediaSrc: ["'self'", "blob:"],
+            objectSrc: ["'none'"],
+            frameSrc: ["'self'", "https://www.openstreetmap.org"],
             workerSrc: ["'self'", "blob:"],
+            frameAncestors: ["'none'"],
+            upgradeInsecureRequests: []
         }
     },
     crossOriginEmbedderPolicy: false,
     crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
+
+// ─── ADDITIONAL SECURITY HEADERS ─────────────────────────────
+app.use((req, res, next) => {
+    res.setHeader('X-Robots-Tag', 'noarchive, nosnippet');
+    if (req.path.startsWith('/api/')) {
+        res.setHeader('Cache-Control', 'no-store');
+    }
+    next();
+});
 
 const allowedOrigins = process.env.ALLOWED_ORIGINS
     ? process.env.ALLOWED_ORIGINS.split(',').map(s => s.trim())
@@ -724,9 +738,10 @@ load();setInterval(load,5000);
 app.locals.getUserFromToken = getUserFromToken;
 app.locals.supabaseAdmin = supabaseAdmin;
 
-// ═══ PAYMENTS & LEGAL ROUTES ═══
+// ═══ PAYMENTS, LEGAL & PROTECT ROUTES ═══
 app.use('/api/payments', paymentsRouter);
 app.use('/api/legal', legalRouter);
+app.use('/api/protect', protectRouter);
 
 // ═══ HEALTH ═══
 app.get('/api/health', (req, res) => {
