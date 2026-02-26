@@ -34,6 +34,11 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
+      - name: Run unit tests
+        run: npm run test:unit
+        env:
+          NODE_ENV: test
+
       - name: Run E2E tests
         id: test
         continue-on-error: true
