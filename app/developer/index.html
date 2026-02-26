@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KelionAI — Developer Portal</title>
+    <link rel="stylesheet" href="/developer/developer.css">
+</head>
+<body>
+
+<!-- AUTH OVERLAY (shown when not logged in) -->
+<div id="dev-auth-overlay" class="hidden">
+    <div class="auth-box">
+        <h2>🤖 KelionAI Dev</h2>
+        <p>Sign in to manage your API keys and access the developer portal.</p>
+        <div id="auth-name-row" style="display:none">
+            <input class="dev-input" id="auth-name" type="text" placeholder="Your name" autocomplete="name">
+        </div>
+        <input class="dev-input" id="auth-email" type="email" placeholder="Email" autocomplete="email">
+        <input class="dev-input" id="auth-password" type="password" placeholder="Password" autocomplete="current-password">
+        <div id="auth-err"></div>
+        <button class="btn btn-primary" id="auth-submit-btn" style="width:100%;justify-content:center;margin-top:4px">Sign In</button>
+        <div id="auth-switch">Don't have an account? <a id="auth-toggle-link">Create one</a></div>
+    </div>
+</div>
+
+<!-- NAV -->
+<nav class="dev-nav">
+    <a href="/" class="logo">🤖 KelionAI <span>/ Developers</span></a>
+    <div class="nav-tabs">
+        <button class="nav-tab active" data-panel="overview">Overview</button>
+        <button class="nav-tab" data-panel="keys">API Keys</button>
+        <button class="nav-tab" data-panel="docs">Documentation</button>
+        <button class="nav-tab" data-panel="sandbox">Sandbox</button>
+        <button class="nav-tab" data-panel="webhooks">Webhooks</button>
+    </div>
+    <div class="nav-auth">
+        <span id="nav-user"></span>
+        <button id="nav-logout-btn" style="display:none">Sign Out</button>
+    </div>
+</nav>
+
+<div class="dev-container">
+
+    <!-- ═══ OVERVIEW ═══ -->
+    <div id="panel-overview" class="panel active">
+        <div class="dev-hero">
+            <h1>Developer API</h1>
+            <p>Build powerful AI-powered applications using the KelionAI API. Generate API keys, explore docs, and test endpoints in the sandbox.</p>
+            <div class="hero-btns">
+                <button class="btn btn-primary" data-goto="keys">Generate API Key</button>
+                <button class="btn btn-secondary" data-goto="docs">Read Docs</button>
+            </div>
+        </div>
+
+        <div id="overview-stats" style="display:none">
+            <div class="stats-grid">
+                <div class="stat-card"><div class="stat-value" id="stat-active-keys">—</div><div class="stat-label">Active Keys</div></div>
+                <div class="stat-card"><div class="stat-value" id="stat-total-req">—</div><div class="stat-label">Total Requests</div></div>
+                <div class="stat-card"><div class="stat-value" id="stat-total-keys">—</div><div class="stat-label">Total Keys</div></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>🚀 Quick Start</h2>
+            <p style="color:var(--muted);font-size:0.9rem;margin-bottom:14px">Send your first API request in seconds:</p>
+            <pre>curl -X POST https://kelionai.app/api/v1/chat \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -d '{"message":"Hello, KelionAI!"}'</pre>
+        </div>
+
+        <div class="card">
+            <h2>📋 Base URL &amp; Auth</h2>
+            <p style="color:var(--muted);font-size:0.85rem;margin-bottom:12px">All API requests must include your API key in the <code>X-API-Key</code> header.</p>
+            <pre>Base URL:  https://kelionai.app/api/v1
+Auth:      X-API-Key: kel_xxxxxxxxxxxx</pre>
+        </div>
+    </div>
+
+    <!-- ═══ API KEYS ═══ -->
+    <div id="panel-keys" class="panel">
+        <div class="card">
+            <h2>🔑 API Keys</h2>
+            <div id="key-alert" class="alert"></div>
+            <div id="new-key-reveal" style="display:none" class="new-key-reveal">
+                <p>⚠️ Copy your API key now — it won't be shown again.</p>
+                <div class="key-copy-row">
+                    <span id="new-key-text"></span>
+                    <button id="copy-key-btn">Copy</button>
+                </div>
+            </div>
+            <div class="form-row" style="margin-top:4px">
+                <div class="form-group">
+                    <label>Key name</label>
+                    <input class="dev-input" id="new-key-name" type="text" placeholder="My Application" maxlength="100">
+                </div>
+                <button class="btn btn-primary" id="create-key-btn">+ Generate Key</button>
+            </div>
+            <div id="key-list" class="key-list">
+                <div class="empty-state"><div class="icon">🔑</div><p>No API keys yet. Generate one above.</p></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ DOCUMENTATION ═══ -->
+    <div id="panel-docs" class="panel">
+        <div class="card">
+            <h2>📚 API Reference</h2>
+            <p style="color:var(--muted);font-size:0.85rem;margin-bottom:20px">Click an endpoint to expand details and examples.</p>
+            <div class="endpoint-list">
+
+                <div class="endpoint" id="ep-status">
+                    <div class="endpoint-header">
+                        <span class="method get">GET</span>
+                        <span class="endpoint-path">/api/v1/status</span>
+                        <span class="endpoint-desc">API status and available endpoints</span>
+                        <span class="auth-badge public">Public</span>
+                        <span class="endpoint-chevron">▼</span>
+                    </div>
+                    <div class="endpoint-body">
+                        <p style="color:var(--muted);font-size:0.85rem">Returns the current API status and a list of all available endpoints. No authentication required.</p>
+                        <pre>{
+  "status": "online",
+  "version": "1.0",
+  "timestamp": "2026-02-26T12:00:00Z",
+  "endpoints": [...]
+}</pre>
+                    </div>
+                </div>
+
+                <div class="endpoint" id="ep-models">
+                    <div class="endpoint-header">
+                        <span class="method get">GET</span>
+                        <span class="endpoint-path">/api/v1/models</span>
+                        <span class="endpoint-desc">List available AI models</span>
+                        <span class="auth-badge required">API Key</span>
+                        <span class="endpoint-chevron">▼</span>
+                    </div>
+                    <div class="endpoint-body">
+                        <p style="color:var(--muted);font-size:0.85rem">Returns the list of AI models currently available on this instance.</p>
+                        <pre>{
+  "models": [
+    { "id": "claude-sonnet-4", "name": "Claude Sonnet 4", "provider": "Anthropic", "primary": true }
+  ]
+}</pre>
+                    </div>
+                </div>
+
+                <div class="endpoint" id="ep-profile">
+                    <div class="endpoint-header">
+                        <span class="method get">GET</span>
+                        <span class="endpoint-path">/api/v1/user/profile</span>
+                        <span class="endpoint-desc">Get authenticated user profile</span>
+                        <span class="auth-badge required">API Key</span>
+                        <span class="endpoint-chevron">▼</span>
+                    </div>
+                    <div class="endpoint-body">
+                        <p style="color:var(--muted);font-size:0.85rem">Returns the profile of the user associated with the API key.</p>
+                        <pre>{
+  "id": "uuid",
+  "email": "user@example.com",
+  "name": "User Name",
+  "createdAt": "2026-01-01T00:00:00Z"
+}</pre>
+                    </div>
+                </div>
+
+                <div class="endpoint" id="ep-chat">
+                    <div class="endpoint-header">
+                        <span class="method post">POST</span>
+                        <span class="endpoint-path">/api/v1/chat</span>
+                        <span class="endpoint-desc">Send message, receive AI response</span>
+                        <span class="auth-badge required">API Key</span>
+                        <span class="endpoint-chevron">▼</span>
+                    </div>
+                    <div class="endpoint-body">
+                        <p style="color:var(--muted);font-size:0.85rem">Send a message to the AI and receive a response. Supports conversation history and avatar selection.</p>
+                        <table class="param-table">
+                            <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+                            <tr><td>message</td><td>string</td><td>Required. The message to send (max 10 000 chars)</td></tr>
+                            <tr><td>avatar</td><td>string</td><td>Optional. <code>kelion</code> (default) or <code>kira</code></td></tr>
+                            <tr><td>language</td><td>string</td><td>Optional. Response language code (default <code>en</code>)</td></tr>
+                            <tr><td>history</td><td>array</td><td>Optional. Previous messages [{role, content}] max 20</td></tr>
+                        </table>
+                        <pre>// Request
+{
+  "message": "What is the capital of France?",
+  "avatar": "kelion",
+  "language": "en"
+}
+
+// Response
+{
+  "reply": "The capital of France is Paris.",
+  "avatar": "kelion",
+  "language": "en",
+  "toolsUsed": []
+}</pre>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>🔒 Rate Limits</h2>
+            <p style="color:var(--muted);font-size:0.85rem">Each API key is limited to <strong style="color:var(--cyan)">100 requests/hour</strong> by default. The limit resets every hour.</p>
+            <pre>HTTP 429 Too Many Requests
+{ "error": "Rate limit exceeded. Max 100 requests/hour." }</pre>
+        </div>
+
+        <div class="card">
+            <h2>❌ Error Codes</h2>
+            <table class="param-table" style="margin-top:0">
+                <tr><th>Code</th><th>Meaning</th></tr>
+                <tr><td>400</td><td>Bad request — missing or invalid fields</td></tr>
+                <tr><td>401</td><td>Unauthorized — missing or invalid API key</td></tr>
+                <tr><td>429</td><td>Rate limit exceeded</td></tr>
+                <tr><td>503</td><td>Service unavailable — AI or DB offline</td></tr>
+                <tr><td>500</td><td>Internal server error</td></tr>
+            </table>
+        </div>
+    </div>
+
+    <!-- ═══ SANDBOX ═══ -->
+    <div id="panel-sandbox" class="panel">
+        <div class="card">
+            <h2>🧪 API Sandbox</h2>
+            <p style="color:var(--muted);font-size:0.85rem;margin-bottom:16px">Test API endpoints directly in your browser. Your API key is injected automatically when you're signed in.</p>
+
+            <div class="sandbox-controls">
+                <select class="sandbox-select" id="sb-method">
+                    <option value="GET">GET</option>
+                    <option value="POST" selected>POST</option>
+                </select>
+                <select class="sandbox-select" id="sb-endpoint">
+                    <option value="/api/v1/status">GET /api/v1/status</option>
+                    <option value="/api/v1/models">GET /api/v1/models</option>
+                    <option value="/api/v1/user/profile">GET /api/v1/user/profile</option>
+                    <option value="/api/v1/chat" selected>POST /api/v1/chat</option>
+                </select>
+                <button class="btn btn-primary" id="sb-run-btn">▶ Run</button>
+                <span id="sandbox-status"></span>
+            </div>
+
+            <div class="sandbox-grid">
+                <div class="sandbox-pane">
+                    <label>Request Body (JSON)</label>
+                    <textarea class="sandbox-textarea" id="sb-body">{"message": "Hello! What can you do?"}</textarea>
+                    <label style="margin-top:8px">API Key (optional override)</label>
+                    <input class="dev-input" id="sb-apikey" type="text" placeholder="kel_xxxx (uses saved key if empty)">
+                </div>
+                <div class="sandbox-pane">
+                    <label>Response</label>
+                    <textarea class="sandbox-textarea" id="sb-response" readonly placeholder="Response will appear here…"></textarea>
+                    <div style="display:flex;gap:8px;margin-top:4px">
+                        <span id="sb-status-code" style="font-size:0.8rem;color:var(--muted)"></span>
+                        <span id="sb-duration" style="font-size:0.8rem;color:var(--muted)"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ WEBHOOKS ═══ -->
+    <div id="panel-webhooks" class="panel">
+        <div class="card">
+            <h2>🔔 Webhooks</h2>
+            <p style="color:var(--muted);font-size:0.85rem;margin-bottom:16px">Configure a URL to receive POST notifications when events happen (e.g. chat response generated).</p>
+            <div id="webhook-alert" class="alert"></div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Webhook URL</label>
+                    <input class="dev-input" id="webhook-url-input" type="url" placeholder="https://your-server.com/webhook">
+                </div>
+                <button class="btn btn-primary" id="save-webhook-btn">Save</button>
+            </div>
+            <p style="color:var(--muted);font-size:0.8rem">Leave empty to remove the webhook. KelionAI will send a <code>POST</code> request with a JSON payload to your URL.</p>
+        </div>
+        <div class="card">
+            <h2>📦 Payload Format</h2>
+            <pre>{
+  "event": "chat.response",
+  "timestamp": "2026-02-26T12:00:00Z",
+  "data": {
+    "message": "User message",
+    "reply": "AI response",
+    "avatar": "kelion",
+    "language": "en"
+  }
+}</pre>
+        </div>
+    </div>
+
+</div><!-- /dev-container -->
+
+<!-- REVOKE CONFIRMATION MODAL -->
+<div class="dev-modal" id="revoke-modal">
+    <div class="dev-modal-box">
+        <button class="modal-close-btn" id="revoke-cancel">✕</button>
+        <h3>Revoke API Key?</h3>
+        <p style="color:var(--muted);font-size:0.9rem">This key will be permanently revoked and can no longer be used. This action cannot be undone.</p>
+        <div class="modal-actions">
+            <button class="btn btn-secondary" id="revoke-cancel2">Cancel</button>
+            <button class="btn btn-danger" id="revoke-confirm-btn">Revoke Key</button>
+        </div>
+    </div>
+</div>
+
+<script src="/developer/developer.js"></script>
+</body>
+</html>
