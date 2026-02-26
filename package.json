@@ -32,7 +32,12 @@
             "!server/**/*.test.js"
         ],
         "coverageDirectory": "coverage",
-        "coverageReporters": ["text", "text-summary", "lcov", "clover"],
+        "coverageReporters": [
+            "text",
+            "text-summary",
+            "lcov",
+            "clover"
+        ],
         "coverageThreshold": {
             "global": {
                 "branches": 35,
