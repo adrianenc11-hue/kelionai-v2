@@ -355,7 +355,9 @@
         var text = await KVoice.stopListening();
         if (text && text.trim()) { hideWelcome(); addMessage('user', text);
             if (isUpgradeRequest(text)) { showThinking(false); if (window.KPayments) KPayments.showUpgradePrompt(); }
-            else if (isVisionRequest(text)) triggerVision(); else await sendToAI(text, KVoice.getLanguage());
+            else if (isVisionRequest(text)) triggerVision();
+            else if (window.KEvents && KEvents.handleVoiceTrigger(text)) { showThinking(false); }
+            else await sendToAI(text, KVoice.getLanguage());
         } else { showThinking(false); KVoice.resumeWakeDetection(); }
     }
 
@@ -367,7 +369,9 @@
         if (!text) return;
         if (isUpgradeRequest(text)) { if (window.KPayments) KPayments.showUpgradePrompt(); return; }
         hideWelcome(); KAvatar.setAttentive(true); addMessage('user', text); showThinking(true);
-        if (isVisionRequest(text)) triggerVision(); else await sendToAI(text, KVoice.getLanguage());
+        if (isVisionRequest(text)) triggerVision();
+        else if (window.KEvents && KEvents.handleVoiceTrigger(text)) { showThinking(false); }
+        else await sendToAI(text, KVoice.getLanguage());
     }
 
     // ─── Drag & Drop ─────────────────────────────────────────
@@ -448,13 +452,16 @@
 
         window.addEventListener('wake-message', function(e) {
             var detail = e.detail; hideWelcome(); addMessage('user', detail.text); showThinking(true);
-            if (isVisionRequest(detail.text)) triggerVision(); else sendToAI(detail.text, detail.language);
+            if (isVisionRequest(detail.text)) triggerVision();
+            else if (window.KEvents && KEvents.handleVoiceTrigger(detail.text)) { showThinking(false); }
+            else sendToAI(detail.text, detail.language);
         });
 
         setupDragDrop();
         KVoice.startWakeWordDetection();
         checkHealth();
         if (window.KPayments) KPayments.showUsageBar();
+        if (window.KEvents) KEvents.checkUpcomingEvents();
 
         // Restore last conversation from localStorage
         var savedConvId = restoreConvId();

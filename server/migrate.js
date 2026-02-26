@@ -35,13 +35,28 @@ CREATE TABLE IF NOT EXISTS user_preferences (
     UNIQUE(user_id, key)
 );
 
+CREATE TABLE IF NOT EXISTS journal_entries (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    date DATE NOT NULL DEFAULT CURRENT_DATE,
+    rating INTEGER CHECK (rating BETWEEN 1 AND 5),
+    best_moment TEXT,
+    improvement TEXT,
+    goals TEXT,
+    mood TEXT DEFAULT 'neutral',
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(user_id, date)
+);
+
 CREATE INDEX IF NOT EXISTS idx_conversations_user ON conversations(user_id, updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id, created_at ASC);
 CREATE INDEX IF NOT EXISTS idx_user_prefs_user ON user_preferences(user_id);
+CREATE INDEX IF NOT EXISTS idx_journal_user_date ON journal_entries(user_id, date);
 
 ALTER TABLE conversations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_preferences ENABLE ROW LEVEL SECURITY;
+ALTER TABLE journal_entries ENABLE ROW LEVEL SECURITY;
 
 DO $$ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Users own convos') THEN
@@ -54,6 +69,9 @@ DO $$ BEGIN
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Users own prefs') THEN
         CREATE POLICY "Users own prefs" ON user_preferences FOR ALL USING (auth.uid() = user_id);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Users own journal') THEN
+        CREATE POLICY "Users own journal" ON journal_entries FOR ALL USING (auth.uid() = user_id);
     END IF;
 END $$;
 `;
@@ -90,7 +108,7 @@ async function runMigration() {
     try {
         logger.info({ component: 'Migration' }, '�� Running database migration...');
         await pool.query(MIGRATION_SQL);
-        logger.info({ component: 'Migration' }, '✅ Tables created/verified: conversations, messages, user_preferences');
+        logger.info({ component: 'Migration' }, '✅ Tables created/verified: conversations, messages, user_preferences, journal_entries');
         logger.info({ component: 'Migration' }, '✅ RLS policies applied');
         return true;
     } catch (e) {

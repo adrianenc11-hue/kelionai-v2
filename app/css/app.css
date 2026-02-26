@@ -950,3 +950,41 @@ body {
     transition: background 0.2s;
 }
 .usage-upgrade-badge:hover { background: rgba(255,68,68,0.35); }
+
+/* ═══ Journal Panel ═══ */
+.journal-panel {
+    padding: 16px; color: #e0e0e0; height: 100%; overflow-y: auto;
+    display: flex; flex-direction: column; gap: 12px;
+}
+.journal-panel h3 { color: #00ffff; font-size: 1rem; margin: 0; }
+.journal-rating { display: flex; flex-direction: column; gap: 6px; }
+.journal-rating > span { font-size: 0.85rem; color: #aaa; }
+.stars { display: flex; gap: 6px; }
+.star { font-size: 1.5rem; cursor: pointer; opacity: 0.3; transition: opacity 0.15s; }
+.star:hover { opacity: 0.8; }
+.journal-rating-val { font-size: 0.8rem; color: #00ccff; }
+.journal-panel textarea {
+    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 8px; color: #e0e0e0; padding: 8px; font-size: 0.82rem;
+    resize: vertical; font-family: inherit; outline: none;
+    transition: border-color 0.2s;
+}
+.journal-panel textarea:focus { border-color: rgba(0,255,255,0.4); }
+.journal-mood-row { display: flex; align-items: center; gap: 10px; font-size: 0.85rem; }
+.journal-mood-row label { color: #aaa; }
+#journal-mood {
+    background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 6px; color: #e0e0e0; padding: 4px 8px; font-size: 0.82rem;
+    cursor: pointer;
+}
+.journal-btn-save {
+    background: linear-gradient(135deg, #00ccff, #00ff88); color: #000;
+    border: none; border-radius: 8px; padding: 8px 18px; font-size: 0.85rem;
+    font-weight: 600; cursor: pointer; align-self: flex-start;
+    transition: opacity 0.2s, transform 0.15s;
+}
+.journal-btn-save:hover { opacity: 0.85; transform: scale(1.03); }
+.journal-status { font-size: 0.8rem; min-height: 18px; }
+
+/* ═══ Mood Chart ═══ */
+.mood-chart-wrapper { padding: 12px; }
