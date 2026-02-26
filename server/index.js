@@ -742,30 +742,36 @@ app.get('/api/messenger/stats', adminAuth, (req, res) => {
 app.get('/api/payments/admin/stats', adminAuth, asyncHandler(async (req, res) => {
     if (!supabaseAdmin) return res.status(503).json({ error: 'DB indisponibil' });
 
-    // Active subscribers by plan
+    const { PLAN_LIMITS } = require('./payments');
+    const PLAN_PRICES = { pro: 9.99, enterprise: 29.99, premium: 19.99 };
+
+    // Active subscribers by plan (fetch updated_at for churn calculation)
     const { data: subs } = await supabaseAdmin
         .from('subscriptions')
-        .select('plan, status, current_period_end, stripe_subscription_id')
+        .select('plan, status, current_period_end, updated_at')
         .order('status');
 
     const now = new Date();
+    const thirtyDaysAgo = new Date(now - 30 * 24 * 60 * 60 * 1000);
     const activeSubs = (subs || []).filter(s =>
         s.status === 'active' && s.current_period_end && new Date(s.current_period_end) > now
     );
-    const cancelledSubs = (subs || []).filter(s => s.status === 'cancelled');
     const pastDueSubs = (subs || []).filter(s => s.status === 'past_due');
+    // Churn: subscriptions cancelled in the last 30 days
+    const recentCancelledSubs = (subs || []).filter(s =>
+        s.status === 'cancelled' && s.updated_at && new Date(s.updated_at) >= thirtyDaysAgo
+    );
 
     const planCounts = {};
     activeSubs.forEach(s => { planCounts[s.plan] = (planCounts[s.plan] || 0) + 1; });
 
-    const PLAN_PRICES = { pro: 9.99, enterprise: 29.99, premium: 19.99 };
     const mrr = activeSubs.reduce((sum, s) => sum + (PLAN_PRICES[s.plan] || 0), 0);
 
-    // Churn rate: cancelled / (active + cancelled) in last 30 days
-    const thirtyDaysAgo = new Date(now - 30 * 24 * 60 * 60 * 1000);
-    const recentCancelled = cancelledSubs.length;
-    const totalForChurn = activeSubs.length + recentCancelled;
-    const churnRate = totalForChurn > 0 ? ((recentCancelled / totalForChurn) * 100).toFixed(1) : '0.0';
+    // Churn rate: recently cancelled / (active + recently cancelled)
+    const totalForChurn = activeSubs.length + recentCancelledSubs.length;
+    const churnRate = totalForChurn > 0
+        ? ((recentCancelledSubs.length / totalForChurn) * 100).toFixed(1)
+        : '0.0';
 
     // Usage stats (today)
     const today = now.toISOString().split('T')[0];
@@ -779,7 +785,7 @@ app.get('/api/payments/admin/stats', adminAuth, asyncHandler(async (req, res) =>
 
     res.json({
         activeSubscribers: activeSubs.length,
-        cancelledSubscribers: cancelledSubs.length,
+        cancelledLast30Days: recentCancelledSubs.length,
         pastDueSubscribers: pastDueSubs.length,
         planCounts,
         mrr: Math.round(mrr * 100) / 100,
