@@ -14,6 +14,7 @@
 // THINKING LOOP: Analyze → Decompose → Plan → Execute → Verify → Learn
 // ═══════════════════════════════════════════════════════════════
 const fetch = require('node-fetch');
+const logger = require('./logger');
 
 class KelionBrain {
     constructor(config) {
@@ -86,7 +87,7 @@ class KelionBrain {
         const thinkTime = Date.now() - startTime;
         this.journalEntry('think_complete', `${analysis.complexity} task, ${plan.length} tools, ${thinkTime}ms`, { tools: Object.keys(results), complexity: analysis.complexity });
 
-        console.log(`[Brain] \u{1F9E0} Think: ${analysis.complexity} | tools:[${Object.keys(results).join(',')}] | CoT:${!!chainOfThought} | ${thinkTime}ms`);
+        logger.info({ component: 'Brain', complexity: analysis.complexity, tools: Object.keys(results), chainOfThought: !!chainOfThought, thinkTime }, `🧠 Think: ${analysis.complexity} | tools:[${Object.keys(results).join(',')}] | CoT:${!!chainOfThought} | ${thinkTime}ms`);
 
         return {
             enrichedMessage: enriched,
@@ -336,7 +337,7 @@ Raspunde STRICT cu JSON:
         if (this.strategies.toolCombinations[combo]) {
             const strat = this.strategies.toolCombinations[combo];
             if (strat.successRate < 0.5) {
-                console.log(`[Brain] \u{1F4D3} Combo ${combo} has ${strat.successRate * 100}% success — adjusting`);
+                logger.info({ component: 'Brain', combo, successRate: strat.successRate }, `📓 Combo ${combo} has ${strat.successRate * 100}% success — adjusting`);
             }
         }
 
@@ -374,7 +375,7 @@ Raspunde STRICT cu JSON:
         this.strategies.toolCombinations[combo].successes += successCount === plan.length ? 1 : 0;
         this.strategies.toolCombinations[combo].successRate = this.strategies.toolCombinations[combo].successes / this.strategies.toolCombinations[combo].attempts;
 
-        console.log(`[Brain] \u26A1 ${Date.now() - t0}ms: ${Object.keys(results).join(', ') || 'none'}`);
+        logger.info({ component: 'Brain', tools: Object.keys(results) }, `⚡ ${Date.now() - t0}ms: ${Object.keys(results).join(', ') || 'none'}`);
         return results;
     }
 
@@ -484,19 +485,19 @@ Raspunde STRICT cu JSON:
                 if (error.includes('400') && step.query?.length > 50) {
                     const refined = step.query.split(' ').slice(0, 5).join(' ');
                     this.strategies.searchRefinement.push({ original: step.query, refined, reason: '400_too_long' });
-                    console.log(`[Brain] \u{1F527} Search recovery: refined query to "${refined}"`);
+                    logger.info({ component: 'Brain', refined }, `🔧 Search recovery: refined query to "${refined}"`);
                 }
             },
             weather: () => {
                 // City might not be found — log for future
                 if (error.includes('not found')) {
-                    console.log(`[Brain] \u{1F527} Weather recovery: city "${step.city}" not found`);
+                    logger.info({ component: 'Brain', city: step.city }, `🔧 Weather recovery: city "${step.city}" not found`);
                 }
             },
             imagine: () => {
                 // Rate limit or content filter
                 if (error.includes('429')) {
-                    console.log(`[Brain] \u{1F527} Imagine recovery: rate limited, will delay next attempt`);
+                    logger.info({ component: 'Brain' }, '🔧 Imagine recovery: rate limited, will delay next attempt');
                 }
             }
         };
@@ -542,7 +543,7 @@ Raspunde STRICT cu JSON:
                     const citations = (d.citations || []).slice(0, 4).map(url => `- ${url}`).join('\n');
                     if (answer) { result = answer + (citations ? '\n\nSurse:\n' + citations : ''); engine = 'Perplexity'; }
                 }
-            } catch (e) { console.warn('[Brain] Perplexity:', e.message); }
+            } catch (e) { logger.warn({ component: 'Brain', err: e.message }, 'Perplexity: ' + e.message); }
         }
 
         // 2️⃣ TAVILY — Good: aggregated + parsed for LLM
@@ -555,7 +556,7 @@ Raspunde STRICT cu JSON:
                     const sources = (d.results || []).slice(0, 4).map(x => `- ${x.title}: ${x.content?.substring(0, 200)}`).join('\n');
                     if (d.answer || sources) { result = (d.answer || '') + (sources ? '\n\nSurse:\n' + sources : ''); engine = 'Tavily'; }
                 }
-            } catch (e) { console.warn('[Brain] Tavily:', e.message); }
+            } catch (e) { logger.warn({ component: 'Brain', err: e.message }, 'Tavily: ' + e.message); }
         }
 
         // 3️⃣ SERPER — Fast: raw Google results, very cheap
@@ -572,7 +573,7 @@ Raspunde STRICT cu JSON:
                     const organic = (d.organic || []).slice(0, 4).map(x => `- ${x.title}: ${x.snippet?.substring(0, 200)}`).join('\n');
                     if (answer || organic) { result = answer + (organic ? '\n\nSurse:\n' + organic : ''); engine = 'Serper'; }
                 }
-            } catch (e) { console.warn('[Brain] Serper:', e.message); }
+            } catch (e) { logger.warn({ component: 'Brain', err: e.message }, 'Serper: ' + e.message); }
         }
 
         // 4️⃣ DUCKDUCKGO — Free fallback, no key needed
@@ -586,11 +587,11 @@ Raspunde STRICT cu JSON:
                     if (d.RelatedTopics) for (const t of d.RelatedTopics.slice(0, 4)) if (t.Text) parts.push(`- ${t.Text.substring(0, 150)}`);
                     if (parts.length > 0) { result = parts.join('\n'); engine = 'DuckDuckGo'; }
                 }
-            } catch (e) { console.warn('[Brain] DuckDuckGo:', e.message); }
+            } catch (e) { logger.warn({ component: 'Brain', err: e.message }, 'DuckDuckGo: ' + e.message); }
         }
 
         if (!result) throw new Error('All search engines failed');
-        console.log(`[Brain] \u{1F50D} Search via ${engine}`);
+        logger.info({ component: 'Brain', engine }, `🔍 Search via ${engine}`);
         return result;
     }
 
@@ -661,7 +662,7 @@ Raspunde STRICT JSON. Daca nimic: {}` }] }) });
                 if (k && v) await this.supabaseAdmin.from('user_preferences').upsert({ user_id: userId, key: k, value: typeof v === 'object' ? v : { data: v } }, { onConflict: 'user_id,key' });
             }
             this.learningsExtracted += Object.keys(facts).length;
-            console.log(`[Brain] \u{1F9E0} Learned: ${Object.keys(facts).join(', ')}`);
+            logger.info({ component: 'Brain', facts: Object.keys(facts) }, `🧠 Learned: ${Object.keys(facts).join(', ')}`);
         } catch (e) { /* silent */ }
     }
 
