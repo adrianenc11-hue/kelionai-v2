@@ -124,7 +124,7 @@
         }
 
         // Manage subscription button for paid plans
-        if (currentPlan === 'pro' || currentPlan === 'premium') {
+        if (currentPlan === 'pro' || currentPlan === 'enterprise' || currentPlan === 'premium') {
             var manageBtn = document.createElement('div');
             manageBtn.className = 'pricing-manage';
             manageBtn.innerHTML = '<button class="pricing-btn manage" id="btn-manage-sub">Gestionează abonamentul</button>';

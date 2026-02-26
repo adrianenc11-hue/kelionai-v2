@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prețuri — KelionAI</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap">
+    <link rel="stylesheet" href="/pricing/pricing.css">
+</head>
+<body>
+    <header class="pricing-header">
+        <a href="/" class="pricing-logo">KelionAI</a>
+        <nav class="pricing-nav">
+            <a href="/" class="nav-link">Acasă</a>
+            <a href="/dashboard/billing.html" class="nav-link">Contul meu</a>
+        </nav>
+    </header>
+
+    <main class="pricing-main">
+        <div class="pricing-hero">
+            <h1>Alege planul potrivit pentru tine</h1>
+            <p>Acces la cel mai avansat asistent AI cu avatar 3D</p>
+        </div>
+
+        <div id="pricing-status" class="pricing-status hidden"></div>
+
+        <div class="pricing-plans" id="pricing-plans">
+            <!-- Plans rendered by pricing.js -->
+            <div class="plan-loading">Se încarcă planurile...</div>
+        </div>
+
+        <div class="pricing-faq">
+            <h2>Întrebări frecvente</h2>
+            <div class="faq-grid">
+                <div class="faq-item">
+                    <h3>Pot anula oricând?</h3>
+                    <p>Da, poți anula abonamentul oricând din pagina de billing. Nu există penalizări.</p>
+                </div>
+                <div class="faq-item">
+                    <h3>Ce metode de plată acceptați?</h3>
+                    <p>Acceptăm toate cardurile de credit/debit (Visa, Mastercard, Amex) prin Stripe.</p>
+                </div>
+                <div class="faq-item">
+                    <h3>Există perioadă de probă?</h3>
+                    <p>Planul Free este disponibil permanent. Planurile plătite pot fi anulate în 30 de zile pentru rambursare completă.</p>
+                </div>
+                <div class="faq-item">
+                    <h3>Ce este planul Enterprise?</h3>
+                    <p>Acces nelimitat la toate funcționalitățile, suport prioritar și SLA garantat pentru echipe și companii.</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="pricing-footer">
+        <p>&copy; 2024 KelionAI. <a href="/api/legal/terms">Termeni</a> · <a href="/api/legal/privacy">Confidențialitate</a></p>
+    </footer>
+
+    <script src="/pricing/pricing.js"></script>
+</body>
+</html>

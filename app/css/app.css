@@ -226,6 +226,24 @@ body {
     background: rgba(255, 255, 255, 0.12);
 }
 
+.pricing-nav-link {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--accent-blue);
+    text-decoration: none;
+    padding: 5px 10px;
+    border-radius: 20px;
+    border: 1px solid rgba(0, 204, 255, 0.25);
+    background: rgba(0, 204, 255, 0.07);
+    transition: all 0.2s;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+.pricing-nav-link:hover {
+    background: rgba(0, 204, 255, 0.15);
+    text-decoration: none;
+}
+
 .active-mic {
     background: var(--accent-gradient) !important;
     box-shadow: var(--glow-blue);
