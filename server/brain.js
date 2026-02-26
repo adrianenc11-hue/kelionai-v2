@@ -13,7 +13,6 @@
 //
 // THINKING LOOP: Analyze → Decompose → Plan → Execute → Verify → Learn
 // ═══════════════════════════════════════════════════════════════
-const fetch = require('node-fetch');
 const logger = require('./logger');
 
 class KelionBrain {
@@ -665,7 +664,16 @@ Raspunde STRICT JSON. Daca nimic: {}` }] }) });
             }
             this.learningsExtracted += Object.keys(facts).length;
             logger.info({ component: 'Brain', facts: Object.keys(facts) }, `🧠 Learned: ${Object.keys(facts).join(', ')}`);
-        } catch (e) { /* silent */ }
+        } catch (e) {
+            logger.warn({
+                component: 'Brain',
+                event: 'learn_failed',
+                err: e.message,
+                userId: userId ? userId.substring(0, 8) + '...' : 'null'
+            }, '⚠️ Learning extraction failed (non-critical)');
+            this.toolErrors.memory = (this.toolErrors.memory || 0) + 1;
+            this.journalEntry('learn_error', e.message, { hasUserId: !!userId });
+        }
     }
 
     // ═══════════════════════════════════════════════════════════
