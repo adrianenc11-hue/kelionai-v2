@@ -774,6 +774,63 @@ app.get('/api/messenger/stats', adminAuth, (req, res) => {
     res.json(getMessengerStats());
 });
 
+// ═══ PAYMENTS ADMIN STATS — revenue, active subscribers, churn ═══
+app.get('/api/payments/admin/stats', adminAuth, asyncHandler(async (req, res) => {
+    if (!supabaseAdmin) return res.status(503).json({ error: 'DB indisponibil' });
+
+    const { PLAN_LIMITS } = require('./payments');
+    const PLAN_PRICES = { pro: 9.99, enterprise: 29.99, premium: 19.99 };
+
+    // Active subscribers by plan (fetch updated_at for churn calculation)
+    const { data: subs } = await supabaseAdmin
+        .from('subscriptions')
+        .select('plan, status, current_period_end, updated_at')
+        .order('status');
+
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now - 30 * 24 * 60 * 60 * 1000);
+    const activeSubs = (subs || []).filter(s =>
+        s.status === 'active' && s.current_period_end && new Date(s.current_period_end) > now
+    );
+    const pastDueSubs = (subs || []).filter(s => s.status === 'past_due');
+    // Churn: subscriptions cancelled in the last 30 days
+    const recentCancelledSubs = (subs || []).filter(s =>
+        s.status === 'cancelled' && s.updated_at && new Date(s.updated_at) >= thirtyDaysAgo
+    );
+
+    const planCounts = {};
+    activeSubs.forEach(s => { planCounts[s.plan] = (planCounts[s.plan] || 0) + 1; });
+
+    const mrr = activeSubs.reduce((sum, s) => sum + (PLAN_PRICES[s.plan] || 0), 0);
+
+    // Churn rate: recently cancelled / (active + recently cancelled)
+    const totalForChurn = activeSubs.length + recentCancelledSubs.length;
+    const churnRate = totalForChurn > 0
+        ? ((recentCancelledSubs.length / totalForChurn) * 100).toFixed(1)
+        : '0.0';
+
+    // Usage stats (today)
+    const today = now.toISOString().split('T')[0];
+    const { data: usageData } = await supabaseAdmin
+        .from('usage')
+        .select('type, count')
+        .eq('date', today);
+
+    const usageTotals = {};
+    (usageData || []).forEach(u => { usageTotals[u.type] = (usageTotals[u.type] || 0) + u.count; });
+
+    res.json({
+        activeSubscribers: activeSubs.length,
+        cancelledLast30Days: recentCancelledSubs.length,
+        pastDueSubscribers: pastDueSubs.length,
+        planCounts,
+        mrr: Math.round(mrr * 100) / 100,
+        churnRate: parseFloat(churnRate),
+        usageToday: usageTotals,
+        timestamp: now.toISOString()
+    });
+}));
+
 // POST /api/ticker/disable — save ticker preference (Premium only)
 app.post('/api/ticker/disable', asyncHandler(async (req, res) => {
     const user = await getUserFromToken(req);
