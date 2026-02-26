@@ -12,7 +12,7 @@ try {
         stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
     }
 } catch (e) {
-    logger.warn({ component: 'Payments', err: e.message }, 'Stripe not available: ' + e.message);
+    logger.warn({ component: 'Payments', err: e.message }, 'Stripe not available');
 }
 
 // ═══ PLAN LIMITS ═══
@@ -98,7 +98,7 @@ async function incrementUsage(userId, type, supabaseAdmin) {
                 .insert({ user_id: uid, type, date: today, count: 1 });
         }
     } catch (e) {
-        logger.warn({ component: 'Payments', err: e.message }, 'Usage track error: ' + e.message);
+        logger.warn({ component: 'Payments', err: e.message }, 'Usage track error');
     }
 }
 
@@ -195,7 +195,7 @@ router.post('/checkout', async (req, res) => {
         res.json({ url: session.url, sessionId: session.id });
         
     } catch (e) {
-        logger.error({ component: 'Payments', err: e.message }, 'Checkout error: ' + e.message);
+        logger.error({ component: 'Payments', err: e.message }, 'Checkout error');
         res.status(500).json({ error: 'Eroare checkout' });
     }
 });
@@ -241,7 +241,7 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
         try {
             event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
         } catch (e) {
-            logger.error({ component: 'Payments', err: e.message }, 'Webhook signature fail: ' + e.message);
+            logger.error({ component: 'Payments', err: e.message }, 'Webhook signature fail');
             return res.status(400).send('Invalid signature');
         }
         
@@ -310,7 +310,7 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
         
         res.json({ received: true });
     } catch (e) {
-        logger.error({ component: 'Payments', err: e.message }, 'Webhook error: ' + e.message);
+        logger.error({ component: 'Payments', err: e.message }, 'Webhook error');
         res.status(500).send('Webhook error');
     }
 });

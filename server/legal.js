@@ -136,7 +136,7 @@ router.get('/gdpr/export', async (req, res) => {
         res.setHeader('Content-Disposition', `attachment; filename="kelionai-export-${user.id}.json"`);
         res.json(exportData);
     } catch (e) {
-        logger.error({ component: 'Legal', err: e.message }, 'GDPR Export: ' + e.message);
+        logger.error({ component: 'Legal', err: e.message }, 'GDPR Export');
         res.status(500).json({ error: 'Eroare export date' });
     }
 });
@@ -189,7 +189,7 @@ router.delete('/gdpr/delete', async (req, res) => {
         logger.info({ component: 'Legal', userId: user.id }, `🗑️ All data deleted for user ${user.id}`);
         res.json({ success: true, message: 'Toate datele au fost șterse. Contul poate fi închis din setări.' });
     } catch (e) {
-        logger.error({ component: 'Legal', err: e.message }, 'GDPR Delete: ' + e.message);
+        logger.error({ component: 'Legal', err: e.message }, 'GDPR Delete');
         res.status(500).json({ error: 'Eroare ștergere date' });
     }
 });
