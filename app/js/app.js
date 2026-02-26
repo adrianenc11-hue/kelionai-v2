@@ -15,7 +15,10 @@
     function restoreConvId() { try { return localStorage.getItem('kelion_conv_id') || null; } catch(e){ console.warn('[App] localStorage read:', e.message); return null; } }
 
     function unlockAudio() {
-        if (audioUnlocked) return; audioUnlocked = true;
+        if (!audioUnlocked) {
+            audioUnlocked = true;
+            try { const c = new (window.AudioContext || window.webkitAudioContext)(), b = c.createBuffer(1,1,22050), s = c.createBufferSource(); s.buffer = b; s.connect(c.destination); s.start(0); c.resume(); } catch(e){}
+        }
         if (window.KVoice) KVoice.ensureAudioUnlocked();
     }
 

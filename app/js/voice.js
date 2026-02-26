@@ -4,6 +4,7 @@
     const API_BASE = window.location.origin;
     let mediaRecorder = null, audioChunks = [], isRecording = false, isSpeaking = false;
     let currentSourceNode = null, sharedAudioCtx = null, detectedLanguage = 'ro';
+    let pendingAudioBuffer = null, pendingAudioAvatar = null;
     let recognition = null, isListeningForWake = false, isProcessing = false;
 
     function getAudioContext() {
@@ -14,7 +15,16 @@
 
     function ensureAudioUnlocked() {
         const ctx = getAudioContext();
+        if (ctx.state === 'suspended') ctx.resume();
         try { const b = ctx.createBuffer(1,1,22050), s = ctx.createBufferSource(); s.buffer = b; s.connect(ctx.destination); s.start(0); } catch(e){}
+        // Replay pending audio if context was suspended and is now running
+        if (ctx.state === 'running' && pendingAudioBuffer) {
+            const buf = pendingAudioBuffer, av = pendingAudioAvatar;
+            pendingAudioBuffer = null; pendingAudioAvatar = null;
+            const btn = document.getElementById('audio-unlock-btn'); if (btn) btn.remove();
+            isSpeaking = true;
+            playAudioBuffer(buf);
+        }
     }
 
     // ─── Wake Word (always-on mic) ───────────────────────────
@@ -35,8 +45,14 @@
                 const hasK = t === 'k' || t.startsWith('k ');
 
                 if ((hasKelion || hasKira || hasK) && event.results[i].isFinal) {
-                    if (hasKira) { window.KAvatar.loadAvatar('kira'); document.querySelectorAll('.avatar-pill').forEach(b => b.classList.toggle('active', b.dataset.avatar === 'kira')); }
-                    else { window.KAvatar.loadAvatar('kelion'); document.querySelectorAll('.avatar-pill').forEach(b => b.classList.toggle('active', b.dataset.avatar === 'kelion')); }
+                    const targetAvatar = hasKira ? 'kira' : 'kelion';
+                    const currentAvatar = window.KAvatar.getCurrentAvatar();
+                    if (targetAvatar !== currentAvatar) {
+                        window.KAvatar.loadAvatar(targetAvatar);
+                        document.querySelectorAll('.avatar-pill').forEach(b => b.classList.toggle('active', b.dataset.avatar === targetAvatar));
+                        document.getElementById('avatar-name').textContent = targetAvatar === 'kira' ? 'Kira' : 'Kelion';
+                        var chatOverlay = document.getElementById('chat-overlay'); if (chatOverlay) chatOverlay.innerHTML = '';
+                    }
 
                     let msg = t;
                     if (hasKelion) msg = t.split(/kelion|chelion/i).pop().trim();
@@ -81,29 +97,69 @@
 
             const arrayBuf = await resp.arrayBuffer();
             const ctx = getAudioContext();
-            let audioBuf;
-            try { audioBuf = await ctx.decodeAudioData(arrayBuf.slice(0)); }
-            catch(e) { fallbackTextLipSync(text); isSpeaking = false; resumeWakeDetection(); return; }
 
-            currentSourceNode = ctx.createBufferSource();
-            currentSourceNode.buffer = audioBuf;
+            // Await context resume — required when not in a direct user gesture chain
+            if (ctx.state !== 'running') { try { await ctx.resume(); } catch(e) {} }
 
-            // Wire FFT lip sync
-            const ls = KAvatar.getLipSync();
-            let fftOk = false;
-            if (ls && ls.connectToContext) {
-                try {
-                    const an = ls.connectToContext(ctx);
-                    if (an) { currentSourceNode.connect(an); an.connect(ctx.destination); fftOk = true; ls.start(); }
-                } catch(e){}
+            // Context still suspended (no user gesture yet) — store buffer and show unlock prompt
+            if (ctx.state !== 'running') {
+                isSpeaking = false;
+                showAudioUnlockPrompt(arrayBuf, avatar);
+                resumeWakeDetection();
+                return;
             }
-            if (!fftOk) { currentSourceNode.connect(ctx.destination); fallbackTextLipSync(text); }
 
-            KAvatar.setExpression('happy', 0.3);
-            currentSourceNode.onended = () => { stopAllLipSync(); isSpeaking = false; currentSourceNode = null; KAvatar.setExpression('neutral'); resumeWakeDetection(); };
-            currentSourceNode.start(0);
-            console.log('[Voice] ✅ Audio playing (' + arrayBuf.byteLength + 'B)');
+            await playAudioBuffer(arrayBuf);
         } catch(e) { console.error('[Voice]', e); stopAllLipSync(); isSpeaking = false; resumeWakeDetection(); }
+    }
+
+    async function playAudioBuffer(arrayBuf) {
+        const ctx = getAudioContext();
+        let audioBuf;
+        try { audioBuf = await ctx.decodeAudioData(arrayBuf.slice(0)); }
+        catch(e) { fallbackTextLipSync(''); isSpeaking = false; resumeWakeDetection(); return; }
+
+        currentSourceNode = ctx.createBufferSource();
+        currentSourceNode.buffer = audioBuf;
+
+        // Wire FFT lip sync
+        const ls = KAvatar.getLipSync();
+        let fftOk = false;
+        if (ls && ls.connectToContext) {
+            try {
+                const an = ls.connectToContext(ctx);
+                if (an) { currentSourceNode.connect(an); an.connect(ctx.destination); fftOk = true; ls.start(); }
+            } catch(e){}
+        }
+        if (!fftOk) { currentSourceNode.connect(ctx.destination); fallbackTextLipSync(''); }
+
+        KAvatar.setExpression('happy', 0.3);
+        currentSourceNode.onended = () => { stopAllLipSync(); isSpeaking = false; currentSourceNode = null; KAvatar.setExpression('neutral'); resumeWakeDetection(); };
+        currentSourceNode.start(0);
+        console.log('[Voice] ✅ Audio playing (' + arrayBuf.byteLength + 'B)');
+    }
+
+    function showAudioUnlockPrompt(arrayBuf, avatar) {
+        pendingAudioBuffer = arrayBuf;
+        pendingAudioAvatar = avatar;
+        let btn = document.getElementById('audio-unlock-btn');
+        if (btn) return;
+        btn = document.createElement('button');
+        btn.id = 'audio-unlock-btn';
+        btn.textContent = '🔊 Apasă pentru a activa sunetul';
+        btn.style.cssText = 'position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#1a73e8;color:#fff;border:none;border-radius:24px;padding:12px 24px;cursor:pointer;z-index:9999;font-size:14px;font-weight:600;box-shadow:0 4px 16px rgba(0,0,0,0.4)';
+        btn.onclick = async function() {
+            btn.remove();
+            const buf = pendingAudioBuffer, av = pendingAudioAvatar;
+            pendingAudioBuffer = null; pendingAudioAvatar = null;
+            if (!buf) return;
+            isSpeaking = true;
+            const ctx = getAudioContext();
+            try { await ctx.resume(); } catch(e) {}
+            await playAudioBuffer(buf);
+        };
+        document.body.appendChild(btn);
+        console.log('[Voice] Audio autoplay blocked — showing unlock prompt');
     }
 
     function stopAllLipSync() {
