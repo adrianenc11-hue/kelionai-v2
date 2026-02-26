@@ -159,6 +159,61 @@
         }
     }
 
+    // ═══ Usage bar widget ═══
+    async function showUsageBar() {
+        var bar = document.getElementById('usage-bar');
+        if (!bar) {
+            bar = document.createElement('div');
+            bar.id = 'usage-bar';
+            bar.className = 'usage-bar';
+            document.body.appendChild(bar);
+        }
+
+        var status = await loadStatus();
+        if (!status) { bar.style.display = 'none'; return; }
+
+        var limits = status.limits || {};
+        var usage = status.usage || {};
+        var types = [
+            { key: 'chat', icon: '💬' },
+            { key: 'search', icon: '🔍' },
+            { key: 'image', icon: '🖼' },
+            { key: 'vision', icon: '👁' },
+            { key: 'tts', icon: '🔊' }
+        ];
+
+        var html = '';
+        for (var i = 0; i < types.length; i++) {
+            var t = types[i];
+            var limit = limits[t.key];
+            var used = usage[t.key] || 0;
+            var remaining = limit === -1 ? Infinity : (limit - used);
+            var cls = 'usage-item';
+            if (limit !== -1 && remaining <= 0) cls += ' usage-exceeded';
+            else if (limit !== -1 && remaining <= 2) cls += ' usage-warning';
+            var display = limit === -1 ? '∞' : (used + '/' + limit);
+            html += '<span class="' + cls + '">' + t.icon + ' ' + display + '</span>';
+        }
+
+        if (limits.chat === -1 && limits.search === -1 && limits.image === -1 &&
+            limits.vision === -1 && limits.tts === -1) {
+            html = '<span class="usage-item">💬 ∞</span><span class="usage-item">🔍 ∞</span><span class="usage-item">🖼 ∞</span>';
+        }
+
+        // Check if any quota type is exhausted
+        var anyExceeded = false;
+        for (var j = 0; j < types.length; j++) {
+            var tkey = types[j].key;
+            if (limits[tkey] !== -1 && (usage[tkey] || 0) >= limits[tkey]) { anyExceeded = true; break; }
+        }
+        if (anyExceeded) {
+            html += '<span class="usage-upgrade-badge" onclick="if(window.KPayments)KPayments.showUpgradePrompt()">Upgrade</span>';
+        }
+
+        bar.innerHTML = html;
+        bar.style.display = 'flex';
+    }
+
     // ═══ Init ═══
     function init() {
         var pricingBtn = document.getElementById('btn-pricing');
@@ -187,7 +242,7 @@
         checkPaymentResult();
     }
 
-    window.KPayments = { init: init, showUpgradePrompt: showUpgradePrompt, renderPricing: renderPricing };
+    window.KPayments = { init: init, showUpgradePrompt: showUpgradePrompt, renderPricing: renderPricing, showUsageBar: showUsageBar };
 
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
     else init();
