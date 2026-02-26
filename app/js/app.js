@@ -455,6 +455,7 @@
         KVoice.startWakeWordDetection();
         checkHealth();
         if (window.KPayments) KPayments.showUsageBar();
+        if (window.KTicker) KTicker.init();
 
         // Restore last conversation from localStorage
         var savedConvId = restoreConvId();

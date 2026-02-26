@@ -738,6 +738,16 @@ app.get('/api/messenger/stats', adminAuth, (req, res) => {
     res.json(getMessengerStats());
 });
 
+// POST /api/ticker/disable — save ticker preference (Premium only)
+app.post('/api/ticker/disable', asyncHandler(async (req, res) => {
+    const user = await getUserFromToken(req);
+    if (!user || !supabaseAdmin) return res.status(401).json({ error: 'Auth required' });
+    const { data: sub } = await supabaseAdmin.from('subscriptions').select('plan').eq('user_id', user.id).single();
+    if (sub?.plan !== 'premium') return res.status(403).json({ error: 'Premium only' });
+    await supabaseAdmin.from('user_preferences').upsert({ user_id: user.id, key: 'ticker_disabled', value: req.body.disabled }, { onConflict: 'user_id,key' });
+    res.json({ success: true });
+}));
+
 // ═══ HEALTH ═══
 app.get('/api/health', (req, res) => {
     const diag = brain.getDiagnostics();
