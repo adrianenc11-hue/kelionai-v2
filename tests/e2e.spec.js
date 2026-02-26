@@ -136,19 +136,31 @@ test('avatar switches between Kelion and Kira', async ({ page }) => {
     await page.waitForTimeout(5000);
     await dismissAuth(page);
 
-    // Start with Kelion
-    let currentAvatar = await page.evaluate(() => KAvatar.getCurrentAvatar());
+    // Start cu Kelion
+    let currentAvatar = await page.evaluate(() => window.KAvatar.getCurrentAvatar());
     expect(currentAvatar).toBe('kelion');
+    await expect(page.locator('#avatar-name')).toHaveText('Kelion');
 
-    // Switch to Kira
+    // Switch la Kira — așteptăm ca DOM-ul să confirme load-ul complet
     await page.locator('[data-avatar="kira"]').click();
-    await page.waitForTimeout(3000);
+    // Așteptăm max 10s ca GLB-ul Kira să se încarce și DOM-ul să se actualizeze
+    await expect(page.locator('#avatar-name')).toHaveText('Kira', { timeout: 10000 });
+    await expect(page.locator('#status-text')).toHaveText('Online', { timeout: 10000 });
 
-    currentAvatar = await page.evaluate(() => KAvatar.getCurrentAvatar());
+    currentAvatar = await page.evaluate(() => window.KAvatar.getCurrentAvatar());
     expect(currentAvatar).toBe('kira');
 
-    // Name should update
-    await expect(page.locator('#avatar-name')).toHaveText('Kira');
+    // Verifică că pill-ul Kira e activ
+    await expect(page.locator('[data-avatar="kira"]')).toHaveClass(/active/);
+
+    // Switch înapoi la Kelion
+    await page.locator('[data-avatar="kelion"]').click();
+    await expect(page.locator('#avatar-name')).toHaveText('Kelion', { timeout: 10000 });
+    await expect(page.locator('#status-text')).toHaveText('Online', { timeout: 10000 });
+
+    currentAvatar = await page.evaluate(() => window.KAvatar.getCurrentAvatar());
+    expect(currentAvatar).toBe('kelion');
+    await expect(page.locator('[data-avatar="kelion"]')).toHaveClass(/active/);
 });
 
 // ═══════════════════════════════════════════
