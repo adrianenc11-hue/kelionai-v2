@@ -422,6 +422,12 @@ app.post('/api/speak', apiLimiter, validate(speakSchema), async (req, res) => {
     try {
         const { text, avatar = 'kelion' } = req.body;
         if (!text || !process.env.ELEVENLABS_API_KEY) return res.status(503).json({ error: 'TTS indisponibil' });
+
+        // ── Usage check ──
+        const user = await getUserFromToken(req);
+        const usage = await checkUsage(user?.id, 'tts', supabaseAdmin);
+        if (!usage.allowed) return res.status(429).json({ error: 'Limită TTS atinsă. Upgrade la Pro pentru mai mult.', plan: usage.plan, limit: usage.limit, upgrade: true });
+
         const vid = avatar === 'kira' ? 'EXAVITQu4vr4xnSDxMaL' : 'VR6AewLTigWG4xSOukaG';
         const r = await fetch('https://api.elevenlabs.io/v1/text-to-speech/' + vid, { method: 'POST',
             headers: { 'Content-Type': 'application/json', 'xi-api-key': process.env.ELEVENLABS_API_KEY },
@@ -429,6 +435,7 @@ app.post('/api/speak', apiLimiter, validate(speakSchema), async (req, res) => {
         if (!r.ok) return res.status(503).json({ error: 'TTS fail' });
         const buf = await r.buffer();
         logger.info({ component: 'Speak', bytes: buf.length, avatar }, buf.length + ' bytes | ' + avatar);
+        incrementUsage(user?.id, 'tts', supabaseAdmin).catch(()=>{});
         res.set({ 'Content-Type': 'audio/mpeg', 'Content-Length': buf.length }); res.send(buf);
     } catch(e) { res.status(500).json({ error: 'Eroare TTS' }); }
 });
@@ -455,6 +462,12 @@ app.post('/api/vision', apiLimiter, validate(visionSchema), async (req, res) => 
     try {
         const { image, avatar = 'kelion', language = 'ro' } = req.body;
         if (!image || !process.env.ANTHROPIC_API_KEY) return res.status(503).json({ error: 'Vision indisponibil' });
+
+        // ── Usage check ──
+        const user = await getUserFromToken(req);
+        const usage = await checkUsage(user?.id, 'vision', supabaseAdmin);
+        if (!usage.allowed) return res.status(429).json({ error: 'Limită vision atinsă. Upgrade la Pro pentru mai mult.', plan: usage.plan, limit: usage.limit, upgrade: true });
+
         const LANGS = { ro:'română', en:'English' };
         const prompt = `Ești OCHII unei persoane. Descrie EXACT ce vezi cu PRECIZIE MAXIMĂ.
 Persoane: vârstă, sex, haine (culori exacte), expresie, gesturi, ce țin în mâini.
@@ -467,6 +480,7 @@ Răspunde în ${LANGS[language] || 'română'}, concis dar detaliat.`;
             body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 1024,
                 messages: [{ role: 'user', content: [{ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: image } }, { type: 'text', text: prompt }] }] }) });
         const d = await r.json();
+        incrementUsage(user?.id, 'vision', supabaseAdmin).catch(()=>{});
         res.json({ description: d.content?.[0]?.text || 'Nu am putut analiza.', avatar, engine: 'Claude' });
     } catch(e) { res.status(500).json({ error: 'Eroare viziune' }); }
 });

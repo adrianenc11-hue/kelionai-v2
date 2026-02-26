@@ -17,10 +17,10 @@ try {
 
 // ═══ PLAN LIMITS ═══
 const PLAN_LIMITS = {
-    guest:   { chat: 5,   search: 3,  image: 1,  name: 'Guest' },
-    free:    { chat: 10,  search: 5,  image: 2,  name: 'Free' },
-    pro:     { chat: 100, search: 50, image: 20, name: 'Pro' },
-    premium: { chat: -1,  search: -1, image: -1, name: 'Premium' } // -1 = unlimited
+    guest:   { chat: 5,   search: 3,  image: 1,  vision: 2,  tts: 5,   name: 'Guest' },
+    free:    { chat: 10,  search: 5,  image: 2,  vision: 5,  tts: 10,  name: 'Free' },
+    pro:     { chat: 100, search: 50, image: 20, vision: 50, tts: 100, name: 'Pro' },
+    premium: { chat: -1,  search: -1, image: -1, vision: -1, tts: -1,  name: 'Premium' } // -1 = unlimited
 };
 
 // ═══ CHECK USER PLAN & USAGE ═══
@@ -134,7 +134,7 @@ router.get('/status', async (req, res) => {
         
         // Get today's usage
         const today = new Date().toISOString().split('T')[0];
-        let usage = { chat: 0, search: 0, image: 0 };
+        let usage = { chat: 0, search: 0, image: 0, vision: 0, tts: 0 };
         if (supabaseAdmin) {
             try {
                 const { data } = await supabaseAdmin

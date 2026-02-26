@@ -65,8 +65,9 @@
             if (!resp.ok) {
                 const e = await resp.json().catch(() => ({}));
                 if (resp.status === 429 && e.upgrade) {
-                    addMessage('assistant', '⚡ ' + (e.error || 'Limită atinsă.'));
-                    if (window.KPayments) KPayments.showUpgradePrompt();
+                    const planName = e.plan ? (e.plan.charAt(0).toUpperCase() + e.plan.slice(1)) : 'Free';
+                    addMessage('assistant', 'Ai atins limita zilnică pentru planul ' + planName + '. Spune \'Kelion, upgrade\' pentru mai multe.');
+                    setTimeout(function() { if (window.KPayments) KPayments.showUpgradePrompt(); }, 2000);
                 } else if (resp.status === 429) {
                     addMessage('assistant', '⏳ Prea multe mesaje. Așteaptă un moment.');
                 } else addMessage('assistant', e.error || 'Eroare.');
@@ -169,8 +170,9 @@
             if (!resp.ok) {
                 const e = await resp.json().catch(() => ({}));
                 if (resp.status === 429 && e.upgrade) {
-                    addMessage('assistant', '⚡ ' + (e.error || 'Limită atinsă.'));
-                    if (window.KPayments) KPayments.showUpgradePrompt();
+                    const planName = e.plan ? (e.plan.charAt(0).toUpperCase() + e.plan.slice(1)) : 'Free';
+                    addMessage('assistant', 'Ai atins limita zilnică pentru planul ' + planName + '. Spune \'Kelion, upgrade\' pentru mai multe.');
+                    setTimeout(function() { if (window.KPayments) KPayments.showUpgradePrompt(); }, 2000);
                 } else if (resp.status === 429) {
                     addMessage('assistant', '⏳ Prea multe mesaje. Așteaptă un moment.');
                 } else addMessage('assistant', e.error || 'Eroare.');
@@ -222,6 +224,7 @@
         }
         if (useStreaming) await sendToAI_Stream(msg, language);
         else await sendToAI_Regular(msg, language);
+        if (window.KPayments) KPayments.showUsageBar();
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -337,6 +340,13 @@
         var o = document.getElementById('chat-overlay'); if (o) o.innerHTML = '';
     }
 
+    // ─── Upgrade voice command detection ─────────────────────
+    // Matches: "Kelion/Chelion, upgrade/abonament", "vreau pro/premium", "upgrade plan"
+    function isUpgradeRequest(t) {
+        var l = t.toLowerCase();
+        return /(kelion|chelion)[,.\s]+(upgrade|abonament)|vreau\s+(pro|premium)|upgrade\s+plan/.test(l);
+    }
+
     // ─── Input handlers ──────────────────────────────────────
     async function onMicDown() { var b = document.getElementById('btn-mic'); if (await KVoice.startListening()) { b.classList.add('recording'); b.textContent = '⏹'; } }
     async function onMicUp() {
@@ -344,7 +354,8 @@
         if (!KVoice.isRecording()) return; showThinking(true);
         var text = await KVoice.stopListening();
         if (text && text.trim()) { hideWelcome(); addMessage('user', text);
-            if (isVisionRequest(text)) triggerVision(); else await sendToAI(text, KVoice.getLanguage());
+            if (isUpgradeRequest(text)) { showThinking(false); if (window.KPayments) KPayments.showUpgradePrompt(); }
+            else if (isVisionRequest(text)) triggerVision(); else await sendToAI(text, KVoice.getLanguage());
         } else { showThinking(false); KVoice.resumeWakeDetection(); }
     }
 
@@ -354,6 +365,7 @@
         if (/^(kira|chira)[,.\s]/i.test(l)) { switchAvatar('kira'); text = text.replace(/^(kira|chira)[,.\s]*/i, '').trim(); }
         else if (/^(kelion|chelion)[,.\s]/i.test(l)) { switchAvatar('kelion'); text = text.replace(/^(kelion|chelion)[,.\s]*/i, '').trim(); }
         if (!text) return;
+        if (isUpgradeRequest(text)) { if (window.KPayments) KPayments.showUpgradePrompt(); return; }
         hideWelcome(); KAvatar.setAttentive(true); addMessage('user', text); showThinking(true);
         if (isVisionRequest(text)) triggerVision(); else await sendToAI(text, KVoice.getLanguage());
     }
@@ -442,6 +454,7 @@
         setupDragDrop();
         KVoice.startWakeWordDetection();
         checkHealth();
+        if (window.KPayments) KPayments.showUsageBar();
 
         // Restore last conversation from localStorage
         var savedConvId = restoreConvId();
