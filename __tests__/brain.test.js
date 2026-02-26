@@ -45,6 +45,52 @@ describe('KelionBrain', () => {
         expect(result).toBeDefined();
     });
 
+    describe('detectBackground', () => {
+        test('returns classroom for teaching keywords', () => {
+            expect(brain.detectBackground('i want to learn a lesson')).toBe('classroom');
+        });
+
+        test('returns lab for science keywords', () => {
+            expect(brain.detectBackground('let us do a chemistry experiment')).toBe('lab');
+        });
+
+        test('returns office for code keywords', () => {
+            expect(brain.detectBackground('help me debug this function')).toBe('office');
+        });
+
+        test('returns kitchen for food keywords', () => {
+            expect(brain.detectBackground('show me a recipe to cook')).toBe('kitchen');
+        });
+
+        test('returns gym for workout keywords', () => {
+            expect(brain.detectBackground('my workout at the gym')).toBe('gym');
+        });
+
+        test('returns zen for relax keywords', () => {
+            expect(brain.detectBackground('i need to relax and breathe')).toBe('zen');
+        });
+
+        test('returns corporate for business keywords', () => {
+            expect(brain.detectBackground('corporate meeting with the team')).toBe('corporate');
+        });
+
+        test('returns music for music keywords', () => {
+            expect(brain.detectBackground('play a song from my playlist')).toBe('music');
+        });
+
+        test('returns travel for travel keywords', () => {
+            expect(brain.detectBackground('i want to travel to a new city')).toBe('travel');
+        });
+
+        test('returns night for sleep keywords', () => {
+            expect(brain.detectBackground('tell me a story before sleep')).toBe('night');
+        });
+
+        test('returns null for unrelated messages', () => {
+            expect(brain.detectBackground('hello how are you')).toBeNull();
+        });
+    });
+
     test('resetAll clears tool errors', () => {
         brain.toolErrors.search = 5;
         brain.resetAll();

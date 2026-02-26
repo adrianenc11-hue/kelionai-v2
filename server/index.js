@@ -280,6 +280,9 @@ app.post('/api/chat', chatLimiter, validate(chatSchema), async (req, res) => {
         if (thought.monitor.content) {
             response.monitor = thought.monitor;
         }
+        if (thought.analysis.contextBackground) {
+            response.contextBackground = thought.analysis.contextBackground;
+        }
         res.json(response);
 
     } catch(e) { logger.error({ component: 'Chat', err: e.message }, e.message); res.status(500).json({ error: 'Eroare AI' }); }
@@ -393,7 +396,7 @@ app.post('/api/chat/stream', chatLimiter, validate(chatSchema), async (req, res)
         }
 
         // End stream
-        res.write(`data: ${JSON.stringify({ type: 'done', reply: fullReply, thinkTime: thought.thinkTime, conversationId: savedConvId })}\n\n`);
+        res.write(`data: ${JSON.stringify({ type: 'done', reply: fullReply, thinkTime: thought.thinkTime, conversationId: savedConvId, contextBackground: thought.analysis.contextBackground || null })}\n\n`);
         res.end();
 
         if (fullReply) brain.learnFromConversation(user?.id, message, fullReply).catch(()=>{});

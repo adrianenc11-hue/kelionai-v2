@@ -314,6 +314,8 @@ Raspunde STRICT cu JSON:
         result.isQuestion = /\?$/.test(text.trim()) || /^(ce|cine|cand|unde|cum|de ce|cat|what|who|when|where|how|why)/i.test(lower);
         result.isCommand = /^(fa|seteaza|porneste|opreste|deschide|do|set|start|stop|open|run|executa)/i.test(lower);
 
+        result.contextBackground = this.detectBackground(lower);
+
         return result;
     }
 
@@ -722,6 +724,28 @@ Raspunde STRICT JSON. Daca nimic: {}` }] }) });
 
     resetTool(tool) { this.toolErrors[tool] = 0; }
     resetAll() { for (const t of Object.keys(this.toolErrors)) this.toolErrors[t] = 0; }
+
+    // ═══════════════════════════════════════════════════════════
+    // detectBackground — returns theme name from keyword match or null
+    // ═══════════════════════════════════════════════════════════
+    detectBackground(lower) {
+        const bgKeywords = [
+            { keywords: ['teach', 'learn', 'school', 'lesson', 'course'], theme: 'classroom' },
+            { keywords: ['chemistry', 'science', 'lab', 'experiment'], theme: 'lab' },
+            { keywords: ['code', 'programming', 'function', 'debug'], theme: 'office' },
+            { keywords: ['cook', 'recipe', 'food', 'kitchen'], theme: 'kitchen' },
+            { keywords: ['workout', 'exercise', 'gym', 'hiit', 'yoga'], theme: 'gym' },
+            { keywords: ['meditat', 'breathe', 'calm', 'zen', 'relax'], theme: 'zen' },
+            { keywords: ['business', 'meeting', 'professional', 'corporate'], theme: 'corporate' },
+            { keywords: ['music', 'song', 'playlist', 'concert'], theme: 'music' },
+            { keywords: ['travel', 'map', 'location', 'city', 'country'], theme: 'travel' },
+            { keywords: ['night', 'dream', 'sleep', 'story'], theme: 'night' },
+        ];
+        for (const { keywords, theme } of bgKeywords) {
+            if (keywords.some(k => lower.includes(k))) return theme;
+        }
+        return null;
+    }
 }
 
 module.exports = { KelionBrain };

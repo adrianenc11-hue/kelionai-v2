@@ -119,6 +119,7 @@
                                 msgEl.textContent = fullReply;
                             }
                             if (data.conversationId) persistConvId(data.conversationId);
+                            if (data.contextBackground && window.KBG) KBG.setBackground(data.contextBackground);
                         }
                     } catch(e) { /* skip parse errors */ }
                 }
@@ -182,6 +183,7 @@
 
             const data = await resp.json();
             if (data.conversationId) persistConvId(data.conversationId);
+            if (data.contextBackground && window.KBG) KBG.setBackground(data.contextBackground);
             chatHistory.push({ role: 'user', content: message });
             chatHistory.push({ role: 'assistant', content: data.reply });
             addMessage('assistant', data.reply);
@@ -225,6 +227,7 @@
         if (useStreaming) await sendToAI_Stream(msg, language);
         else await sendToAI_Regular(msg, language);
         if (window.KPayments) KPayments.showUsageBar();
+        if (window.KBG) KBG.detect(message);
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -338,6 +341,7 @@
         var n = document.getElementById('avatar-name'); if (n) n.textContent = name.charAt(0).toUpperCase() + name.slice(1);
         chatHistory = []; persistConvId(null);
         var o = document.getElementById('chat-overlay'); if (o) o.innerHTML = '';
+        if (window.KBG) KBG.setBackground(KBG.getCurrentBg());
     }
 
     // ─── Upgrade voice command detection ─────────────────────
@@ -366,6 +370,8 @@
         else if (/^(kelion|chelion)[,.\s]/i.test(l)) { switchAvatar('kelion'); text = text.replace(/^(kelion|chelion)[,.\s]*/i, '').trim(); }
         if (!text) return;
         if (isUpgradeRequest(text)) { if (window.KPayments) KPayments.showUpgradePrompt(); return; }
+        var bgMatch = text.match(/(?:show|use|switch to|change to)\s+(\w+)\s+background/i);
+        if (bgMatch && window.KBG) { KBG.setManual(bgMatch[1].toLowerCase()); }
         hideWelcome(); KAvatar.setAttentive(true); addMessage('user', text); showThinking(true);
         if (isVisionRequest(text)) triggerVision(); else await sendToAI(text, KVoice.getLanguage());
     }

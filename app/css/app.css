@@ -12,6 +12,9 @@
     --accent-gradient: linear-gradient(135deg, #00ccff, #8855ff);
     --glow-blue: 0 0 20px rgba(0, 204, 255, 0.3);
     --radius: 16px;
+    --bg-gradient: linear-gradient(135deg, #0a0e1a 0%, #1a1e2e 100%);
+    --accent-color: #00D4FF;
+    --bg-transition: background 1.5s ease;
 }
 
 * {
@@ -25,11 +28,12 @@ body {
     width: 100%;
     height: 100%;
     font-family: 'Inter', sans-serif;
-    background: var(--bg-primary);
+    background: var(--bg-gradient);
     color: var(--text-primary);
     overflow: hidden;
     user-select: none;
     -webkit-user-select: none;
+    transition: var(--bg-transition);
 }
 
 /* ─── Main Layout ───────────────────────────────── */
