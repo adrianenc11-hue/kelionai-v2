@@ -191,6 +191,10 @@ app.post('/api/chat', chatLimiter, validate(chatSchema), async (req, res) => {
         if (!message) return res.status(400).json({ error: 'Mesaj lipsă' });
         const user = await getUserFromToken(req);
 
+        // ── Usage check ──
+        const usage = await checkUsage(user?.id, 'chat', supabaseAdmin);
+        if (!usage.allowed) return res.status(429).json({ error: 'Limită chat atinsă. Upgrade la Pro pentru mai multe mesaje.', plan: usage.plan, limit: usage.limit, upgrade: true });
+
         // ── BRAIN v2 THINKS: analyze → decompose → plan → execute → CoT ──
         const thought = await brain.think(message, avatar, history, language, user?.id, conversationId);
 
@@ -254,6 +258,7 @@ app.post('/api/chat', chatLimiter, validate(chatSchema), async (req, res) => {
             try { savedConvId = await saveConv(user?.id, avatar, message, reply, conversationId, language); } catch(e){ logger.warn({ component: 'Chat', err: e.message }, 'saveConv'); }
         }
         brain.learnFromConversation(user?.id, message, reply).catch(()=>{});
+        incrementUsage(user?.id, 'chat', supabaseAdmin).catch(()=>{});
 
         logger.info({ component: 'Chat', engine, avatar, language, tools: thought.toolsUsed, chainOfThought: !!thought.chainOfThought, thinkTime: thought.thinkTime, replyLength: reply.length }, `${engine} | ${avatar} | ${language} | tools:[${thought.toolsUsed.join(',')}] | CoT:${!!thought.chainOfThought} | ${thought.thinkTime}ms think | ${reply.length}c`);
 
@@ -275,6 +280,10 @@ app.post('/api/chat/stream', chatLimiter, validate(chatSchema), async (req, res)
         const { message, avatar = 'kelion', history = [], language = 'ro', conversationId } = req.body;
         if (!message) return res.status(400).json({ error: 'Mesaj lipsă' });
         const user = await getUserFromToken(req);
+
+        // ── Usage check ──
+        const usage = await checkUsage(user?.id, 'chat', supabaseAdmin);
+        if (!usage.allowed) return res.status(429).json({ error: 'Limită chat atinsă. Upgrade la Pro pentru mai multe mesaje.', plan: usage.plan, limit: usage.limit, upgrade: true });
 
         // SSE headers
         res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive', 'X-Accel-Buffering': 'no' });
@@ -375,6 +384,7 @@ app.post('/api/chat/stream', chatLimiter, validate(chatSchema), async (req, res)
         res.end();
 
         if (fullReply) brain.learnFromConversation(user?.id, message, fullReply).catch(()=>{});
+        if (fullReply) incrementUsage(user?.id, 'chat', supabaseAdmin).catch(()=>{});
         logger.info({ component: 'Stream', avatar, language, replyLength: fullReply.length }, `${avatar} | ${language} | ${fullReply.length}c`);
 
     } catch(e) { logger.error({ component: 'Stream', err: e.message }, e.message); if (!res.headersSent) res.status(500).json({ error: 'Eroare stream' }); else res.end(); }
@@ -454,6 +464,11 @@ app.post('/api/search', searchLimiter, validate(searchSchema), async (req, res) 
         const { query } = req.body;
         if (!query) return res.status(400).json({ error: 'Query lipsă' });
 
+        // ── Usage check ──
+        const user = await getUserFromToken(req);
+        const usage = await checkUsage(user?.id, 'search', supabaseAdmin);
+        if (!usage.allowed) return res.status(429).json({ error: 'Limită căutări atinsă. Upgrade la Pro pentru mai multe căutări.', plan: usage.plan, limit: usage.limit, upgrade: true });
+
         // 1. Perplexity Sonar (best — synthesized answer + citations)
         if (process.env.PERPLEXITY_API_KEY) {
             try {
@@ -468,6 +483,7 @@ app.post('/api/search', searchLimiter, validate(searchSchema), async (req, res) 
                     const citations = d.citations || [];
                     const results = citations.slice(0, 5).map(url => ({ title: url, content: '', url }));
                     logger.info({ component: 'Search', engine: 'Perplexity', chars: answer.length }, 'Perplexity Sonar — ' + answer.length + ' chars');
+                    incrementUsage(user?.id, 'search', supabaseAdmin).catch(()=>{});
                     return res.json({ results, answer, engine: 'Perplexity' });
                 }
             } catch (e) { logger.warn({ component: 'Search', engine: 'Perplexity', err: e.message }, 'Perplexity'); }
@@ -481,6 +497,7 @@ app.post('/api/search', searchLimiter, validate(searchSchema), async (req, res) 
                 if (tr.ok) {
                     const td = await tr.json();
                     logger.info({ component: 'Search', engine: 'Tavily', results: (td.results || []).length }, 'Tavily — ' + (td.results || []).length + ' results');
+                    incrementUsage(user?.id, 'search', supabaseAdmin).catch(()=>{});
                     return res.json({ results: (td.results || []).map(x => ({ title: x.title, content: x.content, url: x.url })), answer: td.answer || '', engine: 'Tavily' });
                 }
             } catch (e) { logger.warn({ component: 'Search', engine: 'Tavily', err: e.message }, 'Tavily'); }
@@ -499,6 +516,7 @@ app.post('/api/search', searchLimiter, validate(searchSchema), async (req, res) 
                     const answer = sd.answerBox?.answer || sd.answerBox?.snippet || sd.knowledgeGraph?.description || '';
                     const results = (sd.organic || []).slice(0, 5).map(x => ({ title: x.title, content: x.snippet, url: x.link }));
                     logger.info({ component: 'Search', engine: 'Serper', results: results.length }, 'Serper — ' + results.length + ' results');
+                    incrementUsage(user?.id, 'search', supabaseAdmin).catch(()=>{});
                     return res.json({ results, answer, engine: 'Serper' });
                 }
             } catch (e) { logger.warn({ component: 'Search', engine: 'Serper', err: e.message }, 'Serper'); }
@@ -510,6 +528,7 @@ app.post('/api/search', searchLimiter, validate(searchSchema), async (req, res) 
         const results = [];
         if (d.Abstract) results.push({ title: d.Heading || query, content: d.Abstract, url: d.AbstractURL });
         if (d.RelatedTopics) for (const t of d.RelatedTopics.slice(0, 5)) if (t.Text) results.push({ title: t.Text.substring(0, 80), content: t.Text, url: t.FirstURL });
+        incrementUsage(user?.id, 'search', supabaseAdmin).catch(()=>{});
         res.json({ results, answer: d.Abstract || '', engine: 'DuckDuckGo' });
     } catch(e) { res.status(500).json({ error: 'Eroare căutare' }); }
 });
@@ -536,12 +555,19 @@ app.post('/api/imagine', imageLimiter, validate(imagineSchema), async (req, res)
     try {
         const { prompt } = req.body;
         if (!prompt || !process.env.TOGETHER_API_KEY) return res.status(503).json({ error: 'Imagine indisponibil' });
+
+        // ── Usage check ──
+        const user = await getUserFromToken(req);
+        const usage = await checkUsage(user?.id, 'image', supabaseAdmin);
+        if (!usage.allowed) return res.status(429).json({ error: 'Limită imagini atinsă. Upgrade la Pro pentru mai multe imagini.', plan: usage.plan, limit: usage.limit, upgrade: true });
+
         const r = await fetch('https://api.together.xyz/v1/images/generations', { method: 'POST',
             headers: { 'Authorization': 'Bearer ' + process.env.TOGETHER_API_KEY, 'Content-Type': 'application/json' },
             body: JSON.stringify({ model: 'black-forest-labs/FLUX.1-schnell', prompt, width: 1024, height: 1024, steps: 4, n: 1, response_format: 'b64_json' }) });
         if (!r.ok) return res.status(503).json({ error: 'Generare eșuată' });
         const d = await r.json(); const b64 = d.data?.[0]?.b64_json;
         if (!b64) return res.status(500).json({ error: 'No data' });
+        incrementUsage(user?.id, 'image', supabaseAdmin).catch(()=>{});
         res.json({ image: 'data:image/png;base64,' + b64, prompt, engine: 'FLUX' });
     } catch(e) { res.status(500).json({ error: 'Eroare imagine' }); }
 });
