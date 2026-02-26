@@ -94,7 +94,7 @@ async function runMigration() {
         logger.info({ component: 'Migration' }, '✅ RLS policies applied');
         return true;
     } catch (e) {
-        logger.error({ component: 'Migration', err: e.message }, '❌ Migration failed: ' + e.message);
+        logger.error({ component: 'Migration', err: e.message }, '❌ Migration failed');
         logger.warn({ component: 'Migration' }, '⚠️ Server will continue without persistent storage');
         return false;
     } finally {

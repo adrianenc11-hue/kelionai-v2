@@ -543,7 +543,7 @@ Raspunde STRICT cu JSON:
                     const citations = (d.citations || []).slice(0, 4).map(url => `- ${url}`).join('\n');
                     if (answer) { result = answer + (citations ? '\n\nSurse:\n' + citations : ''); engine = 'Perplexity'; }
                 }
-            } catch (e) { logger.warn({ component: 'Brain', err: e.message }, 'Perplexity: ' + e.message); }
+            } catch (e) { logger.warn({ component: 'Brain', err: e.message }, 'Perplexity'); }
         }
 
         // 2️⃣ TAVILY — Good: aggregated + parsed for LLM
@@ -556,7 +556,7 @@ Raspunde STRICT cu JSON:
                     const sources = (d.results || []).slice(0, 4).map(x => `- ${x.title}: ${x.content?.substring(0, 200)}`).join('\n');
                     if (d.answer || sources) { result = (d.answer || '') + (sources ? '\n\nSurse:\n' + sources : ''); engine = 'Tavily'; }
                 }
-            } catch (e) { logger.warn({ component: 'Brain', err: e.message }, 'Tavily: ' + e.message); }
+            } catch (e) { logger.warn({ component: 'Brain', err: e.message }, 'Tavily'); }
         }
 
         // 3️⃣ SERPER — Fast: raw Google results, very cheap
@@ -573,7 +573,7 @@ Raspunde STRICT cu JSON:
                     const organic = (d.organic || []).slice(0, 4).map(x => `- ${x.title}: ${x.snippet?.substring(0, 200)}`).join('\n');
                     if (answer || organic) { result = answer + (organic ? '\n\nSurse:\n' + organic : ''); engine = 'Serper'; }
                 }
-            } catch (e) { logger.warn({ component: 'Brain', err: e.message }, 'Serper: ' + e.message); }
+            } catch (e) { logger.warn({ component: 'Brain', err: e.message }, 'Serper'); }
         }
 
         // 4️⃣ DUCKDUCKGO — Free fallback, no key needed
@@ -587,7 +587,7 @@ Raspunde STRICT cu JSON:
                     if (d.RelatedTopics) for (const t of d.RelatedTopics.slice(0, 4)) if (t.Text) parts.push(`- ${t.Text.substring(0, 150)}`);
                     if (parts.length > 0) { result = parts.join('\n'); engine = 'DuckDuckGo'; }
                 }
-            } catch (e) { logger.warn({ component: 'Brain', err: e.message }, 'DuckDuckGo: ' + e.message); }
+            } catch (e) { logger.warn({ component: 'Brain', err: e.message }, 'DuckDuckGo'); }
         }
 
         if (!result) throw new Error('All search engines failed');

@@ -221,7 +221,7 @@ app.post('/api/chat', chatLimiter, validate(chatSchema), async (req, res) => {
                 const d = await r.json();
                 reply = d.content?.[0]?.text;
                 if (reply) engine = 'Claude';
-            } catch(e) { logger.warn({ component: 'Chat', err: e.message }, 'Claude: ' + e.message); }
+            } catch(e) { logger.warn({ component: 'Chat', err: e.message }, 'Claude'); }
         }
         // GPT-4o (fallback)
         if (!reply && process.env.OPENAI_API_KEY) {
@@ -232,7 +232,7 @@ app.post('/api/chat', chatLimiter, validate(chatSchema), async (req, res) => {
                 const d = await r.json();
                 reply = d.choices?.[0]?.message?.content;
                 if (reply) engine = 'GPT-4o';
-            } catch(e) { logger.warn({ component: 'Chat', err: e.message }, 'GPT-4o: ' + e.message); }
+            } catch(e) { logger.warn({ component: 'Chat', err: e.message }, 'GPT-4o'); }
         }
         // DeepSeek (tertiary)
         if (!reply && process.env.DEEPSEEK_API_KEY) {
@@ -243,7 +243,7 @@ app.post('/api/chat', chatLimiter, validate(chatSchema), async (req, res) => {
                 const d = await r.json();
                 reply = d.choices?.[0]?.message?.content;
                 if (reply) engine = 'DeepSeek';
-            } catch(e) { logger.warn({ component: 'Chat', err: e.message }, 'DeepSeek: ' + e.message); }
+            } catch(e) { logger.warn({ component: 'Chat', err: e.message }, 'DeepSeek'); }
         }
 
         if (!reply) return res.status(503).json({ error: 'AI indisponibil' });
@@ -251,7 +251,7 @@ app.post('/api/chat', chatLimiter, validate(chatSchema), async (req, res) => {
         // ── Save conversation (sync to get ID) + Learn async ──
         let savedConvId = conversationId;
         if (supabaseAdmin) {
-            try { savedConvId = await saveConv(user?.id, avatar, message, reply, conversationId, language); } catch(e){ logger.warn({ component: 'Chat', err: e.message }, 'saveConv: ' + e.message); }
+            try { savedConvId = await saveConv(user?.id, avatar, message, reply, conversationId, language); } catch(e){ logger.warn({ component: 'Chat', err: e.message }, 'saveConv'); }
         }
         brain.learnFromConversation(user?.id, message, reply).catch(()=>{});
 
@@ -337,7 +337,7 @@ app.post('/api/chat/stream', chatLimiter, validate(chatSchema), async (req, res)
                         reader.on('error', reject);
                     });
                 }
-            } catch (e) { logger.warn({ component: 'Stream', err: e.message }, 'Claude: ' + e.message); }
+            } catch (e) { logger.warn({ component: 'Stream', err: e.message }, 'Claude'); }
         }
 
         // Fallback: non-streaming GPT-4o or DeepSeek (send as single chunk)
@@ -367,7 +367,7 @@ app.post('/api/chat/stream', chatLimiter, validate(chatSchema), async (req, res)
         // Save conversation (sync to get ID) then end stream
         let savedConvId = conversationId;
         if (fullReply && supabaseAdmin) {
-            try { savedConvId = await saveConv(user?.id, avatar, message, fullReply, conversationId, language); } catch(e){ logger.warn({ component: 'Stream', err: e.message }, 'saveConv: ' + e.message); }
+            try { savedConvId = await saveConv(user?.id, avatar, message, fullReply, conversationId, language); } catch(e){ logger.warn({ component: 'Stream', err: e.message }, 'saveConv'); }
         }
 
         // End stream
@@ -470,7 +470,7 @@ app.post('/api/search', searchLimiter, validate(searchSchema), async (req, res) 
                     logger.info({ component: 'Search', engine: 'Perplexity', chars: answer.length }, 'Perplexity Sonar — ' + answer.length + ' chars');
                     return res.json({ results, answer, engine: 'Perplexity' });
                 }
-            } catch (e) { logger.warn({ component: 'Search', engine: 'Perplexity', err: e.message }, 'Perplexity: ' + e.message); }
+            } catch (e) { logger.warn({ component: 'Search', engine: 'Perplexity', err: e.message }, 'Perplexity'); }
         }
 
         // 2. Tavily (good — aggregated + parsed)
@@ -483,7 +483,7 @@ app.post('/api/search', searchLimiter, validate(searchSchema), async (req, res) 
                     logger.info({ component: 'Search', engine: 'Tavily', results: (td.results || []).length }, 'Tavily — ' + (td.results || []).length + ' results');
                     return res.json({ results: (td.results || []).map(x => ({ title: x.title, content: x.content, url: x.url })), answer: td.answer || '', engine: 'Tavily' });
                 }
-            } catch (e) { logger.warn({ component: 'Search', engine: 'Tavily', err: e.message }, 'Tavily: ' + e.message); }
+            } catch (e) { logger.warn({ component: 'Search', engine: 'Tavily', err: e.message }, 'Tavily'); }
         }
 
         // 3. Serper (fast — raw Google results, cheap)
@@ -501,7 +501,7 @@ app.post('/api/search', searchLimiter, validate(searchSchema), async (req, res) 
                     logger.info({ component: 'Search', engine: 'Serper', results: results.length }, 'Serper — ' + results.length + ' results');
                     return res.json({ results, answer, engine: 'Serper' });
                 }
-            } catch (e) { logger.warn({ component: 'Search', engine: 'Serper', err: e.message }, 'Serper: ' + e.message); }
+            } catch (e) { logger.warn({ component: 'Search', engine: 'Serper', err: e.message }, 'Serper'); }
         }
 
         // 4. DuckDuckGo (free fallback)
@@ -745,7 +745,7 @@ if (require.main === module) {
             logger.info({ component: 'Server', port: PORT, ai: { claude: !!process.env.ANTHROPIC_API_KEY, gpt4o: !!process.env.OPENAI_API_KEY, deepseek: !!process.env.DEEPSEEK_API_KEY }, tts: !!process.env.ELEVENLABS_API_KEY, payments: !!process.env.STRIPE_SECRET_KEY, db: !!supabaseAdmin, migration: !!migrated }, 'KelionAI v2.3 started on port ' + PORT);
         });
     }).catch(e => {
-        logger.error({ component: 'Server' }, 'Migration error: ' + e.message);
+        logger.error({ component: 'Server' }, 'Migration error');
         app.listen(PORT, '0.0.0.0', () => logger.info({ component: 'Server', port: PORT }, 'KelionAI v2.3 on port ' + PORT + ' (migration failed)'));
     });
 }
