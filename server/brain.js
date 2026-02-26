@@ -314,6 +314,11 @@ Raspunde STRICT cu JSON:
         result.isQuestion = /\?$/.test(text.trim()) || /^(ce|cine|cand|unde|cum|de ce|cat|what|who|when|where|how|why)/i.test(lower);
         result.isCommand = /^(fa|seteaza|porneste|opreste|deschide|do|set|start|stop|open|run|executa)/i.test(lower);
 
+        // ── JOURNAL ──
+        if (/\b(jurnal|journal|reflectie|reflectie zilnica|daily reflection|adauga in jurnal|cum a fost ziua|ziua mea|note de zi)\b/i.test(lower)) {
+            result.isJournal = true;
+        }
+
         return result;
     }
 

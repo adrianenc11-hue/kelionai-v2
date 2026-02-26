@@ -25,6 +25,7 @@ const logger = require('./logger');
 const { router: paymentsRouter, checkUsage, incrementUsage } = require('./payments');
 const legalRouter = require('./legal');
 const { validate, registerSchema, loginSchema, refreshSchema, chatSchema, speakSchema, listenSchema, visionSchema, searchSchema, weatherSchema, imagineSchema, memorySchema } = require('./validation');
+const { buildEmergencyResponse } = require('./emergency');
 
 const app = express();
 app.set('trust proxy', 1);
@@ -211,12 +212,32 @@ app.post('/api/chat', chatLimiter, validate(chatSchema), async (req, res) => {
         // ── BRAIN v2 THINKS: analyze → decompose → plan → execute → CoT ──
         const thought = await brain.think(message, avatar, history, language, user?.id, conversationId);
 
+        // ── EMERGENCY OVERRIDE — skip AI call, return safety response immediately ──
+        if (thought.analysis?.isEmergency) {
+            const emergencyReply = buildEmergencyResponse(language, user);
+            let savedConvId = conversationId;
+            if (supabaseAdmin) {
+                try { savedConvId = await saveConv(user?.id, avatar, message, emergencyReply, conversationId, language); } catch(e){ logger.warn({ component: 'Chat', err: e.message }, 'saveConv emergency'); }
+            }
+            incrementUsage(user?.id, 'chat', supabaseAdmin).catch(()=>{});
+            logger.warn({ component: 'Chat', avatar, language }, '🚨 Emergency detected');
+            return res.json({ reply: emergencyReply, avatar, engine: 'Emergency', language, thinkTime: thought.thinkTime, conversationId: savedConvId, isEmergency: true });
+        }
+
         // ── BUILD DEEP PERSONA PROMPT (with CoT guidance) ──
         let memoryContext = '';
         if (user && supabaseAdmin) {
             try {
                 const { data: prefs } = await supabaseAdmin.from('user_preferences').select('key, value').eq('user_id', user.id).limit(30);
                 if (prefs?.length > 0) memoryContext = prefs.map(p => `${p.key}: ${JSON.stringify(p.value)}`).join('; ');
+            } catch(e){}
+            // Prepend upcoming events to memory context
+            try {
+                const upcomingEvents = await getUpcomingEvents(user.id, supabaseAdmin);
+                if (upcomingEvents.length > 0) {
+                    const eventStr = upcomingEvents.map(ev => `${ev.title} (${ev.event_date})`).join(', ');
+                    memoryContext = `[EVENTS]: ${eventStr}` + (memoryContext ? '; ' + memoryContext : '');
+                }
             } catch(e){}
         }
         const systemPrompt = buildSystemPrompt(avatar, language, memoryContext, { failedTools: thought.failedTools }, thought.chainOfThought);
@@ -633,6 +654,111 @@ app.get('/api/conversations/:id/messages', asyncHandler(async (req, res) => {
     if (!conv) return res.status(403).json({ error: 'Access interzis' });
     const { data } = await supabaseAdmin.from('messages').select('id, role, content, created_at').eq('conversation_id', req.params.id).order('created_at', { ascending: true });
     res.json({ messages: data || [] });
+}));
+
+// ═══ EVENTS (Birthday & Reminders) ═══
+async function getUpcomingEvents(userId, db) {
+    if (!userId || !db) return [];
+    try {
+        const today = new Date().toISOString().split('T')[0];
+        const in7 = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        const { data } = await db.from('user_events').select('id, title, event_date, type, recurrence').eq('user_id', userId).gte('event_date', today).lte('event_date', in7).order('event_date', { ascending: true });
+        return data || [];
+    } catch(e) { return []; }
+}
+
+const eventsLimiter = rateLimit({ windowMs: 60 * 1000, max: 30, message: { error: 'Prea multe cereri.' }, standardHeaders: true, legacyHeaders: false });
+
+app.get('/api/events', eventsLimiter, asyncHandler(async (req, res) => {
+    const u = await getUserFromToken(req);
+    if (!u) return res.status(401).json({ error: 'Neautentificat' });
+    if (!supabaseAdmin) return res.json({ events: [] });
+    const { data } = await supabaseAdmin.from('user_events').select('*').eq('user_id', u.id).order('event_date', { ascending: true });
+    res.json({ events: data || [] });
+}));
+
+app.get('/api/events/upcoming', eventsLimiter, asyncHandler(async (req, res) => {
+    const u = await getUserFromToken(req);
+    if (!u) return res.status(401).json({ error: 'Neautentificat' });
+    const events = await getUpcomingEvents(u.id, supabaseAdmin);
+    res.json({ events });
+}));
+
+app.post('/api/events', eventsLimiter, asyncHandler(async (req, res) => {
+    const u = await getUserFromToken(req);
+    if (!u) return res.status(401).json({ error: 'Neautentificat' });
+    if (!supabaseAdmin) return res.status(503).json({ error: 'DB indisponibil' });
+    const { title, event_date, type = 'birthday', recurrence = 'yearly', notes } = req.body;
+    if (!title || !event_date) return res.status(400).json({ error: 'title și event_date sunt obligatorii' });
+    const { data, error } = await supabaseAdmin.from('user_events').insert({ user_id: u.id, title, event_date, type, recurrence, notes }).select().single();
+    if (error) return res.status(500).json({ error: 'Eroare salvare eveniment' });
+    res.status(201).json({ event: data });
+}));
+
+app.delete('/api/events/:id', eventsLimiter, asyncHandler(async (req, res) => {
+    const u = await getUserFromToken(req);
+    if (!u) return res.status(401).json({ error: 'Neautentificat' });
+    if (!supabaseAdmin) return res.status(503).json({ error: 'DB indisponibil' });
+    const { error } = await supabaseAdmin.from('user_events').delete().eq('id', req.params.id).eq('user_id', u.id);
+    if (error) return res.status(500).json({ error: 'Eroare ștergere' });
+    res.json({ success: true });
+}));
+
+// ═══ JOURNAL ═══
+const journalLimiter = rateLimit({ windowMs: 60 * 1000, max: 30, message: { error: 'Prea multe cereri.' }, standardHeaders: true, legacyHeaders: false });
+
+app.get('/api/journal', journalLimiter, asyncHandler(async (req, res) => {
+    const u = await getUserFromToken(req);
+    if (!u) return res.status(401).json({ error: 'Neautentificat' });
+    if (!supabaseAdmin) return res.json({ entries: [] });
+    const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const { data } = await supabaseAdmin.from('journal_entries').select('*').eq('user_id', u.id).gte('entry_date', since).order('entry_date', { ascending: false });
+    res.json({ entries: data || [] });
+}));
+
+app.post('/api/journal', journalLimiter, asyncHandler(async (req, res) => {
+    const u = await getUserFromToken(req);
+    if (!u) return res.status(401).json({ error: 'Neautentificat' });
+    if (!supabaseAdmin) return res.status(503).json({ error: 'DB indisponibil' });
+    const { day_rating, best_moment, improvements, goals, mood = 'neutral', entry_date } = req.body;
+    const date = entry_date || new Date().toISOString().split('T')[0];
+    if (day_rating !== undefined && (day_rating < 1 || day_rating > 10)) return res.status(400).json({ error: 'day_rating trebuie să fie între 1 și 10' });
+    const { data, error } = await supabaseAdmin.from('journal_entries').upsert({ user_id: u.id, entry_date: date, day_rating, best_moment, improvements, goals, mood }, { onConflict: 'user_id,entry_date' }).select().single();
+    if (error) return res.status(500).json({ error: 'Eroare salvare jurnal' });
+    res.json({ entry: data });
+}));
+
+app.get('/api/journal/stats', journalLimiter, asyncHandler(async (req, res) => {
+    const u = await getUserFromToken(req);
+    if (!u) return res.status(401).json({ error: 'Neautentificat' });
+    if (!supabaseAdmin) return res.json({ stats: {} });
+    const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const { data } = await supabaseAdmin.from('journal_entries').select('entry_date, day_rating, mood').eq('user_id', u.id).gte('entry_date', since).order('entry_date', { ascending: true });
+    const entries = data || [];
+    const moodCounts = {};
+    let ratingSum = 0, ratingCount = 0;
+    entries.forEach(e => {
+        if (e.mood) moodCounts[e.mood] = (moodCounts[e.mood] || 0) + 1;
+        if (e.day_rating) { ratingSum += e.day_rating; ratingCount++; }
+    });
+    res.json({ stats: { totalEntries: entries.length, avgRating: ratingCount ? (ratingSum / ratingCount).toFixed(1) : null, moodDistribution: moodCounts, entries } });
+}));
+
+app.get('/api/journal/export', journalLimiter, asyncHandler(async (req, res) => {
+    const u = await getUserFromToken(req);
+    if (!u) return res.status(401).json({ error: 'Neautentificat' });
+    if (!supabaseAdmin) return res.status(503).json({ error: 'DB indisponibil' });
+    const { data } = await supabaseAdmin.from('journal_entries').select('*').eq('user_id', u.id).order('entry_date', { ascending: false });
+    const entries = data || [];
+    const lines = entries.map(e =>
+        `[${e.entry_date}] Rating: ${e.day_rating || '-'}/10 | Mood: ${e.mood || '-'}\n` +
+        (e.best_moment ? `Best moment: ${e.best_moment}\n` : '') +
+        (e.improvements ? `Improvements: ${e.improvements}\n` : '') +
+        (e.goals ? `Goals: ${e.goals}\n` : '')
+    ).join('\n---\n\n');
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="journal.txt"');
+    res.send('KelionAI Journal Export\n========================\n\n' + lines);
 }));
 
 // ═══ BRAIN DIAGNOSTICS ═══

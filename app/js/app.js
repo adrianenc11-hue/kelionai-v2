@@ -296,6 +296,7 @@
         if (overlay) overlay.innerHTML = '';
         document.querySelectorAll('.history-item').forEach(function(el) { el.classList.remove('active'); });
         if (window.innerWidth < 768) toggleHistory(false);
+        if (window.KBackgrounds) KBackgrounds.reset();
     }
 
     function toggleHistory(forceState) {
@@ -328,6 +329,7 @@
         m.textContent = text;
         o.appendChild(m);
         o.scrollTop = o.scrollHeight;
+        if (type === 'user' && window.KBackgrounds) KBackgrounds.onMessage(text);
     }
     function showThinking(v) { document.getElementById('thinking').classList.toggle('active', v); }
     function hideWelcome() { var w = document.getElementById('welcome'); if (w) w.classList.add('hidden'); }
@@ -345,6 +347,42 @@
     function isUpgradeRequest(t) {
         var l = t.toLowerCase();
         return /(kelion|chelion)[,.\s]+(upgrade|abonament)|vreau\s+(pro|premium)|upgrade\s+plan/.test(l);
+    }
+
+    // ─── Emergency SOS detection ─────────────────────────────
+    function isSOSRequest(text) {
+        return /\b(SOS|HELP|URGENTA|URGENȚĂ|AJUTOR URGENT|112|911|999)\b/i.test(text);
+    }
+
+    function showEmergencyOverlay() {
+        var existing = document.getElementById('sos-overlay');
+        if (existing) existing.remove();
+        var overlay = document.createElement('div');
+        overlay.id = 'sos-overlay';
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(255,0,0,0.15);border:3px solid #ff0000;z-index:9999;display:flex;align-items:center;justify-content:center;';
+        overlay.innerHTML = '<div style="background:#1a0000;padding:32px;border-radius:16px;text-align:center;color:#fff;max-width:400px">' +
+            '<div style="font-size:48px">🚨</div>' +
+            '<h2 style="color:#ff4444;margin:8px 0">URGENȚĂ</h2>' +
+            '<div style="font-size:28px;font-weight:bold;color:#ff4444;margin:16px 0">📞 112</div>' +
+            '<p style="color:rgba(255,255,255,0.7);font-size:13px">Poliție · Pompieri · Ambulanță</p>' +
+            '<button onclick="this.closest(\'#sos-overlay\').remove()" style="margin-top:16px;padding:10px 24px;background:#333;color:#fff;border:none;border-radius:8px;cursor:pointer">Închide</button>' +
+            '</div>';
+        // Allow clicking outside to close
+        overlay.addEventListener('click', function (e) { if (e.target === overlay) overlay.remove(); });
+        document.body.appendChild(overlay);
+        // Auto-dismiss after 60 seconds
+        setTimeout(function () { if (overlay.parentNode) overlay.remove(); }, 60000);
+    }
+
+    // ─── Focus mode detection ────────────────────────────────
+    function detectFocusCommand(text) {
+        var l = text.toLowerCase();
+        if (/pomodoro|focus mode|mod focus/.test(l)) return 'pomodoro';
+        if (/meditat(ie|ion)|meditez|respirat(ie|ion)|relax(are)?/.test(l)) {
+            var m20 = /20\s*min/.test(l) ? 20 : /10\s*min/.test(l) ? 10 : /5\s*min/.test(l) ? 5 : null;
+            return m20 ? 'meditation:' + m20 : 'meditation';
+        }
+        return null;
     }
 
     // ─── Input handlers ──────────────────────────────────────
@@ -366,6 +404,14 @@
         else if (/^(kelion|chelion)[,.\s]/i.test(l)) { switchAvatar('kelion'); text = text.replace(/^(kelion|chelion)[,.\s]*/i, '').trim(); }
         if (!text) return;
         if (isUpgradeRequest(text)) { if (window.KPayments) KPayments.showUpgradePrompt(); return; }
+        // SOS check — show overlay immediately before waiting for AI
+        if (isSOSRequest(text)) showEmergencyOverlay();
+        // Focus/meditation detection
+        var focusCmd = detectFocusCommand(text);
+        if (focusCmd && window.KFocus) {
+            if (focusCmd === 'pomodoro') { KFocus.startPomodoro(); }
+            else { var mins = parseInt(focusCmd.split(':')[1]) || 10; KFocus.startMeditation(mins); }
+        }
         hideWelcome(); KAvatar.setAttentive(true); addMessage('user', text); showThinking(true);
         if (isVisionRequest(text)) triggerVision(); else await sendToAI(text, KVoice.getLanguage());
     }
@@ -448,6 +494,7 @@
 
         window.addEventListener('wake-message', function(e) {
             var detail = e.detail; hideWelcome(); addMessage('user', detail.text); showThinking(true);
+            if (isSOSRequest(detail.text)) showEmergencyOverlay();
             if (isVisionRequest(detail.text)) triggerVision(); else sendToAI(detail.text, detail.language);
         });
 
@@ -480,6 +527,34 @@
         }
 
         console.log('[App] ✅ KelionAI v2.3 — STREAMING + HISTORY');
+
+        // ─── Multi-device sync polling ───────────────────────
+        // Every 30 seconds check if there are new messages from another device
+        var lastKnownMsgId = null;
+        setInterval(function () {
+            if (!currentConversationId || !window.KAuth || !KAuth.isLoggedIn()) return;
+            fetch(API_BASE + '/api/conversations/' + currentConversationId + '/messages', { headers: authHeaders() })
+                .then(function (r) { return r.ok ? r.json() : null; })
+                .then(function (data) {
+                    if (!data) return;
+                    var msgs = data.messages || data || [];
+                    if (msgs.length === 0) return;
+                    var latestId = msgs[msgs.length - 1].id;
+                    if (lastKnownMsgId && latestId !== lastKnownMsgId) {
+                        // New message from another device — show notification on history button
+                        var histBtn = document.getElementById('btn-history');
+                        if (histBtn && !histBtn.querySelector('.sync-dot')) {
+                            var dot = document.createElement('span');
+                            dot.className = 'sync-dot';
+                            dot.style.cssText = 'position:absolute;top:0;right:0;width:8px;height:8px;background:#00D4FF;border-radius:50%;';
+                            histBtn.style.position = 'relative';
+                            histBtn.appendChild(dot);
+                        }
+                    }
+                    lastKnownMsgId = latestId;
+                })
+                .catch(function () {});
+        }, 30000);
     }
 
     window.KApp = { loadConversations: loadConversations, toggleHistory: toggleHistory, startNewChat: startNewChat };

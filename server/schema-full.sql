@@ -145,3 +145,35 @@ CREATE POLICY IF NOT EXISTS "users_own_referrals" ON referrals FOR ALL USING (au
 COMMENT ON TABLE subscriptions IS 'Stripe subscription tracking — plans: free, pro (€9.99), premium (€19.99)';
 COMMENT ON TABLE usage IS 'Daily usage counters per user — limits: guest(5/3/1), free(10/5/2), pro(100/50/20), premium(unlimited)';
 COMMENT ON TABLE referrals IS 'Referral codes KEL-XXXXXX — both users get 7 days Pro';
+
+-- ═══ USER EVENTS (Birthday & Reminders) ═══
+CREATE TABLE IF NOT EXISTS user_events (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    event_date DATE NOT NULL,
+    type TEXT DEFAULT 'birthday', -- birthday|anniversary|reminder|custom
+    recurrence TEXT DEFAULT 'yearly', -- yearly|monthly|once
+    notes TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_events_user_date ON user_events(user_id, event_date);
+ALTER TABLE user_events ENABLE ROW LEVEL SECURITY;
+CREATE POLICY IF NOT EXISTS "users_own_events" ON user_events FOR ALL USING (auth.uid() = user_id);
+
+-- ═══ JOURNAL ENTRIES ═══
+CREATE TABLE IF NOT EXISTS journal_entries (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id UUID NOT NULL,
+    entry_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    day_rating INTEGER CHECK (day_rating BETWEEN 1 AND 10),
+    best_moment TEXT,
+    improvements TEXT,
+    goals TEXT,
+    mood TEXT DEFAULT 'neutral', -- happy|sad|stressed|energetic|neutral
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(user_id, entry_date)
+);
+CREATE INDEX IF NOT EXISTS idx_journal_user_date ON journal_entries(user_id, entry_date);
+ALTER TABLE journal_entries ENABLE ROW LEVEL SECURITY;
+CREATE POLICY IF NOT EXISTS "users_own_journal" ON journal_entries FOR ALL USING (auth.uid() = user_id::uuid);
