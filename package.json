@@ -8,12 +8,19 @@
         "start": "node server/index.js",
         "test": "npx playwright test --project=chromium",
         "test:all": "npx playwright test",
+        "test:unit": "jest",
         "test:report": "npx playwright show-report",
         "setup": "bash scripts/setup-env.sh",
         "setup:full": "bash scripts/setup-full.sh",
         "setup:db": "bash scripts/setup-db.sh",
         "deploy": "bash scripts/deploy.sh",
         "health": "bash scripts/health-check.sh"
+    },
+    "jest": {
+        "testEnvironment": "node",
+        "testMatch": [
+            "**/__tests__/**/*.test.js"
+        ]
     },
     "dependencies": {
         "@sentry/browser": "^10.39.0",
@@ -34,6 +41,8 @@
         "node": ">=20.0.0"
     },
     "devDependencies": {
-        "@playwright/test": "^1.58.2"
+        "@playwright/test": "^1.58.2",
+        "jest": "^29.7.0",
+        "supertest": "^7.2.2"
     }
 }
