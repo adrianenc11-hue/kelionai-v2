@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head><title>Admin Login — KelionAI</title>
+<style>
+  body { background: #0a0e1a; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; font-family: sans-serif; }
+  .box { background: rgba(255,255,255,0.05); padding: 40px; border-radius: 16px; border: 1px solid rgba(0,212,255,0.2); }
+  input { display: block; width: 280px; padding: 12px; margin: 16px 0; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #fff; font-size: 14px; }
+  button { width: 100%; padding: 12px; background: #00D4FF; color: #000; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 14px; }
+  h2 { color: #00D4FF; margin: 0 0 8px; }
+  p { color: rgba(255,255,255,0.5); font-size: 12px; margin: 0 0 24px; }
+  .err { color: #ff6b6b; font-size: 12px; margin-top: 8px; }
+</style>
+</head>
+<body>
+<div class="box">
+  <h2>&#x1F510; Admin Access</h2>
+  <p>KelionAI Admin Panel</p>
+  <input type="password" id="secret" placeholder="Admin secret key" />
+  <button onclick="login()">Accesează</button>
+  <div class="err" id="err"></div>
+</div>
+<script>
+async function login() {
+  const secret = document.getElementById('secret').value;
+  const r = await fetch('/api/admin/dashboard', { headers: { 'x-admin-secret': secret } });
+  if (r.ok) { sessionStorage.setItem('admin_secret', secret); window.location.href = '/admin/dashboard'; }
+  else { document.getElementById('err').textContent = 'Acces refuzat.'; }
+}
+document.getElementById('secret').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
+</script>
+</body></html>

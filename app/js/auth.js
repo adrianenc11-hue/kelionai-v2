@@ -60,7 +60,7 @@
 
         const ab = document.getElementById('btn-auth');
         if (ab) ab.addEventListener('click', async () => {
-            if (currentUser) { await logout(); updateUI(); if (window.KApp) KApp.startNewChat(); scr.classList.remove('hidden'); document.getElementById('app-layout').classList.add('hidden'); }
+            if (currentUser) { if (!window.confirm('Ești sigur că vrei să te deconectezi?')) return; await logout(); updateUI(); if (window.KApp) KApp.startNewChat(); scr.classList.remove('hidden'); document.getElementById('app-layout').classList.add('hidden'); }
             else { scr.classList.remove('hidden'); document.getElementById('app-layout').classList.add('hidden'); } });
     }
 

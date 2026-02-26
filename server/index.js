@@ -64,6 +64,8 @@ app.use(cors({
     credentials: true
 }));
 
+app.use((req, res, next) => { res.setHeader('X-Content-Type-Options', 'nosniff'); next(); });
+
 // Stripe webhook needs raw body — must be before express.json()
 app.use('/api/payments/webhook', express.raw({ type: 'application/json' }));
 app.use(express.json({ limit: '10mb' }));
@@ -203,6 +205,8 @@ app.post('/api/chat', chatLimiter, validate(chatSchema), async (req, res) => {
         const { message, avatar = 'kelion', history = [], language = 'ro', conversationId } = req.body;
         if (!message) return res.status(400).json({ error: 'Mesaj lipsă' });
         const user = await getUserFromToken(req);
+        const sessionId = req.headers['x-session-id'];
+        logger.info({ component: 'Chat', sessionId, userId: user?.id }, 'Request fingerprint');
 
         // ── Usage check ──
         const usage = await checkUsage(user?.id, 'chat', supabaseAdmin);
@@ -465,6 +469,8 @@ app.post('/api/vision', apiLimiter, validate(visionSchema), async (req, res) => 
 
         // ── Usage check ──
         const user = await getUserFromToken(req);
+        const sessionId = req.headers['x-session-id'];
+        logger.info({ component: 'Vision', sessionId, userId: user?.id }, 'Request fingerprint');
         const usage = await checkUsage(user?.id, 'vision', supabaseAdmin);
         if (!usage.allowed) return res.status(429).json({ error: 'Limită vision atinsă. Upgrade la Pro pentru mai mult.', plan: usage.plan, limit: usage.limit, upgrade: true });
 
@@ -760,6 +766,20 @@ const _indexHtml = process.env.SENTRY_DSN
 // 404 for unknown API routes — must come before the catch-all
 app.use('/api', (req, res, next) => {
     res.status(404).json({ error: 'API endpoint negăsit' });
+});
+
+// ═══ ADMIN ROUTES ═══
+// GET /admin → serve login page (no auth needed for login page itself)
+app.get('/admin', authLimiter, (req, res) => {
+    res.sendFile(path.join(__dirname, '..', 'app', 'admin', 'login.html'));
+});
+// GET /api/admin/dashboard → validate admin secret (used by login page before redirect)
+app.get('/api/admin/dashboard', authLimiter, adminAuth, (req, res) => {
+    res.json({ ok: true });
+});
+// GET /admin/dashboard → serve dashboard HTML (protected: redirect to login if no secret cookie)
+app.get('/admin/dashboard', authLimiter, (req, res) => {
+    res.sendFile(path.join(__dirname, '..', 'app', 'admin', 'index.html'));
 });
 
 app.get('*', (req, res) => res.type('html').send(_indexHtml));

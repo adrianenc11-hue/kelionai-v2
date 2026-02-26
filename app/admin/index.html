@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head><title>Admin Dashboard — KelionAI</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a1a;color:#e0e0e0;font-family:system-ui,sans-serif;padding:20px}
+h1{color:#00ffff;margin-bottom:20px;font-size:1.5rem}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+.card{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:20px}
+.card h2{color:#888;font-size:0.85rem;text-transform:uppercase;margin-bottom:12px;letter-spacing:1px}
+.stat{font-size:2rem;font-weight:bold;color:#00ffff}
+.stat.warn{color:#ffaa00}.stat.bad{color:#ff4444}.stat.good{color:#00ff88}
+.row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.05)}
+.row:last-child{border:none}
+.label{color:#888}.val{font-weight:bold}
+.bar{height:6px;background:rgba(255,255,255,0.1);border-radius:3px;margin-top:4px}
+.bar-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,#00ffff,#00ff88)}
+.journal{font-size:0.8rem;color:#aaa;margin-top:8px}
+.journal-entry{padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.03)}
+.topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+.btn{background:#00D4FF;color:#000;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-weight:bold}
+.btn-back{background:rgba(255,255,255,0.1);color:#fff;border:1px solid rgba(255,255,255,0.2);margin-right:8px}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <h1>&#x1F9E0; KelionAI Brain Dashboard</h1>
+  <div>
+    <button class="btn btn-back" onclick="window.location.href='/'">&#x2190; Înapoi</button>
+    <button class="btn" onclick="load()">Refresh</button>
+  </div>
+</div>
+<div class="grid" id="grid"></div>
+<script>
+const secret = sessionStorage.getItem('admin_secret');
+if (!secret) { window.location.href = '/admin'; }
+
+async function load() {
+  try {
+    const r = await fetch('/api/brain', { headers: { 'x-admin-secret': secret } });
+    if (r.status === 401) { window.location.href = '/admin'; return; }
+    const d = await r.json();
+    const g = document.getElementById('grid');
+    const statusClass = d.status === 'healthy' ? 'good' : d.status === 'degraded' ? 'bad' : 'warn';
+    g.innerHTML = `
+    <div class="card"><h2>Status</h2><div class="stat ${statusClass}">${d.status.toUpperCase()}</div>
+    <div class="row"><span class="label">Version</span><span class="val">${d.version}</span></div>
+    <div class="row"><span class="label">Uptime</span><span class="val">${Math.round(d.uptime/60)}m</span></div>
+    <div class="row"><span class="label">Memory</span><span class="val">${d.memory.rss} / ${d.memory.heap}</span></div></div>
+
+    <div class="card"><h2>Conversations</h2><div class="stat">${d.conversations}</div>
+    <div class="row"><span class="label">Learnings</span><span class="val">${d.learningsExtracted}</span></div>
+    <div class="row"><span class="label">Errors (1h)</span><span class="val ${d.recentErrors>5?'bad':''}">${d.recentErrors}</span></div></div>
+
+    <div class="card"><h2>Tool Usage</h2>
+    ${Object.entries(d.toolStats).map(([k,v])=>`<div class="row"><span class="label">${k}</span><span class="val">${v}</span></div>`).join('')}</div>
+
+    <div class="card"><h2>Tool Health</h2>
+    ${Object.entries(d.toolErrors).map(([k,v])=>{
+      const cls=v>=5?'bad':v>0?'warn':'good';
+      return `<div class="row"><span class="label">${k}</span><span class="val ${cls}">${v>=5?'DEGRADED':v>0?v+' errors':'OK'}</span></div>`;
+    }).join('')}</div>
+
+    <div class="card"><h2>Latency (avg)</h2>
+    ${Object.entries(d.avgLatency).map(([k,v])=>`<div class="row"><span class="label">${k}</span><span class="val">${v}ms</span>
+    <div class="bar"><div class="bar-fill" style="width:${Math.min(100,v/100*100)}%"></div></div></div>`).join('')||'<div style="color:#888">No data yet</div>'}</div>
+
+    <div class="card"><h2>Strategies</h2>
+    <div class="row"><span class="label">Search refinements</span><span class="val">${d.strategies.searchRefinements}</span></div>
+    <div class="row"><span class="label">Failure recoveries</span><span class="val">${d.strategies.failureRecoveries}</span></div>
+    ${Object.entries(d.strategies.toolCombinations).map(([k,v])=>`<div class="row"><span class="label">${k}</span><span class="val">${v}</span></div>`).join('')}</div>
+
+    <div class="card" style="grid-column:1/-1"><h2>Journal (last 10)</h2>
+    <div class="journal">${(d.journal||[]).map(j=>`<div class="journal-entry">${new Date(j.time).toLocaleTimeString()} — <strong>${j.event}</strong>: ${j.lesson}</div>`).join('')||'Empty'}</div></div>
+    `;
+  } catch(e) { document.getElementById('grid').innerHTML='<div class="card"><div class="stat bad">OFFLINE</div></div>'; }
+}
+load();
+setInterval(load, 5000);
+</script>
+</body></html>
