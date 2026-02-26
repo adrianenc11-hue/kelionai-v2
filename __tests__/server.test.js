@@ -160,3 +160,37 @@ describe('Coverage Configuration', () => {
     });
 });
 
+describe('Payments API', () => {
+    test('GET /api/payments/plans returns plan list', async () => {
+        const res = await request(app).get('/api/payments/plans');
+        expect(res.status).toBe(200);
+        expect(res.body.plans).toBeInstanceOf(Array);
+        expect(res.body.plans.length).toBeGreaterThanOrEqual(2);
+        const planIds = res.body.plans.map(p => p.id);
+        expect(planIds).toContain('free');
+        expect(planIds).toContain('pro');
+        expect(planIds).toContain('premium');
+    });
+
+    test('GET /api/payments/plans includes price and limits', async () => {
+        const res = await request(app).get('/api/payments/plans');
+        const pro = res.body.plans.find(p => p.id === 'pro');
+        expect(pro.price).toBe(9.99);
+        expect(pro.limits).toBeDefined();
+        expect(pro.limits.chat).toBeGreaterThan(0);
+    });
+
+    test('GET /api/payments/status returns guest plan for unauthenticated user', async () => {
+        const res = await request(app).get('/api/payments/status');
+        expect(res.status).toBe(200);
+        expect(res.body.plan).toBe('guest');
+        expect(res.body.limits).toBeDefined();
+    });
+
+    test('POST /api/payments/checkout requires authentication', async () => {
+        const res = await request(app).post('/api/payments/checkout').send({ plan: 'pro' });
+        // Without Stripe configured, returns 503 or 401
+        expect([401, 503]).toContain(res.status);
+    });
+});
+
