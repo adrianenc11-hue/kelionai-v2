@@ -632,7 +632,7 @@ if (require.main === module) {
         });
     }).catch(e => {
         console.error('[Startup] Migration error:', e.message);
-        app.listen(PORT, '0.0.0.0', () => console.log('KelionAI v2.2 on port ' + PORT + ' (migration failed)'));
+        app.listen(PORT, '0.0.0.0', () => console.log('KelionAI v2.3 on port ' + PORT + ' (migration failed)'));
     });
 }
 

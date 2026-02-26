@@ -1,7 +1,11 @@
 'use strict';
 
+require('dotenv').config();
 const request = require('supertest');
-const app = require('../server/index');
+let app;
+beforeAll(() => {
+    app = require('../server/index');
+});
 
 describe('Server API', () => {
     describe('GET /api/health', () => {
@@ -47,6 +51,7 @@ describe('Server API', () => {
         test('returns brain diagnostics with status', async () => {
             const res = await request(app).get('/api/brain');
             expect(res.body).toHaveProperty('status');
+            expect(['healthy', 'stressed', 'degraded']).toContain(res.body.status);
         });
     });
 
@@ -85,8 +90,7 @@ describe('Server API', () => {
 
         test('serves the frontend on GET /', async () => {
             const res = await request(app).get('/');
-            // Returns the SPA index.html (200) or redirects
-            expect([200, 301, 302]).toContain(res.status);
+            expect(res.status).toBe(200);
         });
     });
 });

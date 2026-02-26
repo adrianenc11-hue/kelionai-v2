@@ -12,6 +12,7 @@
         "test:report": "npx playwright show-report"
     },
     "jest": {
+        "testEnvironment": "node",
         "testMatch": [
             "**/__tests__/**/*.test.js"
         ]

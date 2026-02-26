@@ -56,6 +56,10 @@ describe('KelionBrain', () => {
             const diag = brain.getDiagnostics();
             expect(diag.memory).toHaveProperty('rss');
             expect(diag.memory).toHaveProperty('heap');
+            expect(typeof diag.memory.rss).toBe('string');
+            expect(typeof diag.memory.heap).toBe('string');
+            expect(diag.memory.rss).toMatch(/MB$/);
+            expect(diag.memory.heap).toMatch(/MB$/);
         });
     });
 
