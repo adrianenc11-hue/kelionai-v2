@@ -103,6 +103,16 @@ describe('Input Validation', () => {
     });
 });
 
+describe('Metrics Endpoint', () => {
+    test('GET /metrics returns Prometheus format', async () => {
+        const res = await request(app).get('/metrics');
+        expect(res.status).toBe(200);
+        expect(res.headers['content-type']).toMatch(/text\/plain/);
+        expect(res.text).toContain('kelionai_http_requests_total');
+        expect(res.text).toContain('kelionai_http_request_duration_seconds');
+    });
+});
+
 describe('Error Handling', () => {
     test('404 for unknown API routes returns JSON error', async () => {
         const res = await request(app).get('/api/nonexistent');
