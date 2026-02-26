@@ -24,6 +24,8 @@ const { buildSystemPrompt } = require('./persona');
 const logger = require('./logger');
 const { router: paymentsRouter, checkUsage, incrementUsage } = require('./payments');
 const legalRouter = require('./legal');
+const protectionRouter = require('./protection').router;
+const { getFlaggedSessions } = require('./protection');
 const { validate, registerSchema, loginSchema, refreshSchema, chatSchema, speakSchema, listenSchema, visionSchema, searchSchema, weatherSchema, imagineSchema, memorySchema } = require('./validation');
 
 const app = express();
@@ -40,8 +42,10 @@ app.use(helmet({
             connectSrc: ["'self'", "https://api.openai.com", "https://generativelanguage.googleapis.com", "https://api.anthropic.com", "https://api.elevenlabs.io", "https://api.groq.com", "https://api.perplexity.ai", "https://api.tavily.com", "https://google.serper.dev", "https://api.duckduckgo.com", "https://api.together.xyz", "https://api.deepseek.com", "https://geocoding-api.open-meteo.com", "https://api.open-meteo.com"],
             mediaSrc: ["'self'", "blob:"],
             workerSrc: ["'self'", "blob:"],
+            frameAncestors: ["'none'"],
         }
     },
+    frameguard: { action: 'deny' },
     crossOriginEmbedderPolicy: false,
     crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
@@ -727,6 +731,8 @@ app.locals.supabaseAdmin = supabaseAdmin;
 // ═══ PAYMENTS & LEGAL ROUTES ═══
 app.use('/api/payments', paymentsRouter);
 app.use('/api/legal', legalRouter);
+app.use('/api/protection', protectionRouter);
+app.get('/api/admin/fingerprints', adminAuth, (req, res) => res.json(getFlaggedSessions()));
 
 // ═══ HEALTH ═══
 app.get('/api/health', (req, res) => {

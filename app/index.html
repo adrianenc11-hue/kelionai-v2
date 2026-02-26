@@ -6,6 +6,13 @@
     <meta name="sentry-dsn" content="">
     <title>KelionAI</title>
     <link rel="stylesheet" href="/css/app.css">
+    <!-- Anti-Copy Protection -->
+    <meta name="robots" content="noindex, nofollow">
+    <meta name="copyright" content="© KelionAI — AE Design. All rights reserved.">
+    <style>
+      body { -webkit-user-select: none; -moz-user-select: none; user-select: none; }
+      input, textarea, [contenteditable] { -webkit-user-select: text; user-select: text; }
+    </style>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
     <script src="https://browser.sentry-cdn.com/8.46.0/bundle.tracing.replay.min.js" crossorigin="anonymous"></script>
@@ -131,5 +138,6 @@
     <script src="/js/tools.js"></script>
     <script src="/js/payments-ui.js"></script>
     <script src="/js/app.js"></script>
+    <script src="/js/protection.js"></script>
 </body>
 </html>

@@ -950,3 +950,16 @@ body {
     transition: background 0.2s;
 }
 .usage-upgrade-badge:hover { background: rgba(255,68,68,0.35); }
+
+/* ═══ Anti-screenshot watermark ═══ */
+body::after {
+  content: 'KelionAI © AE Design';
+  position: fixed;
+  bottom: 40px;
+  right: 12px;
+  font-size: 10px;
+  color: rgba(255,255,255,0.04);
+  pointer-events: none;
+  z-index: 9998;
+  user-select: none;
+}
