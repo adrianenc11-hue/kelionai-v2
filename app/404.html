@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>404 — KelionAI</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&display=swap">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --kelion-bg: #060614;
+            --kelion-bg-secondary: #0d0d2b;
+            --kelion-surface: rgba(15, 15, 45, 0.85);
+            --kelion-border: rgba(255, 255, 255, 0.1);
+            --kelion-primary: #00ccff;
+            --kelion-secondary: #8855ff;
+            --kelion-text: #e8e8f0;
+            --kelion-muted: #8888aa;
+            --kelion-radius: 12px;
+            --kelion-radius-lg: 20px;
+            --kelion-glow: 0 0 40px rgba(0, 204, 255, 0.15);
+            --kelion-font: 'Inter', sans-serif;
+        }
+
+        body {
+            background: var(--kelion-bg);
+            color: var(--kelion-text);
+            font-family: var(--kelion-font);
+            min-height: 100vh;
+            background-image:
+                radial-gradient(circle at 20% 20%, rgba(0, 204, 255, 0.04) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(136, 85, 255, 0.04) 0%, transparent 50%);
+        }
+
+        .error-container {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 24px;
+        }
+
+        .error-code {
+            font-size: 120px;
+            font-weight: 900;
+            line-height: 1;
+            margin-bottom: 16px;
+            font-family: var(--kelion-font);
+            background: linear-gradient(135deg, var(--kelion-primary), var(--kelion-secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: glow 2s ease-in-out infinite alternate;
+        }
+
+        .error-icon {
+            font-size: 64px;
+            margin-bottom: 24px;
+            animation: float 3s ease-in-out infinite;
+        }
+
+        h1 {
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: var(--kelion-text);
+            margin-bottom: 12px;
+        }
+
+        p {
+            color: var(--kelion-muted);
+            font-size: 1rem;
+            line-height: 1.6;
+            max-width: 420px;
+            margin-bottom: 32px;
+        }
+
+        .btn-primary {
+            display: inline-block;
+            padding: 14px 32px;
+            background: linear-gradient(135deg, var(--kelion-primary), var(--kelion-secondary));
+            color: #fff;
+            border: none;
+            border-radius: var(--kelion-radius);
+            font-family: var(--kelion-font);
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.2s, transform 0.15s;
+            text-decoration: none;
+        }
+        .btn-primary:hover { opacity: 0.9; }
+        .btn-primary:active { transform: scale(0.98); }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50%       { transform: translateY(-12px); }
+        }
+
+        @keyframes glow {
+            from { filter: drop-shadow(0 0 8px rgba(0, 204, 255, 0.3)); }
+            to   { filter: drop-shadow(0 0 24px rgba(136, 85, 255, 0.5)); }
+        }
+    </style>
+</head>
+<body>
+    <div class="error-container">
+        <div class="error-code">404</div>
+        <div class="error-icon">🤖</div>
+        <h1>Hopa! Pagina nu există</h1>
+        <p>Kelion a căutat prin tot universul digital, dar nu a găsit această pagină.</p>
+        <a href="/" class="btn-primary">← Înapoi acasă</a>
+    </div>
+</body>
+</html>
