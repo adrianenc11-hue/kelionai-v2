@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KelionAI — Trading Dashboard (Admin)</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a1a;color:#e0e0e0;font-family:system-ui,sans-serif;min-height:100vh}
+
+/* Disclaimer banner */
+.disclaimer{
+    background:linear-gradient(90deg,#8b4513,#b85c00,#8b4513);
+    color:#fff;font-size:0.8rem;padding:10px 20px;
+    text-align:center;font-weight:600;letter-spacing:0.5px;
+    position:sticky;top:0;z-index:100;border-bottom:2px solid #ff8c00;
+}
+
+header{
+    background:rgba(0,0,0,0.6);
+    border-bottom:1px solid rgba(255,255,255,0.08);
+    padding:16px 24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+}
+header h1{color:#00ffff;font-size:1.4rem;flex:1}
+.header-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+
+.btn{
+    padding:8px 16px;border:none;border-radius:8px;cursor:pointer;
+    font-size:0.85rem;font-weight:600;transition:opacity 0.2s;
+}
+.btn:hover{opacity:0.85}
+.btn-primary{background:#00ffff;color:#000}
+.btn-danger{background:#ff4444;color:#fff}
+.btn-ghost{background:rgba(255,255,255,0.1);color:#e0e0e0;border:1px solid rgba(255,255,255,0.15)}
+
+/* Auth section */
+#auth-section{
+    max-width:400px;margin:80px auto;padding:32px;
+    background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);
+    border-radius:16px;text-align:center;
+}
+#auth-section h2{color:#00ffff;margin-bottom:16px}
+#auth-section input{
+    width:100%;padding:10px 14px;background:rgba(255,255,255,0.08);
+    border:1px solid rgba(255,255,255,0.2);border-radius:8px;
+    color:#e0e0e0;font-size:0.95rem;margin-bottom:12px;
+}
+#auth-section input::placeholder{color:#888}
+#auth-error{color:#ff4444;font-size:0.85rem;margin-top:8px}
+
+/* Main layout */
+#main{display:none;padding:20px 24px}
+
+/* Market tabs */
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px}
+.tab{
+    padding:8px 18px;border-radius:24px;cursor:pointer;font-size:0.85rem;font-weight:600;
+    background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);
+    color:#aaa;transition:all 0.2s;
+}
+.tab.active{background:#00ffff;color:#000;border-color:#00ffff}
+.tab:hover:not(.active){background:rgba(0,255,255,0.1);color:#00ffff}
+
+/* Watchlist controls */
+.watchlist-controls{
+    display:flex;gap:10px;align-items:center;margin-bottom:20px;flex-wrap:wrap;
+}
+.watchlist-controls input{
+    flex:1;min-width:160px;max-width:280px;padding:9px 14px;
+    background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.18);
+    border-radius:8px;color:#e0e0e0;font-size:0.9rem;
+}
+.watchlist-controls input::placeholder{color:#666}
+
+/* Cards grid */
+.cards-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(240px,1fr));
+    gap:16px;
+}
+
+.card{
+    background:rgba(255,255,255,0.04);
+    border:1px solid rgba(255,255,255,0.1);
+    border-radius:14px;padding:18px;
+    cursor:pointer;transition:all 0.2s;position:relative;
+    overflow:hidden;
+}
+.card:hover{background:rgba(255,255,255,0.07);border-color:rgba(0,255,255,0.3);transform:translateY(-2px)}
+.card.selected{border-color:#00ffff;background:rgba(0,255,255,0.05)}
+
+.card-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
+.card-symbol{font-size:1rem;font-weight:700;color:#fff}
+.card-name{font-size:0.75rem;color:#888;margin-top:2px}
+.card-remove{
+    background:none;border:none;color:#555;cursor:pointer;
+    font-size:0.9rem;padding:2px 6px;border-radius:4px;
+    transition:color 0.2s;
+}
+.card-remove:hover{color:#ff4444}
+
+.card-price{font-size:1.5rem;font-weight:700;color:#fff;margin-bottom:4px}
+.card-change{font-size:0.85rem;font-weight:600}
+.card-change.up{color:#00ff88}
+.card-change.down{color:#ff4444}
+.card-change.neutral{color:#ffaa00}
+
+.trend-badge{
+    display:inline-block;padding:3px 10px;border-radius:12px;
+    font-size:0.75rem;font-weight:700;margin-top:8px;
+}
+.trend-badge.BULLISH{background:rgba(0,255,136,0.15);color:#00ff88;border:1px solid rgba(0,255,136,0.3)}
+.trend-badge.BEARISH{background:rgba(255,68,68,0.15);color:#ff4444;border:1px solid rgba(255,68,68,0.3)}
+.trend-badge.SIDEWAYS{background:rgba(255,170,0,0.15);color:#ffaa00;border:1px solid rgba(255,170,0,0.3)}
+.trend-badge.UNKNOWN{background:rgba(255,255,255,0.08);color:#888;border:1px solid rgba(255,255,255,0.15)}
+
+/* Sparkline (CSS-based bar chart) */
+.sparkline{
+    display:flex;align-items:flex-end;gap:2px;height:32px;margin-top:10px;
+}
+.spark-bar{
+    flex:1;min-width:3px;border-radius:2px 2px 0 0;
+    background:rgba(0,255,255,0.4);transition:height 0.3s;
+}
+.spark-bar.up{background:rgba(0,255,136,0.5)}
+.spark-bar.down{background:rgba(255,68,68,0.4)}
+
+.card-loading{color:#555;font-size:0.8rem;text-align:center;padding:12px 0}
+
+/* Detail panel */
+#detail-panel{
+    background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);
+    border-radius:14px;padding:24px;margin-top:20px;display:none;
+}
+#detail-panel h2{color:#00ffff;margin-bottom:16px;font-size:1.1rem}
+.detail-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:16px}
+.detail-stat{
+    background:rgba(255,255,255,0.05);border-radius:10px;padding:14px;
+}
+.detail-stat .label{color:#888;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px}
+.detail-stat .value{font-size:1.1rem;font-weight:700;color:#fff}
+
+.analysis-text{
+    background:rgba(0,0,0,0.3);border-left:3px solid #00ffff;
+    padding:14px 16px;border-radius:4px;font-size:0.85rem;line-height:1.7;
+    color:#ccc;white-space:pre-wrap;word-break:break-word;margin-bottom:16px;
+}
+
+/* News section */
+.news-list{list-style:none}
+.news-item{
+    padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.06);
+}
+.news-item:last-child{border:none}
+.news-item a{color:#00ffff;text-decoration:none;font-size:0.85rem;font-weight:600}
+.news-item a:hover{text-decoration:underline}
+.news-item p{color:#888;font-size:0.78rem;margin-top:3px}
+
+.error-msg{color:#ff4444;font-size:0.85rem;padding:8px 0}
+.empty-msg{color:#555;font-size:0.85rem;padding:16px 0;text-align:center}
+
+/* Responsive */
+@media(max-width:600px){
+    .cards-grid{grid-template-columns:1fr 1fr}
+    header h1{font-size:1.1rem}
+}
+</style>
+</head>
+<body>
+
+<div class="disclaimer">
+    ⚠️ INFORMATIONAL PURPOSES ONLY. This is NOT financial advice. KelionAI does not recommend buying or selling any financial instrument. Always consult a licensed financial advisor. Past performance is not indicative of future results.
+</div>
+
+<!-- Auth gate -->
+<div id="auth-section">
+    <h2>🔐 Admin Access</h2>
+    <p style="color:#888;margin-bottom:20px;font-size:0.9rem">Enter your admin secret key to access the Trading Dashboard</p>
+    <input type="password" id="admin-key" placeholder="Admin secret key" autocomplete="off">
+    <button class="btn btn-primary" style="width:100%" onclick="authenticate()">Access Dashboard</button>
+    <div id="auth-error"></div>
+</div>
+
+<!-- Main dashboard -->
+<div id="main">
+    <header>
+        <div>
+            <h1>📈 Trading Dashboard</h1>
+            <div style="color:#555;font-size:0.75rem;margin-top:2px">Market analysis · Admin only · Data for informational use only</div>
+        </div>
+        <div class="header-actions">
+            <span id="last-update" style="color:#555;font-size:0.78rem"></span>
+            <button class="btn btn-ghost" onclick="refreshAll()">↻ Refresh</button>
+        </div>
+    </header>
+
+    <div style="padding:20px 24px 0">
+        <!-- Market tabs -->
+        <div class="tabs" id="market-tabs">
+            <div class="tab active" onclick="selectTab('watchlist')">⭐ Watchlist</div>
+            <div class="tab" onclick="selectTab('crypto')">₿ Crypto</div>
+            <div class="tab" onclick="selectTab('forex')">💱 Forex</div>
+            <div class="tab" onclick="selectTab('stocks')">🏢 Stocks</div>
+            <div class="tab" onclick="selectTab('indices')">📊 Indices</div>
+            <div class="tab" onclick="selectTab('commodities')">🥇 Commodities</div>
+        </div>
+
+        <!-- Watchlist controls (only shown on watchlist tab) -->
+        <div class="watchlist-controls" id="watchlist-controls">
+            <input type="text" id="add-symbol-input" placeholder="Add symbol (e.g. BTC, TSLA, EUR/USD)" maxlength="20"
+                onkeydown="if(event.key==='Enter')addToWatchlist()">
+            <button class="btn btn-primary" onclick="addToWatchlist()">+ Add</button>
+            <span id="add-error" style="color:#ff4444;font-size:0.8rem"></span>
+        </div>
+
+        <!-- Cards grid -->
+        <div class="cards-grid" id="cards-grid">
+            <div class="empty-msg">Loading...</div>
+        </div>
+
+        <!-- Detail panel -->
+        <div id="detail-panel">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+                <h2 id="detail-title">Analysis</h2>
+                <button class="btn btn-ghost" onclick="closeDetail()" style="font-size:0.8rem">✕ Close</button>
+            </div>
+            <div class="detail-grid" id="detail-stats"></div>
+            <div class="analysis-text" id="detail-analysis"></div>
+            <div id="detail-news">
+                <h3 style="color:#888;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px">Latest News</h3>
+                <ul class="news-list" id="news-list"><li class="empty-msg">Loading news...</li></ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+'use strict';
+
+let adminSecret = '';
+let currentTab = 'watchlist';
+let marketsData = null;
+let watchlistSymbols = [];
+let analysisCache = {};
+
+// ═══ AUTH ═══
+function authenticate() {
+    const key = document.getElementById('admin-key').value.trim();
+    if (!key) { showAuthError('Please enter the admin key'); return; }
+    adminSecret = key;
+    // Test the key by hitting a protected endpoint
+    apiFetch('/api/trading/watchlist')
+        .then(data => {
+            watchlistSymbols = data.watchlist || [];
+            document.getElementById('auth-section').style.display = 'none';
+            document.getElementById('main').style.display = 'block';
+            loadMarkets().then(() => loadTab('watchlist'));
+        })
+        .catch(() => {
+            adminSecret = '';
+            showAuthError('Invalid admin key');
+        });
+}
+document.getElementById('admin-key').addEventListener('keydown', e => { if (e.key === 'Enter') authenticate(); });
+
+function showAuthError(msg) {
+    document.getElementById('auth-error').textContent = msg;
+}
+
+// ═══ API ═══
+async function apiFetch(url, opts = {}) {
+    const res = await fetch(url, {
+        ...opts,
+        headers: { 'x-admin-secret': adminSecret, 'Content-Type': 'application/json', ...(opts.headers || {}) },
+    });
+    if (res.status === 401) throw new Error('Unauthorized');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+}
+
+// ═══ MARKETS ═══
+async function loadMarkets() {
+    try {
+        const data = await apiFetch('/api/trading/markets');
+        marketsData = data.markets;
+    } catch(e) {
+        marketsData = null;
+    }
+}
+
+// ═══ TABS ═══
+function selectTab(tab) {
+    currentTab = tab;
+    document.querySelectorAll('.tab').forEach((el, i) => {
+        const tabs = ['watchlist','crypto','forex','stocks','indices','commodities'];
+        el.classList.toggle('active', tabs[i] === tab);
+    });
+    document.getElementById('watchlist-controls').style.display = tab === 'watchlist' ? 'flex' : 'none';
+    closeDetail();
+    loadTab(tab);
+}
+
+function getSymbolsForTab(tab) {
+    if (tab === 'watchlist') return watchlistSymbols;
+    if (!marketsData) return [];
+    const m = marketsData[tab] || [];
+    return m.map(item => item.symbol);
+}
+
+function loadTab(tab) {
+    const symbols = getSymbolsForTab(tab);
+    renderCards(symbols, tab === 'watchlist');
+    symbols.forEach(sym => loadCard(sym));
+}
+
+// ═══ CARDS ═══
+function renderCards(symbols, showRemove) {
+    const grid = document.getElementById('cards-grid');
+    if (!symbols.length) {
+        grid.innerHTML = '<div class="empty-msg">No symbols in this list. Add one above.</div>';
+        return;
+    }
+    grid.innerHTML = symbols.map(sym => `
+        <div class="card" id="card-${symbolToDomId(sym)}" onclick="showDetail('${escapeHtml(sym)}')">
+            <div class="card-header">
+                <div>
+                    <div class="card-symbol">${escapeHtml(sym)}</div>
+                    <div class="card-name" id="name-${symbolToDomId(sym)}">—</div>
+                </div>
+                ${showRemove ? `<button class="card-remove" title="Remove" onclick="event.stopPropagation();removeFromWatchlist('${escapeHtml(sym)}')">✕</button>` : ''}
+            </div>
+            <div class="card-price" id="price-${symbolToDomId(sym)}">
+                <span class="card-loading">Loading…</span>
+            </div>
+            <div class="card-change neutral" id="change-${symbolToDomId(sym)}"></div>
+            <div id="trend-${symbolToDomId(sym)}"></div>
+            <div class="sparkline" id="spark-${symbolToDomId(sym)}"></div>
+        </div>
+    `).join('');
+}
+
+async function loadCard(symbol) {
+    const id = symbolToDomId(symbol);
+    const cached = analysisCache[symbol];
+    if (cached && (Date.now() - cached.ts < 5 * 60 * 1000)) {
+        updateCard(symbol, cached.data);
+        return;
+    }
+    try {
+        const data = await apiFetch(`/api/trading/analysis/${encodeURIComponent(symbol)}`);
+        analysisCache[symbol] = { data, ts: Date.now() };
+        updateCard(symbol, data);
+    } catch(e) {
+        const priceEl = document.getElementById(`price-${id}`);
+        if (priceEl) priceEl.innerHTML = '<span style="color:#555;font-size:0.8rem">Unavailable</span>';
+    }
+}
+
+function updateCard(symbol, data) {
+    const id = symbolToDomId(symbol);
+    const nameEl = document.getElementById(`name-${id}`);
+    const priceEl = document.getElementById(`price-${id}`);
+    const changeEl = document.getElementById(`change-${id}`);
+    const trendEl = document.getElementById(`trend-${id}`);
+    const sparkEl = document.getElementById(`spark-${id}`);
+    if (!priceEl) return;
+
+    if (nameEl && data.name) nameEl.textContent = data.name;
+
+    if (data.price === null) {
+        priceEl.innerHTML = '<span style="color:#555;font-size:0.8rem">Data unavailable</span>';
+        return;
+    }
+
+    priceEl.textContent = formatPrice(data.price, data.symbol);
+
+    if (data.change24h !== null) {
+        const sign = data.change24h >= 0 ? '+' : '';
+        changeEl.textContent = `${sign}${data.change24h.toFixed(2)}%`;
+        changeEl.className = `card-change ${data.change24h > 0 ? 'up' : data.change24h < 0 ? 'down' : 'neutral'}`;
+    }
+
+    if (data.indicators && data.indicators.trend) {
+        const trend = data.indicators.trend;
+        trendEl.innerHTML = `<span class="trend-badge ${trend}">${trend === 'BULLISH' ? '▲' : trend === 'BEARISH' ? '▼' : '—'} ${trend}</span>`;
+    }
+
+    // Sparkline
+    const spark = data.sparkline || [];
+    if (spark.length > 1 && sparkEl) {
+        const mn = Math.min(...spark), mx = Math.max(...spark);
+        const range = mx - mn || 1;
+        sparkEl.innerHTML = spark.slice(-14).map((p, i, arr) => {
+            const h = Math.round(((p - mn) / range) * 28) + 4;
+            const cls = i > 0 ? (p >= arr[i-1] ? 'up' : 'down') : '';
+            return `<div class="spark-bar ${cls}" style="height:${h}px"></div>`;
+        }).join('');
+    }
+}
+
+function formatPrice(price, symbol) {
+    if (price === null || price === undefined) return 'N/A';
+    if (price < 0.01) return '$' + price.toFixed(6);
+    if (price < 1) return '$' + price.toFixed(4);
+    if (price > 10000) return '$' + price.toLocaleString('en-US', { maximumFractionDigits: 0 });
+    return '$' + price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+}
+
+// ═══ WATCHLIST ═══
+async function addToWatchlist() {
+    const input = document.getElementById('add-symbol-input');
+    const errEl = document.getElementById('add-error');
+    const sym = input.value.trim().toUpperCase();
+    errEl.textContent = '';
+    if (!sym) { errEl.textContent = 'Enter a symbol'; return; }
+    try {
+        const data = await apiFetch('/api/trading/watchlist', {
+            method: 'POST',
+            body: JSON.stringify({ symbol: sym }),
+        });
+        watchlistSymbols = data.watchlist || [];
+        input.value = '';
+        if (currentTab === 'watchlist') {
+            renderCards(watchlistSymbols, true);
+            watchlistSymbols.forEach(s => loadCard(s));
+        }
+    } catch(e) {
+        errEl.textContent = e.message === 'Unauthorized' ? 'Unauthorized' : 'Failed to add symbol';
+    }
+}
+
+async function removeFromWatchlist(symbol) {
+    try {
+        const data = await apiFetch(`/api/trading/watchlist/${encodeURIComponent(symbol)}`, { method: 'DELETE' });
+        watchlistSymbols = data.watchlist || [];
+        if (currentTab === 'watchlist') {
+            renderCards(watchlistSymbols, true);
+            watchlistSymbols.forEach(s => loadCard(s));
+        }
+    } catch(e) { /* ignore */ }
+}
+
+// ═══ DETAIL PANEL ═══
+function showDetail(symbol) {
+    const panel = document.getElementById('detail-panel');
+    document.getElementById('detail-title').textContent = `${symbol} — Detailed Analysis`;
+    document.getElementById('detail-stats').innerHTML = '<div style="color:#555;font-size:0.85rem">Loading...</div>';
+    document.getElementById('detail-analysis').textContent = '';
+    document.getElementById('news-list').innerHTML = '<li class="empty-msg">Loading news...</li>';
+    panel.style.display = 'block';
+    panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    const cached = analysisCache[symbol];
+    if (cached) renderDetail(symbol, cached.data);
+
+    apiFetch(`/api/trading/analysis/${encodeURIComponent(symbol)}`)
+        .then(data => {
+            analysisCache[symbol] = { data, ts: Date.now() };
+            renderDetail(symbol, data);
+        })
+        .catch(() => {
+            document.getElementById('detail-stats').innerHTML = '<div class="error-msg">Failed to load analysis</div>';
+        });
+
+    loadNews(symbol);
+}
+
+function renderDetail(symbol, data) {
+    const statsEl = document.getElementById('detail-stats');
+    const analysisEl = document.getElementById('detail-analysis');
+    if (data.price === null) {
+        statsEl.innerHTML = '<div class="error-msg">Data unavailable for this symbol</div>';
+        analysisEl.textContent = data.analysis || '';
+        return;
+    }
+    const ind = data.indicators || {};
+    const stats = [
+        { label: 'Price', value: formatPrice(data.price, symbol) },
+        { label: '24h Change', value: data.change24h !== null ? `${data.change24h >= 0 ? '+' : ''}${data.change24h.toFixed(2)}%` : 'N/A', color: data.change24h > 0 ? '#00ff88' : data.change24h < 0 ? '#ff4444' : '#ffaa00' },
+        { label: 'Trend', value: ind.trend || 'N/A', color: ind.trend === 'BULLISH' ? '#00ff88' : ind.trend === 'BEARISH' ? '#ff4444' : '#ffaa00' },
+        { label: 'RSI (14)', value: ind.rsi !== null && ind.rsi !== undefined ? `${ind.rsi} (${ind.rsiLabel || ''})` : 'N/A', color: ind.rsi >= 70 ? '#ff4444' : ind.rsi <= 30 ? '#00ff88' : '#e0e0e0' },
+        { label: 'Support', value: ind.support !== null ? formatPrice(ind.support, symbol) : 'N/A' },
+        { label: 'Resistance', value: ind.resistance !== null ? formatPrice(ind.resistance, symbol) : 'N/A' },
+        { label: 'MA7', value: ind.ma7 !== null ? formatPrice(ind.ma7, symbol) : 'N/A' },
+        { label: 'MA21', value: ind.ma21 !== null ? formatPrice(ind.ma21, symbol) : 'N/A' },
+        { label: 'MA Signal', value: ind.maSignal ? ind.maSignal.toUpperCase() : 'N/A', color: ind.maSignal === 'bullish' ? '#00ff88' : ind.maSignal === 'bearish' ? '#ff4444' : '#e0e0e0' },
+    ];
+    statsEl.innerHTML = stats.map(s => `
+        <div class="detail-stat">
+            <div class="label">${escapeHtml(s.label)}</div>
+            <div class="value" style="${s.color ? `color:${s.color}` : ''}">${escapeHtml(String(s.value))}</div>
+        </div>
+    `).join('');
+    analysisEl.textContent = data.analysis || '';
+}
+
+async function loadNews(symbol) {
+    const newsList = document.getElementById('news-list');
+    try {
+        const data = await apiFetch(`/api/trading/news/${encodeURIComponent(symbol)}`);
+        if (!data.news || data.news.length === 0) {
+            newsList.innerHTML = `<li class="empty-msg">${data.message || 'No news available'}</li>`;
+            return;
+        }
+        newsList.innerHTML = data.news.map(n => `
+            <li class="news-item">
+                <a href="${escapeHtml(n.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(n.title)}</a>
+                ${n.snippet ? `<p>${escapeHtml(n.snippet)}</p>` : ''}
+            </li>
+        `).join('');
+    } catch(e) {
+        newsList.innerHTML = '<li class="error-msg">News unavailable</li>';
+    }
+}
+
+function closeDetail() {
+    document.getElementById('detail-panel').style.display = 'none';
+}
+
+// ═══ REFRESH ═══
+function refreshAll() {
+    // Clear analysis cache
+    analysisCache = {};
+    const symbols = getSymbolsForTab(currentTab);
+    renderCards(symbols, currentTab === 'watchlist');
+    symbols.forEach(sym => loadCard(sym));
+    document.getElementById('last-update').textContent = 'Updated: ' + new Date().toLocaleTimeString();
+}
+
+// ═══ UTILS ═══
+function symbolToDomId(sym) {
+    return sym.replace(/[^a-zA-Z0-9]/g, '_');
+}
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+</script>
+</body>
+</html>
