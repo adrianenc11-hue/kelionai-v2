@@ -23,15 +23,17 @@ var KelionTools = (function () {
     }
 
     async function weather(city) {
-        var r = await fetch(API + '/api/weather?city=' + encodeURIComponent(city), {
-            headers: window.KAuth ? KAuth.getAuthHeaders() : {}
+        var r = await fetch(API + '/api/weather', {
+            method: 'POST',
+            headers: authHeaders(),
+            body: JSON.stringify({ city: city })
         });
         if (!r.ok) throw new Error('Weather failed: ' + r.status);
         return r.json();
     }
 
     async function generateImage(prompt) {
-        var r = await fetch(API + '/api/generate-image', {
+        var r = await fetch(API + '/api/imagine', {
             method: 'POST',
             headers: authHeaders(),
             body: JSON.stringify({ prompt: prompt })
