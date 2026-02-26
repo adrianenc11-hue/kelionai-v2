@@ -1,5 +1,8 @@
 # KelionAI v2
 
+![Tests](https://github.com/adrianenc11-hue/kelionai-v2/actions/workflows/test.yml/badge.svg?branch=master)
+![Build](https://github.com/adrianenc11-hue/kelionai-v2/actions/workflows/deploy.yml/badge.svg?branch=master)
+
 AI-powered assistant with 3D avatars, voice interaction (STT/TTS), and multilingual support.
 
 ## Features
