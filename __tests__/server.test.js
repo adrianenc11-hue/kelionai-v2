@@ -195,3 +195,29 @@ describe('Payments API', () => {
     });
 });
 
+describe('GET /api/sync/latest', () => {
+    test('returns 200 with empty conversations for unauthenticated user', async () => {
+        const res = await request(app).get('/api/sync/latest');
+        expect(res.status).toBe(200);
+        expect(res.body.conversations).toBeInstanceOf(Array);
+        expect(res.body.conversations.length).toBe(0);
+        expect(res.body.latest_at).toBeNull();
+        expect(typeof res.body.server_time).toBe('string');
+    });
+
+    test('includes server_time in response', async () => {
+        const before = new Date().toISOString();
+        const res = await request(app).get('/api/sync/latest');
+        const after = new Date().toISOString();
+        expect(res.status).toBe(200);
+        expect(res.body.server_time >= before).toBe(true);
+        expect(res.body.server_time <= after).toBe(true);
+    });
+
+    test('accepts since query parameter without error', async () => {
+        const since = new Date(Date.now() - 60000).toISOString();
+        const res = await request(app).get('/api/sync/latest?since=' + encodeURIComponent(since));
+        expect(res.status).toBe(200);
+        expect(res.body.conversations).toBeInstanceOf(Array);
+    });
+});

@@ -451,10 +451,21 @@
             if (isVisionRequest(detail.text)) triggerVision(); else sendToAI(detail.text, detail.language);
         });
 
+        window.addEventListener('sync-update', function(e) {
+            var conv = e.detail.conversation;
+            var note = document.createElement('div');
+            note.className = 'sync-notice';
+            note.textContent = '📱 Synced from another device';
+            note.style.cssText = 'position:fixed;top:60px;right:16px;background:rgba(0,212,255,0.15);color:#00D4FF;padding:8px 16px;border-radius:8px;font-size:12px;z-index:900;transition:opacity 1s';
+            document.body.appendChild(note);
+            setTimeout(function() { note.style.opacity = '0'; setTimeout(function() { note.remove(); }, 1000); }, 3000);
+        });
+
         setupDragDrop();
         KVoice.startWakeWordDetection();
         checkHealth();
         if (window.KPayments) KPayments.showUsageBar();
+        if (window.KSync) setTimeout(function() { KSync.init(); }, 5000);
 
         // Restore last conversation from localStorage
         var savedConvId = restoreConvId();

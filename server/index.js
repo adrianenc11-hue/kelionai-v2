@@ -635,6 +635,31 @@ app.get('/api/conversations/:id/messages', asyncHandler(async (req, res) => {
     res.json({ messages: data || [] });
 }));
 
+// ═══ SYNC ═══
+app.get('/api/sync/latest', asyncHandler(async (req, res) => {
+    const u = await getUserFromToken(req);
+    if (!u || !supabaseAdmin) return res.json({ conversations: [], latest_at: null, server_time: new Date().toISOString() });
+
+    const since = req.query.since;
+    const sinceValid = since && !isNaN(Date.parse(since)) ? since : null;
+
+    let query = supabaseAdmin
+        .from('conversations')
+        .select('id, avatar, title, updated_at')
+        .eq('user_id', u.id)
+        .order('updated_at', { ascending: false })
+        .limit(1);
+
+    if (sinceValid) query = query.gt('updated_at', sinceValid);
+
+    const { data } = await query;
+    res.json({
+        conversations: data || [],
+        latest_at: data && data[0] ? data[0].updated_at : null,
+        server_time: new Date().toISOString()
+    });
+}));
+
 // ═══ BRAIN DIAGNOSTICS ═══
 app.get('/api/brain', adminAuth, (req, res) => {
     res.json(brain.getDiagnostics());
