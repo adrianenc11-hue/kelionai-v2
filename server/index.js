@@ -13,6 +13,7 @@ const cors = require('cors');
 const fetch = require('node-fetch');
 const FormData = require('form-data');
 const path = require('path');
+const fs = require('fs');
 const rateLimit = require('express-rate-limit');
 const { supabase, supabaseAdmin } = require('./supabase');
 const { runMigration } = require('./migrate');
@@ -23,7 +24,6 @@ const { router: paymentsRouter, checkUsage, incrementUsage } = require('./paymen
 const legalRouter = require('./legal');
 
 const app = express();
-if (process.env.SENTRY_DSN) Sentry.setupExpressErrorHandler(app);
 app.use(cors());
 
 // Stripe webhook needs raw body — must be before express.json()
@@ -612,7 +612,18 @@ app.get('/api/health', (req, res) => {
     });
 });
 
-app.get('*', (req, res) => res.sendFile(path.join(__dirname, '..', 'app', 'index.html')));
+// Inject Sentry DSN as a meta tag when SENTRY_DSN is configured (optional)
+const _rawHtml = fs.readFileSync(path.join(__dirname, '..', 'app', 'index.html'), 'utf8');
+const _indexHtml = process.env.SENTRY_DSN
+    ? _rawHtml.replace(
+        '<meta name="sentry-dsn" content="">',
+        `<meta name="sentry-dsn" content="${process.env.SENTRY_DSN.replace(/&/g, '&amp;').replace(/"/g, '&quot;')}">`
+    )
+    : _rawHtml;
+app.get('*', (req, res) => res.type('html').send(_indexHtml));
+
+// Sentry error handler must be registered after all routes
+if (process.env.SENTRY_DSN) Sentry.setupExpressErrorHandler(app);
 
 // ═══ STARTUP ═══
 runMigration().then(migrated => {
