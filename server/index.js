@@ -615,21 +615,25 @@ app.get('/api/health', (req, res) => {
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, '..', 'app', 'index.html')));
 
 // ═══ STARTUP ═══
-runMigration().then(migrated => {
-    app.listen(PORT, '0.0.0.0', () => {
-        console.log('\n══════════════════════════════════════════');
-        console.log('  KelionAI v2.3 — PAYMENTS + LEGAL EDITION');
-        console.log('  http://localhost:' + PORT);
-        console.log('  Dashboard: http://localhost:' + PORT + '/dashboard');
-        console.log('  AI: ' + (process.env.ANTHROPIC_API_KEY ? '✅ Claude' : '❌') + ' | ' + (process.env.OPENAI_API_KEY ? '✅ GPT-4o' : '❌') + ' | ' + (process.env.DEEPSEEK_API_KEY ? '✅ DeepSeek' : '❌'));
-        console.log('  TTS: ' + (process.env.ELEVENLABS_API_KEY ? '✅ ElevenLabs' : '❌'));
-        console.log('  Brain: 🧠 v2 — CoT + Decompose + SelfRepair + AutoLearn');
-        console.log('  Payments: ' + (process.env.STRIPE_SECRET_KEY ? '✅ Stripe' : '❌ Not configured'));
-        console.log('  DB: ' + (supabaseAdmin ? '✅ Supabase' : '⚠️ In-memory'));
-        console.log('  Migration: ' + (migrated ? '✅ Tables ready' : '⚠️ Skipped'));
-        console.log('══════════════════════════════════════════\n');
+if (require.main === module) {
+    runMigration().then(migrated => {
+        app.listen(PORT, '0.0.0.0', () => {
+            console.log('\n══════════════════════════════════════════');
+            console.log('  KelionAI v2.3 — PAYMENTS + LEGAL EDITION');
+            console.log('  http://localhost:' + PORT);
+            console.log('  Dashboard: http://localhost:' + PORT + '/dashboard');
+            console.log('  AI: ' + (process.env.ANTHROPIC_API_KEY ? '✅ Claude' : '❌') + ' | ' + (process.env.OPENAI_API_KEY ? '✅ GPT-4o' : '❌') + ' | ' + (process.env.DEEPSEEK_API_KEY ? '✅ DeepSeek' : '❌'));
+            console.log('  TTS: ' + (process.env.ELEVENLABS_API_KEY ? '✅ ElevenLabs' : '❌'));
+            console.log('  Brain: 🧠 v2 — CoT + Decompose + SelfRepair + AutoLearn');
+            console.log('  Payments: ' + (process.env.STRIPE_SECRET_KEY ? '✅ Stripe' : '❌ Not configured'));
+            console.log('  DB: ' + (supabaseAdmin ? '✅ Supabase' : '⚠️ In-memory'));
+            console.log('  Migration: ' + (migrated ? '✅ Tables ready' : '⚠️ Skipped'));
+            console.log('══════════════════════════════════════════\n');
+        });
+    }).catch(e => {
+        console.error('[Startup] Migration error:', e.message);
+        app.listen(PORT, '0.0.0.0', () => console.log('KelionAI v2.2 on port ' + PORT + ' (migration failed)'));
     });
-}).catch(e => {
-    console.error('[Startup] Migration error:', e.message);
-    app.listen(PORT, '0.0.0.0', () => console.log('KelionAI v2.2 on port ' + PORT + ' (migration failed)'));
-});
+}
+
+module.exports = app;
