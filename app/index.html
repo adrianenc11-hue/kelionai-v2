@@ -4,7 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="sentry-dsn" content="">
+    <meta name="theme-color" content="#0A0A0F">
     <title>KelionAI</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+    <link rel="stylesheet" href="/styles/design-system.css">
+    <link rel="stylesheet" href="/styles/components.css">
+    <link rel="stylesheet" href="/styles/animations.css">
     <link rel="stylesheet" href="/css/app.css">
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
@@ -46,6 +53,51 @@
 
     <!-- MAIN APP -->
     <div id="app-layout" class="hidden">
+
+        <!-- NAVBAR -->
+        <nav class="navbar" id="app-navbar">
+            <a href="/" class="navbar-logo">Kelion<span>AI</span></a>
+            <ul class="navbar-links">
+                <li><a href="/">Home</a></li>
+                <li><a href="/#features">Features</a></li>
+                <li><a href="/pricing/">Pricing</a></li>
+                <li><a href="/developer">Developer</a></li>
+                <li><a href="/docs" target="_blank" rel="noopener">Docs</a></li>
+            </ul>
+            <div class="navbar-right">
+                <div class="lang-switcher">
+                    <button class="lang-switcher-btn" aria-label="Schimbă limba">
+                        <span>🌐</span>
+                        <span id="navbar-lang-label">RO</span>
+                        <span>▾</span>
+                    </button>
+                    <div class="lang-dropdown">
+                        <button class="lang-option" data-lang="ro">🇷🇴 Română</button>
+                        <button class="lang-option" data-lang="en">🇬🇧 English</button>
+                        <button class="lang-option" data-lang="fr">🇫🇷 Français</button>
+                        <button class="lang-option" data-lang="de">🇩🇪 Deutsch</button>
+                        <button class="lang-option" data-lang="es">🇪🇸 Español</button>
+                    </div>
+                </div>
+                <button class="btn-primary" id="navbar-get-started" style="padding:8px 18px;font-size:0.85rem;">Get Started</button>
+                <button class="navbar-hamburger" id="navbar-hamburger" aria-label="Meniu">
+                    <span></span><span></span><span></span>
+                </button>
+            </div>
+        </nav>
+
+        <!-- MOBILE NAV MENU -->
+        <div class="navbar-mobile-menu" id="navbar-mobile-menu">
+            <a href="/">Home</a>
+            <a href="/#features">Features</a>
+            <a href="/pricing/">Pricing</a>
+            <a href="/developer">Developer</a>
+            <a href="/docs" target="_blank" rel="noopener">Docs</a>
+        </div>
+
+        <!-- MAIN CONTENT -->
+        <div id="main-content">
+
         <!-- CONVERSATION HISTORY SIDEBAR -->
         <div id="history-sidebar" class="hidden">
             <div id="history-header">
@@ -106,7 +158,8 @@
                 </div>
             </div>
         </div>
-    </div>
+        </div><!-- /#main-content -->
+    </div><!-- /#app-layout -->
 
     <div id="drop-zone" class="hidden">
         <div class="drop-zone-content"><div class="drop-icon">📂</div><p>Trage fișierul aici</p></div>
@@ -140,5 +193,6 @@
     <script src="/js/payments-ui.js"></script>
     <script src="/js/ticker.js"></script>
     <script src="/js/app.js"></script>
+    <script src="/js/navbar.js"></script>
 </body>
 </html>

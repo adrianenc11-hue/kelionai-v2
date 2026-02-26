@@ -1,17 +1,16 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-
 :root {
-    --bg-primary: #060614;
-    --bg-secondary: #0d0d2b;
-    --bg-card: rgba(15, 15, 45, 0.8);
-    --bg-display: rgba(10, 10, 30, 0.95);
-    --text-primary: #e8e8f0;
-    --text-secondary: #8888aa;
-    --accent-blue: #00ccff;
-    --accent-purple: #8855ff;
-    --accent-gradient: linear-gradient(135deg, #00ccff, #8855ff);
-    --glow-blue: 0 0 20px rgba(0, 204, 255, 0.3);
-    --radius: 16px;
+    /* Legacy aliases mapped to design system variables */
+    --bg-primary: var(--kelion-bg);
+    --bg-secondary: var(--kelion-bg-secondary);
+    --bg-card: var(--kelion-surface);
+    --bg-display: rgba(10, 10, 15, 0.95);
+    --text-primary: var(--kelion-text);
+    --text-secondary: var(--kelion-text-secondary);
+    --accent-blue: var(--kelion-secondary);
+    --accent-purple: var(--kelion-primary);
+    --accent-gradient: linear-gradient(135deg, var(--kelion-secondary), var(--kelion-primary));
+    --glow-blue: var(--kelion-glow-cyan);
+    --radius: var(--kelion-radius-lg);
 }
 
 * {
@@ -24,7 +23,7 @@ html,
 body {
     width: 100%;
     height: 100%;
-    font-family: 'Inter', sans-serif;
+    font-family: var(--kelion-font);
     background: var(--bg-primary);
     color: var(--text-primary);
     overflow: hidden;
@@ -35,8 +34,15 @@ body {
 /* ─── Main Layout ───────────────────────────────── */
 #app-layout {
     display: flex;
+    flex-direction: column;
     width: 100%;
     height: 100%;
+}
+
+#main-content {
+    flex: 1;
+    display: flex;
+    min-height: 0;
 }
 
 /* ─── LEFT PANEL: Avatar + Chat ─────────────────── */
@@ -125,7 +131,7 @@ body {
     background: transparent;
     color: var(--text-secondary);
     font-size: 0.75rem;
-    font-family: 'Inter', sans-serif;
+    font-family: var(--kelion-font);
     cursor: pointer;
     transition: all 0.2s;
 }
@@ -275,7 +281,7 @@ body {
     border-radius: 999px;
     color: var(--text-primary);
     font-size: 0.85rem;
-    font-family: 'Inter', sans-serif;
+    font-family: var(--kelion-font);
     outline: none;
     min-width: 0;
 }
@@ -652,7 +658,7 @@ body {
 
 /* ─── Responsive ────────────────────────────────── */
 @media (max-width: 768px) {
-    #app-layout {
+    #main-content {
         flex-direction: column;
     }
 
@@ -740,7 +746,7 @@ body {
     border: 1px solid rgba(255,255,255,0.08);
     background: var(--bg-secondary);
     color: var(--text-primary);
-    font-family: 'Inter', sans-serif;
+    font-family: var(--kelion-font);
     font-size: 0.95rem;
     outline: none;
     transition: border-color 0.2s;
@@ -760,7 +766,7 @@ body {
     border: none;
     background: var(--accent-gradient);
     color: white;
-    font-family: 'Inter', sans-serif;
+    font-family: var(--kelion-font);
     font-size: 1rem;
     font-weight: 600;
     cursor: pointer;
@@ -793,7 +799,7 @@ body {
     border: 1px solid rgba(255,255,255,0.1);
     background: transparent;
     color: var(--text-secondary);
-    font-family: 'Inter', sans-serif;
+    font-family: var(--kelion-font);
     font-size: 0.85rem;
     cursor: pointer;
     transition: all 0.2s;
