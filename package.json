@@ -8,7 +8,12 @@
         "start": "node server/index.js",
         "test": "npx playwright test --project=chromium",
         "test:all": "npx playwright test",
-        "test:report": "npx playwright show-report"
+        "test:report": "npx playwright show-report",
+        "setup": "bash scripts/setup-env.sh",
+        "setup:full": "bash scripts/setup-full.sh",
+        "setup:db": "bash scripts/setup-db.sh",
+        "deploy": "bash scripts/deploy.sh",
+        "health": "bash scripts/health-check.sh"
     },
     "dependencies": {
         "@sentry/browser": "^10.39.0",
