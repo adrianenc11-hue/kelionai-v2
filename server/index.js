@@ -728,6 +728,10 @@ app.locals.supabaseAdmin = supabaseAdmin;
 app.use('/api/payments', paymentsRouter);
 app.use('/api/legal', legalRouter);
 
+// ═══ NEWS BOT (admin only) ═══
+const newsRouter = require('./news');
+app.use('/api/news', adminAuth, newsRouter);
+
 // ═══ HEALTH ═══
 app.get('/api/health', (req, res) => {
     const diag = brain.getDiagnostics();
