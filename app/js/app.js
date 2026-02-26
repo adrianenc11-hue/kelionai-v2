@@ -215,6 +215,7 @@
 
     // ─── Route to streaming or regular ─────────────────────
     async function sendToAI(message, language) {
+        if (window.KBackgrounds) KBackgrounds.onMessage(message);
         let msg = message;
         if (window.KelionTools) {
             try {
@@ -366,6 +367,9 @@
         else if (/^(kelion|chelion)[,.\s]/i.test(l)) { switchAvatar('kelion'); text = text.replace(/^(kelion|chelion)[,.\s]*/i, '').trim(); }
         if (!text) return;
         if (isUpgradeRequest(text)) { if (window.KPayments) KPayments.showUpgradePrompt(); return; }
+        // Manual background override
+        var bgMatch = text.match(/(?:switch to|change background to|background|fundal|schimbă)\s+(\w+)/i);
+        if (bgMatch && window.KBackgrounds) KBackgrounds.setTheme(bgMatch[1].toLowerCase());
         hideWelcome(); KAvatar.setAttentive(true); addMessage('user', text); showThinking(true);
         if (isVisionRequest(text)) triggerVision(); else await sendToAI(text, KVoice.getLanguage());
     }
