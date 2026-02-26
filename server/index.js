@@ -24,6 +24,10 @@ const { buildSystemPrompt } = require('./persona');
 const logger = require('./logger');
 const { router: paymentsRouter, checkUsage, incrementUsage } = require('./payments');
 const legalRouter = require('./legal');
+const adminRouter = require('./admin');
+
+const Stripe = require('stripe');
+const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null;
 const { validate, registerSchema, loginSchema, refreshSchema, chatSchema, speakSchema, listenSchema, visionSchema, searchSchema, weatherSchema, imagineSchema, memorySchema } = require('./validation');
 
 const app = express();
@@ -109,6 +113,7 @@ const globalLimiter = rateLimit({
 
 const memoryLimiter = rateLimit({ windowMs: 60 * 1000, max: 30, message: { error: 'Prea multe cereri memorie.' }, standardHeaders: true, legacyHeaders: false });
 const weatherLimiter = rateLimit({ windowMs: 60 * 1000, max: 10, message: { error: 'Prea multe cereri meteo.' }, standardHeaders: true, legacyHeaders: false });
+const adminLimiter = rateLimit({ windowMs: 60 * 1000, max: 60, message: { error: 'Too many admin requests.' }, standardHeaders: true, legacyHeaders: false });
 
 const asyncHandler = (fn) => (req, res, next) => {
     Promise.resolve(fn(req, res, next)).catch(next);
@@ -720,13 +725,21 @@ load();setInterval(load,5000);
 </script></body></html>`);
 });
 
-// ═══ SHARE HELPERS VIA app.locals (for payments/legal routers) ═══
+// ═══ SHARE HELPERS VIA app.locals (for payments/legal/admin routers) ═══
 app.locals.getUserFromToken = getUserFromToken;
 app.locals.supabaseAdmin = supabaseAdmin;
+app.locals.brain = brain;
+app.locals.stripe = stripe;
+
+// ═══ ADMIN PANEL (static HTML, protected) ═══
+app.get('/admin', adminLimiter, adminAuth, (req, res) => {
+    res.sendFile(path.join(__dirname, '..', 'app', 'admin', 'index.html'));
+});
 
 // ═══ PAYMENTS & LEGAL ROUTES ═══
 app.use('/api/payments', paymentsRouter);
 app.use('/api/legal', legalRouter);
+app.use('/api/admin', adminLimiter, adminAuth, adminRouter);
 
 // ═══ HEALTH ═══
 app.get('/api/health', (req, res) => {

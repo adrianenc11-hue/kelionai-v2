@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KelionAI Admin</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0e1a;color:#e0e0e0;font-family:system-ui,-apple-system,sans-serif;min-height:100vh}
+a{color:#00D4FF;text-decoration:none}
+
+/* ── Login ── */
+#login-screen{position:fixed;top:0;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;background:#0a0e1a;z-index:9999}
+#login-screen.hidden{display:none}
+.login-box{background:rgba(255,255,255,0.05);border:1px solid rgba(0,212,255,0.2);border-radius:16px;padding:40px 32px;width:100%;max-width:360px;backdrop-filter:blur(10px)}
+.login-box h1{color:#00D4FF;font-size:1.5rem;margin-bottom:8px;text-align:center}
+.login-box p{color:#888;text-align:center;margin-bottom:24px;font-size:0.9rem}
+.login-box input{width:100%;padding:12px 16px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:8px;color:#e0e0e0;font-size:1rem;margin-bottom:12px}
+.login-box input:focus{outline:none;border-color:#00D4FF}
+.login-box button{width:100%;padding:12px;background:linear-gradient(135deg,#00D4FF,#0066FF);border:none;border-radius:8px;color:#fff;font-size:1rem;font-weight:600;cursor:pointer}
+.login-box button:hover{opacity:0.9}
+#login-error{color:#ff4466;font-size:0.85rem;text-align:center;margin-top:8px;min-height:20px}
+
+/* ── Dashboard ── */
+#dashboard{display:none}
+#dashboard.visible{display:block}
+header{background:rgba(255,255,255,0.03);border-bottom:1px solid rgba(255,255,255,0.08);padding:16px 24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+header h1{font-size:1.2rem;font-weight:700;color:#00D4FF;flex:1}
+#refresh-info{font-size:0.8rem;color:#666}
+#refresh-btn{background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.3);color:#00D4FF;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:0.85rem}
+#refresh-btn:hover{background:rgba(0,212,255,0.2)}
+#logout-btn{background:rgba(255,68,68,0.1);border:1px solid rgba(255,68,68,0.3);color:#ff4466;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:0.85rem}
+#logout-btn:hover{background:rgba(255,68,68,0.2)}
+
+main{padding:24px;max-width:1400px;margin:0 auto}
+.section-title{font-size:0.75rem;text-transform:uppercase;letter-spacing:2px;color:#555;margin:24px 0 12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;margin-bottom:8px}
+
+/* ── Cards ── */
+.card{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:20px;backdrop-filter:blur(10px);transition:border-color 0.2s}
+.card:hover{border-color:rgba(0,212,255,0.3)}
+.card-label{font-size:0.75rem;text-transform:uppercase;letter-spacing:1px;color:#888;margin-bottom:8px}
+.card-icon{font-size:1.1rem;margin-bottom:4px}
+.card-value{font-size:1.8rem;font-weight:700;color:#00D4FF;line-height:1}
+.card-value.na{color:#555;font-size:1.2rem}
+.card-value.good{color:#00ff88}
+.card-value.warn{color:#ffaa00}
+.card-value.bad{color:#ff4466}
+.card-sub{font-size:0.75rem;color:#666;margin-top:6px}
+
+/* ── Loading ── */
+.loading{color:#555;font-size:1.5rem;animation:pulse 1s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+
+/* ── Status bar ── */
+#status-bar{background:rgba(255,68,68,0.1);border:1px solid rgba(255,68,68,0.3);border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:0.85rem;color:#ff8888;display:none}
+#status-bar.visible{display:block}
+</style>
+</head>
+<body>
+
+<!-- ── LOGIN ── -->
+<div id="login-screen">
+  <div class="login-box">
+    <h1>🔐 KelionAI Admin</h1>
+    <p>Enter your admin secret key to continue</p>
+    <input type="password" id="secret-input" placeholder="Admin Secret Key" autocomplete="off">
+    <button onclick="doLogin()">Access Dashboard</button>
+    <div id="login-error"></div>
+  </div>
+</div>
+
+<!-- ── DASHBOARD ── -->
+<div id="dashboard">
+  <header>
+    <h1>⚙️ KelionAI Admin</h1>
+    <span id="refresh-info">Loading…</span>
+    <button id="refresh-btn" onclick="loadDashboard()">🔄 Refresh</button>
+    <button id="logout-btn" onclick="doLogout()">Logout</button>
+  </header>
+
+  <main>
+    <div id="status-bar"></div>
+
+    <div class="section-title">👥 Users</div>
+    <div class="grid">
+      <div class="card"><div class="card-icon">👥</div><div class="card-label">Total Users</div><div class="card-value" id="v-users-total"><span class="loading">…</span></div></div>
+      <div class="card"><div class="card-icon">🆕</div><div class="card-label">Joined Today</div><div class="card-value" id="v-users-today"><span class="loading">…</span></div></div>
+      <div class="card"><div class="card-icon">⭐</div><div class="card-label">Pro Users</div><div class="card-value" id="v-users-pro"><span class="loading">…</span></div></div>
+      <div class="card"><div class="card-icon">💎</div><div class="card-label">Premium Users</div><div class="card-value" id="v-users-premium"><span class="loading">…</span></div></div>
+      <div class="card"><div class="card-icon">🆓</div><div class="card-label">Free Users</div><div class="card-value" id="v-users-free"><span class="loading">…</span></div></div>
+    </div>
+
+    <div class="section-title">💰 Revenue</div>
+    <div class="grid">
+      <div class="card"><div class="card-icon">📅</div><div class="card-label">MRR (€)</div><div class="card-value" id="v-mrr"><span class="loading">…</span></div><div class="card-sub">Monthly Recurring</div></div>
+      <div class="card"><div class="card-icon">📈</div><div class="card-label">ARR (€)</div><div class="card-value" id="v-arr"><span class="loading">…</span></div><div class="card-sub">Annual Recurring</div></div>
+    </div>
+
+    <div class="section-title">💬 Usage Today</div>
+    <div class="grid">
+      <div class="card"><div class="card-icon">💬</div><div class="card-label">Chat Requests</div><div class="card-value" id="v-chat-today"><span class="loading">…</span></div></div>
+      <div class="card"><div class="card-icon">🔊</div><div class="card-label">TTS Requests</div><div class="card-value" id="v-tts-today"><span class="loading">…</span></div></div>
+      <div class="card"><div class="card-icon">👁️</div><div class="card-label">Vision Requests</div><div class="card-value" id="v-vision-today"><span class="loading">…</span></div></div>
+    </div>
+
+    <div class="section-title">📊 Subscriptions</div>
+    <div class="grid">
+      <div class="card"><div class="card-icon">✅</div><div class="card-label">Active</div><div class="card-value" id="v-subs-active"><span class="loading">…</span></div></div>
+      <div class="card"><div class="card-icon">❌</div><div class="card-label">Cancelled</div><div class="card-value" id="v-subs-cancelled"><span class="loading">…</span></div></div>
+    </div>
+
+    <div class="section-title">🔗 Referrals</div>
+    <div class="grid">
+      <div class="card"><div class="card-icon">🔗</div><div class="card-label">Total Codes</div><div class="card-value" id="v-ref-codes"><span class="loading">…</span></div></div>
+      <div class="card"><div class="card-icon">✔️</div><div class="card-label">Redeemed</div><div class="card-value" id="v-ref-redeemed"><span class="loading">…</span></div></div>
+    </div>
+
+    <div class="section-title">🤖 Bots & System</div>
+    <div class="grid">
+      <div class="card"><div class="card-icon">🤖</div><div class="card-label">Messenger Bot</div><div class="card-value" id="v-bot-status"><span class="loading">…</span></div></div>
+      <div class="card"><div class="card-icon">⏱️</div><div class="card-label">Uptime</div><div class="card-value" id="v-uptime"><span class="loading">…</span></div></div>
+      <div class="card"><div class="card-icon">🧠</div><div class="card-label">Brain Status</div><div class="card-value" id="v-brain"><span class="loading">…</span></div></div>
+      <div class="card"><div class="card-icon">🔑</div><div class="card-label">API Keys</div><div class="card-value" id="v-api-keys"><span class="loading">…</span></div><div class="card-sub">Configured</div></div>
+    </div>
+  </main>
+</div>
+
+<script>
+(function () {
+    'use strict';
+
+    var secret = sessionStorage.getItem('admin_secret') || '';
+    var countdownTimer = null;
+    var countdown = 30;
+
+    function getHeaders() {
+        return { 'x-admin-secret': secret };
+    }
+
+    function val(el, v, opts) {
+        var elem = document.getElementById(el);
+        if (!elem) return;
+        opts = opts || {};
+        if (v === null || v === undefined) {
+            elem.innerHTML = '<span class="na">N/A</span>';
+            return;
+        }
+        var cls = 'card-value';
+        if (opts.cls) cls += ' ' + opts.cls;
+        elem.className = cls;
+        elem.textContent = opts.fmt ? opts.fmt(v) : String(v);
+    }
+
+    function fmtUptime(secs) {
+        secs = Math.round(secs);
+        var h = Math.floor(secs / 3600);
+        var m = Math.floor((secs % 3600) / 60);
+        if (h > 0) return h + 'h ' + m + 'm';
+        return m + 'm';
+    }
+
+    function fmtMoney(n) {
+        return '€' + n.toFixed(2);
+    }
+
+    function brainClass(status) {
+        if (status === 'healthy') return 'good';
+        if (status === 'degraded') return 'bad';
+        return 'warn';
+    }
+
+    function botClass(status) {
+        if (status === 'online') return 'good';
+        if (status === 'not_configured') return 'na';
+        return 'warn';
+    }
+
+    function showStatus(msg) {
+        var bar = document.getElementById('status-bar');
+        if (!bar) return;
+        if (msg) { bar.textContent = msg; bar.classList.add('visible'); }
+        else { bar.classList.remove('visible'); }
+    }
+
+    async function loadDashboard() {
+        showStatus('');
+        document.getElementById('refresh-info').textContent = 'Loading…';
+        try {
+            var r = await fetch('/api/admin/dashboard', { headers: getHeaders() });
+            if (r.status === 401) { doLogout(); return; }
+            if (!r.ok) { showStatus('Server error: ' + r.status); return; }
+            var d = await r.json();
+
+            // Users
+            val('v-users-total', d.users.total);
+            val('v-users-today', d.users.today);
+            val('v-users-pro', d.users.pro);
+            val('v-users-premium', d.users.premium);
+            val('v-users-free', d.users.free);
+
+            // Revenue
+            val('v-mrr', d.revenue.mrr, { fmt: fmtMoney });
+            val('v-arr', d.revenue.arr, { fmt: fmtMoney });
+
+            // Usage
+            val('v-chat-today', d.usage.chat_today);
+            val('v-tts-today', d.usage.tts_today);
+            val('v-vision-today', d.usage.vision_today);
+
+            // Subscriptions
+            val('v-subs-active', d.subscriptions.active, { cls: 'good' });
+            val('v-subs-cancelled', d.subscriptions.cancelled);
+
+            // Referrals
+            val('v-ref-codes', d.referrals.total_codes);
+            val('v-ref-redeemed', d.referrals.redeemed);
+
+            // Bot (fetched separately)
+            fetchBotStatus();
+
+            // System
+            val('v-uptime', d.system.uptime, { fmt: fmtUptime });
+            val('v-brain', d.system.brain_status, { cls: brainClass(d.system.brain_status) });
+            val('v-api-keys', d.system.api_keys_configured);
+
+            var ts = new Date(d.generated_at).toLocaleTimeString();
+            countdown = 30;
+            document.getElementById('refresh-info').textContent = 'Updated ' + ts;
+        } catch (e) {
+            showStatus('Failed to load dashboard: ' + e.message);
+            document.getElementById('refresh-info').textContent = 'Error';
+        }
+    }
+
+    async function fetchBotStatus() {
+        try {
+            var r = await fetch('/api/admin/bots/status', { headers: getHeaders() });
+            if (!r.ok) return;
+            var d = await r.json();
+            var st = d.messenger ? d.messenger.status : null;
+            val('v-bot-status', st, { cls: botClass(st) });
+        } catch (e) { /* ignore */ }
+    }
+
+    function startCountdown() {
+        if (countdownTimer) clearInterval(countdownTimer);
+        countdown = 30;
+        countdownTimer = setInterval(function () {
+            countdown--;
+            var info = document.getElementById('refresh-info');
+            if (info && info.textContent.indexOf('Error') === -1) {
+                var base = info.textContent.split(' — ')[0];
+                info.textContent = base + ' — refresh in ' + countdown + 's';
+            }
+            if (countdown <= 0) {
+                countdown = 30;
+                loadDashboard();
+            }
+        }, 1000);
+    }
+
+    async function doLogin() {
+        var input = document.getElementById('secret-input');
+        var errEl = document.getElementById('login-error');
+        var key = input ? input.value.trim() : '';
+        if (!key) { if (errEl) errEl.textContent = 'Please enter the admin secret key.'; return; }
+        // Test the key
+        try {
+            var r = await fetch('/api/admin/dashboard', { headers: { 'x-admin-secret': key } });
+            if (r.status === 401) {
+                if (errEl) errEl.textContent = 'Invalid secret key.';
+                return;
+            }
+            secret = key;
+            sessionStorage.setItem('admin_secret', key);
+            document.getElementById('login-screen').classList.add('hidden');
+            document.getElementById('dashboard').classList.add('visible');
+            loadDashboard();
+            startCountdown();
+        } catch (e) {
+            if (errEl) errEl.textContent = 'Connection error: ' + e.message;
+        }
+    }
+
+    function doLogout() {
+        sessionStorage.removeItem('admin_secret');
+        secret = '';
+        if (countdownTimer) clearInterval(countdownTimer);
+        document.getElementById('dashboard').classList.remove('visible');
+        document.getElementById('login-screen').classList.remove('hidden');
+        var input = document.getElementById('secret-input');
+        if (input) input.value = '';
+    }
+
+    // Allow Enter key in login
+    document.addEventListener('DOMContentLoaded', function () {
+        var input = document.getElementById('secret-input');
+        if (input) {
+            input.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') doLogin();
+            });
+        }
+        // Auto-login if key stored
+        if (secret) {
+            document.getElementById('login-screen').classList.add('hidden');
+            document.getElementById('dashboard').classList.add('visible');
+            loadDashboard();
+            startCountdown();
+        }
+    });
+
+    // Expose for onclick
+    window.doLogin = doLogin;
+    window.doLogout = doLogout;
+    window.loadDashboard = loadDashboard;
+}());
+</script>
+</body>
+</html>
