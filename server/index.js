@@ -37,7 +37,7 @@ app.use(helmet({
             styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
             fontSrc: ["'self'", "https://fonts.gstatic.com"],
             imgSrc: ["'self'", "data:", "blob:"],
-            connectSrc: ["'self'", "https://api.openai.com", "https://generativelanguage.googleapis.com"],
+            connectSrc: ["'self'", "https://api.openai.com", "https://generativelanguage.googleapis.com", "https://api.anthropic.com", "https://api.elevenlabs.io", "https://api.groq.com", "https://api.perplexity.ai", "https://api.tavily.com", "https://google.serper.dev", "https://api.duckduckgo.com", "https://api.together.xyz", "https://api.deepseek.com", "https://geocoding-api.open-meteo.com", "https://api.open-meteo.com"],
             mediaSrc: ["'self'", "blob:"],
             workerSrc: ["'self'", "blob:"],
         }
@@ -66,7 +66,7 @@ app.use(cors({
 
 // Stripe webhook needs raw body — must be before express.json()
 app.use('/api/payments/webhook', express.raw({ type: 'application/json' }));
-app.use(express.json({ limit: '50mb' }));
+app.use(express.json({ limit: '10mb' }));
 
 // ═══ HTTP REQUEST LOGGING ═══
 app.use((req, res, next) => {
@@ -107,13 +107,25 @@ const globalLimiter = rateLimit({
     legacyHeaders: false
 });
 
+const memoryLimiter = rateLimit({ windowMs: 60 * 1000, max: 30, message: { error: 'Prea multe cereri memorie.' }, standardHeaders: true, legacyHeaders: false });
+const weatherLimiter = rateLimit({ windowMs: 60 * 1000, max: 10, message: { error: 'Prea multe cereri meteo.' }, standardHeaders: true, legacyHeaders: false });
+
 const asyncHandler = (fn) => (req, res, next) => {
     Promise.resolve(fn(req, res, next)).catch(next);
 };
 
+// ═══ ADMIN AUTH MIDDLEWARE ═══
+function adminAuth(req, res, next) {
+    const secret = req.headers['x-admin-secret'];
+    if (!secret || secret !== process.env.ADMIN_SECRET_KEY) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+    next();
+}
+
 const metrics = require('./metrics');
 app.use(metrics.metricsMiddleware);
-app.get('/metrics', asyncHandler(async (req, res) => { res.set('Content-Type', metrics.register.contentType); res.end(await metrics.register.metrics()); }));
+app.get('/metrics', adminAuth, asyncHandler(async (req, res) => { res.set('Content-Type', metrics.register.contentType); res.end(await metrics.register.metrics()); }));
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', uptime: process.uptime(), timestamp: new Date().toISOString() });
 });
@@ -130,6 +142,7 @@ const brain = new KelionBrain({
     tavilyKey: process.env.TAVILY_API_KEY,
     serperKey: process.env.SERPER_API_KEY,
     togetherKey: process.env.TOGETHER_API_KEY,
+    googleMapsKey: process.env.GOOGLE_MAPS_API_KEY,
     supabaseAdmin
 });
 logger.info({ component: 'Brain' }, '🧠 Engine initialized');
@@ -534,7 +547,7 @@ app.post('/api/search', searchLimiter, validate(searchSchema), async (req, res) 
 });
 
 // ═══ WEATHER — Open-Meteo ═══
-app.post('/api/weather', validate(weatherSchema), async (req, res) => {
+app.post('/api/weather', weatherLimiter, validate(weatherSchema), async (req, res) => {
     try {
         const { city } = req.body;
         if (!city) return res.status(400).json({ error: 'Oraș lipsă' });
@@ -573,7 +586,7 @@ app.post('/api/imagine', imageLimiter, validate(imagineSchema), async (req, res)
 });
 
 // ═══ MEMORY ═══
-app.post('/api/memory', validate(memorySchema), async (req, res) => {
+app.post('/api/memory', memoryLimiter, validate(memorySchema), async (req, res) => {
     try {
         const { action, key, value } = req.body;
         const user = await getUserFromToken(req); const uid = user?.id || 'guest';
@@ -600,15 +613,19 @@ app.get('/api/conversations', asyncHandler(async (req, res) => {
 app.get('/api/conversations/:id/messages', asyncHandler(async (req, res) => {
     const u = await getUserFromToken(req);
     if (!u || !supabaseAdmin) return res.json({ messages: [] });
+    // Verify the conversation belongs to this user
+    const { data: conv, error: convErr } = await supabaseAdmin.from('conversations').select('id').eq('id', req.params.id).eq('user_id', u.id).single();
+    if (convErr && convErr.code !== 'PGRST116') return res.status(500).json({ error: 'Eroare server' });
+    if (!conv) return res.status(403).json({ error: 'Access interzis' });
     const { data } = await supabaseAdmin.from('messages').select('id, role, content, created_at').eq('conversation_id', req.params.id).order('created_at', { ascending: true });
     res.json({ messages: data || [] });
 }));
 
 // ═══ BRAIN DIAGNOSTICS ═══
-app.get('/api/brain', (req, res) => {
+app.get('/api/brain', adminAuth, (req, res) => {
     res.json(brain.getDiagnostics());
 });
-app.post('/api/brain/reset', (req, res) => {
+app.post('/api/brain/reset', adminAuth, (req, res) => {
     const { tool } = req.body;
     if (tool) brain.resetTool(tool);
     else brain.resetAll();
@@ -616,7 +633,7 @@ app.post('/api/brain/reset', (req, res) => {
 });
 
 // ═══ BRAIN DASHBOARD (live monitoring) ═══
-app.get('/dashboard', (req, res) => {
+app.get('/dashboard', adminAuth, (req, res) => {
     res.send(`<!DOCTYPE html>
 <html><head><title>KelionAI Brain Dashboard</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">

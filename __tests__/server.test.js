@@ -105,7 +105,8 @@ describe('Input Validation', () => {
 
 describe('Metrics Endpoint', () => {
     test('GET /metrics returns Prometheus format', async () => {
-        const res = await request(app).get('/metrics');
+        process.env.ADMIN_SECRET_KEY = 'test-secret';
+        const res = await request(app).get('/metrics').set('x-admin-secret', 'test-secret');
         expect(res.status).toBe(200);
         expect(res.headers['content-type']).toMatch(/text\/plain/);
         expect(res.text).toContain('kelionai_http_requests_total');
