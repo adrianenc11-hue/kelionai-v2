@@ -71,6 +71,7 @@
                     <button class="avatar-pill" data-avatar="kira">Kira</button>
                     <button class="ctrl-btn-sm" id="btn-history" title="Istoric conversații">📋</button>
                     <span id="user-name" class="user-badge">Guest</span>
+                    <button class="ctrl-btn-sm" id="btn-pricing" title="Plan & Prețuri">💎</button>
                     <button class="ctrl-btn-sm" id="btn-auth" title="Autentificare">🔑</button>
                 </div>
             </div>
@@ -109,6 +110,17 @@
         <div class="drop-zone-content"><div class="drop-icon">📂</div><p>Trage fișierul aici</p></div>
     </div>
 
+    <!-- PRICING MODAL -->
+    <div id="pricing-modal" class="modal-overlay hidden">
+        <div class="modal-content pricing-modal">
+            <button class="modal-close" id="pricing-close">&times;</button>
+            <h2 class="pricing-title">Alege planul tău</h2>
+            <div id="current-plan-info" class="current-plan-info"></div>
+            <div class="pricing-grid" id="pricing-grid"></div>
+            <div id="pricing-referral" class="pricing-referral"></div>
+        </div>
+    </div>
+
     <script src="/lib/three.bundle.js"></script>
     <script src="/js/fft-lipsync.js"></script>
     <script src="/js/avatar.js"></script>
@@ -117,6 +129,7 @@
     <script src="/js/auth.js"></script>
     <script src="/js/monitor.js"></script>
     <script src="/js/tools.js"></script>
+    <script src="/js/payments-ui.js"></script>
     <script src="/js/app.js"></script>
 </body>
 </html>

@@ -50,4 +50,23 @@ describe('KelionBrain', () => {
         brain.resetAll();
         expect(brain.toolErrors.search).toBe(0);
     });
+
+    describe('refineSearchQuery', () => {
+        test('removes filler words from queries', () => {
+            const result = brain.refineSearchQuery('te rog spune-mi despre quantum computing');
+            expect(result).not.toContain('te rog');
+            expect(result).toContain('quantum');
+        });
+
+        test('returns original query when all words are filler', () => {
+            const result = brain.refineSearchQuery('te rog');
+            expect(result).toBe('te rog');
+        });
+
+        test('truncates very long queries', () => {
+            const longQ = 'tell me everything you know about the history of artificial intelligence from the very beginning until now including all major milestones';
+            const result = brain.refineSearchQuery(longQ);
+            expect(result.split(' ').length).toBeLessThanOrEqual(8);
+        });
+    });
 });
