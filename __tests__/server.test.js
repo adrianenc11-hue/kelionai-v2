@@ -39,3 +39,12 @@ describe('GET /nonexistent-route', () => {
         expect(res.status).toBe(200);
     });
 });
+
+describe('Security Headers', () => {
+    test('responses include helmet security headers', async () => {
+        const res = await request(app).get('/health');
+        expect(res.headers['x-content-type-options']).toBe('nosniff');
+        expect(res.headers['x-frame-options']).toBeDefined();
+    });
+});
+
