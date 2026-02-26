@@ -29,6 +29,7 @@ const logger = require('./logger');
 const { router: paymentsRouter, checkUsage, incrementUsage } = require('./payments');
 const legalRouter = require('./legal');
 const { router: messengerRouter, getStats: getMessengerStats } = require('./messenger');
+const developerRouter = require('./routes/developer');
 const { validate, registerSchema, loginSchema, refreshSchema, chatSchema, speakSchema, listenSchema, visionSchema, searchSchema, weatherSchema, imagineSchema, memorySchema } = require('./validation');
 
 const app = express();
@@ -761,10 +762,12 @@ app.locals.getUserFromToken = getUserFromToken;
 app.locals.supabaseAdmin = supabaseAdmin;
 app.locals.brain = brain;
 
-// ═══ PAYMENTS, LEGAL & MESSENGER ROUTES ═══
+// ═══ PAYMENTS, LEGAL, MESSENGER & DEVELOPER ROUTES ═══
 app.use('/api/payments', paymentsRouter);
 app.use('/api/legal', legalRouter);
 app.use('/api/messenger', messengerRouter);
+app.use('/api/developer', developerRouter);
+app.use('/api', developerRouter); // mounts /api/v1/* endpoints
 
 // ═══ MESSENGER STATS (admin only) ═══
 app.get('/api/messenger/stats', adminAuth, (req, res) => {
