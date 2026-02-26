@@ -200,3 +200,127 @@ a:hover { text-decoration: underline; }
     .pricing-hero h1 { font-size: 1.8rem; }
     .pricing-plans { grid-template-columns: 1fr; }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   Redesign v2 — Pricing Cards (design-system variables)
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Card base ── */
+.pricing-card {
+    background: var(--kelion-surface, rgba(15,15,45,0.85));
+    border: 1px solid var(--kelion-border, rgba(255,255,255,0.08));
+    border-radius: var(--kelion-radius-lg, 16px);
+    padding: 32px;
+    text-align: center;
+    transition: var(--kelion-transition-slow, all 0.35s ease);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.pricing-card:hover {
+    transform: translateY(-4px);
+    border-color: var(--kelion-primary, #6c63ff);
+    box-shadow: 0 8px 40px rgba(108, 99, 255, 0.15);
+}
+
+/* ── Featured (Most Popular) ── */
+.pricing-card--featured {
+    border-color: var(--kelion-primary, #6c63ff);
+    transform: scale(1.05);
+    box-shadow: var(--kelion-glow, 0 0 30px rgba(108,99,255,0.3));
+}
+
+.pricing-card--featured:hover {
+    transform: scale(1.05) translateY(-4px);
+}
+
+/* ── Enterprise ── */
+.pricing-card--enterprise {
+    border-color: rgba(255, 184, 0, 0.3);
+}
+
+.pricing-card--enterprise:hover {
+    border-color: #FFB800;
+    box-shadow: 0 8px 40px rgba(255, 184, 0, 0.15);
+}
+
+/* ── Price display ── */
+.pricing-card .plan-price {
+    font-size: 3rem;
+    font-weight: 800;
+    color: var(--kelion-text, #e8e8f0);
+    margin: 16px 0;
+    line-height: 1;
+}
+
+.pricing-card .plan-price span {
+    font-size: 1rem;
+    font-weight: 400;
+    color: var(--kelion-text-secondary, #8888aa);
+}
+
+/* ── Feature list ── */
+.pricing-card .plan-features {
+    list-style: none;
+    flex: 1;
+    text-align: left;
+}
+
+.pricing-card .plan-features li {
+    padding: 8px 0;
+    font-size: 0.9rem;
+    color: var(--kelion-text-secondary, #8888aa);
+    border-bottom: 1px solid var(--kelion-border, rgba(255,255,255,0.04));
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.pricing-card .plan-features li:last-child { border-bottom: none; }
+
+.pricing-card .plan-features li::before {
+    content: '✓';
+    color: var(--kelion-primary, #6c63ff);
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+/* ── Buttons ── */
+.btn-primary {
+    display: inline-block;
+    width: 100%;
+    padding: 13px;
+    border-radius: var(--kelion-radius, 12px);
+    border: none;
+    background: linear-gradient(135deg, var(--kelion-primary, #6c63ff), var(--kelion-secondary, #00ccff));
+    color: #fff;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--kelion-transition, all 0.2s ease);
+    font-family: var(--kelion-font, 'Inter', sans-serif);
+}
+
+.btn-primary:hover { opacity: 0.88; transform: scale(1.02); }
+
+.btn-secondary {
+    display: inline-block;
+    width: 100%;
+    padding: 13px;
+    border-radius: var(--kelion-radius, 12px);
+    border: 1px solid var(--kelion-border, rgba(255,255,255,0.08));
+    background: var(--kelion-surface-hover, rgba(255,255,255,0.06));
+    color: var(--kelion-text-secondary, #8888aa);
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--kelion-transition, all 0.2s ease);
+    font-family: var(--kelion-font, 'Inter', sans-serif);
+}
+
+.btn-secondary:hover {
+    color: var(--kelion-text, #e8e8f0);
+    border-color: var(--kelion-primary, #6c63ff);
+}

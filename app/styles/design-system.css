@@ -1,0 +1,94 @@
+/* ═══════════════════════════════════════════════════════════════
+   KelionAI — Design System v2
+   Global CSS design tokens used across all pages.
+   Reference this file from page stylesheets via <link> or @import.
+   ═══════════════════════════════════════════════════════════════ */
+
+:root {
+    /* ── Backgrounds ── */
+    --kelion-bg:            #060614;
+    --kelion-bg-secondary:  #0d0d2b;
+    --kelion-surface:       rgba(15, 15, 45, 0.85);
+    --kelion-surface-hover: rgba(255, 255, 255, 0.06);
+
+    /* ── Borders ── */
+    --kelion-border: rgba(255, 255, 255, 0.08);
+
+    /* ── Primary accent — Purple ── */
+    --kelion-primary:       #6c63ff;
+    --kelion-primary-hover: #5a52e0;
+
+    /* ── Secondary accent — Cyan ── */
+    --kelion-secondary: #00ccff;
+
+    /* ── Text ── */
+    --kelion-text:           #e8e8f0;
+    --kelion-text-secondary: #8888aa;
+
+    /* ── Status colours ── */
+    --kelion-success: #00cc66;
+    --kelion-warning: #ffaa00;
+    --kelion-danger:  #ff4466;
+
+    /* ── Glow ── */
+    --kelion-glow: 0 0 30px rgba(108, 99, 255, 0.3);
+
+    /* ── Border radii ── */
+    --kelion-radius-sm: 8px;
+    --kelion-radius:    12px;
+    --kelion-radius-lg: 16px;
+
+    /* ── Transitions ── */
+    --kelion-transition:      all 0.2s ease;
+    --kelion-transition-slow: all 0.35s ease;
+
+    /* ── Typography ── */
+    --kelion-font:      'Inter', system-ui, -apple-system, sans-serif;
+    --kelion-font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+
+    /* ── Z-index layers ── */
+    --z-base:    1;
+    --z-overlay: 100;
+    --z-modal:   200;
+    --z-tooltip: 300;
+}
+
+/* ── Glow pulse animation ── */
+@keyframes kelion-glow-pulse {
+    0%, 100% { box-shadow: var(--kelion-glow); }
+    50%       { box-shadow: 0 0 50px rgba(108, 99, 255, 0.5); }
+}
+
+.animate-glow {
+    animation: kelion-glow-pulse 2s ease-in-out infinite;
+}
+
+/* ── Badge helpers ── */
+.badge {
+    display: inline-block;
+    padding: 3px 12px;
+    border-radius: 20px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.badge-primary {
+    background: rgba(108, 99, 255, 0.2);
+    color: var(--kelion-primary);
+    border: 1px solid rgba(108, 99, 255, 0.3);
+}
+
+.badge-warning {
+    background: rgba(255, 184, 0, 0.15);
+    color: #FFB800;
+    border: 1px solid rgba(255, 184, 0, 0.3);
+}
+
+.badge-success {
+    background: rgba(0, 204, 102, 0.15);
+    color: var(--kelion-success);
+    border: 1px solid rgba(0, 204, 102, 0.3);
+}
