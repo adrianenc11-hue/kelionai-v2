@@ -276,7 +276,7 @@ app.post('/api/chat', chatLimiter, validate(chatSchema), async (req, res) => {
         logger.info({ component: 'Chat', engine, avatar, language, tools: thought.toolsUsed, chainOfThought: !!thought.chainOfThought, thinkTime: thought.thinkTime, replyLength: reply.length }, `${engine} | ${avatar} | ${language} | tools:[${thought.toolsUsed.join(',')}] | CoT:${!!thought.chainOfThought} | ${thought.thinkTime}ms think | ${reply.length}c`);
 
         // ── RESPONSE with monitor content + brain metadata ──
-        const response = { reply, avatar, engine, language, thinkTime: thought.thinkTime, conversationId: savedConvId };
+        const response = { reply, avatar, engine, language, thinkTime: thought.thinkTime, conversationId: savedConvId, isEmergency: !!thought.analysis?.isEmergency };
         if (thought.monitor.content) {
             response.monitor = thought.monitor;
         }
@@ -393,7 +393,7 @@ app.post('/api/chat/stream', chatLimiter, validate(chatSchema), async (req, res)
         }
 
         // End stream
-        res.write(`data: ${JSON.stringify({ type: 'done', reply: fullReply, thinkTime: thought.thinkTime, conversationId: savedConvId })}\n\n`);
+        res.write(`data: ${JSON.stringify({ type: 'done', reply: fullReply, thinkTime: thought.thinkTime, conversationId: savedConvId, isEmergency: !!thought.analysis?.isEmergency })}\n\n`);
         res.end();
 
         if (fullReply) brain.learnFromConversation(user?.id, message, fullReply).catch(()=>{});
@@ -616,6 +616,31 @@ app.post('/api/memory', memoryLimiter, validate(memorySchema), async (req, res) 
         else res.status(400).json({ error: 'Acțiune: save, load, list' });
     } catch(e) { res.status(500).json({ error: 'Eroare memorie' }); }
 });
+
+// ═══ SOS ═══
+const sosLimiter = rateLimit({ windowMs: 60 * 1000, max: 10, message: { error: 'Prea multe cereri SOS.' } });
+
+app.post('/api/sos/alert', sosLimiter, asyncHandler(async (req, res) => {
+    const { location, contact, message } = req.body;
+    if (supabaseAdmin) {
+        await supabaseAdmin.from('brain_learnings').insert({
+            user_id: null,
+            category: 'sos_event',
+            lesson: `SOS triggered: ${message || 'Emergency'} at ${location || 'unknown location'}`,
+            confidence: 1.0
+        }).catch(() => {});
+    }
+    logger.warn({ component: 'SOS', location, contact: contact?.name }, 'SOS ALERT TRIGGERED');
+    res.json({ success: true, message: 'Alert sent', timestamp: new Date().toISOString() });
+}));
+
+app.get('/api/sos/contact', asyncHandler(async (req, res) => {
+    const user = await getUserFromToken(req);
+    if (!user || !supabaseAdmin) return res.json({ contact: null });
+    const { data } = await supabaseAdmin.from('user_preferences')
+        .select('value').eq('user_id', user.id).eq('key', 'emergency_contact').single();
+    res.json({ contact: data?.value || null });
+}));
 
 // ═══ CONVERSATIONS ═══
 app.get('/api/conversations', asyncHandler(async (req, res) => {

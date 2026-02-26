@@ -119,6 +119,7 @@
                                 msgEl.textContent = fullReply;
                             }
                             if (data.conversationId) persistConvId(data.conversationId);
+                            if ((data.isEmergency || isSOSRequest(message)) && window.KSOS) KSOS.triggerSOS();
                         }
                     } catch(e) { /* skip parse errors */ }
                 }
@@ -182,6 +183,7 @@
 
             const data = await resp.json();
             if (data.conversationId) persistConvId(data.conversationId);
+            if ((data.isEmergency || isSOSRequest(message)) && window.KSOS) KSOS.triggerSOS();
             chatHistory.push({ role: 'user', content: message });
             chatHistory.push({ role: 'assistant', content: data.reply });
             addMessage('assistant', data.reply);
@@ -338,6 +340,12 @@
         var n = document.getElementById('avatar-name'); if (n) n.textContent = name.charAt(0).toUpperCase() + name.slice(1);
         chatHistory = []; persistConvId(null);
         var o = document.getElementById('chat-overlay'); if (o) o.innerHTML = '';
+    }
+
+    // ─── SOS voice command detection ─────────────────────────────
+    // Covers: Romanian (ajutor, urgenta, pericol, accident, foc, incendiu), English (sos, help, emergency)
+    function isSOSRequest(t) {
+        return /\b(sos|help|ajutor|urgenta|urgență|emergency|pericol|accident|foc|incendiu)\b/i.test(t);
     }
 
     // ─── Upgrade voice command detection ─────────────────────
