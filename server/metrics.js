@@ -45,11 +45,45 @@ const httpDuration = new client.Histogram({
     registers: [register],
 });
 
+// HTTP request duration (standard name)
+const httpRequestDuration = new client.Histogram({
+    name: 'kelionai_http_request_duration_seconds',
+    help: 'Duration of HTTP requests in seconds',
+    labelNames: ['method', 'route', 'status_code'],
+    buckets: [0.01, 0.05, 0.1, 0.5, 1, 2, 5, 10],
+    registers: [register],
+});
+
+// HTTP requests total
+const httpRequestsTotal = new client.Counter({
+    name: 'kelionai_http_requests_total',
+    help: 'Total number of HTTP requests',
+    labelNames: ['method', 'route', 'status_code'],
+    registers: [register],
+});
+
 // API call counters
 const apiCalls = new client.Counter({
     name: 'kelionai_api_calls_total',
     help: 'Total API calls by endpoint and result',
     labelNames: ['endpoint', 'result'],
+    registers: [register],
+});
+
+// AI request duration
+const aiRequestDuration = new client.Histogram({
+    name: 'kelionai_ai_request_duration_seconds',
+    help: 'Duration of AI provider requests in seconds',
+    labelNames: ['provider', 'model'],
+    buckets: [0.5, 1, 2, 5, 10, 30, 60],
+    registers: [register],
+});
+
+// AI requests total
+const aiRequestsTotal = new client.Counter({
+    name: 'kelionai_ai_requests_total',
+    help: 'Total AI requests by provider',
+    labelNames: ['provider', 'status'],
     registers: [register],
 });
 
@@ -97,6 +131,8 @@ const aiHealth = new client.Gauge({
 // ─── Middleware ────────────────────────────────────────────────
 
 function metricsMiddleware(req, res, next) {
+    if (req.path === '/metrics' || req.path === '/health') return next();
+    const end = httpRequestDuration.startTimer();
     activeConnections.inc();
     const start = process.hrtime.bigint();
 
@@ -105,6 +141,9 @@ function metricsMiddleware(req, res, next) {
         const duration = Number(process.hrtime.bigint() - start) / 1e9;
         const route = req.route ? req.route.path : req.path;
         httpDuration.observe({ method: req.method, route, status: res.statusCode }, duration);
+        const labels = { method: req.method, route, status_code: res.statusCode };
+        end(labels);
+        httpRequestsTotal.inc(labels);
     });
 
     next();
@@ -115,7 +154,11 @@ function metricsMiddleware(req, res, next) {
 module.exports = {
     register,
     httpDuration,
+    httpRequestDuration,
+    httpRequestsTotal,
     apiCalls,
+    aiRequestDuration,
+    aiRequestsTotal,
     aiLatency,
     ttsLatency,
     activeConnections,
