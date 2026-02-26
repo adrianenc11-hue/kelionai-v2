@@ -249,7 +249,7 @@ function parseRSS(xml, sourceName) {
         const pubMatch = item.match(/<pubDate>([\s\S]*?)<\/pubDate>/i);
         const title = titleMatch ? titleMatch[1].trim() : '';
         const url = linkMatch ? linkMatch[1].trim() : '';
-        const description = descMatch ? descMatch[1].replace(/<[^>]+>/g, '').trim() : '';
+        const description = descMatch ? descMatch[1].replace(/</g, ' ').replace(/>/g, ' ').replace(/\s+/g, ' ').trim() : '';
         const pubDateStr = pubMatch ? pubMatch[1].trim() : '';
         let publishedAt;
         try { publishedAt = pubDateStr ? new Date(pubDateStr).toISOString() : new Date().toISOString(); }
