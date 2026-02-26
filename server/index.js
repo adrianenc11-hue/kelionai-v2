@@ -89,9 +89,13 @@ const globalLimiter = rateLimit({
     legacyHeaders: false
 });
 
+const asyncHandler = (fn) => (req, res, next) => {
+    Promise.resolve(fn(req, res, next)).catch(next);
+};
+
 const metrics = require('./metrics');
 app.use(metrics.metricsMiddleware);
-app.get('/metrics', async (req, res) => { res.set('Content-Type', metrics.register.contentType); res.end(await metrics.register.metrics()); });
+app.get('/metrics', asyncHandler(async (req, res) => { res.set('Content-Type', metrics.register.contentType); res.end(await metrics.register.metrics()); }));
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', uptime: process.uptime(), timestamp: new Date().toISOString() });
 });
@@ -144,11 +148,11 @@ app.post('/api/auth/login', authLimiter, validate(loginSchema), async (req, res)
 });
 
 app.post('/api/auth/logout', async (req, res) => { try { if (supabase) await supabase.auth.signOut(); } catch(e){} res.json({ success: true }); });
-app.get('/api/auth/me', async (req, res) => {
+app.get('/api/auth/me', asyncHandler(async (req, res) => {
     const u = await getUserFromToken(req);
     if (!u) return res.status(401).json({ error: 'Neautentificat' });
     res.json({ user: { id: u.id, email: u.email, name: u.user_metadata?.full_name } });
-});
+}));
 app.post('/api/auth/refresh', validate(refreshSchema), async (req, res) => {
     try {
         const { refresh_token } = req.body;
@@ -543,18 +547,18 @@ app.post('/api/memory', validate(memorySchema), async (req, res) => {
 });
 
 // ═══ CONVERSATIONS ═══
-app.get('/api/conversations', async (req, res) => {
+app.get('/api/conversations', asyncHandler(async (req, res) => {
     const u = await getUserFromToken(req);
     if (!u || !supabaseAdmin) return res.json({ conversations: [] });
     const { data } = await supabaseAdmin.from('conversations').select('id, avatar, title, created_at, updated_at').eq('user_id', u.id).order('updated_at', { ascending: false }).limit(50);
     res.json({ conversations: data || [] });
-});
-app.get('/api/conversations/:id/messages', async (req, res) => {
+}));
+app.get('/api/conversations/:id/messages', asyncHandler(async (req, res) => {
     const u = await getUserFromToken(req);
     if (!u || !supabaseAdmin) return res.json({ messages: [] });
     const { data } = await supabaseAdmin.from('messages').select('id, role, content, created_at').eq('conversation_id', req.params.id).order('created_at', { ascending: true });
     res.json({ messages: data || [] });
-});
+}));
 
 // ═══ BRAIN DIAGNOSTICS ═══
 app.get('/api/brain', (req, res) => {
@@ -677,13 +681,47 @@ const _indexHtml = process.env.SENTRY_DSN
         `<meta name="sentry-dsn" content="${process.env.SENTRY_DSN.replace(/&/g, '&amp;').replace(/"/g, '&quot;')}">`
     )
     : _rawHtml;
+
+// 404 for unknown API routes — must come before the catch-all
+app.use('/api', (req, res, next) => {
+    res.status(404).json({ error: 'API endpoint negăsit' });
+});
+
 app.get('*', (req, res) => res.type('html').send(_indexHtml));
 
 // Sentry error handler must be registered after all routes
 if (process.env.SENTRY_DSN) Sentry.setupExpressErrorHandler(app);
 
+// ═══ GLOBAL ERROR HANDLER ═══
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
+    const statusCode = err.statusCode || err.status || 500;
+    if (process.env.NODE_ENV === 'production') {
+        console.error(`[ERROR] ${req.method} ${req.path}:`, err.message);
+        return res.status(statusCode).json({
+            error: statusCode === 500 ? 'Eroare internă de server' : err.message
+        });
+    }
+    console.error(`[ERROR] ${req.method} ${req.path}:`, err);
+    res.status(statusCode).json({
+        error: err.message,
+        stack: err.stack,
+        details: err.details || undefined
+    });
+});
+
 // ═══ STARTUP ═══
 if (require.main === module) {
+    process.on('uncaughtException', (err) => {
+        console.error('[FATAL] Uncaught Exception:', err);
+        process.exit(1);
+    });
+
+    process.on('unhandledRejection', (reason) => {
+        console.error('[FATAL] Unhandled Rejection:', reason);
+        process.exit(1);
+    });
+
     runMigration().then(migrated => {
         app.listen(PORT, '0.0.0.0', () => {
             console.log('\n══════════════════════════════════════════');
