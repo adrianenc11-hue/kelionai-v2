@@ -1,0 +1,202 @@
+/* ═══════════════════════════════════════════════════════════════
+   KelionAI — Pricing Page Styles
+   ═══════════════════════════════════════════════════════════════ */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+:root {
+    --bg-primary: #060614;
+    --bg-secondary: #0d0d2b;
+    --bg-card: rgba(15, 15, 45, 0.85);
+    --text-primary: #e8e8f0;
+    --text-secondary: #8888aa;
+    --accent-blue: #00ccff;
+    --accent-purple: #8855ff;
+    --accent-gradient: linear-gradient(135deg, #00ccff, #8855ff);
+    --radius: 16px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    font-family: 'Inter', sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+a { color: var(--accent-blue); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ─── Header ─── */
+.pricing-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 40px;
+    border-bottom: 1px solid rgba(0, 204, 255, 0.1);
+    background: rgba(6, 6, 20, 0.9);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    backdrop-filter: blur(12px);
+}
+
+.pricing-logo {
+    font-size: 1.4rem;
+    font-weight: 700;
+    background: var(--accent-gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-decoration: none;
+}
+
+.pricing-nav { display: flex; gap: 24px; }
+.nav-link { color: var(--text-secondary); font-size: 0.9rem; transition: color 0.2s; }
+.nav-link:hover { color: var(--text-primary); text-decoration: none; }
+
+/* ─── Main ─── */
+.pricing-main { flex: 1; padding: 60px 40px 80px; max-width: 1100px; margin: 0 auto; width: 100%; }
+
+/* ─── Hero ─── */
+.pricing-hero { text-align: center; margin-bottom: 56px; }
+.pricing-hero h1 { font-size: 2.5rem; font-weight: 700; margin-bottom: 12px; }
+.pricing-hero p { color: var(--text-secondary); font-size: 1.1rem; }
+
+/* ─── Status ─── */
+.pricing-status {
+    text-align: center;
+    padding: 12px 24px;
+    border-radius: 10px;
+    margin-bottom: 32px;
+    font-size: 0.9rem;
+    background: rgba(0, 204, 255, 0.08);
+    border: 1px solid rgba(0, 204, 255, 0.2);
+    color: var(--accent-blue);
+}
+.pricing-status.hidden { display: none; }
+
+/* ─── Plans Grid ─── */
+.pricing-plans {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 24px;
+    margin-bottom: 80px;
+}
+
+.plan-loading { color: var(--text-secondary); text-align: center; padding: 40px; }
+
+/* ─── Plan Card ─── */
+.plan-card {
+    background: var(--bg-card);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: var(--radius);
+    padding: 36px 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    position: relative;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.plan-card:hover { transform: translateY(-4px); box-shadow: 0 8px 40px rgba(0, 204, 255, 0.12); }
+
+.plan-card.featured {
+    border-color: var(--accent-blue);
+    box-shadow: 0 0 30px rgba(0, 204, 255, 0.15);
+}
+
+.plan-card.current { border-color: #00ff88; box-shadow: 0 0 20px rgba(0, 255, 136, 0.1); }
+
+.plan-badge {
+    position: absolute;
+    top: -12px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--accent-gradient);
+    color: #000;
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 4px 12px;
+    border-radius: 20px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+}
+
+.plan-name { font-size: 1.2rem; font-weight: 600; }
+
+.plan-price {
+    font-size: 2.4rem;
+    font-weight: 700;
+    line-height: 1;
+}
+.plan-price small { font-size: 1rem; font-weight: 400; color: var(--text-secondary); }
+.plan-price .currency { font-size: 1.4rem; vertical-align: top; margin-top: 4px; display: inline-block; }
+
+.plan-features { list-style: none; flex: 1; }
+.plan-features li {
+    padding: 7px 0;
+    font-size: 0.88rem;
+    color: var(--text-secondary);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.plan-features li:last-child { border: none; }
+.plan-features li::before { content: '✓'; color: var(--accent-blue); font-weight: 700; }
+
+/* ─── Plan Button ─── */
+.plan-btn {
+    width: 100%;
+    padding: 13px;
+    border-radius: 10px;
+    border: none;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s, transform 0.15s;
+    font-family: 'Inter', sans-serif;
+}
+.plan-btn:hover:not(:disabled) { opacity: 0.85; transform: scale(1.02); }
+.plan-btn:disabled { opacity: 0.5; cursor: default; transform: none; }
+
+.plan-btn.upgrade { background: var(--accent-gradient); color: #000; }
+.plan-btn.current-plan { background: rgba(0, 255, 136, 0.1); color: #00ff88; border: 1px solid rgba(0, 255, 136, 0.3); }
+.plan-btn.free-plan { background: rgba(255, 255, 255, 0.07); color: var(--text-secondary); border: 1px solid rgba(255, 255, 255, 0.1); }
+.plan-btn.manage { background: rgba(0, 204, 255, 0.1); color: var(--accent-blue); border: 1px solid rgba(0, 204, 255, 0.25); margin-top: 8px; }
+
+/* ─── FAQ ─── */
+.pricing-faq { margin-top: 20px; }
+.pricing-faq h2 { font-size: 1.6rem; font-weight: 600; text-align: center; margin-bottom: 36px; }
+
+.faq-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; }
+
+.faq-item {
+    background: var(--bg-card);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 12px;
+    padding: 24px;
+}
+.faq-item h3 { font-size: 0.95rem; font-weight: 600; margin-bottom: 8px; }
+.faq-item p { font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5; }
+
+/* ─── Footer ─── */
+.pricing-footer {
+    text-align: center;
+    padding: 24px;
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* ─── Responsive ─── */
+@media (max-width: 600px) {
+    .pricing-header { padding: 14px 20px; }
+    .pricing-main { padding: 40px 20px 60px; }
+    .pricing-hero h1 { font-size: 1.8rem; }
+    .pricing-plans { grid-template-columns: 1fr; }
+}
