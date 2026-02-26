@@ -950,3 +950,69 @@ body {
     transition: background 0.2s;
 }
 .usage-upgrade-badge:hover { background: rgba(255,68,68,0.35); }
+
+/* ═══ Focus & Meditation Mode ═══ */
+#focus-panel, #meditation-panel {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; padding: 24px 16px; height: 100%;
+    color: #e0e0e0; text-align: center;
+}
+#focus-mode-label, #med-mode-label {
+    font-size: 1.1rem; font-weight: 700; letter-spacing: 2px;
+    color: #00d4ff; margin-bottom: 12px;
+}
+#focus-timer, #med-timer {
+    font-size: 3.5rem; font-weight: 700; font-variant-numeric: tabular-nums;
+    color: #fff; margin: 8px 0;
+}
+#focus-phase {
+    font-size: 0.85rem; color: #aaa; margin-bottom: 14px;
+}
+#focus-progress-bar, #med-progress-bar {
+    width: 80%; max-width: 280px; height: 6px;
+    background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden;
+    margin: 10px auto;
+}
+#focus-progress-fill, #med-progress-fill {
+    height: 100%; width: 0%;
+    background: linear-gradient(90deg, #00d4ff, #0088cc);
+    border-radius: 3px; transition: width 1s linear;
+}
+#focus-controls {
+    display: flex; gap: 10px; margin: 12px 0;
+}
+#focus-controls button, #med-stop {
+    background: rgba(255,255,255,0.08); color: #ddd;
+    border: 1px solid rgba(255,255,255,0.15); border-radius: 20px;
+    padding: 8px 18px; font-size: 0.85rem; cursor: pointer;
+    transition: background 0.2s;
+}
+#focus-controls button:hover, #med-stop:hover {
+    background: rgba(255,255,255,0.18);
+}
+#focus-ambient {
+    margin-top: 14px; font-size: 0.8rem; color: #aaa;
+    display: flex; flex-wrap: wrap; gap: 6px; justify-content: center;
+    align-items: center;
+}
+.ambient-btn {
+    background: rgba(255,255,255,0.06); color: #bbb;
+    border: 1px solid rgba(255,255,255,0.12); border-radius: 14px;
+    padding: 4px 12px; font-size: 0.78rem; cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+}
+.ambient-btn:hover { background: rgba(0,212,255,0.15); color: #00d4ff; }
+.ambient-btn.active { background: rgba(0,212,255,0.2); color: #00d4ff; border-color: #00d4ff; }
+#med-breathe-text {
+    font-size: 1.1rem; color: #88ddff; margin: 8px 0; min-height: 1.4em;
+}
+#med-circle {
+    width: 100px; height: 100px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(0,212,255,0.4), rgba(0,212,255,0.1));
+    margin: 20px auto;
+    transition: transform 4s ease-in-out, opacity 4s ease-in-out;
+}
+#med-circle.inhale { transform: scale(1.8); opacity: 1; }
+#med-circle.hold   { transform: scale(1.8); opacity: 0.7; }
+#med-circle.exhale { transform: scale(1);   opacity: 0.4; }

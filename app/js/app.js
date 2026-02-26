@@ -347,6 +347,26 @@
         return /(kelion|chelion)[,.\s]+(upgrade|abonament)|vreau\s+(pro|premium)|upgrade\s+plan/.test(l);
     }
 
+    // ─── Focus / Meditation voice command detection ───────────
+    function handleFocusCommands(text) {
+        if (/\b(focus mode|pomodoro|concentr|focus)\b/i.test(text)) {
+            showThinking(false);
+            if (window.KFocus) KFocus.startFocus();
+            return true;
+        }
+        if (/\b(meditat|breathe|respir|calm|zen|relax)\b/i.test(text)) {
+            showThinking(false);
+            if (window.KFocus) KFocus.startMeditation();
+            return true;
+        }
+        if (/\b(stop focus|stop meditation|stop timer|opreste timer)\b/i.test(text)) {
+            showThinking(false);
+            if (window.KFocus) KFocus.stop();
+            return true;
+        }
+        return false;
+    }
+
     // ─── Input handlers ──────────────────────────────────────
     async function onMicDown() { var b = document.getElementById('btn-mic'); if (await KVoice.startListening()) { b.classList.add('recording'); b.textContent = '⏹'; } }
     async function onMicUp() {
@@ -355,6 +375,7 @@
         var text = await KVoice.stopListening();
         if (text && text.trim()) { hideWelcome(); addMessage('user', text);
             if (isUpgradeRequest(text)) { showThinking(false); if (window.KPayments) KPayments.showUpgradePrompt(); }
+            else if (handleFocusCommands(text)) { /* handled */ }
             else if (isVisionRequest(text)) triggerVision(); else await sendToAI(text, KVoice.getLanguage());
         } else { showThinking(false); KVoice.resumeWakeDetection(); }
     }
@@ -367,7 +388,7 @@
         if (!text) return;
         if (isUpgradeRequest(text)) { if (window.KPayments) KPayments.showUpgradePrompt(); return; }
         hideWelcome(); KAvatar.setAttentive(true); addMessage('user', text); showThinking(true);
-        if (isVisionRequest(text)) triggerVision(); else await sendToAI(text, KVoice.getLanguage());
+        if (handleFocusCommands(text)) { /* handled */ } else if (isVisionRequest(text)) triggerVision(); else await sendToAI(text, KVoice.getLanguage());
     }
 
     // ─── Drag & Drop ─────────────────────────────────────────
@@ -448,7 +469,7 @@
 
         window.addEventListener('wake-message', function(e) {
             var detail = e.detail; hideWelcome(); addMessage('user', detail.text); showThinking(true);
-            if (isVisionRequest(detail.text)) triggerVision(); else sendToAI(detail.text, detail.language);
+            if (handleFocusCommands(detail.text)) { /* handled */ } else if (isVisionRequest(detail.text)) triggerVision(); else sendToAI(detail.text, detail.language);
         });
 
         setupDragDrop();
