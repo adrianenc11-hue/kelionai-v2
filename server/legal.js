@@ -1,6 +1,7 @@
 // ═══════════════════════════════════════════════════════════════
 // KelionAI v2.3 — LEGAL (GDPR, Terms, Privacy)
 // ═══════════════════════════════════════════════════════════════
+const logger = require('./logger');
 const express = require('express');
 const router = express.Router();
 
@@ -135,7 +136,7 @@ router.get('/gdpr/export', async (req, res) => {
         res.setHeader('Content-Disposition', `attachment; filename="kelionai-export-${user.id}.json"`);
         res.json(exportData);
     } catch (e) {
-        console.error('[GDPR Export]', e.message);
+        logger.error({ component: 'Legal', err: e.message }, 'GDPR Export');
         res.status(500).json({ error: 'Eroare export date' });
     }
 });
@@ -185,10 +186,10 @@ router.delete('/gdpr/delete', async (req, res) => {
         await supabaseAdmin.from('usage').delete().eq('user_id', user.id);
         await supabaseAdmin.from('referrals').delete().eq('user_id', user.id);
 
-        console.log(`[GDPR] 🗑️ All data deleted for user ${user.id}`);
+        logger.info({ component: 'Legal', userId: user.id }, `🗑️ All data deleted for user ${user.id}`);
         res.json({ success: true, message: 'Toate datele au fost șterse. Contul poate fi închis din setări.' });
     } catch (e) {
-        console.error('[GDPR Delete]', e.message);
+        logger.error({ component: 'Legal', err: e.message }, 'GDPR Delete');
         res.status(500).json({ error: 'Eroare ștergere date' });
     }
 });

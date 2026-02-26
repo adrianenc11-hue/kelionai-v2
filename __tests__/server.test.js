@@ -153,3 +153,13 @@ describe('Error Handling', () => {
     });
 });
 
+describe('Logger', () => {
+    test('logger module exports a pino instance', () => {
+        const logger = require('../server/logger');
+        expect(logger).toBeDefined();
+        expect(typeof logger.info).toBe('function');
+        expect(typeof logger.error).toBe('function');
+        expect(typeof logger.warn).toBe('function');
+    });
+});
+
