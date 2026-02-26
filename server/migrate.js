@@ -56,6 +56,28 @@ DO $$ BEGIN
         CREATE POLICY "Users own prefs" ON user_preferences FOR ALL USING (auth.uid() = user_id);
     END IF;
 END $$;
+
+CREATE TABLE IF NOT EXISTS api_keys (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    name TEXT NOT NULL DEFAULT 'My API Key',
+    key TEXT NOT NULL UNIQUE,
+    key_preview TEXT NOT NULL,
+    rate_limit INTEGER NOT NULL DEFAULT 100,
+    request_count INTEGER NOT NULL DEFAULT 0,
+    last_used_at TIMESTAMPTZ,
+    revoked_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_api_keys_user ON api_keys(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_api_keys_key ON api_keys(key);
+
+CREATE OR REPLACE FUNCTION increment_api_key_count(key_id UUID)
+RETURNS void LANGUAGE plpgsql AS $$
+BEGIN
+    UPDATE api_keys SET request_count = request_count + 1, last_used_at = now() WHERE id = key_id;
+END; $$;
 `;
 
 async function runMigration() {
@@ -90,7 +112,7 @@ async function runMigration() {
     try {
         logger.info({ component: 'Migration' }, '�� Running database migration...');
         await pool.query(MIGRATION_SQL);
-        logger.info({ component: 'Migration' }, '✅ Tables created/verified: conversations, messages, user_preferences');
+        logger.info({ component: 'Migration' }, '✅ Tables created/verified: conversations, messages, user_preferences, api_keys');
         logger.info({ component: 'Migration' }, '✅ RLS policies applied');
         return true;
     } catch (e) {
