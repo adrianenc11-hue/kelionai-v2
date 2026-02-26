@@ -17,10 +17,11 @@ try {
 
 // ═══ PLAN LIMITS ═══
 const PLAN_LIMITS = {
-    guest:   { chat: 5,   search: 3,  image: 1,  vision: 2,  tts: 5,   name: 'Guest' },
-    free:    { chat: 10,  search: 5,  image: 2,  vision: 5,  tts: 10,  name: 'Free' },
-    pro:     { chat: 100, search: 50, image: 20, vision: 50, tts: 100, name: 'Pro' },
-    premium: { chat: -1,  search: -1, image: -1, vision: -1, tts: -1,  name: 'Premium' } // -1 = unlimited
+    guest:      { chat: 5,   search: 3,  image: 1,  vision: 2,  tts: 5,   name: 'Guest' },
+    free:       { chat: 10,  search: 5,  image: 2,  vision: 5,  tts: 10,  name: 'Free' },
+    pro:        { chat: 100, search: 50, image: 20, vision: 50, tts: 100, name: 'Pro' },
+    enterprise: { chat: -1,  search: -1, image: -1, vision: -1, tts: -1,  name: 'Enterprise' }, // -1 = unlimited
+    premium:    { chat: -1,  search: -1, image: -1, vision: -1, tts: -1,  name: 'Premium' } // legacy alias
 };
 
 // ═══ CHECK USER PLAN & USAGE ═══
@@ -118,7 +119,7 @@ router.get('/plans', (req, res) => {
         plans: [
             { id: 'free', name: 'Free', price: 0, currency: 'EUR', limits: PLAN_LIMITS.free },
             { id: 'pro', name: 'Pro', price: 9.99, currency: 'EUR', limits: PLAN_LIMITS.pro, features: ['100 chat/zi', '50 căutări/zi', '20 imagini/zi', 'Memorie persistentă', 'Istoric conversații'] },
-            { id: 'premium', name: 'Premium', price: 19.99, currency: 'EUR', limits: PLAN_LIMITS.premium, features: ['Nelimitat chat', 'Nelimitat căutări', 'Nelimitat imagini', 'Suport prioritar', 'API access', 'Custom avatar'] }
+            { id: 'enterprise', name: 'Enterprise', price: 29.99, currency: 'EUR', limits: PLAN_LIMITS.enterprise, features: ['Nelimitat chat', 'Nelimitat căutări', 'Nelimitat imagini', 'Suport prioritar', 'API access', 'Custom avatar', 'SLA garantat'] }
         ]
     });
 });
@@ -162,9 +163,11 @@ router.post('/checkout', async (req, res) => {
         if (!user) return res.status(401).json({ error: 'Trebuie să fii autentificat' });
         
         const { plan } = req.body;
-        if (!['pro', 'premium'].includes(plan)) return res.status(400).json({ error: 'Plan invalid' });
+        if (!['pro', 'enterprise'].includes(plan)) return res.status(400).json({ error: 'Plan invalid' });
         
-        const priceId = plan === 'pro' ? process.env.STRIPE_PRICE_PRO : process.env.STRIPE_PRICE_PREMIUM;
+        const priceId = plan === 'pro'
+            ? (process.env.STRIPE_PRO_PRICE_ID || process.env.STRIPE_PRICE_PRO)
+            : (process.env.STRIPE_ENTERPRISE_PRICE_ID || process.env.STRIPE_PRICE_PREMIUM);
         if (!priceId) return res.status(503).json({ error: 'Prețuri neconfigurare' });
         
         // Check if user already has a Stripe customer ID

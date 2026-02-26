@@ -3,6 +3,11 @@
 // Autonomous thinking, self-repair, auto-learning
 // ═══════════════════════════════════════════════════════════════
 require('dotenv').config();
+
+// Verificare Node.js versiune — fetch nativ disponibil din Node 18+
+if (!globalThis.fetch) {
+    throw new Error('Node.js 18+ required for native fetch. Current: ' + process.version);
+}
 const Sentry = require('@sentry/node');
 if (process.env.SENTRY_DSN) {
     Sentry.init({ dsn: process.env.SENTRY_DSN, environment: process.env.NODE_ENV || 'development',
@@ -10,10 +15,9 @@ if (process.env.SENTRY_DSN) {
 }
 const express = require('express');
 const cors = require('cors');
-const fetch = require('node-fetch');
-const FormData = require('form-data');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const { supabase, supabaseAdmin } = require('./supabase');
@@ -25,27 +29,57 @@ const logger = require('./logger');
 const { router: paymentsRouter, checkUsage, incrementUsage } = require('./payments');
 const legalRouter = require('./legal');
 const { router: messengerRouter, getStats: getMessengerStats } = require('./messenger');
+const developerRouter = require('./routes/developer');
 const { validate, registerSchema, loginSchema, refreshSchema, chatSchema, speakSchema, listenSchema, visionSchema, searchSchema, weatherSchema, imagineSchema, memorySchema } = require('./validation');
 
 const app = express();
 app.set('trust proxy', 1);
 
-app.use(helmet({
-    contentSecurityPolicy: {
-        directives: {
-            defaultSrc: ["'self'"],
-            scriptSrc: ["'self'", "'unsafe-inline'"],
-            styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-            fontSrc: ["'self'", "https://fonts.gstatic.com"],
-            imgSrc: ["'self'", "data:", "blob:"],
-            connectSrc: ["'self'", "https://api.openai.com", "https://generativelanguage.googleapis.com", "https://api.anthropic.com", "https://api.elevenlabs.io", "https://api.groq.com", "https://api.perplexity.ai", "https://api.tavily.com", "https://google.serper.dev", "https://api.duckduckgo.com", "https://api.together.xyz", "https://api.deepseek.com", "https://geocoding-api.open-meteo.com", "https://api.open-meteo.com"],
-            mediaSrc: ["'self'", "blob:"],
-            workerSrc: ["'self'", "blob:"],
-        }
-    },
-    crossOriginEmbedderPolicy: false,
-    crossOriginResourcePolicy: { policy: "cross-origin" }
-}));
+// ═══ CSP NONCE MIDDLEWARE — generează nonce unic per request ═══
+app.use((req, res, next) => {
+    res.locals.cspNonce = crypto.randomBytes(16).toString('base64');
+    next();
+});
+
+app.use((req, res, next) => {
+    helmet({
+        contentSecurityPolicy: {
+            directives: {
+                defaultSrc: ["'self'"],
+                scriptSrc: [
+                    "'self'",
+                    (req, res) => `'nonce-${res.locals.cspNonce}'`,
+                    // CDN-uri necesare cu versiuni pinned
+                    "https://cdn.jsdelivr.net",
+                    "https://browser.sentry-cdn.com",
+                ],
+                styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+                fontSrc: ["'self'", "https://fonts.gstatic.com"],
+                imgSrc: ["'self'", "data:", "blob:"],
+                connectSrc: [
+                    "'self'",
+                    "https://api.openai.com",
+                    "https://generativelanguage.googleapis.com",
+                    "https://api.anthropic.com",
+                    "https://api.elevenlabs.io",
+                    "https://api.groq.com",
+                    "https://api.perplexity.ai",
+                    "https://api.tavily.com",
+                    "https://google.serper.dev",
+                    "https://api.duckduckgo.com",
+                    "https://api.together.xyz",
+                    "https://api.deepseek.com",
+                    "https://geocoding-api.open-meteo.com",
+                    "https://api.open-meteo.com",
+                ],
+                mediaSrc: ["'self'", "blob:"],
+                workerSrc: ["'self'", "blob:"],
+            }
+        },
+        crossOriginEmbedderPolicy: false,
+        crossOriginResourcePolicy: { policy: "cross-origin" }
+    })(req, res, next);
+});
 
 const allowedOrigins = process.env.ALLOWED_ORIGINS
     ? process.env.ALLOWED_ORIGINS.split(',').map(s => s.trim())
@@ -728,15 +762,74 @@ app.locals.getUserFromToken = getUserFromToken;
 app.locals.supabaseAdmin = supabaseAdmin;
 app.locals.brain = brain;
 
-// ═══ PAYMENTS, LEGAL & MESSENGER ROUTES ═══
+// ═══ PAYMENTS, LEGAL, MESSENGER & DEVELOPER ROUTES ═══
 app.use('/api/payments', paymentsRouter);
 app.use('/api/legal', legalRouter);
 app.use('/api/messenger', messengerRouter);
+app.use('/api/developer', developerRouter);
+app.use('/api', developerRouter); // mounts /api/v1/* endpoints
 
 // ═══ MESSENGER STATS (admin only) ═══
 app.get('/api/messenger/stats', adminAuth, (req, res) => {
     res.json(getMessengerStats());
 });
+
+// ═══ PAYMENTS ADMIN STATS — revenue, active subscribers, churn ═══
+app.get('/api/payments/admin/stats', adminAuth, asyncHandler(async (req, res) => {
+    if (!supabaseAdmin) return res.status(503).json({ error: 'DB indisponibil' });
+
+    const { PLAN_LIMITS } = require('./payments');
+    const PLAN_PRICES = { pro: 9.99, enterprise: 29.99, premium: 19.99 };
+
+    // Active subscribers by plan (fetch updated_at for churn calculation)
+    const { data: subs } = await supabaseAdmin
+        .from('subscriptions')
+        .select('plan, status, current_period_end, updated_at')
+        .order('status');
+
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now - 30 * 24 * 60 * 60 * 1000);
+    const activeSubs = (subs || []).filter(s =>
+        s.status === 'active' && s.current_period_end && new Date(s.current_period_end) > now
+    );
+    const pastDueSubs = (subs || []).filter(s => s.status === 'past_due');
+    // Churn: subscriptions cancelled in the last 30 days
+    const recentCancelledSubs = (subs || []).filter(s =>
+        s.status === 'cancelled' && s.updated_at && new Date(s.updated_at) >= thirtyDaysAgo
+    );
+
+    const planCounts = {};
+    activeSubs.forEach(s => { planCounts[s.plan] = (planCounts[s.plan] || 0) + 1; });
+
+    const mrr = activeSubs.reduce((sum, s) => sum + (PLAN_PRICES[s.plan] || 0), 0);
+
+    // Churn rate: recently cancelled / (active + recently cancelled)
+    const totalForChurn = activeSubs.length + recentCancelledSubs.length;
+    const churnRate = totalForChurn > 0
+        ? ((recentCancelledSubs.length / totalForChurn) * 100).toFixed(1)
+        : '0.0';
+
+    // Usage stats (today)
+    const today = now.toISOString().split('T')[0];
+    const { data: usageData } = await supabaseAdmin
+        .from('usage')
+        .select('type, count')
+        .eq('date', today);
+
+    const usageTotals = {};
+    (usageData || []).forEach(u => { usageTotals[u.type] = (usageTotals[u.type] || 0) + u.count; });
+
+    res.json({
+        activeSubscribers: activeSubs.length,
+        cancelledLast30Days: recentCancelledSubs.length,
+        pastDueSubscribers: pastDueSubs.length,
+        planCounts,
+        mrr: Math.round(mrr * 100) / 100,
+        churnRate: parseFloat(churnRate),
+        usageToday: usageTotals,
+        timestamp: now.toISOString()
+    });
+}));
 
 // POST /api/ticker/disable — save ticker preference (Premium only)
 app.post('/api/ticker/disable', asyncHandler(async (req, res) => {
@@ -786,7 +879,14 @@ app.use('/api', (req, res, next) => {
     res.status(404).json({ error: 'API endpoint negăsit' });
 });
 
-app.get('*', (req, res) => res.type('html').send(_indexHtml));
+app.get('*', (req, res) => {
+    const nonce = res.locals.cspNonce || '';
+    const html = _indexHtml.replace(
+        /<script\b(?![^>]*\bnonce=)/g,
+        `<script nonce="${nonce}"`
+    );
+    res.type('html').send(html);
+});
 
 // Sentry error handler must be registered after all routes
 if (process.env.SENTRY_DSN) Sentry.setupExpressErrorHandler(app);
