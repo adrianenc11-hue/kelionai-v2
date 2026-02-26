@@ -110,6 +110,22 @@
         <div class="drop-zone-content"><div class="drop-icon">📂</div><p>Trage fișierul aici</p></div>
     </div>
 
+    <!-- SOS OVERLAY -->
+    <div id="sos-overlay" class="sos-overlay hidden">
+        <div class="sos-content">
+            <div class="sos-pulse">🚨</div>
+            <h1>EMERGENCY SOS</h1>
+            <div id="sos-countdown">Auto-alerting in: <span id="sos-timer">60</span>s</div>
+            <div id="sos-numbers">
+                <a href="tel:112">📞 112 (EU/RO)</a>
+                <a href="tel:999">📞 999 (UK)</a>
+                <a href="tel:911">📞 911 (US)</a>
+            </div>
+            <div id="sos-contact"></div>
+            <button id="sos-cancel" class="sos-cancel-btn">✅ I'M SAFE — Cancel</button>
+        </div>
+    </div>
+
     <!-- PRICING MODAL -->
     <div id="pricing-modal" class="modal-overlay hidden">
         <div class="modal-content pricing-modal">
@@ -130,6 +146,7 @@
     <script src="/js/monitor.js"></script>
     <script src="/js/tools.js"></script>
     <script src="/js/payments-ui.js"></script>
+    <script src="/js/sos.js"></script>
     <script src="/js/app.js"></script>
 </body>
 </html>

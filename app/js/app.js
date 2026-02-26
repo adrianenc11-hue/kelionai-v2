@@ -186,6 +186,8 @@
             chatHistory.push({ role: 'assistant', content: data.reply });
             addMessage('assistant', data.reply);
 
+            if (data.isEmergency && window.KSOS) { KSOS.trigger(data); }
+
             if (data.monitor && data.monitor.content) {
                 showOnMonitor(data.monitor.content, data.monitor.type);
             } else if (data.monitor && data.monitor.search_results) {
@@ -347,6 +349,11 @@
         return /(kelion|chelion)[,.\s]+(upgrade|abonament)|vreau\s+(pro|premium)|upgrade\s+plan/.test(l);
     }
 
+    // ─── SOS trigger word detection ──────────────────────────
+    function isSosRequest(text) {
+        return /kelion\s*(help|ajuta|ajutor)|emergency|urgenta|\bsos\b/i.test(text);
+    }
+
     // ─── Input handlers ──────────────────────────────────────
     async function onMicDown() { var b = document.getElementById('btn-mic'); if (await KVoice.startListening()) { b.classList.add('recording'); b.textContent = '⏹'; } }
     async function onMicUp() {
@@ -355,6 +362,7 @@
         var text = await KVoice.stopListening();
         if (text && text.trim()) { hideWelcome(); addMessage('user', text);
             if (isUpgradeRequest(text)) { showThinking(false); if (window.KPayments) KPayments.showUpgradePrompt(); }
+            else if (isSosRequest(text)) { showThinking(false); if (window.KSOS) KSOS.trigger({}); }
             else if (isVisionRequest(text)) triggerVision(); else await sendToAI(text, KVoice.getLanguage());
         } else { showThinking(false); KVoice.resumeWakeDetection(); }
     }
@@ -366,6 +374,7 @@
         else if (/^(kelion|chelion)[,.\s]/i.test(l)) { switchAvatar('kelion'); text = text.replace(/^(kelion|chelion)[,.\s]*/i, '').trim(); }
         if (!text) return;
         if (isUpgradeRequest(text)) { if (window.KPayments) KPayments.showUpgradePrompt(); return; }
+        if (isSosRequest(text)) { if (window.KSOS) KSOS.trigger(); return; }
         hideWelcome(); KAvatar.setAttentive(true); addMessage('user', text); showThinking(true);
         if (isVisionRequest(text)) triggerVision(); else await sendToAI(text, KVoice.getLanguage());
     }
@@ -448,7 +457,8 @@
 
         window.addEventListener('wake-message', function(e) {
             var detail = e.detail; hideWelcome(); addMessage('user', detail.text); showThinking(true);
-            if (isVisionRequest(detail.text)) triggerVision(); else sendToAI(detail.text, detail.language);
+            if (isSosRequest(detail.text)) { showThinking(false); if (window.KSOS) KSOS.trigger({}); }
+            else if (isVisionRequest(detail.text)) triggerVision(); else sendToAI(detail.text, detail.language);
         });
 
         setupDragDrop();

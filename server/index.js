@@ -280,6 +280,29 @@ app.post('/api/chat', chatLimiter, validate(chatSchema), async (req, res) => {
         if (thought.monitor.content) {
             response.monitor = thought.monitor;
         }
+
+        // ── EMERGENCY: attach extra data when brain flags isEmergency ──
+        if (thought.isEmergency) {
+            response.isEmergency = true;
+            response.emergencyNumbers = { ro: '112', uk: '999', us: '911', eu: '112' };
+
+            // Try to get emergency contact from user preferences
+            let emergencyContact = null;
+            if (user && supabaseAdmin) {
+                try {
+                    const { data: pref } = await supabaseAdmin.from('user_preferences').select('value').eq('user_id', user.id).eq('key', 'emergency_contact').single();
+                    if (pref?.value) emergencyContact = pref.value;
+                } catch(e) { logger.debug({ component: 'Emergency', err: e.message }, 'Failed to fetch emergency contact'); }
+            }
+            response.emergencyContact = emergencyContact;
+
+            // Location from request body (optional)
+            const loc = req.body.location;
+            response.location = (loc && (loc.lat !== null && loc.lat !== undefined || loc.city)) ? loc : null;
+
+            logger.warn({ component: 'Emergency', userId: user?.id }, '🚨 Emergency detected in chat');
+        }
+
         res.json(response);
 
     } catch(e) { logger.error({ component: 'Chat', err: e.message }, e.message); res.status(500).json({ error: 'Eroare AI' }); }
@@ -727,6 +750,68 @@ app.locals.supabaseAdmin = supabaseAdmin;
 // ═══ PAYMENTS & LEGAL ROUTES ═══
 app.use('/api/payments', paymentsRouter);
 app.use('/api/legal', legalRouter);
+
+// ═══ SOS — Emergency Alert & Contact Management ═══
+const sosLimiter = rateLimit({ windowMs: 60 * 1000, max: 10, message: { error: 'Prea multe cereri SOS.' }, standardHeaders: true, legacyHeaders: false });
+
+app.post('/api/sos/alert', sosLimiter, asyncHandler(async (req, res) => {
+    const { userId, location, emergencyContact, timestamp } = req.body;
+    const user = await getUserFromToken(req);
+    const uid = user?.id || userId || 'guest';
+
+    const alertData = {
+        userId: uid,
+        location: location || null,
+        emergencyContact: emergencyContact || null,
+        timestamp: timestamp || new Date().toISOString(),
+        alertedAt: new Date().toISOString()
+    };
+
+    let alertSent = false;
+    if (supabaseAdmin && user) {
+        try {
+            await supabaseAdmin.from('user_preferences').upsert(
+                { user_id: user.id, key: 'last_sos_alert', value: alertData },
+                { onConflict: 'user_id,key' }
+            );
+            alertSent = true;
+        } catch(e) { logger.warn({ component: 'SOS', err: e.message }, 'Failed to save SOS alert'); }
+    }
+
+    // Log alert (email service not configured yet)
+    logger.warn({ component: 'SOS', uid, location: location || null, contact: emergencyContact ? 'set' : 'none' }, '🚨 SOS alert received');
+    if (emergencyContact?.email) {
+        logger.info({ component: 'SOS', email: emergencyContact.email }, 'Would send SOS email to emergency contact (no email service configured)');
+    }
+
+    res.json({ success: true, alertSent });
+}));
+
+app.post('/api/sos/contact', sosLimiter, asyncHandler(async (req, res) => {
+    const user = await getUserFromToken(req);
+    if (!user) return res.status(401).json({ error: 'Autentificare necesară' });
+    if (!supabaseAdmin) return res.status(503).json({ error: 'Database indisponibil' });
+
+    const { name, phone, email } = req.body;
+    if (!name && !phone && !email) return res.status(400).json({ error: 'Cel puțin un câmp obligatoriu: name, phone sau email' });
+
+    const contact = { name: name || null, phone: phone || null, email: email || null };
+    await supabaseAdmin.from('user_preferences').upsert(
+        { user_id: user.id, key: 'emergency_contact', value: contact },
+        { onConflict: 'user_id,key' }
+    );
+    logger.info({ component: 'SOS', userId: user.id }, 'Emergency contact saved');
+    res.json({ success: true, contact });
+}));
+
+app.get('/api/sos/contact', sosLimiter, asyncHandler(async (req, res) => {
+    const user = await getUserFromToken(req);
+    if (!user) return res.status(401).json({ error: 'Autentificare necesară' });
+    if (!supabaseAdmin) return res.json({ contact: null });
+
+    const { data } = await supabaseAdmin.from('user_preferences').select('value').eq('user_id', user.id).eq('key', 'emergency_contact').single();
+    res.json({ contact: data?.value || null });
+}));
 
 // ═══ HEALTH ═══
 app.get('/api/health', (req, res) => {

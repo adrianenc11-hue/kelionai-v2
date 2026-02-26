@@ -950,3 +950,33 @@ body {
     transition: background 0.2s;
 }
 .usage-upgrade-badge:hover { background: rgba(255,68,68,0.35); }
+
+/* ═══ SOS Emergency Overlay ═══ */
+.sos-overlay {
+    position: fixed; inset: 0; z-index: 9999;
+    background: rgba(180, 0, 0, 0.95);
+    display: flex; align-items: center; justify-content: center;
+    animation: sos-pulse-bg 1s infinite alternate;
+}
+@keyframes sos-pulse-bg {
+    from { background: rgba(180, 0, 0, 0.95); }
+    to   { background: rgba(220, 20, 20, 0.99); }
+}
+.sos-overlay.hidden { display: none; }
+.sos-content { text-align: center; color: white; padding: 24px; }
+.sos-content h1 { font-size: 2.2rem; font-weight: bold; margin: 12px 0; letter-spacing: 2px; }
+.sos-pulse { font-size: 80px; animation: sos-bounce 0.5s infinite alternate; }
+@keyframes sos-bounce { from { transform: scale(1); } to { transform: scale(1.2); } }
+#sos-countdown { font-size: 1.1rem; margin: 12px 0; }
+#sos-timer { font-size: 48px; font-weight: bold; color: #ffff00; display: block; line-height: 1.1; }
+#sos-numbers { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin: 16px 0; }
+#sos-numbers a { color: #fff; text-decoration: none; background: rgba(255,255,255,0.15); padding: 8px 16px; border-radius: 8px; font-size: 1rem; }
+#sos-numbers a:hover { background: rgba(255,255,255,0.3); }
+#sos-contact { margin: 8px 0; font-size: 0.95rem; color: #ffd0d0; }
+#sos-contact a { color: #ffd0d0; }
+.sos-cancel-btn {
+    margin-top: 24px; padding: 16px 32px; font-size: 18px; font-weight: bold;
+    background: #00ff88; color: #000; border: none; border-radius: 12px; cursor: pointer;
+    transition: transform 0.1s;
+}
+.sos-cancel-btn:hover { transform: scale(1.05); }
