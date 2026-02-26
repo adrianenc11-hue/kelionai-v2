@@ -24,6 +24,7 @@ const { buildSystemPrompt } = require('./persona');
 const logger = require('./logger');
 const { router: paymentsRouter, checkUsage, incrementUsage } = require('./payments');
 const legalRouter = require('./legal');
+const adminRouter = require('./admin');
 const { validate, registerSchema, loginSchema, refreshSchema, chatSchema, speakSchema, listenSchema, visionSchema, searchSchema, weatherSchema, imagineSchema, memorySchema } = require('./validation');
 
 const app = express();
@@ -109,6 +110,7 @@ const globalLimiter = rateLimit({
 
 const memoryLimiter = rateLimit({ windowMs: 60 * 1000, max: 30, message: { error: 'Prea multe cereri memorie.' }, standardHeaders: true, legacyHeaders: false });
 const weatherLimiter = rateLimit({ windowMs: 60 * 1000, max: 10, message: { error: 'Prea multe cereri meteo.' }, standardHeaders: true, legacyHeaders: false });
+const adminPageLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 30, standardHeaders: true, legacyHeaders: false });
 
 const asyncHandler = (fn) => (req, res, next) => {
     Promise.resolve(fn(req, res, next)).catch(next);
@@ -724,9 +726,10 @@ load();setInterval(load,5000);
 app.locals.getUserFromToken = getUserFromToken;
 app.locals.supabaseAdmin = supabaseAdmin;
 
-// ═══ PAYMENTS & LEGAL ROUTES ═══
+// ═══ PAYMENTS, LEGAL & ADMIN ROUTES ═══
 app.use('/api/payments', paymentsRouter);
 app.use('/api/legal', legalRouter);
+app.use('/api/admin', adminRouter);
 
 // ═══ HEALTH ═══
 app.get('/api/health', (req, res) => {
@@ -760,6 +763,11 @@ const _indexHtml = process.env.SENTRY_DSN
 // 404 for unknown API routes — must come before the catch-all
 app.use('/api', (req, res, next) => {
     res.status(404).json({ error: 'API endpoint negăsit' });
+});
+
+// ═══ ADMIN PAGE (server-side — just serve the HTML; auth enforced client-side + API) ═══
+app.get('/admin', adminPageLimiter, (req, res) => {
+    res.sendFile(path.join(__dirname, '..', 'app', 'admin', 'index.html'));
 });
 
 app.get('*', (req, res) => res.type('html').send(_indexHtml));

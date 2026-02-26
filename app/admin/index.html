@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KelionAI — Admin Panel</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --bg: #0a0a1a;
+            --surface: rgba(255,255,255,0.05);
+            --border: rgba(255,255,255,0.1);
+            --text: #e0e0e0;
+            --muted: #888;
+            --cyan: #00ffff;
+            --green: #00ff88;
+            --yellow: #ffaa00;
+            --red: #ff4444;
+        }
+        body { background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, sans-serif; min-height: 100vh; }
+
+        /* ── Login ── */
+        #login-screen {
+            display: flex; align-items: center; justify-content: center;
+            min-height: 100vh; padding: 20px;
+        }
+        .login-card {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 16px; padding: 40px; width: 100%; max-width: 400px;
+            backdrop-filter: blur(20px);
+        }
+        .login-card h1 { color: var(--cyan); font-size: 1.6rem; margin-bottom: 8px; }
+        .login-card p { color: var(--muted); margin-bottom: 28px; font-size: 0.9rem; }
+        .field { margin-bottom: 16px; }
+        .field input {
+            width: 100%; padding: 12px 16px; background: rgba(255,255,255,0.08);
+            border: 1px solid var(--border); border-radius: 8px; color: var(--text);
+            font-size: 0.95rem; outline: none; transition: border-color 0.2s;
+        }
+        .field input:focus { border-color: var(--cyan); }
+        .btn-primary {
+            width: 100%; padding: 12px; background: var(--cyan); color: #000;
+            border: none; border-radius: 8px; font-size: 1rem; font-weight: 700;
+            cursor: pointer; transition: opacity 0.2s;
+        }
+        .btn-primary:hover { opacity: 0.85; }
+        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+        #login-error { color: var(--red); font-size: 0.85rem; margin-top: 12px; min-height: 20px; }
+
+        /* ── Dashboard ── */
+        #dashboard { display: none; }
+        .topbar {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 16px 24px; border-bottom: 1px solid var(--border);
+            background: rgba(0,0,0,0.4); backdrop-filter: blur(10px);
+            position: sticky; top: 0; z-index: 100;
+        }
+        .topbar h1 { color: var(--cyan); font-size: 1.2rem; }
+        .topbar-right { display: flex; align-items: center; gap: 16px; }
+        .countdown { color: var(--muted); font-size: 0.85rem; }
+        .countdown span { color: var(--cyan); font-weight: bold; }
+        .btn-sm {
+            padding: 6px 14px; border-radius: 6px; font-size: 0.85rem;
+            font-weight: 600; cursor: pointer; border: none; transition: opacity 0.2s;
+        }
+        .btn-sm:hover { opacity: 0.8; }
+        .btn-logout { background: rgba(255,68,68,0.2); color: var(--red); border: 1px solid var(--red); }
+        .btn-refresh { background: var(--cyan); color: #000; }
+
+        .content { padding: 24px; max-width: 1400px; margin: 0 auto; }
+        .section-title {
+            font-size: 0.8rem; font-weight: 700; letter-spacing: 1.5px;
+            text-transform: uppercase; color: var(--muted); margin-bottom: 12px; margin-top: 28px;
+        }
+        .grid { display: grid; gap: 16px; }
+        .grid-4 { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+        .grid-3 { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+        .grid-2 { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+
+        .card {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 12px; padding: 20px;
+        }
+        .card-label { font-size: 0.78rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 8px; }
+        .card-value { font-size: 2rem; font-weight: 700; color: var(--cyan); }
+        .card-sub { font-size: 0.8rem; color: var(--muted); margin-top: 4px; }
+        .card-value.na { color: var(--muted); font-size: 1.4rem; }
+
+        .row-item {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.04);
+        }
+        .row-item:last-child { border: none; }
+        .row-label { color: var(--muted); font-size: 0.88rem; }
+        .row-val { font-weight: 600; font-size: 0.88rem; }
+
+        /* Bot toggles */
+        .bot-card { display: flex; align-items: center; justify-content: space-between; }
+        .bot-info h3 { font-size: 1rem; font-weight: 600; }
+        .bot-info p { font-size: 0.78rem; color: var(--muted); margin-top: 2px; }
+        .toggle {
+            position: relative; width: 48px; height: 26px;
+        }
+        .toggle input { opacity: 0; width: 0; height: 0; }
+        .toggle-slider {
+            position: absolute; cursor: pointer; inset: 0;
+            background: rgba(255,255,255,0.15); border-radius: 26px; transition: 0.3s;
+        }
+        .toggle-slider::before {
+            content: ''; position: absolute;
+            height: 20px; width: 20px; left: 3px; bottom: 3px;
+            background: white; border-radius: 50%; transition: 0.3s;
+        }
+        .toggle input:checked + .toggle-slider { background: var(--green); }
+        .toggle input:checked + .toggle-slider::before { transform: translateX(22px); }
+
+        /* Health */
+        .health-dot {
+            display: inline-block; width: 10px; height: 10px; border-radius: 50%;
+            margin-right: 8px;
+        }
+        .health-dot.ok { background: var(--green); }
+        .health-dot.error { background: var(--red); }
+        .health-dot.warn { background: var(--yellow); }
+        .health-dot.unconfigured { background: var(--muted); }
+
+        #status-bar {
+            text-align: center; padding: 10px; font-size: 0.8rem;
+            color: var(--muted); border-top: 1px solid var(--border);
+            margin-top: 24px;
+        }
+
+        @media (max-width: 600px) {
+            .content { padding: 16px; }
+            .topbar { padding: 12px 16px; }
+            .topbar h1 { font-size: 1rem; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ══ LOGIN SCREEN ══ -->
+<div id="login-screen">
+    <div class="login-card">
+        <h1>🛡 Admin Panel</h1>
+        <p>KelionAI — super_admin only</p>
+        <form id="login-form">
+            <div class="field">
+                <input type="email" id="admin-email" placeholder="Email" autocomplete="email" required>
+            </div>
+            <div class="field">
+                <input type="password" id="admin-password" placeholder="Password" autocomplete="current-password" required>
+            </div>
+            <button type="submit" class="btn-primary" id="login-btn">Sign In</button>
+            <div id="login-error"></div>
+        </form>
+    </div>
+</div>
+
+<!-- ══ DASHBOARD ══ -->
+<div id="dashboard">
+    <div class="topbar">
+        <h1>🛡 KelionAI Admin</h1>
+        <div class="topbar-right">
+            <div class="countdown">Auto-refresh in <span id="countdown">30</span>s</div>
+            <button class="btn-sm btn-refresh" id="refresh-btn">↻ Refresh</button>
+            <button class="btn-sm btn-logout" id="logout-btn">Logout</button>
+        </div>
+    </div>
+
+    <div class="content">
+
+        <!-- Users -->
+        <div class="section-title">👥 Users</div>
+        <div class="grid grid-4" id="users-grid">
+            <div class="card"><div class="card-label">Total Users</div><div class="card-value" id="u-total">—</div></div>
+            <div class="card"><div class="card-label">New Today</div><div class="card-value" id="u-today">—</div></div>
+            <div class="card"><div class="card-label">Active 7 days</div><div class="card-value" id="u-active">—</div></div>
+            <div class="card"><div class="card-label">Pro / Premium</div><div class="card-value" id="u-paid">—</div></div>
+        </div>
+
+        <!-- Revenue -->
+        <div class="section-title">💰 Revenue (Stripe Live)</div>
+        <div class="grid grid-3" id="revenue-grid">
+            <div class="card"><div class="card-label">MRR</div><div class="card-value" id="r-mrr">—</div><div class="card-sub">Monthly Recurring Revenue</div></div>
+            <div class="card"><div class="card-label">Today's Revenue</div><div class="card-value" id="r-today">—</div></div>
+            <div class="card"><div class="card-label">Active Subscriptions</div><div class="card-value" id="r-subs">—</div></div>
+        </div>
+
+        <!-- Usage -->
+        <div class="section-title">💬 Usage Today</div>
+        <div class="grid grid-4">
+            <div class="card"><div class="card-label">Chat</div><div class="card-value" id="ug-chat">—</div></div>
+            <div class="card"><div class="card-label">TTS</div><div class="card-value" id="ug-tts">—</div></div>
+            <div class="card"><div class="card-label">Vision</div><div class="card-value" id="ug-vision">—</div></div>
+            <div class="card"><div class="card-label">Search</div><div class="card-value" id="ug-search">—</div></div>
+        </div>
+
+        <!-- Conversations -->
+        <div class="section-title">🗨 Conversations</div>
+        <div class="grid grid-4">
+            <div class="card"><div class="card-label">Total</div><div class="card-value" id="c-total">—</div></div>
+            <div class="card"><div class="card-label">Today</div><div class="card-value" id="c-today">—</div></div>
+        </div>
+
+        <!-- Bots -->
+        <div class="section-title">🤖 Bots</div>
+        <div class="grid grid-3" id="bots-grid">
+            <div class="card bot-card">
+                <div class="bot-info">
+                    <h3>📰 News Bot</h3>
+                    <p id="bot-news-last">Last run: —</p>
+                </div>
+                <label class="toggle"><input type="checkbox" id="bot-news" data-bot="news"><span class="toggle-slider"></span></label>
+            </div>
+            <div class="card bot-card">
+                <div class="bot-info">
+                    <h3>📈 Trading Bot</h3>
+                    <p id="bot-trading-last">Last run: —</p>
+                </div>
+                <label class="toggle"><input type="checkbox" id="bot-trading" data-bot="trading"><span class="toggle-slider"></span></label>
+            </div>
+            <div class="card bot-card">
+                <div class="bot-info">
+                    <h3>⚽ Sports Bot</h3>
+                    <p id="bot-sports-last">Last run: —</p>
+                </div>
+                <label class="toggle"><input type="checkbox" id="bot-sports" data-bot="sports"><span class="toggle-slider"></span></label>
+            </div>
+        </div>
+
+        <!-- Health -->
+        <div class="section-title">🏥 System Health</div>
+        <div class="grid grid-2">
+            <div class="card" id="health-services"></div>
+            <div class="card">
+                <div class="card-label">System</div>
+                <div id="system-info"></div>
+            </div>
+        </div>
+
+        <div id="status-bar">Last updated: <span id="last-updated">—</span></div>
+    </div>
+</div>
+
+<script src="/admin/admin.js"></script>
+</body>
+</html>
