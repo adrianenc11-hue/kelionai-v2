@@ -15,7 +15,10 @@
     function restoreConvId() { try { return localStorage.getItem('kelion_conv_id') || null; } catch(e){ console.warn('[App] localStorage read:', e.message); return null; } }
 
     function unlockAudio() {
-        if (audioUnlocked) return; audioUnlocked = true;
+        if (!audioUnlocked) {
+            audioUnlocked = true;
+            try { const c = new (window.AudioContext || window.webkitAudioContext)(), b = c.createBuffer(1,1,22050), s = c.createBufferSource(); s.buffer = b; s.connect(c.destination); s.start(0); c.resume(); } catch(e){}
+        }
         if (window.KVoice) KVoice.ensureAudioUnlocked();
     }
 
@@ -402,13 +405,6 @@
 
         var vb = document.getElementById('btn-vision');
         if (vb) vb.addEventListener('click', function() { hideWelcome(); addMessage('user', 'Ce e în fața mea?'); showThinking(true); triggerVision(); });
-
-        var fileInput = document.getElementById('file-input');
-        var btnFiles = document.getElementById('btn-files');
-        if (btnFiles && fileInput) {
-            btnFiles.addEventListener('click', function() { fileInput.click(); });
-            fileInput.addEventListener('change', function(e) { if (e.target.files && e.target.files.length) { hideWelcome(); handleFiles(e.target.files); } fileInput.value = ''; });
-        }
 
         document.getElementById('btn-send').addEventListener('click', onSendText);
         document.getElementById('text-input').addEventListener('keydown', function(e) { if (e.key === 'Enter') onSendText(); });

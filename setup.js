@@ -17,30 +17,59 @@ async function main() {
 
     // 1. Check env vars
     console.log('📋 Verificare chei API...');
-    const keys = {
-        'ANTHROPIC_API_KEY': process.env.ANTHROPIC_API_KEY,
-        'ELEVENLABS_API_KEY': process.env.ELEVENLABS_API_KEY,
-        'SUPABASE_URL': SUPA_URL,
-        'SUPABASE_ANON_KEY': process.env.SUPABASE_ANON_KEY,
-        'SUPABASE_SERVICE_KEY': SUPA_KEY,
+
+    // Obligatorii — cel puțin una din AI și Supabase
+    const required = {
+        'SUPABASE_URL':         { val: process.env.SUPABASE_URL,         desc: 'Baza de date' },
+        'SUPABASE_ANON_KEY':    { val: process.env.SUPABASE_ANON_KEY,    desc: 'Supabase public key' },
+        'SUPABASE_SERVICE_KEY': { val: process.env.SUPABASE_SERVICE_KEY, desc: 'Supabase admin key' },
     };
+
+    // AI — cel puțin una
+    const aiKeys = {
+        'ANTHROPIC_API_KEY': process.env.ANTHROPIC_API_KEY,
+        'OPENAI_API_KEY':    process.env.OPENAI_API_KEY,
+        'DEEPSEEK_API_KEY':  process.env.DEEPSEEK_API_KEY,
+    };
+
+    // Opționale recomandate
     const optional = {
-        'DEEPSEEK_API_KEY': process.env.DEEPSEEK_API_KEY,
-        'TOGETHER_API_KEY': process.env.TOGETHER_API_KEY,
-        'GROQ_API_KEY': process.env.GROQ_API_KEY,
+        'ELEVENLABS_API_KEY':    { val: process.env.ELEVENLABS_API_KEY,    desc: 'TTS voce' },
+        'GROQ_API_KEY':          { val: process.env.GROQ_API_KEY,          desc: 'STT transcriere' },
+        'PERPLEXITY_API_KEY':    { val: process.env.PERPLEXITY_API_KEY,    desc: 'Căutare web' },
+        'TAVILY_API_KEY':        { val: process.env.TAVILY_API_KEY,        desc: 'Căutare web' },
+        'SERPER_API_KEY':        { val: process.env.SERPER_API_KEY,        desc: 'Google Search' },
+        'TOGETHER_API_KEY':      { val: process.env.TOGETHER_API_KEY,      desc: 'Generare imagini' },
+        'STRIPE_SECRET_KEY':     { val: process.env.STRIPE_SECRET_KEY,     desc: 'Plăți Stripe' },
+        'STRIPE_WEBHOOK_SECRET': { val: process.env.STRIPE_WEBHOOK_SECRET, desc: 'Webhook Stripe' },
+        'STRIPE_PRICE_PRO':      { val: process.env.STRIPE_PRICE_PRO,      desc: 'Preț plan Pro' },
+        'STRIPE_PRICE_PREMIUM':  { val: process.env.STRIPE_PRICE_PREMIUM,  desc: 'Preț plan Premium' },
+        'SENTRY_DSN':            { val: process.env.SENTRY_DSN,            desc: 'Monitorizare erori' },
     };
 
     let allGood = true;
-    for (const [name, val] of Object.entries(keys)) {
-        if (val) console.log(`  ✅ ${name}`);
-        else { console.log(`  ❌ ${name} — LIPSĂ!`); allGood = false; }
+
+    console.log('\n  [ Baza de date ]');
+    for (const [name, { val, desc }] of Object.entries(required)) {
+        if (val) console.log(`  ✅ ${name} — ${desc}`);
+        else { console.log(`  ❌ ${name} — LIPSĂ! (${desc})`); allGood = false; }
     }
-    for (const [name, val] of Object.entries(optional)) {
-        console.log(`  ${val ? '✅' : '⚠️'} ${name} ${val ? '' : '(opțional)'}`);
+
+    console.log('\n  [ AI — cel puțin una obligatorie ]');
+    const hasAI = Object.values(aiKeys).some(Boolean);
+    for (const [name, val] of Object.entries(aiKeys)) {
+        console.log(`  ${val ? '✅' : '⚠️'} ${name}${val ? '' : ' (lipsă)'}`);
+    }
+    if (!hasAI) { console.log('  ❌ Nicio cheie AI configurată!'); allGood = false; }
+
+    console.log('\n  [ Opționale ]');
+    for (const [name, { val, desc }] of Object.entries(optional)) {
+        console.log(`  ${val ? '✅' : '⚠️'} ${name}${val ? '' : ' (opțional)'} — ${desc}`);
     }
 
     if (!allGood) {
         console.log('\n⚠️  Chei obligatorii lipsesc! Adaugă-le în .env sau Railway.');
+        console.log('   Vezi .env.example pentru lista completă și instrucțiuni.');
         console.log('   Continuă oricum cu crearea tabelelor...\n');
     }
 
@@ -153,7 +182,7 @@ async function main() {
         if (fail > 0) {
             console.log(`\n  ⚠️  Unele queries nu au mers automat (${fail}/${queries.length}).`);
             console.log('  📋 Copiază și rulează manual fișierul server/schema.sql în:');
-            console.log('     https://supabase.com/dashboard/project/nqlobybfwmtkmsqadqqr/sql\n');
+            console.log('     https://supabase.com/dashboard/project/YOUR_PROJECT_REF/sql\n');
         } else {
             console.log(`  ✅ Toate ${queries.length} queries executate!`);
         }

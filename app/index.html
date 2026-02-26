@@ -10,7 +10,7 @@
     <script src="https://browser.sentry-cdn.com/8.46.0/bundle.tracing.replay.min.js" crossorigin="anonymous"></script>
     <script>
         if (window.Sentry) Sentry.init({
-            dsn: "https://5c261710f7055bef0cdcdb50239b5519@o4510937317834752.ingest.us.sentry.io/4510937323012096",
+            dsn: "YOUR_SENTRY_DSN",
             integrations: [Sentry.browserTracingIntegration(), Sentry.replayIntegration()],
             tracesSampleRate: 1.0, replaysOnErrorSampleRate: 1.0
         });
@@ -80,8 +80,6 @@
                 <div id="input-row">
                     <button class="ctrl-btn-sm active-mic" id="btn-mic" title="Ține apăsat să vorbești">🎤</button>
                     <button class="ctrl-btn-sm" id="btn-vision" title="Cameră">👁️</button>
-                    <input type="file" id="file-input" accept="*" multiple style="display:none">
-                    <button class="ctrl-btn-sm" id="btn-files" title="Fișiere">📎</button>
                     <input type="text" id="text-input" placeholder="Scrie sau vorbește..." autocomplete="off">
                     <button id="btn-send">➤</button>
                 </div>
