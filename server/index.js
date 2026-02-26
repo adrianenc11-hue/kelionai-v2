@@ -617,6 +617,34 @@ app.post('/api/memory', memoryLimiter, validate(memorySchema), async (req, res) 
     } catch(e) { res.status(500).json({ error: 'Eroare memorie' }); }
 });
 
+// ═══ SOS ALERT ═══
+app.post('/api/sos/alert', asyncHandler(async (req, res) => {
+    const { userId, location, message } = req.body;
+    logger.warn({ component: 'SOS', userId, location, message }, 'SOS alert triggered');
+    if (supabaseAdmin) {
+        await supabaseAdmin.from('sos_alerts').insert({ user_id: userId || null, location: location || null, message: message || null }).catch((e) => {
+            logger.error({ component: 'SOS', userId }, 'Failed to store SOS alert: ' + e.message);
+        });
+    }
+    res.json({ success: true, emergencyNumbers: ['112', '116 111'] });
+}));
+
+// ═══ MULTI-DEVICE SYNC ═══
+app.get('/api/sync/status', asyncHandler(async (req, res) => {
+    const u = await getUserFromToken(req);
+    if (!u || !supabaseAdmin) return res.json({ active_conversation_id: null });
+    const { data } = await supabaseAdmin.from('user_preferences').select('value').eq('user_id', u.id).eq('key', 'active_conversation_id').single();
+    res.json({ active_conversation_id: data?.value?.data || null });
+}));
+
+app.post('/api/sync/active', asyncHandler(async (req, res) => {
+    const u = await getUserFromToken(req);
+    if (!u || !supabaseAdmin) return res.json({ success: false });
+    const { conversationId } = req.body;
+    await supabaseAdmin.from('user_preferences').upsert({ user_id: u.id, key: 'active_conversation_id', value: { data: conversationId } }, { onConflict: 'user_id,key' });
+    res.json({ success: true });
+}));
+
 // ═══ CONVERSATIONS ═══
 app.get('/api/conversations', asyncHandler(async (req, res) => {
     const u = await getUserFromToken(req);

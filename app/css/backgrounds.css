@@ -1,0 +1,46 @@
+/* ═══════════════════════════════════════════════════════
+   KelionAI — Dynamic Background Themes
+   Applied as classes on <body>
+════════════════════════════════════════════════════════ */
+
+body {
+    transition: background 1.5s ease;
+}
+
+/* bg-default is the base — no class needed (handled by app.css) */
+
+body.bg-classroom {
+    background: linear-gradient(135deg, #0a1a2e 0%, #0d2137 50%, #112840 100%);
+}
+
+body.bg-lab {
+    background: linear-gradient(135deg, #0f0a1e 0%, #1a0d2e 50%, #20103a 100%);
+}
+
+body.bg-office {
+    background: linear-gradient(135deg, #0d0f1a 0%, #111520 50%, #141928 100%);
+}
+
+body.bg-kitchen {
+    background: linear-gradient(135deg, #1a0f08 0%, #261509 50%, #2e1a0a 100%);
+}
+
+body.bg-gym {
+    background: linear-gradient(135deg, #1a0808 0%, #220d0d 50%, #2a0e0e 100%);
+}
+
+body.bg-zen {
+    background: linear-gradient(135deg, #081a12 0%, #0b2218 50%, #0e2a1e 100%);
+}
+
+body.bg-night {
+    background: linear-gradient(135deg, #040408 0%, #060610 50%, #080812 100%);
+}
+
+body.bg-emergency {
+    background: linear-gradient(135deg, #2a0505 0%, #350808 50%, #400a0a 100%);
+}
+
+body.bg-happy {
+    background: linear-gradient(135deg, #1a1208 0%, #24190a 50%, #2c200e 100%);
+}

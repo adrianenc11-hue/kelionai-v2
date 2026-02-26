@@ -6,6 +6,7 @@
     <meta name="sentry-dsn" content="">
     <title>KelionAI</title>
     <link rel="stylesheet" href="/css/app.css">
+    <link rel="stylesheet" href="/css/backgrounds.css">
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
     <script src="https://browser.sentry-cdn.com/8.46.0/bundle.tracing.replay.min.js" crossorigin="anonymous"></script>
@@ -97,6 +98,19 @@
                 <div id="monitor-text" style="display:none"></div>
                 <div id="monitor-search" style="display:none"></div>
                 <div id="monitor-weather" style="display:none"></div>
+                <div id="monitor-focus" style="display:none">
+                    <div id="focus-header"><span id="focus-mode-name">Focus Mode</span></div>
+                    <div id="focus-timer-display">25:00</div>
+                    <div id="focus-phase">Work Session 1/4</div>
+                    <div id="focus-breathing" class="hidden">
+                        <div id="breath-circle"></div>
+                        <p id="breath-label">Inhale...</p>
+                    </div>
+                    <div id="focus-controls">
+                        <button id="focus-start">&#9654; Start</button>
+                        <button id="focus-stop">&#9209; Stop</button>
+                    </div>
+                </div>
                 <div id="monitor-default">
                     <div class="welcome-icon">🎯</div>
                     <p>Monitorul va afișa conținut când asistentul AI partajează informații.</p>
@@ -121,6 +135,20 @@
         </div>
     </div>
 
+    <!-- SOS OVERLAY -->
+    <div id="sos-overlay" class="hidden">
+        <div id="sos-content">
+            <div id="sos-icon">&#x1F198;</div>
+            <h1>Are you OK?</h1>
+            <p id="sos-countdown">Auto-alerting in <span id="sos-timer">60</span>s</p>
+            <p id="sos-location">Getting your location...</p>
+            <div id="sos-buttons">
+                <button id="sos-ok">&#x2705; I'm OK</button>
+                <a id="sos-call" href="tel:112">&#x1F4DE; Call 112</a>
+            </div>
+        </div>
+    </div>
+
     <script src="/lib/three.bundle.js"></script>
     <script src="/js/fft-lipsync.js"></script>
     <script src="/js/avatar.js"></script>
@@ -131,5 +159,9 @@
     <script src="/js/tools.js"></script>
     <script src="/js/payments-ui.js"></script>
     <script src="/js/app.js"></script>
+    <script src="/js/sos.js"></script>
+    <script src="/js/backgrounds.js"></script>
+    <script src="/js/focus.js"></script>
+    <script src="/js/sync.js"></script>
 </body>
 </html>

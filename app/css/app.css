@@ -950,3 +950,66 @@ body {
     transition: background 0.2s;
 }
 .usage-upgrade-badge:hover { background: rgba(255,68,68,0.35); }
+
+/* ═══ SOS Overlay ═══ */
+#sos-overlay {
+    position: fixed; inset: 0; z-index: 99999;
+    background: rgba(140, 0, 0, 0.92);
+    display: flex; align-items: center; justify-content: center;
+    backdrop-filter: blur(4px);
+}
+#sos-overlay.hidden { display: none; }
+#sos-content {
+    text-align: center; color: #fff; padding: 40px;
+    border: 2px solid rgba(255,80,80,0.5); border-radius: 20px;
+    background: rgba(0,0,0,0.4); max-width: 360px; width: 90%;
+}
+#sos-icon { font-size: 3rem; margin-bottom: 12px; }
+#sos-content h1 { font-size: 1.8rem; margin-bottom: 8px; }
+#sos-countdown { color: #ffaaaa; font-size: 1rem; margin-bottom: 8px; }
+#sos-timer { font-weight: bold; color: #fff; }
+#sos-location { font-size: 0.8rem; color: #ccc; margin-bottom: 20px; }
+#sos-buttons { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+#sos-ok {
+    padding: 12px 24px; background: rgba(0,200,80,0.2); border: 1px solid #00c850;
+    color: #00c850; border-radius: 10px; font-size: 1rem; cursor: pointer; font-weight: 600;
+    transition: background 0.2s;
+}
+#sos-ok:hover { background: rgba(0,200,80,0.35); }
+#sos-call {
+    padding: 12px 24px; background: rgba(255,80,80,0.2); border: 1px solid #ff5050;
+    color: #ff5050; border-radius: 10px; font-size: 1rem; font-weight: 600;
+    text-decoration: none; display: inline-flex; align-items: center;
+    transition: background 0.2s;
+}
+#sos-call:hover { background: rgba(255,80,80,0.35); }
+
+/* ═══ Focus / Meditation Panel ═══ */
+#monitor-focus {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    height: 100%; padding: 24px; text-align: center; color: #e0e0e0;
+}
+#focus-header { font-size: 0.9rem; color: #888; text-transform: uppercase;
+    letter-spacing: 1px; margin-bottom: 16px; }
+#focus-timer-display {
+    font-size: 3.5rem; font-weight: 700; color: #00ccff;
+    font-variant-numeric: tabular-nums; margin-bottom: 8px;
+}
+#focus-phase { font-size: 0.9rem; color: #aaa; margin-bottom: 20px; }
+#focus-breathing { text-align: center; margin-bottom: 20px; }
+#focus-breathing.hidden { display: none; }
+#breath-circle {
+    width: 80px; height: 80px; border-radius: 50%;
+    background: rgba(0,200,255,0.15); border: 2px solid rgba(0,200,255,0.4);
+    margin: 0 auto 12px; transition: transform 4s ease-in-out;
+}
+#breath-label { font-size: 0.95rem; color: #99ddff; }
+#focus-controls { display: flex; gap: 12px; }
+#focus-start, #focus-stop {
+    padding: 10px 20px; border-radius: 8px; border: none; cursor: pointer;
+    font-size: 0.9rem; font-weight: 600; transition: background 0.2s, transform 0.15s;
+}
+#focus-start { background: rgba(0,200,255,0.15); color: #00ccff; border: 1px solid rgba(0,200,255,0.3); }
+#focus-start:hover { background: rgba(0,200,255,0.3); transform: scale(1.03); }
+#focus-stop { background: rgba(255,80,80,0.12); color: #ff6060; border: 1px solid rgba(255,80,80,0.25); }
+#focus-stop:hover { background: rgba(255,80,80,0.25); transform: scale(1.03); }

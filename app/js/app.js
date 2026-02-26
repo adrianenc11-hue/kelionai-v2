@@ -225,6 +225,11 @@
         if (useStreaming) await sendToAI_Stream(msg, language);
         else await sendToAI_Regular(msg, language);
         if (window.KPayments) KPayments.showUsageBar();
+        // Phase 2 integrations — run after AI reply
+        const _lowerMsg = message.toLowerCase();
+        if (window.KBackground) KBackground.detectFromMessage(message);
+        if (window.KSOS && (KSOS.triggers || []).some(t => _lowerMsg.includes(t))) KSOS.trigger();
+        if (window.KFocus) KFocus.detectCommand(message);
     }
 
     // ═══════════════════════════════════════════════════════════
