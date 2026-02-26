@@ -24,21 +24,44 @@ const legalRouter = require('./legal');
 
 const app = express();
 if (process.env.SENTRY_DSN) Sentry.setupExpressErrorHandler(app);
-app.use(cors());
+// ═══ CORS ═══
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+    ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
+    : null;
+app.use(cors({
+    origin: (origin, callback) => {
+        if (!allowedOrigins) return callback(null, true);
+        if (!origin) return callback(null, true);
+        const isLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(origin);
+        if (process.env.NODE_ENV !== 'production' && isLocalhost) return callback(null, true);
+        if (allowedOrigins.includes(origin)) return callback(null, true);
+        callback(new Error('Not allowed by CORS'));
+    },
+    credentials: true
+}));
 
 // Stripe webhook needs raw body — must be before express.json()
 app.use('/api/payments/webhook', express.raw({ type: 'application/json' }));
 app.use(express.json({ limit: '50mb' }));
 
 // ═══ RATE LIMITING ═══
+const globalLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100, message: { error: 'Prea multe cereri. Încearcă din nou mai târziu.' }, standardHeaders: true, legacyHeaders: false });
+const apiLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, message: { error: 'Limită AI atinsă. Încearcă din nou în 15 minute.' }, standardHeaders: true, legacyHeaders: false });
 const chatLimiter = rateLimit({ windowMs: 60 * 1000, max: 20, message: { error: 'Prea multe cereri. Așteaptă un minut.' }, standardHeaders: true, legacyHeaders: false });
 const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10, message: { error: 'Prea multe încercări. Așteaptă 15 minute.' } });
 const searchLimiter = rateLimit({ windowMs: 60 * 1000, max: 15, message: { error: 'Prea multe căutări. Așteaptă un minut.' } });
 const imageLimiter = rateLimit({ windowMs: 60 * 1000, max: 5, message: { error: 'Prea multe imagini. Așteaptă un minut.' } });
+app.use(globalLimiter);
 
 const metrics = require('./metrics');
 app.use(metrics.metricsMiddleware);
 app.get('/metrics', async (req, res) => { res.set('Content-Type', metrics.register.contentType); res.end(await metrics.register.metrics()); });
+
+// ═══ HEALTH CHECK ═══
+app.get('/health', (req, res) => {
+    res.json({ status: 'ok', uptime: process.uptime(), timestamp: new Date().toISOString() });
+});
+
 app.use(express.static(path.join(__dirname, '..', 'app')));
 const PORT = process.env.PORT || 3000;
 const memFallback = {};
@@ -316,7 +339,7 @@ async function saveConv(uid, avatar, userMsg, aiReply, convId, lang) {
 }
 
 // ═══ TTS — ElevenLabs ═══
-app.post('/api/speak', async (req, res) => {
+app.post('/api/speak', apiLimiter, async (req, res) => {
     try {
         const { text, avatar = 'kelion' } = req.body;
         if (!text || !process.env.ELEVENLABS_API_KEY) return res.status(503).json({ error: 'TTS indisponibil' });
@@ -332,7 +355,7 @@ app.post('/api/speak', async (req, res) => {
 });
 
 // ═══ STT — Groq Whisper ═══
-app.post('/api/listen', async (req, res) => {
+app.post('/api/listen', apiLimiter, async (req, res) => {
     try {
         if (req.body.text) return res.json({ text: req.body.text, engine: 'WebSpeech' });
         const { audio } = req.body;
@@ -349,7 +372,7 @@ app.post('/api/listen', async (req, res) => {
 });
 
 // ═══ VISION — Claude Vision ═══
-app.post('/api/vision', async (req, res) => {
+app.post('/api/vision', apiLimiter, async (req, res) => {
     try {
         const { image, avatar = 'kelion', language = 'ro' } = req.body;
         if (!image || !process.env.ANTHROPIC_API_KEY) return res.status(503).json({ error: 'Vision indisponibil' });
