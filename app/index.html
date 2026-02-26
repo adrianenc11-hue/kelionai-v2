@@ -3,14 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="sentry-dsn" content="">
     <title>KelionAI</title>
     <link rel="stylesheet" href="/css/app.css">
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
     <script src="https://browser.sentry-cdn.com/8.46.0/bundle.tracing.replay.min.js" crossorigin="anonymous"></script>
     <script>
-        if (window.Sentry) Sentry.init({
-            dsn: "YOUR_SENTRY_DSN",
+        // Sentry is optional — only initialized when the server provides a DSN via meta tag
+        var _sentryDsn = (document.querySelector('meta[name="sentry-dsn"]') || {}).content;
+        if (window.Sentry && _sentryDsn) Sentry.init({
+            dsn: _sentryDsn,
             integrations: [Sentry.browserTracingIntegration(), Sentry.replayIntegration()],
             tracesSampleRate: 1.0, replaysOnErrorSampleRate: 1.0
         });
