@@ -5,7 +5,7 @@
 var MonitorManager = (function () {
     'use strict';
 
-    var PANELS = ['monitor-image', 'monitor-map', 'monitor-text', 'monitor-search', 'monitor-weather', 'monitor-default'];
+    var PANELS = ['monitor-image', 'monitor-map', 'monitor-text', 'monitor-search', 'monitor-weather', 'monitor-journal', 'monitor-default'];
 
     function showPanel(id) {
         PANELS.forEach(function (pid) {

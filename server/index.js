@@ -728,6 +728,12 @@ app.locals.supabaseAdmin = supabaseAdmin;
 app.use('/api/payments', paymentsRouter);
 app.use('/api/legal', legalRouter);
 
+// ═══ EVENTS & JOURNAL ROUTES ═══
+const eventsRouter = require('./events');
+const journalRouter = require('./journal');
+app.use('/api/events', apiLimiter, eventsRouter);
+app.use('/api/journal', apiLimiter, journalRouter);
+
 // ═══ HEALTH ═══
 app.get('/api/health', (req, res) => {
     const diag = brain.getDiagnostics();
