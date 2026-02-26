@@ -3,6 +3,7 @@
 // Plans: Free €0, Pro €9.99/mo, Premium €19.99/mo
 // ═══════════════════════════════════════════════════════════════
 const express = require('express');
+const logger = require('./logger');
 const router = express.Router();
 
 let stripe;
@@ -11,7 +12,7 @@ try {
         stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
     }
 } catch (e) {
-    console.warn('[Payments] Stripe not available:', e.message);
+    logger.warn({ component: 'Payments', err: e.message }, 'Stripe not available: ' + e.message);
 }
 
 // ═══ PLAN LIMITS ═══
@@ -97,7 +98,7 @@ async function incrementUsage(userId, type, supabaseAdmin) {
                 .insert({ user_id: uid, type, date: today, count: 1 });
         }
     } catch (e) {
-        console.warn('[Usage] Track error:', e.message);
+        logger.warn({ component: 'Payments', err: e.message }, 'Usage track error: ' + e.message);
     }
 }
 
@@ -194,7 +195,7 @@ router.post('/checkout', async (req, res) => {
         res.json({ url: session.url, sessionId: session.id });
         
     } catch (e) {
-        console.error('[Payments] Checkout error:', e.message);
+        logger.error({ component: 'Payments', err: e.message }, 'Checkout error: ' + e.message);
         res.status(500).json({ error: 'Eroare checkout' });
     }
 });
@@ -240,7 +241,7 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
         try {
             event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
         } catch (e) {
-            console.error('[Webhook] Signature fail:', e.message);
+            logger.error({ component: 'Payments', err: e.message }, 'Webhook signature fail: ' + e.message);
             return res.status(400).send('Invalid signature');
         }
         
@@ -266,7 +267,7 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
                     current_period_end: new Date(subscription.current_period_end * 1000).toISOString()
                 }, { onConflict: 'user_id' });
                 
-                console.log(`[Payments] ✅ ${plan} activated for ${userId}`);
+                logger.info({ component: 'Payments', plan, userId }, `✅ ${plan} activated for ${userId}`);
                 break;
             }
             
@@ -280,7 +281,7 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
                     current_period_end: new Date(sub.current_period_end * 1000).toISOString()
                 }).eq('stripe_subscription_id', sub.id);
                 
-                console.log(`[Payments] Updated sub ${sub.id} → ${sub.status}`);
+                logger.info({ component: 'Payments', subId: sub.id, status: sub.status }, `Updated sub ${sub.id} → ${sub.status}`);
                 break;
             }
             
@@ -290,7 +291,7 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
                     .update({ status: 'cancelled', plan: 'free' })
                     .eq('stripe_subscription_id', sub.id);
                 
-                console.log(`[Payments] ❌ Sub cancelled: ${sub.id}`);
+                logger.info({ component: 'Payments', subId: sub.id }, `❌ Sub cancelled: ${sub.id}`);
                 break;
             }
             
@@ -302,14 +303,14 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
                         .update({ status: 'past_due' })
                         .eq('stripe_subscription_id', subId);
                 }
-                console.log(`[Payments] ⚠️ Payment failed for sub: ${subId}`);
+                logger.warn({ component: 'Payments', subId }, `⚠️ Payment failed for sub: ${subId}`);
                 break;
             }
         }
         
         res.json({ received: true });
     } catch (e) {
-        console.error('[Webhook]', e.message);
+        logger.error({ component: 'Payments', err: e.message }, 'Webhook error: ' + e.message);
         res.status(500).send('Webhook error');
     }
 });
