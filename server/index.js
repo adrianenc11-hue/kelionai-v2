@@ -748,6 +748,10 @@ app.post('/api/ticker/disable', asyncHandler(async (req, res) => {
     res.json({ success: true });
 }));
 
+// ═══ NEWS BOT (admin only) ═══
+const newsRouter = require('./news');
+app.use('/api/news', adminAuth, newsRouter);
+
 // ═══ HEALTH ═══
 app.get('/api/health', (req, res) => {
     const diag = brain.getDiagnostics();
