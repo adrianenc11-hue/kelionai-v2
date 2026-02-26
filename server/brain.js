@@ -513,13 +513,15 @@ Raspunde STRICT cu JSON:
     // 9. SEARCH QUERY REFINEMENT — Apply learned improvements
     // ═══════════════════════════════════════════════════════════
     refineSearchQuery(query) {
+        const original = query;
+
         // Truncate overly long queries
         if (query.length > 100) query = query.split(' ').slice(0, 8).join(' ');
 
         // Remove filler words that hurt search quality
         query = query.replace(/\b(te rog|please|un pic|putin|vreau sa stiu|as vrea)\b/gi, '').trim();
 
-        return query || query; // Return original if empty after cleanup
+        return query || original; // Return original if empty after cleanup
     }
 
     // ═══════════════════════════════════════════════════════════
