@@ -119,6 +119,7 @@
                                 msgEl.textContent = fullReply;
                             }
                             if (data.conversationId) persistConvId(data.conversationId);
+                            if (data.isEmergency) window.dispatchEvent(new CustomEvent('kelion-emergency', { detail: { message: message } }));
                         }
                     } catch(e) { /* skip parse errors */ }
                 }
@@ -185,6 +186,7 @@
             chatHistory.push({ role: 'user', content: message });
             chatHistory.push({ role: 'assistant', content: data.reply });
             addMessage('assistant', data.reply);
+            if (data.isEmergency) window.dispatchEvent(new CustomEvent('kelion-emergency', { detail: { message: message } }));
 
             if (data.monitor && data.monitor.content) {
                 showOnMonitor(data.monitor.content, data.monitor.type);
@@ -215,6 +217,9 @@
 
     // ─── Route to streaming or regular ─────────────────────
     async function sendToAI(message, language) {
+        // Dispatch context-change event for backgrounds and focus detection
+        window.dispatchEvent(new CustomEvent('kelion-context-change', { detail: { message: message } }));
+
         let msg = message;
         if (window.KelionTools) {
             try {

@@ -950,3 +950,14 @@ body {
     transition: background 0.2s;
 }
 .usage-upgrade-badge:hover { background: rgba(255,68,68,0.35); }
+
+/* ═══ Dynamic Background Contexts ═══ */
+body { transition: background-color 1.5s ease; }
+body.bg-classroom { --bg-primary: #1a1e3a; --bg-secondary: #2a3070; --particle-color: rgba(100,150,255,0.3); background: var(--bg-primary); }
+body.bg-lab       { --bg-primary: #0a1a1a; --bg-secondary: #0a3a2a; --particle-color: rgba(0,255,150,0.3); background: var(--bg-primary); }
+body.bg-office    { --bg-primary: #0a0e1a; --bg-secondary: #1a1e3a; --particle-color: rgba(0,212,255,0.3); background: var(--bg-primary); }
+body.bg-kitchen   { --bg-primary: #1a120a; --bg-secondary: #3a2a0a; --particle-color: rgba(255,180,0,0.3); background: var(--bg-primary); }
+body.bg-gym       { --bg-primary: #1a0a0a; --bg-secondary: #3a1a0a; --particle-color: rgba(255,80,0,0.3); background: var(--bg-primary); }
+body.bg-zen       { --bg-primary: #0a1a1a; --bg-secondary: #0a2a1a; --particle-color: rgba(0,255,200,0.2); background: var(--bg-primary); }
+body.bg-corporate { --bg-primary: #1a1a1a; --bg-secondary: #2a2a2a; --particle-color: rgba(200,200,200,0.2); background: var(--bg-primary); }
+body.bg-space     { --bg-primary: #000010; --bg-secondary: #00001a; --particle-color: rgba(200,200,255,0.4); background: var(--bg-primary); }

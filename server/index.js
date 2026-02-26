@@ -276,7 +276,7 @@ app.post('/api/chat', chatLimiter, validate(chatSchema), async (req, res) => {
         logger.info({ component: 'Chat', engine, avatar, language, tools: thought.toolsUsed, chainOfThought: !!thought.chainOfThought, thinkTime: thought.thinkTime, replyLength: reply.length }, `${engine} | ${avatar} | ${language} | tools:[${thought.toolsUsed.join(',')}] | CoT:${!!thought.chainOfThought} | ${thought.thinkTime}ms think | ${reply.length}c`);
 
         // ── RESPONSE with monitor content + brain metadata ──
-        const response = { reply, avatar, engine, language, thinkTime: thought.thinkTime, conversationId: savedConvId };
+        const response = { reply, avatar, engine, language, thinkTime: thought.thinkTime, conversationId: savedConvId, isEmergency: thought.analysis?.isEmergency || false };
         if (thought.monitor.content) {
             response.monitor = thought.monitor;
         }
@@ -393,7 +393,7 @@ app.post('/api/chat/stream', chatLimiter, validate(chatSchema), async (req, res)
         }
 
         // End stream
-        res.write(`data: ${JSON.stringify({ type: 'done', reply: fullReply, thinkTime: thought.thinkTime, conversationId: savedConvId })}\n\n`);
+        res.write(`data: ${JSON.stringify({ type: 'done', reply: fullReply, thinkTime: thought.thinkTime, conversationId: savedConvId, isEmergency: thought.analysis?.isEmergency || false })}\n\n`);
         res.end();
 
         if (fullReply) brain.learnFromConversation(user?.id, message, fullReply).catch(()=>{});
@@ -727,6 +727,35 @@ app.locals.supabaseAdmin = supabaseAdmin;
 // ═══ PAYMENTS & LEGAL ROUTES ═══
 app.use('/api/payments', paymentsRouter);
 app.use('/api/legal', legalRouter);
+
+// ═══ SOS ═══
+const sosLimiter = rateLimit({ windowMs: 60 * 1000, max: 5, message: { error: 'Prea multe alerte SOS.' }, standardHeaders: true, legacyHeaders: false });
+app.post('/api/sos/alert', sosLimiter, asyncHandler(async (req, res) => {
+    const user = await getUserFromToken(req);
+    const { lat, lng, address, message } = req.body;
+    const userId = user?.id || 'guest';
+    logger.warn({ component: 'SOS', userId, lat, lng, message }, '🆘 SOS ALERT TRIGGERED');
+    res.json({
+        success: true,
+        emergencyNumbers: { ro: '112', eu: '112', uk: '999', us: '911' },
+        message: 'Alert logged. Call 112 immediately if in danger.'
+    });
+}));
+
+// ═══ SYNC ═══
+const syncLimiter = rateLimit({ windowMs: 60 * 1000, max: 60, message: { error: 'Prea multe cereri sync.' }, standardHeaders: true, legacyHeaders: false });
+app.get('/api/sync/status', syncLimiter, asyncHandler(async (req, res) => {
+    const user = await getUserFromToken(req);
+    if (!user || !supabaseAdmin) return res.json({ lastUpdated: null });
+    const { data } = await supabaseAdmin
+        .from('conversations')
+        .select('updated_at')
+        .eq('user_id', user.id)
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .single();
+    res.json({ lastUpdated: data?.updated_at || null, userId: user.id });
+}));
 
 // ═══ HEALTH ═══
 app.get('/api/health', (req, res) => {
