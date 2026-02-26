@@ -16,7 +16,9 @@
         "setup:full": "bash scripts/setup-full.sh",
         "setup:db": "bash scripts/setup-db.sh",
         "deploy": "bash scripts/deploy.sh",
-        "health": "bash scripts/health-check.sh"
+        "health": "bash scripts/health-check.sh",
+        "railway:setup": "node scripts/railway-setup.js",
+        "railway:vars": "bash scripts/railway-env.sh"
     },
     "jest": {
         "testEnvironment": "node",
