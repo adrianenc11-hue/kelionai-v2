@@ -24,6 +24,8 @@ const { buildSystemPrompt } = require('./persona');
 const logger = require('./logger');
 const { router: paymentsRouter, checkUsage, incrementUsage } = require('./payments');
 const legalRouter = require('./legal');
+const eventsRouter = require('./events').router;
+const journalRouter = require('./journal');
 const { validate, registerSchema, loginSchema, refreshSchema, chatSchema, speakSchema, listenSchema, visionSchema, searchSchema, weatherSchema, imagineSchema, memorySchema } = require('./validation');
 
 const app = express();
@@ -219,7 +221,35 @@ app.post('/api/chat', chatLimiter, validate(chatSchema), async (req, res) => {
                 if (prefs?.length > 0) memoryContext = prefs.map(p => `${p.key}: ${JSON.stringify(p.value)}`).join('; ');
             } catch(e){}
         }
-        const systemPrompt = buildSystemPrompt(avatar, language, memoryContext, { failedTools: thought.failedTools }, thought.chainOfThought);
+
+        // ── EVENT REMINDERS: prepend upcoming events to system prompt ──
+        let eventReminders = '';
+        if (user && supabaseAdmin) {
+            try {
+                const { daysUntil: calcDaysUntil } = require('./events');
+                const { data: upcomingEvents } = await supabaseAdmin
+                    .from('user_events')
+                    .select('*')
+                    .eq('user_id', user.id);
+                if (upcomingEvents) {
+                    const soon = upcomingEvents.filter(e => {
+                        const d = calcDaysUntil(e.event_date, e.year_repeats);
+                        return d >= 0 && d <= 3;
+                    });
+                    if (soon.length > 0) {
+                        eventReminders = soon.map(e => {
+                            const d = calcDaysUntil(e.event_date, e.year_repeats);
+                            const possessive = e.person_name
+                                ? e.person_name + (e.person_name.endsWith('s') ? "' " : "'s ") : '';
+                            return `[REMINDER: ${possessive}${e.category} is in ${d} days. Mention it proactively if not already discussed.]`;
+                        }).join(' ');
+                    }
+                }
+            } catch(e){ logger.warn({ component: 'Chat', err: e.message }, 'event reminders'); }
+        }
+
+        const systemPrompt = (eventReminders ? eventReminders + '\n' : '') +
+            buildSystemPrompt(avatar, language, memoryContext, { failedTools: thought.failedTools }, thought.chainOfThought);
 
         // ── COMPRESSED CONVERSATION HISTORY (auto-summarized if >20 msgs) ──
         const compressedHist = thought.compressedHistory || history.slice(-20);
@@ -727,6 +757,8 @@ app.locals.supabaseAdmin = supabaseAdmin;
 // ═══ PAYMENTS & LEGAL ROUTES ═══
 app.use('/api/payments', paymentsRouter);
 app.use('/api/legal', legalRouter);
+app.use('/api/events', eventsRouter);
+app.use('/api/journal', journalRouter);
 
 // ═══ HEALTH ═══
 app.get('/api/health', (req, res) => {

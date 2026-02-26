@@ -97,6 +97,30 @@
                 <div id="monitor-text" style="display:none"></div>
                 <div id="monitor-search" style="display:none"></div>
                 <div id="monitor-weather" style="display:none"></div>
+                <div id="monitor-journal" style="display:none">
+                    <div id="journal-header" style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.1)">
+                        <h3 style="margin:0;color:#00ffff">📓 Daily Journal</h3>
+                        <button id="journal-close" style="background:none;border:none;color:#888;font-size:1.2rem;cursor:pointer">✕</button>
+                    </div>
+                    <div id="journal-form" style="padding:12px">
+                        <div id="journal-mood-section" style="margin-bottom:10px">
+                            <p style="color:#ccc;margin-bottom:6px">How was your day?</p>
+                            <div id="journal-stars" style="font-size:1.6rem;letter-spacing:4px">
+                                <span class="star" data-val="1">⭐</span>
+                                <span class="star" data-val="2">⭐</span>
+                                <span class="star" data-val="3">⭐</span>
+                                <span class="star" data-val="4">⭐</span>
+                                <span class="star" data-val="5">⭐</span>
+                            </div>
+                        </div>
+                        <textarea id="journal-best" placeholder="Best moment today..." style="width:100%;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#e0e0e0;border-radius:6px;padding:8px;margin-bottom:6px;resize:vertical;min-height:50px"></textarea>
+                        <textarea id="journal-improve" placeholder="What could be better..." style="width:100%;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#e0e0e0;border-radius:6px;padding:8px;margin-bottom:6px;resize:vertical;min-height:50px"></textarea>
+                        <textarea id="journal-goals" placeholder="Tomorrow's goal..." style="width:100%;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#e0e0e0;border-radius:6px;padding:8px;margin-bottom:8px;resize:vertical;min-height:50px"></textarea>
+                        <button id="journal-save" style="background:#00ffff;color:#000;border:none;padding:8px 18px;border-radius:8px;cursor:pointer;font-weight:bold">💾 Save</button>
+                        <div id="journal-overall" style="font-size:0.75rem;color:#888;margin-top:6px"></div>
+                    </div>
+                    <canvas id="journal-chart" width="400" height="150" style="display:block;width:100%;max-height:150px"></canvas>
+                </div>
                 <div id="monitor-default">
                     <div class="welcome-icon">🎯</div>
                     <p>Monitorul va afișa conținut când asistentul AI partajează informații.</p>
@@ -130,6 +154,8 @@
     <script src="/js/monitor.js"></script>
     <script src="/js/tools.js"></script>
     <script src="/js/payments-ui.js"></script>
+    <script src="/js/events-ui.js"></script>
+    <script src="/js/journal-ui.js"></script>
     <script src="/js/app.js"></script>
 </body>
 </html>
