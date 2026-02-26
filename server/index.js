@@ -24,6 +24,7 @@ const { buildSystemPrompt } = require('./persona');
 const logger = require('./logger');
 const { router: paymentsRouter, checkUsage, incrementUsage } = require('./payments');
 const legalRouter = require('./legal');
+const { router: messengerRouter, getStats: getMessengerStats } = require('./messenger');
 const { validate, registerSchema, loginSchema, refreshSchema, chatSchema, speakSchema, listenSchema, visionSchema, searchSchema, weatherSchema, imagineSchema, memorySchema } = require('./validation');
 
 const app = express();
@@ -66,6 +67,8 @@ app.use(cors({
 
 // Stripe webhook needs raw body — must be before express.json()
 app.use('/api/payments/webhook', express.raw({ type: 'application/json' }));
+// Messenger webhook needs raw body for HMAC-SHA256 validation
+app.use('/api/messenger/webhook', express.raw({ type: 'application/json' }));
 app.use(express.json({ limit: '10mb' }));
 
 // ═══ HTTP REQUEST LOGGING ═══
@@ -720,13 +723,20 @@ load();setInterval(load,5000);
 </script></body></html>`);
 });
 
-// ═══ SHARE HELPERS VIA app.locals (for payments/legal routers) ═══
+// ═══ SHARE HELPERS VIA app.locals (for payments/legal/messenger routers) ═══
 app.locals.getUserFromToken = getUserFromToken;
 app.locals.supabaseAdmin = supabaseAdmin;
+app.locals.brain = brain;
 
-// ═══ PAYMENTS & LEGAL ROUTES ═══
+// ═══ PAYMENTS, LEGAL & MESSENGER ROUTES ═══
 app.use('/api/payments', paymentsRouter);
 app.use('/api/legal', legalRouter);
+app.use('/api/messenger', messengerRouter);
+
+// ═══ MESSENGER STATS (admin only) ═══
+app.get('/api/messenger/stats', adminAuth, (req, res) => {
+    res.json(getMessengerStats());
+});
 
 // ═══ HEALTH ═══
 app.get('/api/health', (req, res) => {
