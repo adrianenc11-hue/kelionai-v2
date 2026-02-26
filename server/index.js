@@ -40,6 +40,9 @@ app.use(helmet({
             connectSrc: ["'self'", "https://api.openai.com", "https://generativelanguage.googleapis.com", "https://api.anthropic.com", "https://api.elevenlabs.io", "https://api.groq.com", "https://api.perplexity.ai", "https://api.tavily.com", "https://google.serper.dev", "https://api.duckduckgo.com", "https://api.together.xyz", "https://api.deepseek.com", "https://geocoding-api.open-meteo.com", "https://api.open-meteo.com"],
             mediaSrc: ["'self'", "blob:"],
             workerSrc: ["'self'", "blob:"],
+            frameAncestors: ["'none'"],
+            objectSrc: ["'none'"],
+            baseUri: ["'self'"],
         }
     },
     crossOriginEmbedderPolicy: false,
@@ -727,6 +730,16 @@ app.locals.supabaseAdmin = supabaseAdmin;
 // ═══ PAYMENTS & LEGAL ROUTES ═══
 app.use('/api/payments', paymentsRouter);
 app.use('/api/legal', legalRouter);
+
+// ═══ SECURITY LOGGING ═══
+const securityRateLimit = rateLimit({ windowMs: 60 * 1000, max: 10, standardHeaders: true, legacyHeaders: false });
+app.post('/api/security/devtools-open', securityRateLimit, (req, res) => {
+    const { fingerprint, url } = req.body || {};
+    const fp = typeof fingerprint === 'string' ? fingerprint.substring(0, 64) : 'unknown';
+    const u = typeof url === 'string' ? url.substring(0, 256) : 'unknown';
+    logger.warn({ component: 'Security', fingerprint: fp, url: u }, 'DevTools opened by visitor');
+    res.json({ ok: true });
+});
 
 // ═══ HEALTH ═══
 app.get('/api/health', (req, res) => {
