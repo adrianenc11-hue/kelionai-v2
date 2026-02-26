@@ -21,6 +21,7 @@ const { runMigration } = require('./migrate');
 const { KelionBrain } = require('./brain');
 const { buildSystemPrompt } = require('./persona');
 
+const logger = require('./logger');
 const { router: paymentsRouter, checkUsage, incrementUsage } = require('./payments');
 const legalRouter = require('./legal');
 const { validate, registerSchema, loginSchema, refreshSchema, chatSchema, speakSchema, listenSchema, visionSchema, searchSchema, weatherSchema, imagineSchema, memorySchema } = require('./validation');
@@ -66,6 +67,23 @@ app.use(cors({
 // Stripe webhook needs raw body — must be before express.json()
 app.use('/api/payments/webhook', express.raw({ type: 'application/json' }));
 app.use(express.json({ limit: '50mb' }));
+
+// ═══ HTTP REQUEST LOGGING ═══
+app.use((req, res, next) => {
+    const start = Date.now();
+    res.on('finish', () => {
+        const duration = Date.now() - start;
+        logger.info({
+            component: 'HTTP',
+            method: req.method,
+            path: req.path,
+            statusCode: res.statusCode,
+            duration,
+            userAgent: req.get('user-agent')
+        }, `${req.method} ${req.path} ${res.statusCode} ${duration}ms`);
+    });
+    next();
+});
 
 // ═══ RATE LIMITING ═══
 const chatLimiter = rateLimit({ windowMs: 60 * 1000, max: 20, message: { error: 'Prea multe cereri. Așteaptă un minut.' }, standardHeaders: true, legacyHeaders: false });
@@ -114,7 +132,7 @@ const brain = new KelionBrain({
     togetherKey: process.env.TOGETHER_API_KEY,
     supabaseAdmin
 });
-console.log('[Brain] 🧠 Engine initialized');
+logger.info({ component: 'Brain' }, '🧠 Engine initialized');
 
 // ═══ AUTH HELPER ═══
 async function getUserFromToken(req) {
@@ -203,7 +221,7 @@ app.post('/api/chat', chatLimiter, validate(chatSchema), async (req, res) => {
                 const d = await r.json();
                 reply = d.content?.[0]?.text;
                 if (reply) engine = 'Claude';
-            } catch(e) { console.warn('[CHAT] Claude:', e.message); }
+            } catch(e) { logger.warn({ component: 'Chat', err: e.message }, 'Claude'); }
         }
         // GPT-4o (fallback)
         if (!reply && process.env.OPENAI_API_KEY) {
@@ -214,7 +232,7 @@ app.post('/api/chat', chatLimiter, validate(chatSchema), async (req, res) => {
                 const d = await r.json();
                 reply = d.choices?.[0]?.message?.content;
                 if (reply) engine = 'GPT-4o';
-            } catch(e) { console.warn('[CHAT] GPT-4o:', e.message); }
+            } catch(e) { logger.warn({ component: 'Chat', err: e.message }, 'GPT-4o'); }
         }
         // DeepSeek (tertiary)
         if (!reply && process.env.DEEPSEEK_API_KEY) {
@@ -225,7 +243,7 @@ app.post('/api/chat', chatLimiter, validate(chatSchema), async (req, res) => {
                 const d = await r.json();
                 reply = d.choices?.[0]?.message?.content;
                 if (reply) engine = 'DeepSeek';
-            } catch(e) { console.warn('[CHAT] DeepSeek:', e.message); }
+            } catch(e) { logger.warn({ component: 'Chat', err: e.message }, 'DeepSeek'); }
         }
 
         if (!reply) return res.status(503).json({ error: 'AI indisponibil' });
@@ -233,11 +251,11 @@ app.post('/api/chat', chatLimiter, validate(chatSchema), async (req, res) => {
         // ── Save conversation (sync to get ID) + Learn async ──
         let savedConvId = conversationId;
         if (supabaseAdmin) {
-            try { savedConvId = await saveConv(user?.id, avatar, message, reply, conversationId, language); } catch(e){ console.warn('[CHAT] saveConv:', e.message); }
+            try { savedConvId = await saveConv(user?.id, avatar, message, reply, conversationId, language); } catch(e){ logger.warn({ component: 'Chat', err: e.message }, 'saveConv'); }
         }
         brain.learnFromConversation(user?.id, message, reply).catch(()=>{});
 
-        console.log(`[CHAT] ${engine} | ${avatar} | ${language} | tools:[${thought.toolsUsed.join(',')}] | CoT:${!!thought.chainOfThought} | ${thought.thinkTime}ms think | ${reply.length}c`);
+        logger.info({ component: 'Chat', engine, avatar, language, tools: thought.toolsUsed, chainOfThought: !!thought.chainOfThought, thinkTime: thought.thinkTime, replyLength: reply.length }, `${engine} | ${avatar} | ${language} | tools:[${thought.toolsUsed.join(',')}] | CoT:${!!thought.chainOfThought} | ${thought.thinkTime}ms think | ${reply.length}c`);
 
         // ── RESPONSE with monitor content + brain metadata ──
         const response = { reply, avatar, engine, language, thinkTime: thought.thinkTime, conversationId: savedConvId };
@@ -246,7 +264,7 @@ app.post('/api/chat', chatLimiter, validate(chatSchema), async (req, res) => {
         }
         res.json(response);
 
-    } catch(e) { console.error('[CHAT]', e.message); res.status(500).json({ error: 'Eroare AI' }); }
+    } catch(e) { logger.error({ component: 'Chat', err: e.message }, e.message); res.status(500).json({ error: 'Eroare AI' }); }
 });
 
 // ═══════════════════════════════════════════════════════════════
@@ -319,7 +337,7 @@ app.post('/api/chat/stream', chatLimiter, validate(chatSchema), async (req, res)
                         reader.on('error', reject);
                     });
                 }
-            } catch (e) { console.warn('[STREAM] Claude:', e.message); }
+            } catch (e) { logger.warn({ component: 'Stream', err: e.message }, 'Claude'); }
         }
 
         // Fallback: non-streaming GPT-4o or DeepSeek (send as single chunk)
@@ -349,7 +367,7 @@ app.post('/api/chat/stream', chatLimiter, validate(chatSchema), async (req, res)
         // Save conversation (sync to get ID) then end stream
         let savedConvId = conversationId;
         if (fullReply && supabaseAdmin) {
-            try { savedConvId = await saveConv(user?.id, avatar, message, fullReply, conversationId, language); } catch(e){ console.warn('[STREAM] saveConv:', e.message); }
+            try { savedConvId = await saveConv(user?.id, avatar, message, fullReply, conversationId, language); } catch(e){ logger.warn({ component: 'Stream', err: e.message }, 'saveConv'); }
         }
 
         // End stream
@@ -357,9 +375,9 @@ app.post('/api/chat/stream', chatLimiter, validate(chatSchema), async (req, res)
         res.end();
 
         if (fullReply) brain.learnFromConversation(user?.id, message, fullReply).catch(()=>{});
-        console.log(`[STREAM] ${avatar} | ${language} | ${fullReply.length}c`);
+        logger.info({ component: 'Stream', avatar, language, replyLength: fullReply.length }, `${avatar} | ${language} | ${fullReply.length}c`);
 
-    } catch(e) { console.error('[STREAM]', e.message); if (!res.headersSent) res.status(500).json({ error: 'Eroare stream' }); else res.end(); }
+    } catch(e) { logger.error({ component: 'Stream', err: e.message }, e.message); if (!res.headersSent) res.status(500).json({ error: 'Eroare stream' }); else res.end(); }
 });
 
 // ═══ SAVE CONVERSATION ═══
@@ -387,7 +405,7 @@ app.post('/api/speak', apiLimiter, validate(speakSchema), async (req, res) => {
             body: JSON.stringify({ text, model_id: 'eleven_multilingual_v2', voice_settings: { stability: 0.5, similarity_boost: 0.75 } }) });
         if (!r.ok) return res.status(503).json({ error: 'TTS fail' });
         const buf = await r.buffer();
-        console.log('[SPEAK]', buf.length, 'bytes |', avatar);
+        logger.info({ component: 'Speak', bytes: buf.length, avatar }, buf.length + ' bytes | ' + avatar);
         res.set({ 'Content-Type': 'audio/mpeg', 'Content-Length': buf.length }); res.send(buf);
     } catch(e) { res.status(500).json({ error: 'Eroare TTS' }); }
 });
@@ -449,10 +467,10 @@ app.post('/api/search', searchLimiter, validate(searchSchema), async (req, res) 
                     const answer = d.choices?.[0]?.message?.content || '';
                     const citations = d.citations || [];
                     const results = citations.slice(0, 5).map(url => ({ title: url, content: '', url }));
-                    console.log('[SEARCH] Perplexity Sonar —', answer.length, 'chars');
+                    logger.info({ component: 'Search', engine: 'Perplexity', chars: answer.length }, 'Perplexity Sonar — ' + answer.length + ' chars');
                     return res.json({ results, answer, engine: 'Perplexity' });
                 }
-            } catch (e) { console.warn('[SEARCH] Perplexity:', e.message); }
+            } catch (e) { logger.warn({ component: 'Search', engine: 'Perplexity', err: e.message }, 'Perplexity'); }
         }
 
         // 2. Tavily (good — aggregated + parsed)
@@ -462,10 +480,10 @@ app.post('/api/search', searchLimiter, validate(searchSchema), async (req, res) 
                     body: JSON.stringify({ api_key: process.env.TAVILY_API_KEY, query, search_depth: 'basic', max_results: 5, include_answer: true }) });
                 if (tr.ok) {
                     const td = await tr.json();
-                    console.log('[SEARCH] Tavily —', (td.results || []).length, 'results');
+                    logger.info({ component: 'Search', engine: 'Tavily', results: (td.results || []).length }, 'Tavily — ' + (td.results || []).length + ' results');
                     return res.json({ results: (td.results || []).map(x => ({ title: x.title, content: x.content, url: x.url })), answer: td.answer || '', engine: 'Tavily' });
                 }
-            } catch (e) { console.warn('[SEARCH] Tavily:', e.message); }
+            } catch (e) { logger.warn({ component: 'Search', engine: 'Tavily', err: e.message }, 'Tavily'); }
         }
 
         // 3. Serper (fast — raw Google results, cheap)
@@ -480,10 +498,10 @@ app.post('/api/search', searchLimiter, validate(searchSchema), async (req, res) 
                     const sd = await sr.json();
                     const answer = sd.answerBox?.answer || sd.answerBox?.snippet || sd.knowledgeGraph?.description || '';
                     const results = (sd.organic || []).slice(0, 5).map(x => ({ title: x.title, content: x.snippet, url: x.link }));
-                    console.log('[SEARCH] Serper —', results.length, 'results');
+                    logger.info({ component: 'Search', engine: 'Serper', results: results.length }, 'Serper — ' + results.length + ' results');
                     return res.json({ results, answer, engine: 'Serper' });
                 }
-            } catch (e) { console.warn('[SEARCH] Serper:', e.message); }
+            } catch (e) { logger.warn({ component: 'Search', engine: 'Serper', err: e.message }, 'Serper'); }
         }
 
         // 4. DuckDuckGo (free fallback)
@@ -697,12 +715,12 @@ if (process.env.SENTRY_DSN) Sentry.setupExpressErrorHandler(app);
 app.use((err, req, res, next) => {
     const statusCode = err.statusCode || err.status || 500;
     if (process.env.NODE_ENV === 'production') {
-        console.error(`[ERROR] ${req.method} ${req.path}:`, err.message);
+        logger.error({ component: 'Error', method: req.method, path: req.path }, err.message);
         return res.status(statusCode).json({
             error: statusCode === 500 ? 'Eroare internă de server' : err.message
         });
     }
-    console.error(`[ERROR] ${req.method} ${req.path}:`, err);
+    logger.error({ component: 'Error', method: req.method, path: req.path, err: err.stack }, err.message);
     res.status(statusCode).json({
         error: err.message,
         stack: err.stack,
@@ -713,32 +731,22 @@ app.use((err, req, res, next) => {
 // ═══ STARTUP ═══
 if (require.main === module) {
     process.on('uncaughtException', (err) => {
-        console.error('[FATAL] Uncaught Exception:', err);
+        logger.fatal({ component: 'Process', err: err.stack }, 'Uncaught Exception: ' + err.message);
         process.exit(1);
     });
 
     process.on('unhandledRejection', (reason) => {
-        console.error('[FATAL] Unhandled Rejection:', reason);
+        logger.fatal({ component: 'Process', reason: String(reason) }, 'Unhandled Rejection: ' + reason);
         process.exit(1);
     });
 
     runMigration().then(migrated => {
         app.listen(PORT, '0.0.0.0', () => {
-            console.log('\n══════════════════════════════════════════');
-            console.log('  KelionAI v2.3 — PAYMENTS + LEGAL EDITION');
-            console.log('  http://localhost:' + PORT);
-            console.log('  Dashboard: http://localhost:' + PORT + '/dashboard');
-            console.log('  AI: ' + (process.env.ANTHROPIC_API_KEY ? '✅ Claude' : '❌') + ' | ' + (process.env.OPENAI_API_KEY ? '✅ GPT-4o' : '❌') + ' | ' + (process.env.DEEPSEEK_API_KEY ? '✅ DeepSeek' : '❌'));
-            console.log('  TTS: ' + (process.env.ELEVENLABS_API_KEY ? '✅ ElevenLabs' : '❌'));
-            console.log('  Brain: 🧠 v2 — CoT + Decompose + SelfRepair + AutoLearn');
-            console.log('  Payments: ' + (process.env.STRIPE_SECRET_KEY ? '✅ Stripe' : '❌ Not configured'));
-            console.log('  DB: ' + (supabaseAdmin ? '✅ Supabase' : '⚠️ In-memory'));
-            console.log('  Migration: ' + (migrated ? '✅ Tables ready' : '⚠️ Skipped'));
-            console.log('══════════════════════════════════════════\n');
+            logger.info({ component: 'Server', port: PORT, ai: { claude: !!process.env.ANTHROPIC_API_KEY, gpt4o: !!process.env.OPENAI_API_KEY, deepseek: !!process.env.DEEPSEEK_API_KEY }, tts: !!process.env.ELEVENLABS_API_KEY, payments: !!process.env.STRIPE_SECRET_KEY, db: !!supabaseAdmin, migration: !!migrated }, 'KelionAI v2.3 started on port ' + PORT);
         });
     }).catch(e => {
-        console.error('[Startup] Migration error:', e.message);
-        app.listen(PORT, '0.0.0.0', () => console.log('KelionAI v2.3 on port ' + PORT + ' (migration failed)'));
+        logger.error({ component: 'Server' }, 'Migration error');
+        app.listen(PORT, '0.0.0.0', () => logger.info({ component: 'Server', port: PORT }, 'KelionAI v2.3 on port ' + PORT + ' (migration failed)'));
     });
 }
 

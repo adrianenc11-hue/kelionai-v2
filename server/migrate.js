@@ -4,6 +4,7 @@
 // Uses direct PostgreSQL connection (node-postgres)
 // ═══════════════════════════════════════════════════════════════
 const { Pool } = require('pg');
+const logger = require('./logger');
 
 const MIGRATION_SQL = `
 CREATE TABLE IF NOT EXISTS conversations (
@@ -68,7 +69,7 @@ async function runMigration() {
             const ref = match[1];
             const password = process.env.SUPABASE_DB_PASSWORD || process.env.DB_PASSWORD;
             if (!password) {
-                console.log('[Migration] ⚠️ No DB password configured — skipping migration');
+                logger.warn({ component: 'Migration' }, '⚠️ No DB password configured — skipping migration');
                 return false;
             }
             connectionString = `postgresql://postgres:${encodeURIComponent(password)}@db.${ref}.supabase.co:5432/postgres`;
@@ -76,7 +77,7 @@ async function runMigration() {
     }
 
     if (!connectionString) {
-        console.log('[Migration] ⚠️ No database connection — skipping migration');
+        logger.warn({ component: 'Migration' }, '⚠️ No database connection — skipping migration');
         return false;
     }
 
@@ -87,14 +88,14 @@ async function runMigration() {
     });
 
     try {
-        console.log('[Migration] 🔄 Running database migration...');
+        logger.info({ component: 'Migration' }, '�� Running database migration...');
         await pool.query(MIGRATION_SQL);
-        console.log('[Migration] ✅ Tables created/verified: conversations, messages, user_preferences');
-        console.log('[Migration] ✅ RLS policies applied');
+        logger.info({ component: 'Migration' }, '✅ Tables created/verified: conversations, messages, user_preferences');
+        logger.info({ component: 'Migration' }, '✅ RLS policies applied');
         return true;
     } catch (e) {
-        console.error('[Migration] ❌ Migration failed:', e.message);
-        console.log('[Migration] ⚠️ Server will continue without persistent storage');
+        logger.error({ component: 'Migration', err: e.message }, '❌ Migration failed');
+        logger.warn({ component: 'Migration' }, '⚠️ Server will continue without persistent storage');
         return false;
     } finally {
         await pool.end();
