@@ -48,3 +48,58 @@ describe('Security Headers', () => {
     });
 });
 
+describe('Input Validation', () => {
+    test('POST /api/speak with empty body returns 400', async () => {
+        const res = await request(app).post('/api/speak').send({});
+        expect(res.status).toBe(400);
+        expect(res.body.error).toBeDefined();
+    });
+
+    test('POST /api/speak with oversized text returns 400', async () => {
+        const res = await request(app).post('/api/speak').send({ text: 'a'.repeat(10001) });
+        expect(res.status).toBe(400);
+    });
+
+    test('POST /api/speak with valid text does not return 400 for validation', async () => {
+        const res = await request(app).post('/api/speak').send({ text: 'hello' });
+        // Validation passes; service may be unavailable (503) but not a validation error
+        expect(res.status).not.toBe(400);
+    });
+
+    test('POST /api/chat with empty body returns 400', async () => {
+        const res = await request(app).post('/api/chat').send({});
+        expect(res.status).toBe(400);
+        expect(res.body.error).toBeDefined();
+    });
+
+    test('POST /api/chat with oversized message returns 400', async () => {
+        const res = await request(app).post('/api/chat').send({ message: 'a'.repeat(10001) });
+        expect(res.status).toBe(400);
+    });
+
+    test('POST /api/search with empty query returns 400', async () => {
+        const res = await request(app).post('/api/search').send({ query: '' });
+        expect(res.status).toBe(400);
+        expect(res.body.error).toBeDefined();
+    });
+
+    test('POST /api/weather with empty city returns 400', async () => {
+        const res = await request(app).post('/api/weather').send({});
+        expect(res.status).toBe(400);
+        expect(res.body.error).toBeDefined();
+    });
+
+    test('POST /api/imagine with empty body returns 400', async () => {
+        const res = await request(app).post('/api/imagine').send({});
+        expect(res.status).toBe(400);
+        expect(res.body.error).toBeDefined();
+    });
+
+    test('validation error response includes details array', async () => {
+        const res = await request(app).post('/api/speak').send({});
+        expect(res.status).toBe(400);
+        expect(res.body.details).toBeInstanceOf(Array);
+        expect(res.body.details.length).toBeGreaterThan(0);
+    });
+});
+
