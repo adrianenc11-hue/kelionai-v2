@@ -23,6 +23,7 @@ const { buildSystemPrompt } = require('./persona');
 
 const { router: paymentsRouter, checkUsage, incrementUsage } = require('./payments');
 const legalRouter = require('./legal');
+const { validate, registerSchema, loginSchema, refreshSchema, chatSchema, speakSchema, listenSchema, visionSchema, searchSchema, weatherSchema, imagineSchema, memorySchema } = require('./validation');
 
 const app = express();
 app.set('trust proxy', 1);
@@ -120,7 +121,7 @@ async function getUserFromToken(req) {
 }
 
 // ═══ AUTH ENDPOINTS ═══
-app.post('/api/auth/register', authLimiter, async (req, res) => {
+app.post('/api/auth/register', authLimiter, validate(registerSchema), async (req, res) => {
     try {
         const { email, password, name } = req.body;
         if (!email || !password) return res.status(400).json({ error: 'Email și parolă obligatorii' });
@@ -131,7 +132,7 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
     } catch (e) { res.status(500).json({ error: 'Eroare înregistrare' }); }
 });
 
-app.post('/api/auth/login', authLimiter, async (req, res) => {
+app.post('/api/auth/login', authLimiter, validate(loginSchema), async (req, res) => {
     try {
         const { email, password } = req.body;
         if (!email || !password) return res.status(400).json({ error: 'Email și parolă obligatorii' });
@@ -148,7 +149,7 @@ app.get('/api/auth/me', async (req, res) => {
     if (!u) return res.status(401).json({ error: 'Neautentificat' });
     res.json({ user: { id: u.id, email: u.email, name: u.user_metadata?.full_name } });
 });
-app.post('/api/auth/refresh', async (req, res) => {
+app.post('/api/auth/refresh', validate(refreshSchema), async (req, res) => {
     try {
         const { refresh_token } = req.body;
         if (!refresh_token || !supabase) return res.status(400).json({ error: 'Token lipsă' });
@@ -162,7 +163,7 @@ app.post('/api/auth/refresh', async (req, res) => {
 // CHAT — BRAIN-POWERED (the core)
 // Brain decides tools → executes in parallel → builds deep prompt → AI responds → learns
 // ═══════════════════════════════════════════════════════════════
-app.post('/api/chat', chatLimiter, async (req, res) => {
+app.post('/api/chat', chatLimiter, validate(chatSchema), async (req, res) => {
     try {
         const { message, avatar = 'kelion', history = [], language = 'ro', conversationId } = req.body;
         if (!message) return res.status(400).json({ error: 'Mesaj lipsă' });
@@ -247,7 +248,7 @@ app.post('/api/chat', chatLimiter, async (req, res) => {
 // ═══════════════════════════════════════════════════════════════
 // CHAT STREAM — Server-Sent Events (word-by-word response)
 // ═══════════════════════════════════════════════════════════════
-app.post('/api/chat/stream', chatLimiter, async (req, res) => {
+app.post('/api/chat/stream', chatLimiter, validate(chatSchema), async (req, res) => {
     try {
         const { message, avatar = 'kelion', history = [], language = 'ro', conversationId } = req.body;
         if (!message) return res.status(400).json({ error: 'Mesaj lipsă' });
@@ -372,7 +373,7 @@ async function saveConv(uid, avatar, userMsg, aiReply, convId, lang) {
 }
 
 // ═══ TTS — ElevenLabs ═══
-app.post('/api/speak', apiLimiter, async (req, res) => {
+app.post('/api/speak', apiLimiter, validate(speakSchema), async (req, res) => {
     try {
         const { text, avatar = 'kelion' } = req.body;
         if (!text || !process.env.ELEVENLABS_API_KEY) return res.status(503).json({ error: 'TTS indisponibil' });
@@ -388,7 +389,7 @@ app.post('/api/speak', apiLimiter, async (req, res) => {
 });
 
 // ═══ STT — Groq Whisper ═══
-app.post('/api/listen', apiLimiter, async (req, res) => {
+app.post('/api/listen', apiLimiter, validate(listenSchema), async (req, res) => {
     try {
         if (req.body.text) return res.json({ text: req.body.text, engine: 'WebSpeech' });
         const { audio } = req.body;
@@ -405,7 +406,7 @@ app.post('/api/listen', apiLimiter, async (req, res) => {
 });
 
 // ═══ VISION — Claude Vision ═══
-app.post('/api/vision', apiLimiter, async (req, res) => {
+app.post('/api/vision', apiLimiter, validate(visionSchema), async (req, res) => {
     try {
         const { image, avatar = 'kelion', language = 'ro' } = req.body;
         if (!image || !process.env.ANTHROPIC_API_KEY) return res.status(503).json({ error: 'Vision indisponibil' });
@@ -426,7 +427,7 @@ Răspunde în ${LANGS[language] || 'română'}, concis dar detaliat.`;
 });
 
 // ═══ SEARCH — Perplexity Sonar → Tavily → Serper → DuckDuckGo ═══
-app.post('/api/search', searchLimiter, async (req, res) => {
+app.post('/api/search', searchLimiter, validate(searchSchema), async (req, res) => {
     try {
         const { query } = req.body;
         if (!query) return res.status(400).json({ error: 'Query lipsă' });
@@ -492,7 +493,7 @@ app.post('/api/search', searchLimiter, async (req, res) => {
 });
 
 // ═══ WEATHER — Open-Meteo ═══
-app.post('/api/weather', async (req, res) => {
+app.post('/api/weather', validate(weatherSchema), async (req, res) => {
     try {
         const { city } = req.body;
         if (!city) return res.status(400).json({ error: 'Oraș lipsă' });
@@ -509,7 +510,7 @@ app.post('/api/weather', async (req, res) => {
 });
 
 // ═══ IMAGINE — Together FLUX ═══
-app.post('/api/imagine', imageLimiter, async (req, res) => {
+app.post('/api/imagine', imageLimiter, validate(imagineSchema), async (req, res) => {
     try {
         const { prompt } = req.body;
         if (!prompt || !process.env.TOGETHER_API_KEY) return res.status(503).json({ error: 'Imagine indisponibil' });
@@ -524,7 +525,7 @@ app.post('/api/imagine', imageLimiter, async (req, res) => {
 });
 
 // ═══ MEMORY ═══
-app.post('/api/memory', async (req, res) => {
+app.post('/api/memory', validate(memorySchema), async (req, res) => {
     try {
         const { action, key, value } = req.body;
         const user = await getUserFromToken(req); const uid = user?.id || 'guest';
