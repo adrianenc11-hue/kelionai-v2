@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sports Bot — KelionAI Admin</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0d0d1a; --card: #151528; --border: #2a2a4a; --accent: #6c63ff;
+    --live: #00e676; --upcoming: #40c4ff; --finished: #616161;
+    --text: #e0e0e0; --muted: #888; --warn: #ff9800; --danger: #f44336;
+  }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; }
+  header { background: var(--card); border-bottom: 1px solid var(--border); padding: 16px 24px; display: flex; align-items: center; gap: 16px; }
+  header h1 { font-size: 1.3rem; font-weight: 700; }
+  header span.badge { background: var(--danger); color: #fff; font-size: 0.65rem; padding: 2px 8px; border-radius: 12px; text-transform: uppercase; letter-spacing: 1px; }
+  .disclaimer { background: #1a1200; border: 1px solid var(--warn); color: var(--warn); padding: 10px 20px; font-size: 0.82rem; text-align: center; font-weight: 500; }
+  .auth-bar { background: var(--card); border-bottom: 1px solid var(--border); padding: 10px 24px; display: flex; align-items: center; gap: 10px; font-size: 0.85rem; }
+  .auth-bar input { background: #1e1e3a; border: 1px solid var(--border); color: var(--text); padding: 5px 10px; border-radius: 6px; font-size: 0.85rem; width: 260px; }
+  .auth-bar button { background: var(--accent); color: #fff; border: none; padding: 6px 16px; border-radius: 6px; cursor: pointer; font-size: 0.85rem; }
+  .tabs { display: flex; gap: 4px; padding: 16px 24px 0; border-bottom: 1px solid var(--border); background: var(--card); }
+  .tab { background: none; border: none; color: var(--muted); font-size: 0.95rem; padding: 10px 18px; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+  .container { max-width: 1280px; margin: 0 auto; padding: 24px; }
+  .section-title { font-size: 1rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+  .section-title .refresh-btn { background: none; border: 1px solid var(--border); color: var(--muted); padding: 2px 10px; border-radius: 4px; cursor: pointer; font-size: 0.75rem; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; margin-bottom: 32px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; transition: border-color 0.2s; cursor: pointer; }
+  .card:hover { border-color: var(--accent); }
+  .card.live { border-left: 3px solid var(--live); }
+  .card.upcoming { border-left: 3px solid var(--upcoming); }
+  .card.finished { border-left: 3px solid var(--finished); opacity: 0.8; }
+  .match-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+  .match-league { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  .status-badge { font-size: 0.65rem; padding: 2px 8px; border-radius: 10px; font-weight: 600; }
+  .status-badge.live { background: rgba(0,230,118,0.15); color: var(--live); }
+  .status-badge.live::before { content: '●'; margin-right: 3px; animation: pulse 1s infinite; }
+  .status-badge.upcoming { background: rgba(64,196,255,0.15); color: var(--upcoming); }
+  .status-badge.finished { background: rgba(97,97,97,0.2); color: var(--finished); }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+  .teams { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 8px 0; }
+  .team { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: 1; }
+  .team-logo { width: 36px; height: 36px; object-fit: contain; border-radius: 4px; background: #1e1e3a; }
+  .team-name { font-size: 0.82rem; font-weight: 600; text-align: center; }
+  .team-form { font-size: 0.68rem; color: var(--muted); letter-spacing: 1px; }
+  .score { font-size: 1.6rem; font-weight: 800; min-width: 60px; text-align: center; }
+  .score span { color: var(--muted); font-weight: 400; }
+  .match-time { font-size: 0.75rem; color: var(--muted); text-align: center; margin-top: 6px; }
+  .analysis-panel { background: #0f0f25; border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 24px; display: none; }
+  .analysis-panel.open { display: block; }
+  .analysis-panel h3 { font-size: 1rem; margin-bottom: 14px; color: var(--accent); }
+  .signal-box { background: rgba(108,99,255,0.1); border: 1px solid rgba(108,99,255,0.3); border-radius: 8px; padding: 12px 16px; margin-bottom: 12px; font-size: 0.9rem; }
+  .factors { list-style: none; margin: 10px 0; }
+  .factors li { font-size: 0.82rem; color: var(--muted); padding: 3px 0; }
+  .factors li::before { content: '•'; margin-right: 6px; color: var(--accent); }
+  .disclaimer-inline { background: #1a1200; border: 1px solid var(--warn); color: var(--warn); padding: 8px 12px; border-radius: 6px; font-size: 0.78rem; margin-top: 12px; }
+  .standings-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; margin-bottom: 24px; }
+  .standings-table th { text-align: left; padding: 8px 10px; color: var(--muted); border-bottom: 1px solid var(--border); text-transform: uppercase; font-size: 0.7rem; letter-spacing: 0.5px; }
+  .standings-table td { padding: 8px 10px; border-bottom: 1px solid rgba(42,42,74,0.5); }
+  .standings-table tr:hover td { background: rgba(108,99,255,0.05); }
+  .standings-table .pos { color: var(--muted); width: 32px; }
+  .news-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 24px; }
+  .news-item { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; }
+  .news-item a { color: var(--text); text-decoration: none; font-size: 0.9rem; font-weight: 600; }
+  .news-item a:hover { color: var(--accent); }
+  .news-meta { font-size: 0.72rem; color: var(--muted); margin-top: 4px; }
+  .news-desc { font-size: 0.8rem; color: var(--muted); margin-top: 4px; }
+  .empty { color: var(--muted); font-size: 0.9rem; padding: 24px; text-align: center; }
+  .loading { color: var(--muted); font-size: 0.85rem; padding: 24px; text-align: center; }
+  .error-msg { background: rgba(244,67,54,0.1); border: 1px solid var(--danger); color: var(--danger); padding: 10px 14px; border-radius: 8px; font-size: 0.85rem; margin: 10px 0; }
+  .sport-panel { display: none; }
+  .sport-panel.active { display: block; }
+  .form-char { display: inline-block; width: 16px; height: 16px; border-radius: 50%; font-size: 0.65rem; font-weight: 700; text-align: center; line-height: 16px; margin: 0 1px; }
+  .form-W { background: rgba(0,230,118,0.2); color: var(--live); }
+  .form-D { background: rgba(255,235,59,0.2); color: #ffe600; }
+  .form-L { background: rgba(244,67,54,0.2); color: var(--danger); }
+</style>
+</head>
+<body>
+
+<header>
+  <span style="font-size:1.5rem">🏆</span>
+  <h1>Sports Bot</h1>
+  <span class="badge">Admin Only</span>
+</header>
+
+<div class="disclaimer">
+  ⚠️ INFO ONLY: Sports analysis is for informational purposes only. This is NOT betting advice.
+  KelionAI provides no guarantees about match outcomes. Please gamble responsibly.
+</div>
+
+<div class="auth-bar">
+  <label for="adminKey">Admin Secret:</label>
+  <input type="password" id="adminKey" placeholder="Enter ADMIN_SECRET_KEY" />
+  <button onclick="loadAll()">Load Data</button>
+  <span id="authStatus" style="color:var(--muted)"></span>
+</div>
+
+<div class="tabs">
+  <button class="tab active" onclick="showSport('football', this)">⚽ Football</button>
+  <button class="tab" onclick="showSport('basketball', this)">🏀 Basketball</button>
+  <button class="tab" onclick="showSport('tennis', this)">🎾 Tennis</button>
+  <button class="tab" onclick="showSport('f1', this)">🏎️ F1</button>
+  <button class="tab" onclick="showSport('rugby', this)">🏉 Rugby</button>
+  <button class="tab" onclick="showSport('news', this)">📰 News</button>
+</div>
+
+<div class="container">
+
+  <!-- Live Scores (always visible regardless of sport tab) -->
+  <div id="liveSection">
+    <div class="section-title">
+      🔴 Live Scores
+      <button class="refresh-btn" onclick="loadLive()">↻ Refresh</button>
+      <span id="liveTimer" style="color:var(--muted);font-size:0.72rem;margin-left:4px"></span>
+    </div>
+    <div id="liveGrid" class="grid"><div class="loading">Enter admin key and click Load Data</div></div>
+  </div>
+
+  <!-- Analysis Panel (shared) -->
+  <div id="analysisPanel" class="analysis-panel">
+    <h3>📊 Pre-Match Analysis</h3>
+    <div id="analysisContent"></div>
+  </div>
+
+  <!-- Football -->
+  <div id="panel-football" class="sport-panel active">
+    <div class="section-title">📅 Today's Fixtures — Football</div>
+    <div id="fixtures-football" class="grid"><div class="loading">—</div></div>
+    <div class="section-title">📊 Standings</div>
+    <div id="standings-football"><div class="loading">—</div></div>
+  </div>
+
+  <!-- Basketball -->
+  <div id="panel-basketball" class="sport-panel">
+    <div class="section-title">📅 Today's Fixtures — Basketball</div>
+    <div id="fixtures-basketball" class="grid"><div class="loading">—</div></div>
+    <div class="section-title">📊 Standings</div>
+    <div id="standings-basketball"><div class="loading">—</div></div>
+  </div>
+
+  <!-- Tennis -->
+  <div id="panel-tennis" class="sport-panel">
+    <div class="section-title">📅 Today's Fixtures — Tennis</div>
+    <div id="fixtures-tennis" class="grid"><div class="loading">—</div></div>
+    <div class="section-title">📊 Standings</div>
+    <div id="standings-tennis"><div class="loading">—</div></div>
+  </div>
+
+  <!-- F1 -->
+  <div id="panel-f1" class="sport-panel">
+    <div class="section-title">📅 Upcoming Races — F1</div>
+    <div id="fixtures-f1" class="grid"><div class="loading">—</div></div>
+    <div class="section-title">🏆 Driver Standings</div>
+    <div id="standings-f1"><div class="loading">—</div></div>
+  </div>
+
+  <!-- Rugby -->
+  <div id="panel-rugby" class="sport-panel">
+    <div class="section-title">📅 Today's Fixtures — Rugby</div>
+    <div id="fixtures-rugby" class="grid"><div class="loading">—</div></div>
+    <div class="section-title">📊 Standings</div>
+    <div id="standings-rugby"><div class="loading">—</div></div>
+  </div>
+
+  <!-- News -->
+  <div id="panel-news" class="sport-panel">
+    <div class="section-title">📰 Sports News</div>
+    <div id="newsList" class="news-list"><div class="loading">—</div></div>
+  </div>
+
+</div>
+
+<script>
+'use strict';
+
+let _secret = '';
+let _liveInterval = null;
+let _countdownInterval = null;
+let _liveCountdown = 90;
+let _loadedFixtures = null;
+
+function adminHeaders() {
+  return { 'Content-Type': 'application/json', 'x-admin-secret': _secret };
+}
+
+async function apiFetch(path) {
+  const r = await fetch(path, { headers: adminHeaders() });
+  if (r.status === 401) { document.getElementById('authStatus').textContent = '❌ Auth failed'; throw new Error('Unauthorized'); }
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  document.getElementById('authStatus').textContent = '✅ Authenticated';
+  return r.json();
+}
+
+// ── Tab switching ─────────────────────────────────────────────
+function showSport(sport, btn) {
+  document.querySelectorAll('.sport-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(`panel-${sport}`).classList.add('active');
+  if (btn) btn.classList.add('active');
+  // Close analysis panel on tab switch
+  document.getElementById('analysisPanel').classList.remove('open');
+}
+
+// ── Format form string ────────────────────────────────────────
+function renderForm(form) {
+  if (!form) return '';
+  return form.toUpperCase().split('').map(c => {
+    const cls = { W: 'form-W', D: 'form-D', L: 'form-L' }[c] || '';
+    return `<span class="form-char ${cls}">${c}</span>`;
+  }).join('');
+}
+
+// ── Fixture store (indexed by data-fixture-id) ────────────────
+const _fixtureStore = new Map();
+let _fixtureCounter = 0;
+
+// ── Render a fixture card ─────────────────────────────────────
+function renderFixtureCard(f) {
+  const fixtureKey = `fixture-${_fixtureCounter++}`;
+  _fixtureStore.set(fixtureKey, f);
+
+  const statusClass = f.status === 'live' ? 'live' : f.status === 'finished' ? 'finished' : 'upcoming';
+  const statusLabel = f.status === 'live' ? 'LIVE' : f.status === 'finished' ? 'FT' : 'Soon';
+  const score = f.score ? `<span class="score">${f.score.home} <span>–</span> ${f.score.away}</span>` :
+    `<span class="score" style="font-size:1rem;color:var(--muted)">vs</span>`;
+  const homeLogo = f.homeTeam.logo ? `<img class="team-logo" src="${escHtml(f.homeTeam.logo)}" alt="" loading="lazy">` : `<div class="team-logo"></div>`;
+  const awayLogo = f.awayTeam.logo ? `<img class="team-logo" src="${escHtml(f.awayTeam.logo)}" alt="" loading="lazy">` : `<div class="team-logo"></div>`;
+  const dateStr = f.date ? new Date(f.date).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+
+  return `<div class="card ${statusClass}" data-fixture-key="${escHtml(fixtureKey)}">
+    <div class="match-header">
+      <span class="match-league">${escHtml(f.league)}</span>
+      <span class="status-badge ${statusClass}">${statusLabel}${f.liveMinute ? ' ' + escHtml(f.liveMinute) : ''}</span>
+    </div>
+    <div class="teams">
+      <div class="team">
+        ${homeLogo}
+        <span class="team-name">${escHtml(f.homeTeam.name)}</span>
+        <span class="team-form">${renderForm(f.homeTeam.form)}</span>
+      </div>
+      ${score}
+      <div class="team">
+        ${awayLogo}
+        <span class="team-name">${escHtml(f.awayTeam.name)}</span>
+        <span class="team-form">${renderForm(f.awayTeam.form)}</span>
+      </div>
+    </div>
+    <div class="match-time">${escHtml(dateStr)}${f.venue ? ' · ' + escHtml(f.venue) : ''}</div>
+  </div>`;
+}
+
+// Delegate click on fixture cards
+document.addEventListener('click', function(e) {
+  const card = e.target.closest('[data-fixture-key]');
+  if (!card) return;
+  const f = _fixtureStore.get(card.dataset.fixtureKey);
+  if (f) showAnalysis(f);
+});
+
+// ── Show analysis panel ───────────────────────────────────────
+function showAnalysis(f) {
+  const panel = document.getElementById('analysisPanel');
+  const content = document.getElementById('analysisContent');
+  const a = f.analysis || {};
+  const factors = (a.keyFactors || []).map(kf => `<li>${escHtml(kf)}</li>`).join('');
+
+  content.innerHTML = `
+    <div style="margin-bottom:10px;font-size:0.85rem;color:var(--muted)">
+      ${escHtml(f.homeTeam.name)} vs ${escHtml(f.awayTeam.name)}
+      &nbsp;·&nbsp; ${escHtml(f.league)}
+    </div>
+    <div class="signal-box">💡 ${escHtml(a.signal || 'No signal available')}</div>
+    <div style="display:flex;gap:20px;margin:10px 0;font-size:0.82rem">
+      <div>🏠 Home form rating: <strong>${a.homeFormRating || '—'}/10</strong></div>
+      <div>✈️ Away form rating: <strong>${a.awayFormRating || '—'}/10</strong></div>
+      <div>📈 Form advantage: <strong>${escHtml(a.formAdvantage || 'even')}</strong></div>
+    </div>
+    <ul class="factors">${factors}</ul>
+    <div class="disclaimer-inline">${escHtml(a.disclaimer || '')}</div>
+  `;
+  panel.classList.add('open');
+  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// ── HTML escape ───────────────────────────────────────────────
+function escHtml(str) {
+  return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+// ── Load live scores ──────────────────────────────────────────
+async function loadLive() {
+  const el = document.getElementById('liveGrid');
+  el.innerHTML = '<div class="loading">Loading live scores…</div>';
+  try {
+    const data = await apiFetch('/api/sports/live');
+    if (!data.live || !data.live.length) {
+      el.innerHTML = '<div class="empty">No live matches right now.</div>';
+    } else {
+      el.innerHTML = data.live.map(renderFixtureCard).join('');
+    }
+    _liveCountdown = 90;
+    if (_countdownInterval) {
+      clearInterval(_countdownInterval);
+      const timerEl = document.getElementById('liveTimer');
+      _countdownInterval = setInterval(() => {
+        _liveCountdown = Math.max(0, _liveCountdown - 1);
+        timerEl.textContent = `(next refresh in ${_liveCountdown}s)`;
+      }, 1000);
+    }
+  } catch (e) {
+    el.innerHTML = `<div class="error-msg">⚠️ ${escHtml(e.message)}</div>`;
+  }
+}
+
+// ── Load fixtures for a sport ─────────────────────────────────
+async function loadFixtures() {
+  if (_loadedFixtures) return _loadedFixtures;
+  try {
+    _loadedFixtures = await apiFetch('/api/sports/fixtures');
+    return _loadedFixtures;
+  } catch (e) {
+    return null;
+  }
+}
+
+async function populateFixtures(sport) {
+  const el = document.getElementById(`fixtures-${sport}`);
+  if (!el) return;
+  el.innerHTML = '<div class="loading">Loading…</div>';
+  const data = await loadFixtures();
+  if (!data) { el.innerHTML = '<div class="error-msg">Failed to load fixtures</div>'; return; }
+  const filtered = (data.fixtures || []).filter(f => f.sport === sport || (sport === 'f1' && f.sport === 'f1'));
+  if (!filtered.length) { el.innerHTML = '<div class="empty">No fixtures found.</div>'; return; }
+  el.innerHTML = filtered.map(renderFixtureCard).join('');
+}
+
+// ── Load standings ────────────────────────────────────────────
+async function loadStandings(sport) {
+  const el = document.getElementById(`standings-${sport}`);
+  if (!el) return;
+  el.innerHTML = '<div class="loading">Loading standings…</div>';
+  try {
+    const data = await apiFetch(`/api/sports/${encodeURIComponent(sport)}/standings`);
+
+    if (sport === 'f1') {
+      el.innerHTML = renderF1Standings(data);
+      return;
+    }
+
+    if (!data.standings || !data.standings.length) {
+      el.innerHTML = '<div class="empty">No standings available.</div>';
+      return;
+    }
+
+    el.innerHTML = data.standings.map(lg => {
+      const rows = (lg.table || []).slice(0, 10).map(row => `
+        <tr>
+          <td class="pos">${row.position}</td>
+          <td>${escHtml(row.team)}</td>
+          <td>${row.played}</td>
+          <td>${row.won}</td>
+          <td>${row.drawn}</td>
+          <td>${row.lost}</td>
+          <td>${row.goalsFor}–${row.goalsAgainst}</td>
+          <td><strong>${row.points}</strong></td>
+          <td>${renderForm(row.form)}</td>
+        </tr>`).join('');
+      return `<div style="margin-bottom:24px">
+        <div class="section-title" style="font-size:0.78rem">${escHtml(lg.leagueName)} ${lg.country ? '· ' + escHtml(lg.country) : ''}</div>
+        ${rows ? `<table class="standings-table">
+          <thead><tr><th>#</th><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th>GD</th><th>Pts</th><th>Form</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>` : '<div class="empty">No table data.</div>'}
+      </div>`;
+    }).join('');
+  } catch (e) {
+    el.innerHTML = `<div class="error-msg">⚠️ ${escHtml(e.message)}</div>`;
+  }
+}
+
+function renderF1Standings(data) {
+  if (!data.drivers || !data.drivers.length) return '<div class="empty">No F1 standings.</div>';
+  const rows = data.drivers.slice(0, 20).map(d => `
+    <tr>
+      <td class="pos">${d.position}</td>
+      <td>${escHtml(d.name)}</td>
+      <td>${escHtml(d.team)}</td>
+      <td>${escHtml(d.nationality)}</td>
+      <td><strong>${d.points}</strong></td>
+      <td>${d.wins}</td>
+    </tr>`).join('');
+  return `<div style="margin-bottom:24px">
+    <div class="section-title" style="font-size:0.78rem">Driver Standings — ${escHtml(String(data.season || ''))}</div>
+    <table class="standings-table">
+      <thead><tr><th>#</th><th>Driver</th><th>Team</th><th>Nat.</th><th>Pts</th><th>Wins</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>`;
+}
+
+// ── Load news ─────────────────────────────────────────────────
+async function loadNews() {
+  const el = document.getElementById('newsList');
+  el.innerHTML = '<div class="loading">Loading news…</div>';
+  try {
+    const data = await apiFetch('/api/sports/news');
+    if (!data.news || !data.news.length) { el.innerHTML = '<div class="empty">No news available.</div>'; return; }
+    el.innerHTML = data.news.slice(0, 30).map(item => `
+      <div class="news-item">
+        <a href="${escHtml(item.link)}" target="_blank" rel="noopener">${escHtml(item.title)}</a>
+        ${item.description ? `<div class="news-desc">${escHtml(item.description.slice(0, 160))}…</div>` : ''}
+        <div class="news-meta">${escHtml(item.source)} · ${escHtml(item.pubDate)}</div>
+      </div>`).join('');
+  } catch (e) {
+    el.innerHTML = `<div class="error-msg">⚠️ ${escHtml(e.message)}</div>`;
+  }
+}
+
+// ── Load all sections ─────────────────────────────────────────
+async function loadAll() {
+  _secret = document.getElementById('adminKey').value.trim();
+  if (!_secret) { alert('Please enter admin secret key'); return; }
+
+  // Clear cached fixtures on reload
+  _loadedFixtures = null;
+
+  await loadLive();
+  await Promise.all([
+    populateFixtures('football'),
+    populateFixtures('basketball'),
+    populateFixtures('tennis'),
+    populateFixtures('f1'),
+    populateFixtures('rugby'),
+    loadStandings('football'),
+    loadStandings('basketball'),
+    loadStandings('f1'),
+    loadNews(),
+  ]);
+
+  // Auto-refresh live scores every 90s
+  if (_liveInterval) clearInterval(_liveInterval);
+  _liveInterval = setInterval(loadLive, 90000);
+
+  // Countdown display
+  _liveCountdown = 90;
+  if (_countdownInterval) clearInterval(_countdownInterval);
+  const timerEl = document.getElementById('liveTimer');
+  _countdownInterval = setInterval(() => {
+    _liveCountdown = Math.max(0, _liveCountdown - 1);
+    timerEl.textContent = `(next refresh in ${_liveCountdown}s)`;
+  }, 1000);
+}
+</script>
+</body>
+</html>

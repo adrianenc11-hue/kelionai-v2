@@ -24,6 +24,7 @@ const { buildSystemPrompt } = require('./persona');
 const logger = require('./logger');
 const { router: paymentsRouter, checkUsage, incrementUsage } = require('./payments');
 const legalRouter = require('./legal');
+const sportsRouter = require('./sports');
 const { validate, registerSchema, loginSchema, refreshSchema, chatSchema, speakSchema, listenSchema, visionSchema, searchSchema, weatherSchema, imagineSchema, memorySchema } = require('./validation');
 
 const app = express();
@@ -727,6 +728,7 @@ app.locals.supabaseAdmin = supabaseAdmin;
 // ═══ PAYMENTS & LEGAL ROUTES ═══
 app.use('/api/payments', paymentsRouter);
 app.use('/api/legal', legalRouter);
+app.use('/api/sports', adminAuth, sportsRouter);
 
 // ═══ HEALTH ═══
 app.get('/api/health', (req, res) => {
