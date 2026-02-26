@@ -1,0 +1,35 @@
+name: Test & Deploy
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm test
+        env:
+          NODE_ENV: test
+
+  deploy-check:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions: {}
+    if: github.ref == 'refs/heads/master'
+    steps:
+      - name: ✅ Deploy confirmed
+        run: |
+          echo "All tests passed! Railway will auto-deploy from master."
+          echo "Check deployment at: https://kelionai-v2-production.up.railway.app/"
