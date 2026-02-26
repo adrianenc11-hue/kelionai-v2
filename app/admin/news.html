@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KelionAI — News Bot Admin</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #0a0a1a; color: #e0e0e0; font-family: system-ui, sans-serif; padding: 20px; }
+        h1 { color: #00ffff; margin-bottom: 6px; font-size: 1.4rem; }
+        .subtitle { color: #888; font-size: 0.85rem; margin-bottom: 20px; }
+        .toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 20px; }
+        .btn { background: #00ffff; color: #000; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 0.85rem; }
+        .btn:hover { background: #00dddd; }
+        .btn.secondary { background: rgba(255,255,255,0.1); color: #e0e0e0; }
+        .btn.secondary:hover { background: rgba(255,255,255,0.18); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .admin-input { background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.15); color: #e0e0e0; padding: 8px 12px; border-radius: 8px; font-size: 0.85rem; width: 240px; }
+        .status-bar { font-size: 0.8rem; color: #888; }
+        .status-bar span { color: #00ffff; }
+
+        /* Breaking news banner */
+        #breaking-section { margin-bottom: 20px; display: none; }
+        .breaking-banner { background: rgba(255, 40, 40, 0.12); border: 1px solid rgba(255, 40, 40, 0.4); border-radius: 10px; padding: 14px 16px; }
+        .breaking-banner h2 { color: #ff4444; font-size: 0.9rem; margin-bottom: 10px; letter-spacing: 1px; }
+        .breaking-article { padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); cursor: pointer; }
+        .breaking-article:last-child { border: none; }
+        .breaking-article:hover { opacity: 0.8; }
+
+        /* Category tabs */
+        .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
+        .tab { background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.12); color: #aaa; padding: 6px 14px; border-radius: 20px; cursor: pointer; font-size: 0.82rem; }
+        .tab.active { background: #00ffff; color: #000; border-color: #00ffff; font-weight: bold; }
+        .tab:hover:not(.active) { background: rgba(255,255,255,0.12); }
+
+        /* Articles list */
+        #articles-section { }
+        .articles-list { display: flex; flex-direction: column; gap: 8px; }
+        .article-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 14px 16px; cursor: pointer; transition: background 0.15s; }
+        .article-card:hover { background: rgba(255,255,255,0.08); }
+        .article-card .title { font-size: 0.95rem; color: #e0e0e0; margin-bottom: 6px; line-height: 1.4; }
+        .article-meta { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; font-size: 0.75rem; color: #777; }
+        .badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 10px; font-size: 0.72rem; font-weight: bold; }
+        .badge.breaking { background: rgba(255, 40, 40, 0.2); color: #ff6666; border: 1px solid rgba(255, 40, 40, 0.3); }
+        .badge.category { background: rgba(0, 255, 255, 0.1); color: #00cccc; border: 1px solid rgba(0, 255, 255, 0.2); }
+        .badge.sources { background: rgba(0, 200, 100, 0.1); color: #00cc66; border: 1px solid rgba(0, 200, 100, 0.2); }
+
+        /* Article detail view */
+        #detail-view { display: none; }
+        .detail-back { background: none; border: none; color: #00ffff; cursor: pointer; font-size: 0.9rem; margin-bottom: 16px; padding: 0; }
+        .detail-back:hover { text-decoration: underline; }
+        .detail-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 24px; }
+        .detail-card h2 { font-size: 1.15rem; color: #fff; margin-bottom: 12px; line-height: 1.5; }
+        .detail-meta { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; font-size: 0.78rem; color: #888; }
+        .detail-summary { color: #ccc; font-size: 0.9rem; line-height: 1.6; margin-bottom: 20px; }
+        .detail-link { display: inline-block; background: #00ffff; color: #000; padding: 8px 18px; border-radius: 8px; font-weight: bold; font-size: 0.85rem; text-decoration: none; }
+        .detail-link:hover { background: #00dddd; }
+
+        /* Schedule panel */
+        #schedule-panel { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 16px; margin-bottom: 20px; }
+        #schedule-panel h3 { font-size: 0.85rem; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
+        .schedule-row { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 0.82rem; }
+        .schedule-row:last-child { border: none; }
+        .schedule-label { color: #ccc; }
+        .schedule-time { color: #00ffff; }
+
+        .empty-state { text-align: center; padding: 40px; color: #555; font-size: 0.9rem; }
+        .loading { text-align: center; padding: 30px; color: #00ffff; font-size: 0.9rem; }
+        .error-msg { color: #ff6666; font-size: 0.82rem; }
+
+        /* Auth row */
+        .auth-row { display: flex; gap: 8px; align-items: center; margin-bottom: 16px; }
+        .auth-row label { font-size: 0.82rem; color: #888; }
+    </style>
+</head>
+<body>
+    <h1>📰 KelionAI — News Bot</h1>
+    <p class="subtitle">Panou administrare știri — ADMIN ONLY</p>
+
+    <div class="auth-row">
+        <label>Admin Secret:</label>
+        <input type="password" id="admin-secret" class="admin-input" placeholder="x-admin-secret" autocomplete="off">
+        <button class="btn secondary" onclick="saveSecret()">Salvează</button>
+    </div>
+
+    <div class="toolbar">
+        <button class="btn" id="btn-fetch" onclick="triggerFetch()">⚡ Fetch Acum</button>
+        <button class="btn secondary" onclick="loadLatest()">🔄 Reîncarcă</button>
+        <span class="status-bar" id="status-bar">—</span>
+    </div>
+
+    <div id="schedule-panel">
+        <h3>⏰ Program Următor</h3>
+        <div id="schedule-list"><div class="loading">Se încarcă...</div></div>
+    </div>
+
+    <div id="breaking-section">
+        <div class="breaking-banner">
+            <h2>🚨 BREAKING NEWS</h2>
+            <div id="breaking-list"></div>
+        </div>
+    </div>
+
+    <div id="list-view">
+        <div class="tabs" id="category-tabs">
+            <div class="tab active" data-cat="">Toate</div>
+            <div class="tab" data-cat="general">General</div>
+            <div class="tab" data-cat="politics">Politică</div>
+            <div class="tab" data-cat="economy">Economie</div>
+            <div class="tab" data-cat="sports">Sport</div>
+            <div class="tab" data-cat="tech">Tech</div>
+            <div class="tab" data-cat="world">Internațional</div>
+        </div>
+        <div class="articles-list" id="articles-list">
+            <div class="loading">Se încarcă...</div>
+        </div>
+    </div>
+
+    <div id="detail-view">
+        <button class="detail-back" onclick="closeDetail()">← Înapoi la lista de știri</button>
+        <div class="detail-card" id="detail-content"></div>
+    </div>
+
+    <script>
+        'use strict';
+
+        let allArticles = [];
+        let currentCategory = '';
+        let adminSecret = sessionStorage.getItem('kelion_admin_secret') || '';
+
+        // Pre-fill secret input
+        document.getElementById('admin-secret').value = adminSecret;
+
+        function saveSecret() {
+            adminSecret = document.getElementById('admin-secret').value.trim();
+            sessionStorage.setItem('kelion_admin_secret', adminSecret);
+            setStatus('Secret salvat.');
+            loadAll();
+        }
+
+        function getHeaders() {
+            return { 'x-admin-secret': adminSecret };
+        }
+
+        function setStatus(msg, isError) {
+            const el = document.getElementById('status-bar');
+            el.innerHTML = isError ? `<span class="error-msg">${msg}</span>` : `<span>${msg}</span>`;
+        }
+
+        function formatDate(iso) {
+            try {
+                return new Date(iso).toLocaleString('ro-RO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+            } catch (e) { return iso || ''; }
+        }
+
+        // ═══ CATEGORY TABS ═══
+        document.getElementById('category-tabs').addEventListener('click', (e) => {
+            const tab = e.target.closest('.tab');
+            if (!tab) return;
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            currentCategory = tab.dataset.cat;
+            renderArticles();
+        });
+
+        // ═══ RENDER ARTICLES ═══
+        function renderArticles() {
+            const list = document.getElementById('articles-list');
+            const filtered = currentCategory ? allArticles.filter(a => a.category === currentCategory) : allArticles;
+
+            if (!filtered.length) {
+                list.innerHTML = '<div class="empty-state">Nicio știre disponibilă în această categorie.<br><small>Apasă "Fetch Acum" pentru a aduce știri.</small></div>';
+                return;
+            }
+
+            list.innerHTML = filtered.map(a => `
+                <div class="article-card" onclick="openDetail('${escHtml(a.id)}')">
+                    <div class="title">${escHtml(a.title)}</div>
+                    <div class="article-meta">
+                        <span>📡 ${escHtml(a.source)}</span>
+                        <span>🕐 ${formatDate(a.publishedAt)}</span>
+                        <span class="badge category">${escHtml(a.category)}</span>
+                        ${a.isBreaking ? '<span class="badge breaking">🔴 BREAKING</span>' : ''}
+                        ${a.confirmedBy > 1 ? `<span class="badge sources">✓ ${a.confirmedBy} surse</span>` : ''}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function escHtml(str) {
+            return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        }
+
+        // ═══ BREAKING NEWS ═══
+        function renderBreaking(articles) {
+            const breaking = articles.filter(a => a.isBreaking || a.confirmedBy >= 2);
+            const section = document.getElementById('breaking-section');
+            if (!breaking.length) { section.style.display = 'none'; return; }
+            section.style.display = 'block';
+            document.getElementById('breaking-list').innerHTML = breaking.map(a => `
+                <div class="breaking-article" onclick="openDetail('${escHtml(a.id)}')">
+                    <strong>${escHtml(a.title)}</strong>
+                    <div style="font-size:0.78rem;color:#888;margin-top:3px;">
+                        ${escHtml(a.source)} · ${formatDate(a.publishedAt)} · ✓ ${a.confirmedBy} surse
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // ═══ ARTICLE DETAIL ═══
+        function openDetail(id) {
+            const article = allArticles.find(a => a.id === id);
+            if (!article) return;
+
+            document.getElementById('detail-content').innerHTML = `
+                <h2>${escHtml(article.title)}</h2>
+                <div class="detail-meta">
+                    <span>📡 ${escHtml(article.source)}</span>
+                    <span>🕐 ${formatDate(article.publishedAt)}</span>
+                    <span class="badge category">${escHtml(article.category)}</span>
+                    ${article.isBreaking ? '<span class="badge breaking">🔴 BREAKING</span>' : ''}
+                    ${article.confirmedBy > 1 ? `<span class="badge sources">✓ ${article.confirmedBy} surse confirmate</span>` : ''}
+                </div>
+                <p class="detail-summary">${escHtml(article.summary || 'Fără rezumat disponibil.')}</p>
+                ${article.url ? `<a class="detail-link" href="${escHtml(article.url)}" target="_blank" rel="noopener noreferrer">→ Citește articolul complet</a>` : ''}
+            `;
+
+            document.getElementById('list-view').style.display = 'none';
+            document.getElementById('detail-view').style.display = 'block';
+            window.scrollTo(0, 0);
+        }
+
+        function closeDetail() {
+            document.getElementById('list-view').style.display = 'block';
+            document.getElementById('detail-view').style.display = 'none';
+        }
+
+        // ═══ LOAD LATEST ═══
+        async function loadLatest() {
+            const cat = currentCategory;
+            const url = `/api/news/latest${cat ? `?category=${encodeURIComponent(cat)}` : ''}`;
+            try {
+                const res = await fetch(url, { headers: getHeaders() });
+                if (res.status === 401) { setStatus('Unauthorized — verifică admin secret.', true); return; }
+                const data = await res.json();
+                allArticles = data.articles || [];
+                renderArticles();
+                renderBreaking(allArticles);
+                const last = data.lastFetchAt ? `Ultima: ${formatDate(data.lastFetchAt)}` : 'Nicio fetch efectuat';
+                setStatus(`${allArticles.length} știri · ${last}`);
+            } catch (e) {
+                setStatus('Eroare la încărcarea știrilor: ' + e.message, true);
+            }
+        }
+
+        // ═══ LOAD SCHEDULE ═══
+        async function loadSchedule() {
+            try {
+                const res = await fetch('/api/news/schedule', { headers: getHeaders() });
+                if (!res.ok) return;
+                const data = await res.json();
+                const scheduleList = document.getElementById('schedule-list');
+                if (!data.schedule || !data.schedule.length) { scheduleList.innerHTML = '<div style="color:#555;font-size:0.82rem;">N/A</div>'; return; }
+                scheduleList.innerHTML = data.schedule.map(s => `
+                    <div class="schedule-row">
+                        <span class="schedule-label">${s.label}</span>
+                        <span class="schedule-time">${formatDate(s.nextAt)}</span>
+                    </div>
+                `).join('') + `<div class="schedule-row"><span class="schedule-label">Articole în cache</span><span class="schedule-time">${data.cacheSize}</span></div>`;
+            } catch (e) { /* ignore */ }
+        }
+
+        // ═══ TRIGGER FETCH ═══
+        async function triggerFetch() {
+            const btn = document.getElementById('btn-fetch');
+            btn.disabled = true;
+            setStatus('Se fetch-uiesc știrile...');
+            try {
+                const res = await fetch('/api/news/fetch', { headers: getHeaders() });
+                if (res.status === 401) { setStatus('Unauthorized — verifică admin secret.', true); btn.disabled = false; return; }
+                if (res.status === 429) { const d = await res.json(); setStatus(d.error || 'Prea devreme.', true); btn.disabled = false; return; }
+                const data = await res.json();
+                setStatus(data.success ? `✓ Fetch OK — ${data.articles} articole` : `Fetch parțial: ${data.error || ''}`);
+                await loadLatest();
+                await loadSchedule();
+            } catch (e) {
+                setStatus('Eroare fetch: ' + e.message, true);
+            }
+            btn.disabled = false;
+        }
+
+        // ═══ INIT ═══
+        async function loadAll() {
+            await Promise.all([loadLatest(), loadSchedule()]);
+        }
+
+        if (adminSecret) loadAll();
+        else setStatus('Introdu admin secret și apasă Salvează.');
+    </script>
+</body>
+</html>
