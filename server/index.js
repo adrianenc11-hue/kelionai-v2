@@ -14,6 +14,7 @@ const fetch = require('node-fetch');
 const FormData = require('form-data');
 const path = require('path');
 const fs = require('fs');
+const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const { supabase, supabaseAdmin } = require('./supabase');
 const { runMigration } = require('./migrate');
@@ -25,6 +26,23 @@ const legalRouter = require('./legal');
 
 const app = express();
 app.set('trust proxy', 1);
+
+app.use(helmet({
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'", "'unsafe-inline'"],
+            styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+            fontSrc: ["'self'", "https://fonts.gstatic.com"],
+            imgSrc: ["'self'", "data:", "blob:"],
+            connectSrc: ["'self'", "https://api.openai.com", "https://generativelanguage.googleapis.com"],
+            mediaSrc: ["'self'", "blob:"],
+            workerSrc: ["'self'", "blob:"],
+        }
+    },
+    crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
 
 const allowedOrigins = process.env.ALLOWED_ORIGINS
     ? process.env.ALLOWED_ORIGINS.split(',').map(s => s.trim())
