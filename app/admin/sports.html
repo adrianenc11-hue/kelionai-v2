@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KelionAI — Sports Dashboard (Admin)</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #0a0a1a; color: #e0e0e0; font-family: system-ui, sans-serif; min-height: 100vh; }
+
+        /* ── HEADER ── */
+        header { background: rgba(0,0,0,0.6); border-bottom: 1px solid rgba(255,255,255,0.08); padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; }
+        header h1 { color: #00ffcc; font-size: 1.25rem; letter-spacing: 1px; }
+        header .badge { background: #ff4444; color: #fff; font-size: 0.7rem; font-weight: bold; padding: 2px 8px; border-radius: 4px; margin-left: 10px; text-transform: uppercase; }
+        .header-right { display: flex; gap: 12px; align-items: center; }
+        .auth-form { display: flex; gap: 8px; align-items: center; }
+        .auth-form input { background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #e0e0e0; padding: 6px 12px; font-size: 0.85rem; width: 180px; }
+        .auth-form button, .btn { background: #00ffcc; color: #000; border: none; border-radius: 6px; padding: 7px 14px; font-size: 0.85rem; font-weight: bold; cursor: pointer; transition: opacity 0.2s; }
+        .btn:hover, .auth-form button:hover { opacity: 0.85; }
+        .btn-sm { padding: 5px 10px; font-size: 0.75rem; }
+        .btn-outline { background: transparent; color: #00ffcc; border: 1px solid #00ffcc; }
+
+        /* ── DISCLAIMER BANNER ── */
+        .disclaimer-banner { background: rgba(255,170,0,0.12); border: 1px solid rgba(255,170,0,0.35); border-radius: 8px; padding: 10px 18px; margin: 16px 24px; font-size: 0.82rem; color: #ffcc66; }
+
+        /* ── TABS ── */
+        .tabs { display: flex; gap: 4px; padding: 14px 24px 0; border-bottom: 1px solid rgba(255,255,255,0.08); overflow-x: auto; }
+        .tab { padding: 10px 20px; font-size: 0.88rem; font-weight: 600; cursor: pointer; border-radius: 8px 8px 0 0; color: #888; border: 1px solid transparent; border-bottom: none; transition: all 0.2s; white-space: nowrap; }
+        .tab:hover { color: #ccc; }
+        .tab.active { background: rgba(0,255,204,0.08); color: #00ffcc; border-color: rgba(255,255,255,0.1); }
+
+        /* ── MAIN LAYOUT ── */
+        .main { display: grid; grid-template-columns: 1fr 320px; gap: 20px; padding: 20px 24px; }
+        @media (max-width: 900px) { .main { grid-template-columns: 1fr; } }
+
+        /* ── CARDS ── */
+        .card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; overflow: hidden; }
+        .card-header { padding: 14px 18px; border-bottom: 1px solid rgba(255,255,255,0.07); display: flex; align-items: center; justify-content: space-between; }
+        .card-header h2 { font-size: 0.9rem; color: #aaa; text-transform: uppercase; letter-spacing: 1px; }
+        .card-body { padding: 16px; }
+
+        /* ── SECTION TITLE ── */
+        .section-title { font-size: 0.8rem; color: #666; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
+
+        /* ── LIVE SCORES ── */
+        .live-dot { width: 8px; height: 8px; border-radius: 50%; background: #ff4444; display: inline-block; margin-right: 6px; animation: blink 1s infinite; }
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+        .match-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); gap: 8px; }
+        .match-row:last-child { border: none; }
+        .team-name { font-size: 0.88rem; flex: 1; }
+        .team-form { font-size: 0.7rem; color: #666; margin-top: 2px; letter-spacing: 1px; }
+        .score-box { background: rgba(0,255,204,0.08); border: 1px solid rgba(0,255,204,0.2); border-radius: 6px; padding: 4px 12px; font-size: 1rem; font-weight: bold; color: #00ffcc; min-width: 56px; text-align: center; }
+        .match-meta { font-size: 0.72rem; color: #666; }
+        .status-live { color: #ff4444; font-size: 0.75rem; font-weight: bold; }
+        .status-scheduled { color: #888; font-size: 0.75rem; }
+        .status-finished { color: #00ff88; font-size: 0.75rem; }
+
+        /* ── FIXTURE GRID ── */
+        .fixture-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+        .fixture-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); border-radius: 10px; padding: 14px; cursor: pointer; transition: border-color 0.2s; }
+        .fixture-card:hover { border-color: rgba(0,255,204,0.3); }
+        .fixture-league { font-size: 0.7rem; color: #666; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+        .fixture-teams { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+        .fixture-team { font-size: 0.85rem; font-weight: 600; flex: 1; }
+        .fixture-team.away { text-align: right; }
+        .fixture-vs { color: #666; font-size: 0.8rem; }
+        .fixture-date { font-size: 0.72rem; color: #666; margin-top: 8px; }
+
+        /* ── ANALYSIS PANEL ── */
+        .analysis-panel { padding: 0; }
+        .form-bar { display: flex; gap: 3px; margin-top: 6px; }
+        .form-dot { width: 20px; height: 20px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: bold; }
+        .form-dot.W { background: rgba(0,255,136,0.2); color: #00ff88; }
+        .form-dot.D { background: rgba(255,170,0,0.2); color: #ffaa00; }
+        .form-dot.L { background: rgba(255,68,68,0.2); color: #ff4444; }
+        .form-dot-q { background: rgba(255,255,255,0.08); color: #666; }
+        .points-bar { height: 6px; border-radius: 3px; background: rgba(255,255,255,0.08); margin-top: 8px; overflow: hidden; }
+        .points-fill { height: 100%; border-radius: 3px; background: linear-gradient(90deg, #00ffcc, #00ff88); transition: width 0.5s; }
+        .verdict-box { background: rgba(0,255,204,0.06); border: 1px solid rgba(0,255,204,0.15); border-radius: 8px; padding: 10px 14px; margin-top: 12px; font-size: 0.85rem; color: #00ffcc; }
+        .confidence { font-size: 0.72rem; color: #888; margin-top: 4px; }
+        .analysis-disclaimer { font-size: 0.72rem; color: #ffcc66; margin-top: 12px; padding: 8px; background: rgba(255,170,0,0.07); border-radius: 6px; }
+
+        /* ── NEWS ── */
+        .news-item { padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .news-item:last-child { border: none; }
+        .news-source { font-size: 0.68rem; color: #00ffcc; text-transform: uppercase; letter-spacing: 1px; }
+        .news-title { font-size: 0.82rem; margin-top: 3px; }
+        .news-title a { color: #ccc; text-decoration: none; }
+        .news-title a:hover { color: #fff; }
+        .news-date { font-size: 0.68rem; color: #555; margin-top: 2px; }
+
+        /* ── EMPTY / LOADING ── */
+        .empty { color: #555; font-size: 0.85rem; padding: 20px; text-align: center; }
+        .loading { color: #666; font-size: 0.82rem; padding: 16px; text-align: center; animation: pulse 1.2s infinite; }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+        .error-msg { color: #ff6666; font-size: 0.82rem; padding: 12px; }
+
+        /* ── HIDDEN ── */
+        .hidden { display: none !important; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* ── AUTO-REFRESH TIMER ── */
+        .refresh-info { font-size: 0.72rem; color: #555; }
+
+        /* ── SECTION ── */
+        .section { margin-bottom: 24px; }
+    </style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+    <div style="display:flex;align-items:center">
+        <h1>⚽ KelionAI Sports</h1>
+        <span class="badge">Admin Only</span>
+    </div>
+    <div class="header-right">
+        <div class="auth-form">
+            <input type="password" id="admin-secret" placeholder="Admin secret…" autocomplete="off">
+            <button onclick="applySecret()">Connect</button>
+        </div>
+        <span class="refresh-info" id="refresh-timer">—</span>
+    </div>
+</header>
+
+<!-- DISCLAIMER BANNER -->
+<div class="disclaimer-banner">
+    ⚠️ <strong>IMPORTANT:</strong> All sports analysis is <strong>INFORMATIONAL ONLY</strong>. KelionAI <strong>NEVER</strong> guarantees any outcome. Sports predictions are inherently uncertain. This is <strong>NOT</strong> betting advice. Always gamble responsibly.
+</div>
+
+<!-- TABS -->
+<div class="tabs">
+    <div class="tab active" data-tab="football">⚽ Football</div>
+    <div class="tab" data-tab="basketball">🏀 Basketball</div>
+    <div class="tab" data-tab="tennis">🎾 Tennis</div>
+    <div class="tab" data-tab="f1">🏎️ Formula 1</div>
+    <div class="tab" data-tab="other">🏆 Other</div>
+</div>
+
+<!-- FOOTBALL TAB -->
+<div id="tab-football" class="tab-content active">
+    <div class="main">
+        <!-- LEFT COLUMN -->
+        <div>
+            <!-- LIVE SCORES -->
+            <div class="card section">
+                <div class="card-header">
+                    <h2><span class="live-dot"></span>Live Scores</h2>
+                    <button class="btn btn-sm btn-outline" onclick="loadLive()">↻ Refresh</button>
+                </div>
+                <div class="card-body" id="live-container">
+                    <div class="loading">Loading live scores…</div>
+                </div>
+            </div>
+
+            <!-- UPCOMING FIXTURES -->
+            <div class="card section">
+                <div class="card-header">
+                    <h2>📅 Upcoming Fixtures (next 48h)</h2>
+                    <button class="btn btn-sm btn-outline" onclick="loadFixtures()">↻</button>
+                </div>
+                <div class="card-body" id="fixtures-container">
+                    <div class="loading">Loading fixtures…</div>
+                </div>
+            </div>
+
+            <!-- RECENT RESULTS -->
+            <div class="card section">
+                <div class="card-header">
+                    <h2>📊 Recent Results (last 24h)</h2>
+                    <button class="btn btn-sm btn-outline" onclick="loadResults()">↻</button>
+                </div>
+                <div class="card-body" id="results-container">
+                    <div class="loading">Loading results…</div>
+                </div>
+            </div>
+
+            <!-- ANALYSIS PANEL -->
+            <div class="card section" id="analysis-card" style="display:none">
+                <div class="card-header">
+                    <h2>🔍 Pre-Match Analysis</h2>
+                    <button class="btn btn-sm btn-outline" onclick="closeAnalysis()">✕ Close</button>
+                </div>
+                <div class="card-body analysis-panel" id="analysis-container"></div>
+            </div>
+        </div>
+
+        <!-- RIGHT COLUMN: NEWS SIDEBAR -->
+        <div>
+            <div class="card">
+                <div class="card-header">
+                    <h2>📰 Sports News</h2>
+                    <button class="btn btn-sm btn-outline" onclick="loadNews()">↻</button>
+                </div>
+                <div class="card-body" id="news-container">
+                    <div class="loading">Loading news…</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- OTHER TABS (placeholder) -->
+<div id="tab-basketball" class="tab-content">
+    <div style="padding:40px;text-align:center;color:#555">Basketball data coming soon.</div>
+</div>
+<div id="tab-tennis" class="tab-content">
+    <div style="padding:40px;text-align:center;color:#555">Tennis data coming soon.</div>
+</div>
+<div id="tab-f1" class="tab-content">
+    <div style="padding:40px;text-align:center;color:#555">Formula 1 data coming soon.</div>
+</div>
+<div id="tab-other" class="tab-content">
+    <div style="padding:40px;text-align:center;color:#555">Other sports coming soon.</div>
+</div>
+
+<script>
+'use strict';
+
+let adminSecret = '';
+let liveRefreshTimer = null;
+let countdown = 60;
+
+// ── AUTH ──
+function applySecret() {
+    adminSecret = document.getElementById('admin-secret').value.trim();
+    if (!adminSecret) return;
+    // Visual-only masking — the value is in-memory; do not rely on this for security
+    document.getElementById('admin-secret').value = '●'.repeat(adminSecret.length);
+    loadAll();
+    startAutoRefresh();
+}
+
+function headers() {
+    return { 'x-admin-secret': adminSecret };
+}
+
+// ── TAB SWITCHING ──
+document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+    });
+});
+
+// ── FETCH HELPERS ──
+async function apiFetch(path) {
+    const res = await fetch('/api/sports' + path, { headers: headers() });
+    if (res.status === 401) throw new Error('Unauthorized — check admin secret');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return res.json();
+}
+
+// ── RENDER HELPERS ──
+function renderMatchRow(m) {
+    const scoreHtml = (m.score.home !== null)
+        ? `<div class="score-box">${m.score.home} – ${m.score.away}</div>`
+        : `<div class="score-box">vs</div>`;
+    const statusHtml = m.status === 'live'
+        ? `<span class="status-live"><span class="live-dot"></span>LIVE</span>`
+        : m.status === 'finished'
+            ? `<span class="status-finished">FT</span>`
+            : `<span class="status-scheduled">${m.date ? new Date(m.date).toLocaleTimeString('ro-RO', {hour:'2-digit',minute:'2-digit'}) : ''}</span>`;
+    return `<div class="match-row">
+        <div style="flex:1">
+            <div class="team-name">${esc(m.homeTeam.name)}</div>
+            ${m.homeTeam.form ? `<div class="team-form">${m.homeTeam.form}</div>` : ''}
+        </div>
+        <div style="text-align:center;min-width:80px">
+            ${scoreHtml}
+            <div style="margin-top:4px">${statusHtml}</div>
+        </div>
+        <div style="flex:1;text-align:right">
+            <div class="team-name">${esc(m.awayTeam.name)}</div>
+            ${m.awayTeam.form ? `<div class="team-form">${m.awayTeam.form}</div>` : ''}
+        </div>
+    </div>`;
+}
+
+function renderFixtureCard(m) {
+    const dateStr = m.date ? new Date(m.date).toLocaleString('ro-RO', {weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : 'TBD';
+    return `<div class="fixture-card" onclick="loadAnalysis('${esc(m.id)}')">
+        <div class="fixture-league">${esc(m.league)}</div>
+        <div class="fixture-teams">
+            <div class="fixture-team">${esc(m.homeTeam.name)}</div>
+            <div class="fixture-vs">vs</div>
+            <div class="fixture-team away">${esc(m.awayTeam.name)}</div>
+        </div>
+        <div class="fixture-date">📅 ${dateStr} · 📍 ${esc(m.venue || '—')}</div>
+    </div>`;
+}
+
+function renderFormBar(formStr) {
+    if (!formStr) return '<span style="color:#555;font-size:0.75rem">No data</span>';
+    return `<div class="form-bar">${formStr.split('').map(c => {
+        const cls = ['W','D','L'].includes(c) ? c : 'form-dot-q';
+        return `<div class="form-dot ${cls}">${c}</div>`;
+    }).join('')}</div>`;
+}
+
+function renderAnalysis(data) {
+    const a = data.analysis || {};
+    const homePoints = a.homeFormPoints || 0;
+    const awayPoints = a.awayFormPoints || 0;
+    const maxPts = 15;
+    return `
+        <div style="margin-bottom:16px">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+                <div>
+                    <div style="font-weight:bold;margin-bottom:4px">${esc(data.homeTeam.name)} <span style="color:#888;font-size:0.75rem">(Home)</span></div>
+                    ${renderFormBar(data.homeTeam.form)}
+                    <div class="points-bar"><div class="points-fill" style="width:${Math.round(homePoints/maxPts*100)}%"></div></div>
+                    <div style="font-size:0.72rem;color:#888;margin-top:3px">Form points: ${homePoints}/15</div>
+                </div>
+                <div>
+                    <div style="font-weight:bold;margin-bottom:4px">${esc(data.awayTeam.name)} <span style="color:#888;font-size:0.75rem">(Away)</span></div>
+                    ${renderFormBar(data.awayTeam.form)}
+                    <div class="points-bar"><div class="points-fill" style="width:${Math.round(awayPoints/maxPts*100)}%"></div></div>
+                    <div style="font-size:0.72rem;color:#888;margin-top:3px">Form points: ${awayPoints}/15</div>
+                </div>
+            </div>
+            ${a.h2hMatches > 0 ? `<div style="font-size:0.75rem;color:#888;margin-top:8px">Head-to-head: ${a.h2hMatches} recent meetings analysed</div>` : ''}
+        </div>
+        <div class="verdict-box">
+            <strong>📊 Analysis:</strong> ${esc(a.verdict || '—')}
+            <div class="confidence">Confidence: ${a.confidence || 'low'} — <em>always treat with caution</em></div>
+        </div>
+        <div class="analysis-disclaimer">${esc(data.disclaimer || '')}</div>
+    `;
+}
+
+function esc(s) {
+    return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+// ── LOAD FUNCTIONS ──
+async function loadLive() {
+    const el = document.getElementById('live-container');
+    el.innerHTML = '<div class="loading">Loading…</div>';
+    try {
+        const d = await apiFetch('/live');
+        if (!d.data || d.data.length === 0) {
+            el.innerHTML = `<div class="empty">${d.note || 'No live matches right now.'}</div>`;
+            return;
+        }
+        el.innerHTML = d.data.map(renderMatchRow).join('');
+    } catch (e) {
+        el.innerHTML = `<div class="error-msg">⚠️ ${esc(e.message)}</div>`;
+    }
+}
+
+async function loadFixtures() {
+    const el = document.getElementById('fixtures-container');
+    el.innerHTML = '<div class="loading">Loading…</div>';
+    try {
+        const d = await apiFetch('/fixtures');
+        if (!d.data || d.data.length === 0) {
+            el.innerHTML = `<div class="empty">${d.note || 'No upcoming fixtures found.'}</div>`;
+            return;
+        }
+        el.innerHTML = `<div class="fixture-grid">${d.data.map(renderFixtureCard).join('')}</div>`;
+    } catch (e) {
+        el.innerHTML = `<div class="error-msg">⚠️ ${esc(e.message)}</div>`;
+    }
+}
+
+async function loadResults() {
+    const el = document.getElementById('results-container');
+    el.innerHTML = '<div class="loading">Loading…</div>';
+    try {
+        const d = await apiFetch('/results');
+        if (!d.data || d.data.length === 0) {
+            el.innerHTML = `<div class="empty">${d.note || 'No recent results.'}</div>`;
+            return;
+        }
+        el.innerHTML = d.data.map(renderMatchRow).join('');
+    } catch (e) {
+        el.innerHTML = `<div class="error-msg">⚠️ ${esc(e.message)}</div>`;
+    }
+}
+
+async function loadAnalysis(id) {
+    if (!id) return;
+    const card = document.getElementById('analysis-card');
+    const el = document.getElementById('analysis-container');
+    card.style.display = '';
+    el.innerHTML = '<div class="loading">Analysing fixture…</div>';
+    card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    try {
+        const d = await apiFetch('/analysis/' + encodeURIComponent(id));
+        if (d.error) { el.innerHTML = `<div class="error-msg">⚠️ ${esc(d.error)}</div>`; return; }
+        el.innerHTML = renderAnalysis(d);
+    } catch (e) {
+        el.innerHTML = `<div class="error-msg">⚠️ ${esc(e.message)}</div>`;
+    }
+}
+
+function closeAnalysis() {
+    document.getElementById('analysis-card').style.display = 'none';
+}
+
+async function loadNews() {
+    const el = document.getElementById('news-container');
+    el.innerHTML = '<div class="loading">Loading news…</div>';
+    try {
+        const d = await apiFetch('/news');
+        if (!d.data || d.data.length === 0) {
+            el.innerHTML = '<div class="empty">No news available.</div>';
+            return;
+        }
+        el.innerHTML = d.data.map(n => `
+            <div class="news-item">
+                <div class="news-source">${esc(n.source)}</div>
+                <div class="news-title"><a href="${esc(n.link)}" target="_blank" rel="noopener noreferrer">${esc(n.title)}</a></div>
+                <div class="news-date">${esc(n.pubDate)}</div>
+            </div>
+        `).join('');
+    } catch (e) {
+        el.innerHTML = `<div class="error-msg">⚠️ ${esc(e.message)}</div>`;
+    }
+}
+
+function loadAll() {
+    loadLive();
+    loadFixtures();
+    loadResults();
+    loadNews();
+}
+
+// ── AUTO-REFRESH (live: 60s) ──
+function startAutoRefresh() {
+    if (liveRefreshTimer) clearInterval(liveRefreshTimer);
+    countdown = 60;
+    updateTimer();
+    liveRefreshTimer = setInterval(() => {
+        countdown--;
+        if (countdown <= 0) {
+            countdown = 60;
+            loadLive();
+        }
+        updateTimer();
+    }, 1000);
+}
+
+function updateTimer() {
+    document.getElementById('refresh-timer').textContent = `Live refresh in ${countdown}s`;
+}
+</script>
+</body>
+</html>
