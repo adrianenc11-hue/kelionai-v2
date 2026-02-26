@@ -24,7 +24,25 @@ const { router: paymentsRouter, checkUsage, incrementUsage } = require('./paymen
 const legalRouter = require('./legal');
 
 const app = express();
-app.use(cors());
+app.set('trust proxy', 1);
+
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+    ? process.env.ALLOWED_ORIGINS.split(',').map(s => s.trim())
+    : null;
+
+app.use(cors({
+    origin: (origin, callback) => {
+        if (!allowedOrigins) return callback(null, true);
+        if (!origin) return callback(null, true);
+        const env = process.env.NODE_ENV || 'development';
+        if (env !== 'production' && (origin.startsWith('http://localhost') || origin.startsWith('http://127.'))) {
+            return callback(null, true);
+        }
+        if (allowedOrigins.includes(origin)) return callback(null, true);
+        callback(null, false);
+    },
+    credentials: true
+}));
 
 // Stripe webhook needs raw body — must be before express.json()
 app.use('/api/payments/webhook', express.raw({ type: 'application/json' }));
@@ -36,10 +54,30 @@ const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10, message: { er
 const searchLimiter = rateLimit({ windowMs: 60 * 1000, max: 15, message: { error: 'Prea multe căutări. Așteaptă un minut.' } });
 const imageLimiter = rateLimit({ windowMs: 60 * 1000, max: 5, message: { error: 'Prea multe imagini. Așteaptă un minut.' } });
 
+const apiLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 20,
+    message: { error: 'Prea multe cereri API. Așteaptă 15 minute.' },
+    standardHeaders: true,
+    legacyHeaders: false
+});
+
+const globalLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 200,
+    message: { error: 'Prea multe cereri. Încearcă mai târziu.' },
+    standardHeaders: true,
+    legacyHeaders: false
+});
+
 const metrics = require('./metrics');
 app.use(metrics.metricsMiddleware);
 app.get('/metrics', async (req, res) => { res.set('Content-Type', metrics.register.contentType); res.end(await metrics.register.metrics()); });
+app.get('/health', (req, res) => {
+    res.json({ status: 'ok', uptime: process.uptime(), timestamp: new Date().toISOString() });
+});
 app.use(express.static(path.join(__dirname, '..', 'app')));
+app.use('/api', globalLimiter);
 const PORT = process.env.PORT || 3000;
 const memFallback = {};
 
@@ -316,7 +354,7 @@ async function saveConv(uid, avatar, userMsg, aiReply, convId, lang) {
 }
 
 // ═══ TTS — ElevenLabs ═══
-app.post('/api/speak', async (req, res) => {
+app.post('/api/speak', apiLimiter, async (req, res) => {
     try {
         const { text, avatar = 'kelion' } = req.body;
         if (!text || !process.env.ELEVENLABS_API_KEY) return res.status(503).json({ error: 'TTS indisponibil' });
@@ -332,7 +370,7 @@ app.post('/api/speak', async (req, res) => {
 });
 
 // ═══ STT — Groq Whisper ═══
-app.post('/api/listen', async (req, res) => {
+app.post('/api/listen', apiLimiter, async (req, res) => {
     try {
         if (req.body.text) return res.json({ text: req.body.text, engine: 'WebSpeech' });
         const { audio } = req.body;
@@ -349,7 +387,7 @@ app.post('/api/listen', async (req, res) => {
 });
 
 // ═══ VISION — Claude Vision ═══
-app.post('/api/vision', async (req, res) => {
+app.post('/api/vision', apiLimiter, async (req, res) => {
     try {
         const { image, avatar = 'kelion', language = 'ro' } = req.body;
         if (!image || !process.env.ANTHROPIC_API_KEY) return res.status(503).json({ error: 'Vision indisponibil' });
@@ -626,21 +664,25 @@ app.get('*', (req, res) => res.type('html').send(_indexHtml));
 if (process.env.SENTRY_DSN) Sentry.setupExpressErrorHandler(app);
 
 // ═══ STARTUP ═══
-runMigration().then(migrated => {
-    app.listen(PORT, '0.0.0.0', () => {
-        console.log('\n══════════════════════════════════════════');
-        console.log('  KelionAI v2.3 — PAYMENTS + LEGAL EDITION');
-        console.log('  http://localhost:' + PORT);
-        console.log('  Dashboard: http://localhost:' + PORT + '/dashboard');
-        console.log('  AI: ' + (process.env.ANTHROPIC_API_KEY ? '✅ Claude' : '❌') + ' | ' + (process.env.OPENAI_API_KEY ? '✅ GPT-4o' : '❌') + ' | ' + (process.env.DEEPSEEK_API_KEY ? '✅ DeepSeek' : '❌'));
-        console.log('  TTS: ' + (process.env.ELEVENLABS_API_KEY ? '✅ ElevenLabs' : '❌'));
-        console.log('  Brain: 🧠 v2 — CoT + Decompose + SelfRepair + AutoLearn');
-        console.log('  Payments: ' + (process.env.STRIPE_SECRET_KEY ? '✅ Stripe' : '❌ Not configured'));
-        console.log('  DB: ' + (supabaseAdmin ? '✅ Supabase' : '⚠️ In-memory'));
-        console.log('  Migration: ' + (migrated ? '✅ Tables ready' : '⚠️ Skipped'));
-        console.log('══════════════════════════════════════════\n');
+if (require.main === module) {
+    runMigration().then(migrated => {
+        app.listen(PORT, '0.0.0.0', () => {
+            console.log('\n══════════════════════════════════════════');
+            console.log('  KelionAI v2.3 — PAYMENTS + LEGAL EDITION');
+            console.log('  http://localhost:' + PORT);
+            console.log('  Dashboard: http://localhost:' + PORT + '/dashboard');
+            console.log('  AI: ' + (process.env.ANTHROPIC_API_KEY ? '✅ Claude' : '❌') + ' | ' + (process.env.OPENAI_API_KEY ? '✅ GPT-4o' : '❌') + ' | ' + (process.env.DEEPSEEK_API_KEY ? '✅ DeepSeek' : '❌'));
+            console.log('  TTS: ' + (process.env.ELEVENLABS_API_KEY ? '✅ ElevenLabs' : '❌'));
+            console.log('  Brain: 🧠 v2 — CoT + Decompose + SelfRepair + AutoLearn');
+            console.log('  Payments: ' + (process.env.STRIPE_SECRET_KEY ? '✅ Stripe' : '❌ Not configured'));
+            console.log('  DB: ' + (supabaseAdmin ? '✅ Supabase' : '⚠️ In-memory'));
+            console.log('  Migration: ' + (migrated ? '✅ Tables ready' : '⚠️ Skipped'));
+            console.log('══════════════════════════════════════════\n');
+        });
+    }).catch(e => {
+        console.error('[Startup] Migration error:', e.message);
+        app.listen(PORT, '0.0.0.0', () => console.log('KelionAI v2.3 on port ' + PORT + ' (migration failed)'));
     });
-}).catch(e => {
-    console.error('[Startup] Migration error:', e.message);
-    app.listen(PORT, '0.0.0.0', () => console.log('KelionAI v2.2 on port ' + PORT + ' (migration failed)'));
-});
+}
+
+module.exports = app;
