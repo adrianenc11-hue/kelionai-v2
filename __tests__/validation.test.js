@@ -12,6 +12,8 @@ const {
     weatherSchema,
     imagineSchema,
     memorySchema,
+    eventSchema,
+    journalSchema,
     validate,
 } = require('../server/validation');
 
@@ -233,6 +235,84 @@ describe('memorySchema', () => {
 
     test('rejects missing action', () => {
         const result = memorySchema.safeParse({});
+        expect(result.success).toBe(false);
+    });
+});
+
+describe('eventSchema', () => {
+    test('accepts valid event with all required fields', () => {
+        const result = eventSchema.safeParse({ title: 'Ana birthday', type: 'birthday', date: '1990-05-15', recurring: true });
+        expect(result.success).toBe(true);
+    });
+
+    test('accepts event with default type and remind_days_before', () => {
+        const result = eventSchema.safeParse({ title: 'Meeting', date: '2026-03-01' });
+        expect(result.success).toBe(true);
+        expect(result.data.type).toBe('event');
+        expect(result.data.remind_days_before).toBe(3);
+    });
+
+    test('accepts all event types', () => {
+        for (const type of ['birthday', 'anniversary', 'event', 'reminder']) {
+            const r = eventSchema.safeParse({ title: 'Test', date: '2026-01-01', type });
+            expect(r.success).toBe(true);
+        }
+    });
+
+    test('rejects invalid event type', () => {
+        const result = eventSchema.safeParse({ title: 'T', date: '2026-01-01', type: 'holiday' });
+        expect(result.success).toBe(false);
+    });
+
+    test('rejects missing title', () => {
+        const result = eventSchema.safeParse({ date: '2026-01-01' });
+        expect(result.success).toBe(false);
+    });
+
+    test('rejects missing date', () => {
+        const result = eventSchema.safeParse({ title: 'Test' });
+        expect(result.success).toBe(false);
+    });
+
+    test('rejects invalid date format', () => {
+        const result = eventSchema.safeParse({ title: 'Test', date: '01-01-2026' });
+        expect(result.success).toBe(false);
+    });
+
+    test('rejects remind_days_before out of range', () => {
+        const result = eventSchema.safeParse({ title: 'Test', date: '2026-01-01', remind_days_before: 400 });
+        expect(result.success).toBe(false);
+    });
+});
+
+describe('journalSchema', () => {
+    test('accepts empty body (all optional fields)', () => {
+        const result = journalSchema.safeParse({});
+        expect(result.success).toBe(true);
+    });
+
+    test('accepts full journal entry', () => {
+        const result = journalSchema.safeParse({ mood: 4, best_moment: 'Great day', improvements: 'Sleep earlier', goals: 'Exercise', free_text: 'Long day' });
+        expect(result.success).toBe(true);
+    });
+
+    test('accepts mood at boundaries (1 and 5)', () => {
+        expect(journalSchema.safeParse({ mood: 1 }).success).toBe(true);
+        expect(journalSchema.safeParse({ mood: 5 }).success).toBe(true);
+    });
+
+    test('rejects mood below 1', () => {
+        const result = journalSchema.safeParse({ mood: 0 });
+        expect(result.success).toBe(false);
+    });
+
+    test('rejects mood above 5', () => {
+        const result = journalSchema.safeParse({ mood: 6 });
+        expect(result.success).toBe(false);
+    });
+
+    test('rejects non-integer mood', () => {
+        const result = journalSchema.safeParse({ mood: 3.5 });
         expect(result.success).toBe(false);
     });
 });

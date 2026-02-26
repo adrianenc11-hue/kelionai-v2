@@ -24,6 +24,8 @@ const { buildSystemPrompt } = require('./persona');
 const logger = require('./logger');
 const { router: paymentsRouter, checkUsage, incrementUsage } = require('./payments');
 const legalRouter = require('./legal');
+const eventsRouter = require('./events');
+const journalRouter = require('./journal');
 const { validate, registerSchema, loginSchema, refreshSchema, chatSchema, speakSchema, listenSchema, visionSchema, searchSchema, weatherSchema, imagineSchema, memorySchema } = require('./validation');
 
 const app = express();
@@ -155,6 +157,37 @@ async function getUserFromToken(req) {
     catch (e) { return null; }
 }
 
+// ═══ EVENTS CONTEXT HELPER ═══
+async function getTodayEventsContext(userId, db) {
+    if (!userId || !db) return '';
+    try {
+        const { data: evs } = await db.from('events').select('title, type, date, recurring').eq('user_id', userId);
+        if (!evs || !evs.length) return '';
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const todayMonth = today.getMonth() + 1;
+        const todayDay = today.getDate();
+        const todayYear = today.getFullYear();
+        const matches = evs.filter(ev => {
+            const [y, m, d] = ev.date.split('-').map(Number);
+            if (ev.recurring) return m === todayMonth && d === todayDay;
+            return y === todayYear && m === todayMonth && d === todayDay;
+        });
+        if (!matches.length) return '';
+        const parts = matches.map(ev => {
+            if (ev.type === 'birthday') {
+                const birthYear = parseInt(ev.date.split('-')[0], 10);
+                if (birthYear >= 1900 && birthYear < todayYear) {
+                    return `${ev.title}'s birthday (turning ${todayYear - birthYear})`;
+                }
+                return `${ev.title}'s birthday`;
+            }
+            return ev.title;
+        });
+        return `[EVENTS TODAY]: ${parts.join(', ')}`;
+    } catch(e) { return ''; }
+}
+
 // ═══ AUTH ENDPOINTS ═══
 app.post('/api/auth/register', authLimiter, validate(registerSchema), async (req, res) => {
     try {
@@ -219,7 +252,9 @@ app.post('/api/chat', chatLimiter, validate(chatSchema), async (req, res) => {
                 if (prefs?.length > 0) memoryContext = prefs.map(p => `${p.key}: ${JSON.stringify(p.value)}`).join('; ');
             } catch(e){}
         }
-        const systemPrompt = buildSystemPrompt(avatar, language, memoryContext, { failedTools: thought.failedTools }, thought.chainOfThought);
+        let systemPrompt = buildSystemPrompt(avatar, language, memoryContext, { failedTools: thought.failedTools }, thought.chainOfThought);
+        const eventsContext = await getTodayEventsContext(user?.id, supabaseAdmin);
+        if (eventsContext) systemPrompt += `\n${eventsContext}`;
 
         // ── COMPRESSED CONVERSATION HISTORY (auto-summarized if >20 msgs) ──
         const compressedHist = thought.compressedHistory || history.slice(-20);
@@ -317,7 +352,9 @@ app.post('/api/chat/stream', chatLimiter, validate(chatSchema), async (req, res)
                 if (prefs?.length > 0) memoryContext = prefs.map(p => `${p.key}: ${JSON.stringify(p.value)}`).join('; ');
             } catch(e){}
         }
-        const systemPrompt = buildSystemPrompt(avatar, language, memoryContext, { failedTools: thought.failedTools }, thought.chainOfThought);
+        let systemPrompt = buildSystemPrompt(avatar, language, memoryContext, { failedTools: thought.failedTools }, thought.chainOfThought);
+        const eventsContext = await getTodayEventsContext(user?.id, supabaseAdmin);
+        if (eventsContext) systemPrompt += `\n${eventsContext}`;
         const compressedHist = thought.compressedHistory || history.slice(-20);
         const msgs = compressedHist.map(h => ({ role: h.role === 'ai' ? 'assistant' : h.role, content: h.content }));
         msgs.push({ role: 'user', content: thought.enrichedMessage });
@@ -727,6 +764,8 @@ app.locals.supabaseAdmin = supabaseAdmin;
 // ═══ PAYMENTS & LEGAL ROUTES ═══
 app.use('/api/payments', paymentsRouter);
 app.use('/api/legal', legalRouter);
+app.use('/api/events', eventsRouter);
+app.use('/api/journal', journalRouter);
 
 // ═══ HEALTH ═══
 app.get('/api/health', (req, res) => {

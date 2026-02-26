@@ -66,6 +66,23 @@ const memorySchema = z.object({
     value: z.any().optional(),
 });
 
+const eventSchema = z.object({
+    title: z.string().min(1).max(200),
+    type: z.enum(['birthday', 'anniversary', 'event', 'reminder']).default('event'),
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Format dată: YYYY-MM-DD'),
+    recurring: z.boolean().default(false),
+    notes: z.string().max(2000).optional(),
+    remind_days_before: z.number().int().min(0).max(365).default(3),
+});
+
+const journalSchema = z.object({
+    mood: z.number().int().min(1).max(5).optional(),
+    best_moment: z.string().max(2000).optional(),
+    improvements: z.string().max(2000).optional(),
+    goals: z.string().max(2000).optional(),
+    free_text: z.string().max(10000).optional(),
+});
+
 // ═══ MIDDLEWARE FACTORY ═══
 
 function validate(schema) {
@@ -98,4 +115,6 @@ module.exports = {
     weatherSchema,
     imagineSchema,
     memorySchema,
+    eventSchema,
+    journalSchema,
 };
