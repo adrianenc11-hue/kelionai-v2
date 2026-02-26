@@ -103,3 +103,43 @@ describe('Input Validation', () => {
     });
 });
 
+describe('Error Handling', () => {
+    test('404 for unknown API routes returns JSON error', async () => {
+        const res = await request(app).get('/api/nonexistent');
+        expect(res.status).toBe(404);
+        expect(res.body.error).toBeDefined();
+    });
+
+    test('error responses do not contain stack traces in production mode', async () => {
+        const orig = process.env.NODE_ENV;
+        process.env.NODE_ENV = 'production';
+        try {
+            const res = await request(app).get('/api/nonexistent');
+            expect(res.body.stack).toBeUndefined();
+        } finally {
+            process.env.NODE_ENV = orig;
+        }
+    });
+
+    test('500 errors hide stack trace and return generic message in production', () => {
+        // Locate the global error handler from the app router stack and call it directly
+        const errorLayer = app._router.stack.find(l => l.handle && l.handle.length === 4);
+        const errorHandler = errorLayer.handle;
+        const err = new Error('Test internal error');
+        const req = { method: 'GET', path: '/test' };
+        const res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+        const next = jest.fn();
+        const orig = process.env.NODE_ENV;
+        process.env.NODE_ENV = 'production';
+        try {
+            errorHandler(err, req, res, next);
+            expect(res.status).toHaveBeenCalledWith(500);
+            const body = res.json.mock.calls[0][0];
+            expect(body.stack).toBeUndefined();
+            expect(body.error).toBe('Eroare internă de server');
+        } finally {
+            process.env.NODE_ENV = orig;
+        }
+    });
+});
+
