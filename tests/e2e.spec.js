@@ -3,10 +3,11 @@ const { test, expect } = require('@playwright/test');
 // Helper: dismiss auth screen by clicking "Continue as guest"
 async function dismissAuth(page) {
     const guest = page.locator('#auth-guest');
-    if (await guest.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await guest.click();
-        await page.waitForTimeout(500);
-    }
+    // Wait for auth screen to be ready, then click guest
+    await guest.waitFor({ state: 'visible', timeout: 5000 });
+    await guest.click();
+    // Wait until auth screen is actually hidden
+    await page.locator('#auth-screen').waitFor({ state: 'hidden', timeout: 5000 });
 }
 
 // ═══════════════════════════════════════════
