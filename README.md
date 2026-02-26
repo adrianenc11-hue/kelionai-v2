@@ -36,6 +36,16 @@ app/            Frontend (static HTML/CSS/JS + Three.js)
 tests/          Playwright end-to-end tests
 ```
 
+## Setup rapid
+
+```bash
+# Configurare interactivă a cheilor API
+npm run setup
+
+# Setup complet automat (Railway + Supabase + deploy)
+npm run setup:full
+```
+
 ## Setup
 
 ### 1. Clone and install
@@ -81,10 +91,15 @@ Server listens on `http://localhost:3000`.
 
 | Script | Description |
 |--------|-------------|
-| `npm run dev` | Start development server |
-| `npm start` | Start production server |
-| `npm test` | Run Playwright E2E tests (Chromium) |
-| `npm run test:all` | Run tests on all browsers |
+| `npm run dev` | Pornește serverul de dezvoltare |
+| `npm start` | Pornește serverul de producție |
+| `npm test` | Rulează testele Playwright E2E (Chromium) |
+| `npm run test:all` | Rulează testele pe toate browserele |
+| `npm run setup` | Configurare interactivă chei API (scrie .env) |
+| `npm run setup:full` | Setup complet automat: Railway + Supabase + deploy |
+| `npm run setup:db` | Configurare bază de date Supabase |
+| `npm run deploy` | Redeploy rapid: git push + Railway + health check |
+| `npm run health` | Verificare stare endpoint-uri kelionai.app |
 
 ## Database
 
