@@ -182,7 +182,7 @@ async function main() {
         if (fail > 0) {
             console.log(`\n  ⚠️  Unele queries nu au mers automat (${fail}/${queries.length}).`);
             console.log('  📋 Copiază și rulează manual fișierul server/schema.sql în:');
-            console.log('     https://supabase.com/dashboard/project/nqlobybfwmtkmsqadqqr/sql\n');
+            console.log('     https://supabase.com/dashboard/project/YOUR_PROJECT_REF/sql\n');
         } else {
             console.log(`  ✅ Toate ${queries.length} queries executate!`);
         }
