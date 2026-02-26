@@ -64,8 +64,12 @@
 
             if (!resp.ok) {
                 const e = await resp.json().catch(() => ({}));
-                if (resp.status === 429) addMessage('assistant', '⏳ Prea multe mesaje. Așteaptă un moment.');
-                else addMessage('assistant', e.error || 'Eroare.');
+                if (resp.status === 429 && e.upgrade) {
+                    addMessage('assistant', '⚡ ' + (e.error || 'Limită atinsă.'));
+                    if (window.KPayments) KPayments.showUpgradePrompt();
+                } else if (resp.status === 429) {
+                    addMessage('assistant', '⏳ Prea multe mesaje. Așteaptă un moment.');
+                } else addMessage('assistant', e.error || 'Eroare.');
                 KVoice.resumeWakeDetection();
                 return;
             }
@@ -164,8 +168,12 @@
             showThinking(false);
             if (!resp.ok) {
                 const e = await resp.json().catch(() => ({}));
-                if (resp.status === 429) addMessage('assistant', '⏳ Prea multe mesaje. Așteaptă un moment.');
-                else addMessage('assistant', e.error || 'Eroare.');
+                if (resp.status === 429 && e.upgrade) {
+                    addMessage('assistant', '⚡ ' + (e.error || 'Limită atinsă.'));
+                    if (window.KPayments) KPayments.showUpgradePrompt();
+                } else if (resp.status === 429) {
+                    addMessage('assistant', '⏳ Prea multe mesaje. Așteaptă un moment.');
+                } else addMessage('assistant', e.error || 'Eroare.');
                 KVoice.resumeWakeDetection();
                 return;
             }
