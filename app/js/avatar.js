@@ -17,6 +17,7 @@
     let lipSync = null;
     let textLipSync = null;
     let currentAvatar = 'kelion';
+    let loadPromise = null;
 
     // Blink
     let blinkTimer = 0, nextBlink = 2 + Math.random() * 4, blinkPhase = 0, blinkValue = 0;
@@ -87,12 +88,13 @@
     }
 
     function loadAvatar(name) {
-        if (!MODELS[name]) return;
+        if (!MODELS[name]) return Promise.resolve();
         currentAvatar = name;
 
         if (currentModel) { scene.remove(currentModel); currentModel = null; }
         morphMeshes = [];
 
+        loadPromise = new Promise(function (resolve, reject) {
         const loader = new THREE.GLTFLoader();
         loader.load(MODELS[name], (gltf) => {
             currentModel = gltf.scene;
@@ -208,6 +210,7 @@
             document.getElementById('avatar-name').textContent = name === 'kira' ? 'Kira' : 'Kelion';
             document.getElementById('status-text').textContent = 'Online';
             console.log(`[Avatar] ${name} loaded — ${morphMeshes.length} morph meshes`);
+            resolve(name);
         }, (progress) => {
             if (progress.total) {
                 const pct = Math.round((progress.loaded / progress.total) * 100);
@@ -216,7 +219,11 @@
         }, (err) => {
             console.error(`[Avatar] Load error:`, err);
             document.getElementById('status-text').textContent = 'Eroare model';
+            reject(err);
         });
+        });
+
+        return loadPromise;
     }
 
     function setMorph(name, value) {
@@ -317,7 +324,9 @@
 
     window.KAvatar = {
         init: init,
-        loadAvatar: loadAvatar,
+        loadAvatar: function (name) { return loadAvatar(name); },
+        loadAvatarAsync: loadAvatar,
+        waitForLoad: function () { return loadPromise || Promise.resolve(); },
         getCurrentAvatar: function () { return currentAvatar; },
         setExpression: setExpression,
         setMorph: setMorph,
