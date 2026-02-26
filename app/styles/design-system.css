@@ -1,0 +1,49 @@
+/* ═══════════════════════════════════════════
+   KelionAI Design System — CSS Variables
+   ═══════════════════════════════════════════ */
+
+:root {
+  /* Culori principale */
+  --kelion-primary: #6C63FF;
+  --kelion-primary-hover: #5A52E0;
+  --kelion-secondary: #00D4FF;
+  --kelion-accent: #FF6B6B;
+  --kelion-success: #00E096;
+  --kelion-warning: #FFB800;
+
+  /* Backgrounds */
+  --kelion-bg: #0A0A0F;
+  --kelion-bg-secondary: #0F0F1A;
+  --kelion-surface: #12121A;
+  --kelion-surface-hover: #1A1A28;
+  --kelion-border: rgba(108, 99, 255, 0.2);
+
+  /* Text */
+  --kelion-text: #E8E8FF;
+  --kelion-text-secondary: #9090B0;
+  --kelion-text-muted: #505070;
+
+  /* Typography */
+  --kelion-font: 'Inter', -apple-system, sans-serif;
+  --kelion-font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+
+  /* Spacing */
+  --kelion-radius: 12px;
+  --kelion-radius-sm: 8px;
+  --kelion-radius-lg: 20px;
+
+  /* Shadows & Glow */
+  --kelion-glow: 0 0 20px rgba(108, 99, 255, 0.3);
+  --kelion-glow-cyan: 0 0 20px rgba(0, 212, 255, 0.3);
+  --kelion-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+
+  /* Transitions */
+  --kelion-transition: 0.2s ease;
+  --kelion-transition-slow: 0.4s ease;
+
+  /* Z-index layers */
+  --z-base: 1;
+  --z-overlay: 100;
+  --z-modal: 200;
+  --z-toast: 300;
+}
