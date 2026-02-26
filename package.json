@@ -9,6 +9,8 @@
         "test": "npx playwright test --project=chromium",
         "test:all": "npx playwright test",
         "test:unit": "jest",
+        "test:coverage": "jest --coverage",
+        "test:ci": "jest --coverage --ci --forceExit",
         "test:report": "npx playwright show-report",
         "setup": "bash scripts/setup-env.sh",
         "setup:full": "bash scripts/setup-full.sh",
@@ -20,7 +22,23 @@
         "testEnvironment": "node",
         "testMatch": [
             "**/__tests__/**/*.test.js"
-        ]
+        ],
+        "collectCoverage": false,
+        "collectCoverageFrom": [
+            "server/**/*.js",
+            "!server/node_modules/**",
+            "!server/**/*.test.js"
+        ],
+        "coverageDirectory": "coverage",
+        "coverageReporters": ["text", "text-summary", "lcov", "clover"],
+        "coverageThreshold": {
+            "global": {
+                "branches": 8,
+                "functions": 18,
+                "lines": 24,
+                "statements": 20
+            }
+        }
     },
     "dependencies": {
         "@sentry/browser": "^10.39.0",
