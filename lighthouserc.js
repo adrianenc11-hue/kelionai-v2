@@ -3,7 +3,12 @@ module.exports = {
         collect: {
             url: ['http://localhost:3000/'],
             startServerCommand: 'node server/index.js',
+            startServerReadyPattern: 'on port',
+            startServerReadyTimeout: 30000,
             numberOfRuns: 1,
+            settings: {
+                chromeFlags: '--no-sandbox --disable-gpu --ignore-certificate-errors',
+            },
         },
         assert: {
             assertions: {
