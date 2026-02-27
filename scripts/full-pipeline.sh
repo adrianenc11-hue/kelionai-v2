@@ -15,6 +15,7 @@
 #   --dry-run        Simulate all steps without making real changes
 #   --skip-deploy    Skip the deploy-and-verify step
 #   --skip-recovery  Skip the PR recovery step
+#   --base-url=URL   Override the verification base URL (default: https://kelionai.app)
 #
 # Environment:
 #   GITHUB_TOKEN   — required for GitHub operations
@@ -43,6 +44,7 @@ header() { echo -e "\n${BOLD}${CYAN}══════════════�
 DRY_RUN=false
 SKIP_DEPLOY=false
 SKIP_RECOVERY=false
+BASE_URL="https://kelionai.app"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 mkdir -p logs
@@ -54,6 +56,7 @@ for arg in "$@"; do
     --dry-run)       DRY_RUN=true ;;
     --skip-deploy)   SKIP_DEPLOY=true ;;
     --skip-recovery) SKIP_RECOVERY=true ;;
+    --base-url=*)    BASE_URL="${arg#--base-url=}" ;;
   esac
 done
 
@@ -82,6 +85,7 @@ info "Log file  : $LOG_FILE"
 info "Dry-run   : $DRY_RUN"
 info "Skip deploy   : $SKIP_DEPLOY"
 info "Skip recovery : $SKIP_RECOVERY"
+info "Base URL      : $BASE_URL"
 
 # ─── Step 1: Recover unmerged PRs ────────────────────────────────────────────
 header "Step 1 / 3 — Recover Unmerged PRs"
@@ -127,6 +131,7 @@ if [[ "$SKIP_DEPLOY" == "true" ]]; then
   STEP_DEPLOY_STATUS="SKIPPED"
 else
   deploy_args=("${PASSTHROUGH_FLAGS[@]:-}")
+  deploy_args+=("--base-url=${BASE_URL}")
 
   info "Running: deploy-and-verify.sh ${deploy_args[*]:-}"
 
