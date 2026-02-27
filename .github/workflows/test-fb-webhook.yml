@@ -1,0 +1,21 @@
+name: Test FB Messenger Webhook
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test-webhook:
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Test webhook endpoint
+        run: |
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
+            "https://kelionai-backend.railway.app/api/messenger/webhook?hub.mode=subscribe&hub.verify_token=${{ secrets.FB_VERIFY_TOKEN }}&hub.challenge=test123")
+          echo "Response code: $RESPONSE"
+          if [ "$RESPONSE" = "200" ]; then
+            echo "✅ Webhook functional!"
+          else
+            echo "❌ Webhook not responding correctly"
+            exit 1
+          fi
