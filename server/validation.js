@@ -33,6 +33,7 @@ const chatSchema = z.object({
 const speakSchema = z.object({
     text: z.string().min(1).max(10000),
     avatar: z.enum(['kelion', 'kira']).optional(),
+    mood: z.enum(['happy', 'sad', 'laughing', 'thinking', 'excited', 'concerned', 'neutral', 'surprised', 'playful', 'determined', 'loving', 'sleepy', 'frustrated', 'anxious']).optional(),
 });
 
 const listenSchema = z.object({

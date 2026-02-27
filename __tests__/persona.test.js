@@ -39,4 +39,39 @@ describe('buildSystemPrompt', () => {
         const prompt = buildSystemPrompt('kelion', 'en', memory, null, false);
         expect(prompt).toContain(memory);
     });
+
+    test('includes HUMOR_IQ section', () => {
+        const prompt = buildSystemPrompt('kelion', 'ro', '', null, false);
+        expect(prompt).toContain('INTELIGENȚĂ UMORISTICĂ');
+    });
+
+    test('includes TEMPORAL_AWARENESS section', () => {
+        const prompt = buildSystemPrompt('kelion', 'ro', '', null, false);
+        expect(prompt).toContain('AWARENESS TEMPORAL');
+    });
+
+    test('includes CURIOSITY section', () => {
+        const prompt = buildSystemPrompt('kelion', 'ro', '', null, false);
+        expect(prompt).toContain('CURIOZITATE NATURALĂ');
+    });
+
+    test('injects current time context', () => {
+        const prompt = buildSystemPrompt('kelion', 'ro', '', null, false);
+        expect(prompt).toContain('ACUM:');
+    });
+
+    test('Kelion persona has catchphrases', () => {
+        const prompt = buildSystemPrompt('kelion', 'ro', '', null, false);
+        expect(prompt).toContain('CATCHPHRASES');
+    });
+
+    test('Kira persona has catchphrases', () => {
+        const prompt = buildSystemPrompt('kira', 'ro', '', null, false);
+        expect(prompt).toContain('CATCHPHRASES');
+    });
+
+    test('includes variability rules', () => {
+        const prompt = buildSystemPrompt('kelion', 'ro', '', null, false);
+        expect(prompt).toContain('VARIABIL');
+    });
 });
