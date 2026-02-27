@@ -11,9 +11,14 @@
         // Runs in <head> before DOM renders to avoid flash of content
         try {
             if (!localStorage.getItem('kelion_onboarded')) {
-                location.replace('/onboarding.html');
+                window.location.replace('/onboarding.html');
+                // Stop executing rest of page
+                throw new Error('redirect');
             }
-        } catch (e) {}
+        } catch (e) {
+            if (e.message === 'redirect') throw e;
+            // localStorage blocked (incognito etc) — skip onboarding
+        }
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
