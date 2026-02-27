@@ -249,29 +249,29 @@
                 <span class="onboarding-icon animate-glow">🤖</span>
                 <h1>Bun venit la <span class="gradient-text">KelionAI</span></h1>
                 <p>Asistentul tău AI personal — inteligent, rapid, multilingv.</p>
-                <button class="btn-primary" onclick="nextStep()">Începe →</button>
+                <button class="btn-primary" id="btn-start">Începe →</button>
             </div>
 
             <!-- Step 2 — Choose language -->
             <div class="onboarding-step" data-step="2">
                 <h2>🌍 Alege limba preferată</h2>
                 <div class="lang-grid">
-                    <div class="lang-option" data-lang="ro" onclick="selectLang(this)">🇷🇴 Română</div>
-                    <div class="lang-option" data-lang="en" onclick="selectLang(this)">🇬🇧 English</div>
-                    <div class="lang-option" data-lang="fr" onclick="selectLang(this)">🇫🇷 Français</div>
-                    <div class="lang-option" data-lang="de" onclick="selectLang(this)">🇩🇪 Deutsch</div>
-                    <div class="lang-option" data-lang="es" onclick="selectLang(this)">🇪🇸 Español</div>
-                    <div class="lang-option" data-lang="it" onclick="selectLang(this)">🇮🇹 Italiano</div>
+                    <div class="lang-option" data-lang="ro">🇷🇴 Română</div>
+                    <div class="lang-option" data-lang="en">🇬🇧 English</div>
+                    <div class="lang-option" data-lang="fr">🇫🇷 Français</div>
+                    <div class="lang-option" data-lang="de">🇩🇪 Deutsch</div>
+                    <div class="lang-option" data-lang="es">🇪🇸 Español</div>
+                    <div class="lang-option" data-lang="it">🇮🇹 Italiano</div>
                 </div>
-                <button class="btn-primary" id="btn-lang-next" onclick="nextStep()">Continuă →</button>
-                <button class="btn-secondary" onclick="prevStep()">← Înapoi</button>
+                <button class="btn-primary" id="btn-lang-next">Continuă →</button>
+                <button class="btn-secondary" id="btn-lang-back">← Înapoi</button>
             </div>
 
             <!-- Step 3 — Choose plan -->
             <div class="onboarding-step" data-step="3">
                 <h2>💎 Alege planul tău</h2>
                 <div class="plan-grid">
-                    <div class="plan-card" data-plan="free" onclick="selectPlan(this)">
+                    <div class="plan-card" data-plan="free">
                         <span class="plan-icon">🆓</span>
                         <div class="plan-info">
                             <div class="plan-name">Free</div>
@@ -279,7 +279,7 @@
                         </div>
                         <span class="plan-price">Gratuit</span>
                     </div>
-                    <div class="plan-card featured" data-plan="pro" onclick="selectPlan(this)">
+                    <div class="plan-card featured" data-plan="pro">
                         <span class="plan-icon">⚡</span>
                         <div class="plan-info">
                             <div class="plan-name">Pro</div>
@@ -287,7 +287,7 @@
                         </div>
                         <span class="plan-price">€9/lună</span>
                     </div>
-                    <div class="plan-card" data-plan="premium" onclick="selectPlan(this)">
+                    <div class="plan-card" data-plan="premium">
                         <span class="plan-icon">👑</span>
                         <div class="plan-info">
                             <div class="plan-name">Premium</div>
@@ -296,8 +296,8 @@
                         <span class="plan-price">€19/lună</span>
                     </div>
                 </div>
-                <button class="btn-primary" onclick="finishOnboarding()">Finalizează →</button>
-                <button class="btn-secondary" onclick="prevStep()">← Înapoi</button>
+                <button class="btn-primary" id="btn-finish">Finalizează →</button>
+                <button class="btn-secondary" id="btn-plan-back">← Înapoi</button>
             </div>
 
         </div>
