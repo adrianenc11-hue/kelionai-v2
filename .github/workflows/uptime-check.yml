@@ -1,0 +1,57 @@
+name: Uptime Check
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  uptime:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check API health endpoint
+        id: health
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 https://kelionai.app/api/health)
+          echo "health_status=$STATUS" >> "$GITHUB_OUTPUT"
+
+      - name: Check homepage
+        id: homepage
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 https://kelionai.app/)
+          echo "homepage_status=$STATUS" >> "$GITHUB_OUTPUT"
+
+      - name: Create issue on downtime
+        if: steps.health.outputs.health_status != '200' || steps.homepage.outputs.homepage_status != '200'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const healthStatus = '${{ steps.health.outputs.health_status }}';
+            const homepageStatus = '${{ steps.homepage.outputs.homepage_status }}';
+            const now = new Date().toISOString();
+
+            // Check for existing open downtime issues to avoid spam
+            const { data: existingIssues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'downtime',
+              per_page: 1
+            });
+
+            if (existingIssues.length > 0) {
+              console.log(`Open downtime issue already exists: #${existingIssues[0].number}`);
+              return;
+            }
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `🚨 Downtime detected at ${now}`,
+              body: `## Downtime Alert\n\n**Time**: ${now}\n\n| Endpoint | Status |\n|---|---|\n| /api/health | ${healthStatus} |\n| / | ${homepageStatus} |\n\nPlease investigate immediately.`,
+              labels: ['downtime']
+            });
