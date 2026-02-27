@@ -1,0 +1,46 @@
+name: 🔍 Diagnose FB Messenger
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  diagnose:
+    name: 🔍 Run Messenger Diagnostics
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Check health endpoint
+        run: |
+          APP_URL="${{ secrets.APP_URL || 'https://kelionai.app' }}"
+          # Mask secrets to prevent them from appearing in logs
+          echo "::add-mask::${{ secrets.FB_VERIFY_TOKEN }}"
+          echo "::add-mask::${{ secrets.FB_PAGE_ACCESS_TOKEN }}"
+          echo "## 🔍 Messenger Diagnostics" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "### Health Check" >> $GITHUB_STEP_SUMMARY
+          HEALTH=$(curl -sf "${APP_URL}/api/messenger/health" 2>&1 || echo "FAILED")
+          echo "\`\`\`json" >> $GITHUB_STEP_SUMMARY
+          echo "$HEALTH" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Webhook Verification" >> $GITHUB_STEP_SUMMARY
+          VERIFY_CODE=$(curl -s -o /dev/null -w "%{http_code}" "${APP_URL}/api/messenger/webhook?hub.mode=subscribe&hub.verify_token=${{ secrets.FB_VERIFY_TOKEN }}&hub.challenge=diag_test_$(date +%s)")
+          if [ "$VERIFY_CODE" = "200" ]; then
+            echo "✅ Webhook verification: **PASS** (HTTP $VERIFY_CODE)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Webhook verification: **FAIL** (HTTP $VERIFY_CODE)" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Graph API Check" >> $GITHUB_STEP_SUMMARY
+          API_CODE=$(curl -s -o /dev/null -w "%{http_code}" "https://graph.facebook.com/v21.0/me?access_token=${{ secrets.FB_PAGE_ACCESS_TOKEN }}")
+          if [ "$API_CODE" = "200" ]; then
+            echo "✅ FB Page Token: **VALID** (HTTP $API_CODE)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ FB Page Token: **EXPIRED/INVALID** (HTTP $API_CODE)" >> $GITHUB_STEP_SUMMARY
+            echo "→ Regenerează tokenul pe developers.facebook.com" >> $GITHUB_STEP_SUMMARY
+          fi
