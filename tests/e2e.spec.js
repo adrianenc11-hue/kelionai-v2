@@ -1,5 +1,12 @@
 const { test, expect } = require('@playwright/test');
 
+// Mark onboarding as complete so tests always land on the main app
+test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+        localStorage.setItem('kelion_onboarded', 'true');
+    });
+});
+
 // Helper: dismiss auth screen by clicking "Continue as guest"
 async function dismissAuth(page) {
     const guest = page.locator('#auth-guest');
