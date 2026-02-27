@@ -750,6 +750,139 @@ app.post('/api/brain/reset', adminAuth, (req, res) => {
     res.json({ success: true, diagnostics: brain.getDiagnostics() });
 });
 
+// ═══ ADMIN HEALTH CHECK ═══
+app.get('/api/admin/health-check', adminAuth, asyncHandler(async (req, res) => {
+    logger.info({ component: 'Admin' }, '🏥 Health check performed');
+    const recommendations = [];
+
+    // a) Server status
+    const upSec = process.uptime();
+    const d0 = Math.floor(upSec / 86400), h0 = Math.floor((upSec % 86400) / 3600);
+    const m0 = Math.floor((upSec % 3600) / 60), s0 = Math.floor(upSec % 60);
+    const mem = process.memoryUsage();
+    const server = {
+        version: '2.3.0',
+        uptime: `${d0}d ${h0}h ${m0}m ${s0}s`,
+        uptimeSeconds: Math.round(upSec),
+        nodeVersion: process.version,
+        memory: {
+            rss: Math.round(mem.rss / 1024 / 1024) + 'MB',
+            heapUsed: Math.round(mem.heapUsed / 1024 / 1024) + 'MB',
+            heapTotal: Math.round(mem.heapTotal / 1024 / 1024) + 'MB'
+        },
+        timestamp: new Date().toISOString()
+    };
+
+    // b) Service availability
+    const services = {
+        ai_claude:         { label: 'AI Claude',           active: !!process.env.ANTHROPIC_API_KEY },
+        ai_gpt4o:          { label: 'AI GPT-4o',           active: !!process.env.OPENAI_API_KEY },
+        ai_deepseek:       { label: 'AI DeepSeek',         active: !!process.env.DEEPSEEK_API_KEY },
+        tts_elevenlabs:    { label: 'TTS ElevenLabs',      active: !!process.env.ELEVENLABS_API_KEY },
+        stt_groq:          { label: 'STT Groq',            active: !!process.env.GROQ_API_KEY },
+        search_perplexity: { label: 'Search Perplexity',   active: !!process.env.PERPLEXITY_API_KEY },
+        search_tavily:     { label: 'Search Tavily',       active: !!process.env.TAVILY_API_KEY },
+        search_serper:     { label: 'Search Serper',       active: !!process.env.SERPER_API_KEY },
+        images_together:   { label: 'Image Together',      active: !!process.env.TOGETHER_API_KEY },
+        payments_stripe:   { label: 'Payments Stripe',     active: !!process.env.STRIPE_SECRET_KEY },
+        stripe_webhook:    { label: 'Stripe Webhook',      active: !!process.env.STRIPE_WEBHOOK_SECRET },
+        monitoring_sentry: { label: 'Error Monitoring Sentry', active: !!process.env.SENTRY_DSN }
+    };
+    if (!process.env.STRIPE_WEBHOOK_SECRET) recommendations.push('STRIPE_WEBHOOK_SECRET nu e configurat — webhook-urile nu vor fi validate');
+    if (!process.env.SENTRY_DSN) recommendations.push('SENTRY_DSN lipsește — erorile nu sunt monitorizate');
+    if (!process.env.ANTHROPIC_API_KEY && !process.env.OPENAI_API_KEY && !process.env.DEEPSEEK_API_KEY) {
+        recommendations.push('Nicio cheie AI configurată — chat-ul nu va funcționa');
+    }
+
+    // c) Database check
+    const database = { connected: false, tables: {} };
+    if (supabaseAdmin) {
+        const tables = ['conversations', 'messages', 'user_preferences', 'subscriptions', 'usage'];
+        await Promise.all(tables.map(async (tbl) => {
+            try {
+                const { count, error } = await supabaseAdmin.from(tbl).select('id', { count: 'exact', head: true });
+                database.tables[tbl] = error ? { ok: false, error: error.message } : { ok: true, count };
+            } catch (e) { database.tables[tbl] = { ok: false, error: e.message }; }
+        }));
+        database.connected = Object.values(database.tables).some(t => t.ok);
+    } else {
+        database.error = 'supabaseAdmin client not initialized';
+        recommendations.push('Supabase nu este configurat — baza de date nu funcționează');
+    }
+
+    // d) Brain diagnostics
+    const brainDiag = brain.getDiagnostics();
+    const degradedTools = brainDiag.degradedTools || Object.entries(brainDiag.toolErrors || {}).filter(([, v]) => v >= 5).map(([k]) => k);
+    const brainResult = {
+        status: brainDiag.status,
+        conversations: brainDiag.conversations,
+        toolStats: brainDiag.toolStats,
+        toolErrors: brainDiag.toolErrors,
+        degradedTools,
+        recentErrors: brainDiag.recentErrors,
+        avgLatency: brainDiag.avgLatency,
+        journal: (brainDiag.journal || []).slice(-5)
+    };
+    if (brainDiag.status === 'degraded') recommendations.push(`Brain engine is degraded — ${degradedTools.join(', ') || 'unele tool-uri'} au erori`);
+
+    // e) Auth system check
+    const auth = { supabaseInitialized: !!supabase, supabaseAdminInitialized: !!supabaseAdmin, authAvailable: !!supabase };
+    if (!supabase) recommendations.push('Supabase anon client nu e inițializat — autentificarea nu funcționează');
+
+    // f) Payments check
+    const paymentsCheck = {
+        stripeConfigured: !!process.env.STRIPE_SECRET_KEY,
+        webhookConfigured: !!process.env.STRIPE_WEBHOOK_SECRET,
+        priceProConfigured: !!process.env.STRIPE_PRICE_PRO,
+        pricePremiumConfigured: !!process.env.STRIPE_PRICE_PREMIUM,
+        activeSubscribers: null
+    };
+    if (supabaseAdmin && process.env.STRIPE_SECRET_KEY) {
+        try {
+            const { count } = await supabaseAdmin.from('subscriptions').select('id', { count: 'exact', head: true }).eq('status', 'active');
+            paymentsCheck.activeSubscribers = count;
+        } catch (e) { paymentsCheck.subscribersError = e.message; }
+    }
+
+    // g) Rate limiting status
+    const rateLimits = {
+        chat:    { max: 20,  windowMs: 60000,       windowLabel: '1min' },
+        auth:    { max: 10,  windowMs: 900000,       windowLabel: '15min' },
+        search:  { max: 15,  windowMs: 60000,        windowLabel: '1min' },
+        image:   { max: 5,   windowMs: 60000,        windowLabel: '1min' },
+        memory:  { max: 30,  windowMs: 60000,        windowLabel: '1min' },
+        weather: { max: 10,  windowMs: 60000,        windowLabel: '1min' },
+        api:     { max: 20,  windowMs: 900000,       windowLabel: '15min' },
+        global:  { max: 200, windowMs: 900000,       windowLabel: '15min' }
+    };
+
+    // h) Security check
+    const security = {
+        cspEnabled: true,
+        httpsRedirect: process.env.NODE_ENV === 'production',
+        corsConfigured: true,
+        adminSecretConfigured: !!process.env.ADMIN_SECRET_KEY
+    };
+    if (!process.env.ADMIN_SECRET_KEY) recommendations.push('ADMIN_SECRET_KEY nu e configurat — dashboard-ul admin nu este protejat');
+
+    // i) Error summary
+    const errors = { recentCount: brainDiag.recentErrors || 0, degradedTools };
+
+    // j) Overall score
+    let score = 0;
+    const activeCount = Object.values(services).filter(s => s.active).length;
+    score += Math.floor(activeCount / Object.keys(services).length * 20);
+    if (database.connected) score += 20;
+    if (brainDiag.status === 'healthy') score += 15;
+    if ((brainDiag.recentErrors || 0) === 0) score += 10;
+    if (security.cspEnabled && security.adminSecretConfigured) score += 15;
+    if (services.ai_claude.active || services.ai_gpt4o.active || services.ai_deepseek.active) score += 20;
+
+    const grade = score >= 90 ? 'A' : score >= 75 ? 'B' : score >= 60 ? 'C' : score >= 40 ? 'D' : 'F';
+
+    res.json({ timestamp: new Date().toISOString(), score, grade, server, services, database, brain: brainResult, auth, payments: paymentsCheck, rateLimits, security, errors, recommendations });
+}));
+
 // ═══ BRAIN DASHBOARD (live monitoring) ═══
 app.get('/dashboard', adminAuth, (req, res) => {
     res.send(`<!DOCTYPE html>
@@ -774,16 +907,54 @@ h1{color:#00ffff;margin-bottom:20px;font-size:1.5rem}
 .bar-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,#00ffff,#00ff88)}
 .journal{font-size:0.8rem;color:#aaa;margin-top:8px}
 .journal-entry{padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.03)}
-.refresh{position:fixed;top:15px;right:15px;background:#00ffff;color:#000;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-weight:bold}
+.btns{position:fixed;top:15px;right:15px;display:flex;gap:8px}
+.refresh{background:#00ffff;color:#000;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-weight:bold}
+.hc-btn{background:#1a1a2a;color:#00ffff;border:1px solid #00ffff;padding:8px 16px;border-radius:8px;cursor:pointer;font-weight:bold}
+.hc-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:999;align-items:flex-start;justify-content:center;overflow-y:auto;padding:20px}
+.hc-box{background:#0d0d20;border:1px solid rgba(0,255,255,0.2);border-radius:16px;padding:28px;width:100%;max-width:860px;margin:auto}
+.hc-box h2{color:#00ffff;margin-bottom:4px;font-size:1.2rem}
+.hc-score{font-size:3rem;font-weight:bold;margin:8px 0}
+.hc-grade-A,.hc-grade-B{color:#00ff88}
+.hc-grade-C{color:#ffaa00}
+.hc-grade-D,.hc-grade-F{color:#ff4444}
+.hc-bar-wrap{background:rgba(255,255,255,0.08);border-radius:6px;height:10px;margin-bottom:20px}
+.hc-bar-fill{height:100%;border-radius:6px;background:linear-gradient(90deg,#00ffff,#00ff88);transition:width .4s}
+.hc-section{margin-top:18px}
+.hc-section h3{color:#888;font-size:0.78rem;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;border-bottom:1px solid rgba(255,255,255,0.07);padding-bottom:6px}
+.hc-row{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.04);font-size:0.85rem}
+.hc-row:last-child{border:none}
+.hc-ok{color:#00ff88}
+.hc-err{color:#ff4444}
+.hc-warn{color:#ffaa00}
+.hc-rec{background:rgba(255,170,0,0.08);border:1px solid rgba(255,170,0,0.25);border-radius:8px;padding:10px 14px;font-size:0.82rem;color:#ffcc66;margin-top:6px}
+.hc-footer{display:flex;gap:10px;margin-top:24px;justify-content:flex-end}
+.hc-close{background:rgba(255,255,255,0.1);color:#e0e0e0;border:none;padding:8px 18px;border-radius:8px;cursor:pointer;font-weight:bold}
+.hc-export{background:#00ffff;color:#000;border:none;padding:8px 18px;border-radius:8px;cursor:pointer;font-weight:bold}
 </style></head>
 <body>
 <h1>\u{1F9E0} KelionAI Brain Dashboard</h1>
-<button class="refresh" onclick="load()">Refresh</button>
+<div class="btns">
+  <button class="hc-btn" onclick="runHealthCheck()">🏥 Health Check</button>
+  <button class="refresh" onclick="load()">Refresh</button>
+</div>
 <div class="grid" id="grid"></div>
+<div class="hc-modal" id="hc-modal">
+  <div class="hc-box">
+    <h2>🏥 Health Check Report</h2>
+    <div id="hc-body"></div>
+    <div class="hc-footer">
+      <button class="hc-export" onclick="exportHC()">Exportă JSON</button>
+      <button class="hc-close" onclick="document.getElementById('hc-modal').style.display='none'">Închide</button>
+    </div>
+  </div>
+</div>
 <script>
+var _adminSecret=sessionStorage.getItem('kelion_admin_secret')||'';
+var _hcData=null;
+function adminHdrs(){return _adminSecret?{'x-admin-secret':_adminSecret}:{};}
 async function load(){
   try{
-    const r=await fetch('/api/brain');
+    const r=await fetch('/api/brain',{headers:adminHdrs()});
     const d=await r.json();
     const g=document.getElementById('grid');
     const statusClass=d.status==='healthy'?'good':d.status==='degraded'?'bad':'warn';
@@ -819,6 +990,72 @@ async function load(){
     <div class="journal">\${(d.journal||[]).map(j=>\`<div class="journal-entry">\${new Date(j.time).toLocaleTimeString()} — <strong>\${j.event}</strong>: \${j.lesson}</div>\`).join('')||'Empty'}</div></div>
     \`;
   }catch(e){document.getElementById('grid').innerHTML='<div class="card"><div class="stat bad">OFFLINE</div></div>';}
+}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function ic(ok){return ok?'<span class="hc-ok">✅</span>':'<span class="hc-err">❌</span>';}
+function renderHC(d){
+  const gc=d.grade==='A'||d.grade==='B'?'hc-grade-A':d.grade==='C'?'hc-grade-C':'hc-grade-D';
+  let h='<div class="hc-score '+gc+'">'+d.score+'/100 <small style="font-size:1.2rem">Grade: '+esc(d.grade)+'</small></div>';
+  h+='<div class="hc-bar-wrap"><div class="hc-bar-fill" style="width:'+d.score+'%"></div></div>';
+  h+='<div class="hc-section"><h3>🖥 Server</h3>';
+  h+='<div class="hc-row"><span>Version</span><span>'+esc(d.server.version)+'</span></div>';
+  h+='<div class="hc-row"><span>Uptime</span><span>'+esc(d.server.uptime)+'</span></div>';
+  h+='<div class="hc-row"><span>Node.js</span><span>'+esc(d.server.nodeVersion)+'</span></div>';
+  h+='<div class="hc-row"><span>Memory RSS</span><span>'+esc(d.server.memory.rss)+'</span></div>';
+  h+='<div class="hc-row"><span>Heap Used</span><span>'+esc(d.server.memory.heapUsed)+'</span></div></div>';
+  h+='<div class="hc-section"><h3>⚙️ Services</h3>';
+  for(const[k,s] of Object.entries(d.services)){h+='<div class="hc-row"><span>'+esc(s.label)+'</span><span>'+ic(s.active)+'</span></div>';}
+  h+='</div>';
+  h+='<div class="hc-section"><h3>🗄 Database</h3>';
+  h+='<div class="hc-row"><span>Connected</span><span>'+ic(d.database.connected)+'</span></div>';
+  for(const[t,v] of Object.entries(d.database.tables||{})){h+='<div class="hc-row"><span>'+esc(t)+'</span><span>'+(v.ok?'<span class="hc-ok">✅ '+v.count+' rows</span>':'<span class="hc-err">❌ '+esc(v.error)+'</span>')+'</span></div>';}
+  h+='</div>';
+  h+='<div class="hc-section"><h3>🧠 Brain</h3>';
+  const bc=d.brain.status==='healthy'?'hc-ok':d.brain.status==='degraded'?'hc-err':'hc-warn';
+  h+='<div class="hc-row"><span>Status</span><span class="'+bc+'">'+esc(d.brain.status)+'</span></div>';
+  h+='<div class="hc-row"><span>Conversations</span><span>'+d.brain.conversations+'</span></div>';
+  h+='<div class="hc-row"><span>Recent Errors</span><span class="'+(d.brain.recentErrors>0?'hc-err':'hc-ok')+'">'+d.brain.recentErrors+'</span></div>';
+  if(d.brain.degradedTools&&d.brain.degradedTools.length){h+='<div class="hc-row"><span>Degraded Tools</span><span class="hc-err">'+esc(d.brain.degradedTools.join(', '))+'</span></div>';}
+  if(d.brain.journal&&d.brain.journal.length){h+='<div style="margin-top:8px;font-size:0.78rem;color:#888">';for(const j of d.brain.journal){h+='<div style="padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.04)">'+new Date(j.time).toLocaleTimeString()+' — <strong>'+esc(j.event)+'</strong>: '+esc(j.lesson)+'</div>';}h+='</div>';}
+  h+='</div>';
+  h+='<div class="hc-section"><h3>🔐 Auth & Security</h3>';
+  h+='<div class="hc-row"><span>Supabase Auth</span><span>'+ic(d.auth.authAvailable)+'</span></div>';
+  h+='<div class="hc-row"><span>CSP Enabled</span><span>'+ic(d.security.cspEnabled)+'</span></div>';
+  h+='<div class="hc-row"><span>HTTPS Redirect</span><span>'+ic(d.security.httpsRedirect)+'</span></div>';
+  h+='<div class="hc-row"><span>Admin Secret</span><span>'+ic(d.security.adminSecretConfigured)+'</span></div>';
+  h+='</div>';
+  h+='<div class="hc-section"><h3>💳 Payments</h3>';
+  h+='<div class="hc-row"><span>Stripe</span><span>'+ic(d.payments.stripeConfigured)+'</span></div>';
+  h+='<div class="hc-row"><span>Webhook</span><span>'+ic(d.payments.webhookConfigured)+'</span></div>';
+  if(d.payments.activeSubscribers!==null){h+='<div class="hc-row"><span>Active Subscribers</span><span>'+d.payments.activeSubscribers+'</span></div>';}
+  h+='</div>';
+  if(d.recommendations&&d.recommendations.length){
+    h+='<div class="hc-section"><h3>⚠️ Recomandări</h3>';
+    for(const r of d.recommendations){h+='<div class="hc-rec">'+esc(r)+'</div>';}
+    h+='</div>';
+  }
+  return h;
+}
+async function runHealthCheck(){
+  const modal=document.getElementById('hc-modal');
+  const body=document.getElementById('hc-body');
+  modal.style.display='flex';
+  body.innerHTML='<div style="text-align:center;color:#00ffff;padding:40px;font-size:1.1rem">⏳ Se verifică...</div>';
+  try{
+    const r=await fetch('/api/admin/health-check',{headers:adminHdrs()});
+    const d=await r.json();
+    if(r.status===401){body.innerHTML='<div style="color:#ff4444;padding:20px">❌ Unauthorized. Setează admin secret în sessionStorage (kelion_admin_secret).</div>';return;}
+    _hcData=d;
+    body.innerHTML=renderHC(d);
+  }catch(e){body.innerHTML='<div style="color:#ff4444;padding:20px">❌ Eroare: '+esc(e.message)+'</div>';}
+}
+function exportHC(){
+  if(!_hcData)return;
+  const blob=new Blob([JSON.stringify(_hcData,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='health-check-'+new Date().toISOString().slice(0,19).replace(/:/g,'-')+'.json';
+  a.click();
 }
 load();setInterval(load,5000);
 </script></body></html>`);
