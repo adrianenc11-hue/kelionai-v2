@@ -475,7 +475,7 @@ async function saveConv(uid, avatar, userMsg, aiReply, convId, lang) {
 // ═══ TTS — ElevenLabs ═══
 app.post('/api/speak', apiLimiter, validate(speakSchema), async (req, res) => {
     try {
-        const { text, avatar = 'kelion' } = req.body;
+        const { text, avatar = 'kelion', mood = 'neutral' } = req.body;
         if (!text || !process.env.ELEVENLABS_API_KEY) return res.status(503).json({ error: 'TTS indisponibil' });
 
         // ── Usage check ──
@@ -483,13 +483,24 @@ app.post('/api/speak', apiLimiter, validate(speakSchema), async (req, res) => {
         const usage = await checkUsage(user?.id, 'tts', supabaseAdmin);
         if (!usage.allowed) return res.status(429).json({ error: 'Limită TTS atinsă. Upgrade la Pro pentru mai mult.', plan: usage.plan, limit: usage.limit, upgrade: true });
 
+        const voiceSettings = {
+            happy:     { stability: 0.4, similarity_boost: 0.8, style: 0.7 },
+            sad:       { stability: 0.7, similarity_boost: 0.9, style: 0.3 },
+            laughing:  { stability: 0.3, similarity_boost: 0.7, style: 0.9 },
+            thinking:  { stability: 0.6, similarity_boost: 0.8, style: 0.4 },
+            excited:   { stability: 0.3, similarity_boost: 0.8, style: 0.8 },
+            concerned: { stability: 0.7, similarity_boost: 0.9, style: 0.4 },
+            neutral:   { stability: 0.5, similarity_boost: 0.75, style: 0.5 }
+        };
+        const selectedVoiceSettings = voiceSettings[mood] || voiceSettings.neutral;
+
         const vid = avatar === 'kira' ? 'EXAVITQu4vr4xnSDxMaL' : 'VR6AewLTigWG4xSOukaG';
         const r = await fetch('https://api.elevenlabs.io/v1/text-to-speech/' + vid, { method: 'POST',
             headers: { 'Content-Type': 'application/json', 'xi-api-key': process.env.ELEVENLABS_API_KEY },
-            body: JSON.stringify({ text, model_id: 'eleven_multilingual_v2', voice_settings: { stability: 0.5, similarity_boost: 0.75 } }) });
+            body: JSON.stringify({ text, model_id: 'eleven_multilingual_v2', voice_settings: selectedVoiceSettings }) });
         if (!r.ok) return res.status(503).json({ error: 'TTS fail' });
         const buf = await r.buffer();
-        logger.info({ component: 'Speak', bytes: buf.length, avatar }, buf.length + ' bytes | ' + avatar);
+        logger.info({ component: 'Speak', bytes: buf.length, avatar, mood }, buf.length + ' bytes | ' + avatar);
         incrementUsage(user?.id, 'tts', supabaseAdmin).catch(()=>{});
         res.set({ 'Content-Type': 'audio/mpeg', 'Content-Length': buf.length }); res.send(buf);
     } catch(e) { res.status(500).json({ error: 'Eroare TTS' }); }

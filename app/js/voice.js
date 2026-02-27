@@ -89,9 +89,10 @@
         isSpeaking = true;
 
         try {
+            const currentExpression = (window.KAvatar && window.KAvatar.getCurrentExpression) ? window.KAvatar.getCurrentExpression() : 'neutral';
             const resp = await fetch(API_BASE + '/api/speak', { method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...(window.KAuth ? KAuth.getAuthHeaders() : {}) },
-                body: JSON.stringify({ text, avatar: avatar || KAvatar.getCurrentAvatar(), language: detectedLanguage }) });
+                body: JSON.stringify({ text, avatar: avatar || KAvatar.getCurrentAvatar(), language: detectedLanguage, mood: currentExpression }) });
 
             if (!resp.ok) { fallbackTextLipSync(text); isSpeaking = false; resumeWakeDetection(); return; }
 
