@@ -3,11 +3,11 @@ name: Test FB Messenger Webhook
 on:
   workflow_dispatch:
 
+permissions: {}
+
 jobs:
   test-webhook:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
     steps:
       - name: Test webhook endpoint
         env:
