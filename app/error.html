@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ro">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -135,12 +135,14 @@
     <div class="error-container">
         <div class="error-code">500</div>
         <div class="error-icon">⚠️</div>
-        <h1>Oops! Ceva a mers prost</h1>
-        <p>Serverul a întâmpinat o problemă. Echipa a fost notificată.</p>
+        <h1 data-i18n="error.title">Oops! Something went wrong</h1>
+        <p data-i18n="error.description">The server encountered a problem. The team has been notified.</p>
         <div class="btn-group">
-            <button class="btn-primary" onclick="window.location.reload()">Reîncearcă</button>
-            <a href="mailto:support@kelionai.com" class="btn-secondary">Raportează problema</a>
+            <button class="btn-primary" id="btn-retry" data-i18n="error.retry">Try Again</button>
+            <a href="mailto:support@kelionai.com" class="btn-secondary" data-i18n="error.report">Report Issue</a>
         </div>
     </div>
+    <script src="/js/i18n.js"></script>
+    <script src="/js/error.js"></script>
 </body>
 </html>
