@@ -48,7 +48,7 @@
         }
     },
     "dependencies": {
-        "@sentry/browser": "^10.39.0",
+        "@sentry/browser": "^10.40.0",
         "@sentry/node": "^10.39.0",
         "@supabase/supabase-js": "^2.98.0",
         "cors": "^2.8.5",
