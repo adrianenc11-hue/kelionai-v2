@@ -19,7 +19,7 @@ jobs:
       contents: read
       deployments: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Deploy to Netlify
         uses: nwtgck/actions-netlify@v3.0
