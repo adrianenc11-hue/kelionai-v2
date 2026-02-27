@@ -867,7 +867,8 @@ app.use('/api/news', adminAuth, newsRouter);
 app.get('/api/health', (req, res) => {
     const diag = brain.getDiagnostics();
     res.json({
-        status: 'online', version: '2.3.0', timestamp: new Date().toISOString(),
+        status: 'ok', version: '2.3.0', timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
         brain: diag.status,
         conversations: diag.conversations,
         services: {
