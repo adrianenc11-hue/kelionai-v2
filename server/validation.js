@@ -27,7 +27,7 @@ const chatSchema = z.object({
         content: z.string(),
     })).max(100).optional(),
     language: z.string().min(2).max(10).optional(),
-    conversationId: z.string().optional(),
+    conversationId: z.string().nullish(),
 });
 
 const speakSchema = z.object({
