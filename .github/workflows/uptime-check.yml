@@ -27,7 +27,7 @@ jobs:
 
       - name: Create issue on downtime
         if: steps.health.outputs.health_status != '200' || steps.homepage.outputs.homepage_status != '200'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const healthStatus = '${{ steps.health.outputs.health_status }}';
