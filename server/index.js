@@ -184,6 +184,23 @@ app.get('/', (req, res) => {
     );
     res.type('html').send(html);
 });
+
+// Read onboarding.html once at startup
+const _rawOnboarding = fs.existsSync(path.join(__dirname, '..', 'app', 'onboarding.html'))
+    ? fs.readFileSync(path.join(__dirname, '..', 'app', 'onboarding.html'), 'utf8')
+    : null;
+
+// Serve onboarding with CSP nonce injection
+app.get('/onboarding.html', (req, res) => {
+    if (!_rawOnboarding) return res.redirect('/');
+    const nonce = res.locals.cspNonce || '';
+    const html = _rawOnboarding.replace(
+        /<script\b(?![^>]*\bnonce=)/g,
+        `<script nonce="${nonce}"`
+    );
+    res.type('html').send(html);
+});
+
 app.use(express.static(path.join(__dirname, '..', 'app')));
 app.use('/api', globalLimiter);
 const PORT = process.env.PORT || 3000;
