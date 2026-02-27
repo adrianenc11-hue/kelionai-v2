@@ -166,6 +166,24 @@ app.get('/metrics', adminAuth, asyncHandler(async (req, res) => { res.set('Conte
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', uptime: process.uptime(), timestamp: new Date().toISOString() });
 });
+// Read index.html once at startup, injecting Sentry DSN if configured
+const _rawHtml = fs.readFileSync(path.join(__dirname, '..', 'app', 'index.html'), 'utf8');
+const _indexHtml = process.env.SENTRY_DSN
+    ? _rawHtml.replace(
+        '<meta name="sentry-dsn" content="">',
+        `<meta name="sentry-dsn" content="${process.env.SENTRY_DSN.replace(/&/g, '&amp;').replace(/"/g, '&quot;')}">`
+    )
+    : _rawHtml;
+
+// Serve main app with CSP nonce injection (express.static skips index.html for /)
+app.get('/', (req, res) => {
+    const nonce = res.locals.cspNonce || '';
+    const html = _indexHtml.replace(
+        /<script\b(?![^>]*\bnonce=)/g,
+        `<script nonce="${nonce}"`
+    );
+    res.type('html').send(html);
+});
 app.use(express.static(path.join(__dirname, '..', 'app')));
 app.use('/api', globalLimiter);
 const PORT = process.env.PORT || 3000;
@@ -864,15 +882,6 @@ app.get('/api/health', (req, res) => {
         }
     });
 });
-
-// Inject Sentry DSN as a meta tag when SENTRY_DSN is configured (optional)
-const _rawHtml = fs.readFileSync(path.join(__dirname, '..', 'app', 'index.html'), 'utf8');
-const _indexHtml = process.env.SENTRY_DSN
-    ? _rawHtml.replace(
-        '<meta name="sentry-dsn" content="">',
-        `<meta name="sentry-dsn" content="${process.env.SENTRY_DSN.replace(/&/g, '&amp;').replace(/"/g, '&quot;')}">`
-    )
-    : _rawHtml;
 
 // 404 for unknown API routes — must come before the catch-all
 app.use('/api', (req, res, next) => {
