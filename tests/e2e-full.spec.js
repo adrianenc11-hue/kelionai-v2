@@ -30,7 +30,7 @@ test.describe('Onboarding Flow', () => {
         await page.screenshot({ path: 'test-results/onboarding-load-after.png' });
     });
 
-    test('onboarding step 1 → step 2 via "Începe" button', async ({ page }) => {
+    test('onboarding step 1 → step 2 via "Get Started" button', async ({ page }) => {
         await page.goto('/onboarding.html');
         await page.screenshot({ path: 'test-results/onboarding-step1-before.png' });
 
@@ -43,36 +43,9 @@ test.describe('Onboarding Flow', () => {
         await page.screenshot({ path: 'test-results/onboarding-step2-after.png' });
     });
 
-    test('onboarding step 2 has language selection', async ({ page }) => {
+    test('onboarding step 2 has plan selection', async ({ page }) => {
         await page.goto('/onboarding.html');
         await page.evaluate(() => nextStep());
-
-        // Language options present
-        await expect(page.locator('[data-lang="ro"]')).toBeVisible();
-        await expect(page.locator('[data-lang="en"]')).toBeVisible();
-
-        // Select English
-        await page.evaluate(() => {
-            const en = document.querySelector('[data-lang="en"]');
-            selectLang(en);
-        });
-        await expect(page.locator('[data-lang="en"]')).toHaveClass(/selected/);
-        await page.screenshot({ path: 'test-results/onboarding-lang-selected.png' });
-    });
-
-    test('onboarding navigate prev (back) from step 2 to step 1', async ({ page }) => {
-        await page.goto('/onboarding.html');
-        await page.evaluate(() => nextStep());
-        await expect(page.locator('[data-step="2"]')).toHaveClass(/active/);
-
-        await page.evaluate(() => prevStep());
-        await expect(page.locator('[data-step="1"]')).toHaveClass(/active/);
-        await page.screenshot({ path: 'test-results/onboarding-prev-step.png' });
-    });
-
-    test('onboarding step 3 has plan selection', async ({ page }) => {
-        await page.goto('/onboarding.html');
-        await page.evaluate(() => { nextStep(); nextStep(); });
 
         // Plan cards present
         await expect(page.locator('[data-plan="free"]')).toBeVisible();
@@ -88,9 +61,19 @@ test.describe('Onboarding Flow', () => {
         await page.screenshot({ path: 'test-results/onboarding-plan-selected.png' });
     });
 
-    test('"Finalizează" finishes onboarding and redirects to /', async ({ page }) => {
+    test('onboarding navigate prev (back) from step 2 to step 1', async ({ page }) => {
         await page.goto('/onboarding.html');
-        await page.evaluate(() => { nextStep(); nextStep(); });
+        await page.evaluate(() => nextStep());
+        await expect(page.locator('[data-step="2"]')).toHaveClass(/active/);
+
+        await page.evaluate(() => prevStep());
+        await expect(page.locator('[data-step="1"]')).toHaveClass(/active/);
+        await page.screenshot({ path: 'test-results/onboarding-prev-step.png' });
+    });
+
+    test('"Finish" finishes onboarding and redirects to /', async ({ page }) => {
+        await page.goto('/onboarding.html');
+        await page.evaluate(() => { nextStep(); });
         await page.screenshot({ path: 'test-results/onboarding-finish-before.png' });
 
         // Finish onboarding
