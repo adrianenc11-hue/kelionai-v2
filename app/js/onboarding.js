@@ -57,3 +57,30 @@ function finishOnboarding() {
     var roOption = document.querySelector('[data-lang="ro"]');
     if (roOption) { roOption.classList.add('selected'); }
 })();
+
+// Wire up event listeners (replaces inline onclick — required by CSP).
+// Script is loaded at end of <body>, so DOM is already available.
+(function() {
+    var btnStart = document.getElementById('btn-start');
+    if (btnStart) { btnStart.addEventListener('click', nextStep); }
+
+    var btnLangNext = document.getElementById('btn-lang-next');
+    if (btnLangNext) { btnLangNext.addEventListener('click', nextStep); }
+
+    var btnLangBack = document.getElementById('btn-lang-back');
+    if (btnLangBack) { btnLangBack.addEventListener('click', prevStep); }
+
+    var btnFinish = document.getElementById('btn-finish');
+    if (btnFinish) { btnFinish.addEventListener('click', finishOnboarding); }
+
+    var btnPlanBack = document.getElementById('btn-plan-back');
+    if (btnPlanBack) { btnPlanBack.addEventListener('click', prevStep); }
+
+    document.querySelectorAll('.lang-option').forEach(function(el) {
+        el.addEventListener('click', function() { selectLang(this); });
+    });
+
+    document.querySelectorAll('.plan-card').forEach(function(el) {
+        el.addEventListener('click', function() { selectPlan(this); });
+    });
+})();
