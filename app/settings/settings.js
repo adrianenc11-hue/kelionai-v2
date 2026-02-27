@@ -40,7 +40,9 @@
     /* ── Apply saved preferences to UI ── */
     function applyPrefs(prefs) {
         var lang = document.getElementById('pref-language');
-        if (lang && prefs.language) lang.value = prefs.language;
+        // Use i18n module language as source of truth, fall back to saved prefs
+        var currentLang = (window.i18n ? i18n.getLanguage() : null) || prefs.language;
+        if (lang && currentLang) lang.value = currentLang;
 
         var browser = document.getElementById('notif-browser');
         if (browser) browser.checked = !!prefs.notifBrowser;
@@ -108,6 +110,8 @@
             lang.addEventListener('change', function () {
                 prefs.language = this.value;
                 savePrefs(prefs);
+                // Apply i18n language switch
+                if (window.i18n) i18n.setLanguage(this.value);
             });
         }
 
