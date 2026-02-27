@@ -1,0 +1,190 @@
+name: 🚀 Auto-Merge All Open PRs
+
+on:
+  workflow_dispatch:
+
+jobs:
+  auto-merge:
+    name: Merge PRs in optimal order
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Auto-merge PRs via GitHub API
+        uses: actions/github-script@v8
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const owner = context.repo.owner;
+            const repo  = context.repo.repo;
+
+            // Optimal merge order (see README — Auto-merge procedure)
+            const PR_ORDER = [
+              { number: 136, title: 'actions/checkout 4→6' },
+              { number: 134, title: 'actions/setup-node 4→6' },
+              { number: 133, title: 'actions/github-script 7→8' },
+              { number: 138, title: 'actions/upload-artifact 4→7' },
+              { number: 135, title: '@supabase/supabase-js 2.97→2.98' },
+              { number: 137, title: 'stripe 20.3.1→20.4.0' },
+              { number: 139, title: '@sentry/browser 10.39→10.40' },
+              { number: 140, title: '@sentry/node 10.39→10.40' },
+              { number: 141, title: 'jest 29.7→30.2' },
+              { number: 123, title: 'Add full integration pipeline' },
+              { number: 128, title: 'Add comprehensive Playwright E2E test suite' },
+              { number: 129, title: 'Add HTTPS redirect, Lighthouse CI, uptime monitoring' },
+              { number: 142, title: 'Fix onboarding flow (inline event handlers)' },
+              { number: 143, title: 'Add live Work-In-Progress status page' },
+            ];
+
+            const DEPENDABOT_PRS = new Set([133, 134, 135, 136, 137, 138, 139, 140, 141]);
+            const WAIT_MS = 30_000;
+
+            const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+            // Results tracking
+            const merged   = [];
+            const conflicts = [];
+            const skipped   = [];
+            const drafts    = [];
+
+            for (const { number, title } of PR_ORDER) {
+              console.log(`\n── PR #${number}: ${title} ──`);
+
+              let pr;
+              try {
+                ({ data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: number }));
+              } catch (e) {
+                console.log(`  ⚠️  Could not fetch PR #${number}: ${e.message}`);
+                skipped.push({ number, title, reason: `fetch error: ${e.message}` });
+                continue;
+              }
+
+              // Already merged / closed
+              if (pr.merged) {
+                console.log(`  ⏭️  Already merged — skip`);
+                skipped.push({ number, title, reason: 'already merged' });
+                continue;
+              }
+              if (pr.state === 'closed') {
+                console.log(`  ⏭️  Closed — skip`);
+                skipped.push({ number, title, reason: 'closed' });
+                continue;
+              }
+
+              // Draft handling
+              if (pr.draft) {
+                console.log(`  📝  PR is draft — attempting to mark ready for review`);
+                try {
+                  await github.graphql(`
+                    mutation($id: ID!) {
+                      markPullRequestReadyForReview(input: { pullRequestId: $id }) {
+                        pullRequest { isDraft }
+                      }
+                    }`, { id: pr.node_id });
+                  console.log(`  ✅  Marked ready for review`);
+                  await sleep(5_000);
+                  ({ data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: number }));
+                } catch (e) {
+                  console.log(`  ❌  Could not mark ready: ${e.message}`);
+                  drafts.push({ number, title, reason: e.message });
+                  continue;
+                }
+                if (pr.draft) {
+                  console.log(`  ❌  Still in draft — skip`);
+                  drafts.push({ number, title, reason: 'still in draft after mutation' });
+                  continue;
+                }
+              }
+
+              // Trigger rebase/update
+              if (DEPENDABOT_PRS.has(number)) {
+                console.log(`  🔄  Posting @dependabot rebase comment`);
+                try {
+                  await github.rest.issues.createComment({
+                    owner, repo,
+                    issue_number: number,
+                    body: '@dependabot rebase',
+                  });
+                } catch (e) {
+                  console.log(`  ⚠️  Could not post rebase comment: ${e.message}`);
+                }
+              } else {
+                console.log(`  🔄  Requesting branch update`);
+                try {
+                  await github.rest.pulls.updateBranch({ owner, repo, pull_number: number });
+                } catch (e) {
+                  console.log(`  ⚠️  Branch update: ${e.message}`);
+                }
+              }
+
+              // Wait for GitHub to recompute mergeability
+              console.log(`  ⏳  Waiting ${WAIT_MS / 1000}s for mergeability check…`);
+              await sleep(WAIT_MS);
+
+              // Re-fetch to get fresh mergeable state
+              ({ data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: number }));
+
+              const state = pr.mergeable_state;
+              console.log(`  ℹ️  mergeable=${pr.mergeable}  state=${state}`);
+
+              if (pr.mergeable === false || state === 'dirty' || state === 'conflict') {
+                console.log(`  ❌  Conflict detected — skip`);
+                conflicts.push({ number, title, state });
+                continue;
+              }
+
+              // Attempt merge
+              try {
+                await github.rest.pulls.merge({
+                  owner, repo,
+                  pull_number: number,
+                  merge_method: 'merge',
+                  commit_title: `Merge PR #${number}: ${title}`,
+                });
+                const ts = new Date().toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
+                console.log(`  ✅  Merged at ${ts}`);
+                merged.push({ number, title, ts });
+              } catch (e) {
+                console.log(`  ❌  Merge failed: ${e.message}`);
+                conflicts.push({ number, title, state: e.message });
+              }
+
+              // Brief pause between merges
+              await sleep(15_000);
+            }
+
+            // ── Generate Markdown summary ──────────────────────────────────────
+            const date = new Date().toISOString().slice(0, 10);
+            let summary = `# 🚀 Auto-Merge Report — ${date}\n\n`;
+            summary += `## Summary\n`;
+            summary += `- ✅ Merged: ${merged.length}/${PR_ORDER.length}\n`;
+            summary += `- ❌ Conflicts: ${conflicts.length}/${PR_ORDER.length}\n`;
+            summary += `- ⏭️ Skipped: ${skipped.length}/${PR_ORDER.length}\n`;
+            summary += `- 📝 Still draft: ${drafts.length}/${PR_ORDER.length}\n\n`;
+            summary += `## Details\n\n`;
+            summary += `| # | PR | Title | Status | Details |\n`;
+            summary += `|---|---|---|---|---|\n`;
+
+            let idx = 1;
+            for (const { number, title } of PR_ORDER) {
+              const m = merged.find(x => x.number === number);
+              const c = conflicts.find(x => x.number === number);
+              const s = skipped.find(x => x.number === number);
+              const d = drafts.find(x => x.number === number);
+              let status, details;
+              if (m)      { status = '✅ Merged';    details = `Merged at ${m.ts}`; }
+              else if (c) { status = '❌ Conflict';  details = `State: ${c.state}`; }
+              else if (s) { status = '⏭️ Skipped';   details = s.reason; }
+              else if (d) { status = '📝 Draft';     details = d.reason; }
+              else        { status = '❓ Unknown';   details = ''; }
+              summary += `| ${idx++} | #${number} | ${title} | ${status} | ${details} |\n`;
+            }
+
+            summary += `\n---\n_Run at ${new Date().toISOString()} by [auto-merge-all workflow](https://github.com/${owner}/${repo}/actions/workflows/auto-merge-all.yml)_\n`;
+
+            // Write to GitHub Actions step summary
+            const fs = require('fs');
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary);
+            console.log('\n' + summary);
