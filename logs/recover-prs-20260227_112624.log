@@ -1,0 +1,45 @@
+[0;36mℹ️   DRY-RUN mode enabled — no changes will be made[0m
+
+[1m[0;36m══ Recovering unmerged PRs ══[0m
+[0;36mℹ️   Log: logs/recover-prs-20260227_112624.log[0m
+[0;36mℹ️   Conflict log: logs/conflict-resolution-20260227_112624.log[0m
+
+[1m[0;36m══ PR #101 ══[0m
+[0;36mℹ️   Source branch: copilot/redesign-pricing-developer-settings[0m
+[0;36mℹ️   Recovery branch: recover/pr-101[0m
+[0;36mℹ️   Source branch 'copilot/redesign-pricing-developer-settings' not found on origin — trying recover/ branch[0m
+[0;31m❌  Source branch for PR #101 not found and no recovery branch exists — skipping[0m
+
+[1m[0;36m══ PR #102 ══[0m
+[0;36mℹ️   Source branch: copilot/add-onboarding-flow-and-error-pages[0m
+[0;36mℹ️   Recovery branch: recover/pr-102[0m
+[0;36mℹ️   Source branch exists on origin: copilot/add-onboarding-flow-and-error-pages[0m
+[0;36mℹ️   [DRY-RUN] Would create branch recover/pr-102 from origin/copilot/add-onboarding-flow-and-error-pages[0m
+[0;36mℹ️   [DRY-RUN] Would open PR: '[Recover PR #102] Add PWA onboarding flow, error pages, install banner & splash screen' from recover/pr-102 → master[0m
+
+[1m[0;36m══ PR #105 ══[0m
+[0;36mℹ️   Source branch: copilot/sync-fb-secrets-and-test-webhook[0m
+[0;36mℹ️   Recovery branch: recover/pr-105[0m
+[0;36mℹ️   Source branch 'copilot/sync-fb-secrets-and-test-webhook' not found on origin — trying recover/ branch[0m
+[0;31m❌  Source branch for PR #105 not found and no recovery branch exists — skipping[0m
+
+[1m[0;36m══ PR #107 ══[0m
+[0;36mℹ️   Source branch: copilot/sync-railway-netlify-env-secrets[0m
+[0;36mℹ️   Recovery branch: recover/pr-107[0m
+[0;36mℹ️   Source branch 'copilot/sync-railway-netlify-env-secrets' not found on origin — trying recover/ branch[0m
+[0;31m❌  Source branch for PR #107 not found and no recovery branch exists — skipping[0m
+
+[1m[0;36m══ PR #110 ══[0m
+[0;36mℹ️   Source branch: copilot/fix-sync-all-secrets-workflow[0m
+[0;36mℹ️   Recovery branch: recover/pr-110[0m
+[0;36mℹ️   Source branch 'copilot/fix-sync-all-secrets-workflow' not found on origin — trying recover/ branch[0m
+[0;31m❌  Source branch for PR #110 not found and no recovery branch exists — skipping[0m
+
+[1m[0;36m══ Recovery Summary ══[0m
+[0;32m  Recovered : 1[0m
+[1;33m  Skipped   : 0[0m
+[0;34m  Conflicts : 0 resolved[0m
+[0;31m  Errors    : 4[0m
+
+[0;36mℹ️   Full log: logs/recover-prs-20260227_112624.log[0m
+[0;36mℹ️   Conflict resolution log: logs/conflict-resolution-20260227_112624.log[0m
