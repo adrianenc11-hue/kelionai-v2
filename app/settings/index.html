@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Setări — KelionAI</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap">
+    <link rel="stylesheet" href="/styles/design-system.css">
+    <link rel="stylesheet" href="/settings/settings.css">
+    <link rel="stylesheet" href="/styles/mobile.css">
+</head>
+<body>
+
+<header class="settings-header">
+    <a href="/" class="settings-logo">KelionAI</a>
+    <nav class="settings-nav">
+        <a href="/" class="nav-link">Acasă</a>
+        <a href="/pricing/" class="nav-link">Prețuri</a>
+        <a href="/developer" class="nav-link">Developer</a>
+    </nav>
+</header>
+
+<main class="settings-main">
+    <h1 class="settings-title">⚙️ Setări</h1>
+    <p class="settings-subtitle">Personalizează experiența KelionAI</p>
+
+    <!-- ═══ Language ═══ -->
+    <div class="settings-section">
+        <div class="settings-section-title">🌍 Limbă &amp; Regiune</div>
+
+        <div class="settings-row">
+            <div class="settings-row-info">
+                <div class="settings-row-label">Limbă interfață</div>
+                <div class="settings-row-desc">Limba în care primești răspunsurile AI</div>
+            </div>
+            <select class="lang-select" id="pref-language" aria-label="Selectează limba">
+                <option value="ro">🇷🇴 Română</option>
+                <option value="en">🇬🇧 English</option>
+                <option value="fr">🇫🇷 Français</option>
+                <option value="de">🇩🇪 Deutsch</option>
+                <option value="es">🇪🇸 Español</option>
+                <option value="it">🇮🇹 Italiano</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- ═══ Theme ═══ -->
+    <div class="settings-section">
+        <div class="settings-section-title">🎨 Temă</div>
+
+        <div class="settings-row">
+            <div class="settings-row-info">
+                <div class="settings-row-label">Temă vizuală</div>
+                <div class="settings-row-desc">KelionAI este optimizat pentru dark mode</div>
+            </div>
+            <div class="theme-options">
+                <button class="theme-option dark active" aria-pressed="true">
+                    <span class="theme-dot"></span>
+                    Dark
+                </button>
+                <button class="theme-option light disabled" aria-disabled="true" tabindex="-1">
+                    <span class="theme-dot"></span>
+                    Light
+                    <span class="tooltip-disabled">Indisponibil momentan</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ Notifications ═══ -->
+    <div class="settings-section">
+        <div class="settings-section-title">🔔 Notificări</div>
+
+        <div class="settings-row">
+            <div class="settings-row-info">
+                <div class="settings-row-label">Notificări browser</div>
+                <div class="settings-row-desc">Primește alertă când AI termină de răspuns</div>
+            </div>
+            <label class="toggle" aria-label="Activează notificările browser">
+                <input type="checkbox" id="notif-browser">
+                <span class="toggle-slider"></span>
+            </label>
+        </div>
+
+        <div class="settings-row">
+            <div class="settings-row-info">
+                <div class="settings-row-label">Sunete UI</div>
+                <div class="settings-row-desc">Sunete la trimiterea și primirea mesajelor</div>
+            </div>
+            <label class="toggle" aria-label="Activează sunetele UI">
+                <input type="checkbox" id="notif-sounds" checked>
+                <span class="toggle-slider"></span>
+            </label>
+        </div>
+
+        <div class="settings-row">
+            <div class="settings-row-info">
+                <div class="settings-row-label">Ticker de știri</div>
+                <div class="settings-row-desc">Afișează știri live în bara de jos</div>
+            </div>
+            <label class="toggle" aria-label="Activează ticker-ul de știri">
+                <input type="checkbox" id="notif-ticker" checked>
+                <span class="toggle-slider"></span>
+            </label>
+        </div>
+    </div>
+
+    <!-- ═══ API Keys ═══ -->
+    <div class="settings-section">
+        <div class="settings-section-title">🔑 API &amp; Integrări</div>
+
+        <div class="settings-row">
+            <div class="settings-row-info">
+                <div class="settings-row-label">API Keys</div>
+                <div class="settings-row-desc">Gestionează cheile API pentru integrări externe</div>
+            </div>
+            <a href="/developer" class="btn-link">Developer Portal →</a>
+        </div>
+    </div>
+
+    <!-- ═══ Subscription ═══ -->
+    <div class="settings-section">
+        <div class="settings-section-title">💳 Abonament</div>
+
+        <div class="settings-row">
+            <div class="settings-row-info">
+                <div class="settings-row-label">Plan curent</div>
+                <div class="settings-row-desc" id="plan-desc">Se încarcă...</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px">
+                <span class="plan-status-badge free" id="plan-badge">Free</span>
+                <a href="/pricing/" class="btn-upgrade" id="btn-upgrade">Upgrade</a>
+            </div>
+        </div>
+
+        <div class="settings-row" id="billing-row" style="display:none">
+            <div class="settings-row-info">
+                <div class="settings-row-label">Facturare</div>
+                <div class="settings-row-desc">Gestionează plăți și facturi</div>
+            </div>
+            <button class="btn-link" id="btn-portal">Portal billing →</button>
+        </div>
+    </div>
+
+    <!-- ═══ Save feedback ═══ -->
+    <div style="text-align:right;margin-top:8px">
+        <span class="save-feedback" id="save-feedback">✓ Salvat</span>
+    </div>
+</main>
+
+<footer class="settings-footer">
+    <p>&copy; 2024 KelionAI. <a href="/api/legal/terms">Termeni</a> · <a href="/api/legal/privacy">Confidențialitate</a></p>
+</footer>
+
+<script src="/settings/settings.js"></script>
+</body>
+</html>
