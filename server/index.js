@@ -35,6 +35,14 @@ const { validate, registerSchema, loginSchema, refreshSchema, chatSchema, speakS
 const app = express();
 app.set('trust proxy', 1);
 
+// ═══ HTTPS FORCE REDIRECT ═══
+app.use((req, res, next) => {
+    if (req.headers['x-forwarded-proto'] !== 'https' && process.env.NODE_ENV === 'production') {
+        return res.redirect(301, `https://${req.hostname}${req.url}`);
+    }
+    next();
+});
+
 // ═══ CSP NONCE MIDDLEWARE — generează nonce unic per request ═══
 app.use((req, res, next) => {
     res.locals.cspNonce = crypto.randomBytes(16).toString('base64');
