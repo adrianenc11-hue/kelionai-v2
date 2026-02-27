@@ -1,0 +1,84 @@
+name: Full Integration Pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Simulate without making real changes'
+        type: boolean
+        default: false
+      skip_deploy:
+        description: 'Skip the deploy and verify step'
+        type: boolean
+        default: false
+      skip_recovery:
+        description: 'Skip the PR recovery step'
+        type: boolean
+        default: false
+
+jobs:
+  pipeline:
+    name: Full Integration Pipeline
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Configure git identity
+        run: |
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+
+      - name: Make scripts executable
+        run: chmod +x scripts/recover-unmerged-prs.sh scripts/integrate-orphan-branches.sh scripts/deploy-and-verify.sh scripts/full-pipeline.sh
+
+      - name: Build pipeline flags
+        id: flags
+        env:
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+          SKIP_DEPLOY: ${{ github.event.inputs.skip_deploy }}
+          SKIP_RECOVERY: ${{ github.event.inputs.skip_recovery }}
+        run: |
+          FLAGS=""
+          [ "$DRY_RUN"      = "true" ] && FLAGS="$FLAGS --dry-run"
+          [ "$SKIP_DEPLOY"  = "true" ] && FLAGS="$FLAGS --skip-deploy"
+          [ "$SKIP_RECOVERY"= "true" ] && FLAGS="$FLAGS --skip-recovery"
+          echo "flags=$FLAGS" >> "$GITHUB_OUTPUT"
+
+      - name: Run full pipeline
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          # shellcheck disable=SC2086
+          bash scripts/full-pipeline.sh ${{ steps.flags.outputs.flags }}
+
+      - name: Upload pipeline logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pipeline-logs-${{ github.run_id }}
+          path: logs/
+          retention-days: 30
+
+      - name: Upload conflict resolution files
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: conflict-files-${{ github.run_id }}
+          path: conflicts/
+          if-no-files-found: ignore
+          retention-days: 30
