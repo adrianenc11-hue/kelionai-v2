@@ -9,4 +9,6 @@ blob-report/
 coverage/
 logs/
 conflicts/
+reports/*.json
+reports/*.md
 
