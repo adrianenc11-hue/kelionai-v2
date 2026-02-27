@@ -14,6 +14,9 @@ jobs:
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
+      issues: write
     outputs:
       test-passed: ${{ steps.unit-tests.outcome }}
 
@@ -77,6 +80,7 @@ jobs:
 
       - name: Create issue on failure
         if: steps.e2e-tests.outcome == 'failure' && github.event_name != 'pull_request'
+        continue-on-error: true
         uses: actions/github-script@v8
         with:
           script: |
