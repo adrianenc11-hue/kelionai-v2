@@ -66,6 +66,7 @@ app.use((req, res, next) => {
                 imgSrc: ["'self'", "data:", "blob:"],
                 connectSrc: [
                     "'self'",
+                    "blob:",
                     "https://api.openai.com",
                     "https://generativelanguage.googleapis.com",
                     "https://api.anthropic.com",
