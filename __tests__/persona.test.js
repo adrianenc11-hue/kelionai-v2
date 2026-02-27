@@ -1,6 +1,6 @@
 'use strict';
 
-const { buildSystemPrompt } = require('../server/persona');
+const { buildSystemPrompt, TRUTH_ENGINE } = require('../server/persona');
 
 describe('buildSystemPrompt', () => {
     test('returns a non-empty string', () => {
@@ -73,5 +73,64 @@ describe('buildSystemPrompt', () => {
     test('includes variability rules', () => {
         const prompt = buildSystemPrompt('kelion', 'ro', '', null, false);
         expect(prompt).toContain('VARIABIL');
+    });
+});
+
+describe('TRUTH_ENGINE', () => {
+    test('TRUTH_ENGINE appears first in prompt before persona text', () => {
+        const prompt = buildSystemPrompt('kelion', 'ro', '', null, false);
+        const truthIndex = prompt.indexOf('MOTORUL ADEVĂRULUI');
+        const kelionIndex = prompt.indexOf('Ești Kelion');
+        expect(truthIndex).toBeGreaterThanOrEqual(0);
+        expect(kelionIndex).toBeGreaterThanOrEqual(0);
+        expect(truthIndex).toBeLessThan(kelionIndex);
+    });
+
+    test('TRUTH_ENGINE appears first in kira prompt before persona text', () => {
+        const prompt = buildSystemPrompt('kira', 'ro', '', null, false);
+        const truthIndex = prompt.indexOf('MOTORUL ADEVĂRULUI');
+        const kiraIndex = prompt.indexOf('Ești Kira');
+        expect(truthIndex).toBeGreaterThanOrEqual(0);
+        expect(kiraIndex).toBeGreaterThanOrEqual(0);
+        expect(truthIndex).toBeLessThan(kiraIndex);
+    });
+
+    test('contains NENEGOCIABIL', () => {
+        const prompt = buildSystemPrompt('kelion', 'ro', '', null, false);
+        expect(prompt).toContain('NENEGOCIABIL');
+    });
+
+    test('contains EXCLUDEREA MINCIUNII', () => {
+        const prompt = buildSystemPrompt('kelion', 'ro', '', null, false);
+        expect(prompt).toContain('EXCLUDEREA MINCIUNII');
+    });
+
+    test('contains EXCLUDEREA RAPORTĂRII FALSE', () => {
+        const prompt = buildSystemPrompt('kelion', 'ro', '', null, false);
+        expect(prompt).toContain('EXCLUDEREA RAPORTĂRII FALSE');
+    });
+
+    test('contains ADEVĂR 100%', () => {
+        const prompt = buildSystemPrompt('kelion', 'ro', '', null, false);
+        expect(prompt).toContain('ADEVĂR 100%');
+    });
+
+    test('contains ETICHETARE OBLIGATORIE', () => {
+        const prompt = buildSystemPrompt('kelion', 'ro', '', null, false);
+        expect(prompt).toContain('ETICHETARE OBLIGATORIE');
+    });
+
+    test('contains REGULA SUPREMĂ', () => {
+        const prompt = buildSystemPrompt('kelion', 'ro', '', null, false);
+        expect(prompt).toContain('REGULA SUPREMĂ');
+    });
+
+    test('TRUTH_ENGINE constant contains expected sections', () => {
+        expect(TRUTH_ENGINE).toContain('NENEGOCIABIL');
+        expect(TRUTH_ENGINE).toContain('EXCLUDEREA MINCIUNII');
+        expect(TRUTH_ENGINE).toContain('EXCLUDEREA RAPORTĂRII FALSE');
+        expect(TRUTH_ENGINE).toContain('ADEVĂR 100%');
+        expect(TRUTH_ENGINE).toContain('ETICHETARE OBLIGATORIE');
+        expect(TRUTH_ENGINE).toContain('REGULA SUPREMĂ');
     });
 });

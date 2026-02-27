@@ -438,6 +438,9 @@ Raspunde STRICT cu JSON:
             if (chainOfThought.anticipate) ctx += `\nAnticipeaza intrebare: ${chainOfThought.anticipate}`;
         }
 
+        // Add truth check reminder
+        ctx += '\n[TRUTH CHECK: Verifică fiecare afirmație — e fapt, presupunere sau opinie? Etichetează intern.]';
+
         return ctx;
     }
 
