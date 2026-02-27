@@ -57,3 +57,15 @@ describe('POST /api/messenger/webhook', () => {
         expect(res.status).toBe(200);
     });
 });
+
+describe('GET /api/messenger/health', () => {
+    test('returns health status object', async () => {
+        const res = await request(app).get('/api/messenger/health');
+        expect(res.status).toBe(200);
+        expect(res.body).toHaveProperty('status');
+        expect(res.body).toHaveProperty('graphApiVersion', 'v21.0');
+        expect(res.body).toHaveProperty('hasPageToken');
+        expect(res.body).toHaveProperty('hasAppSecret');
+        expect(res.body).toHaveProperty('stats');
+    });
+});
