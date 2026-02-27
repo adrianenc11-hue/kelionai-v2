@@ -1149,6 +1149,18 @@ app.post('/api/ticker/disable', asyncHandler(async (req, res) => {
 const newsRouter = require('./news');
 app.use('/api/news', adminAuth, newsRouter);
 
+// ═══ TRADING BOT (admin only) ═══
+const tradingRouter = require('./trading');
+app.use('/api/trading', adminAuth, tradingRouter);
+
+// ═══ SPORTS BOT (admin only) ═══
+const sportsRouter = require('./sports');
+app.use('/api/sports', adminAuth, sportsRouter);
+
+// Serve admin pages
+app.get('/admin/trading', (req, res) => res.sendFile(path.join(__dirname, '../app/admin/trading.html')));
+app.get('/admin/sports', (req, res) => res.sendFile(path.join(__dirname, '../app/admin/sports.html')));
+
 // ═══ HEALTH ═══
 app.get('/api/health', (req, res) => {
     const diag = brain.getDiagnostics();
@@ -1165,7 +1177,9 @@ app.get('/api/health', (req, res) => {
             search_serper: !!process.env.SERPER_API_KEY, search_ddg: true, weather: true,
             images: !!process.env.TOGETHER_API_KEY,
             payments: !!process.env.STRIPE_SECRET_KEY,
-            auth: !!supabase, database: !!supabaseAdmin
+            auth: !!supabase, database: !!supabaseAdmin,
+            trading_bot: true,
+            sports_bot: true
         }
     });
 });
