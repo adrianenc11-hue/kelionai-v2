@@ -530,7 +530,9 @@ app.post('/api/speak', apiLimiter, validate(speakSchema), async (req, res) => {
         };
         const selectedVoiceSettings = voiceSettings[mood] || voiceSettings.neutral;
 
-        const vid = avatar === 'kira' ? 'EXAVITQu4vr4xnSDxMaL' : 'VR6AewLTigWG4xSOukaG';
+        const vid = avatar === 'kira'
+            ? (process.env.ELEVENLABS_VOICE_KIRA || 'EXAVITQu4vr4xnSDxMaL')
+            : (process.env.ELEVENLABS_VOICE_KELION || 'VR6AewLTigWG4xSOukaG');
         const r = await fetch('https://api.elevenlabs.io/v1/text-to-speech/' + vid, { method: 'POST',
             headers: { 'Content-Type': 'application/json', 'xi-api-key': process.env.ELEVENLABS_API_KEY },
             body: JSON.stringify({ text, model_id: 'eleven_multilingual_v2', voice_settings: selectedVoiceSettings }) });
@@ -1146,8 +1148,16 @@ app.post('/api/ticker/disable', asyncHandler(async (req, res) => {
 }));
 
 // ═══ NEWS BOT (admin only) ═══
-const newsRouter = require('./news');
-app.use('/api/news', adminAuth, newsRouter);
+const newsModule = require('./news');
+app.use('/api/news', adminAuth, newsModule.router);
+newsModule.setSupabase(supabaseAdmin);
+newsModule.restoreCache();
+
+// ═══ TRADING BOT (admin only) ═══
+app.use('/api/trading', adminAuth, require('./trading'));
+
+// ═══ SPORTS BOT (admin only) ═══
+app.use('/api/sports', adminAuth, require('./sports'));
 
 // ═══ HEALTH ═══
 app.get('/api/health', (req, res) => {
