@@ -225,6 +225,17 @@ app.use('/api', globalLimiter);
 const PORT = process.env.PORT || 3000;
 const memFallback = Object.create(null);
 
+// Cleanup memFallback every hour to prevent memory leaks
+setInterval(() => {
+    const keys = Object.keys(memFallback);
+    if (keys.length > 1000) {
+        // Keep only the most recent 500 entries
+        const toDelete = keys.slice(0, keys.length - 500);
+        for (const k of toDelete) delete memFallback[k];
+        logger.info({ component: 'Memory', removed: toDelete.length, remaining: 500 }, 'memFallback cleanup');
+    }
+}, 60 * 60 * 1000);
+
 // ═══ BRAIN INITIALIZATION ═══
 const brain = new KelionBrain({
     anthropicKey: process.env.ANTHROPIC_API_KEY,
