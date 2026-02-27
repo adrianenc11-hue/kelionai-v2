@@ -24,6 +24,7 @@
 
     // Expression
     let targetExpression = {}, currentExpression = {};
+    let currentExpressionName = 'neutral';
 
     // Attention state — stops idle when listening
     let isAttentive = false;
@@ -258,11 +259,86 @@
             happy: { 'cheekSquintLeft': 0.3, 'cheekSquintRight': 0.3, 'mouthSmileLeft': 0.2, 'mouthSmileRight': 0.2 },
             thinking: { 'browInnerUp': 0.3, 'eyeSquintLeft': 0.15, 'eyeSquintRight': 0.15 },
             concerned: { 'browInnerUp': 0.4, 'mouthFrownLeft': 0.2, 'mouthFrownRight': 0.2 },
-            neutral: {}
+            neutral: {},
+            laughing: { 'mouthSmileLeft': 0.7, 'mouthSmileRight': 0.7, 'cheekSquintLeft': 0.6, 'cheekSquintRight': 0.6, 'eyeSquintLeft': 0.4, 'eyeSquintRight': 0.4 },
+            surprised: { 'browInnerUp': 0.8, 'browOuterUpLeft': 0.5, 'browOuterUpRight': 0.5, 'mouthOpen': 0.3 },
+            playful: { 'eyeSquintLeft': 0.3, 'mouthSmileLeft': 0.4, 'mouthSmileRight': 0.1, 'browOuterUpRight': 0.3 },
+            sad: { 'browInnerUp': 0.5, 'mouthFrownLeft': 0.4, 'mouthFrownRight': 0.4, 'eyeSquintLeft': 0.2, 'eyeSquintRight': 0.2 },
+            determined: { 'browDownLeft': 0.3, 'browDownRight': 0.3, 'jawForward': 0.1, 'mouthPressLeft': 0.2, 'mouthPressRight': 0.2 },
+            loving: { 'cheekSquintLeft': 0.4, 'cheekSquintRight': 0.4, 'mouthSmileLeft': 0.3, 'mouthSmileRight': 0.3, 'eyeSquintLeft': 0.15, 'eyeSquintRight': 0.15 },
+            sleepy: { 'eyeBlinkLeft': 0.4, 'eyeBlinkRight': 0.4, 'browInnerUp': 0.1, 'mouthOpen': 0.05 }
         };
+        currentExpressionName = name;
         targetExpression = {};
         var expr = expressions[name] || {};
         for (var key in expr) targetExpression[key] = expr[key] * intensity;
+        setMoodLighting(name);
+    }
+
+    // Mood lighting target
+    var targetBgColor = new THREE.Color(0x060614);
+
+    function setMoodLighting(mood) {
+        if (!scene) return;
+        var colors = {
+            happy: 0x0a0a1e,
+            laughing: 0x0e0a1e,
+            sad: 0x060618,
+            concerned: 0x0a0814,
+            thinking: 0x060614,
+            surprised: 0x0e0e1e,
+            playful: 0x0c0a1e,
+            loving: 0x100a18,
+            determined: 0x08080e,
+            neutral: 0x060614
+        };
+        targetBgColor.set(colors[mood] || colors.neutral);
+    }
+
+    function updateMoodLighting() {
+        if (!scene || !scene.background) return;
+        scene.background.lerp(targetBgColor, 0.05);
+    }
+
+    // ── Gesture system ───────────────────────────────────────
+    var gestureQueue = [];
+    var gestureActive = false;
+    var gestureTimer = 0;
+    var gestureDuration = 0;
+    var gestureData = null;
+
+    function playGesture(type) {
+        gestureQueue.push(type);
+    }
+
+    function updateGesture(dt) {
+        if (!currentModel) return;
+        if (gestureActive) {
+            gestureTimer += dt;
+            var t = gestureTimer / gestureDuration;
+            if (t >= 1) {
+                gestureActive = false;
+                gestureTimer = 0;
+                gestureData = null;
+                currentModel.rotation.z += (-currentModel.rotation.z) * 0.1;
+                return;
+            }
+            var angle = Math.sin(t * Math.PI);
+            if (gestureData === 'nod') {
+                currentModel.rotation.x += (angle * 0.15 - currentModel.rotation.x) * 0.2;
+            } else if (gestureData === 'shake') {
+                currentModel.rotation.y += (Math.sin(t * Math.PI * 3) * 0.12 - currentModel.rotation.y) * 0.2;
+            } else if (gestureData === 'tilt') {
+                currentModel.rotation.z += (angle * 0.1 - currentModel.rotation.z) * 0.15;
+            } else if (gestureData === 'lookAway') {
+                currentModel.rotation.y += (Math.sin(t * Math.PI) * 0.2 - currentModel.rotation.y) * 0.15;
+            }
+        } else if (gestureQueue.length > 0) {
+            gestureData = gestureQueue.shift();
+            gestureActive = true;
+            gestureTimer = 0;
+            gestureDuration = gestureData === 'shake' ? 1.0 : 0.6;
+        }
     }
 
     function updateExpression(dt) {
@@ -287,6 +363,8 @@
         updateBlink(dt);
         updateExpression(dt);
         if (lipSync) lipSync.update();
+        updateGesture(dt);
+        updateMoodLighting();
         if (currentModel) {
             var targetY = 0;
             var targetX = 0;
@@ -328,7 +406,10 @@
         loadAvatarAsync: loadAvatar,
         waitForLoad: function () { return loadPromise || Promise.resolve(); },
         getCurrentAvatar: function () { return currentAvatar; },
+        getCurrentExpression: function () { return currentExpressionName; },
         setExpression: setExpression,
+        setMoodLighting: setMoodLighting,
+        playGesture: playGesture,
         setMorph: setMorph,
         setAttentive: function (v) { isAttentive = v; },
         setPresenting: function (v) { isPresenting = v; },

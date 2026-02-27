@@ -310,6 +310,21 @@ Raspunde STRICT cu JSON:
         ];
         result.topics = topicPatterns.filter(t => t.pattern.test(lower)).map(t => t.topic);
 
+        // ── MOOD DETECTION ──
+        const moodPatterns = {
+            happy: /\b(super|minunat|yay|woohoo|amazing|perfect|grozav|excelent|bravo|wow)\b/i,
+            sad: /\b(trist|supărat|rău|plâng|deprimat|singur|lonely|sad|down|pierdut)\b/i,
+            frustrated: /\b(nu merge|enervant|prostie|nu funcționează|broken|hate|ura|naiba|drace)\b/i,
+            excited: /\b(abia aștept|nu pot să cred|OMG|incredibil|fantastic|awesome)\b/i,
+            anxious: /\b(îngrijorat|anxios|frica|teamă|worried|stressed|stresat|panicat)\b/i,
+            playful: /\b(haha|😂|😏|lol|rofl|:D|glum|funny|amuzant|haios|hazliu)\b/i
+        };
+        let detectedMood = 'neutral';
+        for (const [mood, pattern] of Object.entries(moodPatterns)) {
+            if (pattern.test(text)) { detectedMood = mood; break; }
+        }
+        result.detectedMood = detectedMood;
+
         result.isQuestion = /\?$/.test(text.trim()) || /^(ce|cine|cand|unde|cum|de ce|cat|what|who|when|where|how|why)/i.test(lower);
         result.isCommand = /^(fa|seteaza|porneste|opreste|deschide|do|set|start|stop|open|run|executa)/i.test(lower);
 
