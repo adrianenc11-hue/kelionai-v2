@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ro">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
@@ -137,20 +137,20 @@
             <div id="auth-logo">
                 <div class="auth-avatar-icon">🤖</div>
                 <h1>KelionAI</h1>
-                <p class="auth-subtitle">Asistentul tău AI inteligent</p>
+                <p class="auth-subtitle" data-i18n="auth.subtitle">Your smart AI assistant</p>
             </div>
             <form id="auth-form">
-                <h2 id="auth-title">Autentificare</h2>
+                <h2 id="auth-title" data-i18n="auth.title">Sign In</h2>
                 <div id="auth-name-group" style="display:none">
-                    <input type="text" id="auth-name" placeholder="Numele tău" autocomplete="name">
+                    <input type="text" id="auth-name" data-i18n-placeholder="auth.name.placeholder" placeholder="Your name" autocomplete="name">
                 </div>
-                <div><input type="email" id="auth-email" placeholder="Email" autocomplete="email" required></div>
-                <div><input type="password" id="auth-password" placeholder="Parolă" autocomplete="current-password" required></div>
+                <div><input type="email" id="auth-email" data-i18n-placeholder="auth.email.placeholder" placeholder="Email" autocomplete="email" required></div>
+                <div><input type="password" id="auth-password" data-i18n-placeholder="auth.password.placeholder" placeholder="Password" autocomplete="current-password" required></div>
                 <div id="auth-error"></div>
-                <button type="submit" id="auth-submit">Intră</button>
-                <a href="#" id="auth-toggle">Nu am cont → Creează</a>
+                <button type="submit" id="auth-submit" data-i18n="auth.submit">Sign In</button>
+                <a href="#" id="auth-toggle" data-i18n="auth.toggle">No account → Create</a>
             </form>
-            <button id="auth-guest" class="auth-guest-btn">Continuă fără cont</button>
+            <button id="auth-guest" class="auth-guest-btn" data-i18n="auth.guest">Continue without account</button>
         </div>
     </div>
 
@@ -161,17 +161,17 @@
         <nav class="navbar" id="app-navbar">
             <a href="/" class="navbar-logo">Kelion<span>AI</span></a>
             <ul class="navbar-links">
-                <li><a href="/">Home</a></li>
-                <li><a href="/#features">Features</a></li>
-                <li><a href="/pricing/">Pricing</a></li>
-                <li><a href="/developer">Developer</a></li>
-                <li><a href="/docs" target="_blank" rel="noopener">Docs</a></li>
+                <li><a href="/" data-i18n="nav.home">Home</a></li>
+                <li><a href="/#features" data-i18n="nav.features">Features</a></li>
+                <li><a href="/pricing/" data-i18n="nav.pricing">Pricing</a></li>
+                <li><a href="/developer" data-i18n="nav.developer">Developer</a></li>
+                <li><a href="/docs" target="_blank" rel="noopener" data-i18n="nav.docs">Docs</a></li>
             </ul>
             <div class="navbar-right">
                 <div class="lang-switcher">
-                    <button class="lang-switcher-btn" aria-label="Schimbă limba">
+                    <button class="lang-switcher-btn" data-i18n-aria="nav.lang_aria" aria-label="Change language">
                         <span>🌐</span>
-                        <span id="navbar-lang-label">RO</span>
+                        <span id="navbar-lang-label">EN</span>
                         <span>▾</span>
                     </button>
                     <div class="lang-dropdown">
@@ -182,8 +182,8 @@
                         <button class="lang-option" data-lang="es">🇪🇸 Español</button>
                     </div>
                 </div>
-                <button class="btn-primary" id="navbar-get-started" style="padding:8px 18px;font-size:0.85rem;">Get Started</button>
-                <button class="navbar-hamburger" id="navbar-hamburger" aria-label="Meniu">
+                <button class="btn-primary" id="navbar-get-started" style="padding:8px 18px;font-size:0.85rem;" data-i18n="nav.get_started">Get Started</button>
+                <button class="navbar-hamburger" id="navbar-hamburger" aria-label="Menu">
                     <span></span><span></span><span></span>
                 </button>
             </div>
@@ -191,11 +191,11 @@
 
         <!-- MOBILE NAV MENU -->
         <div class="navbar-mobile-menu" id="navbar-mobile-menu">
-            <a href="/">Home</a>
-            <a href="/#features">Features</a>
-            <a href="/pricing/">Pricing</a>
-            <a href="/developer">Developer</a>
-            <a href="/docs" target="_blank" rel="noopener">Docs</a>
+            <a href="/" data-i18n="nav.home">Home</a>
+            <a href="/#features" data-i18n="nav.features">Features</a>
+            <a href="/pricing/" data-i18n="nav.pricing">Pricing</a>
+            <a href="/developer" data-i18n="nav.developer">Developer</a>
+            <a href="/docs" target="_blank" rel="noopener" data-i18n="nav.docs">Docs</a>
         </div>
 
         <!-- MAIN CONTENT -->
@@ -204,9 +204,9 @@
         <!-- CONVERSATION HISTORY SIDEBAR -->
         <div id="history-sidebar" class="hidden">
             <div id="history-header">
-                <h3>Conversații</h3>
-                <button id="btn-new-chat" title="Chat nou">＋</button>
-                <button id="btn-close-history" title="Închide">✕</button>
+                <h3 data-i18n="history.title">Conversations</h3>
+                <button id="btn-new-chat" title="New chat">＋</button>
+                <button id="btn-close-history" title="Close">✕</button>
             </div>
             <div id="history-list"></div>
         </div>
@@ -226,9 +226,9 @@
                     <button class="avatar-pill" data-avatar="kira">Kira</button>
                     <button class="ctrl-btn-sm" id="btn-history" title="Istoric conversații">📋</button>
                     <span id="user-name" class="user-badge">Guest</span>
-                    <a href="/pricing/" class="pricing-nav-link" id="btn-pricing-link" title="Pagina de prețuri">Pricing</a>
-                    <button class="ctrl-btn-sm" id="btn-pricing" title="Plan & Prețuri">💎</button>
-                    <button class="ctrl-btn-sm" id="btn-auth" title="Autentificare">🔑</button>
+                    <a href="/pricing/" class="pricing-nav-link" id="btn-pricing-link" title="Pricing">Pricing</a>
+                    <button class="ctrl-btn-sm" id="btn-pricing" title="Plan & Pricing">💎</button>
+                    <button class="ctrl-btn-sm" id="btn-auth" title="Sign In">🔑</button>
                     <a href="/developer" class="ctrl-btn-sm" title="Developer API" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center">⚡</a>
                 </div>
             </div>
@@ -236,18 +236,18 @@
                 <div id="chat-overlay"></div>
                 <div id="thinking">
                     <div class="thinking-dots"><span></span><span></span><span></span></div>
-                    <span>Se gândește...</span>
+                    <span data-i18n="thinking.text">Thinking...</span>
                 </div>
                 <div id="input-row">
-                    <button class="ctrl-btn-sm active-mic" id="btn-mic" title="Ține apăsat să vorbești">🎤</button>
-                    <button class="ctrl-btn-sm" id="btn-vision" title="Cameră">👁️</button>
-                    <input type="text" id="text-input" placeholder="Scrie sau vorbește..." autocomplete="off">
+                    <button class="ctrl-btn-sm active-mic" id="btn-mic" title="Hold to speak">🎤</button>
+                    <button class="ctrl-btn-sm" id="btn-vision" title="Camera">👁️</button>
+                    <input type="text" id="text-input" data-i18n-placeholder="input.placeholder" placeholder="Type or speak..." autocomplete="off">
                     <button id="btn-send">➤</button>
                 </div>
             </div>
         </div>
         <div id="display-panel">
-            <div id="display-header"><span id="display-title">Monitor</span></div>
+            <div id="display-header"><span id="display-title" data-i18n="monitor.title">Monitor</span></div>
             <div id="display-content">
                 <div id="monitor-image" style="display:none"></div>
                 <div id="monitor-map" style="display:none"></div>
@@ -256,8 +256,8 @@
                 <div id="monitor-weather" style="display:none"></div>
                 <div id="monitor-default">
                     <div class="welcome-icon">🎯</div>
-                    <p>Monitorul va afișa conținut când asistentul AI partajează informații.</p>
-                    <small>Spune "ce e în față" sau "arată-mi o hartă"</small>
+                    <p data-i18n="monitor.default.text">The monitor will display content when the AI assistant shares information.</p>
+                    <small data-i18n="monitor.default.hint">Say "what's ahead" or "show me a map"</small>
                 </div>
             </div>
         </div>
@@ -265,14 +265,14 @@
     </div><!-- /#app-layout -->
 
     <div id="drop-zone" class="hidden">
-        <div class="drop-zone-content"><div class="drop-icon">📂</div><p>Trage fișierul aici</p></div>
+        <div class="drop-zone-content"><div class="drop-icon">📂</div><p data-i18n="drop.text">Drop file here</p></div>
     </div>
 
     <!-- PRICING MODAL -->
     <div id="pricing-modal" class="modal-overlay hidden">
         <div class="modal-content pricing-modal">
             <button class="modal-close" id="pricing-close">&times;</button>
-            <h2 class="pricing-title">Alege planul tău</h2>
+            <h2 class="pricing-title" data-i18n="pricing.modal.title">Choose your plan</h2>
             <div id="current-plan-info" class="current-plan-info"></div>
             <div class="pricing-grid" id="pricing-grid"></div>
             <div id="pricing-referral" class="pricing-referral"></div>
@@ -286,6 +286,7 @@
     </div>
 
     <script src="/lib/three.bundle.js"></script>
+    <script src="/js/i18n.js"></script>
     <script src="/js/fft-lipsync.js"></script>
     <script src="/js/avatar.js"></script>
     <script src="/js/voice.js"></script>
@@ -303,13 +304,13 @@
         <div class="pwa-banner-content">
             <span>📱</span>
             <div>
-                <strong>Instalează KelionAI</strong>
-                <p>Acces rapid de pe ecranul tău</p>
+                <strong data-i18n="pwa.title">Install KelionAI</strong>
+                <p data-i18n="pwa.subtitle">Quick access from your screen</p>
             </div>
         </div>
         <div class="pwa-banner-actions">
-            <button id="pwa-install-btn" class="pwa-btn-primary">Instalează</button>
-            <button id="pwa-dismiss-btn" class="pwa-btn-secondary">Nu acum</button>
+            <button id="pwa-install-btn" class="pwa-btn-primary" data-i18n="pwa.install">Install</button>
+            <button id="pwa-dismiss-btn" class="pwa-btn-secondary" data-i18n="pwa.dismiss">Not now</button>
         </div>
     </div>
 
