@@ -48,6 +48,7 @@ async function getUserPlan(userId, supabaseAdmin) {
 
 // ═══ CHECK USAGE LIMIT ═══
 async function checkUsage(userId, type, supabaseAdmin) {
+    if (!userId) return { allowed: true, plan: 'free', remaining: 5 };
     const { plan, limits } = await getUserPlan(userId, supabaseAdmin);
     if (limits[type] === -1) return { allowed: true, plan, remaining: -1 }; // unlimited
     
