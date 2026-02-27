@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="ro">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bun venit — KelionAI</title>
+    <title>Welcome — KelionAI</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&display=swap">
     <style>
@@ -141,31 +141,6 @@
         }
         .btn-secondary:hover { border-color: var(--kelion-primary); color: var(--kelion-text); }
 
-        /* ─── Language grid ─── */
-        .lang-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-            margin: 24px 0;
-        }
-
-        .lang-option {
-            background: var(--kelion-bg-secondary);
-            border: 2px solid var(--kelion-border);
-            border-radius: var(--kelion-radius);
-            padding: 16px;
-            cursor: pointer;
-            transition: var(--kelion-transition);
-            font-size: 16px;
-            color: var(--kelion-text);
-        }
-
-        .lang-option:hover,
-        .lang-option.selected {
-            border-color: var(--kelion-primary);
-            background: rgba(0, 204, 255, 0.08);
-        }
-
         /* ─── Plan cards ─── */
         .plan-grid {
             display: flex;
@@ -241,68 +216,53 @@
             <div class="progress-dots">
                 <div class="progress-dot active" id="dot-1"></div>
                 <div class="progress-dot" id="dot-2"></div>
-                <div class="progress-dot" id="dot-3"></div>
             </div>
 
             <!-- Step 1 — Welcome -->
             <div class="onboarding-step active" data-step="1">
                 <span class="onboarding-icon animate-glow">🤖</span>
-                <h1>Bun venit la <span class="gradient-text">KelionAI</span></h1>
-                <p>Asistentul tău AI personal — inteligent, rapid, multilingv.</p>
-                <button class="btn-primary" id="btn-start">Începe →</button>
+                <h1><span data-i18n="onboarding.title">Welcome to</span> <span class="gradient-text">KelionAI</span></h1>
+                <p data-i18n="onboarding.subtitle">Your personal AI assistant — smart, fast, multilingual.</p>
+                <button class="btn-primary" id="btn-start" data-i18n="onboarding.start">Get Started →</button>
             </div>
 
-            <!-- Step 2 — Choose language -->
+            <!-- Step 2 — Choose plan -->
             <div class="onboarding-step" data-step="2">
-                <h2>🌍 Alege limba preferată</h2>
-                <div class="lang-grid">
-                    <div class="lang-option" data-lang="ro">🇷🇴 Română</div>
-                    <div class="lang-option" data-lang="en">🇬🇧 English</div>
-                    <div class="lang-option" data-lang="fr">🇫🇷 Français</div>
-                    <div class="lang-option" data-lang="de">🇩🇪 Deutsch</div>
-                    <div class="lang-option" data-lang="es">🇪🇸 Español</div>
-                    <div class="lang-option" data-lang="it">🇮🇹 Italiano</div>
-                </div>
-                <button class="btn-primary" id="btn-lang-next">Continuă →</button>
-                <button class="btn-secondary" id="btn-lang-back">← Înapoi</button>
-            </div>
-
-            <!-- Step 3 — Choose plan -->
-            <div class="onboarding-step" data-step="3">
-                <h2>💎 Alege planul tău</h2>
+                <h2 data-i18n="onboarding.plan.title">💎 Choose your plan</h2>
                 <div class="plan-grid">
                     <div class="plan-card" data-plan="free">
                         <span class="plan-icon">🆓</span>
                         <div class="plan-info">
-                            <div class="plan-name">Free</div>
-                            <div class="plan-desc">20 mesaje/zi · Funcții de bază</div>
+                            <div class="plan-name" data-i18n="onboarding.plan.free.name">Free</div>
+                            <div class="plan-desc" data-i18n="onboarding.plan.free.desc">20 messages/day · Basic features</div>
                         </div>
-                        <span class="plan-price">Gratuit</span>
+                        <span class="plan-price" data-i18n="onboarding.plan.free.price">Free</span>
                     </div>
                     <div class="plan-card featured" data-plan="pro">
                         <span class="plan-icon">⚡</span>
                         <div class="plan-info">
-                            <div class="plan-name">Pro</div>
-                            <div class="plan-desc">200 mesaje/zi · Toate funcțiile</div>
+                            <div class="plan-name" data-i18n="onboarding.plan.pro.name">Pro</div>
+                            <div class="plan-desc" data-i18n="onboarding.plan.pro.desc">200 messages/day · All features</div>
                         </div>
-                        <span class="plan-price">€9/lună</span>
+                        <span class="plan-price" data-i18n="onboarding.plan.pro.price">€9/month</span>
                     </div>
                     <div class="plan-card" data-plan="premium">
                         <span class="plan-icon">👑</span>
                         <div class="plan-info">
-                            <div class="plan-name">Premium</div>
-                            <div class="plan-desc">Nelimitat · Prioritate maximă</div>
+                            <div class="plan-name" data-i18n="onboarding.plan.premium.name">Premium</div>
+                            <div class="plan-desc" data-i18n="onboarding.plan.premium.desc">Unlimited · Maximum priority</div>
                         </div>
-                        <span class="plan-price">€19/lună</span>
+                        <span class="plan-price" data-i18n="onboarding.plan.premium.price">€19/month</span>
                     </div>
                 </div>
-                <button class="btn-primary" id="btn-finish">Finalizează →</button>
-                <button class="btn-secondary" id="btn-plan-back">← Înapoi</button>
+                <button class="btn-primary" id="btn-finish" data-i18n="onboarding.finish">Finish →</button>
+                <button class="btn-secondary" id="btn-plan-back" data-i18n="onboarding.back">← Back</button>
             </div>
 
         </div>
     </div>
 
+    <script src="/js/i18n.js"></script>
     <script src="/js/onboarding.js"></script>
 </body>
 </html>

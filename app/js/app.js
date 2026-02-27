@@ -55,7 +55,7 @@
                     message,
                     avatar: KAvatar.getCurrentAvatar(),
                     history: chatHistory.slice(-20),
-                    language: language || 'ro',
+                    language: language || (window.i18n ? i18n.getLanguage() : 'en'),
                     conversationId: currentConversationId
                 })
             });
@@ -161,7 +161,7 @@
                     message,
                     avatar: KAvatar.getCurrentAvatar(),
                     history: chatHistory.slice(-20),
-                    language: language || 'ro',
+                    language: language || (window.i18n ? i18n.getLanguage() : 'en'),
                     conversationId: currentConversationId
                 })
             });
@@ -354,8 +354,13 @@
         if (!KVoice.isRecording()) return; showThinking(true);
         var text = await KVoice.stopListening();
         if (text && text.trim()) { hideWelcome(); addMessage('user', text);
+            // Auto-detect language from voice transcription and update UI
+            if (window.i18n) {
+                var detected = i18n.detectLanguage(text);
+                if (detected && detected !== i18n.getLanguage()) i18n.setLanguage(detected);
+            }
             if (isUpgradeRequest(text)) { showThinking(false); if (window.KPayments) KPayments.showUpgradePrompt(); }
-            else if (isVisionRequest(text)) triggerVision(); else await sendToAI(text, KVoice.getLanguage());
+            else if (isVisionRequest(text)) triggerVision(); else await sendToAI(text, window.i18n ? i18n.getLanguage() : KVoice.getLanguage());
         } else { showThinking(false); KVoice.resumeWakeDetection(); }
     }
 
@@ -366,8 +371,13 @@
         else if (/^(kelion|chelion)[,.\s]/i.test(l)) { switchAvatar('kelion'); text = text.replace(/^(kelion|chelion)[,.\s]*/i, '').trim(); }
         if (!text) return;
         if (isUpgradeRequest(text)) { if (window.KPayments) KPayments.showUpgradePrompt(); return; }
+        // Auto-detect language and update UI
+        if (window.i18n) {
+            var detected = i18n.detectLanguage(text);
+            if (detected && detected !== i18n.getLanguage()) i18n.setLanguage(detected);
+        }
         hideWelcome(); KAvatar.setAttentive(true); addMessage('user', text); showThinking(true);
-        if (isVisionRequest(text)) triggerVision(); else await sendToAI(text, KVoice.getLanguage());
+        if (isVisionRequest(text)) triggerVision(); else await sendToAI(text, window.i18n ? i18n.getLanguage() : KVoice.getLanguage());
     }
 
     // ─── Drag & Drop ─────────────────────────────────────────
