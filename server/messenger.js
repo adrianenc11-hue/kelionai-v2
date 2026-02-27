@@ -57,8 +57,9 @@ async function sendMessage(recipientId, text) {
         logger.warn({ component: 'Messenger' }, 'FB_PAGE_ACCESS_TOKEN not set');
         return;
     }
+    logger.info({ component: 'Messenger', recipientId, textLength: text.length }, 'Sending message via Graph API v21.0');
     const res = await fetch(
-        `https://graph.facebook.com/v19.0/me/messages?access_token=${token}`,
+        `https://graph.facebook.com/v21.0/me/messages?access_token=${token}`,
         {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -68,7 +69,9 @@ async function sendMessage(recipientId, text) {
             })
         }
     );
-    if (!res.ok) {
+    if (res.ok) {
+        logger.info({ component: 'Messenger', recipientId, status: res.status }, 'Message sent successfully');
+    } else {
         const body = await res.text();
         logger.error({ component: 'Messenger', status: res.status, body }, 'Failed to send message');
     }
@@ -165,6 +168,26 @@ router.post('/webhook', async (req, res) => {
     } catch (e) {
         logger.error({ component: 'Messenger', err: e.message }, 'Webhook handler error');
     }
+});
+
+// ═══ HEALTH ENDPOINT ═══
+router.get('/health', (req, res) => {
+    const token = process.env.FB_PAGE_ACCESS_TOKEN;
+    const secret = process.env.FB_APP_SECRET;
+    const verify = process.env.FB_VERIFY_TOKEN;
+
+    const status = {
+        status: token && secret ? 'configured' : 'misconfigured',
+        hasPageToken: !!token,
+        tokenPrefix: token ? token.substring(0, 10) + '...' : null,
+        hasAppSecret: !!secret,
+        hasVerifyToken: !!verify,
+        graphApiVersion: 'v21.0',
+        stats: getStats(),
+        webhookUrl: (process.env.APP_URL || 'https://kelionai.app') + '/api/messenger/webhook'
+    };
+
+    res.json(status);
 });
 
 // ═══ STATS EXPORT ═══
