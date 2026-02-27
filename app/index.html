@@ -6,6 +6,15 @@
     <meta name="sentry-dsn" content="">
     <meta name="theme-color" content="#0A0A0F">
     <title>KelionAI</title>
+    <script>
+        // ─── Onboarding redirect (first visit only) ───────────────────
+        // Runs in <head> before DOM renders to avoid flash of content
+        try {
+            if (!localStorage.getItem('kelion_onboarded')) {
+                location.replace('/onboarding.html');
+            }
+        } catch (e) {}
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
@@ -13,6 +22,85 @@
     <link rel="stylesheet" href="/styles/components.css">
     <link rel="stylesheet" href="/styles/animations.css">
     <link rel="stylesheet" href="/css/app.css">
+    <style>
+        /* ─── Splash Screen ─── */
+        .splash {
+            position: fixed; inset: 0;
+            background: var(--kelion-bg, #0A0A0F);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            transition: opacity 0.5s ease;
+        }
+        .splash.hidden { opacity: 0; pointer-events: none; }
+        .gradient-text {
+            background: linear-gradient(135deg, #00ccff, #8855ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .splash .animate-glow {
+            animation: splashGlow 2s ease-in-out infinite alternate;
+        }
+        @keyframes splashGlow {
+            from { filter: drop-shadow(0 0 8px rgba(0,204,255,0.4)); }
+            to   { filter: drop-shadow(0 0 24px rgba(136,85,255,0.6)); }
+        }
+        .typing-indicator { display: flex; gap: 6px; align-items: center; }
+        .typing-indicator span {
+            display: inline-block; width: 8px; height: 8px;
+            border-radius: 50%; background: #00ccff;
+            animation: typingDot 1.4s infinite ease-in-out;
+        }
+        .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+        .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes typingDot {
+            0%,80%,100% { transform: scale(0.4); opacity: 0.3; }
+            40%          { transform: scale(1);   opacity: 1; }
+        }
+
+        /* ─── PWA Install Banner ─── */
+        .pwa-banner {
+            position: fixed;
+            bottom: 24px; left: 50%;
+            transform: translateX(-50%);
+            background: var(--kelion-surface, #12121A);
+            border: 1px solid rgba(0,204,255,0.4);
+            border-radius: 16px;
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            box-shadow: 0 0 30px rgba(0,204,255,0.15);
+            z-index: 1500;
+            max-width: 400px;
+            width: calc(100% - 48px);
+            animation: fadeIn 0.4s ease;
+        }
+        .pwa-banner-content {
+            display: flex; align-items: center; gap: 12px; flex: 1;
+        }
+        .pwa-banner-content > span { font-size: 1.6rem; }
+        .pwa-banner-content strong { color: var(--kelion-text, #E8E8FF); font-size: 0.9rem; }
+        .pwa-banner-content p { color: var(--kelion-text-secondary, #9090B0); font-size: 0.78rem; margin: 2px 0 0; }
+        .pwa-banner-actions { display: flex; gap: 8px; flex-shrink: 0; }
+        .pwa-btn-primary {
+            padding: 8px 16px; font-size: 13px; font-weight: 600;
+            background: linear-gradient(135deg,#00ccff,#8855ff); color: #fff;
+            border: none; border-radius: 8px; cursor: pointer;
+            font-family: 'Inter', sans-serif; transition: opacity 0.2s;
+        }
+        .pwa-btn-primary:hover { opacity: 0.88; }
+        .pwa-btn-secondary {
+            padding: 8px 14px; font-size: 13px;
+            background: rgba(255,255,255,0.07); color: var(--kelion-text-secondary, #9090B0);
+            border: 1px solid rgba(255,255,255,0.1); border-radius: 8px;
+            cursor: pointer; font-family: 'Inter', sans-serif; transition: background 0.2s;
+        }
+        .pwa-btn-secondary:hover { background: rgba(255,255,255,0.12); }
+    </style>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
     <script src="https://browser.sentry-cdn.com/8.46.0/bundle.tracing.replay.min.js" crossorigin="anonymous"></script>
@@ -27,6 +115,16 @@
     </script>
 </head>
 <body>
+
+    <!-- SPLASH SCREEN -->
+    <div id="splash-screen" class="splash">
+        <div class="splash-logo animate-glow">
+            <span class="gradient-text" style="font-size:48px;font-weight:900">Kelion<span style="color:#8855ff">AI</span></span>
+        </div>
+        <div class="typing-indicator" style="margin-top:24px">
+            <span></span><span></span><span></span>
+        </div>
+    </div>
 
     <!-- AUTH SCREEN -->
     <div id="auth-screen">
@@ -194,5 +292,65 @@
     <script src="/js/ticker.js"></script>
     <script src="/js/app.js"></script>
     <script src="/js/navbar.js"></script>
+
+    <!-- PWA INSTALL BANNER -->
+    <div id="pwa-install-banner" class="pwa-banner" style="display:none">
+        <div class="pwa-banner-content">
+            <span>📱</span>
+            <div>
+                <strong>Instalează KelionAI</strong>
+                <p>Acces rapid de pe ecranul tău</p>
+            </div>
+        </div>
+        <div class="pwa-banner-actions">
+            <button id="pwa-install-btn" class="pwa-btn-primary">Instalează</button>
+            <button id="pwa-dismiss-btn" class="pwa-btn-secondary">Nu acum</button>
+        </div>
+    </div>
+
+    <script>
+        // ─── Splash screen ────────────────────────────────────────────
+        window.addEventListener('load', function () {
+            setTimeout(function () {
+                var splash = document.getElementById('splash-screen');
+                if (splash) {
+                    splash.classList.add('hidden');
+                    setTimeout(function () { if (splash.parentNode) splash.parentNode.removeChild(splash); }, 500);
+                }
+            }, 1500);
+        });
+
+        // ─── PWA Install banner ───────────────────────────────────────
+        var deferredInstallPrompt = null;
+        window.addEventListener('beforeinstallprompt', function (e) {
+            e.preventDefault();
+            deferredInstallPrompt = e;
+            try {
+                var dismissed = localStorage.getItem('pwa_dismissed');
+                if (dismissed && Date.now() - Number(dismissed) < 7 * 24 * 60 * 60 * 1000) return;
+            } catch (e2) {}
+            var banner = document.getElementById('pwa-install-banner');
+            if (banner) banner.style.display = 'flex';
+        });
+        var installBtn = document.getElementById('pwa-install-btn');
+        if (installBtn) {
+            installBtn.addEventListener('click', function () {
+                var banner = document.getElementById('pwa-install-banner');
+                if (banner) banner.style.display = 'none';
+                if (deferredInstallPrompt) {
+                    deferredInstallPrompt.prompt();
+                    deferredInstallPrompt.userChoice.then(function () { deferredInstallPrompt = null; });
+                }
+            });
+        }
+        var dismissBtn = document.getElementById('pwa-dismiss-btn');
+        if (dismissBtn) {
+            dismissBtn.addEventListener('click', function () {
+                var banner = document.getElementById('pwa-install-banner');
+                if (banner) banner.style.display = 'none';
+                try { localStorage.setItem('pwa_dismissed', Date.now()); } catch (e) {}
+            });
+        }
+    </script>
 </body>
 </html>
