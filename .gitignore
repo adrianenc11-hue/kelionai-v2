@@ -11,4 +11,5 @@ logs/
 conflicts/
 reports/*.json
 reports/*.md
+auto-merge-report.md
 
