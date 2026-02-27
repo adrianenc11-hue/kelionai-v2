@@ -1,0 +1,98 @@
+/* ═══════════════════════════════════════════════════════════════
+   KelionAI — Chat Ambient Visual Improvements
+   Depends on design-system.css for CSS variables.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Message bubbles ── */
+.message-user {
+    background: linear-gradient(135deg, var(--kelion-primary, #6c63ff), var(--kelion-primary-hover, #5a52e0));
+    color: #fff;
+    border-radius: var(--kelion-radius, 12px) var(--kelion-radius, 12px) 4px var(--kelion-radius, 12px);
+    padding: 12px 16px;
+    max-width: 70%;
+    align-self: flex-end;
+    animation: fadeIn 0.3s ease;
+}
+
+.message-ai {
+    background: var(--kelion-surface, rgba(15,15,45,0.85));
+    border: 1px solid var(--kelion-border, rgba(255,255,255,0.08));
+    color: var(--kelion-text, #e8e8f0);
+    border-radius: var(--kelion-radius, 12px) var(--kelion-radius, 12px) var(--kelion-radius, 12px) 4px;
+    padding: 12px 16px;
+    max-width: 70%;
+    align-self: flex-start;
+    animation: fadeIn 0.3s ease;
+}
+
+/* ── AI avatar glow ── */
+.ai-avatar {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--kelion-primary, #6c63ff), var(--kelion-secondary, #00ccff));
+    box-shadow: var(--kelion-glow, 0 0 30px rgba(108,99,255,0.3));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+}
+
+/* ── Chat container ── */
+.chat-container {
+    background: var(--kelion-bg, #060614);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* ── Chat input area ── */
+.chat-input-area {
+    background: rgba(10, 10, 15, 0.9);
+    backdrop-filter: blur(20px);
+    border-top: 1px solid var(--kelion-border, rgba(255,255,255,0.08));
+    padding: 16px 24px;
+    position: sticky;
+    bottom: 0;
+}
+
+/* ── Chat input ── */
+.chat-input {
+    background: var(--kelion-surface, rgba(15,15,45,0.85));
+    border: 1px solid var(--kelion-border, rgba(255,255,255,0.08));
+    border-radius: 100px;
+    color: var(--kelion-text, #e8e8f0);
+    font-family: var(--kelion-font, 'Inter', sans-serif);
+    padding: 14px 60px 14px 20px;
+    width: 100%;
+    font-size: 15px;
+    transition: var(--kelion-transition, all 0.2s ease);
+    resize: none;
+    outline: none;
+}
+
+.chat-input:focus {
+    border-color: var(--kelion-primary, #6c63ff);
+    box-shadow: 0 0 0 3px rgba(108, 99, 255, 0.15);
+}
+
+/* ── Send button ── */
+.send-btn {
+    position: absolute;
+    right: 32px;
+    bottom: 24px;
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--kelion-primary, #6c63ff), var(--kelion-secondary, #00ccff));
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: var(--kelion-glow, 0 0 30px rgba(108,99,255,0.3));
+    transition: var(--kelion-transition, all 0.2s ease);
+    color: #fff;
+    font-size: 1rem;
+}
+
+.send-btn:hover { transform: scale(1.1); }
