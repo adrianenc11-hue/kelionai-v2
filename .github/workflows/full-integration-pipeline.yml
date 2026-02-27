@@ -70,7 +70,7 @@ jobs:
 
       - name: Upload pipeline logs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: pipeline-logs-${{ github.run_id }}
           path: logs/
@@ -78,7 +78,7 @@ jobs:
 
       - name: Upload conflict resolution files
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: conflict-files-${{ github.run_id }}
           path: conflicts/
