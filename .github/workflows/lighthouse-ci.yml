@@ -27,6 +27,10 @@ jobs:
         env:
           LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}
           NODE_ENV: production
+          PORT: 3000
+          SUPABASE_URL: https://placeholder.supabase.co
+          SUPABASE_SERVICE_KEY: placeholder-key-for-ci
+          SUPABASE_ANON_KEY: placeholder-anon-key-for-ci
 
       - name: Upload Lighthouse report
         if: always()
