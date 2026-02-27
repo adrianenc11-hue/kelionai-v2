@@ -162,7 +162,17 @@ const asyncHandler = (fn) => (req, res, next) => {
 // ═══ ADMIN AUTH MIDDLEWARE ═══
 function adminAuth(req, res, next) {
     const secret = req.headers['x-admin-secret'];
-    if (!secret || secret !== process.env.ADMIN_SECRET_KEY) {
+    const expected = process.env.ADMIN_SECRET_KEY;
+    if (!secret || !expected) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+    try {
+        const secretBuf = Buffer.from(secret);
+        const expectedBuf = Buffer.from(expected);
+        if (secretBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(secretBuf, expectedBuf)) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+    } catch (e) {
         return res.status(401).json({ error: 'Unauthorized' });
     }
     next();
@@ -212,7 +222,7 @@ app.get('/onboarding.html', (req, res) => {
 app.use(express.static(path.join(__dirname, '..', 'app')));
 app.use('/api', globalLimiter);
 const PORT = process.env.PORT || 3000;
-const memFallback = {};
+const memFallback = Object.create(null);
 
 // ═══ BRAIN INITIALIZATION ═══
 const brain = new KelionBrain({
@@ -524,7 +534,7 @@ app.post('/api/speak', apiLimiter, validate(speakSchema), async (req, res) => {
             headers: { 'Content-Type': 'application/json', 'xi-api-key': process.env.ELEVENLABS_API_KEY },
             body: JSON.stringify({ text, model_id: 'eleven_multilingual_v2', voice_settings: selectedVoiceSettings }) });
         if (!r.ok) return res.status(503).json({ error: 'TTS fail' });
-        const buf = await r.buffer();
+        const buf = Buffer.from(await r.arrayBuffer());
         logger.info({ component: 'Speak', bytes: buf.length, avatar, mood }, buf.length + ' bytes | ' + avatar);
         incrementUsage(user?.id, 'tts', supabaseAdmin).catch(()=>{});
         res.set({ 'Content-Type': 'audio/mpeg', 'Content-Length': buf.length }); res.send(buf);
@@ -694,13 +704,15 @@ app.post('/api/imagine', imageLimiter, validate(imagineSchema), async (req, res)
 app.post('/api/memory', memoryLimiter, validate(memorySchema), async (req, res) => {
     try {
         const { action, key, value } = req.body;
-        const user = await getUserFromToken(req); const uid = user?.id || 'guest';
+        const user = await getUserFromToken(req);
+        // Sanitize uid to prevent prototype pollution: prefix with 'u:' to ensure it's never a prototype key
+        const uid = 'u:' + (user?.id || 'guest');
         if (supabaseAdmin && user) {
             if (action === 'save') { await supabaseAdmin.from('user_preferences').upsert({ user_id: user.id, key, value: typeof value === 'object' ? value : { data: value } }, { onConflict: 'user_id,key' }); return res.json({ success: true }); }
             if (action === 'load') { const { data } = await supabaseAdmin.from('user_preferences').select('value').eq('user_id', user.id).eq('key', key).single(); return res.json({ value: data?.value || null }); }
             if (action === 'list') { const { data } = await supabaseAdmin.from('user_preferences').select('key, value').eq('user_id', user.id); return res.json({ keys: (data||[]).map(d=>d.key), items: data||[] }); }
         }
-        if (!memFallback[uid]) memFallback[uid] = {};
+        if (!memFallback[uid]) memFallback[uid] = Object.create(null);
         if (action === 'save') { memFallback[uid][key] = value; res.json({ success: true }); }
         else if (action === 'load') res.json({ value: memFallback[uid][key] || null });
         else if (action === 'list') res.json({ keys: Object.keys(memFallback[uid]) });

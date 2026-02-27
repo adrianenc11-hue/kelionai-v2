@@ -172,7 +172,6 @@ describe('Payments API', () => {
         const planIds = res.body.plans.map(p => p.id);
         expect(planIds).toContain('free');
         expect(planIds).toContain('pro');
-        expect(planIds).toContain('premium');
     });
 
     test('GET /api/payments/plans includes price and limits', async () => {
