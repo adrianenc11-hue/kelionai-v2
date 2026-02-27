@@ -1,0 +1,317 @@
+name: 🚀 Auto-Merge All PRs
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths:
+      - '.github/workflows/auto-merge-all-prs.yml'
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  auto-merge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run full auto-merge sequence
+        uses: actions/github-script@v8
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const owner = context.repo.owner;
+            const repo  = context.repo.repo;
+
+            // ----------------------------------------------------------------
+            // Ordered list of PRs to merge
+            // ----------------------------------------------------------------
+            const PRS = [
+              { number: 136, title: 'actions/checkout 4→6'              },
+              { number: 134, title: 'actions/setup-node 4→6'            },
+              { number: 133, title: 'actions/github-script 7→8'         },
+              { number: 138, title: 'actions/upload-artifact 4→7'       },
+              { number: 135, title: '@supabase/supabase-js 2.97→2.98'   },
+              { number: 137, title: 'stripe 20.3.1→20.4.0'              },
+              { number: 139, title: '@sentry/browser 10.39→10.40'       },
+              { number: 140, title: '@sentry/node 10.39→10.40'          },
+              { number: 141, title: 'jest 29.7→30.2'                    },
+              { number: 123, title: 'Integration pipeline'              },
+              { number: 128, title: 'Playwright E2E tests'              },
+              { number: 129, title: 'HTTPS + Lighthouse + monitoring'   },
+              { number: 142, title: 'Fix onboarding'                    },
+              { number: 143, title: 'WIP Status page'                   },
+            ];
+
+            // ----------------------------------------------------------------
+            // Helpers
+            // ----------------------------------------------------------------
+            const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+            async function markReadyForReview(nodeId) {
+              const mutation = `
+                mutation($id: ID!) {
+                  markPullRequestReadyForReview(input: { pullRequestId: $id }) {
+                    pullRequest { isDraft }
+                  }
+                }`;
+              try {
+                await github.graphql(mutation, { id: nodeId });
+                console.log(`  ↳ Marked ready for review (nodeId=${nodeId})`);
+              } catch (e) {
+                console.log(`  ↳ markReadyForReview error (ignored): ${e.message}`);
+              }
+            }
+
+            async function updateBranch(prNumber) {
+              try {
+                await github.rest.pulls.updateBranch({ owner, repo, pull_number: prNumber });
+                console.log(`  ↳ Branch updated`);
+              } catch (e) {
+                console.log(`  ↳ updateBranch error (ignored): ${e.message}`);
+              }
+            }
+
+            async function getMergeableState(prNumber, maxRetries = 5) {
+              for (let attempt = 1; attempt <= maxRetries; attempt++) {
+                const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: prNumber });
+                const state = pr.mergeable_state;
+                console.log(`  ↳ mergeable_state=${state} (attempt ${attempt}/${maxRetries})`);
+
+                if (state === 'unknown') {
+                  await sleep(15_000);
+                  continue;
+                }
+                return { pr, state };
+              }
+              // Last chance fetch
+              const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: prNumber });
+              return { pr, state: pr.mergeable_state };
+            }
+
+            // ----------------------------------------------------------------
+            // Step 1 — Mark draft PRs ready for review
+            // ----------------------------------------------------------------
+            console.log('=== Step 1: Un-drafting PRs ===');
+            const draftPrNumbers = [128, 142, 143, 123, 129];
+            for (const num of draftPrNumbers) {
+              try {
+                const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: num });
+                if (pr.state === 'closed') {
+                  console.log(`PR #${num}: already closed — skipping un-draft`);
+                  continue;
+                }
+                if (pr.draft) {
+                  if (pr.changed_files === 0) {
+                    console.log(`PR #${num}: draft with 0 changes — skipping un-draft`);
+                  } else {
+                    console.log(`PR #${num}: marking ready for review…`);
+                    await markReadyForReview(pr.node_id);
+                  }
+                } else {
+                  console.log(`PR #${num}: not a draft`);
+                }
+              } catch (e) {
+                console.log(`PR #${num}: error fetching — ${e.message}`);
+              }
+            }
+
+            // ----------------------------------------------------------------
+            // Step 2 — Merge each PR in order
+            // ----------------------------------------------------------------
+            console.log('\n=== Step 2: Merging PRs ===');
+
+            const results = [];
+
+            for (const { number, title } of PRS) {
+              console.log(`\n--- PR #${number}: ${title} ---`);
+              const result = { number, title, status: '', detail: '' };
+
+              // 2a. Fetch PR
+              let pr;
+              try {
+                ({ data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: number }));
+              } catch (e) {
+                result.status  = '❌ Error';
+                result.detail  = `Could not fetch PR: ${e.message}`;
+                results.push(result);
+                console.log(`  ↳ ${result.detail}`);
+                continue;
+              }
+
+              // 2b. Skip if already merged / closed
+              if (pr.merged) {
+                result.status = '⏭️ Skipped';
+                result.detail = 'Already merged';
+                results.push(result);
+                console.log(`  ↳ Already merged — skipping`);
+                continue;
+              }
+              if (pr.state === 'closed') {
+                result.status = '⏭️ Skipped';
+                result.detail = 'Closed (not merged)';
+                results.push(result);
+                console.log(`  ↳ Closed — skipping`);
+                continue;
+              }
+
+              // 2c. Un-draft if needed (safety net for any that slipped through Step 1)
+              if (pr.draft) {
+                console.log(`  ↳ Still draft — attempting un-draft`);
+                await markReadyForReview(pr.node_id);
+                await sleep(5_000);
+              }
+
+              // 2d. Dependabot vs regular branch update
+              const isDependabot = pr.user && (
+                pr.user.login === 'dependabot[bot]' ||
+                pr.user.login === 'dependabot'
+              );
+
+              if (isDependabot) {
+                console.log(`  ↳ Dependabot PR — posting @dependabot rebase`);
+                try {
+                  await github.rest.issues.createComment({
+                    owner, repo,
+                    issue_number: number,
+                    body: '@dependabot rebase',
+                  });
+                } catch (e) {
+                  console.log(`  ↳ Comment error (ignored): ${e.message}`);
+                }
+                await sleep(60_000);
+              } else {
+                console.log(`  ↳ Updating branch with base`);
+                await updateBranch(number);
+                await sleep(30_000);
+              }
+
+              // 2e. Get mergeable_state with retries
+              let mergeableState;
+              try {
+                ({ pr, state: mergeableState } = await getMergeableState(number));
+              } catch (e) {
+                result.status = '❌ Error';
+                result.detail = `getMergeableState error: ${e.message}`;
+                results.push(result);
+                console.log(`  ↳ ${result.detail}`);
+                continue;
+              }
+
+              if (mergeableState === 'behind') {
+                console.log(`  ↳ Still behind — retrying branch update`);
+                await updateBranch(number);
+                await sleep(30_000);
+                ({ pr, state: mergeableState } = await getMergeableState(number));
+              }
+
+              if (mergeableState === 'dirty') {
+                result.status = '❌ Conflict';
+                result.detail = 'Merge conflict — skipped';
+                results.push(result);
+                console.log(`  ↳ CONFLICT — skipping`);
+                continue;
+              }
+
+              if (mergeableState === 'blocked') {
+                console.log(`  ↳ State=blocked — attempting merge anyway`);
+              }
+
+              // 2f. Merge (with retry)
+              let merged = false;
+              for (let attempt = 1; attempt <= 3; attempt++) {
+                try {
+                  await github.rest.pulls.merge({
+                    owner, repo,
+                    pull_number: number,
+                    merge_method: 'merge',
+                  });
+                  merged = true;
+                  console.log(`  ↳ ✅ Merged (attempt ${attempt})`);
+                  break;
+                } catch (e) {
+                  console.log(`  ↳ Merge attempt ${attempt}/3 failed: ${e.message}`);
+                  if (e.status === 409) {
+                    // Conflict — record it and stop retrying
+                    result.status = '❌ Conflict';
+                    result.detail = 'Merge conflict detected during merge';
+                    break;
+                  }
+                  if (attempt < 3) {
+                    await sleep(15_000);
+                  }
+                }
+              }
+
+              if (merged) {
+                const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
+                result.status = '✅ Merged';
+                result.detail = `Merged at ${now} UTC`;
+              } else if (!result.status) {
+                result.status = '❌ Failed';
+                result.detail = 'All merge attempts failed';
+              }
+              results.push(result);
+
+              // 2g. Wait before next PR
+              await sleep(15_000);
+            }
+
+            // ----------------------------------------------------------------
+            // Step 3 — Build report
+            // ----------------------------------------------------------------
+            console.log('\n=== Step 3: Building report ===');
+
+            const merged  = results.filter(r => r.status.startsWith('✅')).length;
+            const failed  = results.filter(r => r.status.startsWith('❌')).length;
+            const skipped = results.filter(r => r.status.startsWith('⏭️')).length;
+            const total   = results.length;
+            const dateStr = new Date().toISOString().slice(0, 10);
+
+            let table = '| # | PR | Title | Status | Details |\n';
+            table    += '|---|---|---|---|---|\n';
+            results.forEach((r, i) => {
+              table += `| ${i + 1} | #${r.number} | ${r.title} | ${r.status} | ${r.detail} |\n`;
+            });
+
+            const reportBody = [
+              `# 🚀 Auto-Merge Report — ${dateStr}`,
+              '',
+              '## Summary',
+              `- ✅ Merged: ${merged}/${total}`,
+              `- ❌ Failed: ${failed}/${total}`,
+              `- ⏭️ Skipped: ${skipped}/${total}`,
+              '',
+              '## Detailed Results',
+              '',
+              table,
+            ].join('\n');
+
+            // Step summary
+            await core.summary
+              .addRaw(reportBody)
+              .write();
+
+            // Create GitHub Issue
+            try {
+              await github.rest.issues.create({
+                owner, repo,
+                title: `🚀 Auto-Merge Report — ${dateStr}`,
+                body: reportBody,
+                labels: [],
+              });
+              console.log('Issue created successfully');
+            } catch (e) {
+              console.log(`Issue creation failed (ignored): ${e.message}`);
+            }
+
+            console.log('\nDone!');
+            console.log(`Merged: ${merged}  Failed: ${failed}  Skipped: ${skipped}`);
+
+            if (failed > 0) {
+              core.setFailed(`${failed} PR(s) failed to merge. See report for details.`);
+            }
