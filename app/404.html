@@ -5,114 +5,129 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>404 — KelionAI</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap">
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-        :root {
-            --kelion-bg: #060614;
-            --kelion-bg-secondary: #0d0d2b;
-            --kelion-surface: rgba(15, 15, 45, 0.85);
-            --kelion-border: rgba(255, 255, 255, 0.1);
-            --kelion-primary: #00ccff;
-            --kelion-secondary: #8855ff;
-            --kelion-text: #e8e8f0;
-            --kelion-muted: #8888aa;
-            --kelion-radius: 12px;
-            --kelion-radius-lg: 20px;
-            --kelion-glow: 0 0 40px rgba(0, 204, 255, 0.15);
-            --kelion-font: 'Inter', sans-serif;
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: #050510;
+            color: #F0F0FF;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            -webkit-font-smoothing: antialiased;
+            position: relative;
+            overflow: hidden;
         }
 
-        body {
-            background: var(--kelion-bg);
-            color: var(--kelion-text);
-            font-family: var(--kelion-font);
-            min-height: 100vh;
-            background-image:
-                radial-gradient(circle at 20% 20%, rgba(0, 204, 255, 0.04) 0%, transparent 50%),
-                radial-gradient(circle at 80% 80%, rgba(136, 85, 255, 0.04) 0%, transparent 50%);
+        /* Fundal */
+        body::before {
+            content: '';
+            position: fixed; inset: 0;
+            background:
+                radial-gradient(ellipse at 30% 40%, rgba(99,102,241,0.1) 0%, transparent 50%),
+                radial-gradient(ellipse at 70% 60%, rgba(6,182,212,0.08) 0%, transparent 50%);
+            pointer-events: none;
         }
 
         .error-container {
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
             text-align: center;
-            padding: 24px;
+            padding: 48px 32px;
+            position: relative;
+            z-index: 1;
+            max-width: 500px;
         }
 
         .error-code {
-            font-size: 120px;
+            font-size: 8rem;
             font-weight: 900;
             line-height: 1;
-            margin-bottom: 16px;
-            font-family: var(--kelion-font);
-            background: linear-gradient(135deg, var(--kelion-primary), var(--kelion-secondary));
+            background: linear-gradient(135deg, #6366F1, #06B6D4);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
-            animation: glow 2s ease-in-out infinite alternate;
+            margin-bottom: 16px;
+            animation: float 4s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-16px); }
         }
 
         .error-icon {
-            font-size: 64px;
-            margin-bottom: 24px;
-            animation: float 3s ease-in-out infinite;
+            font-size: 3.5rem;
+            margin-bottom: 20px;
+            display: block;
+            opacity: 0.8;
         }
 
         h1 {
-            font-size: 1.6rem;
+            font-size: 1.5rem;
             font-weight: 700;
-            color: var(--kelion-text);
             margin-bottom: 12px;
         }
 
         p {
-            color: var(--kelion-muted);
+            color: #9090B0;
             font-size: 1rem;
             line-height: 1.6;
-            max-width: 420px;
-            margin-bottom: 32px;
+            margin-bottom: 36px;
+        }
+
+        .error-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+
+        .btn {
+            padding: 13px 28px;
+            border-radius: 12px;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.25s;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            border: none;
         }
 
         .btn-primary {
-            display: inline-block;
-            padding: 14px 32px;
-            background: linear-gradient(135deg, var(--kelion-primary), var(--kelion-secondary));
+            background: linear-gradient(135deg, #6366F1, #06B6D4);
             color: #fff;
-            border: none;
-            border-radius: var(--kelion-radius);
-            font-family: var(--kelion-font);
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: opacity 0.2s, transform 0.15s;
-            text-decoration: none;
-        }
-        .btn-primary:hover { opacity: 0.9; }
-        .btn-primary:active { transform: scale(0.98); }
-
-        @keyframes float {
-            0%, 100% { transform: translateY(0); }
-            50%       { transform: translateY(-12px); }
         }
 
-        @keyframes glow {
-            from { filter: drop-shadow(0 0 8px rgba(0, 204, 255, 0.3)); }
-            to   { filter: drop-shadow(0 0 24px rgba(136, 85, 255, 0.5)); }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 0 30px rgba(99, 102, 241, 0.3);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: #9090B0;
+            border: 1px solid rgba(99, 102, 241, 0.15);
+        }
+
+        .btn-secondary:hover {
+            border-color: rgba(99, 102, 241, 0.3);
+            color: #F0F0FF;
+            background: rgba(99, 102, 241, 0.05);
         }
     </style>
 </head>
 <body>
     <div class="error-container">
         <div class="error-code">404</div>
-        <div class="error-icon">🤖</div>
-        <h1>Hopa! Pagina nu există</h1>
-        <p>Kelion a căutat prin tot universul digital, dar nu a găsit această pagină.</p>
-        <a href="/" class="btn-primary">← Înapoi acasă</a>
+        <span class="error-icon">🔭</span>
+        <h1>Pagină negăsită</h1>
+        <p>Se pare că te-ai rătăcit în spațiul digital. Pagina pe care o cauți nu există sau a fost mutată.</p>
+        <div class="error-actions">
+            <a href="/" class="btn btn-primary">🏠 Acasă</a>
+            <a href="/pricing/" class="btn btn-secondary">💎 Prețuri</a>
+            <a href="/developer" class="btn btn-secondary">⚡ Dezvoltatori</a>
+        </div>
     </div>
 </body>
 </html>

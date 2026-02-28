@@ -3,87 +3,214 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Billing — KelionAI</title>
+    <title>Facturare — KelionAI</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap">
-    <link rel="stylesheet" href="/pricing/pricing.css">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap">
+    <link rel="stylesheet" href="/styles/design-system.css">
     <style>
-        .billing-main { max-width: 720px; }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-        .billing-section {
-            background: var(--bg-card);
-            border: 1px solid rgba(255,255,255,0.08);
-            border-radius: var(--radius);
-            padding: 28px 32px;
-            margin-bottom: 24px;
+        :root {
+            --bg: #050510;
+            --bg2: #0A0A1B;
+            --surface: rgba(15, 15, 40, 0.7);
+            --border: rgba(99, 102, 241, 0.12);
+            --border-hover: rgba(99, 102, 241, 0.25);
+            --primary: #6366F1;
+            --secondary: #06B6D4;
+            --gradient: linear-gradient(135deg, #6366F1, #06B6D4);
+            --success: #10B981;
+            --warning: #F59E0B;
+            --danger: #EF4444;
+            --text: #F0F0FF;
+            --text-sec: #8888AA;
+            --text-muted: #555577;
+            --radius: 12px;
+            --radius-lg: 20px;
+            --font: 'Inter', -apple-system, sans-serif;
+            --transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            --glass: rgba(10, 10, 30, 0.6);
+            --glass-blur: blur(20px);
         }
 
-        .billing-section h2 {
-            font-size: 1rem;
-            font-weight: 600;
-            color: var(--text-secondary);
-            text-transform: uppercase;
-            letter-spacing: 0.8px;
+        body {
+            font-family: var(--font);
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        a { color: var(--secondary); text-decoration: none; }
+        a:hover { color: var(--text); }
+
+        /* ─── Header ─── */
+        .billing-header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 18px 40px;
+            border-bottom: 1px solid var(--border);
+            background: rgba(5, 5, 16, 0.75);
+            backdrop-filter: blur(24px);
+            position: sticky; top: 0; z-index: 100;
+        }
+        .billing-logo {
+            font-size: 1.4rem; font-weight: 800; text-decoration: none; color: var(--text);
+        }
+        .billing-logo span {
+            background: var(--gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .billing-nav { display: flex; gap: 24px; }
+        .nav-link { color: var(--text-sec); font-size: 0.9rem; font-weight: 500; transition: color var(--transition); }
+        .nav-link:hover { color: var(--text); text-decoration: none; }
+
+        /* ─── Main ─── */
+        .billing-main {
+            flex: 1; max-width: 760px; margin: 0 auto; width: 100%;
+            padding: 52px 32px 80px;
+        }
+
+        .billing-hero { text-align: center; margin-bottom: 40px; }
+        .billing-hero h1 {
+            font-size: 2.2rem; font-weight: 800; margin-bottom: 10px;
+            background: var(--gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .billing-hero p { color: var(--text-sec); font-size: 1rem; }
+
+        /* ─── Sections ─── */
+        .billing-section {
+            background: var(--glass);
+            backdrop-filter: var(--glass-blur);
+            -webkit-backdrop-filter: var(--glass-blur);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 28px 32px;
             margin-bottom: 20px;
+            transition: border-color 0.3s;
+        }
+        .billing-section:hover { border-color: var(--border-hover); }
+
+        .billing-section h2 {
+            font-size: 0.82rem; font-weight: 700; color: var(--text-sec);
+            text-transform: uppercase; letter-spacing: 1px;
+            margin-bottom: 20px; padding-bottom: 10px;
+            border-bottom: 1px solid rgba(99, 102, 241, 0.06);
         }
 
         .billing-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px 0;
-            border-bottom: 1px solid rgba(255,255,255,0.05);
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid rgba(99, 102, 241, 0.05);
             font-size: 0.9rem;
         }
         .billing-row:last-child { border: none; }
-        .billing-row .label { color: var(--text-secondary); }
-        .billing-row .value { font-weight: 500; }
-        .billing-row .value.active { color: #00ff88; }
-        .billing-row .value.cancelled { color: #ff6666; }
-        .billing-row .value.past_due { color: #ffaa00; }
+        .billing-row .label { color: var(--text-sec); }
+        .billing-row .value { font-weight: 600; }
+        .billing-row .value.active { color: var(--success); }
+        .billing-row .value.cancelled { color: var(--danger); }
+        .billing-row .value.past_due { color: var(--warning); }
 
-        .usage-bar-wrap { margin-top: 8px; }
-        .usage-label { display: flex; justify-content: space-between; font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 4px; }
-        .usage-track { height: 6px; background: rgba(255,255,255,0.08); border-radius: 4px; overflow: hidden; }
-        .usage-fill { height: 100%; border-radius: 4px; background: var(--accent-gradient); transition: width 0.4s; }
-        .usage-fill.warn { background: linear-gradient(90deg, #ffaa00, #ff6600); }
-        .usage-fill.exceeded { background: linear-gradient(90deg, #ff4444, #cc0000); }
-
-        .billing-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 4px; }
-        .btn { padding: 10px 22px; border-radius: 9px; border: none; font-size: 0.88rem; font-weight: 600; cursor: pointer; transition: opacity 0.2s; font-family: 'Inter', sans-serif; }
-        .btn:hover { opacity: 0.8; }
-        .btn-primary { background: var(--accent-gradient); color: #000; }
-        .btn-secondary { background: rgba(0,204,255,0.1); color: var(--accent-blue); border: 1px solid rgba(0,204,255,0.25); }
-        .btn-danger { background: rgba(255,70,70,0.1); color: #ff6666; border: 1px solid rgba(255,70,70,0.2); }
-
-        #billing-message {
-            padding: 12px 20px;
-            border-radius: 10px;
-            font-size: 0.88rem;
-            margin-bottom: 20px;
-            display: none;
+        /* ─── Usage bars ─── */
+        .usage-bar-wrap { margin-top: 10px; }
+        .usage-label {
+            display: flex; justify-content: space-between;
+            font-size: 0.78rem; color: var(--text-sec); margin-bottom: 5px;
         }
-        #billing-message.success { background: rgba(0,255,136,0.1); color: #00ff88; border: 1px solid rgba(0,255,136,0.25); }
-        #billing-message.error { background: rgba(255,70,70,0.1); color: #ff6666; border: 1px solid rgba(255,70,70,0.2); }
+        .usage-track {
+            height: 6px; background: rgba(99, 102, 241, 0.08);
+            border-radius: 4px; overflow: hidden;
+        }
+        .usage-fill {
+            height: 100%; border-radius: 4px;
+            background: var(--gradient);
+            transition: width 0.5s ease;
+        }
+        .usage-fill.warn { background: linear-gradient(90deg, #F59E0B, #EF4444); }
+        .usage-fill.exceeded { background: linear-gradient(90deg, #EF4444, #DC2626); }
 
-        .no-sub { color: var(--text-secondary); font-size: 0.9rem; line-height: 1.6; }
+        /* ─── Buttons ─── */
+        .billing-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 8px; }
+        .btn {
+            padding: 11px 24px; border-radius: var(--radius); border: none;
+            font-size: 0.88rem; font-weight: 600; cursor: pointer;
+            transition: var(--transition); font-family: var(--font);
+        }
+        .btn:hover { opacity: 0.85; }
+        .btn-primary {
+            background: var(--gradient); color: #fff;
+            box-shadow: 0 2px 12px rgba(99, 102, 241, 0.2);
+        }
+        .btn-secondary {
+            background: rgba(99, 102, 241, 0.08); color: var(--secondary);
+            border: 1px solid rgba(99, 102, 241, 0.2);
+        }
+        .btn-danger {
+            background: rgba(239, 68, 68, 0.08); color: var(--danger);
+            border: 1px solid rgba(239, 68, 68, 0.15);
+        }
 
-        .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.2); border-top-color: var(--accent-blue); border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-left: 8px; }
+        /* ─── Message ─── */
+        #billing-message {
+            padding: 14px 20px; border-radius: var(--radius);
+            font-size: 0.88rem; margin-bottom: 20px; display: none;
+        }
+        #billing-message.success {
+            background: rgba(16, 185, 129, 0.08); color: var(--success);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+        #billing-message.error {
+            background: rgba(239, 68, 68, 0.08); color: var(--danger);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+        }
+
+        .no-sub { color: var(--text-sec); font-size: 0.9rem; line-height: 1.65; }
+        .plan-loading { color: var(--text-sec); text-align: center; padding: 40px; }
+
+        .spinner {
+            display: inline-block; width: 16px; height: 16px;
+            border: 2px solid rgba(99, 102, 241, 0.15);
+            border-top-color: var(--secondary);
+            border-radius: 50%; animation: spin 0.7s linear infinite;
+            vertical-align: middle; margin-left: 8px;
+        }
         @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ─── Footer ─── */
+        .billing-footer {
+            text-align: center; padding: 28px;
+            color: var(--text-muted); font-size: 0.8rem;
+            border-top: 1px solid rgba(99, 102, 241, 0.06);
+        }
+        .billing-footer a { color: var(--text-sec); }
+        .billing-footer a:hover { color: var(--text); }
+
+        @media (max-width: 600px) {
+            .billing-header { padding: 14px 20px; }
+            .billing-main { padding: 32px 16px; }
+            .billing-hero h1 { font-size: 1.6rem; }
+        }
     </style>
 </head>
 <body>
-    <header class="pricing-header">
-        <a href="/" class="pricing-logo">KelionAI</a>
-        <nav class="pricing-nav">
+    <header class="billing-header">
+        <a href="/" class="billing-logo">Kelion<span>AI</span></a>
+        <nav class="billing-nav">
             <a href="/" class="nav-link">Acasă</a>
             <a href="/pricing/" class="nav-link">Prețuri</a>
         </nav>
     </header>
 
-    <main class="pricing-main billing-main">
-        <div class="pricing-hero" style="margin-bottom:36px">
-            <h1>Billing & Abonament</h1>
+    <main class="billing-main">
+        <div class="billing-hero">
+            <h1>Facturare & Abonament</h1>
             <p>Gestionează planul și plățile tale</p>
         </div>
 
@@ -94,8 +221,8 @@
         </div>
     </main>
 
-    <footer class="pricing-footer">
-        <p>&copy; 2024 KelionAI. <a href="/api/legal/terms">Termeni</a> · <a href="/api/legal/privacy">Confidențialitate</a></p>
+    <footer class="billing-footer">
+        <p>&copy; 2025 KelionAI. <a href="/api/legal/terms">Termeni</a> · <a href="/api/legal/privacy">Confidențialitate</a></p>
     </footer>
 
     <script>
@@ -146,7 +273,7 @@
             var token = getToken();
             if (!token) {
                 document.getElementById('billing-content').innerHTML =
-                    '<div class="billing-section"><p class="no-sub">Trebuie să fii autentificat pentru a vedea datele de billing. ' +
+                    '<div class="billing-section"><p class="no-sub">Trebuie să fii autentificat pentru a vedea datele de facturare. ' +
                     '<a href="/">Mergi la aplicație</a> și autentifică-te.</p></div>';
                 return;
             }
@@ -214,7 +341,6 @@
                 });
             }
 
-            // Handle payment result URL params
             var params = new URLSearchParams(window.location.search);
             if (params.get('payment') === 'success') {
                 showMsg('✅ Plata procesată cu succes! Planul tău a fost activat.', 'success');
