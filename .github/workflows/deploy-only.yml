@@ -19,7 +19,7 @@ jobs:
       contents: read
       deployments: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
       - name: Check Netlify secrets
         id: check-secrets
