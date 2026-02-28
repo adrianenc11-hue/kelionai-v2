@@ -418,6 +418,27 @@
 
     // ─── INIT ────────────────────────────────────────────────
     function init() {
+        // ─── Splash: force removal after 3s as fallback ──────────────
+        var splashEl = document.getElementById('splash-screen');
+        function dismissSplash() {
+            if (splashEl && splashEl.parentNode) {
+                splashEl.style.opacity = '0';
+                splashEl.style.pointerEvents = 'none';
+                setTimeout(function() { if (splashEl && splashEl.parentNode) splashEl.parentNode.removeChild(splashEl); }, 600);
+            }
+        }
+        var splashTimer = setTimeout(dismissSplash, 3000);
+
+        // ─── Auth safety: show app as guest after 5s if auth hangs ──
+        setTimeout(function() {
+            var layout = document.getElementById('app-layout');
+            if (layout && layout.classList.contains('hidden')) {
+                var authScr = document.getElementById('auth-screen');
+                if (authScr) authScr.classList.add('hidden');
+                layout.classList.remove('hidden');
+            }
+        }, 5000);
+
         if (window.KAuth) KAuth.init();
         KAvatar.init();
 
@@ -473,6 +494,10 @@
                 })
                 .catch(function(e) { console.warn('[App] restore conversation:', e.message); persistConvId(null); });
         }
+
+        // ─── Dismiss splash after init completes ─────────────────────
+        clearTimeout(splashTimer);
+        dismissSplash();
 
         console.log('[App] ✅ KelionAI v2.3 — STREAMING + HISTORY');
     }
