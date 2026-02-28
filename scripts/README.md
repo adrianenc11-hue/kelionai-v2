@@ -4,6 +4,41 @@ Scripturi pentru configurarea automată a variabilelor de environment în Railwa
 
 ---
 
+## `setup-secrets.sh` — Configurare GitHub Secrets pentru CI/CD
+
+Script interactiv care setează secretele GitHub necesare pentru workflow-ul CI/CD (Netlify deploy).
+
+### Cerințe
+
+- [GitHub CLI](https://cli.github.com/) instalat și autentificat (`gh auth login`)
+- Acces de scriere la repo
+
+### Rulare
+
+```bash
+npm run setup:secrets
+# sau direct:
+bash scripts/setup-secrets.sh
+```
+
+Scriptul va:
+1. Verifica dacă `gh` CLI este instalat
+2. Verifica autentificarea GitHub
+3. Cere interactiv:
+   - `NETLIFY_AUTH_TOKEN` — tokenul personal de la [Netlify](https://app.netlify.com/user/applications)
+   - `NETLIFY_SITE_ID` — Site ID de la Netlify (Site Settings → General → Site details)
+4. Opțional, setează și `SENTRY_AUTH_TOKEN`
+5. Valida valorile (nu goale, fără newlines sau spații)
+6. Seta secretele în GitHub cu `gh secret set`
+7. Afișa un summary cu ce a fost setat
+8. Opțional, re-rula workflow-ul `test.yml`
+
+### De ce este necesar
+
+Workflow-ul `.github/workflows/test.yml` pică cu eroarea `is not a legal HTTP header value` dacă `NETLIFY_AUTH_TOKEN` sau `NETLIFY_SITE_ID` sunt goale sau invalide.
+
+---
+
 ## Cerințe preliminare
 
 ### 1. Instalează Railway CLI
