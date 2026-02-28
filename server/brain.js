@@ -46,6 +46,9 @@ class KelionBrain {
 
         // ── Conversation Summarizer ──
         this.conversationSummaries = new Map(); // conversationId → compressed summary
+
+        // ── Learning Rate Limiter ──
+        this.lastLearnTime = new Map(); // userId → timestamp of last learning extraction
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -55,49 +58,67 @@ class KelionBrain {
         this.conversationCount++;
         const startTime = Date.now();
 
-        // Step 1: ANALYZE intent deeply
-        const analysis = this.analyzeIntent(message, language);
+        try {
+            // Step 1: ANALYZE intent deeply
+            const analysis = this.analyzeIntent(message, language);
 
-        // Step 2: DECOMPOSE complex tasks into sub-tasks
-        let subTasks = [{ message, analysis }];
-        if (analysis.complexity === 'complex') {
-            subTasks = await this.decomposeTask(message, analysis, language);
+            // Step 2: DECOMPOSE complex tasks into sub-tasks
+            let subTasks = [{ message, analysis }];
+            if (analysis.complexity === 'complex') {
+                subTasks = await this.decomposeTask(message, analysis, language);
+            }
+
+            // Step 3: PLAN tools for each sub-task
+            const plan = this.buildPlan(subTasks, userId);
+
+            // Step 4: EXECUTE tools in parallel
+            const results = await this.executePlan(plan);
+
+            // Step 5: CHAIN-OF-THOUGHT — pre-reason only for complex+tools or emergencies
+            let chainOfThought = null;
+            const shouldRunCoT = (analysis.complexity === 'complex' && Object.keys(results).length >= 1) || analysis.isEmergency;
+            if (shouldRunCoT) {
+                chainOfThought = await this.chainOfThought(message, results, analysis, history, language);
+            }
+
+            // Step 6: BUILD enriched context
+            const enriched = this.buildEnrichedContext(message, results, chainOfThought, analysis);
+
+            // Step 7: COMPRESS conversation if too long
+            const compressedHistory = this.compressHistory(history, conversationId);
+
+            // Step 8: SELF-EVALUATE (async — doesn't block response)
+            const thinkTime = Date.now() - startTime;
+            this.journalEntry('think_complete', `${analysis.complexity} task, ${plan.length} tools, ${thinkTime}ms`, { tools: Object.keys(results), complexity: analysis.complexity });
+
+            logger.info({ component: 'Brain', complexity: analysis.complexity, tools: Object.keys(results), chainOfThought: !!chainOfThought, thinkTime }, `🧠 Think: ${analysis.complexity} | tools:[${Object.keys(results).join(',')}] | CoT:${!!chainOfThought} | ${thinkTime}ms`);
+
+            return {
+                enrichedMessage: enriched,
+                toolsUsed: Object.keys(results),
+                monitor: this.extractMonitor(results),
+                analysis,
+                chainOfThought,
+                compressedHistory,
+                failedTools: plan.filter(p => !results[p.tool]).map(p => p.tool),
+                thinkTime
+            };
+        } catch (e) {
+            const thinkTime = Date.now() - startTime;
+            this.recordError('think', e.message);
+            this.journalEntry('think_error', e.message, { thinkTime });
+            logger.error({ component: 'Brain', err: e.message, thinkTime }, `🧠 Think failed: ${e.message}`);
+            return {
+                enrichedMessage: message,
+                toolsUsed: [],
+                monitor: { content: null, type: null },
+                analysis: { complexity: 'simple', needsSearch: false, needsWeather: false, needsImage: false, needsMap: false, needsVision: false, needsMemory: false, isQuestion: false, isCommand: false, isEmotional: false, isEmergency: false, isGreeting: false, isFollowUp: false, emotionalTone: 'neutral', language: language || 'ro', topics: [], confidenceScore: 0, detectedMood: 'neutral' },
+                chainOfThought: null,
+                compressedHistory: history || [],
+                failedTools: [],
+                thinkTime
+            };
         }
-
-        // Step 3: PLAN tools for each sub-task
-        const plan = this.buildPlan(subTasks, userId);
-
-        // Step 4: EXECUTE tools in parallel
-        const results = await this.executePlan(plan);
-
-        // Step 5: CHAIN-OF-THOUGHT — pre-reason if complex
-        let chainOfThought = null;
-        if (analysis.complexity !== 'simple' || analysis.isEmotional || analysis.isEmergency) {
-            chainOfThought = await this.chainOfThought(message, results, analysis, history, language);
-        }
-
-        // Step 6: BUILD enriched context
-        const enriched = this.buildEnrichedContext(message, results, chainOfThought, analysis);
-
-        // Step 7: COMPRESS conversation if too long
-        const compressedHistory = this.compressHistory(history, conversationId);
-
-        // Step 8: SELF-EVALUATE (async — doesn't block response)
-        const thinkTime = Date.now() - startTime;
-        this.journalEntry('think_complete', `${analysis.complexity} task, ${plan.length} tools, ${thinkTime}ms`, { tools: Object.keys(results), complexity: analysis.complexity });
-
-        logger.info({ component: 'Brain', complexity: analysis.complexity, tools: Object.keys(results), chainOfThought: !!chainOfThought, thinkTime }, `🧠 Think: ${analysis.complexity} | tools:[${Object.keys(results).join(',')}] | CoT:${!!chainOfThought} | ${thinkTime}ms`);
-
-        return {
-            enrichedMessage: enriched,
-            toolsUsed: Object.keys(results),
-            monitor: this.extractMonitor(results),
-            analysis,
-            chainOfThought,
-            compressedHistory,
-            failedTools: plan.filter(p => !results[p.tool]).map(p => p.tool),
-            thinkTime
-        };
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -163,7 +184,7 @@ Raspunde STRICT cu JSON:
 
         // Fast decomposition without AI call (pattern-based)
         const subTasks = [];
-        const parts = message.split(/\s+(și|si|and|then|apoi|după|dupa|plus)\s+/i).filter(p => p.length > 3);
+        const parts = message.split(/\s+(?:și|si|and|then|apoi|după|dupa|plus)\s+/i).filter(p => p.length > 3);
 
         if (parts.length > 1) {
             // User asked multiple things: "caută X și arată-mi meteo"
@@ -668,6 +689,19 @@ Raspunde STRICT cu JSON:
     // ═══════════════════════════════════════════════════════════
     async learnFromConversation(userId, userMessage, aiReply) {
         if (!this.supabaseAdmin || !userId || !this.anthropicKey || userMessage.length < 15) return;
+
+        // Rate limit: max 1 learning extraction per 5 minutes per user
+        const now = Date.now();
+        const lastTime = this.lastLearnTime.get(userId) || 0;
+        if (now - lastTime < 300000) return; // 5 minutes cooldown
+        this.lastLearnTime.set(userId, now);
+
+        // Prevent lastLearnTime map from growing unbounded
+        if (this.lastLearnTime.size > 10000) {
+            const oldest = this.lastLearnTime.keys().next().value;
+            this.lastLearnTime.delete(oldest);
+        }
+
         try {
             const r = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'x-api-key': this.anthropicKey, 'anthropic-version': '2023-06-01' },
@@ -707,6 +741,8 @@ Raspunde STRICT JSON. Daca nimic: {}` }] }) });
         if (this.errorLog.length > 200) this.errorLog = this.errorLog.slice(-100);
     }
     recordSuccess(tool, ms) {
+        this.successLog.push({ tool, latency: ms, time: Date.now() });
+        if (this.successLog.length > 1000) this.successLog = this.successLog.slice(-500);
         if (!this.toolLatency[tool]) this.toolLatency[tool] = [];
         this.toolLatency[tool].push(ms);
         if (this.toolLatency[tool].length > 50) this.toolLatency[tool] = this.toolLatency[tool].slice(-25);
