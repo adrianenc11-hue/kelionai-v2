@@ -8,7 +8,7 @@
         "start": "node server/index.js",
         "test": "npx playwright test --project=chromium",
         "test:all": "npx playwright test",
-        "test:e2e": "npx playwright test tests/e2e-live.spec.js --project=chromium",
+        "test:e2e": "npx playwright test tests/e2e-full.spec.js --project=chromium",
         "test:unit": "jest",
         "test:coverage": "jest --coverage",
         "test:ci": "jest --coverage --ci --forceExit",
@@ -42,10 +42,10 @@
         ],
         "coverageThreshold": {
             "global": {
-                "branches": 35,
-                "functions": 45,
-                "lines": 50,
-                "statements": 45
+                "branches": 50,
+                "functions": 60,
+                "lines": 65,
+                "statements": 65
             }
         }
     },
