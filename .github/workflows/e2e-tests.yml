@@ -27,28 +27,10 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
-      - name: Start server
-        run: npm start &
-        env:
-          NODE_ENV: test
-          PORT: 3000
-
-      - name: Wait for server to be ready
-        run: |
-          for i in $(seq 1 10); do
-            if curl -sf http://localhost:3000/api/health; then
-              echo "Server is ready"
-              break
-            fi
-            echo "Waiting for server... attempt $i"
-            sleep 2
-          done
-
       - name: Run E2E tests
         run: npx playwright test tests/e2e-full.spec.js --project=chromium
         env:
           NODE_ENV: test
-          PLAYWRIGHT_BASE_URL: http://localhost:3000
 
       - name: Upload Playwright report
         uses: actions/upload-artifact@v7
