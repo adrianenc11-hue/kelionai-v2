@@ -526,6 +526,13 @@ router.get('/portfolio', (req, res) => {
 router.post('/backtest', (req, res) => {
     try {
         const { strategy = 'RSI', asset = 'BTC', period = 90 } = req.body || {};
+        const allAssets = Object.values(ASSETS).flat();
+        if (!STRATEGIES.includes(strategy)) {
+            return res.status(400).json({ error: `Strategie invalidă. Opțiuni: ${STRATEGIES.join(', ')}.` });
+        }
+        if (!allAssets.includes(asset)) {
+            return res.status(400).json({ error: `Asset invalid. Opțiuni: ${allAssets.join(', ')}.` });
+        }
         const len = Math.min(Math.max(parseInt(period) || 90, 30), 365);
         logger.info({ strategy, asset, period: len }, '[Trading] Running backtest');
 
@@ -568,7 +575,7 @@ router.post('/backtest', (req, res) => {
         }
 
         const wins = trades.filter(t => t.pnlPct > 0).length;
-        const totalReturn = Math.round((equity - 10000) / 100 * 100) / 100;
+        const totalReturn = Math.round((equity - 10000) * 100) / 100;
 
         // Calculate actual max drawdown from equity curve
         let equityCurve = 10000;
@@ -618,16 +625,34 @@ router.get('/alerts', (req, res) => {
 // GET /correlation
 router.get('/correlation', (req, res) => {
     const allAssets = Object.values(ASSETS).flat();
+    const priceData = {};
+    allAssets.forEach(a => {
+        priceData[a] = generateSimulatedPrices(a, 100).prices;
+    });
+
     const matrix = {};
     allAssets.forEach(a => {
         matrix[a] = {};
         allAssets.forEach(b => {
             if (a === b) { matrix[a][b] = 1; return; }
-            // Simulated correlation coefficient -1 to 1
-            matrix[a][b] = Math.round((Math.random() * 2 - 1) * 100) / 100;
+            const xArr = priceData[a];
+            const yArr = priceData[b];
+            const n = Math.min(xArr.length, yArr.length);
+            const meanX = xArr.slice(0, n).reduce((s, v) => s + v, 0) / n;
+            const meanY = yArr.slice(0, n).reduce((s, v) => s + v, 0) / n;
+            let num = 0, denX = 0, denY = 0;
+            for (let i = 0; i < n; i++) {
+                const dx = xArr[i] - meanX;
+                const dy = yArr[i] - meanY;
+                num += dx * dy;
+                denX += dx * dx;
+                denY += dy * dy;
+            }
+            const den = Math.sqrt(denX * denY);
+            matrix[a][b] = den > 0 ? Math.round((num / den) * 100) / 100 : 0;
         });
     });
-    res.json({ matrix, assets: allAssets, note: 'Corelații simulate — date demo', disclaimer: DISCLAIMER });
+    res.json({ matrix, assets: allAssets, note: 'Corelații calculate din date simulate', disclaimer: DISCLAIMER });
 });
 
 // GET /risk
@@ -681,3 +706,4 @@ module.exports.calculateFibonacci = calculateFibonacci;
 module.exports.analyzeVolume = analyzeVolume;
 module.exports.analyzeSentiment = analyzeSentiment;
 module.exports.calculateConfluence = calculateConfluence;
+module.exports.generateSimulatedPrices = generateSimulatedPrices;
