@@ -34,12 +34,16 @@
     async function triggerVision() {
         showThinking(false);
         addMessage('assistant', '👁️ Activating camera...');
-        KAvatar.setExpression('thinking', 0.5);
-        const desc = await KVoice.captureAndAnalyze();
-        addMessage('assistant', desc);
-        chatHistory.push({ role: 'assistant', content: desc });
-        KAvatar.setExpression('happy', 0.3);
-        await KVoice.speak(desc);
+        try { KAvatar.setExpression('thinking', 0.5); } catch(e) { console.warn('[App] Expression change failed:', e.message); }
+        try {
+            const desc = await KVoice.captureAndAnalyze();
+            addMessage('assistant', desc);
+            chatHistory.push({ role: 'assistant', content: desc });
+            try { KAvatar.setExpression('happy', 0.3); } catch(e) { console.warn('[App] Expression change failed:', e.message); }
+            if (window.KVoice) await KVoice.speak(desc);
+        } catch(e) {
+            addMessage('assistant', 'Camera not available.');
+        }
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -72,7 +76,7 @@
                 } else if (resp.status === 429) {
                     addMessage('assistant', '⏳ Too many messages. Please wait a moment.');
                 } else addMessage('assistant', e.error || 'Error.');
-                KVoice.resumeWakeDetection();
+                if (window.KVoice) KVoice.resumeWakeDetection();
                 return;
             }
 
@@ -140,7 +144,7 @@
             }
 
             KAvatar.setExpression('happy', 0.3);
-            await KVoice.speak(fullReply, KAvatar.getCurrentAvatar());
+            if (window.KVoice) await KVoice.speak(fullReply, KAvatar.getCurrentAvatar());
 
         } catch (e) {
             showThinking(false);
@@ -177,7 +181,7 @@
                 } else if (resp.status === 429) {
                     addMessage('assistant', '⏳ Too many messages. Please wait a moment.');
                 } else addMessage('assistant', e.error || 'Error.');
-                KVoice.resumeWakeDetection();
+                if (window.KVoice) KVoice.resumeWakeDetection();
                 return;
             }
 
@@ -206,11 +210,11 @@
             }
 
             KAvatar.setExpression('happy', 0.3);
-            await KVoice.speak(data.reply, data.avatar);
+            if (window.KVoice) await KVoice.speak(data.reply, data.avatar);
         } catch (e) {
             showThinking(false);
             addMessage('assistant', 'Connection error.');
-            KVoice.resumeWakeDetection();
+            if (window.KVoice) KVoice.resumeWakeDetection();
         }
     }
 
@@ -334,7 +338,8 @@
     function hideWelcome() { var w = document.getElementById('welcome'); if (w) w.classList.add('hidden'); }
 
     function switchAvatar(name) {
-        KVoice.stopSpeaking(); KAvatar.loadAvatar(name);
+        if (window.KVoice) KVoice.stopSpeaking();
+        try { KAvatar.loadAvatar(name); } catch(e) { console.warn('[App] Avatar load failed:', e.message); }
         document.querySelectorAll('.avatar-pill').forEach(function(b) { b.classList.toggle('active', b.dataset.avatar === name); });
         var displayName = name.charAt(0).toUpperCase() + name.slice(1);
         var n = document.getElementById('avatar-name'); if (n) n.textContent = displayName;
@@ -365,7 +370,7 @@
             if (detected && detected !== i18n.getLanguage()) i18n.setLanguage(detected);
         }
         hideWelcome(); KAvatar.setAttentive(true); addMessage('user', text); showThinking(true);
-        if (isVisionRequest(text)) triggerVision(); else await sendToAI(text, window.i18n ? i18n.getLanguage() : KVoice.getLanguage());
+        if (isVisionRequest(text)) triggerVision(); else await sendToAI(text, window.i18n ? i18n.getLanguage() : (window.KVoice ? KVoice.getLanguage() : 'en'));
     }
 
     // ─── Drag & Drop ─────────────────────────────────────────
@@ -388,9 +393,9 @@
                     var b64 = reader.result.split(',')[1];
                     KAvatar.setExpression('thinking', 0.5); showThinking(true);
                     try {
-                        var r = await fetch(API_BASE+'/api/vision', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ image: b64, avatar: KAvatar.getCurrentAvatar(), language: KVoice.getLanguage() }) });
+                        var r = await fetch(API_BASE+'/api/vision', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ image: b64, avatar: KAvatar.getCurrentAvatar(), language: window.KVoice ? KVoice.getLanguage() : 'en' }) });
                         var d = await r.json(); showThinking(false); addMessage('assistant', d.description || 'Could not analyze.');
-                        KAvatar.setExpression('happy', 0.3); await KVoice.speak(d.description);
+                        KAvatar.setExpression('happy', 0.3); if (window.KVoice) await KVoice.speak(d.description);
                     } catch(e) { showThinking(false); addMessage('assistant', 'Analysis error.'); }
                 } else { addMessage('assistant', 'I received ' + file.name + '. What should I do with it?'); }
             };
@@ -405,13 +410,17 @@
             var r = await fetch(API_BASE+'/api/health');
             var d = await r.json();
             if (d.status === 'online') {
-                document.getElementById('status-text').textContent = 'Online' + (d.brain !== 'healthy' ? ' ⚠️' : '');
-                document.getElementById('status-dot').style.background = d.brain === 'healthy' ? '#00ff88' : '#ffaa00';
+                var statusText = document.getElementById('status-text');
+                var statusDot = document.getElementById('status-dot');
+                if (statusText) statusText.textContent = 'Online' + (d.brain !== 'healthy' ? ' ⚠️' : '');
+                if (statusDot) statusDot.style.background = d.brain === 'healthy' ? '#00ff88' : '#ffaa00';
                 if (d.tools && !d.tools.ai_claude) useStreaming = false;
             }
         } catch(e) {
-            document.getElementById('status-text').textContent = 'Offline';
-            document.getElementById('status-dot').style.background = '#ff4444';
+            var statusText = document.getElementById('status-text');
+            var statusDot = document.getElementById('status-dot');
+            if (statusText) statusText.textContent = 'Offline';
+            if (statusDot) statusDot.style.background = '#ff4444';
             useStreaming = false;
         }
     }
@@ -440,7 +449,13 @@
         }, 5000);
 
         if (window.KAuth) KAuth.init();
-        KAvatar.init();
+        try {
+            KAvatar.init();
+        } catch(e) {
+            console.error('[App] Avatar init failed:', e.message);
+            var canvas = document.getElementById('avatar-canvas');
+            if (canvas) canvas.style.display = 'none';
+        }
 
         ['click','touchstart','keydown'].forEach(function(e) { document.addEventListener(e, unlockAudio, { once: false, passive: true }); });
 
