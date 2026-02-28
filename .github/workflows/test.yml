@@ -34,7 +34,7 @@ jobs:
 
       - name: Run unit tests with coverage
         id: unit-tests
-        # continue-on-error: true — nu bloca deploy pentru coverage
+        # continue-on-error: true — do not block deploy on coverage failures
         continue-on-error: true
         run: npm run test:ci
         env:
@@ -96,10 +96,10 @@ jobs:
               labels: ['bug', 'automated']
             });
 
-  # ─── STEP 2: Deploy (MEREU pe push master) ───
+  # ─── STEP 2: Deploy (always on push to master) ───
   deploy:
     needs: test
-    # Deploy MEREU pe push master — nu mai depinde de test outcome
+    # Always deploy on push to master — does not depend on test outcome
     if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
 
@@ -118,20 +118,46 @@ jobs:
       - name: Check Netlify secrets
         id: check-secrets
         run: |
-          MISSING=""
-          if [ -z "$NETLIFY_AUTH_TOKEN" ]; then
-            MISSING="${MISSING} NETLIFY_AUTH_TOKEN"
-          fi
-          if [ -z "$NETLIFY_SITE_ID" ]; then
-            MISSING="${MISSING} NETLIFY_SITE_ID"
-          fi
-          if [ -n "$MISSING" ]; then
+          SKIP=false
+
+          validate_secret() {
+            local name="$1"
+            local value="$2"
+            # Empty check
+            if [ -z "$value" ]; then
+              echo "::warning::${name} is empty. Deploy will be skipped."
+              SKIP=true
+              return
+            fi
+            # Whitespace-only check
+            if [ -z "$(echo "$value" | tr -d '[:space:]')" ]; then
+              echo "::warning::${name} contains only whitespace. Deploy will be skipped."
+              SKIP=true
+              return
+            fi
+            # Newline characters check
+            if printf '%s' "$value" | grep -zqP '[\r\n]'; then
+              echo "::warning::${name} contains newline characters (\\r or \\n) and is not a valid HTTP header value. Deploy will be skipped."
+              SKIP=true
+              return
+            fi
+            # Printable ASCII only (0x20–0x7E)
+            if printf '%s' "$value" | grep -zqP '[^\x20-\x7E]'; then
+              echo "::warning::${name} contains non-printable or non-ASCII characters and is not a valid HTTP header value. Deploy will be skipped."
+              SKIP=true
+              return
+            fi
+          }
+
+          validate_secret "NETLIFY_AUTH_TOKEN" "$NETLIFY_AUTH_TOKEN"
+          validate_secret "NETLIFY_SITE_ID" "$NETLIFY_SITE_ID"
+
+          if [ "$SKIP" = "true" ]; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "::warning::Netlify secrets lipsesc:${MISSING}. Deploy-ul va fi skipped."
             echo ""
-            echo "  Pentru a seta secretele, rulează local:"
+            echo "  To set the secrets, run locally:"
             echo "    bash scripts/setup-secrets.sh"
-            echo "  sau:"
+            echo "  or:"
             echo "    npm run setup:secrets"
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
@@ -155,11 +181,11 @@ jobs:
           NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
         timeout-minutes: 10
 
-      - name: Deploy skipped — secrets lipsă
+      - name: Deploy skipped — missing secrets
         if: steps.check-secrets.outputs.skip == 'true'
         run: |
-          echo "⏭️  Deploy skipped: secretele NETLIFY_AUTH_TOKEN și/sau NETLIFY_SITE_ID nu sunt setate."
-          echo "   Rulează 'bash scripts/setup-secrets.sh' sau 'npm run setup:secrets' pentru a le seta."
+          echo "⏭️  Deploy skipped: NETLIFY_AUTH_TOKEN and/or NETLIFY_SITE_ID are not set or invalid."
+          echo "   Run 'bash scripts/setup-secrets.sh' or 'npm run setup:secrets' to configure them."
 
       - name: Deploy summary
         if: steps.check-secrets.outputs.skip == 'false'
