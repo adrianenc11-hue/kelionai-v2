@@ -31,8 +31,8 @@
 
     function updateUI() {
         const n = document.getElementById('user-name'), b = document.getElementById('btn-auth');
-        if (currentUser) { if (n) n.textContent = currentUser.name || currentUser.email; if (b) { b.textContent = '🚪'; b.title = 'Deconectare'; } }
-        else { if (n) n.textContent = 'Guest'; if (b) { b.textContent = '🔑'; b.title = 'Login'; } }
+        if (currentUser) { if (n) n.textContent = currentUser.name || currentUser.email; if (b) { b.textContent = '🚪'; b.title = 'Sign Out'; } }
+        else { if (n) n.textContent = 'Guest'; if (b) { b.textContent = '🔑'; b.title = 'Sign In'; } }
     }
 
     function initUI() {
@@ -43,18 +43,18 @@
         let isReg = false;
 
         if (tog) tog.addEventListener('click', (e) => { e.preventDefault(); isReg = !isReg;
-            ttl.textContent = isReg ? 'Creează cont' : 'Autentificare'; sub.textContent = isReg ? 'Înregistrează-te' : 'Intră';
-            tog.textContent = isReg ? 'Am cont → Intră' : 'Nu am cont → Creează'; if (nmg) nmg.style.display = isReg ? 'block' : 'none'; if (err) err.textContent = ''; });
+            ttl.textContent = isReg ? 'Create Account' : 'Sign In'; sub.textContent = isReg ? 'Register' : 'Sign In';
+            tog.textContent = isReg ? 'I have an account → Sign In' : 'No account → Create'; if (nmg) nmg.style.display = isReg ? 'block' : 'none'; if (err) err.textContent = ''; });
 
         if (form) form.addEventListener('submit', async (e) => { e.preventDefault();
             const em = form.querySelector('#auth-email').value.trim(), pw = form.querySelector('#auth-password').value, nm = form.querySelector('#auth-name')?.value.trim();
-            if (!em || !pw) { if (err) err.textContent = 'Completează email și parola'; return; }
+            if (!em || !pw) { if (err) err.textContent = 'Please enter email and password'; return; }
             sub.disabled = true; sub.textContent = '...'; if (err) err.textContent = '';
             try { if (isReg) await register(em, pw, nm); else await login(em, pw);
                 scr.classList.add('hidden'); document.getElementById('app-layout').classList.remove('hidden'); updateUI();
                 if (window.KApp) KApp.loadConversations();
             } catch(ex) { if (err) err.textContent = ex.message; }
-            finally { sub.disabled = false; sub.textContent = isReg ? 'Înregistrează-te' : 'Intră'; } });
+            finally { sub.disabled = false; sub.textContent = isReg ? 'Register' : 'Sign In'; } });
 
         if (guest) guest.addEventListener('click', () => { scr.classList.add('hidden'); document.getElementById('app-layout').classList.remove('hidden'); updateUI(); });
 

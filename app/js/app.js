@@ -27,12 +27,13 @@
     }
 
     // ─── Vision (client-side camera) ────────────────────────
-    const VISION_TRIGGERS = ['ce e în față','ce e in fata','ce vezi','mă vezi','ma vezi','uită-te','uita-te','arată-mi','arata-mi','privește','priveste','see me','look at','what do you see','identifică','identifica','identify','what is this','ce e asta','descrie ce vezi','ce observi','ce e pe stradă','ce e pe strada','ce e în jurul','ce e in jurul'];
+    // Triggers include both English and Romanian for multilingual support
+    const VISION_TRIGGERS = ['what is ahead','what do you see','look at','see me','identify','what is this','describe what you see','what is around','ce e în față','ce e in fata','ce vezi','mă vezi','ma vezi','uită-te','uita-te','arată-mi','arata-mi','privește','priveste','identifică','identifica','ce e asta','descrie ce vezi','ce observi','ce e pe stradă','ce e pe strada','ce e în jurul','ce e in jurul'];
     function isVisionRequest(t) { const l = t.toLowerCase(); return VISION_TRIGGERS.some(v => l.includes(v)); }
 
     async function triggerVision() {
         showThinking(false);
-        addMessage('assistant', '👁️ Activez camera...');
+        addMessage('assistant', '👁️ Activating camera...');
         KAvatar.setExpression('thinking', 0.5);
         const desc = await KVoice.captureAndAnalyze();
         addMessage('assistant', desc);
@@ -66,11 +67,11 @@
                 const e = await resp.json().catch(() => ({}));
                 if (resp.status === 429 && e.upgrade) {
                     const planName = e.plan ? (e.plan.charAt(0).toUpperCase() + e.plan.slice(1)) : 'Free';
-                    addMessage('assistant', 'Ai atins limita zilnică pentru planul ' + planName + '. Spune \'Kelion, upgrade\' pentru mai multe.');
+                    addMessage('assistant', 'You have reached the daily limit for the ' + planName + ' plan. Say \'Kelion, upgrade\' for more.');
                     setTimeout(function() { if (window.KPayments) KPayments.showUpgradePrompt(); }, 2000);
                 } else if (resp.status === 429) {
-                    addMessage('assistant', '⏳ Prea multe mesaje. Așteaptă un moment.');
-                } else addMessage('assistant', e.error || 'Eroare.');
+                    addMessage('assistant', '⏳ Too many messages. Please wait a moment.');
+                } else addMessage('assistant', e.error || 'Error.');
                 KVoice.resumeWakeDetection();
                 return;
             }
@@ -171,11 +172,11 @@
                 const e = await resp.json().catch(() => ({}));
                 if (resp.status === 429 && e.upgrade) {
                     const planName = e.plan ? (e.plan.charAt(0).toUpperCase() + e.plan.slice(1)) : 'Free';
-                    addMessage('assistant', 'Ai atins limita zilnică pentru planul ' + planName + '. Spune \'Kelion, upgrade\' pentru mai multe.');
+                    addMessage('assistant', 'You have reached the daily limit for the ' + planName + ' plan. Say \'Kelion, upgrade\' for more.');
                     setTimeout(function() { if (window.KPayments) KPayments.showUpgradePrompt(); }, 2000);
                 } else if (resp.status === 429) {
-                    addMessage('assistant', '⏳ Prea multe mesaje. Așteaptă un moment.');
-                } else addMessage('assistant', e.error || 'Eroare.');
+                    addMessage('assistant', '⏳ Too many messages. Please wait a moment.');
+                } else addMessage('assistant', e.error || 'Error.');
                 KVoice.resumeWakeDetection();
                 return;
             }
@@ -208,7 +209,7 @@
             await KVoice.speak(data.reply, data.avatar);
         } catch (e) {
             showThinking(false);
-            addMessage('assistant', 'Eroare conectare.');
+            addMessage('assistant', 'Connection error.');
             KVoice.resumeWakeDetection();
         }
     }
@@ -233,7 +234,7 @@
     async function loadConversations() {
         const list = document.getElementById('history-list');
         if (!list) return;
-        list.innerHTML = '<div class="history-empty">Se încarcă...</div>';
+        list.innerHTML = '<div class="history-empty">Loading...</div>';
 
         try {
             const r = await fetch(API_BASE + '/api/conversations', { headers: authHeaders() });
@@ -242,7 +243,7 @@
             const convs = data.conversations || data || [];
 
             if (convs.length === 0) {
-                list.innerHTML = '<div class="history-empty">Nicio conversație încă.<br>Începe să vorbești!</div>';
+                list.innerHTML = '<div class="history-empty">No conversations yet.<br>Start chatting!</div>';
                 return;
             }
 
@@ -252,13 +253,13 @@
                 item.className = 'history-item' + (c.id === currentConversationId ? ' active' : '');
                 const date = new Date(c.updated_at || c.created_at);
                 const timeAgo = formatTimeAgo(date);
-                item.innerHTML = '<div class="history-item-title">' + escapeHtml(c.title || 'Conversație') + '</div>' +
+                item.innerHTML = '<div class="history-item-title">' + escapeHtml(c.title || 'Conversation') + '</div>' +
                     '<div class="history-item-meta"><span class="history-item-avatar">' + (c.avatar || 'kelion') + '</span> · ' + timeAgo + '</div>';
                 item.addEventListener('click', () => resumeConversation(c.id, c.avatar));
                 list.appendChild(item);
             }
         } catch (e) {
-            list.innerHTML = '<div class="history-empty">Nu pot încărca istoricul.<br>Verifică autentificarea.</div>';
+            list.innerHTML = '<div class="history-empty">Unable to load history.<br>Check authentication.</div>';
         }
     }
 
@@ -285,7 +286,7 @@
             document.querySelectorAll('.history-item').forEach(function(el) { el.classList.remove('active'); });
             if (window.innerWidth < 768) toggleHistory(false);
         } catch (e) {
-            addMessage('assistant', 'Nu am putut încărca conversația.');
+            addMessage('assistant', 'Failed to load conversation.');
         }
     }
 
@@ -309,13 +310,13 @@
     function formatTimeAgo(date) {
         var now = new Date(), diff = now - date;
         var mins = Math.floor(diff / 60000);
-        if (mins < 1) return 'acum';
+        if (mins < 1) return 'just now';
         if (mins < 60) return mins + ' min';
         var hours = Math.floor(mins / 60);
         if (hours < 24) return hours + 'h';
         var days = Math.floor(hours / 24);
-        if (days < 7) return days + 'z';
-        return date.toLocaleDateString('ro-RO', { day: 'numeric', month: 'short' });
+        if (days < 7) return days + 'd';
+        return date.toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
     }
 
     function escapeHtml(t) { var d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
@@ -335,8 +336,10 @@
     function switchAvatar(name) {
         KVoice.stopSpeaking(); KAvatar.loadAvatar(name);
         document.querySelectorAll('.avatar-pill').forEach(function(b) { b.classList.toggle('active', b.dataset.avatar === name); });
-        var n = document.getElementById('avatar-name'); if (n) n.textContent = name.charAt(0).toUpperCase() + name.slice(1);
-        var navName = document.getElementById('navbar-avatar-name'); if (navName) navName.textContent = name.charAt(0).toUpperCase() + name.slice(1);
+        var displayName = name.charAt(0).toUpperCase() + name.slice(1);
+        var n = document.getElementById('avatar-name'); if (n) n.textContent = displayName;
+        var navName = document.getElementById('navbar-avatar-name'); if (navName) navName.textContent = displayName;
+        document.title = displayName + 'AI';
         chatHistory = []; persistConvId(null);
         var o = document.getElementById('chat-overlay'); if (o) o.innerHTML = '';
     }
@@ -349,22 +352,6 @@
     }
 
     // ─── Input handlers ──────────────────────────────────────
-    async function onMicDown() { var b = document.getElementById('btn-mic'); if (await KVoice.startListening()) { b.classList.add('recording'); b.textContent = '⏹'; } }
-    async function onMicUp() {
-        var b = document.getElementById('btn-mic'); b.classList.remove('recording'); b.textContent = '🎤';
-        if (!KVoice.isRecording()) return; showThinking(true);
-        var text = await KVoice.stopListening();
-        if (text && text.trim()) { hideWelcome(); addMessage('user', text);
-            // Auto-detect language from voice transcription and update UI
-            if (window.i18n) {
-                var detected = i18n.detectLanguage(text);
-                if (detected && detected !== i18n.getLanguage()) i18n.setLanguage(detected);
-            }
-            if (isUpgradeRequest(text)) { showThinking(false); if (window.KPayments) KPayments.showUpgradePrompt(); }
-            else if (isVisionRequest(text)) triggerVision(); else await sendToAI(text, window.i18n ? i18n.getLanguage() : KVoice.getLanguage());
-        } else { showThinking(false); KVoice.resumeWakeDetection(); }
-    }
-
     async function onSendText() {
         var inp = document.getElementById('text-input'); var text = inp.value.trim(); if (!text) return; inp.value = '';
         var l = text.toLowerCase();
@@ -402,10 +389,10 @@
                     KAvatar.setExpression('thinking', 0.5); showThinking(true);
                     try {
                         var r = await fetch(API_BASE+'/api/vision', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ image: b64, avatar: KAvatar.getCurrentAvatar(), language: KVoice.getLanguage() }) });
-                        var d = await r.json(); showThinking(false); addMessage('assistant', d.description || 'Nu am putut analiza.');
+                        var d = await r.json(); showThinking(false); addMessage('assistant', d.description || 'Could not analyze.');
                         KAvatar.setExpression('happy', 0.3); await KVoice.speak(d.description);
-                    } catch(e) { showThinking(false); addMessage('assistant', 'Eroare analiză.'); }
-                } else { addMessage('assistant', 'Am primit ' + file.name + '. Ce fac cu el?'); }
+                    } catch(e) { showThinking(false); addMessage('assistant', 'Analysis error.'); }
+                } else { addMessage('assistant', 'I received ' + file.name + '. What should I do with it?'); }
             };
             if (file.type.startsWith('text/') || file.name.match(/\.(txt|md|json|csv)$/)) reader.readAsText(file);
             else reader.readAsDataURL(file);
@@ -436,14 +423,6 @@
 
         ['click','touchstart','keydown'].forEach(function(e) { document.addEventListener(e, unlockAudio, { once: false, passive: true }); });
 
-        document.getElementById('btn-mic').addEventListener('mousedown', onMicDown);
-        document.getElementById('btn-mic').addEventListener('mouseup', onMicUp);
-        document.getElementById('btn-mic').addEventListener('touchstart', function(e) { e.preventDefault(); onMicDown(); });
-        document.getElementById('btn-mic').addEventListener('touchend', function(e) { e.preventDefault(); onMicUp(); });
-
-        var vb = document.getElementById('btn-vision');
-        if (vb) vb.addEventListener('click', function() { hideWelcome(); addMessage('user', 'Ce e în fața mea?'); showThinking(true); triggerVision(); });
-
         document.getElementById('btn-send').addEventListener('click', onSendText);
         document.getElementById('text-input').addEventListener('keydown', function(e) { if (e.key === 'Enter') onSendText(); });
 
@@ -457,13 +436,17 @@
         var newChat = document.getElementById('btn-new-chat');
         if (newChat) newChat.addEventListener('click', startNewChat);
 
+        // Pricing close
+        var pricingClose = document.getElementById('pricing-close');
+        if (pricingClose) pricingClose.addEventListener('click', function() { var m = document.getElementById('pricing-modal'); if (m) m.classList.add('hidden'); });
+
         window.addEventListener('wake-message', function(e) {
             var detail = e.detail; hideWelcome(); addMessage('user', detail.text); showThinking(true);
             if (isVisionRequest(detail.text)) triggerVision(); else sendToAI(detail.text, detail.language);
         });
 
         setupDragDrop();
-        if (window.KVoice && KVoice.startPermanentListening) KVoice.startPermanentListening();
+        if (window.KVoice) KVoice.startWakeWordDetection();
         checkHealth();
         if (window.KPayments) KPayments.showUsageBar();
         if (window.KTicker) KTicker.init();

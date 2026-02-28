@@ -215,11 +215,11 @@
         }, (progress) => {
             if (progress.total) {
                 const pct = Math.round((progress.loaded / progress.total) * 100);
-                document.getElementById('status-text').textContent = `Se încarcă... ${pct}%`;
+                document.getElementById('status-text').textContent = `Loading... ${pct}%`;
             }
         }, (err) => {
             console.error(`[Avatar] Load error:`, err);
-            document.getElementById('status-text').textContent = 'Eroare model';
+            document.getElementById('status-text').textContent = 'Model error';
             reject(err);
         });
         });
