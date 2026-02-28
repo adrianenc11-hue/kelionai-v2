@@ -54,10 +54,10 @@ test('page loads with avatar and layout', async ({ page }) => {
 test('text input accepts text and send button works', async ({ page }) => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
-    await page.waitForSelector('#auth-screen', { state: 'visible', timeout: 10000 }).catch(() => {
-        // Auth screen may already be dismissed or not present — this is expected on live
-    });
-    await dismissAuth(page);
+    const authVisible = await page.waitForSelector('#auth-screen', { state: 'visible', timeout: 10000 })
+        .then(() => true)
+        .catch(() => false);
+    if (authVisible) await dismissAuth(page);
 
     const input = page.locator('#text-input');
     await input.click();
