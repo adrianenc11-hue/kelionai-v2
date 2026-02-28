@@ -145,3 +145,10 @@ CREATE POLICY IF NOT EXISTS "users_own_referrals" ON referrals FOR ALL USING (au
 COMMENT ON TABLE subscriptions IS 'Stripe subscription tracking — plans: free, pro (€9.99), premium (€19.99)';
 COMMENT ON TABLE usage IS 'Daily usage counters per user — limits: guest(5/3/1), free(10/5/2), pro(100/50/20), premium(unlimited)';
 COMMENT ON TABLE referrals IS 'Referral codes KEL-XXXXXX — both users get 7 days Pro';
+
+-- ═══ NEWS CACHE ═══
+CREATE TABLE IF NOT EXISTS news_cache (
+    id TEXT PRIMARY KEY DEFAULT 'latest',
+    data JSONB,
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);

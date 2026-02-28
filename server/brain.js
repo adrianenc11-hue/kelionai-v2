@@ -656,7 +656,11 @@ Raspunde STRICT cu JSON:
 
     _map(place) {
         this.toolStats.map++;
-        return { place, url: `https://www.google.com/maps/embed/v1/place?key=AIzaSyBFw0Qbyq9zTFTd-tUY6dZWTgaQzuU17R8&q=${encodeURIComponent(place)}` };
+        const mapsKey = process.env.GOOGLE_MAPS_KEY;
+        const url = mapsKey
+            ? `https://www.google.com/maps/embed/v1/place?key=${mapsKey}&q=${encodeURIComponent(place)}`
+            : `https://www.openstreetmap.org/search?query=${encodeURIComponent(place)}`;
+        return { place, url };
     }
 
     // ═══════════════════════════════════════════════════════════

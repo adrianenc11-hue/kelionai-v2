@@ -105,6 +105,49 @@ describe('Input Validation', () => {
     });
 });
 
+describe('GET /api/admin/health-check', () => {
+    test('returns 401 without admin secret', async () => {
+        const res = await request(app).get('/api/admin/health-check');
+        expect(res.status).toBe(401);
+    });
+
+    test('returns 200 with valid admin secret', async () => {
+        process.env.ADMIN_SECRET_KEY = 'test-secret';
+        const res = await request(app).get('/api/admin/health-check').set('x-admin-secret', 'test-secret');
+        expect(res.status).toBe(200);
+        expect(typeof res.body.score).toBe('number');
+        expect(res.body.score).toBeGreaterThanOrEqual(0);
+        expect(res.body.score).toBeLessThanOrEqual(100);
+        expect(['A', 'B', 'C', 'D', 'F']).toContain(res.body.grade);
+        expect(typeof res.body.timestamp).toBe('string');
+        expect(res.body.server).toBeDefined();
+        expect(res.body.services).toBeDefined();
+        expect(res.body.database).toBeDefined();
+        expect(res.body.brain).toBeDefined();
+        expect(res.body.auth).toBeDefined();
+        expect(res.body.payments).toBeDefined();
+        expect(res.body.rateLimits).toBeDefined();
+        expect(res.body.security).toBeDefined();
+        expect(res.body.errors).toBeDefined();
+        expect(res.body.recommendations).toBeInstanceOf(Array);
+    });
+
+    test('server section has expected fields', async () => {
+        process.env.ADMIN_SECRET_KEY = 'test-secret';
+        const res = await request(app).get('/api/admin/health-check').set('x-admin-secret', 'test-secret');
+        expect(res.body.server.version).toBe('2.3.0');
+        expect(typeof res.body.server.uptime).toBe('string');
+        expect(typeof res.body.server.nodeVersion).toBe('string');
+        expect(res.body.server.memory).toBeDefined();
+    });
+
+    test('security section reflects CSP enabled', async () => {
+        process.env.ADMIN_SECRET_KEY = 'test-secret';
+        const res = await request(app).get('/api/admin/health-check').set('x-admin-secret', 'test-secret');
+        expect(res.body.security.cspEnabled).toBe(true);
+    });
+});
+
 describe('Metrics Endpoint', () => {
     test('GET /metrics returns Prometheus format', async () => {
         process.env.ADMIN_SECRET_KEY = 'test-secret';
