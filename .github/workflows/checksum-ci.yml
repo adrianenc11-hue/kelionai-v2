@@ -31,4 +31,3 @@ jobs:
         env:
           CHECKSUM_API_KEY: ${{ secrets.CHECKSUM_API_KEY }}
           CHECKSUM_BASE_URL: ${{ vars.CHECKSUM_BASE_URL || 'https://kelionai.app' }}
-          NODE_ENV: test

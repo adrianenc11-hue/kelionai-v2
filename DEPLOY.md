@@ -76,8 +76,7 @@ Railway auto-deploys on push to master via GitHub Actions (`.github/workflows/de
 - [ ] `https://kelionai.app/developer/` → 200
 - [ ] `https://kelionai.app/settings/` → 200
 - [ ] Test Stripe checkout flow with test card: 4242 4242 4242 4242
-- [ ] Test webhook: `stripe listen --forward-to localhost:3000/api/payments/webhook`
-  > ℹ️ Stripe CLI este singurul caz unde se folosește localhost (development Stripe webhook forwarding).
+- [ ] Test webhook: `stripe listen --forward-to https://kelionai.app/api/payments/webhook`
 
 ---
 
