@@ -27,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    if: github.ref == 'refs/heads/master'
+    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -35,13 +35,36 @@ jobs:
           node-version: '20'
           cache: 'npm'
       - run: npm ci --omit=dev
+
+      - name: Check Railway token
+        id: check-railway
+        run: |
+          if [ -z "$RAILWAY_TOKEN" ]; then
+            echo "::warning::RAILWAY_TOKEN is not set. Deploy will be skipped."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
       - name: Deploy to Railway
+        if: steps.check-railway.outputs.skip == 'false'
         run: |
           npm install -g @railway/cli
           railway up --detach --service kelionai-v2
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+      - name: Deploy skipped
+        if: steps.check-railway.outputs.skip == 'true'
+        run: |
+          echo "⏭️ Deploy skipped: RAILWAY_TOKEN is not set."
+          echo "Set it in Settings → Secrets → Actions."
+
       - name: Health check post-deploy
+        if: steps.check-railway.outputs.skip == 'false'
+        continue-on-error: true
         run: |
           echo "Waiting for deployment to be ready..."
           MAX_WAIT=300
