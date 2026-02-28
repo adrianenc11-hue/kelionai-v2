@@ -115,8 +115,33 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Check Netlify secrets
+        id: check-secrets
+        run: |
+          MISSING=""
+          if [ -z "$NETLIFY_AUTH_TOKEN" ]; then
+            MISSING="${MISSING} NETLIFY_AUTH_TOKEN"
+          fi
+          if [ -z "$NETLIFY_SITE_ID" ]; then
+            MISSING="${MISSING} NETLIFY_SITE_ID"
+          fi
+          if [ -n "$MISSING" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "::warning::Netlify secrets lipsesc:${MISSING}. Deploy-ul va fi skipped."
+            echo ""
+            echo "  Pentru a seta secretele, rulează local:"
+            echo "    bash scripts/setup-secrets.sh"
+            echo "  sau:"
+            echo "    npm run setup:secrets"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+
       - name: Deploy to Netlify
-        if: ${{ secrets.NETLIFY_AUTH_TOKEN != '' }}
+        if: steps.check-secrets.outputs.skip == 'false'
         uses: nwtgck/actions-netlify@v3.0
         with:
           publish-dir: './app'
@@ -130,7 +155,14 @@ jobs:
           NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
         timeout-minutes: 10
 
+      - name: Deploy skipped — secrets lipsă
+        if: steps.check-secrets.outputs.skip == 'true'
+        run: |
+          echo "⏭️  Deploy skipped: secretele NETLIFY_AUTH_TOKEN și/sau NETLIFY_SITE_ID nu sunt setate."
+          echo "   Rulează 'bash scripts/setup-secrets.sh' sau 'npm run setup:secrets' pentru a le seta."
+
       - name: Deploy summary
+        if: steps.check-secrets.outputs.skip == 'false'
         run: |
           echo "✅ Deploy completed successfully!"
           echo "🌐 Site: https://kelionai.app"
