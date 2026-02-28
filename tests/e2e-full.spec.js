@@ -382,6 +382,7 @@ test.describe('API Health', () => {
         expect(resp.status()).toBe(200);
         const body = await resp.json();
         expect(body).toHaveProperty('status');
+        expect(body.status).toBe('ok');
     });
 
     test('GET / returns 200', async ({ request }) => {
@@ -391,7 +392,7 @@ test.describe('API Health', () => {
         expect(text).toContain('KelionAI');
     });
 
-    test('GET /health returns 200', async ({ request }) => {
+    test('GET /health returns 200 (catch-all serves app)', async ({ request }) => {
         const resp = await request.get('/health');
         expect(resp.status()).toBe(200);
     });
