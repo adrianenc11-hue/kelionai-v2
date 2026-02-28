@@ -1297,6 +1297,20 @@ app.use('/api/news', adminAuth, newsModule.router);
 newsModule.setSupabase(supabaseAdmin);
 newsModule.restoreCache();
 
+// ═══ AUTO-PUBLISH: when news fetches, distribute to all media ═══
+newsModule.onNewsFetched(async (articles) => {
+    logger.info({ component: 'MediaAutoPublish', count: articles.length }, '📢 Auto-publishing news...');
+    // Facebook Page (top 3 articles)
+    try { await fbPage.publishNewsBatch(articles, 3); } catch (e) { logger.warn({ component: 'MediaAutoPublish', err: e.message }, 'FB Page publish failed'); }
+    // Telegram channel broadcast
+    try { await broadcastNews(articles); } catch (e) { logger.warn({ component: 'MediaAutoPublish', err: e.message }, 'Telegram broadcast failed'); }
+    // Instagram (top 1 article with default image)
+    try { if (articles[0]) await instagram.postNews(articles[0]); } catch (e) { logger.warn({ component: 'MediaAutoPublish', err: e.message }, 'Instagram post failed'); }
+});
+
+// ═══ STORE ARTICLES REF IN app.locals for Telegram bot ═══
+app.locals._getNewsArticles = newsModule.getArticlesArray;
+
 // ═══ TRADING BOT (admin only) ═══
 app.use('/api/trading', adminAuth, require('./trading'));
 
