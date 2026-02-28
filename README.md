@@ -186,3 +186,16 @@ GITHUB_TOKEN=ghp_... node scripts/auto-merge-report.js
 ```
 
 This writes a `auto-merge-report.md` file in the project root and prints the same Markdown table to stdout.
+
+## Checksum.ai Integration
+
+This repository is integrated with [Checksum.ai](https://checksum.ai/) CI Agent for automated E2E test generation and self-healing.
+
+- Tests are auto-generated in `checksum-tests/`
+- CI Agent runs on every PR via `.github/workflows/checksum-ci.yml`
+- Configure via `checksum.config.ts`
+
+### Setup
+1. Set `CHECKSUM_API_KEY` as a repository secret
+2. Optionally set `CHECKSUM_BASE_URL` as a repository variable
+3. Tests will run automatically on PRs
