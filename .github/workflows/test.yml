@@ -205,7 +205,7 @@ jobs:
         if: needs.deploy.result == 'success'
         run: |
           curl -sL https://sentry.io/api/0/organizations/kelion-ai/releases/ \
-            -H "Authorization: Bearer ${{ secrets.SENTRY_AUTH_TOKEN }}" \
+            -H "Authorization: Bearer ${{ secrets.KS_SENTRY }}" \
             -H "Content-Type: application/json" \
             -d "{\"version\": \"${{ github.sha }}\", \"projects\": [\"kelionai-v2\"]}" || true
 
