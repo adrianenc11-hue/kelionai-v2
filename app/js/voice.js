@@ -3,7 +3,7 @@
     'use strict';
     const API_BASE = window.location.origin;
     let mediaRecorder = null, audioChunks = [], isRecording = false, isSpeaking = false;
-    let currentSourceNode = null, sharedAudioCtx = null, detectedLanguage = 'ro';
+    let currentSourceNode = null, sharedAudioCtx = null, detectedLanguage = 'en';
     let pendingAudioBuffer = null, pendingAudioAvatar = null;
     let recognition = null, isListeningForWake = false, isProcessing = false;
 
@@ -49,17 +49,22 @@
 
                 const hasKelion = t.includes('kelion') || t.includes('chelion');
                 const hasKira = t.includes('kira') || t.includes('chira');
+
                 if (hasKelion || hasKira) {
                     const targetAvatar = hasKira ? 'kira' : 'kelion';
                     if (window.KAvatar && targetAvatar !== window.KAvatar.getCurrentAvatar()) {
                         window.KAvatar.loadAvatar(targetAvatar);
                         document.querySelectorAll('.avatar-pill').forEach(b => b.classList.toggle('active', b.dataset.avatar === targetAvatar));
+                        var displayName = targetAvatar.charAt(0).toUpperCase() + targetAvatar.slice(1);
                         var navName = document.getElementById('navbar-avatar-name');
-                        if (navName) navName.textContent = targetAvatar.charAt(0).toUpperCase() + targetAvatar.slice(1);
+                        if (navName) navName.textContent = displayName;
+                        var avatarName = document.getElementById('avatar-name');
+                        if (avatarName) avatarName.textContent = displayName;
+                        document.title = displayName + 'AI';
                     }
                 }
 
-                if (t.length > 1) {
+                if ((hasKelion || hasKira) && t.length > 1) {
                     isProcessing = true;
                     if (window.KAvatar) window.KAvatar.setAttentive(true);
                     let msg = t;
@@ -71,7 +76,7 @@
         };
         recognition.onend = () => { if (isListeningForWake && !isProcessing) try { recognition.start(); } catch(e){} };
         recognition.onerror = (e) => { if (e.error !== 'not-allowed' && isListeningForWake) setTimeout(() => { try { recognition.start(); } catch(e){} }, 1000); };
-        try { recognition.start(); isListeningForWake = true; console.log('[Voice] Wake word activ'); } catch(e){}
+        try { recognition.start(); isListeningForWake = true; console.log('[Voice] Wake word active'); } catch(e){}
     }
 
     function resumeWakeDetection() {
@@ -156,7 +161,7 @@
         if (btn) return;
         btn = document.createElement('button');
         btn.id = 'audio-unlock-btn';
-        btn.textContent = '🔊 Apasă pentru a activa sunetul';
+        btn.textContent = '🔊 Click to enable sound';
         btn.style.cssText = 'position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#1a73e8;color:#fff;border:none;border-radius:24px;padding:12px 24px;cursor:pointer;z-index:9999;font-size:14px;font-weight:600;box-shadow:0 4px 16px rgba(0,0,0,0.4)';
         btn.onclick = async function() {
             btn.remove();
@@ -237,8 +242,8 @@
             const r = await fetch(API_BASE + '/api/vision', { method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...(window.KAuth ? KAuth.getAuthHeaders() : {}) },
                 body: JSON.stringify({ image: b64, avatar: KAvatar.getCurrentAvatar(), language: detectedLanguage }) });
-            const d = await r.json(); return d.description || 'Nu am putut analiza.';
-        } catch(e) { return e.name === 'NotAllowedError' ? 'Permite accesul la cameră.' : 'Eroare cameră.'; }
+            const d = await r.json(); return d.description || 'Could not analyze.';
+        } catch(e) { return e.name === 'NotAllowedError' ? 'Please allow camera access.' : 'Camera error.'; }
     }
 
     window.KVoice = { speak, stopSpeaking, startListening, stopListening, captureAndAnalyze,

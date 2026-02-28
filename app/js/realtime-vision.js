@@ -12,106 +12,22 @@ const RealtimeVision = (() => {
     let lastSpoken = '';
     let lastSpokeTime = 0;
 
-    // Romanian labels for COCO-SSD detected objects
-    const LABELS_RO = {
-        'person': 'persoană',
-        'bicycle': 'bicicletă',
-        'car': 'mașină',
-        'motorcycle': 'motocicletă',
-        'airplane': 'avion',
-        'bus': 'autobuz',
-        'train': 'tren',
-        'truck': 'camion',
-        'boat': 'barcă',
-        'traffic light': 'semafor',
-        'fire hydrant': 'hidrant',
-        'stop sign': 'semn stop',
-        'parking meter': 'parcometre',
-        'bench': 'bancă',
-        'bird': 'pasăre',
-        'cat': 'pisică',
-        'dog': 'câine',
-        'horse': 'cal',
-        'sheep': 'oaie',
-        'cow': 'vacă',
-        'elephant': 'elefant',
-        'bear': 'urs',
-        'zebra': 'zebră',
-        'giraffe': 'girafă',
-        'backpack': 'rucsac',
-        'umbrella': 'umbrelă',
-        'handbag': 'geantă',
-        'tie': 'cravată',
-        'suitcase': 'valiză',
-        'frisbee': 'frisbee',
-        'skis': 'schiuri',
-        'snowboard': 'snowboard',
-        'sports ball': 'minge',
-        'kite': 'zmeu',
-        'baseball bat': 'bâtă',
-        'baseball glove': 'mănușă',
-        'skateboard': 'skateboard',
-        'surfboard': 'surfboard',
-        'tennis racket': 'rachetă de tenis',
-        'bottle': 'sticlă',
-        'wine glass': 'pahar de vin',
-        'cup': 'ceașcă',
-        'fork': 'furculiță',
-        'knife': 'cuțit',
-        'spoon': 'lingură',
-        'bowl': 'castron',
-        'banana': 'banană',
-        'apple': 'măr',
-        'sandwich': 'sandviș',
-        'orange': 'portocală',
-        'broccoli': 'broccoli',
-        'carrot': 'morcov',
-        'hot dog': 'hot dog',
-        'pizza': 'pizza',
-        'donut': 'gogoașă',
-        'cake': 'tort',
-        'chair': 'scaun',
-        'couch': 'canapea',
-        'potted plant': 'plantă',
-        'bed': 'pat',
-        'dining table': 'masă',
-        'toilet': 'toaletă',
-        'tv': 'televizor',
-        'laptop': 'laptop',
-        'mouse': 'mouse',
-        'remote': 'telecomandă',
-        'keyboard': 'tastatură',
-        'cell phone': 'telefon',
-        'microwave': 'cuptor cu microunde',
-        'oven': 'cuptor',
-        'toaster': 'prăjitor',
-        'sink': 'chiuvetă',
-        'refrigerator': 'frigider',
-        'book': 'carte',
-        'clock': 'ceas',
-        'vase': 'vază',
-        'scissors': 'foarfece',
-        'teddy bear': 'ursuleț',
-        'hair drier': 'uscător de păr',
-        'toothbrush': 'periuță de dinți',
-    };
-
     // Position description based on bounding box
     function getPosition(bbox, videoWidth) {
         const centerX = bbox[0] + bbox[2] / 2;
         const relX = centerX / videoWidth;
-        if (relX < 0.33) return 'la stânga';
-        if (relX > 0.66) return 'la dreapta';
-        return 'în față';
+        if (relX < 0.33) return 'to the left';
+        if (relX > 0.66) return 'to the right';
+        return 'ahead';
     }
 
     // Distance estimate based on bounding box height
     function getDistance(bbox, videoHeight) {
         const relH = bbox[3] / videoHeight;
-        if (relH > 0.6) return 'foarte aproape';
-        if (relH > 0.3) return 'aproape';
-        if (relH > 0.15) return 'la distanță medie';
-        return 'departe';
+        if (relH > 0.6) return 'very close';
+        if (relH > 0.3) return 'close';
+        if (relH > 0.15) return 'at medium distance';
+        return 'far away';
     }
 
     // Build natural language description
@@ -121,7 +37,7 @@ const RealtimeVision = (() => {
         const items = predictions
             .filter(p => p.score > 0.5)
             .map(p => {
-                const label = LABELS_RO[p.class] || p.class;
+                const label = p.class;
                 const pos = getPosition(p.bbox, videoWidth);
                 const dist = getDistance(p.bbox, videoHeight);
                 return `${label} ${pos}, ${dist}`;
@@ -144,7 +60,7 @@ const RealtimeVision = (() => {
 
         // Use Web Speech API for instant local TTS (no server cost)
         const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = 'ro-RO';
+        utterance.lang = 'en-US';
         utterance.rate = 1.2; // Slightly faster for real-time
         utterance.volume = 0.8;
         speechSynthesis.cancel(); // Cancel previous
@@ -225,20 +141,20 @@ const RealtimeVision = (() => {
 
             const cameraOk = await initCamera();
             if (!cameraOk) {
-                speakIfNew('Nu am acces la cameră. Te rog să permiți accesul.');
+                speakIfNew('Camera access denied. Please allow camera access.');
                 return false;
             }
 
             const modelOk = await loadModel();
             if (!modelOk) {
-                speakIfNew('Modelul de detectare nu s-a putut încărca.');
+                speakIfNew('The detection model could not be loaded.');
                 return false;
             }
 
             isRunning = true;
             intervalId = setInterval(detect, intervalMs);
             console.log(`[VISION] ✅ Real-time detection started (${intervalMs}ms interval)`);
-            speakIfNew('Viziunea în timp real este activată.');
+            speakIfNew('Real-time vision is active.');
             return true;
         },
 
