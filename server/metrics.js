@@ -37,15 +37,6 @@ if (process.env.GRAFANA_PROM_URL) {
 // ─── Custom Metrics ───────────────────────────────────────────
 
 // HTTP request duration
-const httpDuration = new client.Histogram({
-    name: 'kelionai_http_duration_seconds',
-    help: 'Duration of HTTP requests in seconds',
-    labelNames: ['method', 'route', 'status'],
-    buckets: [0.05, 0.1, 0.3, 0.5, 1, 2, 5, 10, 30],
-    registers: [register],
-});
-
-// HTTP request duration (standard name)
 const httpRequestDuration = new client.Histogram({
     name: 'kelionai_http_request_duration_seconds',
     help: 'Duration of HTTP requests in seconds',
@@ -134,13 +125,10 @@ function metricsMiddleware(req, res, next) {
     if (req.path === '/metrics' || req.path === '/health') return next();
     const end = httpRequestDuration.startTimer();
     activeConnections.inc();
-    const start = process.hrtime.bigint();
 
     res.on('finish', () => {
         activeConnections.dec();
-        const duration = Number(process.hrtime.bigint() - start) / 1e9;
         const route = req.route ? req.route.path : req.path;
-        httpDuration.observe({ method: req.method, route, status: res.statusCode }, duration);
         const labels = { method: req.method, route, status_code: res.statusCode };
         end(labels);
         httpRequestsTotal.inc(labels);
@@ -153,7 +141,6 @@ function metricsMiddleware(req, res, next) {
 
 module.exports = {
     register,
-    httpDuration,
     httpRequestDuration,
     httpRequestsTotal,
     apiCalls,
