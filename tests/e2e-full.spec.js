@@ -1,7 +1,6 @@
 // @ts-check
 // LIVE-ONLY: Toate testele rulează contra https://kelionai.app
 const { test, expect } = require('@playwright/test');
-
 // ═══════════════════════════════════════════════════════════════
 // SECTION 1 — Onboarding Flow
 // ═══════════════════════════════════════════════════════════════
@@ -131,6 +130,15 @@ test.describe('Main Pages Navigation', () => {
         await page.addInitScript(() => {
             localStorage.setItem('kelion_onboarded', 'true');
         });
+        await page.goto('/');
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        // Dismiss auth screen which intercepts pointer events
+        const authScreen = page.locator('#auth-screen');
+        if (await authScreen.isVisible().catch(() => false)) {
+            const authGuest = page.locator('#auth-guest');
+            await authGuest.click().catch(() => {});
+            await authScreen.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+        }
     });
 
     test('homepage / loads with visible content', async ({ page }) => {
@@ -222,6 +230,15 @@ test.describe('Buttons and Links', () => {
         await page.addInitScript(() => {
             localStorage.setItem('kelion_onboarded', 'true');
         });
+        await page.goto('/');
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        // Dismiss auth screen which intercepts pointer events
+        const authScreen = page.locator('#auth-screen');
+        if (await authScreen.isVisible().catch(() => false)) {
+            const authGuest = page.locator('#auth-guest');
+            await authGuest.click().catch(() => {});
+            await authScreen.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+        }
     });
 
     test('navbar links are all reachable (no 404)', async ({ page, request }) => {
@@ -308,6 +325,15 @@ test.describe('Responsive Mobile (375×812)', () => {
         await page.addInitScript(() => {
             localStorage.setItem('kelion_onboarded', 'true');
         });
+        await page.goto('/');
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        // Dismiss auth screen which intercepts pointer events
+        const authScreen = page.locator('#auth-screen');
+        if (await authScreen.isVisible().catch(() => false)) {
+            const authGuest = page.locator('#auth-guest');
+            await authGuest.click().catch(() => {});
+            await authScreen.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+        }
     });
 
     test('homepage loads on mobile viewport', async ({ page }) => {
@@ -422,6 +448,15 @@ test.describe('Error Handling', () => {
         await page.addInitScript(() => {
             localStorage.setItem('kelion_onboarded', 'true');
         });
+        await page.goto('/');
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        // Dismiss auth screen which intercepts pointer events
+        const authScreen = page.locator('#auth-screen');
+        if (await authScreen.isVisible().catch(() => false)) {
+            const authGuest = page.locator('#auth-guest');
+            await authGuest.click().catch(() => {});
+            await authScreen.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+        }
     });
 
     test('unknown page returns app (not crash)', async ({ page }) => {
