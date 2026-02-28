@@ -133,7 +133,7 @@ if [ "$CHECK_ONLY" = "true" ]; then
 
   check_secret_exists "NETLIFY_AUTH_TOKEN"
   check_secret_exists "NETLIFY_SITE_ID"
-  check_secret_exists "SENTRY_AUTH_TOKEN"
+  check_secret_exists "KS_SENTRY"
   echo ""
   info "Pentru a seta secretele lipsă, rulează: bash scripts/setup-secrets.sh"
   echo ""
@@ -151,15 +151,15 @@ echo ""
 echo "  Găsești NETLIFY_SITE_ID la: Site Settings → General → Site details"
 read_secret NETLIFY_SITE_ID "NETLIFY_SITE_ID" "uuid"
 
-# ─── Opțional: SENTRY_AUTH_TOKEN ─────────────────────────────────────────────
+# ─── Opțional: KS_SENTRY ─────────────────────────────────────────────────────
 echo ""
-echo -n "  Vrei să setezi și SENTRY_AUTH_TOKEN? (y/N): "
+echo -n "  Vrei să setezi și KS_SENTRY? (y/N): "
 read -r SET_SENTRY
-SENTRY_AUTH_TOKEN=""
+KS_SENTRY=""
 
 if [[ "$SET_SENTRY" =~ ^[Yy]$ ]]; then
-  echo "  Găsești SENTRY_AUTH_TOKEN la: https://sentry.io/settings/account/api/auth-tokens/"
-  read_secret SENTRY_AUTH_TOKEN "SENTRY_AUTH_TOKEN"
+  echo "  Găsești KS_SENTRY la: https://sentry.io/settings/account/api/auth-tokens/"
+  read_secret KS_SENTRY "KS_SENTRY"
 fi
 
 # ─── Confirmare ──────────────────────────────────────────────────────────────
@@ -167,8 +167,8 @@ echo ""
 echo -e "${YELLOW}Urmează să setezi:${NC}"
 echo "  • NETLIFY_AUTH_TOKEN  = ${NETLIFY_AUTH_TOKEN:0:4}****"
 echo "  • NETLIFY_SITE_ID     = ${NETLIFY_SITE_ID:0:8}****"
-if [ -n "$SENTRY_AUTH_TOKEN" ]; then
-  echo "  • SENTRY_AUTH_TOKEN   = ${SENTRY_AUTH_TOKEN:0:4}****"
+if [ -n "$KS_SENTRY" ]; then
+  echo "  • KS_SENTRY           = ${KS_SENTRY:0:4}****"
 fi
 echo "  în repo: ${REPO}"
 echo ""
@@ -200,11 +200,11 @@ else
   exit 1
 fi
 
-if [ -n "$SENTRY_AUTH_TOKEN" ]; then
-  if printf '%s' "$SENTRY_AUTH_TOKEN" | gh secret set SENTRY_AUTH_TOKEN --repo "$REPO"; then
-    success "SENTRY_AUTH_TOKEN setat cu succes."
+if [ -n "$KS_SENTRY" ]; then
+  if printf '%s' "$KS_SENTRY" | gh secret set KS_SENTRY --repo "$REPO"; then
+    success "KS_SENTRY setat cu succes."
   else
-    warning "Eroare la setarea SENTRY_AUTH_TOKEN (ne-critic)."
+    warning "Eroare la setarea KS_SENTRY (ne-critic)."
   fi
 fi
 
@@ -224,8 +224,8 @@ verify_secret() {
 
 verify_secret "NETLIFY_AUTH_TOKEN"
 verify_secret "NETLIFY_SITE_ID"
-if [ -n "$SENTRY_AUTH_TOKEN" ]; then
-  verify_secret "SENTRY_AUTH_TOKEN"
+if [ -n "$KS_SENTRY" ]; then
+  verify_secret "KS_SENTRY"
 fi
 
 # ─── Summary ─────────────────────────────────────────────────────────────────
@@ -236,8 +236,8 @@ echo -e "${GREEN}╚════════════════════
 echo ""
 success "NETLIFY_AUTH_TOKEN  — setat"
 success "NETLIFY_SITE_ID     — setat"
-if [ -n "$SENTRY_AUTH_TOKEN" ]; then
-  success "SENTRY_AUTH_TOKEN   — setat"
+if [ -n "$KS_SENTRY" ]; then
+  success "KS_SENTRY           — setat"
 fi
 echo ""
 info "Secretele sunt acum disponibile în GitHub Actions."

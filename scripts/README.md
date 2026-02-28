@@ -27,7 +27,7 @@ Scriptul va:
 3. Cere interactiv:
    - `NETLIFY_AUTH_TOKEN` — tokenul personal de la [Netlify](https://app.netlify.com/user/applications)
    - `NETLIFY_SITE_ID` — Site ID de la Netlify (Site Settings → General → Site details)
-4. Opțional, setează și `SENTRY_AUTH_TOKEN`
+4. Opțional, setează și `KS_SENTRY`
 5. Valida valorile (nu goale, fără newlines sau spații)
 6. Seta secretele în GitHub cu `gh secret set`
 7. Afișa un summary cu ce a fost setat
