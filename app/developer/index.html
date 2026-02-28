@@ -1,131 +1,134 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ro">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KelionAI — Developer Portal</title>
+    <title>KelionAI — Portal Dezvoltatori</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
     <link rel="stylesheet" href="/styles/design-system.css">
     <link rel="stylesheet" href="/developer/developer.css">
     <link rel="stylesheet" href="/styles/mobile.css">
 </head>
 <body>
 
-<!-- AUTH OVERLAY (shown when not logged in) -->
+<!-- AUTH OVERLAY -->
 <div id="dev-auth-overlay" class="hidden">
     <div class="auth-box">
         <h2>🤖 KelionAI Dev</h2>
-        <p>Sign in to manage your API keys and access the developer portal.</p>
+        <p>Autentifică-te pentru a gestiona cheile API și a accesa portalul dezvoltatorilor.</p>
         <div id="auth-name-row" style="display:none">
-            <input class="dev-input" id="auth-name" type="text" placeholder="Your name" autocomplete="name">
+            <input class="dev-input" id="auth-name" type="text" placeholder="Numele tău" autocomplete="name">
         </div>
         <input class="dev-input" id="auth-email" type="email" placeholder="Email" autocomplete="email">
-        <input class="dev-input" id="auth-password" type="password" placeholder="Password" autocomplete="current-password">
+        <input class="dev-input" id="auth-password" type="password" placeholder="Parolă" autocomplete="current-password">
         <div id="auth-err"></div>
-        <button class="btn btn-primary" id="auth-submit-btn" style="width:100%;justify-content:center;margin-top:4px">Sign In</button>
-        <div id="auth-switch">Don't have an account? <a id="auth-toggle-link">Create one</a></div>
+        <button class="btn btn-primary" id="auth-submit-btn" style="width:100%;justify-content:center;margin-top:4px">Autentifică-te</button>
+        <div id="auth-switch">Nu ai cont? <a id="auth-toggle-link">Creează unul</a></div>
     </div>
 </div>
 
 <!-- NAV -->
 <nav class="dev-nav">
-    <a href="/" class="logo">🤖 KelionAI <span>/ Developers</span></a>
+    <a href="/" class="logo">🤖 Kelion<span>AI</span> <span>/ Dezvoltatori</span></a>
     <div class="nav-tabs">
-        <button class="nav-tab active" data-panel="overview">Overview</button>
-        <button class="nav-tab" data-panel="keys">API Keys</button>
-        <button class="nav-tab" data-panel="docs">Documentation</button>
+        <button class="nav-tab active" data-panel="overview">Prezentare</button>
+        <button class="nav-tab" data-panel="keys">Chei API</button>
+        <button class="nav-tab" data-panel="docs">Documentație</button>
         <button class="nav-tab" data-panel="sandbox">Sandbox</button>
         <button class="nav-tab" data-panel="webhooks">Webhooks</button>
     </div>
     <div class="nav-auth">
         <span id="nav-user"></span>
-        <button id="nav-logout-btn" style="display:none">Sign Out</button>
+        <button id="nav-logout-btn" style="display:none">Deconectare</button>
     </div>
 </nav>
 
 <div class="dev-container">
 
-    <!-- ═══ OVERVIEW ═══ -->
+    <!-- ═══ PREZENTARE ═══ -->
     <div id="panel-overview" class="panel active">
         <div class="dev-hero">
-            <h1>Developer API</h1>
-            <p>Build powerful AI-powered applications using the KelionAI API. Generate API keys, explore docs, and test endpoints in the sandbox.</p>
+            <h1>API Dezvoltatori</h1>
+            <p>Construiește aplicații puternice cu AI folosind API-ul KelionAI. Generează chei API, explorează documentația și testează endpoint-urile în sandbox.</p>
             <div class="hero-btns">
-                <button class="btn btn-primary" data-goto="keys">Generate API Key</button>
-                <button class="btn btn-secondary" data-goto="docs">Read Docs</button>
+                <button class="btn btn-primary" data-goto="keys">Generează Cheie API</button>
+                <button class="btn btn-secondary" data-goto="docs">Citește Documentația</button>
             </div>
         </div>
 
         <div id="overview-stats" style="display:none">
             <div class="stats-grid">
-                <div class="stat-card"><div class="stat-value" id="stat-active-keys">—</div><div class="stat-label">Active Keys</div></div>
-                <div class="stat-card"><div class="stat-value" id="stat-total-req">—</div><div class="stat-label">Total Requests</div></div>
-                <div class="stat-card"><div class="stat-value" id="stat-total-keys">—</div><div class="stat-label">Total Keys</div></div>
+                <div class="stat-card"><div class="stat-value" id="stat-active-keys">—</div><div class="stat-label">Chei Active</div></div>
+                <div class="stat-card"><div class="stat-value" id="stat-total-req">—</div><div class="stat-label">Total Cereri</div></div>
+                <div class="stat-card"><div class="stat-value" id="stat-total-keys">—</div><div class="stat-label">Total Chei</div></div>
             </div>
         </div>
 
         <div class="card">
-            <h2>🚀 Quick Start</h2>
-            <p style="color:var(--muted);font-size:0.9rem;margin-bottom:14px">Send your first API request in seconds:</p>
+            <h2>🚀 Start Rapid</h2>
+            <p style="color:var(--muted);font-size:0.9rem;margin-bottom:14px">Trimite prima ta cerere API în câteva secunde:</p>
             <pre>curl -X POST https://kelionai.app/api/v1/chat \
   -H "Content-Type: application/json" \
   -H "X-API-Key: YOUR_API_KEY" \
-  -d '{"message":"Hello, KelionAI!"}'</pre>
+  -d '{"message":"Salut, KelionAI!"}'</pre>
         </div>
 
         <div class="card">
-            <h2>📋 Base URL &amp; Auth</h2>
-            <p style="color:var(--muted);font-size:0.85rem;margin-bottom:12px">All API requests must include your API key in the <code>X-API-Key</code> header.</p>
-            <pre>Base URL:  https://kelionai.app/api/v1
+            <h2>📋 URL de Bază & Autentificare</h2>
+            <p style="color:var(--muted);font-size:0.85rem;margin-bottom:12px">Toate cererile API trebuie să includă cheia API în header-ul <code>X-API-Key</code>.</p>
+            <pre>URL Bază:  https://kelionai.app/api/v1
 Auth:      X-API-Key: kel_xxxxxxxxxxxx</pre>
         </div>
     </div>
 
-    <!-- ═══ API KEYS ═══ -->
+    <!-- ═══ CHEI API ═══ -->
     <div id="panel-keys" class="panel">
         <div class="card">
-            <h2>🔑 API Keys</h2>
+            <h2>🔑 Chei API</h2>
             <div id="key-alert" class="alert"></div>
             <div id="new-key-reveal" style="display:none" class="new-key-reveal">
-                <p>⚠️ Copy your API key now — it won't be shown again.</p>
+                <p>⚠️ Copiază cheia API acum — nu va mai fi afișată.</p>
                 <div class="key-copy-row">
                     <span id="new-key-text"></span>
-                    <button id="copy-key-btn">Copy</button>
+                    <button id="copy-key-btn">Copiază</button>
                 </div>
             </div>
             <div class="form-row" style="margin-top:4px">
                 <div class="form-group">
-                    <label>Key name</label>
-                    <input class="dev-input" id="new-key-name" type="text" placeholder="My Application" maxlength="100">
+                    <label>Nume cheie</label>
+                    <input class="dev-input" id="new-key-name" type="text" placeholder="Aplicația Mea" maxlength="100">
                 </div>
-                <button class="btn btn-primary" id="create-key-btn">+ Generate Key</button>
+                <button class="btn btn-primary" id="create-key-btn">+ Generează Cheie</button>
             </div>
             <div id="key-list" class="key-list">
-                <div class="empty-state"><div class="icon">🔑</div><p>No API keys yet. Generate one above.</p></div>
+                <div class="empty-state"><div class="icon">🔑</div><p>Nicio cheie API încă. Generează una mai sus.</p></div>
             </div>
         </div>
     </div>
 
-    <!-- ═══ DOCUMENTATION ═══ -->
+    <!-- ═══ DOCUMENTAȚIE ═══ -->
     <div id="panel-docs" class="panel">
         <div class="card">
-            <h2>📚 API Reference</h2>
-            <p style="color:var(--muted);font-size:0.85rem;margin-bottom:20px">Click an endpoint to expand details and examples.</p>
+            <h2>📚 Referință API</h2>
+            <p style="color:var(--muted);font-size:0.85rem;margin-bottom:20px">Click pe un endpoint pentru a extinde detaliile și exemplele.</p>
             <div class="endpoint-list">
 
                 <div class="endpoint" id="ep-status">
                     <div class="endpoint-header">
                         <span class="method get">GET</span>
                         <span class="endpoint-path">/api/v1/status</span>
-                        <span class="endpoint-desc">API status and available endpoints</span>
+                        <span class="endpoint-desc">Status API și endpoint-uri disponibile</span>
                         <span class="auth-badge public">Public</span>
                         <span class="endpoint-chevron">▼</span>
                     </div>
                     <div class="endpoint-body">
-                        <p style="color:var(--muted);font-size:0.85rem">Returns the current API status and a list of all available endpoints. No authentication required.</p>
+                        <p style="color:var(--muted);font-size:0.85rem">Returnează statusul curent al API-ului și lista tuturor endpoint-urilor disponibile. Nu necesită autentificare.</p>
                         <pre>{
   "status": "online",
   "version": "1.0",
-  "timestamp": "2026-02-26T12:00:00Z",
+  "timestamp": "2026-02-28T12:00:00Z",
   "endpoints": [...]
 }</pre>
                     </div>
@@ -135,12 +138,12 @@ Auth:      X-API-Key: kel_xxxxxxxxxxxx</pre>
                     <div class="endpoint-header">
                         <span class="method get">GET</span>
                         <span class="endpoint-path">/api/v1/models</span>
-                        <span class="endpoint-desc">List available AI models</span>
-                        <span class="auth-badge required">API Key</span>
+                        <span class="endpoint-desc">Listează modelele AI disponibile</span>
+                        <span class="auth-badge required">Cheie API</span>
                         <span class="endpoint-chevron">▼</span>
                     </div>
                     <div class="endpoint-body">
-                        <p style="color:var(--muted);font-size:0.85rem">Returns the list of AI models currently available on this instance.</p>
+                        <p style="color:var(--muted);font-size:0.85rem">Returnează lista modelelor AI disponibile pe această instanță.</p>
                         <pre>{
   "models": [
     { "id": "claude-sonnet-4", "name": "Claude Sonnet 4", "provider": "Anthropic", "primary": true }
@@ -153,16 +156,16 @@ Auth:      X-API-Key: kel_xxxxxxxxxxxx</pre>
                     <div class="endpoint-header">
                         <span class="method get">GET</span>
                         <span class="endpoint-path">/api/v1/user/profile</span>
-                        <span class="endpoint-desc">Get authenticated user profile</span>
-                        <span class="auth-badge required">API Key</span>
+                        <span class="endpoint-desc">Obține profilul utilizatorului autentificat</span>
+                        <span class="auth-badge required">Cheie API</span>
                         <span class="endpoint-chevron">▼</span>
                     </div>
                     <div class="endpoint-body">
-                        <p style="color:var(--muted);font-size:0.85rem">Returns the profile of the user associated with the API key.</p>
+                        <p style="color:var(--muted);font-size:0.85rem">Returnează profilul utilizatorului asociat cheii API.</p>
                         <pre>{
   "id": "uuid",
   "email": "user@example.com",
-  "name": "User Name",
+  "name": "Nume Utilizator",
   "createdAt": "2026-01-01T00:00:00Z"
 }</pre>
                     </div>
@@ -172,31 +175,31 @@ Auth:      X-API-Key: kel_xxxxxxxxxxxx</pre>
                     <div class="endpoint-header">
                         <span class="method post">POST</span>
                         <span class="endpoint-path">/api/v1/chat</span>
-                        <span class="endpoint-desc">Send message, receive AI response</span>
-                        <span class="auth-badge required">API Key</span>
+                        <span class="endpoint-desc">Trimite mesaj, primește răspuns AI</span>
+                        <span class="auth-badge required">Cheie API</span>
                         <span class="endpoint-chevron">▼</span>
                     </div>
                     <div class="endpoint-body">
-                        <p style="color:var(--muted);font-size:0.85rem">Send a message to the AI and receive a response. Supports conversation history and avatar selection.</p>
+                        <p style="color:var(--muted);font-size:0.85rem">Trimite un mesaj către AI și primește un răspuns. Suportă istoric conversație și selecție avatar.</p>
                         <table class="param-table">
-                            <tr><th>Field</th><th>Type</th><th>Description</th></tr>
-                            <tr><td>message</td><td>string</td><td>Required. The message to send (max 10 000 chars)</td></tr>
-                            <tr><td>avatar</td><td>string</td><td>Optional. <code>kelion</code> (default) or <code>kira</code></td></tr>
-                            <tr><td>language</td><td>string</td><td>Optional. Response language code (default <code>en</code>)</td></tr>
-                            <tr><td>history</td><td>array</td><td>Optional. Previous messages [{role, content}] max 20</td></tr>
+                            <tr><th>Câmp</th><th>Tip</th><th>Descriere</th></tr>
+                            <tr><td>message</td><td>string</td><td>Obligatoriu. Mesajul de trimis (max 10 000 caractere)</td></tr>
+                            <tr><td>avatar</td><td>string</td><td>Opțional. <code>kelion</code> (implicit) sau <code>kira</code></td></tr>
+                            <tr><td>language</td><td>string</td><td>Opțional. Codul limbii răspunsului (implicit <code>ro</code>)</td></tr>
+                            <tr><td>history</td><td>array</td><td>Opțional. Mesaje anterioare [{role, content}] max 20</td></tr>
                         </table>
-                        <pre>// Request
+                        <pre>// Cerere
 {
-  "message": "What is the capital of France?",
+  "message": "Care este capitala Franței?",
   "avatar": "kelion",
-  "language": "en"
+  "language": "ro"
 }
 
-// Response
+// Răspuns
 {
-  "reply": "The capital of France is Paris.",
+  "reply": "Capitala Franței este Parisul.",
   "avatar": "kelion",
-  "language": "en",
+  "language": "ro",
   "toolsUsed": []
 }</pre>
                     </div>
@@ -206,21 +209,21 @@ Auth:      X-API-Key: kel_xxxxxxxxxxxx</pre>
         </div>
 
         <div class="card">
-            <h2>🔒 Rate Limits</h2>
-            <p style="color:var(--muted);font-size:0.85rem">Each API key is limited to <strong style="color:var(--cyan)">100 requests/hour</strong> by default. The limit resets every hour.</p>
+            <h2>🔒 Limite de Rată</h2>
+            <p style="color:var(--muted);font-size:0.85rem">Fiecare cheie API este limitată la <strong style="color:var(--secondary)">100 cereri/oră</strong> implicit. Limita se resetează la fiecare oră.</p>
             <pre>HTTP 429 Too Many Requests
-{ "error": "Rate limit exceeded. Max 100 requests/hour." }</pre>
+{ "error": "Limita de rată depășită. Max 100 cereri/oră." }</pre>
         </div>
 
         <div class="card">
-            <h2>❌ Error Codes</h2>
+            <h2>❌ Coduri de Eroare</h2>
             <table class="param-table" style="margin-top:0">
-                <tr><th>Code</th><th>Meaning</th></tr>
-                <tr><td>400</td><td>Bad request — missing or invalid fields</td></tr>
-                <tr><td>401</td><td>Unauthorized — missing or invalid API key</td></tr>
-                <tr><td>429</td><td>Rate limit exceeded</td></tr>
-                <tr><td>503</td><td>Service unavailable — AI or DB offline</td></tr>
-                <tr><td>500</td><td>Internal server error</td></tr>
+                <tr><th>Cod</th><th>Semnificație</th></tr>
+                <tr><td>400</td><td>Cerere invalidă — câmpuri lipsă sau invalide</td></tr>
+                <tr><td>401</td><td>Neautorizat — cheie API lipsă sau invalidă</td></tr>
+                <tr><td>429</td><td>Limita de rată depășită</td></tr>
+                <tr><td>503</td><td>Serviciu indisponibil — AI sau BD offline</td></tr>
+                <tr><td>500</td><td>Eroare internă server</td></tr>
             </table>
         </div>
     </div>
@@ -228,8 +231,8 @@ Auth:      X-API-Key: kel_xxxxxxxxxxxx</pre>
     <!-- ═══ SANDBOX ═══ -->
     <div id="panel-sandbox" class="panel">
         <div class="card">
-            <h2>🧪 API Sandbox</h2>
-            <p style="color:var(--muted);font-size:0.85rem;margin-bottom:16px">Test API endpoints directly in your browser. Your API key is injected automatically when you're signed in.</p>
+            <h2>🧪 Sandbox API</h2>
+            <p style="color:var(--muted);font-size:0.85rem;margin-bottom:16px">Testează endpoint-urile API direct în browser. Cheia ta API este injectată automat când ești autentificat.</p>
 
             <div class="sandbox-controls">
                 <select class="sandbox-select" id="sb-method">
@@ -242,20 +245,20 @@ Auth:      X-API-Key: kel_xxxxxxxxxxxx</pre>
                     <option value="/api/v1/user/profile">GET /api/v1/user/profile</option>
                     <option value="/api/v1/chat" selected>POST /api/v1/chat</option>
                 </select>
-                <button class="btn btn-primary" id="sb-run-btn">▶ Run</button>
+                <button class="btn btn-primary" id="sb-run-btn">▶ Rulează</button>
                 <span id="sandbox-status"></span>
             </div>
 
             <div class="sandbox-grid">
                 <div class="sandbox-pane">
-                    <label>Request Body (JSON)</label>
-                    <textarea class="sandbox-textarea" id="sb-body">{"message": "Hello! What can you do?"}</textarea>
-                    <label style="margin-top:8px">API Key (optional override)</label>
-                    <input class="dev-input" id="sb-apikey" type="text" placeholder="kel_xxxx (uses saved key if empty)">
+                    <label>Corp Cerere (JSON)</label>
+                    <textarea class="sandbox-textarea" id="sb-body">{"message": "Salut! Ce poți face?"}</textarea>
+                    <label style="margin-top:8px">Cheie API (opțional)</label>
+                    <input class="dev-input" id="sb-apikey" type="text" placeholder="kel_xxxx (folosește cheia salvată dacă e gol)">
                 </div>
                 <div class="sandbox-pane">
-                    <label>Response</label>
-                    <textarea class="sandbox-textarea" id="sb-response" readonly placeholder="Response will appear here…"></textarea>
+                    <label>Răspuns</label>
+                    <textarea class="sandbox-textarea" id="sb-response" readonly placeholder="Răspunsul va apărea aici…"></textarea>
                     <div style="display:flex;gap:8px;margin-top:4px">
                         <span id="sb-status-code" style="font-size:0.8rem;color:var(--muted)"></span>
                         <span id="sb-duration" style="font-size:0.8rem;color:var(--muted)"></span>
@@ -269,27 +272,27 @@ Auth:      X-API-Key: kel_xxxxxxxxxxxx</pre>
     <div id="panel-webhooks" class="panel">
         <div class="card">
             <h2>🔔 Webhooks</h2>
-            <p style="color:var(--muted);font-size:0.85rem;margin-bottom:16px">Configure a URL to receive POST notifications when events happen (e.g. chat response generated).</p>
+            <p style="color:var(--muted);font-size:0.85rem;margin-bottom:16px">Configurează un URL pentru a primi notificări POST când au loc evenimente (ex. răspuns chat generat).</p>
             <div id="webhook-alert" class="alert"></div>
             <div class="form-row">
                 <div class="form-group">
-                    <label>Webhook URL</label>
-                    <input class="dev-input" id="webhook-url-input" type="url" placeholder="https://your-server.com/webhook">
+                    <label>URL Webhook</label>
+                    <input class="dev-input" id="webhook-url-input" type="url" placeholder="https://server-ul-tau.com/webhook">
                 </div>
-                <button class="btn btn-primary" id="save-webhook-btn">Save</button>
+                <button class="btn btn-primary" id="save-webhook-btn">Salvează</button>
             </div>
-            <p style="color:var(--muted);font-size:0.8rem">Leave empty to remove the webhook. KelionAI will send a <code>POST</code> request with a JSON payload to your URL.</p>
+            <p style="color:var(--muted);font-size:0.8rem">Lasă gol pentru a elimina webhook-ul. KelionAI va trimite o cerere <code>POST</code> cu un payload JSON la URL-ul tău.</p>
         </div>
         <div class="card">
-            <h2>📦 Payload Format</h2>
+            <h2>📦 Format Payload</h2>
             <pre>{
   "event": "chat.response",
-  "timestamp": "2026-02-26T12:00:00Z",
+  "timestamp": "2026-02-28T12:00:00Z",
   "data": {
-    "message": "User message",
-    "reply": "AI response",
+    "message": "Mesajul utilizatorului",
+    "reply": "Răspunsul AI",
     "avatar": "kelion",
-    "language": "en"
+    "language": "ro"
   }
 }</pre>
         </div>
@@ -297,15 +300,15 @@ Auth:      X-API-Key: kel_xxxxxxxxxxxx</pre>
 
 </div><!-- /dev-container -->
 
-<!-- REVOKE CONFIRMATION MODAL -->
+<!-- MODAL REVOCARE -->
 <div class="dev-modal" id="revoke-modal">
     <div class="dev-modal-box">
         <button class="modal-close-btn" id="revoke-cancel">✕</button>
-        <h3>Revoke API Key?</h3>
-        <p style="color:var(--muted);font-size:0.9rem">This key will be permanently revoked and can no longer be used. This action cannot be undone.</p>
+        <h3>Revocă Cheia API?</h3>
+        <p style="color:var(--muted);font-size:0.9rem">Această cheie va fi revocată permanent și nu va mai putea fi folosită. Acțiunea nu poate fi anulată.</p>
         <div class="modal-actions">
-            <button class="btn btn-secondary" id="revoke-cancel2">Cancel</button>
-            <button class="btn btn-danger" id="revoke-confirm-btn">Revoke Key</button>
+            <button class="btn btn-secondary" id="revoke-cancel2">Anulează</button>
+            <button class="btn btn-danger" id="revoke-confirm-btn">Revocă Cheia</button>
         </div>
     </div>
 </div>
