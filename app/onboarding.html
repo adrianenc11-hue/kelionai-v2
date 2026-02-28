@@ -5,206 +5,204 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Welcome — KelionAI</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&display=swap">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap">
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
         :root {
-            --kelion-bg: #060614;
-            --kelion-bg-secondary: #0d0d2b;
-            --kelion-surface: rgba(15, 15, 45, 0.85);
-            --kelion-border: rgba(255, 255, 255, 0.1);
-            --kelion-primary: #00ccff;
-            --kelion-secondary: #8855ff;
-            --kelion-text: #e8e8f0;
-            --kelion-muted: #8888aa;
-            --kelion-radius: 12px;
-            --kelion-radius-lg: 20px;
-            --kelion-glow: 0 0 40px rgba(0, 204, 255, 0.15);
-            --kelion-transition: 0.2s ease;
-            --kelion-font: 'Inter', sans-serif;
+            --bg: #050510;
+            --bg-secondary: #0A0A1B;
+            --surface: rgba(15, 15, 40, 0.7);
+            --border: rgba(99, 102, 241, 0.12);
+            --border-hover: rgba(99, 102, 241, 0.3);
+            --primary: #6366F1;
+            --secondary: #06B6D4;
+            --accent: #8B5CF6;
+            --text: #F0F0FF;
+            --muted: #8888AA;
+            --muted-dark: #555577;
+            --radius: 12px;
+            --radius-lg: 24px;
+            --glow: 0 0 40px rgba(99, 102, 241, 0.2);
+            --gradient: linear-gradient(135deg, #6366F1, #06B6D4);
+            --font: 'Inter', -apple-system, sans-serif;
         }
 
         body {
-            background: var(--kelion-bg);
-            color: var(--kelion-text);
-            font-family: var(--kelion-font);
+            background: var(--bg);
+            color: var(--text);
+            font-family: var(--font);
             min-height: 100vh;
         }
 
-        /* ─── Background ─── */
         .neural-bg {
             background-image:
-                radial-gradient(circle at 20% 20%, rgba(0, 204, 255, 0.04) 0%, transparent 50%),
-                radial-gradient(circle at 80% 80%, rgba(136, 85, 255, 0.04) 0%, transparent 50%);
+                radial-gradient(circle at 20% 20%, rgba(99, 102, 241, 0.04) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(6, 182, 212, 0.03) 0%, transparent 50%);
         }
 
-        /* ─── Container ─── */
         .onboarding-container {
             min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
-            background: var(--kelion-bg);
             padding: 24px;
         }
 
         .onboarding-card {
-            background: var(--kelion-surface);
-            border: 1px solid var(--kelion-border);
-            border-radius: var(--kelion-radius-lg);
-            padding: 48px;
-            max-width: 480px;
+            background: var(--surface);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 52px;
+            max-width: 500px;
             width: 100%;
             text-align: center;
-            box-shadow: var(--kelion-glow);
+            box-shadow: var(--glow);
             animation: fadeIn 0.5s ease;
-            backdrop-filter: blur(20px);
         }
 
         .onboarding-icon {
-            font-size: 64px;
-            margin-bottom: 24px;
+            font-size: 68px;
+            margin-bottom: 28px;
             display: block;
         }
 
         .onboarding-step { display: none; }
         .onboarding-step.active { display: block; animation: fadeIn 0.4s ease; }
 
-        /* ─── Typography ─── */
-        h1 { font-size: 1.9rem; font-weight: 700; color: var(--kelion-text); margin-bottom: 12px; line-height: 1.2; }
-        h2 { font-size: 1.4rem; font-weight: 600; color: var(--kelion-text); margin-bottom: 20px; }
-        p  { color: var(--kelion-muted); font-size: 1rem; line-height: 1.6; margin-bottom: 28px; }
+        h1 { font-size: 2rem; font-weight: 800; color: var(--text); margin-bottom: 14px; line-height: 1.2; }
+        h2 { font-size: 1.4rem; font-weight: 700; color: var(--text); margin-bottom: 22px; }
+        p  { color: var(--muted); font-size: 1rem; line-height: 1.65; margin-bottom: 32px; }
 
         .gradient-text {
-            background: linear-gradient(135deg, var(--kelion-primary), var(--kelion-secondary));
+            background: var(--gradient);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
         }
 
-        /* ─── Progress dots ─── */
         .progress-dots {
             display: flex;
             gap: 8px;
             justify-content: center;
-            margin-bottom: 32px;
+            margin-bottom: 36px;
         }
 
         .progress-dot {
-            width: 8px;
-            height: 8px;
+            width: 8px; height: 8px;
             border-radius: 50%;
-            background: var(--kelion-border);
-            transition: var(--kelion-transition);
-            transition-property: background, width, border-radius;
+            background: rgba(99, 102, 241, 0.15);
+            transition: all 0.3s ease;
         }
-
         .progress-dot.active {
-            background: var(--kelion-primary);
-            width: 24px;
+            background: var(--primary);
+            width: 28px;
             border-radius: 4px;
+            box-shadow: 0 0 12px rgba(99, 102, 241, 0.4);
         }
 
-        /* ─── Buttons ─── */
         .btn-primary {
             display: inline-block;
-            padding: 14px 32px;
-            background: linear-gradient(135deg, var(--kelion-primary), var(--kelion-secondary));
+            padding: 15px 32px;
+            background: var(--gradient);
             color: #fff;
             border: none;
-            border-radius: var(--kelion-radius);
-            font-family: var(--kelion-font);
+            border-radius: var(--radius);
+            font-family: var(--font);
             font-size: 1rem;
             font-weight: 600;
             cursor: pointer;
-            transition: opacity 0.2s, transform 0.15s;
+            transition: all 0.2s ease;
             text-decoration: none;
             width: 100%;
+            box-shadow: 0 2px 16px rgba(99, 102, 241, 0.25);
         }
-        .btn-primary:hover { opacity: 0.9; }
+        .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
         .btn-primary:active { transform: scale(0.98); }
 
         .btn-secondary {
             display: inline-block;
             padding: 12px 24px;
             background: transparent;
-            color: var(--kelion-muted);
-            border: 1px solid var(--kelion-border);
-            border-radius: var(--kelion-radius);
-            font-family: var(--kelion-font);
+            color: var(--muted);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            font-family: var(--font);
             font-size: 0.9rem;
             cursor: pointer;
-            transition: var(--kelion-transition);
+            transition: all 0.2s ease;
             margin-top: 12px;
             width: 100%;
         }
-        .btn-secondary:hover { border-color: var(--kelion-primary); color: var(--kelion-text); }
+        .btn-secondary:hover { border-color: var(--primary); color: var(--text); }
 
-        /* ─── Plan cards ─── */
         .plan-grid {
             display: flex;
             flex-direction: column;
             gap: 12px;
-            margin: 20px 0 24px;
+            margin: 22px 0 28px;
         }
 
         .plan-card {
-            background: var(--kelion-bg-secondary);
-            border: 2px solid var(--kelion-border);
-            border-radius: var(--kelion-radius);
-            padding: 16px 20px;
+            background: var(--bg-secondary);
+            border: 2px solid var(--border);
+            border-radius: var(--radius);
+            padding: 18px 22px;
             cursor: pointer;
-            transition: var(--kelion-transition);
+            transition: all 0.2s ease;
             text-align: left;
             display: flex;
             align-items: center;
-            gap: 14px;
+            gap: 16px;
         }
-
         .plan-card:hover,
         .plan-card.selected {
-            border-color: var(--kelion-primary);
-            background: rgba(0, 204, 255, 0.06);
+            border-color: var(--primary);
+            background: rgba(99, 102, 241, 0.06);
+            box-shadow: 0 0 20px rgba(99, 102, 241, 0.1);
         }
-
         .plan-card.featured {
-            border-color: rgba(136, 85, 255, 0.4);
+            border-color: rgba(139, 92, 246, 0.3);
         }
-
         .plan-card.featured:hover,
         .plan-card.featured.selected {
-            border-color: var(--kelion-secondary);
-            background: rgba(136, 85, 255, 0.08);
+            border-color: var(--accent);
+            background: rgba(139, 92, 246, 0.06);
         }
 
-        .plan-icon { font-size: 1.5rem; flex-shrink: 0; }
-
+        .plan-icon { font-size: 1.6rem; flex-shrink: 0; }
         .plan-info { flex: 1; }
-        .plan-name { font-weight: 600; color: var(--kelion-text); font-size: 0.95rem; }
-        .plan-desc { color: var(--kelion-muted); font-size: 0.8rem; margin-top: 2px; }
+        .plan-name { font-weight: 600; color: var(--text); font-size: 0.95rem; }
+        .plan-desc { color: var(--muted); font-size: 0.8rem; margin-top: 3px; }
+        .plan-price { font-weight: 800; color: var(--secondary); font-size: 0.95rem; white-space: nowrap; }
 
-        .plan-price { font-weight: 700; color: var(--kelion-primary); font-size: 0.95rem; white-space: nowrap; }
-
-        /* ─── Animate glow ─── */
         .animate-glow {
-            animation: glow 2s ease-in-out infinite alternate;
+            animation: glow 2.5s ease-in-out infinite alternate;
+        }
+        @keyframes glow {
+            from { filter: drop-shadow(0 0 10px rgba(99, 102, 241, 0.3)); }
+            to   { filter: drop-shadow(0 0 24px rgba(6, 182, 212, 0.5)); }
         }
 
-        @keyframes glow {
-            from { filter: drop-shadow(0 0 8px rgba(0, 204, 255, 0.3)); }
-            to   { filter: drop-shadow(0 0 20px rgba(136, 85, 255, 0.5)); }
+        .animate-float {
+            animation: float 3s ease-in-out infinite;
+        }
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-12px); }
         }
 
         @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(12px); }
+            from { opacity: 0; transform: translateY(14px); }
             to   { opacity: 1; transform: translateY(0); }
         }
 
-        /* ─── Responsive ─── */
         @media (max-width: 520px) {
-            .onboarding-card { padding: 32px 20px; }
-            h1 { font-size: 1.5rem; }
+            .onboarding-card { padding: 36px 22px; }
+            h1 { font-size: 1.6rem; }
         }
     </style>
 </head>
@@ -212,7 +210,6 @@
     <div class="onboarding-container">
         <div class="onboarding-card">
 
-            <!-- Progress dots -->
             <div class="progress-dots">
                 <div class="progress-dot active" id="dot-1"></div>
                 <div class="progress-dot" id="dot-2"></div>
@@ -220,7 +217,7 @@
 
             <!-- Step 1 — Welcome -->
             <div class="onboarding-step active" data-step="1">
-                <span class="onboarding-icon animate-glow">🤖</span>
+                <span class="onboarding-icon animate-float">🤖</span>
                 <h1><span data-i18n="onboarding.title">Welcome to</span> <span class="gradient-text">KelionAI</span></h1>
                 <p data-i18n="onboarding.subtitle">Your personal AI assistant — smart, fast, multilingual.</p>
                 <button class="btn-primary" id="btn-start" data-i18n="onboarding.start">Get Started →</button>

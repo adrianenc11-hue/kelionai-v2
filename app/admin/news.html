@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ro">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -75,23 +75,23 @@
 </head>
 <body>
     <h1>📰 KelionAI — News Bot</h1>
-    <p class="subtitle">Panou administrare știri — ADMIN ONLY</p>
+    <p class="subtitle">News management panel — ADMIN ONLY</p>
 
     <div class="auth-row">
         <label>Admin Secret:</label>
         <input type="password" id="admin-secret" class="admin-input" placeholder="x-admin-secret" autocomplete="off">
-        <button class="btn secondary" onclick="saveSecret()">Salvează</button>
+        <button class="btn secondary" onclick="saveSecret()">Save</button>
     </div>
 
     <div class="toolbar">
-        <button class="btn" id="btn-fetch" onclick="triggerFetch()">⚡ Fetch Acum</button>
-        <button class="btn secondary" onclick="loadLatest()">🔄 Reîncarcă</button>
+        <button class="btn" id="btn-fetch" onclick="triggerFetch()">⚡ Fetch Now</button>
+        <button class="btn secondary" onclick="loadLatest()">🔄 Reload</button>
         <span class="status-bar" id="status-bar">—</span>
     </div>
 
     <div id="schedule-panel">
-        <h3>⏰ Program Următor</h3>
-        <div id="schedule-list"><div class="loading">Se încarcă...</div></div>
+        <h3>⏰ Next Schedule</h3>
+        <div id="schedule-list"><div class="loading">Loading...</div></div>
     </div>
 
     <div id="breaking-section">
@@ -103,21 +103,21 @@
 
     <div id="list-view">
         <div class="tabs" id="category-tabs">
-            <div class="tab active" data-cat="">Toate</div>
+            <div class="tab active" data-cat="">All</div>
             <div class="tab" data-cat="general">General</div>
-            <div class="tab" data-cat="politics">Politică</div>
-            <div class="tab" data-cat="economy">Economie</div>
-            <div class="tab" data-cat="sports">Sport</div>
+            <div class="tab" data-cat="politics">Politics</div>
+            <div class="tab" data-cat="economy">Economy</div>
+            <div class="tab" data-cat="sports">Sports</div>
             <div class="tab" data-cat="tech">Tech</div>
-            <div class="tab" data-cat="world">Internațional</div>
+            <div class="tab" data-cat="world">World</div>
         </div>
         <div class="articles-list" id="articles-list">
-            <div class="loading">Se încarcă...</div>
+            <div class="loading">Loading...</div>
         </div>
     </div>
 
     <div id="detail-view">
-        <button class="detail-back" onclick="closeDetail()">← Înapoi la lista de știri</button>
+        <button class="detail-back" onclick="closeDetail()">← Back to news list</button>
         <div class="detail-card" id="detail-content"></div>
     </div>
 
@@ -134,7 +134,7 @@
         function saveSecret() {
             adminSecret = document.getElementById('admin-secret').value.trim();
             sessionStorage.setItem('kelion_admin_secret', adminSecret);
-            setStatus('Secret salvat.');
+            setStatus('Secret saved.');
             loadAll();
         }
 
@@ -149,7 +149,7 @@
 
         function formatDate(iso) {
             try {
-                return new Date(iso).toLocaleString('ro-RO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+                return new Date(iso).toLocaleString('en-US', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
             } catch (e) { return iso || ''; }
         }
 
@@ -169,7 +169,7 @@
             const filtered = currentCategory ? allArticles.filter(a => a.category === currentCategory) : allArticles;
 
             if (!filtered.length) {
-                list.innerHTML = '<div class="empty-state">Nicio știre disponibilă în această categorie.<br><small>Apasă "Fetch Acum" pentru a aduce știri.</small></div>';
+                list.innerHTML = '<div class="empty-state">No news available in this category.<br><small>Click "Fetch Now" to retrieve news.</small></div>';
                 return;
             }
 
@@ -181,7 +181,7 @@
                         <span>🕐 ${formatDate(a.publishedAt)}</span>
                         <span class="badge category">${escHtml(a.category)}</span>
                         ${a.isBreaking ? '<span class="badge breaking">🔴 BREAKING</span>' : ''}
-                        ${a.confirmedBy > 1 ? `<span class="badge sources">✓ ${a.confirmedBy} surse</span>` : ''}
+                        ${a.confirmedBy > 1 ? `<span class="badge sources">✓ ${a.confirmedBy} sources</span>` : ''}
                     </div>
                 </div>
             `).join('');
@@ -201,7 +201,7 @@
                 <div class="breaking-article" onclick="openDetail('${escHtml(a.id)}')">
                     <strong>${escHtml(a.title)}</strong>
                     <div style="font-size:0.78rem;color:#888;margin-top:3px;">
-                        ${escHtml(a.source)} · ${formatDate(a.publishedAt)} · ✓ ${a.confirmedBy} surse
+                        ${escHtml(a.source)} · ${formatDate(a.publishedAt)} · ✓ ${a.confirmedBy} sources
                     </div>
                 </div>
             `).join('');
@@ -219,10 +219,10 @@
                     <span>🕐 ${formatDate(article.publishedAt)}</span>
                     <span class="badge category">${escHtml(article.category)}</span>
                     ${article.isBreaking ? '<span class="badge breaking">🔴 BREAKING</span>' : ''}
-                    ${article.confirmedBy > 1 ? `<span class="badge sources">✓ ${article.confirmedBy} surse confirmate</span>` : ''}
+                    ${article.confirmedBy > 1 ? `<span class="badge sources">✓ ${article.confirmedBy} confirmed sources</span>` : ''}
                 </div>
-                <p class="detail-summary">${escHtml(article.summary || 'Fără rezumat disponibil.')}</p>
-                ${article.url ? `<a class="detail-link" href="${escHtml(article.url)}" target="_blank" rel="noopener noreferrer">→ Citește articolul complet</a>` : ''}
+                <p class="detail-summary">${escHtml(article.summary || 'No summary available.')}</p>
+                ${article.url ? `<a class="detail-link" href="${escHtml(article.url)}" target="_blank" rel="noopener noreferrer">→ Read full article</a>` : ''}
             `;
 
             document.getElementById('list-view').style.display = 'none';
@@ -241,15 +241,15 @@
             const url = `/api/news/latest${cat ? `?category=${encodeURIComponent(cat)}` : ''}`;
             try {
                 const res = await fetch(url, { headers: getHeaders() });
-                if (res.status === 401) { setStatus('Unauthorized — verifică admin secret.', true); return; }
+                if (res.status === 401) { setStatus('Unauthorized — check admin secret.', true); return; }
                 const data = await res.json();
                 allArticles = data.articles || [];
                 renderArticles();
                 renderBreaking(allArticles);
-                const last = data.lastFetchAt ? `Ultima: ${formatDate(data.lastFetchAt)}` : 'Nicio fetch efectuat';
-                setStatus(`${allArticles.length} știri · ${last}`);
+                const last = data.lastFetchAt ? `Last: ${formatDate(data.lastFetchAt)}` : 'No fetch performed';
+                setStatus(`${allArticles.length} articles · ${last}`);
             } catch (e) {
-                setStatus('Eroare la încărcarea știrilor: ' + e.message, true);
+                setStatus('Error loading news: ' + e.message, true);
             }
         }
 
@@ -266,7 +266,7 @@
                         <span class="schedule-label">${s.label}</span>
                         <span class="schedule-time">${formatDate(s.nextAt)}</span>
                     </div>
-                `).join('') + `<div class="schedule-row"><span class="schedule-label">Articole în cache</span><span class="schedule-time">${data.cacheSize}</span></div>`;
+                `).join('') + `<div class="schedule-row"><span class="schedule-label">Cached articles</span><span class="schedule-time">${data.cacheSize}</span></div>`;
             } catch (e) { /* ignore */ }
         }
 
@@ -274,17 +274,17 @@
         async function triggerFetch() {
             const btn = document.getElementById('btn-fetch');
             btn.disabled = true;
-            setStatus('Se fetch-uiesc știrile...');
+            setStatus('Fetching news...');
             try {
                 const res = await fetch('/api/news/fetch', { headers: getHeaders() });
-                if (res.status === 401) { setStatus('Unauthorized — verifică admin secret.', true); btn.disabled = false; return; }
-                if (res.status === 429) { const d = await res.json(); setStatus(d.error || 'Prea devreme.', true); btn.disabled = false; return; }
+                if (res.status === 401) { setStatus('Unauthorized — check admin secret.', true); btn.disabled = false; return; }
+                if (res.status === 429) { const d = await res.json(); setStatus(d.error || 'Too early.', true); btn.disabled = false; return; }
                 const data = await res.json();
-                setStatus(data.success ? `✓ Fetch OK — ${data.articles} articole` : `Fetch parțial: ${data.error || ''}`);
+                setStatus(data.success ? `✓ Fetch OK — ${data.articles} articles` : `Partial fetch: ${data.error || ''}`);
                 await loadLatest();
                 await loadSchedule();
             } catch (e) {
-                setStatus('Eroare fetch: ' + e.message, true);
+                setStatus('Fetch error: ' + e.message, true);
             }
             btn.disabled = false;
         }
@@ -295,7 +295,7 @@
         }
 
         if (adminSecret) loadAll();
-        else setStatus('Introdu admin secret și apasă Salvează.');
+        else setStatus('Enter admin secret and click Save.');
     </script>
 </body>
 </html>

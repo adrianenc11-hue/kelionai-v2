@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ro">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -43,12 +43,12 @@
 </head>
 <body>
     <h1>🏥 KelionAI — Health Check</h1>
-    <p class="subtitle">Verificare stare sistem — ADMIN ONLY</p>
+    <p class="subtitle">System health check — ADMIN ONLY</p>
 
     <div class="auth-row">
         <label>Admin Secret:</label>
         <input type="password" id="admin-secret" class="admin-input" placeholder="x-admin-secret" autocomplete="off">
-        <button class="btn secondary" onclick="saveSecret()">Salvează</button>
+        <button class="btn secondary" onclick="saveSecret()">Save</button>
     </div>
 
     <div class="toolbar">
@@ -69,7 +69,7 @@
         function saveSecret() {
             adminSecret = document.getElementById('admin-secret').value.trim();
             sessionStorage.setItem('kelion_admin_secret', adminSecret);
-            setStatus('Secret salvat.');
+            setStatus('Secret saved.');
         }
 
         function setStatus(msg, isError) {
@@ -171,7 +171,7 @@
             h += '</div>';
 
             if (d.recommendations && d.recommendations.length) {
-                h += '<div class="section"><h3>⚠️ Recomandări</h3>';
+                h += '<div class="section"><h3>⚠️ Recommendations</h3>';
                 for (const r of d.recommendations) {
                     h += '<div class="rec">' + esc(r) + '</div>';
                 }
@@ -179,7 +179,7 @@
             }
 
             h += '<div class="export-row">';
-            h += '<button class="btn" onclick="exportJSON()">Exportă JSON</button>';
+            h += '<button class="btn" onclick="exportJSON()">Export JSON</button>';
             h += '</div>';
 
             return h;
@@ -189,15 +189,15 @@
             const btn = document.getElementById('btn-run');
             const report = document.getElementById('report');
             btn.disabled = true;
-            setStatus('Se verifică...');
+            setStatus('Checking...');
             report.style.display = 'block';
-            report.innerHTML = '<div class="loading">⏳ Se verifică...</div>';
+            report.innerHTML = '<div class="loading">⏳ Checking...</div>';
             try {
                 const res = await fetch('/api/admin/health-check', {
                     headers: { 'x-admin-secret': adminSecret }
                 });
                 if (res.status === 401) {
-                    report.innerHTML = '<div style="color:#ff6666;padding:20px">❌ Unauthorized — verifică admin secret.</div>';
+                    report.innerHTML = '<div style="color:#ff6666;padding:20px">❌ Unauthorized — check admin secret.</div>';
                     setStatus('Unauthorized.', true);
                     btn.disabled = false;
                     return;
@@ -205,10 +205,10 @@
                 const data = await res.json();
                 lastData = data;
                 report.innerHTML = renderReport(data);
-                setStatus('✓ Health check finalizat — Score: ' + data.score + '/100 (Grade: ' + data.grade + ')');
+                setStatus('✓ Health check complete — Score: ' + data.score + '/100 (Grade: ' + data.grade + ')');
             } catch (e) {
-                report.innerHTML = '<div style="color:#ff6666;padding:20px">❌ Eroare: ' + esc(e.message) + '</div>';
-                setStatus('Eroare: ' + e.message, true);
+                report.innerHTML = '<div style="color:#ff6666;padding:20px">❌ Error: ' + esc(e.message) + '</div>';
+                setStatus('Error: ' + e.message, true);
             }
             btn.disabled = false;
         }
