@@ -19,7 +19,8 @@
         "deploy": "bash scripts/deploy.sh",
         "health": "bash scripts/health-check.sh",
         "railway:setup": "node scripts/railway-setup.js",
-        "railway:vars": "bash scripts/railway-env.sh"
+        "railway:vars": "bash scripts/railway-env.sh",
+        "setup:secrets": "bash scripts/setup-secrets.sh"
     },
     "jest": {
         "testEnvironment": "node",
