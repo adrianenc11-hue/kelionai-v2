@@ -491,8 +491,9 @@ router.get('/h2h/:team1/:team2', (req, res) => {
 
         // Simulated H2H stats
         const totalGames = 10 + Math.floor(Math.random() * 20);
-        const team1Wins  = Math.floor(Math.random() * totalGames * 0.5);
-        const team2Wins  = Math.floor(Math.random() * (totalGames - team1Wins) * 0.6);
+        const team1Wins  = Math.floor(Math.random() * Math.floor(totalGames * 0.45));
+        const remaining  = totalGames - team1Wins;
+        const team2Wins  = Math.floor(Math.random() * Math.floor(remaining * 0.55));
         const draws      = totalGames - team1Wins - team2Wins;
         const team1Goals = team1Wins * 2 + draws + Math.floor(Math.random() * 10);
         const team2Goals = team2Wins * 2 + draws + Math.floor(Math.random() * 10);
@@ -556,7 +557,9 @@ router.get('/form/:team', (req, res) => {
 // POST /simulate
 router.post('/simulate', (req, res) => {
     try {
-        const { team1, team2, simulations } = req.body || {};
+        const { team1: rawTeam1, team2: rawTeam2, simulations } = req.body || {};
+        const team1 = typeof rawTeam1 === 'string' ? rawTeam1.trim().slice(0, 100) : '';
+        const team2 = typeof rawTeam2 === 'string' ? rawTeam2.trim().slice(0, 100) : '';
         if (!team1 || !team2) {
             return res.status(400).json({ error: 'Câmpuri obligatorii: team1, team2.' });
         }
