@@ -133,6 +133,7 @@ app.use((req, res, next) => {
 
 // ═══ RATE LIMITING ═══
 const chatLimiter = rateLimit({ windowMs: 60 * 1000, max: 20, message: { error: 'Too many requests. Please wait a minute.' }, standardHeaders: true, legacyHeaders: false });
+const ttsLimiter = rateLimit({ windowMs: 60 * 1000, max: 30, message: { error: 'Too many TTS requests. Please wait a minute.' }, standardHeaders: true, legacyHeaders: false });
 const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10, message: { error: 'Too many attempts. Please wait 15 minutes.' } });
 const searchLimiter = rateLimit({ windowMs: 60 * 1000, max: 15, message: { error: 'Too many searches. Please wait a minute.' } });
 const imageLimiter = rateLimit({ windowMs: 60 * 1000, max: 5, message: { error: 'Too many image requests. Please wait a minute.' } });
@@ -586,7 +587,7 @@ async function saveConv(uid, avatar, userMsg, aiReply, convId, lang) {
 }
 
 // ═══ TTS — ElevenLabs ═══
-app.post('/api/speak', apiLimiter, validate(speakSchema), async (req, res) => {
+app.post('/api/speak', ttsLimiter, validate(speakSchema), async (req, res) => {
     try {
         const { text, avatar = 'kelion', mood = 'neutral' } = req.body;
         if (!text || !process.env.ELEVENLABS_API_KEY) return res.status(503).json({ error: 'TTS indisponibil' });
