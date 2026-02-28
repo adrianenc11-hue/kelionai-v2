@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ro">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -92,77 +92,77 @@
 </head>
 <body>
     <h1>⚽ KelionAI — Sports Betting Bot</h1>
-    <p class="subtitle">Panou administrare pariuri sportive — ADMIN ONLY</p>
+    <p class="subtitle">Sports betting management panel — ADMIN ONLY</p>
 
     <div class="disclaimer">
-        ⚠️ INFORMATIV — Jocurile de noroc creează dependență. Nu garantăm câștiguri. Joacă responsabil. 18+
+        ⚠️ INFORMATIONAL — Gambling can be addictive. We do not guarantee winnings. Play responsibly. 18+
     </div>
 
     <div class="auth-row">
         <label>Admin Secret:</label>
         <input type="password" id="admin-secret" class="admin-input" placeholder="x-admin-secret" autocomplete="off">
-        <button class="btn secondary" onclick="saveSecret()">Salvează</button>
+        <button class="btn secondary" onclick="saveSecret()">Save</button>
         <span class="status-bar" id="status-bar">—</span>
     </div>
 
     <div class="toolbar">
-        <button class="btn secondary" onclick="loadAll()">🔄 Reîncarcă</button>
+        <button class="btn secondary" onclick="loadAll()">🔄 Reload</button>
         <button class="btn secondary" onclick="exportJson()">⬇ Export JSON</button>
     </div>
 
     <!-- STATUS PANEL -->
     <div class="section">
-        <div class="section-title">📊 Status Bot</div>
+        <div class="section-title">📊 Bot Status</div>
         <div class="stat-grid" id="status-grid">
-            <div class="loading">Se încarcă...</div>
+            <div class="loading">Loading...</div>
         </div>
     </div>
 
     <!-- TODAY'S PREDICTIONS -->
     <div class="section">
-        <div class="section-title">🔮 Predicții Azi</div>
+        <div class="section-title">🔮 Today's Predictions</div>
         <div class="predictions-grid" id="predictions-grid">
-            <div class="loading">Se încarcă...</div>
+            <div class="loading">Loading...</div>
         </div>
     </div>
 
     <!-- LIVE SCORES -->
     <div class="section">
-        <div class="section-title"><span class="live-dot"></span>Scoruri Live</div>
+        <div class="section-title"><span class="live-dot"></span>Live Scores</div>
         <div class="live-list" id="live-list">
-            <div class="loading">Se încarcă...</div>
+            <div class="loading">Loading...</div>
         </div>
     </div>
 
     <!-- LEAGUES -->
     <div class="section">
-        <div class="section-title">🏆 Ligi Active</div>
+        <div class="section-title">🏆 Active Leagues</div>
         <div class="leagues-grid" id="leagues-grid">
-            <div class="loading">Se încarcă...</div>
+            <div class="loading">Loading...</div>
         </div>
     </div>
 
     <!-- KELLY CALCULATOR -->
     <div class="section">
-        <div class="section-title">🧮 Calculator Kelly</div>
+        <div class="section-title">🧮 Kelly Calculator</div>
         <div class="card">
             <div class="kelly-form">
                 <div class="form-group">
-                    <label>Probabilitate Estimată (%)</label>
+                    <label>Estimated Probability (%)</label>
                     <input type="number" id="kelly-prob" class="admin-input" min="1" max="99" value="55" step="1">
                 </div>
                 <div class="form-group">
-                    <label>Cota Oferită</label>
+                    <label>Offered Odds</label>
                     <input type="number" id="kelly-odds" class="admin-input" min="1.01" step="0.01" value="2.00">
                 </div>
                 <div class="form-group">
                     <label>Bankroll (RON)</label>
                     <input type="number" id="kelly-bankroll" class="admin-input" min="1" value="1000">
                 </div>
-                <button class="btn" onclick="calcKelly()">Calculează</button>
+                <button class="btn" onclick="calcKelly()">Calculate</button>
             </div>
             <div id="kelly-result" style="display:none;" class="kelly-result">
-                <div class="kr-label">Miză Recomandată (Kelly Fracțional ¼)</div>
+                <div class="kr-label">Recommended Stake (Quarter Kelly ¼)</div>
                 <div class="kr-value" id="kelly-stake">—</div>
                 <div class="kr-note" id="kelly-note"></div>
             </div>
@@ -173,7 +173,7 @@
     <div class="section">
         <div class="section-title">💰 ROI & Bankroll</div>
         <div class="roi-grid" id="roi-grid">
-            <div class="loading">Se încarcă...</div>
+            <div class="loading">Loading...</div>
         </div>
     </div>
 
@@ -188,7 +188,7 @@
         function saveSecret() {
             adminSecret = document.getElementById('admin-secret').value.trim();
             sessionStorage.setItem('kelion_admin_secret', adminSecret);
-            setStatus('Secret salvat.');
+            setStatus('Secret saved.');
             loadAll();
         }
 
@@ -208,7 +208,7 @@
         }
 
         function fmtDate(iso) {
-            try { return new Date(iso).toLocaleString('ro-RO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }); }
+            try { return new Date(iso).toLocaleString('en-US', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }); }
             catch (e) { return iso || '—'; }
         }
 
@@ -224,16 +224,16 @@
             const el = document.getElementById('status-grid');
             try {
                 const res = await fetch('/api/sports/status', { headers: getHeaders() });
-                if (res.status === 401) { el.innerHTML = '<div class="error-msg">Unauthorized — verifică admin secret.</div>'; return; }
+                if (res.status === 401) { el.innerHTML = '<div class="error-msg">Unauthorized — check admin secret.</div>'; return; }
                 const data = await res.json();
                 snapshot.status = data;
                 const activeSports = Array.isArray(data.activeSports) ? data.activeSports.join(', ') : (data.activeSports || '—');
                 const items = [
-                    { label: 'Status Bot', value: escHtml(data.status || 'N/A') },
-                    { label: 'Sporturi Active', value: escHtml(activeSports) },
-                    { label: 'Predicții Azi', value: escHtml(String(data.predictionsToday ?? '—')) },
-                    { label: 'Meciuri Monitorizate', value: escHtml(String(data.matchesTracked ?? '—')) },
-                    { label: 'Ultima Actualizare', value: fmtDate(data.lastUpdate) },
+                    { label: 'Bot Status', value: escHtml(data.status || 'N/A') },
+                    { label: 'Active Sports', value: escHtml(activeSports) },
+                    { label: 'Predictions Today', value: escHtml(String(data.predictionsToday ?? '—')) },
+                    { label: 'Tracked Matches', value: escHtml(String(data.matchesTracked ?? '—')) },
+                    { label: 'Last Update', value: fmtDate(data.lastUpdate) },
                 ];
                 el.innerHTML = items.map(i => `
                     <div class="stat-item">
@@ -241,7 +241,7 @@
                         <div class="stat-value">${i.value}</div>
                     </div>`).join('');
             } catch (e) {
-                el.innerHTML = `<div class="error-msg">Eroare status: ${escHtml(e.message)}</div>`;
+                el.innerHTML = `<div class="error-msg">Status error: ${escHtml(e.message)}</div>`;
             }
         }
 
@@ -254,7 +254,7 @@
                 const data = await res.json();
                 snapshot.predictions = data;
                 const preds = (data.predictions || []).sort((a, b) => (parseFloat(b.confidence) || 0) - (parseFloat(a.confidence) || 0));
-                if (!preds.length) { el.innerHTML = '<div class="empty-state">Nicio predicție disponibilă azi.</div>'; return; }
+                if (!preds.length) { el.innerHTML = '<div class="empty-state">No predictions available today.</div>'; return; }
                 el.innerHTML = preds.map(p => `
                     <div class="pred-card${p.valueBet ? ' value-bet' : ''}">
                         <div class="pred-match">${escHtml(p.match || p.homeTeam && p.awayTeam ? (p.homeTeam + ' vs ' + p.awayTeam) : '—')}</div>
@@ -267,7 +267,7 @@
                         </div>
                     </div>`).join('');
             } catch (e) {
-                el.innerHTML = `<div class="error-msg">Eroare predicții: ${escHtml(e.message)}</div>`;
+                el.innerHTML = `<div class="error-msg">Predictions error: ${escHtml(e.message)}</div>`;
             }
         }
 
@@ -280,7 +280,7 @@
                 const data = await res.json();
                 snapshot.live = data;
                 const matches = data.matches || data.live || [];
-                if (!matches.length) { el.innerHTML = '<div class="empty-state">Niciun meci live în acest moment.</div>'; return; }
+                if (!matches.length) { el.innerHTML = '<div class="empty-state">No live matches at the moment.</div>'; return; }
                 el.innerHTML = matches.map(m => {
                     // Backend returns { match: 'A vs B', score: '1-1', minute: 67, status: 'LIVE', competition: '...' }
                     const scoreParts = String(m.score || '').split('-');
@@ -295,7 +295,7 @@
                     </div>`;
                 }).join('');
             } catch (e) {
-                el.innerHTML = `<div class="error-msg">Eroare scoruri live: ${escHtml(e.message)}</div>`;
+                el.innerHTML = `<div class="error-msg">Live scores error: ${escHtml(e.message)}</div>`;
             }
         }
 
@@ -308,14 +308,14 @@
                 const data = await res.json();
                 snapshot.leagues = data;
                 const leagues = data.leagues || [];
-                if (!leagues.length) { el.innerHTML = '<div class="empty-state">Nicio ligă configurată.</div>'; return; }
+                if (!leagues.length) { el.innerHTML = '<div class="empty-state">No leagues configured.</div>'; return; }
                 el.innerHTML = leagues.map(l => `
                     <div class="league-item">
                         <div>${escHtml(l.name || l)}</div>
                         ${l.sport ? `<div class="league-sport">${escHtml(l.sport)}</div>` : ''}
                     </div>`).join('');
             } catch (e) {
-                el.innerHTML = `<div class="error-msg">Eroare ligi: ${escHtml(e.message)}</div>`;
+                el.innerHTML = `<div class="error-msg">Leagues error: ${escHtml(e.message)}</div>`;
             }
         }
 
@@ -339,8 +339,8 @@
             const resultEl = document.getElementById('kelly-result');
             document.getElementById('kelly-stake').textContent = stake.toFixed(2) + ' RON';
             const noteText = kellyFull <= 0
-                ? '⚠️ Kelly negativ — fără avantaj statistic la această cotă/probabilitate.'
-                : `Kelly complet: ${(kellyFull * 100).toFixed(1)}% | Kelly ¼ (recomandat): ${(kellyFrac * 100).toFixed(1)}% din bankroll`;
+                ? '⚠️ Negative Kelly — no statistical edge at this odds/probability.'
+                : `Full Kelly: ${(kellyFull * 100).toFixed(1)}% | Quarter Kelly (recommended): ${(kellyFrac * 100).toFixed(1)}% of bankroll`;
             document.getElementById('kelly-note').textContent = noteText;
             resultEl.style.display = 'block';
         }
@@ -365,13 +365,13 @@
                 const profitVal = parseFloat(roi.profit ?? roi.netProfit);
                 const metrics = [
                     { label: 'ROI', value: roi.roi != null ? (roiVal >= 0 ? '+' : '') + roiVal.toFixed(2) + '%' : '—', cls: roiVal >= 0 ? 'pos' : 'neg' },
-                    { label: 'Profit Net', value: roi.profit != null || roi.netProfit != null ? (profitVal >= 0 ? '+' : '') + profitVal.toFixed(2) + ' RON' : '—', cls: profitVal >= 0 ? 'pos' : 'neg' },
-                    { label: 'Total Bilete', value: String(roi.totalBets ?? '—') },
-                    { label: 'Rata Succes', value: roi.winRate != null ? roi.winRate + '%' : '—' },
-                    { label: 'Bankroll Curent', value: bankroll.current != null ? bankroll.current + ' RON' : '—' },
-                    { label: 'Bankroll Inițial', value: bankroll.initial != null ? bankroll.initial + ' RON' : '—' },
+                    { label: 'Net Profit', value: roi.profit != null || roi.netProfit != null ? (profitVal >= 0 ? '+' : '') + profitVal.toFixed(2) + ' RON' : '—', cls: profitVal >= 0 ? 'pos' : 'neg' },
+                    { label: 'Total Bets', value: String(roi.totalBets ?? '—') },
+                    { label: 'Win Rate', value: roi.winRate != null ? roi.winRate + '%' : '—' },
+                    { label: 'Current Bankroll', value: bankroll.current != null ? bankroll.current + ' RON' : '—' },
+                    { label: 'Initial Bankroll', value: bankroll.initial != null ? bankroll.initial + ' RON' : '—' },
                     { label: 'Max Drawdown', value: bankroll.maxDrawdown != null ? bankroll.maxDrawdown + '%' : '—' },
-                    { label: 'Ultima Actualizare', value: fmtDate(roi.updatedAt || bankroll.updatedAt) },
+                    { label: 'Last Update', value: fmtDate(roi.updatedAt || bankroll.updatedAt) },
                 ];
                 el.innerHTML = metrics.map(m => `
                     <div class="roi-item">
@@ -379,7 +379,7 @@
                         <div class="roi-value ${m.cls || ''}">${escHtml(String(m.value))}</div>
                     </div>`).join('');
             } catch (e) {
-                el.innerHTML = `<div class="error-msg">Eroare ROI: ${escHtml(e.message)}</div>`;
+                el.innerHTML = `<div class="error-msg">ROI error: ${escHtml(e.message)}</div>`;
             }
         }
 
@@ -396,15 +396,15 @@
 
         // ═══ INIT ═══
         async function loadAll() {
-            setStatus('Se încarcă datele...');
+            setStatus('Loading data...');
             await Promise.all([loadStatus(), loadPredictions(), loadLive(), loadLeagues(), loadRoi()]);
-            setStatus(`Actualizat la ${new Date().toLocaleTimeString('ro-RO')}`);
+            setStatus(`Updated at ${new Date().toLocaleTimeString('en-US')}`);
         }
 
         if (adminSecret) {
             loadAll();
         } else {
-            setStatus('Introdu admin secret și apasă Salvează.');
+            setStatus('Enter admin secret and click Save.');
         }
 
         // Auto-refresh every 60 seconds

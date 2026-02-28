@@ -242,7 +242,7 @@
 
         try {
             const r = await fetch(API_BASE + '/api/conversations', { headers: authHeaders() });
-            if (!r.ok) throw new Error('Eroare');
+            if (!r.ok) throw new Error('Error');
             const data = await r.json();
             const convs = data.conversations || data || [];
 
@@ -273,7 +273,7 @@
             persistConvId(convId);
 
             const r = await fetch(API_BASE + '/api/conversations/' + convId + '/messages', { headers: authHeaders() });
-            if (!r.ok) throw new Error('Eroare');
+            if (!r.ok) throw new Error('Error');
             const data = await r.json();
             const msgs = data.messages || data || [];
 

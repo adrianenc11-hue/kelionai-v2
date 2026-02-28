@@ -28,7 +28,7 @@
     // ═══ Start checkout ═══
     async function checkout(plan) {
         if (!window.KAuth || !KAuth.isLoggedIn()) {
-            alert('Trebuie să fii autentificat pentru a upgrade.');
+            alert('You need to be signed in to upgrade.');
             return;
         }
         try {
@@ -38,8 +38,8 @@
             });
             var d = await r.json();
             if (d.url) window.location.href = d.url;
-            else alert(d.error || 'Eroare checkout');
-        } catch (e) { alert('Eroare la procesarea plății.'); }
+            else alert(d.error || 'Checkout error');
+        } catch (e) { alert('Error processing payment.'); }
     }
 
     // ═══ Open billing portal ═══
@@ -50,8 +50,8 @@
             });
             var d = await r.json();
             if (d.url) window.location.href = d.url;
-            else alert(d.error || 'Eroare portal');
-        } catch (e) { alert('Eroare la deschiderea portalului.'); }
+            else alert(d.error || 'Portal error');
+        } catch (e) { alert('Error opening portal.'); }
     }
 
     // ═══ Render pricing modal ═══
@@ -60,7 +60,7 @@
         var info = document.getElementById('current-plan-info');
         if (!grid) return;
 
-        grid.innerHTML = '<div class="pricing-loading">Se încarcă...</div>';
+        grid.innerHTML = '<div class="pricing-loading">Loading...</div>';
 
         var plans = await loadPlans();
         var status = await loadStatus();
@@ -73,13 +73,13 @@
             info.innerHTML = '<div class="plan-status">' +
                 '<span class="plan-badge plan-' + currentPlan + '">' + currentPlan.toUpperCase() + '</span>' +
                 '<span class="plan-usage">Chat: ' + (usage.chat || 0) + '/' + (limits.chat === -1 ? '∞' : limits.chat) +
-                ' · Căutări: ' + (usage.search || 0) + '/' + (limits.search === -1 ? '∞' : limits.search) +
-                ' · Imagini: ' + (usage.image || 0) + '/' + (limits.image === -1 ? '∞' : limits.image) +
+                ' · Search: ' + (usage.search || 0) + '/' + (limits.search === -1 ? '∞' : limits.search) +
+                ' · Images: ' + (usage.image || 0) + '/' + (limits.image === -1 ? '∞' : limits.image) +
                 '</span></div>';
         }
 
         if (plans.length === 0) {
-            grid.innerHTML = '<div class="pricing-loading">Planurile nu sunt disponibile momentan.</div>';
+            grid.innerHTML = '<div class="pricing-loading">Plans are not available at the moment.</div>';
             return;
         }
 
@@ -96,13 +96,13 @@
                     featuresHtml += '<li>✓ ' + p.features[j] + '</li>';
                 }
             } else {
-                featuresHtml = '<li>✓ ' + p.limits.chat + ' chat/zi</li>' +
-                    '<li>✓ ' + p.limits.search + ' căutări/zi</li>' +
-                    '<li>✓ ' + p.limits.image + ' imagini/zi</li>';
+                featuresHtml = '<li>✓ ' + p.limits.chat + ' chat/day</li>' +
+                    '<li>✓ ' + p.limits.search + ' searches/day</li>' +
+                    '<li>✓ ' + p.limits.image + ' images/day</li>';
             }
 
             card.innerHTML = '<h3 class="pricing-plan-name">' + p.name + '</h3>' +
-                '<div class="pricing-price">' + (p.price === 0 ? 'Gratuit' : '€' + p.price + '<small>/lună</small>') + '</div>' +
+                '<div class="pricing-price">' + (p.price === 0 ? 'Free' : '€' + p.price + '<small>/month</small>') + '</div>' +
                 '<ul class="pricing-features">' + featuresHtml + '</ul>' +
                 '<div class="pricing-action" data-plan="' + p.id + '"></div>';
 
@@ -110,13 +110,13 @@
 
             var actionDiv = card.querySelector('.pricing-action');
             if (isCurrent) {
-                actionDiv.innerHTML = '<button class="pricing-btn current" disabled>Plan curent</button>';
+                actionDiv.innerHTML = '<button class="pricing-btn current" disabled>Current plan</button>';
             } else if (p.price === 0) {
-                actionDiv.innerHTML = '<span class="pricing-btn free">Inclus</span>';
+                actionDiv.innerHTML = '<span class="pricing-btn free">Included</span>';
             } else {
                 var btn = document.createElement('button');
                 btn.className = 'pricing-btn upgrade';
-                btn.textContent = 'Upgrade la ' + p.name;
+                btn.textContent = 'Upgrade to ' + p.name;
                 btn.setAttribute('data-plan', p.id);
                 btn.addEventListener('click', function () { checkout(this.getAttribute('data-plan')); });
                 actionDiv.appendChild(btn);
@@ -127,7 +127,7 @@
         if (currentPlan === 'pro' || currentPlan === 'enterprise' || currentPlan === 'premium') {
             var manageBtn = document.createElement('div');
             manageBtn.className = 'pricing-manage';
-            manageBtn.innerHTML = '<button class="pricing-btn manage" id="btn-manage-sub">Gestionează abonamentul</button>';
+            manageBtn.innerHTML = '<button class="pricing-btn manage" id="btn-manage-sub">Manage subscription</button>';
             grid.parentNode.appendChild(manageBtn);
             document.getElementById('btn-manage-sub').addEventListener('click', openPortal);
         }
@@ -139,12 +139,12 @@
         var payment = params.get('payment');
         if (payment === 'success') {
             setTimeout(function () {
-                alert('✅ Plata a fost procesată cu succes! Planul tău a fost activat.');
+                alert('✅ Payment processed successfully! Your plan has been activated.');
             }, 500);
             window.history.replaceState({}, '', window.location.pathname);
         } else if (payment === 'cancel') {
             setTimeout(function () {
-                alert('Plata a fost anulată. Poți încerca din nou oricând.');
+                alert('Payment was cancelled. You can try again anytime.');
             }, 500);
             window.history.replaceState({}, '', window.location.pathname);
         }
