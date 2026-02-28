@@ -21,8 +21,21 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Check Netlify secrets
+        id: check-secrets
+        run: |
+          if [ -z "$NETLIFY_AUTH_TOKEN" ] || [ -z "$NETLIFY_SITE_ID" ]; then
+            echo "::warning::NETLIFY_AUTH_TOKEN or NETLIFY_SITE_ID is not set. Deploy will be skipped."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+
       - name: Deploy to Netlify
-        if: ${{ secrets.NETLIFY_AUTH_TOKEN != '' }}
+        if: steps.check-secrets.outputs.skip == 'false'
         uses: nwtgck/actions-netlify@v3.0
         with:
           publish-dir: './app'
@@ -34,5 +47,12 @@ jobs:
           NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
         timeout-minutes: 10
 
+      - name: Deploy skipped
+        if: steps.check-secrets.outputs.skip == 'true'
+        run: |
+          echo "⏭️ Deploy skipped: NETLIFY_AUTH_TOKEN and/or NETLIFY_SITE_ID are not set."
+          echo "Run 'bash scripts/setup-secrets.sh' to configure them."
+
       - name: Done
+        if: steps.check-secrets.outputs.skip == 'false'
         run: echo "✅ Manual deploy to ${{ inputs.environment }} completed!"
