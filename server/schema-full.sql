@@ -46,7 +46,7 @@ CREATE INDEX IF NOT EXISTS idx_prefs_user ON user_preferences(user_id);
 CREATE TABLE IF NOT EXISTS subscriptions (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE UNIQUE,
-    plan TEXT DEFAULT 'free' CHECK (plan IN ('free', 'pro', 'premium')),
+    plan TEXT DEFAULT 'free' CHECK (plan IN ('free', 'pro', 'premium', 'enterprise')),
     status TEXT DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'cancelled', 'past_due')),
     stripe_customer_id TEXT,
     stripe_subscription_id TEXT,
@@ -62,9 +62,10 @@ CREATE INDEX IF NOT EXISTS idx_subs_stripe ON subscriptions(stripe_subscription_
 CREATE INDEX IF NOT EXISTS idx_subs_status ON subscriptions(status);
 
 -- ═══ USAGE TRACKING ═══
+-- user_id is TEXT (not UUID) to support both authenticated users (UUID) and guests (literal 'guest')
 CREATE TABLE IF NOT EXISTS usage (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    user_id TEXT NOT NULL,
+    user_id TEXT NOT NULL, -- UUID for authenticated users, 'guest' for unauthenticated users
     type TEXT NOT NULL CHECK (type IN ('chat', 'search', 'image', 'vision', 'tts')),
     date DATE DEFAULT CURRENT_DATE,
     count INTEGER DEFAULT 0,

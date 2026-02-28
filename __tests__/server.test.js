@@ -192,7 +192,7 @@ describe('Error Handling', () => {
             expect(res.status).toHaveBeenCalledWith(500);
             const body = res.json.mock.calls[0][0];
             expect(body.stack).toBeUndefined();
-            expect(body.error).toBe('Eroare internă de server');
+            expect(body.error).toBe('Internal server error');
         } finally {
             process.env.NODE_ENV = orig;
         }

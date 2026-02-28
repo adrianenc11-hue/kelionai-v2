@@ -255,7 +255,7 @@ describe('validate middleware factory', () => {
         const next = jest.fn();
         middleware(req, res, next);
         expect(res.status).toHaveBeenCalledWith(400);
-        expect(json).toHaveBeenCalledWith(expect.objectContaining({ error: 'Validare eșuată', details: expect.any(Array) }));
+        expect(json).toHaveBeenCalledWith(expect.objectContaining({ error: 'Validation failed', details: expect.any(Array) }));
         expect(next).not.toHaveBeenCalled();
     });
 

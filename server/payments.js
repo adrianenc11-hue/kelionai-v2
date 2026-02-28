@@ -20,8 +20,8 @@ const PLAN_LIMITS = {
     guest:      { chat: 5,   search: 3,  image: 1,  vision: 2,  tts: 5,   name: 'Guest' },
     free:       { chat: 10,  search: 5,  image: 2,  vision: 5,  tts: 10,  name: 'Free' },
     pro:        { chat: 100, search: 50, image: 20, vision: 50, tts: 100, name: 'Pro' },
-    enterprise: { chat: -1,  search: -1, image: -1, vision: -1, tts: -1,  name: 'Enterprise' }, // -1 = unlimited
-    premium:    { chat: -1,  search: -1, image: -1, vision: -1, tts: -1,  name: 'Premium' } // legacy alias
+    premium:    { chat: -1,  search: -1, image: -1, vision: -1, tts: -1,  name: 'Premium' }, // -1 = unlimited
+    enterprise: { chat: -1,  search: -1, image: -1, vision: -1, tts: -1,  name: 'Premium' } // legacy alias for premium
 };
 
 // ═══ CHECK USER PLAN & USAGE ═══
@@ -112,6 +112,9 @@ function generateReferralCode() {
     return code;
 }
 
+// ═══ STRIPE WEBHOOK IDEMPOTENCY ═══
+const processedWebhookEvents = new Set();
+
 // ═══ ROUTES ═══
 
 // GET /api/payments/plans — list available plans
@@ -119,8 +122,8 @@ router.get('/plans', (req, res) => {
     res.json({
         plans: [
             { id: 'free', name: 'Free', price: 0, currency: 'EUR', limits: PLAN_LIMITS.free },
-            { id: 'pro', name: 'Pro', price: 9.99, currency: 'EUR', limits: PLAN_LIMITS.pro, features: ['100 chat/zi', '50 căutări/zi', '20 imagini/zi', 'Memorie persistentă', 'Istoric conversații'] },
-            { id: 'enterprise', name: 'Enterprise', price: 29.99, currency: 'EUR', limits: PLAN_LIMITS.enterprise, features: ['Nelimitat chat', 'Nelimitat căutări', 'Nelimitat imagini', 'Suport prioritar', 'API access', 'Custom avatar', 'SLA garantat'] }
+            { id: 'pro', name: 'Pro', price: 9.99, currency: 'EUR', limits: PLAN_LIMITS.pro, features: ['100 chat/day', '50 searches/day', '20 images/day', 'Persistent memory', 'Conversation history'] },
+            { id: 'premium', name: 'Premium', price: 19.99, currency: 'EUR', limits: PLAN_LIMITS.premium, features: ['Unlimited chat', 'Unlimited searches', 'Unlimited images', 'Priority support', 'API access', 'Custom avatar', 'SLA guaranteed'] }
         ]
     });
 });
@@ -150,26 +153,28 @@ router.get('/status', async (req, res) => {
         
         res.json({ ...planInfo, usage });
     } catch (e) {
-        res.status(500).json({ error: 'Eroare plan' });
+        res.status(500).json({ error: 'Plan status error' });
     }
 });
 
 // POST /api/payments/checkout — create Stripe checkout session
 router.post('/checkout', async (req, res) => {
     try {
-        if (!stripe) return res.status(503).json({ error: 'Plăți indisponibile momentan' });
+        if (!stripe) return res.status(503).json({ error: 'Payments service unavailable' });
         
         const { getUserFromToken, supabaseAdmin } = req.app.locals;
         const user = await getUserFromToken(req);
-        if (!user) return res.status(401).json({ error: 'Trebuie să fii autentificat' });
+        if (!user) return res.status(401).json({ error: 'Authentication required' });
         
         const { plan } = req.body;
-        if (!['pro', 'enterprise'].includes(plan)) return res.status(400).json({ error: 'Plan invalid' });
+        // Accept 'enterprise' as alias for 'premium' for backward compatibility
+        const normalizedPlan = plan === 'enterprise' ? 'premium' : plan;
+        if (!['pro', 'premium'].includes(normalizedPlan)) return res.status(400).json({ error: 'Invalid plan' });
         
-        const priceId = plan === 'pro'
+        const priceId = normalizedPlan === 'pro'
             ? (process.env.STRIPE_PRO_PRICE_ID || process.env.STRIPE_PRICE_PRO)
-            : (process.env.STRIPE_ENTERPRISE_PRICE_ID || process.env.STRIPE_PRICE_PREMIUM);
-        if (!priceId) return res.status(503).json({ error: 'Prețuri neconfigurare' });
+            : (process.env.STRIPE_PREMIUM_PRICE_ID || process.env.STRIPE_ENTERPRISE_PRICE_ID || process.env.STRIPE_PRICE_PREMIUM);
+        if (!priceId) return res.status(503).json({ error: 'Prices not configured' });
         
         // Check if user already has a Stripe customer ID
         let customerId;
@@ -188,8 +193,8 @@ router.post('/checkout', async (req, res) => {
             line_items: [{ price: priceId, quantity: 1 }],
             success_url: (process.env.APP_URL || 'https://kelionai.app') + '/?payment=success',
             cancel_url: (process.env.APP_URL || 'https://kelionai.app') + '/?payment=cancel',
-            metadata: { user_id: user.id, plan },
-            subscription_data: { metadata: { user_id: user.id, plan } }
+            metadata: { user_id: user.id, plan: normalizedPlan },
+            subscription_data: { metadata: { user_id: user.id, plan: normalizedPlan } }
         };
         
         if (customerId) sessionParams.customer = customerId;
@@ -200,20 +205,20 @@ router.post('/checkout', async (req, res) => {
         
     } catch (e) {
         logger.error({ component: 'Payments', err: e.message }, 'Checkout error');
-        res.status(500).json({ error: 'Eroare checkout' });
+        res.status(500).json({ error: 'Checkout error' });
     }
 });
 
 // POST /api/payments/portal — Stripe billing portal (manage subscription)
 router.post('/portal', async (req, res) => {
     try {
-        if (!stripe) return res.status(503).json({ error: 'Plăți indisponibile' });
+        if (!stripe) return res.status(503).json({ error: 'Payments service unavailable' });
         
         const { getUserFromToken, supabaseAdmin } = req.app.locals;
         const user = await getUserFromToken(req);
-        if (!user) return res.status(401).json({ error: 'Neautentificat' });
+        if (!user) return res.status(401).json({ error: 'Not authenticated' });
         
-        if (!supabaseAdmin) return res.status(503).json({ error: 'DB indisponibil' });
+        if (!supabaseAdmin) return res.status(503).json({ error: 'Database unavailable' });
         
         const { data } = await supabaseAdmin
             .from('subscriptions')
@@ -221,7 +226,7 @@ router.post('/portal', async (req, res) => {
             .eq('user_id', user.id)
             .single();
         
-        if (!data?.stripe_customer_id) return res.status(404).json({ error: 'Nicio subscripție activă' });
+        if (!data?.stripe_customer_id) return res.status(404).json({ error: 'No active subscription found' });
         
         const session = await stripe.billingPortal.sessions.create({
             customer: data.stripe_customer_id,
@@ -230,7 +235,7 @@ router.post('/portal', async (req, res) => {
         
         res.json({ url: session.url });
     } catch (e) {
-        res.status(500).json({ error: 'Eroare portal' });
+        res.status(500).json({ error: 'Portal error' });
     }
 });
 
@@ -257,6 +262,18 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
         
         const { supabaseAdmin } = req.app.locals;
         if (!supabaseAdmin) return res.status(503).send('DB not available');
+
+        // Idempotency check — skip already-processed events
+        if (processedWebhookEvents.has(event.id)) {
+            logger.info({ component: 'Payments', eventId: event.id }, 'Duplicate webhook event skipped');
+            return res.json({ received: true });
+        }
+        processedWebhookEvents.add(event.id);
+        // Keep the set bounded to avoid unbounded memory growth (keep last 10000 events)
+        if (processedWebhookEvents.size > 10000) {
+            const first = processedWebhookEvents.values().next().value;
+            processedWebhookEvents.delete(first);
+        }
         
         switch (event.type) {
             case 'checkout.session.completed': {
@@ -330,8 +347,8 @@ router.post('/referral', async (req, res) => {
     try {
         const { getUserFromToken, supabaseAdmin } = req.app.locals;
         const user = await getUserFromToken(req);
-        if (!user) return res.status(401).json({ error: 'Neautentificat' });
-        if (!supabaseAdmin) return res.status(503).json({ error: 'DB indisponibil' });
+        if (!user) return res.status(401).json({ error: 'Not authenticated' });
+        if (!supabaseAdmin) return res.status(503).json({ error: 'Database unavailable' });
         
         // Check if user already has a referral code
         const { data: existing } = await supabaseAdmin
@@ -347,7 +364,7 @@ router.post('/referral', async (req, res) => {
         
         res.json({ code });
     } catch (e) {
-        res.status(500).json({ error: 'Eroare referral' });
+        res.status(500).json({ error: 'Referral error' });
     }
 });
 
@@ -356,11 +373,11 @@ router.post('/redeem', async (req, res) => {
     try {
         const { getUserFromToken, supabaseAdmin } = req.app.locals;
         const user = await getUserFromToken(req);
-        if (!user) return res.status(401).json({ error: 'Neautentificat' });
-        if (!supabaseAdmin) return res.status(503).json({ error: 'DB indisponibil' });
+        if (!user) return res.status(401).json({ error: 'Not authenticated' });
+        if (!supabaseAdmin) return res.status(503).json({ error: 'Database unavailable' });
         
         const { code } = req.body;
-        if (!code) return res.status(400).json({ error: 'Cod lipsă' });
+        if (!code) return res.status(400).json({ error: 'Code is required' });
         
         const { data: referral } = await supabaseAdmin
             .from('referrals')
@@ -368,10 +385,10 @@ router.post('/redeem', async (req, res) => {
             .eq('code', code.toUpperCase())
             .single();
         
-        if (!referral) return res.status(404).json({ error: 'Cod invalid' });
-        if (referral.user_id === user.id) return res.status(400).json({ error: 'Nu poți folosi propriul cod' });
+        if (!referral) return res.status(404).json({ error: 'Invalid code' });
+        if (referral.user_id === user.id) return res.status(400).json({ error: 'You cannot use your own referral code' });
         if (referral.redeemed_by && referral.redeemed_by.includes(user.id)) {
-            return res.status(400).json({ error: 'Cod deja folosit' });
+            return res.status(400).json({ error: 'Code already used' });
         }
         
         const proEnd = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
@@ -397,9 +414,9 @@ router.post('/redeem', async (req, res) => {
         redeemed.push(user.id);
         await supabaseAdmin.from('referrals').update({ redeemed_by: redeemed }).eq('code', code.toUpperCase());
         
-        res.json({ success: true, message: '7 zile Pro activate pentru tine și prietenul tău!' });
+        res.json({ success: true, message: '7 days Pro activated for you and your friend!' });
     } catch (e) {
-        res.status(500).json({ error: 'Eroare redeem' });
+        res.status(500).json({ error: 'Redeem error' });
     }
 });
 
