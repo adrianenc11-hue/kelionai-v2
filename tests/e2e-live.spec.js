@@ -1,4 +1,5 @@
 // @ts-check
+// LIVE-ONLY: Toate testele rulează contra https://kelionai.app — NU localhost
 /**
  * E2E Live Tests — kelionai.app
  * Runs directly against https://kelionai.app (zero localhost).
