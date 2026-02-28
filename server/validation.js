@@ -67,6 +67,23 @@ const memorySchema = z.object({
     value: z.any().optional(),
 });
 
+const forgotPasswordSchema = z.object({
+    email: z.string().email(),
+});
+
+const resetPasswordSchema = z.object({
+    access_token: z.string().min(1),
+    password: z.string().min(6).max(128),
+});
+
+const changePasswordSchema = z.object({
+    password: z.string().min(6).max(128),
+});
+
+const changeEmailSchema = z.object({
+    email: z.string().email(),
+});
+
 // ═══ MIDDLEWARE FACTORY ═══
 
 function validate(schema) {
@@ -74,7 +91,7 @@ function validate(schema) {
         const result = schema.safeParse(req.body);
         if (!result.success) {
             return res.status(400).json({
-                error: 'Validare eșuată',
+                error: 'Validation failed',
                 details: result.error.issues.map(i => ({
                     field: i.path.join('.'),
                     message: i.message,
@@ -99,4 +116,8 @@ module.exports = {
     weatherSchema,
     imagineSchema,
     memorySchema,
+    forgotPasswordSchema,
+    resetPasswordSchema,
+    changePasswordSchema,
+    changeEmailSchema,
 };

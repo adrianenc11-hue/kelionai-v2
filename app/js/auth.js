@@ -12,7 +12,9 @@
 
     async function register(email, pw, name) {
         const r = await fetch(API+'/api/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password: pw, name }) });
-        const d = await r.json(); if (!r.ok) throw new Error(d.error); currentUser = d.user; if (d.session) saveSession(d.session, d.user); return d;
+        const d = await r.json(); if (!r.ok) throw new Error(d.error);
+        // Registration no longer returns a session — user must verify email first
+        return d;
     }
 
     async function login(email, pw) {
@@ -21,6 +23,21 @@
     }
 
     async function logout() { try { await fetch(API+'/api/auth/logout', { method: 'POST', headers: getAuthHeaders() }); } catch(e){} clearSession(); }
+
+    async function forgotPassword(email) {
+        const r = await fetch(API+'/api/auth/forgot-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) });
+        const d = await r.json(); if (!r.ok) throw new Error(d.error); return d;
+    }
+
+    async function changePassword(password) {
+        const r = await fetch(API+'/api/auth/change-password', { method: 'POST', headers: { 'Content-Type': 'application/json', ...getAuthHeaders() }, body: JSON.stringify({ password }) });
+        const d = await r.json(); if (!r.ok) throw new Error(d.error); return d;
+    }
+
+    async function changeEmail(email) {
+        const r = await fetch(API+'/api/auth/change-email', { method: 'POST', headers: { 'Content-Type': 'application/json', ...getAuthHeaders() }, body: JSON.stringify({ email }) });
+        const d = await r.json(); if (!r.ok) throw new Error(d.error); return d;
+    }
 
     async function checkSession() {
         const { token, user } = loadSession(); if (!token) return null;
@@ -40,20 +57,45 @@
         const form = scr.querySelector('#auth-form'), tog = scr.querySelector('#auth-toggle'), err = scr.querySelector('#auth-error');
         const sub = scr.querySelector('#auth-submit'), ttl = scr.querySelector('#auth-title'), nmg = scr.querySelector('#auth-name-group');
         const guest = scr.querySelector('#auth-guest');
+        const forgotLink = scr.querySelector('#auth-forgot-link');
+        const forgotDiv = scr.querySelector('#auth-forgot');
         let isReg = false;
 
         if (tog) tog.addEventListener('click', (e) => { e.preventDefault(); isReg = !isReg;
             ttl.textContent = isReg ? 'Create Account' : 'Sign In'; sub.textContent = isReg ? 'Register' : 'Sign In';
-            tog.textContent = isReg ? 'I have an account → Sign In' : 'No account → Create'; if (nmg) nmg.style.display = isReg ? 'block' : 'none'; if (err) err.textContent = ''; });
+            tog.textContent = isReg ? 'I have an account → Sign In' : 'No account → Create';
+            if (nmg) nmg.style.display = isReg ? 'block' : 'none';
+            if (forgotDiv) forgotDiv.style.display = isReg ? 'none' : 'block';
+            if (err) err.textContent = ''; });
+
+        if (forgotLink) forgotLink.addEventListener('click', async (e) => {
+            e.preventDefault();
+            const emailEl = form ? form.querySelector('#auth-email') : null;
+            const email = emailEl ? emailEl.value.trim() : '';
+            if (!email) { if (err) err.textContent = 'Please enter your email address first'; return; }
+            forgotLink.textContent = '...';
+            try {
+                await forgotPassword(email);
+                if (err) { err.style.color = '#00ff88'; err.textContent = 'Password reset email sent. Please check your inbox.'; }
+            } catch(ex) {
+                if (err) { err.style.color = ''; err.textContent = ex.message; }
+            } finally { forgotLink.textContent = 'Forgot password?'; }
+        });
 
         if (form) form.addEventListener('submit', async (e) => { e.preventDefault();
             const em = form.querySelector('#auth-email').value.trim(), pw = form.querySelector('#auth-password').value, nm = form.querySelector('#auth-name')?.value.trim();
             if (!em || !pw) { if (err) err.textContent = 'Please enter email and password'; return; }
-            sub.disabled = true; sub.textContent = '...'; if (err) err.textContent = '';
-            try { if (isReg) await register(em, pw, nm); else await login(em, pw);
-                scr.classList.add('hidden'); document.getElementById('app-layout').classList.remove('hidden'); updateUI();
-                if (window.KApp) KApp.loadConversations();
-            } catch(ex) { if (err) err.textContent = ex.message; }
+            sub.disabled = true; sub.textContent = '...'; if (err) { err.textContent = ''; err.style.color = ''; }
+            try {
+                if (isReg) {
+                    const d = await register(em, pw, nm);
+                    if (err) { err.style.color = '#00ff88'; err.textContent = d.message || 'Please check your email to verify your account.'; }
+                } else {
+                    await login(em, pw);
+                    scr.classList.add('hidden'); document.getElementById('app-layout').classList.remove('hidden'); updateUI();
+                    if (window.KApp) KApp.loadConversations();
+                }
+            } catch(ex) { if (err) { err.style.color = ''; err.textContent = ex.message; } }
             finally { sub.disabled = false; sub.textContent = isReg ? 'Register' : 'Sign In'; } });
 
         if (guest) guest.addEventListener('click', () => { scr.classList.add('hidden'); document.getElementById('app-layout').classList.remove('hidden'); updateUI(); });
@@ -69,5 +111,5 @@
         else { document.getElementById('auth-screen')?.classList.remove('hidden'); document.getElementById('app-layout')?.classList.add('hidden'); updateUI(); }
         setInterval(async () => { if (localStorage.getItem('kelion_token') && isTokenExpired()) { const ok = await refreshToken(); if (!ok) { updateUI(); document.getElementById('auth-screen')?.classList.remove('hidden'); document.getElementById('app-layout')?.classList.add('hidden'); } } }, 5 * 60 * 1000); }
 
-    window.KAuth = { init, register, login, logout, checkSession, getAuthHeaders, getUser: () => currentUser, isLoggedIn: () => !!currentUser };
+    window.KAuth = { init, register, login, logout, checkSession, getAuthHeaders, getUser: () => currentUser, isLoggedIn: () => !!currentUser, forgotPassword, changePassword, changeEmail };
 })();
