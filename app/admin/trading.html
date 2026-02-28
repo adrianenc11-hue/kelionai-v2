@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KelionAI — Trading Bot Admin</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #0a0a1a; color: #e0e0e0; font-family: system-ui, sans-serif; padding: 20px; }
+        h1 { color: #00ffff; margin-bottom: 6px; font-size: 1.4rem; }
+        .subtitle { color: #888; font-size: 0.85rem; margin-bottom: 14px; }
+        .btn { background: #00ffff; color: #000; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 0.85rem; }
+        .btn:hover { background: #00dddd; }
+        .btn.secondary { background: rgba(255,255,255,0.1); color: #e0e0e0; }
+        .btn.secondary:hover { background: rgba(255,255,255,0.18); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .admin-input { background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.15); color: #e0e0e0; padding: 8px 12px; border-radius: 8px; font-size: 0.85rem; width: 240px; }
+        select.admin-input { width: auto; min-width: 140px; }
+        .auth-row { display: flex; gap: 8px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
+        .auth-row label { font-size: 0.82rem; color: #888; }
+        .status-bar { font-size: 0.8rem; color: #888; }
+        .status-bar span { color: #00ffff; }
+        .error-msg { color: #ff6666; font-size: 0.82rem; }
+        .loading { text-align: center; padding: 24px; color: #00ffff; font-size: 0.88rem; }
+        .empty-state { text-align: center; padding: 30px; color: #555; font-size: 0.88rem; }
+
+        /* Disclaimer */
+        .disclaimer { background: rgba(255,180,0,0.1); border: 1px solid rgba(255,180,0,0.35); border-radius: 10px; padding: 12px 16px; margin-bottom: 18px; font-size: 0.83rem; color: #ffd060; display: flex; align-items: center; gap: 8px; }
+
+        /* Section headings */
+        .section { margin-bottom: 24px; }
+        .section-title { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 1px; color: #888; margin-bottom: 10px; }
+
+        /* Cards */
+        .card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 16px; }
+        .card + .card { margin-top: 8px; }
+
+        /* Status panel */
+        .stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
+        .stat-item { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 14px 16px; }
+        .stat-label { font-size: 0.73rem; color: #888; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 6px; }
+        .stat-value { font-size: 1.15rem; color: #00ffff; font-weight: bold; }
+
+        /* Market grid */
+        .market-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; }
+        .asset-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 14px; }
+        .asset-name { font-size: 0.95rem; font-weight: bold; color: #fff; margin-bottom: 4px; }
+        .asset-price { font-size: 0.82rem; color: #aaa; margin-bottom: 8px; }
+        .signal-badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 0.78rem; font-weight: bold; }
+        .signal-buy { background: rgba(0,200,80,0.18); color: #00dd66; border: 1px solid rgba(0,200,80,0.35); }
+        .signal-sell { background: rgba(255,60,60,0.18); color: #ff6666; border: 1px solid rgba(255,60,60,0.35); }
+        .signal-hold { background: rgba(255,200,0,0.15); color: #ffc800; border: 1px solid rgba(255,200,0,0.3); }
+
+        /* Signal cards */
+        .signal-list { display: flex; flex-direction: column; gap: 8px; }
+        .signal-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 14px 16px; }
+        .signal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .signal-asset { font-size: 1rem; font-weight: bold; color: #fff; }
+        .signal-details { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 6px; font-size: 0.8rem; }
+        .signal-detail-item .detail-label { color: #888; font-size: 0.72rem; text-transform: uppercase; }
+        .signal-detail-item .detail-val { color: #e0e0e0; margin-top: 2px; }
+        .rr-badge { background: rgba(0,255,255,0.1); color: #00ffff; border: 1px solid rgba(0,255,255,0.25); padding: 2px 8px; border-radius: 6px; font-size: 0.78rem; }
+
+        /* Backtest form */
+        .backtest-form { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+        .form-group { display: flex; flex-direction: column; gap: 5px; }
+        .form-group label { font-size: 0.78rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; }
+        .backtest-result { margin-top: 14px; }
+        .backtest-result table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+        .backtest-result th { text-align: left; color: #888; font-size: 0.72rem; text-transform: uppercase; padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+        .backtest-result td { padding: 7px 8px; border-bottom: 1px solid rgba(255,255,255,0.05); color: #e0e0e0; }
+        .backtest-result tr:last-child td { border: none; }
+
+        /* Risk */
+        .risk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
+        .risk-item { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 14px; }
+        .risk-label { font-size: 0.72rem; color: #888; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 5px; }
+        .risk-value { font-size: 1.1rem; font-weight: bold; color: #00ffff; }
+        .risk-value.warn { color: #ffc800; }
+        .risk-value.danger { color: #ff6666; }
+
+        /* Toolbar */
+        .toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 6px; }
+    </style>
+</head>
+<body>
+    <h1>📈 KelionAI — Trading Bot</h1>
+    <p class="subtitle">Panou administrare trading — ADMIN ONLY</p>
+
+    <div class="disclaimer">
+        ⚠️ INFORMATIV — Nu constituie sfat de investiții. KelionAI nu oferă consiliere financiară.
+    </div>
+
+    <div class="auth-row">
+        <label>Admin Secret:</label>
+        <input type="password" id="admin-secret" class="admin-input" placeholder="x-admin-secret" autocomplete="off">
+        <button class="btn secondary" onclick="saveSecret()">Salvează</button>
+        <span class="status-bar" id="status-bar">—</span>
+    </div>
+
+    <div class="toolbar">
+        <button class="btn secondary" onclick="loadAll()">🔄 Reîncarcă</button>
+        <button class="btn secondary" onclick="exportJson()">⬇ Export JSON</button>
+    </div>
+
+    <!-- STATUS PANEL -->
+    <div class="section">
+        <div class="section-title">📊 Status Bot</div>
+        <div class="stat-grid" id="status-grid">
+            <div class="loading">Se încarcă...</div>
+        </div>
+    </div>
+
+    <!-- MARKET OVERVIEW -->
+    <div class="section">
+        <div class="section-title">🌐 Prezentare Generală Piață</div>
+        <div class="market-grid" id="market-grid">
+            <div class="loading">Se încarcă...</div>
+        </div>
+    </div>
+
+    <!-- SIGNAL CARDS -->
+    <div class="section">
+        <div class="section-title">🎯 Semnale Active</div>
+        <div class="signal-list" id="signal-list">
+            <div class="loading">Se încarcă...</div>
+        </div>
+    </div>
+
+    <!-- BACKTEST PANEL -->
+    <div class="section">
+        <div class="section-title">🔬 Backtest Strategie</div>
+        <div class="card">
+            <div class="backtest-form">
+                <div class="form-group">
+                    <label>Strategie</label>
+                    <select id="bt-strategy" class="admin-input">
+                        <option value="RSI">RSI</option>
+                        <option value="MACD">MACD</option>
+                        <option value="BollingerBands">Bollinger Bands</option>
+                        <option value="EMACrossover">EMA Crossover</option>
+                        <option value="Fibonacci">Fibonacci</option>
+                        <option value="VolumeProfile">Volume Profile</option>
+                        <option value="Sentiment">Sentiment</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Activ</label>
+                    <select id="bt-asset" class="admin-input">
+                        <option value="BTC">BTC</option>
+                        <option value="ETH">ETH</option>
+                        <option value="SOL">SOL</option>
+                        <option value="EUR/USD">EUR/USD</option>
+                        <option value="GBP/USD">GBP/USD</option>
+                        <option value="Gold">Gold</option>
+                        <option value="Oil">Oil</option>
+                        <option value="S&amp;P 500">S&amp;P 500</option>
+                        <option value="NASDAQ">NASDAQ</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Perioadă</label>
+                    <select id="bt-period" class="admin-input">
+                        <option value="30">1 Lună</option>
+                        <option value="90">3 Luni</option>
+                        <option value="180">6 Luni</option>
+                        <option value="365" selected>1 An</option>
+                    </select>
+                </div>
+                <button class="btn" id="btn-backtest" onclick="runBacktest()">▶ Rulează Backtest</button>
+            </div>
+            <div class="backtest-result" id="backtest-result"></div>
+        </div>
+    </div>
+
+    <!-- RISK DASHBOARD -->
+    <div class="section">
+        <div class="section-title">🛡 Dashboard Risc</div>
+        <div class="risk-grid" id="risk-grid">
+            <div class="loading">Se încarcă...</div>
+        </div>
+    </div>
+
+    <script>
+        'use strict';
+
+        let adminSecret = sessionStorage.getItem('kelion_admin_secret') || '';
+        let snapshot = {};
+
+        document.getElementById('admin-secret').value = adminSecret;
+
+        function saveSecret() {
+            adminSecret = document.getElementById('admin-secret').value.trim();
+            sessionStorage.setItem('kelion_admin_secret', adminSecret);
+            setStatus('Secret salvat.');
+            loadAll();
+        }
+
+        function getHeaders() {
+            return { 'x-admin-secret': adminSecret };
+        }
+
+        function setStatus(msg, isError) {
+            const el = document.getElementById('status-bar');
+            el.innerHTML = isError
+                ? `<span class="error-msg">${escHtml(msg)}</span>`
+                : `<span>${escHtml(msg)}</span>`;
+        }
+
+        function escHtml(str) {
+            return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        }
+
+        function fmtDate(iso) {
+            try { return new Date(iso).toLocaleString('ro-RO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }); }
+            catch (e) { return iso || '—'; }
+        }
+
+        function signalClass(signal) {
+            if (!signal) return 'signal-hold';
+            const s = String(signal).toUpperCase();
+            if (s === 'BUY') return 'signal-buy';
+            if (s === 'SELL') return 'signal-sell';
+            return 'signal-hold';
+        }
+
+        // ═══ STATUS ═══
+        async function loadStatus() {
+            const el = document.getElementById('status-grid');
+            try {
+                const res = await fetch('/api/trading/status', { headers: getHeaders() });
+                if (res.status === 401) { el.innerHTML = '<div class="error-msg">Unauthorized — verifică admin secret.</div>'; return; }
+                const data = await res.json();
+                snapshot.status = data;
+                const items = [
+                    { label: 'Status Bot', value: escHtml(data.status || 'N/A') },
+                    { label: 'Versiune', value: escHtml(data.version || 'N/A') },
+                    { label: 'Ultima Actualizare', value: fmtDate(data.lastUpdate) },
+                    { label: 'Active Trades', value: escHtml(String(data.activeTrades ?? '—')) },
+                    { label: 'Uptime', value: escHtml(data.uptime || '—') },
+                ];
+                el.innerHTML = items.map(i => `
+                    <div class="stat-item">
+                        <div class="stat-label">${i.label}</div>
+                        <div class="stat-value">${i.value}</div>
+                    </div>`).join('');
+            } catch (e) {
+                el.innerHTML = `<div class="error-msg">Eroare status: ${escHtml(e.message)}</div>`;
+            }
+        }
+
+        // ═══ MARKET OVERVIEW ═══
+        async function loadAnalysis() {
+            const el = document.getElementById('market-grid');
+            try {
+                const res = await fetch('/api/trading/analysis', { headers: getHeaders() });
+                if (res.status === 401) { el.innerHTML = '<div class="error-msg">Unauthorized.</div>'; return; }
+                const data = await res.json();
+                snapshot.analysis = data;
+                const assets = data.assets || data.analysis || [];
+                if (!assets.length) { el.innerHTML = '<div class="empty-state">Nicio analiză disponibilă.</div>'; return; }
+                el.innerHTML = assets.map(a => `
+                    <div class="asset-card">
+                        <div class="asset-name">${escHtml(a.symbol || a.asset)}</div>
+                        <div class="asset-price">${escHtml(a.price ? String(a.price) : '—')}</div>
+                        <span class="signal-badge ${signalClass(a.signal)}">${escHtml(a.signal || 'HOLD')}</span>
+                        ${a.changePercent != null ? `<div style="font-size:0.78rem;margin-top:6px;color:${parseFloat(a.changePercent)>=0?'#00dd66':'#ff6666'}">${parseFloat(a.changePercent)>=0?'+':''}${escHtml(String(a.changePercent))}%</div>` : ''}
+                    </div>`).join('');
+            } catch (e) {
+                el.innerHTML = `<div class="error-msg">Eroare analiză: ${escHtml(e.message)}</div>`;
+            }
+        }
+
+        // ═══ SIGNALS ═══
+        async function loadSignals() {
+            const el = document.getElementById('signal-list');
+            try {
+                const res = await fetch('/api/trading/signals', { headers: getHeaders() });
+                if (res.status === 401) { el.innerHTML = '<div class="error-msg">Unauthorized.</div>'; return; }
+                const data = await res.json();
+                snapshot.signals = data;
+                const signals = data.signals || [];
+                if (!signals.length) { el.innerHTML = '<div class="empty-state">Niciun semnal activ.</div>'; return; }
+                el.innerHTML = signals.map(s => `
+                    <div class="signal-card">
+                        <div class="signal-header">
+                            <span class="signal-asset">${escHtml(s.symbol || s.asset)}</span>
+                            <div style="display:flex;gap:6px;align-items:center;">
+                                <span class="signal-badge ${signalClass(s.signal)}">${escHtml(s.signal || 'HOLD')}</span>
+                                ${s.riskReward ? `<span class="rr-badge">R:R ${escHtml(String(s.riskReward))}</span>` : ''}
+                            </div>
+                        </div>
+                        <div class="signal-details">
+                            <div class="signal-detail-item"><div class="detail-label">Intrare</div><div class="detail-val">${escHtml(s.entry != null ? String(s.entry) : '—')}</div></div>
+                            <div class="signal-detail-item"><div class="detail-label">Target</div><div class="detail-val" style="color:#00dd66">${escHtml(s.target != null ? String(s.target) : '—')}</div></div>
+                            <div class="signal-detail-item"><div class="detail-label">Stop Loss</div><div class="detail-val" style="color:#ff6666">${escHtml(s.stopLoss != null ? String(s.stopLoss) : '—')}</div></div>
+                            <div class="signal-detail-item"><div class="detail-label">Timeframe</div><div class="detail-val">${escHtml(s.timeframe || '—')}</div></div>
+                            <div class="signal-detail-item"><div class="detail-label">Confidence</div><div class="detail-val">${escHtml(s.confidence != null ? String(s.confidence) + '%' : '—')}</div></div>
+                            <div class="signal-detail-item"><div class="detail-label">Generat La</div><div class="detail-val">${fmtDate(s.generatedAt)}</div></div>
+                        </div>
+                    </div>`).join('');
+            } catch (e) {
+                el.innerHTML = `<div class="error-msg">Eroare semnale: ${escHtml(e.message)}</div>`;
+            }
+        }
+
+        // ═══ BACKTEST ═══
+        async function runBacktest() {
+            const btn = document.getElementById('btn-backtest');
+            const resultEl = document.getElementById('backtest-result');
+            btn.disabled = true;
+            resultEl.innerHTML = '<div class="loading">Se rulează backtest...</div>';
+            const payload = {
+                strategy: document.getElementById('bt-strategy').value,
+                asset: document.getElementById('bt-asset').value,
+                period: document.getElementById('bt-period').value,
+            };
+            try {
+                const res = await fetch('/api/trading/backtest', {
+                    method: 'POST',
+                    headers: { ...getHeaders(), 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                if (res.status === 401) { resultEl.innerHTML = '<div class="error-msg">Unauthorized.</div>'; btn.disabled = false; return; }
+                const data = await res.json();
+                snapshot.backtest = data;
+                const rows = [
+                    ['Total Trades', data.totalTrades ?? '—'],
+                    ['Win Rate', data.winRate != null ? data.winRate + '%' : '—'],
+                    ['Profit Net', data.netProfit != null ? data.netProfit + '%' : '—'],
+                    ['Max Drawdown', data.maxDrawdown != null ? data.maxDrawdown + '%' : '—'],
+                    ['Sharpe Ratio', data.sharpeRatio ?? '—'],
+                    ['Profit Factor', data.profitFactor ?? '—'],
+                ];
+                resultEl.innerHTML = `<table>
+                    <tr>${rows.map(r => `<th>${escHtml(String(r[0]))}</th>`).join('')}</tr>
+                    <tr>${rows.map(r => `<td>${escHtml(String(r[1]))}</td>`).join('')}</tr>
+                </table>`;
+            } catch (e) {
+                resultEl.innerHTML = `<div class="error-msg">Eroare backtest: ${escHtml(e.message)}</div>`;
+            }
+            btn.disabled = false;
+        }
+
+        // ═══ RISK ═══
+        async function loadRisk() {
+            const el = document.getElementById('risk-grid');
+            try {
+                const res = await fetch('/api/trading/risk', { headers: getHeaders() });
+                if (res.status === 401) { el.innerHTML = '<div class="error-msg">Unauthorized.</div>'; return; }
+                const data = await res.json();
+                snapshot.risk = data;
+                const metrics = [
+                    { label: 'Sharpe Ratio', value: data.sharpeRatio ?? '—', warn: parseFloat(data.sharpeRatio) < 1 },
+                    { label: 'Max Drawdown', value: data.maxDrawdown != null ? data.maxDrawdown + '%' : '—', warn: parseFloat(data.maxDrawdown) > 15, danger: parseFloat(data.maxDrawdown) > 25 },
+                    { label: 'VaR (95%)', value: data.var95 != null ? data.var95 + '%' : '—', warn: parseFloat(data.var95) > 5 },
+                    { label: 'VaR (99%)', value: data.var99 != null ? data.var99 + '%' : '—', warn: parseFloat(data.var99) > 8 },
+                    { label: 'Sortino Ratio', value: data.sortinoRatio ?? '—' },
+                    { label: 'Calmar Ratio', value: data.calmarRatio ?? '—' },
+                    { label: 'Expunere Totală', value: data.totalExposure != null ? data.totalExposure + '%' : '—', warn: parseFloat(data.totalExposure) > 50 },
+                    { label: 'Nivelul Riscului', value: data.riskLevel || '—' },
+                ];
+                el.innerHTML = metrics.map(m => {
+                    const cls = m.danger ? 'danger' : m.warn ? 'warn' : '';
+                    return `<div class="risk-item">
+                        <div class="risk-label">${escHtml(m.label)}</div>
+                        <div class="risk-value ${cls}">${escHtml(String(m.value))}</div>
+                    </div>`;
+                }).join('');
+            } catch (e) {
+                el.innerHTML = `<div class="error-msg">Eroare risc: ${escHtml(e.message)}</div>`;
+            }
+        }
+
+        // ═══ EXPORT ═══
+        function exportJson() {
+            const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `trading-snapshot-${new Date().toISOString().slice(0,10)}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // ═══ INIT ═══
+        async function loadAll() {
+            setStatus('Se încarcă datele...');
+            await Promise.all([loadStatus(), loadAnalysis(), loadSignals(), loadRisk()]);
+            setStatus(`Actualizat la ${new Date().toLocaleTimeString('ro-RO')}`);
+        }
+
+        if (adminSecret) {
+            loadAll();
+        } else {
+            setStatus('Introdu admin secret și apasă Salvează.');
+        }
+
+        // Auto-refresh every 30 seconds
+        setInterval(() => { if (adminSecret) loadAll(); }, 30000);
+    </script>
+</body>
+</html>
