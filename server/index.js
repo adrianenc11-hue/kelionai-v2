@@ -30,7 +30,7 @@ const { router: paymentsRouter, checkUsage, incrementUsage } = require('./paymen
 const legalRouter = require('./legal');
 const { router: messengerRouter, getStats: getMessengerStats } = require('./messenger');
 const developerRouter = require('./routes/developer');
-const { validate, registerSchema, loginSchema, refreshSchema, chatSchema, speakSchema, listenSchema, visionSchema, searchSchema, weatherSchema, imagineSchema, memorySchema } = require('./validation');
+const { validate, registerSchema, loginSchema, refreshSchema, chatSchema, speakSchema, listenSchema, visionSchema, searchSchema, weatherSchema, imagineSchema, memorySchema, forgotPasswordSchema, resetPasswordSchema, changePasswordSchema, changeEmailSchema } = require('./validation');
 
 const app = express();
 app.set('trust proxy', 1);
@@ -132,15 +132,15 @@ app.use((req, res, next) => {
 });
 
 // ═══ RATE LIMITING ═══
-const chatLimiter = rateLimit({ windowMs: 60 * 1000, max: 20, message: { error: 'Prea multe cereri. Așteaptă un minut.' }, standardHeaders: true, legacyHeaders: false });
-const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10, message: { error: 'Prea multe încercări. Așteaptă 15 minute.' } });
-const searchLimiter = rateLimit({ windowMs: 60 * 1000, max: 15, message: { error: 'Prea multe căutări. Așteaptă un minut.' } });
-const imageLimiter = rateLimit({ windowMs: 60 * 1000, max: 5, message: { error: 'Prea multe imagini. Așteaptă un minut.' } });
+const chatLimiter = rateLimit({ windowMs: 60 * 1000, max: 20, message: { error: 'Too many requests. Please wait a minute.' }, standardHeaders: true, legacyHeaders: false });
+const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10, message: { error: 'Too many attempts. Please wait 15 minutes.' } });
+const searchLimiter = rateLimit({ windowMs: 60 * 1000, max: 15, message: { error: 'Too many searches. Please wait a minute.' } });
+const imageLimiter = rateLimit({ windowMs: 60 * 1000, max: 5, message: { error: 'Too many image requests. Please wait a minute.' } });
 
 const apiLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 20,
-    message: { error: 'Prea multe cereri API. Așteaptă 15 minute.' },
+    message: { error: 'Too many API requests. Please wait 15 minutes.' },
     standardHeaders: true,
     legacyHeaders: false
 });
@@ -148,13 +148,13 @@ const apiLimiter = rateLimit({
 const globalLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 200,
-    message: { error: 'Prea multe cereri. Încearcă mai târziu.' },
+    message: { error: 'Too many requests. Please try again later.' },
     standardHeaders: true,
     legacyHeaders: false
 });
 
-const memoryLimiter = rateLimit({ windowMs: 60 * 1000, max: 30, message: { error: 'Prea multe cereri memorie.' }, standardHeaders: true, legacyHeaders: false });
-const weatherLimiter = rateLimit({ windowMs: 60 * 1000, max: 10, message: { error: 'Prea multe cereri meteo.' }, standardHeaders: true, legacyHeaders: false });
+const memoryLimiter = rateLimit({ windowMs: 60 * 1000, max: 30, message: { error: 'Too many memory requests.' }, standardHeaders: true, legacyHeaders: false });
+const weatherLimiter = rateLimit({ windowMs: 60 * 1000, max: 10, message: { error: 'Too many weather requests.' }, standardHeaders: true, legacyHeaders: false });
 
 const asyncHandler = (fn) => (req, res, next) => {
     Promise.resolve(fn(req, res, next)).catch(next);
@@ -209,11 +209,27 @@ const _rawOnboarding = fs.existsSync(path.join(__dirname, '..', 'app', 'onboardi
     ? fs.readFileSync(path.join(__dirname, '..', 'app', 'onboarding.html'), 'utf8')
     : null;
 
+// Read reset-password.html once at startup
+const _rawResetPassword = fs.existsSync(path.join(__dirname, '..', 'app', 'reset-password.html'))
+    ? fs.readFileSync(path.join(__dirname, '..', 'app', 'reset-password.html'), 'utf8')
+    : null;
+
 // Serve onboarding with CSP nonce injection
 app.get('/onboarding.html', (req, res) => {
     if (!_rawOnboarding) return res.redirect('/');
     const nonce = res.locals.cspNonce || '';
     const html = _rawOnboarding.replace(
+        /<script\b(?![^>]*\bnonce=)/g,
+        `<script nonce="${nonce}"`
+    );
+    res.type('html').send(html);
+});
+
+// Serve reset-password with CSP nonce injection
+app.get('/reset-password.html', (req, res) => {
+    if (!_rawResetPassword) return res.redirect('/');
+    const nonce = res.locals.cspNonce || '';
+    const html = _rawResetPassword.replace(
         /<script\b(?![^>]*\bnonce=)/g,
         `<script nonce="${nonce}"`
     );
@@ -261,39 +277,89 @@ async function getUserFromToken(req) {
 app.post('/api/auth/register', authLimiter, validate(registerSchema), async (req, res) => {
     try {
         const { email, password, name } = req.body;
-        if (!email || !password) return res.status(400).json({ error: 'Email și parolă obligatorii' });
-        if (!supabase) return res.status(503).json({ error: 'Auth indisponibil' });
+        if (!email || !password) return res.status(400).json({ error: 'Email and password are required' });
+        if (!supabase) return res.status(503).json({ error: 'Auth service unavailable' });
         const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { full_name: name || email.split('@')[0] } } });
         if (error) return res.status(400).json({ error: error.message });
-        res.json({ user: { id: data.user.id, email: data.user.email, name: data.user.user_metadata?.full_name }, session: data.session });
-    } catch (e) { res.status(500).json({ error: 'Eroare înregistrare' }); }
+        res.json({ user: { id: data.user.id, email: data.user.email, name: data.user.user_metadata?.full_name }, message: 'Please check your email to verify your account before signing in.' });
+    } catch (e) { res.status(500).json({ error: 'Registration error' }); }
 });
 
 app.post('/api/auth/login', authLimiter, validate(loginSchema), async (req, res) => {
     try {
         const { email, password } = req.body;
-        if (!email || !password) return res.status(400).json({ error: 'Email și parolă obligatorii' });
-        if (!supabase) return res.status(503).json({ error: 'Auth indisponibil' });
+        if (!email || !password) return res.status(400).json({ error: 'Email and password are required' });
+        if (!supabase) return res.status(503).json({ error: 'Auth service unavailable' });
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) return res.status(401).json({ error: error.message });
+        if (!data.user.email_confirmed_at) {
+            return res.status(403).json({ error: 'Email not verified. Please check your inbox and verify your email before signing in.' });
+        }
         res.json({ user: { id: data.user.id, email: data.user.email, name: data.user.user_metadata?.full_name }, session: data.session });
-    } catch (e) { res.status(500).json({ error: 'Eroare login' }); }
+    } catch (e) { res.status(500).json({ error: 'Login error' }); }
 });
 
 app.post('/api/auth/logout', async (req, res) => { try { if (supabase) await supabase.auth.signOut(); } catch(e){} res.json({ success: true }); });
 app.get('/api/auth/me', asyncHandler(async (req, res) => {
     const u = await getUserFromToken(req);
-    if (!u) return res.status(401).json({ error: 'Neautentificat' });
+    if (!u) return res.status(401).json({ error: 'Not authenticated' });
     res.json({ user: { id: u.id, email: u.email, name: u.user_metadata?.full_name } });
 }));
 app.post('/api/auth/refresh', validate(refreshSchema), async (req, res) => {
     try {
         const { refresh_token } = req.body;
-        if (!refresh_token || !supabase) return res.status(400).json({ error: 'Token lipsă' });
+        if (!refresh_token || !supabase) return res.status(400).json({ error: 'Token missing' });
         const { data, error } = await supabase.auth.refreshSession({ refresh_token });
         if (error) return res.status(401).json({ error: error.message });
         res.json({ user: { id: data.user.id, email: data.user.email, name: data.user.user_metadata?.full_name }, session: data.session });
-    } catch (e) { res.status(500).json({ error: 'Eroare refresh' }); }
+    } catch (e) { res.status(500).json({ error: 'Refresh error' }); }
+});
+
+app.post('/api/auth/forgot-password', authLimiter, validate(forgotPasswordSchema), async (req, res) => {
+    try {
+        const { email } = req.body;
+        if (!supabase) return res.status(503).json({ error: 'Auth service unavailable' });
+        const redirectTo = (process.env.APP_URL || 'https://kelionai.app') + '/reset-password.html';
+        const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+        if (error) return res.status(400).json({ error: error.message });
+        res.json({ message: 'If an account with that email exists, a password reset link has been sent.' });
+    } catch (e) { res.status(500).json({ error: 'Password reset error' }); }
+});
+
+app.post('/api/auth/reset-password', authLimiter, validate(resetPasswordSchema), async (req, res) => {
+    try {
+        const { access_token, password } = req.body;
+        if (!supabase) return res.status(503).json({ error: 'Auth service unavailable' });
+        const { error: sessionError } = await supabase.auth.setSession({ access_token, refresh_token: access_token });
+        if (sessionError) return res.status(401).json({ error: 'Invalid or expired reset token' });
+        const { error } = await supabase.auth.updateUser({ password });
+        if (error) return res.status(400).json({ error: error.message });
+        res.json({ message: 'Password updated successfully.' });
+    } catch (e) { res.status(500).json({ error: 'Password reset error' }); }
+});
+
+app.post('/api/auth/change-password', authLimiter, validate(changePasswordSchema), async (req, res) => {
+    try {
+        const u = await getUserFromToken(req);
+        if (!u) return res.status(401).json({ error: 'Not authenticated' });
+        if (!supabase) return res.status(503).json({ error: 'Auth service unavailable' });
+        const { password } = req.body;
+        const { error } = await supabase.auth.updateUser({ password });
+        if (error) return res.status(400).json({ error: error.message });
+        res.json({ message: 'Password updated successfully.' });
+    } catch (e) { res.status(500).json({ error: 'Change password error' }); }
+});
+
+app.post('/api/auth/change-email', authLimiter, validate(changeEmailSchema), async (req, res) => {
+    try {
+        const u = await getUserFromToken(req);
+        if (!u) return res.status(401).json({ error: 'Not authenticated' });
+        if (!supabase) return res.status(503).json({ error: 'Auth service unavailable' });
+        const { email } = req.body;
+        const { error } = await supabase.auth.updateUser({ email });
+        if (error) return res.status(400).json({ error: error.message });
+        res.json({ message: 'A confirmation email has been sent to the new address.' });
+    } catch (e) { res.status(500).json({ error: 'Change email error' }); }
 });
 
 // ═══════════════════════════════════════════════════════════════
@@ -303,12 +369,12 @@ app.post('/api/auth/refresh', validate(refreshSchema), async (req, res) => {
 app.post('/api/chat', chatLimiter, validate(chatSchema), async (req, res) => {
     try {
         const { message, avatar = 'kelion', history = [], language = 'ro', conversationId } = req.body;
-        if (!message) return res.status(400).json({ error: 'Mesaj lipsă' });
+        if (!message) return res.status(400).json({ error: 'Message is required' });
         const user = await getUserFromToken(req);
 
         // ── Usage check ──
         const usage = await checkUsage(user?.id, 'chat', supabaseAdmin);
-        if (!usage.allowed) return res.status(429).json({ error: 'Limită chat atinsă. Upgrade la Pro pentru mai multe mesaje.', plan: usage.plan, limit: usage.limit, upgrade: true });
+        if (!usage.allowed) return res.status(429).json({ error: 'Chat limit reached. Upgrade to Pro for more messages.', plan: usage.plan, limit: usage.limit, upgrade: true });
 
         // ── BRAIN v2 THINKS: analyze → decompose → plan → execute → CoT ──
         const thought = await brain.think(message, avatar, history, language, user?.id, conversationId);
@@ -393,12 +459,12 @@ app.post('/api/chat', chatLimiter, validate(chatSchema), async (req, res) => {
 app.post('/api/chat/stream', chatLimiter, validate(chatSchema), async (req, res) => {
     try {
         const { message, avatar = 'kelion', history = [], language = 'ro', conversationId } = req.body;
-        if (!message) return res.status(400).json({ error: 'Mesaj lipsă' });
+        if (!message) return res.status(400).json({ error: 'Message is required' });
         const user = await getUserFromToken(req);
 
         // ── Usage check ──
         const usage = await checkUsage(user?.id, 'chat', supabaseAdmin);
-        if (!usage.allowed) return res.status(429).json({ error: 'Limită chat atinsă. Upgrade la Pro pentru mai multe mesaje.', plan: usage.plan, limit: usage.limit, upgrade: true });
+        if (!usage.allowed) return res.status(429).json({ error: 'Chat limit reached. Upgrade to Pro for more messages.', plan: usage.plan, limit: usage.limit, upgrade: true });
 
         // SSE headers
         res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive', 'X-Accel-Buffering': 'no' });
@@ -528,7 +594,7 @@ app.post('/api/speak', apiLimiter, validate(speakSchema), async (req, res) => {
         // ── Usage check ──
         const user = await getUserFromToken(req);
         const usage = await checkUsage(user?.id, 'tts', supabaseAdmin);
-        if (!usage.allowed) return res.status(429).json({ error: 'Limită TTS atinsă. Upgrade la Pro pentru mai mult.', plan: usage.plan, limit: usage.limit, upgrade: true });
+        if (!usage.allowed) return res.status(429).json({ error: 'TTS limit reached. Upgrade to Pro for more.', plan: usage.plan, limit: usage.limit, upgrade: true });
 
         const voiceSettings = {
             happy:     { stability: 0.4, similarity_boost: 0.8, style: 0.7 },
@@ -552,7 +618,7 @@ app.post('/api/speak', apiLimiter, validate(speakSchema), async (req, res) => {
         logger.info({ component: 'Speak', bytes: buf.length, avatar, mood }, buf.length + ' bytes | ' + avatar);
         incrementUsage(user?.id, 'tts', supabaseAdmin).catch(()=>{});
         res.set({ 'Content-Type': 'audio/mpeg', 'Content-Length': buf.length }); res.send(buf);
-    } catch(e) { res.status(500).json({ error: 'Eroare TTS' }); }
+    } catch(e) { res.status(500).json({ error: 'TTS error' }); }
 });
 
 // ═══ STT — Groq Whisper ═══
@@ -560,7 +626,7 @@ app.post('/api/listen', apiLimiter, validate(listenSchema), async (req, res) => 
     try {
         if (req.body.text) return res.json({ text: req.body.text, engine: 'WebSpeech' });
         const { audio } = req.body;
-        if (!audio) return res.status(400).json({ error: 'Audio lipsă' });
+        if (!audio) return res.status(400).json({ error: 'Audio is required' });
         if (process.env.GROQ_API_KEY) {
             const form = new FormData();
             form.append('file', Buffer.from(audio, 'base64'), { filename: 'a.webm', contentType: 'audio/webm' });
@@ -568,8 +634,8 @@ app.post('/api/listen', apiLimiter, validate(listenSchema), async (req, res) => 
             const r = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', { method: 'POST', headers: { 'Authorization': 'Bearer ' + process.env.GROQ_API_KEY }, body: form });
             const d = await r.json(); return res.json({ text: d.text || '', engine: 'Groq' });
         }
-        res.status(503).json({ error: 'Folosește Web Speech API' });
-    } catch(e) { res.status(500).json({ error: 'Eroare STT' }); }
+        res.status(503).json({ error: 'Use Web Speech API' });
+    } catch(e) { res.status(500).json({ error: 'STT error' }); }
 });
 
 // ═══ VISION — Claude Vision ═══
@@ -581,7 +647,7 @@ app.post('/api/vision', apiLimiter, validate(visionSchema), async (req, res) => 
         // ── Usage check ──
         const user = await getUserFromToken(req);
         const usage = await checkUsage(user?.id, 'vision', supabaseAdmin);
-        if (!usage.allowed) return res.status(429).json({ error: 'Limită vision atinsă. Upgrade la Pro pentru mai mult.', plan: usage.plan, limit: usage.limit, upgrade: true });
+        if (!usage.allowed) return res.status(429).json({ error: 'Vision limit reached. Upgrade to Pro for more.', plan: usage.plan, limit: usage.limit, upgrade: true });
 
         const LANGS = { ro:'română', en:'English' };
         const prompt = `Ești OCHII unei persoane. Descrie EXACT ce vezi cu PRECIZIE MAXIMĂ.
@@ -597,19 +663,19 @@ Răspunde în ${LANGS[language] || 'română'}, concis dar detaliat.`;
         const d = await r.json();
         incrementUsage(user?.id, 'vision', supabaseAdmin).catch(()=>{});
         res.json({ description: d.content?.[0]?.text || 'Nu am putut analiza.', avatar, engine: 'Claude' });
-    } catch(e) { res.status(500).json({ error: 'Eroare viziune' }); }
+    } catch(e) { res.status(500).json({ error: 'Vision error' }); }
 });
 
 // ═══ SEARCH — Perplexity Sonar → Tavily → Serper → DuckDuckGo ═══
 app.post('/api/search', searchLimiter, validate(searchSchema), async (req, res) => {
     try {
         const { query } = req.body;
-        if (!query) return res.status(400).json({ error: 'Query lipsă' });
+        if (!query) return res.status(400).json({ error: 'Query is required' });
 
         // ── Usage check ──
         const user = await getUserFromToken(req);
         const usage = await checkUsage(user?.id, 'search', supabaseAdmin);
-        if (!usage.allowed) return res.status(429).json({ error: 'Limită căutări atinsă. Upgrade la Pro pentru mai multe căutări.', plan: usage.plan, limit: usage.limit, upgrade: true });
+        if (!usage.allowed) return res.status(429).json({ error: 'Search limit reached. Upgrade to Pro for more searches.', plan: usage.plan, limit: usage.limit, upgrade: true });
 
         // 1. Perplexity Sonar (best — synthesized answer + citations)
         if (process.env.PERPLEXITY_API_KEY) {
@@ -672,16 +738,16 @@ app.post('/api/search', searchLimiter, validate(searchSchema), async (req, res) 
         if (d.RelatedTopics) for (const t of d.RelatedTopics.slice(0, 5)) if (t.Text) results.push({ title: t.Text.substring(0, 80), content: t.Text, url: t.FirstURL });
         incrementUsage(user?.id, 'search', supabaseAdmin).catch(()=>{});
         res.json({ results, answer: d.Abstract || '', engine: 'DuckDuckGo' });
-    } catch(e) { res.status(500).json({ error: 'Eroare căutare' }); }
+    } catch(e) { res.status(500).json({ error: 'Search error' }); }
 });
 
 // ═══ WEATHER — Open-Meteo ═══
 app.post('/api/weather', weatherLimiter, validate(weatherSchema), async (req, res) => {
     try {
         const { city } = req.body;
-        if (!city) return res.status(400).json({ error: 'Oraș lipsă' });
+        if (!city) return res.status(400).json({ error: 'City is required' });
         const geo = await (await fetch('https://geocoding-api.open-meteo.com/v1/search?name=' + encodeURIComponent(city) + '&count=1&language=ro')).json();
-        if (!geo.results?.[0]) return res.status(404).json({ error: '"' + city + '" negăsit' });
+        if (!geo.results?.[0]) return res.status(404).json({ error: '"' + city + '" not found' });
         const { latitude, longitude, name, country } = geo.results[0];
         const wx = await (await fetch('https://api.open-meteo.com/v1/forecast?latitude='+latitude+'&longitude='+longitude+'&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&timezone=auto')).json();
         const c = wx.current;
@@ -689,7 +755,7 @@ app.post('/api/weather', weatherLimiter, validate(weatherSchema), async (req, re
         const cond = codes[c.weather_code] || '?';
         res.json({ city: name, country, temperature: c.temperature_2m, humidity: c.relative_humidity_2m, wind: c.wind_speed_10m, condition: cond,
             description: name+', '+country+': '+c.temperature_2m+'°C, '+cond+', umiditate '+c.relative_humidity_2m+'%, vânt '+c.wind_speed_10m+' km/h' });
-    } catch(e) { res.status(500).json({ error: 'Eroare meteo' }); }
+    } catch(e) { res.status(500).json({ error: 'Weather error' }); }
 });
 
 // ═══ IMAGINE — Together FLUX ═══
@@ -701,17 +767,17 @@ app.post('/api/imagine', imageLimiter, validate(imagineSchema), async (req, res)
         // ── Usage check ──
         const user = await getUserFromToken(req);
         const usage = await checkUsage(user?.id, 'image', supabaseAdmin);
-        if (!usage.allowed) return res.status(429).json({ error: 'Limită imagini atinsă. Upgrade la Pro pentru mai multe imagini.', plan: usage.plan, limit: usage.limit, upgrade: true });
+        if (!usage.allowed) return res.status(429).json({ error: 'Image limit reached. Upgrade to Pro for more images.', plan: usage.plan, limit: usage.limit, upgrade: true });
 
         const r = await fetch('https://api.together.xyz/v1/images/generations', { method: 'POST',
             headers: { 'Authorization': 'Bearer ' + process.env.TOGETHER_API_KEY, 'Content-Type': 'application/json' },
             body: JSON.stringify({ model: 'black-forest-labs/FLUX.1-schnell', prompt, width: 1024, height: 1024, steps: 4, n: 1, response_format: 'b64_json' }) });
-        if (!r.ok) return res.status(503).json({ error: 'Generare eșuată' });
+        if (!r.ok) return res.status(503).json({ error: 'Image generation failed' });
         const d = await r.json(); const b64 = d.data?.[0]?.b64_json;
         if (!b64) return res.status(500).json({ error: 'No data' });
         incrementUsage(user?.id, 'image', supabaseAdmin).catch(()=>{});
         res.json({ image: 'data:image/png;base64,' + b64, prompt, engine: 'FLUX' });
-    } catch(e) { res.status(500).json({ error: 'Eroare imagine' }); }
+    } catch(e) { res.status(500).json({ error: 'Image error' }); }
 });
 
 // ═══ MEMORY ═══
@@ -730,8 +796,8 @@ app.post('/api/memory', memoryLimiter, validate(memorySchema), async (req, res) 
         if (action === 'save') { memFallback[uid][key] = value; res.json({ success: true }); }
         else if (action === 'load') res.json({ value: memFallback[uid][key] || null });
         else if (action === 'list') res.json({ keys: Object.keys(memFallback[uid]) });
-        else res.status(400).json({ error: 'Acțiune: save, load, list' });
-    } catch(e) { res.status(500).json({ error: 'Eroare memorie' }); }
+        else res.status(400).json({ error: 'Action must be: save, load, list' });
+    } catch(e) { res.status(500).json({ error: 'Memory error' }); }
 });
 
 // ═══ CONVERSATIONS ═══
@@ -746,8 +812,8 @@ app.get('/api/conversations/:id/messages', asyncHandler(async (req, res) => {
     if (!u || !supabaseAdmin) return res.json({ messages: [] });
     // Verify the conversation belongs to this user
     const { data: conv, error: convErr } = await supabaseAdmin.from('conversations').select('id').eq('id', req.params.id).eq('user_id', u.id).single();
-    if (convErr && convErr.code !== 'PGRST116') return res.status(500).json({ error: 'Eroare server' });
-    if (!conv) return res.status(403).json({ error: 'Access interzis' });
+    if (convErr && convErr.code !== 'PGRST116') return res.status(500).json({ error: 'Server error' });
+    if (!conv) return res.status(403).json({ error: 'Access denied' });
     const { data } = await supabaseAdmin.from('messages').select('id, role, content, created_at').eq('conversation_id', req.params.id).order('created_at', { ascending: true });
     res.json({ messages: data || [] });
 }));
@@ -1193,7 +1259,7 @@ app.get('/api/health', (req, res) => {
 
 // 404 for unknown API routes — must come before the catch-all
 app.use('/api', (req, res, next) => {
-    res.status(404).json({ error: 'API endpoint negăsit' });
+    res.status(404).json({ error: 'API endpoint not found' });
 });
 
 app.get('*', (req, res) => {
@@ -1215,7 +1281,7 @@ app.use((err, req, res, next) => {
     if (process.env.NODE_ENV === 'production') {
         logger.error({ component: 'Error', method: req.method, path: req.path }, err.message);
         return res.status(statusCode).json({
-            error: statusCode === 500 ? 'Eroare internă de server' : err.message
+            error: statusCode === 500 ? 'Internal server error' : err.message
         });
     }
     logger.error({ component: 'Error', method: req.method, path: req.path, err: err.stack }, err.message);

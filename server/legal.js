@@ -92,8 +92,8 @@ router.get('/gdpr/export', async (req, res) => {
     try {
         const { getUserFromToken, supabaseAdmin } = req.app.locals;
         const user = await getUserFromToken(req);
-        if (!user) return res.status(401).json({ error: 'Neautentificat' });
-        if (!supabaseAdmin) return res.status(503).json({ error: 'DB indisponibil' });
+        if (!user) return res.status(401).json({ error: 'Not authenticated' });
+        if (!supabaseAdmin) return res.status(503).json({ error: 'Database unavailable' });
 
         const [conversations, preferences, subscription, usage, referrals] = await Promise.all([
             supabaseAdmin.from('conversations').select('id, avatar, title, created_at').eq('user_id', user.id),
@@ -137,7 +137,7 @@ router.get('/gdpr/export', async (req, res) => {
         res.json(exportData);
     } catch (e) {
         logger.error({ component: 'Legal', err: e.message }, 'GDPR Export');
-        res.status(500).json({ error: 'Eroare export date' });
+        res.status(500).json({ error: 'Data export error' });
     }
 });
 
@@ -146,14 +146,14 @@ router.delete('/gdpr/delete', async (req, res) => {
     try {
         const { getUserFromToken, supabaseAdmin } = req.app.locals;
         const user = await getUserFromToken(req);
-        if (!user) return res.status(401).json({ error: 'Neautentificat' });
-        if (!supabaseAdmin) return res.status(503).json({ error: 'DB indisponibil' });
+        if (!user) return res.status(401).json({ error: 'Not authenticated' });
+        if (!supabaseAdmin) return res.status(503).json({ error: 'Database unavailable' });
 
         const { confirm } = req.body;
         if (confirm !== 'DELETE_MY_DATA') {
             return res.status(400).json({
-                error: 'Trimite { "confirm": "DELETE_MY_DATA" } pentru confirmare',
-                warning: 'Această acțiune este IREVERSIBILĂ. Toate conversațiile, preferințele și datele vor fi șterse.'
+                error: 'Send { "confirm": "DELETE_MY_DATA" } to confirm',
+                warning: 'This action is IRREVERSIBLE. All conversations, preferences and data will be deleted.'
             });
         }
 
@@ -187,10 +187,10 @@ router.delete('/gdpr/delete', async (req, res) => {
         await supabaseAdmin.from('referrals').delete().eq('user_id', user.id);
 
         logger.info({ component: 'Legal', userId: user.id }, `🗑️ All data deleted for user ${user.id}`);
-        res.json({ success: true, message: 'Toate datele au fost șterse. Contul poate fi închis din setări.' });
+        res.json({ success: true, message: 'All data deleted. Your account can be closed from settings.' });
     } catch (e) {
         logger.error({ component: 'Legal', err: e.message }, 'GDPR Delete');
-        res.status(500).json({ error: 'Eroare ștergere date' });
+        res.status(500).json({ error: 'Data deletion error' });
     }
 });
 
@@ -199,7 +199,7 @@ router.get('/gdpr/consent', async (req, res) => {
     try {
         const { getUserFromToken, supabaseAdmin } = req.app.locals;
         const user = await getUserFromToken(req);
-        if (!user) return res.status(401).json({ error: 'Neautentificat' });
+        if (!user) return res.status(401).json({ error: 'Not authenticated' });
         if (!supabaseAdmin) return res.json({ consents: {} });
 
         const { data } = await supabaseAdmin
@@ -213,7 +213,7 @@ router.get('/gdpr/consent', async (req, res) => {
 
         res.json({ consents });
     } catch (e) {
-        res.status(500).json({ error: 'Eroare consent' });
+        res.status(500).json({ error: 'Consent error' });
     }
 });
 
@@ -222,13 +222,13 @@ router.post('/gdpr/consent', async (req, res) => {
     try {
         const { getUserFromToken, supabaseAdmin } = req.app.locals;
         const user = await getUserFromToken(req);
-        if (!user) return res.status(401).json({ error: 'Neautentificat' });
-        if (!supabaseAdmin) return res.status(503).json({ error: 'DB indisponibil' });
+        if (!user) return res.status(401).json({ error: 'Not authenticated' });
+        if (!supabaseAdmin) return res.status(503).json({ error: 'Database unavailable' });
 
         const { type, granted } = req.body;
         const validTypes = ['memory', 'analytics', 'marketing'];
         if (!validTypes.includes(type)) {
-            return res.status(400).json({ error: `Tip valid: ${validTypes.join(', ')}` });
+            return res.status(400).json({ error: `Valid types: ${validTypes.join(', ')}` });
         }
 
         await supabaseAdmin.from('user_preferences').upsert({
@@ -239,7 +239,7 @@ router.post('/gdpr/consent', async (req, res) => {
 
         res.json({ success: true, type, granted: !!granted });
     } catch (e) {
-        res.status(500).json({ error: 'Eroare actualizare consent' });
+        res.status(500).json({ error: 'Consent update error' });
     }
 });
 
