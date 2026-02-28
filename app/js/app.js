@@ -242,7 +242,7 @@
 
         try {
             const r = await fetch(API_BASE + '/api/conversations', { headers: authHeaders() });
-            if (!r.ok) throw new Error('Eroare');
+            if (!r.ok) throw new Error('Error');
             const data = await r.json();
             const convs = data.conversations || data || [];
 
@@ -273,7 +273,7 @@
             persistConvId(convId);
 
             const r = await fetch(API_BASE + '/api/conversations/' + convId + '/messages', { headers: authHeaders() });
-            if (!r.ok) throw new Error('Eroare');
+            if (!r.ok) throw new Error('Error');
             const data = await r.json();
             const msgs = data.messages || data || [];
 
@@ -409,12 +409,12 @@
         try {
             var r = await fetch(API_BASE+'/api/health');
             var d = await r.json();
-            if (d.status === 'online') {
+            if (d.status === 'ok' || d.status === 'online') {
                 var statusText = document.getElementById('status-text');
                 var statusDot = document.getElementById('status-dot');
                 if (statusText) statusText.textContent = 'Online' + (d.brain !== 'healthy' ? ' ⚠️' : '');
                 if (statusDot) statusDot.style.background = d.brain === 'healthy' ? '#00ff88' : '#ffaa00';
-                if (d.tools && !d.tools.ai_claude) useStreaming = false;
+                if (d.services && !d.services.ai_claude) useStreaming = false;
             }
         } catch(e) {
             var statusText = document.getElementById('status-text');
@@ -462,6 +462,15 @@
         document.getElementById('btn-send').addEventListener('click', onSendText);
         document.getElementById('text-input').addEventListener('keydown', function(e) { if (e.key === 'Enter') onSendText(); });
 
+        // Mic button — hold to record, release to send
+        var micBtn = document.getElementById('btn-mic');
+        if (micBtn && window.KVoice) {
+            micBtn.addEventListener('mousedown', async function() { micBtn.classList.add('recording'); await KVoice.startListening(); });
+            micBtn.addEventListener('mouseup', async function() { micBtn.classList.remove('recording'); var text = await KVoice.stopListening(); if (text) { hideWelcome(); addMessage('user', text); showThinking(true); await sendToAI(text, window.i18n ? i18n.getLanguage() : 'en'); } });
+            micBtn.addEventListener('touchstart', async function(e) { e.preventDefault(); micBtn.classList.add('recording'); await KVoice.startListening(); }, { passive: false });
+            micBtn.addEventListener('touchend', async function(e) { e.preventDefault(); micBtn.classList.remove('recording'); var text = await KVoice.stopListening(); if (text) { hideWelcome(); addMessage('user', text); showThinking(true); await sendToAI(text, window.i18n ? i18n.getLanguage() : 'en'); } }, { passive: false });
+        }
+
         document.querySelectorAll('.avatar-pill').forEach(function(b) { b.addEventListener('click', function() { switchAvatar(b.dataset.avatar); }); });
 
         // History buttons
@@ -471,6 +480,10 @@
         if (closeHist) closeHist.addEventListener('click', function() { toggleHistory(false); });
         var newChat = document.getElementById('btn-new-chat');
         if (newChat) newChat.addEventListener('click', startNewChat);
+
+        // Pricing button — open modal
+        var pricingBtn = document.getElementById('btn-pricing');
+        if (pricingBtn) pricingBtn.addEventListener('click', function() { var m = document.getElementById('pricing-modal'); if (m) m.classList.remove('hidden'); });
 
         // Pricing close
         var pricingClose = document.getElementById('pricing-close');

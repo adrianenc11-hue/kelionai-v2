@@ -1,0 +1,24 @@
+{
+    "name": "KelionAI",
+    "short_name": "KelionAI",
+    "description": "Your personal AI assistant — smart, fast, multilingual.",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#0A0A0F",
+    "theme_color": "#0A0A0F",
+    "orientation": "portrait-primary",
+    "icons": [
+        {
+            "src": "/images/Icon.jpg",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "/images/Productivity.jpg",
+            "sizes": "512x512",
+            "type": "image/png"
+        }
+    ],
+    "categories": ["productivity", "utilities"],
+    "lang": "en"
+}

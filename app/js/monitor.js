@@ -30,7 +30,7 @@ var MonitorManager = (function () {
     function showMap(lat, lng, label) {
         var el = document.getElementById('monitor-map');
         if (!el) return;
-        var safeLabel = label ? String(label).replace(/"/g, '&quot;') : 'Hartă';
+        var safeLabel = label ? String(label).replace(/"/g, '&quot;') : 'Map';
         var bbox = (lng - 0.05) + '%2C' + (lat - 0.05) + '%2C' + (lng + 0.05) + '%2C' + (lat + 0.05);
         var url = 'https://www.openstreetmap.org/export/embed.html?bbox=' + bbox +
             '&layer=mapnik&marker=' + lat + '%2C' + lng;
@@ -44,7 +44,7 @@ var MonitorManager = (function () {
         var el = document.getElementById('monitor-map');
         if (!el) return;
         var safeUrl = String(url).replace(/"/g, '&quot;');
-        el.innerHTML = '<iframe src="' + safeUrl + '" title="Conținut web"></iframe>';
+        el.innerHTML = '<iframe src="' + safeUrl + '" title="Web content"></iframe>';
         showPanel('monitor-map');
         if (window.KAvatar) KAvatar.setPresenting(true);
     }
@@ -120,7 +120,7 @@ var MonitorManager = (function () {
             var el = document.getElementById('monitor-map');
             if (!el) return;
             var safeUrl = String(content).replace(/"/g, '&quot;');
-            el.innerHTML = '<iframe src="' + safeUrl + '" title="Hartă"></iframe>';
+            el.innerHTML = '<iframe src="' + safeUrl + '" title="Map"></iframe>';
             showPanel('monitor-map');
             if (window.KAvatar) KAvatar.setPresenting(true);
         } else if (type === 'html') {

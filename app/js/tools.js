@@ -53,11 +53,11 @@ var KelionTools = (function () {
             // Extract city — word(s) after "în"/"in"/"la"/"for"/"at"
             var cityMatch = lower.match(/(?:în|in|la|for|at)\s+([a-zA-ZăâîșțĂÂÎȘȚ\s]{2,30})/) ||
                             lower.match(/vreme(?:a)?\s+(?:din\s+)?([a-zA-ZăâîșțĂÂÎȘȚ\s]{2,20})/);
-            var city = cityMatch ? cityMatch[1].trim() : 'București';
+            var city = cityMatch ? cityMatch[1].trim() : 'Bucharest';
             try {
                 var data = await weather(city);
                 if (window.MonitorManager) MonitorManager.showWeather(data);
-                return '\n[Vreme ' + city + ': ' + (data.temperature !== undefined ? data.temperature : '') + '°C, ' + (data.description || '') + ']';
+                return '\n[Weather ' + city + ': ' + (data.temperature !== undefined ? data.temperature : '') + '°C, ' + (data.description || '') + ']';
             } catch (e) {
                 console.warn('[Tools] weather error:', e.message);
                 return '';
@@ -76,7 +76,7 @@ var KelionTools = (function () {
                     var snippet = results.slice(0, 3).map(function (r) {
                         return (r.title || '') + ': ' + (r.snippet || r.description || '');
                     }).join(' | ');
-                    return '\n[Rezultate căutare: ' + snippet + ']';
+                    return '\n[Search results: ' + snippet + ']';
                 }
             } catch (e) {
                 console.warn('[Tools] search error:', e.message);

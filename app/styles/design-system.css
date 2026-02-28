@@ -1,70 +1,111 @@
 /* ═══════════════════════════════════════════
-   KelionAI Design System — CSS Variables
+   KelionAI v3 — Premium Design System
    ═══════════════════════════════════════════ */
 
 :root {
   /* Culori principale */
-  --kelion-primary: #6C63FF;
-  --kelion-primary-hover: #5A52E0;
-  --kelion-secondary: #00D4FF;
-  --kelion-accent: #FF6B6B;
-  --kelion-success: #00E096;
-  --kelion-warning: #FFB800;
-  --kelion-danger: #ff4466;
+  --kelion-primary: #6366F1;
+  --kelion-primary-hover: #5558E8;
+  --kelion-secondary: #06B6D4;
+  --kelion-accent: #8B5CF6;
+  --kelion-success: #10B981;
+  --kelion-warning: #F59E0B;
+  --kelion-danger: #EF4444;
 
   /* Backgrounds */
-  --kelion-bg: #0A0A0F;
-  --kelion-bg-secondary: #0F0F1A;
-  --kelion-surface: #12121A;
-  --kelion-surface-hover: #1A1A28;
-  --kelion-border: rgba(108, 99, 255, 0.2);
+  --kelion-bg: #050510;
+  --kelion-bg-secondary: #0A0A1B;
+  --kelion-surface: rgba(15, 15, 40, 0.7);
+  --kelion-surface-hover: rgba(25, 25, 55, 0.8);
+  --kelion-surface-solid: #0E0E24;
+  --kelion-border: rgba(99, 102, 241, 0.12);
+  --kelion-border-hover: rgba(99, 102, 241, 0.3);
 
   /* Text */
-  --kelion-text: #E8E8FF;
-  --kelion-text-secondary: #9090B0;
-  --kelion-text-muted: #505070;
+  --kelion-text: #F0F0FF;
+  --kelion-text-secondary: #8888AA;
+  --kelion-text-muted: #555577;
 
   /* Typography */
-  --kelion-font: 'Inter', -apple-system, sans-serif;
+  --kelion-font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --kelion-font-mono: 'JetBrains Mono', 'Fira Code', monospace;
 
   /* Spacing */
   --kelion-radius: 12px;
   --kelion-radius-sm: 8px;
   --kelion-radius-lg: 20px;
+  --kelion-radius-xl: 28px;
 
   /* Shadows & Glow */
-  --kelion-glow: 0 0 20px rgba(108, 99, 255, 0.3);
-  --kelion-glow-cyan: 0 0 20px rgba(0, 212, 255, 0.3);
-  --kelion-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+  --kelion-glow: 0 0 30px rgba(99, 102, 241, 0.25);
+  --kelion-glow-cyan: 0 0 30px rgba(6, 182, 212, 0.25);
+  --kelion-glow-accent: 0 0 30px rgba(139, 92, 246, 0.25);
+  --kelion-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+  --kelion-shadow-lg: 0 8px 48px rgba(0, 0, 0, 0.6);
+
+  /* Gradients */
+  --kelion-gradient: linear-gradient(135deg, #6366F1, #06B6D4);
+  --kelion-gradient-accent: linear-gradient(135deg, #8B5CF6, #6366F1);
+  --kelion-gradient-warm: linear-gradient(135deg, #F59E0B, #EF4444);
+  --kelion-gradient-surface: linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(6, 182, 212, 0.05));
+  --kelion-gradient-bg: linear-gradient(180deg, #050510 0%, #0A0A1B 50%, #050510 100%);
+
+  /* Glass */
+  --kelion-glass: rgba(10, 10, 30, 0.6);
+  --kelion-glass-border: rgba(99, 102, 241, 0.15);
+  --kelion-glass-blur: blur(20px);
 
   /* Transitions */
-  --kelion-transition: 0.2s ease;
-  --kelion-transition-slow: 0.4s ease;
+  --kelion-transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  --kelion-transition-slow: 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  --kelion-transition-spring: 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
 
   /* Z-index layers */
   --z-base: 1;
+  --z-dropdown: 50;
+  --z-sticky: 80;
   --z-overlay: 100;
   --z-modal: 200;
   --z-toast: 300;
-  --z-tooltip: 300;
+  --z-tooltip: 400;
 }
 
 /* ── Glow pulse animation ── */
 @keyframes kelion-glow-pulse {
   0%, 100% { box-shadow: var(--kelion-glow); }
-  50%       { box-shadow: 0 0 50px rgba(108, 99, 255, 0.5); }
+  50%       { box-shadow: 0 0 50px rgba(99, 102, 241, 0.4); }
 }
 
-.animate-glow {
-  animation: kelion-glow-pulse 2s ease-in-out infinite;
+/* ── Gradient text ── */
+.gradient-text {
+  background: var(--kelion-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.gradient-text-accent {
+  background: var(--kelion-gradient-accent);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Glass effect ── */
+.glass {
+  background: var(--kelion-glass);
+  backdrop-filter: var(--kelion-glass-blur);
+  -webkit-backdrop-filter: var(--kelion-glass-blur);
+  border: 1px solid var(--kelion-glass-border);
 }
 
 /* ── Badge helpers ── */
 .badge {
-  display: inline-block;
-  padding: 3px 12px;
-  border-radius: 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  border-radius: 100px;
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.5px;
@@ -73,19 +114,31 @@
 }
 
 .badge-primary {
-  background: rgba(108, 99, 255, 0.2);
+  background: rgba(99, 102, 241, 0.15);
   color: var(--kelion-primary);
-  border: 1px solid rgba(108, 99, 255, 0.3);
+  border: 1px solid rgba(99, 102, 241, 0.25);
 }
 
 .badge-warning {
-  background: rgba(255, 184, 0, 0.15);
+  background: rgba(245, 158, 11, 0.12);
   color: var(--kelion-warning);
-  border: 1px solid rgba(255, 184, 0, 0.3);
+  border: 1px solid rgba(245, 158, 11, 0.25);
 }
 
 .badge-success {
-  background: rgba(0, 204, 102, 0.15);
+  background: rgba(16, 185, 129, 0.12);
   color: var(--kelion-success);
-  border: 1px solid rgba(0, 204, 102, 0.3);
+  border: 1px solid rgba(16, 185, 129, 0.25);
 }
+
+.badge-danger {
+  background: rgba(239, 68, 68, 0.12);
+  color: var(--kelion-danger);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(99, 102, 241, 0.2); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(99, 102, 241, 0.4); }

@@ -1,6 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════
-   KelionAI — Mobile / Responsive Styles
-   Depends on design-system.css for CSS variables.
+   KelionAI v3 — Mobile / Responsive Styles
    ═══════════════════════════════════════════════════════════════ */
 
 /* ── Small screens ── */
@@ -20,7 +19,7 @@
 
     /* Chat bubbles */
     .message-user,
-    .message-ai { max-width: 90%; }
+    .message-ai { max-width: 92%; }
 
     /* Settings */
     .settings-section { padding: 16px; }
@@ -31,9 +30,10 @@
         display: flex;
         position: fixed;
         bottom: 0; left: 0; right: 0;
-        background: rgba(10, 10, 15, 0.95);
+        background: rgba(5, 5, 16, 0.95);
         backdrop-filter: blur(20px);
-        border-top: 1px solid var(--kelion-border, rgba(255,255,255,0.08));
+        -webkit-backdrop-filter: blur(20px);
+        border-top: 1px solid var(--kelion-border, rgba(99,102,241,0.12));
         padding: 12px 0 20px;
         z-index: var(--z-overlay, 100);
         justify-content: space-around;
@@ -51,7 +51,7 @@
         transition: var(--kelion-transition, all 0.2s ease);
     }
 
-    .bottom-nav-item.active { color: var(--kelion-primary, #6c63ff); }
+    .bottom-nav-item.active { color: var(--kelion-primary, #6366F1); }
     .bottom-nav-item svg { width: 24px; height: 24px; }
 }
 

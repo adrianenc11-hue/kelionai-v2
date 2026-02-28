@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ro">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -85,55 +85,55 @@
 </head>
 <body>
     <h1>📈 KelionAI — Trading Bot</h1>
-    <p class="subtitle">Panou administrare trading — ADMIN ONLY</p>
+    <p class="subtitle">Trading management panel — ADMIN ONLY</p>
 
     <div class="disclaimer">
-        ⚠️ INFORMATIV — Nu constituie sfat de investiții. KelionAI nu oferă consiliere financiară.
+        ⚠️ INFORMATIONAL — This does not constitute investment advice. KelionAI does not provide financial counseling.
     </div>
 
     <div class="auth-row">
         <label>Admin Secret:</label>
         <input type="password" id="admin-secret" class="admin-input" placeholder="x-admin-secret" autocomplete="off">
-        <button class="btn secondary" onclick="saveSecret()">Salvează</button>
+        <button class="btn secondary" onclick="saveSecret()">Save</button>
         <span class="status-bar" id="status-bar">—</span>
     </div>
 
     <div class="toolbar">
-        <button class="btn secondary" onclick="loadAll()">🔄 Reîncarcă</button>
+        <button class="btn secondary" onclick="loadAll()">🔄 Reload</button>
         <button class="btn secondary" onclick="exportJson()">⬇ Export JSON</button>
     </div>
 
     <!-- STATUS PANEL -->
     <div class="section">
-        <div class="section-title">📊 Status Bot</div>
+        <div class="section-title">📊 Bot Status</div>
         <div class="stat-grid" id="status-grid">
-            <div class="loading">Se încarcă...</div>
+            <div class="loading">Loading...</div>
         </div>
     </div>
 
     <!-- MARKET OVERVIEW -->
     <div class="section">
-        <div class="section-title">🌐 Prezentare Generală Piață</div>
+        <div class="section-title">🌐 Market Overview</div>
         <div class="market-grid" id="market-grid">
-            <div class="loading">Se încarcă...</div>
+            <div class="loading">Loading...</div>
         </div>
     </div>
 
     <!-- SIGNAL CARDS -->
     <div class="section">
-        <div class="section-title">🎯 Semnale Active</div>
+        <div class="section-title">🎯 Active Signals</div>
         <div class="signal-list" id="signal-list">
-            <div class="loading">Se încarcă...</div>
+            <div class="loading">Loading...</div>
         </div>
     </div>
 
     <!-- BACKTEST PANEL -->
     <div class="section">
-        <div class="section-title">🔬 Backtest Strategie</div>
+        <div class="section-title">🔬 Strategy Backtest</div>
         <div class="card">
             <div class="backtest-form">
                 <div class="form-group">
-                    <label>Strategie</label>
+                    <label>Strategy</label>
                     <select id="bt-strategy" class="admin-input">
                         <option value="RSI">RSI</option>
                         <option value="MACD">MACD</option>
@@ -145,7 +145,7 @@
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>Activ</label>
+                    <label>Asset</label>
                     <select id="bt-asset" class="admin-input">
                         <option value="BTC">BTC</option>
                         <option value="ETH">ETH</option>
@@ -159,15 +159,15 @@
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>Perioadă</label>
+                    <label>Period</label>
                     <select id="bt-period" class="admin-input">
-                        <option value="30">1 Lună</option>
-                        <option value="90">3 Luni</option>
-                        <option value="180">6 Luni</option>
-                        <option value="365" selected>1 An</option>
+                        <option value="30">1 Month</option>
+                        <option value="90">3 Months</option>
+                        <option value="180">6 Months</option>
+                        <option value="365" selected>1 Year</option>
                     </select>
                 </div>
-                <button class="btn" id="btn-backtest" onclick="runBacktest()">▶ Rulează Backtest</button>
+                <button class="btn" id="btn-backtest" onclick="runBacktest()">▶ Run Backtest</button>
             </div>
             <div class="backtest-result" id="backtest-result"></div>
         </div>
@@ -175,9 +175,9 @@
 
     <!-- RISK DASHBOARD -->
     <div class="section">
-        <div class="section-title">🛡 Dashboard Risc</div>
+        <div class="section-title">🛡 Risk Dashboard</div>
         <div class="risk-grid" id="risk-grid">
-            <div class="loading">Se încarcă...</div>
+            <div class="loading">Loading...</div>
         </div>
     </div>
 
@@ -192,7 +192,7 @@
         function saveSecret() {
             adminSecret = document.getElementById('admin-secret').value.trim();
             sessionStorage.setItem('kelion_admin_secret', adminSecret);
-            setStatus('Secret salvat.');
+            setStatus('Secret saved.');
             loadAll();
         }
 
@@ -212,7 +212,7 @@
         }
 
         function fmtDate(iso) {
-            try { return new Date(iso).toLocaleString('ro-RO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }); }
+            try { return new Date(iso).toLocaleString('en-US', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }); }
             catch (e) { return iso || '—'; }
         }
 
@@ -229,13 +229,13 @@
             const el = document.getElementById('status-grid');
             try {
                 const res = await fetch('/api/trading/status', { headers: getHeaders() });
-                if (res.status === 401) { el.innerHTML = '<div class="error-msg">Unauthorized — verifică admin secret.</div>'; return; }
+                if (res.status === 401) { el.innerHTML = '<div class="error-msg">Unauthorized — check admin secret.</div>'; return; }
                 const data = await res.json();
                 snapshot.status = data;
                 const items = [
-                    { label: 'Status Bot', value: escHtml(data.status || 'N/A') },
-                    { label: 'Versiune', value: escHtml(data.version || 'N/A') },
-                    { label: 'Ultima Actualizare', value: fmtDate(data.lastUpdate) },
+                    { label: 'Bot Status', value: escHtml(data.status || 'N/A') },
+                    { label: 'Version', value: escHtml(data.version || 'N/A') },
+                    { label: 'Last Update', value: fmtDate(data.lastUpdate) },
                     { label: 'Active Trades', value: escHtml(String(data.activeTrades ?? '—')) },
                     { label: 'Uptime', value: escHtml(data.uptime || '—') },
                 ];
@@ -245,7 +245,7 @@
                         <div class="stat-value">${i.value}</div>
                     </div>`).join('');
             } catch (e) {
-                el.innerHTML = `<div class="error-msg">Eroare status: ${escHtml(e.message)}</div>`;
+                el.innerHTML = `<div class="error-msg">Status error: ${escHtml(e.message)}</div>`;
             }
         }
 
@@ -258,7 +258,7 @@
                 const data = await res.json();
                 snapshot.analysis = data;
                 const assets = data.assets || data.analysis || [];
-                if (!assets.length) { el.innerHTML = '<div class="empty-state">Nicio analiză disponibilă.</div>'; return; }
+                if (!assets.length) { el.innerHTML = '<div class="empty-state">No analysis available.</div>'; return; }
                 el.innerHTML = assets.map(a => `
                     <div class="asset-card">
                         <div class="asset-name">${escHtml(a.symbol || a.asset)}</div>
@@ -267,7 +267,7 @@
                         ${a.changePercent != null ? `<div style="font-size:0.78rem;margin-top:6px;color:${parseFloat(a.changePercent)>=0?'#00dd66':'#ff6666'}">${parseFloat(a.changePercent)>=0?'+':''}${escHtml(String(a.changePercent))}%</div>` : ''}
                     </div>`).join('');
             } catch (e) {
-                el.innerHTML = `<div class="error-msg">Eroare analiză: ${escHtml(e.message)}</div>`;
+                el.innerHTML = `<div class="error-msg">Analysis error: ${escHtml(e.message)}</div>`;
             }
         }
 
@@ -280,7 +280,7 @@
                 const data = await res.json();
                 snapshot.signals = data;
                 const signals = data.signals || [];
-                if (!signals.length) { el.innerHTML = '<div class="empty-state">Niciun semnal activ.</div>'; return; }
+                if (!signals.length) { el.innerHTML = '<div class="empty-state">No active signals.</div>'; return; }
                 el.innerHTML = signals.map(s => `
                     <div class="signal-card">
                         <div class="signal-header">
@@ -291,16 +291,16 @@
                             </div>
                         </div>
                         <div class="signal-details">
-                            <div class="signal-detail-item"><div class="detail-label">Intrare</div><div class="detail-val">${escHtml(s.entry != null ? String(s.entry) : '—')}</div></div>
+                            <div class="signal-detail-item"><div class="detail-label">Entry</div><div class="detail-val">${escHtml(s.entry != null ? String(s.entry) : '—')}</div></div>
                             <div class="signal-detail-item"><div class="detail-label">Target</div><div class="detail-val" style="color:#00dd66">${escHtml(s.target != null ? String(s.target) : '—')}</div></div>
                             <div class="signal-detail-item"><div class="detail-label">Stop Loss</div><div class="detail-val" style="color:#ff6666">${escHtml(s.stopLoss != null ? String(s.stopLoss) : '—')}</div></div>
                             <div class="signal-detail-item"><div class="detail-label">Timeframe</div><div class="detail-val">${escHtml(s.timeframe || '—')}</div></div>
                             <div class="signal-detail-item"><div class="detail-label">Confidence</div><div class="detail-val">${escHtml(s.confidence != null ? String(s.confidence) + '%' : '—')}</div></div>
-                            <div class="signal-detail-item"><div class="detail-label">Generat La</div><div class="detail-val">${fmtDate(s.generatedAt)}</div></div>
+                            <div class="signal-detail-item"><div class="detail-label">Generated At</div><div class="detail-val">${fmtDate(s.generatedAt)}</div></div>
                         </div>
                     </div>`).join('');
             } catch (e) {
-                el.innerHTML = `<div class="error-msg">Eroare semnale: ${escHtml(e.message)}</div>`;
+                el.innerHTML = `<div class="error-msg">Signals error: ${escHtml(e.message)}</div>`;
             }
         }
 
@@ -309,7 +309,7 @@
             const btn = document.getElementById('btn-backtest');
             const resultEl = document.getElementById('backtest-result');
             btn.disabled = true;
-            resultEl.innerHTML = '<div class="loading">Se rulează backtest...</div>';
+            resultEl.innerHTML = '<div class="loading">Running backtest...</div>';
             const payload = {
                 strategy: document.getElementById('bt-strategy').value,
                 asset: document.getElementById('bt-asset').value,
@@ -327,7 +327,7 @@
                 const rows = [
                     ['Total Trades', data.totalTrades ?? '—'],
                     ['Win Rate', data.winRate != null ? data.winRate + '%' : '—'],
-                    ['Profit Net', data.netProfit != null ? data.netProfit + '%' : '—'],
+                    ['Net Profit', data.netProfit != null ? data.netProfit + '%' : '—'],
                     ['Max Drawdown', data.maxDrawdown != null ? data.maxDrawdown + '%' : '—'],
                     ['Sharpe Ratio', data.sharpeRatio ?? '—'],
                     ['Profit Factor', data.profitFactor ?? '—'],
@@ -337,7 +337,7 @@
                     <tr>${rows.map(r => `<td>${escHtml(String(r[1]))}</td>`).join('')}</tr>
                 </table>`;
             } catch (e) {
-                resultEl.innerHTML = `<div class="error-msg">Eroare backtest: ${escHtml(e.message)}</div>`;
+                resultEl.innerHTML = `<div class="error-msg">Backtest error: ${escHtml(e.message)}</div>`;
             }
             btn.disabled = false;
         }
@@ -357,8 +357,8 @@
                     { label: 'VaR (99%)', value: data.var99 != null ? data.var99 + '%' : '—', warn: parseFloat(data.var99) > 8 },
                     { label: 'Sortino Ratio', value: data.sortinoRatio ?? '—' },
                     { label: 'Calmar Ratio', value: data.calmarRatio ?? '—' },
-                    { label: 'Expunere Totală', value: data.totalExposure != null ? data.totalExposure + '%' : '—', warn: parseFloat(data.totalExposure) > 50 },
-                    { label: 'Nivelul Riscului', value: data.riskLevel || '—' },
+                    { label: 'Total Exposure', value: data.totalExposure != null ? data.totalExposure + '%' : '—', warn: parseFloat(data.totalExposure) > 50 },
+                    { label: 'Risk Level', value: data.riskLevel || '—' },
                 ];
                 el.innerHTML = metrics.map(m => {
                     const cls = m.danger ? 'danger' : m.warn ? 'warn' : '';
@@ -368,7 +368,7 @@
                     </div>`;
                 }).join('');
             } catch (e) {
-                el.innerHTML = `<div class="error-msg">Eroare risc: ${escHtml(e.message)}</div>`;
+                el.innerHTML = `<div class="error-msg">Risk error: ${escHtml(e.message)}</div>`;
             }
         }
 
@@ -385,15 +385,15 @@
 
         // ═══ INIT ═══
         async function loadAll() {
-            setStatus('Se încarcă datele...');
+            setStatus('Loading data...');
             await Promise.all([loadStatus(), loadAnalysis(), loadSignals(), loadRisk()]);
-            setStatus(`Actualizat la ${new Date().toLocaleTimeString('ro-RO')}`);
+            setStatus(`Updated at ${new Date().toLocaleTimeString('en-US')}`);
         }
 
         if (adminSecret) {
             loadAll();
         } else {
-            setStatus('Introdu admin secret și apasă Salvează.');
+            setStatus('Enter admin secret and click Save.');
         }
 
         // Auto-refresh every 30 seconds
