@@ -354,9 +354,82 @@ function generateSimulatedPrices(asset, length = 300) {
     return { prices, volumes };
 }
 
-/** Run all technical indicators on an asset. */
-function analyzeAsset(asset) {
-    const { prices, volumes } = generateSimulatedPrices(asset, 300);
+/**
+ * Fetch live price data for an asset from CoinGecko (crypto) or Alpha Vantage (forex/stocks).
+ * Falls back to generateSimulatedPrices() if API is unavailable or key is missing.
+ * @param {string} asset
+ * @param {number} [length=300] - used only for simulation fallback
+ * @returns {Promise<{ prices: number[], volumes: number[], source: 'live'|'simulated' }>}
+ */
+async function fetchLivePrices(asset, length = 300) {
+    const cryptoMap = { BTC: 'bitcoin', ETH: 'ethereum', SOL: 'solana' };
+    const forexMap  = { 'EUR/USD': { from: 'EUR', to: 'USD' }, 'GBP/USD': { from: 'GBP', to: 'USD' } };
+    const stockMap  = { 'S&P 500': 'SPY', NASDAQ: 'QQQ', Gold: 'GLD', Oil: 'USO' };
+
+    if (cryptoMap[asset]) {
+        try {
+            const coinId = cryptoMap[asset];
+            logger.info(`[Trading] Fetching CoinGecko data for ${asset}`);
+            const res = await fetch(
+                `https://api.coingecko.com/api/v3/coins/${coinId}/market_chart?vs_currency=usd&days=30`,
+                { signal: AbortSignal.timeout(5000) }
+            );
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+            if (!data.prices || !data.prices.length) throw new Error('Empty price data');
+            const prices  = data.prices.map(p => p[1]);
+            const volumes = data.total_volumes.map(v => v[1]);
+            logger.info(`[Trading] CoinGecko live data for ${asset}: ${prices.length} points`);
+            return { prices, volumes, source: 'live' };
+        } catch (err) {
+            logger.warn(`[Trading] CoinGecko unavailable for ${asset}: ${err.message}`);
+            return { ...generateSimulatedPrices(asset, length), source: 'simulated' };
+        }
+    }
+
+    if (process.env.ALPHA_VANTAGE_KEY && (forexMap[asset] || stockMap[asset])) {
+        try {
+            const key = process.env.ALPHA_VANTAGE_KEY;
+            let url, tsKey, closeKey, hasVolume;
+            if (forexMap[asset]) {
+                const { from, to } = forexMap[asset];
+                url      = `https://www.alphavantage.co/query?function=FX_DAILY&from_symbol=${from}&to_symbol=${to}&apikey=${key}`;
+                tsKey    = 'Time Series FX (Daily)';
+                closeKey = '4. close';
+                hasVolume = false;
+            } else {
+                url      = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${stockMap[asset]}&outputsize=compact&apikey=${key}`;
+                tsKey    = 'Time Series (Daily)';
+                closeKey = '4. close';
+                hasVolume = true;
+            }
+            logger.info(`[Trading] Fetching Alpha Vantage data for ${asset}`);
+            const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+            if (data['Note'] || data['Information']) {
+                throw new Error(data['Note'] || data['Information']);
+            }
+            const series  = data[tsKey] || {};
+            const entries = Object.entries(series).sort((a, b) => a[0].localeCompare(b[0]));
+            if (!entries.length) throw new Error('Empty time series');
+            const prices  = entries.map(([, v]) => parseFloat(v[closeKey]));
+            const volumes = hasVolume
+                ? entries.map(([, v]) => parseFloat(v['5. volume']) || 0)
+                : entries.map(() => Math.round(1000 + Math.random() * 9000));
+            logger.info(`[Trading] Alpha Vantage live data for ${asset}: ${prices.length} points`);
+            return { prices, volumes, source: 'live' };
+        } catch (err) {
+            logger.warn(`[Trading] Alpha Vantage unavailable for ${asset}: ${err.message}`);
+        }
+    }
+
+    return { ...generateSimulatedPrices(asset, length), source: 'simulated' };
+}
+
+/** Run all technical indicators on an asset using live or simulated price data. */
+async function analyzeAsset(asset) {
+    const { prices, volumes, source } = await fetchLivePrices(asset, 300);
     const high = Math.max(...prices);
     const low  = Math.min(...prices);
     const last = prices[prices.length - 1];
@@ -370,7 +443,7 @@ function analyzeAsset(asset) {
     const sentiment = analyzeSentiment(`${asset} market analysis trading signals`);
     const confluence = calculateConfluence({ rsi, macd, bollinger, ema, fibonacci, volume, sentiment });
 
-    return { asset, price: last, rsi, macd, bollinger, ema, fibonacci, volume, sentiment, confluence };
+    return { asset, price: last, rsi, macd, bollinger, ema, fibonacci, volume, sentiment, confluence, dataSource: source };
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -397,7 +470,7 @@ router.get('/analysis', async (req, res) => {
         const now = Date.now();
         if (analysisCache && now - cacheTsMs < CACHE_TTL_MS) {
             logger.info('[Trading] Returning cached analysis');
-            return res.json(analysisCache);
+            return res.json({ ...analysisCache, dataSource: 'cached' });
         }
 
         logger.info('[Trading] Running fresh market analysis');
@@ -419,13 +492,15 @@ router.get('/analysis', async (req, res) => {
         }
 
         const allAssets = Object.values(ASSETS).flat();
-        const results = allAssets.map(analyzeAsset);
+        const results = await Promise.all(allAssets.map(analyzeAsset));
+        const dataSource = results.some(r => r.dataSource === 'live') ? 'live' : 'simulated';
 
         const entry = {
             timestamp: new Date().toISOString(),
             assets: results,
             searchContext: searchSummary ? String(searchSummary).substring(0, MAX_SEARCH_CONTEXT_LENGTH) : null,
             stale: false,
+            dataSource,
             disclaimer: DISCLAIMER,
         };
 
@@ -445,12 +520,13 @@ router.get('/analysis', async (req, res) => {
 });
 
 // GET /signals
-router.get('/signals', (req, res) => {
+router.get('/signals', async (req, res) => {
     try {
         const allAssets = Object.values(ASSETS).flat();
+        const priceData = await Promise.all(allAssets.map(a => fetchLivePrices(a, 300)));
         const signals = allAssets
-            .map(asset => {
-                const { prices, volumes } = generateSimulatedPrices(asset, 300);
+            .map((asset, idx) => {
+                const { prices, volumes, source } = priceData[idx];
                 const high = Math.max(...prices);
                 const low  = Math.min(...prices);
                 const last = prices[prices.length - 1];
@@ -482,12 +558,14 @@ router.get('/signals', (req, res) => {
                     takeProfit: target,
                     rsi: rsi.value,
                     timestamp: new Date().toISOString(),
+                    dataSource: source,
                 };
             })
             .filter(s => s.signal !== 'HOLD')
             .sort((a, b) => b.confidence - a.confidence);
 
-        res.json({ signals, count: signals.length, disclaimer: DISCLAIMER });
+        const dataSource = signals.some(s => s.dataSource === 'live') ? 'live' : 'simulated';
+        res.json({ signals, count: signals.length, dataSource, disclaimer: DISCLAIMER });
     } catch (err) {
         logger.error({ err: err.message }, '[Trading] Signals error');
         res.status(500).json({ error: 'Semnalele nu sunt disponibile.' });
@@ -598,21 +676,29 @@ router.post('/backtest', (req, res) => {
 });
 
 // GET /alerts
-router.get('/alerts', (req, res) => {
-    const alerts = Object.values(ASSETS).flat().map(asset => {
-        const { prices } = generateSimulatedPrices(asset, 30);
-        const rsi = calculateRSI(prices);
-        const last = prices[prices.length - 1];
-        return {
-            asset,
-            price: last,
-            rsiValue: rsi.value,
-            alert: rsi.value < 30 ? 'OVERSOLD' : rsi.value > 70 ? 'OVERBOUGHT' : null,
-            threshold: { low: last * 0.95, high: last * 1.05 },
-        };
-    }).filter(a => a.alert !== null);
-
-    res.json({ alerts, count: alerts.length, disclaimer: DISCLAIMER });
+router.get('/alerts', async (req, res) => {
+    try {
+        const allAssets = Object.values(ASSETS).flat();
+        const alertsData = await Promise.all(allAssets.map(async asset => {
+            const { prices, source } = await fetchLivePrices(asset, 30);
+            const rsi = calculateRSI(prices);
+            const last = prices[prices.length - 1];
+            return {
+                asset,
+                price: last,
+                rsiValue: rsi.value,
+                alert: rsi.value < 30 ? 'OVERSOLD' : rsi.value > 70 ? 'OVERBOUGHT' : null,
+                threshold: { low: last * 0.95, high: last * 1.05 },
+                dataSource: source,
+            };
+        }));
+        const alerts = alertsData.filter(a => a.alert !== null);
+        const dataSource = alertsData.some(a => a.dataSource === 'live') ? 'live' : 'simulated';
+        res.json({ alerts, count: alerts.length, dataSource, disclaimer: DISCLAIMER });
+    } catch (err) {
+        logger.error({ err: err.message }, '[Trading] Alerts error');
+        res.status(500).json({ error: 'Alertele nu sunt disponibile.' });
+    }
 });
 
 // GET /correlation
@@ -631,36 +717,43 @@ router.get('/correlation', (req, res) => {
 });
 
 // GET /risk
-router.get('/risk', (req, res) => {
-    const allAssets = Object.values(ASSETS).flat();
-    const riskData = allAssets.map(asset => {
-        const { prices } = generateSimulatedPrices(asset, 252);
-        const returns = prices.slice(1).map((p, i) => (p - prices[i]) / prices[i]);
-        const avgReturn = returns.reduce((a, b) => a + b, 0) / returns.length;
-        const variance = returns.reduce((a, r) => a + Math.pow(r - avgReturn, 2), 0) / returns.length;
-        const stdDev = Math.sqrt(variance);
-        const sharpe = stdDev > 0 ? Math.round((avgReturn / stdDev) * Math.sqrt(252) * 100) / 100 : 0;
-        const sortedReturns = [...returns].sort((a, b) => a - b);
-        const varIdx = Math.floor(returns.length * 0.05);
-        const var95 = Math.round(sortedReturns[varIdx] * 10000) / 100;
-        let peak = prices[0];
-        let maxDD = 0;
-        prices.forEach(p => {
-            if (p > peak) peak = p;
-            const dd = (p - peak) / peak;
-            if (dd < maxDD) maxDD = dd;
-        });
+router.get('/risk', async (req, res) => {
+    try {
+        const allAssets = Object.values(ASSETS).flat();
+        const riskData = await Promise.all(allAssets.map(async asset => {
+            const { prices, source } = await fetchLivePrices(asset, 252);
+            const returns = prices.slice(1).map((p, i) => (p - prices[i]) / prices[i]);
+            const avgReturn = returns.reduce((a, b) => a + b, 0) / returns.length;
+            const variance = returns.reduce((a, r) => a + Math.pow(r - avgReturn, 2), 0) / returns.length;
+            const stdDev = Math.sqrt(variance);
+            const sharpe = stdDev > 0 ? Math.round((avgReturn / stdDev) * Math.sqrt(252) * 100) / 100 : 0;
+            const sortedReturns = [...returns].sort((a, b) => a - b);
+            const varIdx = Math.floor(returns.length * 0.05);
+            const var95 = Math.round(sortedReturns[varIdx] * 10000) / 100;
+            let peak = prices[0];
+            let maxDD = 0;
+            prices.forEach(p => {
+                if (p > peak) peak = p;
+                const dd = (p - peak) / peak;
+                if (dd < maxDD) maxDD = dd;
+            });
 
-        return {
-            asset,
-            sharpeRatio: sharpe,
-            maxDrawdown: Math.round(maxDD * 10000) / 100,
-            var95Pct: var95,
-            annualizedVol: Math.round(stdDev * Math.sqrt(252) * 10000) / 100,
-        };
-    });
+            return {
+                asset,
+                sharpeRatio: sharpe,
+                maxDrawdown: Math.round(maxDD * 10000) / 100,
+                var95Pct: var95,
+                annualizedVol: Math.round(stdDev * Math.sqrt(252) * 10000) / 100,
+                dataSource: source,
+            };
+        }));
 
-    res.json({ risk: riskData, disclaimer: DISCLAIMER });
+        const dataSource = riskData.some(r => r.dataSource === 'live') ? 'live' : 'simulated';
+        res.json({ risk: riskData, dataSource, disclaimer: DISCLAIMER });
+    } catch (err) {
+        logger.error({ err: err.message }, '[Trading] Risk error');
+        res.status(500).json({ error: 'Datele de risc nu sunt disponibile.' });
+    }
 });
 
 // ═══ HISTORY ═══

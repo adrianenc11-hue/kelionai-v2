@@ -81,6 +81,13 @@
 
         /* Toolbar */
         .toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 6px; }
+
+        /* Data source badge */
+        .ds-badge { display: inline-block; padding: 2px 9px; border-radius: 6px; font-size: 0.75rem; font-weight: bold; }
+        .ds-live      { background: rgba(0,200,80,0.18);  color: #00dd66; border: 1px solid rgba(0,200,80,0.35); }
+        .ds-cached    { background: rgba(0,200,255,0.12); color: #00ccff; border: 1px solid rgba(0,200,255,0.3); }
+        .ds-simulated { background: rgba(255,60,60,0.12); color: #ff6666; border: 1px solid rgba(255,60,60,0.3); }
+        .api-status   { font-size: 0.78rem; color: #666; margin-left: 4px; }
     </style>
 </head>
 <body>
@@ -101,6 +108,8 @@
     <div class="toolbar">
         <button class="btn secondary" onclick="loadAll()">🔄 Reîncarcă</button>
         <button class="btn secondary" onclick="exportJson()">⬇ Export JSON</button>
+        <span id="ds-badge" class="ds-badge" style="display:none;"></span>
+        <span id="api-status" class="api-status"></span>
     </div>
 
     <!-- STATUS PANEL -->
@@ -216,6 +225,26 @@
             catch (e) { return iso || '—'; }
         }
 
+        function updateDsBadge(dataSource) {
+            const badge = document.getElementById('ds-badge');
+            const status = document.getElementById('api-status');
+            if (!badge) return;
+            const map = {
+                live:      ['ds-live',      '🟢 LIVE'],
+                cached:    ['ds-cached',    '🟡 CACHED'],
+                simulated: ['ds-simulated', '🔴 SIMULATED'],
+            };
+            const [cls, label] = map[dataSource] || ['', dataSource || ''];
+            badge.className = 'ds-badge ' + cls;
+            badge.textContent = label;
+            badge.style.display = label ? '' : 'none';
+            if (status) {
+                status.textContent = dataSource === 'live' ? 'CoinGecko / Alpha Vantage conectat'
+                    : dataSource === 'cached' ? 'Date din cache'
+                    : 'API-uri indisponibile — date simulate';
+            }
+        }
+
         function signalClass(signal) {
             if (!signal) return 'signal-hold';
             const s = String(signal).toUpperCase();
@@ -257,6 +286,7 @@
                 if (res.status === 401) { el.innerHTML = '<div class="error-msg">Unauthorized.</div>'; return; }
                 const data = await res.json();
                 snapshot.analysis = data;
+                updateDsBadge(data.dataSource);
                 const assets = data.assets || data.analysis || [];
                 if (!assets.length) { el.innerHTML = '<div class="empty-state">Nicio analiză disponibilă.</div>'; return; }
                 el.innerHTML = assets.map(a => `

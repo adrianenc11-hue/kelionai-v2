@@ -334,6 +334,108 @@ function getSimulatedFixtures() {
     ];
 }
 
+/** Simulated live match scores fallback. */
+function getSimulatedLiveScores() {
+    return [
+        { match: 'Real Madrid vs Atletico Madrid', competition: 'La Liga',        minute: 67, score: '1-1', status: 'LIVE' },
+        { match: 'Liverpool vs Man United',        competition: 'Premier League', minute: 34, score: '2-0', status: 'LIVE' },
+        { match: 'PSG vs Lyon',                    competition: 'Ligue 1',        minute: 0,  score: '-',  status: 'UPCOMING' },
+    ];
+}
+
+/**
+ * Fetch today's upcoming fixtures from API-Football.
+ * Falls back to getSimulatedFixtures() if SPORTS_API_KEY is missing or request fails.
+ * @returns {Promise<{ fixtures: Array, source: 'live'|'simulated' }>}
+ */
+async function fetchLiveFixtures() {
+    if (!process.env.SPORTS_API_KEY) {
+        return { fixtures: getSimulatedFixtures(), source: 'simulated' };
+    }
+    try {
+        const today = new Date().toISOString().split('T')[0];
+        logger.info('[Sports] Fetching live fixtures from API-Football');
+        const res = await fetch(
+            `https://v3.football.api-sports.io/fixtures?date=${today}&status=NS`,
+            {
+                headers: { 'x-apisports-key': process.env.SPORTS_API_KEY },
+                signal: AbortSignal.timeout(5000),
+            }
+        );
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const fixtures = (data.response || []).slice(0, 10).map(f => ({
+            match:       `${f.teams.home.name} vs ${f.teams.away.name}`,
+            competition: f.league.name,
+            kickoff:     f.fixture.date,
+        }));
+        if (!fixtures.length) return { fixtures: getSimulatedFixtures(), source: 'simulated' };
+        return { fixtures, source: 'live' };
+    } catch (err) {
+        logger.warn(`[Sports] API-Football unavailable: ${err.message}`);
+        return { fixtures: getSimulatedFixtures(), source: 'simulated' };
+    }
+}
+
+/**
+ * Fetch current live match scores from API-Football.
+ * Falls back to getSimulatedLiveScores() if SPORTS_API_KEY is missing or request fails.
+ * @returns {Promise<{ matches: Array, source: 'live'|'simulated' }>}
+ */
+async function fetchLiveScores() {
+    if (!process.env.SPORTS_API_KEY) {
+        return { matches: getSimulatedLiveScores(), source: 'simulated' };
+    }
+    try {
+        logger.info('[Sports] Fetching live scores from API-Football');
+        const res = await fetch(
+            'https://v3.football.api-sports.io/fixtures?live=all',
+            {
+                headers: { 'x-apisports-key': process.env.SPORTS_API_KEY },
+                signal: AbortSignal.timeout(5000),
+            }
+        );
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const matches = (data.response || []).slice(0, 10).map(f => ({
+            match:       `${f.teams.home.name} vs ${f.teams.away.name}`,
+            competition: f.league.name,
+            minute:      f.fixture.status.elapsed,
+            score:       `${f.goals.home}-${f.goals.away}`,
+            status:      'LIVE',
+        }));
+        if (!matches.length) return { matches: getSimulatedLiveScores(), source: 'simulated' };
+        return { matches, source: 'live' };
+    } catch (err) {
+        logger.warn(`[Sports] API-Football live scores unavailable: ${err.message}`);
+        return { matches: getSimulatedLiveScores(), source: 'simulated' };
+    }
+}
+
+/**
+ * Fetch soccer odds from The Odds API.
+ * Falls back to empty odds if ODDS_API_KEY is missing or request fails.
+ * @returns {Promise<{ odds: Array, source: 'live'|'simulated' }>}
+ */
+async function fetchLiveOdds() {
+    if (!process.env.ODDS_API_KEY) {
+        return { odds: [], source: 'simulated' };
+    }
+    try {
+        logger.info('[Sports] Fetching live odds from The Odds API');
+        const res = await fetch(
+            `https://api.the-odds-api.com/v4/sports/soccer/odds?apiKey=${process.env.ODDS_API_KEY}&regions=eu&markets=h2h`,
+            { signal: AbortSignal.timeout(5000) }
+        );
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        return { odds: Array.isArray(data) ? data : [], source: 'live' };
+    } catch (err) {
+        logger.warn(`[Sports] The Odds API unavailable: ${err.message}`);
+        return { odds: [], source: 'simulated' };
+    }
+}
+
 // ═══════════════════════════════════════════════════════════════
 // ROUTES
 // ═══════════════════════════════════════════════════════════════
@@ -419,9 +521,9 @@ router.get('/analysis', async (req, res) => {
 });
 
 // GET /predictions
-router.get('/predictions', (req, res) => {
+router.get('/predictions', async (req, res) => {
     try {
-        const fixtures = getSimulatedFixtures();
+        const { fixtures, source } = await fetchLiveFixtures();
         const predictions = fixtures
             .map(f => generatePrediction(f.match, f.competition))
             .sort((a, b) => b.confidence - a.confidence);
@@ -432,7 +534,7 @@ router.get('/predictions', (req, res) => {
         }
         while (predictionHistory.length > MAX_HISTORY) predictionHistory.shift();
 
-        res.json({ predictions, disclaimer: DISCLAIMER });
+        res.json({ predictions, dataSource: source, disclaimer: DISCLAIMER });
     } catch (err) {
         logger.error({ err: err.message }, '[Sports] Predictions error');
         res.status(500).json({ error: 'Predicțiile nu sunt disponibile momentan.' });
@@ -442,6 +544,8 @@ router.get('/predictions', (req, res) => {
 // GET /live
 router.get('/live', async (req, res) => {
     try {
+        const { matches, source } = await fetchLiveScores();
+
         const brain = req.app.locals.brain;
         let liveData = null;
 
@@ -458,15 +562,9 @@ router.get('/live', async (req, res) => {
             }
         }
 
-        // Simulated live matches fallback
-        const matches = [
-            { match: 'Real Madrid vs Atletico Madrid', competition: 'La Liga',          minute: 67, score: '1-1', status: 'LIVE' },
-            { match: 'Liverpool vs Man United',        competition: 'Premier League',   minute: 34, score: '2-0', status: 'LIVE' },
-            { match: 'PSG vs Lyon',                    competition: 'Ligue 1',          minute: 0,  score: '-',  status: 'UPCOMING' },
-        ];
-
         res.json({
             matches,
+            dataSource: source,
             searchContext: liveData ? String(liveData).substring(0, MAX_SEARCH_CONTEXT_LENGTH) : null,
             disclaimer: DISCLAIMER,
         });
