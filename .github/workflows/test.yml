@@ -48,11 +48,31 @@ jobs:
           path: coverage/
           retention-days: 7
 
+      - name: Start server for E2E
+        run: npm start &
+        env:
+          NODE_ENV: test
+          PORT: 3000
+
+      - name: Wait for server
+        run: |
+          for i in $(seq 1 10); do
+            if curl -sf http://localhost:3000/api/health; then
+              echo "Server is ready"
+              exit 0
+            fi
+            echo "Waiting for server... attempt $i"
+            sleep 2
+          done
+          echo "Server failed to start" && exit 1
+
       - name: Run E2E tests
         id: e2e-tests
         continue-on-error: true
-        run: npx playwright install --with-deps chromium && npx playwright test --project=chromium
+        run: npx playwright install --with-deps chromium && npx playwright test tests/e2e-full.spec.js --project=chromium
         env:
+          PLAYWRIGHT_BASE_URL: http://localhost:3000
+          NODE_ENV: test
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
@@ -85,6 +105,18 @@ jobs:
         with:
           script: |
             const { owner, repo } = context.repo;
+            // Check if an open E2E failure issue already exists
+            const { data: existingIssues } = await github.rest.issues.listForRepo({
+              owner, repo,
+              state: 'open',
+              labels: 'bug,automated',
+              per_page: 10
+            });
+            const hasOpen = existingIssues.some(i => i.title.includes('E2E Tests Failed'));
+            if (hasOpen) {
+              console.log('An open E2E failure issue already exists — skipping creation');
+              return;
+            }
             const runUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
             await github.rest.issues.create({
               owner, repo,
