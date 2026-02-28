@@ -181,17 +181,8 @@ function escapeHtml(text) {
 
 function getNewsArticles(app) {
     try {
-        // Try to get from the news module's internal cache
-        const newsModule = require('./news');
-        // The news router has /latest endpoint - we can access the cache directly
-        // Since we're in the same process, we can require and call internal functions
-        const response = [];
-        // Access via HTTP internally would be circular, so we access the exported module
-        // news.js exports { router, setSupabase, restoreCache }
-        // We need to access the articleCache - but it's not exported
-        // Workaround: make an internal request or access via app locals
-        if (app && app.locals && app.locals._newsArticles) {
-            return app.locals._newsArticles;
+        if (app && app.locals && app.locals._getNewsArticles) {
+            return app.locals._getNewsArticles();
         }
         return [];
     } catch (e) {
