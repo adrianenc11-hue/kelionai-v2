@@ -43,6 +43,10 @@ let lastFetchedHour = -1; // UTC hour last fetched in
 let _supabase = null;
 function setSupabase(client) { _supabase = client; }
 
+// ═══ AUTO-PUBLISH CALLBACK ═══
+let _onNewsFetched = null;
+function onNewsFetched(callback) { _onNewsFetched = callback; }
+
 // ═══ RATE LIMITER for fetch endpoint ═══
 const fetchLimiter = rateLimit({
     windowMs: 14 * 60 * 1000,
@@ -347,6 +351,17 @@ async function fetchAllSources() {
     lastFetchTime = Date.now();
     logger.info({ component: 'News', count: articleCache.size }, `📰 News cache updated: ${articleCache.size} articles`);
     await persistCache();
+
+    // ═══ AUTO-PUBLISH to all media channels ═══
+    if (_onNewsFetched && articleCache.size > 0) {
+        try {
+            const topArticles = getArticlesArray().slice(0, 5);
+            await _onNewsFetched(topArticles);
+            logger.info({ component: 'News', published: topArticles.length }, '📢 Auto-published to media channels');
+        } catch (e) {
+            logger.warn({ component: 'News', err: e.message }, 'Auto-publish failed (non-blocking)');
+        }
+    }
 }
 
 // ═══ SCHEDULER ═══
@@ -502,4 +517,4 @@ async function restoreCache() {
     } catch (e) { /* silent */ }
 }
 
-module.exports = { router, setSupabase, restoreCache };
+module.exports = { router, setSupabase, restoreCache, getArticlesArray, onNewsFetched };
