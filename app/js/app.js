@@ -27,7 +27,7 @@
     }
 
     // ─── Vision (client-side camera) ────────────────────────
-    const VISION_TRIGGERS = ['ce e în față','ce e in fata','ce vezi','mă vezi','ma vezi','uită-te','uita-te','arată-mi','arata-mi','privește','priveste','see me','look at','what do you see','descrie ce vezi','ce observi','ce e pe stradă','ce e pe strada','ce e în jurul','ce e in jurul'];
+    const VISION_TRIGGERS = ['ce e în față','ce e in fata','ce vezi','mă vezi','ma vezi','uită-te','uita-te','arată-mi','arata-mi','privește','priveste','see me','look at','what do you see','identifică','identifica','identify','what is this','ce e asta','descrie ce vezi','ce observi','ce e pe stradă','ce e pe strada','ce e în jurul','ce e in jurul'];
     function isVisionRequest(t) { const l = t.toLowerCase(); return VISION_TRIGGERS.some(v => l.includes(v)); }
 
     async function triggerVision() {
@@ -336,6 +336,7 @@
         KVoice.stopSpeaking(); KAvatar.loadAvatar(name);
         document.querySelectorAll('.avatar-pill').forEach(function(b) { b.classList.toggle('active', b.dataset.avatar === name); });
         var n = document.getElementById('avatar-name'); if (n) n.textContent = name.charAt(0).toUpperCase() + name.slice(1);
+        var navName = document.getElementById('navbar-avatar-name'); if (navName) navName.textContent = name.charAt(0).toUpperCase() + name.slice(1);
         chatHistory = []; persistConvId(null);
         var o = document.getElementById('chat-overlay'); if (o) o.innerHTML = '';
     }
@@ -462,7 +463,7 @@
         });
 
         setupDragDrop();
-        KVoice.startWakeWordDetection();
+        if (window.KVoice && KVoice.startPermanentListening) KVoice.startPermanentListening();
         checkHealth();
         if (window.KPayments) KPayments.showUsageBar();
         if (window.KTicker) KTicker.init();

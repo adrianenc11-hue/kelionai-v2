@@ -37,32 +37,35 @@
         recognition.onresult = (event) => {
             if (isProcessing || isSpeaking) return;
             for (let i = event.resultIndex; i < event.results.length; i++) {
+                if (!event.results[i].isFinal) continue;
                 const t = event.results[i][0].transcript.toLowerCase().trim();
                 const c = event.results[i][0].confidence;
-                if (c < 0.6 && event.results[i].isFinal) continue;
+                if (c < 0.3) continue;
+
+                if (window.i18n) {
+                    const det = i18n.detectLanguage(t);
+                    if (det && det !== detectedLanguage) detectedLanguage = det;
+                }
+
                 const hasKelion = t.includes('kelion') || t.includes('chelion');
                 const hasKira = t.includes('kira') || t.includes('chira');
-                const hasK = t === 'k' || t.startsWith('k ');
-
-                if ((hasKelion || hasKira || hasK) && event.results[i].isFinal) {
+                if (hasKelion || hasKira) {
                     const targetAvatar = hasKira ? 'kira' : 'kelion';
-                    const currentAvatar = window.KAvatar.getCurrentAvatar();
-                    if (targetAvatar !== currentAvatar) {
+                    if (window.KAvatar && targetAvatar !== window.KAvatar.getCurrentAvatar()) {
                         window.KAvatar.loadAvatar(targetAvatar);
                         document.querySelectorAll('.avatar-pill').forEach(b => b.classList.toggle('active', b.dataset.avatar === targetAvatar));
-                        document.getElementById('avatar-name').textContent = targetAvatar === 'kira' ? 'Kira' : 'Kelion';
-                        var chatOverlay = document.getElementById('chat-overlay'); if (chatOverlay) chatOverlay.innerHTML = '';
+                        var navName = document.getElementById('navbar-avatar-name');
+                        if (navName) navName.textContent = targetAvatar.charAt(0).toUpperCase() + targetAvatar.slice(1);
                     }
+                }
 
+                if (t.length > 1) {
+                    isProcessing = true;
+                    if (window.KAvatar) window.KAvatar.setAttentive(true);
                     let msg = t;
-                    if (hasKelion) msg = t.split(/kelion|chelion/i).pop().trim();
-                    else if (hasKira) msg = t.split(/kira|chira/i).pop().trim();
-                    else if (hasK) msg = t.replace(/^\s*k\s+/, '').trim();
-
-                    if (msg.length > 1) {
-                        detectLanguage(t); isProcessing = true; window.KAvatar.setAttentive(true);
-                        window.dispatchEvent(new CustomEvent('wake-message', { detail: { text: msg, language: detectedLanguage } }));
-                    } else { window.KAvatar.setAttentive(true); }
+                    if (hasKelion) msg = t.replace(/kelion|chelion/i, '').trim() || t;
+                    else if (hasKira) msg = t.replace(/kira|chira/i, '').trim() || t;
+                    window.dispatchEvent(new CustomEvent('wake-message', { detail: { text: msg, language: detectedLanguage } }));
                 }
             }
         };
