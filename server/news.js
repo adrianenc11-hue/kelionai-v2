@@ -6,7 +6,6 @@
 // ═══════════════════════════════════════════════════════════════
 'use strict';
 const express = require('express');
-const https = require('https');
 const fetch = require('node-fetch');
 const crypto = require('crypto');
 const logger = require('./logger');
