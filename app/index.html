@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="sentry-dsn" content="">
     <meta name="theme-color" content="#0A0A0F">
+    <link rel="manifest" href="/manifest.json">
     <title>KelionAI</title>
     <script>
         // ─── Onboarding redirect (first visit only) ───────────────────
@@ -173,7 +174,6 @@
                 <li><a href="/docs" target="_blank" rel="noopener" data-i18n="nav.docs">Docs</a></li>
             </ul>
             <div class="navbar-right">
-                </div>
                 <button class="btn-primary" id="navbar-get-started" style="padding:8px 18px;font-size:0.85rem;" data-i18n="nav.get_started">Get Started</button>
                 <button class="navbar-hamburger" id="navbar-hamburger" aria-label="Menu">
                     <span></span><span></span><span></span>
@@ -214,9 +214,8 @@
                     <button class="avatar-pill" data-avatar="kira">Kira</button>
                     <button class="ctrl-btn-sm" id="btn-history" title="Conversation history" aria-label="Conversation history">📋</button>
                     <span id="user-name" class="user-badge">Guest</span>
-                    
-                    
                     <button class="ctrl-btn-sm" id="btn-auth" title="Sign In">🔑</button>
+                    <button class="ctrl-btn-sm" id="btn-pricing" title="Pricing" aria-label="Pricing">💎</button>
                     <a href="/developer" class="ctrl-btn-sm" title="Developer API" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center">⚡</a>
                 </div>
             </div>
@@ -227,8 +226,7 @@
                     <span data-i18n="thinking.text">Thinking...</span>
                 </div>
                 <div id="input-row">
-                    
-                    
+                    <button id="btn-mic" title="Voice input" aria-label="Voice input">🎤</button>
                     <input type="text" id="text-input" data-i18n-placeholder="input.placeholder" placeholder="Type or speak..." autocomplete="off">
                     <button id="btn-send">➤</button>
                 </div>
