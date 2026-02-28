@@ -14,7 +14,7 @@ jobs:
           FB_VERIFY_TOKEN: ${{ secrets.FB_VERIFY_TOKEN }}
         run: |
           RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
-            "https://kelionai-backend.railway.app/api/messenger/webhook?hub.mode=subscribe&hub.verify_token=${FB_VERIFY_TOKEN}&hub.challenge=test123")
+            "https://kelionai.app/api/messenger/webhook?hub.mode=subscribe&hub.verify_token=${FB_VERIFY_TOKEN}&hub.challenge=test123")
           echo "Response code: $RESPONSE"
           if [ "$RESPONSE" = "200" ]; then
             echo "✅ Webhook functional!"
