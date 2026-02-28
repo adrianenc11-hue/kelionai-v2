@@ -149,7 +149,23 @@ app.use(express.json({ limit: '50mb' }));
 
 const metrics = require('./metrics');
 app.use(metrics.metricsMiddleware);
-app.get('/metrics', async (req, res) => { res.set('Content-Type', metrics.register.contentType); res.end(await metrics.register.metrics()); });
+const crypto = require('crypto');
+function adminAuth(req, res, next) {
+    const secret = req.headers['x-admin-secret'];
+    const expected = process.env.ADMIN_SECRET_KEY;
+    if (!secret || !expected) return res.status(401).json({ error: 'Unauthorized' });
+    try {
+        const secretBuf = Buffer.from(secret);
+        const expectedBuf = Buffer.from(expected);
+        if (secretBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(secretBuf, expectedBuf)) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+    } catch (e) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+    next();
+}
+app.get('/metrics', adminAuth, async (req, res) => { res.set('Content-Type', metrics.register.contentType); res.end(await metrics.register.metrics()); });
 app.use(express.static(path.join(__dirname, '..', 'app')));
 const PORT = process.env.PORT || 3000;
 const memFallback = {};

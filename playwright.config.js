@@ -12,7 +12,7 @@ module.exports = defineConfig({
         ['list']
     ],
     use: {
-        baseURL: 'https://kelionai.app',
+        baseURL: process.env.PLAYWRIGHT_BASE_URL || 'https://kelionai.app',
         trace: 'on-first-retry',
         screenshot: 'on',
         video: 'on-first-retry',
