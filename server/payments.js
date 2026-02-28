@@ -48,6 +48,7 @@ async function getUserPlan(userId, supabaseAdmin) {
 
 // ═══ CHECK USAGE LIMIT ═══
 async function checkUsage(userId, type, supabaseAdmin) {
+    if (!userId) return { allowed: true, plan: 'free', remaining: 5 };
     const { plan, limits } = await getUserPlan(userId, supabaseAdmin);
     if (limits[type] === -1) return { allowed: true, plan, remaining: -1 }; // unlimited
     
@@ -239,13 +240,19 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
         if (!stripe) return res.status(503).send('Stripe not configured');
         
         const sig = req.headers['stripe-signature'];
+        const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+        if (!sig || !endpointSecret) {
+            logger.warn({ component: 'Payments' }, 'Webhook signature missing');
+            return res.status(400).json({ error: 'Webhook signature missing' });
+        }
+
         let event;
-        
         try {
-            event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+            event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
         } catch (e) {
-            logger.error({ component: 'Payments', err: e.message }, 'Webhook signature fail');
-            return res.status(400).send('Invalid signature');
+            logger.warn({ component: 'Payments', err: e.message }, 'Webhook signature verification failed');
+            return res.status(400).json({ error: 'Webhook signature verification failed' });
         }
         
         const { supabaseAdmin } = req.app.locals;

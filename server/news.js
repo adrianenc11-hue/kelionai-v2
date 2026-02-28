@@ -27,7 +27,9 @@ const DEDUP_SIMILARITY = 0.70;
 const RSS_SOURCES = [
     { url: 'https://www.digi24.ro/rss', name: 'Digi24' },
     { url: 'https://www.mediafax.ro/rss', name: 'Mediafax' },
-    { url: 'https://stirileprotv.ro/rss.xml', name: 'ProTV' }
+    { url: 'https://stirileprotv.ro/rss', name: 'ProTV' },
+    { url: 'https://www.hotnews.ro/rss/site.xml', name: 'HotNews' },
+    { url: 'https://www.g4media.ro/feed', name: 'G4Media' }
 ];
 
 const CATEGORIES = ['general', 'politics', 'economy', 'sports', 'tech', 'world'];
@@ -37,6 +39,10 @@ const CATEGORIES = ['general', 'politics', 'economy', 'sports', 'tech', 'world']
 const articleCache = new Map();
 let lastFetchTime = 0;
 let lastFetchedHour = -1; // UTC hour last fetched in
+
+// ═══ SUPABASE PERSISTENCE (optional) ═══
+let _supabase = null;
+function setSupabase(client) { _supabase = client; }
 
 // ═══ RATE LIMITER for fetch endpoint ═══
 const fetchLimiter = rateLimit({
@@ -271,16 +277,58 @@ async function fetchAllRSS() {
     return combined;
 }
 
+// ═══ FETCH FROM Currents API ═══
+async function fetchCurrents() {
+    const key = process.env.CURRENTS_API_KEY;
+    if (!key) return [];
+    try {
+        const res = await fetch(`https://api.currentsapi.services/v1/latest-news?language=ro&apiKey=${key}`, { timeout: 8000 });
+        if (!res.ok) return [];
+        const data = await res.json();
+        return (data.news || []).map(a => ({
+            title: a.title,
+            summary: a.description,
+            url: a.url,
+            publishedAt: a.published
+        }));
+    } catch (e) {
+        logger.warn({ component: 'News', source: 'Currents', err: e.message }, 'Currents fetch failed');
+        return [];
+    }
+}
+
+// ═══ FETCH FROM MediaStack ═══
+async function fetchMediaStack() {
+    const key = process.env.MEDIASTACK_KEY;
+    if (!key) return [];
+    try {
+        const res = await fetch(`http://api.mediastack.com/v1/news?access_key=${key}&languages=ro&limit=20`, { timeout: 8000 });
+        if (!res.ok) return [];
+        const data = await res.json();
+        return (data.data || []).map(a => ({
+            title: a.title,
+            summary: a.description,
+            url: a.url,
+            publishedAt: a.published_at
+        }));
+    } catch (e) {
+        logger.warn({ component: 'News', source: 'MediaStack', err: e.message }, 'MediaStack fetch failed');
+        return [];
+    }
+}
+
 // ═══ MAIN FETCH LOGIC ═══
 async function fetchAllSources() {
     logger.info({ component: 'News' }, '📰 Fetching news from all sources...');
     evictExpired();
 
-    const [newsapiArticles, gnewsArticles, guardianArticles, rssResults] = await Promise.allSettled([
+    const [newsapiArticles, gnewsArticles, guardianArticles, rssResults, currentsArticles, mediastackArticles] = await Promise.allSettled([
         fetchNewsAPI(),
         fetchGNews(),
         fetchGuardian(),
-        fetchAllRSS()
+        fetchAllRSS(),
+        fetchCurrents(),
+        fetchMediaStack()
     ]);
 
     const processArticles = (articles, source) => {
@@ -294,31 +342,61 @@ async function fetchAllSources() {
     if (rssResults.status === 'fulfilled') {
         for (const { name, articles } of rssResults.value) processArticles(articles, name);
     }
+    if (currentsArticles.status === 'fulfilled') processArticles(currentsArticles.value, 'Currents');
+    if (mediastackArticles.status === 'fulfilled') processArticles(mediastackArticles.value, 'MediaStack');
 
     lastFetchTime = Date.now();
     logger.info({ component: 'News', count: articleCache.size }, `📰 News cache updated: ${articleCache.size} articles`);
+    await persistCache();
 }
 
 // ═══ SCHEDULER ═══
 function getCurrentRomanianHour() {
-    // Romania: UTC+2 (EET) winter / UTC+3 (EEST) summer — approximate with UTC+2
-    // DST note: during EEST (late March–late October) this will be off by 1h.
-    // Acceptable approximation to avoid adding a timezone library dependency.
-    const now = new Date();
-    return (now.getUTCHours() + 2) % 24;
+    try {
+        const formatter = new Intl.DateTimeFormat('en-US', {
+            timeZone: 'Europe/Bucharest',
+            hour: 'numeric',
+            hour12: false
+        });
+        return parseInt(formatter.format(new Date()), 10);
+    } catch (e) {
+        // Fallback to UTC+2 if Intl is not available
+        return (new Date().getUTCHours() + 2) % 24;
+    }
 }
 
 function getNextFetchTimes() {
     const now = new Date();
-    const times = FETCH_HOUR_RO.map(h => {
-        const d = new Date(now);
-        // Compute approximate UTC hour for this RO hour (UTC+2)
-        const utcH = (h - 2 + 24) % 24;
-        d.setUTCHours(utcH, 0, 0, 0);
-        if (d <= now) d.setUTCDate(d.getUTCDate() + 1);
-        return { roHour: h, label: `${String(h).padStart(2, '0')}:00 (RO)`, nextAt: d.toISOString() };
+    return FETCH_HOUR_RO.map(h => {
+        // Find the next occurrence of hour h in Bucharest timezone
+        // Try today and tomorrow
+        for (let daysAhead = 0; daysAhead <= 1; daysAhead++) {
+            const candidate = new Date(now);
+            candidate.setDate(now.getDate() + daysAhead);
+            // Get current Bucharest date components
+            const parts = new Intl.DateTimeFormat('en-CA', {
+                timeZone: 'Europe/Bucharest',
+                year: 'numeric', month: '2-digit', day: '2-digit'
+            }).format(candidate).split('-');
+            // Build target: year/month/day at h:00 Bucharest time
+            // Simple approach: offset is either 120 or 180 min; try both
+            const formatter = new Intl.DateTimeFormat('en-US', {
+                timeZone: 'Europe/Bucharest',
+                hour: 'numeric', hour12: false
+            });
+            for (const offsetMin of [120, 180]) {
+                const targetUtc = new Date(Date.UTC(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]), h, 0, 0) - offsetMin * 60000);
+                const actualHour = parseInt(formatter.format(targetUtc), 10);
+                if (actualHour === h && targetUtc > now) {
+                    return { roHour: h, label: `${String(h).padStart(2, '0')}:00 (RO)`, nextAt: targetUtc.toISOString() };
+                }
+            }
+        }
+        // fallback
+        const fallback = new Date(now);
+        fallback.setDate(now.getDate() + 1);
+        return { roHour: h, label: `${String(h).padStart(2, '0')}:00 (RO)`, nextAt: fallback.toISOString() };
     });
-    return times;
 }
 
 function startScheduler() {
@@ -397,4 +475,32 @@ router.post('/config', express.json(), (req, res) => {
     res.json({ success: true, message: 'Config saved (runtime only)' });
 });
 
-module.exports = router;
+// ═══ SUPABASE CACHE PERSISTENCE ═══
+async function persistCache() {
+    if (!_supabase) return;
+    try {
+        const articles = getArticlesArray().slice(0, 50);
+        await _supabase.from('news_cache').upsert(
+            { id: 'latest', data: JSON.stringify(articles), updated_at: new Date().toISOString() },
+            { onConflict: 'id' }
+        );
+    } catch (e) { /* silent — persistence is optional */ }
+}
+
+async function restoreCache() {
+    if (!_supabase) return;
+    try {
+        const { data } = await _supabase.from('news_cache').select('data').eq('id', 'latest').single();
+        if (data && data.data) {
+            const articles = JSON.parse(data.data);
+            for (const a of articles) {
+                if (a.title && !isDuplicate(a.title)) {
+                    articleCache.set(a.id || makeId(a.title), { ...a, _cachedAt: a._cachedAt || Date.now() });
+                }
+            }
+            logger.info({ component: 'News', restored: articleCache.size }, 'Cache restored from DB');
+        }
+    } catch (e) { /* silent */ }
+}
+
+module.exports = { router, setSupabase, restoreCache };

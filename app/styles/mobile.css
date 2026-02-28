@@ -1,0 +1,61 @@
+/* ═══════════════════════════════════════════════════════════════
+   KelionAI — Mobile / Responsive Styles
+   Depends on design-system.css for CSS variables.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Small screens ── */
+@media (max-width: 768px) {
+    /* Pricing */
+    .pricing-cards { flex-direction: column; }
+    .pricing-card--featured { transform: scale(1); }
+    .pricing-plans,
+    .pricing-grid { grid-template-columns: 1fr; }
+
+    /* Developer portal — stack API tester */
+    .api-tester { grid-template-columns: 1fr; }
+
+    /* Navigation */
+    .navbar-links { display: none; }
+    .navbar-mobile { display: flex; }
+
+    /* Chat bubbles */
+    .message-user,
+    .message-ai { max-width: 90%; }
+
+    /* Settings */
+    .settings-section { padding: 16px; }
+    .settings-row { flex-direction: column; align-items: flex-start; gap: 12px; }
+
+    /* Bottom navigation */
+    .bottom-nav {
+        display: flex;
+        position: fixed;
+        bottom: 0; left: 0; right: 0;
+        background: rgba(10, 10, 15, 0.95);
+        backdrop-filter: blur(20px);
+        border-top: 1px solid var(--kelion-border, rgba(255,255,255,0.08));
+        padding: 12px 0 20px;
+        z-index: var(--z-overlay, 100);
+        justify-content: space-around;
+    }
+
+    .bottom-nav-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        color: var(--kelion-text-secondary, #8888aa);
+        font-size: 10px;
+        font-family: var(--kelion-font, system-ui, sans-serif);
+        cursor: pointer;
+        transition: var(--kelion-transition, all 0.2s ease);
+    }
+
+    .bottom-nav-item.active { color: var(--kelion-primary, #6c63ff); }
+    .bottom-nav-item svg { width: 24px; height: 24px; }
+}
+
+/* ── Desktop — hide bottom nav ── */
+@media (min-width: 769px) {
+    .bottom-nav { display: none; }
+}

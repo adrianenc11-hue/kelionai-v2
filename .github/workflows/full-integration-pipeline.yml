@@ -1,0 +1,108 @@
+name: 🔄 Full Integration Pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Simulate without making changes (dry run)'
+        required: false
+        default: 'false'
+        type: boolean
+      skip_deploy:
+        description: 'Skip the deploy-and-verify step'
+        required: false
+        default: 'false'
+        type: boolean
+      skip_recovery:
+        description: 'Skip the PR recovery step'
+        required: false
+        default: 'false'
+        type: boolean
+      base_url:
+        description: 'Override verification base URL'
+        required: false
+        default: 'https://kelionai.app'
+        type: string
+
+jobs:
+  pipeline:
+    name: 🚀 Run Full Pipeline
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure git identity
+        run: |
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+
+      - name: Make scripts executable
+        run: chmod +x scripts/recover-unmerged-prs.sh scripts/integrate-orphan-branches.sh scripts/deploy-and-verify.sh scripts/full-pipeline.sh
+
+      - name: Install Railway CLI (if deploy not skipped)
+        if: inputs.skip_deploy != true
+        run: npm install -g @railway/cli
+        continue-on-error: true
+
+      - name: Run full pipeline
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          SKIP_DEPLOY: ${{ inputs.skip_deploy }}
+          SKIP_RECOVERY: ${{ inputs.skip_recovery }}
+          BASE_URL: ${{ inputs.base_url }}
+        run: |
+          FLAGS=()
+          [ "$DRY_RUN" = "true" ]     && FLAGS+=(--dry-run)
+          [ "$SKIP_DEPLOY" = "true" ] && FLAGS+=(--skip-deploy)
+          [ "$SKIP_RECOVERY" = "true" ] && FLAGS+=(--skip-recovery)
+          FLAGS+=(--base-url="$BASE_URL")
+          bash scripts/full-pipeline.sh "${FLAGS[@]}"
+
+      - name: Upload pipeline logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: pipeline-logs-${{ github.run_id }}
+          path: logs/
+          retention-days: 30
+
+      - name: Upload conflict resolution files
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: conflict-files-${{ github.run_id }}
+          path: conflicts/
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: Post summary
+        if: always()
+        run: |
+          LOG_FILE=$(ls -t logs/pipeline-*.log 2>/dev/null | head -1 || echo "")
+          echo "## 🔄 Full Integration Pipeline Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Parameter | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Dry run | ${{ inputs.dry_run }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Skip deploy | ${{ inputs.skip_deploy }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Skip recovery | ${{ inputs.skip_recovery }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Base URL | ${{ inputs.base_url }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -n "$LOG_FILE" ] && [ -f "$LOG_FILE" ]; then
+            echo "### Pipeline Log (last 100 lines)" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            tail -100 "$LOG_FILE" | sed 's/\x1b\[[0-9;]*m//g' >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Run at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY

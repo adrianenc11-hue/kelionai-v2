@@ -125,3 +125,64 @@ To run manually in Supabase SQL Editor:
 - **Images**: DALL-E 3
 - **Payments**: Stripe
 - **Monitoring**: Sentry + Prometheus
+
+## Auto-merge procedure
+
+The repository includes a manual workflow that merges all open PRs in the optimal order, handles conflicts gracefully, and produces a Markdown summary.
+
+### What the workflow does
+
+1. Iterates through 14 PRs in a carefully ordered sequence (see table below).
+2. For each PR:
+   - If **draft** → marks it *Ready for Review* via the GitHub GraphQL API.
+   - If **already merged / closed** → skips it.
+   - If **Dependabot PR** → posts `@dependabot rebase` to trigger a rebase.
+   - If **non-Dependabot PR** → calls the *update branch* REST API.
+   - Waits 30 seconds for GitHub to recompute the `mergeable_state`.
+   - If `mergeable` → merges with the `merge` method (creates a merge commit).
+   - If `conflict` → logs details and moves on without stopping the run.
+3. At the end, writes a full Markdown report to the **Actions step summary**.
+
+### How to run manually
+
+1. Go to **Actions → 🚀 Auto-Merge All Open PRs**.
+2. Click **Run workflow** → **Run workflow** (no inputs required).
+3. Once the run completes, open the run summary to read the report.
+
+### Merge order
+
+| # | PR | Title | Group |
+|---|---|---|---|
+| 1 | #136 | actions/checkout 4→6 | GitHub Actions bumps |
+| 2 | #134 | actions/setup-node 4→6 | GitHub Actions bumps |
+| 3 | #133 | actions/github-script 7→8 | GitHub Actions bumps |
+| 4 | #138 | actions/upload-artifact 4→7 | GitHub Actions bumps |
+| 5 | #135 | @supabase/supabase-js 2.97→2.98 | npm dependency bumps |
+| 6 | #137 | stripe 20.3.1→20.4.0 | npm dependency bumps |
+| 7 | #139 | @sentry/browser 10.39→10.40 | npm dependency bumps |
+| 8 | #140 | @sentry/node 10.39→10.40 | npm dependency bumps |
+| 9 | #141 | jest 29.7→30.2 | npm dependency bumps |
+| 10 | #123 | Add full integration pipeline | Feature PRs |
+| 11 | #128 | Add comprehensive Playwright E2E test suite | Feature PRs |
+| 12 | #129 | Add HTTPS redirect, Lighthouse CI, uptime monitoring | Feature PRs |
+| 13 | #142 | Fix onboarding flow (inline event handlers) | Feature PRs |
+| 14 | #143 | Add live Work-In-Progress status page | Feature PRs |
+
+### Reading the report
+
+| Icon | Meaning |
+|------|---------|
+| ✅ | Merged successfully |
+| ❌ | Merge failed (conflict or API error) |
+| ⏭️ | Skipped — PR was already merged or closed |
+| 📝 | Still in draft (could not be converted) |
+
+### Standalone report script
+
+You can also check PR states without running the workflow:
+
+```bash
+GITHUB_TOKEN=ghp_... node scripts/auto-merge-report.js
+```
+
+This writes a `auto-merge-report.md` file in the project root and prints the same Markdown table to stdout.

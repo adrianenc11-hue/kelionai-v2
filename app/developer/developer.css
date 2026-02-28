@@ -440,3 +440,86 @@ pre {
 #auth-switch { margin-top: 14px; font-size: 0.82rem; color: var(--muted); }
 #auth-switch a { color: var(--cyan); text-decoration: none; cursor: pointer; }
 #auth-err { color: var(--danger); font-size: 0.82rem; min-height: 20px; margin-bottom: 6px; }
+
+/* ═══════════════════════════════════════════════════════════════
+   Redesign v2 — Developer Portal (design-system variables)
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── API Key card ── */
+.api-key-card {
+    background: #0D1117;
+    border: 1px solid #30363D;
+    border-radius: var(--radius);
+    padding: 20px;
+    font-family: var(--font-mono, monospace);
+    margin-bottom: 12px;
+}
+
+.api-key-value {
+    color: var(--success);
+    font-family: var(--font-mono, monospace);
+    font-size: 14px;
+    letter-spacing: 0.05em;
+    word-break: break-all;
+}
+
+/* ── Code block with copy button ── */
+.code-block {
+    background: #161B22;
+    border: 1px solid #30363D;
+    border-radius: 8px;
+    padding: 16px;
+    color: var(--cyan);
+    font-family: var(--font-mono, monospace);
+    font-size: 0.82rem;
+    overflow-x: auto;
+    position: relative;
+    white-space: pre;
+}
+
+.copy-btn {
+    position: absolute;
+    top: 8px; right: 8px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--muted);
+    padding: 4px 8px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: var(--transition);
+    font-family: inherit;
+}
+
+.copy-btn:hover {
+    background: rgba(255, 255, 255, 0.12);
+    color: var(--text);
+}
+
+.copy-btn.copied {
+    color: var(--success);
+    border-color: rgba(0, 204, 102, 0.4);
+}
+
+/* ── Live API tester ── */
+.api-tester {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+@media (max-width: 720px) { .api-tester { grid-template-columns: 1fr; } }
+
+.api-response {
+    background: #0D1117;
+    border: 1px solid var(--success);
+    border-radius: 8px;
+    padding: 16px;
+    color: var(--success);
+    font-family: var(--font-mono, monospace);
+    font-size: 0.8rem;
+    min-height: 200px;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+}

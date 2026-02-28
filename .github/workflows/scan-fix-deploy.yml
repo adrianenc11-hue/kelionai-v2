@@ -1,0 +1,146 @@
+name: 🔍 Scan → Fix → Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Simulate all steps without making real changes'
+        required: false
+        default: 'false'
+        type: boolean
+      base_url:
+        description: 'Override scan base URL'
+        required: false
+        default: 'https://kelionai.app'
+        type: string
+      auto_merge:
+        description: 'Automatically merge the auto-fix PR if created'
+        required: false
+        default: 'false'
+        type: boolean
+      skip_deploy:
+        description: 'Skip the Railway redeploy step'
+        required: false
+        default: 'false'
+        type: boolean
+
+jobs:
+  scan-fix-deploy:
+    name: 🔍 Scan → Fix → Deploy
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure git identity
+        run: |
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+
+      - name: Install jq and openssl
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq jq openssl
+
+      - name: Make scripts executable
+        run: |
+          chmod +x scripts/scan-and-fix-live.sh \
+                   scripts/auto-fix.sh \
+                   scripts/scan-fix-deploy.sh
+
+      - name: Run scan-fix-deploy pipeline
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          SKIP_DEPLOY: ${{ inputs.skip_deploy }}
+          AUTO_MERGE: ${{ inputs.auto_merge }}
+          BASE_URL: ${{ inputs.base_url }}
+        run: |
+          FLAGS=()
+          if [ "$DRY_RUN"    = "true" ]; then FLAGS+=(--dry-run);      fi
+          if [ "$SKIP_DEPLOY" = "true" ]; then FLAGS+=(--skip-deploy);  fi
+          if [ "$AUTO_MERGE"  = "true" ]; then FLAGS+=(--auto-merge);   fi
+          FLAGS+=(--base-url="$BASE_URL")
+          bash scripts/scan-fix-deploy.sh "${FLAGS[@]}"
+
+      - name: Upload scan reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: scan-reports-${{ github.run_id }}
+          path: reports/
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: Upload pipeline logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: pipeline-logs-${{ github.run_id }}
+          path: logs/
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: Write step summary
+        if: always()
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
+          SKIP_DEPLOY: ${{ inputs.skip_deploy }}
+          AUTO_MERGE: ${{ inputs.auto_merge }}
+          BASE_URL: ${{ inputs.base_url }}
+        run: |
+          LATEST_JSON=$(ls -t reports/live-scan-*.json 2>/dev/null | head -1 || echo "")
+          LATEST_LOG=$(ls -t logs/scan-fix-deploy-*.log 2>/dev/null | head -1 || echo "")
+
+          {
+            echo "## 🔍 Scan → Fix → Deploy Summary"
+            echo ""
+            echo "| Parameter | Value |"
+            echo "|-----------|-------|"
+            echo "| Dry run | $DRY_RUN |"
+            echo "| Skip deploy | $SKIP_DEPLOY |"
+            echo "| Auto merge | $AUTO_MERGE |"
+            echo "| Base URL | $BASE_URL |"
+            echo ""
+
+            if [ -n "$LATEST_JSON" ] && [ -f "$LATEST_JSON" ]; then
+              SCORE=$(jq -r '.summary.score // "N/A"' "$LATEST_JSON")
+              PASS=$(jq  -r '.summary.pass  // 0'     "$LATEST_JSON")
+              FAIL=$(jq  -r '.summary.fail  // 0'     "$LATEST_JSON")
+              WARN=$(jq  -r '.summary.warn  // 0'     "$LATEST_JSON")
+              echo "### Scan Results"
+              echo ""
+              echo "| Metric | Value |"
+              echo "|--------|-------|"
+              echo "| Score | $SCORE |"
+              echo "| ✅ Pass | $PASS |"
+              echo "| ❌ Fail | $FAIL |"
+              echo "| ⚠️ Warn | $WARN |"
+              echo ""
+              echo "### Issues"
+              echo ""
+              jq -r '.issues[] | "- **[\(.severity | ascii_upcase)]** \(.description)"' \
+                "$LATEST_JSON" 2>/dev/null || echo "_No issues found._"
+              echo ""
+            fi
+
+            if [ -n "$LATEST_LOG" ] && [ -f "$LATEST_LOG" ]; then
+              echo "### Pipeline Log (last 100 lines)"
+              echo '```'
+              tail -100 "$LATEST_LOG" | sed 's/\x1b\[[0-9;]*m//g'
+              echo '```'
+            fi
+
+            echo ""
+            echo "Run at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          } >> "$GITHUB_STEP_SUMMARY"
