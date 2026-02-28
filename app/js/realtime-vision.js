@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════════
 // KelionAI — Real-Time Vision (TensorFlow.js COCO-SSD)
-// Detecție obiecte în timp real din cameră — 100% client-side
-// Zero cost server, funcționează offline
+// Real-time object detection from camera — 100% client-side
+// Zero server cost, works offline
 // ═══════════════════════════════════════════════════════════════
 
 const RealtimeVision = (() => {

@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="ro">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Facturare — KelionAI</title>
+    <title>Billing — KelionAI</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap">
@@ -203,26 +203,26 @@
     <header class="billing-header">
         <a href="/" class="billing-logo">Kelion<span>AI</span></a>
         <nav class="billing-nav">
-            <a href="/" class="nav-link">Acasă</a>
-            <a href="/pricing/" class="nav-link">Prețuri</a>
+            <a href="/" class="nav-link">Home</a>
+            <a href="/pricing/" class="nav-link">Pricing</a>
         </nav>
     </header>
 
     <main class="billing-main">
         <div class="billing-hero">
-            <h1>Facturare & Abonament</h1>
-            <p>Gestionează planul și plățile tale</p>
+            <h1>Billing & Subscription</h1>
+            <p>Manage your plan and payments</p>
         </div>
 
         <div id="billing-message"></div>
 
         <div id="billing-content">
-            <div class="plan-loading">Se încarcă datele contului...<span class="spinner"></span></div>
+            <div class="plan-loading">Loading account data...<span class="spinner"></span></div>
         </div>
     </main>
 
     <footer class="billing-footer">
-        <p>&copy; 2025 KelionAI. <a href="/api/legal/terms">Termeni</a> · <a href="/api/legal/privacy">Confidențialitate</a></p>
+        <p>&copy; 2026 KelionAI. <a href="/api/legal/terms">Terms</a> · <a href="/api/legal/privacy">Privacy</a></p>
     </footer>
 
     <script>
@@ -265,16 +265,16 @@
                 var r = await fetch(API + '/api/payments/portal', { method: 'POST', headers: authHeaders() });
                 var d = await r.json();
                 if (d.url) window.location.href = d.url;
-                else showMsg(d.error || 'Eroare portal.', 'error');
-            } catch (e) { showMsg('Eroare la deschiderea portalului.', 'error'); }
+                else showMsg(d.error || 'Portal error.', 'error');
+            } catch (e) { showMsg('Error opening portal.', 'error'); }
         }
 
         async function init() {
             var token = getToken();
             if (!token) {
                 document.getElementById('billing-content').innerHTML =
-                    '<div class="billing-section"><p class="no-sub">Trebuie să fii autentificat pentru a vedea datele de facturare. ' +
-                    '<a href="/">Mergi la aplicație</a> și autentifică-te.</p></div>';
+                    '<div class="billing-section"><p class="no-sub">You need to be signed in to view billing data. ' +
+                    '<a href="/">Go to the app</a> and sign in.</p></div>';
                 return;
             }
 
@@ -285,7 +285,7 @@
                 status = await r.json();
             } catch (e) {
                 document.getElementById('billing-content').innerHTML =
-                    '<div class="billing-section"><p class="no-sub">Nu s-au putut încărca datele. Încearcă din nou.</p></div>';
+                    '<div class="billing-section"><p class="no-sub">Could not load data. Please try again.</p></div>';
                 return;
             }
 
@@ -300,11 +300,11 @@
             var renewHtml = '';
             if (sub && sub.current_period_end) {
                 var d = new Date(sub.current_period_end);
-                renewHtml = '<div class="billing-row"><span class="label">Se reînnoiește</span><span class="value">' + d.toLocaleDateString('ro-RO', { day: '2-digit', month: 'long', year: 'numeric' }) + '</span></div>';
+                renewHtml = '<div class="billing-row"><span class="label">Renews</span><span class="value">' + d.toLocaleDateString('en-US', { day: '2-digit', month: 'long', year: 'numeric' }) + '</span></div>';
             }
 
             var planHtml = '<div class="billing-section">' +
-                '<h2>Planul curent</h2>' +
+                '<h2>Current Plan</h2>' +
                 '<div class="billing-row"><span class="label">Plan</span><span class="value">' + plan.toUpperCase() + '</span></div>' +
                 (sub ? '<div class="billing-row"><span class="label">Status</span><span class="value ' + statusClass + '">' + statusText + '</span></div>' : '') +
                 renewHtml +
@@ -313,16 +313,16 @@
             if (plan === 'free' || plan === 'guest') {
                 planHtml += '<button class="btn btn-primary" onclick="window.location.href=\'/pricing/\'">Upgrade plan</button>';
             } else {
-                planHtml += '<button class="btn btn-secondary" id="btn-portal">Gestionează abonamentul</button>';
-                planHtml += '<button class="btn btn-danger" id="btn-cancel">Anulează abonamentul</button>';
+                planHtml += '<button class="btn btn-secondary" id="btn-portal">Manage subscription</button>';
+                planHtml += '<button class="btn btn-danger" id="btn-cancel">Cancel subscription</button>';
             }
 
             planHtml += '</div></div>';
 
-            var usageHtml = '<div class="billing-section"><h2>Utilizare astăzi</h2>' +
+            var usageHtml = '<div class="billing-section"><h2>Usage Today</h2>' +
                 usageBar(usage.chat || 0, limits.chat, '💬 Chat') +
-                usageBar(usage.search || 0, limits.search, '🔍 Căutări') +
-                usageBar(usage.image || 0, limits.image, '🖼 Imagini') +
+                usageBar(usage.search || 0, limits.search, '🔍 Search') +
+                usageBar(usage.image || 0, limits.image, '🖼 Images') +
                 usageBar(usage.vision || 0, limits.vision, '👁 Vision') +
                 usageBar(usage.tts || 0, limits.tts, '🔊 TTS') +
                 '</div>';
@@ -335,7 +335,7 @@
             var cancelBtn = document.getElementById('btn-cancel');
             if (cancelBtn) {
                 cancelBtn.addEventListener('click', function () {
-                    if (confirm('Ești sigur că vrei să anulezi abonamentul? Vei pierde accesul la funcționalitățile premium la sfârșitul perioadei curente.')) {
+                    if (confirm('Are you sure you want to cancel your subscription? You will lose access to premium features at the end of the current period.')) {
                         openPortal();
                     }
                 });
@@ -343,10 +343,10 @@
 
             var params = new URLSearchParams(window.location.search);
             if (params.get('payment') === 'success') {
-                showMsg('✅ Plata procesată cu succes! Planul tău a fost activat.', 'success');
+                showMsg('✅ Payment processed successfully! Your plan has been activated.', 'success');
                 window.history.replaceState({}, '', window.location.pathname);
             } else if (params.get('payment') === 'cancel') {
-                showMsg('Plata a fost anulată.', 'error');
+                showMsg('Payment was cancelled.', 'error');
                 window.history.replaceState({}, '', window.location.pathname);
             }
         }
