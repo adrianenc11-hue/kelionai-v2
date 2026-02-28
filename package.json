@@ -8,7 +8,6 @@
         "start": "node server/index.js",
         "test": "npx playwright test --project=chromium",
         "test:all": "npx playwright test",
-        "test:live": "npx playwright test --project=chromium",
         "test:e2e": "npx playwright test tests/e2e-live.spec.js --project=chromium",
         "test:unit": "jest",
         "test:coverage": "jest --coverage",

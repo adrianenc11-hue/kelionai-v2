@@ -116,7 +116,6 @@ if %errorlevel% neq 0 (
     echo.
 )
 
-:: Test local
 echo ══════════════════════════════════════════════════
 echo   TOTUL E GATA!
 echo.
@@ -130,13 +129,3 @@ echo   2. Copiază conținutul din server/schema.sql
 echo   3. Apasă "Run"
 echo ══════════════════════════════════════════════════
 echo.
-
-:: Offer to start local server
-set /p START="Vrei să pornești serverul local? (d/n): "
-if /i "%START%"=="d" (
-    echo.
-    echo 🚀 Pornesc serverul...
-    node server/index.js
-)
-
-pause
