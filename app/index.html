@@ -211,7 +211,7 @@
                 <div id="avatar-switcher">
                     <button class="avatar-pill active" data-avatar="kelion">Kelion</button>
                     <button class="avatar-pill" data-avatar="kira">Kira</button>
-                    <button class="ctrl-btn-sm" id="btn-history" title="Istoric conversații">📋</button>
+                    <button class="ctrl-btn-sm" id="btn-history" title="Conversation history" aria-label="Conversation history">📋</button>
                     <span id="user-name" class="user-badge">Guest</span>
                     
                     
@@ -310,7 +310,7 @@
                     splash.classList.add('hidden');
                     setTimeout(function () { if (splash.parentNode) splash.parentNode.removeChild(splash); }, 500);
                 }
-            }, 1500);
+            }, 800);
         });
 
         // ─── PWA Install banner ───────────────────────────────────────
