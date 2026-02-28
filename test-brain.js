@@ -550,7 +550,7 @@ const personaSrc = fs.readFileSync('./server/persona.js', 'utf8');
 
 test('No unhandled promise rejections in chat endpoint', () => {
     // Chat endpoint should have try/catch
-    return indexSrc.includes("} catch(e) { console.error('[CHAT]'");
+    return indexSrc.includes("} catch(e) { logger.error(") || indexSrc.includes("catch(e) { logger.error({");
 });
 
 test('Brain think() has try/catch in tool execution', () => {

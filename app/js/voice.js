@@ -78,8 +78,14 @@
 
     function detectLanguage(text) {
         const t = text.toLowerCase();
-        if (/\b(și|sau|este|sunt|pentru|care|cum|unde|vreau|poți)\b/.test(t)) { detectedLanguage = 'ro'; return; }
-        if (/\b(the|is|are|what|where|how|can|you|please)\b/.test(t)) { detectedLanguage = 'en'; return; }
+        let lang = null;
+        if (/\b(și|sau|este|sunt|pentru|care|cum|unde|vreau|poți)\b/.test(t)) { lang = 'ro'; }
+        else if (/\b(the|is|are|what|where|how|can|you|please)\b/.test(t)) { lang = 'en'; }
+        if (lang) {
+            detectedLanguage = lang;
+            // Sync with i18n module if available and language changed
+            if (window.i18n && i18n.getLanguage() !== lang) i18n.setLanguage(lang);
+        }
     }
 
     // ─── SPEAK — AudioContext (bypass autoplay!) ─────────────
@@ -89,9 +95,10 @@
         isSpeaking = true;
 
         try {
+            const currentExpression = (window.KAvatar && window.KAvatar.getCurrentExpression) ? window.KAvatar.getCurrentExpression() : 'neutral';
             const resp = await fetch(API_BASE + '/api/speak', { method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...(window.KAuth ? KAuth.getAuthHeaders() : {}) },
-                body: JSON.stringify({ text, avatar: avatar || KAvatar.getCurrentAvatar(), language: detectedLanguage }) });
+                body: JSON.stringify({ text, avatar: avatar || KAvatar.getCurrentAvatar(), language: detectedLanguage, mood: currentExpression }) });
 
             if (!resp.ok) { fallbackTextLipSync(text); isSpeaking = false; resumeWakeDetection(); return; }
 
@@ -234,5 +241,6 @@
     window.KVoice = { speak, stopSpeaking, startListening, stopListening, captureAndAnalyze,
         startWakeWordDetection, resumeWakeDetection, ensureAudioUnlocked,
         isRecording: () => isRecording, isSpeaking: () => isSpeaking,
-        getLanguage: () => detectedLanguage, setLanguage: (l) => { detectedLanguage = l; } };
+        getLanguage: () => (window.i18n ? i18n.getLanguage() : detectedLanguage),
+        setLanguage: (l) => { detectedLanguage = l; } };
 })();

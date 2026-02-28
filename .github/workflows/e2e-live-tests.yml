@@ -1,0 +1,50 @@
+name: E2E Live Tests
+
+on:
+  push:
+    branches: [master]
+  schedule:
+    - cron: '0 */6 * * *'  # every 6 hours
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run E2E live tests
+        run: npx playwright test tests/e2e-live.spec.js --project=chromium
+
+      - name: Upload test report
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: live-test-report
+          path: playwright-report/
+          retention-days: 30
+
+      - name: Upload screenshots
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: live-test-screenshots
+          path: test-results/
+          retention-days: 30

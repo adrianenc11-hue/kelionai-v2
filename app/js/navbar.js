@@ -36,16 +36,28 @@
             });
         }
 
-        // Language switcher — update label, close dropdown on selection
+        // Language switcher — update label, switch UI language, close dropdown on selection
         langOptions.forEach(function (btn) {
             btn.addEventListener('click', function () {
                 var lang = btn.getAttribute('data-lang');
                 if (langLabel && lang) {
                     langLabel.textContent = lang.toUpperCase();
                 }
+                // Apply i18n language switch
+                if (window.i18n && lang) i18n.setLanguage(lang);
                 var dropdown = btn.closest('.lang-switcher');
                 if (dropdown) dropdown.classList.remove('open');
             });
+        });
+
+        // Sync label with stored language on load
+        if (langLabel && window.i18n) {
+            langLabel.textContent = i18n.getLanguage().toUpperCase();
+        }
+
+        // Keep label in sync when language changes via other means
+        window.addEventListener('kelion-lang-changed', function (e) {
+            if (langLabel && e.detail && e.detail.lang) langLabel.textContent = e.detail.lang.toUpperCase();
         });
     });
 }());

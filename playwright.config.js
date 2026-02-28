@@ -12,7 +12,7 @@ module.exports = defineConfig({
         ['list']
     ],
     use: {
-        baseURL: 'http://localhost:3000',
+        baseURL: process.env.PLAYWRIGHT_BASE_URL || 'https://kelionai.app',
         trace: 'on-first-retry',
         screenshot: 'on',
         video: 'on-first-retry',
@@ -31,10 +31,4 @@ module.exports = defineConfig({
             use: { ...devices['Desktop Safari'] },
         },
     ],
-    webServer: {
-        command: 'npm run dev',
-        url: 'http://localhost:3000',
-        reuseExistingServer: true,
-        timeout: 10000,
-    },
 });

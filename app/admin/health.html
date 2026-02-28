@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KelionAI — Health Check</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #0a0a1a; color: #e0e0e0; font-family: system-ui, sans-serif; padding: 20px; }
+        h1 { color: #00ffff; margin-bottom: 6px; font-size: 1.4rem; }
+        .subtitle { color: #888; font-size: 0.85rem; margin-bottom: 20px; }
+        .auth-row { display: flex; gap: 8px; align-items: center; margin-bottom: 16px; }
+        .auth-row label { font-size: 0.82rem; color: #888; }
+        .admin-input { background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.15); color: #e0e0e0; padding: 8px 12px; border-radius: 8px; font-size: 0.85rem; width: 240px; }
+        .btn { background: #00ffff; color: #000; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 0.85rem; }
+        .btn:hover { background: #00dddd; }
+        .btn.secondary { background: rgba(255,255,255,0.1); color: #e0e0e0; }
+        .btn.secondary:hover { background: rgba(255,255,255,0.18); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 20px; }
+        .status-bar { font-size: 0.8rem; color: #888; }
+        .status-bar span { color: #00ffff; }
+        .error-msg { color: #ff6666; font-size: 0.82rem; }
+        #report { display: none; background: #0d0d20; border: 1px solid rgba(0,255,255,0.2); border-radius: 16px; padding: 28px; }
+        .score-block { margin-bottom: 20px; }
+        .score-val { font-size: 3rem; font-weight: bold; }
+        .grade-A, .grade-B { color: #00ff88; }
+        .grade-C { color: #ffaa00; }
+        .grade-D, .grade-F { color: #ff4444; }
+        .score-bar-wrap { background: rgba(255,255,255,0.08); border-radius: 6px; height: 10px; margin-top: 8px; }
+        .score-bar-fill { height: 100%; border-radius: 6px; background: linear-gradient(90deg,#00ffff,#00ff88); transition: width .4s; }
+        .section { margin-top: 18px; }
+        .section h3 { color: #888; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.07); padding-bottom: 6px; }
+        .hc-row { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 0.85rem; }
+        .hc-row:last-child { border: none; }
+        .ok { color: #00ff88; }
+        .err { color: #ff4444; }
+        .warn { color: #ffaa00; }
+        .rec { background: rgba(255,170,0,0.08); border: 1px solid rgba(255,170,0,0.25); border-radius: 8px; padding: 10px 14px; font-size: 0.82rem; color: #ffcc66; margin-top: 6px; }
+        .export-row { display: flex; gap: 10px; margin-top: 24px; }
+        .loading { text-align: center; padding: 40px; color: #00ffff; font-size: 1rem; }
+    </style>
+</head>
+<body>
+    <h1>🏥 KelionAI — Health Check</h1>
+    <p class="subtitle">Verificare stare sistem — ADMIN ONLY</p>
+
+    <div class="auth-row">
+        <label>Admin Secret:</label>
+        <input type="password" id="admin-secret" class="admin-input" placeholder="x-admin-secret" autocomplete="off">
+        <button class="btn secondary" onclick="saveSecret()">Salvează</button>
+    </div>
+
+    <div class="toolbar">
+        <button class="btn" id="btn-run" onclick="runCheck()">🏥 Run Health Check</button>
+        <span class="status-bar" id="status-bar">—</span>
+    </div>
+
+    <div id="report"></div>
+
+    <script>
+        'use strict';
+
+        let adminSecret = sessionStorage.getItem('kelion_admin_secret') || '';
+        let lastData = null;
+
+        document.getElementById('admin-secret').value = adminSecret;
+
+        function saveSecret() {
+            adminSecret = document.getElementById('admin-secret').value.trim();
+            sessionStorage.setItem('kelion_admin_secret', adminSecret);
+            setStatus('Secret salvat.');
+        }
+
+        function setStatus(msg, isError) {
+            const el = document.getElementById('status-bar');
+            el.innerHTML = isError ? '<span class="error-msg">' + msg + '</span>' : '<span>' + msg + '</span>';
+        }
+
+        function esc(s) {
+            return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+
+        function ic(ok) {
+            return ok ? '<span class="ok">✅</span>' : '<span class="err">❌</span>';
+        }
+
+        function renderReport(d) {
+            const gc = d.grade === 'A' || d.grade === 'B' ? 'grade-A' : d.grade === 'C' ? 'grade-C' : 'grade-D';
+            let h = '<div class="score-block">';
+            h += '<div class="score-val ' + gc + '">' + d.score + '/100 <small style="font-size:1.2rem">Grade: ' + esc(d.grade) + '</small></div>';
+            h += '<div class="score-bar-wrap"><div class="score-bar-fill" style="width:' + d.score + '%"></div></div>';
+            h += '</div>';
+
+            h += '<div class="section"><h3>🖥 Server</h3>';
+            h += '<div class="hc-row"><span>Version</span><span>' + esc(d.server.version) + '</span></div>';
+            h += '<div class="hc-row"><span>Uptime</span><span>' + esc(d.server.uptime) + '</span></div>';
+            h += '<div class="hc-row"><span>Node.js</span><span>' + esc(d.server.nodeVersion) + '</span></div>';
+            h += '<div class="hc-row"><span>Memory RSS</span><span>' + esc(d.server.memory.rss) + '</span></div>';
+            h += '<div class="hc-row"><span>Heap Used / Total</span><span>' + esc(d.server.memory.heapUsed) + ' / ' + esc(d.server.memory.heapTotal) + '</span></div>';
+            h += '<div class="hc-row"><span>Timestamp</span><span>' + esc(d.server.timestamp) + '</span></div>';
+            h += '</div>';
+
+            h += '<div class="section"><h3>⚙️ Services</h3>';
+            for (const [k, s] of Object.entries(d.services)) {
+                h += '<div class="hc-row"><span>' + esc(s.label) + '</span><span>' + ic(s.active) + '</span></div>';
+            }
+            h += '</div>';
+
+            h += '<div class="section"><h3>🗄 Database</h3>';
+            h += '<div class="hc-row"><span>Connected</span><span>' + ic(d.database.connected) + '</span></div>';
+            if (d.database.error) {
+                h += '<div class="hc-row"><span>Error</span><span class="err">' + esc(d.database.error) + '</span></div>';
+            }
+            for (const [tbl, v] of Object.entries(d.database.tables || {})) {
+                const val = v.ok
+                    ? '<span class="ok">✅ ' + v.count + ' rows</span>'
+                    : '<span class="err">❌ ' + esc(v.error) + '</span>';
+                h += '<div class="hc-row"><span>' + esc(tbl) + '</span><span>' + val + '</span></div>';
+            }
+            h += '</div>';
+
+            h += '<div class="section"><h3>🧠 Brain</h3>';
+            const bc = d.brain.status === 'healthy' ? 'ok' : d.brain.status === 'degraded' ? 'err' : 'warn';
+            h += '<div class="hc-row"><span>Status</span><span class="' + bc + '">' + esc(d.brain.status) + '</span></div>';
+            h += '<div class="hc-row"><span>Conversations</span><span>' + d.brain.conversations + '</span></div>';
+            h += '<div class="hc-row"><span>Recent Errors (1h)</span><span class="' + (d.brain.recentErrors > 0 ? 'err' : 'ok') + '">' + d.brain.recentErrors + '</span></div>';
+            if (d.brain.degradedTools && d.brain.degradedTools.length) {
+                h += '<div class="hc-row"><span>Degraded Tools</span><span class="err">' + esc(d.brain.degradedTools.join(', ')) + '</span></div>';
+            }
+            if (d.brain.journal && d.brain.journal.length) {
+                h += '<div style="margin-top:8px;font-size:0.78rem;color:#888">';
+                for (const j of d.brain.journal) {
+                    h += '<div style="padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.04)">' +
+                        new Date(j.time).toLocaleTimeString() + ' — <strong>' + esc(j.event) + '</strong>: ' + esc(j.lesson) + '</div>';
+                }
+                h += '</div>';
+            }
+            h += '</div>';
+
+            h += '<div class="section"><h3>🔐 Auth & Security</h3>';
+            h += '<div class="hc-row"><span>Supabase Auth</span><span>' + ic(d.auth.authAvailable) + '</span></div>';
+            h += '<div class="hc-row"><span>Supabase Admin</span><span>' + ic(d.auth.supabaseAdminInitialized) + '</span></div>';
+            h += '<div class="hc-row"><span>CSP Enabled</span><span>' + ic(d.security.cspEnabled) + '</span></div>';
+            h += '<div class="hc-row"><span>HTTPS Redirect</span><span>' + ic(d.security.httpsRedirect) + '</span></div>';
+            h += '<div class="hc-row"><span>CORS Configured</span><span>' + ic(d.security.corsConfigured) + '</span></div>';
+            h += '<div class="hc-row"><span>Admin Secret</span><span>' + ic(d.security.adminSecretConfigured) + '</span></div>';
+            h += '</div>';
+
+            h += '<div class="section"><h3>💳 Payments</h3>';
+            h += '<div class="hc-row"><span>Stripe Configured</span><span>' + ic(d.payments.stripeConfigured) + '</span></div>';
+            h += '<div class="hc-row"><span>Webhook Configured</span><span>' + ic(d.payments.webhookConfigured) + '</span></div>';
+            h += '<div class="hc-row"><span>Price Pro</span><span>' + ic(d.payments.priceProConfigured) + '</span></div>';
+            h += '<div class="hc-row"><span>Price Premium</span><span>' + ic(d.payments.pricePremiumConfigured) + '</span></div>';
+            if (d.payments.activeSubscribers !== null) {
+                h += '<div class="hc-row"><span>Active Subscribers</span><span>' + d.payments.activeSubscribers + '</span></div>';
+            }
+            h += '</div>';
+
+            h += '<div class="section"><h3>🚦 Rate Limits</h3>';
+            for (const [name, rl] of Object.entries(d.rateLimits)) {
+                h += '<div class="hc-row"><span>' + esc(name) + '</span><span>' + rl.max + ' req/' + esc(rl.windowLabel) + '</span></div>';
+            }
+            h += '</div>';
+
+            h += '<div class="section"><h3>🐛 Errors</h3>';
+            h += '<div class="hc-row"><span>Recent Errors (1h)</span><span class="' + (d.errors.recentCount > 0 ? 'err' : 'ok') + '">' + d.errors.recentCount + '</span></div>';
+            if (d.errors.degradedTools && d.errors.degradedTools.length) {
+                h += '<div class="hc-row"><span>Degraded Tools</span><span class="err">' + esc(d.errors.degradedTools.join(', ')) + '</span></div>';
+            }
+            h += '</div>';
+
+            if (d.recommendations && d.recommendations.length) {
+                h += '<div class="section"><h3>⚠️ Recomandări</h3>';
+                for (const r of d.recommendations) {
+                    h += '<div class="rec">' + esc(r) + '</div>';
+                }
+                h += '</div>';
+            }
+
+            h += '<div class="export-row">';
+            h += '<button class="btn" onclick="exportJSON()">Exportă JSON</button>';
+            h += '</div>';
+
+            return h;
+        }
+
+        async function runCheck() {
+            const btn = document.getElementById('btn-run');
+            const report = document.getElementById('report');
+            btn.disabled = true;
+            setStatus('Se verifică...');
+            report.style.display = 'block';
+            report.innerHTML = '<div class="loading">⏳ Se verifică...</div>';
+            try {
+                const res = await fetch('/api/admin/health-check', {
+                    headers: { 'x-admin-secret': adminSecret }
+                });
+                if (res.status === 401) {
+                    report.innerHTML = '<div style="color:#ff6666;padding:20px">❌ Unauthorized — verifică admin secret.</div>';
+                    setStatus('Unauthorized.', true);
+                    btn.disabled = false;
+                    return;
+                }
+                const data = await res.json();
+                lastData = data;
+                report.innerHTML = renderReport(data);
+                setStatus('✓ Health check finalizat — Score: ' + data.score + '/100 (Grade: ' + data.grade + ')');
+            } catch (e) {
+                report.innerHTML = '<div style="color:#ff6666;padding:20px">❌ Eroare: ' + esc(e.message) + '</div>';
+                setStatus('Eroare: ' + e.message, true);
+            }
+            btn.disabled = false;
+        }
+
+        function exportJSON() {
+            if (!lastData) return;
+            const blob = new Blob([JSON.stringify(lastData, null, 2)], { type: 'application/json' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'health-check-' + new Date().toISOString().slice(0, 19).replace(/:/g, '-') + '.json';
+            a.click();
+        }
+    </script>
+</body>
+</html>
