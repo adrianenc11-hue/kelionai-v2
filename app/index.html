@@ -159,7 +159,11 @@
 
         <!-- NAVBAR -->
         <nav class="navbar" id="app-navbar">
-            <a href="/" class="navbar-logo">Kelion<span>AI</span></a>
+            <a href="/" class="navbar-logo"><span id="navbar-avatar-name">Kelion</span><span>AI</span></a>
+        <div id="status-indicator" style="margin-left: 10px; display: inline-flex; align-items: center; gap: 6px; font-size: 0.75rem; color: var(--kelion-text-secondary); opacity: 0.8;">
+            <div id="status-dot" style="width: 8px; height: 8px; border-radius: 50%; background: #00ff88; box-shadow: 0 0 10px rgba(0,255,136,0.5);"></div>
+            <span id="status-text">Online</span>
+        </div>
             <ul class="navbar-links">
                 <li><a href="/" data-i18n="nav.home">Home</a></li>
                 <li><a href="/#features" data-i18n="nav.features">Features</a></li>
@@ -168,19 +172,6 @@
                 <li><a href="/docs" target="_blank" rel="noopener" data-i18n="nav.docs">Docs</a></li>
             </ul>
             <div class="navbar-right">
-                <div class="lang-switcher">
-                    <button class="lang-switcher-btn" data-i18n-aria="nav.lang_aria" aria-label="Change language">
-                        <span>🌐</span>
-                        <span id="navbar-lang-label">EN</span>
-                        <span>▾</span>
-                    </button>
-                    <div class="lang-dropdown">
-                        <button class="lang-option" data-lang="ro">🇷🇴 Română</button>
-                        <button class="lang-option" data-lang="en">🇬🇧 English</button>
-                        <button class="lang-option" data-lang="fr">🇫🇷 Français</button>
-                        <button class="lang-option" data-lang="de">🇩🇪 Deutsch</button>
-                        <button class="lang-option" data-lang="es">🇪🇸 Español</button>
-                    </div>
                 </div>
                 <button class="btn-primary" id="navbar-get-started" style="padding:8px 18px;font-size:0.85rem;" data-i18n="nav.get_started">Get Started</button>
                 <button class="navbar-hamburger" id="navbar-hamburger" aria-label="Menu">
@@ -215,19 +206,15 @@
             <div id="avatar-area">
                 <canvas id="avatar-canvas"></canvas>
                 <div id="avatar-label">
-                    <span id="avatar-name">Kelion</span>
-                    <div id="status-indicator">
-                        <div id="status-dot"></div>
-                        <span id="status-text">Online</span>
-                    </div>
-                </div>
+                <span id="avatar-name" style="display:none">Kelion</span>
+            </div>
                 <div id="avatar-switcher">
                     <button class="avatar-pill active" data-avatar="kelion">Kelion</button>
                     <button class="avatar-pill" data-avatar="kira">Kira</button>
                     <button class="ctrl-btn-sm" id="btn-history" title="Istoric conversații">📋</button>
                     <span id="user-name" class="user-badge">Guest</span>
-                    <a href="/pricing/" class="pricing-nav-link" id="btn-pricing-link" title="Pricing">Pricing</a>
-                    <button class="ctrl-btn-sm" id="btn-pricing" title="Plan & Pricing">💎</button>
+                    
+                    
                     <button class="ctrl-btn-sm" id="btn-auth" title="Sign In">🔑</button>
                     <a href="/developer" class="ctrl-btn-sm" title="Developer API" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center">⚡</a>
                 </div>
@@ -239,8 +226,8 @@
                     <span data-i18n="thinking.text">Thinking...</span>
                 </div>
                 <div id="input-row">
-                    <button class="ctrl-btn-sm active-mic" id="btn-mic" title="Hold to speak">🎤</button>
-                    <button class="ctrl-btn-sm" id="btn-vision" title="Camera">👁️</button>
+                    
+                    
                     <input type="text" id="text-input" data-i18n-placeholder="input.placeholder" placeholder="Type or speak..." autocomplete="off">
                     <button id="btn-send">➤</button>
                 </div>
