@@ -39,7 +39,7 @@ jobs:
           fi
 
       - name: Run E2E tests against LIVE site
-        run: npx playwright test --project=chromium
+        run: npx playwright test --config=playwright.config.js --project=chromium
 
       - name: Upload Playwright report
         uses: actions/upload-artifact@v7

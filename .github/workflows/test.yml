@@ -51,7 +51,7 @@ jobs:
       - name: Run E2E tests
         id: e2e-tests
         continue-on-error: true
-        run: npx playwright install --with-deps chromium && npx playwright test tests/e2e-full.spec.js --project=chromium
+        run: npx playwright install --with-deps chromium && npx playwright test --config=playwright.config.js tests/e2e-full.spec.js --project=chromium
 
       - name: Upload test report
         uses: actions/upload-artifact@v7
@@ -116,6 +116,7 @@ jobs:
         run: npm ci
 
       - name: Deploy to Netlify
+        if: ${{ secrets.NETLIFY_AUTH_TOKEN != '' }}
         uses: nwtgck/actions-netlify@v3.0
         with:
           publish-dir: './app'
