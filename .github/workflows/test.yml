@@ -46,8 +46,22 @@ jobs:
           path: coverage/
           retention-days: 7
 
+      - name: Verify live site is up
+        id: health-check
+        continue-on-error: true
+        run: |
+          echo "🌐 Checking https://kelionai.app is online..."
+          STATUS=$(curl -sf -o /dev/null -w "%{http_code}" https://kelionai.app/api/health || echo "000")
+          if [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 500 ]; then
+            echo "✅ Site is live (HTTP $STATUS)"
+          else
+            echo "❌ Site returned HTTP $STATUS — E2E tests may fail"
+            exit 1
+          fi
+
       - name: Run E2E tests
         id: e2e-tests
+        if: steps.health-check.outcome == 'success'
         continue-on-error: true
         run: npx playwright install --with-deps chromium && npx playwright test --config=playwright.config.js tests/e2e-full.spec.js --project=chromium
 
@@ -93,6 +107,24 @@ jobs:
               body: `## Test Failure Report\n\n**Run:** ${runUrl}\n**Branch:** ${context.ref}\n**Triggered by:** ${context.eventName}\n\nCheck the [test report](${runUrl}) for details.\n\nDownload screenshots from the artifacts.`,
               labels: ['bug', 'automated']
             });
+
+      - name: Test summary
+        if: always()
+        run: |
+          echo "## 🧪 Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.unit-tests.outcome }}" == "success" ]; then
+            echo "✅ Unit tests passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Unit tests failed" >> $GITHUB_STEP_SUMMARY
+          fi
+          if [ "${{ steps.health-check.outcome }}" != "success" ]; then
+            echo "⚠️ Live site health check failed — E2E tests were skipped" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ steps.e2e-tests.outcome }}" == "success" ]; then
+            echo "✅ E2E tests passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ E2E tests failed — check artifacts for details" >> $GITHUB_STEP_SUMMARY
+          fi
 
   # ─── STEP 2: Deploy (always on push to master) ───
   deploy:
