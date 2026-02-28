@@ -121,7 +121,7 @@ echo ═════════════════════════
 echo   TOTUL E GATA!
 echo.
 echo   🌐 Railway: https://kelionai-v2-production.up.railway.app/
-echo   💻 Local:   http://localhost:3000
+echo   🌐 Live:    https://kelionai.app
 echo.
 echo   ⚠️  ULTIMUL PAS (o singură dată):
 echo   Dacă tabelele Supabase nu s-au creat automat:

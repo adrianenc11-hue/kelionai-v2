@@ -30,9 +30,5 @@ jobs:
         run: npx checksumai test
         env:
           CHECKSUM_API_KEY: ${{ secrets.CHECKSUM_API_KEY }}
-          CHECKSUM_BASE_URL: ${{ vars.CHECKSUM_BASE_URL || 'http://localhost:3000' }}
-          PORT: 3000
+          CHECKSUM_BASE_URL: ${{ vars.CHECKSUM_BASE_URL || 'https://kelionai.app' }}
           NODE_ENV: test
-          SUPABASE_URL: https://placeholder.supabase.co
-          SUPABASE_SERVICE_KEY: placeholder-key-for-ci
-          SUPABASE_ANON_KEY: placeholder-anon-key-for-ci

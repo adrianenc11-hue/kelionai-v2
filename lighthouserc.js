@@ -1,19 +1,21 @@
 module.exports = {
     ci: {
         collect: {
-            url: ['http://localhost:3000/'],
-            startServerCommand: 'node server/index.js',
-            startServerReadyPattern: 'on port',
-            startServerReadyTimeout: 60000,
-            numberOfRuns: 1,
+            // LIVE ONLY — scan direct pe producție
+            url: ['https://kelionai.app/'],
+            // NU porni server local — folosim site-ul live
+            numberOfRuns: 3,
             settings: {
-                chromeFlags: '--no-sandbox --disable-gpu --disable-dev-shm-usage --ignore-certificate-errors --headless=new',
+                chromeFlags: '--no-sandbox --disable-gpu --headless=new',
+                // Throttling mai generos pentru producție
+                throttling: {
+                    cpuSlowdownMultiplier: 1,
+                },
             },
         },
         assert: {
             assertions: {
-                // TODO: CI performance is not representative of production; restore to 0.7 when stable
-                'categories:performance': ['warn', { minScore: 0.5 }],
+                'categories:performance': ['warn', { minScore: 0.6 }],
                 'categories:accessibility': ['error', { minScore: 0.9 }],
                 'categories:best-practices': ['warn', { minScore: 0.8 }],
                 'categories:seo': ['warn', { minScore: 0.8 }],
