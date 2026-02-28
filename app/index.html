@@ -39,7 +39,7 @@
             z-index: 9999;
             transition: opacity 0.5s ease;
         }
-        .splash.hidden { opacity: 0; pointer-events: none; display: block !important; }
+        .splash.hidden { opacity: 0; pointer-events: none; }
         .gradient-text {
             background: linear-gradient(135deg, #00ccff, #8855ff);
             -webkit-background-clip: text;
@@ -303,17 +303,6 @@
     </div>
 
     <script>
-        // ─── Splash screen ────────────────────────────────────────────
-        window.addEventListener('load', function () {
-            setTimeout(function () {
-                var splash = document.getElementById('splash-screen');
-                if (splash) {
-                    splash.classList.add('hidden');
-                    setTimeout(function () { if (splash.parentNode) splash.parentNode.removeChild(splash); }, 500);
-                }
-            }, 800);
-        });
-
         // ─── PWA Install banner ───────────────────────────────────────
         var deferredInstallPrompt = null;
         window.addEventListener('beforeinstallprompt', function (e) {
