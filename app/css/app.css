@@ -1,3 +1,6 @@
+/* Generic utility — must come first so ID-selector rules can override per-element */
+.hidden { display: none !important; }
+
 :root {
     /* Legacy aliases mapped to design system variables */
     --bg-primary: var(--kelion-bg);
