@@ -24,9 +24,47 @@ jobs:
       - name: Check Netlify secrets
         id: check-secrets
         run: |
-          if [ -z "$NETLIFY_AUTH_TOKEN" ] || [ -z "$NETLIFY_SITE_ID" ]; then
-            echo "::warning::NETLIFY_AUTH_TOKEN or NETLIFY_SITE_ID is not set. Deploy will be skipped."
+          SKIP=false
+
+          validate_secret() {
+            local name="$1"
+            local value="$2"
+            # Empty check
+            if [ -z "$value" ]; then
+              echo "::warning::${name} is empty. Deploy will be skipped."
+              SKIP=true
+              return
+            fi
+            # Whitespace-only check
+            if [ -z "$(echo "$value" | tr -d '[:space:]')" ]; then
+              echo "::warning::${name} contains only whitespace. Deploy will be skipped."
+              SKIP=true
+              return
+            fi
+            # Newline characters check
+            if printf '%s' "$value" | grep -zqP '[\r\n]'; then
+              echo "::warning::${name} contains newline characters (\\r or \\n) and is not a valid HTTP header value. Deploy will be skipped."
+              SKIP=true
+              return
+            fi
+            # Printable ASCII only (0x20–0x7E)
+            if printf '%s' "$value" | grep -zqP '[^\x20-\x7E]'; then
+              echo "::warning::${name} contains non-printable or non-ASCII characters and is not a valid HTTP header value. Deploy will be skipped."
+              SKIP=true
+              return
+            fi
+          }
+
+          validate_secret "NETLIFY_AUTH_TOKEN" "$NETLIFY_AUTH_TOKEN"
+          validate_secret "NETLIFY_SITE_ID" "$NETLIFY_SITE_ID"
+
+          if [ "$SKIP" = "true" ]; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo ""
+            echo "  To set the secrets, run locally:"
+            echo "    bash scripts/setup-secrets.sh"
+            echo "  or:"
+            echo "    npm run setup:secrets"
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
@@ -47,11 +85,11 @@ jobs:
           NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
         timeout-minutes: 10
 
-      - name: Deploy skipped
+      - name: Deploy skipped — missing secrets
         if: steps.check-secrets.outputs.skip == 'true'
         run: |
-          echo "⏭️ Deploy skipped: NETLIFY_AUTH_TOKEN and/or NETLIFY_SITE_ID are not set."
-          echo "Run 'bash scripts/setup-secrets.sh' to configure them."
+          echo "⏭️  Deploy skipped: NETLIFY_AUTH_TOKEN and/or NETLIFY_SITE_ID are not set or invalid."
+          echo "   Run 'bash scripts/setup-secrets.sh' or 'npm run setup:secrets' to configure them."
 
       - name: Done
         if: steps.check-secrets.outputs.skip == 'false'

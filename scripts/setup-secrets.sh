@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # setup-secrets.sh — Setează secretele GitHub necesare pentru CI/CD (Netlify deploy)
-# Utilizare: bash scripts/setup-secrets.sh
+# Utilizare: bash scripts/setup-secrets.sh [--check] [--force]
 
 set -euo pipefail
 
@@ -15,6 +15,21 @@ info()    { echo -e "${BLUE}ℹ${NC}  $*"; }
 success() { echo -e "${GREEN}✅${NC} $*"; }
 warning() { echo -e "${YELLOW}⚠️${NC}  $*"; }
 error()   { echo -e "${RED}❌${NC} $*" >&2; }
+
+# ─── Flags ───────────────────────────────────────────────────────────────────
+CHECK_ONLY=false
+FORCE=false
+for arg in "$@"; do
+  case "$arg" in
+    --check) CHECK_ONLY=true ;;
+    --force) FORCE=true ;;
+    *)
+      error "Unknown argument: $arg"
+      echo "  Usage: bash scripts/setup-secrets.sh [--check] [--force]"
+      exit 1
+      ;;
+  esac
+done
 
 # ─── Verifică gh CLI ─────────────────────────────────────────────────────────
 if ! command -v gh &>/dev/null; then
@@ -53,6 +68,7 @@ echo ""
 read_secret() {
   local var_name="$1"
   local prompt_text="$2"
+  local format_check="${3:-}"   # optional: "netlify_token" or "uuid"
   local value=""
 
   while true; do
@@ -80,6 +96,19 @@ read_secret() {
       continue
     fi
 
+    # Validare format specific
+    if [ "$format_check" = "netlify_token" ]; then
+      if [ ${#value} -lt 40 ] || ! [[ "$value" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+        warning "NETLIFY_AUTH_TOKEN trebuie să fie un șir alfanumeric (cu posibile '-' sau '_') de cel puțin 40 de caractere. Încearcă din nou."
+        continue
+      fi
+    elif [ "$format_check" = "uuid" ]; then
+      if ! [[ "$value" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]]; then
+        warning "NETLIFY_SITE_ID trebuie să fie un UUID valid (xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx). Încearcă din nou."
+        continue
+      fi
+    fi
+
     break
   done
 
@@ -87,16 +116,40 @@ read_secret() {
   printf -v "$var_name" '%s' "$value"
 }
 
+# ─── Mod --check: verifică secretele existente ───────────────────────────────
+if [ "$CHECK_ONLY" = "true" ]; then
+  info "Verificare secrete setate pentru repo: ${REPO}"
+  echo ""
+  SECRET_LIST=$(gh secret list --repo "$REPO" 2>/dev/null || true)
+
+  check_secret_exists() {
+    local name="$1"
+    if echo "$SECRET_LIST" | grep -q "^${name}[[:space:]]"; then
+      success "${name}  — setat"
+    else
+      warning "${name}  — LIPSĂ"
+    fi
+  }
+
+  check_secret_exists "NETLIFY_AUTH_TOKEN"
+  check_secret_exists "NETLIFY_SITE_ID"
+  check_secret_exists "SENTRY_AUTH_TOKEN"
+  echo ""
+  info "Pentru a seta secretele lipsă, rulează: bash scripts/setup-secrets.sh"
+  echo ""
+  exit 0
+fi
+
 # ─── Colectare secrete ───────────────────────────────────────────────────────
 echo -e "${YELLOW}Secretele necesare pentru Netlify deploy:${NC}"
 echo ""
 
 echo "  Găsești NETLIFY_AUTH_TOKEN la: https://app.netlify.com/user/applications"
-read_secret NETLIFY_AUTH_TOKEN "NETLIFY_AUTH_TOKEN"
+read_secret NETLIFY_AUTH_TOKEN "NETLIFY_AUTH_TOKEN" "netlify_token"
 
 echo ""
 echo "  Găsești NETLIFY_SITE_ID la: Site Settings → General → Site details"
-read_secret NETLIFY_SITE_ID "NETLIFY_SITE_ID"
+read_secret NETLIFY_SITE_ID "NETLIFY_SITE_ID" "uuid"
 
 # ─── Opțional: SENTRY_AUTH_TOKEN ─────────────────────────────────────────────
 echo ""
@@ -119,12 +172,14 @@ if [ -n "$SENTRY_AUTH_TOKEN" ]; then
 fi
 echo "  în repo: ${REPO}"
 echo ""
-echo -n "  Confirmi? (y/N): "
-read -r CONFIRM
 
-if [[ ! "$CONFIRM" =~ ^[Yy]$ ]]; then
-  warning "Anulat de utilizator."
-  exit 0
+if [ "$FORCE" = "false" ]; then
+  echo -n "  Confirmi? (y/N): "
+  read -r CONFIRM
+  if [[ ! "$CONFIRM" =~ ^[Yy]$ ]]; then
+    warning "Anulat de utilizator."
+    exit 0
+  fi
 fi
 
 # ─── Setare secrete ──────────────────────────────────────────────────────────
@@ -151,6 +206,26 @@ if [ -n "$SENTRY_AUTH_TOKEN" ]; then
   else
     warning "Eroare la setarea SENTRY_AUTH_TOKEN (ne-critic)."
   fi
+fi
+
+# ─── Verificare post-setare ───────────────────────────────────────────────────
+echo ""
+info "Verificare că secretele au fost setate corect..."
+SECRET_LIST=$(gh secret list --repo "$REPO" 2>/dev/null || true)
+
+verify_secret() {
+  local name="$1"
+  if echo "$SECRET_LIST" | grep -q "^${name}[[:space:]]"; then
+    success "${name}  — verificat ✓"
+  else
+    warning "${name}  — nu apare în lista de secrete (poate necesita câteva secunde)"
+  fi
+}
+
+verify_secret "NETLIFY_AUTH_TOKEN"
+verify_secret "NETLIFY_SITE_ID"
+if [ -n "$SENTRY_AUTH_TOKEN" ]; then
+  verify_secret "SENTRY_AUTH_TOKEN"
 fi
 
 # ─── Summary ─────────────────────────────────────────────────────────────────
