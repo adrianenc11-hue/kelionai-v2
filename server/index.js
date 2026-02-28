@@ -10,8 +10,10 @@ if (!globalThis.fetch) {
 }
 const Sentry = require('@sentry/node');
 if (process.env.SENTRY_DSN) {
-    Sentry.init({ dsn: process.env.SENTRY_DSN, environment: process.env.NODE_ENV || 'development',
-        tracesSampleRate: 1.0, integrations: [Sentry.httpIntegration(), Sentry.expressIntegration()] });
+    Sentry.init({
+        dsn: process.env.SENTRY_DSN, environment: process.env.NODE_ENV || 'development',
+        tracesSampleRate: 1.0, integrations: [Sentry.httpIntegration(), Sentry.expressIntegration()]
+    });
 }
 const express = require('express');
 const cors = require('cors');
@@ -29,6 +31,9 @@ const logger = require('./logger');
 const { router: paymentsRouter, checkUsage, incrementUsage } = require('./payments');
 const legalRouter = require('./legal');
 const { router: messengerRouter, getStats: getMessengerStats } = require('./messenger');
+const { router: telegramRouter, broadcastNews } = require('./telegram');
+const fbPage = require('./facebook-page');
+const instagram = require('./instagram');
 const developerRouter = require('./routes/developer');
 const { validate, registerSchema, loginSchema, refreshSchema, chatSchema, speakSchema, listenSchema, visionSchema, searchSchema, weatherSchema, imagineSchema, memorySchema, forgotPasswordSchema, resetPasswordSchema, changePasswordSchema, changeEmailSchema } = require('./validation');
 
@@ -300,7 +305,7 @@ app.post('/api/auth/login', authLimiter, validate(loginSchema), async (req, res)
     } catch (e) { res.status(500).json({ error: 'Login error' }); }
 });
 
-app.post('/api/auth/logout', async (req, res) => { try { if (supabase) await supabase.auth.signOut(); } catch(e){} res.json({ success: true }); });
+app.post('/api/auth/logout', async (req, res) => { try { if (supabase) await supabase.auth.signOut(); } catch (e) { } res.json({ success: true }); });
 app.get('/api/auth/me', asyncHandler(async (req, res) => {
     const u = await getUserFromToken(req);
     if (!u) return res.status(401).json({ error: 'Not authenticated' });
@@ -386,7 +391,7 @@ app.post('/api/chat', chatLimiter, validate(chatSchema), async (req, res) => {
             try {
                 const { data: prefs } = await supabaseAdmin.from('user_preferences').select('key, value').eq('user_id', user.id).limit(30);
                 if (prefs?.length > 0) memoryContext = prefs.map(p => `${p.key}: ${JSON.stringify(p.value)}`).join('; ');
-            } catch(e){}
+            } catch (e) { }
         }
         const systemPrompt = buildSystemPrompt(avatar, language, memoryContext, { failedTools: thought.failedTools }, thought.chainOfThought);
 
@@ -401,35 +406,41 @@ app.post('/api/chat', chatLimiter, validate(chatSchema), async (req, res) => {
         // Claude (primary)
         if (!reply && process.env.ANTHROPIC_API_KEY) {
             try {
-                const r = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST',
+                const r = await fetch('https://api.anthropic.com/v1/messages', {
+                    method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
-                    body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 2048, system: systemPrompt, messages: msgs }) });
+                    body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 2048, system: systemPrompt, messages: msgs })
+                });
                 const d = await r.json();
                 reply = d.content?.[0]?.text;
                 if (reply) engine = 'Claude';
-            } catch(e) { logger.warn({ component: 'Chat', err: e.message }, 'Claude'); }
+            } catch (e) { logger.warn({ component: 'Chat', err: e.message }, 'Claude'); }
         }
         // GPT-4o (fallback)
         if (!reply && process.env.OPENAI_API_KEY) {
             try {
-                const r = await fetch('https://api.openai.com/v1/chat/completions', { method: 'POST',
+                const r = await fetch('https://api.openai.com/v1/chat/completions', {
+                    method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + process.env.OPENAI_API_KEY },
-                    body: JSON.stringify({ model: 'gpt-4o', max_tokens: 2048, messages: [{ role: 'system', content: systemPrompt }, ...msgs] }) });
+                    body: JSON.stringify({ model: 'gpt-4o', max_tokens: 2048, messages: [{ role: 'system', content: systemPrompt }, ...msgs] })
+                });
                 const d = await r.json();
                 reply = d.choices?.[0]?.message?.content;
                 if (reply) engine = 'GPT-4o';
-            } catch(e) { logger.warn({ component: 'Chat', err: e.message }, 'GPT-4o'); }
+            } catch (e) { logger.warn({ component: 'Chat', err: e.message }, 'GPT-4o'); }
         }
         // DeepSeek (tertiary)
         if (!reply && process.env.DEEPSEEK_API_KEY) {
             try {
-                const r = await fetch('https://api.deepseek.com/v1/chat/completions', { method: 'POST',
+                const r = await fetch('https://api.deepseek.com/v1/chat/completions', {
+                    method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + process.env.DEEPSEEK_API_KEY },
-                    body: JSON.stringify({ model: 'deepseek-chat', max_tokens: 2048, messages: [{ role: 'system', content: systemPrompt }, ...msgs] }) });
+                    body: JSON.stringify({ model: 'deepseek-chat', max_tokens: 2048, messages: [{ role: 'system', content: systemPrompt }, ...msgs] })
+                });
                 const d = await r.json();
                 reply = d.choices?.[0]?.message?.content;
                 if (reply) engine = 'DeepSeek';
-            } catch(e) { logger.warn({ component: 'Chat', err: e.message }, 'DeepSeek'); }
+            } catch (e) { logger.warn({ component: 'Chat', err: e.message }, 'DeepSeek'); }
         }
 
         if (!reply) return res.status(503).json({ error: 'AI indisponibil' });
@@ -437,10 +448,10 @@ app.post('/api/chat', chatLimiter, validate(chatSchema), async (req, res) => {
         // ── Save conversation (sync to get ID) + Learn async ──
         let savedConvId = conversationId;
         if (supabaseAdmin) {
-            try { savedConvId = await saveConv(user?.id, avatar, message, reply, conversationId, language); } catch(e){ logger.warn({ component: 'Chat', err: e.message }, 'saveConv'); }
+            try { savedConvId = await saveConv(user?.id, avatar, message, reply, conversationId, language); } catch (e) { logger.warn({ component: 'Chat', err: e.message }, 'saveConv'); }
         }
-        brain.learnFromConversation(user?.id, message, reply).catch(()=>{});
-        incrementUsage(user?.id, 'chat', supabaseAdmin).catch(()=>{});
+        brain.learnFromConversation(user?.id, message, reply).catch(() => { });
+        incrementUsage(user?.id, 'chat', supabaseAdmin).catch(() => { });
 
         logger.info({ component: 'Chat', engine, avatar, language, tools: thought.toolsUsed, chainOfThought: !!thought.chainOfThought, thinkTime: thought.thinkTime, replyLength: reply.length }, `${engine} | ${avatar} | ${language} | tools:[${thought.toolsUsed.join(',')}] | CoT:${!!thought.chainOfThought} | ${thought.thinkTime}ms think | ${reply.length}c`);
 
@@ -451,7 +462,7 @@ app.post('/api/chat', chatLimiter, validate(chatSchema), async (req, res) => {
         }
         res.json(response);
 
-    } catch(e) { logger.error({ component: 'Chat', err: e.message }, e.message); res.status(500).json({ error: 'Eroare AI' }); }
+    } catch (e) { logger.error({ component: 'Chat', err: e.message }, e.message); res.status(500).json({ error: 'Eroare AI' }); }
 });
 
 // ═══════════════════════════════════════════════════════════════
@@ -484,7 +495,7 @@ app.post('/api/chat/stream', chatLimiter, validate(chatSchema), async (req, res)
             try {
                 const { data: prefs } = await supabaseAdmin.from('user_preferences').select('key, value').eq('user_id', user.id).limit(30);
                 if (prefs?.length > 0) memoryContext = prefs.map(p => `${p.key}: ${JSON.stringify(p.value)}`).join('; ');
-            } catch(e){}
+            } catch (e) { }
         }
         const systemPrompt = buildSystemPrompt(avatar, language, memoryContext, { failedTools: thought.failedTools }, thought.chainOfThought);
         const compressedHist = thought.compressedHistory || history.slice(-20);
@@ -496,9 +507,11 @@ app.post('/api/chat/stream', chatLimiter, validate(chatSchema), async (req, res)
         // Try Claude streaming
         if (process.env.ANTHROPIC_API_KEY) {
             try {
-                const r = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST',
+                const r = await fetch('https://api.anthropic.com/v1/messages', {
+                    method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
-                    body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 2048, system: systemPrompt, messages: msgs, stream: true }) });
+                    body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 2048, system: systemPrompt, messages: msgs, stream: true })
+                });
 
                 if (r.ok && r.body) {
                     res.write(`data: ${JSON.stringify({ type: 'start', engine: 'Claude' })}\n\n`);
@@ -535,41 +548,45 @@ app.post('/api/chat/stream', chatLimiter, validate(chatSchema), async (req, res)
         if (!fullReply) {
             if (process.env.OPENAI_API_KEY) {
                 try {
-                    const r = await fetch('https://api.openai.com/v1/chat/completions', { method: 'POST',
+                    const r = await fetch('https://api.openai.com/v1/chat/completions', {
+                        method: 'POST',
                         headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + process.env.OPENAI_API_KEY },
-                        body: JSON.stringify({ model: 'gpt-4o', max_tokens: 2048, messages: [{ role: 'system', content: systemPrompt }, ...msgs] }) });
+                        body: JSON.stringify({ model: 'gpt-4o', max_tokens: 2048, messages: [{ role: 'system', content: systemPrompt }, ...msgs] })
+                    });
                     const d = await r.json();
                     fullReply = d.choices?.[0]?.message?.content || '';
                     if (fullReply) { res.write(`data: ${JSON.stringify({ type: 'start', engine: 'GPT-4o' })}\n\n`); res.write(`data: ${JSON.stringify({ type: 'chunk', text: fullReply })}\n\n`); }
-                } catch(e) {}
+                } catch (e) { }
             }
         }
         if (!fullReply && process.env.DEEPSEEK_API_KEY) {
             try {
-                const r = await fetch('https://api.deepseek.com/v1/chat/completions', { method: 'POST',
+                const r = await fetch('https://api.deepseek.com/v1/chat/completions', {
+                    method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + process.env.DEEPSEEK_API_KEY },
-                    body: JSON.stringify({ model: 'deepseek-chat', max_tokens: 2048, messages: [{ role: 'system', content: systemPrompt }, ...msgs] }) });
+                    body: JSON.stringify({ model: 'deepseek-chat', max_tokens: 2048, messages: [{ role: 'system', content: systemPrompt }, ...msgs] })
+                });
                 const d = await r.json();
                 fullReply = d.choices?.[0]?.message?.content || '';
                 if (fullReply) { res.write(`data: ${JSON.stringify({ type: 'start', engine: 'DeepSeek' })}\n\n`); res.write(`data: ${JSON.stringify({ type: 'chunk', text: fullReply })}\n\n`); }
-            } catch(e) {}
+            } catch (e) { }
         }
 
         // Save conversation (sync to get ID) then end stream
         let savedConvId = conversationId;
         if (fullReply && supabaseAdmin) {
-            try { savedConvId = await saveConv(user?.id, avatar, message, fullReply, conversationId, language); } catch(e){ logger.warn({ component: 'Stream', err: e.message }, 'saveConv'); }
+            try { savedConvId = await saveConv(user?.id, avatar, message, fullReply, conversationId, language); } catch (e) { logger.warn({ component: 'Stream', err: e.message }, 'saveConv'); }
         }
 
         // End stream
         res.write(`data: ${JSON.stringify({ type: 'done', reply: fullReply, thinkTime: thought.thinkTime, conversationId: savedConvId })}\n\n`);
         res.end();
 
-        if (fullReply) brain.learnFromConversation(user?.id, message, fullReply).catch(()=>{});
-        if (fullReply) incrementUsage(user?.id, 'chat', supabaseAdmin).catch(()=>{});
+        if (fullReply) brain.learnFromConversation(user?.id, message, fullReply).catch(() => { });
+        if (fullReply) incrementUsage(user?.id, 'chat', supabaseAdmin).catch(() => { });
         logger.info({ component: 'Stream', avatar, language, replyLength: fullReply.length }, `${avatar} | ${language} | ${fullReply.length}c`);
 
-    } catch(e) { logger.error({ component: 'Stream', err: e.message }, e.message); if (!res.headersSent) res.status(500).json({ error: 'Eroare stream' }); else res.end(); }
+    } catch (e) { logger.error({ component: 'Stream', err: e.message }, e.message); if (!res.headersSent) res.status(500).json({ error: 'Eroare stream' }); else res.end(); }
 });
 
 // ═══ SAVE CONVERSATION ═══
@@ -598,28 +615,30 @@ app.post('/api/speak', ttsLimiter, validate(speakSchema), async (req, res) => {
         if (!usage.allowed) return res.status(429).json({ error: 'TTS limit reached. Upgrade to Pro for more.', plan: usage.plan, limit: usage.limit, upgrade: true });
 
         const voiceSettings = {
-            happy:     { stability: 0.4, similarity_boost: 0.8, style: 0.7 },
-            sad:       { stability: 0.7, similarity_boost: 0.9, style: 0.3 },
-            laughing:  { stability: 0.3, similarity_boost: 0.7, style: 0.9 },
-            thinking:  { stability: 0.6, similarity_boost: 0.8, style: 0.4 },
-            excited:   { stability: 0.3, similarity_boost: 0.8, style: 0.8 },
+            happy: { stability: 0.4, similarity_boost: 0.8, style: 0.7 },
+            sad: { stability: 0.7, similarity_boost: 0.9, style: 0.3 },
+            laughing: { stability: 0.3, similarity_boost: 0.7, style: 0.9 },
+            thinking: { stability: 0.6, similarity_boost: 0.8, style: 0.4 },
+            excited: { stability: 0.3, similarity_boost: 0.8, style: 0.8 },
             concerned: { stability: 0.7, similarity_boost: 0.9, style: 0.4 },
-            neutral:   { stability: 0.5, similarity_boost: 0.75, style: 0.5 }
+            neutral: { stability: 0.5, similarity_boost: 0.75, style: 0.5 }
         };
         const selectedVoiceSettings = voiceSettings[mood] || voiceSettings.neutral;
 
         const vid = avatar === 'kira'
             ? (process.env.ELEVENLABS_VOICE_KIRA || 'EXAVITQu4vr4xnSDxMaL')
             : (process.env.ELEVENLABS_VOICE_KELION || 'VR6AewLTigWG4xSOukaG');
-        const r = await fetch('https://api.elevenlabs.io/v1/text-to-speech/' + vid, { method: 'POST',
+        const r = await fetch('https://api.elevenlabs.io/v1/text-to-speech/' + vid, {
+            method: 'POST',
             headers: { 'Content-Type': 'application/json', 'xi-api-key': process.env.ELEVENLABS_API_KEY },
-            body: JSON.stringify({ text, model_id: 'eleven_multilingual_v2', voice_settings: selectedVoiceSettings }) });
+            body: JSON.stringify({ text, model_id: 'eleven_multilingual_v2', voice_settings: selectedVoiceSettings })
+        });
         if (!r.ok) return res.status(503).json({ error: 'TTS fail' });
         const buf = Buffer.from(await r.arrayBuffer());
         logger.info({ component: 'Speak', bytes: buf.length, avatar, mood }, buf.length + ' bytes | ' + avatar);
-        incrementUsage(user?.id, 'tts', supabaseAdmin).catch(()=>{});
+        incrementUsage(user?.id, 'tts', supabaseAdmin).catch(() => { });
         res.set({ 'Content-Type': 'audio/mpeg', 'Content-Length': buf.length }); res.send(buf);
-    } catch(e) { res.status(500).json({ error: 'TTS error' }); }
+    } catch (e) { res.status(500).json({ error: 'TTS error' }); }
 });
 
 // ═══ STT — Groq Whisper ═══
@@ -636,7 +655,7 @@ app.post('/api/listen', apiLimiter, validate(listenSchema), async (req, res) => 
             const d = await r.json(); return res.json({ text: d.text || '', engine: 'Groq' });
         }
         res.status(503).json({ error: 'Use Web Speech API' });
-    } catch(e) { res.status(500).json({ error: 'STT error' }); }
+    } catch (e) { res.status(500).json({ error: 'STT error' }); }
 });
 
 // ═══ VISION — Claude Vision ═══
@@ -650,21 +669,25 @@ app.post('/api/vision', apiLimiter, validate(visionSchema), async (req, res) => 
         const usage = await checkUsage(user?.id, 'vision', supabaseAdmin);
         if (!usage.allowed) return res.status(429).json({ error: 'Vision limit reached. Upgrade to Pro for more.', plan: usage.plan, limit: usage.limit, upgrade: true });
 
-        const LANGS = { ro:'română', en:'English' };
+        const LANGS = { ro: 'română', en: 'English' };
         const prompt = `Ești OCHII unei persoane. Descrie EXACT ce vezi cu PRECIZIE MAXIMĂ.
 Persoane: vârstă, sex, haine (culori exacte), expresie, gesturi, ce țin în mâini.
 Obiecte: fiecare obiect, culoare, dimensiune, poziție.
 Text: citește ORICE text vizibil.
 Pericole: obstacole, trepte → "ATENȚIE:"
 Răspunde în ${LANGS[language] || 'română'}, concis dar detaliat.`;
-        const r = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST',
+        const r = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
             headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
-            body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 1024,
-                messages: [{ role: 'user', content: [{ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: image } }, { type: 'text', text: prompt }] }] }) });
+            body: JSON.stringify({
+                model: 'claude-sonnet-4-20250514', max_tokens: 1024,
+                messages: [{ role: 'user', content: [{ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: image } }, { type: 'text', text: prompt }] }]
+            })
+        });
         const d = await r.json();
-        incrementUsage(user?.id, 'vision', supabaseAdmin).catch(()=>{});
+        incrementUsage(user?.id, 'vision', supabaseAdmin).catch(() => { });
         res.json({ description: d.content?.[0]?.text || 'Nu am putut analiza.', avatar, engine: 'Claude' });
-    } catch(e) { res.status(500).json({ error: 'Vision error' }); }
+    } catch (e) { res.status(500).json({ error: 'Vision error' }); }
 });
 
 // ═══ SEARCH — Perplexity Sonar → Tavily → Serper → DuckDuckGo ═══
@@ -692,7 +715,7 @@ app.post('/api/search', searchLimiter, validate(searchSchema), async (req, res) 
                     const citations = d.citations || [];
                     const results = citations.slice(0, 5).map(url => ({ title: url, content: '', url }));
                     logger.info({ component: 'Search', engine: 'Perplexity', chars: answer.length }, 'Perplexity Sonar — ' + answer.length + ' chars');
-                    incrementUsage(user?.id, 'search', supabaseAdmin).catch(()=>{});
+                    incrementUsage(user?.id, 'search', supabaseAdmin).catch(() => { });
                     return res.json({ results, answer, engine: 'Perplexity' });
                 }
             } catch (e) { logger.warn({ component: 'Search', engine: 'Perplexity', err: e.message }, 'Perplexity'); }
@@ -701,12 +724,14 @@ app.post('/api/search', searchLimiter, validate(searchSchema), async (req, res) 
         // 2. Tavily (good — aggregated + parsed)
         if (process.env.TAVILY_API_KEY) {
             try {
-                const tr = await fetch('https://api.tavily.com/search', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ api_key: process.env.TAVILY_API_KEY, query, search_depth: 'basic', max_results: 5, include_answer: true }) });
+                const tr = await fetch('https://api.tavily.com/search', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ api_key: process.env.TAVILY_API_KEY, query, search_depth: 'basic', max_results: 5, include_answer: true })
+                });
                 if (tr.ok) {
                     const td = await tr.json();
                     logger.info({ component: 'Search', engine: 'Tavily', results: (td.results || []).length }, 'Tavily — ' + (td.results || []).length + ' results');
-                    incrementUsage(user?.id, 'search', supabaseAdmin).catch(()=>{});
+                    incrementUsage(user?.id, 'search', supabaseAdmin).catch(() => { });
                     return res.json({ results: (td.results || []).map(x => ({ title: x.title, content: x.content, url: x.url })), answer: td.answer || '', engine: 'Tavily' });
                 }
             } catch (e) { logger.warn({ component: 'Search', engine: 'Tavily', err: e.message }, 'Tavily'); }
@@ -725,7 +750,7 @@ app.post('/api/search', searchLimiter, validate(searchSchema), async (req, res) 
                     const answer = sd.answerBox?.answer || sd.answerBox?.snippet || sd.knowledgeGraph?.description || '';
                     const results = (sd.organic || []).slice(0, 5).map(x => ({ title: x.title, content: x.snippet, url: x.link }));
                     logger.info({ component: 'Search', engine: 'Serper', results: results.length }, 'Serper — ' + results.length + ' results');
-                    incrementUsage(user?.id, 'search', supabaseAdmin).catch(()=>{});
+                    incrementUsage(user?.id, 'search', supabaseAdmin).catch(() => { });
                     return res.json({ results, answer, engine: 'Serper' });
                 }
             } catch (e) { logger.warn({ component: 'Search', engine: 'Serper', err: e.message }, 'Serper'); }
@@ -737,9 +762,9 @@ app.post('/api/search', searchLimiter, validate(searchSchema), async (req, res) 
         const results = [];
         if (d.Abstract) results.push({ title: d.Heading || query, content: d.Abstract, url: d.AbstractURL });
         if (d.RelatedTopics) for (const t of d.RelatedTopics.slice(0, 5)) if (t.Text) results.push({ title: t.Text.substring(0, 80), content: t.Text, url: t.FirstURL });
-        incrementUsage(user?.id, 'search', supabaseAdmin).catch(()=>{});
+        incrementUsage(user?.id, 'search', supabaseAdmin).catch(() => { });
         res.json({ results, answer: d.Abstract || '', engine: 'DuckDuckGo' });
-    } catch(e) { res.status(500).json({ error: 'Search error' }); }
+    } catch (e) { res.status(500).json({ error: 'Search error' }); }
 });
 
 // ═══ WEATHER — Open-Meteo ═══
@@ -750,13 +775,15 @@ app.post('/api/weather', weatherLimiter, validate(weatherSchema), async (req, re
         const geo = await (await fetch('https://geocoding-api.open-meteo.com/v1/search?name=' + encodeURIComponent(city) + '&count=1&language=ro')).json();
         if (!geo.results?.[0]) return res.status(404).json({ error: '"' + city + '" not found' });
         const { latitude, longitude, name, country } = geo.results[0];
-        const wx = await (await fetch('https://api.open-meteo.com/v1/forecast?latitude='+latitude+'&longitude='+longitude+'&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&timezone=auto')).json();
+        const wx = await (await fetch('https://api.open-meteo.com/v1/forecast?latitude=' + latitude + '&longitude=' + longitude + '&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&timezone=auto')).json();
         const c = wx.current;
-        const codes = {0:'Senin ☀️',1:'Parțial senin 🌤️',2:'Parțial noros ⛅',3:'Noros ☁️',45:'Ceață 🌫️',51:'Burniță 🌦️',61:'Ploaie 🌧️',71:'Ninsoare 🌨️',80:'Averse 🌦️',95:'Furtună ⛈️'};
+        const codes = { 0: 'Senin ☀️', 1: 'Parțial senin 🌤️', 2: 'Parțial noros ⛅', 3: 'Noros ☁️', 45: 'Ceață 🌫️', 51: 'Burniță 🌦️', 61: 'Ploaie 🌧️', 71: 'Ninsoare 🌨️', 80: 'Averse 🌦️', 95: 'Furtună ⛈️' };
         const cond = codes[c.weather_code] || '?';
-        res.json({ city: name, country, temperature: c.temperature_2m, humidity: c.relative_humidity_2m, wind: c.wind_speed_10m, condition: cond,
-            description: name+', '+country+': '+c.temperature_2m+'°C, '+cond+', umiditate '+c.relative_humidity_2m+'%, vânt '+c.wind_speed_10m+' km/h' });
-    } catch(e) { res.status(500).json({ error: 'Weather error' }); }
+        res.json({
+            city: name, country, temperature: c.temperature_2m, humidity: c.relative_humidity_2m, wind: c.wind_speed_10m, condition: cond,
+            description: name + ', ' + country + ': ' + c.temperature_2m + '°C, ' + cond + ', umiditate ' + c.relative_humidity_2m + '%, vânt ' + c.wind_speed_10m + ' km/h'
+        });
+    } catch (e) { res.status(500).json({ error: 'Weather error' }); }
 });
 
 // ═══ IMAGINE — Together FLUX ═══
@@ -770,15 +797,17 @@ app.post('/api/imagine', imageLimiter, validate(imagineSchema), async (req, res)
         const usage = await checkUsage(user?.id, 'image', supabaseAdmin);
         if (!usage.allowed) return res.status(429).json({ error: 'Image limit reached. Upgrade to Pro for more images.', plan: usage.plan, limit: usage.limit, upgrade: true });
 
-        const r = await fetch('https://api.together.xyz/v1/images/generations', { method: 'POST',
+        const r = await fetch('https://api.together.xyz/v1/images/generations', {
+            method: 'POST',
             headers: { 'Authorization': 'Bearer ' + process.env.TOGETHER_API_KEY, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ model: 'black-forest-labs/FLUX.1-schnell', prompt, width: 1024, height: 1024, steps: 4, n: 1, response_format: 'b64_json' }) });
+            body: JSON.stringify({ model: 'black-forest-labs/FLUX.1-schnell', prompt, width: 1024, height: 1024, steps: 4, n: 1, response_format: 'b64_json' })
+        });
         if (!r.ok) return res.status(503).json({ error: 'Image generation failed' });
         const d = await r.json(); const b64 = d.data?.[0]?.b64_json;
         if (!b64) return res.status(500).json({ error: 'No data' });
-        incrementUsage(user?.id, 'image', supabaseAdmin).catch(()=>{});
+        incrementUsage(user?.id, 'image', supabaseAdmin).catch(() => { });
         res.json({ image: 'data:image/png;base64,' + b64, prompt, engine: 'FLUX' });
-    } catch(e) { res.status(500).json({ error: 'Image error' }); }
+    } catch (e) { res.status(500).json({ error: 'Image error' }); }
 });
 
 // ═══ MEMORY ═══
@@ -791,14 +820,14 @@ app.post('/api/memory', memoryLimiter, validate(memorySchema), async (req, res) 
         if (supabaseAdmin && user) {
             if (action === 'save') { await supabaseAdmin.from('user_preferences').upsert({ user_id: user.id, key, value: typeof value === 'object' ? value : { data: value } }, { onConflict: 'user_id,key' }); return res.json({ success: true }); }
             if (action === 'load') { const { data } = await supabaseAdmin.from('user_preferences').select('value').eq('user_id', user.id).eq('key', key).single(); return res.json({ value: data?.value || null }); }
-            if (action === 'list') { const { data } = await supabaseAdmin.from('user_preferences').select('key, value').eq('user_id', user.id); return res.json({ keys: (data||[]).map(d=>d.key), items: data||[] }); }
+            if (action === 'list') { const { data } = await supabaseAdmin.from('user_preferences').select('key, value').eq('user_id', user.id); return res.json({ keys: (data || []).map(d => d.key), items: data || [] }); }
         }
         if (!memFallback[uid]) memFallback[uid] = Object.create(null);
         if (action === 'save') { memFallback[uid][key] = value; res.json({ success: true }); }
         else if (action === 'load') res.json({ value: memFallback[uid][key] || null });
         else if (action === 'list') res.json({ keys: Object.keys(memFallback[uid]) });
         else res.status(400).json({ error: 'Action must be: save, load, list' });
-    } catch(e) { res.status(500).json({ error: 'Memory error' }); }
+    } catch (e) { res.status(500).json({ error: 'Memory error' }); }
 });
 
 // ═══ CONVERSATIONS ═══
@@ -855,17 +884,17 @@ app.get('/api/admin/health-check', adminAuth, asyncHandler(async (req, res) => {
 
     // b) Service availability
     const services = {
-        ai_claude:         { label: 'AI Claude',           active: !!process.env.ANTHROPIC_API_KEY },
-        ai_gpt4o:          { label: 'AI GPT-4o',           active: !!process.env.OPENAI_API_KEY },
-        ai_deepseek:       { label: 'AI DeepSeek',         active: !!process.env.DEEPSEEK_API_KEY },
-        tts_elevenlabs:    { label: 'TTS ElevenLabs',      active: !!process.env.ELEVENLABS_API_KEY },
-        stt_groq:          { label: 'STT Groq',            active: !!process.env.GROQ_API_KEY },
-        search_perplexity: { label: 'Search Perplexity',   active: !!process.env.PERPLEXITY_API_KEY },
-        search_tavily:     { label: 'Search Tavily',       active: !!process.env.TAVILY_API_KEY },
-        search_serper:     { label: 'Search Serper',       active: !!process.env.SERPER_API_KEY },
-        images_together:   { label: 'Image Together',      active: !!process.env.TOGETHER_API_KEY },
-        payments_stripe:   { label: 'Payments Stripe',     active: !!process.env.STRIPE_SECRET_KEY },
-        stripe_webhook:    { label: 'Stripe Webhook',      active: !!process.env.STRIPE_WEBHOOK_SECRET },
+        ai_claude: { label: 'AI Claude', active: !!process.env.ANTHROPIC_API_KEY },
+        ai_gpt4o: { label: 'AI GPT-4o', active: !!process.env.OPENAI_API_KEY },
+        ai_deepseek: { label: 'AI DeepSeek', active: !!process.env.DEEPSEEK_API_KEY },
+        tts_elevenlabs: { label: 'TTS ElevenLabs', active: !!process.env.ELEVENLABS_API_KEY },
+        stt_groq: { label: 'STT Groq', active: !!process.env.GROQ_API_KEY },
+        search_perplexity: { label: 'Search Perplexity', active: !!process.env.PERPLEXITY_API_KEY },
+        search_tavily: { label: 'Search Tavily', active: !!process.env.TAVILY_API_KEY },
+        search_serper: { label: 'Search Serper', active: !!process.env.SERPER_API_KEY },
+        images_together: { label: 'Image Together', active: !!process.env.TOGETHER_API_KEY },
+        payments_stripe: { label: 'Payments Stripe', active: !!process.env.STRIPE_SECRET_KEY },
+        stripe_webhook: { label: 'Stripe Webhook', active: !!process.env.STRIPE_WEBHOOK_SECRET },
         monitoring_sentry: { label: 'Error Monitoring Sentry', active: !!process.env.SENTRY_DSN }
     };
     if (!process.env.STRIPE_WEBHOOK_SECRET) recommendations.push('STRIPE_WEBHOOK_SECRET nu e configurat — webhook-urile nu vor fi validate');
@@ -926,14 +955,14 @@ app.get('/api/admin/health-check', adminAuth, asyncHandler(async (req, res) => {
 
     // g) Rate limiting status
     const rateLimits = {
-        chat:    { max: 20,  windowMs: 60000,       windowLabel: '1min' },
-        auth:    { max: 10,  windowMs: 900000,       windowLabel: '15min' },
-        search:  { max: 15,  windowMs: 60000,        windowLabel: '1min' },
-        image:   { max: 5,   windowMs: 60000,        windowLabel: '1min' },
-        memory:  { max: 30,  windowMs: 60000,        windowLabel: '1min' },
-        weather: { max: 10,  windowMs: 60000,        windowLabel: '1min' },
-        api:     { max: 20,  windowMs: 900000,       windowLabel: '15min' },
-        global:  { max: 200, windowMs: 900000,       windowLabel: '15min' }
+        chat: { max: 20, windowMs: 60000, windowLabel: '1min' },
+        auth: { max: 10, windowMs: 900000, windowLabel: '15min' },
+        search: { max: 15, windowMs: 60000, windowLabel: '1min' },
+        image: { max: 5, windowMs: 60000, windowLabel: '1min' },
+        memory: { max: 30, windowMs: 60000, windowLabel: '1min' },
+        weather: { max: 10, windowMs: 60000, windowLabel: '1min' },
+        api: { max: 20, windowMs: 900000, windowLabel: '15min' },
+        global: { max: 200, windowMs: 900000, windowLabel: '15min' }
     };
 
     // h) Security check
@@ -1150,6 +1179,7 @@ app.locals.brain = brain;
 app.use('/api/payments', paymentsRouter);
 app.use('/api/legal', legalRouter);
 app.use('/api/messenger', messengerRouter);
+app.use('/api/telegram', express.json(), telegramRouter);
 app.use('/api/developer', developerRouter);
 app.use('/api', developerRouter); // mounts /api/v1/* endpoints
 
@@ -1157,6 +1187,35 @@ app.use('/api', developerRouter); // mounts /api/v1/* endpoints
 app.get('/api/messenger/stats', adminAuth, (req, res) => {
     res.json(getMessengerStats());
 });
+
+// ═══ MEDIA HEALTH ENDPOINTS ═══
+app.get('/api/media/facebook/health', (req, res) => {
+    res.json(fbPage.getHealth());
+});
+app.get('/api/media/instagram/health', (req, res) => {
+    res.json(instagram.getHealth());
+});
+app.get('/api/media/status', adminAuth, (req, res) => {
+    res.json({
+        messenger: { hasToken: !!process.env.FB_PAGE_ACCESS_TOKEN, health: '/api/messenger/health' },
+        telegram: { hasToken: !!process.env.TELEGRAM_BOT_TOKEN, health: '/api/telegram/health' },
+        facebook: fbPage.getHealth(),
+        instagram: instagram.getHealth(),
+        news: { scheduler: 'active', hours: [5, 12, 18], endpoint: '/api/news/public' }
+    });
+});
+
+// ═══ PUBLISH NEWS TO ALL MEDIA (admin trigger) ═══
+app.post('/api/media/publish-news', adminAuth, express.json(), asyncHandler(async (req, res) => {
+    const articles = req.body.articles || [];
+    const results = { facebook: null, telegram: null };
+    if (articles.length > 0) {
+        results.facebook = await fbPage.publishNewsBatch(articles, req.body.maxPosts || 3);
+        await broadcastNews(articles);
+        results.telegram = 'broadcasted';
+    }
+    res.json({ success: true, results });
+}));
 
 // ═══ PAYMENTS ADMIN STATS — revenue, active subscribers, churn ═══
 app.get('/api/payments/admin/stats', adminAuth, asyncHandler(async (req, res) => {
@@ -1225,8 +1284,15 @@ app.post('/api/ticker/disable', asyncHandler(async (req, res) => {
     res.json({ success: true });
 }));
 
-// ═══ NEWS BOT (admin only) ═══
+// ═══ NEWS BOT ═══
 const newsModule = require('./news');
+// Public endpoint — no auth required (for frontend news widget)
+app.get('/api/news/public', (req, res) => {
+    const allReq = Object.assign({}, req, { url: '/latest', query: req.query });
+    newsModule.router.handle(allReq, res, () => {
+        res.json({ articles: [], total: 0, message: 'No articles cached yet. RSS fetches at 05:00, 12:00, 18:00 RO time.' });
+    });
+});
 app.use('/api/news', adminAuth, newsModule.router);
 newsModule.setSupabase(supabaseAdmin);
 newsModule.restoreCache();
