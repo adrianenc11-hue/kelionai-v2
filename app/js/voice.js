@@ -115,7 +115,7 @@
         isSpeaking = true;
 
         try {
-            var ttsText = cleanTextForTTS(text);
+            const ttsText = cleanTextForTTS(text);
             if (!ttsText) { isSpeaking = false; resumeWakeDetection(); return; }
             const currentExpression = (window.KAvatar && window.KAvatar.getCurrentExpression) ? window.KAvatar.getCurrentExpression() : 'neutral';
             const resp = await fetch(API_BASE + '/api/speak', { method: 'POST',
