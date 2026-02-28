@@ -1,4 +1,5 @@
 const { test, expect } = require('@playwright/test');
+// LIVE-ONLY: Rulează contra https://kelionai.app — NU localhost
 
 // Mark onboarding as complete so tests always land on the main app
 test.beforeEach(async ({ page }) => {
@@ -52,7 +53,10 @@ test('page loads with avatar and layout', async ({ page }) => {
 // ═══════════════════════════════════════════
 test('text input accepts text and send button works', async ({ page }) => {
     await page.goto('/');
-    await page.waitForTimeout(3000);
+    await page.waitForLoadState('networkidle');
+    await page.waitForSelector('#auth-screen', { state: 'visible', timeout: 10000 }).catch(() => {
+        // Auth screen may already be dismissed or not present — this is expected on live
+    });
     await dismissAuth(page);
 
     const input = page.locator('#text-input');
@@ -114,7 +118,7 @@ test('TTS API returns audio bytes', async ({ request }) => {
 // ═══════════════════════════════════════════
 test('avatar has Smile morph target', async ({ page }) => {
     await page.goto('/');
-    await page.waitForTimeout(5000);
+    await page.waitForTimeout(15000);
 
     const morphData = await page.evaluate(() => {
         const meshes = KAvatar.getMorphMeshes();

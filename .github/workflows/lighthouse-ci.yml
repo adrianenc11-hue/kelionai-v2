@@ -1,4 +1,4 @@
-name: Lighthouse CI
+name: Lighthouse CI (Live)
 
 on:
   push:
@@ -22,43 +22,21 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Verify server starts
+      - name: Verify live site is up
         run: |
-          node server/index.js &
-          SERVER_PID=$!
-          for i in $(seq 1 30); do
-            if curl -sf http://localhost:3000/health > /dev/null 2>&1; then
-              echo "Server is healthy"
-              kill $SERVER_PID
-              wait $SERVER_PID 2>/dev/null || true
-              exit 0
-            fi
-            sleep 2
-          done
-          kill $SERVER_PID 2>/dev/null || true
-          echo "Server failed to become healthy in time"
-          exit 1
-        env:
-          NODE_ENV: ci
-          PORT: 3000
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL || 'https://placeholder.supabase.co' }}
-          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY || 'placeholder-service-key' }}
-          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY || 'placeholder-anon-key' }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+          STATUS=$(curl -sf -o /dev/null -w "%{http_code}" https://kelionai.app/ || echo "000")
+          if [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 500 ]; then
+            echo "✅ Site is live (HTTP $STATUS)"
+          else
+            echo "❌ Site is DOWN — skipping Lighthouse"
+            exit 1
+          fi
 
-      - name: Run Lighthouse CI
+      - name: Run Lighthouse CI against LIVE
         run: npx @lhci/cli@0.14.0 autorun
         continue-on-error: true
         env:
           LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}
-          NODE_ENV: ci
-          PORT: 3000
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL || 'https://placeholder.supabase.co' }}
-          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY || 'placeholder-service-key' }}
-          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY || 'placeholder-anon-key' }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
 
       - name: Upload Lighthouse report
         if: always()

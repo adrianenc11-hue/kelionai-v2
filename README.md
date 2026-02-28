@@ -88,7 +88,9 @@ npm run dev
 npm start
 ```
 
-Server listens on `http://localhost:3000`.
+App is live at `https://kelionai.app`.
+
+> ⚠️ Toate testele rulează exclusiv contra producției live (https://kelionai.app). NU există mod de testare locală.
 
 ## npm Scripts
 
@@ -197,5 +199,5 @@ This repository is integrated with [Checksum.ai](https://checksum.ai/) CI Agent 
 
 ### Setup
 1. Set `CHECKSUM_API_KEY` as a repository secret
-2. Optionally set `CHECKSUM_BASE_URL` as a repository variable
+2. Optionally set `CHECKSUM_BASE_URL` as a repository variable (defaults to `https://kelionai.app`)
 3. Tests will run automatically on PRs

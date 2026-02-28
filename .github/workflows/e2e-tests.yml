@@ -1,4 +1,4 @@
-name: E2E Tests
+name: E2E Tests (Live)
 
 on:
   push:
@@ -27,55 +27,22 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
-      - name: Start server and wait
+      - name: Verify live site is up
         run: |
-          node server/index.js &
-          SERVER_PID=$!
-          echo "SERVER_PID=$SERVER_PID" >> $GITHUB_ENV
-          for i in $(seq 1 60); do
-            if curl -sf http://localhost:3000/api/health > /dev/null 2>&1; then
-              echo "Server ready after ${i}s"
-              break
-            fi
-            sleep 1
-          done
-        env:
-          NODE_ENV: test
-          PORT: 3000
-          SUPABASE_URL: https://placeholder.supabase.co
-          SUPABASE_SERVICE_KEY: placeholder-service-key
-          SUPABASE_ANON_KEY: placeholder-anon-key
-          ADMIN_SECRET: test-secret
-
-      - name: Run E2E tests
-        id: playwright
-        run: npx playwright test tests/e2e-full.spec.js --project=chromium --reporter=json,list
-        continue-on-error: true
-        env:
-          NODE_ENV: test
-          PORT: 3000
-          SUPABASE_URL: https://placeholder.supabase.co
-          SUPABASE_SERVICE_KEY: placeholder-service-key
-          SUPABASE_ANON_KEY: placeholder-anon-key
-          ADMIN_SECRET: test-secret
-          PLAYWRIGHT_JSON_OUTPUT_NAME: playwright-results.json
-
-      - name: Test summary
-        if: always()
-        run: |
-          if [ -f playwright-results.json ]; then
-            PASSED=$(node -e "const r=require('./playwright-results.json'); console.log(r.stats.expected||0)" 2>/dev/null || echo 0)
-            FAILED=$(node -e "const r=require('./playwright-results.json'); console.log(r.stats.unexpected||0)" 2>/dev/null || echo 0)
-            SKIPPED=$(node -e "const r=require('./playwright-results.json'); console.log(r.stats.skipped||0)" 2>/dev/null || echo 0)
+          echo "🌐 Checking https://kelionai.app is online..."
+          STATUS=$(curl -sf -o /dev/null -w "%{http_code}" https://kelionai.app/api/health || echo "000")
+          if [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 500 ]; then
+            echo "✅ Site is live (HTTP $STATUS)"
           else
-            PASSED=0; FAILED=0; SKIPPED=0
+            echo "❌ Site is DOWN (HTTP $STATUS) — skipping E2E tests"
+            exit 1
           fi
-          echo "## E2E Test Results" >> $GITHUB_STEP_SUMMARY
-          echo "| Status | Count |" >> $GITHUB_STEP_SUMMARY
-          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| ✅ Passed  | $PASSED  |" >> $GITHUB_STEP_SUMMARY
-          echo "| ❌ Failed  | $FAILED  |" >> $GITHUB_STEP_SUMMARY
-          echo "| ⏭️ Skipped | $SKIPPED |" >> $GITHUB_STEP_SUMMARY
+
+      - name: Run E2E tests against LIVE site
+        run: npx playwright test --project=chromium
+        env:
+          NODE_ENV: test
+          PLAYWRIGHT_BASE_URL: https://kelionai.app
 
       - name: Upload Playwright report
         uses: actions/upload-artifact@v7
