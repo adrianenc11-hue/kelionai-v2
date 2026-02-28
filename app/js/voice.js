@@ -97,18 +97,35 @@
     }
 
     // ─── SPEAK — AudioContext (bypass autoplay!) ─────────────
+    function cleanTextForTTS(text) {
+        return text
+            .replace(/```[\s\S]*?```/g, '')         // code blocks
+            .replace(/`[^`]+`/g, '')                 // inline code
+            .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // [text](url) → text
+            .replace(/https?:\/\/\S+/g, '')          // URLs
+            .replace(/[*_~#>]+/g, '')                // markdown formatting
+            .replace(/\n{2,}/g, '. ')                // multiple newlines → pause
+            .replace(/\s{2,}/g, ' ')                 // collapse whitespace
+            .trim();
+    }
+
     async function speak(text, avatar) {
         if (isSpeaking) stopSpeaking();
         if (!text || !text.trim()) return;
         isSpeaking = true;
 
         try {
+            const ttsText = cleanTextForTTS(text);
+            if (!ttsText) { isSpeaking = false; resumeWakeDetection(); return; }
             const currentExpression = (window.KAvatar && window.KAvatar.getCurrentExpression) ? window.KAvatar.getCurrentExpression() : 'neutral';
             const resp = await fetch(API_BASE + '/api/speak', { method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...(window.KAuth ? KAuth.getAuthHeaders() : {}) },
-                body: JSON.stringify({ text, avatar: avatar || KAvatar.getCurrentAvatar(), language: detectedLanguage, mood: currentExpression }) });
+                body: JSON.stringify({ text: ttsText, avatar: avatar || KAvatar.getCurrentAvatar(), language: detectedLanguage, mood: currentExpression }) });
 
-            if (!resp.ok) { fallbackTextLipSync(text); isSpeaking = false; resumeWakeDetection(); return; }
+            if (!resp.ok) {
+                console.warn('[Voice] TTS failed:', resp.status);
+                fallbackTextLipSync(text); isSpeaking = false; resumeWakeDetection(); return;
+            }
 
             const arrayBuf = await resp.arrayBuffer();
             const ctx = getAudioContext();
