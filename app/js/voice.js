@@ -147,15 +147,15 @@
                 return;
             }
 
-            await playAudioBuffer(arrayBuf);
+            await playAudioBuffer(arrayBuf, ttsText);
         } catch(e) { console.error('[Voice]', e); stopAllLipSync(); isSpeaking = false; resumeWakeDetection(); }
     }
 
-    async function playAudioBuffer(arrayBuf) {
+    async function playAudioBuffer(arrayBuf, fallbackText) {
         const ctx = getAudioContext();
         let audioBuf;
         try { audioBuf = await ctx.decodeAudioData(arrayBuf.slice(0)); }
-        catch(e) { fallbackTextLipSync(''); isSpeaking = false; resumeWakeDetection(); return; }
+        catch(e) { fallbackTextLipSync(fallbackText || ''); isSpeaking = false; resumeWakeDetection(); return; }
 
         currentSourceNode = ctx.createBufferSource();
         currentSourceNode.buffer = audioBuf;
@@ -169,11 +169,31 @@
                 if (an) { currentSourceNode.connect(an); an.connect(ctx.destination); fftOk = true; ls.start(); }
             } catch(e){}
         }
-        if (!fftOk) { currentSourceNode.connect(ctx.destination); fallbackTextLipSync(''); }
+        if (!fftOk) { currentSourceNode.connect(ctx.destination); fallbackTextLipSync(fallbackText || ''); }
 
         KAvatar.setExpression('happy', 0.3);
         currentSourceNode.onended = () => { stopAllLipSync(); isSpeaking = false; currentSourceNode = null; KAvatar.setExpression('neutral'); resumeWakeDetection(); };
         currentSourceNode.start(0);
+
+        // Auto-gestures: trigger based on text content
+        if (fallbackText) {
+            var gestureText = fallbackText.toLowerCase();
+            setTimeout(function() { if (window.KAvatar) KAvatar.playGesture('nod'); }, 500);
+            if (gestureText.includes('?')) {
+                setTimeout(function() { if (window.KAvatar) KAvatar.playGesture('tilt'); }, 2000);
+            }
+            if (gestureText.includes('!')) {
+                setTimeout(function() { if (window.KAvatar) KAvatar.playGesture('nod'); }, 1500);
+            }
+            if (gestureText.length > 200) {
+                setTimeout(function() { if (window.KAvatar) KAvatar.playGesture('lookAway'); }, 3000);
+                setTimeout(function() { if (window.KAvatar) KAvatar.playGesture('nod'); }, 5000);
+            }
+            if (/\b(nu|no|nein|non|niet|imposibil|impossible|unfortunately|din păcate)\b/i.test(gestureText)) {
+                setTimeout(function() { if (window.KAvatar) KAvatar.playGesture('shake'); }, 1000);
+            }
+        }
+
         console.log('[Voice] ✅ Audio playing (' + arrayBuf.byteLength + 'B)');
     }
 
@@ -185,7 +205,7 @@
         btn = document.createElement('button');
         btn.id = 'audio-unlock-btn';
         btn.textContent = '🔊 Click to enable sound';
-        btn.style.cssText = 'position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#1a73e8;color:#fff;border:none;border-radius:24px;padding:12px 24px;cursor:pointer;z-index:9999;font-size:14px;font-weight:600;box-shadow:0 4px 16px rgba(0,0,0,0.4)';
+        btn.style.cssText = 'position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#6366F1,#06B6D4);color:#fff;border:none;border-radius:24px;padding:14px 28px;cursor:pointer;z-index:9999;font-size:15px;font-weight:600;box-shadow:0 4px 24px rgba(99,102,241,0.4);animation:pulse 2s infinite;';
         btn.onclick = async function() {
             btn.remove();
             const buf = pendingAudioBuffer, av = pendingAudioAvatar;
