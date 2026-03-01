@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-// KelionAI v2.3 — WHATSAPP BOT (Cloud API)
+// KelionAI v2.5 — WHATSAPP BOT (Cloud API)
 // Text + Audio (STT/TTS) + Video (camera analysis)
 // Webhook: https://kelionai.app/api/whatsapp/webhook
 // ═══════════════════════════════════════════════════════════════

@@ -1,6 +1,6 @@
 {
     "name": "kelionai-v2",
-    "version": "2.3.0",
+    "version": "2.5.0",
     "description": "KelionAI — Asistent AI accesibil cu avatari 3D",
     "main": "server/index.js",
     "scripts": {
@@ -45,6 +45,7 @@
         "@sentry/browser": "^10.40.0",
         "@sentry/node": "^10.40.0",
         "@supabase/supabase-js": "^2.98.0",
+        "ccxt": "^4.4.0",
         "cors": "^2.8.5",
         "dotenv": "^17.3.1",
         "express": "^4.22.1",

@@ -1,6 +1,7 @@
 'use strict';
 
 const request = require('supertest');
+const pkg = require('../package.json');
 
 let app;
 beforeAll(() => {
@@ -135,7 +136,7 @@ describe('GET /api/admin/health-check', () => {
     test('server section has expected fields', async () => {
         process.env.ADMIN_SECRET_KEY = 'test-secret';
         const res = await request(app).get('/api/admin/health-check').set('x-admin-secret', 'test-secret');
-        expect(res.body.server.version).toBe('2.3.0');
+        expect(res.body.server.version).toBe(pkg.version);
         expect(typeof res.body.server.uptime).toBe('string');
         expect(typeof res.body.server.nodeVersion).toBe('string');
         expect(res.body.server.memory).toBeDefined();
