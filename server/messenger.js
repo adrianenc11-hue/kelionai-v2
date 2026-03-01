@@ -173,23 +173,14 @@ router.post('/webhook', async (req, res) => {
                 const msgCount = (senderMessageCount.get(senderId) || 0) + 1;
                 senderMessageCount.set(senderId, msgCount);
 
-                // Site recommendation after 3rd message
-                if (msgCount === RECOMMEND_SITE_AFTER) {
-                    setTimeout(async () => {
-                        await sendMessage(senderId,
-                            '💡 Știai că poți folosi KelionAI cu avatare 3D?\n\n' +
-                            '🎭 Kelion și Kira te așteaptă pe site — voce naturală, căutare web, generare imagini!\n\n' +
-                            '🌐 Încearcă gratuit: https://kelionai.app');
-                    }, 2000);
-                }
-
-                // Subscription prompt at free limit
+                // Subscription + site prompt ONLY at free limit (end of free period)
                 if (msgCount === FREE_MESSAGES_LIMIT) {
                     setTimeout(async () => {
                         await sendMessage(senderId,
                             '⭐ Ai folosit ' + FREE_MESSAGES_LIMIT + ' mesaje gratuite!\n\n' +
-                            'Pentru conversații nelimitate + funcții premium:\n' +
+                            'Continuă cu funcții premium pe kelionai.app:\n' +
                             '• 💬 Chat nelimitat cu AI\n' +
+                            '• 🎭 Avatare 3D — Kelion & Kira\n' +
                             '• 🔊 Voce naturală\n' +
                             '• 🖼️ Generare imagini\n\n' +
                             '🌐 Abonează-te: https://kelionai.app/pricing');
