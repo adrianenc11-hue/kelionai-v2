@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KelionAI — Sports Betting Admin</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #0a0a1a; color: #e0e0e0; font-family: system-ui, sans-serif; padding: 20px; }
+        h1 { color: #00ffff; margin-bottom: 6px; font-size: 1.4rem; }
+        .subtitle { color: #888; font-size: 0.85rem; margin-bottom: 14px; }
+        .btn { background: #00ffff; color: #000; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 0.85rem; }
+        .btn:hover { background: #00dddd; }
+        .btn.secondary { background: rgba(255,255,255,0.1); color: #e0e0e0; }
+        .btn.secondary:hover { background: rgba(255,255,255,0.18); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .admin-input { background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.15); color: #e0e0e0; padding: 8px 12px; border-radius: 8px; font-size: 0.85rem; width: 240px; }
+        input[type="number"].admin-input { width: 110px; }
+        .auth-row { display: flex; gap: 8px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
+        .auth-row label { font-size: 0.82rem; color: #888; }
+        .status-bar { font-size: 0.8rem; color: #888; }
+        .status-bar span { color: #00ffff; }
+        .error-msg { color: #ff6666; font-size: 0.82rem; }
+        .loading { text-align: center; padding: 24px; color: #00ffff; font-size: 0.88rem; }
+        .empty-state { text-align: center; padding: 30px; color: #555; font-size: 0.88rem; }
+
+        /* Disclaimer */
+        .disclaimer { background: rgba(255,60,60,0.1); border: 1px solid rgba(255,60,60,0.35); border-radius: 10px; padding: 12px 16px; margin-bottom: 18px; font-size: 0.83rem; color: #ff8888; display: flex; align-items: center; gap: 8px; }
+
+        /* Sections */
+        .section { margin-bottom: 24px; }
+        .section-title { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 1px; color: #888; margin-bottom: 10px; }
+
+        /* Cards */
+        .card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 16px; }
+
+        /* Status grid */
+        .stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
+        .stat-item { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 14px 16px; }
+        .stat-label { font-size: 0.73rem; color: #888; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 6px; }
+        .stat-value { font-size: 1.1rem; color: #00ffff; font-weight: bold; }
+
+        /* Predictions grid */
+        .predictions-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+        .pred-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 14px; }
+        .pred-card.value-bet { border-color: rgba(0,255,255,0.3); box-shadow: 0 0 8px rgba(0,255,255,0.08); }
+        .pred-match { font-size: 0.88rem; font-weight: bold; color: #fff; margin-bottom: 4px; }
+        .pred-meta { font-size: 0.75rem; color: #888; margin-bottom: 8px; }
+        .pred-pick { font-size: 0.9rem; color: #e0e0e0; margin-bottom: 6px; }
+        .pred-footer { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+        .conf-badge { display: inline-block; padding: 2px 9px; border-radius: 12px; font-size: 0.75rem; font-weight: bold; }
+        .conf-high { background: rgba(0,200,80,0.18); color: #00dd66; border: 1px solid rgba(0,200,80,0.3); }
+        .conf-med { background: rgba(255,200,0,0.15); color: #ffc800; border: 1px solid rgba(255,200,0,0.3); }
+        .conf-low { background: rgba(180,180,180,0.1); color: #999; border: 1px solid rgba(180,180,180,0.2); }
+        .value-badge { background: rgba(0,255,255,0.12); color: #00ffff; border: 1px solid rgba(0,255,255,0.25); padding: 2px 8px; border-radius: 12px; font-size: 0.73rem; font-weight: bold; }
+        .odds-label { font-size: 0.78rem; color: #aaa; }
+
+        /* Live scores */
+        .live-list { display: flex; flex-direction: column; gap: 6px; }
+        .live-item { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+        .live-teams { font-size: 0.88rem; color: #e0e0e0; }
+        .live-score { font-size: 1rem; font-weight: bold; color: #00ffff; }
+        .live-info { font-size: 0.75rem; color: #888; }
+        .live-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #ff4444; animation: blink 1s step-start infinite; margin-right: 5px; }
+        @keyframes blink { 50% { opacity: 0; } }
+
+        /* Leagues */
+        .leagues-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
+        .league-item { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; font-size: 0.85rem; color: #e0e0e0; }
+        .league-sport { font-size: 0.72rem; color: #888; margin-top: 3px; }
+
+        /* Kelly Calculator */
+        .kelly-form { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 14px; }
+        .form-group { display: flex; flex-direction: column; gap: 5px; }
+        .form-group label { font-size: 0.78rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; }
+        .kelly-result { background: rgba(0,255,255,0.06); border: 1px solid rgba(0,255,255,0.2); border-radius: 8px; padding: 14px 16px; }
+        .kelly-result .kr-label { font-size: 0.75rem; color: #888; text-transform: uppercase; margin-bottom: 4px; }
+        .kelly-result .kr-value { font-size: 1.4rem; font-weight: bold; color: #00ffff; }
+        .kelly-result .kr-note { font-size: 0.78rem; color: #888; margin-top: 6px; }
+
+        /* ROI */
+        .roi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
+        .roi-item { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 14px; }
+        .roi-label { font-size: 0.72rem; color: #888; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 5px; }
+        .roi-value { font-size: 1.1rem; font-weight: bold; color: #00ffff; }
+        .roi-value.pos { color: #00dd66; }
+        .roi-value.neg { color: #ff6666; }
+
+        /* Toolbar */
+        .toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 6px; }
+    </style>
+</head>
+<body>
+    <nav style="display:flex;align-items:center;gap:16px;padding:10px 20px;border-bottom:1px solid rgba(255,255,255,0.08);margin-bottom:10px;font-size:0.82rem;">
+        <a href="/" style="color:#00ffff;text-decoration:none;font-weight:bold;">← KelionAI</a>
+        <span style="color:#333;">|</span>
+        <a href="/admin/health.html" style="color:#888;text-decoration:none;">Health</a>
+        <a href="/admin/news.html" style="color:#888;text-decoration:none;">News</a>
+        <a href="/admin/trading.html" style="color:#888;text-decoration:none;">Trading</a>
+        <a href="/admin/sports.html" style="color:#00ffff;text-decoration:none;">Sports</a>
+    </nav>
+    <h1>⚽ KelionAI — Sports Betting Bot</h1>
+    <p class="subtitle">Sports betting management panel — ADMIN ONLY</p>
+
+    <div class="disclaimer">
+        ⚠️ INFORMATIONAL — Gambling can be addictive. We do not guarantee winnings. Play responsibly. 18+
+    </div>
+
+    <div class="auth-row">
+        <label>Admin Secret:</label>
+        <input type="password" id="admin-secret" class="admin-input" placeholder="x-admin-secret" autocomplete="off">
+        <button class="btn secondary" onclick="saveSecret()">Save</button>
+        <span class="status-bar" id="status-bar">—</span>
+    </div>
+
+    <div class="toolbar">
+        <button class="btn secondary" onclick="loadAll()">🔄 Reload</button>
+        <button class="btn secondary" onclick="exportJson()">⬇ Export JSON</button>
+    </div>
+
+    <!-- STATUS PANEL -->
+    <div class="section">
+        <div class="section-title">📊 Bot Status</div>
+        <div class="stat-grid" id="status-grid">
+            <div class="loading">Loading...</div>
+        </div>
+    </div>
+
+    <!-- TODAY'S PREDICTIONS -->
+    <div class="section">
+        <div class="section-title">🔮 Today's Predictions</div>
+        <div class="predictions-grid" id="predictions-grid">
+            <div class="loading">Loading...</div>
+        </div>
+    </div>
+
+    <!-- LIVE SCORES -->
+    <div class="section">
+        <div class="section-title"><span class="live-dot"></span>Live Scores</div>
+        <div class="live-list" id="live-list">
+            <div class="loading">Loading...</div>
+        </div>
+    </div>
+
+    <!-- LEAGUES -->
+    <div class="section">
+        <div class="section-title">🏆 Active Leagues</div>
+        <div class="leagues-grid" id="leagues-grid">
+            <div class="loading">Loading...</div>
+        </div>
+    </div>
+
+    <!-- KELLY CALCULATOR -->
+    <div class="section">
+        <div class="section-title">🧮 Kelly Calculator</div>
+        <div class="card">
+            <div class="kelly-form">
+                <div class="form-group">
+                    <label>Estimated Probability (%)</label>
+                    <input type="number" id="kelly-prob" class="admin-input" min="1" max="99" value="55" step="1">
+                </div>
+                <div class="form-group">
+                    <label>Offered Odds</label>
+                    <input type="number" id="kelly-odds" class="admin-input" min="1.01" step="0.01" value="2.00">
+                </div>
+                <div class="form-group">
+                    <label>Bankroll (RON)</label>
+                    <input type="number" id="kelly-bankroll" class="admin-input" min="1" value="1000">
+                </div>
+                <button class="btn" onclick="calcKelly()">Calculate</button>
+            </div>
+            <div id="kelly-result" style="display:none;" class="kelly-result">
+                <div class="kr-label">Recommended Stake (Quarter Kelly ¼)</div>
+                <div class="kr-value" id="kelly-stake">—</div>
+                <div class="kr-note" id="kelly-note"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ROI TRACKER -->
+    <div class="section">
+        <div class="section-title">💰 ROI & Bankroll</div>
+        <div class="roi-grid" id="roi-grid">
+            <div class="loading">Loading...</div>
+        </div>
+    </div>
+
+    <script>
+        'use strict';
+
+        let adminSecret = sessionStorage.getItem('kelion_admin_secret') || '';
+        let snapshot = {};
+
+        document.getElementById('admin-secret').value = adminSecret;
+
+        function saveSecret() {
+            adminSecret = document.getElementById('admin-secret').value.trim();
+            sessionStorage.setItem('kelion_admin_secret', adminSecret);
+            setStatus('Secret saved.');
+            loadAll();
+        }
+
+        function getHeaders() {
+            return { 'x-admin-secret': adminSecret };
+        }
+
+        function setStatus(msg, isError) {
+            const el = document.getElementById('status-bar');
+            el.innerHTML = isError
+                ? `<span class="error-msg">${escHtml(msg)}</span>`
+                : `<span>${escHtml(msg)}</span>`;
+        }
+
+        function escHtml(str) {
+            return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        }
+
+        function fmtDate(iso) {
+            try { return new Date(iso).toLocaleString('en-US', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }); }
+            catch (e) { return iso || '—'; }
+        }
+
+        function confClass(confidence) {
+            const c = parseFloat(confidence);
+            if (c >= 70) return 'conf-high';
+            if (c >= 50) return 'conf-med';
+            return 'conf-low';
+        }
+
+        // ═══ STATUS ═══
+        async function loadStatus() {
+            const el = document.getElementById('status-grid');
+            try {
+                const res = await fetch('/api/sports/status', { headers: getHeaders() });
+                if (res.status === 401) { el.innerHTML = '<div class="error-msg">Unauthorized — check admin secret.</div>'; return; }
+                const data = await res.json();
+                snapshot.status = data;
+                const activeSports = Array.isArray(data.activeSports) ? data.activeSports.join(', ') : (data.activeSports || '—');
+                const items = [
+                    { label: 'Bot Status', value: escHtml(data.status || 'N/A') },
+                    { label: 'Active Sports', value: escHtml(activeSports) },
+                    { label: 'Predictions Today', value: escHtml(String(data.predictionsToday ?? '—')) },
+                    { label: 'Tracked Matches', value: escHtml(String(data.matchesTracked ?? '—')) },
+                    { label: 'Last Update', value: fmtDate(data.lastUpdate) },
+                ];
+                el.innerHTML = items.map(i => `
+                    <div class="stat-item">
+                        <div class="stat-label">${i.label}</div>
+                        <div class="stat-value">${i.value}</div>
+                    </div>`).join('');
+            } catch (e) {
+                el.innerHTML = `<div class="error-msg">Status error: ${escHtml(e.message)}</div>`;
+            }
+        }
+
+        // ═══ PREDICTIONS ═══
+        async function loadPredictions() {
+            const el = document.getElementById('predictions-grid');
+            try {
+                const res = await fetch('/api/sports/predictions', { headers: getHeaders() });
+                if (res.status === 401) { el.innerHTML = '<div class="error-msg">Unauthorized.</div>'; return; }
+                const data = await res.json();
+                snapshot.predictions = data;
+                const preds = (data.predictions || []).sort((a, b) => (parseFloat(b.confidence) || 0) - (parseFloat(a.confidence) || 0));
+                if (!preds.length) { el.innerHTML = '<div class="empty-state">No predictions available today.</div>'; return; }
+                el.innerHTML = preds.map(p => `
+                    <div class="pred-card${p.valueBet ? ' value-bet' : ''}">
+                        <div class="pred-match">${escHtml(p.match || p.homeTeam && p.awayTeam ? (p.homeTeam + ' vs ' + p.awayTeam) : '—')}</div>
+                        <div class="pred-meta">${escHtml(p.competition || p.league || '—')} · ${fmtDate(p.kickoff || p.date)}</div>
+                        <div class="pred-pick">🎯 ${escHtml(p.pick || p.prediction || '—')}</div>
+                        <div class="pred-footer">
+                            <span class="conf-badge ${confClass(p.confidence)}">${escHtml(String(p.confidence ?? '—'))}% conf.</span>
+                            ${p.valueBet ? '<span class="value-badge">💎 VALUE BET</span>' : ''}
+                            ${p.odds != null ? `<span class="odds-label">Cotă: ${escHtml(String(p.odds))}</span>` : ''}
+                        </div>
+                    </div>`).join('');
+            } catch (e) {
+                el.innerHTML = `<div class="error-msg">Predictions error: ${escHtml(e.message)}</div>`;
+            }
+        }
+
+        // ═══ LIVE SCORES ═══
+        async function loadLive() {
+            const el = document.getElementById('live-list');
+            try {
+                const res = await fetch('/api/sports/live', { headers: getHeaders() });
+                if (res.status === 401) { el.innerHTML = '<div class="error-msg">Unauthorized.</div>'; return; }
+                const data = await res.json();
+                snapshot.live = data;
+                const matches = data.matches || data.live || [];
+                if (!matches.length) { el.innerHTML = '<div class="empty-state">No live matches at the moment.</div>'; return; }
+                el.innerHTML = matches.map(m => {
+                    // Backend returns { match: 'A vs B', score: '1-1', minute: 67, status: 'LIVE', competition: '...' }
+                    const scoreParts = String(m.score || '').split('-');
+                    const homeScore = m.homeScore != null ? m.homeScore : (scoreParts[0] != null ? scoreParts[0] : '—');
+                    const awayScore = m.awayScore != null ? m.awayScore : (scoreParts[1] != null ? scoreParts[1] : '—');
+                    return `<div class="live-item">
+                        <div>
+                            <div class="live-teams">${escHtml(m.match || ((m.homeTeam || m.home || '') + ' vs ' + (m.awayTeam || m.away || '')))}</div>
+                            <div class="live-info">${escHtml(m.competition || m.league || '—')} · ${escHtml(m.minute != null ? String(m.minute) + '\'' : (m.status || '—'))}</div>
+                        </div>
+                        <div class="live-score">${escHtml(String(homeScore))} – ${escHtml(String(awayScore))}</div>
+                    </div>`;
+                }).join('');
+            } catch (e) {
+                el.innerHTML = `<div class="error-msg">Live scores error: ${escHtml(e.message)}</div>`;
+            }
+        }
+
+        // ═══ LEAGUES ═══
+        async function loadLeagues() {
+            const el = document.getElementById('leagues-grid');
+            try {
+                const res = await fetch('/api/sports/leagues', { headers: getHeaders() });
+                if (res.status === 401) { el.innerHTML = '<div class="error-msg">Unauthorized.</div>'; return; }
+                const data = await res.json();
+                snapshot.leagues = data;
+                const leagues = data.leagues || [];
+                if (!leagues.length) { el.innerHTML = '<div class="empty-state">No leagues configured.</div>'; return; }
+                el.innerHTML = leagues.map(l => `
+                    <div class="league-item">
+                        <div>${escHtml(l.name || l)}</div>
+                        ${l.sport ? `<div class="league-sport">${escHtml(l.sport)}</div>` : ''}
+                    </div>`).join('');
+            } catch (e) {
+                el.innerHTML = `<div class="error-msg">Leagues error: ${escHtml(e.message)}</div>`;
+            }
+        }
+
+        // ═══ KELLY CALCULATOR ═══
+        function calcKelly() {
+            const prob = parseFloat(document.getElementById('kelly-prob').value) / 100;
+            const odds = parseFloat(document.getElementById('kelly-odds').value);
+            const bankroll = parseFloat(document.getElementById('kelly-bankroll').value);
+
+            if (isNaN(prob) || isNaN(odds) || isNaN(bankroll) || prob <= 0 || prob >= 1 || odds <= 1 || bankroll <= 0) {
+                document.getElementById('kelly-result').style.display = 'none';
+                return;
+            }
+
+            const b = odds - 1;
+            const q = 1 - prob;
+            const kellyFull = (b * prob - q) / b;
+            const kellyFrac = kellyFull / 4; // Quarter Kelly for safety
+            const stake = Math.max(0, kellyFrac * bankroll);
+
+            const resultEl = document.getElementById('kelly-result');
+            document.getElementById('kelly-stake').textContent = stake.toFixed(2) + ' RON';
+            const noteText = kellyFull <= 0
+                ? '⚠️ Negative Kelly — no statistical edge at this odds/probability.'
+                : `Full Kelly: ${(kellyFull * 100).toFixed(1)}% | Quarter Kelly (recommended): ${(kellyFrac * 100).toFixed(1)}% of bankroll`;
+            document.getElementById('kelly-note').textContent = noteText;
+            resultEl.style.display = 'block';
+        }
+
+        // ═══ ROI & BANKROLL ═══
+        async function loadRoi() {
+            const el = document.getElementById('roi-grid');
+            try {
+                const [roiRes, bankrollRes] = await Promise.all([
+                    fetch('/api/sports/roi', { headers: getHeaders() }),
+                    fetch('/api/sports/bankroll', { headers: getHeaders() }),
+                ]);
+                if (roiRes.status === 401 || bankrollRes.status === 401) {
+                    el.innerHTML = '<div class="error-msg">Unauthorized.</div>'; return;
+                }
+                const roi = await roiRes.json();
+                const bankroll = await bankrollRes.json();
+                snapshot.roi = roi;
+                snapshot.bankroll = bankroll;
+
+                const roiVal = parseFloat(roi.roi);
+                const profitVal = parseFloat(roi.profit ?? roi.netProfit);
+                const metrics = [
+                    { label: 'ROI', value: roi.roi != null ? (roiVal >= 0 ? '+' : '') + roiVal.toFixed(2) + '%' : '—', cls: roiVal >= 0 ? 'pos' : 'neg' },
+                    { label: 'Net Profit', value: roi.profit != null || roi.netProfit != null ? (profitVal >= 0 ? '+' : '') + profitVal.toFixed(2) + ' RON' : '—', cls: profitVal >= 0 ? 'pos' : 'neg' },
+                    { label: 'Total Bets', value: String(roi.totalBets ?? '—') },
+                    { label: 'Win Rate', value: roi.winRate != null ? roi.winRate + '%' : '—' },
+                    { label: 'Current Bankroll', value: bankroll.current != null ? bankroll.current + ' RON' : '—' },
+                    { label: 'Initial Bankroll', value: bankroll.initial != null ? bankroll.initial + ' RON' : '—' },
+                    { label: 'Max Drawdown', value: bankroll.maxDrawdown != null ? bankroll.maxDrawdown + '%' : '—' },
+                    { label: 'Last Update', value: fmtDate(roi.updatedAt || bankroll.updatedAt) },
+                ];
+                el.innerHTML = metrics.map(m => `
+                    <div class="roi-item">
+                        <div class="roi-label">${escHtml(m.label)}</div>
+                        <div class="roi-value ${m.cls || ''}">${escHtml(String(m.value))}</div>
+                    </div>`).join('');
+            } catch (e) {
+                el.innerHTML = `<div class="error-msg">ROI error: ${escHtml(e.message)}</div>`;
+            }
+        }
+
+        // ═══ EXPORT ═══
+        function exportJson() {
+            const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `sports-snapshot-${new Date().toISOString().slice(0,10)}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // ═══ INIT ═══
+        async function loadAll() {
+            setStatus('Loading data...');
+            await Promise.all([loadStatus(), loadPredictions(), loadLive(), loadLeagues(), loadRoi()]);
+            setStatus(`Updated at ${new Date().toLocaleTimeString('en-US')}`);
+        }
+
+        if (adminSecret) {
+            loadAll();
+        } else {
+            setStatus('Enter admin secret and click Save.');
+        }
+
+        // Auto-refresh every 60 seconds
+        setInterval(() => { if (adminSecret) loadAll(); }, 60000);
+    </script>
+</body>
+</html>
