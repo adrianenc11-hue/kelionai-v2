@@ -4,7 +4,7 @@
 // ═══════════════════════════════════════════════════════════════
 require('dotenv').config();
 
-// Verificare Node.js versiune — fetch nativ disponibil din Node 18+
+// Verify Node.js version — native fetch available from Node 18+
 if (!globalThis.fetch) {
     throw new Error('Node.js 18+ required for native fetch. Current: ' + process.version);
 }
@@ -49,7 +49,7 @@ app.use((req, res, next) => {
     next();
 });
 
-// ═══ CSP NONCE MIDDLEWARE — generează nonce unic per request ═══
+// ═══ CSP NONCE MIDDLEWARE — generates unique nonce per request ═══
 app.use((req, res, next) => {
     res.locals.cspNonce = crypto.randomBytes(16).toString('base64');
     next();
@@ -63,7 +63,7 @@ app.use((req, res, next) => {
                 scriptSrc: [
                     "'self'",
                     (req, res) => `'nonce-${res.locals.cspNonce}'`,
-                    // CDN-uri necesare cu versiuni pinned
+                    // Required CDNs with pinned versions
                     "https://cdn.jsdelivr.net",
                     "https://browser.sentry-cdn.com",
                 ],
@@ -444,7 +444,7 @@ app.post('/api/chat', chatLimiter, validate(chatSchema), async (req, res) => {
             } catch (e) { logger.warn({ component: 'Chat', err: e.message }, 'DeepSeek'); }
         }
 
-        if (!reply) return res.status(503).json({ error: 'AI indisponibil' });
+        if (!reply) return res.status(503).json({ error: 'AI unavailable' });
 
         // ── Save conversation (sync to get ID) + Learn async ──
         let savedConvId = conversationId;
@@ -463,7 +463,7 @@ app.post('/api/chat', chatLimiter, validate(chatSchema), async (req, res) => {
         }
         res.json(response);
 
-    } catch (e) { logger.error({ component: 'Chat', err: e.message }, e.message); res.status(500).json({ error: 'Eroare AI' }); }
+    } catch (e) { logger.error({ component: 'Chat', err: e.message }, e.message); res.status(500).json({ error: 'AI error' }); }
 });
 
 // ═══════════════════════════════════════════════════════════════
@@ -587,7 +587,7 @@ app.post('/api/chat/stream', chatLimiter, validate(chatSchema), async (req, res)
         if (fullReply) incrementUsage(user?.id, 'chat', supabaseAdmin).catch(() => { });
         logger.info({ component: 'Stream', avatar, language, replyLength: fullReply.length }, `${avatar} | ${language} | ${fullReply.length}c`);
 
-    } catch (e) { logger.error({ component: 'Stream', err: e.message }, e.message); if (!res.headersSent) res.status(500).json({ error: 'Eroare stream' }); else res.end(); }
+    } catch (e) { logger.error({ component: 'Stream', err: e.message }, e.message); if (!res.headersSent) res.status(500).json({ error: 'Stream error' }); else res.end(); }
 });
 
 // ═══ SAVE CONVERSATION ═══
@@ -608,7 +608,7 @@ async function saveConv(uid, avatar, userMsg, aiReply, convId, lang) {
 app.post('/api/speak', ttsLimiter, validate(speakSchema), async (req, res) => {
     try {
         const { text, avatar = 'kelion', mood = 'neutral' } = req.body;
-        if (!text || !process.env.ELEVENLABS_API_KEY) return res.status(503).json({ error: 'TTS indisponibil' });
+        if (!text || !process.env.ELEVENLABS_API_KEY) return res.status(503).json({ error: 'TTS unavailable' });
 
         // ── Usage check ──
         const user = await getUserFromToken(req);
@@ -663,7 +663,7 @@ app.post('/api/listen', apiLimiter, validate(listenSchema), async (req, res) => 
 app.post('/api/vision', apiLimiter, validate(visionSchema), async (req, res) => {
     try {
         const { image, avatar = 'kelion', language = 'ro' } = req.body;
-        if (!image || !process.env.ANTHROPIC_API_KEY) return res.status(503).json({ error: 'Vision indisponibil' });
+        if (!image || !process.env.ANTHROPIC_API_KEY) return res.status(503).json({ error: 'Vision unavailable' });
 
         // ── Usage check ──
         const user = await getUserFromToken(req);
@@ -671,12 +671,12 @@ app.post('/api/vision', apiLimiter, validate(visionSchema), async (req, res) => 
         if (!usage.allowed) return res.status(429).json({ error: 'Vision limit reached. Upgrade to Pro for more.', plan: usage.plan, limit: usage.limit, upgrade: true });
 
         const LANGS = { ro: 'română', en: 'English' };
-        const prompt = `Ești OCHII unei persoane. Descrie EXACT ce vezi cu PRECIZIE MAXIMĂ.
-Persoane: vârstă, sex, haine (culori exacte), expresie, gesturi, ce țin în mâini.
-Obiecte: fiecare obiect, culoare, dimensiune, poziție.
-Text: citește ORICE text vizibil.
-Pericole: obstacole, trepte → "ATENȚIE:"
-Răspunde în ${LANGS[language] || 'română'}, concis dar detaliat.`;
+        const prompt = `You are the EYES of a person. Describe EXACTLY what you see with MAXIMUM PRECISION.
+People: age, gender, clothing (exact colors), expression, gestures, what they hold.
+Objects: each object, color, size, position.
+Text: read ANY visible text.
+Hazards: obstacles, steps → "CAUTION:"
+Answer in ${LANGS[language] || 'română'}, concise but detailed.`;
         const r = await fetch('https://api.anthropic.com/v1/messages', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
@@ -791,7 +791,7 @@ app.post('/api/weather', weatherLimiter, validate(weatherSchema), async (req, re
 app.post('/api/imagine', imageLimiter, validate(imagineSchema), async (req, res) => {
     try {
         const { prompt } = req.body;
-        if (!prompt || !process.env.TOGETHER_API_KEY) return res.status(503).json({ error: 'Imagine indisponibil' });
+        if (!prompt || !process.env.TOGETHER_API_KEY) return res.status(503).json({ error: 'Image generation unavailable' });
 
         // ── Usage check ──
         const user = await getUserFromToken(req);
@@ -898,10 +898,10 @@ app.get('/api/admin/health-check', adminAuth, asyncHandler(async (req, res) => {
         stripe_webhook: { label: 'Stripe Webhook', active: !!process.env.STRIPE_WEBHOOK_SECRET },
         monitoring_sentry: { label: 'Error Monitoring Sentry', active: !!process.env.SENTRY_DSN }
     };
-    if (!process.env.STRIPE_WEBHOOK_SECRET) recommendations.push('STRIPE_WEBHOOK_SECRET nu e configurat — webhook-urile nu vor fi validate');
-    if (!process.env.SENTRY_DSN) recommendations.push('SENTRY_DSN lipsește — erorile nu sunt monitorizate');
+    if (!process.env.STRIPE_WEBHOOK_SECRET) recommendations.push('STRIPE_WEBHOOK_SECRET is not configured — webhooks will not be validated');
+    if (!process.env.SENTRY_DSN) recommendations.push('SENTRY_DSN is missing — errors are not monitored');
     if (!process.env.ANTHROPIC_API_KEY && !process.env.OPENAI_API_KEY && !process.env.DEEPSEEK_API_KEY) {
-        recommendations.push('Nicio cheie AI configurată — chat-ul nu va funcționa');
+        recommendations.push('No AI key configured — chat will not work');
     }
 
     // c) Database check
@@ -917,7 +917,7 @@ app.get('/api/admin/health-check', adminAuth, asyncHandler(async (req, res) => {
         database.connected = Object.values(database.tables).some(t => t.ok);
     } else {
         database.error = 'supabaseAdmin client not initialized';
-        recommendations.push('Supabase nu este configurat — baza de date nu funcționează');
+        recommendations.push('Supabase is not configured — database is unavailable');
     }
 
     // d) Brain diagnostics
@@ -933,11 +933,11 @@ app.get('/api/admin/health-check', adminAuth, asyncHandler(async (req, res) => {
         avgLatency: brainDiag.avgLatency,
         journal: (brainDiag.journal || []).slice(-5)
     };
-    if (brainDiag.status === 'degraded') recommendations.push(`Brain engine is degraded — ${degradedTools.join(', ') || 'unele tool-uri'} au erori`);
+    if (brainDiag.status === 'degraded') recommendations.push(`Brain engine is degraded — ${degradedTools.join(', ') || 'some tools'} have errors`);
 
     // e) Auth system check
     const auth = { supabaseInitialized: !!supabase, supabaseAdminInitialized: !!supabaseAdmin, authAvailable: !!supabase };
-    if (!supabase) recommendations.push('Supabase anon client nu e inițializat — autentificarea nu funcționează');
+    if (!supabase) recommendations.push('Supabase anon client is not initialized — authentication is unavailable');
 
     // f) Payments check
     const paymentsCheck = {
@@ -973,7 +973,7 @@ app.get('/api/admin/health-check', adminAuth, asyncHandler(async (req, res) => {
         corsConfigured: true,
         adminSecretConfigured: !!process.env.ADMIN_SECRET_KEY
     };
-    if (!process.env.ADMIN_SECRET_KEY) recommendations.push('ADMIN_SECRET_KEY nu e configurat — dashboard-ul admin nu este protejat');
+    if (!process.env.ADMIN_SECRET_KEY) recommendations.push('ADMIN_SECRET_KEY is not configured — admin dashboard is not protected');
 
     // i) Error summary
     const errors = { recentCount: brainDiag.recentErrors || 0, degradedTools };
