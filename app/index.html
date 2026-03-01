@@ -25,6 +25,7 @@
     <link rel="stylesheet" href="/styles/components.css">
     <link rel="stylesheet" href="/styles/animations.css">
     <link rel="stylesheet" href="/css/app.css">
+    <link rel="stylesheet" href="/styles/mobile.css">
     <style>
         /* ─── Splash Screen Premium ─── */
         .splash {
@@ -169,6 +170,7 @@
                 <li><a href="/developer" data-i18n="nav.developer">Developer</a></li>
             </ul>
             <div class="navbar-right">
+                <button class="ctrl-btn-sm" id="btn-history" title="Conversation history" aria-label="Conversation history" style="background:none;border:none;cursor:pointer;font-size:1.1rem;padding:4px 8px;color:var(--kelion-text-secondary);">📋</button>
                 <button class="btn-primary" id="btn-auth" title="Sign in" style="padding:8px 18px;font-size:0.85rem;">🔑 Login</button>
                 <button class="navbar-hamburger" id="navbar-hamburger" aria-label="Menu">
                     <span></span><span></span><span></span>
@@ -206,8 +208,6 @@
                 <div id="avatar-switcher">
                     <button class="avatar-pill active" data-avatar="kelion">Kelion</button>
                     <button class="avatar-pill" data-avatar="kira">Kira</button>
-                    <button class="ctrl-btn-sm" id="btn-history" title="Conversation history" aria-label="Conversation history">📋</button>
-                    <a href="/developer" class="ctrl-btn-sm" title="Developer API" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center">⚡</a>
                 </div>
             </div>
             <div id="chat-area">
