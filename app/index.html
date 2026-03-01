@@ -161,15 +161,15 @@
                 <div id="status-dot" style="width: 8px; height: 8px; border-radius: 50%; background: #10B981; box-shadow: 0 0 10px rgba(16,185,129,0.5);"></div>
                 <span id="status-text">Online</span>
             </div>
+            <span id="user-name" class="user-badge" style="margin-left:12px;">Guest</span>
             <ul class="navbar-links">
                 <li><a href="/" data-i18n="nav.home">Home</a></li>
                 <li><a href="/#features" data-i18n="nav.features">Features</a></li>
                 <li><a href="/pricing/" data-i18n="nav.pricing">Pricing</a></li>
                 <li><a href="/developer" data-i18n="nav.developer">Developer</a></li>
-                <li><a href="/settings/" data-i18n="nav.settings">Settings</a></li>
             </ul>
             <div class="navbar-right">
-                <button class="btn-primary" id="navbar-get-started" style="padding:8px 18px;font-size:0.85rem;" data-i18n="nav.get_started">Get Started</button>
+                <button class="btn-primary" id="btn-auth" title="Sign in" style="padding:8px 18px;font-size:0.85rem;">🔑 Login</button>
                 <button class="navbar-hamburger" id="navbar-hamburger" aria-label="Menu">
                     <span></span><span></span><span></span>
                 </button>
@@ -182,7 +182,6 @@
             <a href="/#features" data-i18n="nav.features">Features</a>
             <a href="/pricing/" data-i18n="nav.pricing">Pricing</a>
             <a href="/developer" data-i18n="nav.developer">Developer</a>
-            <a href="/settings/" data-i18n="nav.settings">Settings</a>
         </div>
 
         <!-- MAIN CONTENT -->
@@ -208,9 +207,6 @@
                     <button class="avatar-pill active" data-avatar="kelion">Kelion</button>
                     <button class="avatar-pill" data-avatar="kira">Kira</button>
                     <button class="ctrl-btn-sm" id="btn-history" title="Conversation history" aria-label="Conversation history">📋</button>
-                    <span id="user-name" class="user-badge">Guest</span>
-                    <button class="ctrl-btn-sm" id="btn-auth" title="Sign in">🔑</button>
-                    <button class="ctrl-btn-sm" id="btn-pricing" title="Pricing" aria-label="Pricing">💎</button>
                     <a href="/developer" class="ctrl-btn-sm" title="Developer API" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center">⚡</a>
                 </div>
             </div>
@@ -221,14 +217,19 @@
                     <span data-i18n="thinking.text">Thinking...</span>
                 </div>
                 <div id="input-row">
-                    <button id="btn-mic" title="Voice input" aria-label="Voice input">🎤</button>
                     <input type="text" id="text-input" data-i18n-placeholder="input.placeholder" placeholder="Type or speak..." autocomplete="off">
+                    <button id="btn-upload" title="Upload file" aria-label="Upload file">📎</button>
+                    <input type="file" id="file-input-hidden" style="display:none" accept="*/*">
                     <button id="btn-send">➤</button>
                 </div>
             </div>
         </div>
         <div id="display-panel">
-            <div id="display-header"><span id="display-title" data-i18n="monitor.title">Monitor</span></div>
+            <div id="display-header">
+                <span id="display-title" data-i18n="monitor.title">Monitor</span>
+                <button id="btn-monitor-download" title="Download content" style="margin-left:auto;background:none;border:none;color:var(--kelion-text-secondary);cursor:pointer;font-size:1rem;padding:4px 8px;">⬇️</button>
+                <button id="btn-monitor-zip" title="Export as ZIP" style="background:none;border:none;color:var(--kelion-text-secondary);cursor:pointer;font-size:1rem;padding:4px 8px;">🗜️</button>
+            </div>
             <div id="display-content">
                 <div id="monitor-image" style="display:none"></div>
                 <div id="monitor-map" style="display:none"></div>
@@ -279,8 +280,11 @@
     <script src="/js/shared.js"></script>
     <script src="/js/payments-ui.js"></script>
     <script src="/js/ticker.js"></script>
+    <script src="/js/geolocation.js"></script>
     <script src="/js/app.js"></script>
     <script src="/js/navbar.js"></script>
+
+    <a href="/" id="home-btn-fixed" class="home-btn-fixed" title="Home">🏠</a>
 
     <!-- PWA INSTALL BANNER -->
     <div id="pwa-install-banner" class="pwa-banner" style="display:none">

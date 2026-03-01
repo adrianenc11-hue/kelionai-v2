@@ -48,8 +48,8 @@
 
     function updateUI() {
         const n = document.getElementById('user-name'), b = document.getElementById('btn-auth');
-        if (currentUser) { if (n) n.textContent = currentUser.name || currentUser.email; if (b) { b.textContent = '👋'; b.title = 'Logoff'; } }
-        else { if (n) n.textContent = 'Guest'; if (b) { b.textContent = '🔑'; b.title = 'Login'; } }
+        if (currentUser) { if (n) n.textContent = currentUser.name || currentUser.email; if (b) { b.textContent = '👋 Logout'; b.title = 'Logoff'; } }
+        else { if (n) n.textContent = 'Guest'; if (b) { b.textContent = '🔑 Login'; b.title = 'Login'; } }
     }
 
     function initUI() {
