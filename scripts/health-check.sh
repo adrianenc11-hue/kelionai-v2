@@ -1,12 +1,12 @@
 #!/bin/bash
 # ═══════════════════════════════════════════════════════════════
-# KelionAI v2.3 — Verificare stare aplicație (health check)
-# Utilizare: bash scripts/health-check.sh  sau  npm run health
+# KelionAI v2.5 — Application health check
+# Usage: bash scripts/health-check.sh  or  npm run health
 # ═══════════════════════════════════════════════════════════════
 
 set -uo pipefail
 
-# ─── Culori ───────────────────────────────────────────────────
+# ─── Colors ───────────────────────────────────────────────────
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -27,13 +27,13 @@ FAIL=0
 
 echo ""
 echo -e "${BOLD}${CYAN}══════════════════════════════════════════════════${NC}"
-echo -e "${BOLD}${CYAN}   KelionAI v2.3 — Verificare stare aplicație     ${NC}"
+echo -e "${BOLD}${CYAN}   KelionAI v2.5 — Application health check       ${NC}"
 echo -e "${BOLD}${CYAN}══════════════════════════════════════════════════${NC}"
 echo ""
-info "Verificare endpoint-uri pe: $BASE_URL"
+info "Checking endpoints at: $BASE_URL"
 echo ""
 
-# ─── Funcție verificare endpoint ──────────────────────────────
+# ─── Endpoint check function ──────────────────────────────────
 check_endpoint() {
     local method="$1"
     local path="$2"
@@ -53,45 +53,45 @@ check_endpoint() {
         ok "[$http_code] $method $path — $description"
         PASS=$((PASS + 1))
     elif [ "$http_code" = "000" ]; then
-        err "[TIMEOUT/ERR] $method $path — $description (conexiune eșuată)"
+        err "[TIMEOUT/ERR] $method $path — $description (connection failed)"
         FAIL=$((FAIL + 1))
     else
-        err "[$http_code] $method $path — $description (așteptat: $expected_code)"
+        err "[$http_code] $method $path — $description (expected: $expected_code)"
         FAIL=$((FAIL + 1))
     fi
 }
 
-# ─── Verificare endpoint-uri principale ───────────────────────
-echo -e "${BOLD}${BLUE}▶ Endpoint-uri principale${NC}"
+# ─── Main endpoints ───────────────────────────────────────────
+echo -e "${BOLD}${BLUE}▶ Main endpoints${NC}"
 check_endpoint "GET"  "/api/health"         "Health check"
-check_endpoint "GET"  "/api/payments/plans" "Planuri plată"
-check_endpoint "GET"  "/api/legal/terms"    "Termeni și condiții"
-check_endpoint "GET"  "/api/legal/privacy"  "Politica de confidențialitate"
+check_endpoint "GET"  "/api/payments/plans" "Payment plans"
+check_endpoint "GET"  "/api/legal/terms"    "Terms and conditions"
+check_endpoint "GET"  "/api/legal/privacy"  "Privacy policy"
 
 echo ""
-echo -e "${BOLD}${BLUE}▶ Endpoint-uri suplimentare${NC}"
-check_endpoint "GET"  "/"                   "Frontend principal"
-check_endpoint "GET"  "/metrics"            "Metrici Prometheus" "200"
+echo -e "${BOLD}${BLUE}▶ Additional endpoints${NC}"
+check_endpoint "GET"  "/"                   "Main frontend"
+check_endpoint "GET"  "/metrics"            "Prometheus metrics" "200"
 
-# ─── Sumar ────────────────────────────────────────────────────
+# ─── Summary ──────────────────────────────────────────────────
 echo ""
 echo -e "${BOLD}══════════════════════════════════════════════════${NC}"
 TOTAL=$((PASS + FAIL))
 if [ $FAIL -eq 0 ]; then
-    echo -e "${BOLD}${GREEN}   ✅ Toate verificările au trecut ($PASS/$TOTAL)${NC}"
+    echo -e "${BOLD}${GREEN}   ✅ All checks passed ($PASS/$TOTAL)${NC}"
     echo -e "${BOLD}${GREEN}══════════════════════════════════════════════════${NC}"
     echo ""
     exit 0
 else
-    echo -e "${BOLD}${RED}   ❌ $FAIL verificări eșuate din $TOTAL${NC}"
+    echo -e "${BOLD}${RED}   ❌ $FAIL checks failed out of $TOTAL${NC}"
     echo -e "${BOLD}${RED}══════════════════════════════════════════════════${NC}"
     echo ""
     if [ $FAIL -eq $TOTAL ]; then
-        warn "Aplicația nu este accesibilă. Verifică:"
-        echo -e "  • Deploy-ul Railway: ${CYAN}https://railway.app/dashboard${NC}"
-        echo -e "  • Log-urile serverului: ${CYAN}railway logs${NC}"
+        warn "Application is not accessible. Check:"
+        echo -e "  • Railway deploy: ${CYAN}https://railway.app/dashboard${NC}"
+        echo -e "  • Server logs: ${CYAN}railway logs${NC}"
     else
-        warn "Unele endpoint-uri nu funcționează. Verifică log-urile."
+        warn "Some endpoints are not working. Check the logs."
     fi
     echo ""
     exit 1

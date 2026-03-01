@@ -241,15 +241,15 @@ async function run() {
     console.log(`  ✅ OK/SET: ${ok}   ⬜ MISSING: ${missing}   🔴 EXPIRED/INVALID: ${expired}`);
 
     // ═══ NAME MISMATCHES ═══
-    console.log('\n── ⚠️ ATENȚIE: DISCREPANȚE NUME în cod vs lista ta ──');
-    console.log('  Cod: WA_ACCESS_TOKEN      → Lista: WHATSAPP_TOKEN');
-    console.log('  Cod: WA_PHONE_NUMBER_ID   → Lista: WHATSAPP_PHONE_NUMBER_ID');
-    console.log('  Cod: WA_VERIFY_TOKEN      → Lista: WHATSAPP_VERIFY_TOKEN');
-    console.log('  Cod: MESSENGER_PAGE_TOKEN → Lista: MESSENGER_PAGE_TOKEN ✅ match');
-    console.log('  → Trebuie să setezi AMBELE sau să aliniezi unul!\n');
+    console.log('\n── ⚠️ WARNING: NAME MISMATCHES in code vs your list ──');
+    console.log('  Code: WA_ACCESS_TOKEN      → List: WHATSAPP_TOKEN');
+    console.log('  Code: WA_PHONE_NUMBER_ID   → List: WHATSAPP_PHONE_NUMBER_ID');
+    console.log('  Code: WA_VERIFY_TOKEN      → List: WHATSAPP_VERIFY_TOKEN');
+    console.log('  Code: MESSENGER_PAGE_TOKEN → List: MESSENGER_PAGE_TOKEN ✅ match');
+    console.log('  → You need to set BOTH or align them!\n');
 
     if (expired > 0) {
-        console.log('🔴 CHEI EXPIRATE/INVALIDE:');
+        console.log('🔴 EXPIRED/INVALID KEYS:');
         results.filter(r => r.status === 'EXPIRED' || r.status === 'INVALID' || r.status === 'ERROR')
             .forEach(r => console.log(`   → ${r.name}: ${r.detail}`));
     }
