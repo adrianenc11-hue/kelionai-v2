@@ -21,6 +21,40 @@ const GRAPH_API = 'https://graph.facebook.com/v21.0';
 // ═══ STATS ═══
 const stats = { messagesReceived: 0, repliesSent: 0, activeUsers: new Set() };
 
+// ═══ CHARACTER SELECTION (Kelion or Kira) ═══
+const chatCharacter = new Map(); // chatId → 'kelion' | 'kira'
+
+// ═══ CONVERSATION CONTEXT (group awareness) ═══
+const MAX_CONTEXT_MESSAGES = 50;
+const conversationHistory = new Map(); // chatId → [{ from, text, timestamp }]
+
+function addToHistory(chatId, from, text) {
+    if (!conversationHistory.has(chatId)) conversationHistory.set(chatId, []);
+    const history = conversationHistory.get(chatId);
+    history.push({ from, text, timestamp: Date.now() });
+    // Keep only last N messages
+    if (history.length > MAX_CONTEXT_MESSAGES) history.splice(0, history.length - MAX_CONTEXT_MESSAGES);
+}
+
+function getContextSummary(chatId) {
+    const history = conversationHistory.get(chatId) || [];
+    if (history.length === 0) return '';
+    return history.map(h => `${h.from}: ${h.text}`).join('\n');
+}
+
+// ═══ CHECK IF BOT IS ADDRESSED ═══
+function getAddressedCharacter(text) {
+    const t = (text || '').toLowerCase();
+    if (/\bkelion\b/i.test(t)) return 'kelion';
+    if (/\bkira\b/i.test(t)) return 'kira';
+    return null;
+}
+
+function isGroupChat(msg) {
+    // WhatsApp group messages have a group_id in the chat
+    return !!(msg.context && msg.context.group_id) || !!(msg.group_id);
+}
+
 // ═══ RATE LIMITING ═══
 const RATE_LIMIT_MAX = 15;
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
@@ -276,16 +310,57 @@ router.post('/webhook', async (req, res) => {
 
                     if (!userText) continue;
 
-                    // ═══ AI RESPONSE ═══
+                    // ═══ DETERMINE CHAT TYPE & CHARACTER ═══
+                    const isGroup = isGroupChat(msg);
+                    const chatId = isGroup ? (msg.group_id || phone) : phone;
+
+                    // Always store message in conversation history (listening mode)
+                    addToHistory(chatId, contactName || phone, userText);
+
+                    // ═══ CHARACTER SELECTION ═══
+                    // 1:1: user can type "kelion" or "kira" to select character
+                    if (!isGroup && /^(kelion|kira)$/i.test(userText.trim())) {
+                        const char = userText.trim().toLowerCase();
+                        chatCharacter.set(chatId, char);
+                        const name = char === 'kelion' ? 'Kelion' : 'Kira';
+                        await sendTextMessage(phone,
+                            `${char === 'kelion' ? '🤖' : '👩‍💻'} ${name} este acum asistentul tău. Cu ce te pot ajuta?`);
+                        stats.repliesSent++;
+                        continue;
+                    }
+
+                    // ═══ GROUP LOGIC: respond ONLY when name is mentioned ═══
+                    if (isGroup) {
+                        const addressed = getAddressedCharacter(userText);
+                        if (!addressed) {
+                            // Name not mentioned → stay silent, but keep listening (context stored above)
+                            continue;
+                        }
+                        // Set active character for this response
+                        chatCharacter.set(chatId, addressed);
+                    }
+
+                    // Get selected character (default: kelion)
+                    const character = chatCharacter.get(chatId) || 'kelion';
+                    const voiceId = character === 'kira'
+                        ? (process.env.ELEVENLABS_VOICE_KIRA || process.env.ELEVENLABS_VOICE_KELION)
+                        : (process.env.ELEVENLABS_VOICE_KELION || 'pNInz6obpgDQGcFmaJgB');
+
+                    // ═══ AI RESPONSE (with conversation context) ═══
                     let reply;
                     const brain = req.app.locals.brain;
+                    const context = getContextSummary(chatId);
+                    const prompt = context
+                        ? `[Conversation context:\n${context}]\n\nUser: ${userText}`
+                        : userText;
+
                     if (brain) {
                         try {
                             const timeout = new Promise((_, reject) =>
                                 setTimeout(() => reject(new Error('Brain timeout')), 15000)
                             );
                             const result = await Promise.race([
-                                brain.think(userText, 'kelion', [], 'auto'),
+                                brain.think(prompt, character, [], 'auto'),
                                 timeout
                             ]);
                             reply = (result && result.enrichedMessage) || 'Nu am putut procesa mesajul.';
