@@ -64,6 +64,8 @@ jobs:
         if: steps.health-check.outcome == 'success'
         continue-on-error: true
         run: npx playwright install --with-deps chromium && npx playwright test --config=playwright.config.js tests/e2e-full.spec.js --project=chromium
+        env:
+          BASE_URL: ${{ vars.BASE_URL || 'https://kelionai.app' }}
 
       - name: Upload test report
         uses: actions/upload-artifact@v4

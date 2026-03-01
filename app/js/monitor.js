@@ -123,12 +123,6 @@ var MonitorManager = (function () {
             el.innerHTML = '<iframe src="' + safeUrl + '" title="Map"></iframe>';
             showPanel('monitor-map');
             if (window.KAvatar) KAvatar.setPresenting(true);
-        } else if (type === 'html') {
-            var el2 = document.getElementById('monitor-text');
-            if (!el2) return;
-            el2.innerHTML = content;
-            showPanel('monitor-text');
-            if (window.KAvatar) KAvatar.setPresenting(true);
         } else {
             showMarkdown(String(content));
         }

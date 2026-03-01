@@ -4,7 +4,7 @@
 'use strict';
 
 // ─── State ───────────────────────────────────────────────────────
-let authToken = localStorage.getItem('kelion_token') || null;
+let authToken = sessionStorage.getItem('kelion_token') || localStorage.getItem('kelion_token') || null;
 let currentUser = null;
 let pendingRevokeId = null;
 let savedApiKey = localStorage.getItem('dev_api_key') || null;
@@ -34,6 +34,7 @@ async function checkAuth() {
             loadWebhook();
         } else {
             authToken = null;
+            sessionStorage.removeItem('kelion_token');
             localStorage.removeItem('kelion_token');
             showAuthOverlay();
         }
@@ -78,7 +79,10 @@ $('auth-submit-btn').addEventListener('click', async () => {
         const data = await res.json();
         if (!res.ok) { $('auth-err').textContent = data.error || 'Auth failed'; return; }
         authToken = data.session?.access_token;
-        if (authToken) localStorage.setItem('kelion_token', authToken);
+        if (authToken) {
+            sessionStorage.setItem('kelion_token', authToken);
+            localStorage.removeItem('kelion_token');
+        }
         currentUser = data.user;
         hideAuthOverlay();
         renderNavUser();
@@ -92,6 +96,7 @@ $('auth-submit-btn').addEventListener('click', async () => {
 $('nav-logout-btn').addEventListener('click', () => {
     authToken = null;
     currentUser = null;
+    sessionStorage.removeItem('kelion_token');
     localStorage.removeItem('kelion_token');
     $('nav-user').textContent = '';
     $('nav-logout-btn').style.display = 'none';
