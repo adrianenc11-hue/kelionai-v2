@@ -4,7 +4,7 @@
     const API_BASE = window.location.origin;
     let mediaRecorder = null, audioChunks = [], isRecording = false, isSpeaking = false;
     let currentSourceNode = null, sharedAudioCtx = null, detectedLanguage = 'en';
-    let pendingAudioBuffer = null, pendingAudioAvatar = null;
+    let pendingAudioBuffer = null, pendingAudioAvatar = null, pendingAudioText = null;
     let recognition = null, isListeningForWake = false, isProcessing = false;
 
     function getAudioContext() {
@@ -19,11 +19,11 @@
         try { const b = ctx.createBuffer(1,1,22050), s = ctx.createBufferSource(); s.buffer = b; s.connect(ctx.destination); s.start(0); } catch(e){}
         // Replay pending audio if context was suspended and is now running
         if (ctx.state === 'running' && pendingAudioBuffer) {
-            const buf = pendingAudioBuffer, av = pendingAudioAvatar;
-            pendingAudioBuffer = null; pendingAudioAvatar = null;
+            const buf = pendingAudioBuffer, av = pendingAudioAvatar, txt = pendingAudioText;
+            pendingAudioBuffer = null; pendingAudioAvatar = null; pendingAudioText = null;
             const btn = document.getElementById('audio-unlock-btn'); if (btn) btn.remove();
             isSpeaking = true;
-            playAudioBuffer(buf, '');
+            playAudioBuffer(buf, txt);
         }
     }
 
@@ -142,7 +142,7 @@
             // Context still suspended (no user gesture yet) — store buffer and show unlock prompt
             if (ctx.state !== 'running') {
                 isSpeaking = false;
-                showAudioUnlockPrompt(arrayBuf, avatar);
+                showAudioUnlockPrompt(arrayBuf, avatar, ttsText);
                 resumeWakeDetection();
                 return;
             }
@@ -193,9 +193,10 @@
         console.log('[Voice] ✅ Audio playing (' + arrayBuf.byteLength + 'B)');
     }
 
-    function showAudioUnlockPrompt(arrayBuf, avatar) {
+    function showAudioUnlockPrompt(arrayBuf, avatar, text) {
         pendingAudioBuffer = arrayBuf;
         pendingAudioAvatar = avatar;
+        pendingAudioText = text || '';
         let btn = document.getElementById('audio-unlock-btn');
         if (btn) return;
         btn = document.createElement('button');
@@ -204,13 +205,13 @@
         btn.style.cssText = 'position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#1a73e8;color:#fff;border:none;border-radius:24px;padding:12px 24px;cursor:pointer;z-index:9999;font-size:14px;font-weight:600;box-shadow:0 4px 16px rgba(0,0,0,0.4)';
         btn.onclick = async function() {
             btn.remove();
-            const buf = pendingAudioBuffer, av = pendingAudioAvatar;
-            pendingAudioBuffer = null; pendingAudioAvatar = null;
+            const buf = pendingAudioBuffer, av = pendingAudioAvatar, txt = pendingAudioText;
+            pendingAudioBuffer = null; pendingAudioAvatar = null; pendingAudioText = null;
             if (!buf) return;
             isSpeaking = true;
             const ctx = getAudioContext();
             try { await ctx.resume(); } catch(e) {}
-            await playAudioBuffer(buf, '');
+            await playAudioBuffer(buf, txt);
         };
         document.body.appendChild(btn);
         console.log('[Voice] Audio autoplay blocked — showing unlock prompt');
