@@ -85,14 +85,20 @@
     }
 
     function detectLanguage(text) {
+        if (window.i18n && typeof i18n.detectLanguage === 'function') {
+            const lang = i18n.detectLanguage(text);
+            if (lang) {
+                detectedLanguage = lang;
+                if (i18n.getLanguage() !== lang) i18n.setLanguage(lang);
+            }
+            return;
+        }
         const t = text.toLowerCase();
         let lang = null;
         if (/\b(și|sau|este|sunt|pentru|care|cum|unde|vreau|poți)\b/.test(t)) { lang = 'ro'; }
         else if (/\b(the|is|are|what|where|how|can|you|please)\b/.test(t)) { lang = 'en'; }
         if (lang) {
             detectedLanguage = lang;
-            // Sync with i18n module if available and language changed
-            if (window.i18n && i18n.getLanguage() !== lang) i18n.setLanguage(lang);
         }
     }
 

@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS messages (
     role TEXT NOT NULL CHECK (role IN ('user', 'assistant', 'system')),
     content TEXT NOT NULL,
     language TEXT DEFAULT 'ro',
+    source TEXT DEFAULT 'web',
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 

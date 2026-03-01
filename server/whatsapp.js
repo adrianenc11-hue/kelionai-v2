@@ -103,11 +103,28 @@ async function saveKnownUser(phoneNumber, lang, name, supabase) {
 // ═══ AUTO-DETECT LANGUAGE ═══
 function detectLanguage(text) {
     const t = (text || '').toLowerCase();
+    // Script-based detection first (unambiguous)
+    if (/[\u0600-\u06FF]/.test(text)) return 'ar';
+    if (/[\u0590-\u05FF]/.test(text)) return 'he';
+    if (/[\u3040-\u309F\u30A0-\u30FF]/.test(text)) return 'ja';
+    if (/[\u4E00-\u9FFF]/.test(text)) return 'zh';
+    if (/[\uAC00-\uD7AF]/.test(text)) return 'ko';
+    if (/[\u0900-\u097F]/.test(text)) return 'hi';
+    if (/[\u0400-\u04FF]/.test(text)) {
+        if (/\b(я|ти|він|вона|ми|ви|вони|привіт|дякую|так|ні)\b/.test(text)) return 'uk';
+        return 'ru';
+    }
+    // Latin-based detection
     if (/\b(the|is|are|what|how|can|will|do|you|my|hi|hello|help|please)\b/.test(t)) return 'en';
-    if (/\b(der|die|das|ist|und|ich|ein|wie|was|können)\b/.test(t)) return 'de';
-    if (/\b(le|la|les|de|est|et|un|une|je|que|comment|bonjour)\b/.test(t)) return 'fr';
-    if (/\b(el|la|los|es|un|una|que|como|por|hola)\b/.test(t)) return 'es';
-    if (/\b(il|lo|la|di|che|un|una|come|sono|ciao)\b/.test(t)) return 'it';
+    if (/\b(și|sau|este|sunt|pentru|care|cum|unde|vreau|poți|bună|salut|mulțumesc)\b/.test(t)) return 'ro';
+    if (/\b(ich|du|er|sie|wir|ist|sind|mit|für|auf|hallo|danke|bitte|wie|was)\b/.test(t)) return 'de';
+    if (/\b(je|tu|il|elle|nous|est|avec|pour|dans|bonjour|merci|oui|non|comment)\b/.test(t)) return 'fr';
+    if (/\b(yo|tú|él|ella|nosotros|hola|gracias|sí|cómo|para)\b/.test(t)) return 'es';
+    if (/\b(io|tu|lui|lei|noi|ciao|grazie|sì|come|sono)\b/.test(t)) return 'it';
+    if (/\b(eu|tu|ele|ela|nós|olá|obrigado|sim|não|como|para)\b/.test(t)) return 'pt';
+    if (/\b(ik|jij|hij|zij|wij|hallo|dank|ja|nee|hoe)\b/.test(t)) return 'nl';
+    if (/\b(ja|ty|on|ona|my|cześć|dziękuję|tak|nie|jak)\b/.test(t)) return 'pl';
+    if (/\b(ben|sen|bu|için|ile|merhaba|teşekkür|evet|hayır)\b/.test(t)) return 'tr';
     return 'ro';
 }
 
@@ -122,6 +139,57 @@ function isRateLimited(phone) {
     entry.count++;
     return false;
 }
+
+// ═══ ADMIN KEYWORD BLACKLIST ═══
+const ADMIN_KEYWORDS = /\b(admin|administrator|dashboard|panou\s*admin|setări\s*admin|settings\s*admin|admin\s*panel|admin\s*mode|deschide\s*admin)\b/i;
+
+// ═══ GROUP STATE — for smart intervention ═══
+const groupState = new Map(); // chatId -> { lastActivity, unansweredQuestions, lastIntervention }
+const GROUP_INTERVENTION_COOLDOWN = 5 * 60 * 1000;  // 5 minutes
+const GROUP_PAUSE_THRESHOLD = 2 * 60 * 1000;         // 2 minutes
+
+function updateGroupState(chatId, text) {
+    const state = groupState.get(chatId) || { lastActivity: 0, unansweredQuestions: [], lastIntervention: 0 };
+    state.lastActivity = Date.now();
+    // Track unanswered questions (messages ending with ?)
+    if (text && text.trim().endsWith('?')) {
+        state.unansweredQuestions.push({ text, time: Date.now() });
+        if (state.unansweredQuestions.length > 5) state.unansweredQuestions.shift();
+    }
+    groupState.set(chatId, state);
+}
+
+function shouldIntervene(chatId, isDirectlyAddressed) {
+    if (isDirectlyAddressed) return true;
+    const state = groupState.get(chatId);
+    if (!state) return false;
+    // Cooldown: don't intervene more than once per 5 minutes
+    if (state.lastIntervention && Date.now() - state.lastIntervention < GROUP_INTERVENTION_COOLDOWN) return false;
+    // Intervene only if there's been a pause > 2 min and there are unanswered questions
+    if (Date.now() - state.lastActivity > GROUP_PAUSE_THRESHOLD && state.unansweredQuestions.length > 0) {
+        return true;
+    }
+    return false;
+}
+
+function getInterventionPrefix(lang) {
+    const prefixes = {
+        ro: 'Scuzați că intervin, dar cred că pot ajuta cu asta... ',
+        en: 'Sorry to jump in, but I might be able to help with that... ',
+        es: 'Disculpen la interrupción, pero creo que puedo ayudar... ',
+        fr: 'Excusez-moi d\'intervenir, mais je peux peut-être aider... ',
+        de: 'Entschuldigung, dass ich mich einmische, aber ich kann vielleicht helfen... ',
+        it: 'Scusate se mi intrometto, ma credo di poter aiutare... ',
+        pt: 'Desculpem a intromissão, mas talvez eu possa ajudar... ',
+        nl: 'Sorry dat ik me erbij mengt, maar ik kan misschien helpen... ',
+        pl: 'Przepraszam, że się wtrącam, ale może mogę pomóc... ',
+        ru: 'Извините, что вмешиваюсь, но я, возможно, могу помочь... ',
+        ja: '割り込んですみませんが、お手伝いできるかもしれません... ',
+        zh: '打扰一下，我或许可以帮上忙... '
+    };
+    return prefixes[lang] || prefixes.en;
+}
+
 
 // ═══ SEND WHATSAPP TEXT MESSAGE ═══
 async function sendTextMessage(to, text) {
@@ -358,12 +426,18 @@ router.post('/webhook', async (req, res) => {
 
                     if (!userText) continue;
 
+                    // ═══ ADMIN KEYWORD BLACKLIST — total silence for non-owners ═══
+                    if (ADMIN_KEYWORDS.test(userText)) continue;
+
                     // ═══ DETERMINE CHAT TYPE & CHARACTER ═══
                     const isGroup = isGroupChat(msg);
                     const chatId = isGroup ? (msg.group_id || phone) : phone;
 
                     // Always store message in conversation history (listening mode)
                     addToHistory(chatId, contactName || phone, userText);
+
+                    // Update group state for smart intervention
+                    if (isGroup) updateGroupState(chatId, userText);
 
                     // ═══ CHARACTER SELECTION ═══
                     // 1:1: user can type "kelion" or "kira" to select character
@@ -377,15 +451,18 @@ router.post('/webhook', async (req, res) => {
                         continue;
                     }
 
-                    // ═══ GROUP LOGIC: respond ONLY when name is mentioned ═══
+                    // ═══ GROUP LOGIC: respond only when addressed or for polite intervention ═══
                     if (isGroup) {
                         const addressed = getAddressedCharacter(userText);
-                        if (!addressed) {
-                            // Name not mentioned → stay silent, but keep listening (context stored above)
+                        if (!shouldIntervene(chatId, !!addressed)) {
+                            // Not addressed and no polite intervention warranted → stay silent
                             continue;
                         }
                         // Set active character for this response
-                        chatCharacter.set(chatId, addressed);
+                        if (addressed) chatCharacter.set(chatId, addressed);
+                        // Mark intervention time
+                        const gs = groupState.get(chatId);
+                        if (gs) { gs.lastIntervention = Date.now(); gs.unansweredQuestions = []; }
                     }
 
                     // Get selected character (default: kelion)
@@ -398,6 +475,7 @@ router.post('/webhook', async (req, res) => {
                     let reply;
                     const brain = req.app.locals.brain;
                     const context = getContextSummary(chatId);
+                    const detectedLangForPrompt = detectLanguage(userText);
                     const prompt = context
                         ? `[Conversation context:\n${context}]\n\nUser: ${userText}`
                         : userText;
@@ -408,7 +486,7 @@ router.post('/webhook', async (req, res) => {
                                 setTimeout(() => reject(new Error('Brain timeout')), 15000)
                             );
                             const result = await Promise.race([
-                                brain.think(prompt, character, [], 'auto'),
+                                brain.think(prompt, character, [], detectedLangForPrompt || 'auto'),
                                 timeout
                             ]);
                             reply = (result && result.enrichedMessage) || 'Nu am putut procesa mesajul.';
@@ -418,6 +496,12 @@ router.post('/webhook', async (req, res) => {
                         }
                     } else {
                         reply = 'Sunt KelionAI! Pentru experiența completă vizitează https://kelionai.app';
+                    }
+
+                    // Prefix polite intervention phrase for unsolicited group responses
+                    if (isGroup && !getAddressedCharacter(userText)) {
+                        const lang = detectedLangForPrompt || 'en';
+                        reply = getInterventionPrefix(lang) + reply;
                     }
 
                     // Send text response always

@@ -3,12 +3,12 @@
     const API = window.location.origin;
     let currentUser = null;
 
-    function saveSession(s, u) { if (s) { localStorage.setItem('kelion_token', s.access_token); if (s.refresh_token) localStorage.setItem('kelion_refresh_token', s.refresh_token); if (s.expires_at) localStorage.setItem('kelion_token_expires', s.expires_at); } if (u) localStorage.setItem('kelion_user', JSON.stringify(u)); }
-    function loadSession() { const t = localStorage.getItem('kelion_token'), u = localStorage.getItem('kelion_user'); if (t && u) { try { currentUser = JSON.parse(u); } catch(e){} } return { token: t, user: currentUser }; }
-    function clearSession() { localStorage.removeItem('kelion_token'); localStorage.removeItem('kelion_refresh_token'); localStorage.removeItem('kelion_token_expires'); localStorage.removeItem('kelion_user'); currentUser = null; }
-    function getAuthHeaders() { const t = localStorage.getItem('kelion_token'); return t ? { 'Authorization': 'Bearer ' + t } : {}; }
-    function isTokenExpired() { const exp = localStorage.getItem('kelion_token_expires'); if (!exp) return false; return (parseInt(exp) - 60) < (Date.now() / 1000); }
-    async function refreshToken() { const rt = localStorage.getItem('kelion_refresh_token'); if (!rt) { clearSession(); return false; } try { const r = await fetch(API+'/api/auth/refresh', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ refresh_token: rt }) }); if (!r.ok) { clearSession(); return false; } const d = await r.json(); currentUser = d.user; saveSession(d.session, d.user); return true; } catch(e) { return false; } }
+    function saveSession(s, u) { if (s) { sessionStorage.setItem('kelion_token', s.access_token); if (s.refresh_token) sessionStorage.setItem('kelion_refresh_token', s.refresh_token); if (s.expires_at) sessionStorage.setItem('kelion_token_expires', s.expires_at); } if (u) sessionStorage.setItem('kelion_user', JSON.stringify(u)); }
+    function loadSession() { const t = sessionStorage.getItem('kelion_token'), u = sessionStorage.getItem('kelion_user'); if (t && u) { try { currentUser = JSON.parse(u); } catch(e){} } return { token: t, user: currentUser }; }
+    function clearSession() { sessionStorage.removeItem('kelion_token'); sessionStorage.removeItem('kelion_refresh_token'); sessionStorage.removeItem('kelion_token_expires'); sessionStorage.removeItem('kelion_user'); currentUser = null; }
+    function getAuthHeaders() { const t = sessionStorage.getItem('kelion_token'); return t ? { 'Authorization': 'Bearer ' + t } : {}; }
+    function isTokenExpired() { const exp = sessionStorage.getItem('kelion_token_expires'); if (!exp) return false; return (parseInt(exp) - 60) < (Date.now() / 1000); }
+    async function refreshToken() { const rt = sessionStorage.getItem('kelion_refresh_token'); if (!rt) { clearSession(); return false; } try { const r = await fetch(API+'/api/auth/refresh', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ refresh_token: rt }) }); if (!r.ok) { clearSession(); return false; } const d = await r.json(); currentUser = d.user; saveSession(d.session, d.user); return true; } catch(e) { return false; } }
 
     async function register(email, pw, name) {
         const r = await fetch(API+'/api/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password: pw, name }) });
@@ -48,8 +48,8 @@
 
     function updateUI() {
         const n = document.getElementById('user-name'), b = document.getElementById('btn-auth');
-        if (currentUser) { if (n) n.textContent = currentUser.name || currentUser.email; if (b) { b.textContent = '🚪'; b.title = 'Sign Out'; } }
-        else { if (n) n.textContent = 'Guest'; if (b) { b.textContent = '🔑'; b.title = 'Sign In'; } }
+        if (currentUser) { if (n) n.textContent = currentUser.name || currentUser.email; if (b) { b.textContent = '👋'; b.title = 'Logoff'; } }
+        else { if (n) n.textContent = 'Guest'; if (b) { b.textContent = '🔑'; b.title = 'Login'; } }
     }
 
     function initUI() {
@@ -141,7 +141,7 @@
             // Clean URL
             window.history.replaceState({}, '', window.location.pathname);
         }
-        setInterval(async () => { if (localStorage.getItem('kelion_token') && isTokenExpired()) { const ok = await refreshToken(); if (!ok) { updateUI(); document.getElementById('auth-screen')?.classList.remove('hidden'); document.getElementById('app-layout')?.classList.add('hidden'); } } }, 5 * 60 * 1000); }
+        setInterval(async () => { if (sessionStorage.getItem('kelion_token') && isTokenExpired()) { const ok = await refreshToken(); if (!ok) { updateUI(); document.getElementById('auth-screen')?.classList.remove('hidden'); document.getElementById('app-layout')?.classList.add('hidden'); } } }, 5 * 60 * 1000); }
 
     window.KAuth = { init, register, login, logout, checkSession, getAuthHeaders, getUser: () => currentUser, isLoggedIn: () => !!currentUser, forgotPassword, changePassword, changeEmail };
 })();
