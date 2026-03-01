@@ -10,7 +10,7 @@
     window.KShared = {
 
         getToken: function () {
-            try { return localStorage.getItem('kelion_token'); } catch (e) { return null; }
+            try { return sessionStorage.getItem('kelion_token') || localStorage.getItem('kelion_token'); } catch (e) { return null; }
         },
 
         authHeaders: function () {

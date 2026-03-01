@@ -16,7 +16,7 @@ const router = express.Router();
 // ═══ CONFIG ═══
 const PHONE_NUMBER_ID = process.env.WA_PHONE_NUMBER_ID || process.env.WHATSAPP_PHONE_NUMBER_ID;
 const WA_TOKEN = process.env.WA_ACCESS_TOKEN || process.env.WHATSAPP_TOKEN || process.env.WHATSAPP_ACCESS_TOKEN;
-const WA_VERIFY_TOKEN = process.env.WA_VERIFY_TOKEN || process.env.WHATSAPP_VERIFY_TOKEN || 'kelionai_wa_verify_2026';
+const WA_VERIFY_TOKEN = process.env.WA_VERIFY_TOKEN || process.env.WHATSAPP_VERIFY_TOKEN || null;
 const GRAPH_API = 'https://graph.facebook.com/v21.0';
 
 // ═══ STATS ═══
@@ -28,6 +28,9 @@ if (!WA_TOKEN) {
 }
 if (!PHONE_NUMBER_ID) {
     logger.warn({ component: 'WhatsApp' }, 'WhatsApp Phone Number ID not set. Set WA_PHONE_NUMBER_ID — bot will not send messages');
+}
+if (!WA_VERIFY_TOKEN) {
+    logger.warn({ component: 'WhatsApp' }, 'WA_VERIFY_TOKEN not set — webhook verification is DISABLED. Set WA_VERIFY_TOKEN env var to enable it.');
 }
 
 // ═══ CHARACTER SELECTION (Kelion or Kira) ═══
@@ -346,6 +349,10 @@ router.get('/webhook', (req, res) => {
     const mode = req.query['hub.mode'];
     const token = req.query['hub.verify_token'];
     const challenge = req.query['hub.challenge'];
+    if (!WA_VERIFY_TOKEN) {
+        logger.warn({ component: 'WhatsApp' }, 'Webhook verification attempted but WA_VERIFY_TOKEN is not set');
+        return res.sendStatus(403);
+    }
     if (mode === 'subscribe' && token === WA_VERIFY_TOKEN) {
         logger.info({ component: 'WhatsApp' }, 'Webhook verified');
         return res.status(200).send(challenge);

@@ -152,7 +152,8 @@
 
         function setStatus(msg, isError) {
             const el = document.getElementById('status-bar');
-            el.innerHTML = isError ? `<span class="error-msg">${msg}</span>` : `<span>${msg}</span>`;
+            const safe = escHtml(msg);
+            el.innerHTML = isError ? `<span class="error-msg">${safe}</span>` : `<span>${safe}</span>`;
         }
 
         function formatDate(iso) {
