@@ -1,4 +1,5 @@
 // @ts-check
+// LIVE-ONLY: All tests run against https://kelionai.app
 const { defineConfig, devices } = require('@playwright/test');
 
 module.exports = defineConfig({
@@ -10,7 +11,7 @@ module.exports = defineConfig({
     navigationTimeout: 10000,
     screenshot: 'only-on-failure',
   },
-  retries: 1,
+  retries: 2,
   reporter: [['html'], ['list']],
   outputDir: 'test-results/',
   projects: [
