@@ -23,7 +23,7 @@
             pendingAudioBuffer = null; pendingAudioAvatar = null;
             const btn = document.getElementById('audio-unlock-btn'); if (btn) btn.remove();
             isSpeaking = true;
-            playAudioBuffer(buf);
+            playAudioBuffer(buf, '');
         }
     }
 
@@ -147,15 +147,15 @@
                 return;
             }
 
-            await playAudioBuffer(arrayBuf);
+            await playAudioBuffer(arrayBuf, ttsText);
         } catch(e) { console.error('[Voice]', e); stopAllLipSync(); isSpeaking = false; resumeWakeDetection(); }
     }
 
-    async function playAudioBuffer(arrayBuf) {
+    async function playAudioBuffer(arrayBuf, fallbackText) {
         const ctx = getAudioContext();
         let audioBuf;
         try { audioBuf = await ctx.decodeAudioData(arrayBuf.slice(0)); }
-        catch(e) { fallbackTextLipSync(''); isSpeaking = false; resumeWakeDetection(); return; }
+        catch(e) { fallbackTextLipSync(fallbackText || ''); isSpeaking = false; resumeWakeDetection(); return; }
 
         currentSourceNode = ctx.createBufferSource();
         currentSourceNode.buffer = audioBuf;
@@ -169,9 +169,25 @@
                 if (an) { currentSourceNode.connect(an); an.connect(ctx.destination); fftOk = true; ls.start(); }
             } catch(e){}
         }
-        if (!fftOk) { currentSourceNode.connect(ctx.destination); fallbackTextLipSync(''); }
+        if (!fftOk) { currentSourceNode.connect(ctx.destination); fallbackTextLipSync(fallbackText || ''); }
 
         KAvatar.setExpression('happy', 0.3);
+
+        // Auto-gestures during speech
+        if (fallbackText) {
+            var gt = fallbackText.toLowerCase();
+            setTimeout(function() { if (window.KAvatar) KAvatar.playGesture('nod'); }, 500);
+            if (gt.includes('?')) setTimeout(function() { if (window.KAvatar) KAvatar.playGesture('tilt'); }, 2000);
+            if (gt.includes('!')) setTimeout(function() { if (window.KAvatar) KAvatar.playGesture('nod'); }, 1500);
+            if (gt.length > 200) {
+                setTimeout(function() { if (window.KAvatar) KAvatar.playGesture('lookAway'); }, 3000);
+                setTimeout(function() { if (window.KAvatar) KAvatar.playGesture('nod'); }, 5000);
+            }
+            if (/\b(nu|no|nein|non|niet|imposibil|impossible|unfortunately|din păcate)\b/i.test(gt)) {
+                setTimeout(function() { if (window.KAvatar) KAvatar.playGesture('shake'); }, 1000);
+            }
+        }
+
         currentSourceNode.onended = () => { stopAllLipSync(); isSpeaking = false; currentSourceNode = null; KAvatar.setExpression('neutral'); resumeWakeDetection(); };
         currentSourceNode.start(0);
         console.log('[Voice] ✅ Audio playing (' + arrayBuf.byteLength + 'B)');
@@ -194,7 +210,7 @@
             isSpeaking = true;
             const ctx = getAudioContext();
             try { await ctx.resume(); } catch(e) {}
-            await playAudioBuffer(buf);
+            await playAudioBuffer(buf, '');
         };
         document.body.appendChild(btn);
         console.log('[Voice] Audio autoplay blocked — showing unlock prompt');

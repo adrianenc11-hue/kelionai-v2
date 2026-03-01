@@ -313,10 +313,12 @@ async function transcribeAudio(audioBuffer, mimeType) {
 }
 
 // ═══ TEXT-TO-SPEECH (ElevenLabs) ═══
-async function generateSpeech(text, lang) {
+async function generateSpeech(text, lang, character) {
     const apiKey = process.env.ELEVENLABS_API_KEY;
     if (!apiKey) return null;
-    const voiceId = process.env.ELEVENLABS_VOICE_KELION || 'pNInz6obpgDQGcFmaJgB';
+    const voiceId = character === 'kira'
+        ? (process.env.ELEVENLABS_VOICE_KIRA || 'EXAVITQu4vr4xnSDxMaL')
+        : (process.env.ELEVENLABS_VOICE_KELION || 'VR6AewLTigWG4xSOukaG');
 
     const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
         method: 'POST',
@@ -418,8 +420,47 @@ router.post('/webhook', async (req, res) => {
                             userText = '[Video processing error]';
                         }
                     } else if (msgType === 'image') {
-                        // Image with caption or analysis
-                        userText = msg.image.caption || 'Describe this image';
+                        // Image → download and analyze with GPT-4o Vision
+                        try {
+                            const imageBuffer = await downloadMedia(msg.image.id);
+                            if (imageBuffer) {
+                                const caption = msg.image.caption || '';
+                                const b64 = imageBuffer.toString('base64');
+                                const mimeType = msg.image.mime_type || 'image/jpeg';
+                                const openaiKey = process.env.OPENAI_API_KEY;
+                                if (openaiKey) {
+                                    const visionRes = await fetch('https://api.openai.com/v1/chat/completions', {
+                                        method: 'POST',
+                                        headers: { 'Authorization': `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({
+                                            model: 'gpt-4o',
+                                            messages: [{
+                                                role: 'user',
+                                                content: [
+                                                    { type: 'image_url', image_url: { url: `data:${mimeType};base64,${b64}` } },
+                                                    { type: 'text', text: caption || 'Describe this image in detail.' }
+                                                ]
+                                            }],
+                                            max_tokens: 500
+                                        })
+                                    });
+                                    if (visionRes.ok) {
+                                        const visionData = await visionRes.json();
+                                        const description = visionData.choices && visionData.choices[0] && visionData.choices[0].message && visionData.choices[0].message.content;
+                                        userText = caption ? `${caption}\n[Image description: ${description}]` : `[Image: ${description}]`;
+                                    } else {
+                                        userText = caption || 'Describe this image';
+                                    }
+                                } else {
+                                    userText = caption || 'Describe this image';
+                                }
+                            } else {
+                                userText = msg.image.caption || 'Describe this image';
+                            }
+                        } catch (e) {
+                            logger.error({ component: 'WhatsApp', err: e.message }, 'Image analysis failed');
+                            userText = msg.image.caption || 'Describe this image';
+                        }
                     } else {
                         continue; // Skip unsupported types
                     }
@@ -511,7 +552,7 @@ router.post('/webhook', async (req, res) => {
                     // If voice message → also send audio response
                     if (respondWithAudio) {
                         try {
-                            const speechBuffer = await generateSpeech(reply);
+                            const speechBuffer = await generateSpeech(reply, detectedLangForPrompt, character);
                             if (speechBuffer) {
                                 const mediaId = await uploadMedia(speechBuffer, 'audio/ogg');
                                 if (mediaId) {
