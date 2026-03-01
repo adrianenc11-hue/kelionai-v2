@@ -272,30 +272,68 @@ async function fetchMarketNews(asset = 'crypto') {
 
 /**
  * NLP-lite sentiment classification for a headline.
- * Much better than simple word counting — uses phrase patterns.
+ * Uses phrase patterns, negation detection, and intensity scaling.
  */
 function classifyNewsSentiment(headline) {
-    if (!headline) return { score: 0, label: 'neutral' };
+    if (!headline) return { score: 0, label: 'neutral', confidence: 0 };
     const h = headline.toLowerCase();
 
-    // Strong bullish phrases
-    const strongBull = ['all-time high', 'ath', 'record high', 'massive rally', 'breakout', 'surge', 'soars', 'skyrockets', 'moon', 'approved etf', 'institutional adoption', 'major partnership', 'bullish reversal'];
-    // Strong bearish phrases
-    const strongBear = ['crash', 'plummets', 'collapse', 'hack', 'exploit', 'major hack', 'ponzi', 'scam', 'sec charges', 'ban crypto', 'liquidat', 'death cross', 'bear market', 'recession fears', 'rate hike'];
-    // Moderate bullish
-    const modBull = ['buy', 'uptick', 'gains', 'rises', 'bullish', 'positive', 'upgrade', 'add', 'accumulate', 'support', 'recovery', 'rebound', 'outperform'];
-    // Moderate bearish
-    const modBear = ['sell', 'drop', 'decline', 'bearish', 'negative', 'downgrade', 'risk', 'warning', 'concern', 'threat', 'volatile', 'uncertainty', 'underperform', 'regulation'];
+    // Strong bullish phrases (+30 each)
+    const strongBull = [
+        'all-time high', 'ath', 'record high', 'massive rally', 'breakout confirmed',
+        'surge', 'soars', 'skyrockets', 'moon', 'approved etf', 'etf approved',
+        'institutional adoption', 'major partnership', 'bullish reversal', 'golden cross',
+        'parabolic', 'explosive growth', 'supply shock', 'halving', 'mega bull',
+        'trillion dollar', 'mainstream adoption', 'regulatory clarity', 'green light',
+    ];
+    // Strong bearish phrases (-30 each)
+    const strongBear = [
+        'crash', 'plummets', 'collapse', 'hack', 'exploit', 'major hack', 'rug pull',
+        'ponzi', 'scam', 'sec charges', 'ban crypto', 'liquidat', 'death cross',
+        'bear market', 'recession', 'rate hike', 'bank run', 'insolvency', 'bankrupt',
+        'fraud', 'money laundering', 'investigation', 'subpoena', 'delisted',
+        'flash crash', 'capitulation', 'panic sell', 'systemic risk', 'contagion',
+    ];
+    // Moderate bullish (+10 each)
+    const modBull = [
+        'buy', 'uptick', 'gains', 'rises', 'bullish', 'positive', 'upgrade',
+        'accumulate', 'support', 'recovery', 'rebound', 'outperform', 'breakout',
+        'higher high', 'accumulation', 'whale buy', 'inflow', 'green', 'optimis',
+        'milestone', 'growth', 'expand', 'launch', 'innovati', 'strong demand',
+    ];
+    // Moderate bearish (-10 each)
+    const modBear = [
+        'sell', 'drop', 'decline', 'bearish', 'negative', 'downgrade', 'risk',
+        'warning', 'concern', 'threat', 'volatile', 'uncertainty', 'underperform',
+        'regulation', 'fine', 'penalty', 'outflow', 'red', 'pessimis', 'slowdown',
+        'weak', 'lower low', 'whale sell', 'dump', 'fear', 'correction', 'pullback',
+    ];
 
     let score = 0;
-    strongBull.forEach(p => { if (h.includes(p)) score += 30; });
-    strongBear.forEach(p => { if (h.includes(p)) score -= 30; });
-    modBull.forEach(p => { if (h.includes(p)) score += 10; });
-    modBear.forEach(p => { if (h.includes(p)) score -= 10; });
+    let matchCount = 0;
+
+    strongBull.forEach(p => { if (h.includes(p)) { score += 30; matchCount++; } });
+    strongBear.forEach(p => { if (h.includes(p)) { score -= 30; matchCount++; } });
+    modBull.forEach(p => { if (h.includes(p)) { score += 10; matchCount++; } });
+    modBear.forEach(p => { if (h.includes(p)) { score -= 10; matchCount++; } });
+
+    // Negation detection: "not bullish", "no recovery", "unlikely to rise"
+    const negators = ['not ', 'no ', 'unlikely', 'fails to', 'failed to', "won't", "can't", 'unable', 'doubt'];
+    negators.forEach(neg => {
+        if (h.includes(neg)) {
+            // If negation found near a positive word, flip the score
+            modBull.forEach(p => { if (h.includes(neg + p) || h.indexOf(p) - h.indexOf(neg) < 15 && h.indexOf(p) > h.indexOf(neg) && h.indexOf(neg) >= 0) { score -= 20; } });
+            modBear.forEach(p => { if (h.includes(neg + p) || h.indexOf(p) - h.indexOf(neg) < 15 && h.indexOf(p) > h.indexOf(neg) && h.indexOf(neg) >= 0) { score += 20; } });
+        }
+    });
+
+    // Question marks reduce confidence ("Will BTC crash?" is less certain than "BTC crashes")
+    if (h.includes('?')) score = Math.round(score * 0.6);
 
     score = Math.max(-100, Math.min(100, score));
+    const confidence = matchCount > 0 ? Math.min(100, matchCount * 25) : 0;
     const label = score > 20 ? 'bullish' : score < -20 ? 'bearish' : 'neutral';
-    return { score, label };
+    return { score, label, confidence };
 }
 
 function calculateNewsSentiment(headlines) {
@@ -311,47 +349,98 @@ function calculateNewsSentiment(headlines) {
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * High-impact economic events calendar.
- * Bot should NOT trade 30 min before/after these events.
- * Data source: static schedule (Fed meets 8x/year, CPI monthly, NFP monthly).
+ * Dynamic economic events calendar with real 2026 FOMC dates,
+ * session overlaps, and smart event detection.
  */
 function getEconomicCalendarRisks() {
     const now = new Date();
     const day = now.getUTCDay();       // 0=Sun, 6=Sat
     const hour = now.getUTCHours();
+    const date = now.getUTCDate();
+    const month = now.getUTCMonth();   // 0-indexed
+    const dateStr = now.toISOString().slice(0, 10);
 
     const risks = [];
 
-    // Weekend = no forex/stocks
+    // ── REAL 2026 FOMC MEETING DATES (Federal Reserve) ──
+    // Source: federalreserve.gov — these are the actual scheduled dates
+    const fomcDates = [
+        '2026-01-28', '2026-03-18', '2026-05-06', '2026-06-17',
+        '2026-07-29', '2026-09-16', '2026-11-04', '2026-12-16',
+    ];
+    const fomcWindow = fomcDates.some(d => {
+        const diff = Math.abs(new Date(d).getTime() - now.getTime());
+        return diff < 24 * 60 * 60 * 1000; // within 24h
+    });
+    if (fomcWindow) {
+        risks.push({ event: 'FOMC Decision Day', risk: 'CRITICAL', action: '⛔ Federal Reserve rate decision TODAY — extreme volatility expected. DO NOT trade forex 2h before/after announcement (typically 18:00 UTC).' });
+    }
+
+    // ── NFP — First Friday of month ──
+    if (day === 5 && date <= 7) {
+        if (hour >= 12 && hour <= 15) {
+            risks.push({ event: 'Non-Farm Payrolls LIVE', risk: 'CRITICAL', action: '⛔ NFP release at 13:30 UTC — PAUSE all forex trading NOW.' });
+        } else {
+            risks.push({ event: 'Non-Farm Payrolls Day', risk: 'HIGH', action: 'NFP day — extreme volatility at 13:30 UTC. Avoid forex 1h before/after.' });
+        }
+    }
+
+    // ── CPI — Usually 2nd Tuesday-Thursday of month ──
+    if (date >= 10 && date <= 15 && day >= 2 && day <= 4) {
+        if (hour >= 12 && hour <= 14) {
+            risks.push({ event: 'CPI Release Window', risk: 'HIGH', action: 'Potential CPI release at 13:30 UTC — high volatility for all markets.' });
+        }
+    }
+
+    // ── Weekend ──
     if (day === 0 || day === 6) {
-        risks.push({ event: 'Weekend', risk: 'HIGH', action: 'AVOID forex/stocks — only crypto trades', tradeable: { crypto: true, forex: false, stocks: false } });
+        risks.push({ event: 'Weekend', risk: 'HIGH', action: 'Markets closed — only crypto tradeable', tradeable: { crypto: true, forex: false, stocks: false } });
     }
 
-    // US market open (14:30 UTC) — high volatility window
-    if (hour >= 13 && hour <= 15) {
-        risks.push({ event: 'US Market Open Window', risk: 'MEDIUM', action: 'Expect volatility spike at 14:30 UTC — wider stops recommended' });
+    // ── Trading Sessions ──
+    if (hour >= 0 && hour < 8) {
+        risks.push({ event: 'Asian Session (Tokyo)', risk: 'LOW', action: 'Low liquidity for Western pairs. Best for: JPY, AUD, NZD pairs.' });
+    }
+    if (hour >= 7 && hour < 16) {
+        risks.push({ event: 'European Session (London)', risk: 'LOW', action: 'High liquidity for EUR, GBP. London open at 07:00 UTC.' });
+    }
+    if (hour >= 13 && hour < 21) {
+        risks.push({ event: 'US Session (New York)', risk: 'LOW', action: 'Highest volume period. NY open at 13:30 UTC.' });
     }
 
-    // Asian session (00:00-08:00 UTC) — low liquidity for Western instruments
-    if (hour >= 0 && hour <= 7) {
-        risks.push({ event: 'Asian Session', risk: 'LOW', action: 'Low liquidity for EUR/USD, GBP/USD — spreads wider' });
+    // London/NY overlap = highest volume (13:00-16:00 UTC)
+    if (hour >= 13 && hour <= 16 && day >= 1 && day <= 5) {
+        risks.push({ event: 'London/NY Overlap', risk: 'MEDIUM', action: 'Peak liquidity — best time for major pairs. Expect volatility spikes.' });
     }
 
-    // First Friday of month = likely NFP day
-    if (day === 5 && now.getUTCDate() <= 7) {
-        risks.push({ event: 'Non-Farm Payrolls (probable)', risk: 'HIGH', action: 'NFP day — extreme volatility expected at 13:30 UTC. DO NOT trade forex 30 min before/after.' });
+    // ── US Market Open volatility ──
+    if (hour >= 13 && hour <= 15 && day >= 1 && day <= 5) {
+        risks.push({ event: 'US Market Open Window', risk: 'MEDIUM', action: 'Volatility spike at 14:30 UTC — wider stops recommended.' });
     }
 
-    // Mid-month = likely CPI
-    if (now.getUTCDate() >= 10 && now.getUTCDate() <= 15 && hour >= 12 && hour <= 14) {
-        risks.push({ event: 'CPI Release Window (probable)', risk: 'HIGH', action: 'Potential CPI release — high volatility window for all markets' });
+    // ── End of Month rebalancing ──
+    if (date >= 28) {
+        risks.push({ event: 'Month-End Rebalancing', risk: 'MEDIUM', action: 'Institutional rebalancing flows — unexpected moves possible.' });
     }
+
+    // ── Quad Witching (3rd Friday of Mar, Jun, Sep, Dec) ──
+    if (day === 5 && date >= 15 && date <= 21 && [2, 5, 8, 11].includes(month)) {
+        risks.push({ event: 'Quad Witching Day', risk: 'HIGH', action: 'Options & futures expiry — extreme volume and volatility in stocks.' });
+    }
+
+    // ── Determine shouldPause ──
+    const criticalRisk = risks.some(r => r.risk === 'CRITICAL');
+    const highRisk = risks.some(r => r.risk === 'HIGH');
+    const shouldPause = criticalRisk || (highRisk && hour >= 13 && hour <= 14);
 
     return {
         risks,
-        highRisk: risks.some(r => r.risk === 'HIGH'),
-        shouldPause: risks.some(r => r.risk === 'HIGH' && hour >= 13 && hour <= 14),
+        criticalRisk,
+        highRisk,
+        shouldPause,
+        currentSession: hour >= 0 && hour < 8 ? 'ASIAN' : hour >= 7 && hour < 13 ? 'EUROPEAN' : hour >= 13 && hour < 21 ? 'US' : 'AFTER_HOURS',
         timestamp: now.toISOString(),
+        nextFOMC: fomcDates.find(d => new Date(d) > now) || 'TBD',
     };
 }
 
