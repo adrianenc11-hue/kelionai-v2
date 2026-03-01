@@ -26,7 +26,50 @@ const senderRateLimits = new Map(); // senderId → { count, resetAt }
 // ═══ USER MESSAGE COUNTER (for site recommendations) ═══
 const senderMessageCount = new Map();
 const FREE_MESSAGES_LIMIT = 10;
-const RECOMMEND_SITE_AFTER = 3;
+
+// ═══ KNOWN USERS (persisted in Supabase) ═══
+const knownSenders = new Map(); // senderId → { lang, firstSeen }
+
+async function getKnownSender(senderId, supabase) {
+    // Check memory first
+    if (knownSenders.has(senderId)) return knownSenders.get(senderId);
+    // Check Supabase
+    if (supabase) {
+        try {
+            const { data } = await supabase.from('messenger_users').select('*').eq('sender_id', senderId).single();
+            if (data) {
+                knownSenders.set(senderId, { lang: data.language, firstSeen: data.first_seen });
+                return knownSenders.get(senderId);
+            }
+        } catch (e) { /* table may not exist yet */ }
+    }
+    return null;
+}
+
+async function saveKnownSender(senderId, lang, name, supabase) {
+    knownSenders.set(senderId, { lang, name, firstSeen: new Date().toISOString() });
+    if (supabase) {
+        try {
+            await supabase.from('messenger_users').upsert({
+                sender_id: senderId, language: lang, name: name || null, first_seen: new Date().toISOString(), last_seen: new Date().toISOString()
+            }, { onConflict: 'sender_id' });
+        } catch (e) { /* table may not exist yet - works in-memory */ }
+    }
+}
+
+// ═══ GET USER NAME FROM FACEBOOK ═══
+async function getUserName(senderId) {
+    const token = process.env.FB_PAGE_ACCESS_TOKEN;
+    if (!token) return null;
+    try {
+        const res = await fetch(`https://graph.facebook.com/v21.0/${senderId}?fields=first_name&access_token=${token}`);
+        if (res.ok) {
+            const data = await res.json();
+            return data.first_name || null;
+        }
+    } catch (e) { /* ignore */ }
+    return null;
+}
 
 function isRateLimited(senderId) {
     const now = Date.now();
@@ -184,14 +227,41 @@ router.post('/webhook', async (req, res) => {
                 const msgCount = (senderMessageCount.get(senderId) || 0) + 1;
                 senderMessageCount.set(senderId, msgCount);
 
-                // ═══ MULTILINGUAL HINT (only if first message is just a greeting) ═══
-                if (msgCount === 1) {
+                // ═══ FIRST-EVER CONTACT? Check Supabase ═══
+                const supabase = req.app.locals.supabaseAdmin || req.app.locals.supabase;
+                const known = await getKnownSender(senderId, supabase);
+
+                if (!known) {
+                    // New user — get name, save, detect language
+                    const userName = await getUserName(senderId);
+                    const detectedLang = detectLanguage(text);
+                    await saveKnownSender(senderId, detectedLang, userName, supabase);
+
+                    // If first message is just a greeting, hint about multilingual support
                     const isJustGreeting = /^(h(ello|i|ey)|salut|bun[aă]|ciao|hola|bonjour|hallo|ola)[!?.,\s]*$/i.test(text.trim());
                     if (isJustGreeting) {
                         setTimeout(async () => {
                             await sendMessage(senderId,
                                 'We can provide support in any language you wish. Feel free to speak in your language. 🌍');
                         }, 1500);
+                    }
+                } else {
+                    // Returning user — greet by name in their language
+                    if (msgCount === 1) {
+                        const greetings = {
+                            ro: `Bine ai revenit, ${known.name || 'prietene'}! 😊`,
+                            en: `Welcome back, ${known.name || 'friend'}! 😊`,
+                            de: `Willkommen zurück, ${known.name || 'Freund'}! 😊`,
+                            fr: `Bon retour, ${known.name || 'ami'}! 😊`,
+                            es: `Bienvenido de nuevo, ${known.name || 'amigo'}! 😊`,
+                            it: `Bentornato, ${known.name || 'amico'}! 😊`
+                        };
+                        await sendMessage(senderId, greetings[known.lang] || greetings.en);
+                    }
+                    // Update language if changed
+                    const newLang = detectLanguage(text);
+                    if (newLang !== known.lang) {
+                        await saveKnownSender(senderId, newLang, known.name, supabase);
                     }
                 }
 
