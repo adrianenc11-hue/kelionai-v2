@@ -164,7 +164,7 @@ router.post('/webhook', async (req, res) => {
                             setTimeout(() => reject(new Error('Brain timeout')), 10000)
                         );
                         const result = await Promise.race([
-                            brain.think(text, 'kelion', [], detectLanguage(text)),
+                            brain.think(text, 'kelion', [], 'auto'),
                             timeout
                         ]);
                         reply = (result && result.enrichedMessage) || faqReply(text);
@@ -186,16 +186,7 @@ router.post('/webhook', async (req, res) => {
 
                 // Welcome tagline on FIRST message only (in detected language)
                 if (msgCount === 1) {
-                    const lang = detectLanguage(text);
-                    const taglines = {
-                        ro: '🌍 KelionAI — Suport în orice limbă',
-                        en: '🌍 KelionAI — Support in any language',
-                        de: '🌍 KelionAI — Hilfe in jeder Sprache',
-                        fr: '🌍 KelionAI — Aide dans toutes les langues',
-                        es: '🌍 KelionAI — Soporte en cualquier idioma',
-                        it: '🌍 KelionAI — Supporto in qualsiasi lingua'
-                    };
-                    await sendMessage(senderId, taglines[lang] || taglines.en);
+                    await sendMessage(senderId, '🌍 KelionAI — Support in any language | kelionai.app');
                 }
 
                 // Subscription + site prompt ONLY at free limit (end of free period)
