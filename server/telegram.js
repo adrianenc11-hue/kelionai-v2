@@ -295,32 +295,16 @@ router.post('/webhook', async (req, res) => {
 
         await sendMessage(chatId, escapeHtml(reply), { parseMode: undefined }); // Plain text for AI responses
 
-        // ═══ SITE RECOMMENDATION (after 3rd message) ═══
-        if (msgCount === RECOMMEND_SITE_AFTER) {
-            setTimeout(async () => {
-                await sendMessage(chatId,
-                    `💡 <b>Știai că poți folosi KelionAI cu avatar 3D?</b>\n\n` +
-                    `🎭 Kelion și Kira te așteaptă pe site — voce naturală, căutare web, generare imagini și multe altele!\n\n` +
-                    `🌐 Încearcă gratuit: https://kelionai.app`, {
-                    replyMarkup: {
-                        inline_keyboard: [[
-                            { text: '🚀 Deschide KelionAI', url: 'https://kelionai.app' }
-                        ]]
-                    }
-                });
-            }, 2000); // 2s delay to feel natural
-        }
-
-        // ═══ FREE LIMIT RECOMMENDATION ═══
+        // ═══ FREE LIMIT — promo ONLY at end of free period ═══
         if (msgCount === FREE_MESSAGES_LIMIT) {
             setTimeout(async () => {
                 await sendMessage(chatId,
                     `⭐ <b>Ai folosit ${FREE_MESSAGES_LIMIT} mesaje gratuite azi!</b>\n\n` +
-                    `Pentru conversații nelimitate + funcții premium:\n` +
+                    `Continuă cu funcții premium pe kelionai.app:\n` +
                     `• 💬 Chat nelimitat cu AI\n` +
+                    `• 🎭 Avatare 3D — Kelion & Kira\n` +
                     `• 🔊 Voce naturală\n` +
-                    `• 🖼️ Generare imagini\n` +
-                    `• 📊 Căutare web avansată\n\n` +
+                    `• 🖼️ Generare imagini\n\n` +
                     `🌐 Abonează-te: https://kelionai.app/pricing`, {
                     replyMarkup: {
                         inline_keyboard: [[
