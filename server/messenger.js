@@ -40,6 +40,17 @@ function isRateLimited(senderId) {
     return false;
 }
 
+// ═══ AUTO-DETECT LANGUAGE ═══
+function detectLanguage(text) {
+    const t = (text || '').toLowerCase();
+    if (/\b(the|is|are|what|how|can|will|do|you|my|hi|hello|help|please)\b/.test(t)) return 'en';
+    if (/\b(der|die|das|ist|und|ich|ein|wie|was|können)\b/.test(t)) return 'de';
+    if (/\b(le|la|les|de|est|et|un|une|je|que|comment|bonjour)\b/.test(t)) return 'fr';
+    if (/\b(el|la|los|es|un|una|que|como|por|hola)\b/.test(t)) return 'es';
+    if (/\b(il|lo|la|di|che|un|una|come|sono|ciao)\b/.test(t)) return 'it';
+    return 'ro'; // default Romanian
+}
+
 // ═══ FAQ FALLBACK ═══
 function faqReply(text) {
     const t = (text || '').toLowerCase();
@@ -153,7 +164,7 @@ router.post('/webhook', async (req, res) => {
                             setTimeout(() => reject(new Error('Brain timeout')), 10000)
                         );
                         const result = await Promise.race([
-                            brain.think(text, 'kelion', [], 'ro'),
+                            brain.think(text, 'kelion', [], detectLanguage(text)),
                             timeout
                         ]);
                         reply = (result && result.enrichedMessage) || faqReply(text);
