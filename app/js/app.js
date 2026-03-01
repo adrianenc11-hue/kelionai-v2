@@ -61,7 +61,8 @@
                     avatar: KAvatar.getCurrentAvatar(),
                     history: chatHistory.slice(-20),
                     language: language || (window.i18n ? i18n.getLanguage() : 'en'),
-                    conversationId: currentConversationId
+                    conversationId: currentConversationId,
+                    geo: window.KGeo ? KGeo.getCached() : null
                 })
             });
 
@@ -167,7 +168,8 @@
                     avatar: KAvatar.getCurrentAvatar(),
                     history: chatHistory.slice(-20),
                     language: language || (window.i18n ? i18n.getLanguage() : 'en'),
-                    conversationId: currentConversationId
+                    conversationId: currentConversationId,
+                    geo: window.KGeo ? KGeo.getCached() : null
                 })
             });
 
@@ -229,7 +231,6 @@
         }
         if (useStreaming) await sendToAI_Stream(msg, language);
         else await sendToAI_Regular(msg, language);
-        if (window.KPayments) KPayments.showUsageBar();
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -462,15 +463,6 @@
         document.getElementById('btn-send').addEventListener('click', onSendText);
         document.getElementById('text-input').addEventListener('keydown', function(e) { if (e.key === 'Enter') onSendText(); });
 
-        // Mic button — hold to record, release to send
-        var micBtn = document.getElementById('btn-mic');
-        if (micBtn && window.KVoice) {
-            micBtn.addEventListener('mousedown', async function() { micBtn.classList.add('recording'); await KVoice.startListening(); });
-            micBtn.addEventListener('mouseup', async function() { micBtn.classList.remove('recording'); var text = await KVoice.stopListening(); if (text) { hideWelcome(); addMessage('user', text); showThinking(true); await sendToAI(text, window.i18n ? i18n.getLanguage() : 'en'); } });
-            micBtn.addEventListener('touchstart', async function(e) { e.preventDefault(); micBtn.classList.add('recording'); await KVoice.startListening(); }, { passive: false });
-            micBtn.addEventListener('touchend', async function(e) { e.preventDefault(); micBtn.classList.remove('recording'); var text = await KVoice.stopListening(); if (text) { hideWelcome(); addMessage('user', text); showThinking(true); await sendToAI(text, window.i18n ? i18n.getLanguage() : 'en'); } }, { passive: false });
-        }
-
         document.querySelectorAll('.avatar-pill').forEach(function(b) { b.addEventListener('click', function() { switchAvatar(b.dataset.avatar); }); });
 
         // History buttons
@@ -481,13 +473,20 @@
         var newChat = document.getElementById('btn-new-chat');
         if (newChat) newChat.addEventListener('click', startNewChat);
 
-        // Pricing button — open modal
-        var pricingBtn = document.getElementById('btn-pricing');
-        if (pricingBtn) pricingBtn.addEventListener('click', function() { var m = document.getElementById('pricing-modal'); if (m) m.classList.remove('hidden'); });
-
         // Pricing close
         var pricingClose = document.getElementById('pricing-close');
         if (pricingClose) pricingClose.addEventListener('click', function() { var m = document.getElementById('pricing-modal'); if (m) m.classList.add('hidden'); });
+
+        // Upload button
+        var uploadBtn = document.getElementById('btn-upload');
+        var fileInput = document.getElementById('file-input-hidden');
+        if (uploadBtn && fileInput) {
+            uploadBtn.addEventListener('click', function() { fileInput.click(); });
+            fileInput.addEventListener('change', function() {
+                if (fileInput.files.length > 0) handleFiles(fileInput.files);
+                fileInput.value = '';
+            });
+        }
 
         window.addEventListener('wake-message', function(e) {
             var detail = e.detail; hideWelcome(); addMessage('user', detail.text); showThinking(true);
@@ -497,7 +496,6 @@
         setupDragDrop();
         if (window.KVoice) KVoice.startWakeWordDetection();
         checkHealth();
-        if (window.KPayments) KPayments.showUsageBar();
         if (window.KTicker) KTicker.init();
 
         // ─── Session exit: cleanup on tab/window close ────────────────

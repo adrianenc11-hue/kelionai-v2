@@ -211,6 +211,8 @@
             document.getElementById('avatar-name').textContent = name === 'kira' ? 'Kira' : 'Kelion';
             document.getElementById('status-text').textContent = 'Online';
             console.log(`[Avatar] ${name} loaded — ${morphMeshes.length} morph meshes`);
+            renderer.render(scene, camera);
+            setTimeout(function() { renderer.render(scene, camera); }, 100);
             resolve(name);
         }, (progress) => {
             if (progress.total) {
