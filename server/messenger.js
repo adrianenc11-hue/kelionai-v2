@@ -23,54 +23,6 @@ const RATE_LIMIT_MAX = 10;
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const senderRateLimits = new Map(); // senderId → { count, resetAt }
 
-// ═══ USER MESSAGE COUNTER (for site recommendations) ═══
-const senderMessageCount = new Map();
-const FREE_MESSAGES_LIMIT = 10;
-
-// ═══ KNOWN USERS (persisted in Supabase) ═══
-const knownSenders = new Map(); // senderId → { lang, firstSeen }
-
-async function getKnownSender(senderId, supabase) {
-    // Check memory first
-    if (knownSenders.has(senderId)) return knownSenders.get(senderId);
-    // Check Supabase
-    if (supabase) {
-        try {
-            const { data } = await supabase.from('messenger_users').select('*').eq('sender_id', senderId).single();
-            if (data) {
-                knownSenders.set(senderId, { lang: data.language, firstSeen: data.first_seen });
-                return knownSenders.get(senderId);
-            }
-        } catch (e) { /* table may not exist yet */ }
-    }
-    return null;
-}
-
-async function saveKnownSender(senderId, lang, name, supabase) {
-    knownSenders.set(senderId, { lang, name, firstSeen: new Date().toISOString() });
-    if (supabase) {
-        try {
-            await supabase.from('messenger_users').upsert({
-                sender_id: senderId, language: lang, name: name || null, first_seen: new Date().toISOString(), last_seen: new Date().toISOString()
-            }, { onConflict: 'sender_id' });
-        } catch (e) { /* table may not exist yet - works in-memory */ }
-    }
-}
-
-// ═══ GET USER NAME FROM FACEBOOK ═══
-async function getUserName(senderId) {
-    const token = process.env.FB_PAGE_ACCESS_TOKEN;
-    if (!token) return null;
-    try {
-        const res = await fetch(`https://graph.facebook.com/v21.0/${senderId}?fields=first_name&access_token=${token}`);
-        if (res.ok) {
-            const data = await res.json();
-            return data.first_name || null;
-        }
-    } catch (e) { /* ignore */ }
-    return null;
-}
-
 function isRateLimited(senderId) {
     const now = Date.now();
     const entry = senderRateLimits.get(senderId);
@@ -81,17 +33,6 @@ function isRateLimited(senderId) {
     if (entry.count >= RATE_LIMIT_MAX) return true;
     entry.count++;
     return false;
-}
-
-// ═══ AUTO-DETECT LANGUAGE ═══
-function detectLanguage(text) {
-    const t = (text || '').toLowerCase();
-    if (/\b(the|is|are|what|how|can|will|do|you|my|hi|hello|help|please)\b/.test(t)) return 'en';
-    if (/\b(der|die|das|ist|und|ich|ein|wie|was|können)\b/.test(t)) return 'de';
-    if (/\b(le|la|les|de|est|et|un|une|je|que|comment|bonjour)\b/.test(t)) return 'fr';
-    if (/\b(el|la|los|es|un|una|que|como|por|hola)\b/.test(t)) return 'es';
-    if (/\b(il|lo|la|di|che|un|una|come|sono|ciao)\b/.test(t)) return 'it';
-    return 'ro'; // default Romanian
 }
 
 // ═══ FAQ FALLBACK ═══
@@ -188,25 +129,7 @@ router.post('/webhook', async (req, res) => {
                 if (!senderId || !message || message.is_echo) continue;
 
                 const text = message.text;
-                const attachments = message.attachments || [];
-
-                // ═══ HANDLE IMAGE/FILE ATTACHMENTS ═══
-                let userText = text || '';
-                let imageUrl = null;
-                for (const att of attachments) {
-                    if (att.type === 'image' && att.payload && att.payload.url) {
-                        imageUrl = att.payload.url;
-                        if (!userText) userText = 'Ce vezi in aceasta imagine?';
-                    } else if (att.type === 'file' && att.payload && att.payload.url) {
-                        if (!userText) userText = 'Am trimis un document. Analizeaza-l.';
-                    } else if (att.type === 'audio' && att.payload && att.payload.url) {
-                        if (!userText) userText = 'Am trimis un mesaj vocal.';
-                    } else if (att.type === 'video' && att.payload && att.payload.url) {
-                        if (!userText) userText = 'Am trimis un video.';
-                    }
-                }
-
-                if (!userText) continue;
+                if (!text) continue;
 
                 stats.messagesReceived++;
                 stats.activeSenders.add(senderId);
@@ -222,117 +145,24 @@ router.post('/webhook', async (req, res) => {
                 if (brain) {
                     try {
                         const timeout = new Promise((_, reject) =>
-                            setTimeout(() => reject(new Error('Brain timeout')), 15000)
+                            setTimeout(() => reject(new Error('Brain timeout')), 10000)
                         );
-                        const thought = await Promise.race([
-                            brain.think(userText, 'kelion', [], 'auto'),
+                        const result = await Promise.race([
+                            brain.think(text, 'kelion', [], 'ro'),
                             timeout
                         ]);
-
-                        // ── BUILD SYSTEM PROMPT ──
-                        const { buildSystemPrompt } = require('./persona');
-                        const systemPrompt = buildSystemPrompt('kelion', 'auto', '', {}, thought.chainOfThought);
-
-                        // ── CALL AI (Claude → GPT-4o fallback) ──
-                        const enrichedContext = thought.enrichedContext || thought.enrichedMessage || userText;
-                        const aiMsgs = [{ role: 'user', content: enrichedContext }];
-
-                        let aiReply = null;
-
-                        // Claude (primary)
-                        if (!aiReply && process.env.ANTHROPIC_API_KEY) {
-                            try {
-                                const r = await fetch('https://api.anthropic.com/v1/messages', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
-                                    body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 500, system: systemPrompt, messages: aiMsgs })
-                                });
-                                const d = await r.json();
-                                aiReply = d.content?.[0]?.text;
-                            } catch (e) { logger.warn({ component: 'Messenger', err: e.message }, 'Claude call failed'); }
-                        }
-
-                        // GPT-4o (fallback)
-                        if (!aiReply && process.env.OPENAI_API_KEY) {
-                            try {
-                                const r = await fetch('https://api.openai.com/v1/chat/completions', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + process.env.OPENAI_API_KEY },
-                                    body: JSON.stringify({ model: 'gpt-4o', max_tokens: 500, messages: [{ role: 'system', content: systemPrompt }, ...aiMsgs] })
-                                });
-                                const d = await r.json();
-                                aiReply = d.choices?.[0]?.message?.content;
-                            } catch (e) { logger.warn({ component: 'Messenger', err: e.message }, 'GPT-4o call failed'); }
-                        }
-
-                        reply = aiReply || faqReply(userText);
+                        reply = (result && result.enrichedMessage) || faqReply(text);
                     } catch (e) {
                         logger.warn({ component: 'Messenger', err: e.message }, 'Brain unavailable, using FAQ');
-                        reply = faqReply(userText);
+                        reply = faqReply(text);
                     }
                 } else {
-                    reply = faqReply(userText);
+                    reply = faqReply(text);
                 }
 
                 await sendMessage(senderId, reply);
                 stats.repliesSent++;
                 logger.info({ component: 'Messenger', senderId }, 'Reply sent');
-
-                // ═══ USER ENGAGEMENT TRACKING ═══
-                const msgCount = (senderMessageCount.get(senderId) || 0) + 1;
-                senderMessageCount.set(senderId, msgCount);
-
-                // ═══ FIRST-EVER CONTACT? Check Supabase ═══
-                const supabase = req.app.locals.supabaseAdmin || req.app.locals.supabase;
-                const known = await getKnownSender(senderId, supabase);
-
-                if (!known) {
-                    // New user — get name, save, detect language
-                    const userName = await getUserName(senderId);
-                    const detectedLang = detectLanguage(text);
-                    await saveKnownSender(senderId, detectedLang, userName, supabase);
-
-                    // If first message is just a greeting, hint about multilingual support
-                    const isJustGreeting = /^(h(ello|i|ey)|salut|bun[aă]|ciao|hola|bonjour|hallo|ola)[!?.,\s]*$/i.test(text.trim());
-                    if (isJustGreeting) {
-                        setTimeout(async () => {
-                            await sendMessage(senderId,
-                                'We can provide support in any language you wish. Feel free to speak in your language. 🌍');
-                        }, 1500);
-                    }
-                } else {
-                    // Returning user — greet by name in their language
-                    if (msgCount === 1) {
-                        const greetings = {
-                            ro: `Bine ai revenit, ${known.name || 'prietene'}! 😊`,
-                            en: `Welcome back, ${known.name || 'friend'}! 😊`,
-                            de: `Willkommen zurück, ${known.name || 'Freund'}! 😊`,
-                            fr: `Bon retour, ${known.name || 'ami'}! 😊`,
-                            es: `Bienvenido de nuevo, ${known.name || 'amigo'}! 😊`,
-                            it: `Bentornato, ${known.name || 'amico'}! 😊`
-                        };
-                        await sendMessage(senderId, greetings[known.lang] || greetings.en);
-                    }
-                    // Update language if changed
-                    const newLang = detectLanguage(text);
-                    if (newLang !== known.lang) {
-                        await saveKnownSender(senderId, newLang, known.name, supabase);
-                    }
-                }
-
-                // Subscription + site prompt ONLY at free limit (end of free period)
-                if (msgCount === FREE_MESSAGES_LIMIT) {
-                    setTimeout(async () => {
-                        await sendMessage(senderId,
-                            '⭐ Ai folosit ' + FREE_MESSAGES_LIMIT + ' mesaje gratuite!\n\n' +
-                            'Continuă cu funcții premium pe kelionai.app:\n' +
-                            '• 💬 Chat nelimitat cu AI\n' +
-                            '• 🎭 Avatare 3D — Kelion & Kira\n' +
-                            '• 🔊 Voce naturală\n' +
-                            '• 🖼️ Generare imagini\n\n' +
-                            '🌐 Abonează-te: https://kelionai.app/pricing');
-                    }, 3000);
-                }
             }
         }
     } catch (e) {
