@@ -523,8 +523,13 @@ newsModule.onNewsFetched(async (articles) => {
     try { await fbPage.publishNewsBatch(articles, 3); } catch (e) { logger.warn({ component: 'MediaAutoPublish', err: e.message }, 'FB Page publish failed'); }
     // Telegram channel broadcast
     try { await broadcastNews(articles); } catch (e) { logger.warn({ component: 'MediaAutoPublish', err: e.message }, 'Telegram broadcast failed'); }
-    // Instagram (top 1 article with default image)
-    try { if (articles[0]) await instagram.postNews(articles[0]); } catch (e) { logger.warn({ component: 'MediaAutoPublish', err: e.message }, 'Instagram post failed'); }
+    // Instagram auto-publish (top article with image)
+    try {
+        const topArticle = articles.find(a => a.imageUrl || a.image_url) || articles[0];
+        if (topArticle && instagram.publishNewsBatch) {
+            await instagram.publishNewsBatch([topArticle], 1);
+        }
+    } catch (e) { logger.warn({ component: 'MediaAutoPublish', err: e.message }, 'Instagram publish failed'); }
     // Messenger subscribers notification
     try { await notifySubscribersNews(articles); } catch (e) { logger.warn({ component: 'MediaAutoPublish', err: e.message }, 'Messenger subscribers notification failed'); }
 });
@@ -574,6 +579,35 @@ app.use((err, req, res, next) => {
 });
 
 // ═══ STARTUP ═══
+function logConfigHealth() {
+    const checks = [
+        { name: 'FB_PAGE_ACCESS_TOKEN', set: !!process.env.FB_PAGE_ACCESS_TOKEN, for: 'Messenger Bot' },
+        { name: 'FB_APP_SECRET', set: !!process.env.FB_APP_SECRET, for: 'Messenger Security' },
+        { name: 'FB_VERIFY_TOKEN', set: !!process.env.FB_VERIFY_TOKEN, for: 'Messenger Webhook' },
+        { name: 'FB_PAGE_ID', set: !!process.env.FB_PAGE_ID, for: 'Facebook Page Posts' },
+        { name: 'TELEGRAM_BOT_TOKEN', set: !!process.env.TELEGRAM_BOT_TOKEN, for: 'Telegram Bot' },
+        { name: 'OPENAI_API_KEY', set: !!process.env.OPENAI_API_KEY, for: 'AI Brain (OpenAI)' },
+        { name: 'GROQ_API_KEY', set: !!process.env.GROQ_API_KEY, for: 'AI Brain (Groq)' },
+        { name: 'SUPABASE_URL', set: !!process.env.SUPABASE_URL, for: 'Database' },
+        { name: 'SUPABASE_SERVICE_KEY', set: !!process.env.SUPABASE_SERVICE_KEY, for: 'Database Admin' },
+        { name: 'ELEVENLABS_API_KEY', set: !!process.env.ELEVENLABS_API_KEY, for: 'Voice TTS' },
+        { name: 'INSTAGRAM_ACCOUNT_ID', set: !!process.env.INSTAGRAM_ACCOUNT_ID, for: 'Instagram Posts' },
+        { name: 'STRIPE_SECRET_KEY', set: !!process.env.STRIPE_SECRET_KEY, for: 'Payments' },
+    ];
+    const missing = checks.filter(c => !c.set);
+    const configured = checks.filter(c => c.set);
+
+    logger.info({ component: 'Config', configured: configured.length, total: checks.length },
+        `✅ ${configured.length}/${checks.length} secrets configured`);
+
+    if (missing.length > 0) {
+        missing.forEach(m => {
+            logger.warn({ component: 'Config', secret: m.name, service: m.for },
+                `⚠️ Missing: ${m.name} — ${m.for} will not work`);
+        });
+    }
+}
+
 if (require.main === module) {
     process.on('uncaughtException', (err) => {
         logger.fatal({ component: 'Process', err: err.stack }, 'Uncaught Exception: ' + err.message);
@@ -586,8 +620,24 @@ if (require.main === module) {
     });
 
     runMigration().then(migrated => {
+        logConfigHealth();
         app.listen(PORT, '0.0.0.0', () => {
             logger.info({ component: 'Server', port: PORT, ai: { claude: !!process.env.ANTHROPIC_API_KEY, gpt4o: !!process.env.OPENAI_API_KEY, deepseek: !!process.env.DEEPSEEK_API_KEY }, tts: !!process.env.ELEVENLABS_API_KEY, payments: !!process.env.STRIPE_SECRET_KEY, db: !!supabaseAdmin, migration: !!migrated }, 'KelionAI v2.3 started on port ' + PORT);
+            // Auto-register Telegram webhook
+            if (process.env.TELEGRAM_BOT_TOKEN && process.env.APP_URL) {
+                const webhookUrl = `${process.env.APP_URL}/api/telegram/webhook`;
+                fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/setWebhook`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: webhookUrl })
+                })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.ok) logger.info({ component: 'Telegram' }, `✅ Webhook registered: ${webhookUrl}`);
+                    else logger.warn({ component: 'Telegram', error: data.description }, '❌ Webhook registration failed');
+                })
+                .catch(e => logger.error({ component: 'Telegram', err: e.message }, 'Webhook registration error'));
+            }
         });
     }).catch(e => {
         logger.error({ component: 'Server' }, 'Migration error');
