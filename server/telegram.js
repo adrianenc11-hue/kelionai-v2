@@ -292,7 +292,7 @@ router.post('/webhook', async (req, res) => {
                     setTimeout(() => reject(new Error('Brain timeout')), 15000)
                 );
                 const result = await Promise.race([
-                    brain.think(text, 'kelion', [], detectLanguage(text)),
+                    brain.think(text, 'kelion', [], 'auto'),
                     timeout
                 ]);
                 reply = (result && result.enrichedMessage) || '🤔 Nu am putut procesa mesajul. Încearcă din nou.';
