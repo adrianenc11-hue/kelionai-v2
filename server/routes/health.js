@@ -5,13 +5,14 @@
 
 const express = require('express');
 const router = express.Router();
+const { version } = require('../../package.json');
 
 // GET /api/health
 router.get('/', (req, res) => {
     const { brain, supabase, supabaseAdmin } = req.app.locals;
     const diag = brain ? brain.getDiagnostics() : { status: 'no-brain', conversations: 0 };
     res.json({
-        status: 'ok', version: '2.4.0', timestamp: new Date().toISOString(),
+        status: 'ok', version, timestamp: new Date().toISOString(),
         uptime: process.uptime(),
         brain: diag.status,
         conversations: diag.conversations,
