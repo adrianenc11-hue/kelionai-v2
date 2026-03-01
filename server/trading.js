@@ -629,33 +629,67 @@ router.get('/signals', async (req, res) => {
     }
 });
 
-// GET /portfolio
+// GET /portfolio — REAL positions from trade engine
 router.get('/portfolio', async (req, res) => {
     try {
-        const assetDefs = [
-            { asset: 'BTC', allocation: 40, qty: 0.5, avgBuy: 58000 },
-            { asset: 'ETH', allocation: 25, qty: 3, avgBuy: 2800 },
-            { asset: 'Gold', allocation: 20, qty: 2, avgBuy: 2200 },
-            { asset: 'S&P 500', allocation: 15, qty: 1, avgBuy: 4800 },
-        ];
-        const realPrices = await Promise.all(assetDefs.map(p => fetchRealPrices(p.asset, 10)));
-        const portfolio = assetDefs.map((p, i) => {
-            const current = realPrices[i].prices.at(-1);
+        const openPositions = tradeEngine.getOpenPositions();
+        const paperBalance = tradeEngine.getPaperBalance();
+        const paperTrades = tradeEngine.getPaperTrades();
+        const isPaper = tradeEngine.isPaperMode();
+        const profile = tradeEngine.getRiskProfile();
+
+        // Get current prices for open positions
+        const uniqueAssets = [...new Set(openPositions.map(p => p.symbol.replace('/USDT', '')))];
+        const priceData = {};
+        for (const asset of uniqueAssets) {
+            try {
+                const { prices } = await fetchRealPrices(asset, 5);
+                priceData[asset] = prices[prices.length - 1];
+            } catch (e) { priceData[asset] = null; }
+        }
+
+        // Calculate P&L for each open position
+        const positions = openPositions.map(pos => {
+            const asset = pos.symbol.replace('/USDT', '');
+            const currentPrice = priceData[asset] || pos.price;
+            const unrealizedPnl = pos.action === 'BUY'
+                ? (currentPrice - pos.price) * pos.size
+                : (pos.price - currentPrice) * pos.size;
+            const pnlPct = ((currentPrice - pos.price) / pos.price) * 100 * (pos.action === 'BUY' ? 1 : -1);
             return {
-                ...p,
-                current,
-                pnl: Math.round((current - p.avgBuy) * p.qty * 100) / 100,
-                pnlPct: Math.round(((current - p.avgBuy) / p.avgBuy) * 10000) / 100,
-                dataSource: realPrices[i].source,
+                ...pos,
+                currentPrice,
+                unrealizedPnl: +unrealizedPnl.toFixed(2),
+                pnlPct: +pnlPct.toFixed(2),
+                distanceToSL: +((Math.abs(currentPrice - pos.stopLoss) / currentPrice) * 100).toFixed(2) + '%',
+                distanceToTP: +((Math.abs(pos.takeProfit - currentPrice) / currentPrice) * 100).toFixed(2) + '%',
             };
         });
 
-        const totalPnl = portfolio.reduce((a, p) => a + p.pnl, 0);
+        // Closed trades summary
+        const closedTrades = paperTrades.filter(t => t.status === 'CLOSED' || t.closedAt);
+        const wins = closedTrades.filter(t => (t.pnl || 0) > 0).length;
+        const losses = closedTrades.filter(t => (t.pnl || 0) <= 0).length;
+
+        const totalUnrealizedPnl = positions.reduce((s, p) => s + p.unrealizedPnl, 0);
+
         res.json({
-            portfolio,
-            totalPnl: Math.round(totalPnl * 100) / 100,
-            currency: 'USD',
-            note: 'Portofoliu cu date reale',
+            mode: isPaper ? 'PAPER' : 'LIVE',
+            riskProfile: { name: profile.name, emoji: profile.emoji, risk: profile.riskPct + '%' },
+            balance: paperBalance,
+            openPositions: positions,
+            openCount: positions.length,
+            maxPositions: tradeEngine.CONFIG.MAX_OPEN_POSITIONS,
+            unrealizedPnl: +totalUnrealizedPnl.toFixed(2),
+            dailyPnL: tradeEngine.getDailyPnL(),
+            weeklyPnL: tradeEngine.getWeeklyPnL(),
+            closedTradesSummary: {
+                total: closedTrades.length,
+                wins,
+                losses,
+                winRate: closedTrades.length > 0 ? +(wins / closedTrades.length * 100).toFixed(1) : 0,
+            },
+            recentTrades: paperTrades.slice(-10),
             disclaimer: DISCLAIMER,
         });
     } catch (err) {
@@ -667,7 +701,7 @@ router.get('/portfolio', async (req, res) => {
 // POST /backtest
 router.post('/backtest', async (req, res) => {
     try {
-        const { strategy = 'RSI', asset = 'BTC', period = 90 } = req.body || {};
+        const { strategy = 'RSI', asset = 'BTC', period = 90, riskProfile = 'moderate' } = req.body || {};
         const allAssets = Object.values(ASSETS).flat();
         if (!STRATEGIES.includes(strategy)) {
             return res.status(400).json({ error: `Strategie invalidă. Opțiuni: ${STRATEGIES.join(', ')}.` });
@@ -676,12 +710,20 @@ router.post('/backtest', async (req, res) => {
             return res.status(400).json({ error: `Asset invalid. Opțiuni: ${allAssets.join(', ')}.` });
         }
         const len = Math.min(Math.max(parseInt(period) || 90, 30), 365);
-        logger.info({ strategy, asset, period: len }, '[Trading] Running backtest');
+        const profile = tradeEngine.RISK_PROFILES[riskProfile] || tradeEngine.RISK_PROFILES.moderate;
+        logger.info({ strategy, asset, period: len, riskProfile: profile.name }, '[Trading] Running backtest');
+
+        const COMMISSION_PCT = 0.001;  // 0.1% per trade (Binance standard)
+        const SLIPPAGE_PCT = 0.0005;   // 0.05% slippage simulation
+        const SL_PCT = profile.DEFAULT_STOP_LOSS_PCT;
+        const TP_PCT = profile.DEFAULT_TAKE_PROFIT_PCT;
 
         const { prices, volumes } = await fetchRealPrices(asset, len + 50);
         const trades = [];
         let position = null;
         let equity = 10000;
+        let totalCommissions = 0;
+        let totalSlippage = 0;
 
         for (let i = 20; i < prices.length; i++) {
             const slice = prices.slice(0, i + 1);
@@ -706,38 +748,78 @@ router.post('/backtest', async (req, res) => {
             }
 
             const price = prices[i];
+
+            // Check stop loss / take profit on open position
+            if (position) {
+                const slPrice = position.entry * (1 - SL_PCT);
+                const tpPrice = position.entry * (1 + TP_PCT);
+                let exitReason = null;
+                let exitPrice = price;
+
+                if (price <= slPrice) { exitReason = 'STOP_LOSS'; exitPrice = slPrice; }
+                else if (price >= tpPrice) { exitReason = 'TAKE_PROFIT'; exitPrice = tpPrice; }
+                else if (signal === 'SELL' || signal === 'STRONG SELL') { exitReason = 'SIGNAL'; exitPrice = price; }
+
+                if (exitReason) {
+                    const slippageExit = exitPrice * SLIPPAGE_PCT;
+                    const actualExit = exitPrice - slippageExit;
+                    const commission = actualExit * COMMISSION_PCT;
+                    const grossPnlPct = (actualExit - position.entry) / position.entry;
+                    const netPnlPct = grossPnlPct - COMMISSION_PCT * 2 - SLIPPAGE_PCT * 2;
+                    totalCommissions += commission + position.entry * COMMISSION_PCT;
+                    totalSlippage += slippageExit + position.slippage;
+                    equity *= (1 + netPnlPct);
+                    trades.push({
+                        entry: +position.entry.toFixed(2), exit: +actualExit.toFixed(2),
+                        grossPnlPct: +(grossPnlPct * 100).toFixed(2),
+                        netPnlPct: +(netPnlPct * 100).toFixed(2),
+                        commission: +(commission + position.entry * COMMISSION_PCT).toFixed(2),
+                        exitReason, bars: i - position.idx,
+                    });
+                    position = null;
+                }
+            }
+
+            // Open new position
             if (!position && (signal === 'BUY' || signal === 'STRONG BUY')) {
-                position = { entry: price, idx: i };
-            } else if (position && (signal === 'SELL' || signal === 'STRONG SELL')) {
-                const pnlPct = (price - position.entry) / position.entry;
-                equity *= (1 + pnlPct);
-                trades.push({ entry: position.entry, exit: price, pnlPct: Math.round(pnlPct * 10000) / 100 });
-                position = null;
+                const slippage = price * SLIPPAGE_PCT;
+                position = { entry: price + slippage, idx: i, slippage };
             }
         }
 
-        const wins = trades.filter(t => t.pnlPct > 0).length;
+        const wins = trades.filter(t => t.netPnlPct > 0).length;
+        const losses = trades.filter(t => t.netPnlPct <= 0).length;
         const totalReturn = Math.round((equity - 10000) * 100) / 100;
+        const grossWins = trades.filter(t => t.netPnlPct > 0).reduce((s, t) => s + t.netPnlPct, 0);
+        const grossLosses = Math.abs(trades.filter(t => t.netPnlPct <= 0).reduce((s, t) => s + t.netPnlPct, 0));
+        const avgBars = trades.length > 0 ? Math.round(trades.reduce((s, t) => s + t.bars, 0) / trades.length) : 0;
 
-        // Calculate actual max drawdown from equity curve
+        // Max drawdown from equity curve
         let equityCurve = 10000;
         let peakEquity = 10000;
         let maxDrawdown = 0;
         trades.forEach(t => {
-            equityCurve *= (1 + t.pnlPct / 100);
+            equityCurve *= (1 + t.netPnlPct / 100);
             if (equityCurve > peakEquity) peakEquity = equityCurve;
             const dd = (equityCurve - peakEquity) / peakEquity * 100;
             if (dd < maxDrawdown) maxDrawdown = dd;
         });
-        maxDrawdown = Math.round(maxDrawdown * 100) / 100;
 
         res.json({
             strategy, asset, period: len,
+            riskProfile: profile.name,
+            stopLoss: (SL_PCT * 100) + '%', takeProfit: (TP_PCT * 100) + '%',
             trades: trades.length,
-            winRate: trades.length ? Math.round((wins / trades.length) * 10000) / 100 : 0,
+            wins, losses,
+            winRate: trades.length ? +(wins / trades.length * 100).toFixed(1) : 0,
+            profitFactor: grossLosses > 0 ? +(grossWins / grossLosses).toFixed(2) : Infinity,
             totalReturn,
-            maxDrawdown,
-            finalEquity: Math.round(equity * 100) / 100,
+            maxDrawdown: +maxDrawdown.toFixed(2),
+            finalEquity: +equity.toFixed(2),
+            totalCommissions: +totalCommissions.toFixed(2),
+            totalSlippage: +totalSlippage.toFixed(2),
+            avgTradeDuration: avgBars + ' bars',
+            recentTrades: trades.slice(-10),
             disclaimer: DISCLAIMER,
         });
     } catch (err) {

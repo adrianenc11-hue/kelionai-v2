@@ -317,18 +317,40 @@ function calculateADX(highs, lows, closes, period = 14) {
 }
 
 function calculateOBV(closes, volumes) {
-    if (!closes || !volumes || closes.length < 2) return { obv: 0, signal: 'HOLD' };
+    if (!closes || !volumes || closes.length < 2) return { obv: 0, signal: 'HOLD', divergence: null };
     let obv = 0; const obvArr = [0];
     for (let i = 1; i < closes.length; i++) {
-        if (closes[i] > closes[i - 1]) obv += (volumes[i] || 0); else if (closes[i] < closes[i - 1]) obv -= (volumes[i] || 0);
+        if (closes[i] > closes[i - 1]) obv += (volumes[i] || 0);
+        else if (closes[i] < closes[i - 1]) obv -= (volumes[i] || 0);
         obvArr.push(obv);
     }
-    const priceUp = closes[closes.length - 1] > closes[Math.max(0, closes.length - 10)];
-    const obvUp = obvArr[obvArr.length - 1] > obvArr[Math.max(0, obvArr.length - 10)];
+
+    // OBV EMA signal line (20 period)
+    const obvEMA = [];
+    const emaPeriod = 20;
+    const k = 2 / (emaPeriod + 1);
+    obvEMA[0] = obvArr[0];
+    for (let i = 1; i < obvArr.length; i++) obvEMA[i] = obvArr[i] * k + obvEMA[i - 1] * (1 - k);
+
+    const obvAboveEMA = obvArr[obvArr.length - 1] > obvEMA[obvEMA.length - 1];
+    const obvMomentum = obvArr.length > 5 ? obvArr[obvArr.length - 1] - obvArr[obvArr.length - 5] : 0;
+
+    // Divergence detection (20 bar lookback)
+    const lookback = Math.min(20, closes.length - 1);
+    const priceTrend = closes[closes.length - 1] - closes[closes.length - 1 - lookback];
+    const obvTrend = obvArr[obvArr.length - 1] - obvArr[obvArr.length - 1 - lookback];
+    let divergence = null;
+    if (priceTrend < 0 && obvTrend > 0) divergence = 'bullish';
+    else if (priceTrend > 0 && obvTrend < 0) divergence = 'bearish';
+
     let signal = 'HOLD';
-    if (priceUp && obvUp) signal = 'BUY'; else if (!priceUp && !obvUp) signal = 'SELL';
-    else if (!priceUp && obvUp) signal = 'BUY'; else if (priceUp && !obvUp) signal = 'SELL';
-    return { obv, signal };
+    if (obvAboveEMA && obvMomentum > 0) signal = 'BUY';
+    else if (!obvAboveEMA && obvMomentum < 0) signal = 'SELL';
+    // Divergence overrides
+    if (divergence === 'bullish') signal = 'BUY';
+    else if (divergence === 'bearish') signal = 'SELL';
+
+    return { obv, obvEMA: +obvEMA[obvEMA.length - 1].toFixed(0), signal, divergence, momentum: obvMomentum > 0 ? 'rising' : 'falling' };
 }
 
 function calculateCCI(highs, lows, closes, period = 20) {
@@ -367,12 +389,45 @@ function calculateIchimoku(highs, lows, closes, tenkanP = 9, kijunP = 26, senkou
     const senkouA = tenkan !== null && kijun !== null ? (tenkan + kijun) / 2 : null;
     const senkouB = calc(highs, lows, senkouBP);
     const price = closes[closes.length - 1];
+
+    // Chikou Span (lagging) = current close plotted 26 periods back
+    const chikouIdx = closes.length - 1 - kijunP;
+    const chikou = chikouIdx >= 0 ? closes[closes.length - 1] : null;
+    const chikouRef = chikouIdx >= 0 ? closes[chikouIdx] : null;
+    const chikouAbove = chikou !== null && chikouRef !== null ? chikou > chikouRef : null;
+
+    // Cloud (kumo) properties
+    const cloudTop = senkouA !== null && senkouB !== null ? Math.max(senkouA, senkouB) : null;
+    const cloudBottom = senkouA !== null && senkouB !== null ? Math.min(senkouA, senkouB) : null;
+    const cloudThickness = cloudTop !== null && cloudBottom !== null ? +((cloudTop - cloudBottom) / price * 100).toFixed(2) : 0;
+    const priceAboveCloud = cloudTop !== null ? price > cloudTop : null;
+    const priceBelowCloud = cloudBottom !== null ? price < cloudBottom : null;
+    const priceInCloud = !priceAboveCloud && !priceBelowCloud;
+
+    // Kumo twist (senkou A crosses senkou B → trend change)
+    const kumoTwist = senkouA !== null && senkouB !== null ? (senkouA > senkouB ? 'bullish' : senkouA < senkouB ? 'bearish' : 'flat') : null;
+
+    // Full signal logic
     let signal = 'HOLD';
-    if (tenkan !== null && kijun !== null && senkouA !== null && senkouB !== null) {
-        if (price > Math.max(senkouA, senkouB) && tenkan > kijun) signal = 'BUY';
-        else if (price < Math.min(senkouA, senkouB) && tenkan < kijun) signal = 'SELL';
-    }
-    return { tenkan: tenkan ? +tenkan.toFixed(2) : null, kijun: kijun ? +kijun.toFixed(2) : null, senkouA: senkouA ? +senkouA.toFixed(2) : null, senkouB: senkouB ? +senkouB.toFixed(2) : null, signal };
+    const tkCross = tenkan !== null && kijun !== null ? (tenkan > kijun ? 'bullish' : tenkan < kijun ? 'bearish' : 'flat') : null;
+
+    if (priceAboveCloud && tkCross === 'bullish' && chikouAbove && kumoTwist === 'bullish') signal = 'STRONG BUY';
+    else if (priceAboveCloud && tkCross === 'bullish') signal = 'BUY';
+    else if (priceBelowCloud && tkCross === 'bearish' && chikouAbove === false && kumoTwist === 'bearish') signal = 'STRONG SELL';
+    else if (priceBelowCloud && tkCross === 'bearish') signal = 'SELL';
+
+    return {
+        tenkan: tenkan ? +tenkan.toFixed(2) : null,
+        kijun: kijun ? +kijun.toFixed(2) : null,
+        senkouA: senkouA ? +senkouA.toFixed(2) : null,
+        senkouB: senkouB ? +senkouB.toFixed(2) : null,
+        chikou: chikou ? +chikou.toFixed(2) : null,
+        cloudThickness: cloudThickness + '%',
+        kumoTwist,
+        tkCross,
+        priceVsCloud: priceAboveCloud ? 'ABOVE' : priceBelowCloud ? 'BELOW' : 'INSIDE',
+        signal,
+    };
 }
 
 function calculateMFI(highs, lows, closes, volumes, period = 14) {
@@ -621,11 +676,72 @@ async function checkStopsAndTargets(currentPrices) {
     const results = [];
     for (const pos of [...openPositions]) {
         const price = currentPrices[pos.symbol]; if (!price) continue;
+
+        // ── TRAILING STOP LOGIC ──
+        // Track high water mark (best price since entry)
+        if (!pos.highWaterMark) pos.highWaterMark = pos.price;
         if (pos.action === 'BUY') {
-            if (price <= pos.stopLoss) results.push(await closePosition(pos.id, price, 'STOP_LOSS'));
+            if (price > pos.highWaterMark) pos.highWaterMark = price;
+        } else {
+            if (price < pos.highWaterMark) pos.highWaterMark = price;
+        }
+
+        // Activate trailing stop once profit exceeds activation threshold
+        const profitPct = pos.action === 'BUY'
+            ? (pos.highWaterMark - pos.price) / pos.price
+            : (pos.price - pos.highWaterMark) / pos.price;
+
+        if (profitPct >= CONFIG.TRAILING_STOP_ACTIVATION) {
+            const trailingDistance = CONFIG.TRAILING_STOP_DISTANCE;
+            let newSL;
+            if (pos.action === 'BUY') {
+                newSL = +(pos.highWaterMark * (1 - trailingDistance)).toFixed(2);
+                if (newSL > pos.stopLoss) {
+                    pos.stopLoss = newSL;
+                    pos.trailingActive = true;
+                }
+            } else {
+                newSL = +(pos.highWaterMark * (1 + trailingDistance)).toFixed(2);
+                if (newSL < pos.stopLoss) {
+                    pos.stopLoss = newSL;
+                    pos.trailingActive = true;
+                }
+            }
+        }
+
+        // ── PARTIAL PROFIT TAKING ──
+        // At 50% of target distance, close half the position and move SL to breakeven
+        if (!pos.partialClosed) {
+            const tp1Distance = Math.abs(pos.takeProfit - pos.price) * 0.5;
+            const currentProfit = pos.action === 'BUY' ? price - pos.price : pos.price - price;
+            if (currentProfit >= tp1Distance && pos.size > 0.001) {
+                const halfSize = +(pos.size / 2).toFixed(6);
+                const halfPnl = currentProfit * halfSize;
+                // Close half
+                if (paperMode) {
+                    const asset = pos.symbol.replace('/USDT', '');
+                    if (pos.action === 'BUY') {
+                        paperBalance.USDT += price * halfSize;
+                        paperBalance[asset] = (paperBalance[asset] || 0) - halfSize;
+                    }
+                }
+                pos.size = +(pos.size - halfSize).toFixed(6);
+                pos.partialClosed = true;
+                pos.partialPnl = +halfPnl.toFixed(2);
+                pos.stopLoss = pos.price; // Move SL to breakeven
+                dailyPnL += halfPnl;
+                recordWeeklyPnL(halfPnl);
+                logger.info({ tradeId: pos.id, halfPnl: +halfPnl.toFixed(2) }, `📊 PARTIAL TP1: ${pos.symbol} closed 50% @ $${price}, SL → breakeven`);
+                results.push({ type: 'PARTIAL_TP', trade: pos, pnl: +halfPnl.toFixed(2) });
+            }
+        }
+
+        // ── STOP LOSS / TAKE PROFIT CHECK ──
+        if (pos.action === 'BUY') {
+            if (price <= pos.stopLoss) results.push(await closePosition(pos.id, price, pos.trailingActive ? 'TRAILING_STOP' : 'STOP_LOSS'));
             else if (price >= pos.takeProfit) results.push(await closePosition(pos.id, price, 'TAKE_PROFIT'));
         } else {
-            if (price >= pos.stopLoss) results.push(await closePosition(pos.id, price, 'STOP_LOSS'));
+            if (price >= pos.stopLoss) results.push(await closePosition(pos.id, price, pos.trailingActive ? 'TRAILING_STOP' : 'STOP_LOSS'));
             else if (price <= pos.takeProfit) results.push(await closePosition(pos.id, price, 'TAKE_PROFIT'));
         }
     }
