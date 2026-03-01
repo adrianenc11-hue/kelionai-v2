@@ -198,7 +198,23 @@ Upgrade: "Kelion, upgrade my plan" or Profile then Billing. Stripe secure. Cance
 
 ## 23. Referral Programme
 
-Say "Kelion, give me a referral code". QR code on monitor. Friend signs up with code, gets 7 days Premium free. When friend subscribes, you also get 7 days free.
+**How it works:**
+- Go to Settings → Referral tab and generate your personal referral code (format: `KEL-xxxx-xxxxxx-XXXXXXXXXX`)
+- Share the code or send an email invitation directly from the app
+- Your friend opens the invite link or enters the code when registering
+
+**Bonuses:**
+- **Your friend (receiver):** +5 free days added to their first paid subscription
+- **You (sender):** +10 free days added to your subscription when your friend's first payment succeeds
+
+**Rules:**
+- Maximum 5 active codes per calendar month
+- Codes expire after 14 days
+- You cannot use your own code
+- Each user can only redeem one referral code
+- Bonuses are never downgraded — if you have Premium, your Premium period is extended
+
+**Free tier:** The Free plan includes **10 messages/day** (chat), **5 searches/day**, **2 images/day**, and **5 TTS/day**. These are daily message counts, not time-based minutes.
 
 ---
 

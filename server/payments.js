@@ -4,6 +4,12 @@
 // ═══════════════════════════════════════════════════════════════
 const express = require('express');
 const logger = require('./logger');
+// Lazy-loaded to avoid potential circular dependency at module init time
+let referralModule;
+function getReferralModule() {
+    if (!referralModule) referralModule = require('./referral');
+    return referralModule;
+}
 const router = express.Router();
 
 let stripe;
@@ -48,7 +54,7 @@ async function getUserPlan(userId, supabaseAdmin) {
 
 // ═══ CHECK USAGE LIMIT ═══
 async function checkUsage(userId, type, supabaseAdmin) {
-    if (!userId) return { allowed: true, plan: 'free', remaining: 5 };
+    if (!userId) return { allowed: true, plan: 'guest', remaining: PLAN_LIMITS.guest.chat };
     const { plan, limits } = await getUserPlan(userId, supabaseAdmin);
     if (limits[type] === -1) return { allowed: true, plan, remaining: -1 }; // unlimited
     
@@ -166,10 +172,37 @@ router.post('/checkout', async (req, res) => {
         const user = await getUserFromToken(req);
         if (!user) return res.status(401).json({ error: 'Authentication required' });
         
-        const { plan } = req.body;
+        const { plan, referral_code } = req.body;
         // Accept 'enterprise' as alias for 'premium' for backward compatibility
         const normalizedPlan = plan === 'enterprise' ? 'premium' : plan;
         if (!['pro', 'premium'].includes(normalizedPlan)) return res.status(400).json({ error: 'Invalid plan' });
+        
+        // Bug #5: Check if user already has an active subscription
+        if (supabaseAdmin) {
+            const { data: existingSub } = await supabaseAdmin
+                .from('subscriptions')
+                .select('plan, status, stripe_subscription_id')
+                .eq('user_id', user.id)
+                .eq('status', 'active')
+                .single();
+            if (existingSub && existingSub.stripe_subscription_id) {
+                return res.status(400).json({
+                    error: 'You already have an active subscription. Use the billing portal to change plans.',
+                    currentPlan: existingSub.plan,
+                    usePortal: true
+                });
+            }
+        }
+
+        // Validate referral_code if provided
+        let verifiedReferralCode = null;
+        if (referral_code) {
+            const { verifyReferralCode } = getReferralModule();
+            const verification = verifyReferralCode(referral_code);
+            if (verification.valid && !verification.isExpired) {
+                verifiedReferralCode = referral_code;
+            }
+        }
         
         const priceId = normalizedPlan === 'pro'
             ? (process.env.STRIPE_PRO_PRICE_ID || process.env.STRIPE_PRICE_PRO)
@@ -193,7 +226,7 @@ router.post('/checkout', async (req, res) => {
             line_items: [{ price: priceId, quantity: 1 }],
             success_url: (process.env.APP_URL || 'https://kelionai.app') + '/?payment=success',
             cancel_url: (process.env.APP_URL || 'https://kelionai.app') + '/?payment=cancel',
-            metadata: { user_id: user.id, plan: normalizedPlan },
+            metadata: { user_id: user.id, plan: normalizedPlan, ...(verifiedReferralCode ? { referral_code: verifiedReferralCode } : {}) },
             subscription_data: { metadata: { user_id: user.id, plan: normalizedPlan } }
         };
         
@@ -263,17 +296,36 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
         const { supabaseAdmin } = req.app.locals;
         if (!supabaseAdmin) return res.status(503).send('DB not available');
 
-        // Idempotency check — skip already-processed events
+        // Idempotency check — check DB first (survives restarts), then in-memory cache
         if (processedWebhookEvents.has(event.id)) {
-            logger.info({ component: 'Payments', eventId: event.id }, 'Duplicate webhook event skipped');
+            logger.info({ component: 'Payments', eventId: event.id }, 'Duplicate webhook event skipped (cache)');
             return res.json({ received: true });
         }
+        // Check persistent DB record
+        try {
+            const { data: existingEvent } = await supabaseAdmin
+                .from('processed_webhook_events')
+                .select('event_id')
+                .eq('event_id', event.id)
+                .single();
+            if (existingEvent) {
+                logger.info({ component: 'Payments', eventId: event.id }, 'Duplicate webhook event skipped (DB)');
+                processedWebhookEvents.add(event.id);
+                return res.json({ received: true });
+            }
+        } catch (_e) { logger.debug({ component: 'Payments', err: _e.message }, 'processed_webhook_events check failed (table may not exist yet)'); }
+
         processedWebhookEvents.add(event.id);
         // Keep the set bounded to avoid unbounded memory growth (keep last 10000 events)
         if (processedWebhookEvents.size > 10000) {
             const first = processedWebhookEvents.values().next().value;
             processedWebhookEvents.delete(first);
         }
+        // Persist to DB for cross-restart idempotency
+        try {
+            await supabaseAdmin.from('processed_webhook_events')
+                .insert({ event_id: event.id, event_type: event.type });
+        } catch (_e) { logger.debug({ component: 'Payments', err: _e.message }, 'processed_webhook_events insert failed (table may not exist yet)'); }
         
         switch (event.type) {
             case 'checkout.session.completed': {
@@ -295,12 +347,29 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
                 }, { onConflict: 'user_id' });
                 
                 logger.info({ component: 'Payments', plan, userId }, `✅ ${plan} activated for ${userId}`);
+
+                // Apply referral bonus if present
+                const referralCode = session.metadata?.referral_code;
+                if (referralCode) {
+                    const { applyReferralBonus } = getReferralModule();
+                    await applyReferralBonus(referralCode, userId, supabaseAdmin);
+                }
                 break;
             }
             
             case 'customer.subscription.updated': {
                 const sub = event.data.object;
-                const userId = sub.metadata?.user_id;
+                let userId = sub.metadata?.user_id;
+
+                // Fallback: lookup by stripe_subscription_id if metadata missing
+                if (!userId) {
+                    const { data: existingSub } = await supabaseAdmin
+                        .from('subscriptions')
+                        .select('user_id')
+                        .eq('stripe_subscription_id', sub.id)
+                        .single();
+                    userId = existingSub?.user_id;
+                }
                 if (!userId) break;
                 
                 await supabaseAdmin.from('subscriptions').update({

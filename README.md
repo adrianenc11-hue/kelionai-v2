@@ -39,13 +39,13 @@ app/            Frontend (static HTML/CSS/JS + Three.js)
 tests/          Playwright end-to-end tests
 ```
 
-## Setup rapid
+## Quick Setup
 
 ```bash
-# Configurare interactivă a cheilor API
+# Interactive API key setup
 npm run setup
 
-# Setup complet automat (Railway + Supabase + deploy)
+# Full automated setup (Railway + Supabase + deploy)
 npm run setup:full
 ```
 
@@ -90,21 +90,21 @@ npm start
 
 App is live at `https://kelionai.app`.
 
-> ⚠️ Toate testele rulează exclusiv contra producției live (https://kelionai.app). NU există mod de testare locală.
+> ⚠️ All tests run exclusively against the live production site (https://kelionai.app). There is no local test mode.
 
 ## npm Scripts
 
 | Script | Description |
 |--------|-------------|
-| `npm run dev` | Pornește serverul de dezvoltare |
-| `npm start` | Pornește serverul de producție |
-| `npm test` | Rulează testele Playwright E2E (Chromium) |
-| `npm run test:all` | Rulează testele pe toate browserele |
-| `npm run setup` | Configurare interactivă chei API (scrie .env) |
-| `npm run setup:full` | Setup complet automat: Railway + Supabase + deploy |
-| `npm run setup:db` | Configurare bază de date Supabase |
-| `npm run deploy` | Redeploy rapid: git push + Railway + health check |
-| `npm run health` | Verificare stare endpoint-uri kelionai.app |
+| `npm run dev` | Start development server |
+| `npm start` | Start production server |
+| `npm test` | Run Playwright E2E tests (Chromium) |
+| `npm run test:all` | Run tests on all browsers |
+| `npm run setup` | Interactive API key setup (writes .env) |
+| `npm run setup:full` | Full automated setup: Railway + Supabase + deploy |
+| `npm run setup:db` | Configure Supabase database |
+| `npm run deploy` | Quick redeploy: git push + Railway + health check |
+| `npm run health` | Check kelionai.app endpoint health |
 
 ## Database
 
