@@ -135,30 +135,30 @@ class KelionBrain {
 
         try {
             const contextParts = [];
-            if (toolResults.search) contextParts.push(`Cautare web: ${String(toolResults.search).substring(0, 500)}`);
-            if (toolResults.weather) contextParts.push(`Meteo: ${toolResults.weather?.description || ''}`);
-            if (toolResults.memory) contextParts.push(`Memorie user: ${String(toolResults.memory).substring(0, 300)}`);
+            if (toolResults.search) contextParts.push(`Web search: ${String(toolResults.search).substring(0, 500)}`);
+            if (toolResults.weather) contextParts.push(`Weather: ${toolResults.weather?.description || ''}`);
+            if (toolResults.memory) contextParts.push(`User memory: ${String(toolResults.memory).substring(0, 300)}`);
 
             const lastMsgs = (history || []).slice(-5).map(h => `${h.role}: ${h.content?.substring(0, 100)}`).join('\n');
 
-            const prompt = `Esti motorul de gandire al unui asistent AI. Analizeaza si structureaza un plan de raspuns.
+            const prompt = `You are the reasoning engine of an AI assistant. Analyse the request and structure a response plan.
 
-CEREREA: "${message}"
-LIMBA: ${language}
-EMOTIE DETECTATA: ${analysis.emotionalTone}
-URGENTA: ${analysis.isEmergency ? 'DA' : 'nu'}
-${contextParts.length > 0 ? 'CONTEXT DISPONIBIL:\n' + contextParts.join('\n') : 'Fara context suplimentar.'}
-${lastMsgs ? 'ISTORIE RECENTA:\n' + lastMsgs : ''}
+REQUEST: "${message}"
+LANGUAGE: ${language}
+DETECTED EMOTION: ${analysis.emotionalTone}
+URGENT: ${analysis.isEmergency ? 'YES' : 'no'}
+${contextParts.length > 0 ? 'AVAILABLE CONTEXT:\n' + contextParts.join('\n') : 'No additional context.'}
+${lastMsgs ? 'RECENT HISTORY:\n' + lastMsgs : ''}
 
-Gandeste pas cu pas:
-1. Ce vrea utilizatorul la suprafata?
-2. Ce vrea in profunzime (nevoia reala)?
-3. Ce ton ar trebui sa am?
-4. Ce informatie cheie trebuie inclusa?
-5. Ce ar putea intreba in continuare?
-6. Plan de raspuns in 2-3 puncte.
+Think step by step:
+1. What does the user want on the surface?
+2. What do they want in depth (the real need)?
+3. What tone should I use?
+4. What key information must be included?
+5. What might they ask next?
+6. Response plan in 2-3 points.
 
-Raspunde STRICT cu JSON:
+Reply STRICTLY with JSON:
 {"surface":"...","deep_need":"...","tone":"...","key_info":["..."],"anticipate":"...","plan":["..."]}`;
 
             const r = await fetch('https://api.anthropic.com/v1/messages', {

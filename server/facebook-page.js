@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════════
 // KelionAI v2 — FACEBOOK PAGE AUTO-POST
-// Auto-publică știri pe pagina Facebook
+// Auto-publishes news to the Facebook Page
 // ═══════════════════════════════════════════════════════════════
 'use strict';
 

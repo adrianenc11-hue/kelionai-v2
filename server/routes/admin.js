@@ -4,30 +4,11 @@
 'use strict';
 
 const express = require('express');
-const crypto = require('crypto');
 const logger = require('../logger');
 const { version } = require('../../package.json');
+const { adminAuth } = require('../middleware/auth');
 
 const router = express.Router();
-
-// ═══ ADMIN AUTH MIDDLEWARE ═══
-function adminAuth(req, res, next) {
-    const secret = req.headers['x-admin-secret'];
-    const expected = process.env.ADMIN_SECRET_KEY;
-    if (!secret || !expected) {
-        return res.status(401).json({ error: 'Unauthorized' });
-    }
-    try {
-        const secretBuf = Buffer.from(secret);
-        const expectedBuf = Buffer.from(expected);
-        if (secretBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(secretBuf, expectedBuf)) {
-            return res.status(401).json({ error: 'Unauthorized' });
-        }
-    } catch (e) {
-        return res.status(401).json({ error: 'Unauthorized' });
-    }
-    next();
-}
 
 // GET /api/brain
 router.get('/brain', adminAuth, (req, res) => {

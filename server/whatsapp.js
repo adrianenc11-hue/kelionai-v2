@@ -10,6 +10,7 @@ const crypto = require('crypto');
 const fetch = require('node-fetch');
 const FormData = require('form-data');
 const logger = require('./logger');
+const { getVoiceId } = require('./config/voices');
 
 const router = express.Router();
 
@@ -319,9 +320,7 @@ async function transcribeAudio(audioBuffer, mimeType) {
 async function generateSpeech(text, lang, character) {
     const apiKey = process.env.ELEVENLABS_API_KEY;
     if (!apiKey) return null;
-    const voiceId = character === 'kira'
-        ? (process.env.ELEVENLABS_VOICE_KIRA || 'EXAVITQu4vr4xnSDxMaL')
-        : (process.env.ELEVENLABS_VOICE_KELION || 'VR6AewLTigWG4xSOukaG');
+    const voiceId = getVoiceId(character);
 
     const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
         method: 'POST',
