@@ -184,6 +184,20 @@ router.post('/webhook', async (req, res) => {
                 const msgCount = (senderMessageCount.get(senderId) || 0) + 1;
                 senderMessageCount.set(senderId, msgCount);
 
+                // Welcome tagline on FIRST message only (in detected language)
+                if (msgCount === 1) {
+                    const lang = detectLanguage(text);
+                    const taglines = {
+                        ro: '🌍 KelionAI — Suport în orice limbă',
+                        en: '🌍 KelionAI — Support in any language',
+                        de: '🌍 KelionAI — Hilfe in jeder Sprache',
+                        fr: '🌍 KelionAI — Aide dans toutes les langues',
+                        es: '🌍 KelionAI — Soporte en cualquier idioma',
+                        it: '🌍 KelionAI — Supporto in qualsiasi lingua'
+                    };
+                    await sendMessage(senderId, taglines[lang] || taglines.en);
+                }
+
                 // Subscription + site prompt ONLY at free limit (end of free period)
                 if (msgCount === FREE_MESSAGES_LIMIT) {
                     setTimeout(async () => {
