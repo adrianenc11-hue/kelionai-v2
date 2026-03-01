@@ -127,6 +127,7 @@ const COMMANDS = {
             `📋 <b>Comenzi disponibile:</b>\n` +
             `/stiri — Ultimele știri din România\n` +
             `/breaking — Breaking news\n` +
+            `/banc — Bancuri românești 😂\n` +
             `/despre — Despre KelionAI\n` +
             `/help — Ajutor\n\n` +
             `💬 Sau pur și simplu scrie-mi un mesaj și îți răspund cu AI!`;
@@ -134,7 +135,37 @@ const COMMANDS = {
             replyMarkup: {
                 inline_keyboard: [[
                     { text: '🌐 Deschide KelionAI', url: 'https://kelionai.app' },
-                    { text: '📰 Știri', callback_data: 'cmd_stiri' }
+                    { text: '📰 Știri', callback_data: 'cmd_stiri' },
+                    { text: '😂 Banc', callback_data: 'cmd_banc' }
+                ]]
+            }
+        });
+    },
+
+    '/banc': async (chatId) => {
+        const jokes = [
+            'De ce nu joacă peștii tenis? Pentru că le e frică de fileu! 🐟',
+            'Bulă la școală: "Doamna învățătoare, pot fi pedepsit pentru ceva ce n-am făcut?" "Nu, Bulă." "Bine, nu mi-am făcut temele." 📚',
+            'Ce face un crocodil când întâlnește o femeie frumoasă? O complimentează! 🐊',
+            'Un optimist și un pesimist la bar. Pesimistul: "Mai rău de atât nu se poate!" Optimistul: "Ba da, se poate!" 🍺',
+            'Cum se numește un magician care și-a pierdut magia? Ian. 🪄',
+            'Bulă: "Tată, am luat 10 la matematică!" "Bravo! La ce?" "La un test de 100..." 📝',
+            'De ce merg programatorii la plajă? Ca să facă debugging! 🏖️',
+            'Ce-i spune un semafon altuia? Nu te uita la mine că mă schimb! 🚦',
+            'Care e cea mai lungă propoziție din lume? Închisoare pe viață. ⚖️',
+            'Ce face un vampir informatician? Dă byte! 🧛',
+            'De ce poartă scafandrii casca pe spate? Pentru că dacă o purtau pe față nu mai vedeau! 🤿',
+            'Bulă: "Mama, la școală mi se spune mincinosul!" "Tu la școală nu mergi, Bulă!" 🏫',
+            'Cum se numește un câine fără picioare? Nu contează, oricum nu vine când îl chemi! 🐕',
+            'Ce scrie pe mormântul unui electrician? A avut un scurtcircuit! ⚡',
+            'De ce nu se ceartă munții? Pentru că au vârfuri comune! ⛰️'
+        ];
+        const joke = jokes[Math.floor(Math.random() * jokes.length)];
+        await sendMessage(chatId, `😂 <b>Bancul zilei:</b>\n\n${joke}\n\n<i>Alt banc? Apasă /banc</i>`, {
+            replyMarkup: {
+                inline_keyboard: [[
+                    { text: '😂 Alt banc', callback_data: 'cmd_banc' },
+                    { text: '🌐 KelionAI', url: 'https://kelionai.app' }
                 ]]
             }
         });
