@@ -46,9 +46,12 @@ html, body {
     min-height: 0;
 }
 
-/* ─── LEFT PANEL: Avatar + Chat (MARE) ──────────── */
+/* ─── LEFT PANEL: Avatar + Chat (NARROW SIDEKICK) ── */
 #left-panel {
-    width: 38%;
+    width: 320px;
+    min-width: 280px;
+    max-width: 360px;
+    flex-shrink: 0;
     height: 100%;
     display: flex;
     flex-direction: column;
@@ -317,7 +320,8 @@ html, body {
 
 /* ─── RIGHT: Display Monitor Premium ──────────── */
 #display-panel {
-    width: 62%;
+    flex: 1;
+    width: auto;
     height: 100%;
     display: flex;
     flex-direction: column;
