@@ -32,6 +32,7 @@ const { router: paymentsRouter, checkUsage, incrementUsage } = require('./paymen
 const legalRouter = require('./legal');
 const { router: messengerRouter, getStats: getMessengerStats } = require('./messenger');
 const { router: telegramRouter, broadcastNews } = require('./telegram');
+const { router: whatsappRouter, getStats: getWhatsAppStats } = require('./whatsapp');
 const fbPage = require('./facebook-page');
 const instagram = require('./instagram');
 const developerRouter = require('./routes/developer');
@@ -1180,6 +1181,7 @@ app.use('/api/payments', paymentsRouter);
 app.use('/api/legal', legalRouter);
 app.use('/api/messenger', messengerRouter);
 app.use('/api/telegram', express.json(), telegramRouter);
+app.use('/api/whatsapp', whatsappRouter);
 app.use('/api/developer', developerRouter);
 app.use('/api', developerRouter); // mounts /api/v1/* endpoints
 
