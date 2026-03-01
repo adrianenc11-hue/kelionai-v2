@@ -1069,10 +1069,48 @@ router.get('/paper-balance', (req, res) => {
     res.json({ balance: tradeEngine.getPaperBalance(), trades: tradeEngine.getPaperTrades().slice(-20), mode: tradeEngine.isPaperMode() ? 'PAPER' : 'LIVE' });
 });
 
+// ═══ RISK PROFILES ═══
+
+router.get('/risk-profile', (req, res) => {
+    res.json(tradeEngine.getRiskProfile());
+});
+
+router.post('/risk-profile', (req, res) => {
+    const { profile } = req.body || {};
+    if (!profile) return res.status(400).json({ error: 'profile required (conservative, moderate, aggressive, yolo)' });
+    const result = tradeEngine.setRiskProfile(profile.toLowerCase());
+    if (result.error) return res.status(400).json(result);
+    logger.info({ component: 'Trading', profile: result.profile }, `Risk profile changed to ${result.emoji} ${result.profile}`);
+    res.json(result);
+});
+
+router.get('/projections', (req, res) => {
+    const capital = parseFloat(req.query.capital) || 10;
+    const profiles = {};
+    for (const [key, p] of Object.entries(tradeEngine.RISK_PROFILES)) {
+        const dailyRate = 1 + (p.projections.daily / 100);
+        profiles[key] = {
+            name: p.name, emoji: p.emoji, risk: p.riskPct + '%',
+            sl: (p.DEFAULT_STOP_LOSS_PCT * 100) + '%', tp: (p.DEFAULT_TAKE_PROFIT_PCT * 100) + '%',
+            results: {
+                '1_day': +(capital * Math.pow(dailyRate, 1)).toFixed(2),
+                '1_week': +(capital * Math.pow(dailyRate, 7)).toFixed(2),
+                '1_month': +(capital * Math.pow(dailyRate, 30)).toFixed(2),
+                '3_months': +(capital * Math.pow(dailyRate, 90)).toFixed(2),
+                '6_months': +(capital * Math.pow(dailyRate, 180)).toFixed(2),
+                '1_year': +(capital * Math.pow(dailyRate, 365)).toFixed(2),
+            },
+            maxDrawdown5Losses: +((1 - Math.pow(1 - p.DEFAULT_STOP_LOSS_PCT, 5)) * 100).toFixed(1) + '%',
+        };
+    }
+    res.json({ capital, currency: 'lei', profiles, activeProfile: tradeEngine.getRiskProfile().active, disclaimer: DISCLAIMER });
+});
+
 // ═══════════════════════════════════════════════════════════════
 // EXPORTS
 // ═══════════════════════════════════════════════════════════════
 module.exports = router;
+
 module.exports.calculateRSI = calculateRSI;
 module.exports.calculateMACD = calculateMACD;
 module.exports.calculateBollingerBands = calculateBollingerBands;

@@ -13,24 +13,90 @@ const logger = require('./logger');
 // CONFIGURATION
 // ═══════════════════════════════════════════════════════════════════════════
 
+// ═══ RISK PROFILES ═══
+const RISK_PROFILES = {
+    conservative: {  // 1% risk
+        name: 'CONSERVATIVE', emoji: '🛡️', riskPct: 1,
+        MAX_RISK_PCT: 0.01, MIN_CONFLUENCE: 70,
+        DEFAULT_STOP_LOSS_PCT: 0.01, DEFAULT_TAKE_PROFIT_PCT: 0.02,
+        MAX_OPEN_POSITIONS: 2, MAX_DAILY_TRADES: 5,
+        MAX_DAILY_LOSS_PCT: 0.03, MAX_WEEKLY_LOSS_PCT: 0.05,
+        COOLDOWN_AFTER_LOSS_MS: 600000, // 10 min
+        MAX_VOLATILITY_PCT: 0.05,
+        projections: { daily: 0.65, weekly: 4.63, monthly: 21.4, sixMonths: 221, yearly: 969 },
+    },
+    moderate: {  // 2% risk (DEFAULT)
+        name: 'MODERATE', emoji: '⚖️', riskPct: 2,
+        MAX_RISK_PCT: 0.02, MIN_CONFLUENCE: 60,
+        DEFAULT_STOP_LOSS_PCT: 0.02, DEFAULT_TAKE_PROFIT_PCT: 0.04,
+        MAX_OPEN_POSITIONS: 3, MAX_DAILY_TRADES: 10,
+        MAX_DAILY_LOSS_PCT: 0.05, MAX_WEEKLY_LOSS_PCT: 0.10,
+        COOLDOWN_AFTER_LOSS_MS: 300000, // 5 min
+        MAX_VOLATILITY_PCT: 0.08,
+        projections: { daily: 1.30, weekly: 9.47, monthly: 47.6, sixMonths: 931, yearly: 11020 },
+    },
+    aggressive: {  // 5% risk
+        name: 'AGGRESSIVE', emoji: '🔥', riskPct: 5,
+        MAX_RISK_PCT: 0.05, MIN_CONFLUENCE: 55,
+        DEFAULT_STOP_LOSS_PCT: 0.05, DEFAULT_TAKE_PROFIT_PCT: 0.10,
+        MAX_OPEN_POSITIONS: 4, MAX_DAILY_TRADES: 15,
+        MAX_DAILY_LOSS_PCT: 0.10, MAX_WEEKLY_LOSS_PCT: 0.20,
+        COOLDOWN_AFTER_LOSS_MS: 180000, // 3 min
+        MAX_VOLATILITY_PCT: 0.12,
+        projections: { daily: 3.25, weekly: 25.2, monthly: 161, sixMonths: 31820, yearly: 'extreme' },
+    },
+    yolo: {  // 10% risk
+        name: 'YOLO', emoji: '💀', riskPct: 10,
+        MAX_RISK_PCT: 0.10, MIN_CONFLUENCE: 50,
+        DEFAULT_STOP_LOSS_PCT: 0.10, DEFAULT_TAKE_PROFIT_PCT: 0.20,
+        MAX_OPEN_POSITIONS: 5, MAX_DAILY_TRADES: 20,
+        MAX_DAILY_LOSS_PCT: 0.20, MAX_WEEKLY_LOSS_PCT: 0.35,
+        COOLDOWN_AFTER_LOSS_MS: 60000, // 1 min
+        MAX_VOLATILITY_PCT: 0.20,
+        projections: { daily: 6.50, weekly: 55.9, monthly: 562, sixMonths: 'extreme', yearly: 'extreme' },
+    },
+};
+
+// Active profile (changeable via API)
+let activeProfile = 'moderate';
+
 const CONFIG = {
-    MAX_RISK_PCT: 0.02,
-    MIN_CONFLUENCE: 60,
-    DEFAULT_STOP_LOSS_PCT: 0.02,
-    DEFAULT_TAKE_PROFIT_PCT: 0.04,
-    MAX_OPEN_POSITIONS: 3,
-    MAX_DAILY_TRADES: 10,
-    MAX_DAILY_LOSS_PCT: 0.05,
-    MAX_WEEKLY_LOSS_PCT: 0.10,
+    ...RISK_PROFILES[activeProfile],
     TRAILING_STOP_ACTIVATION: 0.02,
     TRAILING_STOP_DISTANCE: 0.01,
     MIN_VOLUME_RATIO: 1.2,
-    COOLDOWN_AFTER_LOSS_MS: 300000,
     EXTREME_FEAR_THRESHOLD: 20,
     EXTREME_GREED_THRESHOLD: 80,
-    MAX_VOLATILITY_PCT: 0.08,
     CORRELATED_ASSETS: { BTC: ['ETH', 'SOL'], ETH: ['BTC', 'SOL'], SOL: ['BTC', 'ETH'] },
 };
+
+function setRiskProfile(profile) {
+    if (!RISK_PROFILES[profile]) return { error: `Unknown profile. Available: ${Object.keys(RISK_PROFILES).join(', ')}` };
+    activeProfile = profile;
+    const p = RISK_PROFILES[profile];
+    Object.assign(CONFIG, p);
+    return { success: true, profile: p.name, emoji: p.emoji, riskPct: p.riskPct, config: p };
+}
+
+function getRiskProfile() {
+    const p = RISK_PROFILES[activeProfile];
+    return {
+        active: activeProfile, name: p.name, emoji: p.emoji, riskPct: p.riskPct,
+        stopLoss: (p.DEFAULT_STOP_LOSS_PCT * 100) + '%',
+        takeProfit: (p.DEFAULT_TAKE_PROFIT_PCT * 100) + '%',
+        rr: '2:1',
+        maxPositions: p.MAX_OPEN_POSITIONS,
+        maxDailyTrades: p.MAX_DAILY_TRADES,
+        dailyLossLimit: (p.MAX_DAILY_LOSS_PCT * 100) + '%',
+        weeklyLossLimit: (p.MAX_WEEKLY_LOSS_PCT * 100) + '%',
+        projections: p.projections,
+        allProfiles: Object.entries(RISK_PROFILES).map(([k, v]) => ({
+            id: k, name: v.name, emoji: v.emoji, risk: v.riskPct + '%',
+            sl: (v.DEFAULT_STOP_LOSS_PCT * 100) + '%', tp: (v.DEFAULT_TAKE_PROFIT_PCT * 100) + '%',
+        })),
+    };
+}
+
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 0. MACRO INTELLIGENCE — Fear & Greed, Market Regime, Volatility Guard
@@ -581,5 +647,5 @@ module.exports = {
     getOpenPositions: () => [...openPositions], getDailyTrades: () => [...dailyTrades],
     getPaperTrades: () => [...paperTrades], getPaperBalance: () => ({ ...paperBalance }),
     getDailyPnL: () => dailyPnL, getWeeklyPnL: () => weeklyPnL, isPaperMode: () => paperMode,
-    CONFIG,
+    CONFIG, RISK_PROFILES, setRiskProfile, getRiskProfile,
 };
