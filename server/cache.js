@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════════
 // KelionAI — Cache Layer
-// Redis (via REDIS_URL env) cu fallback graceful la in-memory TTL
-// Folosit pentru: session tokens, usage counters, weather cache
+// Redis (via REDIS_URL env) with graceful fallback to in-memory TTL
+// Used for: session tokens, usage counters, weather cache
 // ═══════════════════════════════════════════════════════════════
 'use strict';
 
@@ -12,17 +12,17 @@ const _memStore = new Map();
 let _redisClient = null;
 let _redisAvailable = false;
 
-// ── Cleanup interval: elimină entri expirate din memStore ────
+// ── Cleanup interval: removes expired entries from memStore ────
 setInterval(() => {
     const now = Date.now();
     for (const [key, entry] of _memStore.entries()) {
         if (now > entry.expires) _memStore.delete(key);
     }
-}, 60 * 1000); // cleanup la fiecare minut
+}, 60 * 1000); // cleanup every minute
 
 /**
- * Inițializează Redis dacă REDIS_URL este setat.
- * Fallback automat la in-memory dacă Redis nu e disponibil.
+ * Initializes Redis if REDIS_URL is set.
+ * Automatically falls back to in-memory if Redis is unavailable.
  */
 async function initCache() {
     if (!process.env.REDIS_URL) {
@@ -30,7 +30,7 @@ async function initCache() {
         return;
     }
     try {
-        // Dynamic import — redis e opțional
+        // Dynamic import — redis is optional
         const { createClient } = require('redis');
         _redisClient = createClient({
             url: process.env.REDIS_URL,
@@ -42,7 +42,7 @@ async function initCache() {
         });
         _redisClient.on('ready', () => {
             _redisAvailable = true;
-            logger.info({ component: 'Cache' }, '✅ Cache: Redis conectat');
+            logger.info({ component: 'Cache' }, '✅ Cache: Redis connected');
         });
         await _redisClient.connect();
     } catch (e) {
@@ -53,12 +53,12 @@ async function initCache() {
 }
 
 /**
- * Obține o valoare din cache.
+ * Gets a value from cache.
  * @param {string} key
  * @returns {Promise<any|null>}
  */
 async function cacheGet(key) {
-    // Încearcă Redis
+    // Try Redis
     if (_redisClient && _redisAvailable) {
         try {
             const val = await _redisClient.get(key);
@@ -75,13 +75,13 @@ async function cacheGet(key) {
 }
 
 /**
- * Salvează o valoare în cache cu TTL.
+ * Saves a value to cache with TTL.
  * @param {string} key
  * @param {any} value
- * @param {number} ttlSeconds - default 300 (5 minute)
+ * @param {number} ttlSeconds - default 300 (5 minutes)
  */
 async function cacheSet(key, value, ttlSeconds = 300) {
-    // Încearcă Redis
+    // Try Redis
     if (_redisClient && _redisAvailable) {
         try {
             await _redisClient.setEx(key, ttlSeconds, JSON.stringify(value));
@@ -95,7 +95,7 @@ async function cacheSet(key, value, ttlSeconds = 300) {
 }
 
 /**
- * Șterge o cheie din cache.
+ * Deletes a key from cache.
  * @param {string} key
  */
 async function cacheDel(key) {
@@ -106,7 +106,7 @@ async function cacheDel(key) {
 }
 
 /**
- * Returnează stats despre cache (pentru /api/health).
+ * Returns cache stats (for /api/health).
  */
 function getCacheStats() {
     return {

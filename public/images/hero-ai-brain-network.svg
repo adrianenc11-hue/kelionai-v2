@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="576" viewBox="0 0 1024 576">
+  <rect width="1024" height="576" fill="#050510"/>
+  <!-- Neural network nodes -->
+  <circle cx="200" cy="180" r="8" fill="#6366F1" opacity="0.9"/>
+  <circle cx="350" cy="120" r="6" fill="#06B6D4" opacity="0.8"/>
+  <circle cx="500" cy="200" r="10" fill="#6366F1" opacity="1"/>
+  <circle cx="650" cy="140" r="7" fill="#06B6D4" opacity="0.9"/>
+  <circle cx="800" cy="180" r="9" fill="#6366F1" opacity="0.8"/>
+  <circle cx="150" cy="320" r="7" fill="#06B6D4" opacity="0.7"/>
+  <circle cx="320" cy="280" r="9" fill="#6366F1" opacity="0.9"/>
+  <circle cx="500" cy="360" r="8" fill="#06B6D4" opacity="0.8"/>
+  <circle cx="700" cy="300" r="10" fill="#6366F1" opacity="1"/>
+  <circle cx="870" cy="340" r="7" fill="#06B6D4" opacity="0.9"/>
+  <circle cx="250" cy="440" r="6" fill="#6366F1" opacity="0.7"/>
+  <circle cx="450" cy="460" r="8" fill="#06B6D4" opacity="0.8"/>
+  <circle cx="620" cy="420" r="7" fill="#6366F1" opacity="0.9"/>
+  <circle cx="780" cy="450" r="9" fill="#06B6D4" opacity="0.8"/>
+  <!-- Connection beams -->
+  <line x1="200" y1="180" x2="350" y2="120" stroke="url(#beam1)" stroke-width="1.5" opacity="0.5"/>
+  <line x1="350" y1="120" x2="500" y2="200" stroke="url(#beam1)" stroke-width="1.5" opacity="0.5"/>
+  <line x1="500" y1="200" x2="650" y2="140" stroke="url(#beam1)" stroke-width="1.5" opacity="0.5"/>
+  <line x1="650" y1="140" x2="800" y2="180" stroke="url(#beam1)" stroke-width="1.5" opacity="0.5"/>
+  <line x1="200" y1="180" x2="320" y2="280" stroke="url(#beam2)" stroke-width="1.5" opacity="0.4"/>
+  <line x1="350" y1="120" x2="500" y2="360" stroke="url(#beam2)" stroke-width="1" opacity="0.3"/>
+  <line x1="500" y1="200" x2="500" y2="360" stroke="url(#beam2)" stroke-width="2" opacity="0.5"/>
+  <line x1="500" y1="200" x2="700" y2="300" stroke="url(#beam1)" stroke-width="1.5" opacity="0.4"/>
+  <line x1="650" y1="140" x2="700" y2="300" stroke="url(#beam2)" stroke-width="1.5" opacity="0.4"/>
+  <line x1="800" y1="180" x2="870" y2="340" stroke="url(#beam1)" stroke-width="1.5" opacity="0.4"/>
+  <line x1="320" y1="280" x2="500" y2="360" stroke="url(#beam2)" stroke-width="1.5" opacity="0.4"/>
+  <line x1="500" y1="360" x2="700" y2="300" stroke="url(#beam1)" stroke-width="1.5" opacity="0.5"/>
+  <line x1="700" y1="300" x2="870" y2="340" stroke="url(#beam2)" stroke-width="1.5" opacity="0.4"/>
+  <line x1="320" y1="280" x2="250" y2="440" stroke="url(#beam2)" stroke-width="1" opacity="0.3"/>
+  <line x1="500" y1="360" x2="450" y2="460" stroke="url(#beam1)" stroke-width="1.5" opacity="0.4"/>
+  <line x1="700" y1="300" x2="620" y2="420" stroke="url(#beam2)" stroke-width="1.5" opacity="0.4"/>
+  <line x1="870" y1="340" x2="780" y2="450" stroke="url(#beam1)" stroke-width="1.5" opacity="0.4"/>
+  <defs>
+    <linearGradient id="beam1" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#6366F1"/>
+      <stop offset="100%" stop-color="#06B6D4"/>
+    </linearGradient>
+    <linearGradient id="beam2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#06B6D4"/>
+      <stop offset="100%" stop-color="#6366F1"/>
+    </linearGradient>
+    <linearGradient id="textGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#6366F1"/>
+      <stop offset="100%" stop-color="#06B6D4"/>
+    </linearGradient>
+  </defs>
+  <!-- Label -->
+  <text x="512" y="530" font-family="Inter, system-ui, sans-serif" font-size="18" font-weight="600" fill="url(#textGrad)" text-anchor="middle" opacity="0.9">AI Neural Network</text>
+  <text x="512" y="554" font-family="Inter, system-ui, sans-serif" font-size="12" fill="#8888AA" text-anchor="middle">hero-ai-brain-network</text>
+</svg>
