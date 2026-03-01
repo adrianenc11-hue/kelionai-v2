@@ -95,6 +95,18 @@ async function postNews(article, imageUrl) {
     return await publishMedia(containerId);
 }
 
+// ═══ PUBLISH NEWS BATCH ═══
+async function publishNewsBatch(articles, maxPosts = 1) {
+    const results = [];
+    const toPost = articles.slice(0, maxPosts);
+    for (const article of toPost) {
+        const imageUrl = article.imageUrl || article.image_url;
+        const result = await postNews(article, imageUrl);
+        results.push({ title: article.title, mediaId: result });
+    }
+    return results;
+}
+
 // ═══ HEALTH ═══
 function getHealth() {
     return {
@@ -105,4 +117,4 @@ function getHealth() {
     };
 }
 
-module.exports = { postNews, createMediaContainer, publishMedia, formatCaption, getHealth };
+module.exports = { postNews, publishNewsBatch, createMediaContainer, publishMedia, formatCaption, getHealth };
