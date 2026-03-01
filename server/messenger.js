@@ -23,6 +23,11 @@ const RATE_LIMIT_MAX = 10;
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const senderRateLimits = new Map(); // senderId → { count, resetAt }
 
+// ═══ USER MESSAGE COUNTER (for site recommendations) ═══
+const senderMessageCount = new Map();
+const FREE_MESSAGES_LIMIT = 10;
+const RECOMMEND_SITE_AFTER = 3;
+
 function isRateLimited(senderId) {
     const now = Date.now();
     const entry = senderRateLimits.get(senderId);
@@ -163,6 +168,33 @@ router.post('/webhook', async (req, res) => {
                 await sendMessage(senderId, reply);
                 stats.repliesSent++;
                 logger.info({ component: 'Messenger', senderId }, 'Reply sent');
+
+                // ═══ USER ENGAGEMENT TRACKING ═══
+                const msgCount = (senderMessageCount.get(senderId) || 0) + 1;
+                senderMessageCount.set(senderId, msgCount);
+
+                // Site recommendation after 3rd message
+                if (msgCount === RECOMMEND_SITE_AFTER) {
+                    setTimeout(async () => {
+                        await sendMessage(senderId,
+                            '💡 Știai că poți folosi KelionAI cu avatare 3D?\n\n' +
+                            '🎭 Kelion și Kira te așteaptă pe site — voce naturală, căutare web, generare imagini!\n\n' +
+                            '🌐 Încearcă gratuit: https://kelionai.app');
+                    }, 2000);
+                }
+
+                // Subscription prompt at free limit
+                if (msgCount === FREE_MESSAGES_LIMIT) {
+                    setTimeout(async () => {
+                        await sendMessage(senderId,
+                            '⭐ Ai folosit ' + FREE_MESSAGES_LIMIT + ' mesaje gratuite!\n\n' +
+                            'Pentru conversații nelimitate + funcții premium:\n' +
+                            '• 💬 Chat nelimitat cu AI\n' +
+                            '• 🔊 Voce naturală\n' +
+                            '• 🖼️ Generare imagini\n\n' +
+                            '🌐 Abonează-te: https://kelionai.app/pricing');
+                    }, 3000);
+                }
             }
         }
     } catch (e) {
