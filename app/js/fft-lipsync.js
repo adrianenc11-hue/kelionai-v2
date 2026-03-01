@@ -33,7 +33,7 @@
 
             analyser = audioCtx.createAnalyser();
             analyser.fftSize = 256;
-            analyser.smoothingTimeConstant = 0.6;
+            analyser.smoothingTimeConstant = 0.3;
             dataArray = new Uint8Array(analyser.frequencyBinCount);
             console.log('[LipSync] Analyser connected to AudioContext, fftSize=256, bins=' + analyser.frequencyBinCount);
             return analyser;
@@ -58,7 +58,7 @@
                 var sourceNode = audioCtx.createMediaElementSource(audioEl);
                 analyser = audioCtx.createAnalyser();
                 analyser.fftSize = 256;
-                analyser.smoothingTimeConstant = 0.6;
+                analyser.smoothingTimeConstant = 0.3;
 
                 sourceNode.connect(analyser);
                 analyser.connect(audioCtx.destination);
@@ -100,7 +100,7 @@
         var avg = count > 0 ? sum / count : 0;
 
         // Normalize to 0-1 with sensitivity
-        var mouthOpen = Math.min(1, Math.max(0, (avg - 15) / 70));
+        var mouthOpen = Math.min(1, Math.max(0, (avg - 10) / 55));
 
         // Add slight variation for natural look
         if (mouthOpen > 0.05) {
@@ -128,7 +128,7 @@
                 if (idx !== undefined) {
                     // Smooth transition
                     var current = mesh.morphTargetInfluences[idx];
-                    mesh.morphTargetInfluences[idx] = current + (value - current) * 0.3;
+                    mesh.morphTargetInfluences[idx] = current + (value - current) * 0.5;
                 }
             }
         }
