@@ -1316,8 +1316,7 @@ app.locals._getNewsArticles = newsModule.getArticlesArray;
 // ═══ TRADING BOT (admin only) ═══
 app.use('/api/trading', adminAuth, require('./trading'));
 
-// ═══ SPORTS BOT (admin only) ═══
-app.use('/api/sports', adminAuth, require('./sports'));
+// ═══ SPORTS BOT — REMOVED (no real utility without betting integration) ═══
 
 // ═══ HEALTH ═══
 app.get('/api/health', (req, res) => {
