@@ -44,7 +44,7 @@
 
                 if (window.i18n) {
                     const det = i18n.detectLanguage(t);
-                    if (det && det !== detectedLanguage) detectedLanguage = det;
+                    if (det && det !== detectedLanguage) { detectedLanguage = det; i18n.setLanguage(det); }
                 }
 
                 const hasKelion = t.includes('kelion') || t.includes('chelion');
@@ -172,6 +172,7 @@
         if (!fftOk) { currentSourceNode.connect(ctx.destination); fallbackTextLipSync(fallbackText || ''); }
 
         KAvatar.setExpression('happy', 0.3);
+        KAvatar.setPresenting(true);
 
         // Auto-gestures during speech
         if (fallbackText) {
@@ -188,7 +189,7 @@
             }
         }
 
-        currentSourceNode.onended = () => { stopAllLipSync(); isSpeaking = false; currentSourceNode = null; KAvatar.setExpression('neutral'); resumeWakeDetection(); };
+        currentSourceNode.onended = () => { KAvatar.setPresenting(false); stopAllLipSync(); isSpeaking = false; currentSourceNode = null; KAvatar.setExpression('neutral'); resumeWakeDetection(); };
         currentSourceNode.start(0);
         console.log('[Voice] ✅ Audio playing (' + arrayBuf.byteLength + 'B)');
     }
@@ -231,6 +232,7 @@
 
     function stopSpeaking() {
         if (currentSourceNode) try { currentSourceNode.stop(); } catch(e){} currentSourceNode = null;
+        KAvatar.setPresenting(false);
         stopAllLipSync(); isSpeaking = false; KAvatar.setExpression('neutral');
     }
 
