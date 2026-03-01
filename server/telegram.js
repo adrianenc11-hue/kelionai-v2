@@ -25,6 +25,11 @@ const RATE_LIMIT_MAX = 15;
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const userRateLimits = new Map();
 
+// ═══ USER MESSAGE COUNTER (for site recommendations) ═══
+const userMessageCount = new Map();
+const FREE_MESSAGES_LIMIT = 10; // after this, recommend subscription
+const RECOMMEND_SITE_AFTER = 3;  // suggest site after 3rd message
+
 function isRateLimited(userId) {
     const now = Date.now();
     const entry = userRateLimits.get(userId);
@@ -145,7 +150,8 @@ const COMMANDS = {
                 if (a.url) msg += ` — <a href="${a.url}">citește</a>`;
                 msg += '\n\n';
             }
-            msg += `🔄 Actualizat automat la 05:00, 12:00, 18:00`;
+            msg += `🔄 Actualizat automat la 05:00, 12:00, 18:00\n\n`;
+            msg += `🌐 <i>Mai multe pe <a href="https://kelionai.app">kelionai.app</a> — AI cu avatar 3D!</i>`;
             await sendMessage(chatId, msg);
         } catch (e) {
             logger.error({ component: 'Telegram', err: e.message }, 'Stiri command error');
@@ -262,6 +268,10 @@ router.post('/webhook', async (req, res) => {
             return;
         }
 
+        // ═══ USER ENGAGEMENT TRACKING ═══
+        const msgCount = (userMessageCount.get(userId) || 0) + 1;
+        userMessageCount.set(userId, msgCount);
+
         // Use Brain AI
         let reply;
         const brain = req.app.locals.brain;
@@ -284,6 +294,42 @@ router.post('/webhook', async (req, res) => {
         }
 
         await sendMessage(chatId, escapeHtml(reply), { parseMode: undefined }); // Plain text for AI responses
+
+        // ═══ SITE RECOMMENDATION (after 3rd message) ═══
+        if (msgCount === RECOMMEND_SITE_AFTER) {
+            setTimeout(async () => {
+                await sendMessage(chatId,
+                    `💡 <b>Știai că poți folosi KelionAI cu avatar 3D?</b>\n\n` +
+                    `🎭 Kelion și Kira te așteaptă pe site — voce naturală, căutare web, generare imagini și multe altele!\n\n` +
+                    `🌐 Încearcă gratuit: https://kelionai.app`, {
+                    replyMarkup: {
+                        inline_keyboard: [[
+                            { text: '🚀 Deschide KelionAI', url: 'https://kelionai.app' }
+                        ]]
+                    }
+                });
+            }, 2000); // 2s delay to feel natural
+        }
+
+        // ═══ FREE LIMIT RECOMMENDATION ═══
+        if (msgCount === FREE_MESSAGES_LIMIT) {
+            setTimeout(async () => {
+                await sendMessage(chatId,
+                    `⭐ <b>Ai folosit ${FREE_MESSAGES_LIMIT} mesaje gratuite azi!</b>\n\n` +
+                    `Pentru conversații nelimitate + funcții premium:\n` +
+                    `• 💬 Chat nelimitat cu AI\n` +
+                    `• 🔊 Voce naturală\n` +
+                    `• 🖼️ Generare imagini\n` +
+                    `• 📊 Căutare web avansată\n\n` +
+                    `🌐 Abonează-te: https://kelionai.app/pricing`, {
+                    replyMarkup: {
+                        inline_keyboard: [[
+                            { text: '💎 Vezi planurile', url: 'https://kelionai.app/pricing' }
+                        ]]
+                    }
+                });
+            }, 3000);
+        }
     } catch (e) {
         logger.error({ component: 'Telegram', err: e.message }, 'Webhook handler error');
     }
