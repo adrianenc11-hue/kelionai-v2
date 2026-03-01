@@ -8,6 +8,7 @@
 const express = require('express');
 const crypto = require('crypto');
 const fetch = require('node-fetch');
+const FormData = require('form-data');
 const logger = require('./logger');
 
 const router = express.Router();
@@ -20,6 +21,14 @@ const GRAPH_API = 'https://graph.facebook.com/v21.0';
 
 // ═══ STATS ═══
 const stats = { messagesReceived: 0, repliesSent: 0, activeUsers: new Set() };
+
+// ═══ STARTUP VALIDATION ═══
+if (!process.env.WA_ACCESS_TOKEN) {
+    logger.warn({ component: 'WhatsApp' }, 'WA_ACCESS_TOKEN is not set — bot will not send messages');
+}
+if (!process.env.WA_PHONE_NUMBER_ID) {
+    logger.warn({ component: 'WhatsApp' }, 'WA_PHONE_NUMBER_ID is not set — bot will not send messages');
+}
 
 // ═══ CHARACTER SELECTION (Kelion or Kira) ═══
 const chatCharacter = new Map(); // chatId → 'kelion' | 'kira'
@@ -139,7 +148,7 @@ async function sendTextMessage(to, text) {
 }
 
 // ═══ SEND WHATSAPP AUDIO MESSAGE ═══
-async function sendAudioMessage(to, audioUrl) {
+async function sendAudioMessage(to, mediaId) {
     if (!WA_TOKEN || !PHONE_NUMBER_ID) return;
     const res = await fetch(`${GRAPH_API}/${PHONE_NUMBER_ID}/messages`, {
         method: 'POST',
@@ -148,7 +157,7 @@ async function sendAudioMessage(to, audioUrl) {
             messaging_product: 'whatsapp',
             to,
             type: 'audio',
-            audio: { link: audioUrl }
+            audio: { id: mediaId }
         })
     });
     if (res.ok) {
@@ -162,19 +171,53 @@ async function sendAudioMessage(to, audioUrl) {
 // ═══ DOWNLOAD WHATSAPP MEDIA ═══
 async function downloadMedia(mediaId) {
     if (!WA_TOKEN) return null;
-    // Step 1: get media URL
-    const metaRes = await fetch(`${GRAPH_API}/${mediaId}`, {
-        headers: { 'Authorization': `Bearer ${WA_TOKEN}` }
-    });
-    if (!metaRes.ok) return null;
-    const meta = await metaRes.json();
+    try {
+        // Step 1: get media URL
+        const metaRes = await fetch(`${GRAPH_API}/${mediaId}`, {
+            headers: { 'Authorization': `Bearer ${WA_TOKEN}` }
+        });
+        if (!metaRes.ok) {
+            logger.error({ component: 'WhatsApp', mediaId, status: metaRes.status }, 'Failed to get media URL');
+            return null;
+        }
+        const meta = await metaRes.json();
 
-    // Step 2: download binary
-    const dataRes = await fetch(meta.url, {
-        headers: { 'Authorization': `Bearer ${WA_TOKEN}` }
-    });
-    if (!dataRes.ok) return null;
-    return dataRes.buffer();
+        // Step 2: download binary
+        const dataRes = await fetch(meta.url, {
+            headers: { 'Authorization': `Bearer ${WA_TOKEN}` }
+        });
+        if (!dataRes.ok) {
+            logger.error({ component: 'WhatsApp', mediaId, status: dataRes.status }, 'Failed to download media');
+            return null;
+        }
+        return dataRes.buffer();
+    } catch (e) {
+        logger.error({ component: 'WhatsApp', mediaId, err: e.message }, 'downloadMedia error');
+        return null;
+    }
+}
+
+// ═══ UPLOAD MEDIA TO WHATSAPP ═══
+async function uploadMedia(buffer, mimeType) {
+    if (!WA_TOKEN || !PHONE_NUMBER_ID) return null;
+    try {
+        const form = new FormData();
+        form.append('file', buffer, { filename: 'audio.ogg', contentType: mimeType || 'audio/ogg' });
+        form.append('messaging_product', 'whatsapp');
+        const res = await fetch(`${GRAPH_API}/${PHONE_NUMBER_ID}/media`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${WA_TOKEN}`, ...form.getHeaders() },
+            body: form
+        });
+        if (res.ok) {
+            const data = await res.json();
+            return data.id || null;
+        }
+        logger.error({ component: 'WhatsApp', status: res.status }, 'Media upload failed');
+    } catch (e) {
+        logger.error({ component: 'WhatsApp', err: e.message }, 'uploadMedia error');
+    }
+    return null;
 }
 
 // ═══ SPEECH-TO-TEXT (Whisper via OpenAI or Groq) ═══
@@ -184,7 +227,6 @@ async function transcribeAudio(audioBuffer, mimeType) {
         ? 'https://api.groq.com/openai/v1'
         : 'https://api.openai.com/v1';
 
-    const FormData = require('form-data');
     const form = new FormData();
     form.append('file', audioBuffer, { filename: 'audio.ogg', contentType: mimeType || 'audio/ogg' });
     form.append('model', process.env.GROQ_API_KEY ? 'whisper-large-v3' : 'whisper-1');
@@ -247,8 +289,14 @@ router.post('/webhook', async (req, res) => {
     res.sendStatus(200); // Always respond 200 first
 
     try {
-        const body = typeof req.body === 'string' ? JSON.parse(req.body) :
-            Buffer.isBuffer(req.body) ? JSON.parse(req.body.toString()) : req.body;
+        let body;
+        try {
+            body = typeof req.body === 'string' ? JSON.parse(req.body) :
+                Buffer.isBuffer(req.body) ? JSON.parse(req.body.toString()) : req.body;
+        } catch (parseErr) {
+            logger.error({ component: 'WhatsApp', err: parseErr.message }, 'Failed to parse request body');
+            return;
+        }
 
         if (!body.entry) return;
 
@@ -283,11 +331,11 @@ router.post('/webhook', async (req, res) => {
                             const audioBuffer = await downloadMedia(msg.audio.id);
                             if (audioBuffer) {
                                 userText = await transcribeAudio(audioBuffer, msg.audio.mime_type);
-                                if (!userText) userText = '[Nu am putut transcrie mesajul vocal]';
+                                if (!userText) userText = '[Could not transcribe voice message]';
                             }
                         } catch (e) {
                             logger.error({ component: 'WhatsApp', err: e.message }, 'Audio processing failed');
-                            userText = '[Eroare procesare audio]';
+                            userText = '[Audio processing error]';
                         }
                     } else if (msgType === 'video') {
                         // Video → analyze (extract audio, transcribe)
@@ -295,15 +343,15 @@ router.post('/webhook', async (req, res) => {
                             const videoBuffer = await downloadMedia(msg.video.id);
                             if (videoBuffer) {
                                 userText = await analyzeVideo(videoBuffer);
-                                if (!userText) userText = '[Nu am putut analiza videoclipul]';
+                                if (!userText) userText = '[Could not analyze video]';
                             }
                         } catch (e) {
                             logger.error({ component: 'WhatsApp', err: e.message }, 'Video processing failed');
-                            userText = '[Eroare procesare video]';
+                            userText = '[Video processing error]';
                         }
                     } else if (msgType === 'image') {
                         // Image with caption or analysis
-                        userText = msg.image.caption || 'Descrie această imagine';
+                        userText = msg.image.caption || 'Describe this image';
                     } else {
                         continue; // Skip unsupported types
                     }
@@ -381,9 +429,12 @@ router.post('/webhook', async (req, res) => {
                         try {
                             const speechBuffer = await generateSpeech(reply);
                             if (speechBuffer) {
-                                // Upload audio to a temporary URL or send inline
-                                // For now, send text only — TTS requires media upload
-                                logger.info({ component: 'WhatsApp' }, 'TTS generated, text response sent');
+                                const mediaId = await uploadMedia(speechBuffer, 'audio/ogg');
+                                if (mediaId) {
+                                    await sendAudioMessage(phone, mediaId);
+                                } else {
+                                    logger.warn({ component: 'WhatsApp' }, 'TTS audio upload failed, text-only response sent');
+                                }
                             }
                         } catch (e) {
                             logger.warn({ component: 'WhatsApp', err: e.message }, 'TTS failed');

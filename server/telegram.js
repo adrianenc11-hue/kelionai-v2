@@ -6,9 +6,28 @@
 'use strict';
 
 const express = require('express');
+const fetch = require('node-fetch');
 const logger = require('./logger');
 
 const router = express.Router();
+
+// ═══ AUTO-REGISTER WEBHOOK ON STARTUP ═══
+if (process.env.TELEGRAM_BOT_TOKEN) {
+    const webhookUrl = (process.env.APP_URL || 'https://kelionai.app') + '/api/telegram/webhook';
+    setTimeout(async () => {
+        try {
+            const res = await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/setWebhook`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url: webhookUrl, allowed_updates: ['message', 'callback_query'] })
+            });
+            const data = await res.json();
+            logger.info({ component: 'Telegram', success: data.ok, webhookUrl }, 'Webhook auto-registered');
+        } catch (e) {
+            logger.error({ component: 'Telegram', err: e.message }, 'Webhook auto-registration failed');
+        }
+    }, 5000);
+}
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const CHANNEL_ID = process.env.TELEGRAM_CHANNEL_ID; // optional — for broadcasting news
@@ -295,6 +314,8 @@ router.post('/webhook', async (req, res) => {
             const chatId = update.callback_query.message?.chat?.id;
             if (chatId && cbData === 'cmd_stiri') {
                 await COMMANDS['/stiri'](chatId, '', req.app);
+            } else if (chatId && cbData === 'cmd_banc') {
+                await COMMANDS['/banc'](chatId);
             }
             // Answer callback to remove loading state
             if (BOT_TOKEN) {
