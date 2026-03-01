@@ -85,6 +85,21 @@ const changeEmailSchema = z.object({
     email: z.string().email(),
 });
 
+const referralGenerateSchema = z.object({});
+
+const referralSendInviteSchema = z.object({
+    code: z.string().min(1).max(100),
+    email: z.string().email(),
+});
+
+const referralVerifySchema = z.object({
+    code: z.string().min(1).max(100),
+});
+
+const referralRedeemSchema = z.object({
+    code: z.string().min(1).max(100),
+});
+
 // ═══ MIDDLEWARE FACTORY ═══
 
 function validate(schema) {
@@ -121,4 +136,8 @@ module.exports = {
     resetPasswordSchema,
     changePasswordSchema,
     changeEmailSchema,
+    referralGenerateSchema,
+    referralSendInviteSchema,
+    referralVerifySchema,
+    referralRedeemSchema,
 };

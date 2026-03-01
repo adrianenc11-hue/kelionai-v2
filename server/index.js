@@ -29,6 +29,7 @@ const { KelionBrain } = require('./brain');
 const logger = require('./logger');
 const { router: paymentsRouter } = require('./payments');
 const legalRouter = require('./legal');
+const { router: referralRouter } = require('./referral');
 const { router: messengerRouter, getStats: getMessengerStats, notifySubscribersNews, setSupabase: setMessengerSupabase } = require('./messenger');
 const { router: telegramRouter, broadcastNews } = require('./telegram');
 const { router: whatsappRouter } = require('./whatsapp');
@@ -270,6 +271,7 @@ app.use('/api/vision', visionRouter);
 app.use('/api/imagine', imagesRouter);
 app.use('/api', adminRouter);
 app.use('/api/health', healthRouter);
+app.use('/api/referral', referralRouter);
 
 // ═══ BRAIN DASHBOARD (live monitoring) ═══
 app.get('/dashboard', adminAuth, (req, res) => {
