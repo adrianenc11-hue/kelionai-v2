@@ -45,7 +45,8 @@ const weatherRouter = require('./routes/weather');
 const visionRouter = require('./routes/vision');
 const imagesRouter = require('./routes/images');
 const authRouter = require('./routes/auth');
-const { router: adminRouter, adminAuth } = require('./routes/admin');
+const adminRouter = require('./routes/admin').router;
+const { adminAuth } = require('./middleware/auth');
 const healthRouter = require('./routes/health');
 const identityRouter = require('./routes/identity');
 
