@@ -99,11 +99,28 @@ async function saveKnownUser(senderId, lang, name, supabase) {
 // LANGUAGE DETECTION
 function detectLanguage(text) {
     var t = (text || '').toLowerCase();
+    // Script-based detection first (unambiguous)
+    if (/[\u0600-\u06FF]/.test(text)) return 'ar';
+    if (/[\u0590-\u05FF]/.test(text)) return 'he';
+    if (/[\u3040-\u309F\u30A0-\u30FF]/.test(text)) return 'ja';
+    if (/[\u4E00-\u9FFF]/.test(text)) return 'zh';
+    if (/[\uAC00-\uD7AF]/.test(text)) return 'ko';
+    if (/[\u0900-\u097F]/.test(text)) return 'hi';
+    if (/[\u0400-\u04FF]/.test(text)) {
+        if (/\b(я|ти|він|вона|ми|ви|вони|привіт|дякую|так|ні)\b/.test(text)) return 'uk';
+        return 'ru';
+    }
+    // Latin-based detection
     if (/\b(the|is|are|what|how|can|will|do|you|my|hi|hello|help|please)\b/.test(t)) return 'en';
-    if (/\b(der|die|das|ist|und|ich|ein|wie|was)\b/.test(t)) return 'de';
-    if (/\b(le|la|les|est|et|un|une|je|que|comment|bonjour)\b/.test(t)) return 'fr';
-    if (/\b(el|los|es|un|una|que|como|por|hola)\b/.test(t)) return 'es';
-    if (/\b(il|lo|di|che|un|una|come|sono|ciao)\b/.test(t)) return 'it';
+    if (/\b(și|sau|este|sunt|pentru|care|cum|unde|vreau|poți|bună|salut|mulțumesc)\b/.test(t)) return 'ro';
+    if (/\b(ich|du|er|sie|wir|ist|sind|mit|für|auf|hallo|danke|bitte|wie|was)\b/.test(t)) return 'de';
+    if (/\b(je|tu|il|elle|nous|est|avec|pour|dans|bonjour|merci|oui|non|comment)\b/.test(t)) return 'fr';
+    if (/\b(yo|tú|él|ella|nosotros|hola|gracias|sí|cómo|para)\b/.test(t)) return 'es';
+    if (/\b(io|tu|lui|lei|noi|ciao|grazie|sì|come|sono)\b/.test(t)) return 'it';
+    if (/\b(eu|tu|ele|ela|nós|olá|obrigado|sim|não|como|para)\b/.test(t)) return 'pt';
+    if (/\b(ik|jij|hij|zij|wij|hallo|dank|ja|nee|hoe)\b/.test(t)) return 'nl';
+    if (/\b(ja|ty|on|ona|my|cześć|dziękuję|tak|nie|jak)\b/.test(t)) return 'pl';
+    if (/\b(ben|sen|bu|için|ile|merhaba|teşekkür|evet|hayır)\b/.test(t)) return 'tr';
     return 'ro';
 }
 
@@ -123,6 +140,52 @@ function isRateLimited(senderId) {
     entry.count++;
     return false;
 }
+
+// ═══ ADMIN KEYWORD BLACKLIST ═══
+var ADMIN_KEYWORDS = /\b(admin|administrator|dashboard|panou\s*admin|setări\s*admin|settings\s*admin|admin\s*panel|admin\s*mode|deschide\s*admin)\b/i;
+
+// ═══ GROUP STATE — for smart intervention ═══
+var messengerGroupState = new Map(); // chatId -> { lastActivity, unansweredQuestions, lastIntervention }
+var GROUP_INTERVENTION_COOLDOWN = 5 * 60 * 1000;
+var GROUP_PAUSE_THRESHOLD = 2 * 60 * 1000;
+
+function updateMessengerGroupState(chatId, text) {
+    var state = messengerGroupState.get(chatId) || { lastActivity: 0, unansweredQuestions: [], lastIntervention: 0 };
+    state.lastActivity = Date.now();
+    if (text && text.trim().endsWith('?')) {
+        state.unansweredQuestions.push({ text: text, time: Date.now() });
+        if (state.unansweredQuestions.length > 5) state.unansweredQuestions.shift();
+    }
+    messengerGroupState.set(chatId, state);
+}
+
+function messengerShouldIntervene(chatId, isDirectlyAddressed) {
+    if (isDirectlyAddressed) return true;
+    var state = messengerGroupState.get(chatId);
+    if (!state) return false;
+    if (state.lastIntervention && Date.now() - state.lastIntervention < GROUP_INTERVENTION_COOLDOWN) return false;
+    if (Date.now() - state.lastActivity > GROUP_PAUSE_THRESHOLD && state.unansweredQuestions.length > 0) return true;
+    return false;
+}
+
+function getMessengerInterventionPrefix(lang) {
+    var prefixes = {
+        ro: 'Scuzați că intervin, dar cred că pot ajuta cu asta... ',
+        en: 'Sorry to jump in, but I might be able to help with that... ',
+        es: 'Disculpen la interrupción, pero creo que puedo ayudar... ',
+        fr: 'Excusez-moi d\'intervenir, mais je peux peut-être aider... ',
+        de: 'Entschuldigung, dass ich mich einmische, aber ich kann vielleicht helfen... ',
+        it: 'Scusate se mi intrometto, ma credo di poter aiutare... ',
+        pt: 'Desculpem a intromissão, mas talvez eu possa ajudar... ',
+        nl: 'Sorry dat ik me erbij mengt, maar ik kan misschien helpen... ',
+        pl: 'Przepraszam, że się wtrącam, ale może mogę pomóc... ',
+        ru: 'Извините, что вмешиваюсь, но я, возможно, могу помочь... ',
+        ja: '割り込んですみませんが、お手伝いできるかもしれません... ',
+        zh: '打扰一下，我或许可以帮上忙... '
+    };
+    return prefixes[lang] || prefixes.en;
+}
+
 
 // GET SENDER PROFILE
 async function getSenderProfile(senderId) {
@@ -742,6 +805,9 @@ router.post('/webhook', async function (req, res) {
 
                 if (!userText && !visionResponse) continue;
 
+                // ADMIN KEYWORD BLACKLIST — total silence for non-owners
+                if (userText && ADMIN_KEYWORDS.test(userText)) continue;
+
                 // GET SENDER NAME
                 var senderName = await getSenderProfile(senderId) || 'User';
                 addToHistory(senderId, senderName, userText);
@@ -811,6 +877,7 @@ router.post('/webhook', async function (req, res) {
 
                 // AI RESPONSE
                 var reply;
+                var detectedLangForReply = detectLanguage(userText || '');
                 if (visionResponse) {
                     reply = visionResponse;
                 } else {
@@ -824,7 +891,7 @@ router.post('/webhook', async function (req, res) {
                                 setTimeout(function () { reject(new Error('Brain timeout')); }, 20000);
                             });
                             var result = await Promise.race([
-                                brain.think(prompt, character, [], 'auto'),
+                                brain.think(prompt, character, [], detectedLangForReply || 'auto'),
                                 timeout
                             ]);
                             reply = (result && result.enrichedMessage) || 'Nu am putut procesa mesajul.';
