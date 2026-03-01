@@ -565,8 +565,20 @@
         { lang: 'ro', re: /\b(și|sau|este|sunt|pentru|care|cum|unde|vreau|poți|bună|salut|mulțumesc|te|îți|îmi|mai|dar|că|nu|da|eu|tu|el|ea|noi|voi|ei|ale|lui|sa|la|în|pe|cu|de|din|spre|până|când|dacă|acum|deja|mereu)\b/i },
         { lang: 'fr', re: /\b(je|tu|il|elle|nous|vous|ils|elles|est|sont|avec|pour|dans|sur|par|les|des|une|bonjour|merci|oui|non|comment|pourquoi|quoi|qui|où|quand|très|mais|ou|et|donc|or|ni|car|que|ce|cet|cette|mon|ton|son|ma|ta|sa)\b/i },
         { lang: 'de', re: /\b(ich|du|er|sie|wir|ihr|ist|sind|mit|für|auf|bei|aus|nach|von|über|unter|an|in|zu|ein|eine|der|die|das|und|oder|aber|nicht|ja|nein|hallo|danke|bitte|wie|was|wer|wo|wann|warum|auch|noch|schon)\b/i },
-        { lang: 'es', re: /\b(yo|tú|él|ella|nosotros|vosotros|ellos|es|son|con|para|en|por|de|del|hola|gracias|sí|no|cómo|por qué|qué|quién|dónde|cuándo|muy|pero|o|y|también|ya|más|menos|bueno|malo|grande|pequeño)\b/i },
-        { lang: 'it', re: /\b(io|tu|lui|lei|noi|voi|loro|è|sono|con|per|in|su|da|di|un|una|ciao|grazie|sì|no|come|perché|cosa|chi|dove|quando|molto|ma|o|e|anche|già|più|meno|buono|cattivo|grande|piccolo)\b/i },
+        { lang: 'es', re: /\b(yo|tú|él|ella|nosotros|vosotros|ellos|es|son|con|para|en|por|de|del|hola|gracias|sí|no|cómo|qué|quién|dónde|cuándo|muy|pero|también|ya|más|menos|bueno|malo|grande|pequeño)\b/i },
+        { lang: 'it', re: /\b(io|tu|lui|lei|noi|voi|loro|è|sono|con|per|in|su|da|di|un|una|ciao|grazie|sì|no|come|perché|cosa|chi|dove|quando|molto|ma|anche|già|più|meno|buono|cattivo|grande|piccolo)\b/i },
+        { lang: 'pt', re: /\b(eu|tu|ele|ela|nós|vós|eles|elas|é|são|com|para|em|por|de|do|da|um|uma|olá|obrigado|sim|não|como|por que|quê|quem|onde|quando|muito|mas|também|já|mais|menos|bom|mau)\b/i },
+        { lang: 'nl', re: /\b(ik|jij|hij|zij|wij|jullie|zij|is|zijn|met|voor|in|op|bij|uit|aan|van|het|de|een|hallo|dank|ja|nee|hoe|waarom|wat|wie|waar|wanneer|ook|al|meer|minder|goed|slecht)\b/i },
+        { lang: 'pl', re: /\b(ja|ty|on|ona|my|wy|oni|jest|są|z|dla|w|na|po|od|do|ten|ta|to|cześć|dziękuję|tak|nie|jak|dlaczego|co|kto|gdzie|kiedy|bardzo|ale|też|już|więcej|mniej|dobry|zły)\b/i },
+        { lang: 'ru', re: /\b(я|ты|он|она|мы|вы|они|есть|быть|с|для|в|на|по|от|к|привет|спасибо|да|нет|как|почему|что|кто|где|когда|очень|но|тоже|уже|больше|меньше|хороший|плохой)\b/i },
+        { lang: 'uk', re: /\b(я|ти|він|вона|ми|ви|вони|є|бути|з|для|в|на|по|від|до|привіт|дякую|так|ні|як|чому|що|хто|де|коли|дуже|але|також|вже|більше|менше|добрий|поганий)\b/i },
+        { lang: 'tr', re: /\b(ben|sen|o|biz|siz|onlar|bu|bir|için|ile|de|da|ve|ama|çok|ne|kim|nerede|nasıl|merhaba|teşekkür|evet|hayır|var|yok|iyi|kötü|büyük|küçük)\b/i },
+        { lang: 'ar', re: /[\u0600-\u06FF]/ },
+        { lang: 'he', re: /[\u0590-\u05FF]/ },
+        { lang: 'ja', re: /[\u3040-\u309F\u30A0-\u30FF]/ },
+        { lang: 'zh', re: /[\u4E00-\u9FFF]/ },
+        { lang: 'ko', re: /[\uAC00-\uD7AF]/ },
+        { lang: 'hi', re: /[\u0900-\u097F]/ },
         { lang: 'en', re: /\b(the|is|are|was|were|with|for|and|or|but|in|on|at|to|of|a|an|hello|hi|thanks|thank|yes|no|how|why|what|who|where|when|very|also|already|more|less|good|bad|big|small)\b/i }
     ];
 
@@ -575,7 +587,7 @@
     // ─── Load saved language ────────────────────────────────────────────────
     try {
         var saved = localStorage.getItem('kelion_lang');
-        if (saved && SUPPORTED.indexOf(saved) !== -1) currentLang = saved;
+        if (saved) currentLang = saved;
     } catch (e) {}
 
     // ─── Translate a single key ─────────────────────────────────────────────
@@ -605,7 +617,7 @@
 
     // ─── setLanguage ────────────────────────────────────────────────────────
     function setLanguage(lang) {
-        if (!lang || SUPPORTED.indexOf(lang) === -1) return;
+        if (!lang) return;
         currentLang = lang;
         try { localStorage.setItem('kelion_lang', lang); } catch (e) {}
         applyTranslations();

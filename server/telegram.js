@@ -92,13 +92,31 @@ function isRateLimited(userId) {
 // ═══ AUTO-DETECT LANGUAGE ═══
 function detectLanguage(text) {
     const t = (text || '').toLowerCase();
+    // Script-based detection first (unambiguous)
+    if (/[\u0600-\u06FF]/.test(text)) return 'ar';
+    if (/[\u0590-\u05FF]/.test(text)) return 'he';
+    if (/[\u3040-\u309F\u30A0-\u30FF]/.test(text)) return 'ja';
+    if (/[\u4E00-\u9FFF]/.test(text)) return 'zh';
+    if (/[\uAC00-\uD7AF]/.test(text)) return 'ko';
+    if (/[\u0900-\u097F]/.test(text)) return 'hi';
+    if (/[\u0400-\u04FF]/.test(text)) {
+        if (/\b(я|ти|він|вона|ми|ви|вони|привіт|дякую|так|ні)\b/.test(text)) return 'uk';
+        return 'ru';
+    }
+    // Latin-based detection
     if (/\b(the|is|are|what|how|can|will|do|you|my|hi|hello|help|please)\b/.test(t)) return 'en';
-    if (/\b(der|die|das|ist|und|ich|ein|wie|was|können)\b/.test(t)) return 'de';
-    if (/\b(le|la|les|de|est|et|un|une|je|que|comment|bonjour)\b/.test(t)) return 'fr';
-    if (/\b(el|la|los|es|un|una|que|como|por|hola)\b/.test(t)) return 'es';
-    if (/\b(il|lo|la|di|che|un|una|come|sono|ciao)\b/.test(t)) return 'it';
+    if (/\b(și|sau|este|sunt|pentru|care|cum|unde|vreau|poți|bună|salut|mulțumesc)\b/.test(t)) return 'ro';
+    if (/\b(ich|du|er|sie|wir|ist|sind|mit|für|auf|hallo|danke|bitte|wie|was)\b/.test(t)) return 'de';
+    if (/\b(je|tu|il|elle|nous|est|avec|pour|dans|bonjour|merci|oui|non|comment)\b/.test(t)) return 'fr';
+    if (/\b(yo|tú|él|ella|nosotros|hola|gracias|sí|cómo|para)\b/.test(t)) return 'es';
+    if (/\b(io|tu|lui|lei|noi|ciao|grazie|sì|come|sono)\b/.test(t)) return 'it';
+    if (/\b(eu|tu|ele|ela|nós|olá|obrigado|sim|não|como|para)\b/.test(t)) return 'pt';
+    if (/\b(ben|sen|bu|için|ile|merhaba|teşekkür|evet|hayır)\b/.test(t)) return 'tr';
     return 'ro'; // default Romanian
 }
+
+// ═══ ADMIN KEYWORD BLACKLIST ═══
+const ADMIN_KEYWORDS = /\b(admin|administrator|dashboard|panou\s*admin|setări\s*admin|settings\s*admin|admin\s*panel|admin\s*mode|deschide\s*admin)\b/i;
 
 // ═══ SEND MESSAGE ═══
 async function sendMessage(chatId, text, options = {}) {
@@ -345,6 +363,9 @@ router.post('/webhook', async (req, res) => {
             return;
         }
 
+        // Admin keyword blacklist — total silence for non-owners
+        if (ADMIN_KEYWORDS.test(text)) return;
+
         // Check for commands
         const cmd = text.split(' ')[0].toLowerCase().split('@')[0]; // Remove @botname
         if (COMMANDS[cmd]) {
@@ -364,6 +385,7 @@ router.post('/webhook', async (req, res) => {
         userMessageCount.set(userId, msgCount);
 
         // Use Brain AI
+        const detectedLangTg = detectLanguage(text);
         let reply;
         const brain = req.app.locals.brain;
         if (brain) {
@@ -372,7 +394,7 @@ router.post('/webhook', async (req, res) => {
                     setTimeout(() => reject(new Error('Brain timeout')), 15000)
                 );
                 const result = await Promise.race([
-                    brain.think(text, 'kelion', [], 'auto'),
+                    brain.think(text, 'kelion', [], detectedLangTg || 'auto'),
                     timeout
                 ]);
                 reply = (result && result.enrichedMessage) || '🤔 Nu am putut procesa mesajul. Încearcă din nou.';

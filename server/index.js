@@ -47,6 +47,7 @@ const imagesRouter = require('./routes/images');
 const authRouter = require('./routes/auth');
 const { router: adminRouter, adminAuth } = require('./routes/admin');
 const healthRouter = require('./routes/health');
+const identityRouter = require('./routes/identity');
 
 const app = express();
 app.set('trust proxy', 1);
@@ -175,6 +176,11 @@ const _indexHtml = process.env.SENTRY_DSN
     )
     : _rawHtml;
 
+// Read 404.html once at startup (for admin stealth)
+const _raw404Html = fs.existsSync(path.join(__dirname, '..', 'app', '404.html'))
+    ? fs.readFileSync(path.join(__dirname, '..', 'app', '404.html'), 'utf8')
+    : '<!DOCTYPE html><html><body><h1>404 Not Found</h1></body></html>';
+
 // Serve main app with CSP nonce injection (express.static skips index.html for /)
 app.get('/', (req, res) => {
     const nonce = res.locals.cspNonce || '';
@@ -272,6 +278,7 @@ app.use('/api/imagine', imagesRouter);
 app.use('/api', adminRouter);
 app.use('/api/health', healthRouter);
 app.use('/api/referral', referralRouter);
+app.use('/api', identityRouter);
 
 // ═══ BRAIN DASHBOARD (live monitoring) ═══
 app.get('/dashboard', adminAuth, (req, res) => {
@@ -547,6 +554,29 @@ app.use('/api/trading', adminAuth, require('./trading'));
 // 404 for unknown API routes — must come before the catch-all
 app.use('/api', (req, res, next) => {
     res.status(404).json({ error: 'API endpoint not found' });
+});
+
+// ═══ ADMIN STEALTH — /admin/* returns 404 (same as unknown routes) for non-owners ═══
+app.get('/admin', (req, res, next) => {
+    const secret = req.headers['x-admin-secret'];
+    const expected = process.env.ADMIN_SECRET_KEY;
+    if (!secret || !expected) return res.status(404).type('html').send(_raw404Html);
+    try {
+        const sb = Buffer.from(secret), eb = Buffer.from(expected);
+        if (sb.length !== eb.length || !require('crypto').timingSafeEqual(sb, eb)) return res.status(404).type('html').send(_raw404Html);
+    } catch (e) { return res.status(404).type('html').send(_raw404Html); }
+    next();
+});
+app.use('/admin', express.static(path.join(__dirname, '..', 'app', 'admin')));
+app.get('/admin/*', (req, res, next) => {
+    const secret = req.headers['x-admin-secret'];
+    const expected = process.env.ADMIN_SECRET_KEY;
+    if (!secret || !expected) return res.status(404).type('html').send(_raw404Html);
+    try {
+        const sb = Buffer.from(secret), eb = Buffer.from(expected);
+        if (sb.length !== eb.length || !require('crypto').timingSafeEqual(sb, eb)) return res.status(404).type('html').send(_raw404Html);
+    } catch (e) { return res.status(404).type('html').send(_raw404Html); }
+    next();
 });
 
 app.get('*', (req, res) => {

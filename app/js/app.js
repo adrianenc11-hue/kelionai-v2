@@ -500,6 +500,58 @@
         if (window.KPayments) KPayments.showUsageBar();
         if (window.KTicker) KTicker.init();
 
+        // ─── Session exit: cleanup on tab/window close ────────────────
+        window.addEventListener('beforeunload', function() {
+            var token = sessionStorage.getItem('kelion_token');
+            if (token) {
+                try { navigator.sendBeacon('/api/auth/logout', JSON.stringify({ token: token })); } catch(e) {}
+            }
+            sessionStorage.clear();
+            if (window.KVoice) { try { KVoice.stopSpeaking(); } catch(e) {} }
+            if (window.i18n) { try { i18n.setLanguage('en'); } catch(e) {} }
+        });
+
+        // ─── Idle detection: logout after 30 min of inactivity ───────
+        var idleTimer = null;
+        function resetIdleTimer() {
+            clearTimeout(idleTimer);
+            if (sessionStorage.getItem('kelion_token')) {
+                idleTimer = setTimeout(function() {
+                    if (window.KAuth && KAuth.isLoggedIn()) {
+                        KAuth.logout().then(function() {
+                            sessionStorage.clear();
+                            if (window.KVoice) try { KVoice.stopSpeaking(); } catch(e) {}
+                            var authScr = document.getElementById('auth-screen');
+                            var appLayout = document.getElementById('app-layout');
+                            if (authScr) authScr.classList.remove('hidden');
+                            if (appLayout) appLayout.classList.add('hidden');
+                        });
+                    }
+                }, 30 * 60 * 1000);
+            }
+        }
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden) {
+                idleTimer = setTimeout(function() {
+                    if (window.KAuth && KAuth.isLoggedIn()) {
+                        KAuth.logout().then(function() {
+                            sessionStorage.clear();
+                            var authScr = document.getElementById('auth-screen');
+                            var appLayout = document.getElementById('app-layout');
+                            if (authScr) authScr.classList.remove('hidden');
+                            if (appLayout) appLayout.classList.add('hidden');
+                        });
+                    }
+                }, 30 * 60 * 1000);
+            } else {
+                clearTimeout(idleTimer);
+            }
+        });
+        ['click', 'keydown', 'touchstart', 'mousemove'].forEach(function(ev) {
+            document.addEventListener(ev, resetIdleTimer, { passive: true });
+        });
+        resetIdleTimer();
+
         // Restore last conversation from localStorage
         var savedConvId = restoreConvId();
         if (savedConvId) {

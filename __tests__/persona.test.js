@@ -57,7 +57,7 @@ describe('buildSystemPrompt', () => {
 
     test('injects current time context', () => {
         const prompt = buildSystemPrompt('kelion', 'ro', '', null, false);
-        expect(prompt).toContain('ACUM:');
+        expect(prompt).toContain('NOW:');
     });
 
     test('Kelion persona has catchphrases', () => {
