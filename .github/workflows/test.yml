@@ -45,6 +45,7 @@ jobs:
           name: coverage-report
           path: coverage/
           retention-days: 7
+          if-no-files-found: ignore
 
       - name: Verify live site is up
         id: health-check
@@ -59,11 +60,16 @@ jobs:
             exit 1
           fi
 
+      - name: Install Playwright browsers
+        id: playwright-install
+        continue-on-error: true
+        run: npx playwright install --with-deps chromium
+
       - name: Run E2E tests
         id: e2e-tests
-        if: steps.health-check.outcome == 'success'
+        if: steps.health-check.outcome == 'success' && steps.playwright-install.outcome == 'success'
         continue-on-error: true
-        run: npx playwright install --with-deps chromium && npx playwright test --config=playwright.config.js tests/e2e-full.spec.js --project=chromium
+        run: npx playwright test --config=playwright.config.js tests/e2e-full.spec.js --project=chromium
         env:
           BASE_URL: ${{ vars.BASE_URL || 'https://kelionai.app' }}
 

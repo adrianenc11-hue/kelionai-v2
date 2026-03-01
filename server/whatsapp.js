@@ -515,9 +515,6 @@ router.post('/webhook', async (req, res) => {
 
                     // Get selected character (default: kelion)
                     const character = chatCharacter.get(chatId) || 'kelion';
-                    const voiceId = character === 'kira'
-                        ? (process.env.ELEVENLABS_VOICE_KIRA || process.env.ELEVENLABS_VOICE_KELION)
-                        : (process.env.ELEVENLABS_VOICE_KELION || 'pNInz6obpgDQGcFmaJgB');
 
                     // ═══ AI RESPONSE (with conversation context) ═══
                     let reply;

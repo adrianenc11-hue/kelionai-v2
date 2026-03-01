@@ -18,6 +18,8 @@
     let textLipSync = null;
     let currentAvatar = 'kelion';
     let loadPromise = null;
+    let initRetryCount = 0;
+    const MAX_INIT_RETRIES = 50; // up to 5s total
 
     // Blink
     let blinkTimer = 0, nextBlink = 2 + Math.random() * 4, blinkPhase = 0, blinkValue = 0;
@@ -46,10 +48,16 @@
 
         // If container has no size yet (hidden/transitioning), wait and retry
         if (w === 0 || h === 0) {
-            console.warn('[Avatar] Container has 0 size, retrying in 100ms...');
-            setTimeout(init, 100);
+            if (initRetryCount < MAX_INIT_RETRIES) {
+                initRetryCount++;
+                console.warn('[Avatar] Container has 0 size, retrying in 100ms... (' + initRetryCount + '/' + MAX_INIT_RETRIES + ')');
+                setTimeout(init, 100);
+            } else {
+                console.error('[Avatar] Container never got a size after 5s — init aborted');
+            }
             return;
         }
+        initRetryCount = 0; // Reached only when w>0 && h>0 — reset counter for next potential call
 
         scene = new THREE.Scene();
         clock = new THREE.Clock();
