@@ -225,21 +225,11 @@
         <p>&copy; 2026 KelionAI. <a href="/api/legal/terms">Terms</a> · <a href="/api/legal/privacy">Privacy</a></p>
     </footer>
 
+    <script src="/js/shared.js"></script>
     <script>
     (function () {
         'use strict';
         var API = window.location.origin;
-
-        function getToken() {
-            try { return localStorage.getItem('kelion_token'); } catch (e) { return null; }
-        }
-
-        function authHeaders() {
-            var h = { 'Content-Type': 'application/json' };
-            var t = getToken();
-            if (t) h['Authorization'] = 'Bearer ' + t;
-            return h;
-        }
 
         function showMsg(text, type) {
             var el = document.getElementById('billing-message');
@@ -262,7 +252,7 @@
 
         async function openPortal() {
             try {
-                var r = await fetch(API + '/api/payments/portal', { method: 'POST', headers: authHeaders() });
+                var r = await fetch(API + '/api/payments/portal', { method: 'POST', headers: KShared.authHeaders() });
                 var d = await r.json();
                 if (d.url) window.location.href = d.url;
                 else showMsg(d.error || 'Portal error.', 'error');
@@ -270,7 +260,7 @@
         }
 
         async function init() {
-            var token = getToken();
+            var token = KShared.getToken();
             if (!token) {
                 document.getElementById('billing-content').innerHTML =
                     '<div class="billing-section"><p class="no-sub">You need to be signed in to view billing data. ' +
@@ -280,7 +270,7 @@
 
             var status;
             try {
-                var r = await fetch(API + '/api/payments/status', { headers: authHeaders() });
+                var r = await fetch(API + '/api/payments/status', { headers: KShared.authHeaders() });
                 if (!r.ok) throw new Error('HTTP ' + r.status);
                 status = await r.json();
             } catch (e) {

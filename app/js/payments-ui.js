@@ -2,62 +2,6 @@
     'use strict';
     var API = window.location.origin;
 
-    function authHeaders() {
-        return { 'Content-Type': 'application/json', ...(window.KAuth ? KAuth.getAuthHeaders() : {}) };
-    }
-
-    // ═══ Load plans from backend ═══
-    async function loadPlans() {
-        try {
-            var r = await fetch(API + '/api/payments/plans');
-            if (!r.ok) return [];
-            var d = await r.json();
-            return d.plans || [];
-        } catch (e) { return []; }
-    }
-
-    // ═══ Load current plan & usage ═══
-    async function loadStatus() {
-        try {
-            var r = await fetch(API + '/api/payments/status', { headers: authHeaders() });
-            if (!r.ok) return null;
-            return await r.json();
-        } catch (e) { return null; }
-    }
-
-    // ═══ Start checkout ═══
-    async function checkout(plan) {
-        if (!window.KAuth || !KAuth.isLoggedIn()) {
-            alert('You need to be signed in to upgrade.');
-            return;
-        }
-        try {
-            var body = { plan: plan };
-            var referralCode = null;
-            try { referralCode = localStorage.getItem('kelion_referral_code'); } catch (_e) {}
-            if (referralCode) body.referral_code = referralCode;
-            var r = await fetch(API + '/api/payments/checkout', {
-                method: 'POST', headers: authHeaders(),
-                body: JSON.stringify(body)
-            });
-            var d = await r.json();
-            if (d.url) window.location.href = d.url;
-            else alert(d.error || 'Checkout error');
-        } catch (e) { alert('Error processing payment.'); }
-    }
-
-    // ═══ Open billing portal ═══
-    async function openPortal() {
-        try {
-            var r = await fetch(API + '/api/payments/portal', {
-                method: 'POST', headers: authHeaders()
-            });
-            var d = await r.json();
-            if (d.url) window.location.href = d.url;
-            else alert(d.error || 'Portal error');
-        } catch (e) { alert('Error opening portal.'); }
-    }
-
     // ═══ Render pricing modal ═══
     async function renderPricing() {
         var grid = document.getElementById('pricing-grid');
@@ -66,8 +10,8 @@
 
         grid.innerHTML = '<div class="pricing-loading">Loading...</div>';
 
-        var plans = await loadPlans();
-        var status = await loadStatus();
+        var plans = await KShared.loadPlans();
+        var status = await KShared.loadStatus();
         var currentPlan = status ? status.plan : 'guest';
         var usage = (status && status.usage) ? status.usage : { chat: 0, search: 0, image: 0 };
 
@@ -122,7 +66,7 @@
                 btn.className = 'pricing-btn upgrade';
                 btn.textContent = 'Upgrade to ' + p.name;
                 btn.setAttribute('data-plan', p.id);
-                btn.addEventListener('click', function () { checkout(this.getAttribute('data-plan')); });
+                btn.addEventListener('click', function () { KShared.checkout(this.getAttribute('data-plan')); });
                 actionDiv.appendChild(btn);
             }
         }
@@ -133,7 +77,7 @@
             manageBtn.className = 'pricing-manage';
             manageBtn.innerHTML = '<button class="pricing-btn manage" id="btn-manage-sub">Manage subscription</button>';
             grid.parentNode.appendChild(manageBtn);
-            document.getElementById('btn-manage-sub').addEventListener('click', openPortal);
+            document.getElementById('btn-manage-sub').addEventListener('click', KShared.openPortal);
         }
     }
 
@@ -173,7 +117,7 @@
             document.body.appendChild(bar);
         }
 
-        var status = await loadStatus();
+        var status = await KShared.loadStatus();
         if (!status) { bar.style.display = 'none'; return; }
 
         var limits = status.limits || {};
