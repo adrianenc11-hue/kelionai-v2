@@ -14,7 +14,7 @@ const router = express.Router();
 
 // ═══ CONFIG ═══
 const PHONE_NUMBER_ID = process.env.WA_PHONE_NUMBER_ID || process.env.WHATSAPP_PHONE_NUMBER_ID;
-const WA_TOKEN = process.env.WA_ACCESS_TOKEN || process.env.WHATSAPP_TOKEN;
+const WA_TOKEN = process.env.WA_ACCESS_TOKEN || process.env.WHATSAPP_TOKEN || process.env.WHATSAPP_ACCESS_TOKEN;
 const WA_VERIFY_TOKEN = process.env.WA_VERIFY_TOKEN || process.env.WHATSAPP_VERIFY_TOKEN || 'kelionai_wa_verify_2026';
 const GRAPH_API = 'https://graph.facebook.com/v21.0';
 
