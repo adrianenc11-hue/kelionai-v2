@@ -186,7 +186,16 @@ router.post('/webhook', async (req, res) => {
 
                 // Welcome tagline on FIRST message only (in detected language)
                 if (msgCount === 1) {
-                    await sendMessage(senderId, '🌍 KelionAI — Support in any language | kelionai.app');
+                    const lang = detectLanguage(text);
+                    const welcomes = {
+                        ro: '🤖 Bun venit! Sunt KelionAI, asistentul tău AI. Cu ce te pot ajuta?',
+                        en: '🤖 Welcome! I\'m KelionAI, your AI assistant. How can I help you?',
+                        de: '🤖 Willkommen! Ich bin KelionAI, dein KI-Assistent. Wie kann ich dir helfen?',
+                        fr: '🤖 Bienvenue! Je suis KelionAI, votre assistant IA. Comment puis-je vous aider?',
+                        es: '🤖 ¡Bienvenido! Soy KelionAI, tu asistente IA. ¿Cómo puedo ayudarte?',
+                        it: '🤖 Benvenuto! Sono KelionAI, il tuo assistente IA. Come posso aiutarti?'
+                    };
+                    await sendMessage(senderId, welcomes[lang] || welcomes.en);
                 }
 
                 // Subscription + site prompt ONLY at free limit (end of free period)
