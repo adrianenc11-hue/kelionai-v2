@@ -29,7 +29,7 @@ const { KelionBrain } = require('./brain');
 const logger = require('./logger');
 const { router: paymentsRouter } = require('./payments');
 const legalRouter = require('./legal');
-const { router: messengerRouter, getStats: getMessengerStats } = require('./messenger');
+const { router: messengerRouter, getStats: getMessengerStats, notifySubscribersNews, setSupabase: setMessengerSupabase } = require('./messenger');
 const { router: telegramRouter, broadcastNews } = require('./telegram');
 const { router: whatsappRouter } = require('./whatsapp');
 const fbPage = require('./facebook-page');
@@ -514,6 +514,7 @@ app.get('/api/news/public', (req, res) => {
 app.use('/api/news', adminAuth, newsModule.router);
 newsModule.setSupabase(supabaseAdmin);
 newsModule.restoreCache();
+setMessengerSupabase(supabaseAdmin);
 
 // ═══ AUTO-PUBLISH: when news fetches, distribute to all media ═══
 newsModule.onNewsFetched(async (articles) => {
@@ -524,6 +525,8 @@ newsModule.onNewsFetched(async (articles) => {
     try { await broadcastNews(articles); } catch (e) { logger.warn({ component: 'MediaAutoPublish', err: e.message }, 'Telegram broadcast failed'); }
     // Instagram (top 1 article with default image)
     try { if (articles[0]) await instagram.postNews(articles[0]); } catch (e) { logger.warn({ component: 'MediaAutoPublish', err: e.message }, 'Instagram post failed'); }
+    // Messenger subscribers notification
+    try { await notifySubscribersNews(articles); } catch (e) { logger.warn({ component: 'MediaAutoPublish', err: e.message }, 'Messenger subscribers notification failed'); }
 });
 
 // ═══ STORE ARTICLES REF IN app.locals for Telegram bot ═══
