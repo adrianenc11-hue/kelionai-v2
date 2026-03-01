@@ -35,18 +35,12 @@ describe('cacheSet / cacheGet', () => {
     });
 
     test('returns null for an expired entry', async () => {
-        // Set a very short TTL (1 second) and wait for expiry
-        await cacheSet('test:ttl', 'expires', 1);
-        // Manually expire by directly advancing time via the internal map
-        // Since we cannot control time, we just verify behavior with a future-dated approach
-        // by setting expires in the past via a zero TTL workaround
-        const { cacheSet: cs, cacheGet: cg } = require('../server/cache');
-        await cs('test:zero', 'data', 0);
-        // Give a tick for expiry
-        await new Promise(r => setTimeout(r, 10));
-        const val = await cg('test:zero');
-        // May be null (expired) or 'data' depending on timing — just check it's string or null
-        expect(val === null || val === 'data').toBe(true);
+        const key = 'test:ttl:' + Date.now();
+        // Set a 1-second TTL, then wait 1.1s for expiry
+        await cacheSet(key, 'expires', 1);
+        await new Promise(r => setTimeout(r, 1100));
+        const val = await cacheGet(key);
+        expect(val).toBeNull();
     });
 });
 
@@ -59,7 +53,7 @@ describe('cacheDel', () => {
     });
 
     test('deleting a non-existent key does not throw', async () => {
-        await expect(cacheDel('test:nothere:abc')).resolves.not.toThrow();
+        await expect(async () => { await cacheDel('test:nothere:abc'); }).not.toThrow();
     });
 });
 
