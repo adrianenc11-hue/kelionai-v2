@@ -90,6 +90,34 @@ router.get('/webhook', (req, res) => {
     res.sendStatus(403);
 });
 
+// ═══ AUTO-SUBSCRIBE PAGE TO WEBHOOKS ═══
+router.get('/subscribe', async (req, res) => {
+    const token = process.env.FB_PAGE_ACCESS_TOKEN;
+    if (!token) return res.status(500).json({ error: 'FB_PAGE_ACCESS_TOKEN not set' });
+    try {
+        // Get page ID from token
+        const meRes = await fetch(`https://graph.facebook.com/v21.0/me?access_token=${token}`);
+        const me = await meRes.json();
+        if (!me.id) return res.status(500).json({ error: 'Cannot get page ID', details: me });
+
+        // Subscribe page to app webhooks
+        const subRes = await fetch(`https://graph.facebook.com/v21.0/${me.id}/subscribed_apps`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                subscribed_fields: 'messages,messaging_postbacks,message_deliveries,message_reads',
+                access_token: token
+            })
+        });
+        const result = await subRes.json();
+        logger.info({ component: 'Messenger', pageId: me.id, result }, 'Webhook subscription result');
+        res.json({ success: result.success, pageId: me.id, pageName: me.name, subscribed_fields: 'messages,messaging_postbacks,message_deliveries,message_reads' });
+    } catch (e) {
+        logger.error({ component: 'Messenger', err: e.message }, 'Subscribe failed');
+        res.status(500).json({ error: e.message });
+    }
+});
+
 // ═══ INCOMING MESSAGE HANDLER (POST) ═══
 // Note: express.raw() is applied in index.js for this route so req.body is a Buffer
 router.post('/webhook', async (req, res) => {
