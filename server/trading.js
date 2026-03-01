@@ -8,6 +8,7 @@
 const express = require('express');
 const rateLimit = require('express-rate-limit');
 const logger = require('./logger');
+const tradeEngine = require('./trade-executor');
 
 const router = express.Router();
 
@@ -852,6 +853,223 @@ router.get('/history', (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════════════════
+// TRADE EXECUTION ROUTES — Full integration of ALL modules
+// ═══════════════════════════════════════════════════════════════
+
+const tradeIntel = require('./trade-intelligence');
+
+// Initialize exchange on module load
+tradeEngine.initExchange();
+
+// POST /execute — FULL analysis + rules check + auto-trade
+router.post('/execute', async (req, res) => {
+    try {
+        const { symbol = 'BTC/USDT', action } = req.body || {};
+        const asset = symbol.replace('/USDT', '');
+        const { prices, volumes, source } = await fetchRealPrices(asset, 300);
+        if (!prices || prices.length < 50) {
+            return res.status(400).json({ error: 'Insufficient price data.' });
+        }
+
+        // Build OHLCV from close prices
+        const highs = prices.map((p, i) => i > 0 ? Math.max(p, prices[i - 1]) * 1.002 : p * 1.002);
+        const lows = prices.map((p, i) => i > 0 ? Math.min(p, prices[i - 1]) * 0.998 : p * 0.998);
+        const candles = prices.map((p, i) => ({ open: i > 0 ? prices[i - 1] : p, high: highs[i], low: lows[i], close: p }));
+        const lastPrice = prices[prices.length - 1];
+        const high = Math.max(...prices);
+        const low = Math.min(...prices);
+
+        // ── LAYER 1: Core Indicators (trading.js) ──
+        const rsi = calculateRSI(prices);
+        const macd = calculateMACD(prices);
+        const bollinger = calculateBollingerBands(prices);
+        const ema = calculateEMACrossover(prices);
+        const fibonacci = calculateFibonacci(high, low);
+        const volume = analyzeVolume(prices, volumes);
+        const sentiment = analyzeSentiment(`${asset} market analysis`);
+
+        // ── LAYER 2: Advanced Indicators (trade-executor.js) ──
+        const stochastic = tradeEngine.calculateStochastic(highs, lows, prices);
+        const williamsR = tradeEngine.calculateWilliamsR(highs, lows, prices);
+        const atr = tradeEngine.calculateATR(highs, lows, prices);
+        const atrPct = lastPrice > 0 ? atr / lastPrice : 0;
+        const adx = tradeEngine.calculateADX(highs, lows, prices);
+        const obv = tradeEngine.calculateOBV(prices, volumes);
+        const cci = tradeEngine.calculateCCI(highs, lows, prices);
+        const parabolicSAR = tradeEngine.calculateParabolicSAR(highs, lows);
+        const ichimoku = tradeEngine.calculateIchimoku(highs, lows, prices);
+        const mfi = tradeEngine.calculateMFI(highs, lows, prices, volumes);
+        const roc = tradeEngine.calculateROC(prices);
+
+        // ── LAYER 3: Pattern Recognition (trade-executor.js) ──
+        const candlestickPatterns = tradeEngine.detectCandlestickPatterns(candles);
+        const chartPatterns = tradeEngine.detectChartPatterns(prices);
+
+        // ── LAYER 4: Intelligence (trade-intelligence.js) ──
+        const rsiValues = prices.map((_, i) => {
+            if (i < 15) return 50;
+            const slice = prices.slice(0, i + 1);
+            return calculateRSI(slice).value;
+        });
+        const macdValues = prices.map((_, i) => {
+            if (i < 35) return 0;
+            return calculateMACD(prices.slice(0, i + 1)).macd;
+        });
+        const divergenceRSI = tradeIntel.detectDivergence(prices, rsiValues);
+        const divergenceMACD = tradeIntel.detectDivergence(prices, macdValues);
+        const pivotPoints = tradeIntel.calculatePivotPoints(
+            Math.max(...prices.slice(-24)),
+            Math.min(...prices.slice(-24)),
+            prices[prices.length - 1],
+            prices[prices.length - 24] || prices[0]
+        );
+        const keltner = tradeIntel.calculateKeltnerChannels(highs, lows, prices);
+        const aroon = tradeIntel.calculateAroon(highs, lows);
+        const advancedPatterns = tradeIntel.detectAdvancedChartPatterns(prices);
+
+        // ── LAYER 5: Macro Intelligence ──
+        const [fearGreed, newsData] = await Promise.all([
+            tradeEngine.fetchFearAndGreed(),
+            tradeIntel.fetchMarketNews(asset),
+        ]);
+        const marketRegime = tradeEngine.detectMarketRegime(adx, atrPct, roc);
+        const economicRisks = tradeIntel.getEconomicCalendarRisks();
+
+        // ── SUPER CONFLUENCE (everything combined) ──
+        const allPatterns = [...chartPatterns, ...advancedPatterns];
+        const superConfluence = tradeEngine.calculateSuperConfluence({
+            rsi, macd, bollinger, ema, fibonacci, volume, sentiment,
+            stochastic, williamsR, adx, obv, cci, parabolicSAR, ichimoku, mfi, roc,
+            candlestickPatterns, chartPatterns: allPatterns,
+            fearGreed, marketRegime,
+        });
+
+        // Determine trade action
+        const tradeAction = action || (superConfluence.signal.includes('BUY') ? 'BUY' : superConfluence.signal.includes('SELL') ? 'SELL' : null);
+
+        // ── TRADING RULES ENGINE — Must pass before execution ──
+        let rulesCheck = null;
+        let result = { executed: false, reason: 'No clear signal' };
+
+        if (tradeAction) {
+            rulesCheck = tradeIntel.evaluateTradingRules({
+                action: tradeAction, price: lastPrice,
+                confluence: superConfluence.confidence,
+                adx, atr, atrPct, rsi, volume, marketRegime, fearGreed, economicRisks,
+                openPositions: tradeEngine.getOpenPositions(),
+            });
+
+            if (rulesCheck.approved && superConfluence.confidence >= tradeEngine.CONFIG.MIN_CONFLUENCE) {
+                result = await tradeEngine.executeTrade(tradeAction, symbol, lastPrice, superConfluence, atrPct);
+            } else if (!rulesCheck.approved) {
+                result = { executed: false, reason: rulesCheck.summary };
+            } else {
+                result = { executed: false, reason: `Confluence too low: ${superConfluence.confidence}% (min: ${tradeEngine.CONFIG.MIN_CONFLUENCE}%)` };
+            }
+        }
+
+        res.json({
+            symbol, price: lastPrice, dataSource: source,
+            analysis: {
+                // Core (7)
+                rsi, macd, bollinger, ema, fibonacci, volume, sentiment,
+                // Advanced (10)
+                stochastic, adx, ichimoku, parabolicSAR, obv, cci, mfi, williamsR, roc, atr: { value: atr, pctOfPrice: +(atrPct * 100).toFixed(2) + '%' },
+                // Intelligence (4)
+                keltner, aroon, pivotPoints,
+                divergence: { rsi: divergenceRSI, macd: divergenceMACD },
+            },
+            patterns: {
+                candlestick: candlestickPatterns,
+                chart: chartPatterns,
+                advanced: advancedPatterns,
+                total: candlestickPatterns.length + allPatterns.length,
+            },
+            macro: {
+                fearGreed, marketRegime, economicRisks,
+                news: newsData,
+            },
+            superConfluence,
+            tradingRules: rulesCheck,
+            execution: result,
+            mode: tradeEngine.isPaperMode() ? 'PAPER' : 'LIVE',
+            totalIndicators: 21,
+            totalPatternTypes: 38,
+            disclaimer: DISCLAIMER,
+        });
+    } catch (err) {
+        logger.error({ err: err.message }, '[Trading] Execute error');
+        res.status(500).json({ error: 'Eroare la execuție.' });
+    }
+});
+
+// GET /full-analysis — Read-only analysis (no execution)
+router.get('/full-analysis/:asset?', async (req, res) => {
+    try {
+        const asset = req.params.asset || 'BTC';
+        const { prices, volumes, source } = await fetchRealPrices(asset, 300);
+        if (!prices || prices.length < 50) return res.status(400).json({ error: 'Insufficient data' });
+
+        const highs = prices.map((p, i) => i > 0 ? Math.max(p, prices[i - 1]) * 1.002 : p * 1.002);
+        const lows = prices.map((p, i) => i > 0 ? Math.min(p, prices[i - 1]) * 0.998 : p * 0.998);
+        const candles = prices.map((p, i) => ({ open: i > 0 ? prices[i - 1] : p, high: highs[i], low: lows[i], close: p }));
+        const lastPrice = prices[prices.length - 1];
+
+        const rsi = calculateRSI(prices);
+        const macd = calculateMACD(prices);
+        const adx = tradeEngine.calculateADX(highs, lows, prices);
+        const atr = tradeEngine.calculateATR(highs, lows, prices);
+        const atrPct = lastPrice > 0 ? atr / lastPrice : 0;
+        const roc = tradeEngine.calculateROC(prices);
+        const fearGreed = await tradeEngine.fetchFearAndGreed();
+        const marketRegime = tradeEngine.detectMarketRegime(adx, atrPct, roc);
+        const candlestickPatterns = tradeEngine.detectCandlestickPatterns(candles);
+        const chartPatterns = tradeEngine.detectChartPatterns(prices);
+        const advancedPatterns = tradeIntel.detectAdvancedChartPatterns(prices);
+        const keltner = tradeIntel.calculateKeltnerChannels(highs, lows, prices);
+        const aroon = tradeIntel.calculateAroon(highs, lows);
+        const pivots = tradeIntel.calculatePivotPoints(Math.max(...prices.slice(-24)), Math.min(...prices.slice(-24)), lastPrice, prices[Math.max(0, prices.length - 24)]);
+        const economicRisks = tradeIntel.getEconomicCalendarRisks();
+
+        res.json({
+            asset, price: lastPrice, dataSource: source,
+            indicators: { rsi, macd, adx, atr: { value: atr, pct: +(atrPct * 100).toFixed(2) }, roc, keltner, aroon, pivots },
+            patterns: { candlestick: candlestickPatterns, chart: chartPatterns, advanced: advancedPatterns },
+            macro: { fearGreed, marketRegime, economicRisks },
+            disclaimer: DISCLAIMER,
+        });
+    } catch (err) {
+        logger.error({ err: err.message }, '[Trading] Full analysis error');
+        res.status(500).json({ error: 'Eroare la analiză.' });
+    }
+});
+
+// GET /calendar — Economic calendar risks
+router.get('/calendar', (req, res) => {
+    res.json(tradeIntel.getEconomicCalendarRisks());
+});
+
+router.get('/positions', (req, res) => {
+    res.json({ positions: tradeEngine.getOpenPositions(), dailyPnL: tradeEngine.getDailyPnL(), weeklyPnL: tradeEngine.getWeeklyPnL(), mode: tradeEngine.isPaperMode() ? 'PAPER' : 'LIVE' });
+});
+
+router.post('/close/:tradeId', async (req, res) => {
+    const { currentPrice } = req.body || {};
+    if (!currentPrice) return res.status(400).json({ error: 'currentPrice required' });
+    const result = await tradeEngine.closePosition(req.params.tradeId, currentPrice, 'admin_manual');
+    res.json(result);
+});
+
+router.post('/kill-switch', async (req, res) => {
+    const result = await tradeEngine.killSwitch(req.body?.prices || {});
+    res.json({ killed: true, closedPositions: result });
+});
+
+router.get('/paper-balance', (req, res) => {
+    res.json({ balance: tradeEngine.getPaperBalance(), trades: tradeEngine.getPaperTrades().slice(-20), mode: tradeEngine.isPaperMode() ? 'PAPER' : 'LIVE' });
+});
+
+// ═══════════════════════════════════════════════════════════════
 // EXPORTS
 // ═══════════════════════════════════════════════════════════════
 module.exports = router;
@@ -864,4 +1082,5 @@ module.exports.calculateFibonacci = calculateFibonacci;
 module.exports.analyzeVolume = analyzeVolume;
 module.exports.analyzeSentiment = analyzeSentiment;
 module.exports.calculateConfluence = calculateConfluence;
-module.exports.generateSimulatedPrices = generateSimulatedPrices;
+module.exports.tradeEngine = tradeEngine;
+module.exports.tradeIntel = tradeIntel;
