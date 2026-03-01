@@ -6,6 +6,7 @@
 const express = require('express');
 const crypto = require('crypto');
 const logger = require('../logger');
+const { version } = require('../../package.json');
 
 const router = express.Router();
 
@@ -55,7 +56,7 @@ router.get('/admin/health-check', adminAuth, async (req, res) => {
         const m0 = Math.floor((upSec % 3600) / 60), s0 = Math.floor(upSec % 60);
         const mem = process.memoryUsage();
         const server = {
-            version: '2.3.0',
+            version,
             uptime: `${d0}d ${h0}h ${m0}m ${s0}s`,
             uptimeSeconds: Math.round(upSec),
             nodeVersion: process.version,
