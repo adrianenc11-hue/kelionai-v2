@@ -107,9 +107,6 @@
         }
     }
 
-    // ═══ Usage bar widget ═══ (disabled)
-    function showUsageBar() {}
-
     // ═══ Init ═══
     function init() {
         var pricingBtn = document.getElementById('btn-pricing');
@@ -138,7 +135,7 @@
         checkPaymentResult();
     }
 
-    window.KPayments = { init: init, showUpgradePrompt: showUpgradePrompt, renderPricing: renderPricing, showUsageBar: showUsageBar };
+    window.KPayments = { init: init, showUpgradePrompt: showUpgradePrompt, renderPricing: renderPricing };
 
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
     else init();
