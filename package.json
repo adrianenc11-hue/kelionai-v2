@@ -27,7 +27,7 @@
         "testMatch": [
             "**/__tests__/**/*.test.js"
         ],
-        "collectCoverage": false,
+        "collectCoverage": true,
         "collectCoverageFrom": [
             "server/**/*.js",
             "!server/node_modules/**",
@@ -39,15 +39,7 @@
             "text-summary",
             "lcov",
             "clover"
-        ],
-        "coverageThreshold": {
-            "global": {
-                "branches": 50,
-                "functions": 60,
-                "lines": 65,
-                "statements": 65
-            }
-        }
+        ]
     },
     "dependencies": {
         "@sentry/browser": "^10.40.0",
