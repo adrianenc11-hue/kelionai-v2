@@ -90,8 +90,19 @@
                 if (isReg) {
                     const d = await register(em, pw, nm);
                     if (err) { err.style.color = '#00ff88'; err.textContent = d.message || 'Please check your email to verify your account.'; }
+                    // Store referral code for redemption after email verification & login
+                    // (actual redemption happens at login time — see redeemStoredReferralCode)
                 } else {
                     await login(em, pw);
+                    // Redeem stored referral code if any
+                    const storedCode = localStorage.getItem('kelion_referral_code');
+                    if (storedCode) {
+                        try {
+                            const rr = await fetch(API + '/api/referral/redeem', { method: 'POST', headers: { 'Content-Type': 'application/json', ...getAuthHeaders() }, body: JSON.stringify({ code: storedCode }) });
+                            const rd = await rr.json();
+                            if (rd.success) localStorage.removeItem('kelion_referral_code');
+                        } catch(_e) {}
+                    }
                     scr.classList.add('hidden'); document.getElementById('app-layout').classList.remove('hidden'); updateUI();
                     if (window.KApp) KApp.loadConversations();
                 }
@@ -109,6 +120,27 @@
     async function init() { initUI(); const u = await checkSession();
         if (u) { document.getElementById('auth-screen')?.classList.add('hidden'); document.getElementById('app-layout')?.classList.remove('hidden'); updateUI(); }
         else { document.getElementById('auth-screen')?.classList.remove('hidden'); document.getElementById('app-layout')?.classList.add('hidden'); updateUI(); }
+        // Detect ?invite= URL param and store referral code
+        const params = new URLSearchParams(window.location.search);
+        const inviteCode = params.get('invite');
+        if (inviteCode && /^KEL-[0-9a-fA-F]{4}-[0-9a-fA-F]{6}-[A-Z0-9]{10}$/i.test(inviteCode)) {
+            localStorage.setItem('kelion_referral_code', inviteCode);
+            // Show bonus badge if register form is visible
+            const authScreen = document.getElementById('auth-screen');
+            if (authScreen && !authScreen.classList.contains('hidden')) {
+                let badge = document.getElementById('referral-bonus-badge');
+                if (!badge) {
+                    badge = document.createElement('div');
+                    badge.id = 'referral-bonus-badge';
+                    badge.style.cssText = 'background:rgba(0,255,136,0.1);border:1px solid rgba(0,255,136,0.3);border-radius:8px;padding:10px 14px;margin:8px 0;font-size:0.85rem;color:#00ff88;text-align:center;';
+                    badge.textContent = '🎁 Invitație de la un prieten! +5 zile bonus la prima subscripție';
+                    const form = authScreen.querySelector('#auth-form');
+                    if (form) form.insertBefore(badge, form.firstChild);
+                }
+            }
+            // Clean URL
+            window.history.replaceState({}, '', window.location.pathname);
+        }
         setInterval(async () => { if (localStorage.getItem('kelion_token') && isTokenExpired()) { const ok = await refreshToken(); if (!ok) { updateUI(); document.getElementById('auth-screen')?.classList.remove('hidden'); document.getElementById('app-layout')?.classList.add('hidden'); } } }, 5 * 60 * 1000); }
 
     window.KAuth = { init, register, login, logout, checkSession, getAuthHeaders, getUser: () => currentUser, isLoggedIn: () => !!currentUser, forgotPassword, changePassword, changeEmail };

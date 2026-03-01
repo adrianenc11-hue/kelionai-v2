@@ -23,7 +23,13 @@ router.post('/register', authLimiter, validate(registerSchema), async (req, res)
         if (!email || !password) return res.status(400).json({ error: 'Email and password are required' });
         if (!supabase) return res.status(503).json({ error: 'Auth service unavailable' });
         const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { full_name: name || email.split('@')[0] } } });
-        if (error) return res.status(400).json({ error: error.message });
+        if (error) {
+            // Don't expose whether email is already registered
+            const safeMessage = error.message.includes('already registered')
+                ? 'If this email is not already in use, a verification email has been sent.'
+                : error.message;
+            return res.status(400).json({ error: safeMessage });
+        }
         res.json({ user: { id: data.user.id, email: data.user.email, name: data.user.user_metadata?.full_name }, message: 'Please check your email to verify your account before signing in.' });
     } catch (e) { res.status(500).json({ error: 'Registration error' }); }
 });

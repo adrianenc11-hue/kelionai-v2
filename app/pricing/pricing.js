@@ -45,9 +45,13 @@
             return;
         }
         try {
+            var body = { plan: plan };
+            var referralCode = null;
+            try { referralCode = localStorage.getItem('kelion_referral_code'); } catch (_e) {}
+            if (referralCode) body.referral_code = referralCode;
             var r = await fetch(API + '/api/payments/checkout', {
                 method: 'POST', headers: authHeaders(),
-                body: JSON.stringify({ plan: plan })
+                body: JSON.stringify(body)
             });
             var d = await r.json();
             if (d.url) window.location.href = d.url;
