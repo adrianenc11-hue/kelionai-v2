@@ -57,6 +57,11 @@ describe('checkUsage', () => {
         expect(result.allowed).toBe(true);
     });
 
+    test('returns plan:guest (not free) for null userId', async () => {
+        const result = await checkUsage(null, 'chat', null);
+        expect(result.plan).toBe('guest');
+    });
+
     test('returns allowed:true for premium plan (unlimited)', async () => {
         // Mock supabaseAdmin that returns an active premium subscription
         const mockSupabase = {

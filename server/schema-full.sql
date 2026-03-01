@@ -74,7 +74,7 @@ CREATE TABLE IF NOT EXISTS usage (
 
 CREATE INDEX IF NOT EXISTS idx_usage_user_date ON usage(user_id, date);
 
--- ═══ REFERRALS ═══
+-- ═══ REFERRALS (legacy — kept for backward compat, no longer used for new codes) ═══
 CREATE TABLE IF NOT EXISTS referrals (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -85,6 +85,50 @@ CREATE TABLE IF NOT EXISTS referrals (
 
 CREATE INDEX IF NOT EXISTS idx_referrals_code ON referrals(code);
 CREATE INDEX IF NOT EXISTS idx_referrals_user ON referrals(user_id);
+
+-- ═══ REFERRAL CODES v2 (HMAC-signed, relational) ═══
+CREATE TABLE IF NOT EXISTS referral_codes (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    sender_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    code TEXT UNIQUE NOT NULL,
+    code_hash TEXT NOT NULL,
+    recipient_email TEXT,
+    recipient_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+    status TEXT NOT NULL DEFAULT 'active'
+        CHECK (status IN ('active', 'pending_send', 'sent', 'redeemed', 'expired', 'revoked')),
+    expires_at TIMESTAMPTZ NOT NULL,
+    sent_at TIMESTAMPTZ,
+    redeemed_at TIMESTAMPTZ,
+    redeemed_via TEXT,
+    sender_bonus_days INTEGER DEFAULT 0,
+    receiver_bonus_days INTEGER DEFAULT 0,
+    sender_bonus_applied BOOLEAN DEFAULT FALSE,
+    receiver_bonus_applied BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_refcodes_sender ON referral_codes(sender_id);
+CREATE INDEX IF NOT EXISTS idx_refcodes_code ON referral_codes(code);
+CREATE INDEX IF NOT EXISTS idx_refcodes_hash ON referral_codes(code_hash);
+CREATE INDEX IF NOT EXISTS idx_refcodes_status ON referral_codes(status);
+CREATE INDEX IF NOT EXISTS idx_refcodes_recipient ON referral_codes(recipient_email);
+CREATE INDEX IF NOT EXISTS idx_refcodes_expires ON referral_codes(expires_at);
+
+ALTER TABLE referral_codes ENABLE ROW LEVEL SECURITY;
+CREATE POLICY IF NOT EXISTS "users_own_referral_codes"
+    ON referral_codes FOR ALL
+    USING (auth.uid() = sender_id OR auth.uid() = recipient_id);
+
+-- ═══ WEBHOOK IDEMPOTENCY (persistent across restarts) ═══
+CREATE TABLE IF NOT EXISTS processed_webhook_events (
+    event_id TEXT PRIMARY KEY,
+    event_type TEXT,
+    processed_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_webhook_events_date ON processed_webhook_events(processed_at);
+-- Cleanup: DELETE FROM processed_webhook_events WHERE processed_at < NOW() - INTERVAL '30 days';
 
 -- ═══ BRAIN LEARNINGS ═══
 CREATE TABLE IF NOT EXISTS brain_learnings (

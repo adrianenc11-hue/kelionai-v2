@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="576" viewBox="0 0 1024 576">
+  <rect width="1024" height="576" fill="#050510"/>
+  <!-- Globe outline -->
+  <circle cx="512" cy="260" r="160" fill="none" stroke="url(#globeGrad)" stroke-width="2" opacity="0.8"/>
+  <!-- Latitude lines -->
+  <ellipse cx="512" cy="260" rx="160" ry="40" fill="none" stroke="#6366F1" stroke-width="1" opacity="0.4"/>
+  <ellipse cx="512" cy="220" rx="140" ry="30" fill="none" stroke="#6366F1" stroke-width="1" opacity="0.3"/>
+  <ellipse cx="512" cy="300" rx="140" ry="30" fill="none" stroke="#6366F1" stroke-width="1" opacity="0.3"/>
+  <ellipse cx="512" cy="180" rx="100" ry="20" fill="none" stroke="#06B6D4" stroke-width="1" opacity="0.3"/>
+  <ellipse cx="512" cy="340" rx="100" ry="20" fill="none" stroke="#06B6D4" stroke-width="1" opacity="0.3"/>
+  <!-- Longitude lines -->
+  <ellipse cx="512" cy="260" rx="40" ry="160" fill="none" stroke="#06B6D4" stroke-width="1" opacity="0.4"/>
+  <ellipse cx="512" cy="260" rx="80" ry="160" fill="none" stroke="#06B6D4" stroke-width="1" opacity="0.3"/>
+  <ellipse cx="512" cy="260" rx="120" ry="160" fill="none" stroke="#6366F1" stroke-width="1" opacity="0.3"/>
+  <!-- Search magnifier -->
+  <circle cx="620" cy="170" r="50" fill="none" stroke="url(#globeGrad)" stroke-width="3" opacity="0.9"/>
+  <line x1="657" y1="207" x2="690" y2="240" stroke="url(#globeGrad)" stroke-width="4" stroke-linecap="round" opacity="0.9"/>
+  <!-- Glow dots on globe -->
+  <circle cx="460" cy="230" r="5" fill="#06B6D4" opacity="0.9"/>
+  <circle cx="540" cy="280" r="4" fill="#6366F1" opacity="0.9"/>
+  <circle cx="490" cy="310" r="5" fill="#06B6D4" opacity="0.8"/>
+  <circle cx="565" cy="220" r="4" fill="#6366F1" opacity="0.8"/>
+  <circle cx="430" cy="270" r="3" fill="#06B6D4" opacity="0.7"/>
+  <defs>
+    <linearGradient id="globeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6366F1"/>
+      <stop offset="100%" stop-color="#06B6D4"/>
+    </linearGradient>
+    <linearGradient id="textGrad4" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#6366F1"/>
+      <stop offset="100%" stop-color="#06B6D4"/>
+    </linearGradient>
+  </defs>
+  <!-- Label -->
+  <text x="512" y="490" font-family="Inter, system-ui, sans-serif" font-size="18" font-weight="600" fill="url(#textGrad4)" text-anchor="middle" opacity="0.9">Search Globe</text>
+  <text x="512" y="514" font-family="Inter, system-ui, sans-serif" font-size="12" fill="#8888AA" text-anchor="middle">feature-search-globe</text>
+</svg>
