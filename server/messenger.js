@@ -222,13 +222,50 @@ router.post('/webhook', async (req, res) => {
                 if (brain) {
                     try {
                         const timeout = new Promise((_, reject) =>
-                            setTimeout(() => reject(new Error('Brain timeout')), 10000)
+                            setTimeout(() => reject(new Error('Brain timeout')), 15000)
                         );
-                        const result = await Promise.race([
+                        const thought = await Promise.race([
                             brain.think(userText, 'kelion', [], 'auto'),
                             timeout
                         ]);
-                        reply = (result && result.enrichedMessage) || faqReply(userText);
+
+                        // ── BUILD SYSTEM PROMPT ──
+                        const { buildSystemPrompt } = require('./persona');
+                        const systemPrompt = buildSystemPrompt('kelion', 'auto', '', {}, thought.chainOfThought);
+
+                        // ── CALL AI (Claude → GPT-4o fallback) ──
+                        const enrichedContext = thought.enrichedContext || thought.enrichedMessage || userText;
+                        const aiMsgs = [{ role: 'user', content: enrichedContext }];
+
+                        let aiReply = null;
+
+                        // Claude (primary)
+                        if (!aiReply && process.env.ANTHROPIC_API_KEY) {
+                            try {
+                                const r = await fetch('https://api.anthropic.com/v1/messages', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
+                                    body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 500, system: systemPrompt, messages: aiMsgs })
+                                });
+                                const d = await r.json();
+                                aiReply = d.content?.[0]?.text;
+                            } catch (e) { logger.warn({ component: 'Messenger', err: e.message }, 'Claude call failed'); }
+                        }
+
+                        // GPT-4o (fallback)
+                        if (!aiReply && process.env.OPENAI_API_KEY) {
+                            try {
+                                const r = await fetch('https://api.openai.com/v1/chat/completions', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + process.env.OPENAI_API_KEY },
+                                    body: JSON.stringify({ model: 'gpt-4o', max_tokens: 500, messages: [{ role: 'system', content: systemPrompt }, ...aiMsgs] })
+                                });
+                                const d = await r.json();
+                                aiReply = d.choices?.[0]?.message?.content;
+                            } catch (e) { logger.warn({ component: 'Messenger', err: e.message }, 'GPT-4o call failed'); }
+                        }
+
+                        reply = aiReply || faqReply(userText);
                     } catch (e) {
                         logger.warn({ component: 'Messenger', err: e.message }, 'Brain unavailable, using FAQ');
                         reply = faqReply(userText);
