@@ -584,10 +584,16 @@
 
     var currentLang = DEFAULT_LANG;
 
-    // ─── Load saved language ────────────────────────────────────────────────
+    // ─── Load saved language (or auto-detect from browser) ─────────────────
     try {
         var saved = localStorage.getItem('kelion_lang');
-        if (saved) currentLang = saved;
+        if (saved) {
+            currentLang = saved;
+        } else {
+            // Auto-detect from browser language on first visit
+            var browserLang = (navigator.language || '').split('-')[0].toLowerCase();
+            if (SUPPORTED.indexOf(browserLang) !== -1) currentLang = browserLang;
+        }
     } catch (e) {}
 
     // ─── Translate a single key ─────────────────────────────────────────────
