@@ -915,3 +915,97 @@ html, body {
     transition: var(--kelion-transition);
 }
 .ticker-disable:hover { color: rgba(240, 240, 255, 0.6); }
+/* ═══ RESPONSIVE — Mobile First ═══ */
+@media (max-width: 768px) {
+    #main-content {
+        flex-direction: column;
+    }
+    #left-panel {
+        width: 100%;
+        height: auto;
+        min-height: 0;
+        border-right: none;
+        border-bottom: 1px solid rgba(99, 102, 241, 0.08);
+    }
+    #avatar-area {
+        height: 35vh;
+        max-height: 280px;
+        flex: none;
+    }
+    #chat-area {
+        height: auto;
+        min-height: 120px;
+        flex: 1;
+    }
+    #display-panel {
+        width: 100%;
+        height: 50vh;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        z-index: 50;
+        transform: translateY(100%);
+        transition: transform 0.3s ease;
+        border-top: 1px solid rgba(99, 102, 241, 0.15);
+    }
+    #display-panel.mobile-visible {
+        transform: translateY(0);
+    }
+    #input-row {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        z-index: 60;
+        background: rgba(5, 5, 16, 0.95);
+        backdrop-filter: blur(12px);
+        padding: 8px 12px;
+        border-top: 1px solid rgba(99, 102, 241, 0.1);
+    }
+    .navbar {
+        padding: 8px 12px;
+    }
+    .navbar-logo {
+        font-size: 1rem;
+    }
+    #avatar-switcher {
+        gap: 6px;
+    }
+    .avatar-pill {
+        padding: 4px 10px;
+        font-size: 0.7rem;
+    }
+    #chat-overlay {
+        padding-bottom: 70px;
+    }
+    .home-btn-fixed {
+        bottom: 70px;
+    }
+}
+
+@media (max-width: 480px) {
+    #avatar-area {
+        height: 28vh;
+        max-height: 220px;
+    }
+    .navbar-links {
+        display: none !important;
+    }
+    #user-name {
+        max-width: 80px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+}
+
+/* Tablet landscape */
+@media (min-width: 769px) and (max-width: 1024px) {
+    #left-panel {
+        width: 45%;
+    }
+    #display-panel {
+        width: 55%;
+    }
+}

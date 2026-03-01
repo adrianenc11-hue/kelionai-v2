@@ -80,7 +80,7 @@
 
         // Lip sync — simple, uses Smile morph
         if (window.SimpleLipSync) lipSync = new SimpleLipSync();
-        if (window.TextLipSync) textLipSync = new TextLipSync({ msPerChar: 55 });
+        if (window.TextLipSync) textLipSync = new TextLipSync({ msPerChar: 38 });
 
         loadAvatar('kelion');
         window.addEventListener('resize', onResize);

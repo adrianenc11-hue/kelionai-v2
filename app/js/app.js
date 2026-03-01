@@ -380,6 +380,14 @@
         dp.addEventListener('dragover', function(e) { e.preventDefault(); dz.classList.remove('hidden'); });
         dp.addEventListener('dragleave', function(e) { if (!dp.contains(e.relatedTarget)) dz.classList.add('hidden'); });
         dp.addEventListener('drop', function(e) { e.preventDefault(); dz.classList.add('hidden'); handleFiles(e.dataTransfer.files); });
+
+        // Also support drag & drop on chat area
+        var chatArea = document.getElementById('chat-overlay') || document.getElementById('chat-area');
+        if (chatArea) {
+            chatArea.addEventListener('dragover', function(e) { e.preventDefault(); dz.classList.remove('hidden'); });
+            chatArea.addEventListener('dragleave', function(e) { if (!chatArea.contains(e.relatedTarget)) dz.classList.add('hidden'); });
+            chatArea.addEventListener('drop', function(e) { e.preventDefault(); dz.classList.add('hidden'); handleFiles(e.dataTransfer.files); });
+        }
     }
 
     async function handleFiles(fileList) {
@@ -498,6 +506,20 @@
         checkHealth();
         if (window.KTicker) KTicker.init();
 
+        // Mobile monitor toggle
+        if (window.innerWidth <= 768) {
+            var monitorToggle = document.createElement('button');
+            monitorToggle.id = 'mobile-monitor-toggle';
+            monitorToggle.textContent = '📺';
+            monitorToggle.title = 'Toggle Monitor';
+            monitorToggle.style.cssText = 'position:fixed;bottom:70px;right:16px;width:44px;height:44px;border-radius:50%;background:rgba(99,102,241,0.2);border:1px solid rgba(99,102,241,0.3);color:#fff;font-size:1.2rem;z-index:70;cursor:pointer;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(8px);';
+            document.body.appendChild(monitorToggle);
+            monitorToggle.addEventListener('click', function() {
+                var dp = document.getElementById('display-panel');
+                if (dp) dp.classList.toggle('mobile-visible');
+            });
+        }
+
         // ─── Session exit: cleanup on tab/window close ────────────────
         window.addEventListener('beforeunload', function() {
             var token = sessionStorage.getItem('kelion_token');
@@ -557,7 +579,12 @@
             fetch(API_BASE + '/api/conversations/' + savedConvId + '/messages', { headers: authHeaders() })
                 .then(function(r) { return r.ok ? r.json() : null; })
                 .then(function(data) {
-                    if (!data) return;
+                    if (!data) {
+                        currentConversationId = null;
+                        localStorage.removeItem('kelion_conv_id');
+                        addMessage('assistant', '💬 Previous conversation not found. Starting fresh!');
+                        return;
+                    }
                     var msgs = data.messages || data || [];
                     if (msgs.length === 0) return;
                     hideWelcome();
