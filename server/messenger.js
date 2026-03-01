@@ -562,6 +562,31 @@ router.get('/webhook', function (req, res) {
     res.sendStatus(403);
 });
 
+// ═══ AUTO-SUBSCRIBE PAGE TO WEBHOOKS ═══
+router.get('/subscribe', async function (req, res) {
+    var token = process.env.FB_PAGE_ACCESS_TOKEN;
+    if (!token) return res.status(500).json({ error: 'FB_PAGE_ACCESS_TOKEN not set' });
+    try {
+        var meRes = await fetch('https://graph.facebook.com/v21.0/me?access_token=' + token);
+        var me = await meRes.json();
+        if (!me.id) return res.status(500).json({ error: 'Cannot get page ID', details: me });
+        var subRes = await fetch('https://graph.facebook.com/v21.0/' + me.id + '/subscribed_apps', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                subscribed_fields: 'messages,messaging_postbacks,message_deliveries,message_reads',
+                access_token: token
+            })
+        });
+        var result = await subRes.json();
+        logger.info({ component: 'Messenger', pageId: me.id, result: result }, 'Webhook subscription result');
+        res.json({ success: result.success, pageId: me.id, pageName: me.name });
+    } catch (e) {
+        logger.error({ component: 'Messenger', err: e.message }, 'Subscribe failed');
+        res.status(500).json({ error: e.message });
+    }
+});
+
 // FEATURE 4: SETUP MENU ENDPOINT
 router.get('/setup-menu', async function (req, res) {
     var result = await setupPersistentMenu();
@@ -570,6 +595,7 @@ router.get('/setup-menu', async function (req, res) {
 
 // INCOMING MESSAGE HANDLER
 router.post('/webhook', async function (req, res) {
+
     res.sendStatus(200);
     try {
         // CRITICAL: req.body should be a Buffer because of express.raw() in index.js
