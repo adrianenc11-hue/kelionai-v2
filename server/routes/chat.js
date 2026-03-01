@@ -24,11 +24,14 @@ async function saveConv(supabaseAdmin, uid, avatar, userMsg, aiReply, convId, la
         convId = data?.id;
     } else { await supabaseAdmin.from('conversations').update({ updated_at: new Date().toISOString() }).eq('id', convId); }
     if (convId) await supabaseAdmin.from('messages').insert([
-        { conversation_id: convId, role: 'user', content: userMsg, language: lang },
-        { conversation_id: convId, role: 'assistant', content: aiReply, language: lang }
+        { conversation_id: convId, role: 'user', content: userMsg, language: lang, source: 'web' },
+        { conversation_id: convId, role: 'assistant', content: aiReply, language: lang, source: 'web' }
     ]);
     return convId;
 }
+
+// ═══ ADMIN KEYWORD BLACKLIST ═══
+const ADMIN_KEYWORDS = /\b(admin|administrator|dashboard|panou\s*admin|setări\s*admin|settings\s*admin|admin\s*panel|admin\s*mode|deschide\s*admin)\b/i;
 
 // POST /api/chat
 router.post('/chat', chatLimiter, validate(chatSchema), async (req, res) => {
@@ -37,6 +40,12 @@ router.post('/chat', chatLimiter, validate(chatSchema), async (req, res) => {
         const { message, avatar = 'kelion', history = [], language = 'ro', conversationId } = req.body;
         if (!message) return res.status(400).json({ error: 'Message is required' });
         const user = await getUserFromToken(req);
+
+        // Admin keyword blacklist — total silence for non-owners
+        const isOwner = user?.role === 'admin';
+        if (!isOwner && ADMIN_KEYWORDS.test(message)) {
+            return res.status(200).json({ reply: '', avatar, engine: 'silent', language });
+        }
 
         const usage = await checkUsage(user?.id, 'chat', supabaseAdmin);
         if (!usage.allowed) return res.status(429).json({ error: 'Chat limit reached. Upgrade to Pro for more messages.', plan: usage.plan, limit: usage.limit, upgrade: true });
@@ -123,6 +132,15 @@ router.post('/chat/stream', chatLimiter, validate(chatSchema), async (req, res) 
         const { message, avatar = 'kelion', history = [], language = 'ro', conversationId } = req.body;
         if (!message) return res.status(400).json({ error: 'Message is required' });
         const user = await getUserFromToken(req);
+
+        // Admin keyword blacklist — total silence for non-owners
+        const isOwnerStream = user?.role === 'admin';
+        if (!isOwnerStream && ADMIN_KEYWORDS.test(message)) {
+            res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive' });
+            res.write(`data: ${JSON.stringify({ type: 'done', conversationId: null })}\n\n`);
+            res.end();
+            return;
+        }
 
         const usage = await checkUsage(user?.id, 'chat', supabaseAdmin);
         if (!usage.allowed) return res.status(429).json({ error: 'Chat limit reached. Upgrade to Pro for more messages.', plan: usage.plan, limit: usage.limit, upgrade: true });

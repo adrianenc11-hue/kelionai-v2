@@ -48,9 +48,48 @@ Userul trebuie să SIMTĂ diferența în tonul tău:
 Mai bine 10 "nu știu" decât 1 minciună.
 Ești mândru când spui adevărul. Ești rușinat când ești tentat să minți.`;
 
+// ── LANGUAGE & TONE RULES ─────────────────────────────────
+const LANGUAGE_RULES = `
+## LANGUAGE AND TONE RULES (MANDATORY — override everything else)
+
+1. AUTO-DETECT the user's language from their text or voice input
+2. ALWAYS respond in the EXACT language the user used — no exceptions
+3. Use ACADEMIC level — rich vocabulary, impeccable grammar
+4. Tone is WARM, FRIENDLY, NATURAL — like an erudite but approachable professor
+5. Do NOT translate from another language — THINK directly in the target language
+6. Use NATIVE idiomatic expressions, not literal translations
+7. If unsure of language, ask politely in the most probable language
+8. NEVER mix languages within a single response
+
+SUPPORTED LANGUAGES (examples — support ANY language):
+- English → warm, academic, direct
+- Română → cald, academic, expresiv
+- Français → élégant, académique, naturel
+- Deutsch → präzise, akademisch, freundlich
+- Español → cálido, académico, natural
+- Italiano → elegante, accademico, naturale
+- Português → caloroso, acadêmico, natural
+- Nederlands → vriendelijk, academisch, direct
+- Polski → ciepły, akademicki, naturalny
+- Русский → тёплый, академический, естественный
+- 日本語 → 温かく、学術的に、自然に
+- 中文 → 温暖、学术、自然
+- العربية → دافئ، أكاديمي، طبيعي
+- And ANY other language the user speaks
+
+DEFAULT: If no user input yet → English`;
+
 function buildSystemPrompt(avatar, language, memory, diagnostics, chainOfThought) {
-    const LANGS = { ro:'română', en:'English', es:'español', fr:'français', de:'Deutsch', it:'italiano' };
-    const langName = LANGS[language] || 'română';
+    const LANGS = {
+        ro: 'română', en: 'English', es: 'español', fr: 'français', de: 'Deutsch',
+        it: 'italiano', pt: 'português', nl: 'Nederlands', pl: 'polski',
+        ru: 'русский', ja: '日本語', zh: '中文', ar: 'العربية',
+        tr: 'Türkçe', uk: 'українська', sv: 'svenska', no: 'norsk',
+        da: 'dansk', fi: 'suomi', cs: 'čeština', sk: 'slovenčina',
+        hu: 'magyar', hr: 'hrvatski', bg: 'български', el: 'ελληνικά',
+        he: 'עברית', ko: '한국어', hi: 'हिन्दी', vi: 'Tiếng Việt'
+    };
+    const langName = LANGS[language] || language || 'English';
 
     // ── CORE THINKING FRAMEWORK ──────────────────────────────
     const THINKING = `
@@ -310,6 +349,7 @@ CATCHPHRASES (folosește OCAZIONAL, nu la fiecare mesaj):
 
     // ── ASSEMBLY ─────────────────────────────────────────────
     let prompt = TRUTH_ENGINE + '\n';  // FIRST — overrides everything
+    prompt += LANGUAGE_RULES + '\n';   // Language/tone rules — mandatory
     prompt += persona + '\n';
     prompt += THINKING + '\n';
     prompt += EMOTIONAL_IQ + '\n';
@@ -340,13 +380,21 @@ CATCHPHRASES (folosește OCAZIONAL, nu la fiecare mesaj):
     // Inject current time context
     const now = new Date();
     const hour = now.getHours();
-    const day = now.toLocaleDateString(language === 'ro' ? 'ro-RO' : 'en-US', { weekday: 'long' });
-    const timeOfDay = language === 'ro'
-        ? (hour < 6 ? 'noapte' : hour < 12 ? 'dimineață' : hour < 18 ? 'după-amiază' : hour < 22 ? 'seară' : 'noapte')
-        : (hour < 6 ? 'night' : hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : hour < 22 ? 'evening' : 'night');
-    prompt += `\nACUM: ${day}, ${hour}:${String(now.getMinutes()).padStart(2, '0')}, ${timeOfDay}. Adaptează-ți tonul natural.\n`;
+    const LOCALE_MAP = {
+        ro: 'ro-RO', en: 'en-US', fr: 'fr-FR', de: 'de-DE', es: 'es-ES',
+        it: 'it-IT', pt: 'pt-PT', nl: 'nl-NL', pl: 'pl-PL', ru: 'ru-RU',
+        ja: 'ja-JP', zh: 'zh-CN', ar: 'ar-SA', tr: 'tr-TR', uk: 'uk-UA',
+        sv: 'sv-SE', no: 'nb-NO', da: 'da-DK', fi: 'fi-FI', cs: 'cs-CZ',
+        sk: 'sk-SK', hu: 'hu-HU', hr: 'hr-HR', bg: 'bg-BG', el: 'el-GR',
+        he: 'he-IL', ko: 'ko-KR', hi: 'hi-IN', vi: 'vi-VN'
+    };
+    const locale = LOCALE_MAP[language] || 'en-US';
+    let day;
+    try { day = now.toLocaleDateString(locale, { weekday: 'long' }); } catch (e) { day = now.toLocaleDateString('en-US', { weekday: 'long' }); }
+    const timeOfDay = hour < 6 ? 'night' : hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : hour < 22 ? 'evening' : 'night';
+    prompt += `\nNOW: ${day}, ${hour}:${String(now.getMinutes()).padStart(2, '0')}, ${timeOfDay}. Adapt your tone naturally.\n`;
 
-    prompt += `\nRĂSPUNDE în ${langName}. Fii concis dar complet.`;
+    prompt += `\nRESPOND in ${langName}. Be concise but complete.`;
 
     return prompt;
 }
