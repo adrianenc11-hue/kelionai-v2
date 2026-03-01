@@ -93,8 +93,12 @@ class KelionBrain {
 
             logger.info({ component: 'Brain', complexity: analysis.complexity, tools: Object.keys(results), chainOfThought: !!chainOfThought, thinkTime }, `🧠 Think: ${analysis.complexity} | tools:[${Object.keys(results).join(',')}] | CoT:${!!chainOfThought} | ${thinkTime}ms`);
 
+            // Strip internal annotations from enriched message (they are for AI context, not user)
+            const cleanReply = enriched.replace(/\[(?:TRUTH CHECK|REZULTATE CAUTARE|DATE METEO|Am generat|Harta|CONTEXT DIN MEMORIE|Utilizatorul pare|URGENTA|GANDIRE STRUCTURATA|REZUMAT CONVERSATIE)[^\]]*\]/g, '').replace(/\n{3,}/g, '\n\n').trim();
+
             return {
-                enrichedMessage: enriched,
+                enrichedMessage: cleanReply,
+                enrichedContext: enriched, // full context for AI use
                 toolsUsed: Object.keys(results),
                 monitor: this.extractMonitor(results),
                 analysis,
@@ -360,11 +364,11 @@ Raspunde STRICT cu JSON:
         const seen = new Set();
 
         for (const { analysis } of subTasks) {
-            if (analysis.needsSearch && !seen.has('search') && !this.isToolDegraded('search'))   { plan.push({ tool: 'search', query: analysis.searchQuery }); seen.add('search'); }
+            if (analysis.needsSearch && !seen.has('search') && !this.isToolDegraded('search')) { plan.push({ tool: 'search', query: analysis.searchQuery }); seen.add('search'); }
             if (analysis.needsWeather && !seen.has('weather') && !this.isToolDegraded('weather')) { plan.push({ tool: 'weather', city: analysis.weatherCity }); seen.add('weather'); }
-            if (analysis.needsImage && !seen.has('imagine') && !this.isToolDegraded('imagine'))   { plan.push({ tool: 'imagine', prompt: analysis.imagePrompt }); seen.add('imagine'); }
-            if (analysis.needsMap && !seen.has('map'))                                             { plan.push({ tool: 'map', place: analysis.mapPlace }); seen.add('map'); }
-            if (analysis.needsMemory && userId && !seen.has('memory'))                             { plan.push({ tool: 'memory', userId }); seen.add('memory'); }
+            if (analysis.needsImage && !seen.has('imagine') && !this.isToolDegraded('imagine')) { plan.push({ tool: 'imagine', prompt: analysis.imagePrompt }); seen.add('imagine'); }
+            if (analysis.needsMap && !seen.has('map')) { plan.push({ tool: 'map', place: analysis.mapPlace }); seen.add('map'); }
+            if (analysis.needsMemory && userId && !seen.has('memory')) { plan.push({ tool: 'memory', userId }); seen.add('memory'); }
         }
 
         // Check for known good combinations from journal
@@ -459,8 +463,7 @@ Raspunde STRICT cu JSON:
             if (chainOfThought.anticipate) ctx += `\nAnticipeaza intrebare: ${chainOfThought.anticipate}`;
         }
 
-        // Add truth check reminder
-        ctx += '\n[TRUTH CHECK: Verifică fiecare afirmație — e fapt, presupunere sau opinie? Etichetează intern.]';
+        // Truth check is internal AI guidance, kept in context but stripped before user-facing message
 
         return ctx;
     }
@@ -589,8 +592,10 @@ Raspunde STRICT cu JSON:
         // 2️⃣ TAVILY — Good: aggregated + parsed for LLM
         if (!result && this.tavilyKey) {
             try {
-                const r = await fetch('https://api.tavily.com/search', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ api_key: this.tavilyKey, query, search_depth: 'basic', max_results: 5, include_answer: true }) });
+                const r = await fetch('https://api.tavily.com/search', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ api_key: this.tavilyKey, query, search_depth: 'basic', max_results: 5, include_answer: true })
+                });
                 if (r.ok) {
                     const d = await r.json();
                     const sources = (d.results || []).slice(0, 4).map(x => `- ${x.title}: ${x.content?.substring(0, 200)}`).join('\n');
@@ -642,7 +647,7 @@ Raspunde STRICT cu JSON:
         const { latitude, longitude, name, country } = geo.results[0];
         const wx = await (await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&daily=temperature_2m_max,temperature_2m_min,weather_code&timezone=auto&forecast_days=3`)).json();
         const c = wx.current;
-        const codes = {0:'Senin \u2600\uFE0F',1:'Partial senin \u{1F324}\uFE0F',2:'Partial noros \u26C5',3:'Noros \u2601\uFE0F',45:'Ceata \u{1F32B}\uFE0F',51:'Burnita \u{1F326}\uFE0F',61:'Ploaie \u{1F327}\uFE0F',71:'Ninsoare \u{1F328}\uFE0F',80:'Averse \u{1F326}\uFE0F',95:'Furtuna \u26C8\uFE0F'};
+        const codes = { 0: 'Senin \u2600\uFE0F', 1: 'Partial senin \u{1F324}\uFE0F', 2: 'Partial noros \u26C5', 3: 'Noros \u2601\uFE0F', 45: 'Ceata \u{1F32B}\uFE0F', 51: 'Burnita \u{1F326}\uFE0F', 61: 'Ploaie \u{1F327}\uFE0F', 71: 'Ninsoare \u{1F328}\uFE0F', 80: 'Averse \u{1F326}\uFE0F', 95: 'Furtuna \u26C8\uFE0F' };
         const cond = codes[c.weather_code] || '?';
         const desc = `${name}, ${country}: ${c.temperature_2m}\u00B0C, ${cond}, umiditate ${c.relative_humidity_2m}%, vant ${c.wind_speed_10m} km/h`;
         let forecast = '';
@@ -657,9 +662,11 @@ Raspunde STRICT cu JSON:
     async _imagine(prompt) {
         if (!this.togetherKey) throw new Error('No key');
         this.toolStats.imagine++;
-        const r = await fetch('https://api.together.xyz/v1/images/generations', { method: 'POST',
+        const r = await fetch('https://api.together.xyz/v1/images/generations', {
+            method: 'POST',
             headers: { 'Authorization': `Bearer ${this.togetherKey}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ model: 'black-forest-labs/FLUX.1-schnell', prompt, width: 1024, height: 1024, steps: 4, n: 1, response_format: 'b64_json' }) });
+            body: JSON.stringify({ model: 'black-forest-labs/FLUX.1-schnell', prompt, width: 1024, height: 1024, steps: 4, n: 1, response_format: 'b64_json' })
+        });
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         const d = await r.json();
         const b64 = d.data?.[0]?.b64_json;
@@ -703,12 +710,17 @@ Raspunde STRICT cu JSON:
         }
 
         try {
-            const r = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST',
+            const r = await fetch('https://api.anthropic.com/v1/messages', {
+                method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'x-api-key': this.anthropicKey, 'anthropic-version': '2023-06-01' },
-                body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 200, messages: [{ role: 'user', content: `Extrage DOAR fapte personale concrete (nume, loc, profesie, hobby, familie, preferinte) din:
+                body: JSON.stringify({
+                    model: 'claude-sonnet-4-20250514', max_tokens: 200, messages: [{
+                        role: 'user', content: `Extrage DOAR fapte personale concrete (nume, loc, profesie, hobby, familie, preferinte) din:
 User: "${userMessage.substring(0, 500)}"
 AI: "${aiReply.substring(0, 300)}"
-Raspunde STRICT JSON. Daca nimic: {}` }] }) });
+Raspunde STRICT JSON. Daca nimic: {}` }]
+                })
+            });
             if (!r.ok) return;
             const d = await r.json();
             const txt = d.content?.[0]?.text?.trim();

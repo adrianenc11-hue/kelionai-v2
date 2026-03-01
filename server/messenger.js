@@ -188,7 +188,25 @@ router.post('/webhook', async (req, res) => {
                 if (!senderId || !message || message.is_echo) continue;
 
                 const text = message.text;
-                if (!text) continue;
+                const attachments = message.attachments || [];
+
+                // ═══ HANDLE IMAGE/FILE ATTACHMENTS ═══
+                let userText = text || '';
+                let imageUrl = null;
+                for (const att of attachments) {
+                    if (att.type === 'image' && att.payload && att.payload.url) {
+                        imageUrl = att.payload.url;
+                        if (!userText) userText = 'Ce vezi in aceasta imagine?';
+                    } else if (att.type === 'file' && att.payload && att.payload.url) {
+                        if (!userText) userText = 'Am trimis un document. Analizeaza-l.';
+                    } else if (att.type === 'audio' && att.payload && att.payload.url) {
+                        if (!userText) userText = 'Am trimis un mesaj vocal.';
+                    } else if (att.type === 'video' && att.payload && att.payload.url) {
+                        if (!userText) userText = 'Am trimis un video.';
+                    }
+                }
+
+                if (!userText) continue;
 
                 stats.messagesReceived++;
                 stats.activeSenders.add(senderId);
@@ -207,16 +225,16 @@ router.post('/webhook', async (req, res) => {
                             setTimeout(() => reject(new Error('Brain timeout')), 10000)
                         );
                         const result = await Promise.race([
-                            brain.think(text, 'kelion', [], 'auto'),
+                            brain.think(userText, 'kelion', [], 'auto'),
                             timeout
                         ]);
-                        reply = (result && result.enrichedMessage) || faqReply(text);
+                        reply = (result && result.enrichedMessage) || faqReply(userText);
                     } catch (e) {
                         logger.warn({ component: 'Messenger', err: e.message }, 'Brain unavailable, using FAQ');
-                        reply = faqReply(text);
+                        reply = faqReply(userText);
                     }
                 } else {
-                    reply = faqReply(text);
+                    reply = faqReply(userText);
                 }
 
                 await sendMessage(senderId, reply);
