@@ -103,7 +103,9 @@ async function getSenderProfile(senderId) {
             var data = await res.json();
             return data.first_name ? (data.first_name + ' ' + (data.last_name || '')).trim() : null;
         }
-    } catch (e) { }
+    } catch (e) {
+        logger.warn({ component: 'Messenger', senderId, err: e.message }, 'Failed to get sender profile');
+    }
     return null;
 }
 
@@ -121,7 +123,7 @@ async function downloadMediaFromUrl(url) {
 // ANALYZE IMAGE WITH GPT-4o VISION
 async function analyzeImage(imageBuffer, caption, mimeType) {
     var apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) return caption || 'Am primit o imagine dar nu am API key pentru viziune.';
+    if (!apiKey) return caption || 'I received an image but no vision API key is configured.';
 
     var base64Image = imageBuffer.toString('base64');
     var mediaType = mimeType || 'image/jpeg';
@@ -227,9 +229,23 @@ router.get('/webhook', function (req, res) {
 router.post('/webhook', async function (req, res) {
     res.sendStatus(200);
     try {
-        // CRITICAL: req.body is a Buffer because of express.raw() in index.js
-        var rawBody = req.body;
-        if (!rawBody) return;
+        // CRITICAL: req.body should be a Buffer because of express.raw() in index.js
+        // Handle both raw Buffer and already-parsed JSON (defensive)
+        var rawBody, body;
+        if (Buffer.isBuffer(req.body)) {
+            rawBody = req.body;
+            body = JSON.parse(rawBody.toString());
+        } else if (typeof req.body === 'string') {
+            rawBody = Buffer.from(req.body);
+            body = JSON.parse(req.body);
+        } else if (req.body && typeof req.body === 'object') {
+            // Already parsed by express.json()
+            rawBody = Buffer.from(JSON.stringify(req.body));
+            body = req.body;
+        } else {
+            logger.warn({ component: 'Messenger' }, 'Empty or missing body');
+            return;
+        }
 
         // HMAC-SHA256 validation
         var appSecret = process.env.FB_APP_SECRET;
@@ -246,7 +262,6 @@ router.post('/webhook', async function (req, res) {
             }
         }
 
-        var body = JSON.parse(rawBody.toString());
         if (body.object !== 'page') return;
 
         for (var e = 0; e < (body.entry || []).length; e++) {
@@ -292,7 +307,7 @@ router.post('/webhook', async function (req, res) {
                             if (transcript) {
                                 userText = transcript;
                             } else {
-                                userText = '[Mesaj vocal - nu am putut transcrie]';
+                                userText = '[Voice message - could not transcribe]';
                             }
                         }
                     } else if (attType === 'video') {
@@ -430,6 +445,7 @@ router.get('/health', function (req, res) {
         hasPageToken: !!process.env.FB_PAGE_ACCESS_TOKEN,
         hasAppSecret: !!process.env.FB_APP_SECRET,
         hasVerifyToken: !!process.env.FB_VERIFY_TOKEN,
+        graphApiVersion: 'v21.0',
         visionEnabled: !!process.env.OPENAI_API_KEY,
         sttEnabled: !!(process.env.GROQ_API_KEY || process.env.OPENAI_API_KEY),
         stats: getStats(),
