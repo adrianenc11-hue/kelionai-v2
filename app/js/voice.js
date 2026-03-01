@@ -172,6 +172,7 @@
         if (!fftOk) { currentSourceNode.connect(ctx.destination); fallbackTextLipSync(fallbackText || ''); }
 
         KAvatar.setExpression('happy', 0.3);
+        KAvatar.setPresenting(true);
 
         // Auto-gestures during speech
         if (fallbackText) {
@@ -188,7 +189,7 @@
             }
         }
 
-        currentSourceNode.onended = () => { stopAllLipSync(); isSpeaking = false; currentSourceNode = null; KAvatar.setExpression('neutral'); resumeWakeDetection(); };
+        currentSourceNode.onended = () => { stopAllLipSync(); isSpeaking = false; currentSourceNode = null; KAvatar.setExpression('neutral'); KAvatar.setPresenting(false); resumeWakeDetection(); };
         currentSourceNode.start(0);
         console.log('[Voice] ✅ Audio playing (' + arrayBuf.byteLength + 'B)');
     }
@@ -231,7 +232,17 @@
 
     function stopSpeaking() {
         if (currentSourceNode) try { currentSourceNode.stop(); } catch(e){} currentSourceNode = null;
-        stopAllLipSync(); isSpeaking = false; KAvatar.setExpression('neutral');
+        stopAllLipSync(); isSpeaking = false; KAvatar.setExpression('neutral'); KAvatar.setPresenting(false);
+    }
+
+    // ─── Mute / Unmute (instant via AudioContext suspend/resume) ─────────
+    function mute() {
+        if (sharedAudioCtx && sharedAudioCtx.state === 'running') sharedAudioCtx.suspend();
+        stopAllLipSync();
+    }
+
+    function unmute() {
+        if (sharedAudioCtx && sharedAudioCtx.state === 'suspended') sharedAudioCtx.resume();
     }
 
     // ─── Manual record ───────────────────────────────────────
@@ -287,7 +298,7 @@
     }
 
     window.KVoice = { speak, stopSpeaking, startListening, stopListening, captureAndAnalyze,
-        startWakeWordDetection, resumeWakeDetection, ensureAudioUnlocked,
+        startWakeWordDetection, resumeWakeDetection, ensureAudioUnlocked, mute, unmute,
         isRecording: () => isRecording, isSpeaking: () => isSpeaking,
         getLanguage: () => (window.i18n ? i18n.getLanguage() : detectedLanguage),
         setLanguage: (l) => { detectedLanguage = l; } };
