@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-// KelionAI v2.2 — BRAIN-POWERED SERVER
+// KelionAI v2.5 — BRAIN-POWERED SERVER
 // Autonomous thinking, self-repair, auto-learning
 // ═══════════════════════════════════════════════════════════════
 require('dotenv').config();
@@ -430,14 +430,14 @@ async function runHealthCheck(){
   const modal=document.getElementById('hc-modal');
   const body=document.getElementById('hc-body');
   modal.style.display='flex';
-  body.innerHTML='<div style="text-align:center;color:#00ffff;padding:40px;font-size:1.1rem">⏳ Se verifică...</div>';
+  body.innerHTML='<div style="text-align:center;color:#00ffff;padding:40px;font-size:1.1rem">⏳ Checking...</div>';
   try{
     const r=await fetch('/api/admin/health-check',{headers:adminHdrs()});
     const d=await r.json();
-    if(r.status===401){body.innerHTML='<div style="color:#ff4444;padding:20px">❌ Unauthorized. Setează admin secret în sessionStorage (kelion_admin_secret).</div>';return;}
+    if(r.status===401){body.innerHTML='<div style="color:#ff4444;padding:20px">❌ Unauthorized. Set admin secret in sessionStorage (kelion_admin_secret).</div>';return;}
     _hcData=d;
     body.innerHTML=renderHC(d);
-  }catch(e){body.innerHTML='<div style="color:#ff4444;padding:20px">❌ Eroare: '+esc(e.message)+'</div>';}
+  }catch(e){body.innerHTML='<div style="color:#ff4444;padding:20px">❌ Error: '+esc(e.message)+'</div>';}
 }
 function exportHC(){
   if(!_hcData)return;
@@ -543,41 +543,6 @@ app.locals._getNewsArticles = newsModule.getArticlesArray;
 app.use('/api/trading', adminAuth, require('./trading'));
 
 // ═══ SPORTS BOT — REMOVED (no real utility without betting integration) ═══
-
-// ═══ HEALTH ═══
-app.get('/api/health', (req, res) => {
-    const diag = brain.getDiagnostics();
-    res.json({
-        status: 'ok', version: '2.4.0', timestamp: new Date().toISOString(),
-        uptime: process.uptime(),
-        brain: diag.status,
-        conversations: diag.conversations,
-        services: {
-            ai_claude: !!process.env.ANTHROPIC_API_KEY, ai_gpt4o: !!process.env.OPENAI_API_KEY,
-            ai_deepseek: !!process.env.DEEPSEEK_API_KEY,
-            tts: !!process.env.ELEVENLABS_API_KEY, stt_groq: !!process.env.GROQ_API_KEY,
-            stt_openai: !!process.env.OPENAI_API_KEY, vision: !!process.env.ANTHROPIC_API_KEY,
-            voice_kelion: !!(process.env.ELEVENLABS_VOICE_KELION || 'pNInz6obpgDQGcFmaJgB'),
-            voice_kira: !!process.env.ELEVENLABS_VOICE_KIRA,
-            search_perplexity: !!process.env.PERPLEXITY_API_KEY, search_tavily: !!process.env.TAVILY_API_KEY,
-            search_serper: !!process.env.SERPER_API_KEY, search_ddg: true, weather: true,
-            images: !!process.env.TOGETHER_API_KEY, maps: !!process.env.GOOGLE_MAPS_KEY,
-            payments: !!process.env.STRIPE_SECRET_KEY, stripe_webhook: !!process.env.STRIPE_WEBHOOK_SECRET,
-            session_secret: !!process.env.SESSION_SECRET, referral_secret: !!process.env.REFERRAL_SECRET,
-            sentry: !!process.env.SENTRY_DSN,
-            auth: !!supabase, database: !!supabaseAdmin,
-            whatsapp: !!(process.env.WA_ACCESS_TOKEN || process.env.WHATSAPP_TOKEN || process.env.WHATSAPP_ACCESS_TOKEN),
-            whatsapp_phone: !!(process.env.WA_PHONE_NUMBER_ID || process.env.WHATSAPP_PHONE_NUMBER_ID),
-            telegram: !!process.env.TELEGRAM_BOT_TOKEN,
-            messenger: !!process.env.MESSENGER_PAGE_TOKEN,
-            facebook_page: !!process.env.FACEBOOK_PAGE_TOKEN,
-            instagram: !!process.env.INSTAGRAM_TOKEN,
-            trading_binance: !!process.env.BINANCE_API_KEY,
-            trading_mode: process.env.BINANCE_API_KEY ? (process.env.BINANCE_TESTNET === 'true' ? 'TESTNET' : 'LIVE') : 'PAPER',
-        }
-    });
-});
-
 
 // 404 for unknown API routes — must come before the catch-all
 app.use('/api', (req, res, next) => {

@@ -78,18 +78,6 @@
         } catch (e) {}
     }
 
-    /* ── Open billing portal ── */
-    async function openPortal() {
-        try {
-            var r = await fetch(API + '/api/payments/portal', {
-                method: 'POST', headers: KShared.authHeaders()
-            });
-            var d = await r.json();
-            if (d.url) window.location.href = d.url;
-            else alert(d.error || 'Eroare portal billing.');
-        } catch (e) { alert('Eroare la deschiderea portalului de billing.'); }
-    }
-
     /* ── Event listeners ── */
     function bindEvents() {
         var prefs = loadPrefs();
@@ -132,7 +120,7 @@
         }
 
         var portal = document.getElementById('btn-portal');
-        if (portal) portal.addEventListener('click', openPortal);
+        if (portal) portal.addEventListener('click', KShared.openPortal);
     }
 
     function init() {
