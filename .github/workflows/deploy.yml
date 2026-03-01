@@ -18,9 +18,13 @@ jobs:
           node-version: '20'
           cache: 'npm'
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
-      - run: npx playwright test --config=playwright.config.js --project=chromium
+      - name: Install Playwright
+        run: npx playwright install --with-deps chromium
+      - name: Run E2E smoke tests (non-blocking)
         continue-on-error: true
+        run: npx playwright test --config=playwright.config.js --project=chromium
+        env:
+          BASE_URL: ${{ vars.BASE_URL || 'https://kelionai.app' }}
 
   deploy:
     needs: test
