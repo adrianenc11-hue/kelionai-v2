@@ -184,18 +184,15 @@ router.post('/webhook', async (req, res) => {
                 const msgCount = (senderMessageCount.get(senderId) || 0) + 1;
                 senderMessageCount.set(senderId, msgCount);
 
-                // Welcome tagline on FIRST message only (in detected language)
+                // ═══ MULTILINGUAL HINT (only if first message is just a greeting) ═══
                 if (msgCount === 1) {
-                    const lang = detectLanguage(text);
-                    const welcomes = {
-                        ro: '🤖 Bun venit! Sunt KelionAI, asistentul tău AI. Cu ce te pot ajuta?',
-                        en: '🤖 Welcome! I\'m KelionAI, your AI assistant. How can I help you?',
-                        de: '🤖 Willkommen! Ich bin KelionAI, dein KI-Assistent. Wie kann ich dir helfen?',
-                        fr: '🤖 Bienvenue! Je suis KelionAI, votre assistant IA. Comment puis-je vous aider?',
-                        es: '🤖 ¡Bienvenido! Soy KelionAI, tu asistente IA. ¿Cómo puedo ayudarte?',
-                        it: '🤖 Benvenuto! Sono KelionAI, il tuo assistente IA. Come posso aiutarti?'
-                    };
-                    await sendMessage(senderId, welcomes[lang] || welcomes.en);
+                    const isJustGreeting = /^(h(ello|i|ey)|salut|bun[aă]|ciao|hola|bonjour|hallo|ola)[!?.,\s]*$/i.test(text.trim());
+                    if (isJustGreeting) {
+                        setTimeout(async () => {
+                            await sendMessage(senderId,
+                                'We can provide support in any language you wish. Feel free to speak in your language. 🌍');
+                        }, 1500);
+                    }
                 }
 
                 // Subscription + site prompt ONLY at free limit (end of free period)
