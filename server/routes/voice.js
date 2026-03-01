@@ -7,6 +7,7 @@ const express = require('express');
 const rateLimit = require('express-rate-limit');
 const FormData = require('form-data');
 const logger = require('../logger');
+const { getVoiceId } = require('../config/voices');
 const { validate, speakSchema, listenSchema } = require('../validation');
 const { checkUsage, incrementUsage } = require('../payments');
 
@@ -37,9 +38,7 @@ router.post('/speak', ttsLimiter, validate(speakSchema), async (req, res) => {
         };
         const selectedVoiceSettings = voiceSettings[mood] || voiceSettings.neutral;
 
-        const vid = avatar === 'kira'
-            ? (process.env.ELEVENLABS_VOICE_KIRA || 'EXAVITQu4vr4xnSDxMaL')
-            : (process.env.ELEVENLABS_VOICE_KELION || 'VR6AewLTigWG4xSOukaG');
+        const vid = getVoiceId(avatar);
         const r = await fetch('https://api.elevenlabs.io/v1/text-to-speech/' + vid, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'xi-api-key': process.env.ELEVENLABS_API_KEY },

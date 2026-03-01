@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════════
 // KelionAI v2 — INSTAGRAM AUTO-POST
-// Auto-publică pe Instagram Business via Graph API
+// Auto-publishes to Instagram Business via Graph API
 // ═══════════════════════════════════════════════════════════════
 'use strict';
 
