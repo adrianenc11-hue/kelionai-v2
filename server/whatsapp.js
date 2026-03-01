@@ -14,20 +14,20 @@ const logger = require('./logger');
 const router = express.Router();
 
 // ═══ CONFIG ═══
-const PHONE_NUMBER_ID = process.env.WA_PHONE_NUMBER_ID;
-const WA_TOKEN = process.env.WA_ACCESS_TOKEN;
-const WA_VERIFY_TOKEN = process.env.WA_VERIFY_TOKEN || 'kelionai_wa_verify_2026';
+const PHONE_NUMBER_ID = process.env.WA_PHONE_NUMBER_ID || process.env.WHATSAPP_PHONE_NUMBER_ID;
+const WA_TOKEN = process.env.WA_ACCESS_TOKEN || process.env.WHATSAPP_TOKEN || process.env.WHATSAPP_ACCESS_TOKEN;
+const WA_VERIFY_TOKEN = process.env.WA_VERIFY_TOKEN || process.env.WHATSAPP_VERIFY_TOKEN || 'kelionai_wa_verify_2026';
 const GRAPH_API = 'https://graph.facebook.com/v21.0';
 
 // ═══ STATS ═══
 const stats = { messagesReceived: 0, repliesSent: 0, activeUsers: new Set() };
 
 // ═══ STARTUP VALIDATION ═══
-if (!process.env.WA_ACCESS_TOKEN) {
-    logger.warn({ component: 'WhatsApp' }, 'WA_ACCESS_TOKEN is not set — bot will not send messages');
+if (!WA_TOKEN) {
+    logger.warn({ component: 'WhatsApp' }, 'WhatsApp token not set. Set WA_ACCESS_TOKEN (or WHATSAPP_TOKEN) — bot will not send messages');
 }
-if (!process.env.WA_PHONE_NUMBER_ID) {
-    logger.warn({ component: 'WhatsApp' }, 'WA_PHONE_NUMBER_ID is not set — bot will not send messages');
+if (!PHONE_NUMBER_ID) {
+    logger.warn({ component: 'WhatsApp' }, 'WhatsApp Phone Number ID not set. Set WA_PHONE_NUMBER_ID — bot will not send messages');
 }
 
 // ═══ CHARACTER SELECTION (Kelion or Kira) ═══

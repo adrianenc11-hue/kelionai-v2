@@ -3,17 +3,6 @@
     var API = window.location.origin;
     var PREFS_KEY = 'kelion_settings';
 
-    function getToken() {
-        try { return localStorage.getItem('kelion_token'); } catch (e) { return null; }
-    }
-
-    function authHeaders() {
-        var h = { 'Content-Type': 'application/json' };
-        var t = getToken();
-        if (t) h['Authorization'] = 'Bearer ' + t;
-        return h;
-    }
-
     /* ── Persist preferences in localStorage ── */
     function loadPrefs() {
         try {
@@ -57,7 +46,7 @@
     /* ── Load billing status ── */
     async function loadBillingStatus() {
         try {
-            var r = await fetch(API + '/api/payments/status', { headers: authHeaders() });
+            var r = await fetch(API + '/api/payments/status', { headers: KShared.authHeaders() });
             if (!r.ok) return;
             var data = await r.json();
             var plan = data.plan || 'free';
@@ -93,7 +82,7 @@
     async function openPortal() {
         try {
             var r = await fetch(API + '/api/payments/portal', {
-                method: 'POST', headers: authHeaders()
+                method: 'POST', headers: KShared.authHeaders()
             });
             var d = await r.json();
             if (d.url) window.location.href = d.url;
