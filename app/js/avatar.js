@@ -40,12 +40,19 @@
             return;
         }
 
-        scene = new THREE.Scene();
-        clock = new THREE.Clock();
-
         const container = canvas.parentElement;
         const w = container.clientWidth;
         const h = container.clientHeight;
+
+        // If container has no size yet (hidden/transitioning), wait and retry
+        if (w === 0 || h === 0) {
+            console.warn('[Avatar] Container has 0 size, retrying in 100ms...');
+            setTimeout(init, 100);
+            return;
+        }
+
+        scene = new THREE.Scene();
+        clock = new THREE.Clock();
 
         renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
         renderer.setSize(w, h);
@@ -80,7 +87,7 @@
 
         // Lip sync — simple, uses Smile morph
         if (window.SimpleLipSync) lipSync = new SimpleLipSync();
-        if (window.TextLipSync) textLipSync = new TextLipSync({ msPerChar: 55 });
+        if (window.TextLipSync) textLipSync = new TextLipSync({ msPerChar: 38 });
 
         loadAvatar('kelion');
         window.addEventListener('resize', onResize);
@@ -199,6 +206,7 @@
             }
 
             scene.add(currentModel);
+            onResize(); // Force canvas resize after model load
 
             if (lipSync) lipSync.setMorphMeshes(morphMeshes);
             if (textLipSync) textLipSync.setMorphMeshes(morphMeshes);
@@ -393,10 +401,11 @@
 
     function onResize() {
         var canvas = document.getElementById('avatar-canvas');
-        if (!canvas) return;
+        if (!canvas || !renderer) return;
         var container = canvas.parentElement;
         var w = container.clientWidth;
         var h = container.clientHeight;
+        if (w === 0 || h === 0) return;
         camera.aspect = w / h;
         camera.updateProjectionMatrix();
         renderer.setSize(w, h);
