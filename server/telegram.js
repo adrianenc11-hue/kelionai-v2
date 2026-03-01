@@ -25,10 +25,38 @@ const RATE_LIMIT_MAX = 15;
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const userRateLimits = new Map();
 
-// ═══ USER MESSAGE COUNTER (for site recommendations) ═══
+// ═══ USER MESSAGE COUNTER ═══
 const userMessageCount = new Map();
-const FREE_MESSAGES_LIMIT = 10; // after this, recommend subscription
-const RECOMMEND_SITE_AFTER = 3;  // suggest site after 3rd message
+const FREE_MESSAGES_LIMIT = 10;
+
+// ═══ KNOWN USERS (persisted in Supabase) ═══
+const knownUsers = new Map(); // { lang, name, firstSeen }
+
+async function getKnownUser(userId, supabase) {
+    if (knownUsers.has(userId)) return knownUsers.get(userId);
+    if (supabase) {
+        try {
+            const { data } = await supabase.from('telegram_users').select('*').eq('user_id', String(userId)).single();
+            if (data) {
+                knownUsers.set(userId, { lang: data.language, name: data.name, firstSeen: data.first_seen });
+                return knownUsers.get(userId);
+            }
+        } catch (e) { /* table may not exist yet */ }
+    }
+    return null;
+}
+
+async function saveKnownUser(userId, lang, name, supabase) {
+    knownUsers.set(userId, { lang, name, firstSeen: new Date().toISOString() });
+    if (supabase) {
+        try {
+            await supabase.from('telegram_users').upsert({
+                user_id: String(userId), language: lang, name: name || null,
+                first_seen: new Date().toISOString(), last_seen: new Date().toISOString()
+            }, { onConflict: 'user_id' });
+        } catch (e) { /* works in-memory */ }
+    }
+}
 
 function isRateLimited(userId) {
     const now = Date.now();
@@ -304,7 +332,40 @@ router.post('/webhook', async (req, res) => {
             reply = '🤖 Sunt KelionAI! Pentru experiența completă vizitează https://kelionai.app';
         }
 
-        await sendMessage(chatId, escapeHtml(reply), { parseMode: undefined }); // Plain text for AI responses
+        await sendMessage(chatId, escapeHtml(reply), { parseMode: undefined });
+
+        // ═══ FIRST-EVER USER? Check Supabase ═══
+        const supabase = req.app.locals.supabaseAdmin || req.app.locals.supabase;
+        const known = await getKnownUser(userId, supabase);
+
+        if (!known) {
+            const detectedLang = detectLanguage(text);
+            await saveKnownUser(userId, detectedLang, userName, supabase);
+
+            const isJustGreeting = /^(\/start|h(ello|i|ey)|salut|bun[aă]|ciao|hola|bonjour|hallo|ola)[!?.,\s]*$/i.test(text.trim());
+            if (isJustGreeting) {
+                setTimeout(async () => {
+                    await sendMessage(chatId,
+                        'We can provide support in any language you wish. Feel free to speak in your language. 🌍');
+                }, 1500);
+            }
+        } else {
+            if (msgCount === 1) {
+                const greetings = {
+                    ro: `Bine ai revenit, ${known.name || 'prietene'}! 😊`,
+                    en: `Welcome back, ${known.name || 'friend'}! 😊`,
+                    de: `Willkommen zurück, ${known.name || 'Freund'}! 😊`,
+                    fr: `Bon retour, ${known.name || 'ami'}! 😊`,
+                    es: `Bienvenido de nuevo, ${known.name || 'amigo'}! 😊`,
+                    it: `Bentornato, ${known.name || 'amico'}! 😊`
+                };
+                await sendMessage(chatId, greetings[known.lang] || greetings.en);
+            }
+            const newLang = detectLanguage(text);
+            if (newLang !== known.lang) {
+                await saveKnownUser(userId, newLang, known.name, supabase);
+            }
+        }
 
         // ═══ FREE LIMIT — promo ONLY at end of free period ═══
         if (msgCount === FREE_MESSAGES_LIMIT) {
