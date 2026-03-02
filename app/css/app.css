@@ -163,8 +163,8 @@ html, body {
 
 /* ── Chat Area (jos-stânga, MARE) ── */
 #chat-area {
-    height: 200px;
-    min-height: 160px;
+    flex: 1;
+    min-height: 250px;
     display: flex;
     flex-direction: column;
     background: rgba(5, 5, 16, 0.85);
