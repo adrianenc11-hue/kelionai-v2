@@ -387,6 +387,12 @@
         updateBlink(dt);
         updateExpression(dt);
         if (lipSync) lipSync.update();
+        // FORCE mouth closed when not speaking — overrides all sources
+        if (window.KVoice && !KVoice.isSpeaking()) {
+            setMorph('jawOpen', 0); setMorph('mouthOpen', 0);
+            setMorph('Smile', 0); setMorph('viseme_aa', 0);
+            setMorph('JawOpen', 0); setMorph('mouth_open', 0);
+        }
         updateGesture(dt);
         updateMoodLighting();
         if (currentModel) {

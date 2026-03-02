@@ -340,10 +340,52 @@
         } catch (e) { return e.name === 'NotAllowedError' ? 'Please allow camera access.' : 'Camera error.'; }
     }
 
+    // Auto-start mic monitor on first user interaction
+    var micMonitorStarted = false;
+    function startMicMonitor() {
+        if (micMonitorStarted) return;
+        micMonitorStarted = true;
+        try {
+            navigator.mediaDevices.getUserMedia({ audio: { noiseSuppression: true, echoCancellation: true } }).then(function (stream) {
+                var micCtx = new (window.AudioContext || window.webkitAudioContext)();
+                micCtx.resume();
+                var micSrc = micCtx.createMediaStreamSource(stream);
+                var micAn = micCtx.createAnalyser();
+                micAn.fftSize = 256;
+                micSrc.connect(micAn);
+                var micData = new Uint8Array(micAn.frequencyBinCount);
+                var micEl = document.getElementById('mic-level');
+                if (!micEl) return;
+                var bars = micEl.querySelectorAll('span');
+                function updateMicLevel() {
+                    micAn.getByteFrequencyData(micData);
+                    var sum = 0; for (var j = 0; j < 32; j++) sum += micData[j];
+                    var vol = sum / 32 / 255;
+                    if (vol > 0.05) {
+                        micEl.classList.add('active');
+                        for (var k = 0; k < bars.length; k++) {
+                            var h = Math.max(4, Math.min(22, vol * 22 * (1 + Math.random() * 0.3)));
+                            bars[k].style.height = h + 'px';
+                        }
+                    } else {
+                        micEl.classList.remove('active');
+                        for (var k = 0; k < bars.length; k++) bars[k].style.height = '4px';
+                    }
+                    requestAnimationFrame(updateMicLevel);
+                }
+                updateMicLevel();
+                console.log('[Voice] Mic monitor started');
+            }).catch(function () { });
+        } catch (e) { }
+    }
+
+    // Auto-start mic monitor on first click
+    document.addEventListener('click', function () { startMicMonitor(); }, { once: true });
+
     window.KVoice = {
         speak, stopSpeaking, startListening, stopListening, captureAndAnalyze,
         startWakeWordDetection, resumeWakeDetection, ensureAudioUnlocked, mute, unmute,
-        getAudioContext,
+        getAudioContext, startMicMonitor,
         isRecording: () => isRecording, isSpeaking: () => isSpeaking,
         getLanguage: () => (window.i18n ? i18n.getLanguage() : detectedLanguage),
         setLanguage: (l) => { detectedLanguage = l; }
