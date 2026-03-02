@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
@@ -20,7 +21,8 @@
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap">
+    <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap">
     <link rel="stylesheet" href="/styles/design-system.css">
     <link rel="stylesheet" href="/styles/components.css">
     <link rel="stylesheet" href="/styles/animations.css">
@@ -29,7 +31,8 @@
     <style>
         /* ─── Splash Screen Premium ─── */
         .splash {
-            position: fixed; inset: 0;
+            position: fixed;
+            inset: 0;
             background: #050510;
             display: flex;
             flex-direction: column;
@@ -38,87 +41,188 @@
             z-index: 9999;
             transition: opacity 0.6s ease, visibility 0.6s;
         }
-        .splash.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+
+        .splash.hidden {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+
         .splash-logo {
             display: flex;
             align-items: center;
             gap: 4px;
         }
+
         .splash .animate-glow {
             animation: splashGlow 2.5s ease-in-out infinite alternate;
         }
+
         @keyframes splashGlow {
-            from { filter: drop-shadow(0 0 12px rgba(99,102,241,0.4)); }
-            to   { filter: drop-shadow(0 0 32px rgba(6,182,212,0.5)); }
+            from {
+                filter: drop-shadow(0 0 12px rgba(99, 102, 241, 0.4));
+            }
+
+            to {
+                filter: drop-shadow(0 0 32px rgba(6, 182, 212, 0.5));
+            }
         }
-        .splash .typing-indicator { margin-top: 28px; }
+
+        .splash .typing-indicator {
+            margin-top: 28px;
+        }
+
         .splash .typing-indicator span {
-            width: 8px; height: 8px;
+            width: 8px;
+            height: 8px;
             background: var(--kelion-primary, #6366F1);
         }
 
         /* ─── PWA Install Banner Premium ─── */
         .pwa-banner {
             position: fixed;
-            bottom: 24px; left: 50%;
+            bottom: 24px;
+            left: 50%;
             transform: translateX(-50%);
-            background: var(--kelion-glass, rgba(10,10,30,0.6));
+            background: var(--kelion-glass, rgba(10, 10, 30, 0.6));
             backdrop-filter: blur(20px);
             -webkit-backdrop-filter: blur(20px);
-            border: 1px solid var(--kelion-glass-border, rgba(99,102,241,0.15));
+            border: 1px solid var(--kelion-glass-border, rgba(99, 102, 241, 0.15));
             border-radius: var(--kelion-radius-lg, 20px);
             padding: 16px 20px;
             display: flex;
             align-items: center;
             gap: 16px;
-            box-shadow: var(--kelion-shadow-lg, 0 8px 48px rgba(0,0,0,0.6));
+            box-shadow: var(--kelion-shadow-lg, 0 8px 48px rgba(0, 0, 0, 0.6));
             z-index: 1500;
             max-width: 420px;
             width: calc(100% - 48px);
             animation: slideUp 0.4s ease;
         }
+
         .pwa-banner-content {
-            display: flex; align-items: center; gap: 12px; flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex: 1;
         }
-        .pwa-banner-content > span { font-size: 1.6rem; }
-        .pwa-banner-content strong { color: var(--kelion-text, #F0F0FF); font-size: 0.9rem; }
-        .pwa-banner-content p { color: var(--kelion-text-secondary, #8888AA); font-size: 0.78rem; margin: 2px 0 0; }
-        .pwa-banner-actions { display: flex; gap: 8px; flex-shrink: 0; }
+
+        .pwa-banner-content>span {
+            font-size: 1.6rem;
+        }
+
+        .pwa-banner-content strong {
+            color: var(--kelion-text, #F0F0FF);
+            font-size: 0.9rem;
+        }
+
+        .pwa-banner-content p {
+            color: var(--kelion-text-secondary, #8888AA);
+            font-size: 0.78rem;
+            margin: 2px 0 0;
+        }
+
+        .pwa-banner-actions {
+            display: flex;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
         .pwa-btn-primary {
-            padding: 8px 16px; font-size: 13px; font-weight: 600;
-            background: var(--kelion-gradient); color: #fff;
-            border: none; border-radius: var(--kelion-radius-sm, 8px); cursor: pointer;
-            font-family: var(--kelion-font); transition: var(--kelion-transition);
+            padding: 8px 16px;
+            font-size: 13px;
+            font-weight: 600;
+            background: var(--kelion-gradient);
+            color: #fff;
+            border: none;
+            border-radius: var(--kelion-radius-sm, 8px);
+            cursor: pointer;
+            font-family: var(--kelion-font);
+            transition: var(--kelion-transition);
         }
-        .pwa-btn-primary:hover { opacity: 0.88; transform: translateY(-1px); }
+
+        .pwa-btn-primary:hover {
+            opacity: 0.88;
+            transform: translateY(-1px);
+        }
+
         .pwa-btn-secondary {
-            padding: 8px 14px; font-size: 13px;
-            background: rgba(255,255,255,0.05); color: var(--kelion-text-secondary, #8888AA);
-            border: 1px solid var(--kelion-border, rgba(99,102,241,0.12)); border-radius: var(--kelion-radius-sm, 8px);
-            cursor: pointer; font-family: var(--kelion-font); transition: var(--kelion-transition);
+            padding: 8px 14px;
+            font-size: 13px;
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--kelion-text-secondary, #8888AA);
+            border: 1px solid var(--kelion-border, rgba(99, 102, 241, 0.12));
+            border-radius: var(--kelion-radius-sm, 8px);
+            cursor: pointer;
+            font-family: var(--kelion-font);
+            transition: var(--kelion-transition);
         }
-        .pwa-btn-secondary:hover { background: rgba(255,255,255,0.08); color: var(--kelion-text); }
+
+        .pwa-btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--kelion-text);
+        }
 
         /* ─── Landing Page (Auth Screen) ─── */
-        .welcome-text { font-size: 1.6rem; font-weight: 700; color: #F0F0FF; margin-bottom: 4px; }
-        .welcome-subtitle { font-size: 0.9rem; color: #8888AA; margin-bottom: 28px; }
-        .avatars-row { display: flex; justify-content: center; gap: 40px; margin-bottom: 28px; }
-        .avatar-card { text-align: center; padding: 16px 24px; }
-        .avatar-card .avatar-emoji { font-size: 4rem; display: block; margin-bottom: 8px; }
-        .avatar-card .avatar-label { font-size: 0.9rem; font-weight: 600; color: #F0F0FF; }
+        .welcome-text {
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: #F0F0FF;
+            margin-bottom: 4px;
+        }
+
+        .welcome-subtitle {
+            font-size: 0.9rem;
+            color: #8888AA;
+            margin-bottom: 28px;
+        }
+
+        .avatars-row {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            margin-bottom: 28px;
+        }
+
+        .avatar-card {
+            text-align: center;
+            padding: 16px 24px;
+        }
+
+        .avatar-card .avatar-emoji {
+            font-size: 4rem;
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        .avatar-card .avatar-label {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #F0F0FF;
+        }
+
         #start-btn {
-            display: inline-flex; align-items: center; gap: 10px;
-            padding: 18px 64px; font-size: 1.3rem; font-weight: 700;
-            letter-spacing: 2px; text-transform: uppercase; color: #fff;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 18px 64px;
+            font-size: 1.3rem;
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: #fff;
             background: linear-gradient(135deg, #6366F1, #06B6D4);
-            border: none; border-radius: 50px; cursor: pointer;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
             transition: all 0.25s;
-            box-shadow: 0 8px 32px rgba(99,102,241,0.35);
+            box-shadow: 0 8px 32px rgba(99, 102, 241, 0.35);
             font-family: Inter, sans-serif;
         }
+
         #start-btn:hover {
             transform: translateY(-3px);
-            box-shadow: 0 0 30px rgba(99,102,241,0.3), 0 0 30px rgba(6,182,212,0.3);
+            box-shadow: 0 0 30px rgba(99, 102, 241, 0.3), 0 0 30px rgba(6, 182, 212, 0.3);
         }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js"></script>
@@ -136,6 +240,7 @@
     <script src="https://cdn.lr-in-prod.com/LogRocket.min.js"></script>
     <script>LogRocket.init('bdaej1/kelionai');</script>
 </head>
+
 <body>
 
     <!-- SPLASH SCREEN -->
@@ -150,23 +255,62 @@
         <p style="margin-top:16px;color:#555577;font-size:0.8rem;letter-spacing:1px">YOUR INTELLIGENT ASSISTANT</p>
     </div>
 
-    <!-- AUTH SCREEN -->
+    <!-- AUTH SCREEN — Premium Landing -->
     <div id="auth-screen">
-        <div id="auth-container">
+        <div id="auth-container" style="text-align:center;max-width:480px;margin:0 auto;">
             <div id="auth-logo">
-                <div class="auth-avatar-icon animate-float">🤖</div>
-                <h1>Kelion<span class="gradient-text">AI</span></h1>
-                <p class="auth-subtitle" data-i18n="auth.subtitle">Your smart AI assistant</p>
+                <div class="auth-avatar-icon animate-float" style="font-size:4.5rem;margin-bottom:12px;">🤖</div>
+                <h1 style="font-size:3rem;font-weight:900;margin-bottom:4px;">Kelion<span
+                        class="gradient-text">AI</span></h1>
+                <p class="auth-subtitle" style="color:#8888AA;font-size:1rem;margin-bottom:8px;">Your intelligent AI
+                    assistant</p>
             </div>
-            <h2 class="welcome-text">Welcome to KelionAI</h2>
-            <p class="welcome-subtitle">Intelligent, fast, multilingual.</p>
-            <div class="avatars-row">
-                <div class="avatar-card">
-                    <span class="avatar-emoji">🤖</span>
-                    <span class="avatar-label">Kelion</span>
+            <div style="display:flex;justify-content:center;gap:32px;margin:28px 0 12px;">
+                <div style="text-align:center;">
+                    <span style="font-size:2.2rem;display:block;margin-bottom:4px;">💬</span>
+                    <span style="color:#8888AA;font-size:0.75rem;">Smart Chat</span>
+                </div>
+                <div style="text-align:center;">
+                    <span style="font-size:2.2rem;display:block;margin-bottom:4px;">🎙️</span>
+                    <span style="color:#8888AA;font-size:0.75rem;">Voice</span>
+                </div>
+                <div style="text-align:center;">
+                    <span style="font-size:2.2rem;display:block;margin-bottom:4px;">🔍</span>
+                    <span style="color:#8888AA;font-size:0.75rem;">Search</span>
+                </div>
+                <div style="text-align:center;">
+                    <span style="font-size:2.2rem;display:block;margin-bottom:4px;">🖼️</span>
+                    <span style="color:#8888AA;font-size:0.75rem;">Images</span>
                 </div>
             </div>
+            <p style="color:#555577;font-size:0.8rem;margin-bottom:32px;">Multilingual • 3D Avatars • Voice Chat • Web
+                Search • AI-Powered</p>
             <button id="start-btn">▶ START</button>
+            <div style="margin-top:20px;display:flex;flex-direction:column;gap:8px;align-items:center;">
+                <span id="auth-guest"
+                    style="color:#6366F1;font-size:0.85rem;cursor:pointer;text-decoration:underline;display:none;">Continue
+                    without account</span>
+            </div>
+            <!-- Login form (hidden by default, toggled by btn-auth) -->
+            <form id="auth-form" style="display:none;margin-top:24px;text-align:left;">
+                <div id="auth-name-group" style="display:none;margin-bottom:12px;">
+                    <input type="text" id="auth-name" placeholder="Name"
+                        style="width:100%;padding:12px 16px;background:rgba(10,10,30,0.6);border:1px solid rgba(99,102,241,0.2);border-radius:10px;color:#f0f0ff;font-family:var(--kelion-font);font-size:0.9rem;outline:none;" />
+                </div>
+                <input type="email" id="auth-email" placeholder="Email" required
+                    style="width:100%;padding:12px 16px;background:rgba(10,10,30,0.6);border:1px solid rgba(99,102,241,0.2);border-radius:10px;color:#f0f0ff;font-family:var(--kelion-font);font-size:0.9rem;outline:none;margin-bottom:12px;" />
+                <input type="password" id="auth-password" placeholder="Password" required
+                    style="width:100%;padding:12px 16px;background:rgba(10,10,30,0.6);border:1px solid rgba(99,102,241,0.2);border-radius:10px;color:#f0f0ff;font-family:var(--kelion-font);font-size:0.9rem;outline:none;margin-bottom:12px;" />
+                <button type="submit" id="auth-submit"
+                    style="width:100%;padding:14px;background:linear-gradient(135deg,#6366f1,#06b6d4);border:none;border-radius:10px;color:#fff;font-size:1rem;font-weight:600;cursor:pointer;font-family:var(--kelion-font);">Sign
+                    In</button>
+                <div id="auth-forgot" style="margin-top:8px;text-align:center;"><a href="#" id="auth-forgot-link"
+                        style="color:#6366F1;font-size:0.8rem;">Forgot password?</a></div>
+                <p id="auth-error" style="color:#f87171;font-size:0.85rem;margin-top:8px;text-align:center;"></p>
+                <div style="text-align:center;margin-top:12px;"><a href="#" id="auth-toggle"
+                        style="color:#8888AA;font-size:0.85rem;">No account → Create</a></div>
+                <h3 id="auth-title" style="display:none;">Sign In</h3>
+            </form>
         </div>
     </div>
 
@@ -176,105 +320,99 @@
         <!-- NAVBAR -->
         <nav class="navbar" id="app-navbar">
             <a href="/" class="navbar-logo"><span id="navbar-avatar-name">Kelion</span><span>AI</span></a>
-            <div id="status-indicator" style="margin-left: 10px; display: inline-flex; align-items: center; gap: 6px; font-size: 0.75rem; color: var(--kelion-text-secondary); opacity: 0.8;">
-                <div id="status-dot" style="width: 8px; height: 8px; border-radius: 50%; background: #10B981; box-shadow: 0 0 10px rgba(16,185,129,0.5);"></div>
+            <div id="status-indicator"
+                style="margin-left: 10px; display: inline-flex; align-items: center; gap: 6px; font-size: 0.75rem; color: var(--kelion-text-secondary); opacity: 0.8;">
+                <div id="status-dot"
+                    style="width: 8px; height: 8px; border-radius: 50%; background: #10B981; box-shadow: 0 0 10px rgba(16,185,129,0.5);">
+                </div>
                 <span id="status-text">Online</span>
             </div>
             <span id="user-name" class="user-badge" style="margin-left:12px;">Guest</span>
             <div class="navbar-right">
-                <button class="ctrl-btn-sm" id="btn-history" title="Conversation history" aria-label="Conversation history" style="background:none;border:none;cursor:pointer;font-size:1.1rem;padding:4px 8px;color:var(--kelion-text-secondary);">📋</button>
-                <button class="btn-secondary" id="btn-subscriptions" title="Abonamente" style="padding:8px 14px;font-size:0.85rem;background:rgba(99,102,241,0.12);border:1px solid rgba(99,102,241,0.3);border-radius:8px;color:#a5b4fc;cursor:pointer;font-family:var(--kelion-font);transition:all 0.2s;">⭐ Abonamente</button>
-                <button class="btn-primary" id="btn-auth" title="Sign in" style="padding:8px 18px;font-size:0.85rem;">🔑 Login</button>
+                <button class="ctrl-btn-sm" id="btn-history" title="Conversation history"
+                    aria-label="Conversation history"
+                    style="background:none;border:none;cursor:pointer;font-size:1.1rem;padding:4px 8px;color:var(--kelion-text-secondary);">📋</button>
+                <button class="btn-secondary" id="btn-subscriptions" title="Abonamente"
+                    style="padding:8px 14px;font-size:0.85rem;background:rgba(99,102,241,0.12);border:1px solid rgba(99,102,241,0.3);border-radius:8px;color:#a5b4fc;cursor:pointer;font-family:var(--kelion-font);transition:all 0.2s;">⭐
+                    Abonamente</button>
+                <button class="btn-primary" id="btn-auth" title="Sign in" style="padding:8px 18px;font-size:0.85rem;">🔑
+                    Login</button>
             </div>
         </nav>
 
         <!-- MAIN CONTENT -->
         <div id="main-content">
 
-        <!-- CONVERSATION HISTORY SIDEBAR -->
-        <div id="history-sidebar" class="hidden">
-            <div id="history-header">
-                <h3 data-i18n="history.title">Conversations</h3>
-                <button id="btn-new-chat" title="New conversation">＋</button>
-                <button id="btn-close-history" title="Close">✕</button>
+            <!-- CONVERSATION HISTORY SIDEBAR -->
+            <div id="history-sidebar" class="hidden">
+                <div id="history-header">
+                    <h3 data-i18n="history.title">Conversations</h3>
+                    <button id="btn-new-chat" title="New conversation">＋</button>
+                    <button id="btn-close-history" title="Close">✕</button>
+                </div>
+                <div id="history-list"></div>
             </div>
-            <div id="history-list"></div>
-        </div>
 
-        <div id="left-panel">
-            <div id="avatar-area">
-                <canvas id="avatar-canvas"></canvas>
-                <div id="avatar-label">
-                    <span id="avatar-name" style="display:none">Kelion</span>
+            <div id="left-panel">
+                <div id="avatar-area">
+                    <canvas id="avatar-canvas"></canvas>
+                    <div id="avatar-label">
+                        <span id="avatar-name" style="display:none">Kelion</span>
+                    </div>
+                    <div id="avatar-switcher">
+                        <button class="avatar-pill active" data-avatar="kelion">Kelion</button>
+                        <button class="avatar-pill" data-avatar="kira">Kira</button>
+                    </div>
                 </div>
-                <div id="avatar-switcher">
-                    <button class="avatar-pill active" data-avatar="kelion">Kelion</button>
-                    <button class="avatar-pill" data-avatar="kira">Kira</button>
-                </div>
-            </div>
-            <div id="chat-area">
-                <div id="chat-overlay"></div>
-                <div id="thinking">
-                    <div class="thinking-dots"><span></span><span></span><span></span></div>
-                    <span data-i18n="thinking.text">Thinking...</span>
-                </div>
-                <div id="input-row">
-                    <input type="text" id="text-input" data-i18n-placeholder="input.placeholder" placeholder="Type or speak..." autocomplete="off">
-                    <button id="btn-upload" title="Upload file" aria-label="Upload file">📎</button>
-                    <input type="file" id="file-input-hidden" style="display:none" accept="*/*">
-                    <button id="btn-send">➤</button>
-                </div>
-            </div>
-        </div>
-        <div id="display-panel">
-            <div id="display-header">
-                <span id="display-title" data-i18n="monitor.title">Monitor</span>
-                <button id="btn-monitor-download" title="Download content" style="margin-left:auto;background:none;border:none;color:var(--kelion-text-secondary);cursor:pointer;font-size:1rem;padding:4px 8px;">⬇️</button>
-                <button id="btn-monitor-zip" title="Export as ZIP" style="background:none;border:none;color:var(--kelion-text-secondary);cursor:pointer;font-size:1rem;padding:4px 8px;">🗜️</button>
-            </div>
-            <div id="display-content">
-                <div id="monitor-image" style="display:none"></div>
-                <div id="monitor-map" style="display:none"></div>
-                <div id="monitor-text" style="display:none"></div>
-                <div id="monitor-search" style="display:none"></div>
-                <div id="monitor-weather" style="display:none"></div>
-                <div id="monitor-default">
-                    <div class="welcome-icon animate-float">🎯</div>
-                    <p data-i18n="monitor.default.text">The monitor will display content when the AI assistant shares information.</p>
-                    <small data-i18n="monitor.default.hint">Say "what's ahead" or "show me a map"</small>
+                <div id="chat-area">
+                    <div id="chat-overlay"></div>
+                    <div id="thinking">
+                        <div class="thinking-dots"><span></span><span></span><span></span></div>
+                        <span data-i18n="thinking.text">Thinking...</span>
+                    </div>
+                    <div id="input-row">
+                        <input type="text" id="text-input" data-i18n-placeholder="input.placeholder"
+                            placeholder="Type or speak..." autocomplete="off">
+                        <button id="btn-upload" title="Upload file" aria-label="Upload file">📎</button>
+                        <input type="file" id="file-input-hidden" style="display:none" accept="*/*">
+                        <button id="btn-send">➤</button>
+                    </div>
                 </div>
             </div>
-        </div>
+            <div id="display-panel">
+                <div id="display-header">
+                    <span id="display-title" data-i18n="monitor.title">Monitor</span>
+                    <button id="btn-monitor-download" title="Download content"
+                        style="margin-left:auto;background:none;border:none;color:var(--kelion-text-secondary);cursor:pointer;font-size:1rem;padding:4px 8px;">⬇️</button>
+                    <button id="btn-monitor-zip" title="Export as ZIP"
+                        style="background:none;border:none;color:var(--kelion-text-secondary);cursor:pointer;font-size:1rem;padding:4px 8px;">🗜️</button>
+                </div>
+                <div id="display-content">
+                    <div id="monitor-image" style="display:none"></div>
+                    <div id="monitor-map" style="display:none"></div>
+                    <div id="monitor-text" style="display:none"></div>
+                    <div id="monitor-search" style="display:none"></div>
+                    <div id="monitor-weather" style="display:none"></div>
+                    <div id="monitor-default">
+                        <div class="welcome-icon animate-float">🎯</div>
+                        <p data-i18n="monitor.default.text">The monitor will display content when the AI assistant
+                            shares information.</p>
+                        <small data-i18n="monitor.default.hint">Say "what's ahead" or "show me a map"</small>
+                    </div>
+                </div>
+            </div>
         </div><!-- /#main-content -->
     </div><!-- /#app-layout -->
 
-    <!-- GUEST TIMER BAR -->
-    <div id="guest-timer-bar" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:1200;background:rgba(5,5,20,0.95);backdrop-filter:blur(12px);border-top:1px solid rgba(99,102,241,0.25);padding:10px 20px;display:none;align-items:center;justify-content:space-between;gap:12px;">
-        <div style="display:flex;align-items:center;gap:10px;">
-            <span style="font-size:1rem;">⏱️</span>
-            <span style="color:#c7d2fe;font-size:0.85rem;font-weight:500;">Sesiune gratuită: <strong id="guest-timer-countdown" style="color:#a5b4fc;font-variant-numeric:tabular-nums;">10:00</strong> rămase azi</span>
-        </div>
-        <div style="display:flex;align-items:center;gap:8px;">
-            <button id="guest-timer-login" style="padding:6px 14px;font-size:0.8rem;background:rgba(99,102,241,0.2);border:1px solid rgba(99,102,241,0.4);border-radius:6px;color:#a5b4fc;cursor:pointer;font-family:var(--kelion-font);">🔑 Login</button>
-            <button id="guest-timer-sub" style="padding:6px 14px;font-size:0.8rem;background:linear-gradient(135deg,#6366f1,#06b6d4);border:none;border-radius:6px;color:#fff;cursor:pointer;font-weight:600;font-family:var(--kelion-font);">⭐ Abonamente</button>
-        </div>
-    </div>
+    <!-- GUEST TIMER BAR — removed (server-side limits apply) -->
 
-    <!-- GUEST EXPIRED OVERLAY -->
-    <div id="guest-expired-overlay" style="display:none;position:fixed;inset:0;z-index:2000;background:rgba(5,5,20,0.92);backdrop-filter:blur(20px);align-items:center;justify-content:center;flex-direction:column;gap:20px;">
-        <div style="text-align:center;max-width:400px;padding:40px;background:rgba(10,10,30,0.8);border:1px solid rgba(99,102,241,0.3);border-radius:20px;">
-            <div style="font-size:3rem;margin-bottom:16px;">⏰</div>
-            <h2 style="color:#f0f0ff;font-size:1.4rem;margin:0 0 8px;">Sesiunea gratuită a expirat</h2>
-            <p style="color:#8888aa;font-size:0.9rem;margin:0 0 24px;">Ai folosit cele 10 minute gratuite de azi. Revino mâine sau alege un plan.</p>
-            <div style="display:flex;flex-direction:column;gap:10px;">
-                <button id="expired-login-btn" style="padding:12px 24px;background:rgba(99,102,241,0.2);border:1px solid rgba(99,102,241,0.4);border-radius:10px;color:#a5b4fc;cursor:pointer;font-size:0.95rem;font-family:var(--kelion-font);">🔑 Am cont — Login</button>
-                <button id="expired-sub-btn" style="padding:12px 24px;background:linear-gradient(135deg,#6366f1,#06b6d4);border:none;border-radius:10px;color:#fff;cursor:pointer;font-size:0.95rem;font-weight:600;font-family:var(--kelion-font);">⭐ Alege un abonament</button>
-            </div>
-        </div>
-    </div>
+    <!-- GUEST EXPIRED OVERLAY — removed (server-side limits apply) -->
 
     <div id="drop-zone" class="hidden">
-        <div class="drop-zone-content"><div class="drop-icon animate-float">📂</div><p data-i18n="drop.text">Drop file here</p></div>
+        <div class="drop-zone-content">
+            <div class="drop-icon animate-float">📂</div>
+            <p data-i18n="drop.text">Drop file here</p>
+        </div>
     </div>
 
     <!-- PRICING MODAL -->
@@ -290,8 +428,8 @@
 
     <!-- TICKER BAR -->
     <div id="ticker-bar" class="ticker-bar hidden">
-      <span id="ticker-text"></span>
-      <button id="ticker-disable" class="ticker-disable hidden" title="Disable ticker">✕</button>
+        <span id="ticker-text"></span>
+        <button id="ticker-disable" class="ticker-disable hidden" title="Disable ticker">✕</button>
     </div>
 
     <script src="/lib/three.bundle.js"></script>
@@ -337,7 +475,7 @@
             try {
                 var dismissed = localStorage.getItem('pwa_dismissed');
                 if (dismissed && Date.now() - Number(dismissed) < 7 * 24 * 60 * 60 * 1000) return;
-            } catch (e2) {}
+            } catch (e2) { }
             var banner = document.getElementById('pwa-install-banner');
             if (banner) banner.style.display = 'flex';
         });
@@ -357,9 +495,10 @@
             dismissBtn.addEventListener('click', function () {
                 var banner = document.getElementById('pwa-install-banner');
                 if (banner) banner.style.display = 'none';
-                try { localStorage.setItem('pwa_dismissed', Date.now()); } catch (e) {}
+                try { localStorage.setItem('pwa_dismissed', Date.now()); } catch (e) { }
             });
         }
     </script>
 </body>
+
 </html>
