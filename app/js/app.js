@@ -413,7 +413,9 @@
 
     // ─── INIT ────────────────────────────────────────────────
     function init() {
-        // ─── Splash: only dismissed by START button click (user gesture needed for AudioContext) ──
+        // ─── Splash: loading animation, auto-dismissed after 3s ──
+        // NOTE: This is just the loading overlay. Auth-screen (with START button) stays visible
+        // until user clicks START — that click is the user gesture needed for AudioContext
         var splashEl = document.getElementById('splash-screen');
         function dismissSplash() {
             if (splashEl && splashEl.parentNode) {
@@ -422,7 +424,8 @@
                 setTimeout(function () { if (splashEl && splashEl.parentNode) splashEl.parentNode.removeChild(splashEl); }, 600);
             }
         }
-        // NO auto-dismiss — START button in auth.js handles this via user gesture
+        var splashTimer = setTimeout(dismissSplash, 3000);
+        // NO auth safety auto-show — START button is the only gate
 
         if (window.KAuth) KAuth.init();
         try {
@@ -555,7 +558,9 @@
                 .catch(function (e) { console.warn('[App] restore conversation:', e.message); persistConvId(null); });
         }
 
-        // ─── Splash stays until START button is clicked (user gesture needed for AudioContext) ──
+        // ─── Dismiss splash loading overlay ─────────────────────
+        clearTimeout(splashTimer);
+        dismissSplash();
 
         console.log('[App] ✅ KelionAI v2.3 — STREAMING + HISTORY');
     }
