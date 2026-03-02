@@ -149,34 +149,43 @@
             .trim();
     }
 
+    var speakSafetyTimer = null;
     async function speak(text, avatar) {
         if (isSpeaking) stopSpeaking();
         if (!text || !text.trim()) return;
         isSpeaking = true;
+        // Safety: auto-reset isSpeaking after 30s max
+        if (speakSafetyTimer) clearTimeout(speakSafetyTimer);
+        speakSafetyTimer = setTimeout(function () {
+            if (isSpeaking) {
+                console.warn('[Voice] Safety timeout: resetting isSpeaking');
+                stopSpeaking();
+            }
+        }, 30000);
 
         try {
             const ttsText = cleanTextForTTS(text);
             if (!ttsText) { isSpeaking = false; resumeWakeDetection(); return; }
-            const currentExpression = (window.KAvatar && window.KAvatar.getCurrentExpression) ? window.KAvatar.getCurrentExpression() : 'neutral';
+            console.log('[Voice] Fetching TTS for:', ttsText.substring(0, 50) + '...');
             const resp = await fetch(API_BASE + '/api/speak', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...(window.KAuth ? KAuth.getAuthHeaders() : {}) },
-                body: JSON.stringify({ text: ttsText, avatar: avatar || KAvatar.getCurrentAvatar(), language: detectedLanguage, mood: currentExpression })
+                body: JSON.stringify({ text: ttsText, avatar: avatar || KAvatar.getCurrentAvatar(), language: detectedLanguage })
             });
 
             if (!resp.ok) {
                 console.warn('[Voice] TTS failed:', resp.status);
-                fallbackTextLipSync(text); isSpeaking = false; resumeWakeDetection(); return;
+                isSpeaking = false; resumeWakeDetection(); return;
             }
 
             const arrayBuf = await resp.arrayBuffer();
+            console.log('[Voice] TTS received:', arrayBuf.byteLength, 'bytes');
             const ctx = getAudioContext();
 
-            // Await context resume — required when not in a direct user gesture chain
             if (ctx.state !== 'running') { try { await ctx.resume(); } catch (e) { } }
 
-            // Context still suspended (no user gesture yet) — store buffer and show unlock prompt
             if (ctx.state !== 'running') {
+                console.warn('[Voice] AudioContext still suspended');
                 isSpeaking = false;
                 showAudioUnlockPrompt(arrayBuf, avatar, ttsText);
                 resumeWakeDetection();
