@@ -98,12 +98,21 @@
         if (window.TextLipSync) textLipSync = new TextLipSync({ msPerChar: 38 });
 
         loadAvatar('kelion').then(function () {
+            console.log('[Avatar] Kelion loaded');
             // Preload Kira model silently into browser cache
             var preloader = new THREE.GLTFLoader();
             preloader.load(MODELS.kira, function () {
                 console.log('[Avatar] Kira model preloaded into cache');
-            }, null, function () { });
-        }).catch(function () { });
+                console.log('[Avatar] ✅ Both avatars ready!');
+                window.dispatchEvent(new CustomEvent('avatars-ready'));
+            }, null, function () {
+                // Even if Kira fails, still signal ready
+                window.dispatchEvent(new CustomEvent('avatars-ready'));
+            });
+        }).catch(function () {
+            // Even if Kelion fails, signal ready after timeout
+            setTimeout(function () { window.dispatchEvent(new CustomEvent('avatars-ready')); }, 3000);
+        });
         window.addEventListener('resize', onResize);
         animate();
         console.log('[Avatar] Initialized');

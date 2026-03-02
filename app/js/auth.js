@@ -138,10 +138,18 @@
             if (window.KGuestTimer) KGuestTimer.start();
         }
         if (startBtn) startBtn.addEventListener('click', enterApp);
-        // Auto-enter app after 2s if user doesn't click START (avatars load in background)
-        setTimeout(function () {
+        // Auto-enter when both avatars are 100% loaded (or 10s max)
+        window.addEventListener('avatars-ready', function () {
+            console.log('[Auth] Avatars ready — auto-entering app');
             if (!scr.classList.contains('hidden')) enterApp();
-        }, 2000);
+        });
+        // Fallback: enter after 10s max even if avatars not loaded
+        setTimeout(function () {
+            if (!scr.classList.contains('hidden')) {
+                console.log('[Auth] 10s timeout — entering app');
+                enterApp();
+            }
+        }, 10000);
 
         const ab = document.getElementById('btn-auth');
         if (ab) ab.addEventListener('click', async () => {
