@@ -130,7 +130,7 @@
                 s.start(0);
                 c.resume();
             } catch (e) { }
-            if (window.KVoice) KVoice.ensureAudioUnlocked();
+            if (window.KVoice) { KVoice.ensureAudioUnlocked(); KVoice.startWakeWordDetection(); }
             document.getElementById('auth-screen').classList.add('hidden');
             var appLayout = document.getElementById('app-layout');
             appLayout.classList.remove('hidden');
