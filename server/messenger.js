@@ -8,6 +8,7 @@ const fetch = require('node-fetch');
 const logger = require('./logger');
 const pdfParse = require('pdf-parse');
 const mammoth = require('mammoth');
+const { getVoiceId } = require('./config/voices');
 
 const router = express.Router();
 
@@ -364,9 +365,7 @@ async function generateAndSendVoice(recipientId, text, character) {
     if (!apiKey) return;
     var appUrl = process.env.APP_URL || 'https://kelionai.app';
     try {
-        var voiceId = character === 'kira'
-            ? (process.env.ELEVENLABS_VOICE_KIRA || 'EXAVITQu4vr4xnSDxMaL')
-            : (process.env.ELEVENLABS_VOICE_KELION || 'VR6AewLTigWG4xSOukaG');
+        var voiceId = getVoiceId(character);
         var res = await fetch('https://api.elevenlabs.io/v1/text-to-speech/' + voiceId, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'xi-api-key': apiKey },
