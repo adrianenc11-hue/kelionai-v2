@@ -392,13 +392,16 @@
         else if (/^(kelion|chelion)[,.\s]/i.test(l)) { switchAvatar('kelion'); text = text.replace(/^(kelion|chelion)[,.\s]*/i, '').trim(); }
         if (!text) return;
         if (isUpgradeRequest(text)) { if (window.KPayments) KPayments.showUpgradePrompt(); return; }
-        // Web command — open site in new tab
+        // Web command — show on monitor + open in new tab backup
         var webUrl = tryWebCommand(text);
         if (webUrl) {
             hideWelcome(); addMessage('user', text);
+            // Show on monitor
+            if (window.MonitorManager) MonitorManager.showWebContent(webUrl);
+            // Also open in new tab (backup for sites that block iframes)
             window.open(webUrl, '_blank');
-            addMessage('assistant', '🌐 Am deschis ' + webUrl + ' într-un tab nou!');
-            if (window.KVoice) KVoice.speak('Am deschis site-ul pentru tine!');
+            addMessage('assistant', '🌐 Am deschis ' + webUrl + ' pe monitor și într-un tab nou!');
+            if (window.KVoice) KVoice.speak('Gata, am deschis pentru tine!');
             return;
         }
         hideWelcome(); KAvatar.setAttentive(true); addMessage('user', text); showThinking(true);
