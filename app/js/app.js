@@ -51,6 +51,8 @@
     // Response comes word-by-word instead of waiting for full block
     // ═══════════════════════════════════════════════════════════
     async function sendToAI_Stream(message, language) {
+        // STOP any previous TTS immediately — prevents voice overlap
+        if (window.KVoice) KVoice.stopSpeaking();
         KAvatar.setExpression('thinking', 0.5);
 
         try {
@@ -89,6 +91,7 @@
             overlay.appendChild(msgEl);
 
             let fullReply = '';
+            let firstSentenceSpoken = false;
 
             // Read SSE stream
             const reader = resp.body.getReader();
@@ -118,6 +121,16 @@
                             fullReply += data.text;
                             msgEl.textContent = fullReply;
                             overlay.scrollTop = overlay.scrollHeight;
+
+                            // Start TTS at first sentence boundary — voice starts FAST
+                            if (!firstSentenceSpoken && window.KVoice && fullReply.length > 15) {
+                                var sentenceEnd = fullReply.search(/[.!?]\s/);
+                                if (sentenceEnd > 10) {
+                                    firstSentenceSpoken = true;
+                                    var firstSentence = fullReply.substring(0, sentenceEnd + 1);
+                                    KVoice.speak(firstSentence, KAvatar.getCurrentAvatar());
+                                }
+                            }
                         } else if (data.type === 'done') {
                             msgEl.classList.remove('streaming');
                             if (data.reply && !fullReply) {
@@ -145,13 +158,18 @@
             }
 
             KAvatar.setExpression('happy', 0.3);
-            // Start text lip sync IMMEDIATELY — mouth moves while TTS loads
-            if (fullReply && window.KAvatar) {
-                var tls = KAvatar.getTextLipSync();
-                if (tls) tls.speak(fullReply);
-            }
-            // Then start TTS — when audio arrives, FFT lip sync takes over
-            if (window.KVoice && fullReply) {
+            // Speak remaining text AFTER first sentence (if first was already spoken)
+            if (firstSentenceSpoken && window.KVoice) {
+                var sentenceEnd = fullReply.search(/[.!?]\s/);
+                var remaining = fullReply.substring(sentenceEnd + 2).trim();
+                if (remaining) {
+                    // Wait for first sentence to finish, then speak rest
+                    setTimeout(function () {
+                        KVoice.speak(remaining, KAvatar.getCurrentAvatar());
+                    }, 3000);
+                }
+            } else if (!firstSentenceSpoken && window.KVoice && fullReply) {
+                // Short reply — no sentence boundary found during stream, speak all now
                 KVoice.speak(fullReply, KAvatar.getCurrentAvatar());
             }
 
