@@ -146,6 +146,8 @@ router.post('/chat/stream', chatLimiter, validate(chatSchema), async (req, res) 
         if (!usage.allowed) return res.status(429).json({ error: 'Chat limit reached. Upgrade to Pro for more messages.', plan: usage.plan, limit: usage.limit, upgrade: true });
 
         res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive', 'X-Accel-Buffering': 'no' });
+        // Send thinking indicator immediately so user sees activity
+        res.write(`data: ${JSON.stringify({ type: 'thinking' })}\n\n`);
 
         const thought = await brain.think(message, avatar, history, language, user?.id, conversationId);
 
@@ -161,7 +163,7 @@ router.post('/chat/stream', chatLimiter, validate(chatSchema), async (req, res) 
             } catch (e) { }
         }
         const systemPrompt = buildSystemPrompt(avatar, language, memoryContext, { failedTools: thought.failedTools }, thought.chainOfThought);
-        const compressedHist = thought.compressedHistory || history.slice(-20);
+        const compressedHist = thought.compressedHistory || history.slice(-10);
         const msgs = compressedHist.map(h => ({ role: h.role === 'ai' ? 'assistant' : h.role, content: h.content }));
         msgs.push({ role: 'user', content: thought.enrichedMessage });
 
