@@ -42,11 +42,6 @@
                 const c = event.results[i][0].confidence;
                 if (c < 0.3) continue;
 
-                if (window.i18n) {
-                    const det = i18n.detectLanguage(t);
-                    if (det && det !== detectedLanguage) detectedLanguage = det;
-                }
-
                 const hasKelion = t.includes('kelion') || t.includes('chelion');
                 const hasKira = t.includes('kira') || t.includes('chira');
 
