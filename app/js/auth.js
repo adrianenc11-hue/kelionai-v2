@@ -118,17 +118,14 @@
             if (window.KGuestTimer) KGuestTimer.start();
         });
 
-        // Buton START (dacă există în auth-screen)
+        // START button — immediate action if clicked
         const startBtn = scr.querySelector('#start-btn');
-        if (startBtn) startBtn.addEventListener('click', () => {
+        function enterApp() {
             try {
                 var c = new (window.AudioContext || window.webkitAudioContext)();
                 var b = c.createBuffer(1, 1, 22050);
                 var s = c.createBufferSource();
-                s.buffer = b;
-                s.connect(c.destination);
-                s.start(0);
-                c.resume();
+                s.buffer = b; s.connect(c.destination); s.start(0); c.resume();
             } catch (e) { }
             if (window.KVoice) { KVoice.ensureAudioUnlocked(); KVoice.startWakeWordDetection(); }
             document.getElementById('auth-screen').classList.add('hidden');
@@ -139,7 +136,12 @@
             if (window.KAvatar) KAvatar.onResize();
             updateUI();
             if (window.KGuestTimer) KGuestTimer.start();
-        });
+        }
+        if (startBtn) startBtn.addEventListener('click', enterApp);
+        // Auto-enter app after 2s if user doesn't click START (avatars load in background)
+        setTimeout(function () {
+            if (!scr.classList.contains('hidden')) enterApp();
+        }, 2000);
 
         const ab = document.getElementById('btn-auth');
         if (ab) ab.addEventListener('click', async () => {

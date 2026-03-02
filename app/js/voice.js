@@ -117,13 +117,9 @@
         if (isSpeaking) stopSpeaking();
         if (!text || !text.trim()) return;
         isSpeaking = true;
-        // Safety: auto-reset isSpeaking after 30s max
         if (speakSafetyTimer) clearTimeout(speakSafetyTimer);
         speakSafetyTimer = setTimeout(function () {
-            if (isSpeaking) {
-                console.warn('[Voice] Safety timeout: resetting isSpeaking');
-                stopSpeaking();
-            }
+            if (isSpeaking) { console.warn('[Voice] Safety timeout'); stopSpeaking(); }
         }, 30000);
 
         try {
@@ -143,17 +139,17 @@
 
             const arrayBuf = await resp.arrayBuffer();
             console.log('[Voice] TTS received:', arrayBuf.byteLength, 'bytes');
-            const ctx = getAudioContext();
 
-            if (ctx.state !== 'running') { try { await ctx.resume(); } catch (e) { } }
-
+            // FORCE AudioContext running — try shared first, create new if needed
+            var ctx = getAudioContext();
+            try { await ctx.resume(); } catch (e) { }
             if (ctx.state !== 'running') {
-                console.warn('[Voice] AudioContext still suspended');
-                isSpeaking = false;
-                showAudioUnlockPrompt(arrayBuf, avatar, ttsText);
-                resumeWakeDetection();
-                return;
+                console.warn('[Voice] Shared AudioContext stuck, creating new one');
+                sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                ctx = sharedAudioCtx;
+                try { await ctx.resume(); } catch (e) { }
             }
+            console.log('[Voice] AudioContext state:', ctx.state);
 
             await playAudioBuffer(arrayBuf, ttsText);
         } catch (e) { console.error('[Voice]', e); stopAllLipSync(); isSpeaking = false; resumeWakeDetection(); }
