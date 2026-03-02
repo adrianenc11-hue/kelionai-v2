@@ -584,16 +584,19 @@
 
     var currentLang = DEFAULT_LANG;
 
-    // ─── Load saved language (or auto-detect from browser) ─────────────────
+    // ─── Language: ALWAYS default English ─────────────────────────────────
+    // Language only changes when detected from chat input.
+    // For subscribers: after login, their saved preference is loaded from Supabase.
+    // On page exit: resets to English.
+    // No browser auto-detection — always start EN.
     try {
-        var saved = localStorage.getItem('kelion_lang');
-        if (saved) {
+        // Only restore saved lang if user was explicitly logged in (has token)
+        var hasToken = sessionStorage.getItem('kelion_token') || localStorage.getItem('kelion_token');
+        var saved = hasToken ? localStorage.getItem('kelion_lang') : null;
+        if (saved && SUPPORTED.indexOf(saved) !== -1) {
             currentLang = saved;
-        } else {
-            // Auto-detect from browser language on first visit
-            var browserLang = (navigator.language || '').split('-')[0].toLowerCase();
-            if (SUPPORTED.indexOf(browserLang) !== -1) currentLang = browserLang;
         }
+        // else: stays 'en' (DEFAULT_LANG)
     } catch (e) { }
 
     // ─── Translate a single key ─────────────────────────────────────────────
