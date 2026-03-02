@@ -177,52 +177,12 @@
 })();
 
 // ═══════════════════════════════════════════════════════════════
-// GUEST TIMER — 10 minute/zi sesiune gratuită
+// GUEST TIMER — DISABLED (server-side message limits still apply)
 // ═══════════════════════════════════════════════════════════════
 (function () {
     'use strict';
-
-    var GUEST_DAILY_SECONDS = 10 * 60;
-    var _interval = null;
-    var _active = false;
-
-    function getTodayKey() {
-        return 'kelion_guest_' + new Date().toISOString().slice(0, 10);
-    }
-    function getSecondsUsedToday() {
-        try { return parseInt(localStorage.getItem(getTodayKey()) || '0', 10); } catch (e) { return 0; }
-    }
-    function saveSecondsUsed(s) {
-        try { localStorage.setItem(getTodayKey(), String(s)); } catch (e) { }
-    }
-    function getSecondsRemaining() {
-        return Math.max(0, GUEST_DAILY_SECONDS - getSecondsUsedToday());
-    }
-    function formatTime(sec) {
-        var m = Math.floor(sec / 60);
-        var s = sec % 60;
-        return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
-    }
-    function showTimerBar(show) {
-        var bar = document.getElementById('guest-timer-bar');
-        if (!bar) return;
-        bar.style.display = show ? 'flex' : 'none';
-    }
-    function updateCountdown(sec) {
-        var el = document.getElementById('guest-timer-countdown');
-        if (!el) return;
-        el.textContent = formatTime(sec);
-        el.style.color = sec <= 60 ? '#f87171' : '#a5b4fc';
-    }
-    function showExpiredOverlay(show) {
-        var ov = document.getElementById('guest-expired-overlay');
-        if (!ov) return;
-        ov.style.display = show ? 'flex' : 'none';
-        var inp = document.getElementById('text-input');
-        var btn = document.getElementById('btn-send');
-        if (inp) inp.disabled = show;
-        if (btn) btn.disabled = show;
-    }
+    // Timer removed — guests are limited by server-side daily message quotas instead.
+    // Stub to prevent errors from existing code that references KGuestTimer.
     function openSubscriptions() {
         var modal = document.getElementById('pricing-modal');
         if (modal) {
@@ -230,57 +190,12 @@
             if (window.KPayments) KPayments.renderPricing();
         }
     }
-    function goToLogin() {
-        stop();
-        showTimerBar(false);
-        showExpiredOverlay(false);
-        var authScr = document.getElementById('auth-screen');
-        var appLayout = document.getElementById('app-layout');
-        if (authScr) authScr.classList.remove('hidden');
-        if (appLayout) appLayout.classList.add('hidden');
-    }
-    function start() {
-        if (_active) return;
-        if (window.KAuth && KAuth.isLoggedIn()) return;
-        var remaining = getSecondsRemaining();
-        if (remaining <= 0) {
-            showExpiredOverlay(true);
-            return;
-        }
-        _active = true;
-        showTimerBar(true);
-        updateCountdown(remaining);
-        _interval = setInterval(function () {
-            var used = getSecondsUsedToday() + 1;
-            saveSecondsUsed(used);
-            var rem = getSecondsRemaining();
-            updateCountdown(rem);
-            if (rem <= 0) {
-                stop();
-                showTimerBar(false);
-                showExpiredOverlay(true);
-            }
-        }, 1000);
-    }
-    function stop() {
-        _active = false;
-        if (_interval) { clearInterval(_interval); _interval = null; }
-    }
-    function initGuestTimer() {
+    function initStub() {
         var subBtn = document.getElementById('btn-subscriptions');
         if (subBtn) subBtn.addEventListener('click', openSubscriptions);
-        var timerLogin = document.getElementById('guest-timer-login');
-        if (timerLogin) timerLogin.addEventListener('click', goToLogin);
-        var timerSub = document.getElementById('guest-timer-sub');
-        if (timerSub) timerSub.addEventListener('click', openSubscriptions);
-        var expLogin = document.getElementById('expired-login-btn');
-        if (expLogin) expLogin.addEventListener('click', goToLogin);
-        var expSub = document.getElementById('expired-sub-btn');
-        if (expSub) expSub.addEventListener('click', openSubscriptions);
     }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initStub);
+    else initStub();
 
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initGuestTimer);
-    else initGuestTimer();
-
-    window.KGuestTimer = { start: start, stop: stop, isActive: function () { return _active; } };
+    window.KGuestTimer = { start: function () { }, stop: function () { }, isActive: function () { return false; } };
 })();
