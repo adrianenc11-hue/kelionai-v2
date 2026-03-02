@@ -5,6 +5,17 @@
 
 .hidden { display: none !important; }
 
+/* #app-layout uses visibility:hidden so Three.js can render the canvas in the background */
+#app-layout.hidden {
+    display: flex !important;
+    visibility: hidden;
+    position: fixed;
+    width: 100%;
+    height: 100vh;
+    pointer-events: none;
+    z-index: -1;
+}
+
 :root {
     --bg-primary: var(--kelion-bg);
     --bg-secondary: var(--kelion-bg-secondary);

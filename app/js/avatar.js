@@ -434,6 +434,7 @@
         setPresenting: function (v) { isPresenting = v; },
         getLipSync: function () { return lipSync; },
         getTextLipSync: function () { return textLipSync; },
-        getMorphMeshes: function () { return morphMeshes; }
+        getMorphMeshes: function () { return morphMeshes; },
+        onResize: onResize
     };
 })();
