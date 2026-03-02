@@ -413,7 +413,7 @@
 
     // ─── INIT ────────────────────────────────────────────────
     function init() {
-        // ─── Splash: force removal after 3s as fallback ──────────────
+        // ─── Splash: only dismissed by START button click (user gesture needed for AudioContext) ──
         var splashEl = document.getElementById('splash-screen');
         function dismissSplash() {
             if (splashEl && splashEl.parentNode) {
@@ -422,17 +422,7 @@
                 setTimeout(function () { if (splashEl && splashEl.parentNode) splashEl.parentNode.removeChild(splashEl); }, 600);
             }
         }
-        var splashTimer = setTimeout(dismissSplash, 3000);
-
-        // ─── Auth safety: show app as guest after 5s if auth hangs ──
-        setTimeout(function () {
-            var layout = document.getElementById('app-layout');
-            if (layout && layout.classList.contains('hidden')) {
-                var authScr = document.getElementById('auth-screen');
-                if (authScr) authScr.classList.add('hidden');
-                layout.classList.remove('hidden');
-            }
-        }, 5000);
+        // NO auto-dismiss — START button in auth.js handles this via user gesture
 
         if (window.KAuth) KAuth.init();
         try {
@@ -565,9 +555,7 @@
                 .catch(function (e) { console.warn('[App] restore conversation:', e.message); persistConvId(null); });
         }
 
-        // ─── Dismiss splash after init completes ─────────────────────
-        clearTimeout(splashTimer);
-        dismissSplash();
+        // ─── Splash stays until START button is clicked (user gesture needed for AudioContext) ──
 
         console.log('[App] ✅ KelionAI v2.3 — STREAMING + HISTORY');
     }
