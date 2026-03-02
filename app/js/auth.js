@@ -68,6 +68,7 @@
             } catch(e){}
             if (window.KVoice) KVoice.ensureAudioUnlocked();
             document.getElementById('auth-screen').classList.add('hidden');
+            document.getElementById('splash-screen')?.classList.add('hidden');
             var appLayout = document.getElementById('app-layout');
             appLayout.classList.remove('hidden');
             appLayout.style.visibility = '';
@@ -83,7 +84,7 @@
     }
 
     async function init() { initUI(); const u = await checkSession();
-        if (u) { document.getElementById('auth-screen')?.classList.add('hidden'); document.getElementById('app-layout')?.classList.remove('hidden'); updateUI(); }
+        if (u) { document.getElementById('auth-screen')?.classList.add('hidden'); document.getElementById('app-layout')?.classList.remove('hidden'); document.getElementById('splash-screen')?.classList.add('hidden'); updateUI(); }
         else { document.getElementById('auth-screen')?.classList.remove('hidden'); document.getElementById('app-layout')?.classList.add('hidden'); updateUI(); }
         // Detect ?invite= URL param and store referral code
         const params = new URLSearchParams(window.location.search);
