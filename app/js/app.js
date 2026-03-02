@@ -543,11 +543,41 @@
         var pricingClose = document.getElementById('pricing-close');
         if (pricingClose) pricingClose.addEventListener('click', function () { var m = document.getElementById('pricing-modal'); if (m) m.classList.add('hidden'); });
 
-        // Upload button
-        var uploadBtn = document.getElementById('btn-upload');
+        // ➕ button — popup with IN (import) / OUT (export ZIP)
+        var plusBtn = document.getElementById('btn-monitor-upload');
         var fileInput = document.getElementById('file-input-hidden');
-        if (uploadBtn && fileInput) {
-            uploadBtn.addEventListener('click', function () { fileInput.click(); });
+        if (plusBtn) {
+            plusBtn.addEventListener('click', function () {
+                // Remove existing popup if any
+                var old = document.getElementById('plus-popup');
+                if (old) { old.remove(); return; }
+                var popup = document.createElement('div');
+                popup.id = 'plus-popup';
+                popup.style.cssText = 'position:absolute;top:36px;right:8px;background:#1a1a2e;border:1px solid #333;border-radius:8px;padding:6px;z-index:100;display:flex;gap:6px;box-shadow:0 4px 16px rgba(0,0,0,0.5);';
+                popup.innerHTML = '<button id="plus-import" style="background:#2a2a4a;color:#8888ff;border:1px solid #444;border-radius:6px;padding:8px 16px;cursor:pointer;font-size:0.85rem;">📥 Import</button>' +
+                    '<button id="plus-export" style="background:#2a2a4a;color:#88ff88;border:1px solid #444;border-radius:6px;padding:8px 16px;cursor:pointer;font-size:0.85rem;">📤 Export ZIP</button>';
+                plusBtn.parentElement.style.position = 'relative';
+                plusBtn.parentElement.appendChild(popup);
+                document.getElementById('plus-import').addEventListener('click', function () {
+                    popup.remove();
+                    if (fileInput) fileInput.click();
+                });
+                document.getElementById('plus-export').addEventListener('click', function () {
+                    popup.remove();
+                    if (window.MonitorManager) MonitorManager.downloadAsZip();
+                });
+                // Close popup on click outside
+                setTimeout(function () {
+                    document.addEventListener('click', function closePopup(e) {
+                        if (!popup.contains(e.target) && e.target !== plusBtn) {
+                            popup.remove();
+                            document.removeEventListener('click', closePopup);
+                        }
+                    });
+                }, 50);
+            });
+        }
+        if (fileInput) {
             fileInput.addEventListener('change', function () {
                 if (fileInput.files.length > 0) handleFiles(fileInput.files);
                 fileInput.value = '';
