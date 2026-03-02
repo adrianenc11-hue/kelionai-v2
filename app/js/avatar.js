@@ -387,12 +387,7 @@
         updateBlink(dt);
         updateExpression(dt);
         if (lipSync) lipSync.update();
-        // FORCE mouth closed when not speaking — overrides all sources
-        if (window.KVoice && !KVoice.isSpeaking()) {
-            setMorph('jawOpen', 0); setMorph('mouthOpen', 0);
-            setMorph('Smile', 0); setMorph('viseme_aa', 0);
-            setMorph('JawOpen', 0); setMorph('mouth_open', 0);
-        }
+
         updateGesture(dt);
         updateMoodLighting();
         if (currentModel) {
@@ -415,6 +410,14 @@
 
             currentModel.rotation.y += (targetY - currentModel.rotation.y) * 0.08;
             currentModel.rotation.x += (targetX - currentModel.rotation.x) * 0.08;
+        }
+        // FORCE mouth closed — LAST STEP before render, overrides EVERYTHING
+        if (window.KVoice && !KVoice.isSpeaking()) {
+            setMorph('jawOpen', 0); setMorph('mouthOpen', 0);
+            setMorph('Smile', 0); setMorph('viseme_aa', 0);
+            setMorph('JawOpen', 0); setMorph('mouth_open', 0);
+            setMorph('mouthSmileLeft', 0); setMorph('mouthSmileRight', 0);
+            setMorph('mouthFunnel', 0); setMorph('mouthPucker', 0);
         }
         renderer.render(scene, camera);
     }
