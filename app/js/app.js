@@ -51,6 +51,16 @@
     // Flow: AI reply → KVoice.speak() → audio-start event → reveal text synced
     // ═══════════════════════════════════════════════════════════
     async function sendToAI_Sync(message, language) {
+        // CRITICAL: unlock AudioContext NOW (in user gesture context) BEFORE async work
+        try {
+            var ctx = window.KVoice ? KVoice.getAudioContext() : null;
+            if (ctx) {
+                if (ctx.state === 'suspended') ctx.resume();
+                var b = ctx.createBuffer(1, 1, 22050);
+                var s = ctx.createBufferSource();
+                s.buffer = b; s.connect(ctx.destination); s.start(0);
+            }
+        } catch (e) { }
         if (window.KVoice) KVoice.stopSpeaking();
         KAvatar.setExpression('thinking', 0.5);
 
