@@ -11,13 +11,13 @@
 
     function authHeaders() { return { 'Content-Type': 'application/json', ...(window.KAuth ? KAuth.getAuthHeaders() : {}) }; }
 
-    function persistConvId(id) { currentConversationId = id; try { if (id) localStorage.setItem('kelion_conv_id', id); else localStorage.removeItem('kelion_conv_id'); } catch(e){ console.warn('[App] localStorage write:', e.message); } }
-    function restoreConvId() { try { return localStorage.getItem('kelion_conv_id') || null; } catch(e){ console.warn('[App] localStorage read:', e.message); return null; } }
+    function persistConvId(id) { currentConversationId = id; try { if (id) localStorage.setItem('kelion_conv_id', id); else localStorage.removeItem('kelion_conv_id'); } catch (e) { console.warn('[App] localStorage write:', e.message); } }
+    function restoreConvId() { try { return localStorage.getItem('kelion_conv_id') || null; } catch (e) { console.warn('[App] localStorage read:', e.message); return null; } }
 
     function unlockAudio() {
         if (!audioUnlocked) {
             audioUnlocked = true;
-            try { const c = new (window.AudioContext || window.webkitAudioContext)(), b = c.createBuffer(1,1,22050), s = c.createBufferSource(); s.buffer = b; s.connect(c.destination); s.start(0); c.resume(); } catch(e){}
+            try { const c = new (window.AudioContext || window.webkitAudioContext)(), b = c.createBuffer(1, 1, 22050), s = c.createBufferSource(); s.buffer = b; s.connect(c.destination); s.start(0); c.resume(); } catch (e) { }
         }
         if (window.KVoice) KVoice.ensureAudioUnlocked();
     }
@@ -28,20 +28,20 @@
 
     // ─── Vision (client-side camera) ────────────────────────
     // Triggers include both English and Romanian for multilingual support
-    const VISION_TRIGGERS = ['what is ahead','what do you see','look at','see me','identify','what is this','describe what you see','what is around','ce e în față','ce e in fata','ce vezi','mă vezi','ma vezi','uită-te','uita-te','arată-mi','arata-mi','privește','priveste','identifică','identifica','ce e asta','descrie ce vezi','ce observi','ce e pe stradă','ce e pe strada','ce e în jurul','ce e in jurul'];
+    const VISION_TRIGGERS = ['what is ahead', 'what do you see', 'look at', 'see me', 'identify', 'what is this', 'describe what you see', 'what is around', 'ce e în față', 'ce e in fata', 'ce vezi', 'mă vezi', 'ma vezi', 'uită-te', 'uita-te', 'arată-mi', 'arata-mi', 'privește', 'priveste', 'identifică', 'identifica', 'ce e asta', 'descrie ce vezi', 'ce observi', 'ce e pe stradă', 'ce e pe strada', 'ce e în jurul', 'ce e in jurul'];
     function isVisionRequest(t) { const l = t.toLowerCase(); return VISION_TRIGGERS.some(v => l.includes(v)); }
 
     async function triggerVision() {
         showThinking(false);
         addMessage('assistant', '👁️ Activating camera...');
-        try { KAvatar.setExpression('thinking', 0.5); } catch(e) { console.warn('[App] Expression change failed:', e.message); }
+        try { KAvatar.setExpression('thinking', 0.5); } catch (e) { console.warn('[App] Expression change failed:', e.message); }
         try {
             const desc = await KVoice.captureAndAnalyze();
             addMessage('assistant', desc);
             chatHistory.push({ role: 'assistant', content: desc });
-            try { KAvatar.setExpression('happy', 0.3); } catch(e) { console.warn('[App] Expression change failed:', e.message); }
+            try { KAvatar.setExpression('happy', 0.3); } catch (e) { console.warn('[App] Expression change failed:', e.message); }
             if (window.KVoice) await KVoice.speak(desc);
-        } catch(e) {
+        } catch (e) {
             addMessage('assistant', 'Camera not available.');
         }
     }
@@ -73,7 +73,7 @@
                 if (resp.status === 429 && e.upgrade) {
                     const planName = e.plan ? (e.plan.charAt(0).toUpperCase() + e.plan.slice(1)) : 'Free';
                     addMessage('assistant', 'You have reached the daily limit for the ' + planName + ' plan. Say \'Kelion, upgrade\' for more.');
-                    setTimeout(function() { if (window.KPayments) KPayments.showUpgradePrompt(); }, 2000);
+                    setTimeout(function () { if (window.KPayments) KPayments.showUpgradePrompt(); }, 2000);
                 } else if (resp.status === 429) {
                     addMessage('assistant', '⏳ Too many messages. Please wait a moment.');
                 } else addMessage('assistant', e.error || 'Error.');
@@ -126,7 +126,7 @@
                             }
                             if (data.conversationId) persistConvId(data.conversationId);
                         }
-                    } catch(e) { /* skip parse errors */ }
+                    } catch (e) { /* skip parse errors */ }
                 }
             }
 
@@ -179,7 +179,7 @@
                 if (resp.status === 429 && e.upgrade) {
                     const planName = e.plan ? (e.plan.charAt(0).toUpperCase() + e.plan.slice(1)) : 'Free';
                     addMessage('assistant', 'You have reached the daily limit for the ' + planName + ' plan. Say \'Kelion, upgrade\' for more.');
-                    setTimeout(function() { if (window.KPayments) KPayments.showUpgradePrompt(); }, 2000);
+                    setTimeout(function () { if (window.KPayments) KPayments.showUpgradePrompt(); }, 2000);
                 } else if (resp.status === 429) {
                     addMessage('assistant', '⏳ Too many messages. Please wait a moment.');
                 } else addMessage('assistant', e.error || 'Error.');
@@ -227,7 +227,7 @@
             try {
                 const ctx = await KelionTools.preprocessMessage(message);
                 if (ctx) msg = message + ctx;
-            } catch(e) { console.warn('[Tools] preprocessMessage error:', e.message); }
+            } catch (e) { console.warn('[Tools] preprocessMessage error:', e.message); }
         }
         if (useStreaming) await sendToAI_Stream(msg, language);
         else await sendToAI_Regular(msg, language);
@@ -288,7 +288,7 @@
                 chatHistory.push({ role: role, content: m.content });
             }
 
-            document.querySelectorAll('.history-item').forEach(function(el) { el.classList.remove('active'); });
+            document.querySelectorAll('.history-item').forEach(function (el) { el.classList.remove('active'); });
             if (window.innerWidth < 768) toggleHistory(false);
         } catch (e) {
             addMessage('assistant', 'Failed to load conversation.');
@@ -300,7 +300,7 @@
         chatHistory = [];
         var overlay = document.getElementById('chat-overlay');
         if (overlay) overlay.innerHTML = '';
-        document.querySelectorAll('.history-item').forEach(function(el) { el.classList.remove('active'); });
+        document.querySelectorAll('.history-item').forEach(function (el) { el.classList.remove('active'); });
         if (window.innerWidth < 768) toggleHistory(false);
     }
 
@@ -340,8 +340,8 @@
 
     function switchAvatar(name) {
         if (window.KVoice) KVoice.stopSpeaking();
-        try { KAvatar.loadAvatar(name); } catch(e) { console.warn('[App] Avatar load failed:', e.message); }
-        document.querySelectorAll('.avatar-pill').forEach(function(b) { b.classList.toggle('active', b.dataset.avatar === name); });
+        try { KAvatar.loadAvatar(name); } catch (e) { console.warn('[App] Avatar load failed:', e.message); }
+        document.querySelectorAll('.avatar-pill').forEach(function (b) { b.classList.toggle('active', b.dataset.avatar === name); });
         var displayName = name.charAt(0).toUpperCase() + name.slice(1);
         var n = document.getElementById('avatar-name'); if (n) n.textContent = displayName;
         var navName = document.getElementById('navbar-avatar-name'); if (navName) navName.textContent = displayName;
@@ -377,9 +377,9 @@
     // ─── Drag & Drop ─────────────────────────────────────────
     function setupDragDrop() {
         var dp = document.getElementById('display-panel'), dz = document.getElementById('drop-zone'); if (!dp || !dz) return;
-        dp.addEventListener('dragover', function(e) { e.preventDefault(); dz.classList.remove('hidden'); });
-        dp.addEventListener('dragleave', function(e) { if (!dp.contains(e.relatedTarget)) dz.classList.add('hidden'); });
-        dp.addEventListener('drop', function(e) { e.preventDefault(); dz.classList.add('hidden'); handleFiles(e.dataTransfer.files); });
+        dp.addEventListener('dragover', function (e) { e.preventDefault(); dz.classList.remove('hidden'); });
+        dp.addEventListener('dragleave', function (e) { if (!dp.contains(e.relatedTarget)) dz.classList.add('hidden'); });
+        dp.addEventListener('drop', function (e) { e.preventDefault(); dz.classList.add('hidden'); handleFiles(e.dataTransfer.files); });
     }
 
     async function handleFiles(fileList) {
@@ -387,17 +387,17 @@
         for (var i = 0; i < fileList.length; i++) {
             var file = fileList[i];
             var reader = new FileReader();
-            reader.onload = async function() {
+            reader.onload = async function () {
                 storedFiles.push({ name: file.name, size: file.size, type: file.type, data: reader.result });
-                addMessage('user', '📎 ' + file.name + ' (' + Math.round(file.size/1024) + ' KB)');
+                addMessage('user', '📎 ' + file.name + ' (' + Math.round(file.size / 1024) + ' KB)');
                 if (file.type.startsWith('image/')) {
                     var b64 = reader.result.split(',')[1];
                     KAvatar.setExpression('thinking', 0.5); showThinking(true);
                     try {
-                        var r = await fetch(API_BASE+'/api/vision', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ image: b64, avatar: KAvatar.getCurrentAvatar(), language: window.KVoice ? KVoice.getLanguage() : 'en' }) });
+                        var r = await fetch(API_BASE + '/api/vision', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ image: b64, avatar: KAvatar.getCurrentAvatar(), language: window.KVoice ? KVoice.getLanguage() : 'en' }) });
                         var d = await r.json(); showThinking(false); addMessage('assistant', d.description || 'Could not analyze.');
                         KAvatar.setExpression('happy', 0.3); if (window.KVoice) await KVoice.speak(d.description);
-                    } catch(e) { showThinking(false); addMessage('assistant', 'Analysis error.'); }
+                    } catch (e) { showThinking(false); addMessage('assistant', 'Analysis error.'); }
                 } else { addMessage('assistant', 'I received ' + file.name + '. What should I do with it?'); }
             };
             if (file.type.startsWith('text/') || file.name.match(/\.(txt|md|json|csv)$/)) reader.readAsText(file);
@@ -408,7 +408,7 @@
     // ─── Health check ────────────────────────────────────────
     async function checkHealth() {
         try {
-            var r = await fetch(API_BASE+'/api/health');
+            var r = await fetch(API_BASE + '/api/health');
             var d = await r.json();
             if (d.status === 'ok' || d.status === 'online') {
                 var statusText = document.getElementById('status-text');
@@ -417,7 +417,7 @@
                 if (statusDot) statusDot.style.background = d.brain === 'healthy' ? '#00ff88' : '#ffaa00';
                 if (d.services && !d.services.ai_claude) useStreaming = false;
             }
-        } catch(e) {
+        } catch (e) {
             var statusText = document.getElementById('status-text');
             var statusDot = document.getElementById('status-dot');
             if (statusText) statusText.textContent = 'Offline';
@@ -434,13 +434,13 @@
             if (splashEl && splashEl.parentNode) {
                 splashEl.style.opacity = '0';
                 splashEl.style.pointerEvents = 'none';
-                setTimeout(function() { if (splashEl && splashEl.parentNode) splashEl.parentNode.removeChild(splashEl); }, 600);
+                setTimeout(function () { if (splashEl && splashEl.parentNode) splashEl.parentNode.removeChild(splashEl); }, 600);
             }
         }
         var splashTimer = setTimeout(dismissSplash, 3000);
 
         // ─── Auth safety: show app as guest after 5s if auth hangs ──
-        setTimeout(function() {
+        setTimeout(function () {
             var layout = document.getElementById('app-layout');
             if (layout && layout.classList.contains('hidden')) {
                 var authScr = document.getElementById('auth-screen');
@@ -452,43 +452,43 @@
         if (window.KAuth) KAuth.init();
         try {
             KAvatar.init();
-        } catch(e) {
+        } catch (e) {
             console.error('[App] Avatar init failed:', e.message);
             var canvas = document.getElementById('avatar-canvas');
             if (canvas) canvas.style.display = 'none';
         }
 
-        ['click','touchstart','keydown'].forEach(function(e) { document.addEventListener(e, unlockAudio, { once: false, passive: true }); });
+        ['click', 'touchstart', 'keydown'].forEach(function (e) { document.addEventListener(e, unlockAudio, { once: false, passive: true }); });
 
         document.getElementById('btn-send').addEventListener('click', onSendText);
-        document.getElementById('text-input').addEventListener('keydown', function(e) { if (e.key === 'Enter') onSendText(); });
+        document.getElementById('text-input').addEventListener('keydown', function (e) { if (e.key === 'Enter') onSendText(); });
 
-        document.querySelectorAll('.avatar-pill').forEach(function(b) { b.addEventListener('click', function() { switchAvatar(b.dataset.avatar); }); });
+        document.querySelectorAll('.avatar-pill').forEach(function (b) { b.addEventListener('click', function () { switchAvatar(b.dataset.avatar); }); });
 
         // History buttons
         var histBtn = document.getElementById('btn-history');
-        if (histBtn) histBtn.addEventListener('click', function() { toggleHistory(); });
+        if (histBtn) histBtn.addEventListener('click', function () { toggleHistory(); });
         var closeHist = document.getElementById('btn-close-history');
-        if (closeHist) closeHist.addEventListener('click', function() { toggleHistory(false); });
+        if (closeHist) closeHist.addEventListener('click', function () { toggleHistory(false); });
         var newChat = document.getElementById('btn-new-chat');
         if (newChat) newChat.addEventListener('click', startNewChat);
 
         // Pricing close
         var pricingClose = document.getElementById('pricing-close');
-        if (pricingClose) pricingClose.addEventListener('click', function() { var m = document.getElementById('pricing-modal'); if (m) m.classList.add('hidden'); });
+        if (pricingClose) pricingClose.addEventListener('click', function () { var m = document.getElementById('pricing-modal'); if (m) m.classList.add('hidden'); });
 
         // Upload button
         var uploadBtn = document.getElementById('btn-upload');
         var fileInput = document.getElementById('file-input-hidden');
         if (uploadBtn && fileInput) {
-            uploadBtn.addEventListener('click', function() { fileInput.click(); });
-            fileInput.addEventListener('change', function() {
+            uploadBtn.addEventListener('click', function () { fileInput.click(); });
+            fileInput.addEventListener('change', function () {
                 if (fileInput.files.length > 0) handleFiles(fileInput.files);
                 fileInput.value = '';
             });
         }
 
-        window.addEventListener('wake-message', function(e) {
+        window.addEventListener('wake-message', function (e) {
             var detail = e.detail; hideWelcome(); addMessage('user', detail.text); showThinking(true);
             if (isVisionRequest(detail.text)) triggerVision(); else sendToAI(detail.text, detail.language);
         });
@@ -499,14 +499,18 @@
         if (window.KTicker) KTicker.init();
 
         // ─── Session exit: cleanup on tab/window close ────────────────
-        window.addEventListener('beforeunload', function() {
+        window.addEventListener('beforeunload', function () {
             var token = sessionStorage.getItem('kelion_token');
             if (token) {
-                try { navigator.sendBeacon('/api/auth/logout', JSON.stringify({ token: token })); } catch(e) {}
+                try { navigator.sendBeacon('/api/auth/logout', JSON.stringify({ token: token })); } catch (e) { }
             }
             sessionStorage.clear();
-            if (window.KVoice) { try { KVoice.stopSpeaking(); } catch(e) {} }
-            if (window.i18n) { try { i18n.setLanguage('en'); } catch(e) {} }
+            if (window.KVoice) {
+                try { KVoice.stopSpeaking(); } catch (e) { }
+                try { KVoice.stopListening(); } catch (e) { }
+                try { KVoice.mute(); } catch (e) { }
+            }
+            if (window.i18n) { try { i18n.setLanguage('en'); } catch (e) { } }
         });
 
         // ─── Idle detection: logout after 30 min of inactivity ───────
@@ -514,11 +518,11 @@
         function resetIdleTimer() {
             clearTimeout(idleTimer);
             if (sessionStorage.getItem('kelion_token')) {
-                idleTimer = setTimeout(function() {
+                idleTimer = setTimeout(function () {
                     if (window.KAuth && KAuth.isLoggedIn()) {
-                        KAuth.logout().then(function() {
+                        KAuth.logout().then(function () {
                             sessionStorage.clear();
-                            if (window.KVoice) try { KVoice.stopSpeaking(); } catch(e) {}
+                            if (window.KVoice) try { KVoice.stopSpeaking(); } catch (e) { }
                             var authScr = document.getElementById('auth-screen');
                             var appLayout = document.getElementById('app-layout');
                             if (authScr) authScr.classList.remove('hidden');
@@ -528,11 +532,11 @@
                 }, 30 * 60 * 1000);
             }
         }
-        document.addEventListener('visibilitychange', function() {
+        document.addEventListener('visibilitychange', function () {
             if (document.hidden) {
-                idleTimer = setTimeout(function() {
+                idleTimer = setTimeout(function () {
                     if (window.KAuth && KAuth.isLoggedIn()) {
-                        KAuth.logout().then(function() {
+                        KAuth.logout().then(function () {
                             sessionStorage.clear();
                             var authScr = document.getElementById('auth-screen');
                             var appLayout = document.getElementById('app-layout');
@@ -545,7 +549,7 @@
                 clearTimeout(idleTimer);
             }
         });
-        ['click', 'keydown', 'touchstart', 'mousemove'].forEach(function(ev) {
+        ['click', 'keydown', 'touchstart', 'mousemove'].forEach(function (ev) {
             document.addEventListener(ev, resetIdleTimer, { passive: true });
         });
         resetIdleTimer();
@@ -555,8 +559,8 @@
         if (savedConvId) {
             currentConversationId = savedConvId;
             fetch(API_BASE + '/api/conversations/' + savedConvId + '/messages', { headers: authHeaders() })
-                .then(function(r) { return r.ok ? r.json() : null; })
-                .then(function(data) {
+                .then(function (r) { return r.ok ? r.json() : null; })
+                .then(function (data) {
                     if (!data) return;
                     var msgs = data.messages || data || [];
                     if (msgs.length === 0) return;
@@ -570,7 +574,7 @@
                         chatHistory.push({ role: role, content: msgs[i].content });
                     }
                 })
-                .catch(function(e) { console.warn('[App] restore conversation:', e.message); persistConvId(null); });
+                .catch(function (e) { console.warn('[App] restore conversation:', e.message); persistConvId(null); });
         }
 
         // ─── Dismiss splash after init completes ─────────────────────
