@@ -31,6 +31,33 @@
     const VISION_TRIGGERS = ['what is ahead', 'what do you see', 'look at', 'see me', 'identify', 'what is this', 'describe what you see', 'what is around', 'ce e în față', 'ce e in fata', 'ce vezi', 'mă vezi', 'ma vezi', 'uită-te', 'uita-te', 'arată-mi', 'arata-mi', 'privește', 'priveste', 'identifică', 'identifica', 'ce e asta', 'descrie ce vezi', 'ce observi', 'ce e pe stradă', 'ce e pe strada', 'ce e în jurul', 'ce e in jurul'];
     function isVisionRequest(t) { const l = t.toLowerCase(); return VISION_TRIGGERS.some(v => l.includes(v)); }
 
+    // ─── Web commands — open sites via chat ──────────────────
+    var WEB_SITES = {
+        'youtube': 'https://www.youtube.com', 'netflix': 'https://www.netflix.com',
+        'radiozu': 'https://www.radiozu.ro', 'radio zu': 'https://www.radiozu.ro',
+        'kissfm': 'https://www.kissfm.ro', 'kiss fm': 'https://www.kissfm.ro',
+        'spotify': 'https://open.spotify.com', 'twitch': 'https://www.twitch.tv',
+        'facebook': 'https://www.facebook.com', 'instagram': 'https://www.instagram.com',
+        'twitter': 'https://www.twitter.com', 'tiktok': 'https://www.tiktok.com',
+        'google': 'https://www.google.com', 'gmail': 'https://mail.google.com',
+        'whatsapp': 'https://web.whatsapp.com', 'telegram': 'https://web.telegram.org',
+        'hbo': 'https://www.max.com', 'disney': 'https://www.disneyplus.com',
+        'prime video': 'https://www.primevideo.com', 'amazon': 'https://www.amazon.com'
+    };
+    var WEB_CMDS = /\b(deschide|pune|open|play|start|go to|du-te pe|arata|arată|mergi pe|porneste|pornește|navighează|navigheaza)\b/i;
+    function tryWebCommand(text) {
+        var lower = text.toLowerCase();
+        if (!WEB_CMDS.test(lower)) return null;
+        // Check for direct URL in message
+        var urlMatch = lower.match(/https?:\/\/[^\s]+/);
+        if (urlMatch) return urlMatch[0];
+        // Check for known sites
+        for (var name in WEB_SITES) {
+            if (lower.includes(name)) return WEB_SITES[name];
+        }
+        return null;
+    }
+
     async function triggerVision() {
         showThinking(false);
         addMessage('assistant', '👁️ Activating camera...');
@@ -365,6 +392,15 @@
         else if (/^(kelion|chelion)[,.\s]/i.test(l)) { switchAvatar('kelion'); text = text.replace(/^(kelion|chelion)[,.\s]*/i, '').trim(); }
         if (!text) return;
         if (isUpgradeRequest(text)) { if (window.KPayments) KPayments.showUpgradePrompt(); return; }
+        // Web command — open site in new tab
+        var webUrl = tryWebCommand(text);
+        if (webUrl) {
+            hideWelcome(); addMessage('user', text);
+            window.open(webUrl, '_blank');
+            addMessage('assistant', '🌐 Am deschis ' + webUrl + ' într-un tab nou!');
+            if (window.KVoice) KVoice.speak('Am deschis site-ul pentru tine!');
+            return;
+        }
         hideWelcome(); KAvatar.setAttentive(true); addMessage('user', text); showThinking(true);
         if (isVisionRequest(text)) triggerVision(); else await sendToAI(text, 'en');
     }

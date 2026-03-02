@@ -51,11 +51,12 @@ var MonitorManager = (function () {
             '<button id="browser-close" style="background:#333;color:#aaa;border:none;border-radius:6px;padding:5px 8px;cursor:pointer;margin-left:4px;font-size:0.75rem;">✕</button>' +
             '</div>' +
             '<div class="browser-quick" style="display:flex;gap:6px;margin:4px 0;flex-wrap:wrap;">' +
-            '<button class="qlink" data-url="https://www.youtube.com" style="font-size:0.65rem;">▶ YouTube</button>' +
-            '<button class="qlink" data-url="https://www.netflix.com" style="font-size:0.65rem;">🎬 Netflix</button>' +
-            '<button class="qlink" data-url="https://www.kissfm.ro/live" style="font-size:0.65rem;">📻 KissFM</button>' +
-            '<button class="qlink" data-url="https://www.twitch.tv" style="font-size:0.65rem;">🎮 Twitch</button>' +
-            '<button class="qlink" data-url="https://open.spotify.com" style="font-size:0.65rem;">🎵 Spotify</button>' +
+            '<button class="qlink" data-url="https://www.youtube.com/embed/jfKfPfyJRdk" style="font-size:0.65rem;">▶ YouTube Live</button>' +
+            '<button class="qlink" data-url="https://www.radiozu.ro" style="font-size:0.65rem;">📻 RadioZU</button>' +
+            '<button class="qlink" data-url="https://www.kissfm.ro" style="font-size:0.65rem;">📻 KissFM</button>' +
+            '<button class="qlink" data-url="https://open.spotify.com/embed/playlist/37i9dQZF1DXcBWIGoYBM5M" style="font-size:0.65rem;">🎵 Spotify</button>' +
+            '<button class="qlink-new" data-url="https://www.netflix.com" style="font-size:0.65rem;">🎬 Netflix ↗</button>' +
+            '<button class="qlink-new" data-url="https://www.twitch.tv" style="font-size:0.65rem;">🎮 Twitch ↗</button>' +
             '</div>' +
             '<iframe src="' + safeUrl + '" title="Web browser" style="width:100%;flex:1;border:none;border-radius:8px;background:#000;"></iframe>' +
             '</div>';
@@ -77,6 +78,9 @@ var MonitorManager = (function () {
             if (closeBtn) closeBtn.addEventListener('click', clear);
             document.querySelectorAll('.qlink').forEach(function (b) {
                 b.addEventListener('click', function () { showWebContent(b.dataset.url); });
+            });
+            document.querySelectorAll('.qlink-new').forEach(function (b) {
+                b.addEventListener('click', function () { window.open(b.dataset.url, '_blank'); });
             });
         }, 50);
     }
