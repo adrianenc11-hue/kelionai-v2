@@ -83,9 +83,17 @@
         console.log('[LipSync] FFT lip sync started');
     };
 
+    SimpleLipSync.prototype.isActive = function () {
+        return fftActive && isRunning;
+    };
+
     // Called each frame from the main Three.js animate loop
     SimpleLipSync.prototype.update = function () {
-        if (!fftActive || !analyser || !dataArray) return;
+        if (!fftActive || !isRunning || !analyser || !dataArray) {
+            // If not active, ensure mouth is closed
+            if (!fftActive && !isRunning) this._setMouth(0);
+            return;
+        }
         analyser.getByteFrequencyData(dataArray);
 
         // Voice frequencies (100-3000Hz)
@@ -122,7 +130,18 @@
             analyser = null;
             dataArray = null;
         }
+        // Force mouth CLOSED immediately
         this._setMouth(0);
+        // Double-ensure: directly reset all mouth morphs to 0
+        for (var m = 0; m < morphMeshes.length; m++) {
+            var mesh = morphMeshes[m];
+            if (!mesh.morphTargetDictionary || !mesh.morphTargetInfluences) continue;
+            for (var i = 0; i < MOUTH_MORPHS.length; i++) {
+                var idx = mesh.morphTargetDictionary[MOUTH_MORPHS[i]];
+                if (idx !== undefined) mesh.morphTargetInfluences[idx] = 0;
+            }
+        }
+        console.log('[LipSync] STOPPED — mouth forced closed');
     };
 
     SimpleLipSync.prototype._setMouth = function (value) {
