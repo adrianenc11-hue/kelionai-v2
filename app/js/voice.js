@@ -50,7 +50,16 @@
                 const hasKelion = t.includes('kelion') || t.includes('chelion');
                 const hasKira = t.includes('kira') || t.includes('chira');
 
-                if (hasKelion || hasKira) {
+                if ((hasKelion || hasKira) && t.length > 1) {
+                    // 1. Activate mic FIRST — always, regardless of selected avatar
+                    isProcessing = true;
+                    if (window.KAvatar) window.KAvatar.setAttentive(true);
+                    let msg = t;
+                    if (hasKelion) msg = t.replace(/kelion|chelion/i, '').trim() || t;
+                    else if (hasKira) msg = t.replace(/kira|chira/i, '').trim() || t;
+                    window.dispatchEvent(new CustomEvent('wake-message', { detail: { text: msg, language: detectedLanguage } }));
+
+                    // 2. Switch avatar AFTER dispatch (heavy 3D load won't block message)
                     const targetAvatar = hasKira ? 'kira' : 'kelion';
                     if (window.KAvatar && targetAvatar !== window.KAvatar.getCurrentAvatar()) {
                         window.KAvatar.loadAvatar(targetAvatar);
@@ -62,15 +71,6 @@
                         if (avatarName) avatarName.textContent = displayName;
                         document.title = displayName + 'AI';
                     }
-                }
-
-                if ((hasKelion || hasKira) && t.length > 1) {
-                    isProcessing = true;
-                    if (window.KAvatar) window.KAvatar.setAttentive(true);
-                    let msg = t;
-                    if (hasKelion) msg = t.replace(/kelion|chelion/i, '').trim() || t;
-                    else if (hasKira) msg = t.replace(/kira|chira/i, '').trim() || t;
-                    window.dispatchEvent(new CustomEvent('wake-message', { detail: { text: msg, language: detectedLanguage } }));
                 }
             }
         };
