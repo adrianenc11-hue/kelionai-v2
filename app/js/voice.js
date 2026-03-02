@@ -307,6 +307,7 @@
     window.KVoice = {
         speak, stopSpeaking, startListening, stopListening, captureAndAnalyze,
         startWakeWordDetection, resumeWakeDetection, ensureAudioUnlocked, mute, unmute,
+        getAudioContext,
         isRecording: () => isRecording, isSpeaking: () => isSpeaking,
         getLanguage: () => (window.i18n ? i18n.getLanguage() : detectedLanguage),
         setLanguage: (l) => { detectedLanguage = l; }

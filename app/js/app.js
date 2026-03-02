@@ -47,21 +47,22 @@
     }
 
     // ═══════════════════════════════════════════════════════════
-    // STREAMING CHAT — SSE (Server-Sent Events)
-    // Response comes word-by-word instead of waiting for full block
+    // SYNCHRONIZED VOICE + TEXT + MOUTH
+    // Flow: AI reply → TTS audio → play audio + reveal text simultaneously
     // ═══════════════════════════════════════════════════════════
-    async function sendToAI_Stream(message, language) {
-        // STOP any previous TTS immediately — prevents voice overlap
+    async function sendToAI_Sync(message, language) {
+        // Stop any previous TTS
         if (window.KVoice) KVoice.stopSpeaking();
         KAvatar.setExpression('thinking', 0.5);
 
         try {
-            const resp = await fetch(API_BASE + '/api/chat/stream', {
+            // Step 1: Get full AI reply (non-streaming, fast: GPT-4o-mini)
+            const resp = await fetch(API_BASE + '/api/chat', {
                 method: 'POST', headers: authHeaders(),
                 body: JSON.stringify({
                     message,
                     avatar: KAvatar.getCurrentAvatar(),
-                    history: chatHistory.slice(-20),
+                    history: chatHistory.slice(-10),
                     language: language || (window.i18n ? i18n.getLanguage() : 'en'),
                     conversationId: currentConversationId,
                     geo: window.KGeo ? KGeo.getCached() : null
@@ -73,110 +74,125 @@
             if (!resp.ok) {
                 const e = await resp.json().catch(() => ({}));
                 if (resp.status === 429 && e.upgrade) {
-                    const planName = e.plan ? (e.plan.charAt(0).toUpperCase() + e.plan.slice(1)) : 'Free';
-                    addMessage('assistant', 'You have reached the daily limit for the ' + planName + ' plan. Say \'Kelion, upgrade\' for more.');
+                    addMessage('assistant', 'Daily limit reached. Say "upgrade" for more.');
                     setTimeout(function () { if (window.KPayments) KPayments.showUpgradePrompt(); }, 2000);
                 } else if (resp.status === 429) {
-                    addMessage('assistant', '⏳ Too many messages. Please wait a moment.');
+                    addMessage('assistant', '⏳ Please wait a moment.');
                 } else addMessage('assistant', e.error || 'Error.');
                 if (window.KVoice) KVoice.resumeWakeDetection();
                 return;
             }
 
-            // Create streaming message element
-            const overlay = document.getElementById('chat-overlay');
-            const msgEl = document.createElement('div');
-            msgEl.className = 'msg assistant streaming';
-            msgEl.textContent = '';
-            overlay.appendChild(msgEl);
+            const data = await resp.json();
+            const fullReply = data.reply || '';
+            if (data.conversationId) persistConvId(data.conversationId);
 
-            let fullReply = '';
-            let firstSentenceSpoken = false;
-
-            // Read SSE stream
-            const reader = resp.body.getReader();
-            const decoder = new TextDecoder();
-            let buffer = '';
-
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-
-                buffer += decoder.decode(value, { stream: true });
-                const lines = buffer.split('\n');
-                buffer = lines.pop() || '';
-
-                for (const line of lines) {
-                    if (!line.startsWith('data: ')) continue;
-                    try {
-                        const data = JSON.parse(line.slice(6));
-
-                        if (data.type === 'monitor') {
-                            showOnMonitor(data.content, data.monitorType);
-                        } else if (data.type === 'search_results') {
-                            if (window.MonitorManager) MonitorManager.showSearchResults(data.results);
-                        } else if (data.type === 'weather') {
-                            if (window.MonitorManager) MonitorManager.showWeather(data.data);
-                        } else if (data.type === 'chunk') {
-                            fullReply += data.text;
-                            msgEl.textContent = fullReply;
-                            overlay.scrollTop = overlay.scrollHeight;
-
-                            // Start TTS at first sentence boundary — voice starts FAST
-                            if (!firstSentenceSpoken && window.KVoice && fullReply.length > 15) {
-                                var sentenceEnd = fullReply.search(/[.!?]\s/);
-                                if (sentenceEnd > 10) {
-                                    firstSentenceSpoken = true;
-                                    var firstSentence = fullReply.substring(0, sentenceEnd + 1);
-                                    KVoice.speak(firstSentence, KAvatar.getCurrentAvatar());
-                                }
-                            }
-                        } else if (data.type === 'done') {
-                            msgEl.classList.remove('streaming');
-                            if (data.reply && !fullReply) {
-                                fullReply = data.reply;
-                                msgEl.textContent = fullReply;
-                            }
-                            if (data.conversationId) persistConvId(data.conversationId);
-                        }
-                    } catch (e) { /* skip parse errors */ }
-                }
+            if (!fullReply) {
+                addMessage('assistant', '...');
+                if (window.KVoice) KVoice.resumeWakeDetection();
+                return;
             }
 
-            // Update state
+            // Update chat history
             chatHistory.push({ role: 'user', content: message });
             chatHistory.push({ role: 'assistant', content: fullReply });
 
+            // Check for monitor content
             const imgMatch = fullReply.match(/https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp)/i);
             if (imgMatch) showOnMonitor(imgMatch[0], 'image');
 
-            const coordMatch = fullReply.match(/(-?\d+\.?\d*)[°\s,]+([NS])?\s*,?\s*(-?\d+\.?\d*)[°\s,]+([EW])?/i);
-            if (!imgMatch && coordMatch) {
-                const lat = parseFloat(coordMatch[1]);
-                const lng = parseFloat(coordMatch[3]);
-                if (!isNaN(lat) && !isNaN(lng) && window.MonitorManager) MonitorManager.showMap(lat, lng);
-            }
+            // Create message element (empty — will be revealed with voice)
+            const overlay = document.getElementById('chat-overlay');
+            const msgEl = document.createElement('div');
+            msgEl.className = 'msg assistant';
+            msgEl.textContent = '';
+            overlay.appendChild(msgEl);
 
             KAvatar.setExpression('happy', 0.3);
-            // Speak remaining text AFTER first sentence (if first was already spoken)
-            if (firstSentenceSpoken && window.KVoice) {
-                var sentenceEnd = fullReply.search(/[.!?]\s/);
-                var remaining = fullReply.substring(sentenceEnd + 2).trim();
-                if (remaining) {
-                    // Wait for first sentence to finish, then speak rest
-                    setTimeout(function () {
-                        KVoice.speak(remaining, KAvatar.getCurrentAvatar());
-                    }, 3000);
+
+            // Step 2: Get TTS audio
+            if (window.KVoice) {
+                try {
+                    const ttsResp = await fetch(API_BASE + '/api/speak', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', ...(window.KAuth ? KAuth.getAuthHeaders() : {}) },
+                        body: JSON.stringify({
+                            text: fullReply.replace(/```[\s\S]*?```/g, '').replace(/`[^`]+`/g, '').replace(/https?:\/\/\S+/g, '').replace(/[*_~#>]+/g, '').trim(),
+                            avatar: KAvatar.getCurrentAvatar(),
+                            language: language || (window.i18n ? i18n.getLanguage() : 'en')
+                        })
+                    });
+
+                    if (ttsResp.ok) {
+                        const arrayBuf = await ttsResp.arrayBuffer();
+                        const ctx = KVoice.getAudioContext ? KVoice.getAudioContext() : new (window.AudioContext || window.webkitAudioContext)();
+                        if (ctx.state !== 'running') try { await ctx.resume(); } catch (e) { }
+
+                        const audioBuf = await ctx.decodeAudioData(arrayBuf.slice(0));
+                        const duration = audioBuf.duration; // seconds
+
+                        // Step 3: SIMULTANEOUS — play audio + reveal text + lip sync
+                        const source = ctx.createBufferSource();
+                        source.buffer = audioBuf;
+
+                        // Wire FFT lip sync
+                        const ls = KAvatar.getLipSync();
+                        if (ls && ls.connectToContext) {
+                            try {
+                                const an = ls.connectToContext(ctx);
+                                if (an) { source.connect(an); an.connect(ctx.destination); ls.start(); }
+                                else { source.connect(ctx.destination); }
+                            } catch (e) { source.connect(ctx.destination); }
+                        } else { source.connect(ctx.destination); }
+
+                        // Start audio
+                        source.start(0);
+
+                        // Reveal text character-by-character synced with audio duration
+                        var msPerChar = (duration * 1000) / fullReply.length;
+                        var charIdx = 0;
+                        var revealTimer = setInterval(function () {
+                            if (charIdx >= fullReply.length) {
+                                clearInterval(revealTimer);
+                                return;
+                            }
+                            charIdx++;
+                            msgEl.textContent = fullReply.substring(0, charIdx);
+                            overlay.scrollTop = overlay.scrollHeight;
+                        }, msPerChar);
+
+                        // Cleanup when audio ends
+                        source.onended = function () {
+                            clearInterval(revealTimer);
+                            msgEl.textContent = fullReply; // ensure full text shown
+                            if (ls) try { ls.stop(); } catch (e) { }
+                            KAvatar.setExpression('neutral');
+                            KAvatar.setPresenting(false);
+                            if (window.KVoice) KVoice.resumeWakeDetection();
+                        };
+                    } else {
+                        // TTS failed — show text immediately
+                        msgEl.textContent = fullReply;
+                        overlay.scrollTop = overlay.scrollHeight;
+                        if (window.KVoice) KVoice.resumeWakeDetection();
+                    }
+                } catch (e) {
+                    console.warn('[Sync] TTS error:', e.message);
+                    msgEl.textContent = fullReply;
+                    overlay.scrollTop = overlay.scrollHeight;
+                    if (window.KVoice) KVoice.resumeWakeDetection();
                 }
-            } else if (!firstSentenceSpoken && window.KVoice && fullReply) {
-                // Short reply — no sentence boundary found during stream, speak all now
-                KVoice.speak(fullReply, KAvatar.getCurrentAvatar());
+            } else {
+                // No voice module — just show text
+                msgEl.textContent = fullReply;
+                overlay.scrollTop = overlay.scrollHeight;
             }
 
         } catch (e) {
             showThinking(false);
-            console.warn('[Stream] Fallback to regular:', e.message);
-            await sendToAI_Regular(message, language);
+            console.warn('[Sync] Error:', e.message);
+            addMessage('assistant', 'Connection error. Please try again.');
+            if (window.KVoice) KVoice.resumeWakeDetection();
         }
     }
 
@@ -255,8 +271,7 @@
                 if (ctx) msg = message + ctx;
             } catch (e) { console.warn('[Tools] preprocessMessage error:', e.message); }
         }
-        if (useStreaming) await sendToAI_Stream(msg, language);
-        else await sendToAI_Regular(msg, language);
+        await sendToAI_Sync(msg, language);
     }
 
     // ═══════════════════════════════════════════════════════════
