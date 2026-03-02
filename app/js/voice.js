@@ -16,7 +16,7 @@
     function ensureAudioUnlocked() {
         const ctx = getAudioContext();
         if (ctx.state === 'suspended') ctx.resume();
-        try { const b = ctx.createBuffer(1,1,22050), s = ctx.createBufferSource(); s.buffer = b; s.connect(ctx.destination); s.start(0); } catch(e){}
+        try { const b = ctx.createBuffer(1, 1, 22050), s = ctx.createBufferSource(); s.buffer = b; s.connect(ctx.destination); s.start(0); } catch (e) { }
         // Replay pending audio if context was suspended and is now running
         if (ctx.state === 'running' && pendingAudioBuffer) {
             const buf = pendingAudioBuffer, av = pendingAudioAvatar, txt = pendingAudioText;
@@ -74,14 +74,14 @@
                 }
             }
         };
-        recognition.onend = () => { if (isListeningForWake && !isProcessing) try { recognition.start(); } catch(e){} };
-        recognition.onerror = (e) => { if (e.error !== 'not-allowed' && isListeningForWake) setTimeout(() => { try { recognition.start(); } catch(e){} }, 1000); };
-        try { recognition.start(); isListeningForWake = true; console.log('[Voice] Wake word active'); } catch(e){}
+        recognition.onend = () => { if (isListeningForWake && !isProcessing) try { recognition.start(); } catch (e) { } };
+        recognition.onerror = (e) => { if (e.error !== 'not-allowed' && isListeningForWake) setTimeout(() => { try { recognition.start(); } catch (e) { } }, 1000); };
+        try { recognition.start(); isListeningForWake = true; console.log('[Voice] Wake word active'); } catch (e) { }
     }
 
     function resumeWakeDetection() {
         isProcessing = false; window.KAvatar.setAttentive(false);
-        if (isListeningForWake && recognition) try { recognition.start(); } catch(e){}
+        if (isListeningForWake && recognition) try { recognition.start(); } catch (e) { }
     }
 
     function detectLanguage(text) {
@@ -124,9 +124,11 @@
             const ttsText = cleanTextForTTS(text);
             if (!ttsText) { isSpeaking = false; resumeWakeDetection(); return; }
             const currentExpression = (window.KAvatar && window.KAvatar.getCurrentExpression) ? window.KAvatar.getCurrentExpression() : 'neutral';
-            const resp = await fetch(API_BASE + '/api/speak', { method: 'POST',
+            const resp = await fetch(API_BASE + '/api/speak', {
+                method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...(window.KAuth ? KAuth.getAuthHeaders() : {}) },
-                body: JSON.stringify({ text: ttsText, avatar: avatar || KAvatar.getCurrentAvatar(), language: detectedLanguage, mood: currentExpression }) });
+                body: JSON.stringify({ text: ttsText, avatar: avatar || KAvatar.getCurrentAvatar(), language: detectedLanguage, mood: currentExpression })
+            });
 
             if (!resp.ok) {
                 console.warn('[Voice] TTS failed:', resp.status);
@@ -137,7 +139,7 @@
             const ctx = getAudioContext();
 
             // Await context resume — required when not in a direct user gesture chain
-            if (ctx.state !== 'running') { try { await ctx.resume(); } catch(e) {} }
+            if (ctx.state !== 'running') { try { await ctx.resume(); } catch (e) { } }
 
             // Context still suspended (no user gesture yet) — store buffer and show unlock prompt
             if (ctx.state !== 'running') {
@@ -148,14 +150,14 @@
             }
 
             await playAudioBuffer(arrayBuf, ttsText);
-        } catch(e) { console.error('[Voice]', e); stopAllLipSync(); isSpeaking = false; resumeWakeDetection(); }
+        } catch (e) { console.error('[Voice]', e); stopAllLipSync(); isSpeaking = false; resumeWakeDetection(); }
     }
 
     async function playAudioBuffer(arrayBuf, fallbackText) {
         const ctx = getAudioContext();
         let audioBuf;
         try { audioBuf = await ctx.decodeAudioData(arrayBuf.slice(0)); }
-        catch(e) { fallbackTextLipSync(fallbackText || ''); isSpeaking = false; resumeWakeDetection(); return; }
+        catch (e) { fallbackTextLipSync(fallbackText || ''); isSpeaking = false; resumeWakeDetection(); return; }
 
         currentSourceNode = ctx.createBufferSource();
         currentSourceNode.buffer = audioBuf;
@@ -167,7 +169,7 @@
             try {
                 const an = ls.connectToContext(ctx);
                 if (an) { currentSourceNode.connect(an); an.connect(ctx.destination); fftOk = true; ls.start(); }
-            } catch(e){}
+            } catch (e) { }
         }
         if (!fftOk) { currentSourceNode.connect(ctx.destination); fallbackTextLipSync(fallbackText || ''); }
 
@@ -177,21 +179,24 @@
         // Auto-gestures during speech
         if (fallbackText) {
             var gt = fallbackText.toLowerCase();
-            setTimeout(function() { if (window.KAvatar) KAvatar.playGesture('nod'); }, 500);
-            if (gt.includes('?')) setTimeout(function() { if (window.KAvatar) KAvatar.playGesture('tilt'); }, 2000);
-            if (gt.includes('!')) setTimeout(function() { if (window.KAvatar) KAvatar.playGesture('nod'); }, 1500);
+            setTimeout(function () { if (window.KAvatar) KAvatar.playGesture('nod'); }, 500);
+            if (gt.includes('?')) setTimeout(function () { if (window.KAvatar) KAvatar.playGesture('tilt'); }, 2000);
+            if (gt.includes('!')) setTimeout(function () { if (window.KAvatar) KAvatar.playGesture('nod'); }, 1500);
             if (gt.length > 200) {
-                setTimeout(function() { if (window.KAvatar) KAvatar.playGesture('lookAway'); }, 3000);
-                setTimeout(function() { if (window.KAvatar) KAvatar.playGesture('nod'); }, 5000);
+                setTimeout(function () { if (window.KAvatar) KAvatar.playGesture('lookAway'); }, 3000);
+                setTimeout(function () { if (window.KAvatar) KAvatar.playGesture('nod'); }, 5000);
             }
             if (/\b(nu|no|nein|non|niet|imposibil|impossible|unfortunately|din păcate)\b/i.test(gt)) {
-                setTimeout(function() { if (window.KAvatar) KAvatar.playGesture('shake'); }, 1000);
+                setTimeout(function () { if (window.KAvatar) KAvatar.playGesture('shake'); }, 1000);
             }
         }
 
         currentSourceNode.onended = () => { stopAllLipSync(); isSpeaking = false; currentSourceNode = null; KAvatar.setExpression('neutral'); KAvatar.setPresenting(false); resumeWakeDetection(); };
         currentSourceNode.start(0);
-        console.log('[Voice] ✅ Audio playing (' + arrayBuf.byteLength + 'B)');
+        // Safety timeout: stop lip sync even if onended doesn't fire
+        var audioDurationMs = Math.ceil(audioBuf.duration * 1000) + 500;
+        setTimeout(function () { if (isSpeaking) { stopAllLipSync(); isSpeaking = false; currentSourceNode = null; KAvatar.setExpression('neutral'); KAvatar.setPresenting(false); resumeWakeDetection(); } }, audioDurationMs);
+        console.log('[Voice] ✅ Audio playing (' + arrayBuf.byteLength + 'B, ' + Math.round(audioBuf.duration) + 's)');
     }
 
     function showAudioUnlockPrompt(arrayBuf, avatar, text) {
@@ -204,14 +209,14 @@
         btn.id = 'audio-unlock-btn';
         btn.textContent = '🔊 Click to enable sound';
         btn.style.cssText = 'position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#1a73e8;color:#fff;border:none;border-radius:24px;padding:12px 24px;cursor:pointer;z-index:9999;font-size:14px;font-weight:600;box-shadow:0 4px 16px rgba(0,0,0,0.4)';
-        btn.onclick = async function() {
+        btn.onclick = async function () {
             btn.remove();
             const buf = pendingAudioBuffer, av = pendingAudioAvatar, txt = pendingAudioText;
             pendingAudioBuffer = null; pendingAudioAvatar = null; pendingAudioText = null;
             if (!buf) return;
             isSpeaking = true;
             const ctx = getAudioContext();
-            try { await ctx.resume(); } catch(e) {}
+            try { await ctx.resume(); } catch (e) { }
             await playAudioBuffer(buf, txt);
         };
         document.body.appendChild(btn);
@@ -220,8 +225,8 @@
 
     function stopAllLipSync() {
         var ls = KAvatar.getLipSync(), ts = KAvatar.getTextLipSync();
-        if (ls) try { ls.stop(); } catch(e){}
-        if (ts) try { ts.stop(); } catch(e){}
+        if (ls) try { ls.stop(); } catch (e) { }
+        if (ts) try { ts.stop(); } catch (e) { }
         KAvatar.setMorph('Smile', 0);
     }
 
@@ -231,7 +236,7 @@
     }
 
     function stopSpeaking() {
-        if (currentSourceNode) try { currentSourceNode.stop(); } catch(e){} currentSourceNode = null;
+        if (currentSourceNode) try { currentSourceNode.stop(); } catch (e) { } currentSourceNode = null;
         stopAllLipSync(); isSpeaking = false; KAvatar.setExpression('neutral'); KAvatar.setPresenting(false);
     }
 
@@ -248,7 +253,7 @@
     // ─── Manual record ───────────────────────────────────────
     async function startListening() {
         if (isRecording) return;
-        if (recognition) try { recognition.stop(); } catch(e){}
+        if (recognition) try { recognition.stop(); } catch (e) { }
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 } });
             audioChunks = [];
@@ -256,7 +261,7 @@
             mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunks.push(e.data); };
             mediaRecorder.start(100); isRecording = true; KAvatar.setExpression('thinking', 0.4);
             return true;
-        } catch(e) { resumeWakeDetection(); return false; }
+        } catch (e) { resumeWakeDetection(); return false; }
     }
 
     function stopListening() {
@@ -272,7 +277,7 @@
                     try {
                         const r = await fetch(API_BASE + '/api/listen', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ audio: b64 }) });
                         const d = await r.json(); if (d.text) detectLanguage(d.text); resolve(d.text || null);
-                    } catch(e) { resolve(null); }
+                    } catch (e) { resolve(null); }
                 };
                 reader.readAsDataURL(blob);
             };
@@ -290,16 +295,20 @@
             c.getContext('2d').drawImage(v, 0, 0); stream.getTracks().forEach(t => t.stop());
             const b64 = c.toDataURL('image/jpeg', 0.95).split(',')[1];
             KAvatar.setExpression('thinking', 0.5);
-            const r = await fetch(API_BASE + '/api/vision', { method: 'POST',
+            const r = await fetch(API_BASE + '/api/vision', {
+                method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...(window.KAuth ? KAuth.getAuthHeaders() : {}) },
-                body: JSON.stringify({ image: b64, avatar: KAvatar.getCurrentAvatar(), language: detectedLanguage }) });
+                body: JSON.stringify({ image: b64, avatar: KAvatar.getCurrentAvatar(), language: detectedLanguage })
+            });
             const d = await r.json(); return d.description || 'Could not analyze.';
-        } catch(e) { return e.name === 'NotAllowedError' ? 'Please allow camera access.' : 'Camera error.'; }
+        } catch (e) { return e.name === 'NotAllowedError' ? 'Please allow camera access.' : 'Camera error.'; }
     }
 
-    window.KVoice = { speak, stopSpeaking, startListening, stopListening, captureAndAnalyze,
+    window.KVoice = {
+        speak, stopSpeaking, startListening, stopListening, captureAndAnalyze,
         startWakeWordDetection, resumeWakeDetection, ensureAudioUnlocked, mute, unmute,
         isRecording: () => isRecording, isSpeaking: () => isSpeaking,
         getLanguage: () => (window.i18n ? i18n.getLanguage() : detectedLanguage),
-        setLanguage: (l) => { detectedLanguage = l; } };
+        setLanguage: (l) => { detectedLanguage = l; }
+    };
 })();

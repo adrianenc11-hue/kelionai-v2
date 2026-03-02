@@ -562,8 +562,8 @@
 
     // ─── Word patterns for language detection ───────────────────────────────
     var LANG_PATTERNS = [
-        { lang: 'ro', re: /\b(și|sau|este|sunt|pentru|care|cum|unde|vreau|poți|bună|salut|mulțumesc|te|îți|îmi|mai|dar|că|nu|da|eu|tu|el|ea|noi|voi|ei|ale|lui|sa|la|în|pe|cu|de|din|spre|până|când|dacă|acum|deja|mereu)\b/i },
-        { lang: 'fr', re: /\b(je|tu|il|elle|nous|vous|ils|elles|est|sont|avec|pour|dans|sur|par|les|des|une|bonjour|merci|oui|non|comment|pourquoi|quoi|qui|où|quand|très|mais|ou|et|donc|or|ni|car|que|ce|cet|cette|mon|ton|son|ma|ta|sa)\b/i },
+        { lang: 'ro', re: /\b(și|si|sau|este|sunt|pentru|care|cum|unde|vreau|poti|poți|buna|bună|salut|multumesc|mulțumesc|te|iti|îți|imi|îmi|mai|dar|ca|că|nu|da|eu|tu|el|ea|noi|voi|ei|ale|lui|sa|la|in|în|pe|cu|de|din|spre|pana|până|cand|când|daca|dacă|acum|deja|mereu|afara|afară|cite|cate|câte|câți|grade|ploua|plouă|vreme|meteo|soare|frig|cald|bine|rau|rău|stiu|știu|fac|pot|spune|arata|arată|vezi|uite|hai|asta|ziua|seara|dimineata|noaptea|trebuie|lucrez|merg|unde|ceva|nimic|acolo|aici|foarte|putina|puțin|mult|acasa|acasă|inainte|înainte|maine|mâine|ieri)\b/i },
+        { lang: 'fr', re: /\b(je|il|elle|nous|vous|ils|elles|avec|dans|sur|par|les|des|une|bonjour|merci|oui|non|comment|pourquoi|quoi|qui|où|quand|très|mais|donc|ni|car|cet|cette|mon|ton|son|ma|ta)\b/i },
         { lang: 'de', re: /\b(ich|du|er|sie|wir|ihr|ist|sind|mit|für|auf|bei|aus|nach|von|über|unter|an|in|zu|ein|eine|der|die|das|und|oder|aber|nicht|ja|nein|hallo|danke|bitte|wie|was|wer|wo|wann|warum|auch|noch|schon)\b/i },
         { lang: 'es', re: /\b(yo|tú|él|ella|nosotros|vosotros|ellos|es|son|con|para|en|por|de|del|hola|gracias|sí|no|cómo|qué|quién|dónde|cuándo|muy|pero|también|ya|más|menos|bueno|malo|grande|pequeño)\b/i },
         { lang: 'it', re: /\b(io|tu|lui|lei|noi|voi|loro|è|sono|con|per|in|su|da|di|un|una|ciao|grazie|sì|no|come|perché|cosa|chi|dove|quando|molto|ma|anche|già|più|meno|buono|cattivo|grande|piccolo)\b/i },
@@ -594,7 +594,7 @@
             var browserLang = (navigator.language || '').split('-')[0].toLowerCase();
             if (SUPPORTED.indexOf(browserLang) !== -1) currentLang = browserLang;
         }
-    } catch (e) {}
+    } catch (e) { }
 
     // ─── Translate a single key ─────────────────────────────────────────────
     function t(key) {
@@ -625,7 +625,7 @@
     function setLanguage(lang) {
         if (!lang) return;
         currentLang = lang;
-        try { localStorage.setItem('kelion_lang', lang); } catch (e) {}
+        try { localStorage.setItem('kelion_lang', lang); } catch (e) { }
         applyTranslations();
         // Update KVoice detected language if available
         if (window.KVoice && typeof KVoice.setLanguage === 'function') KVoice.setLanguage(lang);

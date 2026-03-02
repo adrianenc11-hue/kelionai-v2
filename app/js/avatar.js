@@ -97,7 +97,13 @@
         if (window.SimpleLipSync) lipSync = new SimpleLipSync();
         if (window.TextLipSync) textLipSync = new TextLipSync({ msPerChar: 38 });
 
-        loadAvatar('kelion');
+        loadAvatar('kelion').then(function () {
+            // Preload Kira model silently into browser cache
+            var preloader = new THREE.GLTFLoader();
+            preloader.load(MODELS.kira, function () {
+                console.log('[Avatar] Kira model preloaded into cache');
+            }, null, function () { });
+        }).catch(function () { });
         window.addEventListener('resize', onResize);
         animate();
         console.log('[Avatar] Initialized');
@@ -111,135 +117,135 @@
         morphMeshes = [];
 
         loadPromise = new Promise(function (resolve, reject) {
-        const loader = new THREE.GLTFLoader();
-        loader.load(MODELS[name], (gltf) => {
-            currentModel = gltf.scene;
+            const loader = new THREE.GLTFLoader();
+            loader.load(MODELS[name], (gltf) => {
+                currentModel = gltf.scene;
 
-            const box = new THREE.Box3().setFromObject(currentModel);
-            const center = box.getCenter(new THREE.Vector3());
-            const size = box.getSize(new THREE.Vector3());
+                const box = new THREE.Box3().setFromObject(currentModel);
+                const center = box.getCenter(new THREE.Vector3());
+                const size = box.getSize(new THREE.Vector3());
 
-            currentModel.position.sub(center);
-            const maxDim = Math.max(size.x, size.y, size.z);
-            if (maxDim > 0) currentModel.scale.setScalar(0.5 / maxDim);
+                currentModel.position.sub(center);
+                const maxDim = Math.max(size.x, size.y, size.z);
+                if (maxDim > 0) currentModel.scale.setScalar(0.5 / maxDim);
 
-            currentModel.traverse((child) => {
-                if (child.isMesh) {
-                    child.visible = true;
-                    child.frustumCulled = false;
-                    if (child.material) child.material.needsUpdate = true;
+                currentModel.traverse((child) => {
+                    if (child.isMesh) {
+                        child.visible = true;
+                        child.frustumCulled = false;
+                        if (child.material) child.material.needsUpdate = true;
 
-                    // Morph targets — traverse ALL meshes regardless of name
-                    if (child.isMesh && child.morphTargetDictionary) {
-                        morphMeshes.push(child);
-                        child.morphTargetInfluences.fill(0);
-                        console.log('[Avatar] Morph:', child.name, Object.keys(child.morphTargetDictionary).join(', '));
-                    }
-
-                    // Z-fighting fix for eyebrows/lashes (from v1)
-                    var nm = (child.name || '').toLowerCase();
-                    var matNm = (child.material && child.material.name) ? child.material.name.toLowerCase() : '';
-                    var isHead = (nm.indexOf('head') !== -1 && nm.indexOf('eye') === -1) || matNm === 'head';
-                    var isBrow = nm.indexOf('brow') !== -1 || matNm.indexOf('brow') !== -1;
-                    var isLash = nm.indexOf('lash') !== -1 || matNm.indexOf('lash') !== -1;
-
-                    if (isHead && child.material) {
-                        child.renderOrder = 0;
-                        child.material.polygonOffset = true;
-                        child.material.polygonOffsetFactor = 4;
-                        child.material.polygonOffsetUnits = 4;
-                    }
-                    if ((isBrow || isLash) && child.material) {
-                        child.renderOrder = 2;
-                        child.material.side = THREE.DoubleSide;
-                        child.material.depthTest = false;
-                        child.material.depthWrite = false;
-                        child.material.transparent = true;
-                        child.material.opacity = 1.0;
-                    }
-                }
-            });
-
-            // MIRROR FIX for k-female.glb — Blender mirror modifier not applied
-            // Brows and lashes only have geometry on one side, clone + flip X
-            if (name === 'kira') {
-                var meshesToMirror = [];
-                currentModel.traverse(function (child) {
-                    if (!child.isMesh) return;
-                    var nmLow = (child.name || '').toLowerCase();
-                    if (nmLow.indexOf('brow') !== -1 || nmLow.indexOf('lash') !== -1) {
-                        meshesToMirror.push(child);
-                    }
-                });
-                meshesToMirror.forEach(function (origMesh) {
-                    var mirrorGeo = origMesh.geometry.clone();
-                    var pos = mirrorGeo.attributes.position;
-                    var nrm = mirrorGeo.attributes.normal;
-                    for (var vi = 0; vi < pos.count; vi++) {
-                        pos.setX(vi, -pos.getX(vi));
-                        if (nrm) nrm.setX(vi, -nrm.getX(vi));
-                    }
-                    pos.needsUpdate = true;
-                    if (nrm) nrm.needsUpdate = true;
-                    var idx = mirrorGeo.index;
-                    if (idx) {
-                        var arr = idx.array;
-                        for (var ti = 0; ti < arr.length; ti += 3) {
-                            var tmp = arr[ti]; arr[ti] = arr[ti + 2]; arr[ti + 2] = tmp;
+                        // Morph targets — traverse ALL meshes regardless of name
+                        if (child.isMesh && child.morphTargetDictionary) {
+                            morphMeshes.push(child);
+                            child.morphTargetInfluences.fill(0);
+                            console.log('[Avatar] Morph:', child.name, Object.keys(child.morphTargetDictionary).join(', '));
                         }
-                        idx.needsUpdate = true;
+
+                        // Z-fighting fix for eyebrows/lashes (from v1)
+                        var nm = (child.name || '').toLowerCase();
+                        var matNm = (child.material && child.material.name) ? child.material.name.toLowerCase() : '';
+                        var isHead = (nm.indexOf('head') !== -1 && nm.indexOf('eye') === -1) || matNm === 'head';
+                        var isBrow = nm.indexOf('brow') !== -1 || matNm.indexOf('brow') !== -1;
+                        var isLash = nm.indexOf('lash') !== -1 || matNm.indexOf('lash') !== -1;
+
+                        if (isHead && child.material) {
+                            child.renderOrder = 0;
+                            child.material.polygonOffset = true;
+                            child.material.polygonOffsetFactor = 4;
+                            child.material.polygonOffsetUnits = 4;
+                        }
+                        if ((isBrow || isLash) && child.material) {
+                            child.renderOrder = 2;
+                            child.material.side = THREE.DoubleSide;
+                            child.material.depthTest = false;
+                            child.material.depthWrite = false;
+                            child.material.transparent = true;
+                            child.material.opacity = 1.0;
+                        }
                     }
-                    var mirrorMat = origMesh.material.clone();
-                    mirrorMat.side = THREE.DoubleSide;
-                    mirrorMat.depthTest = false;
-                    mirrorMat.depthWrite = false;
-                    mirrorMat.transparent = true;
-                    mirrorMat.opacity = 1.0;
-                    var mirrorMesh;
-                    if (origMesh.isSkinnedMesh && origMesh.skeleton) {
-                        mirrorMesh = new THREE.SkinnedMesh(mirrorGeo, mirrorMat);
-                        mirrorMesh.bind(origMesh.skeleton, origMesh.bindMatrix);
-                    } else {
-                        mirrorMesh = new THREE.Mesh(mirrorGeo, mirrorMat);
-                    }
-                    mirrorMesh.renderOrder = 2;
-                    mirrorMesh.name = origMesh.name + '_mirror';
-                    mirrorMesh.frustumCulled = false;
-                    mirrorMesh.position.copy(origMesh.position);
-                    mirrorMesh.rotation.copy(origMesh.rotation);
-                    mirrorMesh.scale.copy(origMesh.scale);
-                    origMesh.parent.add(mirrorMesh);
                 });
-                console.log('[Avatar] Kira mirror fix applied to', meshesToMirror.length, 'meshes');
-            }
 
-            scene.add(currentModel);
-            onResize(); // Force canvas resize after model load
+                // MIRROR FIX for k-female.glb — Blender mirror modifier not applied
+                // Brows and lashes only have geometry on one side, clone + flip X
+                if (name === 'kira') {
+                    var meshesToMirror = [];
+                    currentModel.traverse(function (child) {
+                        if (!child.isMesh) return;
+                        var nmLow = (child.name || '').toLowerCase();
+                        if (nmLow.indexOf('brow') !== -1 || nmLow.indexOf('lash') !== -1) {
+                            meshesToMirror.push(child);
+                        }
+                    });
+                    meshesToMirror.forEach(function (origMesh) {
+                        var mirrorGeo = origMesh.geometry.clone();
+                        var pos = mirrorGeo.attributes.position;
+                        var nrm = mirrorGeo.attributes.normal;
+                        for (var vi = 0; vi < pos.count; vi++) {
+                            pos.setX(vi, -pos.getX(vi));
+                            if (nrm) nrm.setX(vi, -nrm.getX(vi));
+                        }
+                        pos.needsUpdate = true;
+                        if (nrm) nrm.needsUpdate = true;
+                        var idx = mirrorGeo.index;
+                        if (idx) {
+                            var arr = idx.array;
+                            for (var ti = 0; ti < arr.length; ti += 3) {
+                                var tmp = arr[ti]; arr[ti] = arr[ti + 2]; arr[ti + 2] = tmp;
+                            }
+                            idx.needsUpdate = true;
+                        }
+                        var mirrorMat = origMesh.material.clone();
+                        mirrorMat.side = THREE.DoubleSide;
+                        mirrorMat.depthTest = false;
+                        mirrorMat.depthWrite = false;
+                        mirrorMat.transparent = true;
+                        mirrorMat.opacity = 1.0;
+                        var mirrorMesh;
+                        if (origMesh.isSkinnedMesh && origMesh.skeleton) {
+                            mirrorMesh = new THREE.SkinnedMesh(mirrorGeo, mirrorMat);
+                            mirrorMesh.bind(origMesh.skeleton, origMesh.bindMatrix);
+                        } else {
+                            mirrorMesh = new THREE.Mesh(mirrorGeo, mirrorMat);
+                        }
+                        mirrorMesh.renderOrder = 2;
+                        mirrorMesh.name = origMesh.name + '_mirror';
+                        mirrorMesh.frustumCulled = false;
+                        mirrorMesh.position.copy(origMesh.position);
+                        mirrorMesh.rotation.copy(origMesh.rotation);
+                        mirrorMesh.scale.copy(origMesh.scale);
+                        origMesh.parent.add(mirrorMesh);
+                    });
+                    console.log('[Avatar] Kira mirror fix applied to', meshesToMirror.length, 'meshes');
+                }
 
-            if (lipSync) lipSync.setMorphMeshes(morphMeshes);
-            if (textLipSync) textLipSync.setMorphMeshes(morphMeshes);
+                scene.add(currentModel);
+                onResize(); // Force canvas resize after model load
 
-            if (gltf.animations && gltf.animations.length) {
-                mixer = new THREE.AnimationMixer(currentModel);
-                gltf.animations.forEach(clip => mixer.clipAction(clip).play());
-            }
+                if (lipSync) lipSync.setMorphMeshes(morphMeshes);
+                if (textLipSync) textLipSync.setMorphMeshes(morphMeshes);
 
-            document.getElementById('avatar-name').textContent = name === 'kira' ? 'Kira' : 'Kelion';
-            document.getElementById('status-text').textContent = 'Online';
-            console.log(`[Avatar] ${name} loaded — ${morphMeshes.length} morph meshes`);
-            renderer.render(scene, camera);
-            setTimeout(function() { renderer.render(scene, camera); }, 100);
-            resolve(name);
-        }, (progress) => {
-            if (progress.total) {
-                const pct = Math.round((progress.loaded / progress.total) * 100);
-                document.getElementById('status-text').textContent = `Loading... ${pct}%`;
-            }
-        }, (err) => {
-            console.error(`[Avatar] Load error:`, err);
-            document.getElementById('status-text').textContent = 'Model error';
-            reject(err);
-        });
+                if (gltf.animations && gltf.animations.length) {
+                    mixer = new THREE.AnimationMixer(currentModel);
+                    gltf.animations.forEach(clip => mixer.clipAction(clip).play());
+                }
+
+                document.getElementById('avatar-name').textContent = name === 'kira' ? 'Kira' : 'Kelion';
+                document.getElementById('status-text').textContent = 'Online';
+                console.log(`[Avatar] ${name} loaded — ${morphMeshes.length} morph meshes`);
+                renderer.render(scene, camera);
+                setTimeout(function () { renderer.render(scene, camera); }, 100);
+                resolve(name);
+            }, (progress) => {
+                if (progress.total) {
+                    const pct = Math.round((progress.loaded / progress.total) * 100);
+                    document.getElementById('status-text').textContent = `Loading... ${pct}%`;
+                }
+            }, (err) => {
+                console.error(`[Avatar] Load error:`, err);
+                document.getElementById('status-text').textContent = 'Model error';
+                reject(err);
+            });
         });
 
         return loadPromise;
