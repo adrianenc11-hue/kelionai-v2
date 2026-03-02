@@ -81,7 +81,8 @@
         // Mic level bargraph — visual feedback
         try {
             navigator.mediaDevices.getUserMedia({ audio: { noiseSuppression: true, echoCancellation: true } }).then(function (stream) {
-                var micCtx = getAudioContext();
+                var micCtx = new (window.AudioContext || window.webkitAudioContext)();
+                micCtx.resume();
                 var micSrc = micCtx.createMediaStreamSource(stream);
                 var micAn = micCtx.createAnalyser();
                 micAn.fftSize = 256;
