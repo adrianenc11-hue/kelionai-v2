@@ -439,16 +439,6 @@
         }
         var splashTimer = setTimeout(dismissSplash, 3000);
 
-        // ─── Auth safety: show app as guest after 5s if auth hangs ──
-        setTimeout(function() {
-            var layout = document.getElementById('app-layout');
-            if (layout && layout.classList.contains('hidden')) {
-                var authScr = document.getElementById('auth-screen');
-                if (authScr) authScr.classList.add('hidden');
-                layout.classList.remove('hidden');
-            }
-        }, 5000);
-
         if (window.KAuth) KAuth.init();
         try {
             KAvatar.init();
