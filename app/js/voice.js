@@ -72,40 +72,8 @@
         recognition.onend = () => { if (isListeningForWake && !isProcessing) try { recognition.start(); } catch (e) { } };
         recognition.onerror = (e) => { if (e.error !== 'not-allowed' && isListeningForWake) setTimeout(() => { try { recognition.start(); } catch (e) { } }, 1000); };
         try { recognition.start(); isListeningForWake = true; console.log('[Voice] Wake word active'); } catch (e) { }
-
-        // Mic level bargraph — visual feedback
-        try {
-            navigator.mediaDevices.getUserMedia({ audio: { noiseSuppression: true, echoCancellation: true } }).then(function (stream) {
-                var micCtx = new (window.AudioContext || window.webkitAudioContext)();
-                micCtx.resume();
-                var micSrc = micCtx.createMediaStreamSource(stream);
-                var micAn = micCtx.createAnalyser();
-                micAn.fftSize = 256;
-                micSrc.connect(micAn);
-                var micData = new Uint8Array(micAn.frequencyBinCount);
-                var micEl = document.getElementById('mic-level');
-                if (!micEl) return;
-                var bars = micEl.querySelectorAll('span');
-                function updateMicLevel() {
-                    if (!isListeningForWake) { micEl.classList.remove('active'); requestAnimationFrame(updateMicLevel); return; }
-                    micAn.getByteFrequencyData(micData);
-                    var sum = 0; for (var j = 0; j < 32; j++) sum += micData[j];
-                    var vol = sum / 32 / 255;
-                    if (vol > 0.05) {
-                        micEl.classList.add('active');
-                        for (var k = 0; k < bars.length; k++) {
-                            var h = Math.max(4, Math.min(22, vol * 22 * (1 + Math.random() * 0.3)));
-                            bars[k].style.height = h + 'px';
-                        }
-                    } else {
-                        micEl.classList.remove('active');
-                        for (var k = 0; k < bars.length; k++) bars[k].style.height = '4px';
-                    }
-                    requestAnimationFrame(updateMicLevel);
-                }
-                updateMicLevel();
-            }).catch(function () { });
-        } catch (e) { }
+        // Start mic level monitor (standalone function, no duplicate)
+        startMicMonitor();
     }
 
     function resumeWakeDetection() {
