@@ -90,8 +90,7 @@
     // Called each frame from the main Three.js animate loop
     SimpleLipSync.prototype.update = function () {
         if (!fftActive || !isRunning || !analyser || !dataArray) {
-            // If not active, ensure mouth is closed
-            if (!fftActive && !isRunning) this._setMouth(0);
+            this._setMouth(0);
             return;
         }
         analyser.getByteFrequencyData(dataArray);
