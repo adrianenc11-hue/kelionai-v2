@@ -183,6 +183,7 @@
             <span id="user-name" class="user-badge" style="margin-left:12px;">Guest</span>
             <div class="navbar-right">
                 <button class="ctrl-btn-sm" id="btn-history" title="Conversation history" aria-label="Conversation history" style="background:none;border:none;cursor:pointer;font-size:1.1rem;padding:4px 8px;color:var(--kelion-text-secondary);">📋</button>
+                <button class="btn-secondary" id="btn-subscriptions" title="Abonamente" style="padding:8px 14px;font-size:0.85rem;background:rgba(99,102,241,0.12);border:1px solid rgba(99,102,241,0.3);border-radius:8px;color:#a5b4fc;cursor:pointer;font-family:var(--kelion-font);transition:all 0.2s;">⭐ Abonamente</button>
                 <button class="btn-primary" id="btn-auth" title="Sign in" style="padding:8px 18px;font-size:0.85rem;">🔑 Login</button>
             </div>
         </nav>
@@ -246,6 +247,31 @@
         </div>
         </div><!-- /#main-content -->
     </div><!-- /#app-layout -->
+
+    <!-- GUEST TIMER BAR -->
+    <div id="guest-timer-bar" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:1200;background:rgba(5,5,20,0.95);backdrop-filter:blur(12px);border-top:1px solid rgba(99,102,241,0.25);padding:10px 20px;display:none;align-items:center;justify-content:space-between;gap:12px;">
+        <div style="display:flex;align-items:center;gap:10px;">
+            <span style="font-size:1rem;">⏱️</span>
+            <span style="color:#c7d2fe;font-size:0.85rem;font-weight:500;">Sesiune gratuită: <strong id="guest-timer-countdown" style="color:#a5b4fc;font-variant-numeric:tabular-nums;">10:00</strong> rămase azi</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+            <button id="guest-timer-login" style="padding:6px 14px;font-size:0.8rem;background:rgba(99,102,241,0.2);border:1px solid rgba(99,102,241,0.4);border-radius:6px;color:#a5b4fc;cursor:pointer;font-family:var(--kelion-font);">🔑 Login</button>
+            <button id="guest-timer-sub" style="padding:6px 14px;font-size:0.8rem;background:linear-gradient(135deg,#6366f1,#06b6d4);border:none;border-radius:6px;color:#fff;cursor:pointer;font-weight:600;font-family:var(--kelion-font);">⭐ Abonamente</button>
+        </div>
+    </div>
+
+    <!-- GUEST EXPIRED OVERLAY -->
+    <div id="guest-expired-overlay" style="display:none;position:fixed;inset:0;z-index:2000;background:rgba(5,5,20,0.92);backdrop-filter:blur(20px);align-items:center;justify-content:center;flex-direction:column;gap:20px;">
+        <div style="text-align:center;max-width:400px;padding:40px;background:rgba(10,10,30,0.8);border:1px solid rgba(99,102,241,0.3);border-radius:20px;">
+            <div style="font-size:3rem;margin-bottom:16px;">⏰</div>
+            <h2 style="color:#f0f0ff;font-size:1.4rem;margin:0 0 8px;">Sesiunea gratuită a expirat</h2>
+            <p style="color:#8888aa;font-size:0.9rem;margin:0 0 24px;">Ai folosit cele 10 minute gratuite de azi. Revino mâine sau alege un plan.</p>
+            <div style="display:flex;flex-direction:column;gap:10px;">
+                <button id="expired-login-btn" style="padding:12px 24px;background:rgba(99,102,241,0.2);border:1px solid rgba(99,102,241,0.4);border-radius:10px;color:#a5b4fc;cursor:pointer;font-size:0.95rem;font-family:var(--kelion-font);">🔑 Am cont — Login</button>
+                <button id="expired-sub-btn" style="padding:12px 24px;background:linear-gradient(135deg,#6366f1,#06b6d4);border:none;border-radius:10px;color:#fff;cursor:pointer;font-size:0.95rem;font-weight:600;font-family:var(--kelion-font);">⭐ Alege un abonament</button>
+            </div>
+        </div>
+    </div>
 
     <div id="drop-zone" class="hidden">
         <div class="drop-zone-content"><div class="drop-icon animate-float">📂</div><p data-i18n="drop.text">Drop file here</p></div>
