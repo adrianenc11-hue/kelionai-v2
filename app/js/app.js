@@ -533,6 +533,8 @@
 
         setupDragDrop();
         if (window.KVoice) KVoice.startWakeWordDetection();
+        // Request geolocation so AI can see user's location
+        if (window.KGeo) KGeo.getLocation().then(function (pos) { if (pos) console.log('[Geo] Location:', pos.lat.toFixed(2), pos.lng.toFixed(2)); });
         checkHealth();
         if (window.KTicker) KTicker.init();
 
