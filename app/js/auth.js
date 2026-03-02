@@ -68,7 +68,11 @@
             } catch(e){}
             if (window.KVoice) KVoice.ensureAudioUnlocked();
             document.getElementById('auth-screen').classList.add('hidden');
-            document.getElementById('app-layout').classList.remove('hidden');
+            var appLayout = document.getElementById('app-layout');
+            appLayout.classList.remove('hidden');
+            appLayout.style.visibility = '';
+            appLayout.style.pointerEvents = '';
+            if (window.KAvatar) KAvatar.onResize();
             updateUI();
         });
 
