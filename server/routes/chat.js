@@ -67,31 +67,31 @@ router.post('/chat', chatLimiter, validate(chatSchema), async (req, res) => {
 
         let reply = null, engine = null;
 
-        // Claude (primary)
-        if (!reply && process.env.ANTHROPIC_API_KEY) {
-            try {
-                const r = await fetch('https://api.anthropic.com/v1/messages', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
-                    body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 2048, system: systemPrompt, messages: msgs })
-                });
-                const d = await r.json();
-                reply = d.content?.[0]?.text;
-                if (reply) engine = 'Claude';
-            } catch (e) { logger.warn({ component: 'Chat', err: e.message }, 'Claude'); }
-        }
-        // GPT-4o (fallback)
+        // GPT-4o-mini (PRIMARY — fastest response for voice sync)
         if (!reply && process.env.OPENAI_API_KEY) {
             try {
                 const r = await fetch('https://api.openai.com/v1/chat/completions', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + process.env.OPENAI_API_KEY },
-                    body: JSON.stringify({ model: 'gpt-4o', max_tokens: 2048, messages: [{ role: 'system', content: systemPrompt }, ...msgs] })
+                    body: JSON.stringify({ model: 'gpt-4o-mini', max_tokens: 500, messages: [{ role: 'system', content: systemPrompt }, ...msgs] })
                 });
                 const d = await r.json();
                 reply = d.choices?.[0]?.message?.content;
-                if (reply) engine = 'GPT-4o';
-            } catch (e) { logger.warn({ component: 'Chat', err: e.message }, 'GPT-4o'); }
+                if (reply) engine = 'GPT-4o-mini';
+            } catch (e) { logger.warn({ component: 'Chat', err: e.message }, 'GPT-4o-mini'); }
+        }
+        // Claude (fallback)
+        if (!reply && process.env.ANTHROPIC_API_KEY) {
+            try {
+                const r = await fetch('https://api.anthropic.com/v1/messages', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
+                    body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 500, system: systemPrompt, messages: msgs })
+                });
+                const d = await r.json();
+                reply = d.content?.[0]?.text;
+                if (reply) engine = 'Claude';
+            } catch (e) { logger.warn({ component: 'Chat', err: e.message }, 'Claude'); }
         }
         // DeepSeek (tertiary)
         if (!reply && process.env.DEEPSEEK_API_KEY) {
