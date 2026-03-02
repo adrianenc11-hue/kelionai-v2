@@ -1,85 +1,21 @@
-name: Test & Deploy
+name: Deploy to VPS
 
 on:
   push:
     branches: [master]
-  pull_request:
-    branches: [master]
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-      - run: npm ci
-      - name: Install Playwright
-        run: npx playwright install --with-deps chromium
-      - name: Run E2E smoke tests (non-blocking)
-        continue-on-error: true
-        run: npx playwright test --config=playwright.config.js --project=chromium
-        env:
-          BASE_URL: ${{ vars.BASE_URL || 'https://kelionai.app' }}
-
   deploy:
-    needs: test
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@master
         with:
-          node-version: '20'
-          cache: 'npm'
-      - run: npm ci --omit=dev
-
-      - name: Check Railway token
-        id: check-railway
-        run: |
-          if [ -z "$RAILWAY_TOKEN" ]; then
-            echo "::warning::RAILWAY_TOKEN is not set. Deploy will be skipped."
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-          fi
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-
-      - name: Deploy to Railway
-        if: steps.check-railway.outputs.skip == 'false'
-        run: |
-          npm install -g @railway/cli
-          railway up --detach --service kelionai-v2
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-
-      - name: Deploy skipped
-        if: steps.check-railway.outputs.skip == 'true'
-        run: |
-          echo "⏭️ Deploy skipped: RAILWAY_TOKEN is not set."
-          echo "Set it in Settings → Secrets → Actions."
-
-      - name: Health check post-deploy
-        if: steps.check-railway.outputs.skip == 'false'
-        continue-on-error: true
-        run: |
-          echo "Waiting for deployment to be ready..."
-          MAX_WAIT=300
-          INTERVAL=10
-          ELAPSED=0
-          until curl -sf https://kelionai.app/api/health; do
-            sleep $INTERVAL
-            ELAPSED=$((ELAPSED + INTERVAL))
-            if [ $ELAPSED -ge $MAX_WAIT ]; then
-              echo "Health check timed out after ${MAX_WAIT}s"
-              exit 1
-            fi
-            echo "Still waiting... ${ELAPSED}s / ${MAX_WAIT}s"
-          done
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            cd /path/to/your/app
+            git pull origin master
+            npm install --production
+            pm2 restart all
