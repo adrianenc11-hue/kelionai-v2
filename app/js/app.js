@@ -454,24 +454,40 @@
 
         document.querySelectorAll('.avatar-pill').forEach(function (b) { b.addEventListener('click', function () { switchAvatar(b.dataset.avatar); }); });
 
-        // Mic toggle button
+        // Mic toggle button — explicit permission request
         var micToggle = document.getElementById('btn-mic-toggle');
         var micOn = false;
         if (micToggle) {
-            micToggle.addEventListener('click', function () {
-                micOn = !micOn;
-                if (micOn) {
-                    // Unlock audio + start listening
-                    if (window.KVoice) { KVoice.ensureAudioUnlocked(); KVoice.startWakeWordDetection(); }
-                    micToggle.style.borderColor = '#00ff88';
-                    micToggle.style.color = '#00ff88';
-                    micToggle.style.boxShadow = '0 0 12px rgba(0,255,136,0.4)';
-                    micToggle.title = 'Microphone ON — click to turn off';
+            micToggle.addEventListener('click', async function () {
+                if (!micOn) {
+                    // Request mic permission explicitly
+                    micToggle.style.borderColor = '#ffaa00';
+                    micToggle.style.color = '#ffaa00';
+                    micToggle.title = 'Requesting mic permission...';
+                    try {
+                        var stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                        stream.getTracks().forEach(function (t) { t.stop(); }); // release immediately
+                        micOn = true;
+                        if (window.KVoice) { KVoice.ensureAudioUnlocked(); KVoice.startWakeWordDetection(); }
+                        micToggle.style.borderColor = '#00ff88';
+                        micToggle.style.color = '#00ff88';
+                        micToggle.style.boxShadow = '0 0 12px rgba(0,255,136,0.4)';
+                        micToggle.title = '🟢 Mic ON — say "Kelion" or "Kira"';
+                        console.log('[App] Mic ON — wake word listening');
+                    } catch (e) {
+                        micToggle.style.borderColor = '#ff4444';
+                        micToggle.style.color = '#ff4444';
+                        micToggle.style.boxShadow = 'none';
+                        micToggle.title = '🔴 Mic blocked — check browser permissions';
+                        console.error('[App] Mic permission denied:', e.message);
+                    }
                 } else {
+                    micOn = false;
                     micToggle.style.borderColor = '#555';
                     micToggle.style.color = '#888';
                     micToggle.style.boxShadow = 'none';
                     micToggle.title = 'Microphone OFF — click to turn on';
+                    console.log('[App] Mic OFF');
                 }
             });
         }

@@ -44,9 +44,41 @@ var MonitorManager = (function () {
         var el = document.getElementById('monitor-map');
         if (!el) return;
         var safeUrl = String(url).replace(/"/g, '&quot;');
-        el.innerHTML = '<iframe src="' + safeUrl + '" title="Web content"></iframe>';
+        el.innerHTML = '<div class="monitor-browser">' +
+            '<div class="browser-bar">' +
+            '<input type="text" id="browser-url" value="' + safeUrl + '" placeholder="Enter URL..." style="flex:1;background:#1a1a2e;color:#e0e0ff;border:1px solid #333;border-radius:6px;padding:5px 10px;font-size:0.75rem;">' +
+            '<button id="browser-go" style="background:#6366F1;color:#fff;border:none;border-radius:6px;padding:5px 12px;cursor:pointer;margin-left:4px;font-size:0.75rem;">Go</button>' +
+            '<button id="browser-close" style="background:#333;color:#aaa;border:none;border-radius:6px;padding:5px 8px;cursor:pointer;margin-left:4px;font-size:0.75rem;">✕</button>' +
+            '</div>' +
+            '<div class="browser-quick" style="display:flex;gap:6px;margin:4px 0;flex-wrap:wrap;">' +
+            '<button class="qlink" data-url="https://www.youtube.com" style="font-size:0.65rem;">▶ YouTube</button>' +
+            '<button class="qlink" data-url="https://www.netflix.com" style="font-size:0.65rem;">🎬 Netflix</button>' +
+            '<button class="qlink" data-url="https://www.kissfm.ro/live" style="font-size:0.65rem;">📻 KissFM</button>' +
+            '<button class="qlink" data-url="https://www.twitch.tv" style="font-size:0.65rem;">🎮 Twitch</button>' +
+            '<button class="qlink" data-url="https://open.spotify.com" style="font-size:0.65rem;">🎵 Spotify</button>' +
+            '</div>' +
+            '<iframe src="' + safeUrl + '" title="Web browser" style="width:100%;flex:1;border:none;border-radius:8px;background:#000;"></iframe>' +
+            '</div>';
         showPanel('monitor-map');
         if (window.KAvatar) KAvatar.setPresenting(true);
+        // Wire up browser controls
+        setTimeout(function () {
+            var goBtn = document.getElementById('browser-go');
+            var urlInput = document.getElementById('browser-url');
+            var closeBtn = document.getElementById('browser-close');
+            if (goBtn && urlInput) {
+                goBtn.addEventListener('click', function () {
+                    var u = urlInput.value.trim();
+                    if (u && !u.startsWith('http')) u = 'https://' + u;
+                    if (u) showWebContent(u);
+                });
+                urlInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') goBtn.click(); });
+            }
+            if (closeBtn) closeBtn.addEventListener('click', clear);
+            document.querySelectorAll('.qlink').forEach(function (b) {
+                b.addEventListener('click', function () { showWebContent(b.dataset.url); });
+            });
+        }, 50);
     }
 
     function showMarkdown(text) {
@@ -132,6 +164,8 @@ var MonitorManager = (function () {
             if (window.KAvatar) KAvatar.setPresenting(true);
         } else if (type === 'weather' && typeof content === 'object') {
             showWeather(content);
+        } else if (type === 'web') {
+            showWebContent(content);
         } else {
             showMarkdown(String(content));
         }
@@ -205,8 +239,10 @@ var MonitorManager = (function () {
     document.addEventListener('DOMContentLoaded', function () {
         var dlBtn = document.getElementById('btn-monitor-download');
         var zipBtn = document.getElementById('btn-monitor-zip');
+        var webBtn = document.getElementById('btn-monitor-web');
         if (dlBtn) dlBtn.addEventListener('click', downloadContent);
         if (zipBtn) zipBtn.addEventListener('click', downloadAsZip);
+        if (webBtn) webBtn.addEventListener('click', function () { showWebContent('about:blank'); });
     });
 
     return {
