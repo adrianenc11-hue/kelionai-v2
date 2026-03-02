@@ -454,6 +454,28 @@
 
         document.querySelectorAll('.avatar-pill').forEach(function (b) { b.addEventListener('click', function () { switchAvatar(b.dataset.avatar); }); });
 
+        // Mic toggle button
+        var micToggle = document.getElementById('btn-mic-toggle');
+        var micOn = false;
+        if (micToggle) {
+            micToggle.addEventListener('click', function () {
+                micOn = !micOn;
+                if (micOn) {
+                    // Unlock audio + start listening
+                    if (window.KVoice) { KVoice.ensureAudioUnlocked(); KVoice.startWakeWordDetection(); }
+                    micToggle.style.borderColor = '#00ff88';
+                    micToggle.style.color = '#00ff88';
+                    micToggle.style.boxShadow = '0 0 12px rgba(0,255,136,0.4)';
+                    micToggle.title = 'Microphone ON — click to turn off';
+                } else {
+                    micToggle.style.borderColor = '#555';
+                    micToggle.style.color = '#888';
+                    micToggle.style.boxShadow = 'none';
+                    micToggle.title = 'Microphone OFF — click to turn on';
+                }
+            });
+        }
+
         // History buttons
         var histBtn = document.getElementById('btn-history');
         if (histBtn) histBtn.addEventListener('click', function () { toggleHistory(); });
