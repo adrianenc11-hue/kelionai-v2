@@ -532,6 +532,36 @@ body {
     min-height: 300px;
 }
 
+/* ── Monitor web browser panel ── */
+.monitor-browser {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    gap: 4px;
+}
+
+.browser-bar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.qlink {
+    background: #1a1a2e;
+    color: #8888aa;
+    border: 1px solid #333;
+    border-radius: 4px;
+    padding: 3px 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.qlink:hover {
+    background: #6366F1;
+    color: #fff;
+    border-color: #6366F1;
+}
+
 /* ── Monitor text/markdown panel ── */
 #monitor-text {
     width: 100%;
