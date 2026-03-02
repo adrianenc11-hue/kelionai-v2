@@ -109,7 +109,7 @@
 
     // ═══ Init ═══
     function init() {
-        var pricingBtn = document.getElementById('btn-pricing');
+        var pricingBtn = document.getElementById('btn-pricing') || document.getElementById('btn-subscriptions');
         var modal = document.getElementById('pricing-modal');
         var closeBtn = document.getElementById('pricing-close');
 
