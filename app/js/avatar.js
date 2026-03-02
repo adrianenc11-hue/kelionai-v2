@@ -386,7 +386,7 @@
         if (mixer) mixer.update(dt);
         updateBlink(dt);
         updateExpression(dt);
-        if (lipSync && lipSync.isActive && lipSync.isActive()) lipSync.update();
+        if (lipSync) lipSync.update();
         updateGesture(dt);
         updateMoodLighting();
         if (currentModel) {
