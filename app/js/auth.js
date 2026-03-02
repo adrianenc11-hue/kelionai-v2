@@ -54,62 +54,23 @@
 
     function initUI() {
         const scr = document.getElementById('auth-screen'); if (!scr) return;
-        const form = scr.querySelector('#auth-form'), tog = scr.querySelector('#auth-toggle'), err = scr.querySelector('#auth-error');
-        const sub = scr.querySelector('#auth-submit'), ttl = scr.querySelector('#auth-title'), nmg = scr.querySelector('#auth-name-group');
-        const guest = scr.querySelector('#auth-guest');
-        const forgotLink = scr.querySelector('#auth-forgot-link');
-        const forgotDiv = scr.querySelector('#auth-forgot');
-        let isReg = false;
 
-        if (tog) tog.addEventListener('click', (e) => { e.preventDefault(); isReg = !isReg;
-            ttl.textContent = isReg ? 'Create Account' : 'Sign In'; sub.textContent = isReg ? 'Register' : 'Sign In';
-            tog.textContent = isReg ? 'I have an account → Sign In' : 'No account → Create';
-            if (nmg) nmg.style.display = isReg ? 'block' : 'none';
-            if (forgotDiv) forgotDiv.style.display = isReg ? 'none' : 'block';
-            if (err) err.textContent = ''; });
-
-        if (forgotLink) forgotLink.addEventListener('click', async (e) => {
-            e.preventDefault();
-            const emailEl = form ? form.querySelector('#auth-email') : null;
-            const email = emailEl ? emailEl.value.trim() : '';
-            if (!email) { if (err) err.textContent = 'Please enter your email address first'; return; }
-            forgotLink.textContent = '...';
+        const startBtn = scr.querySelector('#start-btn');
+        if (startBtn) startBtn.addEventListener('click', () => {
             try {
-                await forgotPassword(email);
-                if (err) { err.style.color = '#00ff88'; err.textContent = 'Password reset email sent. Please check your inbox.'; }
-            } catch(ex) {
-                if (err) { err.style.color = ''; err.textContent = ex.message; }
-            } finally { forgotLink.textContent = 'Forgot password?'; }
+                var c = new (window.AudioContext || window.webkitAudioContext)();
+                var b = c.createBuffer(1,1,22050);
+                var s = c.createBufferSource();
+                s.buffer = b;
+                s.connect(c.destination);
+                s.start(0);
+                c.resume();
+            } catch(e){}
+            if (window.KVoice) KVoice.ensureAudioUnlocked();
+            document.getElementById('auth-screen').classList.add('hidden');
+            document.getElementById('app-layout').classList.remove('hidden');
+            updateUI();
         });
-
-        if (form) form.addEventListener('submit', async (e) => { e.preventDefault();
-            const em = form.querySelector('#auth-email').value.trim(), pw = form.querySelector('#auth-password').value, nm = form.querySelector('#auth-name')?.value.trim();
-            if (!em || !pw) { if (err) err.textContent = 'Please enter email and password'; return; }
-            sub.disabled = true; sub.textContent = '...'; if (err) { err.textContent = ''; err.style.color = ''; }
-            try {
-                if (isReg) {
-                    const d = await register(em, pw, nm);
-                    if (err) { err.style.color = '#00ff88'; err.textContent = d.message || 'Please check your email to verify your account.'; }
-                    // Store referral code for redemption after email verification & login
-                    // (actual redemption happens at login time — see redeemStoredReferralCode)
-                } else {
-                    await login(em, pw);
-                    // Redeem stored referral code if any
-                    const storedCode = localStorage.getItem('kelion_referral_code');
-                    if (storedCode) {
-                        try {
-                            const rr = await fetch(API + '/api/referral/redeem', { method: 'POST', headers: { 'Content-Type': 'application/json', ...getAuthHeaders() }, body: JSON.stringify({ code: storedCode }) });
-                            const rd = await rr.json();
-                            if (rd.success) localStorage.removeItem('kelion_referral_code');
-                        } catch(_e) {}
-                    }
-                    scr.classList.add('hidden'); document.getElementById('app-layout').classList.remove('hidden'); updateUI();
-                    if (window.KApp) KApp.loadConversations();
-                }
-            } catch(ex) { if (err) { err.style.color = ''; err.textContent = ex.message; } }
-            finally { sub.disabled = false; sub.textContent = isReg ? 'Register' : 'Sign In'; } });
-
-        if (guest) guest.addEventListener('click', () => { scr.classList.add('hidden'); document.getElementById('app-layout').classList.remove('hidden'); updateUI(); });
 
         const ab = document.getElementById('btn-auth');
         if (ab) ab.addEventListener('click', async () => {
