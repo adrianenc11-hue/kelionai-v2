@@ -474,6 +474,11 @@
 
         setupDragDrop();
         if (window.KVoice) KVoice.startWakeWordDetection();
+        // Unlock AudioContext on first user interaction (for returning users who skip START)
+        document.addEventListener('click', function unlockAudio() {
+            if (window.KVoice) KVoice.ensureAudioUnlocked();
+            document.removeEventListener('click', unlockAudio);
+        }, { once: true });
         // Request geolocation so AI can see user's location
         if (window.KGeo) KGeo.getLocation().then(function (pos) { if (pos) console.log('[Geo] Location:', pos.lat.toFixed(2), pos.lng.toFixed(2)); });
         checkHealth();
