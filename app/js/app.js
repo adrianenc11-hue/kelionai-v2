@@ -489,35 +489,6 @@
         document.getElementById('btn-send').addEventListener('click', onSendText);
         document.getElementById('text-input').addEventListener('keydown', function (e) { if (e.key === 'Enter') onSendText(); });
 
-        // Mic button — push-to-talk
-        var micBtn = document.getElementById('btn-mic');
-        if (micBtn && window.KVoice) {
-            micBtn.addEventListener('click', async function () {
-                if (micBtn.classList.contains('active-mic')) {
-                    // Second click: Stop listening → transcribe → send to chat
-                    micBtn.classList.remove('active-mic', 'recording');
-                    var spokenText = await KVoice.stopListening();
-                    if (spokenText && spokenText.trim()) {
-                        hideWelcome();
-                        addMessage('user', spokenText);
-                        showThinking(true);
-                        // Detect language from spoken text
-                        if (window.i18n && i18n.detectLanguage) {
-                            var detectedLang = i18n.detectLanguage(spokenText);
-                            if (detectedLang) i18n.setLanguage(detectedLang);
-                        }
-                        await sendToAI(spokenText, window.i18n ? i18n.getLanguage() : 'en');
-                    }
-                } else {
-                    // First click: Start recording
-                    unlockAudio();
-                    var started = await KVoice.startListening();
-                    if (started) {
-                        micBtn.classList.add('active-mic', 'recording');
-                    }
-                }
-            });
-        }
 
         document.querySelectorAll('.avatar-pill').forEach(function (b) { b.addEventListener('click', function () { switchAvatar(b.dataset.avatar); }); });
 
