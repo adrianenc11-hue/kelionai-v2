@@ -178,11 +178,15 @@ router.post('/chat/stream', chatLimiter, validate(chatSchema), async (req, res) 
 
                 if (r.ok && r.body) {
                     res.write(`data: ${JSON.stringify({ type: 'start', engine: 'Claude' })}\n\n`);
-                    const reader = r.body;
                     let buffer = '';
 
+                    // Node 18+ fetch returns Web ReadableStream, not Node.js Readable
+                    // Convert to Node.js Readable if needed
+                    const { Readable } = require('stream');
+                    const nodeStream = (typeof r.body.on === 'function') ? r.body : Readable.fromWeb(r.body);
+
                     await new Promise((resolve, reject) => {
-                        reader.on('data', (chunk) => {
+                        nodeStream.on('data', (chunk) => {
                             buffer += chunk.toString();
                             const lines = buffer.split('\n');
                             buffer = lines.pop() || '';
@@ -200,8 +204,8 @@ router.post('/chat/stream', chatLimiter, validate(chatSchema), async (req, res) 
                                 } catch (e) { /* skip parse errors */ }
                             }
                         });
-                        reader.on('end', resolve);
-                        reader.on('error', reject);
+                        nodeStream.on('end', resolve);
+                        nodeStream.on('error', reject);
                     });
                 }
             } catch (e) { logger.warn({ component: 'Stream', err: e.message }, 'Claude'); }
