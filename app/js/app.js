@@ -63,7 +63,7 @@
                     language: language || (window.i18n ? i18n.getLanguage() : 'en'),
                     conversationId: currentConversationId,
                     geo: window.KGeo ? KGeo.getCached() : null
-                })
+                })f
             });
 
             showThinking(false);
@@ -439,17 +439,7 @@
         }
         var splashTimer = setTimeout(dismissSplash, 3000);
 
-        // ─── Auth safety: show app as guest after 5s if auth hangs ──
-        setTimeout(function() {
-            var layout = document.getElementById('app-layout');
-            if (layout && layout.classList.contains('hidden')) {
-                var authScr = document.getElementById('auth-screen');
-                if (authScr) authScr.classList.add('hidden');
-                layout.classList.remove('hidden');
-            }
-        }, 5000);
-
-        if (window.KAuth) KAuth.init();
+                if (window.KAuth) KAuth.init();
         try {
             KAvatar.init();
         } catch(e) {
