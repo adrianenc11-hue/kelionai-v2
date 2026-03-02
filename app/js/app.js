@@ -48,22 +48,20 @@
 
     // ═══════════════════════════════════════════════════════════
     // SYNCHRONIZED VOICE + TEXT + MOUTH
-    // Flow: AI reply → TTS audio → play audio + reveal text simultaneously
+    // Flow: AI reply → KVoice.speak() → audio-start event → reveal text synced
     // ═══════════════════════════════════════════════════════════
     async function sendToAI_Sync(message, language) {
-        // Stop any previous TTS
         if (window.KVoice) KVoice.stopSpeaking();
         KAvatar.setExpression('thinking', 0.5);
 
         try {
-            // Step 1: Get full AI reply (non-streaming, fast: GPT-4o-mini)
             const resp = await fetch(API_BASE + '/api/chat', {
                 method: 'POST', headers: authHeaders(),
                 body: JSON.stringify({
                     message,
                     avatar: KAvatar.getCurrentAvatar(),
                     history: chatHistory.slice(-10),
-                    language: language || (window.i18n ? i18n.getLanguage() : 'en'),
+                    language: language || 'en',
                     conversationId: currentConversationId,
                     geo: window.KGeo ? KGeo.getCached() : null
                 })
@@ -73,11 +71,9 @@
 
             if (!resp.ok) {
                 const e = await resp.json().catch(() => ({}));
-                if (resp.status === 429 && e.upgrade) {
-                    addMessage('assistant', 'Daily limit reached. Say "upgrade" for more.');
-                    setTimeout(function () { if (window.KPayments) KPayments.showUpgradePrompt(); }, 2000);
-                } else if (resp.status === 429) {
+                if (resp.status === 429) {
                     addMessage('assistant', '⏳ Please wait a moment.');
+                    if (e.upgrade) setTimeout(function () { if (window.KPayments) KPayments.showUpgradePrompt(); }, 2000);
                 } else addMessage('assistant', e.error || 'Error.');
                 if (window.KVoice) KVoice.resumeWakeDetection();
                 return;
@@ -93,15 +89,13 @@
                 return;
             }
 
-            // Update chat history
             chatHistory.push({ role: 'user', content: message });
             chatHistory.push({ role: 'assistant', content: fullReply });
 
-            // Check for monitor content
             const imgMatch = fullReply.match(/https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp)/i);
             if (imgMatch) showOnMonitor(imgMatch[0], 'image');
 
-            // Create message element (empty — will be revealed with voice)
+            // Create empty message element — text will be revealed with voice
             const overlay = document.getElementById('chat-overlay');
             const msgEl = document.createElement('div');
             msgEl.className = 'msg assistant';
@@ -110,88 +104,43 @@
 
             KAvatar.setExpression('happy', 0.3);
 
-            // Step 2: Get TTS audio
-            if (window.KVoice) {
-                try {
-                    const ttsResp = await fetch(API_BASE + '/api/speak', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', ...(window.KAuth ? KAuth.getAuthHeaders() : {}) },
-                        body: JSON.stringify({
-                            text: fullReply.replace(/```[\s\S]*?```/g, '').replace(/`[^`]+`/g, '').replace(/https?:\/\/\S+/g, '').replace(/[*_~#>]+/g, '').trim(),
-                            avatar: KAvatar.getCurrentAvatar(),
-                            language: language || (window.i18n ? i18n.getLanguage() : 'en')
-                        })
-                    });
-
-                    if (ttsResp.ok) {
-                        const arrayBuf = await ttsResp.arrayBuffer();
-                        const ctx = KVoice.getAudioContext ? KVoice.getAudioContext() : new (window.AudioContext || window.webkitAudioContext)();
-                        if (ctx.state !== 'running') try { await ctx.resume(); } catch (e) { }
-
-                        const audioBuf = await ctx.decodeAudioData(arrayBuf.slice(0));
-                        const duration = audioBuf.duration; // seconds
-
-                        // Step 3: SIMULTANEOUS — play audio + reveal text + lip sync
-                        const source = ctx.createBufferSource();
-                        source.buffer = audioBuf;
-
-                        // Wire FFT lip sync
-                        const ls = KAvatar.getLipSync();
-                        if (ls && ls.connectToContext) {
-                            try {
-                                const an = ls.connectToContext(ctx);
-                                if (an) { source.connect(an); an.connect(ctx.destination); ls.start(); }
-                                else { source.connect(ctx.destination); }
-                            } catch (e) { source.connect(ctx.destination); }
-                        } else { source.connect(ctx.destination); }
-
-                        // Start audio
-                        source.start(0);
-
-                        // Reveal text character-by-character synced with audio duration
-                        var msPerChar = (duration * 1000) / fullReply.length;
-                        var charIdx = 0;
-                        var revealTimer = setInterval(function () {
-                            if (charIdx >= fullReply.length) {
-                                clearInterval(revealTimer);
-                                return;
-                            }
-                            charIdx++;
-                            msgEl.textContent = fullReply.substring(0, charIdx);
-                            overlay.scrollTop = overlay.scrollHeight;
-                        }, msPerChar);
-
-                        // Cleanup when audio ends
-                        source.onended = function () {
-                            clearInterval(revealTimer);
-                            msgEl.textContent = fullReply; // ensure full text shown
-                            if (ls) try { ls.stop(); } catch (e) { }
-                            KAvatar.setExpression('neutral');
-                            KAvatar.setPresenting(false);
-                            if (window.KVoice) KVoice.resumeWakeDetection();
-                        };
-                    } else {
-                        // TTS failed — show text immediately
+            // Listen for audio-start event to sync text reveal
+            var revealHandler = function (e) {
+                window.removeEventListener('audio-start', revealHandler);
+                var duration = e.detail.duration;
+                var msPerChar = (duration * 1000) / fullReply.length;
+                var charIdx = 0;
+                var timer = setInterval(function () {
+                    charIdx++;
+                    if (charIdx >= fullReply.length) {
+                        clearInterval(timer);
                         msgEl.textContent = fullReply;
                         overlay.scrollTop = overlay.scrollHeight;
-                        if (window.KVoice) KVoice.resumeWakeDetection();
+                        return;
                     }
-                } catch (e) {
-                    console.warn('[Sync] TTS error:', e.message);
+                    msgEl.textContent = fullReply.substring(0, charIdx);
+                    overlay.scrollTop = overlay.scrollHeight;
+                }, msPerChar);
+            };
+            window.addEventListener('audio-start', revealHandler);
+
+            // Use KVoice.speak() — handles AudioContext, unlock, FFT lip sync
+            if (window.KVoice) {
+                KVoice.speak(fullReply, KAvatar.getCurrentAvatar());
+            }
+
+            // Fallback: if audio doesn't start in 8s, show text anyway
+            setTimeout(function () {
+                window.removeEventListener('audio-start', revealHandler);
+                if (!msgEl.textContent) {
                     msgEl.textContent = fullReply;
                     overlay.scrollTop = overlay.scrollHeight;
-                    if (window.KVoice) KVoice.resumeWakeDetection();
                 }
-            } else {
-                // No voice module — just show text
-                msgEl.textContent = fullReply;
-                overlay.scrollTop = overlay.scrollHeight;
-            }
+            }, 8000);
 
         } catch (e) {
             showThinking(false);
-            console.warn('[Sync] Error:', e.message);
-            addMessage('assistant', 'Connection error. Please try again.');
+            addMessage('assistant', 'Connection error.');
             if (window.KVoice) KVoice.resumeWakeDetection();
         }
     }

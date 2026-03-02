@@ -193,6 +193,8 @@
 
         currentSourceNode.onended = () => { stopAllLipSync(); isSpeaking = false; currentSourceNode = null; KAvatar.setExpression('neutral'); KAvatar.setPresenting(false); resumeWakeDetection(); };
         currentSourceNode.start(0);
+        // Dispatch event for synchronized text reveal
+        window.dispatchEvent(new CustomEvent('audio-start', { detail: { duration: audioBuf.duration } }));
         // Safety timeout: stop lip sync even if onended doesn't fire
         var audioDurationMs = Math.ceil(audioBuf.duration * 1000) + 500;
         setTimeout(function () { if (isSpeaking) { stopAllLipSync(); isSpeaking = false; currentSourceNode = null; KAvatar.setExpression('neutral'); KAvatar.setPresenting(false); resumeWakeDetection(); } }, audioDurationMs);
