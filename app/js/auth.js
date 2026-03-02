@@ -144,7 +144,15 @@
         const ab = document.getElementById('btn-auth');
         if (ab) ab.addEventListener('click', async () => {
             if (currentUser) { await logout(); updateUI(); if (window.KApp) KApp.startNewChat(); scr.classList.remove('hidden'); document.getElementById('app-layout').classList.add('hidden'); }
-            else { scr.classList.remove('hidden'); document.getElementById('app-layout').classList.add('hidden'); }
+            else {
+                scr.classList.remove('hidden');
+                document.getElementById('app-layout').classList.add('hidden');
+                // Show auth form directly, hide START button
+                var startBtn2 = scr.querySelector('#start-btn');
+                if (startBtn2) startBtn2.style.display = 'none';
+                if (form) form.style.display = '';
+                if (guest) guest.style.display = '';
+            }
         });
     }
 

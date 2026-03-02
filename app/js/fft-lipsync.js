@@ -116,6 +116,12 @@
         isRunning = false;
         if (animFrame) cancelAnimationFrame(animFrame);
         animFrame = null;
+        // Disconnect analyser to prevent stale FFT data from driving mouth
+        if (analyser) {
+            try { analyser.disconnect(); } catch (e) { }
+            analyser = null;
+            dataArray = null;
+        }
         this._setMouth(0);
     };
 
