@@ -179,7 +179,7 @@ test.describe('Main Pages Navigation', () => {
         await page.waitForSelector('#avatar-canvas', { state: 'visible', timeout: 60000 });
 
         await expect(page.locator('#avatar-canvas')).toBeVisible();
-        await expect(page.locator('#left-panel')).toBeVisible();
+        await expect(page.locator('#avatar-panel')).toBeVisible();
         await expect(page.locator('#text-input')).toBeVisible();
         await page.screenshot({ path: 'test-results/homepage-after.png' });
     });

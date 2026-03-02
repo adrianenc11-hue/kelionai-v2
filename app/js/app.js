@@ -376,7 +376,7 @@
 
     // ─── Drag & Drop ─────────────────────────────────────────
     function setupDragDrop() {
-        var dp = document.getElementById('display-panel'), dz = document.getElementById('drop-zone'); if (!dp || !dz) return;
+        var dp = document.getElementById('monitor-panel'), dz = document.getElementById('drop-zone'); if (!dp || !dz) return;
         dp.addEventListener('dragover', function(e) { e.preventDefault(); dz.classList.remove('hidden'); });
         dp.addEventListener('dragleave', function(e) { if (!dp.contains(e.relatedTarget)) dz.classList.add('hidden'); });
         dp.addEventListener('drop', function(e) { e.preventDefault(); dz.classList.add('hidden'); handleFiles(e.dataTransfer.files); });
