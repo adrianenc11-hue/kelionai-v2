@@ -55,7 +55,7 @@
         "mammoth": "^1.11.0",
         "node-fetch": "^2.7.0",
         "nodemailer": "^8.0.1",
-        "pdf-parse": "^1.1.4",
+        "pdf-parse": "^2.4.5",
         "pg": "^8.18.0",
         "pino": "^10.3.1",
         "prom-client": "^15.1.3",
