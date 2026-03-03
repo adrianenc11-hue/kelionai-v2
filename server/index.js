@@ -245,6 +245,7 @@ setInterval(() => {
 const brain = new KelionBrain({
     anthropicKey: process.env.ANTHROPIC_API_KEY,
     openaiKey: process.env.OPENAI_API_KEY,
+    groqKey: process.env.GROQ_API_KEY,
     perplexityKey: process.env.PERPLEXITY_API_KEY,
     tavilyKey: process.env.TAVILY_API_KEY,
     serperKey: process.env.SERPER_API_KEY,

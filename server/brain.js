@@ -19,6 +19,7 @@ class KelionBrain {
     constructor(config) {
         this.anthropicKey = config.anthropicKey;
         this.openaiKey = config.openaiKey;
+        this.groqKey = config.groqKey;
         this.perplexityKey = config.perplexityKey;
         this.tavilyKey = config.tavilyKey;
         this.serperKey = config.serperKey;
@@ -127,10 +128,11 @@ class KelionBrain {
 
     // ═══════════════════════════════════════════════════════════
     // 1. CHAIN-OF-THOUGHT — Pre-reasoning before AI responds
-    // Uses a fast Claude call to structure thinking
+    // Uses Groq Llama for ultra-fast structured thinking
     // ═══════════════════════════════════════════════════════════
     async chainOfThought(message, toolResults, analysis, history, language) {
-        if (!this.anthropicKey) return null;
+        const aiKey = this.groqKey || this.openaiKey || this.anthropicKey;
+        if (!aiKey) return null;
         this.toolStats.chainOfThought++;
 
         try {
@@ -161,15 +163,24 @@ Think step by step:
 Reply STRICTLY with JSON:
 {"surface":"...","deep_need":"...","tone":"...","key_info":["..."],"anticipate":"...","plan":["..."]}`;
 
-            const r = await fetch('https://api.anthropic.com/v1/messages', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'x-api-key': this.anthropicKey, 'anthropic-version': '2023-06-01' },
-                body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 400, messages: [{ role: 'user', content: prompt }] })
-            });
-
-            if (!r.ok) return null;
-            const d = await r.json();
-            const txt = d.content?.[0]?.text?.trim();
+            // Use Groq (fastest) → GPT (fallback) → Claude (last resort)
+            let r, d, txt;
+            if (this.groqKey) {
+                r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + this.groqKey },
+                    body: JSON.stringify({ model: 'llama-3.3-70b-versatile', max_tokens: 250, messages: [{ role: 'user', content: prompt }] })
+                });
+                if (r.ok) { d = await r.json(); txt = d.choices?.[0]?.message?.content?.trim(); }
+            }
+            if (!txt && this.anthropicKey) {
+                r = await fetch('https://api.anthropic.com/v1/messages', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'x-api-key': this.anthropicKey, 'anthropic-version': '2023-06-01' },
+                    body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 250, messages: [{ role: 'user', content: prompt }] })
+                });
+                if (r.ok) { d = await r.json(); txt = d.content?.[0]?.text?.trim(); }
+            }
             if (!txt) return null;
 
             try { return JSON.parse(txt.replace(/```json|```/g, '').trim()); }
@@ -695,7 +706,7 @@ Reply STRICTLY with JSON:
     // 10. AUTO-LEARNING — Extract facts + learn from interaction
     // ═══════════════════════════════════════════════════════════
     async learnFromConversation(userId, userMessage, aiReply) {
-        if (!this.supabaseAdmin || !userId || !this.anthropicKey || userMessage.length < 15) return;
+        if (!this.supabaseAdmin || !userId || userMessage.length < 15 || (!this.groqKey && !this.anthropicKey)) return;
 
         // Rate limit: max 1 learning extraction per 5 minutes per user
         const now = Date.now();
@@ -710,20 +721,28 @@ Reply STRICTLY with JSON:
         }
 
         try {
-            const r = await fetch('https://api.anthropic.com/v1/messages', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'x-api-key': this.anthropicKey, 'anthropic-version': '2023-06-01' },
-                body: JSON.stringify({
-                    model: 'claude-sonnet-4-20250514', max_tokens: 200, messages: [{
-                        role: 'user', content: `Extrage DOAR fapte personale concrete (nume, loc, profesie, hobby, familie, preferinte) din:
+            // Use Groq (fastest) for fact extraction
+            const learnPrompt = `Extrage DOAR fapte personale concrete (nume, loc, profesie, hobby, familie, preferinte) din:
 User: "${userMessage.substring(0, 500)}"
 AI: "${aiReply.substring(0, 300)}"
-Raspunde STRICT JSON. Daca nimic: {}` }]
-                })
-            });
-            if (!r.ok) return;
-            const d = await r.json();
-            const txt = d.content?.[0]?.text?.trim();
+Raspunde STRICT JSON. Daca nimic: {}`;
+            let r, d, txt;
+            if (this.groqKey) {
+                r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + this.groqKey },
+                    body: JSON.stringify({ model: 'llama-3.3-70b-versatile', max_tokens: 150, messages: [{ role: 'user', content: learnPrompt }] })
+                });
+                if (r.ok) { d = await r.json(); txt = d.choices?.[0]?.message?.content?.trim(); }
+            }
+            if (!txt && this.anthropicKey) {
+                r = await fetch('https://api.anthropic.com/v1/messages', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'x-api-key': this.anthropicKey, 'anthropic-version': '2023-06-01' },
+                    body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 150, messages: [{ role: 'user', content: learnPrompt }] })
+                });
+                if (r.ok) { d = await r.json(); txt = d.content?.[0]?.text?.trim(); }
+            }
             if (!txt || txt === '{}') return;
             let facts;
             try { facts = JSON.parse(txt.replace(/```json|```/g, '').trim()); } catch { return; }
