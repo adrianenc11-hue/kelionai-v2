@@ -229,3 +229,37 @@ CREATE TABLE IF NOT EXISTS trades (
 
 CREATE INDEX IF NOT EXISTS idx_trades_symbol ON trades(symbol);
 CREATE INDEX IF NOT EXISTS idx_trades_created ON trades(created_at DESC);
+
+-- ═══ PROFILES (Face Recognition / Identity) ═══
+CREATE TABLE IF NOT EXISTS profiles (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE UNIQUE,
+    display_name TEXT,
+    face_encoding JSONB,
+    face_image_url TEXT,
+    metadata JSONB DEFAULT '{}',
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_profiles_user ON profiles(user_id);
+ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+CREATE POLICY IF NOT EXISTS "users_own_profiles" ON profiles FOR ALL USING (auth.uid() = user_id);
+
+-- ═══ API KEYS (Developer Access) ═══
+CREATE TABLE IF NOT EXISTS api_keys (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    key_hash TEXT NOT NULL,
+    name TEXT DEFAULT 'Default',
+    permissions JSONB DEFAULT '{"chat": true, "search": true}',
+    rate_limit INTEGER DEFAULT 100,
+    last_used_at TIMESTAMPTZ,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_api_keys_user ON api_keys(user_id);
+CREATE INDEX IF NOT EXISTS idx_api_keys_hash ON api_keys(key_hash);
+ALTER TABLE api_keys ENABLE ROW LEVEL SECURITY;
+CREATE POLICY IF NOT EXISTS "users_own_api_keys" ON api_keys FOR ALL USING (auth.uid() = user_id);
