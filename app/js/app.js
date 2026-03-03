@@ -478,6 +478,55 @@
         if (sendBtn) sendBtn.addEventListener('click', onSendText);
         document.getElementById('text-input').addEventListener('keydown', function (e) { if (e.key === 'Enter') onSendText(); });
 
+        // ─── Clipboard paste — Ctrl+V images into chat ──────────
+        document.addEventListener('paste', function (e) {
+            var items = (e.clipboardData || e.originalEvent.clipboardData).items;
+            if (!items) return;
+            for (var i = 0; i < items.length; i++) {
+                if (items[i].type.indexOf('image') !== -1) {
+                    e.preventDefault();
+                    var blob = items[i].getAsFile();
+                    var reader = new FileReader();
+                    reader.onload = function (ev) {
+                        var b64 = ev.target.result;
+                        // Show preview in chat
+                        addMessage('user', '📷 [Screenshot pasted]');
+                        var overlay = document.getElementById('chat-overlay');
+                        var imgEl = document.createElement('div');
+                        imgEl.className = 'msg user';
+                        imgEl.innerHTML = '<img src="' + b64 + '" style="max-width:200px;border-radius:8px;margin:4px 0;">';
+                        overlay.appendChild(imgEl);
+                        overlay.scrollTop = overlay.scrollHeight;
+                        // Send to vision API for analysis
+                        showThinking(true);
+                        fetch(API_BASE + '/api/vision/analyze', {
+                            method: 'POST',
+                            headers: authHeaders(),
+                            body: JSON.stringify({
+                                image: b64,
+                                avatar: window.KAvatar ? KAvatar.getCurrentAvatar() : 'kelion',
+                                question: 'Ce vezi în această imagine? Descrie detaliat.'
+                            })
+                        })
+                            .then(function (r) { return r.json(); })
+                            .then(function (data) {
+                                showThinking(false);
+                                var desc = data.description || data.reply || 'Nu am putut analiza imaginea.';
+                                addMessage('assistant', desc);
+                                chatHistory.push({ role: 'user', content: '[User pasted a screenshot]' });
+                                chatHistory.push({ role: 'assistant', content: desc });
+                                if (window.KVoice) KVoice.speak(desc);
+                            })
+                            .catch(function (err) {
+                                showThinking(false);
+                                addMessage('assistant', 'Eroare la analiza imaginii: ' + err.message);
+                            });
+                    };
+                    reader.readAsDataURL(blob);
+                    break;
+                }
+            }
+        });
 
         document.querySelectorAll('.avatar-pill').forEach(function (b) { b.addEventListener('click', function () { switchAvatar(b.dataset.avatar); }); });
 
