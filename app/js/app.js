@@ -499,13 +499,14 @@
                         overlay.scrollTop = overlay.scrollHeight;
                         // Send to vision API for analysis
                         showThinking(true);
-                        fetch(API_BASE + '/api/vision/analyze', {
+                        var rawB64 = b64.replace(/^data:image\/[a-z+]+;base64,/, '');
+                        fetch(API_BASE + '/api/vision', {
                             method: 'POST',
                             headers: authHeaders(),
                             body: JSON.stringify({
-                                image: b64,
+                                image: rawB64,
                                 avatar: window.KAvatar ? KAvatar.getCurrentAvatar() : 'kelion',
-                                question: 'Ce vezi în această imagine? Descrie detaliat.'
+                                language: 'ro'
                             })
                         })
                             .then(function (r) { return r.json(); })
