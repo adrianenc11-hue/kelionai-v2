@@ -495,26 +495,41 @@
                         if (SR) {
                             window._directSpeech = new SR();
                             window._directSpeech.continuous = true;
-                            window._directSpeech.interimResults = false;
-                            window._directSpeech.lang = (window.i18n && i18n.getLanguage && i18n.getLanguage()) || navigator.language || 'ro-RO';
+                            window._directSpeech.interimResults = true;
+                            // Auto-detect: prefer Romanian, fallback to browser language
+                            var micLang = (window.i18n && i18n.getLanguage && i18n.getLanguage()) || navigator.language || 'ro-RO';
+                            // Ensure full locale format for better recognition
+                            if (micLang === 'ro') micLang = 'ro-RO';
+                            if (micLang === 'en') micLang = 'en-US';
+                            if (micLang === 'de') micLang = 'de-DE';
+                            if (micLang === 'fr') micLang = 'fr-FR';
+                            if (micLang === 'es') micLang = 'es-ES';
+                            window._directSpeech.lang = micLang;
+                            console.log('[Mic] SpeechRecognition language:', micLang);
                             window._directSpeech.onresult = function (ev) {
                                 for (var i = ev.resultIndex; i < ev.results.length; i++) {
                                     if (ev.results[i].isFinal) {
                                         var text = ev.results[i][0].transcript.trim();
+                                        var confidence = ev.results[i][0].confidence;
+                                        console.log('[Mic] Final result:', text, 'confidence:', confidence);
                                         if (text && text.length > 1) {
-                                            console.log('[Mic] Heard:', text);
                                             hideWelcome(); addMessage('user', '🎙️ ' + text); showThinking(true);
                                             KAvatar.setAttentive(true);
-                                            sendToAI(text, (window.i18n && i18n.getLanguage()) || 'en');
+                                            sendToAI(text, micLang.split('-')[0]);
                                         }
                                     }
                                 }
                             };
+                            window._directSpeech.onaudiostart = function () { console.log('[Mic] 🎤 Audio capture started'); };
+                            window._directSpeech.onspeechstart = function () { console.log('[Mic] 🗣️ Speech detected'); };
+                            window._directSpeech.onsoundstart = function () { console.log('[Mic] 🔊 Sound detected'); };
+                            window._directSpeech.onnomatch = function () { console.warn('[Mic] ⚠️ No match — speech not recognized'); };
                             window._directSpeech.onend = function () {
-                                if (micOn) try { window._directSpeech.start(); } catch (e) { }
+                                console.log('[Mic] Recognition ended, micOn:', micOn);
+                                if (micOn) try { window._directSpeech.start(); } catch (e) { console.warn('[Mic] Restart failed:', e.message); }
                             };
                             window._directSpeech.onerror = function (e) {
-                                console.warn('[Mic] Error:', e.error);
+                                console.warn('[Mic] Error:', e.error, e.message || '');
                                 if (micOn && e.error !== 'not-allowed') {
                                     setTimeout(function () { try { window._directSpeech.start(); } catch (e) { } }, 1000);
                                 }
