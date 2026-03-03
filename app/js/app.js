@@ -151,7 +151,7 @@
             const overlay = document.getElementById('chat-overlay');
             const msgEl = document.createElement('div');
             msgEl.className = 'msg assistant';
-            msgEl.textContent = '';
+            msgEl.innerHTML = '';
             overlay.appendChild(msgEl);
             overlay.scrollTop = overlay.scrollHeight;
 
@@ -172,11 +172,11 @@
                     charIdx++;
                     if (charIdx >= fullReply.length) {
                         clearInterval(timer);
-                        msgEl.textContent = fullReply;
+                        msgEl.innerHTML = parseMarkdown(fullReply);
                         overlay.scrollTop = overlay.scrollHeight;
                         return;
                     }
-                    msgEl.textContent = fullReply.substring(0, charIdx);
+                    msgEl.innerHTML = parseMarkdown(fullReply.substring(0, charIdx));
                     overlay.scrollTop = overlay.scrollHeight;
                 }, msPerChar);
             };
@@ -187,14 +187,14 @@
                 KVoice.speak(fullReply, data.avatar || KAvatar.getCurrentAvatar());
             }
 
-            // Fallback: if audio doesn't start in 6s, show text anyway
+            // Fallback: if audio doesn't start in 4s, show text anyway (was 6s)
             setTimeout(function () {
                 window.removeEventListener('audio-start', revealHandler);
-                if (!msgEl.textContent) {
-                    msgEl.textContent = fullReply;
+                if (!msgEl.innerHTML || msgEl.innerHTML === '') {
+                    msgEl.innerHTML = parseMarkdown(fullReply);
                     overlay.scrollTop = overlay.scrollHeight;
                 }
-            }, 6000);
+            }, 4000);
 
         } catch (e) {
             showThinking(false);
@@ -308,12 +308,38 @@
 
     function escapeHtml(t) { var d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
 
+    // ─── Markdown parser for chat messages ─────────────────────
+    function parseMarkdown(text) {
+        if (!text) return '';
+        var html = escapeHtml(text);
+        // Bold: **text** or __text__
+        html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+        html = html.replace(/__(.+?)__/g, '<strong>$1</strong>');
+        // Italic: *text* or _text_
+        html = html.replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '<em>$1</em>');
+        // Inline code: `code`
+        html = html.replace(/`([^`]+)`/g, '<code style="background:#1a1a2e;padding:2px 6px;border-radius:4px;font-size:0.9em">$1</code>');
+        // Horizontal rules: --- or ___
+        html = html.replace(/^(---|___)$/gm, '<hr style="border:none;border-top:1px solid #444;margin:8px 0">');
+        // Bullet lists: - item or * item
+        html = html.replace(/^[\-\*]\s+(.+)$/gm, '<li style="margin-left:16px;list-style:disc">$1</li>');
+        // Numbered lists: 1. item
+        html = html.replace(/^\d+\.\s+(.+)$/gm, '<li style="margin-left:16px;list-style:decimal">$1</li>');
+        // Line breaks
+        html = html.replace(/\n/g, '<br>');
+        return html;
+    }
+
     // ─── UI ──────────────────────────────────────────────────
     function addMessage(type, text) {
         var o = document.getElementById('chat-overlay');
         var m = document.createElement('div');
         m.className = 'msg ' + type;
-        m.textContent = text;
+        if (type === 'assistant') {
+            m.innerHTML = parseMarkdown(text);
+        } else {
+            m.textContent = text;
+        }
         o.appendChild(m);
         o.scrollTop = o.scrollHeight;
     }
@@ -328,8 +354,9 @@
         var n = document.getElementById('avatar-name'); if (n) n.textContent = displayName;
         var navName = document.getElementById('navbar-avatar-name'); if (navName) navName.textContent = displayName;
         document.title = displayName + 'AI';
-        chatHistory = []; persistConvId(null);
-        var o = document.getElementById('chat-overlay'); if (o) o.innerHTML = '';
+        // DO NOT clear chat history or chat overlay when switching avatars
+        // chatHistory = []; persistConvId(null);
+        // var o = document.getElementById('chat-overlay'); if (o) o.innerHTML = '';
     }
 
     // ─── Upgrade voice command detection ─────────────────────
