@@ -120,9 +120,11 @@
     }
 
     var speakSafetyTimer = null;
+    var _speakId = 0; // atomic counter — prevents race condition overlap
     async function speak(text, avatar) {
         if (isSpeaking) stopSpeaking();
         if (!text || !text.trim()) return;
+        var thisId = ++_speakId; // capture generation
         isSpeaking = true;
         if (speakSafetyTimer) clearTimeout(speakSafetyTimer);
         speakSafetyTimer = setTimeout(function () {
@@ -139,12 +141,23 @@
                 body: JSON.stringify({ text: ttsText, avatar: avatar || KAvatar.getCurrentAvatar(), language: detectedLanguage })
             });
 
+            // If a newer speak() was called during our fetch, abort
+            if (thisId !== _speakId) {
+                console.log('[Voice] Stale TTS response (id ' + thisId + ' vs ' + _speakId + '), discarding');
+                return;
+            }
+
             if (!resp.ok) {
                 console.warn('[Voice] TTS failed:', resp.status);
                 isSpeaking = false; resumeWakeDetection(); return;
             }
 
             const arrayBuf = await resp.arrayBuffer();
+            // Check again after arrayBuffer read
+            if (thisId !== _speakId) {
+                console.log('[Voice] Stale TTS buffer, discarding');
+                return;
+            }
             console.log('[Voice] TTS received:', arrayBuf.byteLength, 'bytes');
 
             // FORCE AudioContext running — try shared first, create new if needed

@@ -73,120 +73,18 @@
         }
     }
 
-    // ═══════════════════════════════════════════════════════════
-    // SYNCHRONIZED VOICE + TEXT + MOUTH
-    // Flow: AI reply → KVoice.speak() → audio-start event → reveal text synced
-    // ═══════════════════════════════════════════════════════════
-    async function sendToAI_Sync(message, language) {
-        // CRITICAL: unlock AudioContext NOW (in user gesture context) BEFORE async work
-        try {
-            var ctx = window.KVoice ? KVoice.getAudioContext() : null;
-            if (ctx) {
-                if (ctx.state === 'suspended') ctx.resume();
-                var b = ctx.createBuffer(1, 1, 22050);
-                var s = ctx.createBufferSource();
-                s.buffer = b; s.connect(ctx.destination); s.start(0);
-            }
-        } catch (e) { }
-        if (window.KVoice) KVoice.stopSpeaking();
-        KAvatar.setExpression('thinking', 0.5);
 
-        try {
-            const resp = await fetch(API_BASE + '/api/chat', {
-                method: 'POST', headers: authHeaders(),
-                body: JSON.stringify({
-                    message,
-                    avatar: KAvatar.getCurrentAvatar(),
-                    history: chatHistory.slice(-10),
-                    language: language || 'en',
-                    conversationId: currentConversationId,
-                    geo: window.KGeo ? KGeo.getCached() : null
-                })
-            });
-
-            showThinking(false);
-
-            if (!resp.ok) {
-                const e = await resp.json().catch(() => ({}));
-                if (resp.status === 429) {
-                    addMessage('assistant', '⏳ Please wait a moment.');
-                    if (e.upgrade) setTimeout(function () { if (window.KPayments) KPayments.showUpgradePrompt(); }, 2000);
-                } else addMessage('assistant', e.error || 'Error.');
-                if (window.KVoice) KVoice.resumeWakeDetection();
-                return;
-            }
-
-            const data = await resp.json();
-            const fullReply = data.reply || '';
-            if (data.conversationId) persistConvId(data.conversationId);
-
-            if (!fullReply) {
-                addMessage('assistant', '...');
-                if (window.KVoice) KVoice.resumeWakeDetection();
-                return;
-            }
-
-            chatHistory.push({ role: 'user', content: message });
-            chatHistory.push({ role: 'assistant', content: fullReply });
-
-            const imgMatch = fullReply.match(/https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp)/i);
-            if (imgMatch) showOnMonitor(imgMatch[0], 'image');
-
-            // Create empty message element — text will be revealed with voice
-            const overlay = document.getElementById('chat-overlay');
-            const msgEl = document.createElement('div');
-            msgEl.className = 'msg assistant';
-            msgEl.textContent = '';
-            overlay.appendChild(msgEl);
-
-            KAvatar.setExpression('happy', 0.3);
-
-            // Listen for audio-start event to sync text reveal
-            var revealHandler = function (e) {
-                window.removeEventListener('audio-start', revealHandler);
-                var duration = e.detail.duration;
-                var msPerChar = (duration * 1000) / fullReply.length;
-                var charIdx = 0;
-                var timer = setInterval(function () {
-                    charIdx++;
-                    if (charIdx >= fullReply.length) {
-                        clearInterval(timer);
-                        msgEl.textContent = fullReply;
-                        overlay.scrollTop = overlay.scrollHeight;
-                        return;
-                    }
-                    msgEl.textContent = fullReply.substring(0, charIdx);
-                    overlay.scrollTop = overlay.scrollHeight;
-                }, msPerChar);
-            };
-            window.addEventListener('audio-start', revealHandler);
-
-            // Use KVoice.speak() — handles AudioContext, unlock, FFT lip sync
-            if (window.KVoice) {
-                KVoice.speak(fullReply, KAvatar.getCurrentAvatar());
-            }
-
-            // Fallback: if audio doesn't start in 8s, show text anyway
-            setTimeout(function () {
-                window.removeEventListener('audio-start', revealHandler);
-                if (!msgEl.textContent) {
-                    msgEl.textContent = fullReply;
-                    overlay.scrollTop = overlay.scrollHeight;
-                }
-            }, 8000);
-
-        } catch (e) {
-            showThinking(false);
-            addMessage('assistant', 'Connection error.');
-            if (window.KVoice) KVoice.resumeWakeDetection();
-        }
-    }
 
     // ═══════════════════════════════════════════════════════════
-    // REGULAR CHAT — Fallback (single response)
+    // SYNCED CHAT — Voice + Text synchronized
+    // Flow: get AI reply → create empty div → speak() → on audio-start → reveal text char-by-char
     // ═══════════════════════════════════════════════════════════
+    var _speakGeneration = 0; // atomic counter to prevent voice overlap
+
     async function sendToAI_Regular(message, language) {
         showThinking(true);
+        // Stop any ongoing speech BEFORE starting new request
+        if (window.KVoice) KVoice.stopSpeaking();
         KAvatar.setExpression('thinking', 0.5);
 
         try {
@@ -217,11 +115,19 @@
             }
 
             const data = await resp.json();
+            const fullReply = data.reply || '';
             if (data.conversationId) persistConvId(data.conversationId);
-            chatHistory.push({ role: 'user', content: message });
-            chatHistory.push({ role: 'assistant', content: data.reply });
-            addMessage('assistant', data.reply);
 
+            if (!fullReply) {
+                addMessage('assistant', '...');
+                if (window.KVoice) KVoice.resumeWakeDetection();
+                return;
+            }
+
+            chatHistory.push({ role: 'user', content: message });
+            chatHistory.push({ role: 'assistant', content: fullReply });
+
+            // Monitor content
             if (data.monitor && data.monitor.content) {
                 showOnMonitor(data.monitor.content, data.monitor.type);
             } else if (data.monitor && data.monitor.search_results) {
@@ -230,18 +136,66 @@
                 if (window.MonitorManager) MonitorManager.showWeather(data.monitor.weather);
             }
 
-            const imgMatch = data.reply.match(/https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp)/i);
+            const imgMatch = fullReply.match(/https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp)/i);
             if (imgMatch && !data.monitor?.content) showOnMonitor(imgMatch[0], 'image');
 
-            const coordMatch2 = data.reply.match(/(-?\d+\.?\d*)[°\s,]+([NS])?\s*,?\s*(-?\d+\.?\d*)[°\s,]+([EW])?/i);
+            const coordMatch2 = fullReply.match(/(-?\d+\.?\d*)[°\s,]+([NS])?\s*,?\s*(-?\d+\.?\d*)[°\s,]+([EW])?/i);
             if (!imgMatch && !data.monitor?.content && coordMatch2) {
                 const lat2 = parseFloat(coordMatch2[1]);
                 const lng2 = parseFloat(coordMatch2[3]);
                 if (!isNaN(lat2) && !isNaN(lng2) && window.MonitorManager) MonitorManager.showMap(lat2, lng2);
             }
 
+            // ── SYNCED VOICE + TEXT ──
+            // Create empty message — text will be revealed with voice
+            const overlay = document.getElementById('chat-overlay');
+            const msgEl = document.createElement('div');
+            msgEl.className = 'msg assistant';
+            msgEl.textContent = '';
+            overlay.appendChild(msgEl);
+            overlay.scrollTop = overlay.scrollHeight;
+
             KAvatar.setExpression('happy', 0.3);
-            if (window.KVoice) await KVoice.speak(data.reply, data.avatar);
+
+            // Increment generation counter to prevent overlap
+            var thisGen = ++_speakGeneration;
+
+            // Listen for audio-start event to sync text reveal
+            var revealHandler = function (e) {
+                window.removeEventListener('audio-start', revealHandler);
+                if (thisGen !== _speakGeneration) return; // stale, skip
+                var duration = e.detail.duration;
+                var msPerChar = (duration * 1000) / fullReply.length;
+                var charIdx = 0;
+                var timer = setInterval(function () {
+                    if (thisGen !== _speakGeneration) { clearInterval(timer); return; }
+                    charIdx++;
+                    if (charIdx >= fullReply.length) {
+                        clearInterval(timer);
+                        msgEl.textContent = fullReply;
+                        overlay.scrollTop = overlay.scrollHeight;
+                        return;
+                    }
+                    msgEl.textContent = fullReply.substring(0, charIdx);
+                    overlay.scrollTop = overlay.scrollHeight;
+                }, msPerChar);
+            };
+            window.addEventListener('audio-start', revealHandler);
+
+            // Speak — triggers 'audio-start' event when audio actually starts
+            if (window.KVoice) {
+                KVoice.speak(fullReply, data.avatar || KAvatar.getCurrentAvatar());
+            }
+
+            // Fallback: if audio doesn't start in 6s, show text anyway
+            setTimeout(function () {
+                window.removeEventListener('audio-start', revealHandler);
+                if (!msgEl.textContent) {
+                    msgEl.textContent = fullReply;
+                    overlay.scrollTop = overlay.scrollHeight;
+                }
+            }, 6000);
+
         } catch (e) {
             showThinking(false);
             addMessage('assistant', 'Connection error.');
@@ -524,7 +478,7 @@
                                             console.log('[Mic] Heard:', text);
                                             hideWelcome(); addMessage('user', '🎙️ ' + text); showThinking(true);
                                             KAvatar.setAttentive(true);
-                                            sendToAI(text, 'ro');
+                                            sendToAI(text, (window.i18n && i18n.getLanguage()) || 'en');
                                         }
                                     }
                                 }
