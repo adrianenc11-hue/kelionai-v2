@@ -1,8 +1,9 @@
 name: Deploy to Production
 
+# DISABLED: Railway auto-deploys via native GitHub integration.
+# This workflow is kept for manual fallback only.
 on:
-  push:
-    branches: [master]
+  workflow_dispatch:
 
 jobs:
   deploy:
