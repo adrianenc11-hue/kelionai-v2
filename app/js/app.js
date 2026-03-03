@@ -487,7 +487,8 @@
 
         ['click', 'touchstart', 'keydown'].forEach(function (e) { document.addEventListener(e, unlockAudio, { once: false, passive: true }); });
 
-        document.getElementById('btn-send').addEventListener('click', onSendText);
+        var sendBtn = document.getElementById('btn-send');
+        if (sendBtn) sendBtn.addEventListener('click', onSendText);
         document.getElementById('text-input').addEventListener('keydown', function (e) { if (e.key === 'Enter') onSendText(); });
 
 

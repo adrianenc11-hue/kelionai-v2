@@ -420,13 +420,18 @@
             currentModel.rotation.y += (targetY - currentModel.rotation.y) * 0.08;
             currentModel.rotation.x += (targetX - currentModel.rotation.x) * 0.08;
         }
-        // FORCE mouth closed — LAST STEP before render, overrides EVERYTHING
-        if (window.KVoice && !KVoice.isSpeaking()) {
-            setMorph('jawOpen', 0); setMorph('mouthOpen', 0);
-            setMorph('Smile', 0); setMorph('viseme_aa', 0);
-            setMorph('JawOpen', 0); setMorph('mouth_open', 0);
-            setMorph('mouthSmileLeft', 0); setMorph('mouthSmileRight', 0);
-            setMorph('mouthFunnel', 0); setMorph('mouthPucker', 0);
+        // FORCE mouth closed — always, unless lipSync just ran this frame
+        var _lipRan = (lipSync && window.KVoice && KVoice.isSpeaking());
+        if (!_lipRan) {
+            morphMeshes.forEach(function (m) {
+                if (!m.morphTargetDictionary || !m.morphTargetInfluences) return;
+                Object.keys(m.morphTargetDictionary).forEach(function (k) {
+                    var kl = k.toLowerCase();
+                    if (kl.indexOf('mouth') >= 0 || kl.indexOf('jaw') >= 0 || kl.indexOf('viseme') >= 0 || kl.indexOf('lip') >= 0 || kl === 'smile') {
+                        m.morphTargetInfluences[m.morphTargetDictionary[k]] = 0;
+                    }
+                });
+            });
         }
         renderer.render(scene, camera);
     }
