@@ -141,7 +141,11 @@
         // Auto-enter when both avatars are 100% loaded (or 10s max)
         window.addEventListener('avatars-ready', function () {
             console.log('[Auth] Avatars ready — auto-entering app');
-            if (startBtn) startBtn.innerHTML = '▶ START';
+            if (startBtn) {
+                var loadIcon = document.getElementById('loading-icon');
+                if (loadIcon) loadIcon.style.animation = 'none';
+                startBtn.innerHTML = '▶ START';
+            }
             if (!scr.classList.contains('hidden')) enterApp();
         });
         // Fallback: enter after 10s max even if avatars not loaded

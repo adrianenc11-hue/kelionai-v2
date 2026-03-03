@@ -285,7 +285,24 @@
             </div>
             <p style="color:#555577;font-size:0.8rem;margin-bottom:32px;">Multilingual • 3D Avatars • Voice Chat • Web
                 Search • AI-Powered</p>
-            <button id="start-btn">⏳ Loading...</button>
+            <button id="start-btn"><span id="loading-icon"
+                    style="display:inline-block;animation:spin 1.5s ease-in-out infinite;">⏳</span> Se
+                încarcă...</button>
+            <style>
+                @keyframes spin {
+                    0% {
+                        transform: rotate(0deg)
+                    }
+
+                    50% {
+                        transform: rotate(180deg)
+                    }
+
+                    100% {
+                        transform: rotate(360deg)
+                    }
+                }
+            </style>
             <div style="margin-top:20px;display:flex;flex-direction:column;gap:8px;align-items:center;">
                 <span id="auth-guest"
                     style="color:#6366F1;font-size:0.85rem;cursor:pointer;text-decoration:underline;display:none;">Continue
