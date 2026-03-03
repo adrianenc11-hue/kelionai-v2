@@ -243,6 +243,11 @@ Reply STRICTLY with JSON:
             needsFaceCheck: false,
             needsFaceRegister: false,
             needsVoiceClone: false,
+            // Monitor intents (URL/streaming/radio/video)
+            needsOpenURL: false, openURL: '',
+            needsRadio: false, radioStation: '',
+            needsVideo: false, videoQuery: '',
+            needsWebNav: false, webNavURL: '',
             // Admin intents
             needsAdminDiagnose: false,
             needsAdminReset: false, adminResetTool: '',
@@ -329,6 +334,31 @@ Reply STRICTLY with JSON:
         // ── VOICE CLONE ──
         if (/\b(cloneaz[aă]|clonare.*voce|copiaz[aă].*voce|clone voice|my voice|vocea mea|vreau vocea)\b/i.test(lower)) {
             result.needsVoiceClone = true;
+        }
+
+        // ── OPEN URL ON MONITOR ──
+        const urlMatch = text.match(/(https?:\/\/[^\s]+)/i);
+        if (urlMatch || /\b(deschide|afiseaza|arata|open|show|display|pune pe monitor|pe monitor)\b/i.test(lower)) {
+            if (urlMatch) {
+                result.needsOpenURL = true;
+                result.openURL = urlMatch[1];
+            } else if (/\b(deschide|open|pune)\b/i.test(lower)) {
+                result.needsWebNav = true;
+                result.webNavURL = text.replace(/\b(deschide|afiseaza|arata|open|show|pe monitor|display)\b/gi, '').trim();
+            }
+        }
+
+        // ── RADIO LIVE ──
+        if (/\b(radio|fm|asculta radio|pune radio|play radio|kiss fm|europa fm|digi fm|magic fm|rock fm|pro fm|radio zu|radiozu)\b/i.test(lower)) {
+            result.needsRadio = true;
+            const stationMatch = lower.match(/\b(kiss ?fm|europa ?fm|digi ?fm|magic ?fm|rock ?fm|pro ?fm|radio ?zu|virgin ?radio|national ?fm|romantic ?fm|gold ?fm|city ?fm)\b/i);
+            result.radioStation = stationMatch ? stationMatch[1].trim() : 'radio zu';
+        }
+
+        // ── VIDEO / NETFLIX / YOUTUBE ──
+        if (/\b(video|film|movie|netflix|youtube|trailer|serial|episod|watch|viziona|uita-te la|ruleaza)\b/i.test(lower)) {
+            result.needsVideo = true;
+            result.videoQuery = text.replace(/\b(video|pune|ruleaza|arata|film|movie|uita-te la|watch|pe monitor)\b/gi, '').trim();
         }
 
         // ── MEMORY ──
@@ -445,6 +475,11 @@ Reply STRICTLY with JSON:
             if (analysis.needsFaceCheck && !seen.has('faceCheck')) { plan.push({ tool: 'faceCheck' }); seen.add('faceCheck'); }
             if (analysis.needsFaceRegister && !seen.has('faceRegister') && userId) { plan.push({ tool: 'faceRegister', userId }); seen.add('faceRegister'); }
             if (analysis.needsVoiceClone && !seen.has('voiceClone') && userId) { plan.push({ tool: 'voiceClone', userId }); seen.add('voiceClone'); }
+            // Monitor tools
+            if (analysis.needsOpenURL && !seen.has('openURL')) { plan.push({ tool: 'openURL', url: analysis.openURL }); seen.add('openURL'); }
+            if (analysis.needsRadio && !seen.has('radio')) { plan.push({ tool: 'radio', station: analysis.radioStation }); seen.add('radio'); }
+            if (analysis.needsVideo && !seen.has('video')) { plan.push({ tool: 'video', query: analysis.videoQuery }); seen.add('video'); }
+            if (analysis.needsWebNav && !seen.has('webNav')) { plan.push({ tool: 'webNav', query: analysis.webNavURL }); seen.add('webNav'); }
             // Admin tools (only added if isAdmin flag set)
             if (analysis.needsAdminDiagnose && !seen.has('adminDiagnose')) { plan.push({ tool: 'adminDiagnose' }); seen.add('adminDiagnose'); }
             if (analysis.needsAdminReset && !seen.has('adminReset')) { plan.push({ tool: 'adminReset', resetTool: analysis.adminResetTool }); seen.add('adminReset'); }
@@ -501,7 +536,7 @@ Reply STRICTLY with JSON:
     }
 
     async executeTool(step) {
-        const timeouts = { search: 8000, weather: 5000, imagine: 15000, memory: 3000, map: 100, vision: 15000, tts: 10000, stt: 10000, faceCheck: 10000, faceRegister: 10000, voiceClone: 15000 };
+        const timeouts = { search: 8000, weather: 5000, imagine: 15000, memory: 3000, map: 100, vision: 15000, tts: 10000, stt: 10000, faceCheck: 10000, faceRegister: 10000, voiceClone: 15000, openURL: 3000, radio: 3000, video: 5000, webNav: 5000 };
         const tmout = (ms) => new Promise((_, r) => setTimeout(() => r(new Error('Timeout')), ms));
         return Promise.race([this._run(step), tmout(timeouts[step.tool] || 10000)]);
     }
@@ -519,6 +554,10 @@ Reply STRICTLY with JSON:
             case 'faceCheck': return this._faceCheck();
             case 'faceRegister': return this._faceRegister(step.userId);
             case 'voiceClone': return this._voiceClone(step.userId);
+            case 'openURL': return this._openURL(step.url);
+            case 'radio': return this._radio(step.station);
+            case 'video': return this._video(step.query);
+            case 'webNav': return this._webNav(step.query);
             case 'adminDiagnose': return this._adminDiagnose();
             case 'adminReset': return this._adminReset(step.resetTool);
             case 'adminStats': return this._adminStats();
@@ -546,6 +585,11 @@ Reply STRICTLY with JSON:
         if (results.faceCheck) ctx += `\n[IDENTITATE DETECTATA]: ${results.faceCheck.name || 'Necunoscut'}`;
         if (results.faceRegister) ctx += `\n[FATA INREGISTRATA]: ${results.faceRegister.status || 'OK'}`;
         if (results.voiceClone) ctx += `\n[VOCE CLONATA]: ${results.voiceClone.status || 'OK'}`;
+        // Monitor tool contexts
+        if (results.openURL) ctx += `\n[MONITOR: Am deschis ${results.openURL.url} pe ecran. Prezintă conținutul.]`;
+        if (results.radio) ctx += `\n[MONITOR: Radio ${results.radio.station} redă acum pe monitor. Informează utilizatorul.]`;
+        if (results.video) ctx += `\n[MONITOR: Video "${results.video.title || results.video.query}" se redă pe ecran.]`;
+        if (results.webNav) ctx += `\n[MONITOR: Am navigat la ${results.webNav.url}. Descrie ce apare.]`;
 
         if (analysis.isEmotional && analysis.emotionalTone !== 'neutral') {
             ctx += `\n[Utilizatorul pare ${analysis.emotionalTone}. Adapteaza tonul empatic.]`;
@@ -567,6 +611,11 @@ Reply STRICTLY with JSON:
     }
 
     extractMonitor(results) {
+        // Monitor priority: URL/radio/video first, then images/weather/map
+        if (results.openURL) return { content: results.openURL.url, type: 'iframe', title: results.openURL.title };
+        if (results.radio) return { content: results.radio.streamUrl, type: 'audio', title: `Radio ${results.radio.station}` };
+        if (results.video) return { content: results.video.embedUrl || results.video.url, type: 'video', title: results.video.title };
+        if (results.webNav) return { content: results.webNav.url, type: 'iframe', title: results.webNav.title };
         if (results.imagine) return { content: results.imagine, type: 'image' };
         if (results.weather?.html) return { content: results.weather.html, type: 'html' };
         if (results.map) return { content: results.map.url, type: 'map' };
@@ -647,6 +696,154 @@ Reply STRICTLY with JSON:
         if (query.length > 100) query = query.split(' ').slice(0, 8).join(' ');
         query = query.replace(/\b(te rog|please|un pic|putin|vreau sa stiu|as vrea)\b/gi, '').trim();
         return query || original;
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // 10. MONITOR TOOL IMPLEMENTATIONS
+    // ═══════════════════════════════════════════════════════════
+
+    // Helper: log media activity to Supabase
+    async _logMedia(type, url, title, userId) {
+        if (!this.supabaseAdmin) return;
+        try {
+            await this.supabaseAdmin.from('media_history').insert({
+                user_id: userId || 'guest',
+                type, url, title,
+                created_at: new Date().toISOString()
+            });
+        } catch (e) { /* ok — table might not exist yet */ }
+    }
+
+    // ── OPEN URL ON MONITOR ──
+    async _openURL(url) {
+        this.toolStats.openURL = (this.toolStats.openURL || 0) + 1;
+        if (!url || !url.startsWith('http')) {
+            return { type: 'openURL', status: 'error', summary: 'URL invalid.' };
+        }
+        await this._logMedia('url', url, url);
+        return {
+            type: 'openURL',
+            url: url,
+            title: url,
+            displayType: 'iframe',
+            presentOnMonitor: true,
+            summary: `Am deschis ${url} pe monitor.`
+        };
+    }
+
+    // ── RADIO LIVE ON MONITOR ──
+    async _radio(station) {
+        this.toolStats.radio = (this.toolStats.radio || 0) + 1;
+        const RADIO_STREAMS = {
+            'radio zu': { name: 'Radio ZU', url: 'https://live.radiozu.ro/radiozu.mp3', logo: '📻' },
+            'radiozu': { name: 'Radio ZU', url: 'https://live.radiozu.ro/radiozu.mp3', logo: '📻' },
+            'kiss fm': { name: 'Kiss FM', url: 'https://live.kissfm.ro/kissfm.mp3', logo: '💋' },
+            'europa fm': { name: 'Europa FM', url: 'https://astreaming.edi.ro:8443/EuropaFM_aac', logo: '🇪🇺' },
+            'digi fm': { name: 'Digi FM', url: 'https://edge76.rcs-rds.ro/digifm/digifm.mp3', logo: '📡' },
+            'magic fm': { name: 'Magic FM', url: 'https://live.magicfm.ro/magicfm.mp3', logo: '✨' },
+            'rock fm': { name: 'Rock FM', url: 'https://live.rockfm.ro/rockfm.mp3', logo: '🎸' },
+            'pro fm': { name: 'Pro FM', url: 'https://live.profm.ro/profm.mp3', logo: '🎵' },
+            'virgin radio': { name: 'Virgin Radio', url: 'https://astreaming.edi.ro:8443/VirginRadio_aac', logo: '🔴' },
+            'national fm': { name: 'National FM', url: 'https://live.nationalfm.ro/nationalfm.mp3', logo: '🇷🇴' },
+            'romantic fm': { name: 'Romantic FM', url: 'https://stream.romanticfm.ro/romanticfm.mp3', logo: '💕' },
+            'gold fm': { name: 'Gold FM', url: 'https://live.goldfm.ro/goldfm.mp3', logo: '🏆' },
+            'city fm': { name: 'City FM', url: 'https://live.cityfm.ro/cityfm.mp3', logo: '🏙️' }
+        };
+
+        const key = (station || 'radio zu').toLowerCase().trim();
+        const radio = RADIO_STREAMS[key] || RADIO_STREAMS['radio zu'];
+        await this._logMedia('radio', radio.url, radio.name);
+
+        return {
+            type: 'radio',
+            station: radio.name,
+            streamUrl: radio.url,
+            logo: radio.logo,
+            displayType: 'audio',
+            presentOnMonitor: true,
+            summary: `${radio.logo} ${radio.name} redă acum pe monitor!`
+        };
+    }
+
+    // ── VIDEO / YOUTUBE / NETFLIX ON MONITOR ──
+    async _video(query) {
+        this.toolStats.video = (this.toolStats.video || 0) + 1;
+        if (!query) return { type: 'video', status: 'error', summary: 'Ce video dorești?' };
+
+        // Check if it's a direct YouTube URL
+        const ytMatch = query.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/);
+        if (ytMatch) {
+            const embedUrl = `https://www.youtube.com/embed/${ytMatch[1]}?autoplay=1`;
+            await this._logMedia('video', embedUrl, query);
+            return {
+                type: 'video',
+                url: `https://youtube.com/watch?v=${ytMatch[1]}`,
+                embedUrl,
+                videoId: ytMatch[1],
+                title: query,
+                displayType: 'video',
+                presentOnMonitor: true,
+                summary: `Video YouTube redă pe monitor.`
+            };
+        }
+
+        // Check if Netflix URL
+        if (query.includes('netflix.com')) {
+            await this._logMedia('video', query, 'Netflix');
+            return {
+                type: 'video',
+                url: query,
+                embedUrl: query,
+                title: 'Netflix',
+                displayType: 'iframe',
+                presentOnMonitor: true,
+                summary: 'Netflix deschis pe monitor.'
+            };
+        }
+
+        // Search YouTube via API or construct search URL
+        const searchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
+        const embedSearch = `https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(query)}`;
+        await this._logMedia('video', searchUrl, query);
+
+        return {
+            type: 'video',
+            url: searchUrl,
+            embedUrl: embedSearch,
+            query: query,
+            title: query,
+            displayType: 'video',
+            presentOnMonitor: true,
+            summary: `Caut "${query}" pe YouTube — afișez pe monitor.`
+        };
+    }
+
+    // ── WEB NAVIGATION ON MONITOR ──
+    async _webNav(query) {
+        this.toolStats.webNav = (this.toolStats.webNav || 0) + 1;
+        if (!query) return { type: 'webNav', status: 'error', summary: 'Ce pagină dorești?' };
+
+        // If it looks like a domain, add https://
+        let url = query;
+        if (!url.startsWith('http')) {
+            if (/^[\w-]+\.(com|ro|net|org|io|app|dev|eu|info|tv|fm)$/i.test(url)) {
+                url = `https://${url}`;
+            } else {
+                // Search Google for the query
+                url = `https://www.google.com/search?igu=1&q=${encodeURIComponent(query)}`;
+            }
+        }
+        await this._logMedia('webNav', url, query);
+
+        return {
+            type: 'webNav',
+            url: url,
+            query: query,
+            title: query,
+            displayType: 'iframe',
+            presentOnMonitor: true,
+            summary: `Am navigat la ${url} pe monitor.`
+        };
     }
 
     // ═══════════════════════════════════════════════════════════
