@@ -892,6 +892,13 @@ Reply STRICTLY with JSON:
                 if (r.ok) {
                     const data = await r.json();
                     const description = data.content?.[0]?.text || 'Nu am putut analiza imaginea.';
+                    // Supabase usage log
+                    if (this.supabaseAdmin) {
+                        try {
+                            const today = new Date().toISOString().split('T')[0];
+                            await this.supabaseAdmin.from('usage').upsert({ user_id: 'system', type: 'vision', date: today, count: 1 }, { onConflict: 'user_id,type,date' });
+                        } catch (e) { /* ok */ }
+                    }
                     return {
                         type: 'vision',
                         status: 'analyzed',
@@ -954,6 +961,13 @@ Reply STRICTLY with JSON:
                 if (r.ok) {
                     const audioBuffer = Buffer.from(await r.arrayBuffer());
                     const audioBase64 = audioBuffer.toString('base64');
+                    // Supabase usage log
+                    if (this.supabaseAdmin) {
+                        try {
+                            const today = new Date().toISOString().split('T')[0];
+                            await this.supabaseAdmin.from('usage').upsert({ user_id: 'system', type: 'tts', date: today, count: 1 }, { onConflict: 'user_id,type,date' });
+                        } catch (e) { /* ok */ }
+                    }
                     return {
                         type: 'tts',
                         status: 'generated',
