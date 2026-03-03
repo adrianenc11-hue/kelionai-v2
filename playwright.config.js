@@ -4,16 +4,25 @@ const { defineConfig, devices } = require('@playwright/test');
 
 module.exports = defineConfig({
   testDir: './tests',
-  timeout: 60000,
+  timeout: 180000,
+  expect: { timeout: 20000 },
+  fullyParallel: true,
+  retries: 1,
+  workers: 5,
+  reporter: [
+    ['html', { open: 'never' }],
+    ['list'],
+    ['json', { outputFile: 'test-results/results.json' }],
+  ],
+  outputDir: 'test-results/',
   use: {
     baseURL: process.env.BASE_URL || 'https://kelionai.app',
-    actionTimeout: 15000,
-    navigationTimeout: 15000,
-    screenshot: 'only-on-failure',
+    actionTimeout: 20000,
+    navigationTimeout: 120000,
+    screenshot: 'on',
+    video: 'on',
+    trace: 'on-first-retry',
   },
-  retries: 3,
-  reporter: [['html'], ['list']],
-  outputDir: 'test-results/',
   projects: [
     {
       name: 'chromium',

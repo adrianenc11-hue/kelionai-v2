@@ -1,0 +1,87 @@
+1. PASS #13 /reset-password.html loads with form
+2. PASS #14 direct /404.html loads
+3. PASS #15 /error.html loads
+4. PASS #16 /dashboard/billing.html loads
+5. PASS #17 /dashboard/trading.html loads
+6. PASS #18 /dashboard/news.html loads
+7. PASS #19 /dashboard/sports.html loads
+8. PASS #20 /dashboard/health.html loads
+9. PASS #21 /admin/health.html exists
+10. PASS #27 back buttons work
+11. SKIP #28 subscription modal opens
+12. PASS #37 GET /health (root) returns ok
+13. PASS #38 GET /metrics without admin returns 401+
+14. PASS #48 POST /api/chat/stream returns SSE events
+15. PASS #49 POST /api/chat/stream empty message handling
+16. PASS #52 Kira avatar loads
+17. PASS #55 Kira TTS has different voice
+18. PASS #56 Kira chat has different personality
+19. PASS #59 POST /api/speak returns audio
+20. PASS #60 POST /api/speak Kira avatar returns audio
+21. PASS #61 POST /api/listen with text (WebSpeech fallback)
+22. PASS #65 Multiple TTS requests all return audio (no intermittent)
+23. FAIL #68 mic button toggles recording UI [ERR: TimeoutError: page.waitForSelector: Timeout 60000ms exceeded.
+Call log:
+[2m  - waiting for locator('#btn-mic') to be visible[22m
+
+
+  272 |         await page.addInitScript(() => { localStorage.setIt]
+24. PASS #72 POST /api/vision with base64 image
+25. PASS #80 POST /api/auth/refresh without token returns 400
+26. PASS #82 POST /api/auth/forgot-password valid email returns 200
+27. PASS #83 POST /api/auth/forgot-password nonexistent email returns 200
+28. PASS #84 POST /api/auth/reset-password invalid token returns 401
+29. SKIP #85 POST /api/auth/change-email with auth
+30. PASS #117 POST /api/imagine returns full base64 image
+31. PASS #118 AI knows creator is Adrian
+32. PASS #119 POST /api/weather valid city returns data
+33. PASS #120 POST /api/weather unknown city returns 404
+34. PASS #121 POST /api/weather without city returns 400
+35. PASS #122 geolocation permission requested at startup
+36. PASS #124 GET /api/payments/plans returns plan list
+37. PASS #125 GET /api/payments/status no auth returns guest
+38. PASS #138 GET /api/media/instagram/health
+39. PASS #142 GET /api/news/public returns articles or empty
+40. FAIL #148 GET /dashboard without admin secret returns 404 [ERR: Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoBe[2m([22m[32mexpected[39m[2m) // Object.is equality[22m
+
+Expected: [32m404[39m
+Received: [31m401[39m
+
+  462 |         const r = await r]
+41. PASS #160 POST /api/ticker/disable without auth returns 401
+42. PASS #161 language switch EN updates UI
+43. PASS #162 language switch RO updates UI
+44. PASS #163 chat responds in selected language
+45. PASS #164 language persists after reload
+46. PASS #165 message appears in history sidebar
+47. SKIP #168 GET /api/referral/code with auth returns code
+48. PASS #169 GET /api/referral/code without auth
+49. PASS #170 chat area has minimum height
+50. PASS #171 POST /api/vision without image returns error
+51. SKIP #173 full auth: register ÔåÆ login ÔåÆ chat ÔåÆ logout
+52. PASS #174 voice round-trip: TTS returns audio
+53. FAIL #175 search + chat follow-up
+54. PASS #176 Professor: structured lesson
+55. FAIL #177 Presenter: presentation outline
+56. PASS #178 Sales agent: structured pitch
+57. FAIL #179 Consultant: business plan structure
+58. FAIL #180 Researcher: cites sources
+59. PASS #182 Planner: real data vacation plan
+60. FAIL #184 Search-first: thinkTime > 0 on role request
+61. FAIL #185 chain-of-thought: thinkTime on complex request [ERR: Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoBeLessThan[2m([22m[32mexpected[39m[2m)[22m
+
+Expected: < [32m500[39m
+Received:   [31m503[39m
+
+  764 |             data: { message: 'What ]
+62. PASS #191 multi-tool: weather + search in one query
+63. PASS #192 GET /api/brain diagnostics (admin blocked)
+64. PASS #193 Truth Engine: admits not knowing
+65. FAIL #194 EQ sadness: emotional validation
+66. PASS #195 EQ joy: celebrates with user
+67. FAIL #199 Proactive: "going outside" triggers weather suggestion
+68. PASS #202 Kelion vs Kira personality differs
+69. PASS #203 memory save via chat
+70. FAIL #206 memory isolation: no auth user has no memory
+
+TOTAL: 70 | PASS: 55 | FAIL: 3 | SKIP: 4

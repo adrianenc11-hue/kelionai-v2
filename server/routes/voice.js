@@ -21,6 +21,7 @@ router.post('/speak', ttsLimiter, validate(speakSchema), async (req, res) => {
     try {
         const { getUserFromToken, supabaseAdmin } = req.app.locals;
         const { text, avatar = 'kelion', mood = 'neutral' } = req.body;
+        const language = req.body.language || 'ro';
         if (!text || !process.env.ELEVENLABS_API_KEY) return res.status(503).json({ error: 'TTS unavailable' });
 
         const user = await getUserFromToken(req);
@@ -38,7 +39,7 @@ router.post('/speak', ttsLimiter, validate(speakSchema), async (req, res) => {
         };
         const selectedVoiceSettings = voiceSettings[mood] || voiceSettings.neutral;
 
-        const vid = getVoiceId(avatar);
+        const vid = getVoiceId(avatar, language);
         const r = await fetch('https://api.elevenlabs.io/v1/text-to-speech/' + vid, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'xi-api-key': process.env.ELEVENLABS_API_KEY },

@@ -67,20 +67,7 @@ router.post('/chat', chatLimiter, validate(chatSchema), async (req, res) => {
 
         let reply = null, engine = null;
 
-        // GPT-4o-mini (PRIMARY — fastest response for voice sync)
-        if (!reply && process.env.OPENAI_API_KEY) {
-            try {
-                const r = await fetch('https://api.openai.com/v1/chat/completions', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + process.env.OPENAI_API_KEY },
-                    body: JSON.stringify({ model: 'gpt-4o-mini', max_tokens: 500, messages: [{ role: 'system', content: systemPrompt }, ...msgs] })
-                });
-                const d = await r.json();
-                reply = d.choices?.[0]?.message?.content;
-                if (reply) engine = 'GPT-4o-mini';
-            } catch (e) { logger.warn({ component: 'Chat', err: e.message }, 'GPT-4o-mini'); }
-        }
-        // Claude (fallback)
+        // Claude (PRIMARY — best Romanian understanding + system prompt compliance)
         if (!reply && process.env.ANTHROPIC_API_KEY) {
             try {
                 const r = await fetch('https://api.anthropic.com/v1/messages', {
@@ -92,6 +79,19 @@ router.post('/chat', chatLimiter, validate(chatSchema), async (req, res) => {
                 reply = d.content?.[0]?.text;
                 if (reply) engine = 'Claude';
             } catch (e) { logger.warn({ component: 'Chat', err: e.message }, 'Claude'); }
+        }
+        // GPT-4o-mini (fallback — faster but weaker at Romanian)
+        if (!reply && process.env.OPENAI_API_KEY) {
+            try {
+                const r = await fetch('https://api.openai.com/v1/chat/completions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + process.env.OPENAI_API_KEY },
+                    body: JSON.stringify({ model: 'gpt-4o-mini', max_tokens: 500, messages: [{ role: 'system', content: systemPrompt }, ...msgs] })
+                });
+                const d = await r.json();
+                reply = d.choices?.[0]?.message?.content;
+                if (reply) engine = 'GPT-4o-mini';
+            } catch (e) { logger.warn({ component: 'Chat', err: e.message }, 'GPT-4o-mini'); }
         }
         // DeepSeek (tertiary)
         if (!reply && process.env.DEEPSEEK_API_KEY) {

@@ -51,6 +51,7 @@
         "express": "^4.22.1",
         "express-rate-limit": "^8.2.1",
         "form-data": "^4.0.0",
+        "franc-min": "^6.2.0",
         "helmet": "^8.1.0",
         "mammoth": "^1.11.0",
         "node-fetch": "^2.7.0",
