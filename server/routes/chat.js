@@ -120,8 +120,16 @@ router.post('/chat', chatLimiter, validate(chatSchema), async (req, res) => {
         logger.info({ component: 'Chat', engine, avatar, language, tools: thought.toolsUsed, chainOfThought: !!thought.chainOfThought, thinkTime: thought.thinkTime, replyLength: reply.length }, `${engine} | ${avatar} | ${language} | tools:[${thought.toolsUsed.join(',')}] | CoT:${!!thought.chainOfThought} | ${thought.thinkTime}ms think | ${reply.length}c`);
 
         const totalTime = Date.now() - _chatStart;
+        // Parse [MONITOR]...[/MONITOR] tags from AI reply
+        let monitorFromReply = null;
+        const monitorMatch = reply.match(/\[MONITOR\]([\s\S]*?)\[\/MONITOR\]/i);
+        if (monitorMatch) {
+            monitorFromReply = { content: monitorMatch[1].trim(), type: 'html' };
+            reply = reply.replace(/\[MONITOR\][\s\S]*?\[\/MONITOR\]/gi, '').trim();
+        }
         const response = { reply, avatar, engine, language, thinkTime: thought.thinkTime, totalTime, conversationId: savedConvId };
-        if (thought.monitor.content) { response.monitor = thought.monitor; }
+        if (monitorFromReply) { response.monitor = monitorFromReply; }
+        else if (thought.monitor.content) { response.monitor = thought.monitor; }
         res.json(response);
 
     } catch (e) { logger.error({ component: 'Chat', err: e.message }, e.message); res.status(500).json({ error: 'AI error' }); }
