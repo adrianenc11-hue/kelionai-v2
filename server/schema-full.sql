@@ -198,3 +198,34 @@ CREATE TABLE IF NOT EXISTS news_cache (
     data JSONB,
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- ═══ ADMIN LOGS ═══
+CREATE TABLE IF NOT EXISTS admin_logs (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    action TEXT NOT NULL,
+    details JSONB DEFAULT '{}',
+    result JSONB DEFAULT '{}',
+    source TEXT DEFAULT 'chat',
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_admin_logs_action ON admin_logs(action);
+CREATE INDEX IF NOT EXISTS idx_admin_logs_created ON admin_logs(created_at DESC);
+
+-- ═══ TRADES ═══
+CREATE TABLE IF NOT EXISTS trades (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    symbol TEXT NOT NULL,
+    side TEXT NOT NULL CHECK (side IN ('BUY', 'SELL')),
+    quantity DECIMAL,
+    price DECIMAL,
+    status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'executed', 'failed', 'cancelled')),
+    exchange TEXT DEFAULT 'binance',
+    order_id TEXT,
+    pnl DECIMAL,
+    details JSONB DEFAULT '{}',
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_trades_symbol ON trades(symbol);
+CREATE INDEX IF NOT EXISTS idx_trades_created ON trades(created_at DESC);

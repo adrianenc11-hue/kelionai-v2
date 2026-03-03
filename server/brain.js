@@ -854,6 +854,126 @@ Raspunde STRICT JSON. Daca nimic: {}`;
         };
     }
 
+    // ═══════════════════════════════════════════════════════════
+    // ADMIN TOOLS — Only executed when isAdmin = true
+    // ═══════════════════════════════════════════════════════════
+
+    async _logAdminAction(action, details, result) {
+        try {
+            if (this.supabaseAdmin) {
+                await this.supabaseAdmin.from('admin_logs').insert({
+                    action, details: details || {}, result: result || {}, source: 'chat'
+                });
+            }
+        } catch (e) { logger.warn({ component: 'Brain', err: e.message }, 'Admin log failed'); }
+    }
+
+    async _adminDiagnose() {
+        const diag = this.getDiagnostics();
+        // Add Supabase connection status
+        let dbStatus = 'not connected';
+        if (this.supabaseAdmin) {
+            try {
+                const { count } = await this.supabaseAdmin.from('conversations').select('id', { count: 'exact', head: true });
+                dbStatus = `connected (${count || 0} conversations)`;
+            } catch (e) { dbStatus = 'error: ' + e.message; }
+        }
+        const result = { ...diag, database: dbStatus, timestamp: new Date().toISOString() };
+        await this._logAdminAction('diagnose', {}, result);
+        return { type: 'adminDiagnose', data: result, summary: `Brain: ${diag.status}, ${diag.conversations} conv, DB: ${dbStatus}, Memory: ${diag.memory?.rss || '?'}` };
+    }
+
+    async _adminReset(tool) {
+        if (tool === 'all' || tool === 'tot' || tool === 'toate') {
+            this.resetAll();
+            await this._logAdminAction('reset', { tool: 'all' }, { success: true });
+            return { type: 'adminReset', data: { reset: 'all', success: true }, summary: 'Toate tool-urile au fost resetate.' };
+        } else {
+            this.resetTool(tool);
+            await this._logAdminAction('reset', { tool }, { success: true });
+            return { type: 'adminReset', data: { reset: tool, success: true }, summary: `Tool "${tool}" a fost resetat.` };
+        }
+    }
+
+    async _adminStats() {
+        const result = { subscribers: 0, plans: {}, revenue: 0, usageToday: {}, timestamp: new Date().toISOString() };
+        if (this.supabaseAdmin) {
+            try {
+                // Active subscriptions
+                const { data: subs } = await this.supabaseAdmin.from('subscriptions').select('plan, status').eq('status', 'active');
+                result.subscribers = subs?.length || 0;
+                const plans = {};
+                (subs || []).forEach(s => { plans[s.plan] = (plans[s.plan] || 0) + 1; });
+                result.plans = plans;
+                // Revenue estimate
+                const prices = { pro: 9.99, premium: 19.99, enterprise: 49.99 };
+                result.revenue = Object.entries(plans).reduce((sum, [plan, count]) => sum + (prices[plan] || 0) * count, 0);
+                // Usage today
+                const today = new Date().toISOString().split('T')[0];
+                const { data: usage } = await this.supabaseAdmin.from('usage').select('type, count').eq('date', today);
+                (usage || []).forEach(u => { result.usageToday[u.type] = (result.usageToday[u.type] || 0) + u.count; });
+            } catch (e) { result.error = e.message; }
+        }
+        await this._logAdminAction('stats', {}, result);
+        return { type: 'adminStats', data: result, summary: `${result.subscribers} abonați activi, MRR: €${result.revenue.toFixed(2)}, Usage azi: ${JSON.stringify(result.usageToday)}` };
+    }
+
+    async _adminTrading(action) {
+        const result = { action, timestamp: new Date().toISOString(), positions: [], portfolio: null };
+        try {
+            // Try to get portfolio from Binance
+            if (process.env.BINANCE_API_KEY) {
+                const crypto = require('crypto');
+                const timestamp = Date.now();
+                const baseUrl = process.env.BINANCE_TESTNET === 'true' ? 'https://testnet.binance.vision' : 'https://api.binance.com';
+                const query = `timestamp=${timestamp}`;
+                const signature = crypto.createHmac('sha256', process.env.BINANCE_SECRET_KEY || '').update(query).digest('hex');
+                const r = await fetch(`${baseUrl}/api/v3/account?${query}&signature=${signature}`, {
+                    headers: { 'X-MBX-APIKEY': process.env.BINANCE_API_KEY }
+                });
+                if (r.ok) {
+                    const data = await r.json();
+                    result.portfolio = (data.balances || []).filter(b => parseFloat(b.free) > 0 || parseFloat(b.locked) > 0)
+                        .map(b => ({ asset: b.asset, free: parseFloat(b.free), locked: parseFloat(b.locked) }));
+                }
+            }
+            // Get recent trades from Supabase
+            if (this.supabaseAdmin) {
+                const { data: trades } = await this.supabaseAdmin.from('trades').select('*').order('created_at', { ascending: false }).limit(10);
+                result.recentTrades = trades || [];
+            }
+        } catch (e) { result.error = e.message; }
+        await this._logAdminAction('trading', { action }, result);
+        const posCount = result.portfolio?.length || 0;
+        return { type: 'adminTrading', data: result, summary: `${posCount} active pe Binance${result.recentTrades?.length ? `, ${result.recentTrades.length} trade-uri recente` : ''}` };
+    }
+
+    async _adminNews() {
+        const result = { headlines: [], timestamp: new Date().toISOString() };
+        try {
+            // Check news_cache in Supabase
+            if (this.supabaseAdmin) {
+                const { data } = await this.supabaseAdmin.from('news_cache').select('data, updated_at').eq('id', 'latest').single();
+                if (data?.data) {
+                    result.headlines = (Array.isArray(data.data) ? data.data : data.data.articles || []).slice(0, 10);
+                    result.cachedAt = data.updated_at;
+                }
+            }
+            // If no cache, try fetching fresh
+            if (result.headlines.length === 0) {
+                try {
+                    const r = await fetch('https://newsdata.io/api/1/news?apikey=' + (process.env.NEWSDATA_API_KEY || '') + '&language=ro&category=business,technology&size=10');
+                    if (r.ok) {
+                        const d = await r.json();
+                        result.headlines = (d.results || []).map(a => ({ title: a.title, source: a.source_name, link: a.link, pubDate: a.pubDate }));
+                    }
+                } catch (e) { /* no news API */ }
+            }
+        } catch (e) { result.error = e.message; }
+        await this._logAdminAction('news', {}, { count: result.headlines.length });
+        return { type: 'adminNews', data: result, summary: `${result.headlines.length} știri disponibile` };
+    }
+
     resetTool(tool) { this.toolErrors[tool] = 0; }
     resetAll() { for (const t of Object.keys(this.toolErrors)) this.toolErrors[t] = 0; }
 }
