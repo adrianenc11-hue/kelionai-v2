@@ -78,6 +78,56 @@ RETURNS void LANGUAGE plpgsql AS $$
 BEGIN
     UPDATE api_keys SET request_count = request_count + 1, last_used_at = now() WHERE id = key_id;
 END; $$;
+
+-- ═══ ADMIN LOGS ═══
+CREATE TABLE IF NOT EXISTS admin_logs (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    action TEXT NOT NULL,
+    details JSONB DEFAULT '{}',
+    admin_id TEXT,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_admin_logs_action ON admin_logs(action, created_at DESC);
+
+-- ═══ TRADES ═══
+CREATE TABLE IF NOT EXISTS trades (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id TEXT DEFAULT 'admin',
+    asset TEXT NOT NULL,
+    side TEXT NOT NULL CHECK (side IN ('buy', 'sell')),
+    amount NUMERIC NOT NULL DEFAULT 0,
+    price NUMERIC NOT NULL DEFAULT 0,
+    status TEXT DEFAULT 'executed',
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_trades_user ON trades(user_id, created_at DESC);
+
+-- ═══ PROFILES (Face Recognition) ═══
+CREATE TABLE IF NOT EXISTS profiles (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id TEXT NOT NULL UNIQUE,
+    display_name TEXT,
+    face_encoding JSONB,
+    avatar_url TEXT,
+    bio TEXT,
+    updated_at TIMESTAMPTZ DEFAULT now(),
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_profiles_user ON profiles(user_id);
+
+-- ═══ MEDIA HISTORY (Monitor Activity) ═══
+CREATE TABLE IF NOT EXISTS media_history (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id TEXT NOT NULL DEFAULT 'guest',
+    type TEXT NOT NULL,
+    url TEXT,
+    title TEXT,
+    duration_seconds INTEGER,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_media_history_user ON media_history(user_id);
+CREATE INDEX IF NOT EXISTS idx_media_history_type ON media_history(type);
+CREATE INDEX IF NOT EXISTS idx_media_history_created ON media_history(created_at DESC);
 `;
 
 async function runMigration() {

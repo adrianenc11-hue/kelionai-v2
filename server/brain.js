@@ -851,39 +851,125 @@ Reply STRICTLY with JSON:
     // ═══════════════════════════════════════════════════════════
 
     // ── VISION — High precision for accessibility (blind users) ──
-    async _vision() {
+    // Calls Claude Vision API when image is provided in context
+    async _vision(imageBase64) {
         this.toolStats.vision = (this.toolStats.vision || 0) + 1;
-        // Vision requires image data from client; brain signals readiness
-        // The actual vision analysis is done in the vision route
-        // Here we provide context that vision was requested
-        return {
-            type: 'vision',
-            description: 'Camera activată. Descriu ce văd cu precizie maximă — culori, forme, text, persoane, obstacole, distanțe.',
-            precision: 'high',
-            accessibility: true,
-            summary: 'Sistemul de vedere activat — analiză de mare precizie.'
-        };
+
+        // If no image data provided, signal readiness for camera
+        if (!imageBase64) {
+            return {
+                type: 'vision',
+                status: 'awaiting_image',
+                description: 'Camera pregătită. Trimite o imagine pentru analiză de mare precizie.',
+                precision: 'high',
+                accessibility: true,
+                summary: 'Aștept imagine — activează camera sau trimite o fotografie.'
+            };
+        }
+
+        // Call Claude Vision API for high-precision analysis
+        if (this.anthropicKey) {
+            try {
+                const r = await fetch('https://api.anthropic.com/v1/messages', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-api-key': this.anthropicKey,
+                        'anthropic-version': '2023-06-01'
+                    },
+                    body: JSON.stringify({
+                        model: 'claude-sonnet-4-20250514',
+                        max_tokens: 1000,
+                        messages: [{
+                            role: 'user',
+                            content: [
+                                { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: imageBase64 } },
+                                { type: 'text', text: 'Descrie în detaliu maxim ce vezi în această imagine. Menționează: persoane, obiecte, culori, text vizibil, obstacole, distanțe estimate, pericole potențiale. Răspunde în română cu precizie maximă — informația ajută o persoană cu deficiențe de vedere.' }
+                            ]
+                        }]
+                    })
+                });
+                if (r.ok) {
+                    const data = await r.json();
+                    const description = data.content?.[0]?.text || 'Nu am putut analiza imaginea.';
+                    return {
+                        type: 'vision',
+                        status: 'analyzed',
+                        description,
+                        precision: 'high',
+                        accessibility: true,
+                        engine: 'Claude Vision',
+                        summary: description.substring(0, 200)
+                    };
+                }
+            } catch (e) { logger.warn({ component: 'Brain', err: e.message }, 'Claude Vision failed'); }
+        }
+
+        // Fallback to GPT-4o Vision
+        if (this.openaiKey) {
+            try {
+                const r = await fetch('https://api.openai.com/v1/chat/completions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.openaiKey}` },
+                    body: JSON.stringify({
+                        model: 'gpt-4o',
+                        max_tokens: 1000,
+                        messages: [{
+                            role: 'user',
+                            content: [
+                                { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${imageBase64}` } },
+                                { type: 'text', text: 'Descrie în detaliu maxim ce vezi. Menționează persoane, obiecte, culori, text, obstacole, distanțe. Română, precizie maximă pentru accesibilitate.' }
+                            ]
+                        }]
+                    })
+                });
+                if (r.ok) {
+                    const data = await r.json();
+                    const description = data.choices?.[0]?.message?.content || 'Nu am putut analiza.';
+                    return { type: 'vision', status: 'analyzed', description, precision: 'high', accessibility: true, engine: 'GPT-4o Vision', summary: description.substring(0, 200) };
+                }
+            } catch (e) { logger.warn({ component: 'Brain', err: e.message }, 'GPT-4o Vision failed'); }
+        }
+
+        return { type: 'vision', status: 'no_api', summary: 'Nicio cheie API vision configurată (ANTHROPIC_API_KEY sau OPENAI_API_KEY).' };
     }
 
-    // ── TTS — Text-to-Speech via ElevenLabs ──
+    // ── TTS — Text-to-Speech via ElevenLabs — Returns actual audio ──
     async _tts(text) {
         this.toolStats.tts = (this.toolStats.tts || 0) + 1;
         if (!text) return { type: 'tts', status: 'no_text', summary: 'Nu am primit text de citit.' };
 
-        try {
-            if (process.env.ELEVENLABS_API_KEY) {
-                const voiceId = process.env.ELEVENLABS_VOICE_ID || 'pNInz6obpgDQGcFmaJgB'; // Adam default
+        if (process.env.ELEVENLABS_API_KEY) {
+            try {
+                const voiceId = process.env.ELEVENLABS_VOICE_ID || 'pNInz6obpgDQGcFmaJgB';
                 const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'xi-api-key': process.env.ELEVENLABS_API_KEY },
-                    body: JSON.stringify({ text: text.substring(0, 500), model_id: 'eleven_multilingual_v2', voice_settings: { stability: 0.5, similarity_boost: 0.75 } })
+                    body: JSON.stringify({
+                        text: text.substring(0, 500),
+                        model_id: 'eleven_multilingual_v2',
+                        voice_settings: { stability: 0.5, similarity_boost: 0.75 }
+                    })
                 });
                 if (r.ok) {
-                    return { type: 'tts', status: 'generated', text: text.substring(0, 100), summary: `Text redat cu voce (${text.length} caractere)` };
+                    const audioBuffer = Buffer.from(await r.arrayBuffer());
+                    const audioBase64 = audioBuffer.toString('base64');
+                    return {
+                        type: 'tts',
+                        status: 'generated',
+                        audioBase64,
+                        audioSize: audioBuffer.length,
+                        text: text.substring(0, 100),
+                        summary: `Audio generat: ${audioBuffer.length} bytes (${text.length} caractere text)`
+                    };
+                } else {
+                    const errText = await r.text();
+                    logger.warn({ component: 'Brain', status: r.status, body: errText }, 'ElevenLabs TTS failed');
                 }
-            }
-        } catch (e) { logger.warn({ component: 'Brain', err: e.message }, 'TTS error'); }
-        return { type: 'tts', status: 'ready', text: text.substring(0, 100), summary: 'Text pregătit pentru redare vocală.' };
+            } catch (e) { logger.warn({ component: 'Brain', err: e.message }, 'TTS error'); }
+        }
+
+        return { type: 'tts', status: 'no_api', text: text.substring(0, 100), summary: 'ELEVENLABS_API_KEY nu e configurată.' };
     }
 
     // ── STT — Speech-to-Text via Groq Whisper ──
@@ -967,6 +1053,186 @@ Reply STRICTLY with JSON:
             status: 'ready',
             requiresAudio: true,
             summary: 'Pregătit pentru clonare vocală. Trimite un sample audio de 30 secunde.'
+        };
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // ADMIN TOOL IMPLEMENTATIONS — REAL
+    // ═══════════════════════════════════════════════════════════
+
+    // Helper: log admin action to Supabase
+    async _logAdmin(action, details) {
+        if (!this.supabaseAdmin) return;
+        try {
+            await this.supabaseAdmin.from('admin_logs').insert({
+                action,
+                details: details || {},
+                admin_id: 'admin',
+                created_at: new Date().toISOString()
+            });
+        } catch (e) { logger.warn({ component: 'Brain', err: e.message }, 'Admin log insert failed'); }
+    }
+
+    // ── ADMIN DIAGNOSE — Real system diagnostics ──
+    async _adminDiagnose() {
+        const memUsage = process.memoryUsage();
+        const uptime = process.uptime();
+        const diagnostics = {
+            uptime: `${Math.floor(uptime / 3600)}h ${Math.floor((uptime % 3600) / 60)}m`,
+            memory: {
+                heapUsed: `${Math.round(memUsage.heapUsed / 1024 / 1024)}MB`,
+                heapTotal: `${Math.round(memUsage.heapTotal / 1024 / 1024)}MB`,
+                rss: `${Math.round(memUsage.rss / 1024 / 1024)}MB`
+            },
+            toolStats: { ...this.toolStats },
+            errors: this.errorLog.slice(-10),
+            errorCount: this.errorLog.length,
+            strategies: {
+                searchRefinements: this.strategies.searchRefinement.length,
+                failureRecoveries: this.strategies.failureRecoveries.length,
+                toolCombos: Object.keys(this.strategies.toolCombinations).length
+            },
+            nodeVersion: process.version,
+            platform: process.platform
+        };
+
+        await this._logAdmin('diagnose', diagnostics);
+        return {
+            type: 'adminDiagnose',
+            diagnostics,
+            summary: `Server UP ${diagnostics.uptime} | RAM ${diagnostics.memory.heapUsed}/${diagnostics.memory.heapTotal} | ${diagnostics.errorCount} erori | ${Object.values(this.toolStats).reduce((a, b) => a + b, 0)} tool calls total`
+        };
+    }
+
+    // ── ADMIN RESET — Actually clear caches and errors ──
+    async _adminReset(tool) {
+        const before = {
+            errors: this.errorLog.length,
+            toolStats: { ...this.toolStats }
+        };
+
+        if (tool === 'all' || !tool) {
+            this.errorLog = [];
+            Object.keys(this.toolStats).forEach(k => this.toolStats[k] = 0);
+            this.strategies.searchRefinement = [];
+            this.strategies.failureRecoveries = [];
+            this.strategies.toolCombinations = {};
+        } else {
+            if (this.toolStats[tool] !== undefined) this.toolStats[tool] = 0;
+            this.errorLog = this.errorLog.filter(e => e.tool !== tool);
+        }
+
+        await this._logAdmin('reset', { tool: tool || 'all', before });
+        return {
+            type: 'adminReset',
+            tool: tool || 'all',
+            before,
+            summary: `Reset complet: ${before.errors} erori șterse, statistici resetate.`
+        };
+    }
+
+    // ── ADMIN STATS — Real usage statistics from Supabase ──
+    async _adminStats() {
+        const stats = {
+            toolStats: { ...this.toolStats },
+            totalToolCalls: Object.values(this.toolStats).reduce((a, b) => a + b, 0),
+            errorCount: this.errorLog.length,
+            uptime: `${Math.floor(process.uptime() / 3600)}h ${Math.floor((process.uptime() % 3600) / 60)}m`
+        };
+
+        // Get real counts from Supabase if available
+        if (this.supabaseAdmin) {
+            try {
+                const { count: convCount } = await this.supabaseAdmin.from('conversations').select('*', { count: 'exact', head: true });
+                const { count: msgCount } = await this.supabaseAdmin.from('messages').select('*', { count: 'exact', head: true });
+                const { count: userCount } = await this.supabaseAdmin.from('user_preferences').select('*', { count: 'exact', head: true });
+                stats.supabase = {
+                    conversations: convCount || 0,
+                    messages: msgCount || 0,
+                    userPreferences: userCount || 0
+                };
+            } catch (e) { stats.supabase = { error: e.message }; }
+        }
+
+        await this._logAdmin('stats', stats);
+        return {
+            type: 'adminStats',
+            stats,
+            summary: `${stats.totalToolCalls} tool calls | ${stats.supabase?.conversations || '?'} conversații | ${stats.supabase?.messages || '?'} mesaje | ${stats.errorCount} erori`
+        };
+    }
+
+    // ── ADMIN TRADING — Calls real trading.js analysis ──
+    async _adminTrading(action) {
+        let tradingResult;
+        try {
+            const trading = require('./trading');
+            if (action === 'analyze' || !action) {
+                // Call the real analyzeAsset function
+                const assets = ['BTC', 'ETH', 'SOL'];
+                const results = [];
+                for (const asset of assets) {
+                    try {
+                        const analysis = await (trading.analyzeAsset ? trading.analyzeAsset(asset) : Promise.resolve({ asset, error: 'analyzeAsset not exported' }));
+                        results.push({ asset, ...analysis });
+                    } catch (e) { results.push({ asset, error: e.message }); }
+                }
+                tradingResult = { action: 'analyze', assets: results, timestamp: new Date().toISOString() };
+            } else if (action === 'portfolio') {
+                // Get portfolio from Supabase trades table
+                if (this.supabaseAdmin) {
+                    const { data } = await this.supabaseAdmin.from('trades').select('*').order('created_at', { ascending: false }).limit(20);
+                    tradingResult = { action: 'portfolio', trades: data || [], count: (data || []).length };
+                } else {
+                    tradingResult = { action: 'portfolio', error: 'No database connection' };
+                }
+            } else {
+                tradingResult = { action, error: `Unknown action: ${action}` };
+            }
+        } catch (e) {
+            tradingResult = { error: `Trading module error: ${e.message}` };
+        }
+
+        await this._logAdmin('trading', tradingResult);
+        return {
+            type: 'adminTrading',
+            data: tradingResult,
+            summary: tradingResult.error ? `Eroare trading: ${tradingResult.error}` : `Analiză trading: ${(tradingResult.assets || []).length} active analizate`
+        };
+    }
+
+    // ── ADMIN NEWS — Calls real news.js fetch ──
+    async _adminNews() {
+        let newsResult;
+        try {
+            const news = require('./news');
+            // Get cached articles from news module
+            const articles = typeof news.getArticlesArray === 'function' ? news.getArticlesArray() : [];
+            newsResult = {
+                totalArticles: articles.length,
+                latest: articles.slice(0, 10).map(a => ({
+                    title: a.title,
+                    source: a.source,
+                    category: a.category,
+                    publishedAt: a.publishedAt || a.time
+                })),
+                categories: {},
+                timestamp: new Date().toISOString()
+            };
+            // Count by category
+            articles.forEach(a => {
+                const cat = a.category || 'general';
+                newsResult.categories[cat] = (newsResult.categories[cat] || 0) + 1;
+            });
+        } catch (e) {
+            newsResult = { error: `News module error: ${e.message}` };
+        }
+
+        await this._logAdmin('news', newsResult);
+        return {
+            type: 'adminNews',
+            data: newsResult,
+            summary: newsResult.error ? `Eroare știri: ${newsResult.error}` : `${newsResult.totalArticles} articole | Top: ${newsResult.latest?.[0]?.title || 'N/A'}`
         };
     }
 
