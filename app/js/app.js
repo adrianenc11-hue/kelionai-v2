@@ -186,6 +186,7 @@
     // REGULAR CHAT — Fallback (single response)
     // ═══════════════════════════════════════════════════════════
     async function sendToAI_Regular(message, language) {
+        showThinking(true);
         KAvatar.setExpression('thinking', 0.5);
 
         try {
@@ -257,7 +258,7 @@
                 if (ctx) msg = message + ctx;
             } catch (e) { console.warn('[Tools] preprocessMessage error:', e.message); }
         }
-        await sendToAI_Sync(msg, language);
+        await sendToAI_Regular(msg, language);
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -418,8 +419,8 @@
 
     async function handleFiles(fileList) {
         hideWelcome();
-        for (var i = 0; i < fileList.length; i++) {
-            var file = fileList[i];
+        for (let i = 0; i < fileList.length; i++) {
+            let file = fileList[i];
             var reader = new FileReader();
             reader.onload = async function () {
                 storedFiles.push({ name: file.name, size: file.size, type: file.type, data: reader.result });
@@ -485,7 +486,7 @@
             if (canvas) canvas.style.display = 'none';
         }
 
-        ['click', 'touchstart', 'keydown'].forEach(function (e) { document.addEventListener(e, unlockAudio, { once: false, passive: true }); });
+        ['click', 'touchstart', 'keydown'].forEach(function (e) { document.addEventListener(e, unlockAudio, { once: true, passive: true }); });
 
         var sendBtn = document.getElementById('btn-send');
         if (sendBtn) sendBtn.addEventListener('click', onSendText);
@@ -507,14 +508,14 @@
                         var stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                         stream.getTracks().forEach(function (t) { t.stop(); });
                         micOn = true;
-                        if (window.KVoice) KVoice.ensureAudioUnlocked();
+                        if (window.KVoice) { KVoice.ensureAudioUnlocked(); if (KVoice.stopWakeWordDetection) KVoice.stopWakeWordDetection(); }
                         // Start DIRECT speech recognition — no wake word needed
                         var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
                         if (SR) {
                             window._directSpeech = new SR();
                             window._directSpeech.continuous = true;
                             window._directSpeech.interimResults = false;
-                            window._directSpeech.lang = 'ro-RO';
+                            window._directSpeech.lang = (window.i18n && i18n.getLanguage && i18n.getLanguage()) || navigator.language || 'ro-RO';
                             window._directSpeech.onresult = function (ev) {
                                 for (var i = ev.resultIndex; i < ev.results.length; i++) {
                                     if (ev.results[i].isFinal) {
@@ -554,6 +555,7 @@
                 } else {
                     micOn = false;
                     if (window._directSpeech) { try { window._directSpeech.stop(); } catch (e) { } window._directSpeech = null; }
+                    if (window.KVoice && KVoice.startWakeWordDetection) KVoice.startWakeWordDetection();
                     micToggle.style.borderColor = '#555';
                     micToggle.style.color = '#888';
                     micToggle.style.boxShadow = 'none';
@@ -585,7 +587,7 @@
                 if (old) { old.remove(); return; }
                 var popup = document.createElement('div');
                 popup.id = 'plus-popup';
-                popup.style.cssText = 'position:absolute;top:36px;right:8px;background:#1a1a2e;border:1px solid #333;border-radius:8px;padding:6px;z-index:100;display:flex;gap:6px;box-shadow:0 4px 16px rgba(0,0,0,0.5);';
+                popup.style.cssText = 'position:absolute;bottom:44px;right:0;background:#1a1a2e;border:1px solid #333;border-radius:8px;padding:6px;z-index:100;display:flex;gap:6px;box-shadow:0 4px 16px rgba(0,0,0,0.5);';
                 popup.innerHTML = '<button id="plus-import" style="background:#2a2a4a;color:#a5b4fc;border:1px solid #444;border-radius:6px;padding:8px 16px;cursor:pointer;font-size:0.85rem;">📂 Adaugă fișier</button>' +
                     '<button id="plus-export" style="background:#2a2a4a;color:#86efac;border:1px solid #444;border-radius:6px;padding:8px 16px;cursor:pointer;font-size:0.85rem;">💾 Salvează tot</button>';
                 plusBtn.parentElement.style.position = 'relative';
@@ -622,12 +624,7 @@
         });
 
         setupDragDrop();
-        if (window.KVoice) KVoice.startWakeWordDetection();
-        // Unlock AudioContext on first user interaction (for returning users who skip START)
-        document.addEventListener('click', function unlockAudio() {
-            if (window.KVoice) KVoice.ensureAudioUnlocked();
-            document.removeEventListener('click', unlockAudio);
-        }, { once: true });
+        // Wake word NOT auto-started — user controls via 🎙️ button
         // Request geolocation so AI can see user's location
         if (window.KGeo) KGeo.getLocation().then(function (pos) { if (pos) console.log('[Geo] Location:', pos.lat.toFixed(2), pos.lng.toFixed(2)); });
         checkHealth();

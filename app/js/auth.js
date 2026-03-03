@@ -127,7 +127,7 @@
                 var s = c.createBufferSource();
                 s.buffer = b; s.connect(c.destination); s.start(0); c.resume();
             } catch (e) { }
-            if (window.KVoice) { KVoice.ensureAudioUnlocked(); KVoice.startWakeWordDetection(); }
+            if (window.KVoice) { KVoice.ensureAudioUnlocked(); }
             document.getElementById('auth-screen').classList.add('hidden');
             var appLayout = document.getElementById('app-layout');
             appLayout.classList.remove('hidden');
@@ -141,6 +141,7 @@
         // Auto-enter when both avatars are 100% loaded (or 10s max)
         window.addEventListener('avatars-ready', function () {
             console.log('[Auth] Avatars ready — auto-entering app');
+            if (startBtn) startBtn.innerHTML = '▶ START';
             if (!scr.classList.contains('hidden')) enterApp();
         });
         // Fallback: enter after 10s max even if avatars not loaded

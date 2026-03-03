@@ -28,6 +28,22 @@
     let targetExpression = {}, currentExpression = {};
     let currentExpressionName = 'neutral';
 
+    // Mouth morph cache — populated at loadAvatar, used in animate for force-close
+    let _mouthMorphCache = [];
+    function _cacheMouthMorphs() {
+        _mouthMorphCache = [];
+        morphMeshes.forEach(function (m) {
+            if (!m.morphTargetDictionary || !m.morphTargetInfluences) return;
+            Object.keys(m.morphTargetDictionary).forEach(function (k) {
+                var kl = k.toLowerCase();
+                if (kl.indexOf('mouth') >= 0 || kl.indexOf('jaw') >= 0 || kl.indexOf('viseme') >= 0 || kl.indexOf('lip') >= 0 || kl === 'smile') {
+                    _mouthMorphCache.push({ mesh: m, idx: m.morphTargetDictionary[k] });
+                }
+            });
+        });
+        console.log('[Avatar] Mouth morph cache:', _mouthMorphCache.length, 'targets');
+    }
+
     // Attention state — stops idle when listening
     let isAttentive = false;
 
@@ -150,6 +166,8 @@
                             child.morphTargetInfluences.fill(0);
                             console.log('[Avatar] Morph:', child.name, Object.keys(child.morphTargetDictionary).join(', '));
                         }
+                        // After last mesh, rebuild mouth cache
+                        _cacheMouthMorphs();
 
                         // Z-fighting fix for eyebrows/lashes (from v1)
                         var nm = (child.name || '').toLowerCase();
@@ -420,18 +438,12 @@
             currentModel.rotation.y += (targetY - currentModel.rotation.y) * 0.08;
             currentModel.rotation.x += (targetX - currentModel.rotation.x) * 0.08;
         }
-        // FORCE mouth closed — always, unless lipSync just ran this frame
+        // FORCE mouth closed — cached indices, no string comparisons
         var _lipRan = (lipSync && window.KVoice && KVoice.isSpeaking());
         if (!_lipRan) {
-            morphMeshes.forEach(function (m) {
-                if (!m.morphTargetDictionary || !m.morphTargetInfluences) return;
-                Object.keys(m.morphTargetDictionary).forEach(function (k) {
-                    var kl = k.toLowerCase();
-                    if (kl.indexOf('mouth') >= 0 || kl.indexOf('jaw') >= 0 || kl.indexOf('viseme') >= 0 || kl.indexOf('lip') >= 0 || kl === 'smile') {
-                        m.morphTargetInfluences[m.morphTargetDictionary[k]] = 0;
-                    }
-                });
-            });
+            for (var ci = 0; ci < _mouthMorphCache.length; ci++) {
+                _mouthMorphCache[ci].mesh.morphTargetInfluences[_mouthMorphCache[ci].idx] = 0;
+            }
         }
         renderer.render(scene, camera);
     }
