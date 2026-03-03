@@ -49,6 +49,7 @@ const adminRouter = require('./routes/admin').router;
 const { adminAuth } = require('./middleware/auth');
 const healthRouter = require('./routes/health');
 const identityRouter = require('./routes/identity');
+const voiceCloneRouter = require('./routes/voice-clone');
 
 const app = express();
 app.set('trust proxy', 1);
@@ -280,6 +281,7 @@ app.use('/api', adminRouter);
 app.use('/api/health', healthRouter);
 app.use('/api/referral', referralRouter);
 app.use('/api', identityRouter);
+app.use('/api', voiceCloneRouter);
 
 // ═══ BRAIN DASHBOARD (live monitoring) ═══
 app.get('/dashboard', adminAuth, (req, res) => {
