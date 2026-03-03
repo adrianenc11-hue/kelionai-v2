@@ -499,20 +499,50 @@
         if (micToggle) {
             micToggle.addEventListener('click', async function () {
                 if (!micOn) {
-                    // Request mic permission explicitly
                     micToggle.style.borderColor = '#ffaa00';
                     micToggle.style.color = '#ffaa00';
                     micToggle.title = 'Requesting mic permission...';
                     try {
                         var stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                        stream.getTracks().forEach(function (t) { t.stop(); }); // release immediately
+                        stream.getTracks().forEach(function (t) { t.stop(); });
                         micOn = true;
-                        if (window.KVoice) { KVoice.ensureAudioUnlocked(); KVoice.startWakeWordDetection(); }
+                        if (window.KVoice) KVoice.ensureAudioUnlocked();
+                        // Start DIRECT speech recognition — no wake word needed
+                        var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+                        if (SR) {
+                            window._directSpeech = new SR();
+                            window._directSpeech.continuous = true;
+                            window._directSpeech.interimResults = false;
+                            window._directSpeech.lang = 'ro-RO';
+                            window._directSpeech.onresult = function (ev) {
+                                for (var i = ev.resultIndex; i < ev.results.length; i++) {
+                                    if (ev.results[i].isFinal) {
+                                        var text = ev.results[i][0].transcript.trim();
+                                        if (text && text.length > 1) {
+                                            console.log('[Mic] Heard:', text);
+                                            hideWelcome(); addMessage('user', '🎙️ ' + text); showThinking(true);
+                                            KAvatar.setAttentive(true);
+                                            sendToAI(text, 'ro');
+                                        }
+                                    }
+                                }
+                            };
+                            window._directSpeech.onend = function () {
+                                if (micOn) try { window._directSpeech.start(); } catch (e) { }
+                            };
+                            window._directSpeech.onerror = function (e) {
+                                console.warn('[Mic] Error:', e.error);
+                                if (micOn && e.error !== 'not-allowed') {
+                                    setTimeout(function () { try { window._directSpeech.start(); } catch (e) { } }, 1000);
+                                }
+                            };
+                            window._directSpeech.start();
+                        }
                         micToggle.style.borderColor = '#00ff88';
                         micToggle.style.color = '#00ff88';
                         micToggle.style.boxShadow = '0 0 12px rgba(0,255,136,0.4)';
-                        micToggle.title = '🟢 Mic ON — say "Kelion" or "Kira"';
-                        console.log('[App] Mic ON — wake word listening');
+                        micToggle.title = '🟢 Mic ON — vorbește liber!';
+                        console.log('[App] Mic ON — direct speech mode');
                     } catch (e) {
                         micToggle.style.borderColor = '#ff4444';
                         micToggle.style.color = '#ff4444';
@@ -522,6 +552,7 @@
                     }
                 } else {
                     micOn = false;
+                    if (window._directSpeech) { try { window._directSpeech.stop(); } catch (e) { } window._directSpeech = null; }
                     micToggle.style.borderColor = '#555';
                     micToggle.style.color = '#888';
                     micToggle.style.boxShadow = 'none';
@@ -544,7 +575,7 @@
         if (pricingClose) pricingClose.addEventListener('click', function () { var m = document.getElementById('pricing-modal'); if (m) m.classList.add('hidden'); });
 
         // ➕ button — popup with IN (import) / OUT (export ZIP)
-        var plusBtn = document.getElementById('btn-monitor-upload');
+        var plusBtn = document.getElementById('btn-plus');
         var fileInput = document.getElementById('file-input-hidden');
         if (plusBtn) {
             plusBtn.addEventListener('click', function () {
