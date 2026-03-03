@@ -263,3 +263,18 @@ CREATE INDEX IF NOT EXISTS idx_api_keys_user ON api_keys(user_id);
 CREATE INDEX IF NOT EXISTS idx_api_keys_hash ON api_keys(key_hash);
 ALTER TABLE api_keys ENABLE ROW LEVEL SECURITY;
 CREATE POLICY IF NOT EXISTS "users_own_api_keys" ON api_keys FOR ALL USING (auth.uid() = user_id);
+
+-- ═══ MEDIA HISTORY (Monitor Activity Log) ═══
+CREATE TABLE IF NOT EXISTS media_history (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id TEXT NOT NULL DEFAULT 'guest',
+    type TEXT NOT NULL CHECK (type IN ('url', 'radio', 'video', 'webNav', 'image', 'map')),
+    url TEXT,
+    title TEXT,
+    duration_seconds INTEGER,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_media_history_user ON media_history(user_id);
+CREATE INDEX IF NOT EXISTS idx_media_history_type ON media_history(type);
+CREATE INDEX IF NOT EXISTS idx_media_history_created ON media_history(created_at DESC);

@@ -5,7 +5,7 @@
 var MonitorManager = (function () {
     'use strict';
 
-    var PANELS = ['monitor-image', 'monitor-map', 'monitor-text', 'monitor-search', 'monitor-weather', 'monitor-default'];
+    var PANELS = ['monitor-image', 'monitor-map', 'monitor-text', 'monitor-search', 'monitor-weather', 'monitor-iframe', 'monitor-audio', 'monitor-video', 'monitor-default'];
 
     function showPanel(id) {
         PANELS.forEach(function (pid) {
@@ -160,7 +160,6 @@ var MonitorManager = (function () {
             showPanel('monitor-map');
             if (window.KAvatar) KAvatar.setPresenting(true);
         } else if (type === 'html') {
-            // Render trusted server HTML directly (weather, etc.)
             var el = document.getElementById('monitor-text');
             if (!el) return;
             el.innerHTML = content;
@@ -170,9 +169,53 @@ var MonitorManager = (function () {
             showWeather(content);
         } else if (type === 'web') {
             showWebContent(content);
+        } else if (type === 'iframe') {
+            showIframe(content);
+        } else if (type === 'audio') {
+            showRadio(content);
+        } else if (type === 'video') {
+            showVideo(content);
         } else {
             showMarkdown(String(content));
         }
+    }
+
+    // ── IFRAME (URL/Web Navigation) ──
+    function showIframe(url, title) {
+        var iframe = document.getElementById('monitor-iframe-src');
+        if (!iframe) return;
+        iframe.src = String(url);
+        var titleEl = document.getElementById('display-title');
+        if (titleEl && title) titleEl.textContent = title;
+        showPanel('monitor-iframe');
+        if (window.KAvatar) KAvatar.setPresenting(true);
+    }
+
+    // ── RADIO LIVE ──
+    function showRadio(streamUrl, stationName, logo) {
+        var player = document.getElementById('radio-player');
+        var nameEl = document.getElementById('radio-name');
+        var logoEl = document.getElementById('radio-logo');
+        if (!player) return;
+        player.src = String(streamUrl);
+        if (nameEl) nameEl.textContent = stationName || 'Radio';
+        if (logoEl) logoEl.textContent = logo || '📻';
+        player.play().catch(function () { });
+        var titleEl = document.getElementById('display-title');
+        if (titleEl) titleEl.textContent = '🎵 ' + (stationName || 'Radio');
+        showPanel('monitor-audio');
+        if (window.KAvatar) KAvatar.setPresenting(true);
+    }
+
+    // ── VIDEO (YouTube / Netflix / Embed) ──
+    function showVideo(embedUrl, title) {
+        var iframe = document.getElementById('monitor-video-src');
+        if (!iframe) return;
+        iframe.src = String(embedUrl);
+        var titleEl = document.getElementById('display-title');
+        if (titleEl) titleEl.textContent = '🎬 ' + (title || 'Video');
+        showPanel('monitor-video');
+        if (window.KAvatar) KAvatar.setPresenting(true);
     }
 
     function clear() {
@@ -256,6 +299,9 @@ var MonitorManager = (function () {
         showMarkdown: showMarkdown,
         showSearchResults: showSearchResults,
         showWeather: showWeather,
+        showIframe: showIframe,
+        showRadio: showRadio,
+        showVideo: showVideo,
         show: show,
         clear: clear,
         downloadContent: downloadContent,
