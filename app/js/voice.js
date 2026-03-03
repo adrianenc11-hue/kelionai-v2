@@ -363,7 +363,7 @@
                 }
                 updateMicLevel();
                 console.log('[Voice] Mic monitor started');
-            }).catch(function () { });
+            }).catch(function (e) { console.warn('[Voice] Mic monitor failed:', e.message || e); });
         } catch (e) { }
     }
 
