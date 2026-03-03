@@ -972,70 +972,218 @@ Reply STRICTLY with JSON:
         return { type: 'tts', status: 'no_api', text: text.substring(0, 100), summary: 'ELEVENLABS_API_KEY nu e configurată.' };
     }
 
-    // ── STT — Speech-to-Text via Groq Whisper ──
-    async _stt() {
+    // ── STT — Speech-to-Text via Groq Whisper — REAL ──
+    async _stt(audioBase64) {
         this.toolStats.stt = (this.toolStats.stt || 0) + 1;
-        // STT requires audio data from client; brain signals readiness
-        // Log to Supabase usage
-        if (this.supabaseAdmin) {
-            try {
-                const today = new Date().toISOString().split('T')[0];
-                await this.supabaseAdmin.from('usage').upsert({ user_id: 'system', type: 'stt', date: today, count: 1 }, { onConflict: 'user_id,type,date' });
-            } catch (e) { /* ok */ }
+
+        // If no audio, signal readiness
+        if (!audioBase64) {
+            return {
+                type: 'stt',
+                status: 'awaiting_audio',
+                engine: 'Groq Whisper',
+                summary: 'Microfonul pregătit. Trimite audio pentru transcriere.'
+            };
         }
-        return {
-            type: 'stt',
-            status: 'ready',
-            engine: 'Groq Whisper',
-            text: 'Microfonul este activ. Vorbește acum.',
-            summary: 'Transcriere audio activată — Groq Whisper.'
-        };
+
+        // Call Groq Whisper API
+        if (process.env.GROQ_API_KEY) {
+            try {
+                const FormData = require('form-data');
+                const form = new FormData();
+                form.append('file', Buffer.from(audioBase64, 'base64'), { filename: 'audio.webm', contentType: 'audio/webm' });
+                form.append('model', 'whisper-large-v3');
+
+                const r = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${process.env.GROQ_API_KEY}` },
+                    body: form
+                });
+                const d = await r.json();
+                const text = d.text || '';
+
+                if (this.supabaseAdmin) {
+                    try {
+                        const today = new Date().toISOString().split('T')[0];
+                        await this.supabaseAdmin.from('usage').upsert({ user_id: 'system', type: 'stt', date: today, count: 1 }, { onConflict: 'user_id,type,date' });
+                    } catch (e) { /* ok */ }
+                }
+
+                return {
+                    type: 'stt',
+                    status: 'transcribed',
+                    engine: 'Groq Whisper',
+                    text,
+                    summary: text ? `Transcris: "${text.substring(0, 100)}"` : 'Nu am detectat vorbire.'
+                };
+            } catch (e) {
+                logger.warn({ component: 'Brain', err: e.message }, 'STT Groq error');
+            }
+        }
+
+        // Fallback to OpenAI Whisper
+        if (this.openaiKey) {
+            try {
+                const FormData = require('form-data');
+                const form = new FormData();
+                form.append('file', Buffer.from(audioBase64, 'base64'), { filename: 'audio.webm', contentType: 'audio/webm' });
+                form.append('model', 'whisper-1');
+
+                const r = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${this.openaiKey}` },
+                    body: form
+                });
+                const d = await r.json();
+                return {
+                    type: 'stt',
+                    status: 'transcribed',
+                    engine: 'OpenAI Whisper',
+                    text: d.text || '',
+                    summary: d.text ? `Transcris: "${d.text.substring(0, 100)}"` : 'Nu am detectat vorbire.'
+                };
+            } catch (e) { logger.warn({ component: 'Brain', err: e.message }, 'STT OpenAI error'); }
+        }
+
+        return { type: 'stt', status: 'no_api', summary: 'GROQ_API_KEY și OPENAI_API_KEY nu sunt configurate.' };
     }
 
-    // ── FACE CHECK — Identify user via GPT-4o Vision + Supabase profiles ──
-    async _faceCheck() {
+    // ── FACE CHECK — Identify user via Claude Vision + Supabase profiles ──
+    async _faceCheck(imageBase64) {
         this.toolStats.faceCheck = (this.toolStats.faceCheck || 0) + 1;
+
+        // Get known faces from Supabase
         let knownFaces = [];
         if (this.supabaseAdmin) {
             try {
                 const { data } = await this.supabaseAdmin.from('profiles').select('user_id, display_name, face_encoding').not('face_encoding', 'is', null);
-                knownFaces = data || [];
+                knownFaces = (data || []).filter(f => f.face_encoding && Object.keys(f.face_encoding).length > 0);
             } catch (e) { /* no profiles yet */ }
         }
-        return {
-            type: 'faceCheck',
-            status: 'ready',
-            knownFaces: knownFaces.length,
-            name: knownFaces.length > 0 ? 'Verificare în curs...' : 'Necunoscut — nicio față înregistrată.',
-            summary: `${knownFaces.length} fețe cunoscute în baza de date.`
-        };
+
+        if (!imageBase64) {
+            return {
+                type: 'faceCheck',
+                status: 'awaiting_image',
+                knownFaces: knownFaces.length,
+                summary: `${knownFaces.length} fețe înregistrate. Trimite o imagine pentru identificare.`
+            };
+        }
+
+        // Use Claude Vision to describe the face
+        if (this.anthropicKey) {
+            try {
+                const knownList = knownFaces.map(f => `- ${f.display_name || f.user_id}: ${f.face_encoding.description || 'no description'}`).join('\n');
+                const prompt = knownFaces.length > 0
+                    ? `Descrie persoana din imagine (vârstă, gen, păr, ochelari, trăsături distinctive). Apoi compară cu aceste persoane cunoscute:\n${knownList}\nRăspunde: MATCH: [nume] sau NO_MATCH dacă nu e nimeni cunoscut.`
+                    : 'Descrie persoana din imagine: vârstă estimată, gen, culoare păr, ochelari da/nu, trăsături distinctive. Răspunde concis în română.';
+
+                const r = await fetch('https://api.anthropic.com/v1/messages', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'x-api-key': this.anthropicKey, 'anthropic-version': '2023-06-01' },
+                    body: JSON.stringify({
+                        model: 'claude-sonnet-4-20250514', max_tokens: 500,
+                        messages: [{
+                            role: 'user', content: [
+                                { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: imageBase64 } },
+                                { type: 'text', text: prompt }
+                            ]
+                        }]
+                    })
+                });
+                if (r.ok) {
+                    const data = await r.json();
+                    const description = data.content?.[0]?.text || '';
+                    const isMatch = description.includes('MATCH:');
+                    const matchName = isMatch ? description.match(/MATCH:\s*(.+)/)?.[1]?.trim() : null;
+
+                    return {
+                        type: 'faceCheck',
+                        status: isMatch ? 'identified' : 'unknown',
+                        name: matchName || 'Necunoscut',
+                        description,
+                        knownFaces: knownFaces.length,
+                        engine: 'Claude Vision',
+                        summary: isMatch ? `Identificat: ${matchName}` : `Necunoscut — ${knownFaces.length} fețe în baza de date.`
+                    };
+                }
+            } catch (e) { logger.warn({ component: 'Brain', err: e.message }, 'Face check Vision error'); }
+        }
+
+        return { type: 'faceCheck', status: 'no_api', knownFaces: knownFaces.length, summary: 'ANTHROPIC_API_KEY necesară pentru recunoaștere facială.' };
     }
 
-    // ── FACE REGISTER — Save face to Supabase profiles ──
-    async _faceRegister(userId) {
+    // ── FACE REGISTER — Save face description to Supabase profiles ──
+    async _faceRegister(userId, imageBase64) {
         this.toolStats.faceRegister = (this.toolStats.faceRegister || 0) + 1;
         if (!userId) return { type: 'faceRegister', status: 'error', summary: 'Trebuie să fii autentificat.' };
 
+        if (!imageBase64) {
+            return { type: 'faceRegister', status: 'awaiting_image', summary: 'Trimite o imagine cu fața ta pentru înregistrare.' };
+        }
+
+        // Use Claude Vision to extract face description as "encoding"
+        let faceDescription = null;
+        if (this.anthropicKey) {
+            try {
+                const r = await fetch('https://api.anthropic.com/v1/messages', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'x-api-key': this.anthropicKey, 'anthropic-version': '2023-06-01' },
+                    body: JSON.stringify({
+                        model: 'claude-sonnet-4-20250514', max_tokens: 300,
+                        messages: [{
+                            role: 'user', content: [
+                                { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: imageBase64 } },
+                                { type: 'text', text: 'Descrie fața persoanei pentru recunoaștere viitoare: vârstă estimată, gen, culoare păr, lung/scurt, ochelari da/nu, barbă/mustață, forme faciale distinctive, cicatrici sau semne particulare. Format JSON: {"age":X,"gender":"","hair":"","glasses":false,"facial_hair":"","distinctive":"","description":"text liber"}' }
+                            ]
+                        }]
+                    })
+                });
+                if (r.ok) {
+                    const data = await r.json();
+                    const text = data.content?.[0]?.text || '';
+                    try {
+                        const jsonMatch = text.match(/\{[\s\S]*\}/);
+                        faceDescription = jsonMatch ? JSON.parse(jsonMatch[0]) : { description: text };
+                    } catch (e) { faceDescription = { description: text }; }
+                }
+            } catch (e) { logger.warn({ component: 'Brain', err: e.message }, 'Face register Vision error'); }
+        }
+
+        if (!faceDescription) {
+            return { type: 'faceRegister', status: 'no_api', summary: 'ANTHROPIC_API_KEY necesară pentru encoding facial.' };
+        }
+
+        // Save to Supabase profiles
         if (this.supabaseAdmin) {
             try {
                 await this.supabaseAdmin.from('profiles').upsert({
                     user_id: userId,
-                    face_encoding: {},
+                    display_name: faceDescription.description?.substring(0, 50) || userId,
+                    face_encoding: faceDescription,
                     updated_at: new Date().toISOString()
                 }, { onConflict: 'user_id' });
-                return { type: 'faceRegister', status: 'ready', summary: 'Pregătit pentru înregistrare față. Activează camera.' };
+
+                return {
+                    type: 'faceRegister',
+                    status: 'registered',
+                    encoding: faceDescription,
+                    engine: 'Claude Vision',
+                    summary: `Față înregistrată: ${faceDescription.description?.substring(0, 80) || 'OK'}`
+                };
             } catch (e) {
-                return { type: 'faceRegister', status: 'error', summary: 'Eroare la pregătirea înregistrării.' };
+                return { type: 'faceRegister', status: 'error', summary: `Eroare salvare: ${e.message}` };
             }
         }
         return { type: 'faceRegister', status: 'no_db', summary: 'Baza de date indisponibilă.' };
     }
 
-    // ── VOICE CLONE — ElevenLabs Voice Cloning ──
+    // ── VOICE CLONE — ElevenLabs Voice Cloning — REAL status check ──
     async _voiceClone(userId) {
         this.toolStats.voiceClone = (this.toolStats.voiceClone || 0) + 1;
         if (!userId) return { type: 'voiceClone', status: 'error', summary: 'Trebuie să fii autentificat.' };
 
+        // Check for existing cloned voice
         let existingVoice = null;
         if (this.supabaseAdmin) {
             try {
@@ -1045,16 +1193,44 @@ Reply STRICTLY with JSON:
             } catch (e) { /* no voice yet */ }
         }
 
-        if (existingVoice) {
-            return { type: 'voiceClone', status: 'exists', voiceId: existingVoice, summary: 'Vocea ta e deja clonată și activă.' };
+        if (existingVoice?.voice_id) {
+            // Verify voice still exists on ElevenLabs
+            if (process.env.ELEVENLABS_API_KEY) {
+                try {
+                    const r = await fetch(`https://api.elevenlabs.io/v1/voices/${existingVoice.voice_id}`, {
+                        headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY }
+                    });
+                    if (r.ok) {
+                        const voiceData = await r.json();
+                        return {
+                            type: 'voiceClone',
+                            status: 'active',
+                            voiceId: existingVoice.voice_id,
+                            name: voiceData.name || existingVoice.name,
+                            createdAt: existingVoice.created_at,
+                            summary: `Vocea clonată "${voiceData.name}" este activă.`
+                        };
+                    }
+                } catch (e) { /* voice may have been deleted */ }
+            }
+            return { type: 'voiceClone', status: 'exists', voiceId: existingVoice.voice_id, summary: 'Voce clonată existentă.' };
         }
+
+        // No clone — check if API is available
+        if (!process.env.ELEVENLABS_API_KEY) {
+            return { type: 'voiceClone', status: 'no_api', summary: 'ELEVENLABS_API_KEY nu e configurată.' };
+        }
+
         return {
             type: 'voiceClone',
             status: 'ready',
             requiresAudio: true,
-            summary: 'Pregătit pentru clonare vocală. Trimite un sample audio de 30 secunde.'
+            endpoint: '/api/voice/clone',
+            instructions: 'Trimite un fișier audio de min. 30 secunde la POST /api/voice/clone cu form-data (field: audio).',
+            summary: 'Pregătit pentru clonare. Trimite audio de 30s prin /api/voice/clone.'
         };
     }
+
 
     // ═══════════════════════════════════════════════════════════
     // ADMIN TOOL IMPLEMENTATIONS — REAL
