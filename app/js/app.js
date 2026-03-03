@@ -184,6 +184,11 @@
 
             // Speak — triggers 'audio-start' event when audio actually starts
             if (window.KVoice) {
+                // Auto-switch TTS voice to match AI response language
+                // RO stays RO, other languages get their native voice
+                if (data.language && KVoice.setLanguage) {
+                    KVoice.setLanguage(data.language);
+                }
                 KVoice.speak(fullReply, data.avatar || KAvatar.getCurrentAvatar());
             }
 
