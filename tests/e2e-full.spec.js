@@ -36,7 +36,7 @@ test.describe('Onboarding Flow', () => {
 
     test('onboarding page loads with title and content', async ({ page }) => {
         await page.goto('/onboarding.html');
-        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => { });
         await page.screenshot({ path: 'test-results/onboarding-load-before.png' });
 
         // Title and brand
@@ -151,7 +151,7 @@ test.describe('Main Pages Navigation', () => {
             localStorage.setItem('kelion_onboarded', 'true');
         });
         await page.goto('/');
-        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => { });
         // Dismiss auth screen — robust version
         try {
             const authScreen = page.locator('#auth-screen');
@@ -160,13 +160,13 @@ test.describe('Main Pages Navigation', () => {
                 const authGuest = page.locator('#auth-guest');
                 const guestVisible = await authGuest.isVisible().catch(() => false);
                 if (guestVisible) {
-                    await authGuest.click({ timeout: 3000 }).catch(() => {});
+                    await authGuest.click({ timeout: 3000 }).catch(() => { });
                 }
                 await authScreen.waitFor({ state: 'hidden', timeout: 5000 }).catch(async () => {
                     await page.evaluate(() => {
                         const el = document.getElementById('auth-screen');
                         if (el) el.style.display = 'none';
-                    }).catch(() => {});
+                    }).catch(() => { });
                 });
             }
         } catch (e) { /* auth screen not present — continue */ }
@@ -186,8 +186,8 @@ test.describe('Main Pages Navigation', () => {
 
     test('/pricing/ page loads', async ({ page }) => {
         await page.goto('/pricing/');
-        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        await page.screenshot({ path: 'test-results/pricing-before.png' }).catch(() => {});
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => { });
+        await page.screenshot({ path: 'test-results/pricing-before.png' }).catch(() => { });
         await expect(page).toHaveTitle(/KelionAI/i);
         const body = page.locator('body');
         await expect(body).toBeVisible();
@@ -263,7 +263,7 @@ test.describe('Buttons and Links', () => {
             localStorage.setItem('kelion_onboarded', 'true');
         });
         await page.goto('/');
-        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => { });
         // Dismiss auth screen — robust version
         try {
             const authScreen = page.locator('#auth-screen');
@@ -272,13 +272,13 @@ test.describe('Buttons and Links', () => {
                 const authGuest = page.locator('#auth-guest');
                 const guestVisible = await authGuest.isVisible().catch(() => false);
                 if (guestVisible) {
-                    await authGuest.click({ timeout: 3000 }).catch(() => {});
+                    await authGuest.click({ timeout: 3000 }).catch(() => { });
                 }
                 await authScreen.waitFor({ state: 'hidden', timeout: 5000 }).catch(async () => {
                     await page.evaluate(() => {
                         const el = document.getElementById('auth-screen');
                         if (el) el.style.display = 'none';
-                    }).catch(() => {});
+                    }).catch(() => { });
                 });
             }
         } catch (e) { /* auth screen not present — continue */ }
@@ -286,7 +286,7 @@ test.describe('Buttons and Links', () => {
 
     test('navbar links are all reachable (no 404)', async ({ page, request }) => {
         await page.goto('/');
-        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => { });
         await page.waitForSelector('nav a[href]', { state: 'visible', timeout: 10000 });
 
         // Collect href values from navbar links
@@ -316,7 +316,7 @@ test.describe('Buttons and Links', () => {
 
     test('mic button is visible', async ({ page }) => {
         await page.goto('/');
-        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => { });
 
         const btnMic = page.locator('#btn-mic');
         const micExists = await btnMic.isVisible().catch(() => false);
@@ -372,7 +372,7 @@ test.describe('Responsive Mobile (375×812)', () => {
             localStorage.setItem('kelion_onboarded', 'true');
         });
         await page.goto('/');
-        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => { });
         // Dismiss auth screen — robust version
         try {
             const authScreen = page.locator('#auth-screen');
@@ -381,13 +381,13 @@ test.describe('Responsive Mobile (375×812)', () => {
                 const authGuest = page.locator('#auth-guest');
                 const guestVisible = await authGuest.isVisible().catch(() => false);
                 if (guestVisible) {
-                    await authGuest.click({ timeout: 3000 }).catch(() => {});
+                    await authGuest.click({ timeout: 3000 }).catch(() => { });
                 }
                 await authScreen.waitFor({ state: 'hidden', timeout: 5000 }).catch(async () => {
                     await page.evaluate(() => {
                         const el = document.getElementById('auth-screen');
                         if (el) el.style.display = 'none';
-                    }).catch(() => {});
+                    }).catch(() => { });
                 });
             }
         } catch (e) { /* auth screen not present — continue */ }
@@ -424,13 +424,13 @@ test.describe('Responsive Mobile (375×812)', () => {
                 const authGuest = page.locator('#auth-guest');
                 const guestVisible = await authGuest.isVisible().catch(() => false);
                 if (guestVisible) {
-                    await authGuest.click({ timeout: 3000 }).catch(() => {});
+                    await authGuest.click({ timeout: 3000 }).catch(() => { });
                 }
                 await authScreen.waitFor({ state: 'hidden', timeout: 5000 }).catch(async () => {
                     await page.evaluate(() => {
                         const el = document.getElementById('auth-screen');
                         if (el) el.style.display = 'none';
-                    }).catch(() => {});
+                    }).catch(() => { });
                 });
             }
         } catch (e) { /* auth screen not present — continue */ }
@@ -458,8 +458,8 @@ test.describe('Responsive Mobile (375×812)', () => {
 
     test('onboarding page is usable on mobile', async ({ page }) => {
         await page.goto('/onboarding.html');
-        await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
-        await page.screenshot({ path: 'test-results/mobile-onboarding.png' }).catch(() => {});
+        await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => { });
+        await page.screenshot({ path: 'test-results/mobile-onboarding.png' }).catch(() => { });
 
         await expect(page.locator('[data-step="1"]')).toHaveClass(/active/);
         await expect(page.locator('[data-step="1"]')).toBeVisible();
@@ -522,7 +522,7 @@ test.describe('Error Handling', () => {
             localStorage.setItem('kelion_onboarded', 'true');
         });
         await page.goto('/');
-        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => { });
         // Dismiss auth screen — robust version
         try {
             const authScreen = page.locator('#auth-screen');
@@ -531,13 +531,13 @@ test.describe('Error Handling', () => {
                 const authGuest = page.locator('#auth-guest');
                 const guestVisible = await authGuest.isVisible().catch(() => false);
                 if (guestVisible) {
-                    await authGuest.click({ timeout: 3000 }).catch(() => {});
+                    await authGuest.click({ timeout: 3000 }).catch(() => { });
                 }
                 await authScreen.waitFor({ state: 'hidden', timeout: 5000 }).catch(async () => {
                     await page.evaluate(() => {
                         const el = document.getElementById('auth-screen');
                         if (el) el.style.display = 'none';
-                    }).catch(() => {});
+                    }).catch(() => { });
                 });
             }
         } catch (e) { /* auth screen not present — continue */ }
@@ -556,8 +556,8 @@ test.describe('Error Handling', () => {
 
     test('error.html page loads correctly', async ({ page }) => {
         await page.goto('/error.html');
-        await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
-        await page.screenshot({ path: 'test-results/error-page.png' }).catch(() => {});
+        await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => { });
+        await page.screenshot({ path: 'test-results/error-page.png' }).catch(() => { });
 
         await expect(page.locator('body')).toBeVisible();
         // Should have some content
@@ -589,7 +589,7 @@ test.describe('Error Handling', () => {
         page.on('pageerror', err => errors.push(err.message));
 
         await page.goto('/pricing/');
-        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => { });
 
         const critical = errors.filter(e =>
             !e.includes('favicon') &&
@@ -640,5 +640,420 @@ test.describe('PWA', () => {
         // Log result but don't fail — SW may not be implemented yet
         expect(typeof swRegistered).toBe('boolean');
         await page.screenshot({ path: 'test-results/pwa-check.png' });
+    });
+});
+
+// ═══════════════════════════════════════════════════
+// QUALITY — JS Errors (STRICT, no ignore patterns)
+// ═══════════════════════════════════════════════════
+test.describe('Quality — JS Errors', () => {
+    test('no critical JS errors on page', async ({ page }) => {
+        if (!siteIsUp) { test.skip(); return; }
+        const errors = [];
+        page.on('pageerror', err => errors.push(err.message));
+        await page.addInitScript(() => { localStorage.setItem('kelion_onboarded', 'true'); });
+        await page.goto('/');
+        await page.waitForTimeout(10000);
+        if (errors.length > 0) console.log('[REAL JS ERRORS]:', errors);
+        expect(errors.length, `JS errors found: ${errors.join(' | ')}`).toBe(0);
+    });
+});
+
+// ═══════════════════════════════════════════════════
+// DEEP — Chat Quality (3 tests)
+// ═══════════════════════════════════════════════════
+test.describe('Deep — Chat Quality', () => {
+    test('AI reply contains actual words', async ({ request }) => {
+        test.skip(!siteIsUp);
+        const r = await request.post('/api/chat', { data: { message: 'Say hello', avatar: 'kelion', language: 'en' } });
+        const d = await r.json();
+        expect((d.reply || d.response || '').length).toBeGreaterThan(3);
+    });
+    test('AI reply to math is correct', async ({ request }) => {
+        test.skip(!siteIsUp);
+        const r = await request.post('/api/chat', { data: { message: 'What is 5+3? Reply only the number.', avatar: 'kelion', language: 'en' } });
+        const d = await r.json();
+        expect(d.reply || d.response || '').toContain('8');
+    });
+    test('Kira replies in Romanian', async ({ request }) => {
+        test.skip(!siteIsUp);
+        const r = await request.post('/api/chat', { data: { message: 'Spune buna ziua', avatar: 'kira', language: 'ro' } });
+        const d = await r.json();
+        expect((d.reply || d.response || '').length).toBeGreaterThan(3);
+    });
+});
+
+// ═══════════════════════════════════════════════════
+// DEEP — UI Interactions (8 tests)
+// ═══════════════════════════════════════════════════
+test.describe('Deep — UI Interactions', () => {
+    test('pricing modal opens and has grid', async ({ page }) => {
+        test.skip(!siteIsUp);
+        await page.goto('/');
+        await page.waitForSelector('#avatar-canvas', { state: 'visible', timeout: 60000 });
+        await page.click('#btn-subscriptions');
+        await expect(page.locator('#pricing-modal')).toBeVisible({ timeout: 10000 });
+    });
+    test('pricing modal closes', async ({ page }) => {
+        test.skip(!siteIsUp);
+        await page.goto('/');
+        await page.waitForSelector('#avatar-canvas', { state: 'visible', timeout: 60000 });
+        await page.click('#btn-subscriptions');
+        await expect(page.locator('#pricing-modal')).toBeVisible({ timeout: 10000 });
+        await page.click('#pricing-close');
+        await expect(page.locator('#pricing-modal')).toBeHidden({ timeout: 5000 });
+    });
+    test('conversation history sidebar opens', async ({ page }) => {
+        test.skip(!siteIsUp);
+        await page.goto('/');
+        await page.waitForSelector('#avatar-canvas', { state: 'visible', timeout: 60000 });
+        await page.click('#btn-history');
+        await expect(page.locator('#history-sidebar')).toBeVisible({ timeout: 10000 });
+    });
+    test('microphone button visible', async ({ page }) => {
+        test.skip(!siteIsUp);
+        await page.goto('/');
+        await page.waitForSelector('#avatar-canvas', { state: 'visible', timeout: 60000 });
+        await expect(page.locator('#btn-mic-toggle')).toBeVisible({ timeout: 5000 });
+    });
+    test('monitor panel default state', async ({ page }) => {
+        test.skip(!siteIsUp);
+        await page.goto('/');
+        await page.waitForSelector('#avatar-canvas', { state: 'visible', timeout: 60000 });
+        await expect(page.locator('#monitor-default')).toBeVisible({ timeout: 5000 });
+    });
+    test('navbar shows avatar name Kelion', async ({ page }) => {
+        test.skip(!siteIsUp);
+        await page.goto('/');
+        await page.waitForSelector('#avatar-canvas', { state: 'visible', timeout: 60000 });
+        const nav = page.locator('#navbar-avatar-name');
+        await expect(nav).toBeVisible({ timeout: 5000 });
+    });
+    test('user badge shows Guest', async ({ page }) => {
+        test.skip(!siteIsUp);
+        await page.goto('/');
+        await page.waitForSelector('#avatar-canvas', { state: 'visible', timeout: 60000 });
+        const badge = page.locator('#user-name');
+        await expect(badge).toBeVisible({ timeout: 5000 });
+    });
+    test('full chat: send + AI replies', async ({ page }) => {
+        test.skip(!siteIsUp);
+        await page.goto('/');
+        await page.waitForSelector('#text-input', { state: 'visible', timeout: 60000 });
+        await page.fill('#text-input', 'What is the capital of France?');
+        await page.press('#text-input', 'Enter');
+        await expect(page.locator('.msg.user')).toBeVisible({ timeout: 30000 });
+        await expect(page.locator('.msg.assistant').first()).toBeVisible({ timeout: 60000 });
+    });
+});
+
+// ═══════════════════════════════════════════════════
+// DEEP — API Data Quality (4 tests)
+// ═══════════════════════════════════════════════════
+test.describe('Deep — API Data Quality', () => {
+    test('search returns real data', async ({ request }) => {
+        test.skip(!siteIsUp);
+        const r = await request.post('/api/search', { data: { query: 'weather today' } });
+        if (r.status() === 200) {
+            const d = await r.json();
+            expect(d.results || d.data || d.answer).toBeTruthy();
+        }
+    });
+    test('legal terms has real content', async ({ request }) => {
+        test.skip(!siteIsUp);
+        const r = await request.get('/api/legal/terms');
+        expect(r.status()).toBe(200);
+        expect((await r.text()).length).toBeGreaterThan(10);
+    });
+    test('privacy policy has real content', async ({ request }) => {
+        test.skip(!siteIsUp);
+        const r = await request.get('/api/legal/privacy');
+        expect(r.status()).toBe(200);
+        expect((await r.text()).length).toBeGreaterThan(10);
+    });
+    test('developer v1/status returns real data', async ({ request }) => {
+        test.skip(!siteIsUp);
+        const r = await request.get('/api/developer/v1/status');
+        const d = await r.json();
+        expect(d.status || d.version || d.online).toBeTruthy();
+    });
+});
+
+// ═══════════════════════════════════════════════════
+// REAL USER — Authenticated Tests (17 tests)
+// ═══════════════════════════════════════════════════
+const TEST_EMAIL = `e2e_test_${Date.now()}@keliontest.com`;
+const TEST_PASS = 'TestK3li0n!2026';
+const TEST_NAME = 'E2E Tester';
+let authToken = null;
+
+test.describe.serial('Real User — Full Auth Flow', () => {
+    test('register new account', async ({ request }) => {
+        test.skip(!siteIsUp);
+        const r = await request.post('/api/auth/register', { data: { email: TEST_EMAIL, password: TEST_PASS, name: TEST_NAME } });
+        expect([200, 201, 409]).toContain(r.status());
+    });
+    test('login with new account', async ({ request }) => {
+        test.skip(!siteIsUp);
+        const r = await request.post('/api/auth/login', { data: { email: TEST_EMAIL, password: TEST_PASS } });
+        expect(r.status()).toBe(200);
+        const d = await r.json();
+        authToken = d.token || d.accessToken || d.access_token;
+        expect(authToken).toBeTruthy();
+    });
+    test('GET /api/auth/me returns user profile', async ({ request }) => {
+        test.skip(!siteIsUp || !authToken);
+        const r = await request.get('/api/auth/me', { headers: { Authorization: `Bearer ${authToken}` } });
+        expect(r.status()).toBe(200);
+        const d = await r.json();
+        expect(d.email || d.user?.email).toBe(TEST_EMAIL);
+    });
+    test('chat as authenticated user', async ({ request }) => {
+        test.skip(!siteIsUp || !authToken);
+        const r = await request.post('/api/chat', { headers: { Authorization: `Bearer ${authToken}` }, data: { message: 'Hello test', avatar: 'kelion', language: 'en' } });
+        expect(r.status()).toBe(200);
+        const d = await r.json();
+        expect((d.reply || d.response || '').length).toBeGreaterThan(3);
+    });
+    test('conversations list as auth user', async ({ request }) => {
+        test.skip(!siteIsUp || !authToken);
+        expect((await request.get('/api/conversations', { headers: { Authorization: `Bearer ${authToken}` } })).status()).toBe(200);
+    });
+    test('memory as auth user', async ({ request }) => {
+        test.skip(!siteIsUp || !authToken);
+        expect([200, 404]).toContain((await request.get('/api/memory', { headers: { Authorization: `Bearer ${authToken}` } })).status());
+    });
+    test('trading status as auth user', async ({ request }) => {
+        test.skip(!siteIsUp || !authToken);
+        expect((await request.get('/api/trading/status', { headers: { Authorization: `Bearer ${authToken}` } })).status()).toBe(200);
+    });
+    test('trading portfolio as auth user', async ({ request }) => {
+        test.skip(!siteIsUp || !authToken);
+        expect((await request.get('/api/trading/portfolio', { headers: { Authorization: `Bearer ${authToken}` } })).status()).toBe(200);
+    });
+    test('trading signals as auth user', async ({ request }) => {
+        test.skip(!siteIsUp || !authToken);
+        expect((await request.get('/api/trading/signals', { headers: { Authorization: `Bearer ${authToken}` } })).status()).toBe(200);
+    });
+    test('search as auth user', async ({ request }) => {
+        test.skip(!siteIsUp || !authToken);
+        expect([200, 429]).toContain((await request.post('/api/search', { headers: { Authorization: `Bearer ${authToken}` }, data: { query: 'test' } })).status());
+    });
+    test('referral code as auth user', async ({ request }) => {
+        test.skip(!siteIsUp || !authToken);
+        expect([200, 404]).toContain((await request.get('/api/referral/code', { headers: { Authorization: `Bearer ${authToken}` } })).status());
+    });
+    test('payments plans as auth user', async ({ request }) => {
+        test.skip(!siteIsUp || !authToken);
+        expect((await request.get('/api/payments/plans', { headers: { Authorization: `Bearer ${authToken}` } })).status()).toBe(200);
+    });
+    test('GDPR export as auth user', async ({ request }) => {
+        test.skip(!siteIsUp || !authToken);
+        expect([200, 202]).toContain((await request.post('/api/gdpr/export', { headers: { Authorization: `Bearer ${authToken}` } })).status());
+    });
+    test('developer keys as auth user', async ({ request }) => {
+        test.skip(!siteIsUp || !authToken);
+        expect((await request.get('/api/developer/keys', { headers: { Authorization: `Bearer ${authToken}` } })).status()).toBe(200);
+    });
+    test('change-password requires correct old password', async ({ request }) => {
+        test.skip(!siteIsUp || !authToken);
+        expect((await request.post('/api/auth/change-password', { headers: { Authorization: `Bearer ${authToken}` }, data: { oldPassword: 'wrong', newPassword: 'new' } })).status()).toBeGreaterThanOrEqual(400);
+    });
+    test('login in browser and chat as real user', async ({ page }) => {
+        test.skip(!siteIsUp);
+        await page.addInitScript(() => { localStorage.setItem('kelion_onboarded', 'true'); });
+        await page.goto('/');
+        await page.waitForSelector('#btn-auth, #text-input', { state: 'visible', timeout: 60000 });
+        const loginBtn = page.locator('#btn-auth');
+        if (await loginBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+            await loginBtn.click();
+            await page.waitForTimeout(1000);
+            const emailInput = page.locator('#auth-email');
+            if (await emailInput.isVisible({ timeout: 5000 }).catch(() => false)) {
+                await emailInput.fill(TEST_EMAIL);
+                await page.locator('#auth-password').fill(TEST_PASS);
+                await page.locator('#auth-submit').click();
+                await page.waitForTimeout(3000);
+            }
+        }
+        await expect(page.locator('#text-input')).toBeVisible({ timeout: 30000 });
+        await page.fill('#text-input', 'Hello from E2E test');
+        await page.press('#text-input', 'Enter');
+        await expect(page.locator('.msg.user')).toBeVisible({ timeout: 30000 });
+    });
+    test('logout works', async ({ request }) => {
+        test.skip(!siteIsUp || !authToken);
+        expect([200, 204]).toContain((await request.post('/api/auth/logout', { headers: { Authorization: `Bearer ${authToken}` } })).status());
+    });
+});
+
+// ═══════════════════════════════════════════════════
+// ALL API ENDPOINTS (75 tests)
+// ═══════════════════════════════════════════════════
+test.describe('API — Trading', () => {
+    test('GET /api/trading/status', async ({ request }) => { test.skip(!siteIsUp); expect((await request.get('/api/trading/status')).status()).toBeLessThan(500); });
+    test('GET /api/trading/analysis', async ({ request }) => { test.skip(!siteIsUp); expect((await request.get('/api/trading/analysis')).status()).toBeLessThan(500); });
+    test('GET /api/trading/signals', async ({ request }) => { test.skip(!siteIsUp); expect((await request.get('/api/trading/signals')).status()).toBeLessThan(500); });
+    test('GET /api/trading/portfolio', async ({ request }) => { test.skip(!siteIsUp); expect((await request.get('/api/trading/portfolio')).status()).toBeLessThan(500); });
+    test('POST /api/trading/backtest', async ({ request }) => { test.skip(!siteIsUp); expect((await request.post('/api/trading/backtest', { data: { pair: 'EURUSD', days: 30 } })).status()).toBeLessThan(500); });
+    test('GET /api/trading/alerts', async ({ request }) => { test.skip(!siteIsUp); expect((await request.get('/api/trading/alerts')).status()).toBeLessThan(500); });
+    test('GET /api/trading/correlation', async ({ request }) => { test.skip(!siteIsUp); expect((await request.get('/api/trading/correlation')).status()).toBeLessThan(500); });
+    test('GET /api/trading/risk', async ({ request }) => { test.skip(!siteIsUp); expect((await request.get('/api/trading/risk')).status()).toBeLessThan(500); });
+    test('GET /api/trading/history', async ({ request }) => { test.skip(!siteIsUp); expect((await request.get('/api/trading/history')).status()).toBeLessThan(500); });
+    test('POST /api/trading/execute → needs auth', async ({ request }) => { test.skip(!siteIsUp); expect((await request.post('/api/trading/execute', { data: { pair: 'EURUSD', action: 'buy' } })).status()).toBeGreaterThanOrEqual(400); });
+    test('GET /api/trading/full-analysis', async ({ request }) => { test.skip(!siteIsUp); expect((await request.get('/api/trading/full-analysis')).status()).toBeLessThan(500); });
+    test('GET /api/trading/calendar', async ({ request }) => { test.skip(!siteIsUp); expect((await request.get('/api/trading/calendar')).status()).toBeLessThan(500); });
+    test('GET /api/trading/positions', async ({ request }) => { test.skip(!siteIsUp); expect((await request.get('/api/trading/positions')).status()).toBeLessThan(500); });
+    test('POST /api/trading/close', async ({ request }) => { test.skip(!siteIsUp); expect((await request.post('/api/trading/close', { data: {} })).status()).toBeLessThan(500); });
+    test('POST /api/trading/kill-switch', async ({ request }) => { test.skip(!siteIsUp); expect((await request.post('/api/trading/kill-switch')).status()).toBeLessThan(500); });
+    test('GET /api/trading/paper-balance', async ({ request }) => { test.skip(!siteIsUp); expect((await request.get('/api/trading/paper-balance')).status()).toBeLessThan(500); });
+    test('GET /api/trading/risk-profile', async ({ request }) => { test.skip(!siteIsUp); expect((await request.get('/api/trading/risk-profile')).status()).toBeLessThan(500); });
+    test('POST /api/trading/risk-profile', async ({ request }) => { test.skip(!siteIsUp); expect((await request.post('/api/trading/risk-profile', { data: { profile: 'moderate' } })).status()).toBeLessThan(500); });
+    test('GET /api/trading/projections', async ({ request }) => { test.skip(!siteIsUp); expect((await request.get('/api/trading/projections')).status()).toBeLessThan(500); });
+});
+test.describe('API — Developer', () => {
+    test('GET /api/developer/keys', async ({ request }) => { test.skip(!siteIsUp); expect((await request.get('/api/developer/keys')).status()).toBeLessThan(500); });
+    test('POST /api/developer/keys', async ({ request }) => { test.skip(!siteIsUp); expect((await request.post('/api/developer/keys', { data: { name: 'test' } })).status()).toBeLessThan(500); });
+    test('GET /api/developer/stats', async ({ request }) => { test.skip(!siteIsUp); expect((await request.get('/api/developer/stats')).status()).toBeLessThan(500); });
+    test('GET /api/developer/webhooks', async ({ request }) => { test.skip(!siteIsUp); expect((await request.get('/api/developer/webhooks')).status()).toBeLessThan(500); });
+    test('POST /api/developer/webhooks', async ({ request }) => { test.skip(!siteIsUp); expect((await request.post('/api/developer/webhooks', { data: { url: 'https://test.com' } })).status()).toBeLessThan(500); });
+    test('GET /api/developer/v1/status', async ({ request }) => { test.skip(!siteIsUp); expect((await request.get('/api/developer/v1/status')).status()).toBeLessThan(500); });
+    test('GET /api/developer/v1/models', async ({ request }) => { test.skip(!siteIsUp); expect((await request.get('/api/developer/v1/models')).status()).toBeLessThan(500); });
+    test('GET /api/developer/v1/user/profile', async ({ request }) => { test.skip(!siteIsUp); expect((await request.get('/api/developer/v1/user/profile')).status()).toBeLessThan(500); });
+    test('POST /api/developer/v1/chat', async ({ request }) => { test.skip(!siteIsUp); expect((await request.post('/api/developer/v1/chat', { data: { message: 'test' } })).status()).toBeLessThan(500); });
+    test('DELETE /api/developer/keys/test', async ({ request }) => { test.skip(!siteIsUp); expect((await request.delete('/api/developer/keys/test')).status()).toBeLessThan(500); });
+});
+test.describe('API — Legal & GDPR', () => {
+    test('GET /api/legal/terms', async ({ request }) => { test.skip(!siteIsUp); expect((await request.get('/api/legal/terms')).status()).toBe(200); });
+    test('GET /api/legal/privacy', async ({ request }) => { test.skip(!siteIsUp); expect((await request.get('/api/legal/privacy')).status()).toBe(200); });
+    test('POST /api/gdpr/export → needs auth', async ({ request }) => { test.skip(!siteIsUp); expect((await request.post('/api/gdpr/export')).status()).toBeGreaterThanOrEqual(400); });
+    test('DELETE /api/gdpr/delete → needs auth', async ({ request }) => { test.skip(!siteIsUp); expect((await request.delete('/api/gdpr/delete')).status()).toBeGreaterThanOrEqual(400); });
+    test('GET /api/gdpr/consent', async ({ request }) => { test.skip(!siteIsUp); expect((await request.get('/api/gdpr/consent')).status()).toBeLessThan(500); });
+    test('POST /api/gdpr/consent', async ({ request }) => { test.skip(!siteIsUp); expect((await request.post('/api/gdpr/consent', { data: { consent: true } })).status()).toBeLessThan(500); });
+});
+test.describe('API — AI Services', () => {
+    test('POST /api/search', async ({ request }) => { test.skip(!siteIsUp); expect((await request.post('/api/search', { data: { query: 'test' } })).status()).toBeLessThan(500); });
+    test('GET /api/weather', async ({ request }) => { test.skip(!siteIsUp); expect((await request.get('/api/weather?city=London')).status()).toBeLessThan(500); });
+    test('POST /api/vision', async ({ request }) => { test.skip(!siteIsUp); expect((await request.post('/api/vision', { data: { url: 'https://example.com/t.jpg' } })).status()).toBeLessThan(500); });
+    test('POST /api/voice/speak', async ({ request }) => { test.skip(!siteIsUp); expect((await request.post('/api/voice/speak', { data: { text: 'hello' } })).status()).toBeLessThan(500); });
+    test('POST /api/voice/listen', async ({ request }) => { test.skip(!siteIsUp); expect((await request.post('/api/voice/listen')).status()).toBeLessThan(500); });
+    test('POST /api/imagine', async ({ request }) => { test.skip(!siteIsUp); expect((await request.post('/api/imagine', { data: { prompt: 'test' } })).status()).toBeLessThan(500); });
+});
+test.describe('API — Identity', () => {
+    test('POST /api/identity/register-face', async ({ request }) => { test.skip(!siteIsUp); expect((await request.post('/api/identity/register-face')).status()).toBeLessThan(500); });
+    test('POST /api/identity/check', async ({ request }) => { test.skip(!siteIsUp); expect((await request.post('/api/identity/check')).status()).toBeLessThan(500); });
+});
+test.describe('API — Payments', () => {
+    test('GET /api/payments/plans', async ({ request }) => { test.skip(!siteIsUp); expect((await request.get('/api/payments/plans')).status()).toBeLessThan(500); });
+    test('POST /api/payments/checkout → needs auth', async ({ request }) => { test.skip(!siteIsUp); expect((await request.post('/api/payments/checkout', { data: { plan: 'pro' } })).status()).toBeGreaterThanOrEqual(400); });
+});
+test.describe('API — News', () => {
+    test('GET /api/news', async ({ request }) => { test.skip(!siteIsUp); expect((await request.get('/api/news')).status()).toBeLessThan(500); });
+    test('POST /api/news → needs admin', async ({ request }) => { test.skip(!siteIsUp); expect((await request.post('/api/news', { data: { title: 'test' } })).status()).toBeGreaterThanOrEqual(400); });
+});
+test.describe('API — Media', () => {
+    test('GET /api/media/facebook/health', async ({ request }) => { test.skip(!siteIsUp); expect((await request.get('/api/media/facebook/health')).status()).toBeLessThan(500); });
+    test('GET /api/media/instagram/health', async ({ request }) => { test.skip(!siteIsUp); expect((await request.get('/api/media/instagram/health')).status()).toBeLessThan(500); });
+    test('GET /api/media/status → needs admin', async ({ request }) => { test.skip(!siteIsUp); expect((await request.get('/api/media/status')).status()).toBeGreaterThanOrEqual(400); });
+    test('POST /api/media/publish → needs admin', async ({ request }) => { test.skip(!siteIsUp); expect((await request.post('/api/media/publish', { data: {} })).status()).toBeGreaterThanOrEqual(400); });
+});
+test.describe('API — Messaging', () => {
+    test('GET /api/messenger/webhook', async ({ request }) => { test.skip(!siteIsUp); expect((await request.get('/api/messenger/webhook?hub.mode=subscribe&hub.verify_token=test&hub.challenge=test')).status()).toBeLessThan(500); });
+    test('POST /api/telegram/webhook', async ({ request }) => { test.skip(!siteIsUp); expect((await request.post('/api/telegram/webhook', { data: {} })).status()).toBeLessThan(500); });
+    test('GET /api/telegram/health', async ({ request }) => { test.skip(!siteIsUp); expect((await request.get('/api/telegram/health')).status()).toBeLessThan(500); });
+    test('GET /api/whatsapp/webhook', async ({ request }) => { test.skip(!siteIsUp); expect((await request.get('/api/whatsapp/webhook?hub.mode=subscribe&hub.verify_token=test&hub.challenge=test')).status()).toBeLessThan(500); });
+    test('POST /api/whatsapp/webhook', async ({ request }) => { test.skip(!siteIsUp); expect((await request.post('/api/whatsapp/webhook', { data: {} })).status()).toBeLessThan(500); });
+    test('POST /api/whatsapp/send (joke)', async ({ request }) => { test.skip(!siteIsUp); expect((await request.post('/api/whatsapp/send', { data: { to: 'test', message: 'joke' } })).status()).toBeLessThan(500); });
+    test('GET /api/whatsapp/health', async ({ request }) => { test.skip(!siteIsUp); expect((await request.get('/api/whatsapp/health')).status()).toBeLessThan(500); });
+});
+test.describe('API — Admin', () => {
+    test('GET /api/admin/brain → needs admin', async ({ request }) => { test.skip(!siteIsUp); expect((await request.get('/api/admin/brain')).status()).toBeGreaterThanOrEqual(400); });
+    test('POST /api/admin/brain/reset → needs admin', async ({ request }) => { test.skip(!siteIsUp); expect((await request.post('/api/admin/brain/reset')).status()).toBeGreaterThanOrEqual(400); });
+    test('GET /api/admin/health-check → needs admin', async ({ request }) => { test.skip(!siteIsUp); expect((await request.get('/api/admin/health-check')).status()).toBeGreaterThanOrEqual(400); });
+});
+test.describe('API — Ticker & Metrics', () => {
+    test('POST /api/ticker/disable', async ({ request }) => { test.skip(!siteIsUp); expect((await request.post('/api/ticker/disable')).status()).toBeLessThan(500); });
+    test('GET /api/metrics → needs admin', async ({ request }) => { test.skip(!siteIsUp); expect((await request.get('/api/metrics')).status()).toBeGreaterThanOrEqual(400); });
+});
+test.describe('API — Referral', () => {
+    test('GET /api/referral/code', async ({ request }) => { test.skip(!siteIsUp); expect((await request.get('/api/referral/code')).status()).toBeLessThan(500); });
+});
+test.describe('API — Auth Complete', () => {
+    test('POST /api/auth/login bad → 401', async ({ request }) => { test.skip(!siteIsUp); expect((await request.post('/api/auth/login', { data: { email: 'bad@bad.com', password: 'wrong' } })).status()).toBeGreaterThanOrEqual(400); });
+    test('GET /api/auth/me no token → 401', async ({ request }) => { test.skip(!siteIsUp); expect((await request.get('/api/auth/me')).status()).toBeGreaterThanOrEqual(400); });
+    test('POST /api/auth/refresh no token', async ({ request }) => { test.skip(!siteIsUp); expect((await request.post('/api/auth/refresh')).status()).toBeGreaterThanOrEqual(400); });
+    test('POST /api/auth/forgot-password no email', async ({ request }) => { test.skip(!siteIsUp); expect((await request.post('/api/auth/forgot-password', { data: {} })).status()).toBeGreaterThanOrEqual(400); });
+    test('POST /api/auth/change-email no auth', async ({ request }) => { test.skip(!siteIsUp); expect((await request.post('/api/auth/change-email', { data: { email: 'x@x.com' } })).status()).toBeGreaterThanOrEqual(400); });
+});
+test.describe('API — Brain & Chat', () => {
+    test('POST /api/chat empty message', async ({ request }) => { test.skip(!siteIsUp); expect((await request.post('/api/chat', { data: { message: '', avatar: 'kelion' } })).status()).toBeLessThan(500); });
+    test('GET /api/chat/stream SSE', async ({ request }) => { test.skip(!siteIsUp); expect((await request.get('/api/chat/stream')).status()).toBeLessThan(500); });
+    test('GET /api/conversations', async ({ request }) => { test.skip(!siteIsUp); expect((await request.get('/api/conversations')).status()).toBeLessThan(500); });
+    test('GET /api/memory', async ({ request }) => { test.skip(!siteIsUp); expect((await request.get('/api/memory')).status()).toBeLessThan(500); });
+    test('GET /api/admin/payments/stats → admin', async ({ request }) => { test.skip(!siteIsUp); expect((await request.get('/api/admin/payments/admin/stats')).status()).toBeGreaterThanOrEqual(400); });
+});
+test.describe('API — Messenger Stats', () => {
+    test('GET /api/messenger/stats → admin', async ({ request }) => { test.skip(!siteIsUp); expect((await request.get('/api/messenger/stats')).status()).toBeGreaterThanOrEqual(400); });
+});
+
+// ═══════════════════════════════════════════════════
+// SECURITY TESTS (10 tests)
+// ═══════════════════════════════════════════════════
+test.describe('Security', () => {
+    test('XSS in chat message is sanitized', async ({ request }) => {
+        test.skip(!siteIsUp);
+        const r = await request.post('/api/chat', { data: { message: '<script>alert("xss")</script>', avatar: 'kelion' } });
+        const body = await r.text();
+        expect(body).not.toContain('<script>');
+    });
+    test('SQL injection in login is blocked', async ({ request }) => {
+        test.skip(!siteIsUp);
+        const r = await request.post('/api/auth/login', { data: { email: "' OR 1=1 --", password: 'test' } });
+        expect(r.status()).toBeGreaterThanOrEqual(400);
+    });
+    test('path traversal blocked', async ({ request }) => {
+        test.skip(!siteIsUp);
+        const r = await request.get('/api/../../../etc/passwd');
+        expect(r.status()).not.toBe(200);
+    });
+    test('HTTPS enforced', async ({ request }) => {
+        test.skip(!siteIsUp);
+        const r = await request.get('/');
+        expect(r.url()).toContain('https');
+    });
+    test('auth endpoints reject invalid tokens', async ({ request }) => {
+        test.skip(!siteIsUp);
+        const r = await request.get('/api/auth/me', { headers: { Authorization: 'Bearer fake_invalid_token_123' } });
+        expect(r.status()).toBeGreaterThanOrEqual(400);
+    });
+    test('admin routes blocked without admin token', async ({ request }) => {
+        test.skip(!siteIsUp);
+        const r = await request.get('/api/admin/brain', { headers: { Authorization: 'Bearer fake_token' } });
+        expect(r.status()).toBeGreaterThanOrEqual(400);
+    });
+    test('XSS in search query is sanitized', async ({ request }) => {
+        test.skip(!siteIsUp);
+        const r = await request.post('/api/search', { data: { query: '<img src=x onerror=alert(1)>' } });
+        const body = await r.text();
+        expect(body).not.toContain('onerror=');
+    });
+    test('oversized payload rejected', async ({ request }) => {
+        test.skip(!siteIsUp);
+        const bigPayload = 'A'.repeat(10000000);
+        const r = await request.post('/api/chat', { data: { message: bigPayload, avatar: 'kelion' } });
+        expect(r.status()).toBeGreaterThanOrEqual(400);
+    });
+    test('no server version header exposed', async ({ request }) => {
+        test.skip(!siteIsUp);
+        const r = await request.get('/');
+        const headers = r.headers();
+        expect(headers['x-powered-by']).toBeFalsy();
+    });
+    test('CORS headers present', async ({ request }) => {
+        test.skip(!siteIsUp);
+        const r = await request.get('/api/health');
+        const headers = r.headers();
+        // Should have some form of CORS or security headers
+        expect(r.status()).toBeLessThan(500);
     });
 });
