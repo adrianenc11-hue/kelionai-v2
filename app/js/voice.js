@@ -81,6 +81,13 @@
         if (isListeningForWake && recognition) try { recognition.start(); } catch (e) { }
     }
 
+    function stopWakeWordDetection() {
+        isListeningForWake = false;
+        isProcessing = false;
+        if (recognition) try { recognition.stop(); } catch (e) { }
+        console.log('[Voice] Wake word stopped');
+    }
+
     function detectLanguage(text) {
         if (window.i18n && typeof i18n.detectLanguage === 'function') {
             const lang = i18n.detectLanguage(text);
@@ -159,7 +166,7 @@
         const ctx = getAudioContext();
         let audioBuf;
         try { audioBuf = await ctx.decodeAudioData(arrayBuf.slice(0)); }
-        catch (e) { fallbackTextLipSync(fallbackText || ''); isSpeaking = false; resumeWakeDetection(); return; }
+        catch (e) { console.warn('[Voice] Audio decode failed'); fallbackTextLipSync(fallbackText || ''); isSpeaking = false; resumeWakeDetection(); return; }
 
         currentSourceNode = ctx.createBufferSource();
         currentSourceNode.buffer = audioBuf;
@@ -352,7 +359,7 @@
 
     window.KVoice = {
         speak, stopSpeaking, startListening, stopListening, captureAndAnalyze,
-        startWakeWordDetection, resumeWakeDetection, ensureAudioUnlocked, mute, unmute,
+        startWakeWordDetection, stopWakeWordDetection, resumeWakeDetection, ensureAudioUnlocked, mute, unmute,
         getAudioContext, startMicMonitor,
         isRecording: () => isRecording, isSpeaking: () => isSpeaking,
         getLanguage: () => (window.i18n ? i18n.getLanguage() : detectedLanguage),
