@@ -36,6 +36,7 @@ const ADMIN_KEYWORDS = /\b(admin|administrator|dashboard|panou\s*admin|setări\s
 // POST /api/chat
 router.post('/chat', chatLimiter, validate(chatSchema), async (req, res) => {
     try {
+        const _chatStart = Date.now();
         const { getUserFromToken, supabaseAdmin, brain } = req.app.locals;
         const { message, avatar = 'kelion', history = [], language = 'ro', conversationId } = req.body;
         if (!message) return res.status(400).json({ error: 'Message is required' });
@@ -118,7 +119,8 @@ router.post('/chat', chatLimiter, validate(chatSchema), async (req, res) => {
 
         logger.info({ component: 'Chat', engine, avatar, language, tools: thought.toolsUsed, chainOfThought: !!thought.chainOfThought, thinkTime: thought.thinkTime, replyLength: reply.length }, `${engine} | ${avatar} | ${language} | tools:[${thought.toolsUsed.join(',')}] | CoT:${!!thought.chainOfThought} | ${thought.thinkTime}ms think | ${reply.length}c`);
 
-        const response = { reply, avatar, engine, language, thinkTime: thought.thinkTime, conversationId: savedConvId };
+        const totalTime = Date.now() - _chatStart;
+        const response = { reply, avatar, engine, language, thinkTime: thought.thinkTime, totalTime, conversationId: savedConvId };
         if (thought.monitor.content) { response.monitor = thought.monitor; }
         res.json(response);
 
