@@ -395,7 +395,7 @@
         if (mixer) mixer.update(dt);
         updateBlink(dt);
         updateExpression(dt);
-        if (lipSync) lipSync.update();
+        if (lipSync && window.KVoice && KVoice.isSpeaking()) lipSync.update();
 
         updateGesture(dt);
         updateMoodLighting();
