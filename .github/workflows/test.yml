@@ -1,8 +1,10 @@
 name: KelionAI CI/CD Pipeline
 
+# DISABLED push trigger — Railway deploys via native integration.
+# Tests can be run manually or on PRs.
 on:
-  push:
-    branches: [main, master]
+  # push:
+  #   branches: [main, master]
   pull_request:
     branches: [main, master]
   workflow_dispatch:
