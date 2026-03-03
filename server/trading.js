@@ -1204,3 +1204,5 @@ module.exports.analyzeSentiment = analyzeSentiment;
 module.exports.calculateConfluence = calculateConfluence;
 module.exports.tradeEngine = tradeEngine;
 module.exports.tradeIntel = tradeIntel;
+module.exports.analyzeAsset = analyzeAsset;
+module.exports.fetchRealPrices = fetchRealPrices;
