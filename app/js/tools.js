@@ -43,16 +43,40 @@ var KelionTools = (function () {
     }
 
     var WEATHER_KEYWORDS = ['vreme', 'meteo', 'weather', 'temperatură', 'temperatura', 'ploaie', 'forecast'];
-    var SEARCH_KEYWORDS  = ['caută', 'cauta', 'search', 'găsește', 'gaseste', 'find', 'ce este', 'what is'];
+    var SEARCH_KEYWORDS = ['caută', 'cauta', 'search', 'găsește', 'gaseste', 'find', 'ce este', 'what is'];
+    var IMAGE_KEYWORDS = ['generează', 'genereaza', 'generate', 'desenează', 'deseneaza', 'draw', 'creează', 'creeaza', 'create', 'imagine', 'image', 'picture', 'pictură', 'pictura'];
 
     async function preprocessMessage(userMessage) {
         var lower = userMessage.toLowerCase();
+
+        // ── Image Generation ─────────────────────────────────────
+        if (IMAGE_KEYWORDS.some(function (k) { return lower.includes(k); }) &&
+            (lower.includes('imagine') || lower.includes('image') || lower.includes('picture') ||
+                lower.includes('desen') || lower.includes('draw') || lower.includes('genereaz') ||
+                lower.includes('creeaz') || lower.includes('create') || lower.includes('pictur'))) {
+            // Extract the prompt — everything after the trigger keyword
+            var imgPrompt = userMessage
+                .replace(/^(generează|genereaza|generate|desenează|deseneaza|draw|creează|creeaza|create)\s*(o|un|una|an|a)?\s*(imagine|image|picture|pictură|pictura|desen)?\s*(cu|de|of|with|about)?\s*/i, '')
+                .trim();
+            if (!imgPrompt || imgPrompt.length < 3) imgPrompt = userMessage;
+            try {
+                var imgResult = await generateImage(imgPrompt);
+                if (imgResult && imgResult.image) {
+                    // Display on monitor
+                    if (window.MonitorManager) MonitorManager.show(imgResult.image, 'image');
+                    return '\n[IMAGE_GENERATED: ' + imgPrompt + ']\n![Generated Image](' + imgResult.image + ')';
+                }
+            } catch (e) {
+                console.warn('[Tools] image error:', e.message);
+                return '\n[Image generation failed: ' + e.message + ']';
+            }
+        }
 
         // ── Weather ──────────────────────────────────────────────
         if (WEATHER_KEYWORDS.some(function (k) { return lower.includes(k); })) {
             // Extract city — word(s) after "în"/"in"/"la"/"for"/"at"
             var cityMatch = lower.match(/(?:în|in|la|for|at)\s+([a-zA-ZăâîșțĂÂÎȘȚ\s]{2,30})/) ||
-                            lower.match(/vreme(?:a)?\s+(?:din\s+)?([a-zA-ZăâîșțĂÂÎȘȚ\s]{2,20})/);
+                lower.match(/vreme(?:a)?\s+(?:din\s+)?([a-zA-ZăâîșțĂÂÎȘȚ\s]{2,20})/);
             var city = cityMatch ? cityMatch[1].trim() : 'Bucharest';
             try {
                 var data = await weather(city);
