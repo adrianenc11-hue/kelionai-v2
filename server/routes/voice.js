@@ -39,7 +39,19 @@ router.post('/speak', ttsLimiter, validate(speakSchema), async (req, res) => {
         };
         const selectedVoiceSettings = voiceSettings[mood] || voiceSettings.neutral;
 
-        const vid = getVoiceId(avatar, language);
+        // Check if user has a cloned voice — overrides default
+        let vid = null;
+        if (user && supabaseAdmin) {
+            try {
+                const { data } = await supabaseAdmin.from('user_preferences').select('value').eq('user_id', user.id).eq('key', 'cloned_voice_id').single();
+                if (data?.value?.voice_id) {
+                    vid = data.value.voice_id;
+                    logger.info({ component: 'Speak', clonedVoice: true, voiceId: vid }, 'Using cloned voice');
+                }
+            } catch (e) { /* no cloned voice, use default */ }
+        }
+        // Fallback to language-based native voice
+        if (!vid) vid = getVoiceId(avatar, language);
         const r = await fetch('https://api.elevenlabs.io/v1/text-to-speech/' + vid, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'xi-api-key': process.env.ELEVENLABS_API_KEY },

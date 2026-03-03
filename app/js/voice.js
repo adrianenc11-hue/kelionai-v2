@@ -3,7 +3,7 @@
     'use strict';
     const API_BASE = window.location.origin;
     let mediaRecorder = null, audioChunks = [], isRecording = false, isSpeaking = false;
-    let currentSourceNode = null, sharedAudioCtx = null, detectedLanguage = 'en';
+    let currentSourceNode = null, sharedAudioCtx = null, detectedLanguage = 'ro';
     let pendingAudioBuffer = null, pendingAudioAvatar = null, pendingAudioText = null;
     let recognition = null, isListeningForWake = false, isProcessing = false;
 
