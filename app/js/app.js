@@ -58,6 +58,11 @@
         return null;
     }
 
+    // ─── Monitor clear commands ──────────────────────────────
+    const CLEAR_TRIGGERS = ['goleste monitorul', 'golește monitorul', 'sterge monitorul', 'șterge monitorul', 'clear monitor', 'curata monitorul', 'curăță monitorul', 'inchide monitorul', 'închide monitorul'];
+    function isMonitorClear(t) { const l = t.toLowerCase(); return CLEAR_TRIGGERS.some(v => l.includes(v)); }
+
+
     async function triggerVision() {
         showThinking(false);
         addMessage('assistant', '👁️ Activating camera...');
@@ -94,7 +99,7 @@
                     message,
                     avatar: KAvatar.getCurrentAvatar(),
                     history: chatHistory.slice(-20),
-                    language: language || (window.i18n ? i18n.getLanguage() : 'en'),
+                    language: language || (window.i18n ? i18n.getLanguage() : 'ro'),
                     conversationId: currentConversationId,
                     geo: window.KGeo ? KGeo.getCached() : null
                 })
@@ -391,8 +396,16 @@
             if (window.KVoice) KVoice.speak('Gata, am deschis pentru tine!');
             return;
         }
+        // Monitor clear command
+        if (isMonitorClear(text)) {
+            hideWelcome(); addMessage('user', text);
+            if (window.MonitorManager) MonitorManager.clear();
+            addMessage('assistant', 'Am golit monitorul!');
+            if (window.KVoice) KVoice.speak('Gata, am golit monitorul!');
+            return;
+        }
         hideWelcome(); KAvatar.setAttentive(true); addMessage('user', text); showThinking(true);
-        if (isVisionRequest(text)) triggerVision(); else await sendToAI(text, 'en');
+        if (isVisionRequest(text)) triggerVision(); else await sendToAI(text, 'ro');
     }
 
     // ─── Drag & Drop ─────────────────────────────────────────
