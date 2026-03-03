@@ -44,6 +44,8 @@ router.post('/chat', chatLimiter, validate(chatSchema), async (req, res) => {
 
         // Admin keyword blacklist — total silence for non-owners
         const isOwner = user?.role === 'admin';
+        const isAdminMode = req.headers['x-admin-mode'] === 'true';
+        const isAdmin = isOwner && isAdminMode;
         if (!isOwner && ADMIN_KEYWORDS.test(message)) {
             return res.status(200).json({ reply: '', avatar, engine: 'silent', language });
         }
@@ -52,6 +54,21 @@ router.post('/chat', chatLimiter, validate(chatSchema), async (req, res) => {
         if (!usage.allowed) return res.status(429).json({ error: 'Chat limit reached. Upgrade to Pro for more messages.', plan: usage.plan, limit: usage.limit, upgrade: true });
 
         const thought = await brain.think(message, avatar, history, language, user?.id, conversationId);
+
+        // Strip admin tool results if not admin
+        let adminContext = '';
+        if (thought.toolResults) {
+            const adminTools = ['adminDiagnose', 'adminReset', 'adminStats', 'adminTrading', 'adminNews'];
+            for (const tool of adminTools) {
+                if (thought.toolResults[tool]) {
+                    if (isAdmin) {
+                        adminContext += `\n[ADMIN ${tool}]: ${thought.toolResults[tool].summary || JSON.stringify(thought.toolResults[tool].data)}`;
+                    } else {
+                        delete thought.toolResults[tool]; // Non-admin: remove admin data
+                    }
+                }
+            }
+        }
 
         let memoryContext = '';
         if (user && supabaseAdmin) {
@@ -64,7 +81,7 @@ router.post('/chat', chatLimiter, validate(chatSchema), async (req, res) => {
 
         const compressedHist = thought.compressedHistory || history.slice(-20);
         const msgs = compressedHist.map(h => ({ role: h.role === 'ai' ? 'assistant' : h.role, content: h.content }));
-        msgs.push({ role: 'user', content: thought.enrichedMessage });
+        msgs.push({ role: 'user', content: thought.enrichedMessage + (adminContext ? '\n\n[ADMIN DATA]:' + adminContext : '') });
 
         let reply = null, engine = null;
 
