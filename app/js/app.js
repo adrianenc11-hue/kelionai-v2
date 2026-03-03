@@ -8,6 +8,9 @@
     const API_BASE = window.location.origin;
     let chatHistory = [], storedFiles = [], audioUnlocked = false;
     let currentConversationId = null, useStreaming = true, historyOpen = false;
+    let adminSecret = null; // stored when admin mode is active
+
+    function adminHeaders() { return { ...authHeaders(), 'x-admin-secret': adminSecret || '' }; }
 
     function authHeaders() { return { 'Content-Type': 'application/json', ...(window.KAuth ? KAuth.getAuthHeaders() : {}) }; }
 
@@ -384,6 +387,29 @@
         else if (/^(kelion|chelion)[,.\s]/i.test(l)) { switchAvatar('kelion'); text = text.replace(/^(kelion|chelion)[,.\s]*/i, '').trim(); }
         if (!text) return;
         if (isUpgradeRequest(text)) { if (window.KPayments) KPayments.showUpgradePrompt(); return; }
+        // ─── Admin code detection (works from any state) ─────
+        // Try admin code verification — intercept BEFORE sending to AI
+        try {
+            var codeResp = await fetch(API_BASE + '/api/admin/verify-code', {
+                method: 'POST', headers: authHeaders(),
+                body: JSON.stringify({ code: text })
+            });
+            if (codeResp.ok) {
+                var codeData = await codeResp.json();
+                hideWelcome(); addMessage('user', '🔑 [cod admin]');
+                if (codeData.action === 'enter') {
+                    adminSecret = codeData.secret;
+                    addMessage('assistant', '🔓 ' + codeData.message + ' Ai acces la: diagnoza brain, credit AI, trafic site.');
+                    if (window.KVoice) KVoice.speak('Admin mode activat! Ai acces complet.');
+                } else if (codeData.action === 'exit') {
+                    adminSecret = null;
+                    addMessage('assistant', '🔒 ' + codeData.message);
+                    if (window.KVoice) KVoice.speak('Admin mode dezactivat.');
+                }
+                return;
+            }
+            // 403 = invalid code, continue to normal chat flow
+        } catch (e) { /* network error, continue normally */ }
         // Web command — show on monitor + open in new tab backup
         var webUrl = tryWebCommand(text);
         if (webUrl) {

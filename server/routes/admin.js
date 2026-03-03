@@ -10,6 +10,32 @@ const { adminAuth } = require('../middleware/auth');
 
 const router = express.Router();
 
+// POST /api/admin/verify-code — verify admin access/exit code (works from ANY state: guest, free, user)
+router.post('/admin/verify-code', (req, res) => {
+    const { code } = req.body;
+    if (!code) return res.status(400).json({ error: 'Code required' });
+
+    const accessCode = process.env.ADMIN_ACCESS_CODE;
+    const exitCode = process.env.ADMIN_EXIT_CODE;
+
+    // Check ACCESS code — enter admin mode
+    if (accessCode && code.trim() === accessCode.trim()) {
+        const secret = process.env.ADMIN_SECRET_KEY;
+        if (!secret) return res.status(503).json({ error: 'Admin not configured on server' });
+        logger.info({ component: 'Admin' }, '🔑 Admin mode ACTIVATED via code');
+        return res.json({ action: 'enter', success: true, secret, message: 'Admin mode activat!' });
+    }
+
+    // Check EXIT code — exit admin mode
+    if (exitCode && code.trim() === exitCode.trim()) {
+        logger.info({ component: 'Admin' }, '🔒 Admin mode DEACTIVATED via code');
+        return res.json({ action: 'exit', success: true, message: 'Admin mode dezactivat!' });
+    }
+
+    // Invalid code — don't reveal which codes exist
+    res.status(403).json({ error: 'Cod invalid' });
+});
+
 // GET /api/brain
 router.get('/brain', adminAuth, (req, res) => {
     const { brain } = req.app.locals;
