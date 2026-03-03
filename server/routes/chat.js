@@ -68,20 +68,20 @@ router.post('/chat', chatLimiter, validate(chatSchema), async (req, res) => {
 
         let reply = null, engine = null;
 
-        // Claude (PRIMARY — best Romanian understanding + system prompt compliance)
-        if (!reply && process.env.ANTHROPIC_API_KEY) {
+        // Groq Llama 3.3 70B (PRIMARY — ultra-fast ~800 tokens/s)
+        if (!reply && process.env.GROQ_API_KEY) {
             try {
-                const r = await fetch('https://api.anthropic.com/v1/messages', {
+                const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
-                    body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 250, system: systemPrompt, messages: msgs })
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + process.env.GROQ_API_KEY },
+                    body: JSON.stringify({ model: 'llama-3.3-70b-versatile', max_tokens: 250, messages: [{ role: 'system', content: systemPrompt }, ...msgs] })
                 });
                 const d = await r.json();
-                reply = d.content?.[0]?.text;
-                if (reply) engine = 'Claude';
-            } catch (e) { logger.warn({ component: 'Chat', err: e.message }, 'Claude'); }
+                reply = d.choices?.[0]?.message?.content;
+                if (reply) engine = 'Groq-Llama';
+            } catch (e) { logger.warn({ component: 'Chat', err: e.message }, 'Groq-Llama'); }
         }
-        // GPT-4o-mini (fallback — faster but weaker at Romanian)
+        // GPT-4o-mini (fallback #1 — fast, good Romanian)
         if (!reply && process.env.OPENAI_API_KEY) {
             try {
                 const r = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -94,7 +94,20 @@ router.post('/chat', chatLimiter, validate(chatSchema), async (req, res) => {
                 if (reply) engine = 'GPT-4o-mini';
             } catch (e) { logger.warn({ component: 'Chat', err: e.message }, 'GPT-4o-mini'); }
         }
-        // DeepSeek (tertiary)
+        // Claude Sonnet 4 (fallback #2 — best Romanian but slower)
+        if (!reply && process.env.ANTHROPIC_API_KEY) {
+            try {
+                const r = await fetch('https://api.anthropic.com/v1/messages', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
+                    body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 250, system: systemPrompt, messages: msgs })
+                });
+                const d = await r.json();
+                reply = d.content?.[0]?.text;
+                if (reply) engine = 'Claude';
+            } catch (e) { logger.warn({ component: 'Chat', err: e.message }, 'Claude'); }
+        }
+        // DeepSeek (fallback #3)
         if (!reply && process.env.DEEPSEEK_API_KEY) {
             try {
                 const r = await fetch('https://api.deepseek.com/v1/chat/completions', {
