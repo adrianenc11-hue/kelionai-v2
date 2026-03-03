@@ -237,6 +237,12 @@ Reply STRICTLY with JSON:
             needsMap: false, mapPlace: '',
             needsVision: false,
             needsMemory: false,
+            // Admin intents
+            needsAdminDiagnose: false,
+            needsAdminReset: false, adminResetTool: '',
+            needsAdminStats: false,
+            needsAdminTrading: false, adminTradingAction: '',
+            needsAdminNews: false,
             isQuestion: false, isCommand: false, isEmotional: false,
             isEmergency: false, isGreeting: false, isFollowUp: false,
             complexity: 'simple', emotionalTone: 'neutral',
@@ -329,6 +335,26 @@ Reply STRICTLY with JSON:
             result.needsMemory = true;
         }
 
+        // ── ADMIN INTENTS (only detected, executed only if isAdmin) ──
+        if (/\b(diagnoz[aă]|diagnostic|status brain|brain status|health|stare brain|stare sistem)\b/i.test(lower)) {
+            result.needsAdminDiagnose = true;
+        }
+        if (/\b(reset|restart|reporneste|reseteaz[aă])\b/i.test(lower) && /\b(brain|creier|tool|sistem)\b/i.test(lower)) {
+            result.needsAdminReset = true;
+            const toolMatch = lower.match(/\b(search|weather|imagine|memory|map|all|tot|toate)\b/i);
+            result.adminResetTool = toolMatch ? toolMatch[1] : 'all';
+        }
+        if (/\b(stats|statistici|revenue|venituri|abonati|subscribers|plat[iă]|payments|churn)\b/i.test(lower)) {
+            result.needsAdminStats = true;
+        }
+        if (/\b(trading|trade|portofoliu|portfolio|binance|pozitii|positions|profit|p&l|pnl)\b/i.test(lower)) {
+            result.needsAdminTrading = true;
+            result.adminTradingAction = lower.includes('execut') ? 'execute' : 'status';
+        }
+        if (/\b(stiri|news|headline|noutati|pres[aă])\b/i.test(lower)) {
+            result.needsAdminNews = true;
+        }
+
         // ── COMPLEXITY ──
         const toolsNeeded = [result.needsSearch, result.needsWeather, result.needsImage, result.needsMap, result.needsVision].filter(Boolean).length;
         if (toolsNeeded >= 2 || words.length > 30 || text.split(/[?.!]/).length > 3) result.complexity = 'complex';
@@ -380,6 +406,12 @@ Reply STRICTLY with JSON:
             if (analysis.needsImage && !seen.has('imagine') && !this.isToolDegraded('imagine')) { plan.push({ tool: 'imagine', prompt: analysis.imagePrompt }); seen.add('imagine'); }
             if (analysis.needsMap && !seen.has('map')) { plan.push({ tool: 'map', place: analysis.mapPlace }); seen.add('map'); }
             if (analysis.needsMemory && userId && !seen.has('memory')) { plan.push({ tool: 'memory', userId }); seen.add('memory'); }
+            // Admin tools (only added if isAdmin flag set)
+            if (analysis.needsAdminDiagnose && !seen.has('adminDiagnose')) { plan.push({ tool: 'adminDiagnose' }); seen.add('adminDiagnose'); }
+            if (analysis.needsAdminReset && !seen.has('adminReset')) { plan.push({ tool: 'adminReset', resetTool: analysis.adminResetTool }); seen.add('adminReset'); }
+            if (analysis.needsAdminStats && !seen.has('adminStats')) { plan.push({ tool: 'adminStats' }); seen.add('adminStats'); }
+            if (analysis.needsAdminTrading && !seen.has('adminTrading')) { plan.push({ tool: 'adminTrading', action: analysis.adminTradingAction }); seen.add('adminTrading'); }
+            if (analysis.needsAdminNews && !seen.has('adminNews')) { plan.push({ tool: 'adminNews' }); seen.add('adminNews'); }
         }
 
         // Check for known good combinations from journal
@@ -442,6 +474,11 @@ Reply STRICTLY with JSON:
             case 'imagine': return this._imagine(step.prompt);
             case 'memory': return this._memory(step.userId);
             case 'map': return this._map(step.place);
+            case 'adminDiagnose': return this._adminDiagnose();
+            case 'adminReset': return this._adminReset(step.resetTool);
+            case 'adminStats': return this._adminStats();
+            case 'adminTrading': return this._adminTrading(step.action);
+            case 'adminNews': return this._adminNews();
             default: return null;
         }
     }
