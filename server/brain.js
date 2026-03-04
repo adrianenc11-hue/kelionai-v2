@@ -55,7 +55,7 @@ class KelionBrain {
     // ═══════════════════════════════════════════════════════════
     // MAIN ENTRY — Complete thinking loop
     // ═══════════════════════════════════════════════════════════
-    async think(message, avatar, history, language, userId, conversationId, mediaData = {}) {
+    async think(message, avatar, history, language, userId, conversationId, mediaData = {}, isAdmin = false) {
         this.conversationCount++;
         const startTime = Date.now();
         // Store media data for tool access
@@ -72,7 +72,7 @@ class KelionBrain {
             }
 
             // Step 3: PLAN tools for each sub-task
-            const plan = this.buildPlan(subTasks, userId, this._currentMediaData);
+            const plan = this.buildPlan(subTasks, userId, this._currentMediaData, isAdmin);
 
             // Step 4: EXECUTE tools in parallel
             const results = await this.executePlan(plan);
@@ -558,7 +558,7 @@ Reply STRICTLY with JSON:
     // ═══════════════════════════════════════════════════════════
     // 4. PLAN BUILDER — Intelligent tool selection
     // ═══════════════════════════════════════════════════════════
-    buildPlan(subTasks, userId, mediaData = {}) {
+    buildPlan(subTasks, userId, mediaData = {}, isAdmin = false) {
         const plan = [];
         const seen = new Set();
 
@@ -569,9 +569,9 @@ Reply STRICTLY with JSON:
             if (analysis.needsMap && !seen.has('map')) { plan.push({ tool: 'map', place: analysis.mapPlace }); seen.add('map'); }
             if (analysis.needsMemory && userId && !seen.has('memory')) { plan.push({ tool: 'memory', userId }); seen.add('memory'); }
             // Extended tools — NOW with binary data
-            if (analysis.needsVision && !seen.has('vision')) { plan.push({ tool: 'vision', imageBase64: mediaData.imageBase64 }); seen.add('vision'); }
-            if (analysis.needsTTS && !seen.has('tts')) { plan.push({ tool: 'tts', text: analysis.ttsText }); seen.add('tts'); }
-            if (analysis.needsSTT && !seen.has('stt')) { plan.push({ tool: 'stt', audioBase64: mediaData.audioBase64 }); seen.add('stt'); }
+            if (analysis.needsVision && !seen.has('vision')) { plan.push({ tool: 'vision', imageBase64: mediaData.imageBase64, userId }); seen.add('vision'); }
+            if (analysis.needsTTS && !seen.has('tts')) { plan.push({ tool: 'tts', text: analysis.ttsText, userId }); seen.add('tts'); }
+            if (analysis.needsSTT && !seen.has('stt')) { plan.push({ tool: 'stt', audioBase64: mediaData.audioBase64, userId }); seen.add('stt'); }
             if (analysis.needsFaceCheck && !seen.has('faceCheck')) { plan.push({ tool: 'faceCheck', imageBase64: mediaData.imageBase64 }); seen.add('faceCheck'); }
             if (analysis.needsFaceRegister && !seen.has('faceRegister') && userId) { plan.push({ tool: 'faceRegister', userId, imageBase64: mediaData.imageBase64 }); seen.add('faceRegister'); }
             if (analysis.needsVoiceClone && !seen.has('voiceClone') && userId) { plan.push({ tool: 'voiceClone', userId, audioBase64: mediaData.audioBase64 }); seen.add('voiceClone'); }
@@ -580,12 +580,14 @@ Reply STRICTLY with JSON:
             if (analysis.needsRadio && !seen.has('radio')) { plan.push({ tool: 'radio', station: analysis.radioStation }); seen.add('radio'); }
             if (analysis.needsVideo && !seen.has('video')) { plan.push({ tool: 'video', query: analysis.videoQuery }); seen.add('video'); }
             if (analysis.needsWebNav && !seen.has('webNav')) { plan.push({ tool: 'webNav', query: analysis.webNavURL }); seen.add('webNav'); }
-            // Admin tools (only added if isAdmin flag set)
-            if (analysis.needsAdminDiagnose && !seen.has('adminDiagnose')) { plan.push({ tool: 'adminDiagnose' }); seen.add('adminDiagnose'); }
-            if (analysis.needsAdminReset && !seen.has('adminReset')) { plan.push({ tool: 'adminReset', resetTool: analysis.adminResetTool }); seen.add('adminReset'); }
-            if (analysis.needsAdminStats && !seen.has('adminStats')) { plan.push({ tool: 'adminStats' }); seen.add('adminStats'); }
-            if (analysis.needsAdminTrading && !seen.has('adminTrading')) { plan.push({ tool: 'adminTrading', action: analysis.adminTradingAction }); seen.add('adminTrading'); }
-            if (analysis.needsAdminNews && !seen.has('adminNews')) { plan.push({ tool: 'adminNews' }); seen.add('adminNews'); }
+            // Admin tools — GATED: only planned if isAdmin is true
+            if (isAdmin) {
+                if (analysis.needsAdminDiagnose && !seen.has('adminDiagnose')) { plan.push({ tool: 'adminDiagnose' }); seen.add('adminDiagnose'); }
+                if (analysis.needsAdminReset && !seen.has('adminReset')) { plan.push({ tool: 'adminReset', resetTool: analysis.adminResetTool }); seen.add('adminReset'); }
+                if (analysis.needsAdminStats && !seen.has('adminStats')) { plan.push({ tool: 'adminStats' }); seen.add('adminStats'); }
+                if (analysis.needsAdminTrading && !seen.has('adminTrading')) { plan.push({ tool: 'adminTrading', action: analysis.adminTradingAction }); seen.add('adminTrading'); }
+                if (analysis.needsAdminNews && !seen.has('adminNews')) { plan.push({ tool: 'adminNews' }); seen.add('adminNews'); }
+            }
             // Table 3: Non-AI function tools
             if (analysis.needsAuth && !seen.has('authAction')) { plan.push({ tool: 'authAction', action: analysis.authAction, data: analysis.authData }); seen.add('authAction'); }
             if (analysis.needsPayments && !seen.has('paymentAction')) { plan.push({ tool: 'paymentAction', action: analysis.paymentAction }); seen.add('paymentAction'); }
@@ -661,9 +663,9 @@ Reply STRICTLY with JSON:
             case 'imagine': return this._imagine(step.prompt);
             case 'memory': return this._memory(step.userId);
             case 'map': return this._map(step.place);
-            case 'vision': return this._vision(step.imageBase64);
-            case 'tts': return this._tts(step.text);
-            case 'stt': return this._stt(step.audioBase64);
+            case 'vision': return this._vision(step.imageBase64, step.userId);
+            case 'tts': return this._tts(step.text, step.userId);
+            case 'stt': return this._stt(step.audioBase64, step.userId);
             case 'faceCheck': return this._faceCheck(step.imageBase64);
             case 'faceRegister': return this._faceRegister(step.userId, step.imageBase64);
             case 'voiceClone': return this._voiceClone(step.userId, step.audioBase64);
@@ -1534,7 +1536,7 @@ Reply STRICTLY with JSON:
 
     // ── VISION — High precision for accessibility (blind users) ──
     // Calls Claude Vision API when image is provided in context
-    async _vision(imageBase64) {
+    async _vision(imageBase64, userId) {
         this.toolStats.vision = (this.toolStats.vision || 0) + 1;
 
         // If no image data provided, signal readiness for camera
@@ -1624,7 +1626,7 @@ Reply STRICTLY with JSON:
     }
 
     // ── TTS — Text-to-Speech via ElevenLabs — Returns actual audio ──
-    async _tts(text) {
+    async _tts(text, userId) {
         this.toolStats.tts = (this.toolStats.tts || 0) + 1;
         if (!text) return { type: 'tts', status: 'no_text', summary: 'Nu am primit text de citit.' };
 
@@ -1647,7 +1649,7 @@ Reply STRICTLY with JSON:
                     if (this.supabaseAdmin) {
                         try {
                             const today = new Date().toISOString().split('T')[0];
-                            await this.supabaseAdmin.from('usage').upsert({ user_id: 'system', type: 'tts', date: today, count: 1 }, { onConflict: 'user_id,type,date' });
+                            await this.supabaseAdmin.from('usage').upsert({ user_id: userId || 'system', type: 'tts', date: today, count: 1 }, { onConflict: 'user_id,type,date' });
                         } catch (e) { /* ok */ }
                     }
                     return {
@@ -1669,7 +1671,7 @@ Reply STRICTLY with JSON:
     }
 
     // ── STT — Speech-to-Text via Groq Whisper — REAL ──
-    async _stt(audioBase64) {
+    async _stt(audioBase64, userId) {
         this.toolStats.stt = (this.toolStats.stt || 0) + 1;
 
         // If no audio, signal readiness
@@ -1701,7 +1703,7 @@ Reply STRICTLY with JSON:
                 if (this.supabaseAdmin) {
                     try {
                         const today = new Date().toISOString().split('T')[0];
-                        await this.supabaseAdmin.from('usage').upsert({ user_id: 'system', type: 'stt', date: today, count: 1 }, { onConflict: 'user_id,type,date' });
+                        await this.supabaseAdmin.from('usage').upsert({ user_id: userId || 'system', type: 'stt', date: today, count: 1 }, { onConflict: 'user_id,type,date' });
                     } catch (e) { /* ok */ }
                 }
 
@@ -2126,11 +2128,37 @@ Raspunde STRICT JSON. Daca nimic: {}`;
             if (!txt || txt === '{}') return;
             let facts;
             try { facts = JSON.parse(txt.replace(/```json|```/g, '').trim()); } catch { return; }
+
+            // ── SECURITY: Whitelist of allowed personal-fact keys ──
+            // Prevents LLM prompt injection from writing arbitrary keys
+            // (e.g. 'role', 'admin_mode', 'plan') into user_preferences.
+            const ALLOWED_LEARN_KEYS = new Set([
+                'name', 'nume', 'first_name', 'last_name',
+                'city', 'oras', 'location', 'locatie', 'country', 'tara',
+                'job', 'profesie', 'occupation', 'work',
+                'hobby', 'hobbies', 'interests', 'interese',
+                'age', 'varsta', 'birthday', 'zi_nastere',
+                'language', 'limba', 'preferred_language',
+                'family', 'familie', 'children', 'copii', 'partner',
+                'pet', 'animal', 'pets',
+                'favorite_color', 'favorite_food', 'favorite_music',
+                'education', 'educatie', 'school', 'university'
+            ]);
+
+            let savedCount = 0;
             for (const [k, v] of Object.entries(facts)) {
-                if (k && v) await this.supabaseAdmin.from('user_preferences').upsert({ user_id: userId, key: k, value: typeof v === 'object' ? v : { data: v } }, { onConflict: 'user_id,key' });
+                if (!k || !v) continue;
+                // Normalize key: lowercase, trim, remove special chars
+                const safeKey = k.toLowerCase().replace(/[^a-z0-9_]/g, '_').substring(0, 50);
+                if (!ALLOWED_LEARN_KEYS.has(safeKey)) {
+                    logger.info({ component: 'Brain', blockedKey: safeKey }, `🛡️ Learning blocked non-whitelisted key: "${safeKey}"`);
+                    continue;
+                }
+                await this.supabaseAdmin.from('user_preferences').upsert({ user_id: userId, key: safeKey, value: typeof v === 'object' ? v : { data: v } }, { onConflict: 'user_id,key' });
+                savedCount++;
             }
-            this.learningsExtracted += Object.keys(facts).length;
-            logger.info({ component: 'Brain', facts: Object.keys(facts) }, `🧠 Learned: ${Object.keys(facts).join(', ')}`);
+            this.learningsExtracted += savedCount;
+            logger.info({ component: 'Brain', saved: savedCount, blocked: Object.keys(facts).length - savedCount }, `🧠 Learned: ${savedCount} facts (${Object.keys(facts).length - savedCount} blocked)`);
         } catch (e) {
             logger.warn({
                 component: 'Brain',

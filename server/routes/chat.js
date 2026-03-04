@@ -15,6 +15,7 @@ const router = express.Router();
 
 const chatLimiter = rateLimit({ windowMs: 60 * 1000, max: 20, message: { error: 'Too many requests. Please wait a minute.' }, standardHeaders: true, legacyHeaders: false });
 const memoryLimiter = rateLimit({ windowMs: 60 * 1000, max: 30, message: { error: 'Too many memory requests.' }, standardHeaders: true, legacyHeaders: false });
+const convLimiter = rateLimit({ windowMs: 60 * 1000, max: 30, message: { error: 'Too many requests.' }, standardHeaders: true, legacyHeaders: false });
 
 // ═══ SAVE CONVERSATION HELPER ═══
 async function saveConv(supabaseAdmin, uid, avatar, userMsg, aiReply, convId, lang) {
@@ -53,7 +54,7 @@ router.post('/chat', chatLimiter, validate(chatSchema), async (req, res) => {
         const usage = await checkUsage(user?.id, 'chat', supabaseAdmin);
         if (!usage.allowed) return res.status(429).json({ error: 'Chat limit reached. Upgrade to Pro for more messages.', plan: usage.plan, limit: usage.limit, upgrade: true });
 
-        const thought = await brain.think(message, avatar, history, language, user?.id, conversationId, { imageBase64, audioBase64 });
+        const thought = await brain.think(message, avatar, history, language, user?.id, conversationId, { imageBase64, audioBase64 }, isAdmin);
 
         // Strip admin tool results if not admin
         let adminContext = '';
@@ -186,10 +187,13 @@ router.post('/chat/stream', chatLimiter, validate(chatSchema), async (req, res) 
         if (!usage.allowed) return res.status(429).json({ error: 'Chat limit reached. Upgrade to Pro for more messages.', plan: usage.plan, limit: usage.limit, upgrade: true });
 
         res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive', 'X-Accel-Buffering': 'no' });
+        // SSE heartbeat to prevent proxy/LB timeout during AI thinking
+        const heartbeat = setInterval(() => res.write(':keepalive\n\n'), 15000);
         // Send thinking indicator immediately so user sees activity
         res.write(`data: ${JSON.stringify({ type: 'thinking' })}\n\n`);
 
-        const thought = await brain.think(message, avatar, history, language, user?.id, conversationId);
+        const isAdminStream = isOwnerStream && req.headers['x-admin-mode'] === 'true';
+        const thought = await brain.think(message, avatar, history, language, user?.id, conversationId, {}, isAdminStream);
 
         if (thought.monitor.content) {
             res.write(`data: ${JSON.stringify({ type: 'monitor', content: thought.monitor.content, monitorType: thought.monitor.type })}\n\n`);
@@ -293,11 +297,11 @@ router.post('/chat/stream', chatLimiter, validate(chatSchema), async (req, res) 
         if (fullReply) incrementUsage(user?.id, 'chat', supabaseAdmin).catch(() => { });
         logger.info({ component: 'Stream', avatar, language, replyLength: fullReply.length }, `${avatar} | ${language} | ${fullReply.length}c`);
 
-    } catch (e) { logger.error({ component: 'Stream', err: e.message }, e.message); if (!res.headersSent) res.status(500).json({ error: 'Stream error' }); else res.end(); }
+    } catch (e) { logger.error({ component: 'Stream', err: e.message }, e.message); if (!res.headersSent) res.status(500).json({ error: 'Stream error' }); else res.end(); } finally { if (typeof heartbeat !== 'undefined') clearInterval(heartbeat); }
 });
 
 // GET /api/conversations
-router.get('/conversations', async (req, res) => {
+router.get('/conversations', convLimiter, async (req, res) => {
     try {
         const { getUserFromToken, supabaseAdmin } = req.app.locals;
         const u = await getUserFromToken(req);
@@ -308,7 +312,7 @@ router.get('/conversations', async (req, res) => {
 });
 
 // GET /api/conversations/:id/messages
-router.get('/conversations/:id/messages', async (req, res) => {
+router.get('/conversations/:id/messages', convLimiter, async (req, res) => {
     try {
         const { getUserFromToken, supabaseAdmin } = req.app.locals;
         const u = await getUserFromToken(req);

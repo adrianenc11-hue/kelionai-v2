@@ -352,3 +352,21 @@ CREATE TABLE IF NOT EXISTS metrics_snapshots (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_metrics_snap_type ON metrics_snapshots(metric_type, created_at DESC);
+
+-- ═══ RLS — Service-role only tables ═══
+-- These tables are accessed exclusively by the server (supabaseAdmin / service_role).
+-- RLS is enabled with NO user-facing policies, so anon/authenticated roles are blocked.
+-- Service_role bypasses RLS automatically.
+
+ALTER TABLE processed_webhook_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE brain_learnings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE news_cache ENABLE ROW LEVEL SECURITY;
+ALTER TABLE admin_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE trades ENABLE ROW LEVEL SECURITY;
+ALTER TABLE media_history ENABLE ROW LEVEL SECURITY;
+ALTER TABLE telegram_users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE whatsapp_users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE whatsapp_messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE trade_intelligence ENABLE ROW LEVEL SECURITY;
+ALTER TABLE cookie_consents ENABLE ROW LEVEL SECURITY;
+ALTER TABLE metrics_snapshots ENABLE ROW LEVEL SECURITY;
