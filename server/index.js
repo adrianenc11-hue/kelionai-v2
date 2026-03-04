@@ -697,7 +697,7 @@ if (require.main === module) {
                     .catch(e => logger.error({ component: 'Telegram', err: e.message }, 'Webhook registration error'));
             }
         });
-    }).catch(e => {
+    }).catch(() => {
         logger.error({ component: 'Server' }, 'Migration error');
         app.listen(PORT, '0.0.0.0', () => logger.info({ component: 'Server', port: PORT }, 'KelionAI v2.3 on port ' + PORT + ' (migration failed)'));
     });
