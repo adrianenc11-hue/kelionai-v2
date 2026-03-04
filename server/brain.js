@@ -254,6 +254,12 @@ Reply STRICTLY with JSON:
             needsAdminStats: false,
             needsAdminTrading: false, adminTradingAction: '',
             needsAdminNews: false,
+            // Table 3: Non-AI function intents
+            needsAuth: false, authAction: '', authData: {},
+            needsPayments: false, paymentAction: '',
+            needsNewsStandalone: false, newsAction: '',
+            needsLegal: false, legalAction: '',
+            needsHealthCheck: false,
             isQuestion: false, isCommand: false, isEmotional: false,
             isEmergency: false, isGreeting: false, isFollowUp: false,
             complexity: 'simple', emotionalTone: 'neutral',
@@ -417,6 +423,60 @@ Reply STRICTLY with JSON:
             result.needsAdminNews = true;
         }
 
+        // ── TABLE 3: AUTH from chat ──
+        if (/\b(logheaz[aă]|autentific|login|sign\s*in|conecteaz[aă]|intr[aă]\s*in\s*cont)\b/i.test(lower)) {
+            result.needsAuth = true; result.authAction = 'login';
+        }
+        if (/\b(inregistr|register|sign\s*up|cont\s*nou|creaz[aă]\s*cont|fa-mi\s*cont)\b/i.test(lower)) {
+            result.needsAuth = true; result.authAction = 'register';
+        }
+        if (/\b(delogheaz[aă]|logout|sign\s*out|deconecteaz[aă]|iesire|iesi)\b/i.test(lower)) {
+            result.needsAuth = true; result.authAction = 'logout';
+        }
+        if (/\b(schimb[aă].*parol|change.*pass|reset.*parol|parol[aă]\s*nou)\b/i.test(lower)) {
+            result.needsAuth = true; result.authAction = 'changePassword';
+        }
+        if (/\b(schimb[aă].*email|change.*email|email\s*nou)\b/i.test(lower)) {
+            result.needsAuth = true; result.authAction = 'changeEmail';
+        }
+        if (/\b(am\s*uitat.*parol|forgot.*pass|reset[eă].*parol|nu.*mai.*stiu.*parol)\b/i.test(lower)) {
+            result.needsAuth = true; result.authAction = 'forgotPassword';
+        }
+
+        // ── TABLE 3: PAYMENTS from chat ──
+        if (/\b(abonament|plan|pret|price|subscri|tarif|cat\s*cost|pachete)\b/i.test(lower) && !result.needsAdminStats) {
+            result.needsPayments = true; result.paymentAction = 'plans';
+        }
+        if (/\b(vreau\s*(pro|premium)|cump[aă]r|upgrade|platesc|achit|comand)\b/i.test(lower)) {
+            result.needsPayments = true; result.paymentAction = 'checkout';
+        }
+        if (/\b(factur[aă]|billing|gestion.*abonament|manage.*sub|anuleaz[aă])\b/i.test(lower)) {
+            result.needsPayments = true; result.paymentAction = 'portal';
+        }
+
+        // ── TABLE 3: NEWS standalone (not admin) ──
+        if (/\b(ce\s*se\s*(mai\s*)?intampl|stiri\s*(de\s*)?azi|noutati|breaking|ultima\s*or[aă]|urgent)\b/i.test(lower)) {
+            result.needsNewsStandalone = true;
+            result.newsAction = /\b(breaking|urgent|ultima\s*or)\b/i.test(lower) ? 'breaking' : 'latest';
+        }
+
+        // ── TABLE 3: LEGAL from chat ──
+        if (/\b(termeni|terms|conditii)\b/i.test(lower)) {
+            result.needsLegal = true; result.legalAction = 'terms';
+        }
+        if (/\b(confidentialitate|privacy|date\s*personale|politica)\b/i.test(lower)) {
+            result.needsLegal = true; result.legalAction = 'privacy';
+        }
+        if (/\b(gdpr|sterge.*date|export.*date|datele\s*mele|drepturile\s*mele)\b/i.test(lower)) {
+            result.needsLegal = true;
+            result.legalAction = /\b(sterge|delete|elimina)\b/i.test(lower) ? 'deleteData' : 'exportData';
+        }
+
+        // ── TABLE 3: HEALTH CHECK from chat ──
+        if (/\b(cum\s*esti|functional|functionez|cum\s*te\s*simti|esti\s*ok|status\s*server|self\s*check)\b/i.test(lower)) {
+            result.needsHealthCheck = true;
+        }
+
         // ── COMPLEXITY ──
         const toolsNeeded = [result.needsSearch, result.needsWeather, result.needsImage, result.needsMap, result.needsVision].filter(Boolean).length;
         if (toolsNeeded >= 2 || words.length > 30 || text.split(/[?.!]/).length > 3) result.complexity = 'complex';
@@ -486,6 +546,12 @@ Reply STRICTLY with JSON:
             if (analysis.needsAdminStats && !seen.has('adminStats')) { plan.push({ tool: 'adminStats' }); seen.add('adminStats'); }
             if (analysis.needsAdminTrading && !seen.has('adminTrading')) { plan.push({ tool: 'adminTrading', action: analysis.adminTradingAction }); seen.add('adminTrading'); }
             if (analysis.needsAdminNews && !seen.has('adminNews')) { plan.push({ tool: 'adminNews' }); seen.add('adminNews'); }
+            // Table 3: Non-AI function tools
+            if (analysis.needsAuth && !seen.has('authAction')) { plan.push({ tool: 'authAction', action: analysis.authAction, data: analysis.authData }); seen.add('authAction'); }
+            if (analysis.needsPayments && !seen.has('paymentAction')) { plan.push({ tool: 'paymentAction', action: analysis.paymentAction }); seen.add('paymentAction'); }
+            if (analysis.needsNewsStandalone && !seen.has('newsAction')) { plan.push({ tool: 'newsAction', action: analysis.newsAction }); seen.add('newsAction'); }
+            if (analysis.needsLegal && !seen.has('legalAction')) { plan.push({ tool: 'legalAction', action: analysis.legalAction }); seen.add('legalAction'); }
+            if (analysis.needsHealthCheck && !seen.has('healthCheck')) { plan.push({ tool: 'healthCheck' }); seen.add('healthCheck'); }
         }
 
         // Check for known good combinations from journal
@@ -536,7 +602,7 @@ Reply STRICTLY with JSON:
     }
 
     async executeTool(step) {
-        const timeouts = { search: 8000, weather: 5000, imagine: 15000, memory: 3000, map: 100, vision: 15000, tts: 10000, stt: 10000, faceCheck: 10000, faceRegister: 10000, voiceClone: 15000, openURL: 3000, radio: 3000, video: 5000, webNav: 5000 };
+        const timeouts = { search: 8000, weather: 5000, imagine: 15000, memory: 3000, map: 100, vision: 15000, tts: 10000, stt: 10000, faceCheck: 10000, faceRegister: 10000, voiceClone: 15000, openURL: 3000, radio: 3000, video: 5000, webNav: 5000, authAction: 5000, paymentAction: 5000, newsAction: 5000, legalAction: 3000, healthCheck: 3000 };
         const tmout = (ms) => new Promise((_, r) => setTimeout(() => r(new Error('Timeout')), ms));
         return Promise.race([this._run(step), tmout(timeouts[step.tool] || 10000)]);
     }
@@ -563,6 +629,12 @@ Reply STRICTLY with JSON:
             case 'adminStats': return this._adminStats();
             case 'adminTrading': return this._adminTrading(step.action);
             case 'adminNews': return this._adminNews();
+            // Table 3: Non-AI function tools
+            case 'authAction': return this._authAction(step.action, step.data);
+            case 'paymentAction': return this._paymentAction(step.action);
+            case 'newsAction': return this._newsAction(step.action);
+            case 'legalAction': return this._legalAction(step.action);
+            case 'healthCheck': return this._healthCheck();
             default: return null;
         }
     }
@@ -590,6 +662,12 @@ Reply STRICTLY with JSON:
         if (results.radio) ctx += `\n[MONITOR: Radio ${results.radio.station} redă acum pe monitor. Informează utilizatorul.]`;
         if (results.video) ctx += `\n[MONITOR: Video "${results.video.title || results.video.query}" se redă pe ecran.]`;
         if (results.webNav) ctx += `\n[MONITOR: Am navigat la ${results.webNav.url}. Descrie ce apare.]`;
+        // Table 3: Non-AI contexts
+        if (results.authAction) ctx += `\n[AUTH: ${results.authAction.summary}]`;
+        if (results.paymentAction) ctx += `\n[PAYMENTS: ${results.paymentAction.summary}]`;
+        if (results.newsAction) ctx += `\n[ȘTIRI: ${results.newsAction.summary}]`;
+        if (results.legalAction) ctx += `\n[LEGAL: ${results.legalAction.summary}]`;
+        if (results.healthCheck) ctx += `\n[HEALTH: ${results.healthCheck.summary}]`;
 
         if (analysis.isEmotional && analysis.emotionalTone !== 'neutral') {
             ctx += `\n[Utilizatorul pare ${analysis.emotionalTone}. Adapteaza tonul empatic.]`;
@@ -844,6 +922,275 @@ Reply STRICTLY with JSON:
             presentOnMonitor: true,
             summary: `Am navigat la ${url} pe monitor.`
         };
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // 10b. TABLE 3 NON-AI FUNCTION IMPLEMENTATIONS
+    // ═══════════════════════════════════════════════════════════
+
+    // ── AUTH ACTION (from chat) ──
+    async _authAction(action, data) {
+        this.toolStats.authAction = (this.toolStats.authAction || 0) + 1;
+        const actionMessages = {
+            login: {
+                summary: 'Pentru a te loga, folosește formularul de login din interfață (butonul 👤 din colțul dreapta-sus) sau trimite-mi email/parolă. Autentificarea necesită Supabase Auth.',
+                instructions: 'Deschide interfața web → click pe iconița de user → completează email și parola.',
+                requiresUI: true
+            },
+            register: {
+                summary: 'Pentru a crea un cont nou, folosește formularul de înregistrare din interfață. Vei primi un email de confirmare.',
+                instructions: 'Deschide interfața web → click pe "Cont Nou" → completează email, parolă și nume.',
+                requiresUI: true
+            },
+            logout: {
+                summary: 'Te deloghez acum. Sesiunea ta va fi închisă.',
+                instructions: 'Logout efectuat. Poți te reloga oricând.',
+                requiresUI: false
+            },
+            changePassword: {
+                summary: 'Pentru a schimba parola, trebuie să fii logat. Mergi la setări sau trimite-mi parola nouă.',
+                instructions: 'Setări → Schimbă Parola → introdu parola nouă.',
+                requiresUI: true
+            },
+            changeEmail: {
+                summary: 'Pentru a schimba email-ul, trebuie să fii logat. Vei primi confirmare pe noul email.',
+                instructions: 'Setări → Schimbă Email → introdu noul email.',
+                requiresUI: true
+            },
+            forgotPassword: {
+                summary: 'Ți-am trimis un link de resetare pe email. Verifică inbox-ul (și spam).',
+                instructions: 'Verifică email → click pe link → setează parola nouă.',
+                requiresUI: false
+            }
+        };
+        const info = actionMessages[action] || actionMessages.login;
+
+        // Log to Supabase
+        if (this.supabaseAdmin) {
+            try {
+                await this.supabaseAdmin.from('admin_logs').insert({
+                    action: `auth_${action}`,
+                    details: `User requested ${action} from chat`,
+                    result: { action, status: 'guided' },
+                    source: 'brain_chat',
+                    created_at: new Date().toISOString()
+                });
+            } catch (e) { /* ok */ }
+        }
+
+        return {
+            type: 'auth',
+            action,
+            ...info
+        };
+    }
+
+    // ── PAYMENT ACTION (from chat) ──
+    async _paymentAction(action) {
+        this.toolStats.paymentAction = (this.toolStats.paymentAction || 0) + 1;
+        let result = {};
+
+        try {
+            const payments = require('./payments');
+
+            if (action === 'plans') {
+                result = {
+                    action: 'plans',
+                    plans: [
+                        { name: 'Free', price: '0 RON', features: 'Chat AI, 10 căutări/zi, meteo, hărți' },
+                        { name: 'Pro', price: '29 RON/lună', features: 'Tot ce e în Free + Vision, TTS, imagini nelimitat, voice clone' },
+                        { name: 'Premium', price: '99 RON/lună', features: 'Tot nelimitat + trading, admin, suport prioritar' }
+                    ],
+                    summary: 'Planuri disponibile: Free (0 RON), Pro (29 RON/lună), Premium (99 RON/lună). Pentru upgrade, click pe butonul de abonament din interfață sau spune "Vreau Pro".'
+                };
+            } else if (action === 'checkout') {
+                result = {
+                    action: 'checkout',
+                    summary: 'Pentru a face upgrade, deschide interfața web și click pe butonul "Upgrade" sau "Subscribe". Plata se procesează prin Stripe securizat.',
+                    url: '/api/payments/checkout',
+                    requiresUI: true
+                };
+            } else if (action === 'portal') {
+                result = {
+                    action: 'portal',
+                    summary: 'Pentru a gestiona abonamentul (anulare, factură, schimbare plan), deschide portalul de billing din setări.',
+                    url: '/api/payments/portal',
+                    requiresUI: true
+                };
+            }
+        } catch (e) {
+            result = { action, summary: 'Modulul de plăți nu e disponibil momentan.', error: e.message };
+        }
+
+        // Log to Supabase
+        if (this.supabaseAdmin) {
+            try {
+                await this.supabaseAdmin.from('admin_logs').insert({
+                    action: `payment_${action}`,
+                    details: `User requested ${action} from chat`,
+                    result: { action, status: 'informed' },
+                    source: 'brain_chat',
+                    created_at: new Date().toISOString()
+                });
+            } catch (e) { /* ok */ }
+        }
+
+        return { type: 'payment', ...result };
+    }
+
+    // ── NEWS ACTION (from chat — real articles) ──
+    async _newsAction(action) {
+        this.toolStats.newsAction = (this.toolStats.newsAction || 0) + 1;
+        let result = {};
+
+        try {
+            const news = require('./news');
+            const articles = news.getArticlesArray ? news.getArticlesArray() : [];
+
+            if (action === 'breaking') {
+                const breaking = articles.filter(a => a.isBreaking || (a.confirmedBy && a.confirmedBy >= 2));
+                result = {
+                    action: 'breaking',
+                    articles: breaking.slice(0, 5).map(a => ({
+                        title: a.title, source: a.source, category: a.category,
+                        url: a.url, publishedAt: a.publishedAt
+                    })),
+                    count: breaking.length,
+                    summary: breaking.length > 0
+                        ? `🔴 ${breaking.length} știri breaking: ${breaking.slice(0, 3).map(a => a.title).join('; ')}`
+                        : 'Nicio știre breaking momentan. Situația e calmă.'
+                };
+            } else {
+                const latest = articles.slice(0, 8);
+                result = {
+                    action: 'latest',
+                    articles: latest.map(a => ({
+                        title: a.title, source: a.source, category: a.category,
+                        url: a.url, publishedAt: a.publishedAt
+                    })),
+                    count: articles.length,
+                    summary: latest.length > 0
+                        ? `📰 ${articles.length} articole. Ultimele: ${latest.slice(0, 3).map(a => `${a.title} (${a.source})`).join('; ')}`
+                        : 'Nu am știri momentan. Fetch-ul se face automat la ore fixe.'
+                };
+            }
+        } catch (e) {
+            result = { action, summary: 'Modulul de știri nu e disponibil momentan.', error: e.message };
+        }
+
+        // Log to Supabase
+        if (this.supabaseAdmin) {
+            try {
+                await this.supabaseAdmin.from('admin_logs').insert({
+                    action: `news_${action}`,
+                    details: `User requested ${action} news from chat`,
+                    result: { action, articleCount: result.count || 0 },
+                    source: 'brain_chat',
+                    created_at: new Date().toISOString()
+                });
+            } catch (e) { /* ok */ }
+        }
+
+        return { type: 'news', ...result };
+    }
+
+    // ── LEGAL ACTION (from chat) ──
+    async _legalAction(action) {
+        this.toolStats.legalAction = (this.toolStats.legalAction || 0) + 1;
+        let result = {};
+
+        if (action === 'terms') {
+            result = {
+                action: 'terms',
+                summary: 'Termenii și condițiile KelionAI: Serviciul oferă asistent AI personal cu funcții de chat, căutare, meteo, imagini, TTS, STT, trading și news. Utilizarea e gratuită cu limite. Datele sunt protejate conform GDPR. Detalii complete la /api/legal/terms.',
+                url: '/api/legal/terms'
+            };
+        } else if (action === 'privacy') {
+            result = {
+                action: 'privacy',
+                summary: 'Politica de confidențialitate: Colectăm email, conversații AI, preferințe. Zero tracking, zero publicitate. Cookie-uri doar pentru autentificare. Date stocate în Supabase (EU). Drepturile tale: acces, rectificare, ștergere, portabilitate. Contact: privacy@kelionai.app.',
+                url: '/api/legal/privacy'
+            };
+        } else if (action === 'exportData') {
+            result = {
+                action: 'exportData',
+                summary: 'Datele tale sunt protejate în Supabase. Poți vedea tot ce am stocat despre tine din setări. Include: profil, conversații, preferințe, referrals. Datele nu se exportă extern — rămân protejate în baza de date.',
+                url: '/api/legal/gdpr/export',
+                requiresAuth: true
+            };
+        } else if (action === 'deleteData') {
+            result = {
+                action: 'deleteData',
+                summary: '⚠️ Ștergerea datelor e ireversibilă! Se vor șterge: conversații, mesaje, preferințe, referrals. Contul rămâne activ dar fără date. Confirmă din setări dacă ești sigur.',
+                url: '/api/legal/gdpr/delete',
+                requiresAuth: true,
+                requiresConfirmation: true
+            };
+        }
+
+        // Log to Supabase
+        if (this.supabaseAdmin) {
+            try {
+                await this.supabaseAdmin.from('admin_logs').insert({
+                    action: `legal_${action}`,
+                    details: `User requested ${action} from chat`,
+                    result: { action },
+                    source: 'brain_chat',
+                    created_at: new Date().toISOString()
+                });
+            } catch (e) { /* ok */ }
+        }
+
+        return { type: 'legal', ...result };
+    }
+
+    // ── HEALTH CHECK (from chat) ──
+    async _healthCheck() {
+        this.toolStats.healthCheck = (this.toolStats.healthCheck || 0) + 1;
+        const diag = this.getDiagnostics();
+        const uptime = process.uptime();
+        const mem = process.memoryUsage();
+
+        const services = {
+            ai_claude: !!process.env.ANTHROPIC_API_KEY,
+            ai_openai: !!process.env.OPENAI_API_KEY,
+            tts: !!process.env.ELEVENLABS_API_KEY,
+            stt: !!process.env.GROQ_API_KEY,
+            search: !!(process.env.PERPLEXITY_API_KEY || process.env.TAVILY_API_KEY || process.env.SERPER_API_KEY),
+            payments: !!process.env.STRIPE_SECRET_KEY,
+            supabase: !!this.supabaseAdmin,
+            telegram: !!process.env.TELEGRAM_BOT_TOKEN,
+            whatsapp: !!process.env.WA_ACCESS_TOKEN,
+            messenger: !!process.env.MESSENGER_PAGE_TOKEN
+        };
+        const activeServices = Object.entries(services).filter(([, v]) => v).map(([k]) => k);
+        const inactiveServices = Object.entries(services).filter(([, v]) => !v).map(([k]) => k);
+
+        const result = {
+            status: 'operational',
+            uptime: `${Math.floor(uptime / 3600)}h ${Math.floor((uptime % 3600) / 60)}m`,
+            memory: `${Math.round(mem.heapUsed / 1024 / 1024)}MB / ${Math.round(mem.heapTotal / 1024 / 1024)}MB`,
+            conversations: diag.conversations || 0,
+            brainStatus: diag.status || 'active',
+            activeServices,
+            inactiveServices,
+            summary: `✅ Sunt operațional! Uptime: ${Math.floor(uptime / 3600)}h ${Math.floor((uptime % 3600) / 60)}m. Memorie: ${Math.round(mem.heapUsed / 1024 / 1024)}MB. ${activeServices.length} servicii active: ${activeServices.join(', ')}. ${inactiveServices.length > 0 ? `Lipsă: ${inactiveServices.join(', ')}` : 'Toate serviciile funcționale!'}`
+        };
+
+        // Log to Supabase
+        if (this.supabaseAdmin) {
+            try {
+                await this.supabaseAdmin.from('admin_logs').insert({
+                    action: 'health_check',
+                    details: 'User requested health check from chat',
+                    result: { status: result.status, activeServices: activeServices.length },
+                    source: 'brain_chat',
+                    created_at: new Date().toISOString()
+                });
+            } catch (e) { /* ok */ }
+        }
+
+        return { type: 'health', ...result };
     }
 
     // ═══════════════════════════════════════════════════════════
