@@ -445,7 +445,7 @@ Când face ceva banal → adaugi o observație amuzantă scurtă
     };
     const locale = LOCALE_MAP[language] || 'en-US';
     let day;
-    try { day = now.toLocaleDateString(locale, { weekday: 'long' }); } catch (e) { day = now.toLocaleDateString('en-US', { weekday: 'long' }); }
+    try { day = now.toLocaleDateString(locale, { weekday: 'long' }); } catch { day = now.toLocaleDateString('en-US', { weekday: 'long' }); }
     const timeOfDay = hour < 6 ? 'night' : hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : hour < 22 ? 'evening' : 'night';
     prompt += `\nNOW: ${day}, ${hour}:${String(now.getMinutes()).padStart(2, '0')}, ${timeOfDay}. Adapt your tone naturally.\n`;
 

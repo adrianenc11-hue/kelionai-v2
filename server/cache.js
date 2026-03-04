@@ -64,7 +64,7 @@ async function cacheGet(key) {
         try {
             const val = await _redisClient.get(key);
             return val ? JSON.parse(val) : null;
-        } catch (e) {
+        } catch {
             _redisAvailable = false;
         }
     }
@@ -87,7 +87,7 @@ async function cacheSet(key, value, ttlSeconds = 300) {
         try {
             await _redisClient.setEx(key, ttlSeconds, JSON.stringify(value));
             return;
-        } catch (e) {
+        } catch {
             _redisAvailable = false;
         }
     }
@@ -101,7 +101,7 @@ async function cacheSet(key, value, ttlSeconds = 300) {
  */
 async function cacheDel(key) {
     if (_redisClient && _redisAvailable) {
-        try { await _redisClient.del(key); return; } catch (e) { _redisAvailable = false; }
+        try { await _redisClient.del(key); return; } catch { _redisAvailable = false; }
     }
     _memStore.delete(key);
 }

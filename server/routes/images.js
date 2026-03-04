@@ -34,7 +34,7 @@ router.post('/', imageLimiter, validate(imagineSchema), async (req, res) => {
         if (!b64) return res.status(500).json({ error: 'No data' });
         incrementUsage(user?.id, 'image', supabaseAdmin).catch(e => logger.warn({ component: 'Images', err: e.message }, 'incrementUsage failed'));
         res.json({ image: 'data:image/png;base64,' + b64, prompt, engine: 'FLUX' });
-    } catch (e) { res.status(500).json({ error: 'Image error' }); }
+    } catch { res.status(500).json({ error: 'Image error' }); }
 });
 
 module.exports = router;

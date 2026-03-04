@@ -32,7 +32,7 @@ router.post('/register', authLimiter, validate(registerSchema), async (req, res)
             return res.status(400).json({ error: safeMessage });
         }
         res.json({ user: { id: data.user.id, email: data.user.email, name: data.user.user_metadata?.full_name }, message: 'Please check your email to verify your account before signing in.' });
-    } catch (e) { res.status(500).json({ error: 'Registration error' }); }
+    } catch { res.status(500).json({ error: 'Registration error' }); }
 });
 
 // POST /api/auth/login
@@ -48,7 +48,7 @@ router.post('/login', authLimiter, validate(loginSchema), async (req, res) => {
             return res.status(403).json({ error: 'Email not verified. Please check your inbox and verify your email before signing in.' });
         }
         res.json({ user: { id: data.user.id, email: data.user.email, name: data.user.user_metadata?.full_name }, session: data.session });
-    } catch (e) { res.status(500).json({ error: 'Login error' }); }
+    } catch { res.status(500).json({ error: 'Login error' }); }
 });
 
 // POST /api/auth/logout
@@ -64,7 +64,7 @@ router.get('/me', async (req, res) => {
         const u = await getUserFromToken(req);
         if (!u) return res.status(401).json({ error: 'Not authenticated' });
         res.json({ user: { id: u.id, email: u.email, name: u.user_metadata?.full_name } });
-    } catch (e) { res.status(500).json({ error: 'Auth error' }); }
+    } catch { res.status(500).json({ error: 'Auth error' }); }
 });
 
 // POST /api/auth/refresh
@@ -76,7 +76,7 @@ router.post('/refresh', validate(refreshSchema), async (req, res) => {
         const { data, error } = await supabase.auth.refreshSession({ refresh_token });
         if (error) return res.status(401).json({ error: error.message });
         res.json({ user: { id: data.user.id, email: data.user.email, name: data.user.user_metadata?.full_name }, session: data.session });
-    } catch (e) { res.status(500).json({ error: 'Refresh error' }); }
+    } catch { res.status(500).json({ error: 'Refresh error' }); }
 });
 
 // POST /api/auth/forgot-password
@@ -89,7 +89,7 @@ router.post('/forgot-password', authLimiter, validate(forgotPasswordSchema), asy
         const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
         if (error) return res.status(400).json({ error: error.message });
         res.json({ message: 'If an account with that email exists, a password reset link has been sent.' });
-    } catch (e) { res.status(500).json({ error: 'Password reset error' }); }
+    } catch { res.status(500).json({ error: 'Password reset error' }); }
 });
 
 // POST /api/auth/reset-password
@@ -103,7 +103,7 @@ router.post('/reset-password', authLimiter, validate(resetPasswordSchema), async
         const { error } = await supabase.auth.updateUser({ password });
         if (error) return res.status(400).json({ error: error.message });
         res.json({ message: 'Password updated successfully.' });
-    } catch (e) { res.status(500).json({ error: 'Password reset error' }); }
+    } catch { res.status(500).json({ error: 'Password reset error' }); }
 });
 
 // POST /api/auth/change-password
@@ -117,7 +117,7 @@ router.post('/change-password', authLimiter, validate(changePasswordSchema), asy
         const { error } = await supabase.auth.updateUser({ password });
         if (error) return res.status(400).json({ error: error.message });
         res.json({ message: 'Password updated successfully.' });
-    } catch (e) { res.status(500).json({ error: 'Change password error' }); }
+    } catch { res.status(500).json({ error: 'Change password error' }); }
 });
 
 // POST /api/auth/change-email
@@ -131,7 +131,7 @@ router.post('/change-email', authLimiter, validate(changeEmailSchema), async (re
         const { error } = await supabase.auth.updateUser({ email });
         if (error) return res.status(400).json({ error: error.message });
         res.json({ message: 'A confirmation email has been sent to the new address.' });
-    } catch (e) { res.status(500).json({ error: 'Change email error' }); }
+    } catch { res.status(500).json({ error: 'Change email error' }); }
 });
 
 module.exports = router;

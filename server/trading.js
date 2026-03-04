@@ -474,7 +474,7 @@ async function fetchRealPrices(asset, length = 300) {
 }
 
 /** Backward-compatible sync wrapper (for routes that call generateSimulatedPrices) */
-function generateSimulatedPrices(asset, length = 300) {
+function _generateSimulatedPrices(asset, length = 300) {
     const cached = priceCache[`${asset}_${length}`];
     if (cached && Date.now() - cached.ts < PRICE_CACHE_TTL) {
         return { prices: cached.prices, volumes: cached.volumes };
@@ -645,7 +645,7 @@ router.get('/portfolio', async (req, res) => {
             try {
                 const { prices } = await fetchRealPrices(asset, 5);
                 priceData[asset] = prices[prices.length - 1];
-            } catch (e) { priceData[asset] = null; }
+            } catch { priceData[asset] = null; }
         }
 
         // Calculate P&L for each open position
@@ -1089,7 +1089,7 @@ router.post('/execute', async (req, res) => {
 router.get('/full-analysis/:asset?', async (req, res) => {
     try {
         const asset = req.params.asset || 'BTC';
-        const { prices, volumes, source } = await fetchRealPrices(asset, 300);
+        const { prices, _volumes, source } = await fetchRealPrices(asset, 300);
         if (!prices || prices.length < 50) return res.status(400).json({ error: 'Insufficient data' });
 
         const highs = prices.map((p, i) => i > 0 ? Math.max(p, prices[i - 1]) * 1.002 : p * 1.002);

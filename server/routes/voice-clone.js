@@ -152,7 +152,7 @@ router.get('/voice/clone', async (req, res) => {
         } else {
             res.json({ hasClone: false });
         }
-    } catch (e) {
+    } catch {
         res.json({ hasClone: false });
     }
 });

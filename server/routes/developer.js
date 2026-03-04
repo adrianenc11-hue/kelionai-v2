@@ -200,7 +200,7 @@ router.get('/webhooks', mgmtLimiter, async (req, res) => {
             .single();
 
         res.json({ url: data?.value || null });
-    } catch (e) {
+    } catch {
         res.json({ url: null });
     }
 });

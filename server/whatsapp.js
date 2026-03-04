@@ -6,7 +6,7 @@
 'use strict';
 
 const express = require('express');
-const crypto = require('crypto');
+const _crypto = require('crypto');
 const fetch = require('node-fetch');
 const FormData = require('form-data');
 const logger = require('./logger');

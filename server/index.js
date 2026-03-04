@@ -261,7 +261,7 @@ async function getUserFromToken(req) {
     const h = req.headers.authorization;
     if (!h || !h.startsWith('Bearer ') || !supabase) return null;
     try { const { data: { user } } = await supabase.auth.getUser(h.split(' ')[1]); return user; }
-    catch (e) { return null; }
+    catch { return null; }
 }
 
 // ═══ SHARE HELPERS VIA app.locals (for all route modules) ═══
@@ -392,7 +392,7 @@ async function load(){
     <div class="card" style="grid-column:1/-1"><h2>Journal (last 10)</h2>
     <div class="journal">\${(d.journal||[]).map(j=>\`<div class="journal-entry">\${new Date(j.time).toLocaleTimeString()} — <strong>\${j.event}</strong>: \${j.lesson}</div>\`).join('')||'Empty'}</div></div>
     \`;
-  }catch(e){document.getElementById('grid').innerHTML='<div class="card"><div class="stat bad">OFFLINE</div></div>';}
+  }catch{document.getElementById('grid').innerHTML='<div class="card"><div class="stat bad">OFFLINE</div></div>';}
 }
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function ic(ok){return ok?'<span class="hc-ok">✅</span>':'<span class="hc-err">❌</span>';}
@@ -450,7 +450,7 @@ async function runHealthCheck(){
     if(r.status===401){body.innerHTML='<div style="color:#ff4444;padding:20px">❌ Unauthorized. Set admin secret in sessionStorage (kelion_admin_secret).</div>';return;}
     _hcData=d;
     body.innerHTML=renderHC(d);
-  }catch(e){body.innerHTML='<div style="color:#ff4444;padding:20px">❌ Error: '+esc(e.message)+'</div>';}
+  }catch{body.innerHTML='<div style="color:#ff4444;padding:20px">❌ Error: '+esc(e.message)+'</div>';}
 }
 function exportHC(){
   if(!_hcData)return;
@@ -510,7 +510,7 @@ app.post('/api/cookie-consent', express.json(), asyncHandler(async (req, res) =>
             created_at: new Date().toISOString()
         });
         res.json({ success: true, consent: { analytics, marketing, functional } });
-    } catch (e) {
+    } catch {
         res.status(500).json({ error: 'Failed to save consent' });
     }
 }));
@@ -556,18 +556,18 @@ instagram.setSupabase(supabaseAdmin);
 newsModule.onNewsFetched(async (articles) => {
     logger.info({ component: 'MediaAutoPublish', count: articles.length }, '📢 Auto-publishing news...');
     // Facebook Page (top 3 articles)
-    try { await fbPage.publishNewsBatch(articles, 3); } catch (e) { logger.warn({ component: 'MediaAutoPublish', err: e.message }, 'FB Page publish failed'); }
+    try { await fbPage.publishNewsBatch(articles, 3); } catch { logger.warn({ component: 'MediaAutoPublish', err: e.message }, 'FB Page publish failed'); }
     // Telegram channel broadcast
-    try { await broadcastNews(articles); } catch (e) { logger.warn({ component: 'MediaAutoPublish', err: e.message }, 'Telegram broadcast failed'); }
+    try { await broadcastNews(articles); } catch { logger.warn({ component: 'MediaAutoPublish', err: e.message }, 'Telegram broadcast failed'); }
     // Instagram auto-publish (top article with image)
     try {
         const topArticle = articles.find(a => a.imageUrl || a.image_url) || articles[0];
         if (topArticle && instagram.publishNewsBatch) {
             await instagram.publishNewsBatch([topArticle], 1);
         }
-    } catch (e) { logger.warn({ component: 'MediaAutoPublish', err: e.message }, 'Instagram publish failed'); }
+    } catch { logger.warn({ component: 'MediaAutoPublish', err: e.message }, 'Instagram publish failed'); }
     // Messenger subscribers notification
-    try { await notifySubscribersNews(articles); } catch (e) { logger.warn({ component: 'MediaAutoPublish', err: e.message }, 'Messenger subscribers notification failed'); }
+    try { await notifySubscribersNews(articles); } catch { logger.warn({ component: 'MediaAutoPublish', err: e.message }, 'Messenger subscribers notification failed'); }
 });
 
 // ═══ STORE ARTICLES REF IN app.locals for Telegram bot ═══
@@ -579,7 +579,7 @@ app.use('/api/trading', adminAuth, require('./trading'));
 // ═══ SPORTS BOT — REMOVED (no real utility without betting integration) ═══
 
 // 404 for unknown API routes — must come before the catch-all
-app.use('/api', (req, res, next) => {
+app.use('/api', (req, res, _next) => {
     res.status(404).json({ error: 'API endpoint not found' });
 });
 
@@ -591,7 +591,7 @@ app.get('/admin', (req, res, next) => {
     try {
         const sb = Buffer.from(secret), eb = Buffer.from(expected);
         if (sb.length !== eb.length || !require('crypto').timingSafeEqual(sb, eb)) return res.status(404).type('html').send(_raw404Html);
-    } catch (e) { return res.status(404).type('html').send(_raw404Html); }
+    } catch { return res.status(404).type('html').send(_raw404Html); }
     next();
 });
 app.use('/admin', express.static(path.join(__dirname, '..', 'app', 'admin')));
@@ -602,7 +602,7 @@ app.get('/admin/*', (req, res, next) => {
     try {
         const sb = Buffer.from(secret), eb = Buffer.from(expected);
         if (sb.length !== eb.length || !require('crypto').timingSafeEqual(sb, eb)) return res.status(404).type('html').send(_raw404Html);
-    } catch (e) { return res.status(404).type('html').send(_raw404Html); }
+    } catch { return res.status(404).type('html').send(_raw404Html); }
     next();
 });
 

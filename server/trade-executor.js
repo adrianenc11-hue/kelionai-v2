@@ -402,7 +402,7 @@ function calculateIchimoku(highs, lows, closes, tenkanP = 9, kijunP = 26, senkou
     const cloudThickness = cloudTop !== null && cloudBottom !== null ? +((cloudTop - cloudBottom) / price * 100).toFixed(2) : 0;
     const priceAboveCloud = cloudTop !== null ? price > cloudTop : null;
     const priceBelowCloud = cloudBottom !== null ? price < cloudBottom : null;
-    const priceInCloud = !priceAboveCloud && !priceBelowCloud;
+    const _priceInCloud = !priceAboveCloud && !priceBelowCloud;
 
     // Kumo twist (senkou A crosses senkou B → trend change)
     const kumoTwist = senkouA !== null && senkouB !== null ? (senkouA > senkouB ? 'bullish' : senkouA < senkouB ? 'bearish' : 'flat') : null;

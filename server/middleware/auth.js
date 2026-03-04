@@ -23,7 +23,7 @@ function adminAuth(req, res, next) {
         if (secretBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(secretBuf, expectedBuf)) {
             return res.status(401).json({ error: 'Unauthorized' });
         }
-    } catch (e) {
+    } catch {
         return res.status(401).json({ error: 'Unauthorized' });
     }
     next();

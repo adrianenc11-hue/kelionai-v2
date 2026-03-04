@@ -174,7 +174,7 @@ router.get('/admin/health-check', adminAuth, async (req, res) => {
         const grade = score >= 90 ? 'A' : score >= 75 ? 'B' : score >= 60 ? 'C' : score >= 40 ? 'D' : 'F';
 
         res.json({ timestamp: new Date().toISOString(), score, grade, server, services, database, brain: brainResult, auth, payments: paymentsCheck, rateLimits, security, errors, recommendations });
-    } catch (e) { res.status(500).json({ error: 'Health check error' }); }
+    } catch { res.status(500).json({ error: 'Health check error' }); }
 });
 
 // GET /api/payments/admin/stats — revenue, active subscribers, churn
@@ -183,7 +183,7 @@ router.get('/payments/admin/stats', adminAuth, async (req, res) => {
         const { supabaseAdmin } = req.app.locals;
         if (!supabaseAdmin) return res.status(503).json({ error: 'DB unavailable' });
 
-        const { PLAN_LIMITS } = require('../payments');
+        const { _PLAN_LIMITS } = require('../payments');
         const PLAN_PRICES = { pro: 9.99, enterprise: 29.99, premium: 19.99 };
 
         const { data: subs } = await supabaseAdmin
@@ -227,7 +227,7 @@ router.get('/payments/admin/stats', adminAuth, async (req, res) => {
             usageToday: usageTotals,
             timestamp: now.toISOString()
         });
-    } catch (e) { res.status(500).json({ error: 'Stats error' }); }
+    } catch { res.status(500).json({ error: 'Stats error' }); }
 });
 
 module.exports = { router, adminAuth };
