@@ -22,15 +22,22 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Wait for Railway deploy to finish
+        run: sleep 180
+
       - name: Verify live site is up
         run: |
-          STATUS=$(curl -sf -o /dev/null -w "%{http_code}" https://kelionai.app/ || echo "000")
-          if [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 500 ]; then
-            echo "✅ Site is live (HTTP $STATUS)"
-          else
-            echo "❌ Site is DOWN — skipping Lighthouse"
-            exit 1
-          fi
+          for i in 1 2 3; do
+            STATUS=$(curl -sf -o /dev/null -w "%{http_code}" https://kelionai.app/ || echo "000")
+            if [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 500 ]; then
+              echo "✅ Site is live (HTTP $STATUS)"
+              exit 0
+            fi
+            echo "⏳ Attempt $i: HTTP $STATUS — waiting 30s..."
+            sleep 30
+          done
+          echo "❌ Site is DOWN after 3 retries — skipping Lighthouse"
+          exit 1
 
       - name: Run Lighthouse CI against LIVE
         run: npx @lhci/cli@0.14.0 autorun
