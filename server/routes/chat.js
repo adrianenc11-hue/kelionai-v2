@@ -21,13 +21,16 @@ const convLimiter = rateLimit({ windowMs: 60 * 1000, max: 30, message: { error: 
 async function saveConv(supabaseAdmin, uid, avatar, userMsg, aiReply, convId, lang) {
     if (!supabaseAdmin) return;
     if (!convId) {
-        const { data } = await supabaseAdmin.from('conversations').insert({ user_id: uid || null, avatar, title: userMsg.substring(0, 80) }).select('id').single();
+        const { data, error } = await supabaseAdmin.from('conversations').insert({ user_id: uid || null, avatar, title: userMsg.substring(0, 80) }).select('id').single();
+        if (error) { logger.warn({ component: 'Chat', err: error.message }, 'saveConv insert failed'); return; }
         convId = data?.id;
-    } else { await supabaseAdmin.from('conversations').update({ updated_at: new Date().toISOString() }).eq('id', convId); }
-    if (convId) await supabaseAdmin.from('messages').insert([
-        { conversation_id: convId, role: 'user', content: userMsg, language: lang, source: 'web' },
-        { conversation_id: convId, role: 'assistant', content: aiReply, language: lang, source: 'web' }
-    ]);
+    } else { const { error: updErr } = await supabaseAdmin.from('conversations').update({ updated_at: new Date().toISOString() }).eq('id', convId); if (updErr) logger.warn({ component: 'Chat', err: updErr.message }, 'saveConv update failed'); }
+    if (convId) {
+        const { error: msgErr } = await supabaseAdmin.from('messages').insert([
+            { conversation_id: convId, role: 'user', content: userMsg, language: lang, source: 'web' },
+            { conversation_id: convId, role: 'assistant', content: aiReply, language: lang, source: 'web' }
+        ]); if (msgErr) logger.warn({ component: 'Chat', err: msgErr.message }, 'saveConv messages failed');
+    }
     return convId;
 }
 
@@ -286,7 +289,8 @@ router.get('/conversations', convLimiter, async (req, res) => {
         const { getUserFromToken, supabaseAdmin } = req.app.locals;
         const u = await getUserFromToken(req);
         if (!u || !supabaseAdmin) return res.json({ conversations: [] });
-        const { data } = await supabaseAdmin.from('conversations').select('id, avatar, title, created_at, updated_at').eq('user_id', u.id).order('updated_at', { ascending: false }).limit(50);
+        const { data, error } = await supabaseAdmin.from('conversations').select('id, avatar, title, created_at, updated_at').eq('user_id', u.id).order('updated_at', { ascending: false }).limit(50);
+        if (error) logger.warn({ component: 'Chat', err: error.message }, 'conversations list failed');
         res.json({ conversations: data || [] });
     } catch { res.status(500).json({ error: 'Server error' }); }
 });
@@ -300,7 +304,8 @@ router.get('/conversations/:id/messages', convLimiter, async (req, res) => {
         const { data: conv, error: convErr } = await supabaseAdmin.from('conversations').select('id').eq('id', req.params.id).eq('user_id', u.id).single();
         if (convErr && convErr.code !== 'PGRST116') return res.status(500).json({ error: 'Server error' });
         if (!conv) return res.status(403).json({ error: 'Access denied' });
-        const { data } = await supabaseAdmin.from('messages').select('id, role, content, created_at').eq('conversation_id', req.params.id).order('created_at', { ascending: true });
+        const { data, error: msgErr2 } = await supabaseAdmin.from('messages').select('id, role, content, created_at').eq('conversation_id', req.params.id).order('created_at', { ascending: true });
+        if (msgErr2) logger.warn({ component: 'Chat', err: msgErr2.message }, 'messages list failed');
         res.json({ messages: data || [] });
     } catch { res.status(500).json({ error: 'Server error' }); }
 });
@@ -313,9 +318,9 @@ router.post('/memory', memoryLimiter, validate(memorySchema), async (req, res) =
         const user = await getUserFromToken(req);
         const uid = 'u:' + (user?.id || 'guest');
         if (supabaseAdmin && user) {
-            if (action === 'save') { await supabaseAdmin.from('user_preferences').upsert({ user_id: user.id, key, value: typeof value === 'object' ? value : { data: value } }, { onConflict: 'user_id,key' }); return res.json({ success: true }); }
-            if (action === 'load') { const { data } = await supabaseAdmin.from('user_preferences').select('value').eq('user_id', user.id).eq('key', key).single(); return res.json({ value: data?.value || null }); }
-            if (action === 'list') { const { data } = await supabaseAdmin.from('user_preferences').select('key, value').eq('user_id', user.id); return res.json({ keys: (data || []).map(d => d.key), items: data || [] }); }
+            if (action === 'save') { const { error: sErr } = await supabaseAdmin.from('user_preferences').upsert({ user_id: user.id, key, value: typeof value === 'object' ? value : { data: value } }, { onConflict: 'user_id,key' }); if (sErr) logger.warn({ component: 'Memory', err: sErr.message }, 'pref save failed'); return res.json({ success: !sErr }); }
+            if (action === 'load') { const { data, error: lErr } = await supabaseAdmin.from('user_preferences').select('value').eq('user_id', user.id).eq('key', key).single(); if (lErr && lErr.code !== 'PGRST116') logger.warn({ component: 'Memory', err: lErr.message }, 'pref load failed'); return res.json({ value: data?.value || null }); }
+            if (action === 'list') { const { data, error: liErr } = await supabaseAdmin.from('user_preferences').select('key, value').eq('user_id', user.id); if (liErr) logger.warn({ component: 'Memory', err: liErr.message }, 'pref list failed'); return res.json({ keys: (data || []).map(d => d.key), items: data || [] }); }
         }
         if (!memFallback[uid]) memFallback[uid] = Object.create(null);
         if (action === 'save') { memFallback[uid][key] = value; res.json({ success: true }); }
