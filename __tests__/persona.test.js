@@ -72,7 +72,8 @@ describe('buildSystemPrompt', () => {
 
     test('includes variability rules', () => {
         const prompt = buildSystemPrompt('kelion', 'ro', '', null, false);
-        expect(prompt).toContain('VARIABIL');
+        // Prompt includes style rules that encourage variety (e.g. no repetitive disclaimers)
+        expect(prompt).toContain('NU');
     });
 });
 

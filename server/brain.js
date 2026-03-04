@@ -1469,7 +1469,12 @@ Reply STRICTLY with JSON:
     }
 
     // ── SYSTEM STATUS — Reports on DB, migration, cache, validation ──
+    // BRAIN-2 FIX: Cache results for 5 minutes to avoid 21 sequential queries
     async _systemStatus() {
+        const now = Date.now();
+        if (this._systemStatusCache && (now - this._systemStatusCacheTime) < 300000) {
+            return this._systemStatusCache;
+        }
         try {
             let tableCounts = {};
             const tables = ['conversations', 'messages', 'user_preferences', 'subscriptions', 'usage', 'referral_codes', 'referrals', 'admin_logs', 'trades', 'profiles', 'api_keys', 'media_history', 'news_cache', 'brain_learnings', 'telegram_users', 'whatsapp_users', 'whatsapp_messages', 'trade_intelligence', 'cookie_consents', 'metrics_snapshots', 'processed_webhook_events'];
@@ -1511,8 +1516,11 @@ Reply STRICTLY with JSON:
                         source: 'brain_chat',
                         created_at: new Date().toISOString()
                     });
-                } catch (e) { logger.warn({ component: 'Brain', err: e.message }, 'ok'); }
+                } catch (e) { logger.warn({ component: 'Brain', err: e.message }, 'admin_logs insert failed'); }
             }
+            // Cache the result for 5 minutes
+            this._systemStatusCache = result;
+            this._systemStatusCacheTime = Date.now();
             return result;
         } catch (e) {
             return { type: 'systemStatus', error: e.message, summary: `Eroare system: ${e.message}` };
@@ -1569,7 +1577,7 @@ Reply STRICTLY with JSON:
                     if (this.supabaseAdmin) {
                         try {
                             const today = new Date().toISOString().split('T')[0];
-                            await this.supabaseAdmin.from('usage').upsert({ user_id: 'system', type: 'vision', date: today, count: 1 }, { onConflict: 'user_id,type,date' });
+                            await this.supabaseAdmin.from('usage').upsert({ user_id: userId || 'guest', type: 'vision', date: today, count: 1 }, { onConflict: 'user_id,type,date' });
                         } catch (e) { logger.warn({ component: 'Brain', err: e.message }, 'ok'); }
                     }
                     return {
@@ -1638,7 +1646,7 @@ Reply STRICTLY with JSON:
                     if (this.supabaseAdmin) {
                         try {
                             const today = new Date().toISOString().split('T')[0];
-                            await this.supabaseAdmin.from('usage').upsert({ user_id: userId || 'system', type: 'tts', date: today, count: 1 }, { onConflict: 'user_id,type,date' });
+                            await this.supabaseAdmin.from('usage').upsert({ user_id: userId || 'guest', type: 'tts', date: today, count: 1 }, { onConflict: 'user_id,type,date' });
                         } catch (e) { logger.warn({ component: 'Brain', err: e.message }, 'ok'); }
                     }
                     return {
