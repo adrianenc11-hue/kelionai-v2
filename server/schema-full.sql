@@ -278,3 +278,77 @@ CREATE TABLE IF NOT EXISTS media_history (
 CREATE INDEX IF NOT EXISTS idx_media_history_user ON media_history(user_id);
 CREATE INDEX IF NOT EXISTS idx_media_history_type ON media_history(type);
 CREATE INDEX IF NOT EXISTS idx_media_history_created ON media_history(created_at DESC);
+
+-- ═══ TELEGRAM USERS ═══
+CREATE TABLE IF NOT EXISTS telegram_users (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id TEXT NOT NULL UNIQUE,
+    username TEXT,
+    first_name TEXT,
+    language TEXT DEFAULT 'ro',
+    chat_id TEXT,
+    is_subscribed BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_telegram_users_uid ON telegram_users(user_id);
+
+-- ═══ WHATSAPP USERS ═══
+CREATE TABLE IF NOT EXISTS whatsapp_users (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    phone TEXT NOT NULL UNIQUE,
+    name TEXT,
+    language TEXT DEFAULT 'ro',
+    is_subscribed BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_whatsapp_users_phone ON whatsapp_users(phone);
+
+-- ═══ WHATSAPP MESSAGES ═══
+CREATE TABLE IF NOT EXISTS whatsapp_messages (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    phone TEXT NOT NULL,
+    role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
+    content TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_whatsapp_messages_phone ON whatsapp_messages(phone, created_at DESC);
+
+-- ═══ TRADE INTELLIGENCE ═══
+CREATE TABLE IF NOT EXISTS trade_intelligence (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    asset TEXT NOT NULL DEFAULT 'BTC',
+    analysis_type TEXT NOT NULL,
+    result JSONB DEFAULT '{}',
+    sentiment_score NUMERIC DEFAULT 0,
+    confidence NUMERIC DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_trade_intel_asset ON trade_intelligence(asset, created_at DESC);
+
+-- ═══ COOKIE CONSENTS (GDPR) ═══
+CREATE TABLE IF NOT EXISTS cookie_consents (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id UUID,
+    session_id TEXT,
+    functional BOOLEAN DEFAULT true,
+    analytics BOOLEAN DEFAULT false,
+    marketing BOOLEAN DEFAULT false,
+    ip_address TEXT,
+    user_agent TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_cookie_consents_user ON cookie_consents(user_id);
+
+-- ═══ METRICS SNAPSHOTS (Prometheus/Grafana) ═══
+CREATE TABLE IF NOT EXISTS metrics_snapshots (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    metric_type TEXT NOT NULL,
+    metric_name TEXT NOT NULL,
+    value NUMERIC NOT NULL,
+    labels JSONB DEFAULT '{}',
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_metrics_snap_type ON metrics_snapshots(metric_type, created_at DESC);
