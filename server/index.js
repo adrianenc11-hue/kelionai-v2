@@ -231,7 +231,7 @@ const PORT = process.env.PORT || 3000;
 const memFallback = Object.create(null);
 
 // Cleanup memFallback every hour to prevent memory leaks
-setInterval(() => {
+const _memCleanupInterval = setInterval(() => {
     const keys = Object.keys(memFallback);
     if (keys.length > 1000) {
         // Keep only the most recent 500 entries
