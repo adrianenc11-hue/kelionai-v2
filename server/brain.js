@@ -55,9 +55,11 @@ class KelionBrain {
     // ═══════════════════════════════════════════════════════════
     // MAIN ENTRY — Complete thinking loop
     // ═══════════════════════════════════════════════════════════
-    async think(message, avatar, history, language, userId, conversationId) {
+    async think(message, avatar, history, language, userId, conversationId, mediaData = {}) {
         this.conversationCount++;
         const startTime = Date.now();
+        // Store media data for tool access
+        this._currentMediaData = mediaData || {};
 
         try {
             // Step 1: ANALYZE intent deeply
@@ -70,7 +72,7 @@ class KelionBrain {
             }
 
             // Step 3: PLAN tools for each sub-task
-            const plan = this.buildPlan(subTasks, userId);
+            const plan = this.buildPlan(subTasks, userId, this._currentMediaData);
 
             // Step 4: EXECUTE tools in parallel
             const results = await this.executePlan(plan);
@@ -518,7 +520,7 @@ Reply STRICTLY with JSON:
     // ═══════════════════════════════════════════════════════════
     // 4. PLAN BUILDER — Intelligent tool selection
     // ═══════════════════════════════════════════════════════════
-    buildPlan(subTasks, userId) {
+    buildPlan(subTasks, userId, mediaData = {}) {
         const plan = [];
         const seen = new Set();
 
@@ -528,13 +530,13 @@ Reply STRICTLY with JSON:
             if (analysis.needsImage && !seen.has('imagine') && !this.isToolDegraded('imagine')) { plan.push({ tool: 'imagine', prompt: analysis.imagePrompt }); seen.add('imagine'); }
             if (analysis.needsMap && !seen.has('map')) { plan.push({ tool: 'map', place: analysis.mapPlace }); seen.add('map'); }
             if (analysis.needsMemory && userId && !seen.has('memory')) { plan.push({ tool: 'memory', userId }); seen.add('memory'); }
-            // Extended tools
-            if (analysis.needsVision && !seen.has('vision')) { plan.push({ tool: 'vision' }); seen.add('vision'); }
+            // Extended tools — NOW with binary data
+            if (analysis.needsVision && !seen.has('vision')) { plan.push({ tool: 'vision', imageBase64: mediaData.imageBase64 }); seen.add('vision'); }
             if (analysis.needsTTS && !seen.has('tts')) { plan.push({ tool: 'tts', text: analysis.ttsText }); seen.add('tts'); }
-            if (analysis.needsSTT && !seen.has('stt')) { plan.push({ tool: 'stt' }); seen.add('stt'); }
-            if (analysis.needsFaceCheck && !seen.has('faceCheck')) { plan.push({ tool: 'faceCheck' }); seen.add('faceCheck'); }
-            if (analysis.needsFaceRegister && !seen.has('faceRegister') && userId) { plan.push({ tool: 'faceRegister', userId }); seen.add('faceRegister'); }
-            if (analysis.needsVoiceClone && !seen.has('voiceClone') && userId) { plan.push({ tool: 'voiceClone', userId }); seen.add('voiceClone'); }
+            if (analysis.needsSTT && !seen.has('stt')) { plan.push({ tool: 'stt', audioBase64: mediaData.audioBase64 }); seen.add('stt'); }
+            if (analysis.needsFaceCheck && !seen.has('faceCheck')) { plan.push({ tool: 'faceCheck', imageBase64: mediaData.imageBase64 }); seen.add('faceCheck'); }
+            if (analysis.needsFaceRegister && !seen.has('faceRegister') && userId) { plan.push({ tool: 'faceRegister', userId, imageBase64: mediaData.imageBase64 }); seen.add('faceRegister'); }
+            if (analysis.needsVoiceClone && !seen.has('voiceClone') && userId) { plan.push({ tool: 'voiceClone', userId, audioBase64: mediaData.audioBase64 }); seen.add('voiceClone'); }
             // Monitor tools
             if (analysis.needsOpenURL && !seen.has('openURL')) { plan.push({ tool: 'openURL', url: analysis.openURL }); seen.add('openURL'); }
             if (analysis.needsRadio && !seen.has('radio')) { plan.push({ tool: 'radio', station: analysis.radioStation }); seen.add('radio'); }
@@ -614,12 +616,12 @@ Reply STRICTLY with JSON:
             case 'imagine': return this._imagine(step.prompt);
             case 'memory': return this._memory(step.userId);
             case 'map': return this._map(step.place);
-            case 'vision': return this._vision();
+            case 'vision': return this._vision(step.imageBase64);
             case 'tts': return this._tts(step.text);
-            case 'stt': return this._stt();
-            case 'faceCheck': return this._faceCheck();
-            case 'faceRegister': return this._faceRegister(step.userId);
-            case 'voiceClone': return this._voiceClone(step.userId);
+            case 'stt': return this._stt(step.audioBase64);
+            case 'faceCheck': return this._faceCheck(step.imageBase64);
+            case 'faceRegister': return this._faceRegister(step.userId, step.imageBase64);
+            case 'voiceClone': return this._voiceClone(step.userId, step.audioBase64);
             case 'openURL': return this._openURL(step.url);
             case 'radio': return this._radio(step.station);
             case 'video': return this._video(step.query);
@@ -1539,8 +1541,8 @@ Reply STRICTLY with JSON:
         return { type: 'faceRegister', status: 'no_db', summary: 'Baza de date indisponibilă.' };
     }
 
-    // ── VOICE CLONE — ElevenLabs Voice Cloning — REAL status check ──
-    async _voiceClone(userId) {
+    // ── VOICE CLONE — ElevenLabs Voice Cloning — REAL with audio upload ──
+    async _voiceClone(userId, audioBase64) {
         this.toolStats.voiceClone = (this.toolStats.voiceClone || 0) + 1;
         if (!userId) return { type: 'voiceClone', status: 'error', summary: 'Trebuie să fii autentificat.' };
 
@@ -1582,13 +1584,44 @@ Reply STRICTLY with JSON:
             return { type: 'voiceClone', status: 'no_api', summary: 'ELEVENLABS_API_KEY nu e configurată.' };
         }
 
+        // If audioBase64 provided, attempt actual cloning
+        if (audioBase64) {
+            try {
+                const audioBuffer = Buffer.from(audioBase64, 'base64');
+                const FormData = require('form-data');
+                const form = new FormData();
+                form.append('name', `KelionAI_${userId.substring(0, 8)}`);
+                form.append('files', audioBuffer, { filename: 'voice_sample.mp3', contentType: 'audio/mpeg' });
+
+                const r = await fetch('https://api.elevenlabs.io/v1/voices/add', {
+                    method: 'POST',
+                    headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY, ...form.getHeaders() },
+                    body: form
+                });
+                const data = await r.json();
+                if (data.voice_id) {
+                    // Save to Supabase
+                    if (this.supabaseAdmin) {
+                        await this.supabaseAdmin.from('user_preferences').upsert({
+                            user_id: userId, key: 'cloned_voice_id',
+                            value: { voice_id: data.voice_id, name: data.name, created_at: new Date().toISOString() }
+                        }, { onConflict: 'user_id,key' });
+                    }
+                    return { type: 'voiceClone', status: 'cloned', voiceId: data.voice_id, name: data.name, summary: `Vocea ta a fost clonată cu succes! ID: ${data.voice_id}` };
+                }
+                return { type: 'voiceClone', status: 'error', summary: `Clonare eșuată: ${data.detail?.message || JSON.stringify(data)}` };
+            } catch (e) {
+                return { type: 'voiceClone', status: 'error', summary: `Eroare clonare: ${e.message}` };
+            }
+        }
+
         return {
             type: 'voiceClone',
             status: 'ready',
             requiresAudio: true,
             endpoint: '/api/voice/clone',
             instructions: 'Trimite un fișier audio de min. 30 secunde la POST /api/voice/clone cu form-data (field: audio).',
-            summary: 'Pregătit pentru clonare. Trimite audio de 30s prin /api/voice/clone.'
+            summary: 'Pregătit pentru clonare. Trimite audio de 30s prin chat (audioBase64) sau /api/voice/clone.'
         };
     }
 

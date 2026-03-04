@@ -38,7 +38,7 @@ router.post('/chat', chatLimiter, validate(chatSchema), async (req, res) => {
     try {
         const _chatStart = Date.now();
         const { getUserFromToken, supabaseAdmin, brain } = req.app.locals;
-        const { message, avatar = 'kelion', history = [], language = 'ro', conversationId } = req.body;
+        const { message, avatar = 'kelion', history = [], language = 'ro', conversationId, imageBase64, audioBase64 } = req.body;
         if (!message) return res.status(400).json({ error: 'Message is required' });
         const user = await getUserFromToken(req);
 
@@ -53,7 +53,7 @@ router.post('/chat', chatLimiter, validate(chatSchema), async (req, res) => {
         const usage = await checkUsage(user?.id, 'chat', supabaseAdmin);
         if (!usage.allowed) return res.status(429).json({ error: 'Chat limit reached. Upgrade to Pro for more messages.', plan: usage.plan, limit: usage.limit, upgrade: true });
 
-        const thought = await brain.think(message, avatar, history, language, user?.id, conversationId);
+        const thought = await brain.think(message, avatar, history, language, user?.id, conversationId, { imageBase64, audioBase64 });
 
         // Strip admin tool results if not admin
         let adminContext = '';
