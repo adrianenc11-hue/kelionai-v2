@@ -1476,7 +1476,7 @@ Reply STRICTLY with JSON:
             return this._systemStatusCache;
         }
         try {
-            let tableCounts = {};
+            const tableCounts = {};
             const tables = ['conversations', 'messages', 'user_preferences', 'subscriptions', 'usage', 'referral_codes', 'referrals', 'admin_logs', 'trades', 'profiles', 'api_keys', 'media_history', 'news_cache', 'brain_learnings', 'telegram_users', 'whatsapp_users', 'whatsapp_messages', 'trade_intelligence', 'cookie_consents', 'metrics_snapshots', 'processed_webhook_events'];
 
             if (this.supabaseAdmin) {

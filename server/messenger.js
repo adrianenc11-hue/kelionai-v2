@@ -41,9 +41,9 @@ const userMessageCount = new Map();
 const FREE_MESSAGES_LIMIT = 15;
 
 // FEATURE 6: SUBSCRIBER MANAGEMENT
-var subscribedUsers = new Set();
-var lastMessageTime = new Map();
-var _supabase = null;
+const subscribedUsers = new Set();
+const lastMessageTime = new Map();
+let _supabase = null;
 
 function setSupabase(client) {
     _supabase = client;
@@ -61,11 +61,11 @@ function setSupabase(client) {
 }
 
 // TEMPORARY MEDIA BUFFERS (for TTS voice + image serving)
-var mediaBuffers = new Map();
+const mediaBuffers = new Map();
 
 // Clean up expired media buffers every 10 minutes
 setInterval(function () {
-    var now = Date.now();
+    const now = Date.now();
     mediaBuffers.forEach(function (entry, id) {
         if (now > entry.expiresAt) mediaBuffers.delete(id);
     });
@@ -99,7 +99,7 @@ async function saveKnownUser(senderId, lang, name, supabase) {
 
 // LANGUAGE DETECTION
 function detectLanguage(text) {
-    var t = (text || '').toLowerCase();
+    const t = (text || '').toLowerCase();
     // Script-based detection first (unambiguous)
     if (/[\u0600-\u06FF]/.test(text)) return 'ar';
     if (/[\u0590-\u05FF]/.test(text)) return 'he';
@@ -126,13 +126,13 @@ function detectLanguage(text) {
 }
 
 // RATE LIMITING
-var RATE_LIMIT_MAX = 15;
-var RATE_LIMIT_WINDOW_MS = 60 * 1000;
-var senderRateLimits = new Map();
+const RATE_LIMIT_MAX = 15;
+const RATE_LIMIT_WINDOW_MS = 60 * 1000;
+const senderRateLimits = new Map();
 
 function isRateLimited(senderId) {
-    var now = Date.now();
-    var entry = senderRateLimits.get(senderId);
+    const now = Date.now();
+    const entry = senderRateLimits.get(senderId);
     if (!entry || now >= entry.resetAt) {
         senderRateLimits.set(senderId, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
         return false;
@@ -143,15 +143,15 @@ function isRateLimited(senderId) {
 }
 
 // ═══ ADMIN KEYWORD BLACKLIST ═══
-var ADMIN_KEYWORDS = /\b(admin|administrator|dashboard|panou\s*admin|setări\s*admin|settings\s*admin|admin\s*panel|admin\s*mode|deschide\s*admin)\b/i;
+const ADMIN_KEYWORDS = /\b(admin|administrator|dashboard|panou\s*admin|setări\s*admin|settings\s*admin|admin\s*panel|admin\s*mode|deschide\s*admin)\b/i;
 
 // ═══ GROUP STATE — for smart intervention ═══
-var messengerGroupState = new Map(); // chatId -> { lastActivity, unansweredQuestions, lastIntervention }
-var GROUP_INTERVENTION_COOLDOWN = 5 * 60 * 1000;
-var GROUP_PAUSE_THRESHOLD = 2 * 60 * 1000;
+const messengerGroupState = new Map(); // chatId -> { lastActivity, unansweredQuestions, lastIntervention }
+const GROUP_INTERVENTION_COOLDOWN = 5 * 60 * 1000;
+const GROUP_PAUSE_THRESHOLD = 2 * 60 * 1000;
 
 function updateMessengerGroupState(chatId, text) {
-    var state = messengerGroupState.get(chatId) || { lastActivity: 0, unansweredQuestions: [], lastIntervention: 0 };
+    const state = messengerGroupState.get(chatId) || { lastActivity: 0, unansweredQuestions: [], lastIntervention: 0 };
     state.lastActivity = Date.now();
     if (text && text.trim().endsWith('?')) {
         state.unansweredQuestions.push({ text: text, time: Date.now() });
@@ -162,7 +162,7 @@ function updateMessengerGroupState(chatId, text) {
 
 function messengerShouldIntervene(chatId, isDirectlyAddressed) {
     if (isDirectlyAddressed) return true;
-    var state = messengerGroupState.get(chatId);
+    const state = messengerGroupState.get(chatId);
     if (!state) return false;
     if (state.lastIntervention && Date.now() - state.lastIntervention < GROUP_INTERVENTION_COOLDOWN) return false;
     if (Date.now() - state.lastActivity > GROUP_PAUSE_THRESHOLD && state.unansweredQuestions.length > 0) return true;
@@ -170,7 +170,7 @@ function messengerShouldIntervene(chatId, isDirectlyAddressed) {
 }
 
 function getMessengerInterventionPrefix(lang) {
-    var prefixes = {
+    const prefixes = {
         ro: 'Scuzați că intervin, dar cred că pot ajuta cu asta... ',
         en: 'Sorry to jump in, but I might be able to help with that... ',
         es: 'Disculpen la interrupción, pero creo que puedo ayudar... ',
@@ -190,14 +190,14 @@ function getMessengerInterventionPrefix(lang) {
 
 // GET SENDER PROFILE
 async function getSenderProfile(senderId) {
-    var token = process.env.FB_PAGE_ACCESS_TOKEN;
+    const token = process.env.FB_PAGE_ACCESS_TOKEN;
     if (!token) return null;
     try {
-        var res = await fetch(
+        const res = await fetch(
             'https://graph.facebook.com/v21.0/' + senderId + '?fields=first_name,last_name&access_token=' + token
         );
         if (res.ok) {
-            var data = await res.json();
+            const data = await res.json();
             return data.first_name ? (data.first_name + ' ' + (data.last_name || '')).trim() : null;
         }
     } catch (e) {
@@ -209,7 +209,7 @@ async function getSenderProfile(senderId) {
 // DOWNLOAD MEDIA FROM URL
 async function downloadMediaFromUrl(url) {
     try {
-        var res = await fetch(url);
+        const res = await fetch(url);
         if (res.ok) return res.buffer();
     } catch (e) {
         logger.error({ component: 'Messenger', err: e.message }, 'Media download failed');
@@ -219,17 +219,17 @@ async function downloadMediaFromUrl(url) {
 
 // ANALYZE IMAGE WITH GPT-4o VISION
 async function analyzeImage(imageBuffer, caption, mimeType) {
-    var apiKey = process.env.OPENAI_API_KEY;
+    const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) return caption || 'I received an image but no vision API key is configured.';
 
-    var base64Image = imageBuffer.toString('base64');
-    var mediaType = mimeType || 'image/jpeg';
-    var userPrompt = caption
+    const base64Image = imageBuffer.toString('base64');
+    const mediaType = mimeType || 'image/jpeg';
+    const userPrompt = caption
         ? 'Utilizatorul a trimis aceasta imagine cu textul: "' + caption + '". Descrie ce vezi, identifica persoane, obiecte, locuri, texte.'
         : 'Descrie in detaliu ce vezi in aceasta imagine. Identifica persoane, obiecte, locuri, texte vizibile, culori, actiuni.';
 
     try {
-        var res = await fetch('https://api.openai.com/v1/chat/completions', {
+        const res = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
             headers: { 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -245,7 +245,7 @@ async function analyzeImage(imageBuffer, caption, mimeType) {
             })
         });
         if (res.ok) {
-            var data = await res.json();
+            const data = await res.json();
             return (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || 'Am vazut imaginea.';
         }
     } catch (e) {
@@ -256,21 +256,21 @@ async function analyzeImage(imageBuffer, caption, mimeType) {
 
 // TRANSCRIBE AUDIO (Whisper)
 async function transcribeAudio(audioBuffer, mimeType) {
-    var apiKey = process.env.GROQ_API_KEY || process.env.OPENAI_API_KEY;
+    const apiKey = process.env.GROQ_API_KEY || process.env.OPENAI_API_KEY;
     if (!apiKey) return null;
-    var baseUrl = process.env.GROQ_API_KEY ? 'https://api.groq.com/openai/v1' : 'https://api.openai.com/v1';
-    var FormData = require('form-data');
-    var form = new FormData();
+    const baseUrl = process.env.GROQ_API_KEY ? 'https://api.groq.com/openai/v1' : 'https://api.openai.com/v1';
+    const FormData = require('form-data');
+    const form = new FormData();
     form.append('file', audioBuffer, { filename: 'audio.mp4', contentType: mimeType || 'audio/mp4' });
     form.append('model', process.env.GROQ_API_KEY ? 'whisper-large-v3' : 'whisper-1');
     try {
-        var res = await fetch(baseUrl + '/audio/transcriptions', {
+        const res = await fetch(baseUrl + '/audio/transcriptions', {
             method: 'POST',
             headers: Object.assign({ 'Authorization': 'Bearer ' + apiKey }, form.getHeaders()),
             body: form
         });
         if (res.ok) {
-            var data = await res.json();
+            const data = await res.json();
             return data.text || '';
         }
     } catch (e) {
@@ -281,14 +281,14 @@ async function transcribeAudio(audioBuffer, mimeType) {
 
 // FEATURE 1: EXTRACT DOCUMENT TEXT
 async function extractDocumentText(buffer, mimeType, filename) {
-    var ext = (filename || '').split('.').pop().toLowerCase();
+    const ext = (filename || '').split('.').pop().toLowerCase();
     try {
         if (mimeType === 'application/pdf' || ext === 'pdf') {
-            var data = await pdfParse(buffer);
+            const data = await pdfParse(buffer);
             return (data.text || '').slice(0, 3000);
         }
         if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || ext === 'docx') {
-            var result = await mammoth.extractRawText({ buffer: buffer });
+            const result = await mammoth.extractRawText({ buffer: buffer });
             return (result.value || '').slice(0, 3000);
         }
         if (['txt', 'csv', 'json', 'md'].includes(ext) || (mimeType && mimeType.startsWith('text/'))) {
@@ -302,9 +302,9 @@ async function extractDocumentText(buffer, mimeType, filename) {
 
 // SEND MESSAGE (Feature 5: optional quickReplies)
 async function sendMessage(recipientId, text, quickReplies) {
-    var token = process.env.FB_PAGE_ACCESS_TOKEN;
+    const token = process.env.FB_PAGE_ACCESS_TOKEN;
     if (!token) return;
-    var message = { text: text.slice(0, 2000) };
+    const message = { text: text.slice(0, 2000) };
     if (quickReplies && quickReplies.length > 0) {
         message.quick_replies = quickReplies.map(function (qr) {
             if (typeof qr === 'string') {
@@ -313,20 +313,20 @@ async function sendMessage(recipientId, text, quickReplies) {
             return qr;
         }).slice(0, 13);
     }
-    var res = await fetch('https://graph.facebook.com/v21.0/me/messages?access_token=' + token, {
+    const res = await fetch('https://graph.facebook.com/v21.0/me/messages?access_token=' + token, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ recipient: { id: recipientId }, message: message })
     });
     if (!res.ok) {
-        var body = await res.text();
+        const body = await res.text();
         logger.error({ component: 'Messenger', status: res.status, body: body }, 'Send failed');
     }
 }
 
 // SEND TYPING INDICATOR
 async function sendTypingOn(recipientId) {
-    var token = process.env.FB_PAGE_ACCESS_TOKEN;
+    const token = process.env.FB_PAGE_ACCESS_TOKEN;
     if (!token) return;
     try {
         await fetch('https://graph.facebook.com/v21.0/me/messages?access_token=' + token, {
@@ -339,10 +339,10 @@ async function sendTypingOn(recipientId) {
 
 // FEATURE 2: SEND AUDIO MESSAGE
 async function sendAudioMessage(recipientId, audioUrl) {
-    var token = process.env.FB_PAGE_ACCESS_TOKEN;
+    const token = process.env.FB_PAGE_ACCESS_TOKEN;
     if (!token) return;
     try {
-        var res = await fetch('https://graph.facebook.com/v21.0/me/messages?access_token=' + token, {
+        const res = await fetch('https://graph.facebook.com/v21.0/me/messages?access_token=' + token, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -351,7 +351,7 @@ async function sendAudioMessage(recipientId, audioUrl) {
             })
         });
         if (!res.ok) {
-            var body = await res.text();
+            const body = await res.text();
             logger.error({ component: 'Messenger', status: res.status, body: body }, 'Audio send failed');
         }
     } catch (e) {
@@ -361,12 +361,12 @@ async function sendAudioMessage(recipientId, audioUrl) {
 
 // FEATURE 2: GENERATE AND SEND VOICE REPLY
 async function generateAndSendVoice(recipientId, text, character) {
-    var apiKey = process.env.ELEVENLABS_API_KEY;
+    const apiKey = process.env.ELEVENLABS_API_KEY;
     if (!apiKey) return;
-    var appUrl = process.env.APP_URL || 'https://kelionai.app';
+    const appUrl = process.env.APP_URL || 'https://kelionai.app';
     try {
-        var voiceId = getVoiceId(character);
-        var res = await fetch('https://api.elevenlabs.io/v1/text-to-speech/' + voiceId, {
+        const voiceId = getVoiceId(character);
+        const res = await fetch('https://api.elevenlabs.io/v1/text-to-speech/' + voiceId, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'xi-api-key': apiKey },
             body: JSON.stringify({
@@ -376,10 +376,10 @@ async function generateAndSendVoice(recipientId, text, character) {
             })
         });
         if (!res.ok) return;
-        var audioBuffer = Buffer.from(await res.arrayBuffer());
-        var audioId = crypto.randomBytes(16).toString('hex');
+        const audioBuffer = Buffer.from(await res.arrayBuffer());
+        const audioId = crypto.randomBytes(16).toString('hex');
         mediaBuffers.set(audioId, { buffer: audioBuffer, contentType: 'audio/mpeg', expiresAt: Date.now() + 3600000 });
-        var audioUrl = appUrl + '/api/messenger/media/' + audioId;
+        const audioUrl = appUrl + '/api/messenger/media/' + audioId;
         await sendAudioMessage(recipientId, audioUrl);
         logger.info({ component: 'Messenger', recipientId: recipientId }, 'Voice reply sent');
     } catch (e) {
@@ -389,10 +389,10 @@ async function generateAndSendVoice(recipientId, text, character) {
 
 // FEATURE 3: SEND IMAGE MESSAGE
 async function sendImageMessage(recipientId, imageUrl) {
-    var token = process.env.FB_PAGE_ACCESS_TOKEN;
+    const token = process.env.FB_PAGE_ACCESS_TOKEN;
     if (!token) return;
     try {
-        var res = await fetch('https://graph.facebook.com/v21.0/me/messages?access_token=' + token, {
+        const res = await fetch('https://graph.facebook.com/v21.0/me/messages?access_token=' + token, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -401,7 +401,7 @@ async function sendImageMessage(recipientId, imageUrl) {
             })
         });
         if (!res.ok) {
-            var body = await res.text();
+            const body = await res.text();
             logger.error({ component: 'Messenger', status: res.status, body: body }, 'Image send failed');
         }
     } catch (e) {
@@ -411,10 +411,10 @@ async function sendImageMessage(recipientId, imageUrl) {
 
 // FEATURE 3: SEND GENERIC TEMPLATE (Carousel)
 async function sendGenericTemplate(recipientId, elements) {
-    var token = process.env.FB_PAGE_ACCESS_TOKEN;
+    const token = process.env.FB_PAGE_ACCESS_TOKEN;
     if (!token) return;
     try {
-        var res = await fetch('https://graph.facebook.com/v21.0/me/messages?access_token=' + token, {
+        const res = await fetch('https://graph.facebook.com/v21.0/me/messages?access_token=' + token, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -428,7 +428,7 @@ async function sendGenericTemplate(recipientId, elements) {
             })
         });
         if (!res.ok) {
-            var body = await res.text();
+            const body = await res.text();
             logger.error({ component: 'Messenger', status: res.status, body: body }, 'Generic template send failed');
         }
     } catch (e) {
@@ -438,10 +438,10 @@ async function sendGenericTemplate(recipientId, elements) {
 
 // FEATURE 3: SEND BUTTON TEMPLATE
 async function sendButtonTemplate(recipientId, text, buttons) {
-    var token = process.env.FB_PAGE_ACCESS_TOKEN;
+    const token = process.env.FB_PAGE_ACCESS_TOKEN;
     if (!token) return;
     try {
-        var res = await fetch('https://graph.facebook.com/v21.0/me/messages?access_token=' + token, {
+        const res = await fetch('https://graph.facebook.com/v21.0/me/messages?access_token=' + token, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -455,7 +455,7 @@ async function sendButtonTemplate(recipientId, text, buttons) {
             })
         });
         if (!res.ok) {
-            var body = await res.text();
+            const body = await res.text();
             logger.error({ component: 'Messenger', status: res.status, body: body }, 'Button template send failed');
         }
     } catch (e) {
@@ -465,10 +465,10 @@ async function sendButtonTemplate(recipientId, text, buttons) {
 
 // FEATURE 4: SETUP PERSISTENT MENU
 async function setupPersistentMenu() {
-    var token = process.env.FB_PAGE_ACCESS_TOKEN;
+    const token = process.env.FB_PAGE_ACCESS_TOKEN;
     if (!token) return { error: 'No page token configured' };
     try {
-        var res = await fetch('https://graph.facebook.com/v21.0/me/messenger_profile?access_token=' + token, {
+        const res = await fetch('https://graph.facebook.com/v21.0/me/messenger_profile?access_token=' + token, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -485,7 +485,7 @@ async function setupPersistentMenu() {
                 }]
             })
         });
-        var data = await res.json();
+        const data = await res.json();
         logger.info({ component: 'Messenger', result: data }, 'Persistent menu set up');
         return data;
     } catch (e) {
@@ -504,8 +504,8 @@ async function handlePostback(senderId, payload, appLocals) {
             chatCharacter.set(senderId, 'kira');
             await sendMessage(senderId, '👩‍💻 Kira este acum asistenta ta!', ['💬 Chat', '📰 Știri', '🌤️ Meteo']);
         } else if (payload === 'GET_NEWS') {
-            var getArticles = appLocals && appLocals._getNewsArticles;
-            var articles = getArticles ? getArticles() : [];
+            const getArticles = appLocals && appLocals._getNewsArticles;
+            const articles = getArticles ? getArticles() : [];
             if (articles && articles.length > 0) {
                 await sendMessage(senderId, '📰 Ultimele stiri:');
                 await sendGenericTemplate(senderId, buildNewsElements(articles.slice(0, 3)));
@@ -546,11 +546,11 @@ function buildNewsElements(articles) {
 
 // FEATURE 6: BROADCAST TO SUBSCRIBERS
 async function broadcastToSubscribers(message, quickReplies) {
-    var now = Date.now();
-    var windowMs = 24 * 60 * 60 * 1000;
-    var sent = 0;
-    for (var userId of subscribedUsers) {
-        var lastMsg = lastMessageTime.get(userId) || 0;
+    const now = Date.now();
+    const windowMs = 24 * 60 * 60 * 1000;
+    let sent = 0;
+    for (const userId of subscribedUsers) {
+        const lastMsg = lastMessageTime.get(userId) || 0;
         if (now - lastMsg > windowMs) continue;
         try {
             await sendMessage(userId, message, quickReplies);
@@ -565,14 +565,14 @@ async function broadcastToSubscribers(message, quickReplies) {
 // FEATURE 6: NOTIFY SUBSCRIBERS WITH NEWS (exported for index.js)
 async function notifySubscribersNews(articles) {
     if (!articles || articles.length === 0) return;
-    var now = Date.now();
-    var windowMs = 24 * 60 * 60 * 1000;
-    var top3 = articles.slice(0, 3);
-    var elements = buildNewsElements(top3);
-    var targets = Array.from(subscribedUsers);
-    for (var i = 0; i < targets.length; i++) {
-        var userId = targets[i];
-        var lastMsg = lastMessageTime.get(userId) || 0;
+    const now = Date.now();
+    const windowMs = 24 * 60 * 60 * 1000;
+    const top3 = articles.slice(0, 3);
+    const elements = buildNewsElements(top3);
+    const targets = Array.from(subscribedUsers);
+    for (let i = 0; i < targets.length; i++) {
+        const userId = targets[i];
+        const lastMsg = lastMessageTime.get(userId) || 0;
         if (now - lastMsg > windowMs) continue;
         try {
             await sendMessage(userId, '📰 Stiri noi pentru tine:');
@@ -586,16 +586,16 @@ async function notifySubscribersNews(articles) {
 
 // GENERATE IMAGE VIA DALL-E 3
 async function generateImage(prompt) {
-    var apiKey = process.env.OPENAI_API_KEY;
+    const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) return null;
     try {
-        var res = await fetch('https://api.openai.com/v1/images/generations', {
+        const res = await fetch('https://api.openai.com/v1/images/generations', {
             method: 'POST',
             headers: { 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
             body: JSON.stringify({ model: 'dall-e-3', prompt: prompt, n: 1, size: '1024x1024', response_format: 'url' })
         });
         if (res.ok) {
-            var data = await res.json();
+            const data = await res.json();
             return data.data && data.data[0] && data.data[0].url;
         }
     } catch (e) {
@@ -606,7 +606,7 @@ async function generateImage(prompt) {
 
 // SERVE TEMPORARY MEDIA BUFFERS (audio/images)
 router.get('/media/:id', function (req, res) {
-    var entry = mediaBuffers.get(req.params.id);
+    const entry = mediaBuffers.get(req.params.id);
     if (!entry || Date.now() > entry.expiresAt) return res.status(404).send('Not found');
     res.set('Content-Type', entry.contentType);
     res.send(entry.buffer);
@@ -614,9 +614,9 @@ router.get('/media/:id', function (req, res) {
 
 // WEBHOOK VERIFICATION
 router.get('/webhook', function (req, res) {
-    var mode = req.query['hub.mode'];
-    var token = req.query['hub.verify_token'];
-    var challenge = req.query['hub.challenge'];
+    const mode = req.query['hub.mode'];
+    const token = req.query['hub.verify_token'];
+    const challenge = req.query['hub.challenge'];
     if (mode === 'subscribe' && token === process.env.FB_VERIFY_TOKEN) {
         logger.info({ component: 'Messenger' }, 'Webhook verified');
         return res.status(200).send(challenge);
@@ -626,13 +626,13 @@ router.get('/webhook', function (req, res) {
 
 // ═══ AUTO-SUBSCRIBE PAGE TO WEBHOOKS ═══
 router.get('/subscribe', async function (req, res) {
-    var token = process.env.FB_PAGE_ACCESS_TOKEN;
+    const token = process.env.FB_PAGE_ACCESS_TOKEN;
     if (!token) return res.status(500).json({ error: 'FB_PAGE_ACCESS_TOKEN not set' });
     try {
-        var meRes = await fetch('https://graph.facebook.com/v21.0/me?access_token=' + token);
-        var me = await meRes.json();
+        const meRes = await fetch('https://graph.facebook.com/v21.0/me?access_token=' + token);
+        const me = await meRes.json();
         if (!me.id) return res.status(500).json({ error: 'Cannot get page ID', details: me });
-        var subRes = await fetch('https://graph.facebook.com/v21.0/' + me.id + '/subscribed_apps', {
+        const subRes = await fetch('https://graph.facebook.com/v21.0/' + me.id + '/subscribed_apps', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -640,7 +640,7 @@ router.get('/subscribe', async function (req, res) {
                 access_token: token
             })
         });
-        var result = await subRes.json();
+        const result = await subRes.json();
         logger.info({ component: 'Messenger', pageId: me.id, result: result }, 'Webhook subscription result');
         res.json({ success: result.success, pageId: me.id, pageName: me.name });
     } catch (e) {
@@ -651,7 +651,7 @@ router.get('/subscribe', async function (req, res) {
 
 // FEATURE 4: SETUP MENU ENDPOINT
 router.get('/setup-menu', async function (req, res) {
-    var result = await setupPersistentMenu();
+    const result = await setupPersistentMenu();
     res.json(result);
 });
 
@@ -662,7 +662,7 @@ router.post('/webhook', async function (req, res) {
     try {
         // CRITICAL: req.body should be a Buffer because of express.raw() in index.js
         // Handle both raw Buffer and already-parsed JSON (defensive)
-        var rawBody, body;
+        let rawBody, body;
         if (Buffer.isBuffer(req.body)) {
             rawBody = req.body;
             body = JSON.parse(rawBody.toString());
@@ -679,14 +679,14 @@ router.post('/webhook', async function (req, res) {
         }
 
         // HMAC-SHA256 validation
-        var appSecret = process.env.FB_APP_SECRET;
+        const appSecret = process.env.FB_APP_SECRET;
         if (appSecret) {
-            var sig = req.headers['x-hub-signature-256'];
+            const sig = req.headers['x-hub-signature-256'];
             if (!sig) {
                 logger.warn({ component: 'Messenger' }, 'Missing signature');
                 return;
             }
-            var expected = 'sha256=' + crypto.createHmac('sha256', appSecret).update(rawBody).digest('hex');
+            const expected = 'sha256=' + crypto.createHmac('sha256', appSecret).update(rawBody).digest('hex');
             if (sig.length !== expected.length || !crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) {
                 logger.warn({ component: 'Messenger' }, 'Invalid signature');
                 return;
@@ -695,10 +695,10 @@ router.post('/webhook', async function (req, res) {
 
         if (body.object !== 'page') return;
 
-        for (var e = 0; e < (body.entry || []).length; e++) {
-            var entry = body.entry[e];
-            for (var m = 0; m < (entry.messaging || []).length; m++) {
-                var event = entry.messaging[m];
+        for (let e = 0; e < (body.entry || []).length; e++) {
+            const entry = body.entry[e];
+            for (let m = 0; m < (entry.messaging || []).length; m++) {
+                const event = entry.messaging[m];
                 var senderId = event.sender && event.sender.id;
                 if (!senderId) continue;
 
@@ -712,7 +712,7 @@ router.post('/webhook', async function (req, res) {
                     continue;
                 }
 
-                var message = event.message;
+                const message = event.message;
                 if (!message || message.is_echo) continue;
 
                 stats.messagesReceived++;
@@ -722,14 +722,14 @@ router.post('/webhook', async function (req, res) {
 
                 await sendTypingOn(senderId);
 
-                var userText = '';
-                var visionResponse = null;
-                var attachments = message.attachments || [];
-                var receivedAudio = false;
+                let userText = '';
+                let visionResponse = null;
+                const attachments = message.attachments || [];
+                let receivedAudio = false;
 
                 // FEATURE 5: HANDLE QUICK REPLY PAYLOAD
                 if (message.quick_reply && message.quick_reply.payload) {
-                    var qrPayload = message.quick_reply.payload;
+                    const qrPayload = message.quick_reply.payload;
                     if (qrPayload === 'SWITCH_KELION' || qrPayload === 'SWITCH_KIRA' ||
                         qrPayload === 'GET_NEWS' || qrPayload === 'GET_HELP') {
                         await handlePostback(senderId, qrPayload, req.app.locals);
@@ -746,23 +746,23 @@ router.post('/webhook', async function (req, res) {
                 }
 
                 // HANDLE ATTACHMENTS (image, audio, video, file)
-                for (var a = 0; a < attachments.length; a++) {
-                    var att = attachments[a];
-                    var attType = att.type;
-                    var attUrl = att.payload && att.payload.url;
+                for (let a = 0; a < attachments.length; a++) {
+                    const att = attachments[a];
+                    const attType = att.type;
+                    const attUrl = att.payload && att.payload.url;
                     if (!attUrl) continue;
 
                     if (attType === 'image') {
-                        var imgBuffer = await downloadMediaFromUrl(attUrl);
+                        const imgBuffer = await downloadMediaFromUrl(attUrl);
                         if (imgBuffer) {
                             visionResponse = await analyzeImage(imgBuffer, message.text || null, 'image/jpeg');
                             if (!userText) userText = 'Am trimis o imagine';
                         }
                     } else if (attType === 'audio') {
                         receivedAudio = true;
-                        var audBuffer = await downloadMediaFromUrl(attUrl);
+                        const audBuffer = await downloadMediaFromUrl(attUrl);
                         if (audBuffer) {
-                            var transcript = await transcribeAudio(audBuffer, 'audio/mp4');
+                            const transcript = await transcribeAudio(audBuffer, 'audio/mp4');
                             if (transcript) {
                                 userText = transcript;
                             } else {
@@ -770,9 +770,9 @@ router.post('/webhook', async function (req, res) {
                             }
                         }
                     } else if (attType === 'video') {
-                        var vidBuffer = await downloadMediaFromUrl(attUrl);
+                        const vidBuffer = await downloadMediaFromUrl(attUrl);
                         if (vidBuffer) {
-                            var vidTranscript = await transcribeAudio(vidBuffer, 'video/mp4');
+                            const vidTranscript = await transcribeAudio(vidBuffer, 'video/mp4');
                             if (vidTranscript) {
                                 visionResponse = 'Am analizat videoclipul tau. Am auzit: "' + vidTranscript + '"';
                             } else {
@@ -782,11 +782,11 @@ router.post('/webhook', async function (req, res) {
                         }
                     } else if (attType === 'file') {
                         // FEATURE 1: DOCUMENT TEXT ANALYSIS
-                        var fileBuffer = await downloadMediaFromUrl(attUrl);
+                        const fileBuffer = await downloadMediaFromUrl(attUrl);
                         if (fileBuffer) {
-                            var fileName = att.payload && att.payload.name || '';
-                            var fileMime = att.payload && att.payload.mime_type || '';
-                            var extractedText = await extractDocumentText(fileBuffer, fileMime, fileName);
+                            const fileName = att.payload && att.payload.name || '';
+                            const fileMime = att.payload && att.payload.mime_type || '';
+                            const extractedText = await extractDocumentText(fileBuffer, fileMime, fileName);
                             if (extractedText) {
                                 if (!userText) userText = 'Am trimis un document';
                                 visionResponse = null; // will use AI for document
@@ -808,22 +808,22 @@ router.post('/webhook', async function (req, res) {
                 if (userText && ADMIN_KEYWORDS.test(userText)) continue;
 
                 // GET SENDER NAME
-                var senderName = await getSenderProfile(senderId) || 'User';
+                const senderName = await getSenderProfile(senderId) || 'User';
                 addToHistory(senderId, senderName, userText);
 
                 // CHARACTER SELECTION
                 if (/^(kelion|kira)$/i.test((userText || '').trim())) {
-                    var charName = userText.trim().toLowerCase();
+                    const charName = userText.trim().toLowerCase();
                     chatCharacter.set(senderId, charName);
-                    var displayName = charName === 'kelion' ? 'Kelion' : 'Kira';
+                    const displayName = charName === 'kelion' ? 'Kelion' : 'Kira';
                     await sendMessage(senderId, (charName === 'kelion' ? '🤖 ' : '👩‍💻 ') + displayName + ' este acum asistentul tau. Cu ce te pot ajuta?', ['💬 Chat', '📰 Știri', '🌤️ Meteo']);
                     stats.repliesSent++;
                     continue;
                 }
 
                 // FEATURE 6: SUBSCRIBE / UNSUBSCRIBE
-                var supabase = req.app.locals.supabaseAdmin || req.app.locals.supabase;
-                var textLower = (userText || '').toLowerCase().trim();
+                const supabase = req.app.locals.supabaseAdmin || req.app.locals.supabase;
+                const textLower = (userText || '').toLowerCase().trim();
                 if (/^(subscribe|aboneaza-ma|notificari)$/i.test(textLower)) {
                     subscribedUsers.add(senderId);
                     if (supabase) {
@@ -849,8 +849,8 @@ router.post('/webhook', async function (req, res) {
 
                 // NEWS REQUEST — show carousel
                 if (/\b(stiri|news|noutati|ultimele\s+stiri)\b/i.test(textLower)) {
-                    var getArticles = req.app.locals._getNewsArticles;
-                    var articles = getArticles ? getArticles() : [];
+                    const getArticles = req.app.locals._getNewsArticles;
+                    const articles = getArticles ? getArticles() : [];
                     if (articles && articles.length > 0) {
                         await sendMessage(senderId, '📰 Ultimele stiri:');
                         await sendGenericTemplate(senderId, buildNewsElements(articles.slice(0, 3)));
@@ -864,7 +864,7 @@ router.post('/webhook', async function (req, res) {
 
                 // IMAGE GENERATION REQUEST (Feature 3)
                 if (!visionResponse && /\b(genereaz[aă]\s+imagine|generate\s+image|creeaz[aă]\s+(o\s+)?imagine|deseneaz[aă])\b/i.test(userText)) {
-                    var imageUrl = await generateImage(userText);
+                    const imageUrl = await generateImage(userText);
                     if (imageUrl) {
                         await sendMessage(senderId, '🎨 Iata imaginea generata pentru tine!');
                         await sendImageMessage(senderId, imageUrl);
@@ -876,20 +876,20 @@ router.post('/webhook', async function (req, res) {
 
                 // AI RESPONSE
                 var reply;
-                var detectedLangForReply = detectLanguage(userText || '');
+                const detectedLangForReply = detectLanguage(userText || '');
                 if (visionResponse) {
                     reply = visionResponse;
                 } else {
-                    var brain = req.app.locals.brain;
-                    var context = getContextSummary(senderId);
-                    var prompt = context ? '[Context:\n' + context + ']\nUser: ' + userText : userText;
+                    const brain = req.app.locals.brain;
+                    const context = getContextSummary(senderId);
+                    const prompt = context ? '[Context:\n' + context + ']\nUser: ' + userText : userText;
 
                     if (brain) {
                         try {
-                            var timeout = new Promise(function (_, reject) {
+                            const timeout = new Promise(function (_, reject) {
                                 setTimeout(function () { reject(new Error('Brain timeout')); }, 20000);
                             });
-                            var result = await Promise.race([
+                            const result = await Promise.race([
                                 brain.think(prompt, character, [], detectedLangForReply || 'auto'),
                                 timeout
                             ]);
@@ -904,7 +904,7 @@ router.post('/webhook', async function (req, res) {
                 }
 
                 // DETERMINE QUICK REPLIES FOR RESPONSE
-                var msgCount = (userMessageCount.get(senderId) || 0) + 1;
+                const msgCount = (userMessageCount.get(senderId) || 0) + 1;
                 userMessageCount.set(senderId, msgCount);
                 var replyQuickReplies;
                 if (msgCount === FREE_MESSAGES_LIMIT) {
@@ -924,7 +924,7 @@ router.post('/webhook', async function (req, res) {
                 var known = await getKnownUser(senderId, supabase);
 
                 if (!known) {
-                    var detectedLang = detectLanguage(userText || '');
+                    const detectedLang = detectLanguage(userText || '');
                     await saveKnownUser(senderId, detectedLang, senderName, supabase);
                     // FEATURE 5: Quick replies for new users
                     setTimeout(async function () {
@@ -947,7 +947,7 @@ router.post('/webhook', async function (req, res) {
                             } catch (ex) { logger.warn({ component: 'Messenger', err: ex.message }, 'Return greeting failed'); }
                         }, 1000);
                     }
-                    var newLang = detectLanguage(userText || '');
+                    const newLang = detectLanguage(userText || '');
                     if (newLang !== known.lang) {
                         await saveKnownUser(senderId, newLang, known.name, supabase);
                     }
