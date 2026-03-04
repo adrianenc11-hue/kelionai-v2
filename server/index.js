@@ -268,6 +268,7 @@ app.locals.getUserFromToken = getUserFromToken;
 app.locals.supabase = supabase;
 app.locals.supabaseAdmin = supabaseAdmin;
 app.locals.brain = brain;
+instagram.setBrain(brain);
 app.locals.memFallback = memFallback;
 
 // ═══ ROUTE MODULES ═══
@@ -468,6 +469,7 @@ app.use('/api/legal', legalRouter);
 app.use('/api/messenger', messengerRouter);
 app.use('/api/telegram', express.json(), telegramRouter);
 app.use('/api/whatsapp', whatsappRouter);
+app.use('/api/instagram', instagram.router);
 app.use('/api/developer', developerRouter);
 app.use('/api', developerRouter); // mounts /api/v1/* endpoints
 
@@ -528,6 +530,7 @@ app.use('/api/news', adminAuth, newsModule.router);
 newsModule.setSupabase(supabaseAdmin);
 newsModule.restoreCache();
 setMessengerSupabase(supabaseAdmin);
+instagram.setSupabase(supabaseAdmin);
 
 // ═══ AUTO-PUBLISH: when news fetches, distribute to all media ═══
 newsModule.onNewsFetched(async (articles) => {
