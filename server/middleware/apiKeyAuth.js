@@ -22,7 +22,7 @@ function isKeyRateLimited(keyId, limit) {
 }
 
 // Clean up stale entries every hour to prevent memory leaks
-setInterval(() => {
+const _cleanupInterval = setInterval(() => {
     const now = Date.now();
     for (const [id, entry] of keyRateLimits.entries()) {
         if (now >= entry.resetAt) keyRateLimits.delete(id);
@@ -62,14 +62,14 @@ function apiKeyAuth(req, res, next) {
             // Uses rpc to atomically increment request_count at DB level
             supabaseAdmin
                 .rpc('increment_api_key_count', { key_id: data.id })
-                .then(() => {})
+                .then(() => { })
                 .catch(() => {
                     // Fallback: plain update if rpc not available
                     supabaseAdmin
                         .from('api_keys')
                         .update({ last_used_at: new Date().toISOString() })
                         .eq('id', data.id)
-                        .then(() => {}).catch(() => {});
+                        .then(() => { }).catch(() => { });
                 });
 
             next();
@@ -79,4 +79,4 @@ function apiKeyAuth(req, res, next) {
         });
 }
 
-module.exports = { apiKeyAuth };
+module.exports = { apiKeyAuth, _cleanupInterval };

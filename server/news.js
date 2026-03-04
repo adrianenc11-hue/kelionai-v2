@@ -413,8 +413,9 @@ function getNextFetchTimes() {
     });
 }
 
+let _schedulerInterval = null;
 function startScheduler() {
-    setInterval(async () => {
+    _schedulerInterval = setInterval(async () => {
         const roHour = getCurrentRomanianHour();
         const now = Date.now();
         const isScheduledHour = FETCH_HOUR_RO.includes(roHour);
@@ -517,4 +518,4 @@ async function restoreCache() {
     } catch (e) { /* silent */ }
 }
 
-module.exports = { router, setSupabase, restoreCache, getArticlesArray, onNewsFetched };
+module.exports = { router, setSupabase, restoreCache, getArticlesArray, onNewsFetched, _schedulerInterval };

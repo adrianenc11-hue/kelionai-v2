@@ -13,7 +13,7 @@ let _redisClient = null;
 let _redisAvailable = false;
 
 // ── Cleanup interval: removes expired entries from memStore ────
-setInterval(() => {
+const _cleanupInterval = setInterval(() => {
     const now = Date.now();
     for (const [key, entry] of _memStore.entries()) {
         if (now > entry.expires) _memStore.delete(key);
@@ -116,4 +116,4 @@ function getCacheStats() {
     };
 }
 
-module.exports = { initCache, cacheGet, cacheSet, cacheDel, getCacheStats };
+module.exports = { initCache, cacheGet, cacheSet, cacheDel, getCacheStats, _cleanupInterval };
