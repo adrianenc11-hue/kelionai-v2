@@ -226,164 +226,226 @@ Reply STRICTLY with JSON:
     }
 
     // ═══════════════════════════════════════════════════════════
-    // 3. INTENT ANALYSIS — Deep understanding
+    // 3. INTENT ANALYSIS — Deep understanding (Registry Pattern)
     // ═══════════════════════════════════════════════════════════
-    analyzeIntent(text, language) {
-        const lower = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-        const words = text.split(/\s+/);
 
-        const result = {
+    // Default result template — every flag starts false/empty
+    static get DEFAULT_INTENT() {
+        return {
             needsSearch: false, searchQuery: '',
             needsWeather: false, weatherCity: '',
             needsImage: false, imagePrompt: '',
             needsMap: false, mapPlace: '',
             needsVision: false,
             needsMemory: false,
-            // Extra tool intents
             needsTTS: false, ttsText: '',
             needsSTT: false,
             needsFaceCheck: false,
             needsFaceRegister: false,
             needsVoiceClone: false,
-            // Monitor intents (URL/streaming/radio/video)
             needsOpenURL: false, openURL: '',
             needsRadio: false, radioStation: '',
             needsVideo: false, videoQuery: '',
             needsWebNav: false, webNavURL: '',
-            // Admin intents
             needsAdminDiagnose: false,
             needsAdminReset: false, adminResetTool: '',
             needsAdminStats: false,
             needsAdminTrading: false, adminTradingAction: '',
             needsAdminNews: false,
-            // Table 3: Non-AI function intents
             needsAuth: false, authAction: '', authData: {},
             needsPayments: false, paymentAction: '',
             needsNewsStandalone: false, newsAction: '',
             needsLegal: false, legalAction: '',
             needsHealthCheck: false,
-            // Table 3 NEW: remaining functions
             needsTradeIntelligence: false,
             needsCookieConsent: false,
             needsMetricsStats: false,
-            // Full coverage: security, devAPI, system
             needsSecurityCheck: false,
             needsDevAPIInfo: false,
             needsSystemStatus: false,
             isQuestion: false, isCommand: false, isEmotional: false,
             isEmergency: false, isGreeting: false, isFollowUp: false,
             complexity: 'simple', emotionalTone: 'neutral',
-            language: language || 'ro', topics: [],
-            confidenceScore: 0.8 // How confident we are in analysis
+            language: 'ro', topics: [],
+            confidenceScore: 0.8
         };
+    }
 
-        // ── SEARCH ──
-        const searchTriggers = [
-            /\b(cauta|gaseste|informatii|stiri|noutati|explica|spune-mi)\b/i,
-            /\b(ce (e|este|inseamna|sunt)|cine (e|este|sunt))\b/i,
-            /\b(cat costa|pret|tarif)\b/i,
-            /\b(cand|unde |de ce|cum (se|pot|fac))\b/i,
-            /\b(compara|diferenta|versus|vs)\b/i,
-            /\b(ultimele|recent|azi|astazi)\b/i,
-            /\b(search|find|look up|what is|who is|tell me about)\b/i,
-            /\b(how (to|do|does|much|many)|when|where|why)\b/i,
-            /\b(latest|recent|news|update|price|cost)\b/i
+    // ── Intent Registry — each intent = 1 entry ──
+    // To add a new intent: add one object here. That's it.
+    static get INTENT_REGISTRY() {
+        return [
+            // ── SEARCH ──
+            {
+                flag: 'needsSearch',
+                triggers: [
+                    /\b(cauta|gaseste|informatii|stiri|noutati|explica|spune-mi)\b/i,
+                    /\b(ce (e|este|inseamna|sunt)|cine (e|este|sunt))\b/i,
+                    /\b(cat costa|pret|tarif)\b/i,
+                    /\b(cand|unde |de ce|cum (se|pot|fac))\b/i,
+                    /\b(compara|diferenta|versus|vs)\b/i,
+                    /\b(ultimele|recent|azi|astazi)\b/i,
+                    /\b(search|find|look up|what is|who is|tell me about)\b/i,
+                    /\b(how (to|do|does|much|many)|when|where|why)\b/i,
+                    /\b(latest|recent|news|update|price|cost)\b/i
+                ],
+                extract: (text) => {
+                    let q = text.replace(/^(cauta|search|gaseste|spune-mi despre|ce (e|este)|cine (e|este)|tell me about|what is|who is|how to)\s+/i, '').replace(/\?+$/, '').trim();
+                    if (q.length < 3) q = text;
+                    return { searchQuery: q };
+                },
+                needsRefine: true // flag to apply refineSearchQuery
+            },
+            // ── WEATHER ──
+            {
+                flag: 'needsWeather',
+                triggers: [/\b(vreme[ai]?|meteo|temperatur|grad[eu]|ploai[ea]|ploua|soare|ning[ea]|ninsoare|vant|prognoz|weather|forecast|afar[a]|fri[gk]|cald[a]?)\b/i],
+                extract: (text) => {
+                    const m = text.match(/(?:î[n]|in|la|din|pentru|from|for|at)\s+([A-Z\u0100-\u024F][a-zA-Z\u0100-\u024F]+(?:\s+[A-Z\u0100-\u024F][a-zA-Z\u0100-\u024F]+)?)/);
+                    return { weatherCity: m ? m[1] : (text.match(/(?:in|la|din|pentru)\s+(\w+)/i)?.[1] || 'Bucharest') };
+                }
+            },
+            // ── IMAGE (needs BOTH action + object) ──
+            {
+                flag: 'needsImage',
+                triggers: [/\b(genereaza|creeaza|deseneaza|fa-mi|picture|draw|generate|create|paint)\b/i],
+                condition: (lower) => /\b(imagine|poza|foto|picture|image|desen|ilustratie|avatar|logo|poster)\b/i.test(lower),
+                extract: (text) => {
+                    let p = text.replace(/\b(genereaza|creeaza|deseneaza|fa-mi|generate|create|draw|o |un )\b/gi, '')
+                        .replace(/\b(imagine|poza|foto|picture|image)\b/gi, '').replace(/\s+/g, ' ').trim();
+                    if (p.length < 5) p = text;
+                    return { imagePrompt: p };
+                }
+            },
+            // ── MAP ──
+            {
+                flag: 'needsMap',
+                triggers: [/\b(harta|map|ruta|drum|directi|navigare|navigate|unde (e|se|este)|locatie|directions|cum ajung)\b/i],
+                extract: (text) => {
+                    const m = text.match(/(?:harta|map|unde (e|se|este)|locatie|catre|spre|la|to|directions? to)\s+(.+)/i);
+                    return { mapPlace: m ? m[2].replace(/[?.!]/g, '').trim() : text };
+                }
+            },
+            // ── VISION ──
+            { flag: 'needsVision', triggers: [/\b(ce (e |vezi|observi)|ma vezi|uita-te|priveste|see me|look at|what do you see|descrie ce|ce e in fata|scanez|analizez)\b/i] },
+            // ── TTS ──
+            {
+                flag: 'needsTTS',
+                triggers: [/\b(citeste|spune|pronunta|read aloud|speak|say out|cu voce|voce tare|vorbeste)\b/i],
+                extract: (text) => ({ ttsText: text.replace(/\b(citeste|spune|pronunta|cu voce|voce tare|read aloud|speak|say out loud|vorbeste)\b/gi, '').trim() })
+            },
+            // ── STT ──
+            { flag: 'needsSTT', triggers: [/\b(transcrie|transcriere|dictare|dicteaz[aă]|asculta|transcribe|dictate|speech to text)\b/i] },
+            // ── FACE CHECK ──
+            { flag: 'needsFaceCheck', triggers: [/\b(cine (sunt|e)|recunoaste|identifica|verifica fata|face check|who am i|recognize me|cine ma|ma recunosti)\b/i] },
+            // ── FACE REGISTER ──
+            { flag: 'needsFaceRegister', triggers: [/\b(inregistr|salveaz[aă].*fata|memoreaz[aă].*fata|register face|save face|remember my face|retine.*fata)\b/i] },
+            // ── VOICE CLONE ──
+            { flag: 'needsVoiceClone', triggers: [/\b(cloneaz[aă]|clonare.*voce|copiaz[aă].*voce|clone voice|my voice|vocea mea|vreau vocea)\b/i] },
+            // ── RADIO ──
+            {
+                flag: 'needsRadio',
+                triggers: [/\b(radio|fm|asculta radio|pune radio|play radio|kiss fm|europa fm|digi fm|magic fm|rock fm|pro fm|radio zu|radiozu)\b/i],
+                extract: (text, lower) => {
+                    const m = lower.match(/\b(kiss ?fm|europa ?fm|digi ?fm|magic ?fm|rock ?fm|pro ?fm|radio ?zu|virgin ?radio|national ?fm|romantic ?fm|gold ?fm|city ?fm)\b/i);
+                    return { radioStation: m ? m[1].trim() : 'radio zu' };
+                }
+            },
+            // ── VIDEO ──
+            {
+                flag: 'needsVideo',
+                triggers: [/\b(video|film|movie|netflix|youtube|trailer|serial|episod|watch|viziona|uita-te la|ruleaza)\b/i],
+                extract: (text) => ({ videoQuery: text.replace(/\b(video|pune|ruleaza|arata|film|movie|uita-te la|watch|pe monitor)\b/gi, '').trim() })
+            },
+            // ── MEMORY ──
+            { flag: 'needsMemory', triggers: [/\b(amintesti|remember|stiai|data trecuta|ultima data|iti amintesti|ai retinut|am zis|ti-am spus|cum ma cheama|unde locuiesc)\b/i] },
+            // ── EMERGENCY ──
+            { flag: 'isEmergency', triggers: [/\b(pericol|danger|ajutor|help me|urgenta|accident|foc|incendiu|fire|emergency|ambulanta|politie|112|911)\b/i], extra: { confidenceScore: 1.0 } },
+            // ── GREETING ──
+            { flag: 'isGreeting', triggers: [/^(hey|hi|hello|salut|buna|hei|ceau|noroc|servus)/i], condition: (_, words) => words.length <= 5 },
+            // ── FOLLOW-UP ──
+            { flag: 'isFollowUp', triggers: [/\b(asta|aceasta|ce am zis|mai devreme|anterior|that|this|earlier|before|continua)\b/i], extra: { needsMemory: true } },
+            // ── ADMIN: DIAGNOSE ──
+            { flag: 'needsAdminDiagnose', triggers: [/\b(diagnoz[aă]|diagnostic|status brain|brain status|health|stare brain|stare sistem)\b/i] },
+            // ── ADMIN: RESET ──
+            {
+                flag: 'needsAdminReset',
+                triggers: [/\b(reset|restart|reporneste|reseteaz[aă])\b/i],
+                condition: (lower) => /\b(brain|creier|tool|sistem)\b/i.test(lower),
+                extract: (text, lower) => {
+                    const m = lower.match(/\b(search|weather|imagine|memory|map|all|tot|toate)\b/i);
+                    return { adminResetTool: m ? m[1] : 'all' };
+                }
+            },
+            // ── ADMIN: STATS ──
+            { flag: 'needsAdminStats', triggers: [/\b(stats|statistici|revenue|venituri|abonati|subscribers|plat[iă]|payments|churn)\b/i] },
+            // ── ADMIN: TRADING ──
+            {
+                flag: 'needsAdminTrading',
+                triggers: [/\b(trading|trade|portofoliu|portfolio|binance|pozitii|positions|profit|p&l|pnl)\b/i],
+                extract: (text, lower) => ({ adminTradingAction: lower.includes('execut') ? 'execute' : 'status' })
+            },
+            // ── ADMIN: NEWS ──
+            { flag: 'needsAdminNews', triggers: [/\b(stiri|news|headline|noutati|pres[aă])\b/i] },
+            // ── AUTH: LOGIN ──
+            { flag: 'needsAuth', triggers: [/\b(logheaz[aă]|autentific|login|sign\s*in|conecteaz[aă]|intr[aă]\s*in\s*cont)\b/i], extra: { authAction: 'login' } },
+            // ── AUTH: REGISTER ──
+            { flag: 'needsAuth', triggers: [/\b(inregistr|register|sign\s*up|cont\s*nou|creaz[aă]\s*cont|fa-mi\s*cont)\b/i], extra: { authAction: 'register' } },
+            // ── AUTH: LOGOUT ──
+            { flag: 'needsAuth', triggers: [/\b(delogheaz[aă]|logout|sign\s*out|deconecteaz[aă]|iesire|iesi)\b/i], extra: { authAction: 'logout' } },
+            // ── AUTH: CHANGE PASSWORD ──
+            { flag: 'needsAuth', triggers: [/\b(schimb[aă].*parol|change.*pass|reset.*parol|parol[aă]\s*nou)\b/i], extra: { authAction: 'changePassword' } },
+            // ── AUTH: CHANGE EMAIL ──
+            { flag: 'needsAuth', triggers: [/\b(schimb[aă].*email|change.*email|email\s*nou)\b/i], extra: { authAction: 'changeEmail' } },
+            // ── AUTH: FORGOT PASSWORD ──
+            { flag: 'needsAuth', triggers: [/\b(am\s*uitat.*parol|forgot.*pass|reset[eă].*parol|nu.*mai.*stiu.*parol)\b/i], extra: { authAction: 'forgotPassword' } },
+            // ── PAYMENTS: PLANS ──
+            {
+                flag: 'needsPayments',
+                triggers: [/\b(abonament|plan|pret|price|subscri|tarif|cat\s*cost|pachete)\b/i],
+                condition: (_, __, result) => !result.needsAdminStats,
+                extra: { paymentAction: 'plans' }
+            },
+            // ── PAYMENTS: CHECKOUT ──
+            { flag: 'needsPayments', triggers: [/\b(vreau\s*(pro|premium)|cump[aă]r|upgrade|platesc|achit|comand)\b/i], extra: { paymentAction: 'checkout' } },
+            // ── PAYMENTS: PORTAL ──
+            { flag: 'needsPayments', triggers: [/\b(factur[aă]|billing|gestion.*abonament|manage.*sub|anuleaz[aă])\b/i], extra: { paymentAction: 'portal' } },
+            // ── NEWS STANDALONE ──
+            {
+                flag: 'needsNewsStandalone',
+                triggers: [/\b(ce\s*se\s*(mai\s*)?intampl|stiri\s*(de\s*)?azi|noutati|breaking|ultima\s*or[aă]|urgent)\b/i],
+                extract: (text, lower) => ({ newsAction: /\b(breaking|urgent|ultima\s*or)\b/i.test(lower) ? 'breaking' : 'latest' })
+            },
+            // ── LEGAL: TERMS ──
+            { flag: 'needsLegal', triggers: [/\b(termeni|terms|conditii)\b/i], extra: { legalAction: 'terms' } },
+            // ── LEGAL: PRIVACY ──
+            { flag: 'needsLegal', triggers: [/\b(confidentialitate|privacy|date\s*personale|politica)\b/i], extra: { legalAction: 'privacy' } },
+            // ── LEGAL: GDPR ──
+            {
+                flag: 'needsLegal',
+                triggers: [/\b(gdpr|sterge.*date|export.*date|datele\s*mele|drepturile\s*mele)\b/i],
+                extract: (text, lower) => ({ legalAction: /\b(sterge|delete|elimina)\b/i.test(lower) ? 'deleteData' : 'exportData' })
+            },
+            // ── HEALTH CHECK ──
+            { flag: 'needsHealthCheck', triggers: [/\b(cum\s*esti|functional|functionez|cum\s*te\s*simti|esti\s*ok|status\s*server|self\s*check)\b/i] },
+            // ── TRADE INTELLIGENCE ──
+            { flag: 'needsTradeIntelligence', triggers: [/\b(analiza\s*piata|market\s*analysis|sentim(?:ent|ental)|bullish|bearish|divergenta|pivot|support|rezistenta|semnale\s*trading|intelligence\s*trading|crypto\s*signal)\b/i] },
+            // ── COOKIE CONSENT ──
+            { flag: 'needsCookieConsent', triggers: [/\b(cookie|gdpr.*cookie|accept.*cookie|refuz.*cookie|cookie.*consent|cookie.*policy)\b/i] },
+            // ── METRICS ──
+            { flag: 'needsMetricsStats', triggers: [/\b(metrici|metrics|prometheus|grafana|latency|request.*count|error.*rate|performance|latenta|performanta)\b/i] },
+            // ── SECURITY ──
+            { flag: 'needsSecurityCheck', triggers: [/\b(securitate|security|cors|helmet|csp|rate.*limit|https|ssl|protectie|protejat|firewall|vulnerabil|sentry|logging)\b/i] },
+            // ── DEV API ──
+            { flag: 'needsDevAPIInfo', triggers: [/\b(api.*key|developer.*api|v1.*api|endpoint|webhook|sdk|integrare.*api|chei.*api|postman|swagger|rest.*api)\b/i] },
+            // ── SYSTEM STATUS ──
+            { flag: 'needsSystemStatus', triggers: [/\b(migratie|migration|cache|validare|baza.*date|database|tabele|system.*status|infrastructure|deploy|uptime|schema|referral|abonament.*system)\b/i] },
         ];
-        if (searchTriggers.some(p => p.test(lower))) {
-            result.needsSearch = true;
-            result.searchQuery = text.replace(/^(cauta|search|gaseste|spune-mi despre|ce (e|este)|cine (e|este)|tell me about|what is|who is|how to)\s+/i, '').replace(/\?+$/, '').trim();
-            if (result.searchQuery.length < 3) result.searchQuery = text;
+    }
 
-            // Apply learned search refinements
-            result.searchQuery = this.refineSearchQuery(result.searchQuery);
-        }
-
-        // ── WEATHER ──
-        if (/\b(vreme[ai]?|meteo|temperatur|grad[eu]|ploai[ea]|ploua|soare|ning[ea]|ninsoare|vant|prognoz|weather|forecast|afar[a]|fri[gk]|cald[a]?)\b/i.test(lower)) {
-            result.needsWeather = true;
-            const m = text.match(/(?:î[n]|in|la|din|pentru|from|for|at)\s+([A-Z\u0100-\u024F][a-zA-Z\u0100-\u024F]+(?:\s+[A-Z\u0100-\u024F][a-zA-Z\u0100-\u024F]+)?)/);
-            result.weatherCity = m ? m[1] : (text.match(/(?:in|la|din|pentru)\s+(\w+)/i)?.[1] || 'Bucharest');
-        }
-
-        // ── IMAGE ──
-        if (/\b(genereaza|creeaza|deseneaza|fa-mi|picture|draw|generate|create|paint)\b/i.test(lower) &&
-            /\b(imagine|poza|foto|picture|image|desen|ilustratie|avatar|logo|poster)\b/i.test(lower)) {
-            result.needsImage = true;
-            result.imagePrompt = text.replace(/\b(genereaza|creeaza|deseneaza|fa-mi|generate|create|draw|o |un )\b/gi, '')
-                .replace(/\b(imagine|poza|foto|picture|image)\b/gi, '').replace(/\s+/g, ' ').trim();
-            if (result.imagePrompt.length < 5) result.imagePrompt = text;
-        }
-
-        // ── MAP ──
-        if (/\b(harta|map|ruta|drum|directi|navigare|navigate|unde (e|se|este)|locatie|directions|cum ajung)\b/i.test(lower)) {
-            result.needsMap = true;
-            const m = text.match(/(?:harta|map|unde (e|se|este)|locatie|catre|spre|la|to|directions? to)\s+(.+)/i);
-            result.mapPlace = m ? m[2].replace(/[?.!]/g, '').trim() : text;
-        }
-
-        // ── VISION ──
-        if (/\b(ce (e |vezi|observi)|ma vezi|uita-te|priveste|see me|look at|what do you see|descrie ce|ce e in fata|scanez|analizez)\b/i.test(lower)) {
-            result.needsVision = true;
-        }
-
-        // ── TTS (Text-to-Speech) ──
-        if (/\b(citeste|spune|pronunta|read aloud|speak|say out|cu voce|voce tare|vorbeste)\b/i.test(lower)) {
-            result.needsTTS = true;
-            result.ttsText = text.replace(/\b(citeste|spune|pronunta|cu voce|voce tare|read aloud|speak|say out loud|vorbeste)\b/gi, '').trim();
-        }
-
-        // ── STT (Speech-to-Text) ──
-        if (/\b(transcrie|transcriere|dictare|dicteaz[aă]|asculta|transcribe|dictate|speech to text)\b/i.test(lower)) {
-            result.needsSTT = true;
-        }
-
-        // ── FACE CHECK ──
-        if (/\b(cine (sunt|e)|recunoaste|identifica|verifica fata|face check|who am i|recognize me|cine ma|ma recunosti)\b/i.test(lower)) {
-            result.needsFaceCheck = true;
-        }
-
-        // ── FACE REGISTER ──
-        if (/\b(inregistr|salveaz[aă].*fata|memoreaz[aă].*fata|register face|save face|remember my face|retine.*fata)\b/i.test(lower)) {
-            result.needsFaceRegister = true;
-        }
-
-        // ── VOICE CLONE ──
-        if (/\b(cloneaz[aă]|clonare.*voce|copiaz[aă].*voce|clone voice|my voice|vocea mea|vreau vocea)\b/i.test(lower)) {
-            result.needsVoiceClone = true;
-        }
-
-        // ── OPEN URL ON MONITOR ──
-        const urlMatch = text.match(/(https?:\/\/[^\s]+)/i);
-        if (urlMatch || /\b(deschide|afiseaza|arata|open|show|display|pune pe monitor|pe monitor)\b/i.test(lower)) {
-            if (urlMatch) {
-                result.needsOpenURL = true;
-                result.openURL = urlMatch[1];
-            } else if (/\b(deschide|open|pune)\b/i.test(lower)) {
-                result.needsWebNav = true;
-                result.webNavURL = text.replace(/\b(deschide|afiseaza|arata|open|show|pe monitor|display)\b/gi, '').trim();
-            }
-        }
-
-        // ── RADIO LIVE ──
-        if (/\b(radio|fm|asculta radio|pune radio|play radio|kiss fm|europa fm|digi fm|magic fm|rock fm|pro fm|radio zu|radiozu)\b/i.test(lower)) {
-            result.needsRadio = true;
-            const stationMatch = lower.match(/\b(kiss ?fm|europa ?fm|digi ?fm|magic ?fm|rock ?fm|pro ?fm|radio ?zu|virgin ?radio|national ?fm|romantic ?fm|gold ?fm|city ?fm)\b/i);
-            result.radioStation = stationMatch ? stationMatch[1].trim() : 'radio zu';
-        }
-
-        // ── VIDEO / NETFLIX / YOUTUBE ──
-        if (/\b(video|film|movie|netflix|youtube|trailer|serial|episod|watch|viziona|uita-te la|ruleaza)\b/i.test(lower)) {
-            result.needsVideo = true;
-            result.videoQuery = text.replace(/\b(video|pune|ruleaza|arata|film|movie|uita-te la|watch|pe monitor)\b/gi, '').trim();
-        }
-
-        // ── MEMORY ──
-        if (/\b(amintesti|remember|stiai|data trecuta|ultima data|iti amintesti|ai retinut|am zis|ti-am spus|cum ma cheama|unde locuiesc)\b/i.test(lower)) {
-            result.needsMemory = true;
-        }
-
-        // ── EMOTION (multi-signal) ──
-        const emotionMap = {
+    // ── Emotion detection map ──
+    static get EMOTION_MAP() {
+        return {
             sad: { pattern: /\b(trist|deprimat|singur|plang|suparat|nefericit|sad|depressed|lonely|pierdut|dor)\b/i, weight: 0.9 },
             happy: { pattern: /\b(fericit|bucuros|minunat|super|genial|happy|great|awesome|amazing)\b/i, weight: 0.7 },
             angry: { pattern: /\b(nervos|furios|enervat|angry|furious|frustrated|urasc|hate)\b/i, weight: 0.9 },
@@ -392,138 +454,11 @@ Reply STRICTLY with JSON:
             grateful: { pattern: /\b(multumesc|mersi|thanks|thank you|apreciez|recunoscator)\b/i, weight: 0.5 },
             excited: { pattern: /\b(abia astept|super tare|wow|amazing|incredible|fantastic|entuziasmat)\b/i, weight: 0.7 }
         };
-        for (const [emo, { pattern, weight }] of Object.entries(emotionMap)) {
-            if (pattern.test(lower)) { result.emotionalTone = emo; result.isEmotional = true; result.confidenceScore = weight; break; }
-        }
+    }
 
-        // ── EMERGENCY ──
-        if (/\b(pericol|danger|ajutor|help me|urgenta|accident|foc|incendiu|fire|emergency|ambulanta|politie|112|911)\b/i.test(lower)) {
-            result.isEmergency = true;
-            result.confidenceScore = 1.0;
-        }
-
-        // ── GREETING ──
-        if (/^(hey|hi|hello|salut|buna|hei|ceau|noroc|servus)/i.test(lower) && words.length <= 5) {
-            result.isGreeting = true;
-        }
-
-        // ── FOLLOW-UP ──
-        if (/\b(asta|aceasta|ce am zis|mai devreme|anterior|that|this|earlier|before|continua)\b/i.test(lower)) {
-            result.isFollowUp = true;
-            result.needsMemory = true;
-        }
-
-        // ── ADMIN INTENTS (only detected, executed only if isAdmin) ──
-        if (/\b(diagnoz[aă]|diagnostic|status brain|brain status|health|stare brain|stare sistem)\b/i.test(lower)) {
-            result.needsAdminDiagnose = true;
-        }
-        if (/\b(reset|restart|reporneste|reseteaz[aă])\b/i.test(lower) && /\b(brain|creier|tool|sistem)\b/i.test(lower)) {
-            result.needsAdminReset = true;
-            const toolMatch = lower.match(/\b(search|weather|imagine|memory|map|all|tot|toate)\b/i);
-            result.adminResetTool = toolMatch ? toolMatch[1] : 'all';
-        }
-        if (/\b(stats|statistici|revenue|venituri|abonati|subscribers|plat[iă]|payments|churn)\b/i.test(lower)) {
-            result.needsAdminStats = true;
-        }
-        if (/\b(trading|trade|portofoliu|portfolio|binance|pozitii|positions|profit|p&l|pnl)\b/i.test(lower)) {
-            result.needsAdminTrading = true;
-            result.adminTradingAction = lower.includes('execut') ? 'execute' : 'status';
-        }
-        if (/\b(stiri|news|headline|noutati|pres[aă])\b/i.test(lower)) {
-            result.needsAdminNews = true;
-        }
-
-        // ── TABLE 3: AUTH from chat ──
-        if (/\b(logheaz[aă]|autentific|login|sign\s*in|conecteaz[aă]|intr[aă]\s*in\s*cont)\b/i.test(lower)) {
-            result.needsAuth = true; result.authAction = 'login';
-        }
-        if (/\b(inregistr|register|sign\s*up|cont\s*nou|creaz[aă]\s*cont|fa-mi\s*cont)\b/i.test(lower)) {
-            result.needsAuth = true; result.authAction = 'register';
-        }
-        if (/\b(delogheaz[aă]|logout|sign\s*out|deconecteaz[aă]|iesire|iesi)\b/i.test(lower)) {
-            result.needsAuth = true; result.authAction = 'logout';
-        }
-        if (/\b(schimb[aă].*parol|change.*pass|reset.*parol|parol[aă]\s*nou)\b/i.test(lower)) {
-            result.needsAuth = true; result.authAction = 'changePassword';
-        }
-        if (/\b(schimb[aă].*email|change.*email|email\s*nou)\b/i.test(lower)) {
-            result.needsAuth = true; result.authAction = 'changeEmail';
-        }
-        if (/\b(am\s*uitat.*parol|forgot.*pass|reset[eă].*parol|nu.*mai.*stiu.*parol)\b/i.test(lower)) {
-            result.needsAuth = true; result.authAction = 'forgotPassword';
-        }
-
-        // ── TABLE 3: PAYMENTS from chat ──
-        if (/\b(abonament|plan|pret|price|subscri|tarif|cat\s*cost|pachete)\b/i.test(lower) && !result.needsAdminStats) {
-            result.needsPayments = true; result.paymentAction = 'plans';
-        }
-        if (/\b(vreau\s*(pro|premium)|cump[aă]r|upgrade|platesc|achit|comand)\b/i.test(lower)) {
-            result.needsPayments = true; result.paymentAction = 'checkout';
-        }
-        if (/\b(factur[aă]|billing|gestion.*abonament|manage.*sub|anuleaz[aă])\b/i.test(lower)) {
-            result.needsPayments = true; result.paymentAction = 'portal';
-        }
-
-        // ── TABLE 3: NEWS standalone (not admin) ──
-        if (/\b(ce\s*se\s*(mai\s*)?intampl|stiri\s*(de\s*)?azi|noutati|breaking|ultima\s*or[aă]|urgent)\b/i.test(lower)) {
-            result.needsNewsStandalone = true;
-            result.newsAction = /\b(breaking|urgent|ultima\s*or)\b/i.test(lower) ? 'breaking' : 'latest';
-        }
-
-        // ── TABLE 3: LEGAL from chat ──
-        if (/\b(termeni|terms|conditii)\b/i.test(lower)) {
-            result.needsLegal = true; result.legalAction = 'terms';
-        }
-        if (/\b(confidentialitate|privacy|date\s*personale|politica)\b/i.test(lower)) {
-            result.needsLegal = true; result.legalAction = 'privacy';
-        }
-        if (/\b(gdpr|sterge.*date|export.*date|datele\s*mele|drepturile\s*mele)\b/i.test(lower)) {
-            result.needsLegal = true;
-            result.legalAction = /\b(sterge|delete|elimina)\b/i.test(lower) ? 'deleteData' : 'exportData';
-        }
-
-        // ── TABLE 3: HEALTH CHECK from chat ──
-        if (/\b(cum\s*esti|functional|functionez|cum\s*te\s*simti|esti\s*ok|status\s*server|self\s*check)\b/i.test(lower)) {
-            result.needsHealthCheck = true;
-        }
-
-        // ── TABLE 3: TRADE INTELLIGENCE from chat ──
-        if (/\b(analiza\s*piata|market\s*analysis|sentim(?:ent|ental)|bullish|bearish|divergenta|pivot|support|rezistenta|semnale\s*trading|intelligence\s*trading|crypto\s*signal)\b/i.test(lower)) {
-            result.needsTradeIntelligence = true;
-        }
-
-        // ── TABLE 3: COOKIE CONSENT from chat ──
-        if (/\b(cookie|gdpr.*cookie|accept.*cookie|refuz.*cookie|cookie.*consent|cookie.*policy)\b/i.test(lower)) {
-            result.needsCookieConsent = true;
-        }
-
-        // ── TABLE 3: PROMETHEUS / GRAFANA METRICS from chat ──
-        if (/\b(metrici|metrics|prometheus|grafana|latency|request.*count|error.*rate|performance|latenta|performanta)\b/i.test(lower)) {
-            result.needsMetricsStats = true;
-        }
-
-        // ── SECURITY CHECK from chat ──
-        if (/\b(securitate|security|cors|helmet|csp|rate.*limit|https|ssl|protectie|protejat|firewall|vulnerabil|sentry|logging)\b/i.test(lower)) {
-            result.needsSecurityCheck = true;
-        }
-
-        // ── DEVELOPER API INFO from chat ──
-        if (/\b(api.*key|developer.*api|v1.*api|endpoint|webhook|sdk|integrare.*api|chei.*api|postman|swagger|rest.*api)\b/i.test(lower)) {
-            result.needsDevAPIInfo = true;
-        }
-
-        // ── SYSTEM STATUS from chat ──
-        if (/\b(migratie|migration|cache|validare|baza.*date|database|tabele|system.*status|infrastructure|deploy|uptime|schema|referral|abonament.*system)\b/i.test(lower)) {
-            result.needsSystemStatus = true;
-        }
-
-        // ── COMPLEXITY ──
-        const toolsNeeded = [result.needsSearch, result.needsWeather, result.needsImage, result.needsMap, result.needsVision].filter(Boolean).length;
-        if (toolsNeeded >= 2 || words.length > 30 || text.split(/[?.!]/).length > 3) result.complexity = 'complex';
-        else if (toolsNeeded >= 1 || words.length > 12) result.complexity = 'moderate';
-
-        // ── TOPIC EXTRACTION ──
-        const topicPatterns = [
+    // ── Topic detection patterns ──
+    static get TOPIC_PATTERNS() {
+        return [
             { pattern: /\b(programare|code|coding|software|app|web|python|java|react)\b/i, topic: 'tech' },
             { pattern: /\b(sanatate|health|doctor|medical|boala|tratament|medicament)\b/i, topic: 'health' },
             { pattern: /\b(mancare|food|reteta|recipe|gatit|cooking|restaurant)\b/i, topic: 'food' },
@@ -532,10 +467,11 @@ Reply STRICTLY with JSON:
             { pattern: /\b(muzica|music|film|movie|carte|book|joc|game)\b/i, topic: 'entertainment' },
             { pattern: /\b(sport|fitness|antrenament|exercitiu|gym|alergare)\b/i, topic: 'fitness' },
         ];
-        result.topics = topicPatterns.filter(t => t.pattern.test(lower)).map(t => t.topic);
+    }
 
-        // ── MOOD DETECTION ──
-        const moodPatterns = {
+    // ── Mood detection patterns ──
+    static get MOOD_PATTERNS() {
+        return {
             happy: /\b(super|minunat|yay|woohoo|amazing|perfect|grozav|excelent|bravo|wow)\b/i,
             sad: /\b(trist|supărat|rău|plâng|deprimat|singur|lonely|sad|down|pierdut)\b/i,
             frustrated: /\b(nu merge|enervant|prostie|nu funcționează|broken|hate|ura|naiba|drace)\b/i,
@@ -543,12 +479,65 @@ Reply STRICTLY with JSON:
             anxious: /\b(îngrijorat|anxios|frica|teamă|worried|stressed|stresat|panicat)\b/i,
             playful: /\b(haha|😂|😏|lol|rofl|:D|glum|funny|amuzant|haios|hazliu)\b/i
         };
-        let detectedMood = 'neutral';
-        for (const [mood, pattern] of Object.entries(moodPatterns)) {
-            if (pattern.test(text)) { detectedMood = mood; break; }
-        }
-        result.detectedMood = detectedMood;
+    }
 
+    analyzeIntent(text, language) {
+        const lower = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        const words = text.split(/\s+/);
+        const result = { ...KelionBrain.DEFAULT_INTENT, language: language || 'ro' };
+
+        // ── URL detection (special: sets openURL OR webNav) ──
+        const urlMatch = text.match(/(https?:\/\/[^\s]+)/i);
+        if (urlMatch) {
+            result.needsOpenURL = true;
+            result.openURL = urlMatch[1];
+        } else if (/\b(deschide|afiseaza|arata|open|show|display|pune pe monitor|pe monitor)\b/i.test(lower)) {
+            if (/\b(deschide|open|pune)\b/i.test(lower)) {
+                result.needsWebNav = true;
+                result.webNavURL = text.replace(/\b(deschide|afiseaza|arata|open|show|pe monitor|display)\b/gi, '').trim();
+            }
+        }
+
+        // ── Run registry ──
+        for (const intent of KelionBrain.INTENT_REGISTRY) {
+            const triggered = Array.isArray(intent.triggers)
+                ? intent.triggers.some(t => t.test(lower))
+                : intent.triggers.test(lower);
+            if (!triggered) continue;
+
+            // Optional extra condition
+            if (intent.condition && !intent.condition(lower, words, result)) continue;
+
+            result[intent.flag] = true;
+            if (intent.extract) Object.assign(result, intent.extract(text, lower));
+            if (intent.extra) Object.assign(result, intent.extra);
+
+            // Search refinement via learned patterns
+            if (intent.needsRefine && this.refineSearchQuery) {
+                result.searchQuery = this.refineSearchQuery(result.searchQuery);
+            }
+        }
+
+        // ── Emotion detection ──
+        for (const [emo, { pattern, weight }] of Object.entries(KelionBrain.EMOTION_MAP)) {
+            if (pattern.test(lower)) { result.emotionalTone = emo; result.isEmotional = true; result.confidenceScore = weight; break; }
+        }
+
+        // ── Complexity ──
+        const toolsNeeded = [result.needsSearch, result.needsWeather, result.needsImage, result.needsMap, result.needsVision].filter(Boolean).length;
+        if (toolsNeeded >= 2 || words.length > 30 || text.split(/[?.!]/).length > 3) result.complexity = 'complex';
+        else if (toolsNeeded >= 1 || words.length > 12) result.complexity = 'moderate';
+
+        // ── Topics ──
+        result.topics = KelionBrain.TOPIC_PATTERNS.filter(t => t.pattern.test(lower)).map(t => t.topic);
+
+        // ── Mood ──
+        result.detectedMood = 'neutral';
+        for (const [mood, pattern] of Object.entries(KelionBrain.MOOD_PATTERNS)) {
+            if (pattern.test(text)) { result.detectedMood = mood; break; }
+        }
+
+        // ── Question / Command detection ──
         result.isQuestion = /\?$/.test(text.trim()) || /^(ce|cine|cand|unde|cum|de ce|cat|what|who|when|where|how|why)/i.test(lower);
         result.isCommand = /^(fa|seteaza|porneste|opreste|deschide|do|set|start|stop|open|run|executa)/i.test(lower);
 
