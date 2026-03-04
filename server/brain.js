@@ -262,6 +262,10 @@ Reply STRICTLY with JSON:
             needsNewsStandalone: false, newsAction: '',
             needsLegal: false, legalAction: '',
             needsHealthCheck: false,
+            // Table 3 NEW: remaining functions
+            needsTradeIntelligence: false,
+            needsCookieConsent: false,
+            needsMetricsStats: false,
             isQuestion: false, isCommand: false, isEmotional: false,
             isEmergency: false, isGreeting: false, isFollowUp: false,
             complexity: 'simple', emotionalTone: 'neutral',
@@ -479,6 +483,21 @@ Reply STRICTLY with JSON:
             result.needsHealthCheck = true;
         }
 
+        // ── TABLE 3: TRADE INTELLIGENCE from chat ──
+        if (/\b(analiza\s*piata|market\s*analysis|sentim(?:ent|ental)|bullish|bearish|divergenta|pivot|support|rezistenta|semnale\s*trading|intelligence\s*trading|crypto\s*signal)\b/i.test(lower)) {
+            result.needsTradeIntelligence = true;
+        }
+
+        // ── TABLE 3: COOKIE CONSENT from chat ──
+        if (/\b(cookie|gdpr.*cookie|accept.*cookie|refuz.*cookie|cookie.*consent|cookie.*policy)\b/i.test(lower)) {
+            result.needsCookieConsent = true;
+        }
+
+        // ── TABLE 3: PROMETHEUS / GRAFANA METRICS from chat ──
+        if (/\b(metrici|metrics|prometheus|grafana|latency|request.*count|error.*rate|performance|latenta|performanta)\b/i.test(lower)) {
+            result.needsMetricsStats = true;
+        }
+
         // ── COMPLEXITY ──
         const toolsNeeded = [result.needsSearch, result.needsWeather, result.needsImage, result.needsMap, result.needsVision].filter(Boolean).length;
         if (toolsNeeded >= 2 || words.length > 30 || text.split(/[?.!]/).length > 3) result.complexity = 'complex';
@@ -554,6 +573,9 @@ Reply STRICTLY with JSON:
             if (analysis.needsNewsStandalone && !seen.has('newsAction')) { plan.push({ tool: 'newsAction', action: analysis.newsAction }); seen.add('newsAction'); }
             if (analysis.needsLegal && !seen.has('legalAction')) { plan.push({ tool: 'legalAction', action: analysis.legalAction }); seen.add('legalAction'); }
             if (analysis.needsHealthCheck && !seen.has('healthCheck')) { plan.push({ tool: 'healthCheck' }); seen.add('healthCheck'); }
+            if (analysis.needsTradeIntelligence && !seen.has('tradeIntelligence')) { plan.push({ tool: 'tradeIntelligence' }); seen.add('tradeIntelligence'); }
+            if (analysis.needsCookieConsent && !seen.has('cookieConsent')) { plan.push({ tool: 'cookieConsent' }); seen.add('cookieConsent'); }
+            if (analysis.needsMetricsStats && !seen.has('metricsStats')) { plan.push({ tool: 'metricsStats' }); seen.add('metricsStats'); }
         }
 
         // Check for known good combinations from journal
@@ -637,6 +659,9 @@ Reply STRICTLY with JSON:
             case 'newsAction': return this._newsAction(step.action);
             case 'legalAction': return this._legalAction(step.action);
             case 'healthCheck': return this._healthCheck();
+            case 'tradeIntelligence': return this._tradeIntelligence();
+            case 'cookieConsent': return this._cookieConsent();
+            case 'metricsStats': return this._metricsStats();
             default: return null;
         }
     }
@@ -670,6 +695,9 @@ Reply STRICTLY with JSON:
         if (results.newsAction) ctx += `\n[ȘTIRI: ${results.newsAction.summary}]`;
         if (results.legalAction) ctx += `\n[LEGAL: ${results.legalAction.summary}]`;
         if (results.healthCheck) ctx += `\n[HEALTH: ${results.healthCheck.summary}]`;
+        if (results.tradeIntelligence) ctx += `\n[TRADE INTELLIGENCE: ${results.tradeIntelligence.summary}]`;
+        if (results.cookieConsent) ctx += `\n[COOKIE CONSENT: ${results.cookieConsent.summary}]`;
+        if (results.metricsStats) ctx += `\n[METRICS: ${results.metricsStats.summary}]`;
 
         if (analysis.isEmotional && analysis.emotionalTone !== 'neutral') {
             ctx += `\n[Utilizatorul pare ${analysis.emotionalTone}. Adapteaza tonul empatic.]`;
@@ -1193,6 +1221,137 @@ Reply STRICTLY with JSON:
         }
 
         return { type: 'health', ...result };
+    }
+
+    // ── TRADE INTELLIGENCE — Real analysis from trade-intelligence.js ──
+    async _tradeIntelligence() {
+        try {
+            const ti = require('./trade-intelligence');
+            const results = {};
+
+            // Fetch market news sentiment
+            try {
+                const news = await ti.fetchMarketNews('crypto');
+                if (news && news.length > 0) {
+                    const headlines = news.map(n => n.title || n.headline);
+                    results.sentiment = ti.calculateNewsSentiment(headlines);
+                    results.newsCount = news.length;
+                    results.topHeadlines = headlines.slice(0, 5);
+                }
+            } catch (e) { results.sentimentError = e.message; }
+
+            // Economic calendar risks
+            try {
+                results.calendarRisks = ti.getEconomicCalendarRisks();
+            } catch (e) { results.calendarError = e.message; }
+
+            const summary = `Sentiment: ${results.sentiment?.toFixed(2) || 'N/A'} | News: ${results.newsCount || 0} articles | Calendar risks: ${results.calendarRisks?.events?.length || 0}`;
+
+            // Save to Supabase
+            if (this.supabaseAdmin) {
+                try {
+                    await this.supabaseAdmin.from('trade_intelligence').insert({
+                        asset: 'BTC',
+                        analysis_type: 'full_scan',
+                        result: results,
+                        sentiment_score: results.sentiment || 0,
+                        confidence: results.newsCount > 5 ? 0.8 : 0.5,
+                        created_at: new Date().toISOString()
+                    });
+                    await this.supabaseAdmin.from('admin_logs').insert({
+                        action: 'trade_intelligence',
+                        details: summary,
+                        source: 'brain_chat',
+                        created_at: new Date().toISOString()
+                    });
+                } catch (e) { /* ok */ }
+            }
+
+            return { type: 'tradeIntelligence', data: results, summary };
+        } catch (e) {
+            return { type: 'tradeIntelligence', error: e.message, summary: `Eroare: ${e.message}` };
+        }
+    }
+
+    // ── COOKIE CONSENT — GDPR Cookie Management ──
+    async _cookieConsent() {
+        const info = {
+            type: 'cookieConsent',
+            categories: {
+                functional: { required: true, description: 'Cookie-uri esențiale pentru funcționarea site-ului (sesiune, autentificare).' },
+                analytics: { required: false, description: 'Cookie-uri de analiză (ex: Google Analytics) — NU sunt active implicit.' },
+                marketing: { required: false, description: 'Cookie-uri de marketing — NU sunt active. KelionAI nu are advertising.' }
+            },
+            policy: 'KelionAI folosește doar cookie-uri funcționale necesare. Nu avem tracking, nu avem reclame.',
+            endpoint: '/api/cookie-consent',
+            summary: 'Cookie consent: doar funcționale active. Analytics/marketing dezactivate implicit. GDPR compliant.'
+        };
+
+        if (this.supabaseAdmin) {
+            try {
+                await this.supabaseAdmin.from('admin_logs').insert({
+                    action: 'cookie_consent_info',
+                    details: 'User asked about cookie policy from chat',
+                    source: 'brain_chat',
+                    created_at: new Date().toISOString()
+                });
+            } catch (e) { /* ok */ }
+        }
+
+        return info;
+    }
+
+    // ── METRICS STATS — Prometheus + Grafana from metrics.js ──
+    async _metricsStats() {
+        try {
+            const metrics = require('./metrics');
+            const metricsText = await metrics.register.metrics();
+
+            // Parse key metrics from Prometheus output
+            const lines = metricsText.split('\n').filter(l => !l.startsWith('#') && l.includes(' '));
+            const parsed = {};
+            for (const line of lines.slice(0, 30)) {
+                const [name, value] = line.split(' ');
+                if (name && value) parsed[name] = parseFloat(value);
+            }
+
+            const result = {
+                type: 'metricsStats',
+                totalMetrics: lines.length,
+                keyMetrics: {
+                    httpRequests: parsed['kelionai_http_requests_total'] || 0,
+                    activeConnections: parsed['kelionai_active_connections'] || 0,
+                    errors: parsed['kelionai_errors_total'] || 0,
+                    aiRequests: parsed['kelionai_ai_requests_total'] || 0
+                },
+                grafanaEnabled: !!process.env.GRAFANA_PROM_URL,
+                prometheusEndpoint: '/metrics',
+                summary: `Metrici: ${lines.length} active | Requests: ${parsed['kelionai_http_requests_total'] || 0} | Erori: ${parsed['kelionai_errors_total'] || 0} | Grafana: ${process.env.GRAFANA_PROM_URL ? 'ON' : 'OFF'}`
+            };
+
+            // Save snapshot to Supabase
+            if (this.supabaseAdmin) {
+                try {
+                    await this.supabaseAdmin.from('metrics_snapshots').insert({
+                        metric_type: 'full_snapshot',
+                        metric_name: 'brain_chat_query',
+                        value: lines.length,
+                        labels: result.keyMetrics,
+                        created_at: new Date().toISOString()
+                    });
+                    await this.supabaseAdmin.from('admin_logs').insert({
+                        action: 'metrics_stats',
+                        details: result.summary,
+                        source: 'brain_chat',
+                        created_at: new Date().toISOString()
+                    });
+                } catch (e) { /* ok */ }
+            }
+
+            return result;
+        } catch (e) {
+            return { type: 'metricsStats', error: e.message, summary: `Eroare metrici: ${e.message}` };
+        }
     }
 
     // ═══════════════════════════════════════════════════════════
