@@ -19,6 +19,7 @@ const _cleanupInterval = setInterval(() => {
         if (now > entry.expires) _memStore.delete(key);
     }
 }, 60 * 1000); // cleanup every minute
+_cleanupInterval.unref();
 
 /**
  * Initializes Redis if REDIS_URL is set.

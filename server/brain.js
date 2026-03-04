@@ -840,7 +840,7 @@ Reply STRICTLY with JSON:
                 type, url, title,
                 created_at: new Date().toISOString()
             });
-        } catch (e) { /* ok — table might not exist yet */ }
+        } catch (e) { logger.warn({ component: 'Brain', err: e.message }, 'ok — table might not exist yet'); }
     }
 
     // ── OPEN URL ON MONITOR ──
@@ -1026,7 +1026,7 @@ Reply STRICTLY with JSON:
                     source: 'brain_chat',
                     created_at: new Date().toISOString()
                 });
-            } catch (e) { /* ok */ }
+            } catch (e) { logger.warn({ component: 'Brain', err: e.message }, 'ok'); }
         }
 
         return {
@@ -1083,7 +1083,7 @@ Reply STRICTLY with JSON:
                     source: 'brain_chat',
                     created_at: new Date().toISOString()
                 });
-            } catch (e) { /* ok */ }
+            } catch (e) { logger.warn({ component: 'Brain', err: e.message }, 'ok'); }
         }
 
         return { type: 'payment', ...result };
@@ -1139,7 +1139,7 @@ Reply STRICTLY with JSON:
                     source: 'brain_chat',
                     created_at: new Date().toISOString()
                 });
-            } catch (e) { /* ok */ }
+            } catch (e) { logger.warn({ component: 'Brain', err: e.message }, 'ok'); }
         }
 
         return { type: 'news', ...result };
@@ -1189,7 +1189,7 @@ Reply STRICTLY with JSON:
                     source: 'brain_chat',
                     created_at: new Date().toISOString()
                 });
-            } catch (e) { /* ok */ }
+            } catch (e) { logger.warn({ component: 'Brain', err: e.message }, 'ok'); }
         }
 
         return { type: 'legal', ...result };
@@ -1238,7 +1238,7 @@ Reply STRICTLY with JSON:
                     source: 'brain_chat',
                     created_at: new Date().toISOString()
                 });
-            } catch (e) { /* ok */ }
+            } catch (e) { logger.warn({ component: 'Brain', err: e.message }, 'ok'); }
         }
 
         return { type: 'health', ...result };
@@ -1285,7 +1285,7 @@ Reply STRICTLY with JSON:
                         source: 'brain_chat',
                         created_at: new Date().toISOString()
                     });
-                } catch (e) { /* ok */ }
+                } catch (e) { logger.warn({ component: 'Brain', err: e.message }, 'ok'); }
             }
 
             return { type: 'tradeIntelligence', data: results, summary };
@@ -1316,7 +1316,7 @@ Reply STRICTLY with JSON:
                     source: 'brain_chat',
                     created_at: new Date().toISOString()
                 });
-            } catch (e) { /* ok */ }
+            } catch (e) { logger.warn({ component: 'Brain', err: e.message }, 'ok'); }
         }
 
         return info;
@@ -1366,7 +1366,7 @@ Reply STRICTLY with JSON:
                         source: 'brain_chat',
                         created_at: new Date().toISOString()
                     });
-                } catch (e) { /* ok */ }
+                } catch (e) { logger.warn({ component: 'Brain', err: e.message }, 'ok'); }
             }
 
             return result;
@@ -1410,7 +1410,7 @@ Reply STRICTLY with JSON:
                         source: 'brain_chat',
                         created_at: new Date().toISOString()
                     });
-                } catch (e) { /* ok */ }
+                } catch (e) { logger.warn({ component: 'Brain', err: e.message }, 'ok'); }
             }
             return result;
         } catch (e) {
@@ -1426,7 +1426,7 @@ Reply STRICTLY with JSON:
                 try {
                     const { count } = await this.supabaseAdmin.from('api_keys').select('*', { count: 'exact', head: true });
                     totalKeys = count || 0;
-                } catch (e) { /* ok */ }
+                } catch (e) { logger.warn({ component: 'Brain', err: e.message }, 'ok'); }
             }
 
             const endpoints = [
@@ -1460,7 +1460,7 @@ Reply STRICTLY with JSON:
                         source: 'brain_chat',
                         created_at: new Date().toISOString()
                     });
-                } catch (e) { /* ok */ }
+                } catch (e) { logger.warn({ component: 'Brain', err: e.message }, 'ok'); }
             }
             return result;
         } catch (e) {
@@ -1511,7 +1511,7 @@ Reply STRICTLY with JSON:
                         source: 'brain_chat',
                         created_at: new Date().toISOString()
                     });
-                } catch (e) { /* ok */ }
+                } catch (e) { logger.warn({ component: 'Brain', err: e.message }, 'ok'); }
             }
             return result;
         } catch (e) {
@@ -1570,7 +1570,7 @@ Reply STRICTLY with JSON:
                         try {
                             const today = new Date().toISOString().split('T')[0];
                             await this.supabaseAdmin.from('usage').upsert({ user_id: 'system', type: 'vision', date: today, count: 1 }, { onConflict: 'user_id,type,date' });
-                        } catch (e) { /* ok */ }
+                        } catch (e) { logger.warn({ component: 'Brain', err: e.message }, 'ok'); }
                     }
                     return {
                         type: 'vision',
@@ -1639,7 +1639,7 @@ Reply STRICTLY with JSON:
                         try {
                             const today = new Date().toISOString().split('T')[0];
                             await this.supabaseAdmin.from('usage').upsert({ user_id: userId || 'system', type: 'tts', date: today, count: 1 }, { onConflict: 'user_id,type,date' });
-                        } catch (e) { /* ok */ }
+                        } catch (e) { logger.warn({ component: 'Brain', err: e.message }, 'ok'); }
                     }
                     return {
                         type: 'tts',
@@ -1693,7 +1693,7 @@ Reply STRICTLY with JSON:
                     try {
                         const today = new Date().toISOString().split('T')[0];
                         await this.supabaseAdmin.from('usage').upsert({ user_id: userId || 'system', type: 'stt', date: today, count: 1 }, { onConflict: 'user_id,type,date' });
-                    } catch (e) { /* ok */ }
+                    } catch (e) { logger.warn({ component: 'Brain', err: e.message }, 'ok'); }
                 }
 
                 return {
@@ -1745,7 +1745,7 @@ Reply STRICTLY with JSON:
             try {
                 const { data } = await this.supabaseAdmin.from('profiles').select('user_id, display_name, face_encoding').not('face_encoding', 'is', null);
                 knownFaces = (data || []).filter(f => f.face_encoding && Object.keys(f.face_encoding).length > 0);
-            } catch (e) { /* no profiles yet */ }
+            } catch (e) { logger.warn({ component: 'Brain', err: e.message }, 'no profiles yet'); }
         }
 
         if (!imageBase64) {
@@ -1877,7 +1877,7 @@ Reply STRICTLY with JSON:
                 const { data } = await this.supabaseAdmin.from('user_preferences').select('value')
                     .eq('user_id', userId).eq('key', 'cloned_voice_id').single();
                 existingVoice = data?.value;
-            } catch (e) { /* no voice yet */ }
+            } catch (e) { logger.warn({ component: 'Brain', err: e.message }, 'no voice yet'); }
         }
 
         if (existingVoice?.voice_id) {
@@ -1898,7 +1898,7 @@ Reply STRICTLY with JSON:
                             summary: `Vocea clonată "${voiceData.name}" este activă.`
                         };
                     }
-                } catch (e) { /* voice may have been deleted */ }
+                } catch (e) { logger.warn({ component: 'Brain', err: e.message }, 'voice may have been deleted'); }
             }
             return { type: 'voiceClone', status: 'exists', voiceId: existingVoice.voice_id, summary: 'Voce clonată existentă.' };
         }
@@ -2327,7 +2327,7 @@ Raspunde STRICT JSON. Daca nimic: {}`;
                         const d = await r.json();
                         result.headlines = (d.results || []).map(a => ({ title: a.title, source: a.source_name, link: a.link, pubDate: a.pubDate }));
                     }
-                } catch (e) { /* no news API */ }
+                } catch (e) { logger.warn({ component: 'Brain', err: e.message }, 'no news API'); }
             }
         } catch (e) { result.error = e.message; }
         await this._logAdminAction('news', {}, { count: result.headlines.length });

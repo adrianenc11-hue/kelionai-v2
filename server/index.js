@@ -240,6 +240,7 @@ const _memCleanupInterval = setInterval(() => {
         logger.info({ component: 'Memory', removed: toDelete.length, remaining: 500 }, 'memFallback cleanup');
     }
 }, 60 * 60 * 1000);
+_memCleanupInterval.unref();
 
 // ═══ BRAIN INITIALIZATION ═══
 const brain = new KelionBrain({

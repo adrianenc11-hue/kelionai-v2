@@ -170,7 +170,7 @@ router.delete('/gdpr/delete', async (req, res) => {
                 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
                 await stripe.subscriptions.cancel(sub.stripe_subscription_id);
             }
-        } catch (e) { /* subscription might not exist */ }
+        } catch (e) { logger.warn({ component: 'Legal', err: e.message }, 'subscription might not exist'); }
 
         // Delete all user data in order (respecting foreign keys)
         const convIds = [];

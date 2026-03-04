@@ -429,6 +429,7 @@ function startScheduler() {
             }
         }
     }, CHECK_INTERVAL_MS);
+    if (_schedulerInterval) _schedulerInterval.unref();
     logger.info({ component: 'News' }, '📰 News scheduler started (checks every 15min)');
 }
 
@@ -499,7 +500,7 @@ async function persistCache() {
             { id: 'latest', data: JSON.stringify(articles), updated_at: new Date().toISOString() },
             { onConflict: 'id' }
         );
-    } catch (e) { /* silent — persistence is optional */ }
+    } catch (e) { logger.warn({ component: 'News', err: e.message }, 'silent — persistence is optional'); }
 }
 
 async function restoreCache() {
@@ -515,7 +516,7 @@ async function restoreCache() {
             }
             logger.info({ component: 'News', restored: articleCache.size }, 'Cache restored from DB');
         }
-    } catch (e) { /* silent */ }
+    } catch (e) { logger.warn({ component: 'News', err: e.message }, 'silent'); }
 }
 
 module.exports = { router, setSupabase, restoreCache, getArticlesArray, onNewsFetched, _schedulerInterval };
