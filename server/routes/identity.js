@@ -67,8 +67,7 @@ router.post('/identity/check', identityLimiter, express.json({ limit: '2mb' }), 
                     .single();
 
                 if (ownerProfile?.face_reference && process.env.OPENAI_API_KEY) {
-                    // Use Claude/OpenAI Vision to compare faces
-                    const fetch = require('node-fetch');
+                    // Use OpenAI Vision to compare faces
                     const r = await fetch('https://api.openai.com/v1/chat/completions', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + process.env.OPENAI_API_KEY },
