@@ -72,12 +72,19 @@ router.post('/listen', apiLimiter, validate(listenSchema), async (req, res) => {
         if (req.body.text) return res.json({ text: req.body.text, engine: 'WebSpeech' });
         const { audio } = req.body;
         if (!audio) return res.status(400).json({ error: 'Audio is required' });
+
+        const { getUserFromToken, supabaseAdmin } = req.app.locals;
+        const user = await getUserFromToken(req);
+        const usage = await checkUsage(user?.id, 'stt', supabaseAdmin);
+        if (!usage.allowed) return res.status(429).json({ error: 'STT limit reached. Upgrade to Pro for more.', plan: usage.plan, limit: usage.limit, upgrade: true });
+
         if (process.env.GROQ_API_KEY) {
             const form = new FormData();
             form.append('file', Buffer.from(audio, 'base64'), { filename: 'a.webm', contentType: 'audio/webm' });
             form.append('model', 'whisper-large-v3');
             const r = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', { method: 'POST', headers: { 'Authorization': 'Bearer ' + process.env.GROQ_API_KEY }, body: form });
             const d = await r.json();
+            incrementUsage(user?.id, 'stt', supabaseAdmin).catch(e => logger.warn({ component: 'Voice', err: e.message }, 'incrementUsage failed'));
             return res.json({ text: d.text || '', engine: 'Groq' });
         }
         res.status(503).json({ error: 'Use Web Speech API' });
