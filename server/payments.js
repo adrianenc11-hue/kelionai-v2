@@ -147,7 +147,7 @@ router.get('/status', async (req, res) => {
 
         // Get today's usage
         const today = new Date().toISOString().split('T')[0];
-        let usage = { chat: 0, search: 0, image: 0, vision: 0, tts: 0 };
+        const usage = { chat: 0, search: 0, image: 0, vision: 0, tts: 0 };
         if (supabaseAdmin) {
             try {
                 const { data } = await supabaseAdmin
