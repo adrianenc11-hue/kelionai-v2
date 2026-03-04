@@ -980,7 +980,7 @@ Reply STRICTLY with JSON:
     // ═══════════════════════════════════════════════════════════
 
     // ── AUTH ACTION (from chat) ──
-    async _authAction(action, data) {
+    async _authAction(action, _data) {
         this.toolStats.authAction = (this.toolStats.authAction || 0) + 1;
         const actionMessages = {
             login: {
@@ -1042,7 +1042,7 @@ Reply STRICTLY with JSON:
         let result = {};
 
         try {
-            const payments = require('./payments');
+            const _payments = require('./payments');
 
             if (action === 'plans') {
                 result = {
@@ -1484,7 +1484,7 @@ Reply STRICTLY with JSON:
                     try {
                         const { count } = await this.supabaseAdmin.from(table).select('*', { count: 'exact', head: true });
                         tableCounts[table] = count || 0;
-                    } catch (e) {
+                    } catch {
                         tableCounts[table] = 'ERROR';
                     }
                 }
@@ -1840,7 +1840,7 @@ Reply STRICTLY with JSON:
                     try {
                         const jsonMatch = text.match(/\{[\s\S]*\}/);
                         faceDescription = jsonMatch ? JSON.parse(jsonMatch[0]) : { description: text };
-                    } catch (e) { faceDescription = { description: text }; }
+                    } catch { faceDescription = { description: text }; }
                 }
             } catch (e) { logger.warn({ component: 'Brain', err: e.message }, 'Face register Vision error'); }
         }

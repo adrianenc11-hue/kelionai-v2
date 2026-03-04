@@ -47,7 +47,7 @@ async function getUserPlan(userId, supabaseAdmin) {
         }
 
         return { plan: 'free', limits: PLAN_LIMITS.free };
-    } catch (e) {
+    } catch {
         return { plan: 'free', limits: PLAN_LIMITS.free };
     }
 }
@@ -76,7 +76,7 @@ async function checkUsage(userId, type, supabaseAdmin) {
         const remaining = limits[type] - used;
 
         return { allowed: remaining > 0, plan, used, remaining, limit: limits[type] };
-    } catch (e) {
+    } catch {
         return { allowed: true, plan, remaining: limits[type] };
     }
 }
@@ -160,7 +160,7 @@ router.get('/status', async (req, res) => {
         }
 
         res.json({ ...planInfo, usage });
-    } catch (e) {
+    } catch {
         res.status(500).json({ error: 'Plan status error' });
     }
 });
@@ -269,7 +269,7 @@ router.post('/portal', async (req, res) => {
         });
 
         res.json({ url: session.url });
-    } catch (e) {
+    } catch {
         res.status(500).json({ error: 'Portal error' });
     }
 });
@@ -315,7 +315,7 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
                 processedWebhookEvents.add(event.id);
                 return res.json({ received: true });
             }
-        } catch (_e) { logger.debug({ component: 'Payments', err: _e.message }, 'processed_webhook_events check failed (table may not exist yet)'); }
+        } catch { logger.debug({ component: 'Payments', err: _e.message }, 'processed_webhook_events check failed (table may not exist yet)'); }
 
         processedWebhookEvents.add(event.id);
         // Keep the set bounded to avoid unbounded memory growth (keep last 10000 events)
@@ -327,7 +327,7 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
         try {
             await supabaseAdmin.from('processed_webhook_events')
                 .insert({ event_id: event.id, event_type: event.type });
-        } catch (_e) { logger.debug({ component: 'Payments', err: _e.message }, 'processed_webhook_events insert failed (table may not exist yet)'); }
+        } catch { logger.debug({ component: 'Payments', err: _e.message }, 'processed_webhook_events insert failed (table may not exist yet)'); }
 
         switch (event.type) {
             case 'checkout.session.completed': {
@@ -434,7 +434,7 @@ router.post('/referral', async (req, res) => {
         await supabaseAdmin.from('referrals').insert({ user_id: user.id, code });
 
         res.json({ code });
-    } catch (e) {
+    } catch {
         res.status(500).json({ error: 'Referral error' });
     }
 });
@@ -486,7 +486,7 @@ router.post('/redeem', async (req, res) => {
         await supabaseAdmin.from('referrals').update({ redeemed_by: redeemed }).eq('code', code.toUpperCase());
 
         res.json({ success: true, message: '7 days Pro activated for you and your friend!' });
-    } catch (e) {
+    } catch {
         res.status(500).json({ error: 'Redeem error' });
     }
 });

@@ -6,7 +6,7 @@
 //   app.get('/api/premium-feature', checkSubscription(), handler);
 //   app.get('/api/pro-feature', checkSubscription(['pro','enterprise']), handler);
 // ═══════════════════════════════════════════════════════════════
-const { getUserPlan, PLAN_LIMITS } = require('../payments');
+const { getUserPlan, _PLAN_LIMITS } = require('../payments');
 
 /**
  * @param {string[]} [allowedPlans] - list of plans that are allowed; defaults to all paid plans
@@ -37,7 +37,7 @@ function checkSubscription(allowedPlans) {
             req.subscription = planInfo;
             req.user = user;
             next();
-        } catch (e) {
+        } catch {
             res.status(500).json({ error: 'Eroare verificare abonament' });
         }
     };

@@ -63,7 +63,7 @@ router.post('/speak', ttsLimiter, validate(speakSchema), async (req, res) => {
         incrementUsage(user?.id, 'tts', supabaseAdmin).catch(e => logger.warn({ component: 'Voice', err: e.message }, 'incrementUsage failed'));
         res.set({ 'Content-Type': 'audio/mpeg', 'Content-Length': buf.length });
         res.send(buf);
-    } catch (e) { res.status(500).json({ error: 'TTS error' }); }
+    } catch { res.status(500).json({ error: 'TTS error' }); }
 });
 
 // POST /api/listen — STT via Groq Whisper
@@ -88,7 +88,7 @@ router.post('/listen', apiLimiter, validate(listenSchema), async (req, res) => {
             return res.json({ text: d.text || '', engine: 'Groq' });
         }
         res.status(503).json({ error: 'Use Web Speech API' });
-    } catch (e) { res.status(500).json({ error: 'STT error' }); }
+    } catch { res.status(500).json({ error: 'STT error' }); }
 });
 
 module.exports = router;

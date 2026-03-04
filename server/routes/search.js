@@ -87,7 +87,7 @@ router.post('/', searchLimiter, validate(searchSchema), async (req, res) => {
         if (d.RelatedTopics) for (const t of d.RelatedTopics.slice(0, 5)) if (t.Text) results.push({ title: t.Text.substring(0, 80), content: t.Text, url: t.FirstURL });
         incrementUsage(user?.id, 'search', supabaseAdmin).catch(e => logger.warn({ component: 'Search', err: e.message }, 'incrementUsage failed'));
         res.json({ results, answer: d.Abstract || '', engine: 'DuckDuckGo' });
-    } catch (e) { res.status(500).json({ error: 'Search error' }); }
+    } catch { res.status(500).json({ error: 'Search error' }); }
 });
 
 module.exports = router;

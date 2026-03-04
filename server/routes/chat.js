@@ -164,7 +164,7 @@ router.post('/chat/stream', chatLimiter, validate(chatSchema), async (req, res) 
 
         res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive', 'X-Accel-Buffering': 'no' });
         // SSE heartbeat to prevent proxy/LB timeout during AI thinking
-        const heartbeat = setInterval(() => res.write(':keepalive\n\n'), 15000);
+        const _heartbeat = setInterval(() => res.write(':keepalive\n\n'), 15000);
         // Send thinking indicator immediately so user sees activity
         res.write(`data: ${JSON.stringify({ type: 'thinking' })}\n\n`);
 
@@ -288,7 +288,7 @@ router.get('/conversations', convLimiter, async (req, res) => {
         if (!u || !supabaseAdmin) return res.json({ conversations: [] });
         const { data } = await supabaseAdmin.from('conversations').select('id, avatar, title, created_at, updated_at').eq('user_id', u.id).order('updated_at', { ascending: false }).limit(50);
         res.json({ conversations: data || [] });
-    } catch (e) { res.status(500).json({ error: 'Server error' }); }
+    } catch { res.status(500).json({ error: 'Server error' }); }
 });
 
 // GET /api/conversations/:id/messages
@@ -302,7 +302,7 @@ router.get('/conversations/:id/messages', convLimiter, async (req, res) => {
         if (!conv) return res.status(403).json({ error: 'Access denied' });
         const { data } = await supabaseAdmin.from('messages').select('id, role, content, created_at').eq('conversation_id', req.params.id).order('created_at', { ascending: true });
         res.json({ messages: data || [] });
-    } catch (e) { res.status(500).json({ error: 'Server error' }); }
+    } catch { res.status(500).json({ error: 'Server error' }); }
 });
 
 // POST /api/memory
@@ -322,7 +322,7 @@ router.post('/memory', memoryLimiter, validate(memorySchema), async (req, res) =
         else if (action === 'load') res.json({ value: memFallback[uid][key] || null });
         else if (action === 'list') res.json({ keys: Object.keys(memFallback[uid]) });
         else res.status(400).json({ error: 'Action must be: save, load, list' });
-    } catch (e) { res.status(500).json({ error: 'Memory error' }); }
+    } catch { res.status(500).json({ error: 'Memory error' }); }
 });
 
 module.exports = router;

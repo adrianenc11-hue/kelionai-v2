@@ -450,7 +450,7 @@ router.post('/verify', validate(referralVerifySchema), async (req, res) => {
             if (sender?.user) {
                 senderName = sender.user.user_metadata?.full_name || sender.user.email?.split('@')[0] || 'A friend';
             }
-        } catch (_e) { logger.warn({ component: 'Referral', err: _e.message }, 'Sender lookup failed'); }
+        } catch { logger.warn({ component: 'Referral', err: _e.message }, 'Sender lookup failed'); }
 
         res.json({
             valid: true,

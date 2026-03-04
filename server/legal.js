@@ -212,7 +212,7 @@ router.get('/gdpr/consent', async (req, res) => {
         (data || []).forEach(d => { consents[d.key.replace('consent_', '')] = d.value; });
 
         res.json({ consents });
-    } catch (e) {
+    } catch {
         res.status(500).json({ error: 'Consent error' });
     }
 });
@@ -238,7 +238,7 @@ router.post('/gdpr/consent', async (req, res) => {
         }, { onConflict: 'user_id,key' });
 
         res.json({ success: true, type, granted: !!granted });
-    } catch (e) {
+    } catch {
         res.status(500).json({ error: 'Consent update error' });
     }
 });

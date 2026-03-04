@@ -27,7 +27,7 @@ router.post('/', weatherLimiter, validate(weatherSchema), async (req, res) => {
             city: name, country, temperature: c.temperature_2m, humidity: c.relative_humidity_2m, wind: c.wind_speed_10m, condition: cond,
             description: name + ', ' + country + ': ' + c.temperature_2m + '°C, ' + cond + ', humidity ' + c.relative_humidity_2m + '%, wind ' + c.wind_speed_10m + ' km/h'
         });
-    } catch (e) { res.status(500).json({ error: 'Weather error' }); }
+    } catch { res.status(500).json({ error: 'Weather error' }); }
 });
 
 module.exports = router;

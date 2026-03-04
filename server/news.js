@@ -248,7 +248,7 @@ function fetchRSS(url) {
     });
 }
 
-function parseRSS(xml, sourceName) {
+function parseRSS(xml, _sourceName) {
     const articles = [];
     const items = xml.match(/<item[\s>][\s\S]*?<\/item>/gi) || [];
     for (const item of items) {
@@ -262,7 +262,7 @@ function parseRSS(xml, sourceName) {
         const pubDateStr = pubMatch ? pubMatch[1].trim() : '';
         let publishedAt;
         try { publishedAt = pubDateStr ? new Date(pubDateStr).toISOString() : new Date().toISOString(); }
-        catch (e) { publishedAt = new Date().toISOString(); }
+        catch { publishedAt = new Date().toISOString(); }
         if (title && url) articles.push({ title, summary: description, url, publishedAt });
     }
     return articles;
@@ -373,7 +373,7 @@ function getCurrentRomanianHour() {
             hour12: false
         });
         return parseInt(formatter.format(new Date()), 10);
-    } catch (e) {
+    } catch {
         // Fallback to UTC+2 if Intl is not available
         return (new Date().getUTCHours() + 2) % 24;
     }

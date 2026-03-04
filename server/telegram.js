@@ -158,7 +158,7 @@ async function broadcastToChannel(text) {
 
 // ═══ COMMAND HANDLERS ═══
 const COMMANDS = {
-    '/start': async (chatId, userName) => {
+    '/start': async (chatId, _userName) => {
         const msg = `🤖 <b>Bine ai venit la KelionAI!</b>\n\n` +
             `Sunt asistentul tău AI personal. Poți să-mi scrii orice întrebare!\n\n` +
             `📋 <b>Comenzi disponibile:</b>\n` +
@@ -240,7 +240,7 @@ const COMMANDS = {
 
     '/stiri': async (chatId, userName, app) => {
         try {
-            const newsModule = require('./news');
+            const _newsModule = require('./news');
             // Access article cache via internal function
             const articles = getNewsArticles(app);
             if (!articles || articles.length === 0) {
@@ -281,7 +281,7 @@ const COMMANDS = {
                 if (a.url) msg += `   🔗 <a href="${a.url}">citește</a>\n\n`;
             }
             await sendMessage(chatId, msg);
-        } catch (e) {
+        } catch {
             await sendMessage(chatId, '❌ Eroare. Încearcă din nou.');
         }
     }
@@ -298,7 +298,7 @@ function getNewsArticles(app) {
             return app.locals._getNewsArticles();
         }
         return [];
-    } catch (e) {
+    } catch {
         return [];
     }
 }

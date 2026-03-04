@@ -150,7 +150,7 @@ const messengerGroupState = new Map(); // chatId -> { lastActivity, unansweredQu
 const GROUP_INTERVENTION_COOLDOWN = 5 * 60 * 1000;
 const GROUP_PAUSE_THRESHOLD = 2 * 60 * 1000;
 
-function updateMessengerGroupState(chatId, text) {
+function _updateMessengerGroupState(chatId, text) {
     const state = messengerGroupState.get(chatId) || { lastActivity: 0, unansweredQuestions: [], lastIntervention: 0 };
     state.lastActivity = Date.now();
     if (text && text.trim().endsWith('?')) {
@@ -160,7 +160,7 @@ function updateMessengerGroupState(chatId, text) {
     messengerGroupState.set(chatId, state);
 }
 
-function messengerShouldIntervene(chatId, isDirectlyAddressed) {
+function _messengerShouldIntervene(chatId, isDirectlyAddressed) {
     if (isDirectlyAddressed) return true;
     const state = messengerGroupState.get(chatId);
     if (!state) return false;
@@ -169,7 +169,7 @@ function messengerShouldIntervene(chatId, isDirectlyAddressed) {
     return false;
 }
 
-function getMessengerInterventionPrefix(lang) {
+function _getMessengerInterventionPrefix(lang) {
     const prefixes = {
         ro: 'Scuzați că intervin, dar cred că pot ajuta cu asta... ',
         en: 'Sorry to jump in, but I might be able to help with that... ',
@@ -437,7 +437,7 @@ async function sendGenericTemplate(recipientId, elements) {
 }
 
 // FEATURE 3: SEND BUTTON TEMPLATE
-async function sendButtonTemplate(recipientId, text, buttons) {
+async function _sendButtonTemplate(recipientId, text, buttons) {
     const token = process.env.FB_PAGE_ACCESS_TOKEN;
     if (!token) return;
     try {
@@ -545,7 +545,7 @@ function buildNewsElements(articles) {
 }
 
 // FEATURE 6: BROADCAST TO SUBSCRIBERS
-async function broadcastToSubscribers(message, quickReplies) {
+async function _broadcastToSubscribers(message, quickReplies) {
     const now = Date.now();
     const windowMs = 24 * 60 * 60 * 1000;
     let sent = 0;
@@ -699,7 +699,7 @@ router.post('/webhook', async function (req, res) {
             const entry = body.entry[e];
             for (let m = 0; m < (entry.messaging || []).length; m++) {
                 const event = entry.messaging[m];
-                var senderId = event.sender && event.sender.id;
+                const senderId = event.sender && event.sender.id;
                 if (!senderId) continue;
 
                 // FEATURE 4: HANDLE POSTBACK EVENTS
@@ -860,7 +860,7 @@ router.post('/webhook', async function (req, res) {
                     }
                 }
 
-                var character = chatCharacter.get(senderId) || 'kelion';
+                const character = chatCharacter.get(senderId) || 'kelion';
 
                 // IMAGE GENERATION REQUEST (Feature 3)
                 if (!visionResponse && /\b(genereaz[aă]\s+imagine|generate\s+image|creeaz[aă]\s+(o\s+)?imagine|deseneaz[aă])\b/i.test(userText)) {
@@ -875,7 +875,7 @@ router.post('/webhook', async function (req, res) {
                 }
 
                 // AI RESPONSE
-                var reply;
+                let reply;
                 const detectedLangForReply = detectLanguage(userText || '');
                 if (visionResponse) {
                     reply = visionResponse;
@@ -906,7 +906,7 @@ router.post('/webhook', async function (req, res) {
                 // DETERMINE QUICK REPLIES FOR RESPONSE
                 const msgCount = (userMessageCount.get(senderId) || 0) + 1;
                 userMessageCount.set(senderId, msgCount);
-                var replyQuickReplies;
+                let replyQuickReplies;
                 if (msgCount === FREE_MESSAGES_LIMIT) {
                     replyQuickReplies = ['💎 Upgrade', '🌐 Site'];
                 }
@@ -921,7 +921,7 @@ router.post('/webhook', async function (req, res) {
                 }
 
                 // USER PROTOCOL
-                var known = await getKnownUser(senderId, supabase);
+                const known = await getKnownUser(senderId, supabase);
 
                 if (!known) {
                     const detectedLang = detectLanguage(userText || '');
@@ -934,7 +934,7 @@ router.post('/webhook', async function (req, res) {
                     }, 1500);
                 } else {
                     if (msgCount === 1) {
-                        var greetings = {
+                        const greetings = {
                             ro: 'Bine ai revenit, ' + (known.name || 'prietene') + '! 😊',
                             en: 'Welcome back, ' + (known.name || 'friend') + '! 😊',
                             de: 'Willkommen zuruck, ' + (known.name || 'Freund') + '! 😊',

@@ -24,7 +24,7 @@ function detectDivergence(prices, oscillatorValues, lookback = 30) {
 
     // Find local lows and highs in price
     const priceLows = [], priceHighs = [];
-    const oscLows = [], oscHighs = [];
+    const _oscLows = [], _oscHighs = [];
     for (let i = 2; i < pSlice.length - 2; i++) {
         if (pSlice[i] < pSlice[i - 1] && pSlice[i] < pSlice[i - 2] && pSlice[i] < pSlice[i + 1] && pSlice[i] < pSlice[i + 2]) {
             priceLows.push({ idx: i, val: pSlice[i], oscVal: oSlice[i] });
@@ -70,7 +70,7 @@ function detectDivergence(prices, oscillatorValues, lookback = 30) {
  * @param {number} close - Previous period close
  * @param {number} open - Previous period open (for Woodie)
  */
-function calculatePivotPoints(high, low, close, open) {
+function calculatePivotPoints(high, low, close, _open) {
     const r = (v) => Math.round(v * 100) / 100;
 
     // Classic (Floor) Pivots
@@ -240,7 +240,7 @@ async function fetchMarketNews(asset = 'crypto') {
         Gold: 'gold price commodity', Oil: 'oil price crude',
         crypto: 'cryptocurrency market',
     };
-    const query = queries[asset] || queries.crypto;
+    const _query = queries[asset] || queries.crypto;
 
     try {
         // CryptoPanic API (free, no key needed for public feed)
@@ -358,7 +358,7 @@ function getEconomicCalendarRisks() {
     const hour = now.getUTCHours();
     const date = now.getUTCDate();
     const month = now.getUTCMonth();   // 0-indexed
-    const dateStr = now.toISOString().slice(0, 10);
+    const _dateStr = now.toISOString().slice(0, 10);
 
     const risks = [];
 
@@ -453,7 +453,7 @@ function getEconomicCalendarRisks() {
  * Returns array of { rule, passed: boolean, reason: string }
  */
 function evaluateTradingRules(params) {
-    const { action, price, confluence, adx, atr, atrPct, rsi, volume, marketRegime, fearGreed, economicRisks, openPositions = [] } = params;
+    const { action, _price, confluence, adx, _atr, atrPct, rsi, volume, _marketRegime, fearGreed, economicRisks, _openPositions = [] } = params;
     const rules = [];
 
     // Rule 1: Never trade against the primary trend
@@ -536,7 +536,7 @@ function evaluateTradingRules(params) {
         priority: 'HIGH',
     });
 
-    const allPassed = rules.every(r => r.passed || r.priority === 'MEDIUM');
+    const _allPassed = rules.every(r => r.passed || r.priority === 'MEDIUM');
     const criticalFailed = rules.filter(r => !r.passed && r.priority === 'CRITICAL');
     const highFailed = rules.filter(r => !r.passed && r.priority === 'HIGH');
 
