@@ -32,7 +32,7 @@ async function saveConv(supabaseAdmin, uid, avatar, userMsg, aiReply, convId, la
 }
 
 // ═══ ADMIN KEYWORD BLACKLIST ═══
-const ADMIN_KEYWORDS = /\b(admin|administrator|dashboard|panou\s*admin|setări\s*admin|settings\s*admin|admin\s*panel|admin\s*mode|deschide\s*admin)\b/i;
+
 
 // POST /api/chat
 router.post('/chat', chatLimiter, validate(chatSchema), async (req, res) => {
@@ -43,33 +43,15 @@ router.post('/chat', chatLimiter, validate(chatSchema), async (req, res) => {
         if (!message) return res.status(400).json({ error: 'Message is required' });
         const user = await getUserFromToken(req);
 
-        // Admin keyword blacklist — total silence for non-owners
+        // Admin tool execution is gated in brain.buildPlan() via isAdmin parameter.
+        // Non-admin users can mention admin keywords freely — tools won't execute.
         const isOwner = user?.role === 'admin';
-        const isAdminMode = req.headers['x-admin-mode'] === 'true';
-        const isAdmin = isOwner && isAdminMode;
-        if (!isOwner && ADMIN_KEYWORDS.test(message)) {
-            return res.status(200).json({ reply: '', avatar, engine: 'silent', language });
-        }
+        const isAdmin = isOwner && req.headers['x-admin-mode'] === 'true';
 
         const usage = await checkUsage(user?.id, 'chat', supabaseAdmin);
         if (!usage.allowed) return res.status(429).json({ error: 'Chat limit reached. Upgrade to Pro for more messages.', plan: usage.plan, limit: usage.limit, upgrade: true });
 
         const thought = await brain.think(message, avatar, history, language, user?.id, conversationId, { imageBase64, audioBase64 }, isAdmin);
-
-        // Strip admin tool results if not admin
-        let adminContext = '';
-        if (thought.toolResults) {
-            const adminTools = ['adminDiagnose', 'adminReset', 'adminStats', 'adminTrading', 'adminNews'];
-            for (const tool of adminTools) {
-                if (thought.toolResults[tool]) {
-                    if (isAdmin) {
-                        adminContext += `\n[ADMIN ${tool}]: ${thought.toolResults[tool].summary || JSON.stringify(thought.toolResults[tool].data)}`;
-                    } else {
-                        delete thought.toolResults[tool]; // Non-admin: remove admin data
-                    }
-                }
-            }
-        }
 
         let memoryContext = '';
         if (user && supabaseAdmin) {
@@ -82,7 +64,7 @@ router.post('/chat', chatLimiter, validate(chatSchema), async (req, res) => {
 
         const compressedHist = thought.compressedHistory || history.slice(-20);
         const msgs = compressedHist.map(h => ({ role: h.role === 'ai' ? 'assistant' : h.role, content: h.content }));
-        msgs.push({ role: 'user', content: thought.enrichedMessage + (adminContext ? '\n\n[ADMIN DATA]:' + adminContext : '') });
+        msgs.push({ role: 'user', content: thought.enrichedMessage });
 
         let reply = null, engine = null;
 
@@ -174,14 +156,8 @@ router.post('/chat/stream', chatLimiter, validate(chatSchema), async (req, res) 
         if (!message) return res.status(400).json({ error: 'Message is required' });
         const user = await getUserFromToken(req);
 
-        // Admin keyword blacklist — total silence for non-owners
+        // Admin tool execution gated in brain.buildPlan() — no keyword filter needed
         const isOwnerStream = user?.role === 'admin';
-        if (!isOwnerStream && ADMIN_KEYWORDS.test(message)) {
-            res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive' });
-            res.write(`data: ${JSON.stringify({ type: 'done', conversationId: null })}\n\n`);
-            res.end();
-            return;
-        }
 
         const usage = await checkUsage(user?.id, 'chat', supabaseAdmin);
         if (!usage.allowed) return res.status(429).json({ error: 'Chat limit reached. Upgrade to Pro for more messages.', plan: usage.plan, limit: usage.limit, upgrade: true });
@@ -213,6 +189,10 @@ router.post('/chat/stream', chatLimiter, validate(chatSchema), async (req, res) 
 
         let fullReply = '';
 
+        // AI Chain: Claude (streaming nativ) → GPT-4o (fallback) → DeepSeek (backup)
+        // NOTĂ: Chain-ul pe /chat/stream diferă INTENȚIONAT de /chat.
+        // /chat: Groq→GPT-4o-mini→Claude→DeepSeek (optimizat pe viteză, non-streaming)
+        // /chat/stream: Claude→GPT-4o→DeepSeek (Claude face streaming nativ word-by-word)
         // Try Claude streaming
         if (process.env.ANTHROPIC_API_KEY) {
             try {
