@@ -87,7 +87,7 @@ async function getKnownUser(phoneNumber, supabase) {
                 knownUsers.set(phoneNumber, { lang: data.language, name: data.name, firstSeen: data.first_seen });
                 return knownUsers.get(phoneNumber);
             }
-        } catch (e) { /* table may not exist yet */ }
+        } catch (e) { logger.warn({ component: 'WhatsApp', err: e.message }, 'table may not exist yet'); }
     }
     return null;
 }
@@ -100,7 +100,7 @@ async function saveKnownUser(phoneNumber, lang, name, supabase) {
                 phone: phoneNumber, language: lang, name: name || null,
                 first_seen: new Date().toISOString(), last_seen: new Date().toISOString()
             }, { onConflict: 'phone' });
-        } catch (e) { /* works in-memory */ }
+        } catch (e) { logger.warn({ component: 'WhatsApp', err: e.message }, 'works in-memory'); }
     }
 }
 
@@ -629,7 +629,7 @@ router.post('/webhook', async (req, res) => {
                                 phone, direction: 'out', message_type: 'text',
                                 text: reply, created_at: new Date().toISOString()
                             });
-                        } catch (e) { /* table may not exist */ }
+                        } catch (e) { logger.warn({ component: 'WhatsApp', err: e.message }, 'table may not exist'); }
                     }
                 }
             }

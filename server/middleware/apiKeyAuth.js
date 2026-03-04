@@ -28,6 +28,7 @@ const _cleanupInterval = setInterval(() => {
         if (now >= entry.resetAt) keyRateLimits.delete(id);
     }
 }, 60 * 60 * 1000);
+_cleanupInterval.unref();
 
 function apiKeyAuth(req, res, next) {
     const apiKey = req.headers['x-api-key'];

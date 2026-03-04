@@ -227,7 +227,7 @@ router.post('/chat/stream', chatLimiter, validate(chatSchema), async (req, res) 
                                         fullReply += parsed.delta.text;
                                         res.write(`data: ${JSON.stringify({ type: 'chunk', text: parsed.delta.text })}\n\n`);
                                     }
-                                } catch (e) { /* skip parse errors */ }
+                                } catch (e) { logger.warn({ component: 'Chat', err: e.message }, 'skip parse errors'); }
                             }
                         });
                         nodeStream.on('end', resolve);

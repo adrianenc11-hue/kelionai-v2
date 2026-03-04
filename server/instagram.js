@@ -74,7 +74,7 @@ async function handleIncomingDM(msg) {
                 .eq('platform_id', `ig_${senderId}`)
                 .single();
             if (data?.language) userLang = data.language;
-        } catch (e) { /* first time user */ }
+        } catch (e) { logger.warn({ component: 'Instagram', err: e.message }, 'first time user'); }
     }
 
     // Process with Brain
@@ -106,7 +106,7 @@ async function handleIncomingDM(msg) {
                 source: 'instagram_bot',
                 created_at: new Date().toISOString()
             });
-        } catch (e) { /* ok */ }
+        } catch (e) { logger.warn({ component: 'Instagram', err: e.message }, 'ok'); }
     }
 }
 

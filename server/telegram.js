@@ -60,7 +60,7 @@ async function getKnownUser(userId, supabase) {
                 knownUsers.set(userId, { lang: data.language, name: data.name, firstSeen: data.first_seen });
                 return knownUsers.get(userId);
             }
-        } catch (e) { /* table may not exist yet */ }
+        } catch (e) { logger.warn({ component: 'Telegram', err: e.message }, 'table may not exist yet'); }
     }
     return null;
 }
@@ -73,7 +73,7 @@ async function saveKnownUser(userId, lang, name, supabase) {
                 user_id: String(userId), language: lang, name: name || null,
                 first_seen: new Date().toISOString(), last_seen: new Date().toISOString()
             }, { onConflict: 'user_id' });
-        } catch (e) { /* works in-memory */ }
+        } catch (e) { logger.warn({ component: 'Telegram', err: e.message }, 'works in-memory'); }
     }
 }
 

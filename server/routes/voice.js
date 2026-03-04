@@ -48,7 +48,7 @@ router.post('/speak', ttsLimiter, validate(speakSchema), async (req, res) => {
                     vid = data.value.voice_id;
                     logger.info({ component: 'Speak', clonedVoice: true, voiceId: vid }, 'Using cloned voice');
                 }
-            } catch (e) { /* no cloned voice, use default */ }
+            } catch (e) { logger.warn({ component: 'Voice', err: e.message }, 'no cloned voice, use default'); }
         }
         // Fallback to language-based native voice
         if (!vid) vid = getVoiceId(avatar, language);

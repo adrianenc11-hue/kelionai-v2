@@ -290,7 +290,7 @@ router.post('/v1/chat', v1Limiter, apiKeyAuth, async (req, res) => {
                 });
                 const d = await r.json();
                 reply = d.content?.[0]?.text;
-            } catch (e) { /* fallthrough */ }
+            } catch (e) { logger.warn({ component: 'Developer', err: e.message }, 'fallthrough'); }
         }
         if (!reply && process.env.OPENAI_API_KEY) {
             try {
@@ -301,7 +301,7 @@ router.post('/v1/chat', v1Limiter, apiKeyAuth, async (req, res) => {
                 });
                 const d = await r.json();
                 reply = d.choices?.[0]?.message?.content;
-            } catch (e) { /* fallthrough */ }
+            } catch (e) { logger.warn({ component: 'Developer', err: e.message }, 'fallthrough'); }
         }
 
         if (!reply) return res.status(503).json({ error: 'AI unavailable' });

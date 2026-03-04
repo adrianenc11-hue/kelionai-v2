@@ -80,7 +80,7 @@ async function getKnownUser(senderId, supabase) {
                 knownUsers.set(senderId, { lang: data.language, name: data.name, firstSeen: data.first_seen });
                 return knownUsers.get(senderId);
             }
-        } catch (e) { /* table may not exist */ }
+        } catch (e) { logger.warn({ component: 'Messenger', err: e.message }, 'table may not exist'); }
     }
     return null;
 }
@@ -93,7 +93,7 @@ async function saveKnownUser(senderId, lang, name, supabase) {
                 sender_id: senderId, language: lang, name: name || null,
                 first_seen: new Date().toISOString(), last_seen: new Date().toISOString()
             }, { onConflict: 'sender_id' });
-        } catch (e) { /* in-memory fallback */ }
+        } catch (e) { logger.warn({ component: 'Messenger', err: e.message }, 'in-memory fallback'); }
     }
 }
 
@@ -829,7 +829,7 @@ router.post('/webhook', async function (req, res) {
                     if (supabase) {
                         try {
                             await supabase.from('messenger_subscribers').upsert({ sender_id: senderId, subscribed_at: new Date().toISOString() }, { onConflict: 'sender_id' });
-                        } catch (ex) { /* table may not exist */ }
+                        } catch (ex) { logger.warn({ component: 'Messenger', err: ex.message }, 'table may not exist'); }
                     }
                     await sendMessage(senderId, '✅ Esti abonat la notificari de stiri! Vei fi notificat cand apar stiri noi.\n\nScrie "dezaboneaza-ma" oricand pentru a opri notificarile.');
                     stats.repliesSent++;
@@ -840,7 +840,7 @@ router.post('/webhook', async function (req, res) {
                     if (supabase) {
                         try {
                             await supabase.from('messenger_subscribers').delete().eq('sender_id', senderId);
-                        } catch (ex) { /* table may not exist */ }
+                        } catch (ex) { logger.warn({ component: 'Messenger', err: ex.message }, 'table may not exist'); }
                     }
                     await sendMessage(senderId, '❌ Ai fost dezabonat de la notificari. Ne vedem curand! 👋');
                     stats.repliesSent++;
@@ -980,7 +980,7 @@ router.post('/webhook', async function (req, res) {
                             message_type: 'text',
                             text: reply, created_at: new Date().toISOString()
                         });
-                    } catch (ex) { /* table may not exist */ }
+                    } catch (ex) { logger.warn({ component: 'Messenger', err: ex.message }, 'table may not exist'); }
                 }
             }
         }
