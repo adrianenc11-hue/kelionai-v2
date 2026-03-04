@@ -156,7 +156,7 @@ router.get('/status', async (req, res) => {
                     .eq('user_id', user.id)
                     .eq('date', today);
                 if (data) data.forEach(d => { usage[d.type] = d.count; });
-            } catch (e) { }
+            } catch (e) { logger.warn({ component: 'Payments', err: e.message }, 'Usage read failed'); }
         }
 
         res.json({ ...planInfo, usage });

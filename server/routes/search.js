@@ -38,7 +38,7 @@ router.post('/', searchLimiter, validate(searchSchema), async (req, res) => {
                     const citations = d.citations || [];
                     const results = citations.slice(0, 5).map(url => ({ title: url, content: '', url }));
                     logger.info({ component: 'Search', engine: 'Perplexity', chars: answer.length }, 'Perplexity Sonar — ' + answer.length + ' chars');
-                    incrementUsage(user?.id, 'search', supabaseAdmin).catch(() => { });
+                    incrementUsage(user?.id, 'search', supabaseAdmin).catch(e => logger.warn({ component: 'Search', err: e.message }, 'incrementUsage failed'));
                     return res.json({ results, answer, engine: 'Perplexity' });
                 }
             } catch (e) { logger.warn({ component: 'Search', engine: 'Perplexity', err: e.message }, 'Perplexity'); }
@@ -54,7 +54,7 @@ router.post('/', searchLimiter, validate(searchSchema), async (req, res) => {
                 if (tr.ok) {
                     const td = await tr.json();
                     logger.info({ component: 'Search', engine: 'Tavily', results: (td.results || []).length }, 'Tavily — ' + (td.results || []).length + ' results');
-                    incrementUsage(user?.id, 'search', supabaseAdmin).catch(() => { });
+                    incrementUsage(user?.id, 'search', supabaseAdmin).catch(e => logger.warn({ component: 'Search', err: e.message }, 'incrementUsage failed'));
                     return res.json({ results: (td.results || []).map(x => ({ title: x.title, content: x.content, url: x.url })), answer: td.answer || '', engine: 'Tavily' });
                 }
             } catch (e) { logger.warn({ component: 'Search', engine: 'Tavily', err: e.message }, 'Tavily'); }
@@ -73,7 +73,7 @@ router.post('/', searchLimiter, validate(searchSchema), async (req, res) => {
                     const answer = sd.answerBox?.answer || sd.answerBox?.snippet || sd.knowledgeGraph?.description || '';
                     const results = (sd.organic || []).slice(0, 5).map(x => ({ title: x.title, content: x.snippet, url: x.link }));
                     logger.info({ component: 'Search', engine: 'Serper', results: results.length }, 'Serper — ' + results.length + ' results');
-                    incrementUsage(user?.id, 'search', supabaseAdmin).catch(() => { });
+                    incrementUsage(user?.id, 'search', supabaseAdmin).catch(e => logger.warn({ component: 'Search', err: e.message }, 'incrementUsage failed'));
                     return res.json({ results, answer, engine: 'Serper' });
                 }
             } catch (e) { logger.warn({ component: 'Search', engine: 'Serper', err: e.message }, 'Serper'); }
@@ -85,7 +85,7 @@ router.post('/', searchLimiter, validate(searchSchema), async (req, res) => {
         const results = [];
         if (d.Abstract) results.push({ title: d.Heading || query, content: d.Abstract, url: d.AbstractURL });
         if (d.RelatedTopics) for (const t of d.RelatedTopics.slice(0, 5)) if (t.Text) results.push({ title: t.Text.substring(0, 80), content: t.Text, url: t.FirstURL });
-        incrementUsage(user?.id, 'search', supabaseAdmin).catch(() => { });
+        incrementUsage(user?.id, 'search', supabaseAdmin).catch(e => logger.warn({ component: 'Search', err: e.message }, 'incrementUsage failed'));
         res.json({ results, answer: d.Abstract || '', engine: 'DuckDuckGo' });
     } catch (e) { res.status(500).json({ error: 'Search error' }); }
 });

@@ -60,7 +60,7 @@ router.post('/speak', ttsLimiter, validate(speakSchema), async (req, res) => {
         if (!r.ok) return res.status(503).json({ error: 'TTS fail' });
         const buf = Buffer.from(await r.arrayBuffer());
         logger.info({ component: 'Speak', bytes: buf.length, avatar, mood }, buf.length + ' bytes | ' + avatar);
-        incrementUsage(user?.id, 'tts', supabaseAdmin).catch(() => { });
+        incrementUsage(user?.id, 'tts', supabaseAdmin).catch(e => logger.warn({ component: 'Voice', err: e.message }, 'incrementUsage failed'));
         res.set({ 'Content-Type': 'audio/mpeg', 'Content-Length': buf.length });
         res.send(buf);
     } catch (e) { res.status(500).json({ error: 'TTS error' }); }

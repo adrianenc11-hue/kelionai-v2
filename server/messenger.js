@@ -334,7 +334,7 @@ async function sendTypingOn(recipientId) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ recipient: { id: recipientId }, sender_action: 'typing_on' })
         });
-    } catch (e) { }
+    } catch (e) { logger.warn({ component: 'Messenger', err: e.message }, 'sendTypingOn failed'); }
 }
 
 // FEATURE 2: SEND AUDIO MESSAGE
