@@ -355,7 +355,7 @@ CREATE INDEX IF NOT EXISTS idx_metrics_snap_type ON metrics_snapshots(metric_typ
 
 -- ═══ RLS — Service-role only tables ═══
 -- These tables are accessed exclusively by the server (supabaseAdmin / service_role).
--- RLS is enabled with NO user-facing policies, so anon/authenticated roles are blocked.
+-- RLS is enabled with explicit deny-all policies, so anon/authenticated roles are blocked.
 -- Service_role bypasses RLS automatically.
 
 ALTER TABLE processed_webhook_events ENABLE ROW LEVEL SECURITY;
@@ -370,3 +370,22 @@ ALTER TABLE whatsapp_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE trade_intelligence ENABLE ROW LEVEL SECURITY;
 ALTER TABLE cookie_consents ENABLE ROW LEVEL SECURITY;
 ALTER TABLE metrics_snapshots ENABLE ROW LEVEL SECURITY;
+
+-- Explicit deny-all policies (blocks anon + authenticated)
+CREATE POLICY IF NOT EXISTS "service_only" ON processed_webhook_events FOR ALL USING (false);
+CREATE POLICY IF NOT EXISTS "service_only" ON brain_learnings FOR ALL USING (false);
+CREATE POLICY IF NOT EXISTS "service_only" ON news_cache FOR ALL USING (false);
+CREATE POLICY IF NOT EXISTS "service_only" ON admin_logs FOR ALL USING (false);
+CREATE POLICY IF NOT EXISTS "service_only" ON trades FOR ALL USING (false);
+CREATE POLICY IF NOT EXISTS "service_only" ON media_history FOR ALL USING (false);
+CREATE POLICY IF NOT EXISTS "service_only" ON telegram_users FOR ALL USING (false);
+CREATE POLICY IF NOT EXISTS "service_only" ON whatsapp_users FOR ALL USING (false);
+CREATE POLICY IF NOT EXISTS "service_only" ON whatsapp_messages FOR ALL USING (false);
+CREATE POLICY IF NOT EXISTS "service_only" ON trade_intelligence FOR ALL USING (false);
+CREATE POLICY IF NOT EXISTS "service_only" ON cookie_consents FOR ALL USING (false);
+CREATE POLICY IF NOT EXISTS "service_only" ON metrics_snapshots FOR ALL USING (false);
+
+-- FK: brain_learnings.user_id → auth.users
+ALTER TABLE brain_learnings
+    ADD CONSTRAINT fk_brain_learnings_user
+    FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE SET NULL;
