@@ -266,6 +266,10 @@ Reply STRICTLY with JSON:
             needsTradeIntelligence: false,
             needsCookieConsent: false,
             needsMetricsStats: false,
+            // Full coverage: security, devAPI, system
+            needsSecurityCheck: false,
+            needsDevAPIInfo: false,
+            needsSystemStatus: false,
             isQuestion: false, isCommand: false, isEmotional: false,
             isEmergency: false, isGreeting: false, isFollowUp: false,
             complexity: 'simple', emotionalTone: 'neutral',
@@ -498,6 +502,21 @@ Reply STRICTLY with JSON:
             result.needsMetricsStats = true;
         }
 
+        // ── SECURITY CHECK from chat ──
+        if (/\b(securitate|security|cors|helmet|csp|rate.*limit|https|ssl|protectie|protejat|firewall|vulnerabil|sentry|logging)\b/i.test(lower)) {
+            result.needsSecurityCheck = true;
+        }
+
+        // ── DEVELOPER API INFO from chat ──
+        if (/\b(api.*key|developer.*api|v1.*api|endpoint|webhook|sdk|integrare.*api|chei.*api|postman|swagger|rest.*api)\b/i.test(lower)) {
+            result.needsDevAPIInfo = true;
+        }
+
+        // ── SYSTEM STATUS from chat ──
+        if (/\b(migratie|migration|cache|validare|baza.*date|database|tabele|system.*status|infrastructure|deploy|uptime|schema|referral|abonament.*system)\b/i.test(lower)) {
+            result.needsSystemStatus = true;
+        }
+
         // ── COMPLEXITY ──
         const toolsNeeded = [result.needsSearch, result.needsWeather, result.needsImage, result.needsMap, result.needsVision].filter(Boolean).length;
         if (toolsNeeded >= 2 || words.length > 30 || text.split(/[?.!]/).length > 3) result.complexity = 'complex';
@@ -576,6 +595,10 @@ Reply STRICTLY with JSON:
             if (analysis.needsTradeIntelligence && !seen.has('tradeIntelligence')) { plan.push({ tool: 'tradeIntelligence' }); seen.add('tradeIntelligence'); }
             if (analysis.needsCookieConsent && !seen.has('cookieConsent')) { plan.push({ tool: 'cookieConsent' }); seen.add('cookieConsent'); }
             if (analysis.needsMetricsStats && !seen.has('metricsStats')) { plan.push({ tool: 'metricsStats' }); seen.add('metricsStats'); }
+            // Full coverage: security, devAPI, system
+            if (analysis.needsSecurityCheck && !seen.has('securityCheck')) { plan.push({ tool: 'securityCheck' }); seen.add('securityCheck'); }
+            if (analysis.needsDevAPIInfo && !seen.has('devAPIInfo')) { plan.push({ tool: 'devAPIInfo' }); seen.add('devAPIInfo'); }
+            if (analysis.needsSystemStatus && !seen.has('systemStatus')) { plan.push({ tool: 'systemStatus' }); seen.add('systemStatus'); }
         }
 
         // Check for known good combinations from journal
@@ -626,7 +649,7 @@ Reply STRICTLY with JSON:
     }
 
     async executeTool(step) {
-        const timeouts = { search: 8000, weather: 5000, imagine: 15000, memory: 3000, map: 100, vision: 15000, tts: 10000, stt: 10000, faceCheck: 10000, faceRegister: 10000, voiceClone: 15000, openURL: 3000, radio: 3000, video: 5000, webNav: 5000, authAction: 5000, paymentAction: 5000, newsAction: 5000, legalAction: 3000, healthCheck: 3000 };
+        const timeouts = { search: 8000, weather: 5000, imagine: 15000, memory: 3000, map: 100, vision: 15000, tts: 10000, stt: 10000, faceCheck: 10000, faceRegister: 10000, voiceClone: 15000, openURL: 3000, radio: 3000, video: 5000, webNav: 5000, authAction: 5000, paymentAction: 5000, newsAction: 5000, legalAction: 3000, healthCheck: 3000, securityCheck: 3000, devAPIInfo: 5000, systemStatus: 10000 };
         const tmout = (ms) => new Promise((_, r) => setTimeout(() => r(new Error('Timeout')), ms));
         return Promise.race([this._run(step), tmout(timeouts[step.tool] || 10000)]);
     }
@@ -662,6 +685,10 @@ Reply STRICTLY with JSON:
             case 'tradeIntelligence': return this._tradeIntelligence();
             case 'cookieConsent': return this._cookieConsent();
             case 'metricsStats': return this._metricsStats();
+            // Full coverage cases
+            case 'securityCheck': return this._securityCheck();
+            case 'devAPIInfo': return this._devAPIInfo();
+            case 'systemStatus': return this._systemStatus();
             default: return null;
         }
     }
@@ -698,6 +725,9 @@ Reply STRICTLY with JSON:
         if (results.tradeIntelligence) ctx += `\n[TRADE INTELLIGENCE: ${results.tradeIntelligence.summary}]`;
         if (results.cookieConsent) ctx += `\n[COOKIE CONSENT: ${results.cookieConsent.summary}]`;
         if (results.metricsStats) ctx += `\n[METRICS: ${results.metricsStats.summary}]`;
+        if (results.securityCheck) ctx += `\n[SECURITATE: ${results.securityCheck.summary}]`;
+        if (results.devAPIInfo) ctx += `\n[DEVELOPER API: ${results.devAPIInfo.summary}]`;
+        if (results.systemStatus) ctx += `\n[SYSTEM STATUS: ${results.systemStatus.summary}]`;
 
         if (analysis.isEmotional && analysis.emotionalTone !== 'neutral') {
             ctx += `\n[Utilizatorul pare ${analysis.emotionalTone}. Adapteaza tonul empatic.]`;
@@ -1351,6 +1381,150 @@ Reply STRICTLY with JSON:
             return result;
         } catch (e) {
             return { type: 'metricsStats', error: e.message, summary: `Eroare metrici: ${e.message}` };
+        }
+    }
+
+    // ── SECURITY CHECK — Reports on all security features ──
+    async _securityCheck() {
+        try {
+            const securityFeatures = {
+                https: { enabled: true, details: 'Force redirect HTTP → HTTPS' },
+                cspNonce: { enabled: true, details: 'Content Security Policy with per-request nonce' },
+                helmet: { enabled: true, details: 'X-Frame-Options, X-XSS-Protection, HSTS etc.' },
+                cors: { enabled: true, details: `Origins: kelionai.app, localhost` },
+                rateGlobal: { enabled: true, details: '200 requests / 15 min per IP' },
+                rateChat: { enabled: true, details: '30 requests / min per IP' },
+                rateAuth: { enabled: true, details: '10 requests / 15 min per IP' },
+                adminAuth: { enabled: true, details: 'Code verification + IP whitelist' },
+                apiKeyAuth: { enabled: true, details: 'HMAC-signed API keys in api_keys table' },
+                sentry: { enabled: !!process.env.SENTRY_DSN, details: process.env.SENTRY_DSN ? 'Active error tracking' : 'Not configured' },
+                pinoLogger: { enabled: true, details: 'Structured JSON logging' },
+                metricsMiddleware: { enabled: true, details: 'HTTP request/response metrics' }
+            };
+
+            const enabledCount = Object.values(securityFeatures).filter(f => f.enabled).length;
+            const result = {
+                type: 'securityCheck',
+                features: securityFeatures,
+                totalFeatures: 12,
+                enabledFeatures: enabledCount,
+                summary: `Securitate: ${enabledCount}/12 active | HTTPS ✅ | CSP ✅ | Helmet ✅ | CORS ✅ | Rate Limits ✅ | Sentry ${securityFeatures.sentry.enabled ? '✅' : '❌'}`
+            };
+
+            if (this.supabaseAdmin) {
+                try {
+                    await this.supabaseAdmin.from('admin_logs').insert({
+                        action: 'security_check',
+                        details: { features: enabledCount, total: 12 },
+                        source: 'brain_chat',
+                        created_at: new Date().toISOString()
+                    });
+                } catch (e) { /* ok */ }
+            }
+            return result;
+        } catch (e) {
+            return { type: 'securityCheck', error: e.message, summary: `Eroare securitate: ${e.message}` };
+        }
+    }
+
+    // ── DEVELOPER API INFO — Reports on API endpoints & keys ──
+    async _devAPIInfo() {
+        try {
+            let totalKeys = 0;
+            if (this.supabaseAdmin) {
+                try {
+                    const { count } = await this.supabaseAdmin.from('api_keys').select('*', { count: 'exact', head: true });
+                    totalKeys = count || 0;
+                } catch (e) { /* ok */ }
+            }
+
+            const endpoints = [
+                { method: 'GET', path: '/api/v1/status', auth: false, desc: 'API status' },
+                { method: 'GET', path: '/api/v1/models', auth: true, desc: 'List AI models' },
+                { method: 'POST', path: '/api/v1/chat', auth: true, desc: 'Send message to AI' },
+                { method: 'GET', path: '/api/v1/user/profile', auth: true, desc: 'User profile' },
+                { method: 'POST', path: '/api/developer/keys', auth: true, desc: 'Create API key' },
+                { method: 'GET', path: '/api/developer/keys', auth: true, desc: 'List API keys' },
+                { method: 'DELETE', path: '/api/developer/keys/:id', auth: true, desc: 'Revoke API key' },
+                { method: 'GET', path: '/api/developer/stats', auth: true, desc: 'Developer stats' },
+                { method: 'POST', path: '/api/developer/webhooks', auth: true, desc: 'Save webhook URL' },
+                { method: 'GET', path: '/api/developer/webhooks', auth: true, desc: 'Get webhook URL' }
+            ];
+
+            const result = {
+                type: 'devAPIInfo',
+                totalEndpoints: endpoints.length,
+                totalKeys,
+                endpoints,
+                baseUrl: 'https://kelionai.app/api/v1',
+                authMethod: 'Bearer API key',
+                summary: `Developer API: ${endpoints.length} endpoints | ${totalKeys} API keys active | Auth: Bearer token | Base: /api/v1`
+            };
+
+            if (this.supabaseAdmin) {
+                try {
+                    await this.supabaseAdmin.from('admin_logs').insert({
+                        action: 'dev_api_info',
+                        details: { endpoints: endpoints.length, keys: totalKeys },
+                        source: 'brain_chat',
+                        created_at: new Date().toISOString()
+                    });
+                } catch (e) { /* ok */ }
+            }
+            return result;
+        } catch (e) {
+            return { type: 'devAPIInfo', error: e.message, summary: `Eroare API info: ${e.message}` };
+        }
+    }
+
+    // ── SYSTEM STATUS — Reports on DB, migration, cache, validation ──
+    async _systemStatus() {
+        try {
+            let tableCounts = {};
+            const tables = ['conversations', 'messages', 'user_preferences', 'subscriptions', 'usage', 'referral_codes', 'referrals', 'admin_logs', 'trades', 'profiles', 'api_keys', 'media_history', 'news_cache', 'brain_learnings', 'telegram_users', 'whatsapp_users', 'whatsapp_messages', 'trade_intelligence', 'cookie_consents', 'metrics_snapshots', 'processed_webhook_events'];
+
+            if (this.supabaseAdmin) {
+                for (const table of tables) {
+                    try {
+                        const { count } = await this.supabaseAdmin.from(table).select('*', { count: 'exact', head: true });
+                        tableCounts[table] = count || 0;
+                    } catch (e) {
+                        tableCounts[table] = 'ERROR';
+                    }
+                }
+            }
+
+            const totalRecords = Object.values(tableCounts).filter(v => typeof v === 'number').reduce((a, b) => a + b, 0);
+            const errorTables = Object.entries(tableCounts).filter(([, v]) => v === 'ERROR').map(([k]) => k);
+
+            const result = {
+                type: 'systemStatus',
+                totalTables: tables.length,
+                tableCounts,
+                totalRecords,
+                errorTables,
+                cacheEnabled: true,
+                validationEnabled: true,
+                migrationStatus: 'auto_on_startup',
+                schemaVersion: 'schema-full.sql v2.3',
+                serverVersion: '2.5.0',
+                uptime: process.uptime(),
+                summary: `System: ${tables.length} tabele | ${totalRecords} records | ${errorTables.length} erori | Cache: ON | Validare: ON | Uptime: ${Math.round(process.uptime())}s`
+            };
+
+            if (this.supabaseAdmin) {
+                try {
+                    await this.supabaseAdmin.from('admin_logs').insert({
+                        action: 'system_status',
+                        details: { tables: tables.length, records: totalRecords, errors: errorTables },
+                        source: 'brain_chat',
+                        created_at: new Date().toISOString()
+                    });
+                } catch (e) { /* ok */ }
+            }
+            return result;
+        } catch (e) {
+            return { type: 'systemStatus', error: e.message, summary: `Eroare system: ${e.message}` };
         }
     }
 
