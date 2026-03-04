@@ -250,7 +250,7 @@ const brain = new KelionBrain({
     tavilyKey: process.env.TAVILY_API_KEY,
     serperKey: process.env.SERPER_API_KEY,
     togetherKey: process.env.TOGETHER_API_KEY,
-    googleMapsKey: process.env.GOOGLE_MAPS_API_KEY,
+    googleMapsKey: process.env.GOOGLE_MAPS_KEY,
     supabaseAdmin
 });
 logger.info({ component: 'Brain' }, '🧠 Engine initialized');
