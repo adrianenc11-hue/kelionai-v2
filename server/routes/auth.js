@@ -5,6 +5,7 @@
 
 const express = require('express');
 const rateLimit = require('express-rate-limit');
+const logger = require('../logger');
 const { validate, registerSchema, loginSchema, refreshSchema, forgotPasswordSchema, resetPasswordSchema, changePasswordSchema, changeEmailSchema } = require('../validation');
 
 const router = express.Router();
@@ -52,7 +53,7 @@ router.post('/login', authLimiter, validate(loginSchema), async (req, res) => {
 
 // POST /api/auth/logout
 router.post('/logout', async (req, res) => {
-    try { const { supabase } = req.app.locals; if (supabase) await supabase.auth.signOut(); } catch (e) { /* logout failure is non-critical */ }
+    try { const { supabase } = req.app.locals; if (supabase) await supabase.auth.signOut(); } catch (e) { logger.warn({ component: 'Auth', err: e.message }, 'logout failed (non-critical)'); }
     res.json({ success: true });
 });
 
