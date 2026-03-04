@@ -3,6 +3,7 @@
 // Real counters, histograms, gauges for every endpoint
 // ═══════════════════════════════════════════════════════════════
 const client = require('prom-client');
+const logger = require('./logger');
 
 // Create a Registry
 const register = new client.Registry();
@@ -13,7 +14,7 @@ client.collectDefaultMetrics({ register });
 // ─── Push to Grafana Cloud (every 15s) ──────────────────────
 if (process.env.GRAFANA_PROM_URL) {
     const pushInterval = 15000;
-    setInterval(async () => {
+    const _grafanaInterval = setInterval(async () => {
         try {
             const metricsData = await register.metrics();
             const resp = await fetch(process.env.GRAFANA_PROM_URL, {
@@ -26,12 +27,12 @@ if (process.env.GRAFANA_PROM_URL) {
                 },
                 body: metricsData
             });
-            if (!resp.ok) console.warn('[METRICS] Grafana push failed:', resp.status);
+            if (!resp.ok) logger.warn({ component: 'Metrics', status: resp.status }, 'Grafana push failed');
         } catch (e) {
-            console.warn('[METRICS] Grafana push error:', e.message);
+            logger.warn({ component: 'Metrics', err: e.message }, 'Grafana push error');
         }
     }, pushInterval);
-    console.log('[METRICS] Grafana Cloud push enabled (every 15s)');
+    logger.info({ component: 'Metrics' }, 'Grafana Cloud push enabled (every 15s)');
 }
 
 // ─── Custom Metrics ───────────────────────────────────────────

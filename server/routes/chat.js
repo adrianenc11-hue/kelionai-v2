@@ -58,7 +58,7 @@ router.post('/chat', chatLimiter, validate(chatSchema), async (req, res) => {
             try {
                 const { data: prefs } = await supabaseAdmin.from('user_preferences').select('key, value').eq('user_id', user.id).limit(30);
                 if (prefs?.length > 0) memoryContext = prefs.map(p => `${p.key}: ${JSON.stringify(p.value)}`).join('; ');
-            } catch (e) { }
+            } catch (e) { logger.warn({ component: 'Chat', err: e.message }, 'user_preferences read failed'); }
         }
         const systemPrompt = buildSystemPrompt(avatar, language, memoryContext, { failedTools: thought.failedTools }, thought.chainOfThought);
 
@@ -127,8 +127,8 @@ router.post('/chat', chatLimiter, validate(chatSchema), async (req, res) => {
         if (supabaseAdmin) {
             try { savedConvId = await saveConv(supabaseAdmin, user?.id, avatar, message, reply, conversationId, language); } catch (e) { logger.warn({ component: 'Chat', err: e.message }, 'saveConv'); }
         }
-        brain.learnFromConversation(user?.id, message, reply).catch(() => { });
-        incrementUsage(user?.id, 'chat', supabaseAdmin).catch(() => { });
+        brain.learnFromConversation(user?.id, message, reply).catch(e => logger.warn({ component: 'Chat', err: e.message }, 'learnFromConversation failed'));
+        incrementUsage(user?.id, 'chat', supabaseAdmin).catch(e => logger.warn({ component: 'Chat', err: e.message }, 'incrementUsage failed'));
 
         logger.info({ component: 'Chat', engine, avatar, language, tools: thought.toolsUsed, chainOfThought: !!thought.chainOfThought, thinkTime: thought.thinkTime, replyLength: reply.length }, `${engine} | ${avatar} | ${language} | tools:[${thought.toolsUsed.join(',')}] | CoT:${!!thought.chainOfThought} | ${thought.thinkTime}ms think | ${reply.length}c`);
 
@@ -180,7 +180,7 @@ router.post('/chat/stream', chatLimiter, validate(chatSchema), async (req, res) 
             try {
                 const { data: prefs } = await supabaseAdmin.from('user_preferences').select('key, value').eq('user_id', user.id).limit(30);
                 if (prefs?.length > 0) memoryContext = prefs.map(p => `${p.key}: ${JSON.stringify(p.value)}`).join('; ');
-            } catch (e) { }
+            } catch (e) { logger.warn({ component: 'Stream', err: e.message }, 'user_preferences read failed'); }
         }
         const systemPrompt = buildSystemPrompt(avatar, language, memoryContext, { failedTools: thought.failedTools }, thought.chainOfThought);
         const compressedHist = thought.compressedHistory || history.slice(-10);
@@ -249,7 +249,7 @@ router.post('/chat/stream', chatLimiter, validate(chatSchema), async (req, res) 
                     const d = await r.json();
                     fullReply = d.choices?.[0]?.message?.content || '';
                     if (fullReply) { res.write(`data: ${JSON.stringify({ type: 'start', engine: 'GPT-4o' })}\n\n`); res.write(`data: ${JSON.stringify({ type: 'chunk', text: fullReply })}\n\n`); }
-                } catch (e) { }
+                } catch (e) { logger.warn({ component: 'Stream', err: e.message }, 'GPT-4o fallback failed'); }
             }
         }
         if (!fullReply && process.env.DEEPSEEK_API_KEY) {
@@ -262,7 +262,7 @@ router.post('/chat/stream', chatLimiter, validate(chatSchema), async (req, res) 
                 const d = await r.json();
                 fullReply = d.choices?.[0]?.message?.content || '';
                 if (fullReply) { res.write(`data: ${JSON.stringify({ type: 'start', engine: 'DeepSeek' })}\n\n`); res.write(`data: ${JSON.stringify({ type: 'chunk', text: fullReply })}\n\n`); }
-            } catch (e) { }
+            } catch (e) { logger.warn({ component: 'Stream', err: e.message }, 'DeepSeek fallback failed'); }
         }
 
         let savedConvId = conversationId;
@@ -273,8 +273,8 @@ router.post('/chat/stream', chatLimiter, validate(chatSchema), async (req, res) 
         res.write(`data: ${JSON.stringify({ type: 'done', reply: fullReply, thinkTime: thought.thinkTime, conversationId: savedConvId })}\n\n`);
         res.end();
 
-        if (fullReply) brain.learnFromConversation(user?.id, message, fullReply).catch(() => { });
-        if (fullReply) incrementUsage(user?.id, 'chat', supabaseAdmin).catch(() => { });
+        if (fullReply) brain.learnFromConversation(user?.id, message, fullReply).catch(e => logger.warn({ component: 'Stream', err: e.message }, 'learnFromConversation failed'));
+        if (fullReply) incrementUsage(user?.id, 'chat', supabaseAdmin).catch(e => logger.warn({ component: 'Stream', err: e.message }, 'incrementUsage failed'));
         logger.info({ component: 'Stream', avatar, language, replyLength: fullReply.length }, `${avatar} | ${language} | ${fullReply.length}c`);
 
     } catch (e) { logger.error({ component: 'Stream', err: e.message }, e.message); if (!res.headersSent) res.status(500).json({ error: 'Stream error' }); else res.end(); } finally { if (typeof heartbeat !== 'undefined') clearInterval(heartbeat); }

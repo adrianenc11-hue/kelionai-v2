@@ -39,7 +39,7 @@ Answer in ${LANGS[language] || 'English'}, concise but detailed.`;
             })
         });
         const d = await r.json();
-        incrementUsage(user?.id, 'vision', supabaseAdmin).catch(() => { });
+        incrementUsage(user?.id, 'vision', supabaseAdmin).catch(e => logger.warn({ component: 'Vision', err: e.message }, 'incrementUsage failed'));
         res.json({ description: d.content?.[0]?.text || 'Could not analyze.', avatar, engine: 'Claude' });
     } catch (e) { res.status(500).json({ error: 'Vision error' }); }
 });

@@ -52,7 +52,7 @@ router.post('/login', authLimiter, validate(loginSchema), async (req, res) => {
 
 // POST /api/auth/logout
 router.post('/logout', async (req, res) => {
-    try { const { supabase } = req.app.locals; if (supabase) await supabase.auth.signOut(); } catch (e) { }
+    try { const { supabase } = req.app.locals; if (supabase) await supabase.auth.signOut(); } catch (e) { /* logout failure is non-critical */ }
     res.json({ success: true });
 });
 

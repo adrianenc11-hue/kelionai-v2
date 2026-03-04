@@ -63,13 +63,14 @@ function apiKeyAuth(req, res, next) {
             supabaseAdmin
                 .rpc('increment_api_key_count', { key_id: data.id })
                 .then(() => { })
-                .catch(() => {
+                .catch((rpcErr) => {
                     // Fallback: plain update if rpc not available
+                    logger.warn({ component: 'ApiKeyAuth', err: rpcErr.message }, 'RPC increment failed, using fallback');
                     supabaseAdmin
                         .from('api_keys')
                         .update({ last_used_at: new Date().toISOString() })
                         .eq('id', data.id)
-                        .then(() => { }).catch(() => { });
+                        .then(() => { }).catch(e => logger.warn({ component: 'ApiKeyAuth', err: e.message }, 'Fallback update failed'));
                 });
 
             next();
