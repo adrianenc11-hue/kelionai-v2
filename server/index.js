@@ -495,6 +495,25 @@ app.get('/api/media/status', adminAuth, (req, res) => {
     });
 });
 
+// ═══ COOKIE CONSENT ENDPOINT ═══
+app.post('/api/cookie-consent', express.json(), asyncHandler(async (req, res) => {
+    const { analytics = false, marketing = false, functional = true, sessionId } = req.body;
+    const user = req.app.locals.getUserFromToken ? await req.app.locals.getUserFromToken(req) : null;
+    try {
+        await supabaseAdmin.from('cookie_consents').insert({
+            user_id: user?.id || null,
+            session_id: sessionId || req.headers['x-session-id'] || null,
+            analytics, marketing, functional,
+            ip_address: req.ip,
+            user_agent: req.headers['user-agent']?.substring(0, 200),
+            created_at: new Date().toISOString()
+        });
+        res.json({ success: true, consent: { analytics, marketing, functional } });
+    } catch (e) {
+        res.status(500).json({ error: 'Failed to save consent' });
+    }
+}));
+
 // ═══ PUBLISH NEWS TO ALL MEDIA (admin trigger) ═══
 app.post('/api/media/publish-news', adminAuth, express.json(), asyncHandler(async (req, res) => {
     const articles = req.body.articles || [];
