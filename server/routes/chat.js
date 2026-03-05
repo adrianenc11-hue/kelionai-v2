@@ -2,333 +2,783 @@
 // KelionAI — Chat Routes (brain-powered + streaming)
 // Brain decides tools → executes in parallel → builds deep prompt → AI responds → learns
 // ═══════════════════════════════════════════════════════════════
-'use strict';
+"use strict";
 
-const express = require('express');
-const rateLimit = require('express-rate-limit');
-const logger = require('../logger');
-const { validate, chatSchema, memorySchema } = require('../validation');
-const { checkUsage, incrementUsage } = require('../payments');
-const { buildSystemPrompt } = require('../persona');
+const express = require("express");
+const rateLimit = require("express-rate-limit");
+const logger = require("../logger");
+const { validate, chatSchema, memorySchema } = require("../validation");
+const { checkUsage, incrementUsage } = require("../payments");
+const { buildSystemPrompt } = require("../persona");
 
 const router = express.Router();
 
-const chatLimiter = rateLimit({ windowMs: 60 * 1000, max: 20, message: { error: 'Too many requests. Please wait a minute.' }, standardHeaders: true, legacyHeaders: false });
-const memoryLimiter = rateLimit({ windowMs: 60 * 1000, max: 30, message: { error: 'Too many memory requests.' }, standardHeaders: true, legacyHeaders: false });
-const convLimiter = rateLimit({ windowMs: 60 * 1000, max: 30, message: { error: 'Too many requests.' }, standardHeaders: true, legacyHeaders: false });
+const chatLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 20,
+  message: { error: "Too many requests. Please wait a minute." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+const memoryLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  message: { error: "Too many memory requests." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+const convLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  message: { error: "Too many requests." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // ═══ SAVE CONVERSATION HELPER ═══
-async function saveConv(supabaseAdmin, uid, avatar, userMsg, aiReply, convId, lang) {
-    if (!supabaseAdmin) return;
-    if (!convId) {
-        const { data, error } = await supabaseAdmin.from('conversations').insert({ user_id: uid || null, avatar, title: userMsg.substring(0, 80) }).select('id').single();
-        if (error) { logger.warn({ component: 'Chat', err: error.message }, 'saveConv insert failed'); return; }
-        convId = data?.id;
-    } else { const { error: updErr } = await supabaseAdmin.from('conversations').update({ updated_at: new Date().toISOString() }).eq('id', convId); if (updErr) logger.warn({ component: 'Chat', err: updErr.message }, 'saveConv update failed'); }
-    if (convId) {
-        const { error: msgErr } = await supabaseAdmin.from('messages').insert([
-            { conversation_id: convId, role: 'user', content: userMsg, language: lang, source: 'web' },
-            { conversation_id: convId, role: 'assistant', content: aiReply, language: lang, source: 'web' }
-        ]); if (msgErr) logger.warn({ component: 'Chat', err: msgErr.message }, 'saveConv messages failed');
+async function saveConv(
+  supabaseAdmin,
+  uid,
+  avatar,
+  userMsg,
+  aiReply,
+  convId,
+  lang,
+) {
+  if (!supabaseAdmin) return;
+  if (!convId) {
+    const { data, error } = await supabaseAdmin
+      .from("conversations")
+      .insert({ user_id: uid || null, avatar, title: userMsg.substring(0, 80) })
+      .select("id")
+      .single();
+    if (error) {
+      logger.warn(
+        { component: "Chat", err: error.message },
+        "saveConv insert failed",
+      );
+      return;
     }
-    return convId;
+    convId = data?.id;
+  } else {
+    const { error: updErr } = await supabaseAdmin
+      .from("conversations")
+      .update({ updated_at: new Date().toISOString() })
+      .eq("id", convId);
+    if (updErr)
+      logger.warn(
+        { component: "Chat", err: updErr.message },
+        "saveConv update failed",
+      );
+  }
+  if (convId) {
+    const { error: msgErr } = await supabaseAdmin.from("messages").insert([
+      {
+        conversation_id: convId,
+        role: "user",
+        content: userMsg,
+        language: lang,
+        source: "web",
+      },
+      {
+        conversation_id: convId,
+        role: "assistant",
+        content: aiReply,
+        language: lang,
+        source: "web",
+      },
+    ]);
+    if (msgErr)
+      logger.warn(
+        { component: "Chat", err: msgErr.message },
+        "saveConv messages failed",
+      );
+  }
+  return convId;
 }
 
 // ═══ ADMIN KEYWORD BLACKLIST ═══
 
-
 // POST /api/chat
-router.post('/chat', chatLimiter, validate(chatSchema), async (req, res) => {
-    try {
-        const _chatStart = Date.now();
-        const { getUserFromToken, supabaseAdmin, brain } = req.app.locals;
-        const { message, avatar = 'kelion', history = [], language = 'ro', conversationId, imageBase64, audioBase64 } = req.body;
-        if (!message) return res.status(400).json({ error: 'Message is required' });
-        const user = await getUserFromToken(req);
+router.post("/chat", chatLimiter, validate(chatSchema), async (req, res) => {
+  try {
+    const _chatStart = Date.now();
+    const { getUserFromToken, supabaseAdmin, brain } = req.app.locals;
+    const {
+      message,
+      avatar = "kelion",
+      history = [],
+      language = "ro",
+      conversationId,
+      imageBase64,
+      audioBase64,
+    } = req.body;
+    if (!message) return res.status(400).json({ error: "Message is required" });
+    const user = await getUserFromToken(req);
 
-        // Admin tool execution is gated in brain.buildPlan() via isAdmin parameter.
-        // Non-admin users can mention admin keywords freely — tools won't execute.
-        const isOwner = user?.role === 'admin';
-        const isAdmin = isOwner && req.headers['x-admin-mode'] === 'true';
+    // Admin tool execution is gated in brain.buildPlan() via isAdmin parameter.
+    // Non-admin users can mention admin keywords freely — tools won't execute.
+    const isOwner = user?.role === "admin";
+    const isAdmin = isOwner && req.headers["x-admin-mode"] === "true";
 
-        const usage = await checkUsage(user?.id, 'chat', supabaseAdmin);
-        if (!usage.allowed) return res.status(429).json({ error: 'Chat limit reached. Upgrade to Pro for more messages.', plan: usage.plan, limit: usage.limit, upgrade: true });
+    const usage = await checkUsage(user?.id, "chat", supabaseAdmin);
+    if (!usage.allowed)
+      return res.status(429).json({
+        error: "Chat limit reached. Upgrade to Pro for more messages.",
+        plan: usage.plan,
+        limit: usage.limit,
+        upgrade: true,
+      });
 
-        const thought = await brain.think(message, avatar, history, language, user?.id, conversationId, { imageBase64, audioBase64 }, isAdmin);
+    const thought = await brain.think(
+      message,
+      avatar,
+      history,
+      language,
+      user?.id,
+      conversationId,
+      { imageBase64, audioBase64 },
+      isAdmin,
+    );
 
-        let memoryContext = '';
-        if (user && supabaseAdmin) {
-            try {
-                const { data: prefs } = await supabaseAdmin.from('user_preferences').select('key, value').eq('user_id', user.id).limit(30);
-                if (prefs?.length > 0) memoryContext = prefs.map(p => `${p.key}: ${JSON.stringify(p.value)}`).join('; ');
-            } catch (e) { logger.warn({ component: 'Chat', err: e.message }, 'user_preferences read failed'); }
-        }
-        const systemPrompt = buildSystemPrompt(avatar, language, memoryContext, { failedTools: thought.failedTools }, thought.chainOfThought);
+    let memoryContext = "";
+    if (user && supabaseAdmin) {
+      try {
+        const { data: prefs } = await supabaseAdmin
+          .from("user_preferences")
+          .select("key, value")
+          .eq("user_id", user.id)
+          .limit(30);
+        if (prefs?.length > 0)
+          memoryContext = prefs
+            .map((p) => `${p.key}: ${JSON.stringify(p.value)}`)
+            .join("; ");
+      } catch (e) {
+        logger.warn(
+          { component: "Chat", err: e.message },
+          "user_preferences read failed",
+        );
+      }
+    }
+    const systemPrompt = buildSystemPrompt(
+      avatar,
+      language,
+      memoryContext,
+      { failedTools: thought.failedTools },
+      thought.chainOfThought,
+    );
 
-        const compressedHist = thought.compressedHistory || history.slice(-20);
-        const msgs = compressedHist.map(h => ({ role: h.role === 'ai' ? 'assistant' : h.role, content: h.content }));
-        msgs.push({ role: 'user', content: thought.enrichedMessage });
+    const compressedHist = thought.compressedHistory || history.slice(-20);
+    const msgs = compressedHist.map((h) => ({
+      role: h.role === "ai" ? "assistant" : h.role,
+      content: h.content,
+    }));
+    msgs.push({ role: "user", content: thought.enrichedMessage });
 
-        let reply = null, engine = null;
+    let reply = null,
+      engine = null;
 
-        // Groq Llama 3.3 70B (PRIMARY — ultra-fast ~800 tokens/s)
-        if (!reply && process.env.GROQ_API_KEY) {
-            try {
-                const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + process.env.GROQ_API_KEY },
-                    body: JSON.stringify({ model: 'llama-3.3-70b-versatile', max_tokens: 1024, messages: [{ role: 'system', content: systemPrompt }, ...msgs] })
-                });
-                const d = await r.json();
-                reply = d.choices?.[0]?.message?.content;
-                if (reply) engine = 'Groq-Llama';
-            } catch (e) { logger.warn({ component: 'Chat', err: e.message }, 'Groq-Llama'); }
-        }
-        // GPT-4o-mini (fallback #1 — fast, good Romanian)
-        if (!reply && process.env.OPENAI_API_KEY) {
-            try {
-                const r = await fetch('https://api.openai.com/v1/chat/completions', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + process.env.OPENAI_API_KEY },
-                    body: JSON.stringify({ model: 'gpt-4o-mini', max_tokens: 1024, messages: [{ role: 'system', content: systemPrompt }, ...msgs] })
-                });
-                const d = await r.json();
-                reply = d.choices?.[0]?.message?.content;
-                if (reply) engine = 'GPT-4o-mini';
-            } catch (e) { logger.warn({ component: 'Chat', err: e.message }, 'GPT-4o-mini'); }
-        }
-        // Claude Sonnet 4 (fallback #2 — best Romanian but slower)
-        if (!reply && process.env.ANTHROPIC_API_KEY) {
-            try {
-                const r = await fetch('https://api.anthropic.com/v1/messages', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
-                    body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 1024, system: systemPrompt, messages: msgs })
-                });
-                const d = await r.json();
-                reply = d.content?.[0]?.text;
-                if (reply) engine = 'Claude';
-            } catch (e) { logger.warn({ component: 'Chat', err: e.message }, 'Claude'); }
-        }
-        // DeepSeek (fallback #3)
-        if (!reply && process.env.DEEPSEEK_API_KEY) {
-            try {
-                const r = await fetch('https://api.deepseek.com/v1/chat/completions', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + process.env.DEEPSEEK_API_KEY },
-                    body: JSON.stringify({ model: 'deepseek-chat', max_tokens: 1024, messages: [{ role: 'system', content: systemPrompt }, ...msgs] })
-                });
-                const d = await r.json();
-                reply = d.choices?.[0]?.message?.content;
-                if (reply) engine = 'DeepSeek';
-            } catch (e) { logger.warn({ component: 'Chat', err: e.message }, 'DeepSeek'); }
-        }
+    // Groq Llama 3.3 70B (PRIMARY — ultra-fast ~800 tokens/s)
+    if (!reply && process.env.GROQ_API_KEY) {
+      try {
+        const r = await fetch(
+          "https://api.groq.com/openai/v1/chat/completions",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: "Bearer " + process.env.GROQ_API_KEY,
+            },
+            body: JSON.stringify({
+              model: "llama-3.3-70b-versatile",
+              max_tokens: 1024,
+              messages: [{ role: "system", content: systemPrompt }, ...msgs],
+            }),
+          },
+        );
+        const d = await r.json();
+        reply = d.choices?.[0]?.message?.content;
+        if (reply) engine = "Groq-Llama";
+      } catch (e) {
+        logger.warn({ component: "Chat", err: e.message }, "Groq-Llama");
+      }
+    }
+    // GPT-4o-mini (fallback #1 — fast, good Romanian)
+    if (!reply && process.env.OPENAI_API_KEY) {
+      try {
+        const r = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer " + process.env.OPENAI_API_KEY,
+          },
+          body: JSON.stringify({
+            model: "gpt-4o-mini",
+            max_tokens: 1024,
+            messages: [{ role: "system", content: systemPrompt }, ...msgs],
+          }),
+        });
+        const d = await r.json();
+        reply = d.choices?.[0]?.message?.content;
+        if (reply) engine = "GPT-4o-mini";
+      } catch (e) {
+        logger.warn({ component: "Chat", err: e.message }, "GPT-4o-mini");
+      }
+    }
+    // Claude Sonnet 4 (fallback #2 — best Romanian but slower)
+    if (!reply && process.env.ANTHROPIC_API_KEY) {
+      try {
+        const r = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": process.env.ANTHROPIC_API_KEY,
+            "anthropic-version": "2023-06-01",
+          },
+          body: JSON.stringify({
+            model: "claude-sonnet-4-20250514",
+            max_tokens: 1024,
+            system: systemPrompt,
+            messages: msgs,
+          }),
+        });
+        const d = await r.json();
+        reply = d.content?.[0]?.text;
+        if (reply) engine = "Claude";
+      } catch (e) {
+        logger.warn({ component: "Chat", err: e.message }, "Claude");
+      }
+    }
+    // DeepSeek (fallback #3)
+    if (!reply && process.env.DEEPSEEK_API_KEY) {
+      try {
+        const r = await fetch("https://api.deepseek.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer " + process.env.DEEPSEEK_API_KEY,
+          },
+          body: JSON.stringify({
+            model: "deepseek-chat",
+            max_tokens: 1024,
+            messages: [{ role: "system", content: systemPrompt }, ...msgs],
+          }),
+        });
+        const d = await r.json();
+        reply = d.choices?.[0]?.message?.content;
+        if (reply) engine = "DeepSeek";
+      } catch (e) {
+        logger.warn({ component: "Chat", err: e.message }, "DeepSeek");
+      }
+    }
 
-        if (!reply) return res.status(503).json({ error: 'AI unavailable' });
+    if (!reply) return res.status(503).json({ error: "AI unavailable" });
 
-        let savedConvId = conversationId;
-        if (supabaseAdmin) {
-            try { savedConvId = await saveConv(supabaseAdmin, user?.id, avatar, message, reply, conversationId, language); } catch (e) { logger.warn({ component: 'Chat', err: e.message }, 'saveConv'); }
-        }
-        brain.learnFromConversation(user?.id, message, reply).catch(e => logger.warn({ component: 'Chat', err: e.message }, 'learnFromConversation failed'));
-        incrementUsage(user?.id, 'chat', supabaseAdmin).catch(e => logger.warn({ component: 'Chat', err: e.message }, 'incrementUsage failed'));
+    let savedConvId = conversationId;
+    if (supabaseAdmin) {
+      try {
+        savedConvId = await saveConv(
+          supabaseAdmin,
+          user?.id,
+          avatar,
+          message,
+          reply,
+          conversationId,
+          language,
+        );
+      } catch (e) {
+        logger.warn({ component: "Chat", err: e.message }, "saveConv");
+      }
+    }
+    brain
+      .learnFromConversation(user?.id, message, reply)
+      .catch((e) =>
+        logger.warn(
+          { component: "Chat", err: e.message },
+          "learnFromConversation failed",
+        ),
+      );
+    incrementUsage(user?.id, "chat", supabaseAdmin).catch((e) =>
+      logger.warn(
+        { component: "Chat", err: e.message },
+        "incrementUsage failed",
+      ),
+    );
 
-        logger.info({ component: 'Chat', engine, avatar, language, tools: thought.toolsUsed, chainOfThought: !!thought.chainOfThought, thinkTime: thought.thinkTime, replyLength: reply.length }, `${engine} | ${avatar} | ${language} | tools:[${thought.toolsUsed.join(',')}] | CoT:${!!thought.chainOfThought} | ${thought.thinkTime}ms think | ${reply.length}c`);
+    logger.info(
+      {
+        component: "Chat",
+        engine,
+        avatar,
+        language,
+        tools: thought.toolsUsed,
+        chainOfThought: !!thought.chainOfThought,
+        thinkTime: thought.thinkTime,
+        replyLength: reply.length,
+      },
+      `${engine} | ${avatar} | ${language} | tools:[${thought.toolsUsed.join(",")}] | CoT:${!!thought.chainOfThought} | ${thought.thinkTime}ms think | ${reply.length}c`,
+    );
 
-        const totalTime = Date.now() - _chatStart;
-        // Parse [MONITOR]...[/MONITOR] tags from AI reply
-        let monitorFromReply = null;
-        const monitorMatch = reply.match(/\[MONITOR\]([\s\S]*?)\[\/MONITOR\]/i);
-        if (monitorMatch) {
-            monitorFromReply = { content: monitorMatch[1].trim(), type: 'html' };
-            reply = reply.replace(/\[MONITOR\][\s\S]*?\[\/MONITOR\]/gi, '').trim();
-        }
-        const response = { reply, avatar, engine, language, thinkTime: thought.thinkTime, totalTime, conversationId: savedConvId };
-        if (monitorFromReply) { response.monitor = monitorFromReply; }
-        else if (thought.monitor.content) { response.monitor = thought.monitor; }
-        res.json(response);
-
-    } catch (e) { logger.error({ component: 'Chat', err: e.message }, e.message); res.status(500).json({ error: 'AI error' }); }
+    const totalTime = Date.now() - _chatStart;
+    // Parse [MONITOR]...[/MONITOR] tags from AI reply
+    let monitorFromReply = null;
+    const monitorMatch = reply.match(/\[MONITOR\]([\s\S]*?)\[\/MONITOR\]/i);
+    if (monitorMatch) {
+      monitorFromReply = { content: monitorMatch[1].trim(), type: "html" };
+      reply = reply.replace(/\[MONITOR\][\s\S]*?\[\/MONITOR\]/gi, "").trim();
+    }
+    const response = {
+      reply,
+      avatar,
+      engine,
+      language,
+      thinkTime: thought.thinkTime,
+      totalTime,
+      conversationId: savedConvId,
+    };
+    if (monitorFromReply) {
+      response.monitor = monitorFromReply;
+    } else if (thought.monitor.content) {
+      response.monitor = thought.monitor;
+    }
+    res.json(response);
+  } catch (e) {
+    logger.error({ component: "Chat", err: e.message }, e.message);
+    res.status(500).json({ error: "AI error" });
+  }
 });
 
 // POST /api/chat/stream — Server-Sent Events (word-by-word response)
-router.post('/chat/stream', chatLimiter, validate(chatSchema), async (req, res) => {
+router.post(
+  "/chat/stream",
+  chatLimiter,
+  validate(chatSchema),
+  async (req, res) => {
     try {
-        const { getUserFromToken, supabaseAdmin, brain } = req.app.locals;
-        const { message, avatar = 'kelion', history = [], language = 'ro', conversationId } = req.body;
-        if (!message) return res.status(400).json({ error: 'Message is required' });
-        const user = await getUserFromToken(req);
+      const { getUserFromToken, supabaseAdmin, brain } = req.app.locals;
+      const {
+        message,
+        avatar = "kelion",
+        history = [],
+        language = "ro",
+        conversationId,
+      } = req.body;
+      if (!message)
+        return res.status(400).json({ error: "Message is required" });
+      const user = await getUserFromToken(req);
 
-        // Admin tool execution gated in brain.buildPlan() — no keyword filter needed
-        const isOwnerStream = user?.role === 'admin';
+      // Admin tool execution gated in brain.buildPlan() — no keyword filter needed
+      const isOwnerStream = user?.role === "admin";
 
-        const usage = await checkUsage(user?.id, 'chat', supabaseAdmin);
-        if (!usage.allowed) return res.status(429).json({ error: 'Chat limit reached. Upgrade to Pro for more messages.', plan: usage.plan, limit: usage.limit, upgrade: true });
+      const usage = await checkUsage(user?.id, "chat", supabaseAdmin);
+      if (!usage.allowed)
+        return res.status(429).json({
+          error: "Chat limit reached. Upgrade to Pro for more messages.",
+          plan: usage.plan,
+          limit: usage.limit,
+          upgrade: true,
+        });
 
-        res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive', 'X-Accel-Buffering': 'no' });
-        // SSE heartbeat to prevent proxy/LB timeout during AI thinking
-        // eslint-disable-next-line no-unused-vars -- used in finally { clearInterval(heartbeat) }
-        const heartbeat = setInterval(() => res.write(':keepalive\n\n'), 15000);
-        // Send thinking indicator immediately so user sees activity
-        res.write(`data: ${JSON.stringify({ type: 'thinking' })}\n\n`);
+      res.writeHead(200, {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+        "X-Accel-Buffering": "no",
+      });
+      // SSE heartbeat to prevent proxy/LB timeout during AI thinking
+      // eslint-disable-next-line no-unused-vars -- used in finally { clearInterval(heartbeat) }
+      const heartbeat = setInterval(() => res.write(":keepalive\n\n"), 15000);
+      // Send thinking indicator immediately so user sees activity
+      res.write(`data: ${JSON.stringify({ type: "thinking" })}\n\n`);
 
-        const isAdminStream = isOwnerStream && req.headers['x-admin-mode'] === 'true';
-        const thought = await brain.think(message, avatar, history, language, user?.id, conversationId, {}, isAdminStream);
+      const isAdminStream =
+        isOwnerStream && req.headers["x-admin-mode"] === "true";
+      const thought = await brain.think(
+        message,
+        avatar,
+        history,
+        language,
+        user?.id,
+        conversationId,
+        {},
+        isAdminStream,
+      );
 
-        if (thought.monitor.content) {
-            res.write(`data: ${JSON.stringify({ type: 'monitor', content: thought.monitor.content, monitorType: thought.monitor.type })}\n\n`);
+      if (thought.monitor.content) {
+        res.write(
+          `data: ${JSON.stringify({ type: "monitor", content: thought.monitor.content, monitorType: thought.monitor.type })}\n\n`,
+        );
+      }
+
+      let memoryContext = "";
+      if (user && supabaseAdmin) {
+        try {
+          const { data: prefs } = await supabaseAdmin
+            .from("user_preferences")
+            .select("key, value")
+            .eq("user_id", user.id)
+            .limit(30);
+          if (prefs?.length > 0)
+            memoryContext = prefs
+              .map((p) => `${p.key}: ${JSON.stringify(p.value)}`)
+              .join("; ");
+        } catch (e) {
+          logger.warn(
+            { component: "Stream", err: e.message },
+            "user_preferences read failed",
+          );
         }
+      }
+      const systemPrompt = buildSystemPrompt(
+        avatar,
+        language,
+        memoryContext,
+        { failedTools: thought.failedTools },
+        thought.chainOfThought,
+      );
+      const compressedHist = thought.compressedHistory || history.slice(-10);
+      const msgs = compressedHist.map((h) => ({
+        role: h.role === "ai" ? "assistant" : h.role,
+        content: h.content,
+      }));
+      msgs.push({ role: "user", content: thought.enrichedMessage });
 
-        let memoryContext = '';
-        if (user && supabaseAdmin) {
-            try {
-                const { data: prefs } = await supabaseAdmin.from('user_preferences').select('key, value').eq('user_id', user.id).limit(30);
-                if (prefs?.length > 0) memoryContext = prefs.map(p => `${p.key}: ${JSON.stringify(p.value)}`).join('; ');
-            } catch (e) { logger.warn({ component: 'Stream', err: e.message }, 'user_preferences read failed'); }
-        }
-        const systemPrompt = buildSystemPrompt(avatar, language, memoryContext, { failedTools: thought.failedTools }, thought.chainOfThought);
-        const compressedHist = thought.compressedHistory || history.slice(-10);
-        const msgs = compressedHist.map(h => ({ role: h.role === 'ai' ? 'assistant' : h.role, content: h.content }));
-        msgs.push({ role: 'user', content: thought.enrichedMessage });
+      let fullReply = "";
 
-        let fullReply = '';
+      // AI Chain: Claude (streaming nativ) → GPT-4o (fallback) → DeepSeek (backup)
+      // NOTĂ: Chain-ul pe /chat/stream diferă INTENȚIONAT de /chat.
+      // /chat: Groq→GPT-4o-mini→Claude→DeepSeek (optimizat pe viteză, non-streaming)
+      // /chat/stream: Claude→GPT-4o→DeepSeek (Claude face streaming nativ word-by-word)
+      // Try Claude streaming
+      if (process.env.ANTHROPIC_API_KEY) {
+        try {
+          const r = await fetch("https://api.anthropic.com/v1/messages", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-api-key": process.env.ANTHROPIC_API_KEY,
+              "anthropic-version": "2023-06-01",
+            },
+            body: JSON.stringify({
+              model: "claude-sonnet-4-20250514",
+              max_tokens: 2048,
+              system: systemPrompt,
+              messages: msgs,
+              stream: true,
+            }),
+          });
 
-        // AI Chain: Claude (streaming nativ) → GPT-4o (fallback) → DeepSeek (backup)
-        // NOTĂ: Chain-ul pe /chat/stream diferă INTENȚIONAT de /chat.
-        // /chat: Groq→GPT-4o-mini→Claude→DeepSeek (optimizat pe viteză, non-streaming)
-        // /chat/stream: Claude→GPT-4o→DeepSeek (Claude face streaming nativ word-by-word)
-        // Try Claude streaming
-        if (process.env.ANTHROPIC_API_KEY) {
-            try {
-                const r = await fetch('https://api.anthropic.com/v1/messages', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
-                    body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 2048, system: systemPrompt, messages: msgs, stream: true })
-                });
+          if (r.ok && r.body) {
+            res.write(
+              `data: ${JSON.stringify({ type: "start", engine: "Claude" })}\n\n`,
+            );
+            let buffer = "";
 
-                if (r.ok && r.body) {
-                    res.write(`data: ${JSON.stringify({ type: 'start', engine: 'Claude' })}\n\n`);
-                    let buffer = '';
+            // Node 18+ fetch returns Web ReadableStream, not Node.js Readable
+            // Convert to Node.js Readable if needed
+            const { Readable } = require("stream");
+            const nodeStream =
+              typeof r.body.on === "function"
+                ? r.body
+                : Readable.fromWeb(r.body);
 
-                    // Node 18+ fetch returns Web ReadableStream, not Node.js Readable
-                    // Convert to Node.js Readable if needed
-                    const { Readable } = require('stream');
-                    const nodeStream = (typeof r.body.on === 'function') ? r.body : Readable.fromWeb(r.body);
+            await new Promise((resolve, reject) => {
+              nodeStream.on("data", (chunk) => {
+                buffer += chunk.toString();
+                const lines = buffer.split("\n");
+                buffer = lines.pop() || "";
 
-                    await new Promise((resolve, reject) => {
-                        nodeStream.on('data', (chunk) => {
-                            buffer += chunk.toString();
-                            const lines = buffer.split('\n');
-                            buffer = lines.pop() || '';
-
-                            for (const line of lines) {
-                                if (!line.startsWith('data: ')) continue;
-                                const data = line.slice(6).trim();
-                                if (data === '[DONE]') continue;
-                                try {
-                                    const parsed = JSON.parse(data);
-                                    if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
-                                        fullReply += parsed.delta.text;
-                                        res.write(`data: ${JSON.stringify({ type: 'chunk', text: parsed.delta.text })}\n\n`);
-                                    }
-                                } catch (e) { logger.warn({ component: 'Chat', err: e.message }, 'skip parse errors'); }
-                            }
-                        });
-                        nodeStream.on('end', resolve);
-                        nodeStream.on('error', reject);
-                    });
+                for (const line of lines) {
+                  if (!line.startsWith("data: ")) continue;
+                  const data = line.slice(6).trim();
+                  if (data === "[DONE]") continue;
+                  try {
+                    const parsed = JSON.parse(data);
+                    if (
+                      parsed.type === "content_block_delta" &&
+                      parsed.delta?.text
+                    ) {
+                      fullReply += parsed.delta.text;
+                      res.write(
+                        `data: ${JSON.stringify({ type: "chunk", text: parsed.delta.text })}\n\n`,
+                      );
+                    }
+                  } catch (e) {
+                    logger.warn(
+                      { component: "Chat", err: e.message },
+                      "skip parse errors",
+                    );
+                  }
                 }
-            } catch (e) { logger.warn({ component: 'Stream', err: e.message }, 'Claude'); }
+              });
+              nodeStream.on("end", resolve);
+              nodeStream.on("error", reject);
+            });
+          }
+        } catch (e) {
+          logger.warn({ component: "Stream", err: e.message }, "Claude");
         }
+      }
 
-        // Fallback: non-streaming GPT-4o or DeepSeek
-        if (!fullReply) {
-            if (process.env.OPENAI_API_KEY) {
-                try {
-                    const r = await fetch('https://api.openai.com/v1/chat/completions', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + process.env.OPENAI_API_KEY },
-                        body: JSON.stringify({ model: 'gpt-4o', max_tokens: 2048, messages: [{ role: 'system', content: systemPrompt }, ...msgs] })
-                    });
-                    const d = await r.json();
-                    fullReply = d.choices?.[0]?.message?.content || '';
-                    if (fullReply) { res.write(`data: ${JSON.stringify({ type: 'start', engine: 'GPT-4o' })}\n\n`); res.write(`data: ${JSON.stringify({ type: 'chunk', text: fullReply })}\n\n`); }
-                } catch (e) { logger.warn({ component: 'Stream', err: e.message }, 'GPT-4o fallback failed'); }
+      // Fallback: non-streaming GPT-4o or DeepSeek
+      if (!fullReply) {
+        if (process.env.OPENAI_API_KEY) {
+          try {
+            const r = await fetch(
+              "https://api.openai.com/v1/chat/completions",
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: "Bearer " + process.env.OPENAI_API_KEY,
+                },
+                body: JSON.stringify({
+                  model: "gpt-4o",
+                  max_tokens: 2048,
+                  messages: [
+                    { role: "system", content: systemPrompt },
+                    ...msgs,
+                  ],
+                }),
+              },
+            );
+            const d = await r.json();
+            fullReply = d.choices?.[0]?.message?.content || "";
+            if (fullReply) {
+              res.write(
+                `data: ${JSON.stringify({ type: "start", engine: "GPT-4o" })}\n\n`,
+              );
+              res.write(
+                `data: ${JSON.stringify({ type: "chunk", text: fullReply })}\n\n`,
+              );
             }
+          } catch (e) {
+            logger.warn(
+              { component: "Stream", err: e.message },
+              "GPT-4o fallback failed",
+            );
+          }
         }
-        if (!fullReply && process.env.DEEPSEEK_API_KEY) {
-            try {
-                const r = await fetch('https://api.deepseek.com/v1/chat/completions', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + process.env.DEEPSEEK_API_KEY },
-                    body: JSON.stringify({ model: 'deepseek-chat', max_tokens: 2048, messages: [{ role: 'system', content: systemPrompt }, ...msgs] })
-                });
-                const d = await r.json();
-                fullReply = d.choices?.[0]?.message?.content || '';
-                if (fullReply) { res.write(`data: ${JSON.stringify({ type: 'start', engine: 'DeepSeek' })}\n\n`); res.write(`data: ${JSON.stringify({ type: 'chunk', text: fullReply })}\n\n`); }
-            } catch (e) { logger.warn({ component: 'Stream', err: e.message }, 'DeepSeek fallback failed'); }
+      }
+      if (!fullReply && process.env.DEEPSEEK_API_KEY) {
+        try {
+          const r = await fetch(
+            "https://api.deepseek.com/v1/chat/completions",
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: "Bearer " + process.env.DEEPSEEK_API_KEY,
+              },
+              body: JSON.stringify({
+                model: "deepseek-chat",
+                max_tokens: 2048,
+                messages: [{ role: "system", content: systemPrompt }, ...msgs],
+              }),
+            },
+          );
+          const d = await r.json();
+          fullReply = d.choices?.[0]?.message?.content || "";
+          if (fullReply) {
+            res.write(
+              `data: ${JSON.stringify({ type: "start", engine: "DeepSeek" })}\n\n`,
+            );
+            res.write(
+              `data: ${JSON.stringify({ type: "chunk", text: fullReply })}\n\n`,
+            );
+          }
+        } catch (e) {
+          logger.warn(
+            { component: "Stream", err: e.message },
+            "DeepSeek fallback failed",
+          );
         }
+      }
 
-        let savedConvId = conversationId;
-        if (fullReply && supabaseAdmin) {
-            try { savedConvId = await saveConv(supabaseAdmin, user?.id, avatar, message, fullReply, conversationId, language); } catch (e) { logger.warn({ component: 'Stream', err: e.message }, 'saveConv'); }
+      let savedConvId = conversationId;
+      if (fullReply && supabaseAdmin) {
+        try {
+          savedConvId = await saveConv(
+            supabaseAdmin,
+            user?.id,
+            avatar,
+            message,
+            fullReply,
+            conversationId,
+            language,
+          );
+        } catch (e) {
+          logger.warn({ component: "Stream", err: e.message }, "saveConv");
         }
+      }
 
-        res.write(`data: ${JSON.stringify({ type: 'done', reply: fullReply, thinkTime: thought.thinkTime, conversationId: savedConvId })}\n\n`);
-        res.end();
+      res.write(
+        `data: ${JSON.stringify({ type: "done", reply: fullReply, thinkTime: thought.thinkTime, conversationId: savedConvId })}\n\n`,
+      );
+      res.end();
 
-        if (fullReply) brain.learnFromConversation(user?.id, message, fullReply).catch(e => logger.warn({ component: 'Stream', err: e.message }, 'learnFromConversation failed'));
-        if (fullReply) incrementUsage(user?.id, 'chat', supabaseAdmin).catch(e => logger.warn({ component: 'Stream', err: e.message }, 'incrementUsage failed'));
-        logger.info({ component: 'Stream', avatar, language, replyLength: fullReply.length }, `${avatar} | ${language} | ${fullReply.length}c`);
-
-    } catch (e) { logger.error({ component: 'Stream', err: e.message }, e.message); if (!res.headersSent) res.status(500).json({ error: 'Stream error' }); else res.end(); } finally { clearInterval(heartbeat); }
-});
+      if (fullReply)
+        brain
+          .learnFromConversation(user?.id, message, fullReply)
+          .catch((e) =>
+            logger.warn(
+              { component: "Stream", err: e.message },
+              "learnFromConversation failed",
+            ),
+          );
+      if (fullReply)
+        incrementUsage(user?.id, "chat", supabaseAdmin).catch((e) =>
+          logger.warn(
+            { component: "Stream", err: e.message },
+            "incrementUsage failed",
+          ),
+        );
+      logger.info(
+        {
+          component: "Stream",
+          avatar,
+          language,
+          replyLength: fullReply.length,
+        },
+        `${avatar} | ${language} | ${fullReply.length}c`,
+      );
+    } catch (e) {
+      logger.error({ component: "Stream", err: e.message }, e.message);
+      if (!res.headersSent) res.status(500).json({ error: "Stream error" });
+      else res.end();
+    } finally {
+      clearInterval(heartbeat);
+    }
+  },
+);
 
 // GET /api/conversations
-router.get('/conversations', convLimiter, async (req, res) => {
-    try {
-        const { getUserFromToken, supabaseAdmin } = req.app.locals;
-        const u = await getUserFromToken(req);
-        if (!u || !supabaseAdmin) return res.json({ conversations: [] });
-        const { data, error } = await supabaseAdmin.from('conversations').select('id, avatar, title, created_at, updated_at').eq('user_id', u.id).order('updated_at', { ascending: false }).limit(50);
-        if (error) logger.warn({ component: 'Chat', err: error.message }, 'conversations list failed');
-        res.json({ conversations: data || [] });
-    } catch { res.status(500).json({ error: 'Server error' }); }
+router.get("/conversations", convLimiter, async (req, res) => {
+  try {
+    const { getUserFromToken, supabaseAdmin } = req.app.locals;
+    const u = await getUserFromToken(req);
+    if (!u || !supabaseAdmin) return res.json({ conversations: [] });
+    const { data, error } = await supabaseAdmin
+      .from("conversations")
+      .select("id, avatar, title, created_at, updated_at")
+      .eq("user_id", u.id)
+      .order("updated_at", { ascending: false })
+      .limit(50);
+    if (error)
+      logger.warn(
+        { component: "Chat", err: error.message },
+        "conversations list failed",
+      );
+    res.json({ conversations: data || [] });
+  } catch {
+    res.status(500).json({ error: "Server error" });
+  }
 });
 
 // GET /api/conversations/:id/messages
-router.get('/conversations/:id/messages', convLimiter, async (req, res) => {
-    try {
-        const { getUserFromToken, supabaseAdmin } = req.app.locals;
-        const u = await getUserFromToken(req);
-        if (!u || !supabaseAdmin) return res.json({ messages: [] });
-        const { data: conv, error: convErr } = await supabaseAdmin.from('conversations').select('id').eq('id', req.params.id).eq('user_id', u.id).single();
-        if (convErr && convErr.code !== 'PGRST116') return res.status(500).json({ error: 'Server error' });
-        if (!conv) return res.status(403).json({ error: 'Access denied' });
-        const { data, error: msgErr2 } = await supabaseAdmin.from('messages').select('id, role, content, created_at').eq('conversation_id', req.params.id).order('created_at', { ascending: true });
-        if (msgErr2) logger.warn({ component: 'Chat', err: msgErr2.message }, 'messages list failed');
-        res.json({ messages: data || [] });
-    } catch { res.status(500).json({ error: 'Server error' }); }
+router.get("/conversations/:id/messages", convLimiter, async (req, res) => {
+  try {
+    const { getUserFromToken, supabaseAdmin } = req.app.locals;
+    const u = await getUserFromToken(req);
+    if (!u || !supabaseAdmin) return res.json({ messages: [] });
+    const { data: conv, error: convErr } = await supabaseAdmin
+      .from("conversations")
+      .select("id")
+      .eq("id", req.params.id)
+      .eq("user_id", u.id)
+      .single();
+    if (convErr && convErr.code !== "PGRST116")
+      return res.status(500).json({ error: "Server error" });
+    if (!conv) return res.status(403).json({ error: "Access denied" });
+    const { data, error: msgErr2 } = await supabaseAdmin
+      .from("messages")
+      .select("id, role, content, created_at")
+      .eq("conversation_id", req.params.id)
+      .order("created_at", { ascending: true });
+    if (msgErr2)
+      logger.warn(
+        { component: "Chat", err: msgErr2.message },
+        "messages list failed",
+      );
+    res.json({ messages: data || [] });
+  } catch {
+    res.status(500).json({ error: "Server error" });
+  }
 });
 
 // POST /api/memory
-router.post('/memory', memoryLimiter, validate(memorySchema), async (req, res) => {
+router.post(
+  "/memory",
+  memoryLimiter,
+  validate(memorySchema),
+  async (req, res) => {
     try {
-        const { getUserFromToken, supabaseAdmin, memFallback } = req.app.locals;
-        const { action, key, value } = req.body;
-        const user = await getUserFromToken(req);
-        const uid = 'u:' + (user?.id || 'guest');
-        if (supabaseAdmin && user) {
-            if (action === 'save') { const { error: sErr } = await supabaseAdmin.from('user_preferences').upsert({ user_id: user.id, key, value: typeof value === 'object' ? value : { data: value } }, { onConflict: 'user_id,key' }); if (sErr) logger.warn({ component: 'Memory', err: sErr.message }, 'pref save failed'); return res.json({ success: !sErr }); }
-            if (action === 'load') { const { data, error: lErr } = await supabaseAdmin.from('user_preferences').select('value').eq('user_id', user.id).eq('key', key).single(); if (lErr && lErr.code !== 'PGRST116') logger.warn({ component: 'Memory', err: lErr.message }, 'pref load failed'); return res.json({ value: data?.value || null }); }
-            if (action === 'list') { const { data, error: liErr } = await supabaseAdmin.from('user_preferences').select('key, value').eq('user_id', user.id); if (liErr) logger.warn({ component: 'Memory', err: liErr.message }, 'pref list failed'); return res.json({ keys: (data || []).map(d => d.key), items: data || [] }); }
+      const { getUserFromToken, supabaseAdmin, memFallback } = req.app.locals;
+      const { action, key, value } = req.body;
+      const user = await getUserFromToken(req);
+      const uid = "u:" + (user?.id || "guest");
+      if (supabaseAdmin && user) {
+        if (action === "save") {
+          const { error: sErr } = await supabaseAdmin
+            .from("user_preferences")
+            .upsert(
+              {
+                user_id: user.id,
+                key,
+                value: typeof value === "object" ? value : { data: value },
+              },
+              { onConflict: "user_id,key" },
+            );
+          if (sErr)
+            logger.warn(
+              { component: "Memory", err: sErr.message },
+              "pref save failed",
+            );
+          return res.json({ success: !sErr });
         }
-        if (!memFallback[uid]) memFallback[uid] = Object.create(null);
-        if (action === 'save') { memFallback[uid][key] = value; res.json({ success: true }); }
-        else if (action === 'load') res.json({ value: memFallback[uid][key] || null });
-        else if (action === 'list') res.json({ keys: Object.keys(memFallback[uid]) });
-        else res.status(400).json({ error: 'Action must be: save, load, list' });
-    } catch { res.status(500).json({ error: 'Memory error' }); }
-});
+        if (action === "load") {
+          const { data, error: lErr } = await supabaseAdmin
+            .from("user_preferences")
+            .select("value")
+            .eq("user_id", user.id)
+            .eq("key", key)
+            .single();
+          if (lErr && lErr.code !== "PGRST116")
+            logger.warn(
+              { component: "Memory", err: lErr.message },
+              "pref load failed",
+            );
+          return res.json({ value: data?.value || null });
+        }
+        if (action === "list") {
+          const { data, error: liErr } = await supabaseAdmin
+            .from("user_preferences")
+            .select("key, value")
+            .eq("user_id", user.id);
+          if (liErr)
+            logger.warn(
+              { component: "Memory", err: liErr.message },
+              "pref list failed",
+            );
+          return res.json({
+            keys: (data || []).map((d) => d.key),
+            items: data || [],
+          });
+        }
+      }
+      if (!memFallback[uid]) memFallback[uid] = Object.create(null);
+      if (action === "save") {
+        memFallback[uid][key] = value;
+        res.json({ success: true });
+      } else if (action === "load")
+        res.json({ value: memFallback[uid][key] || null });
+      else if (action === "list")
+        res.json({ keys: Object.keys(memFallback[uid]) });
+      else res.status(400).json({ error: "Action must be: save, load, list" });
+    } catch {
+      res.status(500).json({ error: "Memory error" });
+    }
+  },
+);
 
 module.exports = router;

@@ -1,0 +1,64 @@
+{
+  "version": "1.0",
+  "commit": "56ebd14ae399477dec3e4a2edea7851b414f4a24",
+  "branch": "master",
+  "preview_url": "https://kelionai.app",
+  "timestamp": "2026-03-05T08:09:00.866Z",
+  "node_version": "v20.11.0",
+  "overall": "FAIL",
+  "gates": [
+    {
+      "name": "Prettier (format check)",
+      "status": "pass",
+      "duration": 2285,
+      "output": "Checking formatting...\nAll matched files use Prettier code style!"
+    },
+    {
+      "name": "Lint (ESLint)",
+      "status": "pass",
+      "duration": 1473,
+      "output": ""
+    },
+    {
+      "name": "Typecheck",
+      "status": "pass",
+      "duration": 701,
+      "output": "typecheck: N/A (JS-only project)"
+    },
+    {
+      "name": "Unit Tests (Jest)",
+      "status": "pass",
+      "duration": 5340,
+      "output": "----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------\n\n=============================== Coverage summary ===============================\nStatements   : 18.49% ( 1226/6629 )\nBranches     : 11.64% ( 578/4962 )\nFunctions    : 16.35% ( 113/691 )\nLines        : 19.07% ( 1173/6149 )\n================================================================================"
+    },
+    {
+      "name": "Build Validation",
+      "status": "pass",
+      "duration": 710,
+      "output": "Build OK: static assets validated"
+    },
+    {
+      "name": "Security (npm audit)",
+      "status": "pass",
+      "duration": 1136,
+      "output": "found 0 vulnerabilities"
+    },
+    {
+      "name": "Smoke Probe",
+      "status": "pass",
+      "duration": 940,
+      "output": "🔍 Smoke Probe — https://kelionai.app\n\n✅ /health → 200 [171ms]\n✅ /api/news/public → 200 [141ms]\n✅ /api/payments/plans → 200 [179ms]\n\n3/3 probes passed."
+    },
+    {
+      "name": "E2E (Playwright)",
+      "status": "fail",
+      "duration": 600025,
+      "exitCode": null,
+      "output": " Chat Quality › AI reply contains actual words (3.1s)\n  ✓  140 [chromium] › tests\\e2e-full.spec.js:248:5 › Main Pages Navigation › static assets load (CSS/JS) (1.1m)\n  ✓  143 [chromium] › tests\\e2e-full.spec.js:684:5 › Deep — Chat Quality › AI reply to math is correct (3.0s)\n  ✓  145 [chromium] › tests\\e2e-full.spec.js:690:5 › Deep — Chat Quality › Kira replies in Romanian (3.0s)\n  ✘  146 [chromium] › tests\\e2e-full.spec.js:702:5 › Deep — UI Interactions › pricing modal opens and has grid (1.0m)"
+    }
+  ],
+  "limitations": [
+    "Typecheck: N/A (JS-only project)",
+    "Lighthouse: not run in CI (no headless Chrome)"
+  ]
+}

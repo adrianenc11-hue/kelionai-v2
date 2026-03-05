@@ -65,7 +65,11 @@ function runGate(name, cmd, opts = {}) {
     const results = [];
     let failed = false;
 
-    // 1) Lint
+    // 1) Prettier format check
+    results.push(runGate('Prettier (format check)', 'npx prettier --check "server/**/*.js"'));
+    if (results.at(-1).status === 'fail') failed = true;
+
+    // 2) Lint
     results.push(runGate('Lint (ESLint)', 'npx eslint server/'));
     if (results.at(-1).status === 'fail') failed = true;
 

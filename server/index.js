@@ -2,271 +2,345 @@
 // KelionAI v2.5 — BRAIN-POWERED SERVER
 // Autonomous thinking, self-repair, auto-learning
 // ═══════════════════════════════════════════════════════════════
-require('dotenv').config();
+require("dotenv").config();
 
 // Verify Node.js version — native fetch available from Node 18+
 if (!globalThis.fetch) {
-    throw new Error('Node.js 18+ required for native fetch. Current: ' + process.version);
+  throw new Error(
+    "Node.js 18+ required for native fetch. Current: " + process.version,
+  );
 }
-const Sentry = require('@sentry/node');
+const Sentry = require("@sentry/node");
 if (process.env.SENTRY_DSN) {
-    Sentry.init({
-        dsn: process.env.SENTRY_DSN, environment: process.env.NODE_ENV || 'development',
-        tracesSampleRate: 1.0, integrations: [Sentry.httpIntegration(), Sentry.expressIntegration()]
-    });
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    environment: process.env.NODE_ENV || "development",
+    tracesSampleRate: 1.0,
+    integrations: [Sentry.httpIntegration(), Sentry.expressIntegration()],
+  });
 }
-const express = require('express');
-const cors = require('cors');
-const path = require('path');
-const fs = require('fs');
-const crypto = require('crypto');
-const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
-const { supabase, supabaseAdmin } = require('./supabase');
-const { runMigration } = require('./migrate');
-const { KelionBrain } = require('./brain');
+const express = require("express");
+const cors = require("cors");
+const path = require("path");
+const fs = require("fs");
+const crypto = require("crypto");
+const helmet = require("helmet");
+const rateLimit = require("express-rate-limit");
+const { supabase, supabaseAdmin } = require("./supabase");
+const { runMigration } = require("./migrate");
+const { KelionBrain } = require("./brain");
 
-const logger = require('./logger');
-const { router: paymentsRouter } = require('./payments');
-const legalRouter = require('./legal');
-const { router: referralRouter } = require('./referral');
-const { router: messengerRouter, getStats: getMessengerStats, notifySubscribersNews, setSupabase: setMessengerSupabase } = require('./messenger');
-const { router: telegramRouter, broadcastNews } = require('./telegram');
-const { router: whatsappRouter } = require('./whatsapp');
-const fbPage = require('./facebook-page');
-const instagram = require('./instagram');
-const developerRouter = require('./routes/developer');
+const logger = require("./logger");
+const { router: paymentsRouter } = require("./payments");
+const legalRouter = require("./legal");
+const { router: referralRouter } = require("./referral");
+const {
+  router: messengerRouter,
+  getStats: getMessengerStats,
+  notifySubscribersNews,
+  setSupabase: setMessengerSupabase,
+} = require("./messenger");
+const { router: telegramRouter, broadcastNews } = require("./telegram");
+const { router: whatsappRouter } = require("./whatsapp");
+const fbPage = require("./facebook-page");
+const instagram = require("./instagram");
+const developerRouter = require("./routes/developer");
 
 // ═══ EXTRACTED ROUTE MODULES ═══
-const chatRouter = require('./routes/chat');
-const voiceRouter = require('./routes/voice');
-const searchRouter = require('./routes/search');
-const weatherRouter = require('./routes/weather');
-const visionRouter = require('./routes/vision');
-const imagesRouter = require('./routes/images');
-const authRouter = require('./routes/auth');
-const adminRouter = require('./routes/admin').router;
-const { adminAuth } = require('./middleware/auth');
-const healthRouter = require('./routes/health');
-const identityRouter = require('./routes/identity');
-const voiceCloneRouter = require('./routes/voice-clone');
+const chatRouter = require("./routes/chat");
+const voiceRouter = require("./routes/voice");
+const searchRouter = require("./routes/search");
+const weatherRouter = require("./routes/weather");
+const visionRouter = require("./routes/vision");
+const imagesRouter = require("./routes/images");
+const authRouter = require("./routes/auth");
+const adminRouter = require("./routes/admin").router;
+const { adminAuth } = require("./middleware/auth");
+const healthRouter = require("./routes/health");
+const identityRouter = require("./routes/identity");
+const voiceCloneRouter = require("./routes/voice-clone");
 
 const app = express();
-app.set('trust proxy', 1);
+app.set("trust proxy", 1);
 
 // ═══ HTTPS FORCE REDIRECT ═══
 app.use((req, res, next) => {
-    if (req.headers['x-forwarded-proto'] !== 'https' && process.env.NODE_ENV === 'production') {
-        return res.redirect(301, `https://${req.hostname}${req.url}`);
-    }
-    next();
+  if (
+    req.headers["x-forwarded-proto"] !== "https" &&
+    process.env.NODE_ENV === "production"
+  ) {
+    return res.redirect(301, `https://${req.hostname}${req.url}`);
+  }
+  next();
 });
 
 // ═══ CSP NONCE MIDDLEWARE — generates unique nonce per request ═══
 app.use((req, res, next) => {
-    res.locals.cspNonce = crypto.randomBytes(16).toString('base64');
-    next();
+  res.locals.cspNonce = crypto.randomBytes(16).toString("base64");
+  next();
 });
 
 app.use((req, res, next) => {
-    helmet({
-        contentSecurityPolicy: {
-            directives: {
-                defaultSrc: ["'self'"],
-                scriptSrc: [
-                    "'self'",
-                    (req, res) => `'nonce-${res.locals.cspNonce}'`,
-                    // Required CDNs with pinned versions
-                    "https://cdn.jsdelivr.net",
-                    "https://browser.sentry-cdn.com",
-                ],
-                styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-                fontSrc: ["'self'", "https://fonts.gstatic.com"],
-                imgSrc: ["'self'", "data:", "blob:"],
-                connectSrc: [
-                    "'self'",
-                    "blob:",
-                    "https://api.openai.com",
-                    "https://generativelanguage.googleapis.com",
-                    "https://api.anthropic.com",
-                    "https://api.elevenlabs.io",
-                    "https://api.groq.com",
-                    "https://api.perplexity.ai",
-                    "https://api.tavily.com",
-                    "https://google.serper.dev",
-                    "https://api.duckduckgo.com",
-                    "https://api.together.xyz",
-                    "https://api.deepseek.com",
-                    "https://geocoding-api.open-meteo.com",
-                    "https://api.open-meteo.com",
-                ],
-                mediaSrc: ["'self'", "blob:"],
-                workerSrc: ["'self'", "blob:"],
-            }
-        },
-        crossOriginEmbedderPolicy: false,
-        crossOriginResourcePolicy: { policy: "cross-origin" }
-    })(req, res, next);
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: [
+          "'self'",
+          (req, res) => `'nonce-${res.locals.cspNonce}'`,
+          // Required CDNs with pinned versions
+          "https://cdn.jsdelivr.net",
+          "https://browser.sentry-cdn.com",
+        ],
+        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+        fontSrc: ["'self'", "https://fonts.gstatic.com"],
+        imgSrc: ["'self'", "data:", "blob:"],
+        connectSrc: [
+          "'self'",
+          "blob:",
+          "https://api.openai.com",
+          "https://generativelanguage.googleapis.com",
+          "https://api.anthropic.com",
+          "https://api.elevenlabs.io",
+          "https://api.groq.com",
+          "https://api.perplexity.ai",
+          "https://api.tavily.com",
+          "https://google.serper.dev",
+          "https://api.duckduckgo.com",
+          "https://api.together.xyz",
+          "https://api.deepseek.com",
+          "https://geocoding-api.open-meteo.com",
+          "https://api.open-meteo.com",
+        ],
+        mediaSrc: ["'self'", "blob:"],
+        workerSrc: ["'self'", "blob:"],
+      },
+    },
+    crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+  })(req, res, next);
 });
 
 const allowedOrigins = process.env.ALLOWED_ORIGINS
-    ? process.env.ALLOWED_ORIGINS.split(',').map(s => s.trim())
-    : null;
+  ? process.env.ALLOWED_ORIGINS.split(",").map((s) => s.trim())
+  : null;
 
-app.use(cors({
+app.use(
+  cors({
     origin: (origin, callback) => {
-        if (!allowedOrigins) return callback(null, true);
-        if (!origin) return callback(null, true);
-        const env = process.env.NODE_ENV || 'development';
-        if (env !== 'production' && (origin.startsWith('http://localhost') || origin.startsWith('http://127.'))) {
-            return callback(null, true);
-        }
-        if (allowedOrigins.includes(origin)) return callback(null, true);
-        callback(null, false);
+      if (!allowedOrigins) return callback(null, true);
+      if (!origin) return callback(null, true);
+      const env = process.env.NODE_ENV || "development";
+      if (
+        env !== "production" &&
+        (origin.startsWith("http://localhost") ||
+          origin.startsWith("http://127."))
+      ) {
+        return callback(null, true);
+      }
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      callback(null, false);
     },
-    credentials: true
-}));
+    credentials: true,
+  }),
+);
 
 // Stripe webhook needs raw body — must be before express.json()
-app.use('/api/payments/webhook', express.raw({ type: 'application/json' }));
+app.use("/api/payments/webhook", express.raw({ type: "application/json" }));
 // Messenger webhook needs raw body for HMAC-SHA256 validation
-app.use('/api/messenger/webhook', express.raw({ type: 'application/json' }));
-app.use(express.json({ limit: '10mb' }));
+app.use("/api/messenger/webhook", express.raw({ type: "application/json" }));
+app.use(express.json({ limit: "10mb" }));
 
 // ═══ HTTP REQUEST LOGGING ═══
 app.use((req, res, next) => {
-    const start = Date.now();
-    res.on('finish', () => {
-        const duration = Date.now() - start;
-        logger.info({
-            component: 'HTTP',
-            method: req.method,
-            path: req.path,
-            statusCode: res.statusCode,
-            duration,
-            userAgent: req.get('user-agent')
-        }, `${req.method} ${req.path} ${res.statusCode} ${duration}ms`);
-    });
-    next();
+  const start = Date.now();
+  res.on("finish", () => {
+    const duration = Date.now() - start;
+    logger.info(
+      {
+        component: "HTTP",
+        method: req.method,
+        path: req.path,
+        statusCode: res.statusCode,
+        duration,
+        userAgent: req.get("user-agent"),
+      },
+      `${req.method} ${req.path} ${res.statusCode} ${duration}ms`,
+    );
+  });
+  next();
 });
 
 // ═══ RATE LIMITING ═══
 const globalLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 200,
-    message: { error: 'Too many requests. Please try again later.' },
-    standardHeaders: true,
-    legacyHeaders: false
+  windowMs: 15 * 60 * 1000,
+  max: 200,
+  message: { error: "Too many requests. Please try again later." },
+  standardHeaders: true,
+  legacyHeaders: false,
 });
 
 const asyncHandler = (fn) => (req, res, next) => {
-    Promise.resolve(fn(req, res, next)).catch(next);
+  Promise.resolve(fn(req, res, next)).catch(next);
 };
 
-const metrics = require('./metrics');
+const metrics = require("./metrics");
 app.use(metrics.metricsMiddleware);
 // ═══ BUILD INFO (Truth Guard) ═══
-const _buildSha = (() => { try { return require('child_process').execSync('git rev-parse HEAD', { encoding: 'utf8' }).trim(); } catch { return process.env.RAILWAY_GIT_COMMIT_SHA || 'unknown'; } })();
-const _buildEnv = process.env.RAILWAY_ENVIRONMENT_NAME || process.env.NODE_ENV || 'development';
-app.use((req, res, next) => { res.setHeader('x-build-sha', _buildSha.slice(0, 8)); res.setHeader('x-build-env', _buildEnv); next(); });
+const _buildSha = (() => {
+  try {
+    return require("child_process")
+      .execSync("git rev-parse HEAD", { encoding: "utf8" })
+      .trim();
+  } catch {
+    return process.env.RAILWAY_GIT_COMMIT_SHA || "unknown";
+  }
+})();
+const _buildEnv =
+  process.env.RAILWAY_ENVIRONMENT_NAME || process.env.NODE_ENV || "development";
+app.use((req, res, next) => {
+  res.setHeader("x-build-sha", _buildSha.slice(0, 8));
+  res.setHeader("x-build-env", _buildEnv);
+  next();
+});
 
-app.get('/metrics', adminAuth, asyncHandler(async (req, res) => { res.set('Content-Type', metrics.register.contentType); res.end(await metrics.register.metrics()); }));
-app.get('/health', (req, res) => {
-    res.json({ ok: true, status: 'ok', service: 'kelionai', env: _buildEnv, commit: _buildSha.slice(0, 8), uptime: process.uptime(), timestamp: new Date().toISOString() });
+app.get(
+  "/metrics",
+  adminAuth,
+  asyncHandler(async (req, res) => {
+    res.set("Content-Type", metrics.register.contentType);
+    res.end(await metrics.register.metrics());
+  }),
+);
+app.get("/health", (req, res) => {
+  res.json({
+    ok: true,
+    status: "ok",
+    service: "kelionai",
+    env: _buildEnv,
+    commit: _buildSha.slice(0, 8),
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString(),
+  });
 });
 // Read index.html once at startup, injecting Sentry DSN if configured
-const _rawHtml = fs.readFileSync(path.join(__dirname, '..', 'app', 'index.html'), 'utf8');
+const _rawHtml = fs.readFileSync(
+  path.join(__dirname, "..", "app", "index.html"),
+  "utf8",
+);
 const _indexHtml = process.env.SENTRY_DSN
-    ? _rawHtml.replace(
-        '<meta name="sentry-dsn" content="">',
-        `<meta name="sentry-dsn" content="${process.env.SENTRY_DSN.replace(/&/g, '&amp;').replace(/"/g, '&quot;')}">`
+  ? _rawHtml.replace(
+      '<meta name="sentry-dsn" content="">',
+      `<meta name="sentry-dsn" content="${process.env.SENTRY_DSN.replace(/&/g, "&amp;").replace(/"/g, "&quot;")}">`,
     )
-    : _rawHtml;
+  : _rawHtml;
 
 // Read 404.html once at startup (for admin stealth)
-const _raw404Html = fs.existsSync(path.join(__dirname, '..', 'app', '404.html'))
-    ? fs.readFileSync(path.join(__dirname, '..', 'app', '404.html'), 'utf8')
-    : '<!DOCTYPE html><html><body><h1>404 Not Found</h1></body></html>';
+const _raw404Html = fs.existsSync(path.join(__dirname, "..", "app", "404.html"))
+  ? fs.readFileSync(path.join(__dirname, "..", "app", "404.html"), "utf8")
+  : "<!DOCTYPE html><html><body><h1>404 Not Found</h1></body></html>";
 
 // Serve main app with CSP nonce injection (express.static skips index.html for /)
-app.get('/', (req, res) => {
-    const nonce = res.locals.cspNonce || '';
-    const html = _indexHtml.replace(
-        /<script\b(?![^>]*\bnonce=)/g,
-        `<script nonce="${nonce}"`
-    );
-    res.type('html').send(html);
+app.get("/", (req, res) => {
+  const nonce = res.locals.cspNonce || "";
+  const html = _indexHtml.replace(
+    /<script\b(?![^>]*\bnonce=)/g,
+    `<script nonce="${nonce}"`,
+  );
+  res.type("html").send(html);
 });
 
 // Read onboarding.html once at startup
-const _rawOnboarding = fs.existsSync(path.join(__dirname, '..', 'app', 'onboarding.html'))
-    ? fs.readFileSync(path.join(__dirname, '..', 'app', 'onboarding.html'), 'utf8')
-    : null;
+const _rawOnboarding = fs.existsSync(
+  path.join(__dirname, "..", "app", "onboarding.html"),
+)
+  ? fs.readFileSync(
+      path.join(__dirname, "..", "app", "onboarding.html"),
+      "utf8",
+    )
+  : null;
 
 // Read reset-password.html once at startup
-const _rawResetPassword = fs.existsSync(path.join(__dirname, '..', 'app', 'reset-password.html'))
-    ? fs.readFileSync(path.join(__dirname, '..', 'app', 'reset-password.html'), 'utf8')
-    : null;
+const _rawResetPassword = fs.existsSync(
+  path.join(__dirname, "..", "app", "reset-password.html"),
+)
+  ? fs.readFileSync(
+      path.join(__dirname, "..", "app", "reset-password.html"),
+      "utf8",
+    )
+  : null;
 
 // Serve onboarding with CSP nonce injection
-app.get('/onboarding.html', (req, res) => {
-    if (!_rawOnboarding) return res.redirect('/');
-    const nonce = res.locals.cspNonce || '';
-    const html = _rawOnboarding.replace(
-        /<script\b(?![^>]*\bnonce=)/g,
-        `<script nonce="${nonce}"`
-    );
-    res.type('html').send(html);
+app.get("/onboarding.html", (req, res) => {
+  if (!_rawOnboarding) return res.redirect("/");
+  const nonce = res.locals.cspNonce || "";
+  const html = _rawOnboarding.replace(
+    /<script\b(?![^>]*\bnonce=)/g,
+    `<script nonce="${nonce}"`,
+  );
+  res.type("html").send(html);
 });
 
 // Serve reset-password with CSP nonce injection
-app.get('/reset-password.html', (req, res) => {
-    if (!_rawResetPassword) return res.redirect('/');
-    const nonce = res.locals.cspNonce || '';
-    const html = _rawResetPassword.replace(
-        /<script\b(?![^>]*\bnonce=)/g,
-        `<script nonce="${nonce}"`
-    );
-    res.type('html').send(html);
+app.get("/reset-password.html", (req, res) => {
+  if (!_rawResetPassword) return res.redirect("/");
+  const nonce = res.locals.cspNonce || "";
+  const html = _rawResetPassword.replace(
+    /<script\b(?![^>]*\bnonce=)/g,
+    `<script nonce="${nonce}"`,
+  );
+  res.type("html").send(html);
 });
 
-app.use(express.static(path.join(__dirname, '..', 'app')));
-app.use('/api', globalLimiter);
+app.use(express.static(path.join(__dirname, "..", "app")));
+app.use("/api", globalLimiter);
 const PORT = process.env.PORT || 3000;
 const memFallback = Object.create(null);
 
 // Cleanup memFallback every hour to prevent memory leaks
-const _memCleanupInterval = setInterval(() => {
+const _memCleanupInterval = setInterval(
+  () => {
     const keys = Object.keys(memFallback);
     if (keys.length > 1000) {
-        // Keep only the most recent 500 entries
-        const toDelete = keys.slice(0, keys.length - 500);
-        for (const k of toDelete) delete memFallback[k];
-        logger.info({ component: 'Memory', removed: toDelete.length, remaining: 500 }, 'memFallback cleanup');
+      // Keep only the most recent 500 entries
+      const toDelete = keys.slice(0, keys.length - 500);
+      for (const k of toDelete) delete memFallback[k];
+      logger.info(
+        { component: "Memory", removed: toDelete.length, remaining: 500 },
+        "memFallback cleanup",
+      );
     }
-}, 60 * 60 * 1000);
+  },
+  60 * 60 * 1000,
+);
 _memCleanupInterval.unref();
 
 // ═══ BRAIN INITIALIZATION ═══
 const brain = new KelionBrain({
-    anthropicKey: process.env.ANTHROPIC_API_KEY,
-    openaiKey: process.env.OPENAI_API_KEY,
-    groqKey: process.env.GROQ_API_KEY,
-    perplexityKey: process.env.PERPLEXITY_API_KEY,
-    tavilyKey: process.env.TAVILY_API_KEY,
-    serperKey: process.env.SERPER_API_KEY,
-    togetherKey: process.env.TOGETHER_API_KEY,
-    googleMapsKey: process.env.GOOGLE_MAPS_KEY,
-    supabaseAdmin
+  anthropicKey: process.env.ANTHROPIC_API_KEY,
+  openaiKey: process.env.OPENAI_API_KEY,
+  groqKey: process.env.GROQ_API_KEY,
+  perplexityKey: process.env.PERPLEXITY_API_KEY,
+  tavilyKey: process.env.TAVILY_API_KEY,
+  serperKey: process.env.SERPER_API_KEY,
+  togetherKey: process.env.TOGETHER_API_KEY,
+  googleMapsKey: process.env.GOOGLE_MAPS_KEY,
+  supabaseAdmin,
 });
-logger.info({ component: 'Brain' }, '🧠 Engine initialized');
+logger.info({ component: "Brain" }, "🧠 Engine initialized");
 
 // ═══ AUTH HELPER ═══
 async function getUserFromToken(req) {
-    const h = req.headers.authorization;
-    if (!h || !h.startsWith('Bearer ') || !supabase) return null;
-    try { const { data: { user } } = await supabase.auth.getUser(h.split(' ')[1]); return user; }
-    catch { return null; }
+  const h = req.headers.authorization;
+  if (!h || !h.startsWith("Bearer ") || !supabase) return null;
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser(h.split(" ")[1]);
+    return user;
+  } catch {
+    return null;
+  }
 }
 
 // ═══ SHARE HELPERS VIA app.locals (for all route modules) ═══
@@ -278,22 +352,22 @@ instagram.setBrain(brain);
 app.locals.memFallback = memFallback;
 
 // ═══ ROUTE MODULES ═══
-app.use('/api/auth', authRouter);
-app.use('/api', chatRouter);
-app.use('/api', voiceRouter);
-app.use('/api/search', searchRouter);
-app.use('/api/weather', weatherRouter);
-app.use('/api/vision', visionRouter);
-app.use('/api/imagine', imagesRouter);
-app.use('/api', adminRouter);
-app.use('/api/health', healthRouter);
-app.use('/api/referral', referralRouter);
-app.use('/api', identityRouter);
-app.use('/api', voiceCloneRouter);
+app.use("/api/auth", authRouter);
+app.use("/api", chatRouter);
+app.use("/api", voiceRouter);
+app.use("/api/search", searchRouter);
+app.use("/api/weather", weatherRouter);
+app.use("/api/vision", visionRouter);
+app.use("/api/imagine", imagesRouter);
+app.use("/api", adminRouter);
+app.use("/api/health", healthRouter);
+app.use("/api/referral", referralRouter);
+app.use("/api", identityRouter);
+app.use("/api", voiceCloneRouter);
 
 // ═══ BRAIN DASHBOARD (live monitoring) ═══
-app.get('/dashboard', adminAuth, (req, res) => {
-    res.send(`<!DOCTYPE html>
+app.get("/dashboard", adminAuth, (req, res) => {
+  res.send(`<!DOCTYPE html>
 <html><head><title>KelionAI Brain Dashboard</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
@@ -470,88 +544,141 @@ load();setInterval(load,5000);
 });
 
 // ═══ PAYMENTS, LEGAL, MESSENGER & DEVELOPER ROUTES ═══
-app.use('/api/payments', paymentsRouter);
-app.use('/api/legal', legalRouter);
-app.use('/api/messenger', messengerRouter);
-app.use('/api/telegram', express.json(), telegramRouter);
-app.use('/api/whatsapp', whatsappRouter);
-app.use('/api/instagram', instagram.router);
-app.use('/api/developer', developerRouter);
-app.use('/api', developerRouter); // mounts /api/v1/* endpoints
+app.use("/api/payments", paymentsRouter);
+app.use("/api/legal", legalRouter);
+app.use("/api/messenger", messengerRouter);
+app.use("/api/telegram", express.json(), telegramRouter);
+app.use("/api/whatsapp", whatsappRouter);
+app.use("/api/instagram", instagram.router);
+app.use("/api/developer", developerRouter);
+app.use("/api", developerRouter); // mounts /api/v1/* endpoints
 
 // ═══ MESSENGER STATS (admin only) ═══
-app.get('/api/messenger/stats', adminAuth, (req, res) => {
-    res.json(getMessengerStats());
+app.get("/api/messenger/stats", adminAuth, (req, res) => {
+  res.json(getMessengerStats());
 });
 
 // ═══ MEDIA HEALTH ENDPOINTS ═══
-app.get('/api/media/facebook/health', (req, res) => {
-    res.json(fbPage.getHealth());
+app.get("/api/media/facebook/health", (req, res) => {
+  res.json(fbPage.getHealth());
 });
-app.get('/api/media/instagram/health', (req, res) => {
-    res.json(instagram.getHealth());
+app.get("/api/media/instagram/health", (req, res) => {
+  res.json(instagram.getHealth());
 });
-app.get('/api/media/status', adminAuth, (req, res) => {
-    res.json({
-        messenger: { hasToken: !!process.env.FB_PAGE_ACCESS_TOKEN, health: '/api/messenger/health' },
-        telegram: { hasToken: !!process.env.TELEGRAM_BOT_TOKEN, health: '/api/telegram/health' },
-        facebook: fbPage.getHealth(),
-        instagram: instagram.getHealth(),
-        news: { scheduler: 'active', hours: [5, 12, 18], endpoint: '/api/news/public' }
-    });
+app.get("/api/media/status", adminAuth, (req, res) => {
+  res.json({
+    messenger: {
+      hasToken: !!process.env.FB_PAGE_ACCESS_TOKEN,
+      health: "/api/messenger/health",
+    },
+    telegram: {
+      hasToken: !!process.env.TELEGRAM_BOT_TOKEN,
+      health: "/api/telegram/health",
+    },
+    facebook: fbPage.getHealth(),
+    instagram: instagram.getHealth(),
+    news: {
+      scheduler: "active",
+      hours: [5, 12, 18],
+      endpoint: "/api/news/public",
+    },
+  });
 });
 
 // ═══ COOKIE CONSENT ENDPOINT ═══
-app.post('/api/cookie-consent', express.json(), asyncHandler(async (req, res) => {
-    const { analytics = false, marketing = false, functional = true, sessionId } = req.body;
-    const user = req.app.locals.getUserFromToken ? await req.app.locals.getUserFromToken(req) : null;
+app.post(
+  "/api/cookie-consent",
+  express.json(),
+  asyncHandler(async (req, res) => {
+    const {
+      analytics = false,
+      marketing = false,
+      functional = true,
+      sessionId,
+    } = req.body;
+    const user = req.app.locals.getUserFromToken
+      ? await req.app.locals.getUserFromToken(req)
+      : null;
     try {
-        await supabaseAdmin.from('cookie_consents').insert({
-            user_id: user?.id || null,
-            session_id: sessionId || req.headers['x-session-id'] || null,
-            analytics, marketing, functional,
-            ip_address: req.ip,
-            user_agent: req.headers['user-agent']?.substring(0, 200),
-            created_at: new Date().toISOString()
-        });
-        res.json({ success: true, consent: { analytics, marketing, functional } });
+      await supabaseAdmin.from("cookie_consents").insert({
+        user_id: user?.id || null,
+        session_id: sessionId || req.headers["x-session-id"] || null,
+        analytics,
+        marketing,
+        functional,
+        ip_address: req.ip,
+        user_agent: req.headers["user-agent"]?.substring(0, 200),
+        created_at: new Date().toISOString(),
+      });
+      res.json({
+        success: true,
+        consent: { analytics, marketing, functional },
+      });
     } catch {
-        res.status(500).json({ error: 'Failed to save consent' });
+      res.status(500).json({ error: "Failed to save consent" });
     }
-}));
+  }),
+);
 
 // ═══ PUBLISH NEWS TO ALL MEDIA (admin trigger) ═══
-app.post('/api/media/publish-news', adminAuth, express.json(), asyncHandler(async (req, res) => {
+app.post(
+  "/api/media/publish-news",
+  adminAuth,
+  express.json(),
+  asyncHandler(async (req, res) => {
     const articles = req.body.articles || [];
     const results = { facebook: null, telegram: null };
     if (articles.length > 0) {
-        results.facebook = await fbPage.publishNewsBatch(articles, req.body.maxPosts || 3);
-        await broadcastNews(articles);
-        results.telegram = 'broadcasted';
+      results.facebook = await fbPage.publishNewsBatch(
+        articles,
+        req.body.maxPosts || 3,
+      );
+      await broadcastNews(articles);
+      results.telegram = "broadcasted";
     }
     res.json({ success: true, results });
-}));
+  }),
+);
 
 // POST /api/ticker/disable — save ticker preference (Premium only)
-app.post('/api/ticker/disable', asyncHandler(async (req, res) => {
+app.post(
+  "/api/ticker/disable",
+  asyncHandler(async (req, res) => {
     const user = await getUserFromToken(req);
-    if (!user || !supabaseAdmin) return res.status(401).json({ error: 'Auth required' });
-    const { data: sub } = await supabaseAdmin.from('subscriptions').select('plan').eq('user_id', user.id).single();
-    if (sub?.plan !== 'premium') return res.status(403).json({ error: 'Premium only' });
-    await supabaseAdmin.from('user_preferences').upsert({ user_id: user.id, key: 'ticker_disabled', value: req.body.disabled }, { onConflict: 'user_id,key' });
+    if (!user || !supabaseAdmin)
+      return res.status(401).json({ error: "Auth required" });
+    const { data: sub } = await supabaseAdmin
+      .from("subscriptions")
+      .select("plan")
+      .eq("user_id", user.id)
+      .single();
+    if (sub?.plan !== "premium")
+      return res.status(403).json({ error: "Premium only" });
+    await supabaseAdmin
+      .from("user_preferences")
+      .upsert(
+        { user_id: user.id, key: "ticker_disabled", value: req.body.disabled },
+        { onConflict: "user_id,key" },
+      );
     res.json({ success: true });
-}));
+  }),
+);
 
 // ═══ NEWS BOT ═══
-const newsModule = require('./news');
+const newsModule = require("./news");
 // Public endpoint — no auth required (for frontend news widget)
-app.get('/api/news/public', (req, res) => {
-    const allReq = Object.assign({}, req, { url: '/latest', query: req.query });
-    newsModule.router.handle(allReq, res, () => {
-        res.json({ articles: [], total: 0, message: 'No articles cached yet. RSS fetches at 05:00, 12:00, 18:00 RO time.' });
+app.get("/api/news/public", (req, res) => {
+  const allReq = Object.assign({}, req, { url: "/latest", query: req.query });
+  newsModule.router.handle(allReq, res, () => {
+    res.json({
+      articles: [],
+      total: 0,
+      message:
+        "No articles cached yet. RSS fetches at 05:00, 12:00, 18:00 RO time.",
     });
+  });
 });
-app.use('/api/news', adminAuth, newsModule.router);
+app.use("/api/news", adminAuth, newsModule.router);
 newsModule.setSupabase(supabaseAdmin);
 newsModule.restoreCache();
 setMessengerSupabase(supabaseAdmin);
@@ -559,65 +686,118 @@ instagram.setSupabase(supabaseAdmin);
 
 // ═══ AUTO-PUBLISH: when news fetches, distribute to all media ═══
 newsModule.onNewsFetched(async (articles) => {
-    logger.info({ component: 'MediaAutoPublish', count: articles.length }, '📢 Auto-publishing news...');
-    // Facebook Page (top 3 articles)
-    try { await fbPage.publishNewsBatch(articles, 3); } catch (e) { logger.warn({ component: 'MediaAutoPublish', err: e.message }, 'FB Page publish failed'); }
-    // Telegram channel broadcast
-    try { await broadcastNews(articles); } catch (e) { logger.warn({ component: 'MediaAutoPublish', err: e.message }, 'Telegram broadcast failed'); }
-    // Instagram auto-publish (top article with image)
-    try {
-        const topArticle = articles.find(a => a.imageUrl || a.image_url) || articles[0];
-        if (topArticle && instagram.publishNewsBatch) {
-            await instagram.publishNewsBatch([topArticle], 1);
-        }
-    } catch (e) { logger.warn({ component: 'MediaAutoPublish', err: e.message }, 'Instagram publish failed'); }
-    // Messenger subscribers notification
-    try { await notifySubscribersNews(articles); } catch (e) { logger.warn({ component: 'MediaAutoPublish', err: e.message }, 'Messenger subscribers notification failed'); }
+  logger.info(
+    { component: "MediaAutoPublish", count: articles.length },
+    "📢 Auto-publishing news...",
+  );
+  // Facebook Page (top 3 articles)
+  try {
+    await fbPage.publishNewsBatch(articles, 3);
+  } catch (e) {
+    logger.warn(
+      { component: "MediaAutoPublish", err: e.message },
+      "FB Page publish failed",
+    );
+  }
+  // Telegram channel broadcast
+  try {
+    await broadcastNews(articles);
+  } catch (e) {
+    logger.warn(
+      { component: "MediaAutoPublish", err: e.message },
+      "Telegram broadcast failed",
+    );
+  }
+  // Instagram auto-publish (top article with image)
+  try {
+    const topArticle =
+      articles.find((a) => a.imageUrl || a.image_url) || articles[0];
+    if (topArticle && instagram.publishNewsBatch) {
+      await instagram.publishNewsBatch([topArticle], 1);
+    }
+  } catch (e) {
+    logger.warn(
+      { component: "MediaAutoPublish", err: e.message },
+      "Instagram publish failed",
+    );
+  }
+  // Messenger subscribers notification
+  try {
+    await notifySubscribersNews(articles);
+  } catch (e) {
+    logger.warn(
+      { component: "MediaAutoPublish", err: e.message },
+      "Messenger subscribers notification failed",
+    );
+  }
 });
 
 // ═══ STORE ARTICLES REF IN app.locals for Telegram bot ═══
 app.locals._getNewsArticles = newsModule.getArticlesArray;
 
 // ═══ TRADING BOT (admin only) ═══
-app.use('/api/trading', adminAuth, require('./trading'));
+app.use("/api/trading", adminAuth, require("./trading"));
 
 // ═══ SPORTS BOT — REMOVED (no real utility without betting integration) ═══
 
 // 404 for unknown API routes — must come before the catch-all
-app.use('/api', (req, res, _next) => {
-    res.status(404).json({ error: 'API endpoint not found' });
+app.use("/api", (req, res, _next) => {
+  res.status(404).json({ error: "API endpoint not found" });
 });
 
 // ═══ ADMIN STEALTH — /admin/* returns 404 (same as unknown routes) for non-owners ═══
-app.get('/admin', (req, res, next) => {
-    const secret = req.headers['x-admin-secret'];
-    const expected = process.env.ADMIN_SECRET_KEY;
-    if (!secret || !expected) return res.status(404).type('html').send(_raw404Html);
-    try {
-        const sb = Buffer.from(secret), eb = Buffer.from(expected);
-        if (sb.length !== eb.length || !require('crypto').timingSafeEqual(sb, eb)) return res.status(404).type('html').send(_raw404Html);
-    } catch { return res.status(404).type('html').send(_raw404Html); }
-    next();
+app.get("/admin", (req, res, next) => {
+  const secret = req.headers["x-admin-secret"];
+  const expected = process.env.ADMIN_SECRET_KEY;
+  if (!secret || !expected)
+    return res.status(404).type("html").send(_raw404Html);
+  try {
+    const sb = Buffer.from(secret),
+      eb = Buffer.from(expected);
+    if (sb.length !== eb.length || !require("crypto").timingSafeEqual(sb, eb))
+      return res.status(404).type("html").send(_raw404Html);
+  } catch {
+    return res.status(404).type("html").send(_raw404Html);
+  }
+  next();
 });
-app.use('/admin', express.static(path.join(__dirname, '..', 'app', 'admin')));
-app.get('/admin/*', (req, res, next) => {
-    const secret = req.headers['x-admin-secret'];
-    const expected = process.env.ADMIN_SECRET_KEY;
-    if (!secret || !expected) return res.status(404).type('html').send(_raw404Html);
-    try {
-        const sb = Buffer.from(secret), eb = Buffer.from(expected);
-        if (sb.length !== eb.length || !require('crypto').timingSafeEqual(sb, eb)) return res.status(404).type('html').send(_raw404Html);
-    } catch { return res.status(404).type('html').send(_raw404Html); }
-    next();
+app.use("/admin", express.static(path.join(__dirname, "..", "app", "admin")));
+app.get("/admin/*", (req, res, next) => {
+  const secret = req.headers["x-admin-secret"];
+  const expected = process.env.ADMIN_SECRET_KEY;
+  if (!secret || !expected)
+    return res.status(404).type("html").send(_raw404Html);
+  try {
+    const sb = Buffer.from(secret),
+      eb = Buffer.from(expected);
+    if (sb.length !== eb.length || !require("crypto").timingSafeEqual(sb, eb))
+      return res.status(404).type("html").send(_raw404Html);
+  } catch {
+    return res.status(404).type("html").send(_raw404Html);
+  }
+  next();
 });
 
-app.get('*', (req, res) => {
-    const nonce = res.locals.cspNonce || '';
-    const html = _indexHtml.replace(
-        /<script\b(?![^>]*\bnonce=)/g,
-        `<script nonce="${nonce}"`
-    );
-    res.type('html').send(html);
+// ═══ PATH TRAVERSAL GUARD — block before SPA catch-all ═══
+app.use((req, res, next) => {
+  try {
+    const decoded = decodeURIComponent(req.path);
+    if (decoded.includes("..")) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+  } catch {
+    /* malformed URI — let it fall through */
+  }
+  next();
+});
+
+app.get("*", (req, res) => {
+  const nonce = res.locals.cspNonce || "";
+  const html = _indexHtml.replace(
+    /<script\b(?![^>]*\bnonce=)/g,
+    `<script nonce="${nonce}"`,
+  );
+  res.type("html").send(html);
 });
 
 // Sentry error handler must be registered after all routes
@@ -626,85 +806,187 @@ if (process.env.SENTRY_DSN) Sentry.setupExpressErrorHandler(app);
 // ═══ GLOBAL ERROR HANDLER ═══
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
-    const statusCode = err.statusCode || err.status || 500;
-    if (process.env.NODE_ENV === 'production') {
-        logger.error({ component: 'Error', method: req.method, path: req.path }, err.message);
-        return res.status(statusCode).json({
-            error: statusCode === 500 ? 'Internal server error' : err.message
-        });
-    }
-    logger.error({ component: 'Error', method: req.method, path: req.path, err: err.stack }, err.message);
-    res.status(statusCode).json({
-        error: err.message,
-        stack: err.stack,
-        details: err.details || undefined
+  const statusCode = err.statusCode || err.status || 500;
+  if (process.env.NODE_ENV === "production") {
+    logger.error(
+      { component: "Error", method: req.method, path: req.path },
+      err.message,
+    );
+    return res.status(statusCode).json({
+      error: statusCode === 500 ? "Internal server error" : err.message,
     });
+  }
+  logger.error(
+    { component: "Error", method: req.method, path: req.path, err: err.stack },
+    err.message,
+  );
+  res.status(statusCode).json({
+    error: err.message,
+    stack: err.stack,
+    details: err.details || undefined,
+  });
 });
 
 // ═══ STARTUP ═══
 function logConfigHealth() {
-    const checks = [
-        { name: 'FB_PAGE_ACCESS_TOKEN', set: !!process.env.FB_PAGE_ACCESS_TOKEN, for: 'Messenger Bot' },
-        { name: 'FB_APP_SECRET', set: !!process.env.FB_APP_SECRET, for: 'Messenger Security' },
-        { name: 'FB_VERIFY_TOKEN', set: !!process.env.FB_VERIFY_TOKEN, for: 'Messenger Webhook' },
-        { name: 'FB_PAGE_ID', set: !!process.env.FB_PAGE_ID, for: 'Facebook Page Posts' },
-        { name: 'TELEGRAM_BOT_TOKEN', set: !!process.env.TELEGRAM_BOT_TOKEN, for: 'Telegram Bot' },
-        { name: 'OPENAI_API_KEY', set: !!process.env.OPENAI_API_KEY, for: 'AI Brain (OpenAI)' },
-        { name: 'GROQ_API_KEY', set: !!process.env.GROQ_API_KEY, for: 'AI Brain (Groq)' },
-        { name: 'SUPABASE_URL', set: !!process.env.SUPABASE_URL, for: 'Database' },
-        { name: 'SUPABASE_SERVICE_KEY', set: !!process.env.SUPABASE_SERVICE_KEY, for: 'Database Admin' },
-        { name: 'ELEVENLABS_API_KEY', set: !!process.env.ELEVENLABS_API_KEY, for: 'Voice TTS' },
-        { name: 'INSTAGRAM_ACCOUNT_ID', set: !!process.env.INSTAGRAM_ACCOUNT_ID, for: 'Instagram Posts' },
-        { name: 'STRIPE_SECRET_KEY', set: !!process.env.STRIPE_SECRET_KEY, for: 'Payments' },
-    ];
-    const missing = checks.filter(c => !c.set);
-    const configured = checks.filter(c => c.set);
+  const checks = [
+    {
+      name: "FB_PAGE_ACCESS_TOKEN",
+      set: !!process.env.FB_PAGE_ACCESS_TOKEN,
+      for: "Messenger Bot",
+    },
+    {
+      name: "FB_APP_SECRET",
+      set: !!process.env.FB_APP_SECRET,
+      for: "Messenger Security",
+    },
+    {
+      name: "FB_VERIFY_TOKEN",
+      set: !!process.env.FB_VERIFY_TOKEN,
+      for: "Messenger Webhook",
+    },
+    {
+      name: "FB_PAGE_ID",
+      set: !!process.env.FB_PAGE_ID,
+      for: "Facebook Page Posts",
+    },
+    {
+      name: "TELEGRAM_BOT_TOKEN",
+      set: !!process.env.TELEGRAM_BOT_TOKEN,
+      for: "Telegram Bot",
+    },
+    {
+      name: "OPENAI_API_KEY",
+      set: !!process.env.OPENAI_API_KEY,
+      for: "AI Brain (OpenAI)",
+    },
+    {
+      name: "GROQ_API_KEY",
+      set: !!process.env.GROQ_API_KEY,
+      for: "AI Brain (Groq)",
+    },
+    { name: "SUPABASE_URL", set: !!process.env.SUPABASE_URL, for: "Database" },
+    {
+      name: "SUPABASE_SERVICE_KEY",
+      set: !!process.env.SUPABASE_SERVICE_KEY,
+      for: "Database Admin",
+    },
+    {
+      name: "ELEVENLABS_API_KEY",
+      set: !!process.env.ELEVENLABS_API_KEY,
+      for: "Voice TTS",
+    },
+    {
+      name: "INSTAGRAM_ACCOUNT_ID",
+      set: !!process.env.INSTAGRAM_ACCOUNT_ID,
+      for: "Instagram Posts",
+    },
+    {
+      name: "STRIPE_SECRET_KEY",
+      set: !!process.env.STRIPE_SECRET_KEY,
+      for: "Payments",
+    },
+  ];
+  const missing = checks.filter((c) => !c.set);
+  const configured = checks.filter((c) => c.set);
 
-    logger.info({ component: 'Config', configured: configured.length, total: checks.length },
-        `✅ ${configured.length}/${checks.length} secrets configured`);
+  logger.info(
+    {
+      component: "Config",
+      configured: configured.length,
+      total: checks.length,
+    },
+    `✅ ${configured.length}/${checks.length} secrets configured`,
+  );
 
-    if (missing.length > 0) {
-        missing.forEach(m => {
-            logger.warn({ component: 'Config', secret: m.name, service: m.for },
-                `⚠️ Missing: ${m.name} — ${m.for} will not work`);
-        });
-    }
+  if (missing.length > 0) {
+    missing.forEach((m) => {
+      logger.warn(
+        { component: "Config", secret: m.name, service: m.for },
+        `⚠️ Missing: ${m.name} — ${m.for} will not work`,
+      );
+    });
+  }
 }
 
 if (require.main === module) {
-    process.on('uncaughtException', (err) => {
-        logger.fatal({ component: 'Process', err: err.stack }, 'Uncaught Exception: ' + err.message);
-        process.exit(1);
-    });
+  process.on("uncaughtException", (err) => {
+    logger.fatal(
+      { component: "Process", err: err.stack },
+      "Uncaught Exception: " + err.message,
+    );
+    process.exit(1);
+  });
 
-    process.on('unhandledRejection', (reason) => {
-        logger.fatal({ component: 'Process', reason: String(reason) }, 'Unhandled Rejection: ' + reason);
-        process.exit(1);
-    });
+  process.on("unhandledRejection", (reason) => {
+    logger.fatal(
+      { component: "Process", reason: String(reason) },
+      "Unhandled Rejection: " + reason,
+    );
+    process.exit(1);
+  });
 
-    runMigration().then(migrated => {
-        logConfigHealth();
-        app.listen(PORT, '0.0.0.0', () => {
-            logger.info({ component: 'Server', port: PORT, ai: { claude: !!process.env.ANTHROPIC_API_KEY, gpt4o: !!process.env.OPENAI_API_KEY, deepseek: !!process.env.DEEPSEEK_API_KEY }, tts: !!process.env.ELEVENLABS_API_KEY, payments: !!process.env.STRIPE_SECRET_KEY, db: !!supabaseAdmin, migration: !!migrated }, 'KelionAI v2.3 started on port ' + PORT);
-            // Auto-register Telegram webhook
-            if (process.env.TELEGRAM_BOT_TOKEN && process.env.APP_URL) {
-                const webhookUrl = `${process.env.APP_URL}/api/telegram/webhook`;
-                fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/setWebhook`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ url: webhookUrl })
-                })
-                    .then(r => r.json())
-                    .then(data => {
-                        if (data.ok) logger.info({ component: 'Telegram' }, `✅ Webhook registered: ${webhookUrl}`);
-                        else logger.warn({ component: 'Telegram', error: data.description }, '❌ Webhook registration failed');
-                    })
-                    .catch(e => logger.error({ component: 'Telegram', err: e.message }, 'Webhook registration error'));
-            }
-        });
-    }).catch(() => {
-        logger.error({ component: 'Server' }, 'Migration error');
-        app.listen(PORT, '0.0.0.0', () => logger.info({ component: 'Server', port: PORT }, 'KelionAI v2.3 on port ' + PORT + ' (migration failed)'));
+  runMigration()
+    .then((migrated) => {
+      logConfigHealth();
+      app.listen(PORT, "0.0.0.0", () => {
+        logger.info(
+          {
+            component: "Server",
+            port: PORT,
+            ai: {
+              claude: !!process.env.ANTHROPIC_API_KEY,
+              gpt4o: !!process.env.OPENAI_API_KEY,
+              deepseek: !!process.env.DEEPSEEK_API_KEY,
+            },
+            tts: !!process.env.ELEVENLABS_API_KEY,
+            payments: !!process.env.STRIPE_SECRET_KEY,
+            db: !!supabaseAdmin,
+            migration: !!migrated,
+          },
+          "KelionAI v2.3 started on port " + PORT,
+        );
+        // Auto-register Telegram webhook
+        if (process.env.TELEGRAM_BOT_TOKEN && process.env.APP_URL) {
+          const webhookUrl = `${process.env.APP_URL}/api/telegram/webhook`;
+          fetch(
+            `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/setWebhook`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ url: webhookUrl }),
+            },
+          )
+            .then((r) => r.json())
+            .then((data) => {
+              if (data.ok)
+                logger.info(
+                  { component: "Telegram" },
+                  `✅ Webhook registered: ${webhookUrl}`,
+                );
+              else
+                logger.warn(
+                  { component: "Telegram", error: data.description },
+                  "❌ Webhook registration failed",
+                );
+            })
+            .catch((e) =>
+              logger.error(
+                { component: "Telegram", err: e.message },
+                "Webhook registration error",
+              ),
+            );
+        }
+      });
+    })
+    .catch(() => {
+      logger.error({ component: "Server" }, "Migration error");
+      app.listen(PORT, "0.0.0.0", () =>
+        logger.info(
+          { component: "Server", port: PORT },
+          "KelionAI v2.3 on port " + PORT + " (migration failed)",
+        ),
+      );
     });
 }
 
