@@ -1,0 +1,123 @@
+[2026-03-05T07:58:47.028Z] ═══ TRUTH GUARD — GATE RUNNER ═══
+[2026-03-05T07:58:47.033Z] Commit: local
+[2026-03-05T07:58:47.033Z] Node: v20.11.0
+[2026-03-05T07:58:47.033Z] CWD: C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2
+[2026-03-05T07:58:47.033Z] 
+════ GATE: Prettier (format check) ════
+[2026-03-05T07:58:47.034Z] Command: npx prettier --check "server/**/*.js"
+[2026-03-05T07:58:49.319Z] Checking formatting...
+All matched files use Prettier code style!
+Checking formatting...
+All matched files use Prettier code style!
+[2026-03-05T07:58:49.319Z] ✅ Prettier (format check) PASSED (2285ms)
+[2026-03-05T07:58:49.319Z] 
+════ GATE: Lint (ESLint) ════
+[2026-03-05T07:58:49.319Z] Command: npx eslint server/
+[2026-03-05T07:58:50.792Z] ✅ Lint (ESLint) PASSED (1473ms)
+[2026-03-05T07:58:50.792Z] 
+════ GATE: Typecheck ════
+[2026-03-05T07:58:50.792Z] Command: npm run typecheck --silent
+[2026-03-05T07:58:51.493Z] typecheck: N/A (JS-only project)
+typecheck: N/A (JS-only project)
+[2026-03-05T07:58:51.493Z] ✅ Typecheck PASSED (701ms)
+[2026-03-05T07:58:51.494Z] 
+════ GATE: Unit Tests (Jest) ════
+[2026-03-05T07:58:51.494Z] Command: npx jest --forceExit --silent
+[2026-03-05T07:58:56.834Z]                                                                                                                                                                                                                                                                                                           
+  voice.js              |   28.35 |    21.87 |      25 |   29.68 | 40-117,123-166                                                                                                                                                                                                                                                                                                                                                                                                
+  weather.js            |   33.33 |        0 |       0 |      35 | 22-80                                                                                                                                                                                                                                                                                                                                                                                                         
+------------------------|---------|----------|---------|---------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+=============================== Coverage summary ===============================
+Statements   : 18.49% ( 1226/6629 )
+Branches     : 11.64% ( 578/4962 )
+Functions    : 16.35% ( 113/691 )
+Lines        : 19.07% ( 1173/6149 )
+================================================================================
+                                                                                                                                                                                                                                                                                                          
+  voice.js              |   28.35 |    21.87 |      25 |   29.68 | 40-117,123-166                                                                                                                                                                                                                                                                                                                                                                                                
+  weather.js            |   33.33 |        0 |       0 |      35 | 22-80                                                                                                                                                                                                                                                                                                                                                                                                         
+------------------------|---------|----------|---------|---------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+=============================== Coverage summary ===============================
+Statements   : 18.49% ( 1226/6629 )
+Branches     : 11.64% ( 578/4962 )
+Functions    : 16.35% ( 113/691 )
+Lines        : 19.07% ( 1173/6149 )
+================================================================================
+[2026-03-05T07:58:56.835Z] ✅ Unit Tests (Jest) PASSED (5340ms)
+[2026-03-05T07:58:56.835Z] 
+════ GATE: Build Validation ════
+[2026-03-05T07:58:56.835Z] Command: npm run build --silent
+[2026-03-05T07:58:57.545Z] Build OK: static assets validated
+Build OK: static assets validated
+[2026-03-05T07:58:57.546Z] ✅ Build Validation PASSED (710ms)
+[2026-03-05T07:58:57.546Z] 
+════ GATE: Security (npm audit) ════
+[2026-03-05T07:58:57.546Z] Command: npm audit --audit-level=high
+[2026-03-05T07:58:58.682Z] found 0 vulnerabilities
+found 0 vulnerabilities
+[2026-03-05T07:58:58.682Z] ✅ Security (npm audit) PASSED (1136ms)
+[2026-03-05T07:58:58.682Z] 
+════ GATE: Smoke Probe ════
+[2026-03-05T07:58:58.682Z] Command: npm run smoke --silent
+[2026-03-05T07:58:59.622Z] 🔍 Smoke Probe — https://kelionai.app
+
+✅ /health → 200 [171ms]
+✅ /api/news/public → 200 [141ms]
+✅ /api/payments/plans → 200 [179ms]
+
+3/3 probes passed.
+🔍 Smoke Probe — https://kelionai.app
+
+✅ /health → 200 [171ms]
+✅ /api/news/public → 200 [141ms]
+✅ /api/payments/plans → 200 [179ms]
+
+3/3 probes passed.
+[2026-03-05T07:58:59.622Z] ✅ Smoke Probe PASSED (940ms)
+[2026-03-05T07:58:59.622Z] 
+════ GATE: E2E (Playwright) ════
+[2026-03-05T07:58:59.622Z] Command: npm run e2e
+[2026-03-05T08:08:59.647Z] cing/ page loads (22.2s)
+  -  132 [chromium] › tests\e2e-full.spec.js:197:5 › Main Pages Navigation › pricing link from navbar has correct href
+  ✓  130 [chromium] › tests\e2e-full.spec.js:571:5 › Error Handling › no uncaught JS errors on homepage (59.7s)
+  ✓  133 [chromium] › tests\e2e-full.spec.js:215:5 › Main Pages Navigation › /settings page loads (1.6m)
+  ✓  134 [chromium] › tests\e2e-full.spec.js:590:5 › Error Handling › no uncaught JS errors on pricing page (1.6m)
+  ✓  136 [chromium] › tests\e2e-full.spec.js:616:5 › PWA › manifest.json is present and valid (60ms)
+  ✘  137 [chromium] › tests\e2e-full.spec.js:630:5 › PWA › service worker registration attempted (1.5m)
+  ✓  135 [chromium] › tests\e2e-full.spec.js:223:5 › Main Pages Navigation › /developer page loads (1.6m)
+  ✘  139 [chromium] › tests\e2e-full.spec.js:630:5 › PWA › service worker registration attempted (retry #1) (1.8m)
+  ✓  138 [chromium] › tests\e2e-full.spec.js:231:5 › Main Pages Navigation › navigate back to homepage from developer page (1.8m)
+[REAL JS ERRORS]: [
+  [32m`Evaluating a string as JavaScript violates the following Content Security Policy directive because 'unsafe-eval' is not an allowed source of script: script-src 'self' 'nonce-JPrMKObuVktMgUEiu5MglA==' https://cdn.jsdelivr.net https://browser.sentry-cdn.com".\n`[39m
+]
+  ✓  141 [chromium] › tests\e2e-full.spec.js:653:5 › Quality — JS Errors › no critical JS errors on page (57.4s)
+  ✓  142 [chromium] › tests\e2e-full.spec.js:678:5 › Deep — Chat Quality › AI reply contains actual words (3.1s)
+  ✓  140 [chromium] › tests\e2e-full.spec.js:248:5 › Main Pages Navigation › static assets load (CSS/JS) (1.1m)
+  ✓  143 [chromium] › tests\e2e-full.spec.js:684:5 › Deep — Chat Quality › AI reply to math is correct (3.0s)
+  ✓  145 [chromium] › tests\e2e-full.spec.js:690:5 › Deep — Chat Quality › Kira replies in Romanian (3.0s)
+  ✘  146 [chromium] › tests\e2e-full.spec.js:702:5 › Deep — UI Interactions › pricing modal opens and has grid (1.0m)
+cing/ page loads (22.2s)
+  -  132 [chromium] › tests\e2e-full.spec.js:197:5 › Main Pages Navigation › pricing link from navbar has correct href
+  ✓  130 [chromium] › tests\e2e-full.spec.js:571:5 › Error Handling › no uncaught JS errors on homepage (59.7s)
+  ✓  133 [chromium] › tests\e2e-full.spec.js:215:5 › Main Pages Navigation › /settings page loads (1.6m)
+  ✓  134 [chromium] › tests\e2e-full.spec.js:590:5 › Error Handling › no uncaught JS errors on pricing page (1.6m)
+  ✓  136 [chromium] › tests\e2e-full.spec.js:616:5 › PWA › manifest.json is present and valid (60ms)
+  ✘  137 [chromium] › tests\e2e-full.spec.js:630:5 › PWA › service worker registration attempted (1.5m)
+  ✓  135 [chromium] › tests\e2e-full.spec.js:223:5 › Main Pages Navigation › /developer page loads (1.6m)
+  ✘  139 [chromium] › tests\e2e-full.spec.js:630:5 › PWA › service worker registration attempted (retry #1) (1.8m)
+  ✓  138 [chromium] › tests\e2e-full.spec.js:231:5 › Main Pages Navigation › navigate back to homepage from developer page (1.8m)
+[REAL JS ERRORS]: [
+  [32m`Evaluating a string as JavaScript violates the following Content Security Policy directive because 'unsafe-eval' is not an allowed source of script: script-src 'self' 'nonce-JPrMKObuVktMgUEiu5MglA==' https://cdn.jsdelivr.net https://browser.sentry-cdn.com".\n`[39m
+]
+  ✓  141 [chromium] › tests\e2e-full.spec.js:653:5 › Quality — JS Errors › no critical JS errors on page (57.4s)
+  ✓  142 [chromium] › tests\e2e-full.spec.js:678:5 › Deep — Chat Quality › AI reply contains actual words (3.1s)
+  ✓  140 [chromium] › tests\e2e-full.spec.js:248:5 › Main Pages Navigation › static assets load (CSS/JS) (1.1m)
+  ✓  143 [chromium] › tests\e2e-full.spec.js:684:5 › Deep — Chat Quality › AI reply to math is correct (3.0s)
+  ✓  145 [chromium] › tests\e2e-full.spec.js:690:5 › Deep — Chat Quality › Kira replies in Romanian (3.0s)
+  ✘  146 [chromium] › tests\e2e-full.spec.js:702:5 › Deep — UI Interactions › pricing modal opens and has grid (1.0m)
+[2026-03-05T08:08:59.649Z] ❌ E2E (Playwright) FAILED (600025ms, exit null)
+[2026-03-05T08:08:59.652Z] 
+════ GENERATING ARTIFACTS ════
+[2026-03-05T08:09:00.869Z] ✅ gate_report.json written

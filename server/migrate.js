@@ -3,8 +3,8 @@
 // Runs on server startup — creates tables if they don't exist
 // Uses direct PostgreSQL connection (node-postgres)
 // ═══════════════════════════════════════════════════════════════
-const { Pool } = require('pg');
-const logger = require('./logger');
+const { Pool } = require("pg");
+const logger = require("./logger");
 
 const MIGRATION_SQL = `
 CREATE TABLE IF NOT EXISTS conversations (
@@ -205,47 +205,65 @@ CREATE INDEX IF NOT EXISTS idx_metrics_snap_type ON metrics_snapshots(metric_typ
 `;
 
 async function runMigration() {
-    // Build connection string from Supabase URL or explicit DB vars
-    let connectionString = process.env.DATABASE_URL;
+  // Build connection string from Supabase URL or explicit DB vars
+  let connectionString = process.env.DATABASE_URL;
 
-    if (!connectionString && process.env.SUPABASE_URL) {
-        // Extract project ref from Supabase URL
-        const match = process.env.SUPABASE_URL.match(/https:\/\/([^.]+)\.supabase\.co/);
-        if (match) {
-            const ref = match[1];
-            const password = process.env.SUPABASE_DB_PASSWORD || process.env.DB_PASSWORD;
-            if (!password) {
-                logger.warn({ component: 'Migration' }, '⚠️ No DB password configured — skipping migration');
-                return false;
-            }
-            connectionString = `postgresql://postgres:${encodeURIComponent(password)}@db.${ref}.supabase.co:5432/postgres`;
-        }
-    }
-
-    if (!connectionString) {
-        logger.warn({ component: 'Migration' }, '⚠️ No database connection — skipping migration');
+  if (!connectionString && process.env.SUPABASE_URL) {
+    // Extract project ref from Supabase URL
+    const match = process.env.SUPABASE_URL.match(
+      /https:\/\/([^.]+)\.supabase\.co/,
+    );
+    if (match) {
+      const ref = match[1];
+      const password =
+        process.env.SUPABASE_DB_PASSWORD || process.env.DB_PASSWORD;
+      if (!password) {
+        logger.warn(
+          { component: "Migration" },
+          "⚠️ No DB password configured — skipping migration",
+        );
         return false;
+      }
+      connectionString = `postgresql://postgres:${encodeURIComponent(password)}@db.${ref}.supabase.co:5432/postgres`;
     }
+  }
 
-    const pool = new Pool({
-        connectionString,
-        ssl: { rejectUnauthorized: false },
-        connectionTimeoutMillis: 10000,
-    });
+  if (!connectionString) {
+    logger.warn(
+      { component: "Migration" },
+      "⚠️ No database connection — skipping migration",
+    );
+    return false;
+  }
 
-    try {
-        logger.info({ component: 'Migration' }, '�� Running database migration...');
-        await pool.query(MIGRATION_SQL);
-        logger.info({ component: 'Migration' }, '✅ Tables created/verified: conversations, messages, user_preferences, api_keys');
-        logger.info({ component: 'Migration' }, '✅ RLS policies applied');
-        return true;
-    } catch (e) {
-        logger.error({ component: 'Migration', err: e.message }, '❌ Migration failed');
-        logger.warn({ component: 'Migration' }, '⚠️ Server will continue without persistent storage');
-        return false;
-    } finally {
-        await pool.end();
-    }
+  const pool = new Pool({
+    connectionString,
+    ssl: { rejectUnauthorized: false },
+    connectionTimeoutMillis: 10000,
+  });
+
+  try {
+    logger.info({ component: "Migration" }, "�� Running database migration...");
+    await pool.query(MIGRATION_SQL);
+    logger.info(
+      { component: "Migration" },
+      "✅ Tables created/verified: conversations, messages, user_preferences, api_keys",
+    );
+    logger.info({ component: "Migration" }, "✅ RLS policies applied");
+    return true;
+  } catch (e) {
+    logger.error(
+      { component: "Migration", err: e.message },
+      "❌ Migration failed",
+    );
+    logger.warn(
+      { component: "Migration" },
+      "⚠️ Server will continue without persistent storage",
+    );
+    return false;
+  } finally {
+    await pool.end();
+  }
 }
 
 module.exports = { runMigration };

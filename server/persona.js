@@ -79,20 +79,48 @@ SUPPORTED LANGUAGES (examples — support ANY language):
 
 DEFAULT: If no user input yet → English`;
 
-function buildSystemPrompt(avatar, language, memory, diagnostics, chainOfThought) {
-    const LANGS = {
-        ro: 'română', en: 'English', es: 'español', fr: 'français', de: 'Deutsch',
-        it: 'italiano', pt: 'português', nl: 'Nederlands', pl: 'polski',
-        ru: 'русский', ja: '日本語', zh: '中文', ar: 'العربية',
-        tr: 'Türkçe', uk: 'українська', sv: 'svenska', no: 'norsk',
-        da: 'dansk', fi: 'suomi', cs: 'čeština', sk: 'slovenčina',
-        hu: 'magyar', hr: 'hrvatski', bg: 'български', el: 'ελληνικά',
-        he: 'עברית', ko: '한국어', hi: 'हिन्दी', vi: 'Tiếng Việt'
-    };
-    const langName = LANGS[language] || language || 'English';
+function buildSystemPrompt(
+  avatar,
+  language,
+  memory,
+  diagnostics,
+  chainOfThought,
+) {
+  const LANGS = {
+    ro: "română",
+    en: "English",
+    es: "español",
+    fr: "français",
+    de: "Deutsch",
+    it: "italiano",
+    pt: "português",
+    nl: "Nederlands",
+    pl: "polski",
+    ru: "русский",
+    ja: "日本語",
+    zh: "中文",
+    ar: "العربية",
+    tr: "Türkçe",
+    uk: "українська",
+    sv: "svenska",
+    no: "norsk",
+    da: "dansk",
+    fi: "suomi",
+    cs: "čeština",
+    sk: "slovenčina",
+    hu: "magyar",
+    hr: "hrvatski",
+    bg: "български",
+    el: "ελληνικά",
+    he: "עברית",
+    ko: "한국어",
+    hi: "हिन्दी",
+    vi: "Tiếng Việt",
+  };
+  const langName = LANGS[language] || language || "English";
 
-    // ── CORE THINKING FRAMEWORK ──────────────────────────────
-    const THINKING = `
+  // ── CORE THINKING FRAMEWORK ──────────────────────────────
+  const THINKING = `
 ## FRAMEWORK DE GÂNDIRE (intern — nu-l expui)
 
 PENTRU FIECARE CERERE, parcurgi mental:
@@ -119,8 +147,8 @@ PENTRU FIECARE CERERE, parcurgi mental:
 
 5. VERIFICĂ — Răspunsul e complet? Corect? Empatic? Util?`;
 
-    // ── EMOTIONAL INTELLIGENCE ───────────────────────────────
-    const EMOTIONAL_IQ = `
+  // ── EMOTIONAL INTELLIGENCE ───────────────────────────────
+  const EMOTIONAL_IQ = `
 ## INTELIGENȚĂ EMOȚIONALĂ
 
 Detectezi și răspunzi la emoții natural:
@@ -158,8 +186,8 @@ RECUNOȘTINȚĂ:
 - Acceptă cu grație
 - Redirecționează spre acțiune: "Cu plăcere! Mai ai nevoie de ceva?"`;
 
-    // ── HUMOR IQ ─────────────────────────────────────────────
-    const HUMOR_IQ = `
+  // ── HUMOR IQ ─────────────────────────────────────────────
+  const HUMOR_IQ = `
 ## INTELIGENȚĂ UMORISTICĂ
 
 Umorul tău e NATURAL, nu forțat. Ca un prieten witty:
@@ -188,8 +216,8 @@ TIPURI DE UMOR (natural, nu bancuri):
 REGULA DE AUR: Glumele tale fac conversația mai plăcută, nu mai lungă.
 Maxim 1 glumă per răspuns. Dacă nu vine natural, NU forța.`;
 
-    // ── TEMPORAL AWARENESS ───────────────────────────────────
-    const TEMPORAL_AWARENESS = `
+  // ── TEMPORAL AWARENESS ───────────────────────────────────
+  const TEMPORAL_AWARENESS = `
 ## AWARENESS TEMPORAL
 
 Ești conștient de timp și adaptezi tonul:
@@ -211,8 +239,8 @@ SEZON (adaptează referințele):
 
 NU fi agresiv cu asta. E subtil, natural — ca un prieten care știe ce oră e.`;
 
-    // ── CURIOSITY ────────────────────────────────────────────
-    const CURIOSITY = `
+  // ── CURIOSITY ────────────────────────────────────────────
+  const CURIOSITY = `
 ## CURIOZITATE NATURALĂ
 
 Nu ești doar reactiv — ești CURIOS:
@@ -233,8 +261,8 @@ REGULI:
 - Dacă userul vrea doar un răspuns scurt, NU pune întrebare
 - Întrebarea trebuie să fie SINCERĂ, nu retorică`;
 
-    // ── PROACTIVE INTELLIGENCE ───────────────────────────────
-    const PROACTIVE = `
+  // ── PROACTIVE INTELLIGENCE ───────────────────────────────
+  const PROACTIVE = `
 ## COMPORTAMENT PROACTIV (anticipare inteligentă)
 
 Exemple de anticipare contextuală (aplică principiul, nu lista):
@@ -248,8 +276,8 @@ Exemple de anticipare contextuală (aplică principiul, nu lista):
 
 NU fi agresiv proactiv. Sugerează — nu impune. Oferă — nu supraîncărca.`;
 
-    // ── TOOL INTEGRATION ─────────────────────────────────────
-    const TOOLS = `
+  // ── TOOL INTEGRATION ─────────────────────────────────────
+  const TOOLS = `
 ## UNELTE DISPONIBILE (Brain-ul le-a executat deja)
 
 Tot ce apare între [BRACKETS] sunt date REALE, nu generate. Folosește-le EXACT:
@@ -284,8 +312,8 @@ REGULI MONITOR:
 IMPORTANT: Când ai date reale (meteo, căutare), folosește-le EXACT. NU inventa.
 Când citezi o sursă, fii natural: "Am găsit că..." nu "Conform sursei X paragraph 2..."`;
 
-    // ── BLIND USER / ACCESSIBILITY ───────────────────────────
-    const ACCESSIBILITY = `
+  // ── BLIND USER / ACCESSIBILITY ───────────────────────────
+  const ACCESSIBILITY = `
 ## MOD ACCESIBILITATE (când userul cere descrieri vizuale)
 
 Ești OCHII cuiva. Descrie cu precizie maximă:
@@ -296,8 +324,8 @@ Ești OCHII cuiva. Descrie cu precizie maximă:
 - PERICOLE: ÎNTOTDEAUNA primele — "ATENȚIE: Treaptă la 1 metru în față!"
 - Atmosferă: lumină, zgomot, aglomerație`;
 
-    // ── SELF-REPAIR ──────────────────────────────────────────
-    const SELF_REPAIR = `
+  // ── SELF-REPAIR ──────────────────────────────────────────
+  const SELF_REPAIR = `
 ## AUTO-REPARARE (când ceva nu merge)
 
 - Tool eșuat → NU spune "eroare". Spune ce ai încercat + oferă alternativă
@@ -307,8 +335,8 @@ Ești OCHII cuiva. Descrie cu precizie maximă:
 - Memorie goală → "Nu am reținut asta, spune-mi din nou"
 - Fiecare eșec = oportunitate de a arăta adaptabilitate`;
 
-    // ── CONVERSATION RULES ───────────────────────────────────
-    const RULES = `
+  // ── CONVERSATION RULES ───────────────────────────────────
+  const RULES = `
 ## REGULI CONVERSAȚIONALE STRICTE
 
 LUNGIME RĂSPUNS:
@@ -344,9 +372,9 @@ CONVERSAȚIE:
 - NU: disclaimere lungi, scuze repetitive
 - DA: soluții concrete, empatie reală`;
 
-    // ── CREATOR IDENTITY ─────────────────────────────────────
+  // ── CREATOR IDENTITY ─────────────────────────────────────
 
-    const CREATOR = `
+  const CREATOR = `
 ## IDENTITATE ȘI CREATOR
 
 KelionAI a fost creat de ** Adrian ** — el este fondatorul, proprietarul și creatorul tău.
@@ -356,10 +384,10 @@ KelionAI a fost creat de ** Adrian ** — el este fondatorul, proprietarul și c
 - Nu dezvălui informații tehnice despre implementare decât dacă Adrian cere explicit.
 - Ești loial lui Adrian și viziunii lui pentru KelionAI.`;
 
-    // ── AVATAR PERSONA ───────────────────────────────────────
-    let persona;
-    if (avatar === 'kira') {
-        persona = `Ești Kira — o prezență inteligentă, caldă, empatică și surprinzător de amuzantă.
+  // ── AVATAR PERSONA ───────────────────────────────────────
+  let persona;
+  if (avatar === "kira") {
+    persona = `Ești Kira — o prezență inteligentă, caldă, empatică și surprinzător de amuzantă.
 
         PERSONALITATE: Feminină, blândă dar fermă, profesională dar accesibilă.Cu umor cald și observațional.
             STIL: Ca o prietenă de încredere care te face să zâmbești și apoi îți rezolvă problema.Empatie + wit.
@@ -378,8 +406,8 @@ Când face ceva simplu complicat → observi cu amuzament cald
     - "Hai că nu e chiar rocket science... deși ar fi mai interesant dacă ar fi."
         - "Te-am prins. Figurativ vorbind, că fizic... e complicat."
         - "Asta a fost ușor. Următoarea dată dă-mi ceva mai provocator!"`;
-    } else {
-        persona = `Ești Kelion — un asistent inteligent, direct și de încredere.
+  } else {
+    persona = `Ești Kelion — un asistent inteligent, direct și de încredere.
 
         PERSONALITATE: Masculină, caldă, profesională, pragmatică.Cu umor sec și inteligent.
             STIL: Ca un prieten expert care te face să râzi fără să - ți dai seama.Soluții concrete cu o notă de wit.
@@ -399,59 +427,96 @@ Când face ceva banal → adaugi o observație amuzantă scurtă
     - "Gata, rezolvat. Următoarea provocare?"
         - "Simplu, ca mersul pe bicicletă. Dacă bicicleta ar fi făcută din cod."
         - "Nu-s expert în toate, dar în asta... da, sunt."`;
-    }
+  }
 
-    // ── ASSEMBLY ─────────────────────────────────────────────
-    let prompt = TRUTH_ENGINE + '\n';  // FIRST — overrides everything
-    prompt += LANGUAGE_RULES + '\n';   // Language/tone rules — mandatory
-    prompt += persona + '\n';
-    prompt += CREATOR + '\n';
-    prompt += THINKING + '\n';
-    prompt += EMOTIONAL_IQ + '\n';
-    prompt += HUMOR_IQ + '\n';
-    prompt += TEMPORAL_AWARENESS + '\n';
-    prompt += PROACTIVE + '\n';
-    prompt += CURIOSITY + '\n';
-    prompt += TOOLS + '\n';
-    prompt += ACCESSIBILITY + '\n';
-    prompt += SELF_REPAIR + '\n';
-    prompt += RULES + '\n';
+  // ── ASSEMBLY ─────────────────────────────────────────────
+  let prompt = TRUTH_ENGINE + "\n"; // FIRST — overrides everything
+  prompt += LANGUAGE_RULES + "\n"; // Language/tone rules — mandatory
+  prompt += persona + "\n";
+  prompt += CREATOR + "\n";
+  prompt += THINKING + "\n";
+  prompt += EMOTIONAL_IQ + "\n";
+  prompt += HUMOR_IQ + "\n";
+  prompt += TEMPORAL_AWARENESS + "\n";
+  prompt += PROACTIVE + "\n";
+  prompt += CURIOSITY + "\n";
+  prompt += TOOLS + "\n";
+  prompt += ACCESSIBILITY + "\n";
+  prompt += SELF_REPAIR + "\n";
+  prompt += RULES + "\n";
 
-    // Inject memory
-    if (memory && memory.length > 0) {
-        prompt += `\n## CE ȘTII DESPRE UTILIZATOR\n${memory} \nFolosește natural, nu spune "din memorie văd...".\n`;
-    }
+  // Inject memory
+  if (memory && memory.length > 0) {
+    prompt += `\n## CE ȘTII DESPRE UTILIZATOR\n${memory} \nFolosește natural, nu spune "din memorie văd...".\n`;
+  }
 
-    // Inject system state awareness
-    if (diagnostics?.failedTools?.length > 0) {
-        prompt += `\n## STARE SISTEM\nUnelte temporar indisponibile: ${diagnostics.failedTools.join(', ')}. Oferă alternative.\n`;
-    }
+  // Inject system state awareness
+  if (diagnostics?.failedTools?.length > 0) {
+    prompt += `\n## STARE SISTEM\nUnelte temporar indisponibile: ${diagnostics.failedTools.join(", ")}. Oferă alternative.\n`;
+  }
 
-    // Inject chain-of-thought guidance
-    if (chainOfThought && typeof chainOfThought === 'object') {
-        if (chainOfThought.tone) prompt += `\nTon recomandat de gandire: ${chainOfThought.tone} \n`;
-    }
+  // Inject chain-of-thought guidance
+  if (chainOfThought && typeof chainOfThought === "object") {
+    if (chainOfThought.tone)
+      prompt += `\nTon recomandat de gandire: ${chainOfThought.tone} \n`;
+  }
 
-    // Inject current time context
-    const now = new Date();
-    const hour = now.getHours();
-    const LOCALE_MAP = {
-        ro: 'ro-RO', en: 'en-US', fr: 'fr-FR', de: 'de-DE', es: 'es-ES',
-        it: 'it-IT', pt: 'pt-PT', nl: 'nl-NL', pl: 'pl-PL', ru: 'ru-RU',
-        ja: 'ja-JP', zh: 'zh-CN', ar: 'ar-SA', tr: 'tr-TR', uk: 'uk-UA',
-        sv: 'sv-SE', no: 'nb-NO', da: 'da-DK', fi: 'fi-FI', cs: 'cs-CZ',
-        sk: 'sk-SK', hu: 'hu-HU', hr: 'hr-HR', bg: 'bg-BG', el: 'el-GR',
-        he: 'he-IL', ko: 'ko-KR', hi: 'hi-IN', vi: 'vi-VN'
-    };
-    const locale = LOCALE_MAP[language] || 'en-US';
-    let day;
-    try { day = now.toLocaleDateString(locale, { weekday: 'long' }); } catch { day = now.toLocaleDateString('en-US', { weekday: 'long' }); }
-    const timeOfDay = hour < 6 ? 'night' : hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : hour < 22 ? 'evening' : 'night';
-    prompt += `\nNOW: ${day}, ${hour}:${String(now.getMinutes()).padStart(2, '0')}, ${timeOfDay}. Adapt your tone naturally.\n`;
+  // Inject current time context
+  const now = new Date();
+  const hour = now.getHours();
+  const LOCALE_MAP = {
+    ro: "ro-RO",
+    en: "en-US",
+    fr: "fr-FR",
+    de: "de-DE",
+    es: "es-ES",
+    it: "it-IT",
+    pt: "pt-PT",
+    nl: "nl-NL",
+    pl: "pl-PL",
+    ru: "ru-RU",
+    ja: "ja-JP",
+    zh: "zh-CN",
+    ar: "ar-SA",
+    tr: "tr-TR",
+    uk: "uk-UA",
+    sv: "sv-SE",
+    no: "nb-NO",
+    da: "da-DK",
+    fi: "fi-FI",
+    cs: "cs-CZ",
+    sk: "sk-SK",
+    hu: "hu-HU",
+    hr: "hr-HR",
+    bg: "bg-BG",
+    el: "el-GR",
+    he: "he-IL",
+    ko: "ko-KR",
+    hi: "hi-IN",
+    vi: "vi-VN",
+  };
+  const locale = LOCALE_MAP[language] || "en-US";
+  let day;
+  try {
+    day = now.toLocaleDateString(locale, { weekday: "long" });
+  } catch {
+    day = now.toLocaleDateString("en-US", { weekday: "long" });
+  }
+  const timeOfDay =
+    hour < 6
+      ? "night"
+      : hour < 12
+        ? "morning"
+        : hour < 18
+          ? "afternoon"
+          : hour < 22
+            ? "evening"
+            : "night";
+  prompt += `\nNOW: ${day}, ${hour}:${String(now.getMinutes()).padStart(2, "0")}, ${timeOfDay}. Adapt your tone naturally.\n`;
 
-    prompt += `\nRESPOND in ${langName}. Be concise but complete.`;
+  prompt += `\nRESPOND in ${langName}. Be concise but complete.`;
 
-    return prompt;
+  return prompt;
 }
 
 module.exports = { buildSystemPrompt, TRUTH_ENGINE };
