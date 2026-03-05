@@ -165,9 +165,14 @@ const asyncHandler = (fn) => (req, res, next) => {
 
 const metrics = require('./metrics');
 app.use(metrics.metricsMiddleware);
+// ═══ BUILD INFO (Truth Guard) ═══
+const _buildSha = (() => { try { return require('child_process').execSync('git rev-parse HEAD', { encoding: 'utf8' }).trim(); } catch { return process.env.RAILWAY_GIT_COMMIT_SHA || 'unknown'; } })();
+const _buildEnv = process.env.RAILWAY_ENVIRONMENT_NAME || process.env.NODE_ENV || 'development';
+app.use((req, res, next) => { res.setHeader('x-build-sha', _buildSha.slice(0, 8)); res.setHeader('x-build-env', _buildEnv); next(); });
+
 app.get('/metrics', adminAuth, asyncHandler(async (req, res) => { res.set('Content-Type', metrics.register.contentType); res.end(await metrics.register.metrics()); }));
 app.get('/health', (req, res) => {
-    res.json({ status: 'ok', uptime: process.uptime(), timestamp: new Date().toISOString() });
+    res.json({ ok: true, status: 'ok', service: 'kelionai', env: _buildEnv, commit: _buildSha.slice(0, 8), uptime: process.uptime(), timestamp: new Date().toISOString() });
 });
 // Read index.html once at startup, injecting Sentry DSN if configured
 const _rawHtml = fs.readFileSync(path.join(__dirname, '..', 'app', 'index.html'), 'utf8');
