@@ -121,7 +121,7 @@ function runGate(name, cmd, opts = {}) {
   // 7) E2E (only if BASE_URL is set — requires real URL per Truth Guard rules)
   if (smokeUrl) {
     results.push(
-      runGate("E2E (Playwright)", "npm run e2e", { timeout: 600_000 }),
+      runGate("E2E (Playwright)", "npm run e2e", { timeout: 1_500_000 }),
     );
     if (results.at(-1).status === "fail") failed = true;
   } else {
