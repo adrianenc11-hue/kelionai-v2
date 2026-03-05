@@ -1,29 +1,103 @@
-[2026-03-05T07:58:47.028Z] ═══ TRUTH GUARD — GATE RUNNER ═══
-[2026-03-05T07:58:47.033Z] Commit: local
-[2026-03-05T07:58:47.033Z] Node: v20.11.0
-[2026-03-05T07:58:47.033Z] CWD: C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2
-[2026-03-05T07:58:47.033Z] 
+[2026-03-05T08:42:28.146Z] ═══ TRUTH GUARD — GATE RUNNER ═══
+[2026-03-05T08:42:28.150Z] Commit: local
+[2026-03-05T08:42:28.150Z] Node: v20.11.0
+[2026-03-05T08:42:28.151Z] CWD: C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2
+[2026-03-05T08:42:28.151Z] 
 ════ GATE: Prettier (format check) ════
-[2026-03-05T07:58:47.034Z] Command: npx prettier --check "server/**/*.js"
-[2026-03-05T07:58:49.319Z] Checking formatting...
-All matched files use Prettier code style!
+[2026-03-05T08:42:28.151Z] Command: npx prettier --check "server/**/*.js"
+[2026-03-05T08:42:30.437Z] Checking formatting...
+[[33mwarn[39m] server/brain.js
+[[33mwarn[39m] server/cache.js
+[[33mwarn[39m] server/config/voices.js
+[[33mwarn[39m] server/facebook-page.js
+[[33mwarn[39m] server/index.js
+[[33mwarn[39m] server/instagram.js
+[[33mwarn[39m] server/legal.js
+[[33mwarn[39m] server/logger.js
+[[33mwarn[39m] server/messenger.js
+[[33mwarn[39m] server/metrics.js
+[[33mwarn[39m] server/middleware/apiKeyAuth.js
+[[33mwarn[39m] server/middleware/auth.js
+[[33mwarn[39m] server/middleware/checkSubscription.js
+[[33mwarn[39m] server/migrate.js
+[[33mwarn[39m] server/news.js
+[[33mwarn[39m] server/payments.js
+[[33mwarn[39m] server/persona.js
+[[33mwarn[39m] server/referral.js
+[[33mwarn[39m] server/routes/admin.js
+[[33mwarn[39m] server/routes/auth.js
+[[33mwarn[39m] server/routes/chat.js
+[[33mwarn[39m] server/routes/developer.js
+[[33mwarn[39m] server/routes/health.js
+[[33mwarn[39m] server/routes/identity.js
+[[33mwarn[39m] server/routes/images.js
+[[33mwarn[39m] server/routes/search.js
+[[33mwarn[39m] server/routes/vision.js
+[[33mwarn[39m] server/routes/voice-clone.js
+[[33mwarn[39m] server/routes/voice.js
+[[33mwarn[39m] server/routes/weather.js
+[[33mwarn[39m] server/supabase.js
+[[33mwarn[39m] server/telegram.js
+[[33mwarn[39m] server/trade-executor.js
+[[33mwarn[39m] server/trade-intelligence.js
+[[33mwarn[39m] server/trading.js
+[[33mwarn[39m] server/validation.js
+[[33mwarn[39m] server/whatsapp.js
+[[33mwarn[39m] Code style issues found in 37 files. Run Prettier with --write to fix.
 Checking formatting...
-All matched files use Prettier code style!
-[2026-03-05T07:58:49.319Z] ✅ Prettier (format check) PASSED (2285ms)
-[2026-03-05T07:58:49.319Z] 
+[[33mwarn[39m] server/brain.js
+[[33mwarn[39m] server/cache.js
+[[33mwarn[39m] server/config/voices.js
+[[33mwarn[39m] server/facebook-page.js
+[[33mwarn[39m] server/index.js
+[[33mwarn[39m] server/instagram.js
+[[33mwarn[39m] server/legal.js
+[[33mwarn[39m] server/logger.js
+[[33mwarn[39m] server/messenger.js
+[[33mwarn[39m] server/metrics.js
+[[33mwarn[39m] server/middleware/apiKeyAuth.js
+[[33mwarn[39m] server/middleware/auth.js
+[[33mwarn[39m] server/middleware/checkSubscription.js
+[[33mwarn[39m] server/migrate.js
+[[33mwarn[39m] server/news.js
+[[33mwarn[39m] server/payments.js
+[[33mwarn[39m] server/persona.js
+[[33mwarn[39m] server/referral.js
+[[33mwarn[39m] server/routes/admin.js
+[[33mwarn[39m] server/routes/auth.js
+[[33mwarn[39m] server/routes/chat.js
+[[33mwarn[39m] server/routes/developer.js
+[[33mwarn[39m] server/routes/health.js
+[[33mwarn[39m] server/routes/identity.js
+[[33mwarn[39m] server/routes/images.js
+[[33mwarn[39m] server/routes/search.js
+[[33mwarn[39m] server/routes/vision.js
+[[33mwarn[39m] server/routes/voice-clone.js
+[[33mwarn[39m] server/routes/voice.js
+[[33mwarn[39m] server/routes/weather.js
+[[33mwarn[39m] server/supabase.js
+[[33mwarn[39m] server/telegram.js
+[[33mwarn[39m] server/trade-executor.js
+[[33mwarn[39m] server/trade-intelligence.js
+[[33mwarn[39m] server/trading.js
+[[33mwarn[39m] server/validation.js
+[[33mwarn[39m] server/whatsapp.js
+[[33mwarn[39m] Code style issues found in 37 files. Run Prettier with --write to fix.
+[2026-03-05T08:42:30.438Z] ❌ Prettier (format check) FAILED (2286ms, exit 1)
+[2026-03-05T08:42:30.438Z] 
 ════ GATE: Lint (ESLint) ════
-[2026-03-05T07:58:49.319Z] Command: npx eslint server/
-[2026-03-05T07:58:50.792Z] ✅ Lint (ESLint) PASSED (1473ms)
-[2026-03-05T07:58:50.792Z] 
+[2026-03-05T08:42:30.438Z] Command: npx eslint server/
+[2026-03-05T08:42:31.885Z] ✅ Lint (ESLint) PASSED (1447ms)
+[2026-03-05T08:42:31.885Z] 
 ════ GATE: Typecheck ════
-[2026-03-05T07:58:50.792Z] Command: npm run typecheck --silent
-[2026-03-05T07:58:51.493Z] typecheck: N/A (JS-only project)
+[2026-03-05T08:42:31.885Z] Command: npm run typecheck --silent
+[2026-03-05T08:42:32.562Z] typecheck: N/A (JS-only project)
 typecheck: N/A (JS-only project)
-[2026-03-05T07:58:51.493Z] ✅ Typecheck PASSED (701ms)
-[2026-03-05T07:58:51.494Z] 
+[2026-03-05T08:42:32.562Z] ✅ Typecheck PASSED (677ms)
+[2026-03-05T08:42:32.562Z] 
 ════ GATE: Unit Tests (Jest) ════
-[2026-03-05T07:58:51.494Z] Command: npx jest --forceExit --silent
-[2026-03-05T07:58:56.834Z]                                                                                                                                                                                                                                                                                                           
+[2026-03-05T08:42:32.562Z] Command: npx jest --forceExit --silent
+[2026-03-05T08:42:40.468Z]                                                                                                                                                                                                                                                                                                           
   voice.js              |   28.35 |    21.87 |      25 |   29.68 | 40-117,123-166                                                                                                                                                                                                                                                                                                                                                                                                
   weather.js            |   33.33 |        0 |       0 |      35 | 22-80                                                                                                                                                                                                                                                                                                                                                                                                         
 ------------------------|---------|----------|---------|---------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -45,79 +119,79 @@ Branches     : 11.64% ( 578/4962 )
 Functions    : 16.35% ( 113/691 )
 Lines        : 19.07% ( 1173/6149 )
 ================================================================================
-[2026-03-05T07:58:56.835Z] ✅ Unit Tests (Jest) PASSED (5340ms)
-[2026-03-05T07:58:56.835Z] 
+[2026-03-05T08:42:40.468Z] ✅ Unit Tests (Jest) PASSED (7906ms)
+[2026-03-05T08:42:40.468Z] 
 ════ GATE: Build Validation ════
-[2026-03-05T07:58:56.835Z] Command: npm run build --silent
-[2026-03-05T07:58:57.545Z] Build OK: static assets validated
+[2026-03-05T08:42:40.468Z] Command: npm run build --silent
+[2026-03-05T08:42:41.163Z] Build OK: static assets validated
 Build OK: static assets validated
-[2026-03-05T07:58:57.546Z] ✅ Build Validation PASSED (710ms)
-[2026-03-05T07:58:57.546Z] 
+[2026-03-05T08:42:41.163Z] ✅ Build Validation PASSED (695ms)
+[2026-03-05T08:42:41.163Z] 
 ════ GATE: Security (npm audit) ════
-[2026-03-05T07:58:57.546Z] Command: npm audit --audit-level=high
-[2026-03-05T07:58:58.682Z] found 0 vulnerabilities
+[2026-03-05T08:42:41.163Z] Command: npm audit --audit-level=high
+[2026-03-05T08:42:42.257Z] found 0 vulnerabilities
 found 0 vulnerabilities
-[2026-03-05T07:58:58.682Z] ✅ Security (npm audit) PASSED (1136ms)
-[2026-03-05T07:58:58.682Z] 
+[2026-03-05T08:42:42.257Z] ✅ Security (npm audit) PASSED (1094ms)
+[2026-03-05T08:42:42.257Z] 
 ════ GATE: Smoke Probe ════
-[2026-03-05T07:58:58.682Z] Command: npm run smoke --silent
-[2026-03-05T07:58:59.622Z] 🔍 Smoke Probe — https://kelionai.app
+[2026-03-05T08:42:42.257Z] Command: npm run smoke --silent
+[2026-03-05T08:42:43.279Z] 🔍 Smoke Probe — https://kelionai.app
 
-✅ /health → 200 [171ms]
-✅ /api/news/public → 200 [141ms]
-✅ /api/payments/plans → 200 [179ms]
+✅ /health → 200 [121ms]
+✅ /api/news/public → 200 [72ms]
+✅ /api/payments/plans → 200 [216ms]
 
 3/3 probes passed.
 🔍 Smoke Probe — https://kelionai.app
 
-✅ /health → 200 [171ms]
-✅ /api/news/public → 200 [141ms]
-✅ /api/payments/plans → 200 [179ms]
+✅ /health → 200 [121ms]
+✅ /api/news/public → 200 [72ms]
+✅ /api/payments/plans → 200 [216ms]
 
 3/3 probes passed.
-[2026-03-05T07:58:59.622Z] ✅ Smoke Probe PASSED (940ms)
-[2026-03-05T07:58:59.622Z] 
+[2026-03-05T08:42:43.280Z] ✅ Smoke Probe PASSED (1022ms)
+[2026-03-05T08:42:43.280Z] 
 ════ GATE: E2E (Playwright) ════
-[2026-03-05T07:58:59.622Z] Command: npm run e2e
-[2026-03-05T08:08:59.647Z] cing/ page loads (22.2s)
-  -  132 [chromium] › tests\e2e-full.spec.js:197:5 › Main Pages Navigation › pricing link from navbar has correct href
-  ✓  130 [chromium] › tests\e2e-full.spec.js:571:5 › Error Handling › no uncaught JS errors on homepage (59.7s)
-  ✓  133 [chromium] › tests\e2e-full.spec.js:215:5 › Main Pages Navigation › /settings page loads (1.6m)
-  ✓  134 [chromium] › tests\e2e-full.spec.js:590:5 › Error Handling › no uncaught JS errors on pricing page (1.6m)
-  ✓  136 [chromium] › tests\e2e-full.spec.js:616:5 › PWA › manifest.json is present and valid (60ms)
-  ✘  137 [chromium] › tests\e2e-full.spec.js:630:5 › PWA › service worker registration attempted (1.5m)
-  ✓  135 [chromium] › tests\e2e-full.spec.js:223:5 › Main Pages Navigation › /developer page loads (1.6m)
-  ✘  139 [chromium] › tests\e2e-full.spec.js:630:5 › PWA › service worker registration attempted (retry #1) (1.8m)
-  ✓  138 [chromium] › tests\e2e-full.spec.js:231:5 › Main Pages Navigation › navigate back to homepage from developer page (1.8m)
+[2026-03-05T08:42:43.280Z] Command: npm run e2e
+[2026-03-05T08:52:50.192Z] mepage (48.9s)
+  ✓  131 [chromium] › tests\e2e-full.spec.js:187:5 › Main Pages Navigation › /pricing/ page loads (1.7m)
+  ✓  132 [chromium] › tests\e2e-full.spec.js:590:5 › Error Handling › no uncaught JS errors on pricing page (1.7m)
+  ✓  134 [chromium] › tests\e2e-full.spec.js:616:5 › PWA › manifest.json is present and valid (36ms)
+  ✓  135 [chromium] › tests\e2e-full.spec.js:630:5 › PWA › service worker registration attempted (58.0s)
+  -  133 [chromium] › tests\e2e-full.spec.js:197:5 › Main Pages Navigation › pricing link from navbar has correct href
 [REAL JS ERRORS]: [
-  [32m`Evaluating a string as JavaScript violates the following Content Security Policy directive because 'unsafe-eval' is not an allowed source of script: script-src 'self' 'nonce-JPrMKObuVktMgUEiu5MglA==' https://cdn.jsdelivr.net https://browser.sentry-cdn.com".\n`[39m
+  [32m`Evaluating a string as JavaScript violates the following Content Security Policy directive because 'unsafe-eval' is not an allowed source of script: script-src 'self' 'nonce-hodZlP4tRdd8snoiiXmxaA==' https://cdn.jsdelivr.net https://browser.sentry-cdn.com".\n`[39m
 ]
-  ✓  141 [chromium] › tests\e2e-full.spec.js:653:5 › Quality — JS Errors › no critical JS errors on page (57.4s)
-  ✓  142 [chromium] › tests\e2e-full.spec.js:678:5 › Deep — Chat Quality › AI reply contains actual words (3.1s)
-  ✓  140 [chromium] › tests\e2e-full.spec.js:248:5 › Main Pages Navigation › static assets load (CSS/JS) (1.1m)
-  ✓  143 [chromium] › tests\e2e-full.spec.js:684:5 › Deep — Chat Quality › AI reply to math is correct (3.0s)
-  ✓  145 [chromium] › tests\e2e-full.spec.js:690:5 › Deep — Chat Quality › Kira replies in Romanian (3.0s)
-  ✘  146 [chromium] › tests\e2e-full.spec.js:702:5 › Deep — UI Interactions › pricing modal opens and has grid (1.0m)
-cing/ page loads (22.2s)
-  -  132 [chromium] › tests\e2e-full.spec.js:197:5 › Main Pages Navigation › pricing link from navbar has correct href
-  ✓  130 [chromium] › tests\e2e-full.spec.js:571:5 › Error Handling › no uncaught JS errors on homepage (59.7s)
-  ✓  133 [chromium] › tests\e2e-full.spec.js:215:5 › Main Pages Navigation › /settings page loads (1.6m)
-  ✓  134 [chromium] › tests\e2e-full.spec.js:590:5 › Error Handling › no uncaught JS errors on pricing page (1.6m)
-  ✓  136 [chromium] › tests\e2e-full.spec.js:616:5 › PWA › manifest.json is present and valid (60ms)
-  ✘  137 [chromium] › tests\e2e-full.spec.js:630:5 › PWA › service worker registration attempted (1.5m)
-  ✓  135 [chromium] › tests\e2e-full.spec.js:223:5 › Main Pages Navigation › /developer page loads (1.6m)
-  ✘  139 [chromium] › tests\e2e-full.spec.js:630:5 › PWA › service worker registration attempted (retry #1) (1.8m)
-  ✓  138 [chromium] › tests\e2e-full.spec.js:231:5 › Main Pages Navigation › navigate back to homepage from developer page (1.8m)
+  ✓  136 [chromium] › tests\e2e-full.spec.js:653:5 › Quality — JS Errors › no critical JS errors on page (18.3s)
+  ✓  137 [chromium] › tests\e2e-full.spec.js:215:5 › Main Pages Navigation › /settings page loads (18.1s)
+  ✓  138 [chromium] › tests\e2e-full.spec.js:678:5 › Deep — Chat Quality › AI reply contains actual words (2.2s)
+  ✓  140 [chromium] › tests\e2e-full.spec.js:684:5 › Deep — Chat Quality › AI reply to math is correct (3.7s)
+  ✓  141 [chromium] › tests\e2e-full.spec.js:690:5 › Deep — Chat Quality › Kira replies in Romanian (3.3s)
+  ✓  139 [chromium] › tests\e2e-full.spec.js:223:5 › Main Pages Navigation › /developer page loads (1.2m)
+  ✘  142 [chromium] › tests\e2e-full.spec.js:702:5 › Deep — UI Interactions › pricing modal opens and has grid (1.0m)
+  ✓  143 [chromium] › tests\e2e-full.spec.js:231:5 › Main Pages Navigation › navigate back to homepage from developer page (55.2s)
+  ✘  144 [chromium] › tests\e2e-full.spec.js:702:5 › Deep — UI Interactions › pricing modal opens and has grid (retry #1) (2.2m)
+  ✓  145 [chromium] › tests\e2e-full.spec.js:248:5 › Main Pages Navigation › static assets load (CSS/JS) (1.4m)
+mepage (48.9s)
+  ✓  131 [chromium] › tests\e2e-full.spec.js:187:5 › Main Pages Navigation › /pricing/ page loads (1.7m)
+  ✓  132 [chromium] › tests\e2e-full.spec.js:590:5 › Error Handling › no uncaught JS errors on pricing page (1.7m)
+  ✓  134 [chromium] › tests\e2e-full.spec.js:616:5 › PWA › manifest.json is present and valid (36ms)
+  ✓  135 [chromium] › tests\e2e-full.spec.js:630:5 › PWA › service worker registration attempted (58.0s)
+  -  133 [chromium] › tests\e2e-full.spec.js:197:5 › Main Pages Navigation › pricing link from navbar has correct href
 [REAL JS ERRORS]: [
-  [32m`Evaluating a string as JavaScript violates the following Content Security Policy directive because 'unsafe-eval' is not an allowed source of script: script-src 'self' 'nonce-JPrMKObuVktMgUEiu5MglA==' https://cdn.jsdelivr.net https://browser.sentry-cdn.com".\n`[39m
+  [32m`Evaluating a string as JavaScript violates the following Content Security Policy directive because 'unsafe-eval' is not an allowed source of script: script-src 'self' 'nonce-hodZlP4tRdd8snoiiXmxaA==' https://cdn.jsdelivr.net https://browser.sentry-cdn.com".\n`[39m
 ]
-  ✓  141 [chromium] › tests\e2e-full.spec.js:653:5 › Quality — JS Errors › no critical JS errors on page (57.4s)
-  ✓  142 [chromium] › tests\e2e-full.spec.js:678:5 › Deep — Chat Quality › AI reply contains actual words (3.1s)
-  ✓  140 [chromium] › tests\e2e-full.spec.js:248:5 › Main Pages Navigation › static assets load (CSS/JS) (1.1m)
-  ✓  143 [chromium] › tests\e2e-full.spec.js:684:5 › Deep — Chat Quality › AI reply to math is correct (3.0s)
-  ✓  145 [chromium] › tests\e2e-full.spec.js:690:5 › Deep — Chat Quality › Kira replies in Romanian (3.0s)
-  ✘  146 [chromium] › tests\e2e-full.spec.js:702:5 › Deep — UI Interactions › pricing modal opens and has grid (1.0m)
-[2026-03-05T08:08:59.649Z] ❌ E2E (Playwright) FAILED (600025ms, exit null)
-[2026-03-05T08:08:59.652Z] 
+  ✓  136 [chromium] › tests\e2e-full.spec.js:653:5 › Quality — JS Errors › no critical JS errors on page (18.3s)
+  ✓  137 [chromium] › tests\e2e-full.spec.js:215:5 › Main Pages Navigation › /settings page loads (18.1s)
+  ✓  138 [chromium] › tests\e2e-full.spec.js:678:5 › Deep — Chat Quality › AI reply contains actual words (2.2s)
+  ✓  140 [chromium] › tests\e2e-full.spec.js:684:5 › Deep — Chat Quality › AI reply to math is correct (3.7s)
+  ✓  141 [chromium] › tests\e2e-full.spec.js:690:5 › Deep — Chat Quality › Kira replies in Romanian (3.3s)
+  ✓  139 [chromium] › tests\e2e-full.spec.js:223:5 › Main Pages Navigation › /developer page loads (1.2m)
+  ✘  142 [chromium] › tests\e2e-full.spec.js:702:5 › Deep — UI Interactions › pricing modal opens and has grid (1.0m)
+  ✓  143 [chromium] › tests\e2e-full.spec.js:231:5 › Main Pages Navigation › navigate back to homepage from developer page (55.2s)
+  ✘  144 [chromium] › tests\e2e-full.spec.js:702:5 › Deep — UI Interactions › pricing modal opens and has grid (retry #1) (2.2m)
+  ✓  145 [chromium] › tests\e2e-full.spec.js:248:5 › Main Pages Navigation › static assets load (CSS/JS) (1.4m)
+[2026-03-05T08:52:50.195Z] ❌ E2E (Playwright) FAILED (606912ms, exit null)
+[2026-03-05T08:52:50.199Z] 
 ════ GENERATING ARTIFACTS ════
-[2026-03-05T08:09:00.869Z] ✅ gate_report.json written
+[2026-03-05T08:53:01.600Z] ✅ gate_report.json written

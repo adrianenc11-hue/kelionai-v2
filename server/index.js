@@ -778,20 +778,25 @@ app.get("/admin/*", (req, res, next) => {
   next();
 });
 
-// ═══ PATH TRAVERSAL GUARD — block before SPA catch-all ═══
-app.use((req, res, next) => {
-  try {
-    const decoded = decodeURIComponent(req.path);
-    if (decoded.includes("..")) {
-      return res.status(403).json({ error: "Forbidden" });
-    }
-  } catch {
-    /* malformed URI — let it fall through */
-  }
-  next();
-});
+// ═══ SPA ROUTE WHITELIST — only serve index.html for known UI routes ═══
+const SPA_ROUTES = new Set([
+  "/",
+  "/app",
+  "/login",
+  "/signup",
+  "/pricing",
+  "/pricing/",
+  "/onboarding",
+  "/settings",
+  "/developer",
+  "/error",
+]);
 
 app.get("*", (req, res) => {
+  // Only serve SPA for whitelisted UI routes — everything else is 404
+  if (!SPA_ROUTES.has(req.path)) {
+    return res.status(404).type("html").send(_raw404Html);
+  }
   const nonce = res.locals.cspNonce || "";
   const html = _indexHtml.replace(
     /<script\b(?![^>]*\bnonce=)/g,
