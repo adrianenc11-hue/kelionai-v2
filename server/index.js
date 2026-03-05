@@ -87,6 +87,7 @@ app.use((req, res, next) => {
         defaultSrc: ["'self'"],
         scriptSrc: [
           "'self'",
+          "'unsafe-eval'", // Required by Three.js (uses new Function() for shaders)
           (req, res) => `'nonce-${res.locals.cspNonce}'`,
           // Required CDNs with pinned versions
           "https://cdn.jsdelivr.net",
