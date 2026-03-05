@@ -12,33 +12,46 @@ const { getVoiceId } = require("./config/voices");
 
 const router = express.Router();
 
-// STATS
-const stats = { messagesReceived: 0, repliesSent: 0, activeSenders: new Set() };
+// STATS (counters only — no unbounded Sets)
+const stats = { messagesReceived: 0, repliesSent: 0, uniqueSenders: 0 };
 
-// CHARACTER SELECTION
-const chatCharacter = new Map();
-
-// CONVERSATION CONTEXT
+// CONVERSATION CONTEXT — stored in Supabase messenger_messages
 const MAX_CONTEXT_MESSAGES = 50;
-const conversationHistory = new Map();
 
-function addToHistory(senderId, from, text) {
-  if (!conversationHistory.has(senderId)) conversationHistory.set(senderId, []);
-  const history = conversationHistory.get(senderId);
-  history.push({ from, text, timestamp: Date.now() });
-  if (history.length > MAX_CONTEXT_MESSAGES)
-    history.splice(0, history.length - MAX_CONTEXT_MESSAGES);
+async function addToHistory(senderId, from, text) {
+  if (_supabase) {
+    try {
+      await _supabase.from("messenger_messages").insert({
+        sender_id: senderId,
+        role: from === "user" ? "user" : "assistant",
+        content: (text || "").slice(0, 2000),
+      });
+    } catch (e) {
+      logger.warn({ component: "Messenger", err: e.message }, "DB history write failed");
+    }
+  }
 }
 
-function getContextSummary(senderId) {
-  const history = conversationHistory.get(senderId) || [];
-  if (history.length === 0) return "";
-  return history.map((h) => h.from + ": " + h.text).join("\n");
+async function getContextSummary(senderId) {
+  if (!_supabase) return "";
+  try {
+    const { data } = await _supabase
+      .from("messenger_messages")
+      .select("role, content")
+      .eq("sender_id", senderId)
+      .order("created_at", { ascending: false })
+      .limit(MAX_CONTEXT_MESSAGES);
+    if (!data || data.length === 0) return "";
+    return data.reverse().map((h) => h.role + ": " + h.content).join("\n");
+  } catch (e) {
+    logger.warn({ component: "Messenger", err: e.message }, "DB history read failed");
+    return "";
+  }
 }
 
-// KNOWN USERS
-const knownUsers = new Map();
-const userMessageCount = new Map();
+// LRU cache for known users (max 50 entries, backed by Supabase)
+const _userCache = new Map();
+const _USER_CACHE_MAX = 50;
 const FREE_MESSAGES_LIMIT = 15;
 
 // FEATURE 6: SUBSCRIBER MANAGEMENT
@@ -86,51 +99,107 @@ setInterval(function () {
 }, 600000).unref();
 
 async function getKnownUser(senderId, supabase) {
-  if (knownUsers.has(senderId)) return knownUsers.get(senderId);
-  if (supabase) {
+  // Check tiny LRU cache first
+  if (_userCache.has(senderId)) return _userCache.get(senderId);
+  const db = supabase || _supabase;
+  if (db) {
     try {
-      const { data } = await supabase
+      const { data } = await db
         .from("messenger_users")
         .select("*")
         .eq("sender_id", senderId)
         .single();
       if (data) {
-        knownUsers.set(senderId, {
+        const user = {
           lang: data.language,
           name: data.name,
           firstSeen: data.first_seen,
-        });
-        return knownUsers.get(senderId);
+          character: data.character || "kelion",
+          messageCount: data.message_count || 0,
+        };
+        // LRU eviction
+        if (_userCache.size >= _USER_CACHE_MAX) {
+          const oldest = _userCache.keys().next().value;
+          _userCache.delete(oldest);
+        }
+        _userCache.set(senderId, user);
+        return user;
       }
     } catch (e) {
-      logger.warn(
-        { component: "Messenger", err: e.message },
-        "table may not exist",
-      );
+      logger.warn({ component: "Messenger", err: e.message }, "table may not exist");
     }
   }
   return null;
 }
 
 async function saveKnownUser(senderId, lang, name, supabase) {
-  knownUsers.set(senderId, { lang, name, firstSeen: new Date().toISOString() });
-  if (supabase) {
+  const db = supabase || _supabase;
+  // Update cache
+  const cached = _userCache.get(senderId) || {};
+  const user = { ...cached, lang, name, firstSeen: cached.firstSeen || new Date().toISOString() };
+  if (_userCache.size >= _USER_CACHE_MAX) {
+    const oldest = _userCache.keys().next().value;
+    _userCache.delete(oldest);
+  }
+  _userCache.set(senderId, user);
+  if (db) {
     try {
-      await supabase.from("messenger_users").upsert(
+      await db.from("messenger_users").upsert(
         {
           sender_id: senderId,
           language: lang,
           name: name || null,
-          first_seen: new Date().toISOString(),
+          first_seen: user.firstSeen,
           last_seen: new Date().toISOString(),
         },
         { onConflict: "sender_id" },
       );
     } catch (e) {
-      logger.warn(
-        { component: "Messenger", err: e.message },
-        "in-memory fallback",
-      );
+      logger.warn({ component: "Messenger", err: e.message }, "DB write failed");
+    }
+  }
+}
+
+// Character selection — stored in Supabase messenger_users.character
+async function getChatCharacter(senderId) {
+  const user = await getKnownUser(senderId, _supabase);
+  return (user && user.character) || "kelion";
+}
+
+async function setChatCharacter(senderId, character) {
+  // Update cache
+  const cached = _userCache.get(senderId);
+  if (cached) cached.character = character;
+  if (_supabase) {
+    try {
+      await _supabase.from("messenger_users")
+        .update({ character })
+        .eq("sender_id", senderId);
+    } catch (e) {
+      logger.warn({ component: "Messenger", err: e.message }, "character update failed");
+    }
+  }
+}
+
+// Message count — stored in Supabase
+async function getUserMessageCount(senderId) {
+  const user = await getKnownUser(senderId, _supabase);
+  return (user && user.messageCount) || 0;
+}
+
+async function incrementUserMessageCount(senderId) {
+  const cached = _userCache.get(senderId);
+  if (cached) cached.messageCount = (cached.messageCount || 0) + 1;
+  if (_supabase) {
+    try {
+      await _supabase.rpc("increment_messenger_message_count", { p_sender_id: senderId }).catch(() => {
+        // Fallback if RPC not available
+        _supabase.from("messenger_users")
+          .update({ message_count: (cached && cached.messageCount) || 1 })
+          .eq("sender_id", senderId);
+      });
+    } catch (e) {
+      logger.warn({ component: "Messenger", err: e.message }, "message count update failed");
     }
   }
 }
@@ -185,19 +254,24 @@ function detectLanguage(text) {
   return "ro";
 }
 
-// RATE LIMITING
+// RATE LIMITING — stays in memory (ephemeral, needs speed)
 const RATE_LIMIT_MAX = 15;
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
+const _RATE_LIMIT_MAX_ENTRIES = 200;
 const senderRateLimits = new Map();
 
 function isRateLimited(senderId) {
   const now = Date.now();
   const entry = senderRateLimits.get(senderId);
   if (!entry || now >= entry.resetAt) {
-    senderRateLimits.set(senderId, {
-      count: 1,
-      resetAt: now + RATE_LIMIT_WINDOW_MS,
-    });
+    // Evict expired entries if over limit
+    if (senderRateLimits.size >= _RATE_LIMIT_MAX_ENTRIES) {
+      for (const [k, v] of senderRateLimits) {
+        if (now >= v.resetAt) senderRateLimits.delete(k);
+        if (senderRateLimits.size < _RATE_LIMIT_MAX_ENTRIES) break;
+      }
+    }
+    senderRateLimits.set(senderId, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
     return false;
   }
   if (entry.count >= RATE_LIMIT_MAX) return true;
@@ -270,9 +344,9 @@ async function getSenderProfile(senderId) {
   try {
     const res = await fetch(
       "https://graph.facebook.com/v21.0/" +
-        senderId +
-        "?fields=first_name,last_name&access_token=" +
-        token,
+      senderId +
+      "?fields=first_name,last_name&access_token=" +
+      token,
     );
     if (res.ok) {
       const data = await res.json();
@@ -315,8 +389,8 @@ async function analyzeImage(imageBuffer, caption, mimeType) {
   const mediaType = mimeType || "image/jpeg";
   const userPrompt = caption
     ? 'Utilizatorul a trimis aceasta imagine cu textul: "' +
-      caption +
-      '". Descrie ce vezi, identifica persoane, obiecte, locuri, texte.'
+    caption +
+    '". Descrie ce vezi, identifica persoane, obiecte, locuri, texte.'
     : "Descrie in detaliu ce vezi in aceasta imagine. Identifica persoane, obiecte, locuri, texte vizibile, culori, actiuni.";
 
   try {
@@ -408,7 +482,7 @@ async function extractDocumentText(buffer, mimeType, filename) {
     }
     if (
       mimeType ===
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
       ext === "docx"
     ) {
       const result = await mammoth.extractRawText({ buffer: buffer });
@@ -691,7 +765,7 @@ async function setupPersistentMenu() {
   try {
     const res = await fetch(
       "https://graph.facebook.com/v21.0/me/messenger_profile?access_token=" +
-        token,
+      token,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -771,14 +845,14 @@ async function handlePostback(senderId, payload, appLocals) {
       await sendMessage(
         senderId,
         "❓ Cum te pot ajuta:\n\n" +
-          "📝 Trimite text — raspund intrebarii tale\n" +
-          "🖼️ Trimite imagine — analizez poza\n" +
-          "🎤 Trimite mesaj vocal — transcriu si raspund\n" +
-          "📄 Trimite document — extrag si analizez textul\n" +
-          '📰 Scrie "stiri" — iti trimit ultimele stiri\n' +
-          '🤖 Scrie "kelion" sau "kira" — schimba asistentul\n' +
-          '🔔 Scrie "aboneaza-ma" — notificari stiri\n\n' +
-          "🌐 Mai multe pe kelionai.app",
+        "📝 Trimite text — raspund intrebarii tale\n" +
+        "🖼️ Trimite imagine — analizez poza\n" +
+        "🎤 Trimite mesaj vocal — transcriu si raspund\n" +
+        "📄 Trimite document — extrag si analizez textul\n" +
+        '📰 Scrie "stiri" — iti trimit ultimele stiri\n' +
+        '🤖 Scrie "kelion" sau "kira" — schimba asistentul\n' +
+        '🔔 Scrie "aboneaza-ma" — notificari stiri\n\n' +
+        "🌐 Mai multe pe kelionai.app",
         ["💬 Chat", "📰 Știri", "🌐 Site"],
       );
     }
@@ -1159,8 +1233,8 @@ router.post("/webhook", async function (req, res) {
           await sendMessage(
             senderId,
             (charName === "kelion" ? "🤖 " : "👩‍💻 ") +
-              displayName +
-              " este acum asistentul tau. Cu ce te pot ajuta?",
+            displayName +
+            " este acum asistentul tau. Cu ce te pot ajuta?",
             ["💬 Chat", "📰 Știri", "🌤️ Meteo"],
           );
           stats.repliesSent++;
@@ -1337,8 +1411,8 @@ router.post("/webhook", async function (req, res) {
               await sendMessage(
                 senderId,
                 "👋 Bun venit! Sunt " +
-                  (character === "kira" ? "Kira" : "Kelion") +
-                  ", asistentul tau AI.\n\nCe doresti sa faci?",
+                (character === "kira" ? "Kira" : "Kelion") +
+                ", asistentul tau AI.\n\nCe doresti sa faci?",
                 ["🤖 Kelion", "👩‍💻 Kira", "📰 Știri", "❓ Ajutor"],
               );
             } catch (ex) {
@@ -1383,11 +1457,11 @@ router.post("/webhook", async function (req, res) {
               await sendMessage(
                 senderId,
                 "Ai folosit " +
-                  FREE_MESSAGES_LIMIT +
-                  " mesaje gratuite!\n\n" +
-                  "Continua cu functii premium pe kelionai.app:\n" +
-                  "Chat nelimitat cu AI\nAvatare 3D\nVoce naturala\n\n" +
-                  "Aboneaza-te: https://kelionai.app/pricing",
+                FREE_MESSAGES_LIMIT +
+                " mesaje gratuite!\n\n" +
+                "Continua cu functii premium pe kelionai.app:\n" +
+                "Chat nelimitat cu AI\nAvatare 3D\nVoce naturala\n\n" +
+                "Aboneaza-te: https://kelionai.app/pricing",
                 ["💎 Upgrade", "🌐 Site"],
               );
             } catch (ex) {
@@ -1459,7 +1533,7 @@ function getStats() {
   return {
     messagesReceived: stats.messagesReceived,
     repliesSent: stats.repliesSent,
-    activeSenders: stats.activeSenders.size,
+    activeSenders: stats.uniqueSenders,
     subscribers: subscribedUsers.size,
   };
 }

@@ -40,8 +40,8 @@ const {
   notifySubscribersNews,
   setSupabase: setMessengerSupabase,
 } = require("./messenger");
-const { router: telegramRouter, broadcastNews } = require("./telegram");
-const { router: whatsappRouter } = require("./whatsapp");
+const { router: telegramRouter, broadcastNews, setSupabase: setTelegramSupabase } = require("./telegram");
+const { router: whatsappRouter, setSupabase: setWhatsappSupabase } = require("./whatsapp");
 const fbPage = require("./facebook-page");
 const instagram = require("./instagram");
 const developerRouter = require("./routes/developer");
@@ -231,9 +231,9 @@ const _rawHtml = fs.readFileSync(
 );
 const _indexHtml = process.env.SENTRY_DSN
   ? _rawHtml.replace(
-      '<meta name="sentry-dsn" content="">',
-      `<meta name="sentry-dsn" content="${process.env.SENTRY_DSN.replace(/&/g, "&amp;").replace(/"/g, "&quot;")}">`,
-    )
+    '<meta name="sentry-dsn" content="">',
+    `<meta name="sentry-dsn" content="${process.env.SENTRY_DSN.replace(/&/g, "&amp;").replace(/"/g, "&quot;")}">`,
+  )
   : _rawHtml;
 
 // Read 404.html once at startup (for admin stealth)
@@ -256,9 +256,9 @@ const _rawOnboarding = fs.existsSync(
   path.join(__dirname, "..", "app", "onboarding.html"),
 )
   ? fs.readFileSync(
-      path.join(__dirname, "..", "app", "onboarding.html"),
-      "utf8",
-    )
+    path.join(__dirname, "..", "app", "onboarding.html"),
+    "utf8",
+  )
   : null;
 
 // Read reset-password.html once at startup
@@ -266,9 +266,9 @@ const _rawResetPassword = fs.existsSync(
   path.join(__dirname, "..", "app", "reset-password.html"),
 )
   ? fs.readFileSync(
-      path.join(__dirname, "..", "app", "reset-password.html"),
-      "utf8",
-    )
+    path.join(__dirname, "..", "app", "reset-password.html"),
+    "utf8",
+  )
   : null;
 
 // Serve onboarding with CSP nonce injection
@@ -683,6 +683,8 @@ app.use("/api/news", adminAuth, newsModule.router);
 newsModule.setSupabase(supabaseAdmin);
 newsModule.restoreCache();
 setMessengerSupabase(supabaseAdmin);
+setTelegramSupabase(supabaseAdmin);
+setWhatsappSupabase(supabaseAdmin);
 instagram.setSupabase(supabaseAdmin);
 
 // ═══ AUTO-PUBLISH: when news fetches, distribute to all media ═══
