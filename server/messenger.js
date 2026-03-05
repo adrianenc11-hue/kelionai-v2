@@ -813,14 +813,14 @@ async function setupPersistentMenu() {
 async function handlePostback(senderId, payload, appLocals) {
   try {
     if (payload === "SWITCH_KELION") {
-      chatCharacter.set(senderId, "kelion");
+      await setChatCharacter(senderId, "kelion");
       await sendMessage(senderId, "🤖 Kelion este acum asistentul tau!", [
         "💬 Chat",
         "📰 Știri",
         "🌤️ Meteo",
       ]);
     } else if (payload === "SWITCH_KIRA") {
-      chatCharacter.set(senderId, "kira");
+      await setChatCharacter(senderId, "kira");
       await sendMessage(senderId, "👩‍💻 Kira este acum asistenta ta!", [
         "💬 Chat",
         "📰 Știri",
@@ -1228,7 +1228,7 @@ router.post("/webhook", async function (req, res) {
         // CHARACTER SELECTION
         if (/^(kelion|kira)$/i.test((userText || "").trim())) {
           const charName = userText.trim().toLowerCase();
-          chatCharacter.set(senderId, charName);
+          await setChatCharacter(senderId, charName);
           const displayName = charName === "kelion" ? "Kelion" : "Kira";
           await sendMessage(
             senderId,
@@ -1305,7 +1305,7 @@ router.post("/webhook", async function (req, res) {
             );
             addToHistory(
               senderId,
-              chatCharacter.get(senderId) === "kira" ? "Kira" : "Kelion",
+              (await getChatCharacter(senderId)) === "kira" ? "Kira" : "Kelion",
               "Stiri trimise",
             );
             stats.repliesSent++;
@@ -1313,7 +1313,7 @@ router.post("/webhook", async function (req, res) {
           }
         }
 
-        const character = chatCharacter.get(senderId) || "kelion";
+        const character = (await getChatCharacter(senderId)) || "kelion";
 
         // IMAGE GENERATION REQUEST (Feature 3)
         if (
@@ -1383,8 +1383,7 @@ router.post("/webhook", async function (req, res) {
         }
 
         // DETERMINE QUICK REPLIES FOR RESPONSE
-        const msgCount = (userMessageCount.get(senderId) || 0) + 1;
-        userMessageCount.set(senderId, msgCount);
+        const msgCount = await incrementUserMessageCount(senderId);
         let replyQuickReplies;
         if (msgCount === FREE_MESSAGES_LIMIT) {
           replyQuickReplies = ["💎 Upgrade", "🌐 Site"];
