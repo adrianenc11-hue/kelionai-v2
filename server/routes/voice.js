@@ -84,36 +84,46 @@ router.post("/speak", ttsLimiter, validate(speakSchema), async (req, res) => {
     }
     // Fallback to language-based native voice
     if (!vid) vid = getVoiceId(avatar, language);
-    const r = await fetch(
-      "https://api.elevenlabs.io/v1/text-to-speech/" + vid,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "xi-api-key": process.env.ELEVENLABS_API_KEY,
+    const ac = new AbortController();
+    const timer = setTimeout(() => ac.abort(), 25000);
+    try {
+      const r = await fetch(
+        "https://api.elevenlabs.io/v1/text-to-speech/" + vid,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "xi-api-key": process.env.ELEVENLABS_API_KEY,
+          },
+          body: JSON.stringify({
+            text,
+            model_id: "eleven_multilingual_v2",
+            voice_settings: selectedVoiceSettings,
+          }),
+          signal: ac.signal,
         },
-        body: JSON.stringify({
-          text,
-          model_id: "eleven_multilingual_v2",
-          voice_settings: selectedVoiceSettings,
-        }),
-      },
-    );
-    if (!r.ok) return res.status(503).json({ error: "TTS fail" });
-    const buf = Buffer.from(await r.arrayBuffer());
-    logger.info(
-      { component: "Speak", bytes: buf.length, avatar, mood },
-      buf.length + " bytes | " + avatar,
-    );
-    incrementUsage(user?.id, "tts", supabaseAdmin).catch((e) =>
-      logger.warn(
-        { component: "Voice", err: e.message },
-        "incrementUsage failed",
-      ),
-    );
-    res.set({ "Content-Type": "audio/mpeg", "Content-Length": buf.length });
-    res.send(buf);
-  } catch {
+      );
+      clearTimeout(timer);
+      if (!r.ok) return res.status(503).json({ error: "TTS fail" });
+      const buf = Buffer.from(await r.arrayBuffer());
+      logger.info(
+        { component: "Speak", bytes: buf.length, avatar, mood },
+        buf.length + " bytes | " + avatar,
+      );
+      incrementUsage(user?.id, "tts", supabaseAdmin).catch((e) =>
+        logger.warn(
+          { component: "Voice", err: e.message },
+          "incrementUsage failed",
+        ),
+      );
+      res.set({ "Content-Type": "audio/mpeg", "Content-Length": buf.length });
+      res.send(buf);
+    } catch (fetchErr) {
+      clearTimeout(timer);
+      logger.warn({ component: "Speak", err: fetchErr.message }, "TTS fetch error");
+      return res.status(503).json({ error: "TTS timeout or network error" });
+    }
+  } catch (e) {
     res.status(500).json({ error: "TTS error" });
   }
 });
@@ -144,25 +154,35 @@ router.post("/listen", apiLimiter, validate(listenSchema), async (req, res) => {
         contentType: "audio/webm",
       });
       form.append("model", "whisper-large-v3");
-      const r = await fetch(
-        "https://api.groq.com/openai/v1/audio/transcriptions",
-        {
-          method: "POST",
-          headers: { Authorization: "Bearer " + process.env.GROQ_API_KEY },
-          body: form,
-        },
-      );
-      const d = await r.json();
-      incrementUsage(user?.id, "stt", supabaseAdmin).catch((e) =>
-        logger.warn(
-          { component: "Voice", err: e.message },
-          "incrementUsage failed",
-        ),
-      );
-      return res.json({ text: d.text || "", engine: "Groq" });
+      const ac2 = new AbortController();
+      const timer2 = setTimeout(() => ac2.abort(), 25000);
+      try {
+        const r = await fetch(
+          "https://api.groq.com/openai/v1/audio/transcriptions",
+          {
+            method: "POST",
+            headers: { Authorization: "Bearer " + process.env.GROQ_API_KEY },
+            body: form,
+            signal: ac2.signal,
+          },
+        );
+        clearTimeout(timer2);
+        const d = await r.json();
+        incrementUsage(user?.id, "stt", supabaseAdmin).catch((e) =>
+          logger.warn(
+            { component: "Voice", err: e.message },
+            "incrementUsage failed",
+          ),
+        );
+        return res.json({ text: d.text || "", engine: "Groq" });
+      } catch (fetchErr) {
+        clearTimeout(timer2);
+        logger.warn({ component: "Listen", err: fetchErr.message }, "STT fetch error");
+        return res.status(503).json({ error: "STT timeout or network error" });
+      }
     }
     res.status(503).json({ error: "Use Web Speech API" });
-  } catch {
+  } catch (e) {
     res.status(500).json({ error: "STT error" });
   }
 });
