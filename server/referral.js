@@ -308,6 +308,42 @@ async function applyReferralBonus(code, recipientUserId, supabaseAdmin) {
         },
         "✅ Sender bonus applied",
       );
+
+      // ── Send confirmation email to the inviter ──
+      try {
+        const { data: senderUser } = await supabaseAdmin.auth.admin.getUserById(refCode.sender_id);
+        if (senderUser && senderUser.email) {
+          const transport = getMailTransport();
+          if (transport) {
+            const from = process.env.EMAIL_FROM || process.env.SMTP_USER || "noreply@kelionai.app";
+            await transport.sendMail({
+              from,
+              to: senderUser.email,
+              subject: "🎉 Ai primit bonus KelionAI!",
+              html: `<!DOCTYPE html>
+<html><head><meta charset="utf-8"></head>
+<body style="font-family:system-ui,sans-serif;background:#0a0a1a;color:#e0e0e0;margin:0;padding:20px">
+<div style="max-width:520px;margin:0 auto;background:#12122a;border-radius:16px;padding:32px;border:1px solid rgba(0,255,255,0.15)">
+  <h1 style="color:#00ff88;font-size:1.5rem;margin:0 0 8px">🎉 Bonus primit!</h1>
+  <p style="margin:0 0 16px">Felicitări! Prietenul invitat de tine și-a activat subscripția.</p>
+  <div style="background:#0a0a1a;border:2px solid #00ff88;border-radius:12px;padding:20px;text-align:center;margin:0 0 24px">
+    <div style="font-size:2rem;margin-bottom:8px">🎁</div>
+    <div style="font-size:1.3rem;font-weight:bold;color:#00ff88">+${SENDER_BONUS_DAYS} zile bonus</div>
+    <div style="color:#888;font-size:0.85rem;margin-top:6px">adăugate la subscripția ta</div>
+  </div>
+  <p style="color:#aaa;font-size:0.85rem;margin:0 0 16px">Continuă să inviți prieteni pentru și mai multe zile gratuite!</p>
+  <div style="text-align:center">
+    <a href="https://kelionai.app" style="display:inline-block;background:linear-gradient(135deg,#6366F1,#06B6D4);color:#fff;font-weight:bold;padding:12px 28px;border-radius:10px;text-decoration:none">Deschide KelionAI</a>
+  </div>
+</div>
+</body></html>`
+            });
+            logger.info({ component: "Referral", to: senderUser.email }, "Sender bonus confirmation email sent");
+          }
+        }
+      } catch (emailErr) {
+        logger.warn({ component: "Referral", err: emailErr.message }, "Failed to send sender bonus email (non-fatal)");
+      }
     }
   } catch (e) {
     logger.error(
