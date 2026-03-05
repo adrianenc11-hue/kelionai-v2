@@ -1,197 +1,121 @@
-[2026-03-05T08:42:28.146Z] ═══ TRUTH GUARD — GATE RUNNER ═══
-[2026-03-05T08:42:28.150Z] Commit: local
-[2026-03-05T08:42:28.150Z] Node: v20.11.0
-[2026-03-05T08:42:28.151Z] CWD: C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2
-[2026-03-05T08:42:28.151Z] 
+[2026-03-05T10:47:45.176Z] ═══ TRUTH GUARD — GATE RUNNER ═══
+[2026-03-05T10:47:45.189Z] Commit: local
+[2026-03-05T10:47:45.190Z] Node: v20.11.0
+[2026-03-05T10:47:45.190Z] CWD: C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2
+[2026-03-05T10:47:45.190Z] 
 ════ GATE: Prettier (format check) ════
-[2026-03-05T08:42:28.151Z] Command: npx prettier --check "server/**/*.js"
-[2026-03-05T08:42:30.437Z] Checking formatting...
-[[33mwarn[39m] server/brain.js
-[[33mwarn[39m] server/cache.js
-[[33mwarn[39m] server/config/voices.js
-[[33mwarn[39m] server/facebook-page.js
-[[33mwarn[39m] server/index.js
-[[33mwarn[39m] server/instagram.js
-[[33mwarn[39m] server/legal.js
-[[33mwarn[39m] server/logger.js
-[[33mwarn[39m] server/messenger.js
-[[33mwarn[39m] server/metrics.js
-[[33mwarn[39m] server/middleware/apiKeyAuth.js
-[[33mwarn[39m] server/middleware/auth.js
-[[33mwarn[39m] server/middleware/checkSubscription.js
-[[33mwarn[39m] server/migrate.js
-[[33mwarn[39m] server/news.js
-[[33mwarn[39m] server/payments.js
-[[33mwarn[39m] server/persona.js
-[[33mwarn[39m] server/referral.js
-[[33mwarn[39m] server/routes/admin.js
-[[33mwarn[39m] server/routes/auth.js
-[[33mwarn[39m] server/routes/chat.js
-[[33mwarn[39m] server/routes/developer.js
-[[33mwarn[39m] server/routes/health.js
-[[33mwarn[39m] server/routes/identity.js
-[[33mwarn[39m] server/routes/images.js
-[[33mwarn[39m] server/routes/search.js
-[[33mwarn[39m] server/routes/vision.js
-[[33mwarn[39m] server/routes/voice-clone.js
-[[33mwarn[39m] server/routes/voice.js
-[[33mwarn[39m] server/routes/weather.js
-[[33mwarn[39m] server/supabase.js
-[[33mwarn[39m] server/telegram.js
-[[33mwarn[39m] server/trade-executor.js
-[[33mwarn[39m] server/trade-intelligence.js
-[[33mwarn[39m] server/trading.js
-[[33mwarn[39m] server/validation.js
-[[33mwarn[39m] server/whatsapp.js
-[[33mwarn[39m] Code style issues found in 37 files. Run Prettier with --write to fix.
+[2026-03-05T10:47:45.190Z] Command: npx prettier --check "server/**/*.js"
+[2026-03-05T10:47:47.480Z] Checking formatting...
+All matched files use Prettier code style!
 Checking formatting...
-[[33mwarn[39m] server/brain.js
-[[33mwarn[39m] server/cache.js
-[[33mwarn[39m] server/config/voices.js
-[[33mwarn[39m] server/facebook-page.js
-[[33mwarn[39m] server/index.js
-[[33mwarn[39m] server/instagram.js
-[[33mwarn[39m] server/legal.js
-[[33mwarn[39m] server/logger.js
-[[33mwarn[39m] server/messenger.js
-[[33mwarn[39m] server/metrics.js
-[[33mwarn[39m] server/middleware/apiKeyAuth.js
-[[33mwarn[39m] server/middleware/auth.js
-[[33mwarn[39m] server/middleware/checkSubscription.js
-[[33mwarn[39m] server/migrate.js
-[[33mwarn[39m] server/news.js
-[[33mwarn[39m] server/payments.js
-[[33mwarn[39m] server/persona.js
-[[33mwarn[39m] server/referral.js
-[[33mwarn[39m] server/routes/admin.js
-[[33mwarn[39m] server/routes/auth.js
-[[33mwarn[39m] server/routes/chat.js
-[[33mwarn[39m] server/routes/developer.js
-[[33mwarn[39m] server/routes/health.js
-[[33mwarn[39m] server/routes/identity.js
-[[33mwarn[39m] server/routes/images.js
-[[33mwarn[39m] server/routes/search.js
-[[33mwarn[39m] server/routes/vision.js
-[[33mwarn[39m] server/routes/voice-clone.js
-[[33mwarn[39m] server/routes/voice.js
-[[33mwarn[39m] server/routes/weather.js
-[[33mwarn[39m] server/supabase.js
-[[33mwarn[39m] server/telegram.js
-[[33mwarn[39m] server/trade-executor.js
-[[33mwarn[39m] server/trade-intelligence.js
-[[33mwarn[39m] server/trading.js
-[[33mwarn[39m] server/validation.js
-[[33mwarn[39m] server/whatsapp.js
-[[33mwarn[39m] Code style issues found in 37 files. Run Prettier with --write to fix.
-[2026-03-05T08:42:30.438Z] ❌ Prettier (format check) FAILED (2286ms, exit 1)
-[2026-03-05T08:42:30.438Z] 
+All matched files use Prettier code style!
+[2026-03-05T10:47:47.480Z] ✅ Prettier (format check) PASSED (2289ms)
+[2026-03-05T10:47:47.480Z] 
 ════ GATE: Lint (ESLint) ════
-[2026-03-05T08:42:30.438Z] Command: npx eslint server/
-[2026-03-05T08:42:31.885Z] ✅ Lint (ESLint) PASSED (1447ms)
-[2026-03-05T08:42:31.885Z] 
+[2026-03-05T10:47:47.481Z] Command: npx eslint server/
+[2026-03-05T10:47:48.911Z] ✅ Lint (ESLint) PASSED (1430ms)
+[2026-03-05T10:47:48.911Z] 
 ════ GATE: Typecheck ════
-[2026-03-05T08:42:31.885Z] Command: npm run typecheck --silent
-[2026-03-05T08:42:32.562Z] typecheck: N/A (JS-only project)
+[2026-03-05T10:47:48.911Z] Command: npm run typecheck --silent
+[2026-03-05T10:47:49.604Z] typecheck: N/A (JS-only project)
 typecheck: N/A (JS-only project)
-[2026-03-05T08:42:32.562Z] ✅ Typecheck PASSED (677ms)
-[2026-03-05T08:42:32.562Z] 
+[2026-03-05T10:47:49.605Z] ✅ Typecheck PASSED (693ms)
+[2026-03-05T10:47:49.605Z] 
 ════ GATE: Unit Tests (Jest) ════
-[2026-03-05T08:42:32.562Z] Command: npx jest --forceExit --silent
-[2026-03-05T08:42:40.468Z]                                                                                                                                                                                                                                                                                                           
+[2026-03-05T10:47:49.605Z] Command: npx jest --forceExit --silent
+[2026-03-05T10:47:54.889Z]                                                                                                                                                                                                                                                                                                              
   voice.js              |   28.35 |    21.87 |      25 |   29.68 | 40-117,123-166                                                                                                                                                                                                                                                                                                                                                                                                
   weather.js            |   33.33 |        0 |       0 |      35 | 22-80                                                                                                                                                                                                                                                                                                                                                                                                         
 ------------------------|---------|----------|---------|---------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 =============================== Coverage summary ===============================
-Statements   : 18.49% ( 1226/6629 )
-Branches     : 11.64% ( 578/4962 )
-Functions    : 16.35% ( 113/691 )
-Lines        : 19.07% ( 1173/6149 )
+Statements   : 18.42% ( 1221/6626 )
+Branches     : 11.62% ( 577/4962 )
+Functions    : 16.23% ( 112/690 )
+Lines        : 19% ( 1168/6146 )
 ================================================================================
-                                                                                                                                                                                                                                                                                                          
+                                                                                                                                                                                                                                                                                                             
   voice.js              |   28.35 |    21.87 |      25 |   29.68 | 40-117,123-166                                                                                                                                                                                                                                                                                                                                                                                                
   weather.js            |   33.33 |        0 |       0 |      35 | 22-80                                                                                                                                                                                                                                                                                                                                                                                                         
 ------------------------|---------|----------|---------|---------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 =============================== Coverage summary ===============================
-Statements   : 18.49% ( 1226/6629 )
-Branches     : 11.64% ( 578/4962 )
-Functions    : 16.35% ( 113/691 )
-Lines        : 19.07% ( 1173/6149 )
+Statements   : 18.42% ( 1221/6626 )
+Branches     : 11.62% ( 577/4962 )
+Functions    : 16.23% ( 112/690 )
+Lines        : 19% ( 1168/6146 )
 ================================================================================
-[2026-03-05T08:42:40.468Z] ✅ Unit Tests (Jest) PASSED (7906ms)
-[2026-03-05T08:42:40.468Z] 
+[2026-03-05T10:47:54.890Z] ✅ Unit Tests (Jest) PASSED (5284ms)
+[2026-03-05T10:47:54.890Z] 
 ════ GATE: Build Validation ════
-[2026-03-05T08:42:40.468Z] Command: npm run build --silent
-[2026-03-05T08:42:41.163Z] Build OK: static assets validated
+[2026-03-05T10:47:54.890Z] Command: npm run build --silent
+[2026-03-05T10:47:55.579Z] Build OK: static assets validated
 Build OK: static assets validated
-[2026-03-05T08:42:41.163Z] ✅ Build Validation PASSED (695ms)
-[2026-03-05T08:42:41.163Z] 
+[2026-03-05T10:47:55.579Z] ✅ Build Validation PASSED (689ms)
+[2026-03-05T10:47:55.579Z] 
 ════ GATE: Security (npm audit) ════
-[2026-03-05T08:42:41.163Z] Command: npm audit --audit-level=high
-[2026-03-05T08:42:42.257Z] found 0 vulnerabilities
+[2026-03-05T10:47:55.579Z] Command: npm audit --audit-level=high
+[2026-03-05T10:47:56.679Z] found 0 vulnerabilities
 found 0 vulnerabilities
-[2026-03-05T08:42:42.257Z] ✅ Security (npm audit) PASSED (1094ms)
-[2026-03-05T08:42:42.257Z] 
+[2026-03-05T10:47:56.680Z] ✅ Security (npm audit) PASSED (1100ms)
+[2026-03-05T10:47:56.680Z] 
 ════ GATE: Smoke Probe ════
-[2026-03-05T08:42:42.257Z] Command: npm run smoke --silent
-[2026-03-05T08:42:43.279Z] 🔍 Smoke Probe — https://kelionai.app
+[2026-03-05T10:47:56.680Z] Command: npm run smoke --silent
+[2026-03-05T10:47:57.721Z] 🔍 Smoke Probe — https://kelionai.app
 
-✅ /health → 200 [121ms]
-✅ /api/news/public → 200 [72ms]
-✅ /api/payments/plans → 200 [216ms]
+✅ /api/payments/plans → 200 [132ms]
+✅ /api/news/public → 200 [256ms]
+✅ /health → 200 [314ms]
 
 3/3 probes passed.
 🔍 Smoke Probe — https://kelionai.app
 
-✅ /health → 200 [121ms]
-✅ /api/news/public → 200 [72ms]
-✅ /api/payments/plans → 200 [216ms]
+✅ /api/payments/plans → 200 [132ms]
+✅ /api/news/public → 200 [256ms]
+✅ /health → 200 [314ms]
 
 3/3 probes passed.
-[2026-03-05T08:42:43.280Z] ✅ Smoke Probe PASSED (1022ms)
-[2026-03-05T08:42:43.280Z] 
+[2026-03-05T10:47:57.721Z] ✅ Smoke Probe PASSED (1041ms)
+[2026-03-05T10:47:57.721Z] 
 ════ GATE: E2E (Playwright) ════
-[2026-03-05T08:42:43.280Z] Command: npm run e2e
-[2026-03-05T08:52:50.192Z] mepage (48.9s)
-  ✓  131 [chromium] › tests\e2e-full.spec.js:187:5 › Main Pages Navigation › /pricing/ page loads (1.7m)
-  ✓  132 [chromium] › tests\e2e-full.spec.js:590:5 › Error Handling › no uncaught JS errors on pricing page (1.7m)
-  ✓  134 [chromium] › tests\e2e-full.spec.js:616:5 › PWA › manifest.json is present and valid (36ms)
-  ✓  135 [chromium] › tests\e2e-full.spec.js:630:5 › PWA › service worker registration attempted (58.0s)
-  -  133 [chromium] › tests\e2e-full.spec.js:197:5 › Main Pages Navigation › pricing link from navbar has correct href
-[REAL JS ERRORS]: [
-  [32m`Evaluating a string as JavaScript violates the following Content Security Policy directive because 'unsafe-eval' is not an allowed source of script: script-src 'self' 'nonce-hodZlP4tRdd8snoiiXmxaA==' https://cdn.jsdelivr.net https://browser.sentry-cdn.com".\n`[39m
-]
-  ✓  136 [chromium] › tests\e2e-full.spec.js:653:5 › Quality — JS Errors › no critical JS errors on page (18.3s)
-  ✓  137 [chromium] › tests\e2e-full.spec.js:215:5 › Main Pages Navigation › /settings page loads (18.1s)
-  ✓  138 [chromium] › tests\e2e-full.spec.js:678:5 › Deep — Chat Quality › AI reply contains actual words (2.2s)
-  ✓  140 [chromium] › tests\e2e-full.spec.js:684:5 › Deep — Chat Quality › AI reply to math is correct (3.7s)
-  ✓  141 [chromium] › tests\e2e-full.spec.js:690:5 › Deep — Chat Quality › Kira replies in Romanian (3.3s)
-  ✓  139 [chromium] › tests\e2e-full.spec.js:223:5 › Main Pages Navigation › /developer page loads (1.2m)
-  ✘  142 [chromium] › tests\e2e-full.spec.js:702:5 › Deep — UI Interactions › pricing modal opens and has grid (1.0m)
-  ✓  143 [chromium] › tests\e2e-full.spec.js:231:5 › Main Pages Navigation › navigate back to homepage from developer page (55.2s)
-  ✘  144 [chromium] › tests\e2e-full.spec.js:702:5 › Deep — UI Interactions › pricing modal opens and has grid (retry #1) (2.2m)
-  ✓  145 [chromium] › tests\e2e-full.spec.js:248:5 › Main Pages Navigation › static assets load (CSS/JS) (1.4m)
-mepage (48.9s)
-  ✓  131 [chromium] › tests\e2e-full.spec.js:187:5 › Main Pages Navigation › /pricing/ page loads (1.7m)
-  ✓  132 [chromium] › tests\e2e-full.spec.js:590:5 › Error Handling › no uncaught JS errors on pricing page (1.7m)
-  ✓  134 [chromium] › tests\e2e-full.spec.js:616:5 › PWA › manifest.json is present and valid (36ms)
-  ✓  135 [chromium] › tests\e2e-full.spec.js:630:5 › PWA › service worker registration attempted (58.0s)
-  -  133 [chromium] › tests\e2e-full.spec.js:197:5 › Main Pages Navigation › pricing link from navbar has correct href
-[REAL JS ERRORS]: [
-  [32m`Evaluating a string as JavaScript violates the following Content Security Policy directive because 'unsafe-eval' is not an allowed source of script: script-src 'self' 'nonce-hodZlP4tRdd8snoiiXmxaA==' https://cdn.jsdelivr.net https://browser.sentry-cdn.com".\n`[39m
-]
-  ✓  136 [chromium] › tests\e2e-full.spec.js:653:5 › Quality — JS Errors › no critical JS errors on page (18.3s)
-  ✓  137 [chromium] › tests\e2e-full.spec.js:215:5 › Main Pages Navigation › /settings page loads (18.1s)
-  ✓  138 [chromium] › tests\e2e-full.spec.js:678:5 › Deep — Chat Quality › AI reply contains actual words (2.2s)
-  ✓  140 [chromium] › tests\e2e-full.spec.js:684:5 › Deep — Chat Quality › AI reply to math is correct (3.7s)
-  ✓  141 [chromium] › tests\e2e-full.spec.js:690:5 › Deep — Chat Quality › Kira replies in Romanian (3.3s)
-  ✓  139 [chromium] › tests\e2e-full.spec.js:223:5 › Main Pages Navigation › /developer page loads (1.2m)
-  ✘  142 [chromium] › tests\e2e-full.spec.js:702:5 › Deep — UI Interactions › pricing modal opens and has grid (1.0m)
-  ✓  143 [chromium] › tests\e2e-full.spec.js:231:5 › Main Pages Navigation › navigate back to homepage from developer page (55.2s)
-  ✘  144 [chromium] › tests\e2e-full.spec.js:702:5 › Deep — UI Interactions › pricing modal opens and has grid (retry #1) (2.2m)
-  ✓  145 [chromium] › tests\e2e-full.spec.js:248:5 › Main Pages Navigation › static assets load (CSS/JS) (1.4m)
-[2026-03-05T08:52:50.195Z] ❌ E2E (Playwright) FAILED (606912ms, exit null)
-[2026-03-05T08:52:50.199Z] 
+[2026-03-05T10:47:57.721Z] Command: npm run e2e
+[2026-03-05T11:12:57.731Z] ons are clickable (1.9m)
+  ✘  158 [chromium] › tests\e2e-full.spec.js:951:3 › Deep — UI Interactions › navbar shows avatar name Kelion (1.1m)
+  ✘  160 [chromium] › tests\e2e-full.spec.js:951:3 › Deep — UI Interactions › navbar shows avatar name Kelion (retry #1) (1.7m)
+  ✘  159 [chromium] › tests\e2e-full.spec.js:447:3 › Buttons and Links › avatar switcher buttons are clickable (retry #1) (2.3m)
+  ✘  161 [chromium] › tests\e2e-full.spec.js:961:3 › Deep — UI Interactions › user badge shows Guest (1.2m)
+  ✘  162 [chromium] › tests\e2e-full.spec.js:457:3 › Buttons and Links › Get Started button is visible on homepage (2.1m)
+  ✘  163 [chromium] › tests\e2e-full.spec.js:961:3 › Deep — UI Interactions › user badge shows Guest (retry #1) (1.0m)
+  ✘  165 [chromium] › tests\e2e-full.spec.js:971:3 › Deep — UI Interactions › full chat: send + AI replies (1.1m)
+  ✘  166 [chromium] › tests\e2e-full.spec.js:971:3 › Deep — UI Interactions › full chat: send + AI replies (retry #1) (1.4m)
+  ✘  164 [chromium] › tests\e2e-full.spec.js:457:3 › Buttons and Links › Get Started button is visible on homepage (retry #1) (2.7m)
+  ✓  167 [chromium] › tests\e2e-full.spec.js:991:3 › Deep — API Data Quality › search returns real data (3.8s)
+  ✓  169 [chromium] › tests\e2e-full.spec.js:1001:3 › Deep — API Data Quality › legal terms has real content (75ms)
+  ✓  170 [chromium] › tests\e2e-full.spec.js:1007:3 › Deep — API Data Quality › privacy policy has real content (59ms)
+  ✓  171 [chromium] › tests\e2e-full.spec.js:1013:3 › Deep — API Data Quality › developer v1/status returns real data (51ms)
+  ✓  172 [chromium] › tests\e2e-full.spec.js:1221:3 › API — Trading › GET /api/trading/status (96ms)
+  ✓  173 [chromium] › tests\e2e-full.spec.js:1227:3 › API — Trading › GET /api/trading/analysis (30ms)
+  ✓  174 [chromium] › tests\e2e-full.spec.js:1233:3 › API — Trading › GET /api/trading/signals (55ms)
+  ✓  175 [chromium] › tests\e2e-full.spec.js:1239:3 › API — Trading › GET /api/trading/portfolio (68ms)
+ons are clickable (1.9m)
+  ✘  158 [chromium] › tests\e2e-full.spec.js:951:3 › Deep — UI Interactions › navbar shows avatar name Kelion (1.1m)
+  ✘  160 [chromium] › tests\e2e-full.spec.js:951:3 › Deep — UI Interactions › navbar shows avatar name Kelion (retry #1) (1.7m)
+  ✘  159 [chromium] › tests\e2e-full.spec.js:447:3 › Buttons and Links › avatar switcher buttons are clickable (retry #1) (2.3m)
+  ✘  161 [chromium] › tests\e2e-full.spec.js:961:3 › Deep — UI Interactions › user badge shows Guest (1.2m)
+  ✘  162 [chromium] › tests\e2e-full.spec.js:457:3 › Buttons and Links › Get Started button is visible on homepage (2.1m)
+  ✘  163 [chromium] › tests\e2e-full.spec.js:961:3 › Deep — UI Interactions › user badge shows Guest (retry #1) (1.0m)
+  ✘  165 [chromium] › tests\e2e-full.spec.js:971:3 › Deep — UI Interactions › full chat: send + AI replies (1.1m)
+  ✘  166 [chromium] › tests\e2e-full.spec.js:971:3 › Deep — UI Interactions › full chat: send + AI replies (retry #1) (1.4m)
+  ✘  164 [chromium] › tests\e2e-full.spec.js:457:3 › Buttons and Links › Get Started button is visible on homepage (retry #1) (2.7m)
+  ✓  167 [chromium] › tests\e2e-full.spec.js:991:3 › Deep — API Data Quality › search returns real data (3.8s)
+  ✓  169 [chromium] › tests\e2e-full.spec.js:1001:3 › Deep — API Data Quality › legal terms has real content (75ms)
+  ✓  170 [chromium] › tests\e2e-full.spec.js:1007:3 › Deep — API Data Quality › privacy policy has real content (59ms)
+  ✓  171 [chromium] › tests\e2e-full.spec.js:1013:3 › Deep — API Data Quality › developer v1/status returns real data (51ms)
+  ✓  172 [chromium] › tests\e2e-full.spec.js:1221:3 › API — Trading › GET /api/trading/status (96ms)
+  ✓  173 [chromium] › tests\e2e-full.spec.js:1227:3 › API — Trading › GET /api/trading/analysis (30ms)
+  ✓  174 [chromium] › tests\e2e-full.spec.js:1233:3 › API — Trading › GET /api/trading/signals (55ms)
+  ✓  175 [chromium] › tests\e2e-full.spec.js:1239:3 › API — Trading › GET /api/trading/portfolio (68ms)
+[2026-03-05T11:12:57.732Z] ❌ E2E (Playwright) FAILED (1500010ms, exit null)
+[2026-03-05T11:12:57.732Z] 
 ════ GENERATING ARTIFACTS ════
-[2026-03-05T08:53:01.600Z] ✅ gate_report.json written
+[2026-03-05T11:12:58.633Z] ✅ gate_report.json written

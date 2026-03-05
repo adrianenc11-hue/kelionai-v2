@@ -1,61 +1,60 @@
 {
   "version": "1.0",
-  "commit": "c62ee1822e079eff9394948186d6eb836edfa206",
+  "commit": "ed53137cc652b40597d38ef8333c9d0603c7a615",
   "branch": "master",
   "preview_url": "https://kelionai.app",
-  "timestamp": "2026-03-05T08:53:01.598Z",
+  "timestamp": "2026-03-05T11:12:58.632Z",
   "node_version": "v20.11.0",
   "overall": "FAIL",
   "gates": [
     {
       "name": "Prettier (format check)",
-      "status": "fail",
-      "duration": 2286,
-      "exitCode": 1,
-      "output": "outes/vision.js\n[\u001b[33mwarn\u001b[39m] server/routes/voice-clone.js\n[\u001b[33mwarn\u001b[39m] server/routes/voice.js\n[\u001b[33mwarn\u001b[39m] server/routes/weather.js\n[\u001b[33mwarn\u001b[39m] server/supabase.js\n[\u001b[33mwarn\u001b[39m] server/telegram.js\n[\u001b[33mwarn\u001b[39m] server/trade-executor.js\n[\u001b[33mwarn\u001b[39m] server/trade-intelligence.js\n[\u001b[33mwarn\u001b[39m] server/trading.js\n[\u001b[33mwarn\u001b[39m] server/validation.js\n[\u001b[33mwarn\u001b[39m] server/whatsapp.js\n[\u001b[33mwarn\u001b[39m] Code style issues found in 37 files. Run Prettier with --write to fix."
+      "status": "pass",
+      "duration": 2289,
+      "output": "Checking formatting...\nAll matched files use Prettier code style!"
     },
     {
       "name": "Lint (ESLint)",
       "status": "pass",
-      "duration": 1447,
+      "duration": 1430,
       "output": ""
     },
     {
       "name": "Typecheck",
       "status": "pass",
-      "duration": 677,
+      "duration": 693,
       "output": "typecheck: N/A (JS-only project)"
     },
     {
       "name": "Unit Tests (Jest)",
       "status": "pass",
-      "duration": 7906,
-      "output": "----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------\n\n=============================== Coverage summary ===============================\nStatements   : 18.49% ( 1226/6629 )\nBranches     : 11.64% ( 578/4962 )\nFunctions    : 16.35% ( 113/691 )\nLines        : 19.07% ( 1173/6149 )\n================================================================================"
+      "duration": 5284,
+      "output": "-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------\n\n=============================== Coverage summary ===============================\nStatements   : 18.42% ( 1221/6626 )\nBranches     : 11.62% ( 577/4962 )\nFunctions    : 16.23% ( 112/690 )\nLines        : 19% ( 1168/6146 )\n================================================================================"
     },
     {
       "name": "Build Validation",
       "status": "pass",
-      "duration": 695,
+      "duration": 689,
       "output": "Build OK: static assets validated"
     },
     {
       "name": "Security (npm audit)",
       "status": "pass",
-      "duration": 1094,
+      "duration": 1100,
       "output": "found 0 vulnerabilities"
     },
     {
       "name": "Smoke Probe",
       "status": "pass",
-      "duration": 1022,
-      "output": "🔍 Smoke Probe — https://kelionai.app\n\n✅ /health → 200 [121ms]\n✅ /api/news/public → 200 [72ms]\n✅ /api/payments/plans → 200 [216ms]\n\n3/3 probes passed."
+      "duration": 1041,
+      "output": "🔍 Smoke Probe — https://kelionai.app\n\n✅ /api/payments/plans → 200 [132ms]\n✅ /api/news/public → 200 [256ms]\n✅ /health → 200 [314ms]\n\n3/3 probes passed."
     },
     {
       "name": "E2E (Playwright)",
       "status": "fail",
-      "duration": 606912,
+      "duration": 1500010,
       "exitCode": null,
-      "output": "ads (1.2m)\n  ✘  142 [chromium] › tests\\e2e-full.spec.js:702:5 › Deep — UI Interactions › pricing modal opens and has grid (1.0m)\n  ✓  143 [chromium] › tests\\e2e-full.spec.js:231:5 › Main Pages Navigation › navigate back to homepage from developer page (55.2s)\n  ✘  144 [chromium] › tests\\e2e-full.spec.js:702:5 › Deep — UI Interactions › pricing modal opens and has grid (retry #1) (2.2m)\n  ✓  145 [chromium] › tests\\e2e-full.spec.js:248:5 › Main Pages Navigation › static assets load (CSS/JS) (1.4m)"
+      "output": "ll.spec.js:1013:3 › Deep — API Data Quality › developer v1/status returns real data (51ms)\n  ✓  172 [chromium] › tests\\e2e-full.spec.js:1221:3 › API — Trading › GET /api/trading/status (96ms)\n  ✓  173 [chromium] › tests\\e2e-full.spec.js:1227:3 › API — Trading › GET /api/trading/analysis (30ms)\n  ✓  174 [chromium] › tests\\e2e-full.spec.js:1233:3 › API — Trading › GET /api/trading/signals (55ms)\n  ✓  175 [chromium] › tests\\e2e-full.spec.js:1239:3 › API — Trading › GET /api/trading/portfolio (68ms)"
     }
   ],
   "limitations": [
