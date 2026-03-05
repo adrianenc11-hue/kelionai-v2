@@ -290,8 +290,8 @@ router.post("/checkout", async (req, res) => {
       normalizedPlan === "pro"
         ? process.env.STRIPE_PRO_PRICE_ID || process.env.STRIPE_PRICE_PRO
         : process.env.STRIPE_PREMIUM_PRICE_ID ||
-          process.env.STRIPE_ENTERPRISE_PRICE_ID ||
-          process.env.STRIPE_PRICE_PREMIUM;
+        process.env.STRIPE_ENTERPRISE_PRICE_ID ||
+        process.env.STRIPE_PRICE_PREMIUM;
     if (!priceId)
       return res.status(503).json({ error: "Prices not configured" });
 
@@ -332,8 +332,8 @@ router.post("/checkout", async (req, res) => {
     const session = await stripe.checkout.sessions.create(sessionParams);
     res.json({ url: session.url, sessionId: session.id });
   } catch (e) {
-    logger.error({ component: "Payments", err: e.message }, "Checkout error");
-    res.status(500).json({ error: "Checkout error" });
+    logger.error({ component: "Payments", err: e.message, stack: e.stack, type: e.type, code: e.code }, "Checkout error");
+    res.status(500).json({ error: "Checkout error", detail: e.message });
   }
 });
 
