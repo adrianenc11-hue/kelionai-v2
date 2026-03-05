@@ -1098,7 +1098,7 @@ router.post("/webhook", async function (req, res) {
             req.app.locals,
           );
           stats.messagesReceived++;
-          stats.activeSenders.add(senderId);
+          stats.uniqueSenders++;
           stats.repliesSent++;
           continue;
         }
@@ -1107,7 +1107,7 @@ router.post("/webhook", async function (req, res) {
         if (!message || message.is_echo) continue;
 
         stats.messagesReceived++;
-        stats.activeSenders.add(senderId);
+        stats.uniqueSenders++;
         lastMessageTime.set(senderId, Date.now());
         if (isRateLimited(senderId)) continue;
 

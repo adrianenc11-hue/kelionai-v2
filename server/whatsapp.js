@@ -914,7 +914,7 @@ router.get("/health", (req, res) => {
     stats: {
       messagesReceived: stats.messagesReceived,
       repliesSent: stats.repliesSent,
-      activeUsers: stats.activeUsers.size,
+      activeUsers: stats.uniqueUsers,
     },
     webhookUrl:
       (process.env.APP_URL || "https://kelionai.app") + "/api/whatsapp/webhook",
