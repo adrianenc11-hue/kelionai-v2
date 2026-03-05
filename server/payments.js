@@ -315,7 +315,7 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
                 processedWebhookEvents.add(event.id);
                 return res.json({ received: true });
             }
-        } catch { logger.debug({ component: 'Payments', err: _e.message }, 'processed_webhook_events check failed (table may not exist yet)'); }
+        } catch (e) { logger.debug({ component: 'Payments', err: e.message }, 'processed_webhook_events check failed (table may not exist yet)'); }
 
         processedWebhookEvents.add(event.id);
         // Keep the set bounded to avoid unbounded memory growth (keep last 10000 events)
@@ -327,7 +327,7 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
         try {
             await supabaseAdmin.from('processed_webhook_events')
                 .insert({ event_id: event.id, event_type: event.type });
-        } catch { logger.debug({ component: 'Payments', err: _e.message }, 'processed_webhook_events insert failed (table may not exist yet)'); }
+        } catch (e) { logger.debug({ component: 'Payments', err: e.message }, 'processed_webhook_events insert failed (table may not exist yet)'); }
 
         switch (event.type) {
             case 'checkout.session.completed': {
