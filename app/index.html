@@ -357,6 +357,8 @@
                 <button class="btn-secondary" id="btn-subscriptions" title="Abonamente"
                     style="padding:8px 14px;font-size:0.85rem;background:rgba(99,102,241,0.12);border:1px solid rgba(99,102,241,0.3);border-radius:8px;color:#a5b4fc;cursor:pointer;font-family:var(--kelion-font);transition:all 0.2s;">⭐
                     Abonamente</button>
+                <button class="btn-secondary" id="btn-invite" title="Invită prieteni" style="display:none;padding:8px 14px;font-size:0.85rem;background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.3);border-radius:8px;color:#6ee7b7;cursor:pointer;font-family:var(--kelion-font);transition:all 0.2s;">🎁
+                    Invită</button>
                 <button class="btn-primary" id="btn-auth" title="Sign in" style="padding:8px 18px;font-size:0.85rem;">🔑
                     Login</button>
             </div>
@@ -463,6 +465,36 @@
         </div>
     </div>
 
+    <!-- REFERRAL/INVITE MODAL -->
+    <div id="referral-modal" class="modal-overlay hidden">
+        <div class="modal-content" style="max-width:480px;padding:32px;">
+            <button class="modal-close" id="referral-close">&times;</button>
+            <h2 style="font-size:1.4rem;font-weight:700;margin-bottom:8px;">🎁 Invită prieteni</h2>
+            <p style="color:#8888AA;font-size:0.85rem;margin-bottom:20px;">Generează un cod de invitație și trimite-l unui prieten. Ambii primiți bonus de zile!</p>
+            
+            <div id="referral-code-section" style="margin-bottom:20px;">
+                <label style="color:#a5b4fc;font-size:0.8rem;font-weight:600;text-transform:uppercase;letter-spacing:1px;">Codul tău de invitație</label>
+                <div style="display:flex;gap:8px;margin-top:8px;">
+                    <input type="text" id="referral-code-display" readonly style="flex:1;padding:12px 16px;background:rgba(10,10,30,0.8);border:1px solid rgba(99,102,241,0.3);border-radius:10px;color:#6ee7b7;font-family:'JetBrains Mono',monospace;font-size:1rem;letter-spacing:1px;text-align:center;" placeholder="Apasă Generează...">
+                    <button id="btn-copy-code" style="padding:8px 14px;background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.3);border-radius:10px;color:#a5b4fc;cursor:pointer;font-size:1rem;" title="Copiază">📋</button>
+                </div>
+                <div id="referral-expiry" style="color:#555577;font-size:0.75rem;margin-top:6px;"></div>
+                <div id="referral-remaining" style="color:#555577;font-size:0.75rem;margin-top:2px;"></div>
+            </div>
+
+            <button id="btn-generate-code" style="width:100%;padding:12px;background:linear-gradient(135deg,#10B981,#06B6D4);border:none;border-radius:10px;color:#fff;font-size:0.95rem;font-weight:600;cursor:pointer;font-family:var(--kelion-font);margin-bottom:20px;transition:all 0.2s;">✨ Generează cod de invitație</button>
+
+            <div style="border-top:1px solid rgba(99,102,241,0.12);padding-top:20px;">
+                <label style="color:#a5b4fc;font-size:0.8rem;font-weight:600;text-transform:uppercase;letter-spacing:1px;">Trimite invitație prin email</label>
+                <div style="display:flex;gap:8px;margin-top:8px;">
+                    <input type="email" id="referral-email" placeholder="email@prieten.com" style="flex:1;padding:12px 16px;background:rgba(10,10,30,0.6);border:1px solid rgba(99,102,241,0.2);border-radius:10px;color:#f0f0ff;font-family:var(--kelion-font);font-size:0.9rem;outline:none;">
+                    <button id="btn-send-invite" style="padding:8px 18px;background:linear-gradient(135deg,#6366F1,#06B6D4);border:none;border-radius:10px;color:#fff;font-size:0.9rem;font-weight:600;cursor:pointer;font-family:var(--kelion-font);white-space:nowrap;">📧 Trimite</button>
+                </div>
+                <p id="referral-status" style="font-size:0.8rem;margin-top:8px;min-height:20px;"></p>
+            </div>
+        </div>
+    </div>
+
     <!-- TICKER BAR -->
     <div id="ticker-bar" class="ticker-bar hidden">
         <span id="ticker-text"></span>
@@ -485,6 +517,7 @@
     <script src="/js/geolocation.js"></script>
     <script src="/js/app.js"></script>
     <script src="/js/navbar.js"></script>
+    <script src="/js/referral-ui.js"></script>
 
     <a href="/" id="home-btn-fixed" class="home-btn-fixed" title="Home" style="display:none">🏠</a>
 
