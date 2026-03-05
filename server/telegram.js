@@ -45,68 +45,83 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const CHANNEL_ID = process.env.TELEGRAM_CHANNEL_ID; // optional — for broadcasting news
 
-// ═══ STATS ═══
+// ═══ STATS (counters only — no unbounded Sets) ═══
 const stats = {
   messagesReceived: 0,
   repliesSent: 0,
-  activeUsers: new Set(),
+  uniqueUsers: 0,
 };
 
-// ═══ RATE LIMITING ═══
+// ═══ RATE LIMITING — stays in memory (ephemeral) ═══
 const RATE_LIMIT_MAX = 15;
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
+const _RATE_LIMIT_MAX_ENTRIES = 200;
 const userRateLimits = new Map();
 
-// ═══ USER MESSAGE COUNTER ═══
-const userMessageCount = new Map();
+// ═══ USER TRACKING — backed by Supabase ═══
 const FREE_MESSAGES_LIMIT = 10;
 
-// ═══ KNOWN USERS (persisted in Supabase) ═══
-const knownUsers = new Map(); // { lang, name, firstSeen }
+// LRU cache for known users (max 50, backed by Supabase telegram_users)
+const _userCache = new Map();
+const _USER_CACHE_MAX = 50;
+let _supabase = null;
+
+function setSupabase(client) { _supabase = client; }
 
 async function getKnownUser(userId, supabase) {
-  if (knownUsers.has(userId)) return knownUsers.get(userId);
-  if (supabase) {
+  if (_userCache.has(userId)) return _userCache.get(userId);
+  const db = supabase || _supabase;
+  if (db) {
     try {
-      const { data } = await supabase
+      const { data } = await db
         .from("telegram_users")
         .select("*")
         .eq("user_id", String(userId))
         .single();
       if (data) {
-        knownUsers.set(userId, {
+        const user = {
           lang: data.language,
-          name: data.name,
-          firstSeen: data.first_seen,
-        });
-        return knownUsers.get(userId);
+          name: data.name || data.first_name,
+          firstSeen: data.created_at,
+          messageCount: data.message_count || 0,
+        };
+        if (_userCache.size >= _USER_CACHE_MAX) {
+          const oldest = _userCache.keys().next().value;
+          _userCache.delete(oldest);
+        }
+        _userCache.set(userId, user);
+        return user;
       }
     } catch (e) {
-      logger.warn(
-        { component: "Telegram", err: e.message },
-        "table may not exist yet",
-      );
+      logger.warn({ component: "Telegram", err: e.message }, "table may not exist");
     }
   }
   return null;
 }
 
 async function saveKnownUser(userId, lang, name, supabase) {
-  knownUsers.set(userId, { lang, name, firstSeen: new Date().toISOString() });
-  if (supabase) {
+  const db = supabase || _supabase;
+  const cached = _userCache.get(userId) || {};
+  const user = { ...cached, lang, name, firstSeen: cached.firstSeen || new Date().toISOString() };
+  if (_userCache.size >= _USER_CACHE_MAX) {
+    const oldest = _userCache.keys().next().value;
+    _userCache.delete(oldest);
+  }
+  _userCache.set(userId, user);
+  if (db) {
     try {
-      await supabase.from("telegram_users").upsert(
+      await db.from("telegram_users").upsert(
         {
           user_id: String(userId),
           language: lang,
           name: name || null,
-          first_seen: new Date().toISOString(),
-          last_seen: new Date().toISOString(),
+          created_at: user.firstSeen,
+          updated_at: new Date().toISOString(),
         },
         { onConflict: "user_id" },
       );
     } catch (e) {
-      logger.warn({ component: "Telegram", err: e.message }, "works in-memory");
+      logger.warn({ component: "Telegram", err: e.message }, "DB write failed");
     }
   }
 }
@@ -115,15 +130,33 @@ function isRateLimited(userId) {
   const now = Date.now();
   const entry = userRateLimits.get(userId);
   if (!entry || now >= entry.resetAt) {
-    userRateLimits.set(userId, {
-      count: 1,
-      resetAt: now + RATE_LIMIT_WINDOW_MS,
-    });
+    if (userRateLimits.size >= _RATE_LIMIT_MAX_ENTRIES) {
+      for (const [k, v] of userRateLimits) {
+        if (now >= v.resetAt) userRateLimits.delete(k);
+        if (userRateLimits.size < _RATE_LIMIT_MAX_ENTRIES) break;
+      }
+    }
+    userRateLimits.set(userId, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
     return false;
   }
   if (entry.count >= RATE_LIMIT_MAX) return true;
   entry.count++;
   return false;
+}
+
+// ═══ CONVERSATION HISTORY — stored in Supabase telegram_messages ═══
+async function addToHistory(chatId, from, text) {
+  if (_supabase) {
+    try {
+      await _supabase.from("telegram_messages").insert({
+        chat_id: String(chatId),
+        role: from === "user" ? "user" : "assistant",
+        content: (text || "").slice(0, 2000),
+      });
+    } catch (e) {
+      logger.warn({ component: "Telegram", err: e.message }, "DB history write failed");
+    }
+  }
 }
 
 // ═══ AUTO-DETECT LANGUAGE ═══
@@ -458,7 +491,7 @@ router.post("/webhook", async (req, res) => {
     const text = message.text.trim();
 
     stats.messagesReceived++;
-    stats.activeUsers.add(userId);
+    stats.uniqueUsers++;
 
     // Rate limit
     if (isRateLimited(userId)) {
@@ -483,10 +516,20 @@ router.post("/webhook", async (req, res) => {
       return;
     }
 
-    // ═══ USER ENGAGEMENT TRACKING ═══
-    const msgCount = (userMessageCount.get(userId) || 0) + 1;
-    userMessageCount.set(userId, msgCount);
-
+    // ═══ USER ENGAGEMENT TRACKING — from Supabase ═══
+    const known = await getKnownUser(userId, req.app.locals.supabaseAdmin || req.app.locals.supabase);
+    const msgCount = known ? (known.messageCount || 0) + 1 : 1;
+    // Update message count in DB
+    const _db = req.app.locals.supabaseAdmin || req.app.locals.supabase;
+    if (_db) {
+      try {
+        await _db.from("telegram_users")
+          .update({ message_count: msgCount })
+          .eq("user_id", String(userId));
+        // Update cache
+        if (_userCache.has(userId)) _userCache.get(userId).messageCount = msgCount;
+      } catch (e) { /* ignore */ }
+    }
     // Use Brain AI
     const detectedLangTg = detectLanguage(text);
     let reply;
@@ -518,10 +561,12 @@ router.post("/webhook", async (req, res) => {
 
     await sendMessage(chatId, escapeHtml(reply), { parseMode: undefined });
 
+    // ═══ SAVE MESSAGE TO DB ═══
+    await addToHistory(chatId, "user", text);
+    await addToHistory(chatId, "assistant", reply);
+
     // ═══ FIRST-EVER USER? Check Supabase ═══
     const supabase = req.app.locals.supabaseAdmin || req.app.locals.supabase;
-    const known = await getKnownUser(userId, supabase);
-
     if (!known) {
       const detectedLang = detectLanguage(text);
       await saveKnownUser(userId, detectedLang, userName, supabase);
@@ -562,12 +607,12 @@ router.post("/webhook", async (req, res) => {
         await sendMessage(
           chatId,
           `⭐ <b>Ai folosit ${FREE_MESSAGES_LIMIT} mesaje gratuite azi!</b>\n\n` +
-            `Continuă cu funcții premium pe kelionai.app:\n` +
-            `• 💬 Chat nelimitat cu AI\n` +
-            `• 🎭 Avatare 3D — Kelion & Kira\n` +
-            `• 🔊 Voce naturală\n` +
-            `• 🖼️ Generare imagini\n\n` +
-            `🌐 Abonează-te: https://kelionai.app/pricing`,
+          `Continuă cu funcții premium pe kelionai.app:\n` +
+          `• 💬 Chat nelimitat cu AI\n` +
+          `• 🎭 Avatare 3D — Kelion & Kira\n` +
+          `• 🔊 Voce naturală\n` +
+          `• 🖼️ Generare imagini\n\n` +
+          `🌐 Abonează-te: https://kelionai.app/pricing`,
           {
             replyMarkup: {
               inline_keyboard: [
@@ -626,7 +671,7 @@ router.get("/health", (req, res) => {
     stats: {
       messagesReceived: stats.messagesReceived,
       repliesSent: stats.repliesSent,
-      activeUsers: stats.activeUsers.size,
+      activeUsers: stats.uniqueUsers,
     },
     webhookUrl:
       (process.env.APP_URL || "https://kelionai.app") + "/api/telegram/webhook",
@@ -647,4 +692,4 @@ async function broadcastNews(articles) {
   await broadcastToChannel(msg);
 }
 
-module.exports = { router, broadcastNews };
+module.exports = { router, broadcastNews, setSupabase };

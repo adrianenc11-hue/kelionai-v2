@@ -1960,9 +1960,9 @@ Reply STRICTLY with JSON:
           summary:
             breaking.length > 0
               ? `🔴 ${breaking.length} știri breaking: ${breaking
-                  .slice(0, 3)
-                  .map((a) => a.title)
-                  .join("; ")}`
+                .slice(0, 3)
+                .map((a) => a.title)
+                .join("; ")}`
               : "Nicio știre breaking momentan. Situația e calmă.",
         };
       } else {
@@ -1980,9 +1980,9 @@ Reply STRICTLY with JSON:
           summary:
             latest.length > 0
               ? `📰 ${articles.length} articole. Ultimele: ${latest
-                  .slice(0, 3)
-                  .map((a) => `${a.title} (${a.source})`)
-                  .join("; ")}`
+                .slice(0, 3)
+                .map((a) => `${a.title} (${a.source})`)
+                .join("; ")}`
               : "Nu am știri momentan. Fetch-ul se face automat la ore fixe.",
         };
       }
@@ -3386,8 +3386,8 @@ Reply STRICTLY with JSON:
       try {
         const r = await fetch(
           "https://api.duckduckgo.com/?q=" +
-            encodeURIComponent(query) +
-            "&format=json&no_html=1&skip_disambig=1",
+          encodeURIComponent(query) +
+          "&format=json&no_html=1&skip_disambig=1",
         );
         if (r.ok) {
           const d = await r.json();
@@ -3957,8 +3957,8 @@ Raspunde STRICT JSON. Daca nimic: {}`;
         try {
           const r = await fetch(
             "https://newsdata.io/api/1/news?apikey=" +
-              (process.env.NEWSDATA_API_KEY || "") +
-              "&language=ro&category=business,technology&size=10",
+            (process.env.NEWSDATA_API_KEY || "") +
+            "&language=ro&category=business,technology&size=10",
           );
           if (r.ok) {
             const d = await r.json();

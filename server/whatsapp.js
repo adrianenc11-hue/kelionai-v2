@@ -25,8 +25,8 @@ const WA_VERIFY_TOKEN =
   process.env.WA_VERIFY_TOKEN || process.env.WHATSAPP_VERIFY_TOKEN || null;
 const GRAPH_API = "https://graph.facebook.com/v21.0";
 
-// ═══ STATS ═══
-const stats = { messagesReceived: 0, repliesSent: 0, activeUsers: new Set() };
+// ═══ STATS (counters only — no unbounded Sets) ═══
+const stats = { messagesReceived: 0, repliesSent: 0, uniqueUsers: 0 };
 
 // ═══ STARTUP VALIDATION ═══
 if (!WA_TOKEN) {
@@ -48,98 +48,126 @@ if (!WA_VERIFY_TOKEN) {
   );
 }
 
-// ═══ CHARACTER SELECTION (Kelion or Kira) ═══
-const chatCharacter = new Map(); // chatId → 'kelion' | 'kira'
+// ═══ CHARACTER SELECTION — backed by Supabase whatsapp_users.character ═══
 
-// ═══ CONVERSATION CONTEXT (group awareness) ═══
+// ═══ CONVERSATION CONTEXT — stored in Supabase whatsapp_messages ═══
 const MAX_CONTEXT_MESSAGES = 50;
-const conversationHistory = new Map(); // chatId → [{ from, text, timestamp }]
+let _supabase = null;
 
-function addToHistory(chatId, from, text) {
-  if (!conversationHistory.has(chatId)) conversationHistory.set(chatId, []);
-  const history = conversationHistory.get(chatId);
-  history.push({ from, text, timestamp: Date.now() });
-  // Keep only last N messages
-  if (history.length > MAX_CONTEXT_MESSAGES)
-    history.splice(0, history.length - MAX_CONTEXT_MESSAGES);
+function setSupabase(client) { _supabase = client; }
+
+async function addToHistory(chatId, from, text) {
+  if (_supabase) {
+    try {
+      await _supabase.from("whatsapp_messages").insert({
+        phone: chatId,
+        role: from === "user" ? "user" : "assistant",
+        content: (text || "").slice(0, 2000),
+      });
+    } catch (e) {
+      logger.warn({ component: "WhatsApp", err: e.message }, "DB history write failed");
+    }
+  }
 }
 
-function getContextSummary(chatId) {
-  const history = conversationHistory.get(chatId) || [];
-  if (history.length === 0) return "";
-  return history.map((h) => `${h.from}: ${h.text}`).join("\n");
+async function getContextSummary(chatId) {
+  if (!_supabase) return "";
+  try {
+    const { data } = await _supabase
+      .from("whatsapp_messages")
+      .select("role, content")
+      .eq("phone", chatId)
+      .order("created_at", { ascending: false })
+      .limit(MAX_CONTEXT_MESSAGES);
+    if (!data || data.length === 0) return "";
+    return data.reverse().map((h) => h.role + ": " + h.content).join("\n");
+  } catch (e) {
+    logger.warn({ component: "WhatsApp", err: e.message }, "DB history read failed");
+    return "";
+  }
 }
 
 // ═══ CHECK IF BOT IS ADDRESSED ═══
 function getAddressedCharacter(text) {
-  const t = (text || "").toLowerCase();
-  if (/\bkelion\b/i.test(t)) return "kelion";
-  if (/\bkira\b/i.test(t)) return "kira";
+  const lower = (text || "").toLowerCase();
+  if (/\b(kira)\b/.test(lower)) return "kira";
+  if (/\b(kelion)\b/.test(lower)) return "kelion";
   return null;
 }
 
 function isGroupChat(msg) {
-  // WhatsApp group messages have a group_id in the chat
-  return !!(msg.context && msg.context.group_id) || !!msg.group_id;
+  return msg && msg.from && msg.from.includes("-");
 }
 
-// ═══ RATE LIMITING ═══
+// ═══ RATE LIMITING — stays in memory (ephemeral) ═══
 const RATE_LIMIT_MAX = 15;
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
+const _RATE_LIMIT_MAX_ENTRIES = 200;
 const userRateLimits = new Map();
-const userMessageCount = new Map();
+
+// LRU cache for known users (max 50, backed by Supabase)
+const _userCache = new Map();
+const _USER_CACHE_MAX = 50;
 const FREE_MESSAGES_LIMIT = 15;
 
-// ═══ KNOWN USERS (persisted in Supabase) ═══
-const knownUsers = new Map();
+// ═══ KNOWN USERS — backed by Supabase whatsapp_users ═══
+const knownUsers = null; // REMOVED — use _userCache + Supabase
 
 async function getKnownUser(phoneNumber, supabase) {
-  if (knownUsers.has(phoneNumber)) return knownUsers.get(phoneNumber);
-  if (supabase) {
+  if (_userCache.has(phoneNumber)) return _userCache.get(phoneNumber);
+  const db = supabase || _supabase;
+  if (db) {
     try {
-      const { data } = await supabase
+      const { data } = await db
         .from("whatsapp_users")
         .select("*")
         .eq("phone", phoneNumber)
         .single();
       if (data) {
-        knownUsers.set(phoneNumber, {
+        const user = {
           lang: data.language,
           name: data.name,
-          firstSeen: data.first_seen,
-        });
-        return knownUsers.get(phoneNumber);
+          firstSeen: data.created_at,
+          character: data.character || "kelion",
+          messageCount: data.message_count || 0,
+        };
+        if (_userCache.size >= _USER_CACHE_MAX) {
+          const oldest = _userCache.keys().next().value;
+          _userCache.delete(oldest);
+        }
+        _userCache.set(phoneNumber, user);
+        return user;
       }
     } catch (e) {
-      logger.warn(
-        { component: "WhatsApp", err: e.message },
-        "table may not exist yet",
-      );
+      logger.warn({ component: "WhatsApp", err: e.message }, "table may not exist");
     }
   }
   return null;
 }
 
 async function saveKnownUser(phoneNumber, lang, name, supabase) {
-  knownUsers.set(phoneNumber, {
-    lang,
-    name,
-    firstSeen: new Date().toISOString(),
-  });
-  if (supabase) {
+  const db = supabase || _supabase;
+  const cached = _userCache.get(phoneNumber) || {};
+  const user = { ...cached, lang, name, firstSeen: cached.firstSeen || new Date().toISOString() };
+  if (_userCache.size >= _USER_CACHE_MAX) {
+    const oldest = _userCache.keys().next().value;
+    _userCache.delete(oldest);
+  }
+  _userCache.set(phoneNumber, user);
+  if (db) {
     try {
-      await supabase.from("whatsapp_users").upsert(
+      await db.from("whatsapp_users").upsert(
         {
           phone: phoneNumber,
           language: lang,
           name: name || null,
-          first_seen: new Date().toISOString(),
-          last_seen: new Date().toISOString(),
+          created_at: user.firstSeen,
+          updated_at: new Date().toISOString(),
         },
         { onConflict: "phone" },
       );
     } catch (e) {
-      logger.warn({ component: "WhatsApp", err: e.message }, "works in-memory");
+      logger.warn({ component: "WhatsApp", err: e.message }, "DB write failed");
     }
   }
 }
@@ -198,10 +226,13 @@ function isRateLimited(phone) {
   const now = Date.now();
   const entry = userRateLimits.get(phone);
   if (!entry || now >= entry.resetAt) {
-    userRateLimits.set(phone, {
-      count: 1,
-      resetAt: now + RATE_LIMIT_WINDOW_MS,
-    });
+    if (userRateLimits.size >= _RATE_LIMIT_MAX_ENTRIES) {
+      for (const [k, v] of userRateLimits) {
+        if (now >= v.resetAt) userRateLimits.delete(k);
+        if (userRateLimits.size < _RATE_LIMIT_MAX_ENTRIES) break;
+      }
+    }
+    userRateLimits.set(phone, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
     return false;
   }
   if (entry.count >= RATE_LIMIT_MAX) return true;
@@ -520,7 +551,7 @@ router.post("/webhook", async (req, res) => {
               : null;
 
           stats.messagesReceived++;
-          stats.activeUsers.add(phone);
+          stats.uniqueUsers++;
 
           if (isRateLimited(phone)) continue;
 
@@ -656,7 +687,16 @@ router.post("/webhook", async (req, res) => {
           // 1:1: user can type "kelion" or "kira" to select character
           if (!isGroup && /^(kelion|kira)$/i.test(userText.trim())) {
             const char = userText.trim().toLowerCase();
-            chatCharacter.set(chatId, char);
+            // Save character to DB
+            if (_supabase) {
+              try {
+                await _supabase.from("whatsapp_users")
+                  .update({ character: char })
+                  .eq("phone", phone);
+                const cached = _userCache.get(phone);
+                if (cached) cached.character = char;
+              } catch (e) { /* ignore */ }
+            }
             const name = char === "kelion" ? "Kelion" : "Kira";
             await sendTextMessage(
               phone,
@@ -674,7 +714,15 @@ router.post("/webhook", async (req, res) => {
               continue;
             }
             // Set active character for this response
-            if (addressed) chatCharacter.set(chatId, addressed);
+            if (addressed) {
+              if (_supabase) {
+                try {
+                  await _supabase.from("whatsapp_users").update({ character: addressed }).eq("phone", phone);
+                  const cached = _userCache.get(phone);
+                  if (cached) cached.character = addressed;
+                } catch (e) { /* ignore */ }
+              }
+            }
             // Mark intervention time
             const gs = groupState.get(chatId);
             if (gs) {
@@ -684,7 +732,8 @@ router.post("/webhook", async (req, res) => {
           }
 
           // Get selected character (default: kelion)
-          const character = chatCharacter.get(chatId) || "kelion";
+          const knownUser = await getKnownUser(phone, _supabase);
+          const character = (knownUser && knownUser.character) || "kelion";
 
           // ═══ AI RESPONSE (with conversation context) ═══
           let reply;
@@ -761,13 +810,19 @@ router.post("/webhook", async (req, res) => {
             }
           }
 
-          // ═══ USER PROTOCOL ═══
-          const msgCount = (userMessageCount.get(phone) || 0) + 1;
-          userMessageCount.set(phone, msgCount);
-
           const supabase =
             req.app.locals.supabaseAdmin || req.app.locals.supabase;
           const known = await getKnownUser(phone, supabase);
+          const msgCount = known ? (known.messageCount || 0) + 1 : 1;
+          // Update message count in DB
+          if (supabase) {
+            try {
+              await supabase.from("whatsapp_users")
+                .update({ message_count: msgCount })
+                .eq("phone", phone);
+              if (_userCache.has(phone)) _userCache.get(phone).messageCount = msgCount;
+            } catch (e) { /* ignore */ }
+          }
 
           if (!known) {
             const detectedLang = detectLanguage(userText);
@@ -806,44 +861,19 @@ router.post("/webhook", async (req, res) => {
             }
           }
 
-          // Free limit
+          // Free limit promo
           if (msgCount === FREE_MESSAGES_LIMIT) {
             setTimeout(async () => {
               await sendTextMessage(
                 phone,
                 `⭐ Ai folosit ${FREE_MESSAGES_LIMIT} mesaje gratuite!\n\n` +
-                  `Continuă cu funcții premium pe kelionai.app:\n` +
-                  `• 💬 Chat nelimitat cu AI\n` +
-                  `• 🎭 Avatare 3D\n` +
-                  `• 🔊 Voce naturală\n\n` +
-                  `🌐 Abonează-te: https://kelionai.app/pricing`,
+                `Continuă cu funcții premium pe kelionai.app:\n` +
+                `• 💬 Chat nelimitat cu AI\n` +
+                `• 🎭 Avatare 3D\n` +
+                `• 🔊 Voce naturală\n\n` +
+                `🌐 Abonează-te: https://kelionai.app/pricing`,
               );
             }, 3000);
-          }
-
-          // Save conversation text to Supabase (NOT video/audio, only text)
-          if (supabase) {
-            try {
-              await supabase.from("whatsapp_messages").insert({
-                phone,
-                direction: "in",
-                message_type: msgType,
-                text: userText,
-                created_at: new Date().toISOString(),
-              });
-              await supabase.from("whatsapp_messages").insert({
-                phone,
-                direction: "out",
-                message_type: "text",
-                text: reply,
-                created_at: new Date().toISOString(),
-              });
-            } catch (e) {
-              logger.warn(
-                { component: "WhatsApp", err: e.message },
-                "table may not exist",
-              );
-            }
           }
         }
       }
@@ -895,8 +925,8 @@ function getStats() {
   return {
     messagesReceived: stats.messagesReceived,
     repliesSent: stats.repliesSent,
-    activeUsers: stats.activeUsers.size,
+    activeUsers: stats.uniqueUsers,
   };
 }
 
-module.exports = { router, getStats };
+module.exports = { router, getStats, setSupabase };
