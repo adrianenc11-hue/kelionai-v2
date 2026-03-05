@@ -5,6 +5,7 @@
 
 const express = require('express');
 const rateLimit = require('express-rate-limit');
+const logger = require('../logger');
 const { validate, visionSchema } = require('../validation');
 const { checkUsage, incrementUsage } = require('../payments');
 
@@ -41,7 +42,7 @@ Answer in ${LANGS[language] || 'English'}, concise but detailed.`;
         const d = await r.json();
         incrementUsage(user?.id, 'vision', supabaseAdmin).catch(e => logger.warn({ component: 'Vision', err: e.message }, 'incrementUsage failed'));
         res.json({ description: d.content?.[0]?.text || 'Could not analyze.', avatar, engine: 'Claude' });
-    } catch { res.status(500).json({ error: 'Vision error' }); }
+    } catch (e) { logger.error({ component: 'Vision', err: e.message }, 'Vision error'); res.status(500).json({ error: 'Vision error' }); }
 });
 
 module.exports = router;

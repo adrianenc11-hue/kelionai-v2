@@ -450,7 +450,7 @@ async function runHealthCheck(){
     if(r.status===401){body.innerHTML='<div style="color:#ff4444;padding:20px">❌ Unauthorized. Set admin secret in sessionStorage (kelion_admin_secret).</div>';return;}
     _hcData=d;
     body.innerHTML=renderHC(d);
-  }catch{body.innerHTML='<div style="color:#ff4444;padding:20px">❌ Error: '+esc(e.message)+'</div>';}
+  }catch(e){body.innerHTML='<div style="color:#ff4444;padding:20px">❌ Error: '+esc(e.message)+'</div>';}
 }
 function exportHC(){
   if(!_hcData)return;
@@ -556,18 +556,18 @@ instagram.setSupabase(supabaseAdmin);
 newsModule.onNewsFetched(async (articles) => {
     logger.info({ component: 'MediaAutoPublish', count: articles.length }, '📢 Auto-publishing news...');
     // Facebook Page (top 3 articles)
-    try { await fbPage.publishNewsBatch(articles, 3); } catch { logger.warn({ component: 'MediaAutoPublish', err: e.message }, 'FB Page publish failed'); }
+    try { await fbPage.publishNewsBatch(articles, 3); } catch (e) { logger.warn({ component: 'MediaAutoPublish', err: e.message }, 'FB Page publish failed'); }
     // Telegram channel broadcast
-    try { await broadcastNews(articles); } catch { logger.warn({ component: 'MediaAutoPublish', err: e.message }, 'Telegram broadcast failed'); }
+    try { await broadcastNews(articles); } catch (e) { logger.warn({ component: 'MediaAutoPublish', err: e.message }, 'Telegram broadcast failed'); }
     // Instagram auto-publish (top article with image)
     try {
         const topArticle = articles.find(a => a.imageUrl || a.image_url) || articles[0];
         if (topArticle && instagram.publishNewsBatch) {
             await instagram.publishNewsBatch([topArticle], 1);
         }
-    } catch { logger.warn({ component: 'MediaAutoPublish', err: e.message }, 'Instagram publish failed'); }
+    } catch (e) { logger.warn({ component: 'MediaAutoPublish', err: e.message }, 'Instagram publish failed'); }
     // Messenger subscribers notification
-    try { await notifySubscribersNews(articles); } catch { logger.warn({ component: 'MediaAutoPublish', err: e.message }, 'Messenger subscribers notification failed'); }
+    try { await notifySubscribersNews(articles); } catch (e) { logger.warn({ component: 'MediaAutoPublish', err: e.message }, 'Messenger subscribers notification failed'); }
 });
 
 // ═══ STORE ARTICLES REF IN app.locals for Telegram bot ═══

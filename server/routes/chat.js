@@ -167,7 +167,8 @@ router.post('/chat/stream', chatLimiter, validate(chatSchema), async (req, res) 
 
         res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive', 'X-Accel-Buffering': 'no' });
         // SSE heartbeat to prevent proxy/LB timeout during AI thinking
-        const _heartbeat = setInterval(() => res.write(':keepalive\n\n'), 15000);
+        // eslint-disable-next-line no-unused-vars -- used in finally { clearInterval(heartbeat) }
+        const heartbeat = setInterval(() => res.write(':keepalive\n\n'), 15000);
         // Send thinking indicator immediately so user sees activity
         res.write(`data: ${JSON.stringify({ type: 'thinking' })}\n\n`);
 
@@ -280,7 +281,7 @@ router.post('/chat/stream', chatLimiter, validate(chatSchema), async (req, res) 
         if (fullReply) incrementUsage(user?.id, 'chat', supabaseAdmin).catch(e => logger.warn({ component: 'Stream', err: e.message }, 'incrementUsage failed'));
         logger.info({ component: 'Stream', avatar, language, replyLength: fullReply.length }, `${avatar} | ${language} | ${fullReply.length}c`);
 
-    } catch (e) { logger.error({ component: 'Stream', err: e.message }, e.message); if (!res.headersSent) res.status(500).json({ error: 'Stream error' }); else res.end(); } finally { if (typeof heartbeat !== 'undefined') clearInterval(heartbeat); }
+    } catch (e) { logger.error({ component: 'Stream', err: e.message }, e.message); if (!res.headersSent) res.status(500).json({ error: 'Stream error' }); else res.end(); } finally { clearInterval(heartbeat); }
 });
 
 // GET /api/conversations
