@@ -1,6 +1,6 @@
 # IMPLEMENTATION_STATUS.md — KelionAI v2.5
 
-> **Ultima actualizare:** 2026-03-05 18:35 UTC — Audit FINAL: 99/140 confirmate LIVE
+> **Ultima actualizare:** 2026-03-05 19:05 UTC — Audit FINAL: 100/140 confirmate + Stripe EUR fix
 > **Regula:** Niciun agent nu marchează [x] fără testare reală și confirmare utilizator.
 
 ---
@@ -124,7 +124,7 @@
 | 84 | Trading projections | [x] | `GET /api/trading/projections` | 401 fără auth (corect) |
 | 85 | Payments plans list | [x] | `GET /api/payments/plans` | Free/Pro/Premium JSON |
 | 86 | Payments status | [x] | `GET /api/payments/status` | 401 fără auth (corect) |
-| 87 | Payments checkout | **[502]** | `POST /api/payments/checkout` | 502 Bad Gateway — Stripe crash |
+| 87 | Payments checkout | [x] | `POST /api/payments/checkout` | 200 OK, Stripe EUR €9.99/lună |
 | 88 | Payments portal | [x] | `POST /api/payments/portal` | 404 — no active subscription (corect) |
 | 89 | Payments webhook | [ ] | `POST /api/payments/webhook` | Stripe raw |
 | 90 | Payments referral apply | [ ] | `POST /api/payments/referral` | |
