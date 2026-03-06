@@ -15,10 +15,11 @@ const router = express.Router();
 
 const chatLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 20,
+  max: 60,
   message: { error: "Too many requests. Please wait a minute." },
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => req.headers["x-admin-secret"] === process.env.ADMIN_SECRET_KEY,
 });
 const memoryLimiter = rateLimit({
   windowMs: 60 * 1000,
