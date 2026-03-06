@@ -74,10 +74,24 @@
             const desc = await KVoice.captureAndAnalyze();
             addMessage('assistant', desc);
             chatHistory.push({ role: 'assistant', content: desc });
+
+            // Save vision description to Supabase memory for future reference
+            try {
+                fetch(API_BASE + '/api/memory', {
+                    method: 'POST', headers: authHeaders(),
+                    body: JSON.stringify({ action: 'save', key: 'last_vision_' + Date.now(), value: desc })
+                }).catch(function (e) { console.warn('[Vision] Memory save failed:', e.message); });
+            } catch (e) { /* non-blocking */ }
+
+            // Send vision context to brain for enriched follow-up
+            try {
+                await sendToAI_Regular('[VISION_CONTEXT: ' + desc + '] Tocmai am văzut prin cameră. Oferă un comentariu scurt și natural despre ce am observat.', 'ro');
+            } catch (e) { /* fallback: just speak the raw description */ }
+
             try { KAvatar.setExpression('happy', 0.3); } catch (e) { console.warn('[App] Expression change failed:', e.message); }
             if (window.KVoice) await KVoice.speak(desc);
         } catch (e) {
-            addMessage('assistant', 'Camera not available.');
+            addMessage('assistant', 'Camera not available. Please allow camera access in your browser settings.');
         }
     }
 
