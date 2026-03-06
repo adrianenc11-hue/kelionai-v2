@@ -105,7 +105,7 @@ router.post(
                   Authorization: "Bearer " + process.env.OPENAI_API_KEY,
                 },
                 body: JSON.stringify({
-                  model: "gpt-4o",
+                  model: "gpt-5.4",
                   max_tokens: 10,
                   messages: [
                     {
@@ -163,9 +163,9 @@ router.post(
           matchedUser ||
           (user
             ? {
-                name: user.name || user.email,
-                lang: user.preferred_language || "en",
-              }
+              name: user.name || user.email,
+              lang: user.preferred_language || "en",
+            }
             : null),
       });
     } catch (e) {

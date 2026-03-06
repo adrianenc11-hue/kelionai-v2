@@ -19,12 +19,12 @@ const apiLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-// POST /api/vision — Claude Vision analysis
+// POST /api/vision — GPT-5.4 Vision (primary) + Claude (fallback)
 router.post("/", apiLimiter, validate(visionSchema), async (req, res) => {
   try {
     const { getUserFromToken, supabaseAdmin } = req.app.locals;
     const { image, avatar = "kelion", language = "ro" } = req.body;
-    if (!image || !process.env.ANTHROPIC_API_KEY)
+    if (!image)
       return res.status(503).json({ error: "Vision unavailable" });
 
     const user = await getUserFromToken(req);
@@ -44,35 +44,83 @@ Objects: each object, color, size, position.
 Text: read ANY visible text.
 Hazards: obstacles, steps → "CAUTION:"
 Answer in ${LANGS[language] || "English"}, concise but detailed.`;
-    const r = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": process.env.ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 1024,
-        messages: [
-          {
-            role: "user",
-            content: [
-              {
-                type: "image",
-                source: {
-                  type: "base64",
-                  media_type: "image/jpeg",
-                  data: image,
-                },
-              },
-              { type: "text", text: prompt },
-            ],
+
+    let description = null;
+    let engine = null;
+
+    // PRIMARY: GPT-5.4 Vision (most advanced, best for accessibility)
+    if (process.env.OPENAI_API_KEY) {
+      try {
+        const r = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer " + process.env.OPENAI_API_KEY,
           },
-        ],
-      }),
-    });
-    const d = await r.json();
+          body: JSON.stringify({
+            model: "gpt-5.4",
+            max_tokens: 1024,
+            messages: [
+              {
+                role: "user",
+                content: [
+                  {
+                    type: "image_url",
+                    image_url: { url: `data:image/jpeg;base64,${image}` },
+                  },
+                  { type: "text", text: prompt },
+                ],
+              },
+            ],
+          }),
+        });
+        const d = await r.json();
+        description = d.choices?.[0]?.message?.content;
+        if (description) engine = "GPT-5.4";
+      } catch (e) {
+        logger.warn({ component: "Vision", err: e.message }, "GPT-5.4 Vision failed");
+      }
+    }
+
+    // FALLBACK: Claude Vision
+    if (!description && process.env.ANTHROPIC_API_KEY) {
+      try {
+        const r = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": process.env.ANTHROPIC_API_KEY,
+            "anthropic-version": "2023-06-01",
+          },
+          body: JSON.stringify({
+            model: "claude-sonnet-4-20250514",
+            max_tokens: 1024,
+            messages: [
+              {
+                role: "user",
+                content: [
+                  {
+                    type: "image",
+                    source: {
+                      type: "base64",
+                      media_type: "image/jpeg",
+                      data: image,
+                    },
+                  },
+                  { type: "text", text: prompt },
+                ],
+              },
+            ],
+          }),
+        });
+        const d = await r.json();
+        description = d.content?.[0]?.text;
+        if (description) engine = "Claude";
+      } catch (e) {
+        logger.warn({ component: "Vision", err: e.message }, "Claude Vision fallback failed");
+      }
+    }
+
     incrementUsage(user?.id, "vision", supabaseAdmin).catch((e) =>
       logger.warn(
         { component: "Vision", err: e.message },
@@ -80,9 +128,9 @@ Answer in ${LANGS[language] || "English"}, concise but detailed.`;
       ),
     );
     res.json({
-      description: d.content?.[0]?.text || "Could not analyze.",
+      description: description || "Could not analyze.",
       avatar,
-      engine: "Claude",
+      engine: engine || "none",
     });
   } catch (e) {
     logger.error({ component: "Vision", err: e.message }, "Vision error");
