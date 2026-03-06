@@ -113,8 +113,7 @@
                 const e = await resp.json().catch(() => ({}));
                 if (resp.status === 429 && e.upgrade) {
                     const planName = e.plan ? (e.plan.charAt(0).toUpperCase() + e.plan.slice(1)) : 'Free';
-                    addMessage('assistant', 'You have reached the daily limit for the ' + planName + ' plan. Say \'Kelion, upgrade\' for more.');
-                    setTimeout(function () { if (window.KPayments) KPayments.showUpgradePrompt(); }, 2000);
+                    addMessage('assistant', 'You have reached the daily limit for the ' + planName + ' plan. Say \'Kelion, upgrade\' or click ⭐ Plans to see options.');
                 } else if (resp.status === 429) {
                     addMessage('assistant', '⏳ Too many messages. Please wait a moment.');
                 } else addMessage('assistant', e.error || 'Error.');
@@ -712,6 +711,9 @@
                         console.log('[App] ✅ Mic ON — direct speech mode, lang:', micLang);
                         // Start mic monitor for visual feedback
                         if (window.KVoice && KVoice.startMicMonitor) KVoice.startMicMonitor();
+                        // Show bargraph indicator
+                        var micLevelEl = document.getElementById('mic-level');
+                        if (micLevelEl) micLevelEl.style.display = 'flex';
                     } catch (e) {
                         micToggle.style.borderColor = '#ff4444';
                         micToggle.style.color = '#ff4444';
@@ -728,6 +730,9 @@
                     micToggle.style.color = '#888';
                     micToggle.style.boxShadow = 'none';
                     micToggle.title = 'Microphone OFF — click to turn on';
+                    // Hide bargraph indicator
+                    var micLevelEl = document.getElementById('mic-level');
+                    if (micLevelEl) micLevelEl.style.display = 'none';
                     console.log('[App] Mic OFF');
                 }
             });

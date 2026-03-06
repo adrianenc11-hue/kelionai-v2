@@ -192,7 +192,7 @@ router.post("/chat", chatLimiter, validate(chatSchema), async (req, res) => {
             },
             body: JSON.stringify({
               model: "llama-3.3-70b-versatile",
-              max_tokens: 1024,
+              max_tokens: 4096,
               messages: [{ role: "system", content: systemPrompt }, ...msgs],
             }),
           },
@@ -215,7 +215,7 @@ router.post("/chat", chatLimiter, validate(chatSchema), async (req, res) => {
           },
           body: JSON.stringify({
             model: "gpt-4o-mini",
-            max_tokens: 1024,
+            max_tokens: 4096,
             messages: [{ role: "system", content: systemPrompt }, ...msgs],
           }),
         });
@@ -238,7 +238,7 @@ router.post("/chat", chatLimiter, validate(chatSchema), async (req, res) => {
           },
           body: JSON.stringify({
             model: "claude-sonnet-4-20250514",
-            max_tokens: 1024,
+            max_tokens: 4096,
             system: systemPrompt,
             messages: msgs,
           }),
@@ -261,7 +261,7 @@ router.post("/chat", chatLimiter, validate(chatSchema), async (req, res) => {
           },
           body: JSON.stringify({
             model: "deepseek-chat",
-            max_tokens: 1024,
+            max_tokens: 4096,
             messages: [{ role: "system", content: systemPrompt }, ...msgs],
           }),
         });
@@ -462,7 +462,7 @@ router.post(
             },
             body: JSON.stringify({
               model: "claude-sonnet-4-20250514",
-              max_tokens: 2048,
+              max_tokens: 4096,
               system: systemPrompt,
               messages: msgs,
               stream: true,
@@ -535,7 +535,7 @@ router.post(
                 },
                 body: JSON.stringify({
                   model: "gpt-4o",
-                  max_tokens: 2048,
+                  max_tokens: 4096,
                   messages: [
                     { role: "system", content: systemPrompt },
                     ...msgs,
@@ -573,7 +573,7 @@ router.post(
               },
               body: JSON.stringify({
                 model: "deepseek-chat",
-                max_tokens: 2048,
+                max_tokens: 4096,
                 messages: [{ role: "system", content: systemPrompt }, ...msgs],
               }),
             },
