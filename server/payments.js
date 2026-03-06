@@ -75,9 +75,13 @@ async function getUserPlan(userId, supabaseAdmin) {
 }
 
 // ═══ CHECK USAGE LIMIT ═══
-// Everyone can access all features. Daily limits per plan apply.
-// Guest/Free have limits, Pro has higher, Premium unlimited.
-async function checkUsage(userId, type, supabaseAdmin) {
+// DISABLED — all users have unlimited access for now.
+// Re-enable later by uncommenting the original logic below.
+async function checkUsage(userId, type /*, supabaseAdmin */) {
+  const plan = userId ? "unlimited" : "guest";
+  return { allowed: true, plan, remaining: -1 };
+  /*
+  // ── Original limit logic (preserved for future re-activation) ──
   if (!userId)
     return {
       allowed: true,
@@ -85,7 +89,7 @@ async function checkUsage(userId, type, supabaseAdmin) {
       remaining: PLAN_LIMITS.guest[type] || 5,
     };
   const { plan, limits } = await getUserPlan(userId, supabaseAdmin);
-  if (limits[type] === -1) return { allowed: true, plan, remaining: -1 }; // unlimited
+  if (limits[type] === -1) return { allowed: true, plan, remaining: -1 };
 
   if (!supabaseAdmin) return { allowed: true, plan, remaining: limits[type] };
 
@@ -112,6 +116,7 @@ async function checkUsage(userId, type, supabaseAdmin) {
   } catch {
     return { allowed: true, plan, remaining: limits[type] };
   }
+  */
 }
 
 // ═══ INCREMENT USAGE ═══
