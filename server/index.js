@@ -302,6 +302,20 @@ app.get("/reset-password.html", (req, res) => {
   res.type("html").send(html);
 });
 
+// Admin panel — read at startup, serve as explicit GET (before express.static to prevent 301 redirect)
+const _rawAdminHtml = fs.existsSync(path.join(__dirname, "..", "app", "admin", "index.html"))
+  ? fs.readFileSync(path.join(__dirname, "..", "app", "admin", "index.html"), "utf8")
+  : null;
+app.get("/admin", (req, res) => {
+  if (!_rawAdminHtml) return res.status(404).send("Admin page not found");
+  res.type("html").send(_rawAdminHtml);
+});
+app.get("/admin/", (req, res) => {
+  if (!_rawAdminHtml) return res.status(404).send("Admin page not found");
+  res.type("html").send(_rawAdminHtml);
+});
+app.use("/admin", express.static(path.join(__dirname, "..", "app", "admin")));
+
 app.use(express.static(path.join(__dirname, "..", "app")));
 app.use("/api", globalLimiter);
 const PORT = process.env.PORT || 3000;
@@ -757,19 +771,7 @@ app.use("/api", (req, res, _next) => {
   res.status(404).json({ error: "API endpoint not found" });
 });
 
-// Admin panel — JWT-protected (admin.js checks auth client-side)
-const _rawAdminHtml = fs.existsSync(path.join(__dirname, "..", "app", "admin", "index.html"))
-  ? fs.readFileSync(path.join(__dirname, "..", "app", "admin", "index.html"), "utf8")
-  : null;
-app.get("/admin", (req, res) => {
-  if (!_rawAdminHtml) return res.status(404).send("Admin page not found");
-  res.type("html").send(_rawAdminHtml);
-});
-app.get("/admin/", (req, res) => {
-  if (!_rawAdminHtml) return res.status(404).send("Admin page not found");
-  res.type("html").send(_rawAdminHtml);
-});
-app.use("/admin", express.static(path.join(__dirname, "..", "app", "admin")));
+// (admin panel handlers already registered above, before express.static)
 
 
 // ═══ PUBLIC PAGE REDIRECTS (trailing-slash canonical) ═══
