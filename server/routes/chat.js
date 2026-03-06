@@ -10,7 +10,7 @@ const logger = require("../logger");
 const { validate, chatSchema, memorySchema } = require("../validation");
 const { checkUsage, incrementUsage } = require("../payments");
 const { buildSystemPrompt } = require("../persona");
-const KelionBrain = require("../brain");
+const { KelionBrain } = require("../brain");
 
 const router = express.Router();
 
