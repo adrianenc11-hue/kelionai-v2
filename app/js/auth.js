@@ -138,6 +138,9 @@
             if (window.KGuestTimer) KGuestTimer.start();
         }
         if (startBtn) startBtn.addEventListener('click', enterApp);
+        // Admin button → navigate to admin panel
+        var adminBtn = document.getElementById('btn-admin');
+        if (adminBtn) adminBtn.addEventListener('click', function () { window.location.href = '/admin'; });
         // Auto-enter when both avatars are 100% loaded (or 10s max)
         window.addEventListener('avatars-ready', function () {
             console.log('[Auth] Avatars ready — auto-entering app');
