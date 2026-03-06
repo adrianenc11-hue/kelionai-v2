@@ -183,30 +183,30 @@ function getMailTransport() {
 async function sendInviteEmail({ to, senderName, code, expiresAt }) {
   const appUrl = process.env.APP_URL || "https://kelionai.app";
   const inviteLink = `${appUrl}/?invite=${encodeURIComponent(code)}`;
-  const expiryDate = new Date(expiresAt).toLocaleDateString("ro-RO");
+  const expiryDate = new Date(expiresAt).toLocaleDateString("en-US");
 
-  const subject = `${senderName} te invită să încerci KelionAI`;
+  const subject = `${senderName} invites you to try KelionAI`;
   const html = `<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"></head>
 <body style="font-family:system-ui,sans-serif;background:#0a0a1a;color:#e0e0e0;margin:0;padding:20px">
 <div style="max-width:520px;margin:0 auto;background:#12122a;border-radius:16px;padding:32px;border:1px solid rgba(0,255,255,0.15)">
-  <h1 style="color:#00ffff;font-size:1.5rem;margin:0 0 8px">🎁 Invitație KelionAI</h1>
-  <p style="color:#aaa;margin:0 0 24px">de la prietenul tău <strong style="color:#fff">${senderName}</strong></p>
-  <p style="margin:0 0 16px">Ai primit o invitație personală la <strong style="color:#00ffff">KelionAI</strong> — asistentul AI cu avatare 3D.</p>
-  <p style="margin:0 0 24px">Folosind această invitație, vei primi <strong style="color:#00ff88">+${RECEIVER_BONUS_DAYS} zile gratuit</strong> la prima ta subscripție!</p>
+  <h1 style="color:#00ffff;font-size:1.5rem;margin:0 0 8px">🎁 KelionAI Invitation</h1>
+  <p style="color:#aaa;margin:0 0 24px">from your friend <strong style="color:#fff">${senderName}</strong></p>
+  <p style="margin:0 0 16px">You've received a personal invitation to <strong style="color:#00ffff">KelionAI</strong> — the AI assistant with 3D avatars.</p>
+  <p style="margin:0 0 24px">By using this invitation, you'll receive <strong style="color:#00ff88">+${RECEIVER_BONUS_DAYS} free days</strong> on your first subscription!</p>
   <div style="background:#0a0a1a;border:2px solid #00ffff;border-radius:12px;padding:20px;text-align:center;margin:0 0 24px">
-    <div style="color:#888;font-size:0.8rem;margin-bottom:8px">CODUL TĂU DE INVITAȚIE</div>
+    <div style="color:#888;font-size:0.8rem;margin-bottom:8px">YOUR INVITE CODE</div>
     <div style="font-size:1.4rem;font-weight:bold;color:#00ffff;letter-spacing:2px;font-family:monospace">${code}</div>
-    <div style="color:#666;font-size:0.75rem;margin-top:8px">Expiră pe ${expiryDate}</div>
+    <div style="color:#666;font-size:0.75rem;margin-top:8px">Expires on ${expiryDate}</div>
   </div>
   <div style="text-align:center;margin:0 0 24px">
     <a href="${inviteLink}" style="display:inline-block;background:linear-gradient(135deg,#00ffff,#00ff88);color:#000;font-weight:bold;padding:14px 32px;border-radius:12px;text-decoration:none;font-size:1rem">
-      🚀 Încearcă KelionAI
+      🚀 Try KelionAI
     </a>
   </div>
   <p style="color:#666;font-size:0.78rem;text-align:center;margin:0">
-    Codul este valabil ${CODE_EXPIRY_DAYS} zile. Un singur cod per cont.
+    This code is valid for ${CODE_EXPIRY_DAYS} days. One code per account.
   </p>
 </div>
 </body>
@@ -319,21 +319,21 @@ async function applyReferralBonus(code, recipientUserId, supabaseAdmin) {
             await transport.sendMail({
               from,
               to: senderUser.email,
-              subject: "🎉 Ai primit bonus KelionAI!",
+              subject: "🎉 You received a KelionAI bonus!",
               html: `<!DOCTYPE html>
 <html><head><meta charset="utf-8"></head>
 <body style="font-family:system-ui,sans-serif;background:#0a0a1a;color:#e0e0e0;margin:0;padding:20px">
 <div style="max-width:520px;margin:0 auto;background:#12122a;border-radius:16px;padding:32px;border:1px solid rgba(0,255,255,0.15)">
-  <h1 style="color:#00ff88;font-size:1.5rem;margin:0 0 8px">🎉 Bonus primit!</h1>
-  <p style="margin:0 0 16px">Felicitări! Prietenul invitat de tine și-a activat subscripția.</p>
+  <h1 style="color:#00ff88;font-size:1.5rem;margin:0 0 8px">🎉 Bonus received!</h1>
+  <p style="margin:0 0 16px">Congratulations! The friend you invited has activated their subscription.</p>
   <div style="background:#0a0a1a;border:2px solid #00ff88;border-radius:12px;padding:20px;text-align:center;margin:0 0 24px">
     <div style="font-size:2rem;margin-bottom:8px">🎁</div>
-    <div style="font-size:1.3rem;font-weight:bold;color:#00ff88">+${SENDER_BONUS_DAYS} zile bonus</div>
-    <div style="color:#888;font-size:0.85rem;margin-top:6px">adăugate la subscripția ta</div>
+    <div style="font-size:1.3rem;font-weight:bold;color:#00ff88">+${SENDER_BONUS_DAYS} bonus days</div>
+    <div style="color:#888;font-size:0.85rem;margin-top:6px">added to your subscription</div>
   </div>
-  <p style="color:#aaa;font-size:0.85rem;margin:0 0 16px">Continuă să inviți prieteni pentru și mai multe zile gratuite!</p>
+  <p style="color:#aaa;font-size:0.85rem;margin:0 0 16px">Keep inviting friends for even more free days!</p>
   <div style="text-align:center">
-    <a href="https://kelionai.app" style="display:inline-block;background:linear-gradient(135deg,#6366F1,#06B6D4);color:#fff;font-weight:bold;padding:12px 28px;border-radius:10px;text-decoration:none">Deschide KelionAI</a>
+    <a href="https://kelionai.app" style="display:inline-block;background:linear-gradient(135deg,#6366F1,#06B6D4);color:#fff;font-weight:bold;padding:12px 28px;border-radius:10px;text-decoration:none">Open KelionAI</a>
   </div>
 </div>
 </body></html>`

@@ -186,7 +186,7 @@
                     badge = document.createElement('div');
                     badge.id = 'referral-bonus-badge';
                     badge.style.cssText = 'background:rgba(0,255,136,0.1);border:1px solid rgba(0,255,136,0.3);border-radius:8px;padding:10px 14px;margin:8px 0;font-size:0.85rem;color:#00ff88;text-align:center;';
-                    badge.textContent = '🎁 Invitație de la un prieten! +5 zile bonus la prima subscripție';
+                    badge.textContent = '🎁 Invitation from a friend! +5 bonus days on your first subscription';
                     const form = authScreen.querySelector('#auth-form');
                     if (form) form.insertBefore(badge, form.firstChild);
                 }

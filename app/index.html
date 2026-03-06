@@ -286,8 +286,8 @@
             <p style="color:#555577;font-size:0.8rem;margin-bottom:32px;">Multilingual • 3D Avatars • Voice Chat • Web
                 Search • AI-Powered</p>
             <button id="start-btn"><span id="loading-icon"
-                    style="display:inline-block;animation:spin 1.5s ease-in-out infinite;">⏳</span> Se
-                încarcă...</button>
+                    style="display:inline-block;animation:spin 1.5s ease-in-out infinite;">⏳</span>
+                Loading...</button>
             <style>
                 @keyframes spin {
                     0% {
@@ -354,11 +354,12 @@
                     aria-label="Conversation history"
                     style="background:none;border:none;cursor:pointer;font-size:1.1rem;padding:4px 8px;color:var(--kelion-text-secondary);">📋</button>
                 <input type="file" id="file-input-hidden" style="display:none" accept="*/*">
-                <button class="btn-secondary" id="btn-subscriptions" title="Abonamente"
+                <button class="btn-secondary" id="btn-subscriptions" title="Plans"
                     style="padding:8px 14px;font-size:0.85rem;background:rgba(99,102,241,0.12);border:1px solid rgba(99,102,241,0.3);border-radius:8px;color:#a5b4fc;cursor:pointer;font-family:var(--kelion-font);transition:all 0.2s;">⭐
-                    Abonamente</button>
-                <button class="btn-secondary" id="btn-invite" title="Invită prieteni" style="display:none;padding:8px 14px;font-size:0.85rem;background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.3);border-radius:8px;color:#6ee7b7;cursor:pointer;font-family:var(--kelion-font);transition:all 0.2s;">🎁
-                    Invită</button>
+                    Plans</button>
+                <button class="btn-secondary" id="btn-invite" title="Invite friends"
+                    style="display:none;padding:8px 14px;font-size:0.85rem;background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.3);border-radius:8px;color:#6ee7b7;cursor:pointer;font-family:var(--kelion-font);transition:all 0.2s;">🎁
+                    Invite</button>
                 <button class="btn-primary" id="btn-auth" title="Sign in" style="padding:8px 18px;font-size:0.85rem;">🔑
                     Login</button>
             </div>
@@ -398,7 +399,8 @@
                         <button id="btn-mic-toggle" title="Microphone ON/OFF" aria-label="Toggle microphone"
                             style="background:none;border:2px solid #555;border-radius:50%;width:36px;height:36px;cursor:pointer;font-size:1.1rem;color:#888;transition:all 0.3s;">🎙️</button>
                         <div id="mic-level" title="Mic level">
-                            <span></span><span></span><span></span><span></span><span></span></div>
+                            <span></span><span></span><span></span><span></span><span></span>
+                        </div>
                         <input type="text" id="text-input" data-i18n-placeholder="input.placeholder"
                             placeholder="Type or speak..." autocomplete="off">
                         <button id="btn-send" title="Send" aria-label="Send message"
@@ -469,26 +471,40 @@
     <div id="referral-modal" class="modal-overlay hidden">
         <div class="modal-content" style="max-width:480px;padding:32px;">
             <button class="modal-close" id="referral-close">&times;</button>
-            <h2 style="font-size:1.4rem;font-weight:700;margin-bottom:8px;">🎁 Invită prieteni</h2>
-            <p style="color:#8888AA;font-size:0.85rem;margin-bottom:20px;">Generează un cod de invitație și trimite-l unui prieten. Ambii primiți bonus de zile!</p>
-            
+            <h2 style="font-size:1.4rem;font-weight:700;margin-bottom:8px;">🎁 Invite Friends</h2>
+            <p style="color:#8888AA;font-size:0.85rem;margin-bottom:20px;">Generate an invite code and share it with a
+                friend. You both get bonus days!</p>
+
             <div id="referral-code-section" style="margin-bottom:20px;">
-                <label style="color:#a5b4fc;font-size:0.8rem;font-weight:600;text-transform:uppercase;letter-spacing:1px;">Codul tău de invitație</label>
+                <label
+                    style="color:#a5b4fc;font-size:0.8rem;font-weight:600;text-transform:uppercase;letter-spacing:1px;">Your
+                    invite code</label>
                 <div style="display:flex;gap:8px;margin-top:8px;">
-                    <input type="text" id="referral-code-display" readonly style="flex:1;padding:12px 16px;background:rgba(10,10,30,0.8);border:1px solid rgba(99,102,241,0.3);border-radius:10px;color:#6ee7b7;font-family:'JetBrains Mono',monospace;font-size:1rem;letter-spacing:1px;text-align:center;" placeholder="Apasă Generează...">
-                    <button id="btn-copy-code" style="padding:8px 14px;background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.3);border-radius:10px;color:#a5b4fc;cursor:pointer;font-size:1rem;" title="Copiază">📋</button>
+                    <input type="text" id="referral-code-display" readonly
+                        style="flex:1;padding:12px 16px;background:rgba(10,10,30,0.8);border:1px solid rgba(99,102,241,0.3);border-radius:10px;color:#6ee7b7;font-family:'JetBrains Mono',monospace;font-size:1rem;letter-spacing:1px;text-align:center;"
+                        placeholder="Click Generate...">
+                    <button id="btn-copy-code"
+                        style="padding:8px 14px;background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.3);border-radius:10px;color:#a5b4fc;cursor:pointer;font-size:1rem;"
+                        title="Copy">📋</button>
                 </div>
                 <div id="referral-expiry" style="color:#555577;font-size:0.75rem;margin-top:6px;"></div>
                 <div id="referral-remaining" style="color:#555577;font-size:0.75rem;margin-top:2px;"></div>
             </div>
 
-            <button id="btn-generate-code" style="width:100%;padding:12px;background:linear-gradient(135deg,#10B981,#06B6D4);border:none;border-radius:10px;color:#fff;font-size:0.95rem;font-weight:600;cursor:pointer;font-family:var(--kelion-font);margin-bottom:20px;transition:all 0.2s;">✨ Generează cod de invitație</button>
+            <button id="btn-generate-code"
+                style="width:100%;padding:12px;background:linear-gradient(135deg,#10B981,#06B6D4);border:none;border-radius:10px;color:#fff;font-size:0.95rem;font-weight:600;cursor:pointer;font-family:var(--kelion-font);margin-bottom:20px;transition:all 0.2s;">✨
+                Generate invite code</button>
 
             <div style="border-top:1px solid rgba(99,102,241,0.12);padding-top:20px;">
-                <label style="color:#a5b4fc;font-size:0.8rem;font-weight:600;text-transform:uppercase;letter-spacing:1px;">Trimite invitație prin email</label>
+                <label
+                    style="color:#a5b4fc;font-size:0.8rem;font-weight:600;text-transform:uppercase;letter-spacing:1px;">Send
+                    invite via email</label>
                 <div style="display:flex;gap:8px;margin-top:8px;">
-                    <input type="email" id="referral-email" placeholder="email@prieten.com" style="flex:1;padding:12px 16px;background:rgba(10,10,30,0.6);border:1px solid rgba(99,102,241,0.2);border-radius:10px;color:#f0f0ff;font-family:var(--kelion-font);font-size:0.9rem;outline:none;">
-                    <button id="btn-send-invite" style="padding:8px 18px;background:linear-gradient(135deg,#6366F1,#06B6D4);border:none;border-radius:10px;color:#fff;font-size:0.9rem;font-weight:600;cursor:pointer;font-family:var(--kelion-font);white-space:nowrap;">📧 Trimite</button>
+                    <input type="email" id="referral-email" placeholder="friend@email.com"
+                        style="flex:1;padding:12px 16px;background:rgba(10,10,30,0.6);border:1px solid rgba(99,102,241,0.2);border-radius:10px;color:#f0f0ff;font-family:var(--kelion-font);font-size:0.9rem;outline:none;">
+                    <button id="btn-send-invite"
+                        style="padding:8px 18px;background:linear-gradient(135deg,#6366F1,#06B6D4);border:none;border-radius:10px;color:#fff;font-size:0.9rem;font-weight:600;cursor:pointer;font-family:var(--kelion-font);white-space:nowrap;">📧
+                        Send</button>
                 </div>
                 <p id="referral-status" style="font-size:0.8rem;margin-top:8px;min-height:20px;"></p>
             </div>

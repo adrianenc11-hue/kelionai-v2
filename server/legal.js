@@ -8,44 +8,44 @@ const router = express.Router();
 // ═══ TERMS OF SERVICE ═══
 router.get("/terms", (req, res) => {
   res.json({
-    title: "Termeni și Condiții — KelionAI",
+    title: "Terms of Service — KelionAI",
     version: "1.0",
     effectiveDate: "2026-03-01",
     sections: [
       {
-        title: "1. Descrierea Serviciului",
+        title: "1. Service Description",
         content:
-          "KelionAI este un asistent AI accesibil cu avatari 3D care oferă funcții de chat, căutare, generare de imagini, analiză vizuală și informații meteo. Serviciul este disponibil în planurile Free, Pro (€9.99/lună) și Premium (€19.99/lună).",
+          "KelionAI is an AI assistant with accessible 3D avatars offering chat, search, image generation, visual analysis, and weather features. The service is available in Free, Pro (€9.99/month), and Premium (€19.99/month) plans.",
       },
       {
-        title: "2. Conturi și Înregistrare",
+        title: "2. Accounts and Registration",
         content:
-          "Pentru funcționalități complete, utilizatorii trebuie să creeze un cont. Sunteți responsabil pentru securitatea credențialelor. Conturile sunt personale și netransferabile.",
+          "Full functionality requires creating an account. You are responsible for the security of your credentials. Accounts are personal and non-transferable.",
       },
       {
-        title: "3. Utilizare Acceptabilă",
+        title: "3. Acceptable Use",
         content:
-          "Serviciul nu poate fi utilizat pentru: conținut ilegal, hărțuire, spam, manipulare AI în scopuri dăunătoare, sau încălcarea drepturilor altora.",
+          "The service may not be used for: illegal content, harassment, spam, manipulating the AI for harmful purposes, or violating the rights of others.",
       },
       {
-        title: "4. Plăți și Subscripții",
+        title: "4. Payments and Subscriptions",
         content:
-          "Subscripțiile se facturează lunar prin Stripe. Anularea oricând din portalul de facturare. Rambursări conform politicii Stripe.",
+          "Subscriptions are billed monthly through Stripe. You may cancel at any time from the billing portal. Refunds are subject to Stripe's refund policy.",
       },
       {
-        title: "5. Limitarea Răspunderii",
+        title: "5. Limitation of Liability",
         content:
-          'KelionAI oferă informații generate de AI care pot conține erori. Nu garantăm acuratețea sau completitudinea. Serviciul e oferit "ca atare".',
+          'KelionAI provides AI-generated information that may contain errors. We do not guarantee accuracy or completeness. The service is provided "as is".',
       },
       {
-        title: "6. Proprietate Intelectuală",
+        title: "6. Intellectual Property",
         content:
-          "Conținutul generat de AI poate fi utilizat conform planului. KelionAI își rezervă drepturile asupra platformei, codului și designului.",
+          "AI-generated content may be used according to your plan. KelionAI reserves all rights to the platform, codebase, and design.",
       },
       {
-        title: "7. Modificări",
+        title: "7. Modifications",
         content:
-          "Ne rezervăm dreptul de a modifica termenii. Notificăm utilizatorii prin email cu 30 de zile înainte.",
+          "We reserve the right to modify these terms. Users will be notified via email 30 days in advance of any changes.",
       },
     ],
   });
@@ -54,49 +54,49 @@ router.get("/terms", (req, res) => {
 // ═══ PRIVACY POLICY ═══
 router.get("/privacy", (req, res) => {
   res.json({
-    title: "Politica de Confidențialitate — KelionAI",
+    title: "Privacy Policy — KelionAI",
     version: "1.0",
     effectiveDate: "2026-03-01",
     sections: [
       {
-        title: "1. Date Colectate",
+        title: "1. Data Collected",
         content:
-          "Colectăm: email, nume (opțional), conversații AI, preferințe, date utilizare, date plată procesate de Stripe.",
+          "We collect: email address, name (optional), AI conversations, preferences, usage data, and payment data processed by Stripe.",
       },
       {
-        title: "2. Scopul Procesării",
+        title: "2. Purpose of Processing",
         content:
-          "Furnizarea serviciului, personalizare (memorie AI), facturare, îmbunătățirea calității, comunicări serviciu.",
+          "Service delivery, personalization (AI memory), billing, quality improvement, and service communications.",
       },
       {
-        title: "3. Baza Legală (GDPR Art. 6)",
+        title: "3. Legal Basis (GDPR Art. 6)",
         content:
-          "Consimțământ (memorie AI), executarea contractului (serviciu), interes legitim (îmbunătățire).",
+          "Consent (AI memory), contract performance (service delivery), legitimate interest (quality improvement).",
       },
       {
-        title: "4. Stocarea Datelor",
+        title: "4. Data Storage",
         content:
-          "Servere Supabase (EU) și Railway. Conversații criptate TLS + repaus. Plăți gestionate exclusiv de Stripe.",
+          "Supabase servers (EU) and Railway infrastructure. Conversations are encrypted via TLS in transit and at rest. Payments are handled exclusively by Stripe.",
       },
       {
-        title: "5. Partajare Date",
+        title: "5. Data Sharing",
         content:
-          "Anthropic/OpenAI (procesare AI), ElevenLabs (TTS), Stripe (plăți), Supabase (stocare). Nu vindem date personale.",
+          "Anthropic/OpenAI (AI processing), ElevenLabs (text-to-speech), Stripe (payments), Supabase (storage). We never sell personal data.",
       },
       {
-        title: "6. Drepturile Dvs. (GDPR)",
+        title: "6. Your Rights (GDPR)",
         content:
-          "Acces, rectificare, ștergere, portabilitate, restricționare, opoziție. Contact: privacy@kelionai.app.",
+          "Access, rectification, erasure, portability, restriction, and objection. Contact: privacy@kelionai.app.",
       },
       {
-        title: "7. Retenția Datelor",
+        title: "7. Data Retention",
         content:
-          "Conversații: cât contul e activ + 30 zile. Plăți: 5 ani (fiscal). La ștergere cont: eliminare 30 zile.",
+          "Conversations: retained while account is active + 30 days. Payments: 5 years (tax obligations). On account deletion: data removed within 30 days.",
       },
       {
-        title: "8. Cookie-uri",
+        title: "8. Cookies",
         content:
-          "Doar cookie-uri esențiale pentru autentificare. Zero tracking sau publicitate.",
+          "We use only essential cookies for authentication. Zero tracking or advertising cookies.",
       },
     ],
   });

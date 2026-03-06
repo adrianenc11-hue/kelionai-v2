@@ -9,7 +9,7 @@
         var subscription = status ? status.subscription : null;
 
         if (!plans || plans.length === 0) {
-            container.innerHTML = '<div class="plan-loading">Planurile nu sunt disponibile momentan.</div>';
+            container.innerHTML = '<div class="plan-loading">Plans are not available at this time.</div>';
             return;
         }
 
@@ -22,17 +22,17 @@
                 (p.id === 'pro' ? ' featured' : '') +
                 (isCurrent ? ' current' : '');
 
-            var badgeHtml = p.id === 'pro' ? '<div class="plan-badge">Recomandat</div>' :
-                            p.id === 'enterprise' ? '<div class="plan-badge">Business</div>' : '';
+            var badgeHtml = p.id === 'pro' ? '<div class="plan-badge">Recommended</div>' :
+                p.id === 'enterprise' ? '<div class="plan-badge">Business</div>' : '';
 
             var priceHtml = p.price === 0
-                ? '<div class="plan-price">Gratuit</div>'
-                : '<div class="plan-price"><span class="currency">€</span>' + KShared.esc(p.price) + '<small>/lună</small></div>';
+                ? '<div class="plan-price">Free</div>'
+                : '<div class="plan-price"><span class="currency">€</span>' + KShared.esc(p.price) + '<small>/month</small></div>';
 
             var features = p.features || [
-                p.limits.chat === -1 ? 'Chat nelimitat' : p.limits.chat + ' chat/zi',
-                p.limits.search === -1 ? 'Căutări nelimitate' : p.limits.search + ' căutări/zi',
-                p.limits.image === -1 ? 'Imagini nelimitate' : p.limits.image + ' imagini/zi'
+                p.limits.chat === -1 ? 'Unlimited chat' : p.limits.chat + ' chats/day',
+                p.limits.search === -1 ? 'Unlimited searches' : p.limits.search + ' searches/day',
+                p.limits.image === -1 ? 'Unlimited images' : p.limits.image + ' images/day'
             ];
 
             var featuresHtml = features.map(function (f) {
@@ -41,16 +41,16 @@
 
             var btnHtml;
             if (isCurrent) {
-                btnHtml = '<button class="plan-btn current-plan" disabled>Plan curent</button>';
+                btnHtml = '<button class="plan-btn current-plan" disabled>Current plan</button>';
                 if (subscription && subscription.current_period_end) {
-                    var renewDate = new Date(subscription.current_period_end).toLocaleDateString('ro-RO');
-                    btnHtml += '<button class="plan-btn manage" id="btn-manage-' + KShared.esc(p.id) + '">Gestionează abonamentul</button>';
-                    btnHtml += '<p style="font-size:0.75rem;color:#8888aa;text-align:center;margin-top:6px">Se reînnoiește pe ' + KShared.esc(renewDate) + '</p>';
+                    var renewDate = new Date(subscription.current_period_end).toLocaleDateString('en-US');
+                    btnHtml += '<button class="plan-btn manage" id="btn-manage-' + KShared.esc(p.id) + '">Manage subscription</button>';
+                    btnHtml += '<p style="font-size:0.75rem;color:#8888aa;text-align:center;margin-top:6px">Renews on ' + KShared.esc(renewDate) + '</p>';
                 }
             } else if (p.price === 0) {
-                btnHtml = '<button class="plan-btn free-plan" disabled>Inclus</button>';
+                btnHtml = '<button class="plan-btn free-plan" disabled>Included</button>';
             } else {
-                btnHtml = '<button class="plan-btn upgrade" data-plan="' + KShared.esc(p.id) + '">Upgrade la ' + KShared.esc(p.name) + '</button>';
+                btnHtml = '<button class="plan-btn upgrade" data-plan="' + KShared.esc(p.id) + '">Upgrade to ' + KShared.esc(p.name) + '</button>';
             }
 
             card.innerHTML = badgeHtml +
@@ -83,11 +83,11 @@
         var msg = '';
         if (plan !== 'guest' && plan !== 'free') {
             var renewDate = status.subscription && status.subscription.current_period_end
-                ? ' · Reînnoire: ' + KShared.esc(new Date(status.subscription.current_period_end).toLocaleDateString('ro-RO'))
+                ? ' · Renewal: ' + KShared.esc(new Date(status.subscription.current_period_end).toLocaleDateString('en-US'))
                 : '';
-            msg = '✅ Plan curent: <strong>' + KShared.esc(plan.toUpperCase()) + '</strong>' + renewDate;
+            msg = '✅ Current plan: <strong>' + KShared.esc(plan.toUpperCase()) + '</strong>' + renewDate;
         } else if (plan === 'free') {
-            msg = 'Ești pe planul <strong>Free</strong>. Upgrade pentru acces extins.';
+            msg = 'You are on the <strong>Free</strong> plan. Upgrade for extended access.';
         }
 
         if (msg) {
@@ -102,7 +102,7 @@
         if (payment === 'success') {
             var el = document.getElementById('pricing-status');
             if (el) {
-                el.innerHTML = '✅ Plata procesată cu succes! Planul tău a fost activat.';
+                el.innerHTML = '✅ Payment processed successfully! Your plan has been activated.';
                 el.classList.remove('hidden');
                 el.style.background = 'rgba(0, 255, 136, 0.08)';
                 el.style.borderColor = 'rgba(0, 255, 136, 0.3)';
@@ -112,7 +112,7 @@
         } else if (payment === 'cancel') {
             var el2 = document.getElementById('pricing-status');
             if (el2) {
-                el2.innerHTML = 'Plata a fost anulată. Poți încerca din nou oricând.';
+                el2.innerHTML = 'Payment was cancelled. You can try again anytime.';
                 el2.classList.remove('hidden');
                 el2.style.background = 'rgba(255, 100, 100, 0.08)';
                 el2.style.borderColor = 'rgba(255, 100, 100, 0.2)';

@@ -65,11 +65,11 @@
         btnGenerate.addEventListener('click', async function () {
             const token = getToken();
             if (!token) {
-                showStatus('⚠️ Trebuie să fii autentificat', '#f87171');
+                showStatus('⚠️ You must be logged in', '#f87171');
                 return;
             }
             btnGenerate.disabled = true;
-            btnGenerate.textContent = '⏳ Se generează...';
+            btnGenerate.textContent = '⏳ Generating...';
 
             try {
                 const resp = await fetch('/api/referral/generate', {
@@ -85,21 +85,21 @@
 
                     if (data.expiresAt) {
                         const date = new Date(data.expiresAt);
-                        expiryEl.textContent = '⏰ Expiră: ' + date.toLocaleDateString('ro-RO');
+                        expiryEl.textContent = '⏰ Expires: ' + date.toLocaleDateString('en-US');
                     }
                     if (data.codesRemainingThisMonth !== undefined) {
-                        remainingEl.textContent = '📊 Invitații rămase luna aceasta: ' + data.codesRemainingThisMonth;
+                        remainingEl.textContent = '📊 Invites remaining this month: ' + data.codesRemainingThisMonth;
                     }
-                    showStatus('✅ Cod generat cu succes!', '#10B981');
+                    showStatus('✅ Code generated successfully!', '#10B981');
                 } else {
-                    showStatus('❌ ' + (data.error || 'Eroare la generare'), '#f87171');
+                    showStatus('❌ ' + (data.error || 'Generation error'), '#f87171');
                 }
             } catch (err) {
-                showStatus('❌ Eroare de rețea: ' + err.message, '#f87171');
+                showStatus('❌ Network error: ' + err.message, '#f87171');
             }
 
             btnGenerate.disabled = false;
-            btnGenerate.textContent = '✨ Generează cod de invitație';
+            btnGenerate.textContent = '✨ Generate invite code';
         });
     }
 
@@ -125,21 +125,21 @@
         btnSend.addEventListener('click', async function () {
             const email = emailInput.value.trim();
             if (!email) {
-                showStatus('⚠️ Introdu adresa de email', '#f87171');
+                showStatus('⚠️ Enter an email address', '#f87171');
                 return;
             }
             if (!currentCode) {
-                showStatus('⚠️ Generează un cod mai întâi', '#f87171');
+                showStatus('⚠️ Generate a code first', '#f87171');
                 return;
             }
             const token = getToken();
             if (!token) {
-                showStatus('⚠️ Trebuie să fii autentificat', '#f87171');
+                showStatus('⚠️ You must be logged in', '#f87171');
                 return;
             }
 
             btnSend.disabled = true;
-            btnSend.textContent = '⏳ Se trimite...';
+            btnSend.textContent = '⏳ Sending...';
 
             try {
                 const resp = await fetch('/api/referral/send-invite', {
@@ -150,17 +150,17 @@
                 const data = await resp.json();
 
                 if (resp.ok && data.success) {
-                    showStatus('✅ Invitație trimisă la ' + email + '!', '#10B981');
+                    showStatus('✅ Invite sent to ' + email + '!', '#10B981');
                     emailInput.value = '';
                 } else {
-                    showStatus('❌ ' + (data.error || 'Eroare la trimitere'), '#f87171');
+                    showStatus('❌ ' + (data.error || 'Send error'), '#f87171');
                 }
             } catch (err) {
-                showStatus('❌ Eroare: ' + err.message, '#f87171');
+                showStatus('❌ Error: ' + err.message, '#f87171');
             }
 
             btnSend.disabled = false;
-            btnSend.textContent = '📧 Trimite';
+            btnSend.textContent = '📧 Send';
         });
     }
 
