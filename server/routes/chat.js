@@ -10,6 +10,7 @@ const logger = require("../logger");
 const { validate, chatSchema, memorySchema } = require("../validation");
 const { checkUsage, incrementUsage } = require("../payments");
 const { buildSystemPrompt } = require("../persona");
+const KelionBrain = require("../brain");
 
 const router = express.Router();
 
@@ -163,10 +164,14 @@ router.post("/chat", chatLimiter, validate(chatSchema), async (req, res) => {
         );
       }
     }
+    // Combine user_preferences + brain memory + capabilities
+    const brainMemory = brain._currentMemoryContext || "";
+    const capabilities = KelionBrain.CAPABILITIES_PROMPT();
+    const fullMemoryContext = [capabilities, memoryContext, brainMemory].filter(Boolean).join("\n");
     const systemPrompt = buildSystemPrompt(
       avatar,
       language,
-      memoryContext,
+      fullMemoryContext,
       { failedTools: thought.failedTools },
       thought.chainOfThought,
     );
@@ -301,6 +306,19 @@ router.post("/chat", chatLimiter, validate(chatSchema), async (req, res) => {
           "learnFromConversation failed",
         ),
       );
+    // Save brain memory (text) + extract facts
+    if (user?.id) {
+      brain.saveMemory(user.id, "text", "User: " + message.substring(0, 500) + " | Kelion: " + reply.substring(0, 500), { avatar, language, engine }).catch(() => { });
+      brain.extractAndSaveFacts(user.id, message, reply).catch(() => { });
+      // Save visual memory if image was analyzed
+      if (imageBase64 && reply) {
+        brain.saveMemory(user.id, "visual", "Image analysis: " + reply.substring(0, 500), { avatar }).catch(() => { });
+      }
+      // Save audio memory if voice was transcribed
+      if (audioBase64 && message) {
+        brain.saveMemory(user.id, "audio", "Voice said: " + message.substring(0, 500), { avatar }).catch(() => { });
+      }
+    }
     incrementUsage(user?.id, "chat", supabaseAdmin).catch((e) =>
       logger.warn(
         { component: "Chat", err: e.message },

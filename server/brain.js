@@ -70,6 +70,162 @@ class KelionBrain {
   }
 
   // ═══════════════════════════════════════════════════════════
+  // CAPABILITIES — What Kelion knows it can do
+  // ═══════════════════════════════════════════════════════════
+  static CAPABILITIES_PROMPT() {
+    return `You are Kelion, an advanced AI assistant by KelionAI. You have these capabilities:
+- SEARCH: Web search (Tavily, Perplexity, Serper) for real-time information
+- WEATHER: Real-time weather for any location (Open-Meteo)
+- IMAGINE: Generate images from descriptions
+- MAP: Geocoding and maps for any address
+- MEMORY: Remember and recall past conversations and facts about users
+- VISION: Analyze images with GPT-4o (describe scenes, read text, identify objects — critical for blind users)
+- TTS: Convert text to natural speech (ElevenLabs/OpenAI)
+- STT: Transcribe voice to text (Whisper)
+- FACE_CHECK: Recognize registered faces
+- FACE_REGISTER: Register a new face
+- VOICE_CLONE: Clone a voice for TTS
+- RADIO: Stream 13 Romanian radio stations
+- VIDEO: Analyze video content
+- WEB_NAV: Navigate and extract web content
+- OPEN_URL: Open any URL
+- NEWS: Latest news with 29 source fetchers and categories
+- TRADE_INTELLIGENCE: Trading analysis with 11 technical indicators
+- ADMIN: System diagnostics, stats, user management (admin only)
+- AUTH: User registration, login, password management
+- PAYMENTS: Subscription plans, usage tracking, referrals
+- LEGAL: GDPR, Terms, Privacy
+- HEALTH: System health monitoring
+- METRICS: Performance metrics and analytics
+- SECURITY: Security auditing
+- DEVELOPER_API: API key management and docs
+When asked "what can you do?" list these real capabilities. Use them proactively when relevant.`;
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // MEMORY SYSTEM — Load/Save to Supabase
+  // ═══════════════════════════════════════════════════════════
+  async loadMemory(userId, type, limit = 10) {
+    if (!userId || !this.supabaseAdmin) return [];
+    try {
+      const { data, error } = await this.supabaseAdmin
+        .from("brain_memory")
+        .select("content, context, importance, created_at")
+        .eq("user_id", userId)
+        .eq("memory_type", type)
+        .order("created_at", { ascending: false })
+        .limit(limit);
+      if (error) {
+        logger.warn({ component: "Brain", err: error.message }, "loadMemory failed");
+        return [];
+      }
+      return data || [];
+    } catch (e) {
+      logger.warn({ component: "Brain", err: e.message }, "loadMemory error");
+      return [];
+    }
+  }
+
+  async saveMemory(userId, type, content, context = {}, importance = 5) {
+    if (!userId || !this.supabaseAdmin || !content) return;
+    try {
+      await this.supabaseAdmin.from("brain_memory").insert({
+        user_id: userId,
+        memory_type: type,
+        content: content.substring(0, 2000),
+        context,
+        importance,
+      });
+    } catch (e) {
+      logger.warn({ component: "Brain", err: e.message }, "saveMemory error");
+    }
+  }
+
+  async loadFacts(userId, limit = 15) {
+    if (!userId || !this.supabaseAdmin) return [];
+    try {
+      const { data, error } = await this.supabaseAdmin
+        .from("learned_facts")
+        .select("fact, category, confidence")
+        .eq("user_id", userId)
+        .order("confidence", { ascending: false })
+        .limit(limit);
+      if (error) return [];
+      return data || [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  async saveFact(userId, fact, category = "knowledge", source = "conversation") {
+    if (!userId || !this.supabaseAdmin || !fact) return;
+    try {
+      // Avoid duplicates
+      const { data: existing } = await this.supabaseAdmin
+        .from("learned_facts")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("fact", fact)
+        .limit(1);
+      if (existing && existing.length > 0) return;
+      await this.supabaseAdmin.from("learned_facts").insert({
+        user_id: userId,
+        fact: fact.substring(0, 500),
+        category,
+        source,
+      });
+    } catch (e) {
+      logger.warn({ component: "Brain", err: e.message }, "saveFact error");
+    }
+  }
+
+  async extractAndSaveFacts(userId, message, reply) {
+    if (!userId || !this.supabaseAdmin) return;
+    // Rate limit: max once per 30 seconds per user
+    const lastTime = this.lastLearnTime.get(userId) || 0;
+    if (Date.now() - lastTime < 30000) return;
+    this.lastLearnTime.set(userId, Date.now());
+    try {
+      // Use simple heuristics to extract facts (no extra AI call needed)
+      const lower = message.toLowerCase();
+      // Personal preferences
+      if (/\b(prefer|vreau|imi place|mi-ar placea|I like|I prefer)\b/i.test(message)) {
+        await this.saveFact(userId, "User said: " + message.substring(0, 200), "preference", "chat");
+      }
+      // Name sharing
+      const nameMatch = message.match(/\b(?:ma cheama|numele meu|my name is|I'm|I am)\s+([A-Z][a-z]+)/i);
+      if (nameMatch) {
+        await this.saveFact(userId, "User's name is " + nameMatch[1], "personal", "chat");
+      }
+      // Location sharing
+      const locMatch = message.match(/\b(?:sunt din|locuiesc in|I live in|I'm from)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/i);
+      if (locMatch) {
+        await this.saveFact(userId, "User lives in " + locMatch[1], "personal", "chat");
+      }
+      this.learningsExtracted++;
+    } catch (e) {
+      logger.warn({ component: "Brain", err: e.message }, "extractFacts error");
+    }
+  }
+
+  buildMemoryContext(memories, visualMem, audioMem, facts) {
+    const parts = [];
+    if (facts.length > 0) {
+      parts.push("FACTS I KNOW ABOUT THIS USER: " + facts.map(f => f.fact).join("; "));
+    }
+    if (memories.length > 0) {
+      parts.push("RECENT CONVERSATIONS: " + memories.map(m => m.content).join(" | "));
+    }
+    if (visualMem.length > 0) {
+      parts.push("IMAGES I'VE SEEN: " + visualMem.map(m => m.content).join("; "));
+    }
+    if (audioMem.length > 0) {
+      parts.push("VOICE INTERACTIONS: " + audioMem.map(m => m.content).join("; "));
+    }
+    return parts.length > 0 ? "[MEMORY CONTEXT] " + parts.join(" || ") : "";
+  }
+
+  // ═══════════════════════════════════════════════════════════
   // MAIN ENTRY — Complete thinking loop
   // ═══════════════════════════════════════════════════════════
   async think(
@@ -88,6 +244,16 @@ class KelionBrain {
     this._currentMediaData = mediaData || {};
 
     try {
+      // Step 0: LOAD MEMORY — brain wakes up with context
+      const [memories, visualMem, audioMem, facts] = await Promise.all([
+        this.loadMemory(userId, "text", 10),
+        this.loadMemory(userId, "visual", 5),
+        this.loadMemory(userId, "audio", 5),
+        this.loadFacts(userId, 15),
+      ]);
+      const memoryContext = this.buildMemoryContext(memories, visualMem, audioMem, facts);
+      this._currentMemoryContext = memoryContext;
+
       // Step 1: ANALYZE intent deeply
       const analysis = this.analyzeIntent(message, language);
 
