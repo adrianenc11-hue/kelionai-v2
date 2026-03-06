@@ -46,9 +46,9 @@
     }
 
     function updateUI() {
-        const n = document.getElementById('user-name'), b = document.getElementById('btn-auth');
-        if (currentUser) { if (n) n.textContent = currentUser.name || currentUser.email; if (b) { b.textContent = '👋 Logout'; b.title = 'Logoff'; } }
-        else { if (n) n.textContent = 'Guest'; if (b) { b.textContent = '🔑 Login'; b.title = 'Login'; } }
+        const n = document.getElementById('user-name'), b = document.getElementById('btn-auth'), adminBtn = document.getElementById('btn-admin');
+        if (currentUser) { if (n) n.textContent = currentUser.name || currentUser.email; if (b) { b.textContent = '👋 Logout'; b.title = 'Logoff'; } if (adminBtn) adminBtn.style.display = currentUser.role === 'admin' ? '' : 'none'; }
+        else { if (n) n.textContent = 'Guest'; if (b) { b.textContent = '🔑 Login'; b.title = 'Login'; } if (adminBtn) adminBtn.style.display = 'none'; }
     }
 
     function initUI() {

@@ -119,6 +119,7 @@ router.post("/login", authLimiter, validate(loginSchema), async (req, res) => {
         id: data.user.id,
         email: data.user.email,
         name: data.user.user_metadata?.full_name,
+        role: data.user.role || "user",
       },
       session: data.session,
     });
@@ -148,7 +149,7 @@ router.get("/me", async (req, res) => {
     const u = await getUserFromToken(req);
     if (!u) return res.status(401).json({ error: "Not authenticated" });
     res.json({
-      user: { id: u.id, email: u.email, name: u.user_metadata?.full_name },
+      user: { id: u.id, email: u.email, name: u.user_metadata?.full_name, role: u.role || "user" },
     });
   } catch {
     res.status(500).json({ error: "Auth error" });
