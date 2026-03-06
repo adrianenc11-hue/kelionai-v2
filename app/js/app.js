@@ -450,6 +450,8 @@
             return;
         }
         hideWelcome(); KAvatar.setAttentive(true); addMessage('user', text); showThinking(true);
+        // Unlock AudioContext on text send — ensures voice plays without needing mic press
+        if (window.KVoice && KVoice.ensureAudioUnlocked) KVoice.ensureAudioUnlocked();
         if (isVisionRequest(text)) triggerVision(); else await sendToAI(text, 'ro');
     }
 
