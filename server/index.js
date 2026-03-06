@@ -54,7 +54,7 @@ const weatherRouter = require("./routes/weather");
 const visionRouter = require("./routes/vision");
 const imagesRouter = require("./routes/images");
 const authRouter = require("./routes/auth");
-const adminRouter = require("./routes/admin").router;
+const adminApiRouter = require("./routes/admin");
 const { adminAuth } = require("./middleware/auth");
 const healthRouter = require("./routes/health");
 const identityRouter = require("./routes/identity");
@@ -152,7 +152,7 @@ app.use("/api/payments/webhook", express.raw({ type: "application/json" }));
 app.use("/api/messenger/webhook", express.raw({ type: "application/json" }));
 app.use(express.json({ limit: "10mb" }));
 
-// ═══ HTTP REQUEST LOGGING ═══
+// ═══ HTTP REQUEST LOGGING + TRAFFIC TRACKING ═══
 app.use((req, res, next) => {
   const start = Date.now();
   res.on("finish", () => {
@@ -168,6 +168,15 @@ app.use((req, res, next) => {
       },
       `${req.method} ${req.path} ${res.statusCode} ${duration}ms`,
     );
+    // Track page views for admin traffic panel (skip API/static assets)
+    if (req.method === "GET" && !req.path.startsWith("/api/") && !req.path.match(/\.(js|css|png|jpg|svg|ico|woff2?)$/i) && supabaseAdmin) {
+      supabaseAdmin.from("page_views").insert({
+        ip: req.ip || req.headers["x-forwarded-for"] || "unknown",
+        path: req.path,
+        user_agent: (req.get("user-agent") || "").substring(0, 300),
+        country: req.headers["cf-ipcountry"] || req.headers["x-vercel-ip-country"] || null,
+      }).then().catch(() => { });
+    }
   });
   next();
 });
@@ -360,7 +369,7 @@ app.use("/api/search", searchRouter);
 app.use("/api/weather", weatherRouter);
 app.use("/api/vision", visionRouter);
 app.use("/api/imagine", imagesRouter);
-app.use("/api", adminRouter);
+app.use("/api/admin", adminApiRouter);
 app.use("/api/health", healthRouter);
 app.use("/api/referral", referralRouter);
 app.use("/api", identityRouter);
@@ -748,38 +757,9 @@ app.use("/api", (req, res, _next) => {
   res.status(404).json({ error: "API endpoint not found" });
 });
 
-// ═══ ADMIN STEALTH — /admin/* returns 404 (same as unknown routes) for non-owners ═══
-app.get("/admin", (req, res, next) => {
-  const secret = req.headers["x-admin-secret"];
-  const expected = process.env.ADMIN_SECRET_KEY;
-  if (!secret || !expected)
-    return res.status(404).type("html").send(_raw404Html);
-  try {
-    const sb = Buffer.from(secret),
-      eb = Buffer.from(expected);
-    if (sb.length !== eb.length || !require("crypto").timingSafeEqual(sb, eb))
-      return res.status(404).type("html").send(_raw404Html);
-  } catch {
-    return res.status(404).type("html").send(_raw404Html);
-  }
-  next();
-});
+// Admin panel — JWT-protected (admin.js checks auth client-side)
 app.use("/admin", express.static(path.join(__dirname, "..", "app", "admin")));
-app.get("/admin/*", (req, res, next) => {
-  const secret = req.headers["x-admin-secret"];
-  const expected = process.env.ADMIN_SECRET_KEY;
-  if (!secret || !expected)
-    return res.status(404).type("html").send(_raw404Html);
-  try {
-    const sb = Buffer.from(secret),
-      eb = Buffer.from(expected);
-    if (sb.length !== eb.length || !require("crypto").timingSafeEqual(sb, eb))
-      return res.status(404).type("html").send(_raw404Html);
-  } catch {
-    return res.status(404).type("html").send(_raw404Html);
-  }
-  next();
-});
+
 
 // ═══ PUBLIC PAGE REDIRECTS (trailing-slash canonical) ═══
 app.get("/privacy", (req, res) => res.redirect(301, "/privacy/"));

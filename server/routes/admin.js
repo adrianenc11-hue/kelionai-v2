@@ -1,371 +1,295 @@
 // ═══════════════════════════════════════════════════════════════
-// KelionAI — Admin Routes
+// KelionAI — Admin API Routes (admin-only, role-gated)
 // ═══════════════════════════════════════════════════════════════
 "use strict";
 
 const express = require("express");
 const logger = require("../logger");
-const { version } = require("../../package.json");
-const { adminAuth } = require("../middleware/auth");
-
 const router = express.Router();
 
-// POST /api/admin/verify-code — verify admin access/exit code (works from ANY state: guest, free, user)
-router.post("/admin/verify-code", (req, res) => {
-  const { code } = req.body;
-  if (!code) return res.status(400).json({ error: "Code required" });
-
-  const accessCode = process.env.ADMIN_ACCESS_CODE;
-  const exitCode = process.env.ADMIN_EXIT_CODE;
-
-  // Check ACCESS code — enter admin mode
-  if (accessCode && code.trim() === accessCode.trim()) {
-    const secret = process.env.ADMIN_SECRET_KEY;
-    if (!secret)
-      return res.status(503).json({ error: "Admin not configured on server" });
-    logger.info({ component: "Admin" }, "🔑 Admin mode ACTIVATED via code");
-    return res.json({
-      action: "enter",
-      success: true,
-      secret,
-      message: "Admin mode activat!",
-    });
-  }
-
-  // Check EXIT code — exit admin mode
-  if (exitCode && code.trim() === exitCode.trim()) {
-    logger.info({ component: "Admin" }, "🔒 Admin mode DEACTIVATED via code");
-    return res.json({
-      action: "exit",
-      success: true,
-      message: "Admin mode dezactivat!",
-    });
-  }
-
-  // Invalid code — don't reveal which codes exist
-  res.status(403).json({ error: "Cod invalid" });
-});
-
-// GET /api/brain
-router.get("/brain", adminAuth, (req, res) => {
-  const { brain } = req.app.locals;
-  res.json(brain.getDiagnostics());
-});
-
-// POST /api/brain/reset
-router.post("/brain/reset", adminAuth, (req, res) => {
-  const { brain } = req.app.locals;
-  const { tool } = req.body;
-  if (tool) brain.resetTool(tool);
-  else brain.resetAll();
-  res.json({ success: true, diagnostics: brain.getDiagnostics() });
-});
-
-// GET /api/admin/health-check
-router.get("/admin/health-check", adminAuth, async (req, res) => {
+// ── Admin middleware — checks JWT role ──
+async function requireAdmin(req, res, next) {
   try {
-    const { brain, supabase, supabaseAdmin } = req.app.locals;
-    logger.info({ component: "Admin" }, "🏥 Health check performed");
-    const recommendations = [];
-
-    const upSec = process.uptime();
-    const d0 = Math.floor(upSec / 86400),
-      h0 = Math.floor((upSec % 86400) / 3600);
-    const m0 = Math.floor((upSec % 3600) / 60),
-      s0 = Math.floor(upSec % 60);
-    const mem = process.memoryUsage();
-    const server = {
-      version,
-      uptime: `${d0}d ${h0}h ${m0}m ${s0}s`,
-      uptimeSeconds: Math.round(upSec),
-      nodeVersion: process.version,
-      memory: {
-        rss: Math.round(mem.rss / 1024 / 1024) + "MB",
-        heapUsed: Math.round(mem.heapUsed / 1024 / 1024) + "MB",
-        heapTotal: Math.round(mem.heapTotal / 1024 / 1024) + "MB",
-      },
-      timestamp: new Date().toISOString(),
-    };
-
-    const services = {
-      ai_claude: {
-        label: "AI Claude",
-        active: !!process.env.ANTHROPIC_API_KEY,
-      },
-      ai_gpt4o: { label: "AI GPT-4o", active: !!process.env.OPENAI_API_KEY },
-      ai_deepseek: {
-        label: "AI DeepSeek",
-        active: !!process.env.DEEPSEEK_API_KEY,
-      },
-      tts_elevenlabs: {
-        label: "TTS ElevenLabs",
-        active: !!process.env.ELEVENLABS_API_KEY,
-      },
-      stt_groq: { label: "STT Groq", active: !!process.env.GROQ_API_KEY },
-      search_perplexity: {
-        label: "Search Perplexity",
-        active: !!process.env.PERPLEXITY_API_KEY,
-      },
-      search_tavily: {
-        label: "Search Tavily",
-        active: !!process.env.TAVILY_API_KEY,
-      },
-      search_serper: {
-        label: "Search Serper",
-        active: !!process.env.SERPER_API_KEY,
-      },
-      images_together: {
-        label: "Image Together",
-        active: !!process.env.TOGETHER_API_KEY,
-      },
-      payments_stripe: {
-        label: "Payments Stripe",
-        active: !!process.env.STRIPE_SECRET_KEY,
-      },
-      stripe_webhook: {
-        label: "Stripe Webhook",
-        active: !!process.env.STRIPE_WEBHOOK_SECRET,
-      },
-      monitoring_sentry: {
-        label: "Error Monitoring Sentry",
-        active: !!process.env.SENTRY_DSN,
-      },
-    };
-    if (!process.env.STRIPE_WEBHOOK_SECRET)
-      recommendations.push(
-        "STRIPE_WEBHOOK_SECRET is not configured — webhooks will not be validated",
-      );
-    if (!process.env.SENTRY_DSN)
-      recommendations.push("SENTRY_DSN is missing — errors are not monitored");
-    if (
-      !process.env.ANTHROPIC_API_KEY &&
-      !process.env.OPENAI_API_KEY &&
-      !process.env.DEEPSEEK_API_KEY
-    ) {
-      recommendations.push("No AI key configured — chat will not work");
+    const { getUserFromToken } = req.app.locals;
+    const user = await getUserFromToken(req);
+    if (!user || user.role !== "admin") {
+      return res.status(403).json({ error: "Admin access required" });
     }
+    req.adminUser = user;
+    next();
+  } catch (e) {
+    res.status(401).json({ error: "Authentication failed" });
+  }
+}
 
-    const database = { connected: false, tables: {} };
-    if (supabaseAdmin) {
-      const tables = [
-        "conversations",
-        "messages",
-        "user_preferences",
-        "subscriptions",
-        "usage",
-      ];
-      await Promise.all(
-        tables.map(async (tbl) => {
-          try {
-            const { count, error } = await supabaseAdmin
-              .from(tbl)
-              .select("id", { count: "exact", head: true });
-            database.tables[tbl] = error
-              ? { ok: false, error: error.message }
-              : { ok: true, count };
-          } catch (e) {
-            database.tables[tbl] = { ok: false, error: e.message };
-          }
-        }),
-      );
-      database.connected = Object.values(database.tables).some((t) => t.ok);
-    } else {
-      database.error = "supabaseAdmin client not initialized";
-      recommendations.push(
-        "Supabase is not configured — database is unavailable",
-      );
-    }
+router.use(requireAdmin);
 
-    const brainDiag = brain.getDiagnostics();
-    const degradedTools =
-      brainDiag.degradedTools ||
-      Object.entries(brainDiag.toolErrors || {})
-        .filter(([, v]) => v >= 5)
-        .map(([k]) => k);
-    const brainResult = {
-      status: brainDiag.status,
-      conversations: brainDiag.conversations,
-      toolStats: brainDiag.toolStats,
-      toolErrors: brainDiag.toolErrors,
-      degradedTools,
-      recentErrors: brainDiag.recentErrors,
-      avgLatency: brainDiag.avgLatency,
-      journal: (brainDiag.journal || []).slice(-5),
-    };
-    if (brainDiag.status === "degraded")
-      recommendations.push(
-        `Brain engine is degraded — ${degradedTools.join(", ") || "some tools"} have errors`,
-      );
-
-    const auth = {
-      supabaseInitialized: !!supabase,
-      supabaseAdminInitialized: !!supabaseAdmin,
-      authAvailable: !!supabase,
-    };
-    if (!supabase)
-      recommendations.push(
-        "Supabase anon client is not initialized — authentication is unavailable",
-      );
-
-    const paymentsCheck = {
-      stripeConfigured: !!process.env.STRIPE_SECRET_KEY,
-      webhookConfigured: !!process.env.STRIPE_WEBHOOK_SECRET,
-      priceProConfigured: !!process.env.STRIPE_PRICE_PRO,
-      pricePremiumConfigured: !!process.env.STRIPE_PRICE_PREMIUM,
-      activeSubscribers: null,
-    };
-    if (supabaseAdmin && process.env.STRIPE_SECRET_KEY) {
-      try {
-        const { count } = await supabaseAdmin
-          .from("subscriptions")
-          .select("id", { count: "exact", head: true })
-          .eq("status", "active");
-        paymentsCheck.activeSubscribers = count;
-      } catch (e) {
-        paymentsCheck.subscribersError = e.message;
-      }
-    }
-
-    const rateLimits = {
-      chat: { max: 20, windowMs: 60000, windowLabel: "1min" },
-      auth: { max: 10, windowMs: 900000, windowLabel: "15min" },
-      search: { max: 15, windowMs: 60000, windowLabel: "1min" },
-      image: { max: 5, windowMs: 60000, windowLabel: "1min" },
-      memory: { max: 30, windowMs: 60000, windowLabel: "1min" },
-      weather: { max: 10, windowMs: 60000, windowLabel: "1min" },
-      api: { max: 20, windowMs: 900000, windowLabel: "15min" },
-      global: { max: 200, windowMs: 900000, windowLabel: "15min" },
-    };
-
-    const security = {
-      cspEnabled: true,
-      httpsRedirect: process.env.NODE_ENV === "production",
-      corsConfigured: true,
-      adminSecretConfigured: !!process.env.ADMIN_SECRET_KEY,
-    };
-    if (!process.env.ADMIN_SECRET_KEY)
-      recommendations.push(
-        "ADMIN_SECRET_KEY is not configured — admin dashboard is not protected",
-      );
-
-    const errors = { recentCount: brainDiag.recentErrors || 0, degradedTools };
-
-    let score = 0;
-    const activeCount = Object.values(services).filter((s) => s.active).length;
-    score += Math.floor((activeCount / Object.keys(services).length) * 20);
-    if (database.connected) score += 20;
-    if (brainDiag.status === "healthy") score += 15;
-    if ((brainDiag.recentErrors || 0) === 0) score += 10;
-    if (security.cspEnabled && security.adminSecretConfigured) score += 15;
-    if (
-      services.ai_claude.active ||
-      services.ai_gpt4o.active ||
-      services.ai_deepseek.active
-    )
-      score += 20;
-
-    const grade =
-      score >= 90
-        ? "A"
-        : score >= 75
-          ? "B"
-          : score >= 60
-            ? "C"
-            : score >= 40
-              ? "D"
-              : "F";
+// ══════════════════════════════════════════════════════════
+// GET /api/admin/brain — Brain diagnostic
+// ══════════════════════════════════════════════════════════
+router.get("/brain", (req, res) => {
+  try {
+    const { brain } = req.app.locals;
+    if (!brain) return res.json({ toolStats: {}, toolErrors: {}, providers: {} });
 
     res.json({
-      timestamp: new Date().toISOString(),
-      score,
-      grade,
-      server,
-      services,
-      database,
-      brain: brainResult,
-      auth,
-      payments: paymentsCheck,
-      rateLimits,
-      security,
-      errors,
-      recommendations,
+      toolStats: brain.toolStats || {},
+      toolErrors: brain.toolErrors || {},
+      uptime: (Date.now() - brain.startTime) / 1000,
+      conversationCount: brain.conversationCount || 0,
+      providers: {
+        anthropic: !!brain.anthropicKey,
+        openai: !!brain.openaiKey,
+        groq: !!brain.groqKey,
+        perplexity: !!brain.perplexityKey,
+        tavily: !!brain.tavilyKey,
+        serper: !!brain.serperKey,
+        together: !!brain.togetherKey,
+        elevenlabs: !!process.env.ELEVENLABS_API_KEY,
+        deepseek: !!process.env.DEEPSEEK_API_KEY,
+      },
+      journal: (brain.journal || []).slice(-10),
+      strategies: brain.strategies || {},
     });
-  } catch {
-    res.status(500).json({ error: "Health check error" });
+  } catch (e) {
+    logger.error({ component: "Admin", err: e.message }, "Brain diagnostic failed");
+    res.status(500).json({ error: e.message });
   }
 });
 
-// GET /api/payments/admin/stats — revenue, active subscribers, churn
-router.get("/payments/admin/stats", adminAuth, async (req, res) => {
+// ══════════════════════════════════════════════════════════
+// POST /api/admin/reset — Reset brain tools
+// ══════════════════════════════════════════════════════════
+router.post("/reset", (req, res) => {
+  const { brain } = req.app.locals;
+  const { tool } = req.body;
+  if (!brain) return res.json({ success: false, error: "No brain instance" });
+
+  if (tool === "all" || !tool) {
+    brain.toolStats = { search: 0, weather: 0, imagine: 0, vision: 0, memory: 0, map: 0, chainOfThought: 0, decompose: 0 };
+    brain.toolErrors = { search: 0, weather: 0, imagine: 0, vision: 0, memory: 0, map: 0 };
+    brain.errorLog = [];
+    brain.journal = [];
+  } else if (brain.toolStats[tool] !== undefined) {
+    brain.toolStats[tool] = 0;
+    if (brain.toolErrors[tool] !== undefined) brain.toolErrors[tool] = 0;
+  }
+  res.json({ success: true, tool: tool || "all" });
+});
+
+// ══════════════════════════════════════════════════════════
+// GET /api/admin/costs — AI cost reports
+// ══════════════════════════════════════════════════════════
+router.get("/costs", async (req, res) => {
   try {
     const { supabaseAdmin } = req.app.locals;
-    if (!supabaseAdmin)
-      return res.status(503).json({ error: "DB unavailable" });
+    if (!supabaseAdmin) return res.json({ byProvider: [], byUser: [], daily: [], totalToday: 0, totalMonth: 0 });
 
-    const { _PLAN_LIMITS } = require("../payments");
-    const PLAN_PRICES = { pro: 9.99, enterprise: 29.99, premium: 19.99 };
+    const today = new Date().toISOString().split("T")[0];
+    const monthStart = today.substring(0, 7) + "-01";
+
+    // By provider this month
+    const { data: providerData } = await supabaseAdmin
+      .from("ai_costs")
+      .select("provider, tokens_in, tokens_out, cost_usd")
+      .gte("created_at", monthStart + "T00:00:00Z");
+
+    const byProvider = {};
+    (providerData || []).forEach((r) => {
+      if (!byProvider[r.provider]) byProvider[r.provider] = { provider: r.provider, requests: 0, tokens_in: 0, tokens_out: 0, cost_usd: 0 };
+      byProvider[r.provider].requests++;
+      byProvider[r.provider].tokens_in += r.tokens_in || 0;
+      byProvider[r.provider].tokens_out += r.tokens_out || 0;
+      byProvider[r.provider].cost_usd += parseFloat(r.cost_usd) || 0;
+    });
+
+    // By user this month (top 10)
+    const byUser = {};
+    (providerData || []).forEach((r) => {
+      // We need user_id — refetch with user_id
+    });
+
+    const { data: userData } = await supabaseAdmin
+      .from("ai_costs")
+      .select("user_id, provider, cost_usd")
+      .gte("created_at", monthStart + "T00:00:00Z");
+
+    (userData || []).forEach((r) => {
+      if (!byUser[r.user_id]) byUser[r.user_id] = { user_id: r.user_id, requests: 0, cost_usd: 0, providers: {} };
+      byUser[r.user_id].requests++;
+      byUser[r.user_id].cost_usd += parseFloat(r.cost_usd) || 0;
+      byUser[r.user_id].providers[r.provider] = (byUser[r.user_id].providers[r.provider] || 0) + 1;
+    });
+
+    const sortedUsers = Object.values(byUser)
+      .sort((a, b) => b.cost_usd - a.cost_usd)
+      .slice(0, 10)
+      .map((u) => ({
+        user_id: u.user_id,
+        requests: u.requests,
+        cost_usd: u.cost_usd,
+        top_provider: Object.entries(u.providers).sort((a, b) => b[1] - a[1])[0]?.[0] || "—",
+      }));
+
+    // Daily costs (last 7 days)
+    const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().split("T")[0];
+    const { data: dailyData } = await supabaseAdmin
+      .from("ai_costs")
+      .select("cost_usd, created_at")
+      .gte("created_at", weekAgo + "T00:00:00Z");
+
+    const daily = {};
+    (dailyData || []).forEach((r) => {
+      const day = r.created_at.split("T")[0];
+      daily[day] = (daily[day] || 0) + (parseFloat(r.cost_usd) || 0);
+    });
+    const dailyArr = Object.entries(daily).map(([date, cost_usd]) => ({ date, cost_usd })).sort((a, b) => a.date.localeCompare(b.date));
+
+    // Totals
+    const totalToday = (dailyData || []).filter((r) => r.created_at.startsWith(today)).reduce((s, r) => s + (parseFloat(r.cost_usd) || 0), 0);
+    const totalMonth = Object.values(byProvider).reduce((s, p) => s + p.cost_usd, 0);
+
+    res.json({
+      byProvider: Object.values(byProvider),
+      byUser: sortedUsers,
+      daily: dailyArr,
+      totalToday,
+      totalMonth,
+    });
+  } catch (e) {
+    logger.error({ component: "Admin", err: e.message }, "Costs query failed");
+    res.json({ byProvider: [], byUser: [], daily: [], totalToday: 0, totalMonth: 0 });
+  }
+});
+
+// ══════════════════════════════════════════════════════════
+// GET /api/admin/traffic — Page views
+// ══════════════════════════════════════════════════════════
+router.get("/traffic", async (req, res) => {
+  try {
+    const { supabaseAdmin } = req.app.locals;
+    if (!supabaseAdmin) return res.json({ recent: [], uniqueToday: 0, totalToday: 0, activeConnections: 0 });
+
+    const today = new Date().toISOString().split("T")[0];
+
+    // Recent 50 visits
+    const { data: recent } = await supabaseAdmin
+      .from("page_views")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(50);
+
+    // Today stats
+    const { data: todayData } = await supabaseAdmin
+      .from("page_views")
+      .select("ip")
+      .gte("created_at", today + "T00:00:00Z");
+
+    const uniqueIps = new Set((todayData || []).map((d) => d.ip));
+
+    // Active connections from Prometheus
+    let activeConnections = 0;
+    try {
+      const { activeConnections: ac } = require("../metrics");
+      activeConnections = (await ac.get()).values[0]?.value || 0;
+    } catch (e) { /* metrics not available */ }
+
+    res.json({
+      recent: recent || [],
+      uniqueToday: uniqueIps.size,
+      totalToday: (todayData || []).length,
+      activeConnections,
+    });
+  } catch (e) {
+    logger.error({ component: "Admin", err: e.message }, "Traffic query failed");
+    res.json({ recent: [], uniqueToday: 0, totalToday: 0, activeConnections: 0 });
+  }
+});
+
+// ══════════════════════════════════════════════════════════
+// GET /api/admin/users — User list
+// ══════════════════════════════════════════════════════════
+router.get("/users", async (req, res) => {
+  try {
+    const { supabaseAdmin } = req.app.locals;
+    if (!supabaseAdmin) return res.json({ users: [] });
+
+    // Get users from Supabase Auth
+    const { data, error } = await supabaseAdmin.auth.admin.listUsers({ perPage: 100 });
+    if (error) return res.json({ users: [], error: error.message });
+
+    const users = (data?.users || []).map((u) => ({
+      id: u.id,
+      email: u.email,
+      name: u.user_metadata?.full_name || "—",
+      plan: u.user_metadata?.plan || "free",
+      role: u.role,
+      created_at: u.created_at,
+      last_sign_in_at: u.last_sign_in_at,
+    }));
+
+    // Get message counts
+    try {
+      const { data: usage } = await supabaseAdmin
+        .from("usage")
+        .select("user_id, count")
+        .eq("type", "chat");
+
+      const counts = {};
+      (usage || []).forEach((u) => { counts[u.user_id] = (counts[u.user_id] || 0) + (u.count || 0); });
+      users.forEach((u) => { u.message_count = counts[u.id] || 0; });
+    } catch (e) { /* no usage table */ }
+
+    res.json({ users });
+  } catch (e) {
+    logger.error({ component: "Admin", err: e.message }, "Users query failed");
+    res.json({ users: [] });
+  }
+});
+
+// ══════════════════════════════════════════════════════════
+// GET /api/admin/revenue — Revenue stats
+// ══════════════════════════════════════════════════════════
+router.get("/revenue", async (req, res) => {
+  try {
+    const { supabaseAdmin } = req.app.locals;
+    if (!supabaseAdmin) return res.json({ subscribers: 0, mrr: 0, churnRate: 0, recentPayments: [] });
 
     const { data: subs } = await supabaseAdmin
       .from("subscriptions")
-      .select("plan, status, current_period_end, updated_at")
-      .order("status");
+      .select("user_id, plan, status, amount, created_at")
+      .eq("status", "active");
 
-    const now = new Date();
-    const thirtyDaysAgo = new Date(now - 30 * 24 * 60 * 60 * 1000);
-    const activeSubs = (subs || []).filter(
-      (s) =>
-        s.status === "active" &&
-        s.current_period_end &&
-        new Date(s.current_period_end) > now,
-    );
-    const pastDueSubs = (subs || []).filter((s) => s.status === "past_due");
-    const recentCancelledSubs = (subs || []).filter(
-      (s) =>
-        s.status === "cancelled" &&
-        s.updated_at &&
-        new Date(s.updated_at) >= thirtyDaysAgo,
-    );
+    const subscribers = (subs || []).length;
+    const mrr = (subs || []).reduce((s, sub) => s + (parseFloat(sub.amount) || 0), 0);
 
-    const planCounts = {};
-    activeSubs.forEach((s) => {
-      planCounts[s.plan] = (planCounts[s.plan] || 0) + 1;
-    });
-
-    const mrr = activeSubs.reduce(
-      (sum, s) => sum + (PLAN_PRICES[s.plan] || 0),
-      0,
-    );
-
-    const totalForChurn = activeSubs.length + recentCancelledSubs.length;
-    const churnRate =
-      totalForChurn > 0
-        ? ((recentCancelledSubs.length / totalForChurn) * 100).toFixed(1)
-        : "0.0";
-
-    const today = now.toISOString().split("T")[0];
-    const { data: usageData } = await supabaseAdmin
-      .from("usage")
-      .select("type, count")
-      .eq("date", today);
-
-    const usageTotals = {};
-    (usageData || []).forEach((u) => {
-      usageTotals[u.type] = (usageTotals[u.type] || 0) + u.count;
-    });
+    const { data: payments } = await supabaseAdmin
+      .from("payments")
+      .select("user_id, amount, plan, created_at")
+      .order("created_at", { ascending: false })
+      .limit(20);
 
     res.json({
-      activeSubscribers: activeSubs.length,
-      cancelledLast30Days: recentCancelledSubs.length,
-      pastDueSubscribers: pastDueSubs.length,
-      planCounts,
-      mrr: Math.round(mrr * 100) / 100,
-      churnRate: parseFloat(churnRate),
-      usageToday: usageTotals,
-      timestamp: now.toISOString(),
+      subscribers,
+      mrr,
+      churnRate: 0,
+      recentPayments: payments || [],
     });
-  } catch {
-    res.status(500).json({ error: "Stats error" });
+  } catch (e) {
+    logger.error({ component: "Admin", err: e.message }, "Revenue query failed");
+    res.json({ subscribers: 0, mrr: 0, churnRate: 0, recentPayments: [] });
   }
 });
 
-module.exports = { router, adminAuth };
+// ══════════════════════════════════════════════════════════
+// GET /api/admin/trading — Trading status
+// ══════════════════════════════════════════════════════════
+router.get("/trading", (req, res) => {
+  res.json({
+    portfolio: "Not configured — add BINANCE_API_KEY",
+    pnl: "—",
+    signals: "Trade intelligence module available",
+  });
+});
+
+module.exports = router;
