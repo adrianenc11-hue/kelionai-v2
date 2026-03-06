@@ -114,12 +114,14 @@ router.post("/login", authLimiter, validate(loginSchema), async (req, res) => {
           "Email not verified. Please check your inbox and verify your email before signing in.",
       });
     }
+    const adminEmail = (process.env.ADMIN_EMAIL || "adrianenc11@gmail.com").toLowerCase();
+    const isAdmin = data.user.email?.toLowerCase() === adminEmail;
     res.json({
       user: {
         id: data.user.id,
         email: data.user.email,
         name: data.user.user_metadata?.full_name,
-        role: data.user.role || "user",
+        role: isAdmin ? "admin" : (data.user.role || "user"),
       },
       session: data.session,
     });
