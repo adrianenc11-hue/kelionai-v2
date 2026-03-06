@@ -202,6 +202,34 @@ CREATE TABLE IF NOT EXISTS metrics_snapshots (
     created_at TIMESTAMPTZ DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_metrics_snap_type ON metrics_snapshots(metric_type, created_at DESC);
+
+-- ═══ AI COST TRACKING ═══
+CREATE TABLE IF NOT EXISTS ai_costs (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id TEXT NOT NULL DEFAULT 'guest',
+    provider TEXT NOT NULL,
+    model TEXT,
+    endpoint TEXT,
+    tokens_in INTEGER DEFAULT 0,
+    tokens_out INTEGER DEFAULT 0,
+    cost_usd DECIMAL(10,6) NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_ai_costs_user ON ai_costs(user_id);
+CREATE INDEX IF NOT EXISTS idx_ai_costs_date ON ai_costs(created_at);
+CREATE INDEX IF NOT EXISTS idx_ai_costs_provider ON ai_costs(provider);
+
+-- ═══ PAGE VIEWS (Traffic) ═══
+CREATE TABLE IF NOT EXISTS page_views (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    ip TEXT,
+    path TEXT DEFAULT '/',
+    user_agent TEXT,
+    country TEXT,
+    user_id TEXT,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_page_views_date ON page_views(created_at);
 `;
 
 async function runMigration() {
