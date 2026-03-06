@@ -787,6 +787,29 @@ app.get("/terms", (req, res) => res.redirect(301, "/terms/"));
 app.get("/gdpr", (req, res) => res.redirect(301, "/gdpr/"));
 app.get("/premium", (req, res) => res.redirect(301, "/pricing/"));
 
+// ═══ STANDALONE LEGAL PAGES — explicit handlers (not relying on express.static) ═══
+const _legalPages = {};
+for (const page of ["privacy", "terms", "gdpr"]) {
+  const filePath = path.join(__dirname, "..", "app", page, "index.html");
+  if (fs.existsSync(filePath)) {
+    _legalPages[page] = fs.readFileSync(filePath, "utf8");
+    logger.info({ component: "Routes" }, `Legal page loaded: /${page}/`);
+  }
+}
+
+app.get("/privacy/", (req, res) => {
+  if (!_legalPages.privacy) return res.status(404).type("html").send(_raw404Html);
+  res.type("html").send(_legalPages.privacy);
+});
+app.get("/terms/", (req, res) => {
+  if (!_legalPages.terms) return res.status(404).type("html").send(_raw404Html);
+  res.type("html").send(_legalPages.terms);
+});
+app.get("/gdpr/", (req, res) => {
+  if (!_legalPages.gdpr) return res.status(404).type("html").send(_raw404Html);
+  res.type("html").send(_legalPages.gdpr);
+});
+
 // ═══ SPA ROUTE WHITELIST — only serve index.html for known UI routes ═══
 const SPA_ROUTES = new Set([
   "/",
