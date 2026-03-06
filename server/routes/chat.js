@@ -13,6 +13,8 @@ const { buildSystemPrompt } = require("../persona");
 
 const router = express.Router();
 
+// Emotion is decided by the brain via [EMOTION:xxx] tag in the AI reply
+
 const chatLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 60,
@@ -328,6 +330,13 @@ router.post("/chat", chatLimiter, validate(chatSchema), async (req, res) => {
       monitorFromReply = { content: monitorMatch[1].trim(), type: "html" };
       reply = reply.replace(/\[MONITOR\][\s\S]*?\[\/MONITOR\]/gi, "").trim();
     }
+    // Parse [EMOTION:xxx] tag from AI reply (brain decides the emotion)
+    let emotion = "neutral";
+    const emotionMatch = reply.match(/\[EMOTION:(\w+)\]/i);
+    if (emotionMatch) {
+      emotion = emotionMatch[1].toLowerCase();
+      reply = reply.replace(/\[EMOTION:\w+\]/gi, "").trim();
+    }
     const response = {
       reply,
       avatar,
@@ -336,6 +345,7 @@ router.post("/chat", chatLimiter, validate(chatSchema), async (req, res) => {
       thinkTime: thought.thinkTime,
       totalTime,
       conversationId: savedConvId,
+      emotion,
     };
     if (monitorFromReply) {
       response.monitor = monitorFromReply;
