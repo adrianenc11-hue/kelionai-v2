@@ -99,7 +99,14 @@ router.post("/speak", ttsLimiter, validate(speakSchema), async (req, res) => {
         }),
       },
     );
-    if (!r.ok) return res.status(503).json({ error: "TTS fail" });
+    if (!r.ok) {
+      const errBody = await r.text().catch(() => "");
+      logger.error(
+        { component: "Speak", status: r.status, voiceId: vid, error: errBody.substring(0, 300), hasKey: !!process.env.ELEVENLABS_API_KEY },
+        "ElevenLabs TTS failed: " + r.status,
+      );
+      return res.status(503).json({ error: "TTS fail", detail: r.status + ": " + errBody.substring(0, 100) });
+    }
     const buf = Buffer.from(await r.arrayBuffer());
     logger.info(
       { component: "Speak", bytes: buf.length, avatar, mood },
