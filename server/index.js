@@ -758,6 +758,17 @@ app.use("/api", (req, res, _next) => {
 });
 
 // Admin panel — JWT-protected (admin.js checks auth client-side)
+const _rawAdminHtml = fs.existsSync(path.join(__dirname, "..", "app", "admin", "index.html"))
+  ? fs.readFileSync(path.join(__dirname, "..", "app", "admin", "index.html"), "utf8")
+  : null;
+app.get("/admin", (req, res) => {
+  if (!_rawAdminHtml) return res.status(404).send("Admin page not found");
+  res.type("html").send(_rawAdminHtml);
+});
+app.get("/admin/", (req, res) => {
+  if (!_rawAdminHtml) return res.status(404).send("Admin page not found");
+  res.type("html").send(_rawAdminHtml);
+});
 app.use("/admin", express.static(path.join(__dirname, "..", "app", "admin")));
 
 
