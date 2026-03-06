@@ -79,7 +79,7 @@ class KelionBrain {
 - IMAGINE: Generate images from descriptions
 - MAP: Geocoding and maps for any address
 - MEMORY: Remember and recall past conversations and facts about users
-- VISION: Analyze images with GPT-4o (describe scenes, read text, identify objects — critical for blind users)
+- VISION: Analyze images with GPT-5.4 (describe scenes, read text, identify objects — critical for blind users)
 - TTS: Convert text to natural speech (ElevenLabs/OpenAI)
 - STT: Transcribe voice to text (Whisper)
 - FACE_CHECK: Recognize registered faces
@@ -2837,7 +2837,7 @@ Reply STRICTLY with JSON:
       }
     }
 
-    // Fallback to GPT-4o Vision
+    // Primary: GPT-5.4 Vision (most advanced)
     if (this.openaiKey) {
       try {
         const r = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -2847,7 +2847,7 @@ Reply STRICTLY with JSON:
             Authorization: `Bearer ${this.openaiKey}`,
           },
           body: JSON.stringify({
-            model: "gpt-4o",
+            model: "gpt-5.4",
             max_tokens: 1000,
             messages: [
               {
@@ -2876,14 +2876,14 @@ Reply STRICTLY with JSON:
             description,
             precision: "high",
             accessibility: true,
-            engine: "GPT-4o Vision",
+            engine: "GPT-5.4 Vision",
             summary: description.substring(0, 200),
           };
         }
       } catch (e) {
         logger.warn(
           { component: "Brain", err: e.message },
-          "GPT-4o Vision failed",
+          "GPT-5.4 Vision failed",
         );
       }
     }
