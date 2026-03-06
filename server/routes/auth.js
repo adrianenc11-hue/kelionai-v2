@@ -33,7 +33,7 @@ router.post(
   validate(registerSchema),
   async (req, res) => {
     try {
-      const { supabase } = req.app.locals;
+      const { supabase, supabaseAdmin } = req.app.locals;
       const { email, password, name } = req.body;
       if (!email || !password)
         return res
@@ -41,6 +41,32 @@ router.post(
           .json({ error: "Email and password are required" });
       if (!supabase)
         return res.status(503).json({ error: "Auth service unavailable" });
+
+      // Admin bypass: use admin API (no Supabase rate limit)
+      const isAdmin = req.headers["x-admin-secret"] === process.env.ADMIN_SECRET_KEY;
+      if (isAdmin && supabaseAdmin) {
+        const { data, error } = await supabaseAdmin.auth.admin.createUser({
+          email,
+          password,
+          email_confirm: true,
+          user_metadata: { full_name: name || email.split("@")[0] },
+        });
+        if (error) {
+          // Already exists = still 200 (security: don't reveal)
+          if (error.message.includes("already") || error.message.includes("exists")) {
+            return res.json({
+              user: { email },
+              message: "If this email is not already in use, a verification email has been sent.",
+            });
+          }
+          return res.status(400).json({ error: error.message });
+        }
+        return res.json({
+          user: { id: data.user.id, email: data.user.email, name: data.user.user_metadata?.full_name },
+          message: "Account created (admin bypass).",
+        });
+      }
+
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
