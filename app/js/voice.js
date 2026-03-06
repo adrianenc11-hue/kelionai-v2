@@ -27,6 +27,31 @@
         }
     }
 
+    // ─── AUTO-UNLOCK: browser requires user gesture for AudioContext ──
+    // This fires on the FIRST click/key/touch and unlocks audio permanently
+    var _audioUnlocked = false;
+    function _autoUnlockAudio() {
+        if (_audioUnlocked) return;
+        var ctx = getAudioContext();
+        if (ctx.state === 'suspended') {
+            ctx.resume().then(function () {
+                console.log('[Voice] AudioContext unlocked via user gesture');
+            });
+        }
+        try { var b = ctx.createBuffer(1, 1, 22050), s = ctx.createBufferSource(); s.buffer = b; s.connect(ctx.destination); s.start(0); } catch (e) { }
+        if (ctx.state === 'running') {
+            _audioUnlocked = true;
+            console.log('[Voice] Audio permanently unlocked');
+            // Remove listeners — only need to unlock once
+            document.removeEventListener('click', _autoUnlockAudio, true);
+            document.removeEventListener('keydown', _autoUnlockAudio, true);
+            document.removeEventListener('touchstart', _autoUnlockAudio, true);
+        }
+    }
+    document.addEventListener('click', _autoUnlockAudio, true);
+    document.addEventListener('keydown', _autoUnlockAudio, true);
+    document.addEventListener('touchstart', _autoUnlockAudio, true);
+
     // ─── Wake Word (always-on mic) ───────────────────────────
     function startWakeWordDetection() {
         const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
