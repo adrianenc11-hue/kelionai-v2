@@ -84,33 +84,79 @@ router.post("/speak", ttsLimiter, validate(speakSchema), async (req, res) => {
     }
     // Fallback to language-based native voice
     if (!vid) vid = getVoiceId(avatar, language);
-    const r = await fetch(
-      "https://api.elevenlabs.io/v1/text-to-speech/" + vid,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "xi-api-key": process.env.ELEVENLABS_API_KEY,
-        },
-        body: JSON.stringify({
-          text,
-          model_id: "eleven_multilingual_v2",
-          voice_settings: selectedVoiceSettings,
-        }),
-      },
-    );
-    if (!r.ok) {
-      const errBody = await r.text().catch(() => "");
-      logger.error(
-        { component: "Speak", status: r.status, voiceId: vid, error: errBody.substring(0, 300), hasKey: !!process.env.ELEVENLABS_API_KEY },
-        "ElevenLabs TTS failed: " + r.status,
-      );
-      return res.status(503).json({ error: "TTS fail", detail: r.status + ": " + errBody.substring(0, 100) });
+
+    let buf = null;
+    let ttsEngine = "ElevenLabs";
+
+    // ── TRY 1: ElevenLabs (premium quality) ──
+    if (process.env.ELEVENLABS_API_KEY) {
+      try {
+        const r = await fetch(
+          "https://api.elevenlabs.io/v1/text-to-speech/" + vid,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "xi-api-key": process.env.ELEVENLABS_API_KEY,
+            },
+            body: JSON.stringify({
+              text,
+              model_id: "eleven_multilingual_v2",
+              voice_settings: selectedVoiceSettings,
+            }),
+          },
+        );
+        if (r.ok) {
+          buf = Buffer.from(await r.arrayBuffer());
+        } else {
+          const errBody = await r.text().catch(() => "");
+          logger.warn(
+            { component: "Speak", status: r.status, voiceId: vid, error: errBody.substring(0, 200) },
+            "ElevenLabs TTS failed: " + r.status + " — trying OpenAI fallback",
+          );
+        }
+      } catch (e) {
+        logger.warn({ component: "Speak", err: e.message }, "ElevenLabs TTS error — trying OpenAI fallback");
+      }
     }
-    const buf = Buffer.from(await r.arrayBuffer());
+
+    // ── TRY 2: OpenAI TTS (fallback) ──
+    if (!buf && process.env.OPENAI_API_KEY) {
+      try {
+        const openaiVoice = avatar === "kira" ? "nova" : "onyx";
+        const r2 = await fetch("https://api.openai.com/v1/audio/speech", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer " + process.env.OPENAI_API_KEY,
+          },
+          body: JSON.stringify({
+            model: "tts-1",
+            input: text,
+            voice: openaiVoice,
+            response_format: "mp3",
+          }),
+        });
+        if (r2.ok) {
+          buf = Buffer.from(await r2.arrayBuffer());
+          ttsEngine = "OpenAI";
+        } else {
+          const errBody = await r2.text().catch(() => "");
+          logger.error(
+            { component: "Speak", status: r2.status, error: errBody.substring(0, 200) },
+            "OpenAI TTS also failed: " + r2.status,
+          );
+        }
+      } catch (e) {
+        logger.error({ component: "Speak", err: e.message }, "OpenAI TTS error");
+      }
+    }
+
+    if (!buf) return res.status(503).json({ error: "TTS unavailable — all providers failed" });
+
     logger.info(
-      { component: "Speak", bytes: buf.length, avatar, mood },
-      buf.length + " bytes | " + avatar,
+      { component: "Speak", bytes: buf.length, avatar, mood, engine: ttsEngine },
+      ttsEngine + " | " + buf.length + " bytes | " + avatar,
     );
     incrementUsage(user?.id, "tts", supabaseAdmin).catch((e) =>
       logger.warn(
