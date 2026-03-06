@@ -121,6 +121,7 @@ router.post("/speak", ttsLimiter, validate(speakSchema), async (req, res) => {
     }
 
     // ── TRY 2: OpenAI TTS (fallback) ──
+    let openaiErr = "no OPENAI_API_KEY";
     if (!buf && process.env.OPENAI_API_KEY) {
       try {
         const openaiVoice = avatar === "kira" ? "nova" : "onyx";
@@ -141,18 +142,19 @@ router.post("/speak", ttsLimiter, validate(speakSchema), async (req, res) => {
           buf = Buffer.from(await r2.arrayBuffer());
           ttsEngine = "OpenAI";
         } else {
-          const errBody = await r2.text().catch(() => "");
+          openaiErr = r2.status + ": " + (await r2.text().catch(() => "")).substring(0, 200);
           logger.error(
-            { component: "Speak", status: r2.status, error: errBody.substring(0, 200) },
+            { component: "Speak", status: r2.status, error: openaiErr },
             "OpenAI TTS also failed: " + r2.status,
           );
         }
       } catch (e) {
+        openaiErr = e.message;
         logger.error({ component: "Speak", err: e.message }, "OpenAI TTS error");
       }
     }
 
-    if (!buf) return res.status(503).json({ error: "TTS unavailable — all providers failed" });
+    if (!buf) return res.status(503).json({ error: "TTS unavailable", openai: openaiErr });
 
     logger.info(
       { component: "Speak", bytes: buf.length, avatar, mood, engine: ttsEngine },
