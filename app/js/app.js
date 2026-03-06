@@ -221,7 +221,12 @@
         if (window.KelionTools) {
             try {
                 const ctx = await KelionTools.preprocessMessage(message);
-                if (ctx) msg = message + ctx;
+                // Strip base64 image data — it's already on monitor, don't send to chat API
+                // (sending 500KB+ base64 data exceeds chatSchema.message.max(10000) → "Validation failed")
+                if (ctx) {
+                    const cleanCtx = ctx.replace(/!\[.*?\]\(data:[^)]+\)/g, '').trim();
+                    if (cleanCtx) msg = message + cleanCtx;
+                }
             } catch (e) { console.warn('[Tools] preprocessMessage error:', e.message); }
         }
         await sendToAI_Regular(msg, language);
