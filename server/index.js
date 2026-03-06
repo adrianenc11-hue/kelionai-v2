@@ -426,8 +426,8 @@ h1{color:#00ffff;margin-bottom:20px;font-size:1.5rem}
     <h2>🏥 Health Check Report</h2>
     <div id="hc-body"></div>
     <div class="hc-footer">
-      <button class="hc-export" onclick="exportHC()">Exportă JSON</button>
-      <button class="hc-close" onclick="document.getElementById('hc-modal').style.display='none'">Închide</button>
+      <button class="hc-export" onclick="exportHC()">Export JSON</button>
+      <button class="hc-close" onclick="document.getElementById('hc-modal').style.display='none'">Close</button>
     </div>
   </div>
 </div>
@@ -513,7 +513,7 @@ function renderHC(d){
   if(d.payments.activeSubscribers!==null){h+='<div class="hc-row"><span>Active Subscribers</span><span>'+d.payments.activeSubscribers+'</span></div>';}
   h+='</div>';
   if(d.recommendations&&d.recommendations.length){
-    h+='<div class="hc-section"><h3>⚠️ Recomandări</h3>';
+    h+='<div class="hc-section"><h3>⚠️ Recommendations</h3>';
     for(const r of d.recommendations){h+='<div class="hc-rec">'+esc(r)+'</div>';}
     h+='</div>';
   }
@@ -780,6 +780,12 @@ app.get("/admin/*", (req, res, next) => {
   }
   next();
 });
+
+// ═══ PUBLIC PAGE REDIRECTS (trailing-slash canonical) ═══
+app.get("/privacy", (req, res) => res.redirect(301, "/privacy/"));
+app.get("/terms", (req, res) => res.redirect(301, "/terms/"));
+app.get("/gdpr", (req, res) => res.redirect(301, "/gdpr/"));
+app.get("/premium", (req, res) => res.redirect(301, "/pricing/"));
 
 // ═══ SPA ROUTE WHITELIST — only serve index.html for known UI routes ═══
 const SPA_ROUTES = new Set([
