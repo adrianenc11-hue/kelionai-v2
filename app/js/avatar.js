@@ -480,24 +480,21 @@
 
     // ── Pose system (body posture) ────────────────────────────
     var currentPose = 'relaxed';
-    var armBones = { left: null, right: null };
+    var armBones = { leftShoulder: null, rightShoulder: null, leftArm: null, rightArm: null };
 
     function findArmBones() {
         if (!currentModel) return;
-        armBones = { left: null, right: null };
+        armBones = { leftShoulder: null, rightShoulder: null, leftArm: null, rightArm: null };
         currentModel.traverse(function (bone) {
             if (!bone.isBone) return;
-            var bn = (bone.name || '').toLowerCase();
-            if (bn.indexOf('leftupperarm') !== -1 || bn.indexOf('left_upper_arm') !== -1 ||
-                bn.indexOf('lupperarm') !== -1 || bn === 'leftarm' || bn === 'left_arm' || bn.indexOf('leftshoulder') !== -1) {
-                armBones.left = bone;
-            }
-            if (bn.indexOf('rightupperarm') !== -1 || bn.indexOf('right_upper_arm') !== -1 ||
-                bn.indexOf('rupperarm') !== -1 || bn === 'rightarm' || bn === 'right_arm' || bn.indexOf('rightshoulder') !== -1) {
-                armBones.right = bone;
-            }
+            var bn = bone.name || '';
+            if (bn === 'LeftShoulder') armBones.leftShoulder = bone;
+            if (bn === 'RightShoulder') armBones.rightShoulder = bone;
+            if (bn === 'LeftArm') armBones.leftArm = bone;
+            if (bn === 'RightArm') armBones.rightArm = bone;
         });
-        console.log('[Avatar] Arm bones found:', !!armBones.left, !!armBones.right);
+        console.log('[Avatar] Arm bones found — LS:', !!armBones.leftShoulder, 'RS:', !!armBones.rightShoulder,
+            'LA:', !!armBones.leftArm, 'RA:', !!armBones.rightArm);
     }
 
     // ══ Find eye bones, head bone, spine bone for life system ══
@@ -509,60 +506,56 @@
         currentModel.traverse(function (bone) {
             if (!bone.isBone) return;
             var bn = (bone.name || '').toLowerCase();
-            // Eye bones
-            if (bn.indexOf('lefteye') !== -1 || bn.indexOf('left_eye') !== -1 || bn === 'eye_l') {
-                _eyeBones.left = bone;
-            }
-            if (bn.indexOf('righteye') !== -1 || bn.indexOf('right_eye') !== -1 || bn === 'eye_r') {
-                _eyeBones.right = bone;
-            }
-            // Head bone
-            if (!_headBone && (bn === 'head' || bn.indexOf('head') !== -1) && bn.indexOf('headtop') === -1) {
-                _headBone = bone;
-            }
-            // Spine (for breathing)
-            if (!_spineBone && (bn === 'spine' || bn === 'spine1' || bn === 'spine2' || bn.indexOf('spine') !== -1)) {
-                _spineBone = bone;
-            }
+            if (bn.indexOf('lefteye') !== -1 || bn.indexOf('left_eye') !== -1 || bn === 'eye_l') _eyeBones.left = bone;
+            if (bn.indexOf('righteye') !== -1 || bn.indexOf('right_eye') !== -1 || bn === 'eye_r') _eyeBones.right = bone;
+            if (!_headBone && (bn === 'head' || bn.indexOf('head') !== -1) && bn.indexOf('headtop') === -1) _headBone = bone;
+            if (!_spineBone && (bn === 'spine' || bn === 'spine1' || bn === 'spine2' || bn.indexOf('spine') !== -1)) _spineBone = bone;
         });
         console.log('[Avatar] Life system bones — eyes:', !!_eyeBones.left, !!_eyeBones.right,
             '| head:', !!_headBone, '| spine:', !!_spineBone);
     }
 
+    // MetaPerson bone quaternions for arms-down pose
+    // GLB default (A-pose): LeftShoulder Q=[0.5684, 0.4821, -0.4045, 0.5300]
+    // We need to rotate shoulders DOWN so arms hang by body
+    // Arms-down quaternions (calculated: rotate ~70° more downward from A-pose)
+    var ARM_POSES = {
+        relaxed: {
+            // Shoulders rotated so arms point straight down
+            ls: [0.6963, 0.1228, -0.6963, 0.1228],
+            rs: [0.6963, -0.1228, 0.6963, 0.1228],
+            // Upper arms with slight natural bend
+            la: [0.0, 0.0, 0.0, 1.0],
+            ra: [0.0, 0.0, 0.0, 1.0]
+        },
+        presenting: {
+            ls: [0.6533, 0.2706, -0.6533, 0.2706],
+            rs: [0.6533, -0.2706, 0.6533, 0.2706],
+            la: [0.0, 0.0, 0.0, 1.0],
+            ra: [0.0, 0.0, 0.0, 1.0]
+        },
+        open: {
+            // Keep original A-pose (arms slightly out)
+            ls: [0.5684, 0.4821, -0.4045, 0.5300],
+            rs: [0.5684, -0.4821, 0.4045, 0.5300],
+            la: [0.0520, 0.0, -0.1045, 0.9932],
+            ra: [0.0520, 0.0, 0.1045, 0.9932]
+        }
+    };
+
     function setPose(pose) {
         currentPose = pose || 'relaxed';
-        if (!armBones.left && !armBones.right) findArmBones();
-
-        // MetaPerson / Avaturn models use different bone orientations than RPM
-        var poses = {
-            // FOR METAPERSON: Arms down is usually Z=1.3 or Y=1.2. We apply X,Y,Z to cover axes.
-            relaxed: { lx: 0, rx: 0, ly: 0, ry: 0, lz: 1.35, rz: -1.35 },
-            presenting: { lx: 0, rx: 0, ly: 0, ry: 0, lz: 0.8, rz: -0.8 },
-            crossed: { lx: 0.3, rx: 0.3, ly: 0, ry: 0, lz: 1.4, rz: -1.4 },
-            open: { lx: 0, rx: 0, ly: 0, ry: 0, lz: 0.4, rz: -0.4 }
-        };
-        _targetPose = poses[currentPose] || poses.relaxed;
-        _enforcePose(); // Apply immediately
+        if (!armBones.leftShoulder && !armBones.rightShoulder) findArmBones();
+        _enforcePose();
         console.log('[Avatar] Pose set:', currentPose);
     }
 
-    // Default pose values (arms by body)
-    var _targetPose = { lx: 0, rx: 0, ly: 0, ry: 0, lz: 1.2, rz: -1.2 };
-
-    // Called EVERY frame after mixer.update() — FORCE arms to target position
-    // Uses lazy Euler init (THREE may not be ready at parse time)
-    var _tmpEuler = null;
     var _mixerArmsStopped = false;
     function _enforcePose() {
-        if (!_targetPose) return;
-        // Lazy init — THREE must be available by animation time
-        if (!_tmpEuler && typeof THREE !== 'undefined') {
-            _tmpEuler = new THREE.Euler();
-            console.log('[Avatar] _enforcePose: Euler initialized ✅');
-        }
-        if (!_tmpEuler) return;
+        if (typeof THREE === 'undefined') return;
+        var p = ARM_POSES[currentPose] || ARM_POSES.relaxed;
 
-        // Stop mixer from animating arm bones (one-time)
+        // Stop mixer from animating arm/shoulder bones (one-time)
         if (!_mixerArmsStopped && mixer && mixer._actions) {
             mixer._actions.forEach(function (action) {
                 if (!action || !action._clip) return;
@@ -570,29 +563,25 @@
                 var tracksToRemove = [];
                 clip.tracks.forEach(function (track, idx) {
                     var tn = track.name.toLowerCase();
-                    if (tn.indexOf('leftarm') !== -1 || tn.indexOf('rightarm') !== -1 ||
-                        tn.indexOf('left_arm') !== -1 || tn.indexOf('right_arm') !== -1) {
+                    if (tn.indexOf('shoulder') !== -1 || tn.indexOf('leftarm') !== -1 || tn.indexOf('rightarm') !== -1 ||
+                        tn.indexOf('left_arm') !== -1 || tn.indexOf('right_arm') !== -1 ||
+                        tn.indexOf('forearm') !== -1 || tn.indexOf('hand') !== -1) {
                         tracksToRemove.push(idx);
                     }
                 });
-                // Remove arm tracks from clip (reverse order to keep indices valid)
                 for (var i = tracksToRemove.length - 1; i >= 0; i--) {
                     clip.tracks.splice(tracksToRemove[i], 1);
-                    console.log('[Avatar] Removed arm track from animation clip');
                 }
             });
             _mixerArmsStopped = true;
+            console.log('[Avatar] Stopped mixer arm/shoulder tracks');
         }
 
-        var p = _targetPose;
-        if (armBones.left) {
-            _tmpEuler.set(p.lx, p.ly, p.lz);
-            armBones.left.quaternion.setFromEuler(_tmpEuler);
-        }
-        if (armBones.right) {
-            _tmpEuler.set(p.rx, p.ry, p.rz);
-            armBones.right.quaternion.setFromEuler(_tmpEuler);
-        }
+        // Apply quaternions directly — no Euler conversion needed
+        if (armBones.leftShoulder) armBones.leftShoulder.quaternion.set(p.ls[0], p.ls[1], p.ls[2], p.ls[3]);
+        if (armBones.rightShoulder) armBones.rightShoulder.quaternion.set(p.rs[0], p.rs[1], p.rs[2], p.rs[3]);
+        if (armBones.leftArm) armBones.leftArm.quaternion.set(p.la[0], p.la[1], p.la[2], p.la[3]);
+        if (armBones.rightArm) armBones.rightArm.quaternion.set(p.ra[0], p.ra[1], p.ra[2], p.ra[3]);
     }
 
     function updateExpression(dt) {
