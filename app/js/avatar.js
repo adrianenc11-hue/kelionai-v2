@@ -57,6 +57,8 @@
     var _eyeBones = { left: null, right: null };
     var _headBone = null;
     var _spineBone = null;
+    var _neckBone = null;
+    var _fingerBones = { left: {}, right: {} };
     document.addEventListener('mousemove', function (e) {
         // Normalize to -1..1 from viewport center
         _mouseX = (e.clientX / window.innerWidth) * 2 - 1;
@@ -77,10 +79,14 @@
         { morph: 'browOuterUpRight', max: 0.12, duration: 0.25 },
         { morph: 'cheekSquintLeft', max: 0.1, duration: 0.2 },
         { morph: 'cheekSquintRight', max: 0.1, duration: 0.2 },
+        { morph: 'cheekPuff', max: 0.06, duration: 0.3 },
         { morph: 'noseSneerLeft', max: 0.08, duration: 0.15 },
         { morph: 'noseSneerRight', max: 0.08, duration: 0.15 },
         { morph: 'mouthPressLeft', max: 0.06, duration: 0.2 },
         { morph: 'mouthSmileLeft', max: 0.08, duration: 0.3 },
+        { morph: 'mouthDimpleLeft', max: 0.05, duration: 0.2 },
+        { morph: 'mouthDimpleRight', max: 0.05, duration: 0.2 },
+        { morph: 'mouthShrugLower', max: 0.06, duration: 0.25 },
         { morph: 'eyeSquintLeft', max: 0.1, duration: 0.2 },
         { morph: 'eyeSquintRight', max: 0.1, duration: 0.2 }
     ];
@@ -100,7 +106,8 @@
     var EXPRESSION_INTENSITY = {
         happy: 0.5, thinking: 0.35, concerned: 0.4, neutral: 0,
         laughing: 0.7, surprised: 0.6, playful: 0.5,
-        sad: 0.45, determined: 0.4, loving: 0.5, sleepy: 0.3
+        sad: 0.45, determined: 0.4, loving: 0.5, sleepy: 0.3,
+        disgusted: 0.5, angry: 0.5, curious: 0.35
     };
 
     function init() {
@@ -377,17 +384,20 @@
             intensity = EXPRESSION_INTENSITY[name] || 0.5;
         }
         var expressions = {
-            happy: { 'cheekSquintLeft': 0.3, 'cheekSquintRight': 0.3, 'mouthSmileLeft': 0.2, 'mouthSmileRight': 0.2 },
-            thinking: { 'browInnerUp': 0.3, 'eyeSquintLeft': 0.15, 'eyeSquintRight': 0.15 },
-            concerned: { 'browInnerUp': 0.4, 'mouthFrownLeft': 0.2, 'mouthFrownRight': 0.2 },
+            happy: { 'cheekSquintLeft': 0.3, 'cheekSquintRight': 0.3, 'mouthSmileLeft': 0.2, 'mouthSmileRight': 0.2, 'mouthDimpleLeft': 0.1, 'mouthDimpleRight': 0.1 },
+            thinking: { 'browInnerUp': 0.3, 'eyeSquintLeft': 0.15, 'eyeSquintRight': 0.15, 'cheekPuff': 0.08, 'mouthPressLeft': 0.1, 'mouthPressRight': 0.1 },
+            concerned: { 'browInnerUp': 0.4, 'mouthFrownLeft': 0.2, 'mouthFrownRight': 0.2, 'mouthStretchLeft': 0.08, 'mouthStretchRight': 0.08 },
             neutral: {},
-            laughing: { 'mouthSmileLeft': 0.7, 'mouthSmileRight': 0.7, 'cheekSquintLeft': 0.6, 'cheekSquintRight': 0.6, 'eyeSquintLeft': 0.4, 'eyeSquintRight': 0.4 },
-            surprised: { 'browInnerUp': 0.8, 'browOuterUpLeft': 0.5, 'browOuterUpRight': 0.5, 'mouthOpen': 0.3 },
-            playful: { 'eyeSquintLeft': 0.3, 'mouthSmileLeft': 0.4, 'mouthSmileRight': 0.1, 'browOuterUpRight': 0.3 },
-            sad: { 'browInnerUp': 0.5, 'mouthFrownLeft': 0.4, 'mouthFrownRight': 0.4, 'eyeSquintLeft': 0.2, 'eyeSquintRight': 0.2 },
-            determined: { 'browDownLeft': 0.3, 'browDownRight': 0.3, 'jawForward': 0.1, 'mouthPressLeft': 0.2, 'mouthPressRight': 0.2 },
-            loving: { 'cheekSquintLeft': 0.4, 'cheekSquintRight': 0.4, 'mouthSmileLeft': 0.3, 'mouthSmileRight': 0.3, 'eyeSquintLeft': 0.15, 'eyeSquintRight': 0.15 },
-            sleepy: { 'eyeBlinkLeft': 0.4, 'eyeBlinkRight': 0.4, 'browInnerUp': 0.1, 'mouthOpen': 0.05 }
+            laughing: { 'mouthSmileLeft': 0.7, 'mouthSmileRight': 0.7, 'cheekSquintLeft': 0.6, 'cheekSquintRight': 0.6, 'eyeSquintLeft': 0.4, 'eyeSquintRight': 0.4, 'mouthDimpleLeft': 0.3, 'mouthDimpleRight': 0.3, 'mouthUpperUpLeft': 0.15, 'mouthUpperUpRight': 0.15 },
+            surprised: { 'browInnerUp': 0.8, 'browOuterUpLeft': 0.5, 'browOuterUpRight': 0.5, 'mouthOpen': 0.3, 'eyeWideLeft': 0.5, 'eyeWideRight': 0.5, 'jawOpen': 0.15 },
+            playful: { 'eyeSquintLeft': 0.3, 'mouthSmileLeft': 0.4, 'mouthSmileRight': 0.1, 'browOuterUpRight': 0.3, 'mouthDimpleLeft': 0.15 },
+            sad: { 'browInnerUp': 0.5, 'mouthFrownLeft': 0.4, 'mouthFrownRight': 0.4, 'eyeSquintLeft': 0.2, 'eyeSquintRight': 0.2, 'mouthLowerDownLeft': 0.15, 'mouthLowerDownRight': 0.15, 'mouthStretchLeft': 0.1, 'mouthStretchRight': 0.1 },
+            determined: { 'browDownLeft': 0.3, 'browDownRight': 0.3, 'jawForward': 0.1, 'mouthPressLeft': 0.2, 'mouthPressRight': 0.2, 'mouthRollLower': 0.1 },
+            loving: { 'cheekSquintLeft': 0.4, 'cheekSquintRight': 0.4, 'mouthSmileLeft': 0.3, 'mouthSmileRight': 0.3, 'eyeSquintLeft': 0.15, 'eyeSquintRight': 0.15, 'mouthDimpleLeft': 0.1, 'mouthDimpleRight': 0.1 },
+            sleepy: { 'eyeBlinkLeft': 0.4, 'eyeBlinkRight': 0.4, 'browInnerUp': 0.1, 'mouthOpen': 0.05, 'mouthRollLower': 0.05 },
+            disgusted: { 'noseSneerLeft': 0.5, 'noseSneerRight': 0.5, 'mouthUpperUpLeft': 0.4, 'mouthUpperUpRight': 0.4, 'browDownLeft': 0.3, 'browDownRight': 0.3, 'mouthFrownLeft': 0.25, 'mouthFrownRight': 0.25, 'mouthShrugUpper': 0.2 },
+            angry: { 'browDownLeft': 0.6, 'browDownRight': 0.6, 'eyeSquintLeft': 0.3, 'eyeSquintRight': 0.3, 'jawForward': 0.15, 'mouthFrownLeft': 0.3, 'mouthFrownRight': 0.3, 'noseSneerLeft': 0.2, 'noseSneerRight': 0.2, 'mouthPressLeft': 0.2, 'mouthPressRight': 0.2 },
+            curious: { 'browOuterUpLeft': 0.4, 'browOuterUpRight': 0.2, 'eyeWideLeft': 0.15, 'eyeWideRight': 0.15, 'mouthSmileLeft': 0.1, 'mouthFunnel': 0.08 }
         };
         currentExpressionName = name;
         targetExpression = {};
@@ -504,11 +514,28 @@
             var bn = (bone.name || '').toLowerCase();
             if (bn.indexOf('lefteye') !== -1 || bn.indexOf('left_eye') !== -1 || bn === 'eye_l') _eyeBones.left = bone;
             if (bn.indexOf('righteye') !== -1 || bn.indexOf('right_eye') !== -1 || bn === 'eye_r') _eyeBones.right = bone;
-            if (!_headBone && (bn === 'head' || bn.indexOf('head') !== -1) && bn.indexOf('headtop') === -1) _headBone = bone;
+            if (!_headBone && bn === 'head') _headBone = bone;
+            if (!_neckBone && (bn === 'neck' || bn === 'neck1')) _neckBone = bone;
             if (!_spineBone && (bn === 'spine' || bn === 'spine1' || bn === 'spine2' || bn.indexOf('spine') !== -1)) _spineBone = bone;
+            // Finger bones
+            var fnRaw = bone.name || '';
+            var fingerNames = ['Thumb', 'Index', 'Middle', 'Ring', 'Pinky'];
+            for (var fi = 0; fi < fingerNames.length; fi++) {
+                for (var fj = 1; fj <= 4; fj++) {
+                    if (fnRaw === 'LeftHand' + fingerNames[fi] + fj) {
+                        if (!_fingerBones.left[fingerNames[fi]]) _fingerBones.left[fingerNames[fi]] = [];
+                        _fingerBones.left[fingerNames[fi]].push(bone);
+                    }
+                    if (fnRaw === 'RightHand' + fingerNames[fi] + fj) {
+                        if (!_fingerBones.right[fingerNames[fi]]) _fingerBones.right[fingerNames[fi]] = [];
+                        _fingerBones.right[fingerNames[fi]].push(bone);
+                    }
+                }
+            }
         });
         console.log('[Avatar] Life system bones — eyes:', !!_eyeBones.left, !!_eyeBones.right,
-            '| head:', !!_headBone, '| spine:', !!_spineBone);
+            '| head:', !!_headBone, '| neck:', !!_neckBone, '| spine:', !!_spineBone,
+            '| fingers L:', Object.keys(_fingerBones.left).length, 'R:', Object.keys(_fingerBones.right).length);
     }
 
     // MetaPerson bone quaternions for arms-down pose
@@ -611,9 +638,49 @@
         updateMoodLighting();
 
         // ══ BRAIN-ONLY MOVEMENT — no hardcoded body animations ══
-        // Micro-expressions, idle sway, breathing spine movement are DISABLED.
-        // All body movement comes from AI brain via [GESTURE:xxx] [POSE:xxx] tags.
-        // Only natural functions remain: blink, lip sync, eye tracking.
+        // Only natural functions remain: blink, lip sync, eye tracking, breathing, micro-expressions.
+
+        // ══ Breathing (Spine bone gentle movement) ═══════════════
+        _breathPhase += dt * BREATH_SPEED;
+        if (_spineBone) {
+            var breathVal = Math.sin(_breathPhase * Math.PI * 2) * BREATH_AMOUNT;
+            _spineBone.rotation.x += (breathVal - (_spineBone.rotation.x - (_spineBone._baseRotX || 0))) * 0.1;
+            if (!_spineBone._baseRotX) _spineBone._baseRotX = _spineBone.rotation.x;
+        }
+
+        // ══ Head Tracking (head follows mouse subtly) ═════════════
+        if (_headBone) {
+            var headYaw = _mouseX * 0.06;
+            var headPitch = _mouseY * 0.03;
+            _headBone.rotation.y += (headYaw - _headBone.rotation.y) * 0.04;
+            _headBone.rotation.x += (headPitch - _headBone.rotation.x) * 0.04;
+        }
+
+        // ══ Micro-expressions (subtle face twitches) ══════════════
+        _microTimer += dt;
+        if (!_microActive && _microTimer >= _nextMicro) {
+            _microActive = true;
+            _microTimer = 0;
+            _microElapsed = 0;
+            var me = MICRO_EXPRESSIONS[Math.floor(Math.random() * MICRO_EXPRESSIONS.length)];
+            _microMorph = me.morph;
+            _microValue = me.max;
+            _microDuration = me.duration;
+            _nextMicro = 3 + Math.random() * 5;
+        }
+        if (_microActive) {
+            _microElapsed += dt;
+            var mt = _microElapsed / _microDuration;
+            if (mt >= 1) {
+                _microActive = false;
+                setMorph(_microMorph, 0);
+            } else {
+                setMorph(_microMorph, Math.sin(mt * Math.PI) * _microValue);
+            }
+        }
+
+        // ══ Finger Pose (enforce every frame) ═══════════════════
+        _enforceFingerPose();
 
         // ══ Eye Saccades (natural micro-movements) ══════════════
         _saccadeTimer += dt;
@@ -684,6 +751,43 @@
         renderer.setSize(w, h);
     }
 
+    // ── Finger Pose System ─────────────────────────────────────
+    // Each finger has 4 joints (1=base, 4=tip). Rotation is on X axis (curl).
+    var FINGER_POSES = {
+        relaxed: { curl: 0.15 },   // slightly curled, natural
+        fist: { curl: 1.4 },    // fully closed
+        open: { curl: 0 },      // flat, spread
+        point: { index: 0, others: 1.3 },  // index straight, rest curled
+        thumbsup: { thumb: -0.3, others: 1.3 } // thumb out, rest curled
+    };
+
+    function setFingerPose(hand, pose) {
+        var bones = (hand === 'left') ? _fingerBones.left : _fingerBones.right;
+        if (!bones || Object.keys(bones).length === 0) return;
+        var p = FINGER_POSES[pose] || FINGER_POSES.relaxed;
+        var fingerNames = ['Thumb', 'Index', 'Middle', 'Ring', 'Pinky'];
+        for (var i = 0; i < fingerNames.length; i++) {
+            var fn = fingerNames[i];
+            var joints = bones[fn];
+            if (!joints) continue;
+            var curl = p.curl !== undefined ? p.curl : 0;
+            // Special per-finger overrides (for point/thumbsup)
+            if (fn === 'Index' && p.index !== undefined) curl = p.index;
+            else if (fn === 'Thumb' && p.thumb !== undefined) curl = p.thumb;
+            else if (fn !== 'Index' && fn !== 'Thumb' && p.others !== undefined) curl = p.others;
+            for (var j = 0; j < joints.length; j++) {
+                joints[j].rotation.x += (curl - joints[j].rotation.x) * 0.15;
+            }
+        }
+    }
+
+    // Default finger pose — apply every frame for consistency
+    var _currentFingerPose = 'relaxed';
+    function _enforceFingerPose() {
+        setFingerPose('left', _currentFingerPose);
+        setFingerPose('right', _currentFingerPose);
+    }
+
     window.KAvatar = {
         init: init,
         loadAvatar: function (name) { return loadAvatar(name); },
@@ -698,6 +802,10 @@
         setAttentive: function (v) { isAttentive = v; },
         setPresenting: function (v) { isPresenting = v; },
         setPose: setPose,
+        setFingerPose: function (hand, pose) {
+            if (!hand) { _currentFingerPose = pose || 'relaxed'; return; }
+            setFingerPose(hand, pose);
+        },
         findArmBones: findArmBones,
         getLipSync: function () { return lipSync; },
         getTextLipSync: function () { return textLipSync; },
