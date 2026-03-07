@@ -3,6 +3,7 @@
 // Autonomous thinking, self-repair, auto-learning
 // ═══════════════════════════════════════════════════════════════
 require("dotenv").config();
+const http = require("http");
 
 // Verify Node.js version — native fetch available from Node 18+
 if (!globalThis.fetch) {
@@ -1031,10 +1032,18 @@ if (require.main === module) {
     process.exit(1);
   });
 
+  // ── Create HTTP server for WebSocket support ──
+  const server = http.createServer(app);
+
+  // ── Attach Voice Stream WebSocket ──
+  const { setupVoiceStream } = require("./routes/voice-stream");
+  setupVoiceStream(server, app.locals);
+  logger.info({ component: "VoiceStream" }, "WebSocket voice pipeline mounted on /api/voice-stream");
+
   runMigration()
     .then((migrated) => {
       logConfigHealth();
-      app.listen(PORT, "0.0.0.0", () => {
+      server.listen(PORT, "0.0.0.0", () => {
         logger.info(
           {
             component: "Server",
@@ -1045,11 +1054,12 @@ if (require.main === module) {
               deepseek: !!process.env.DEEPSEEK_API_KEY,
             },
             tts: !!process.env.ELEVENLABS_API_KEY,
+            voiceStream: true,
             payments: !!process.env.STRIPE_SECRET_KEY,
             db: !!supabaseAdmin,
             migration: !!migrated,
           },
-          "KelionAI v2.3 started on port " + PORT,
+          "KelionAI v2.5 started on port " + PORT + " (with voice streaming)",
         );
         // Auto-register Telegram webhook
         if (process.env.TELEGRAM_BOT_TOKEN && process.env.APP_URL) {
@@ -1086,10 +1096,10 @@ if (require.main === module) {
     })
     .catch(() => {
       logger.error({ component: "Server" }, "Migration error");
-      app.listen(PORT, "0.0.0.0", () =>
+      server.listen(PORT, "0.0.0.0", () =>
         logger.info(
           { component: "Server", port: PORT },
-          "KelionAI v2.3 on port " + PORT + " (migration failed)",
+          "KelionAI v2.5 on port " + PORT + " (migration failed)",
         ),
       );
     });
