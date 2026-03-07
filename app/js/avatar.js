@@ -607,7 +607,20 @@
         requestAnimationFrame(animate);
         var dt = clock.getDelta();
         if (mixer) mixer.update(dt);
-        _enforcePose();  // MUST be after mixer.update — override animation arm positions
+
+        // ═══ INLINE ARM OVERRIDE ═══════════════════════════════════
+        // Set arm bone quaternions DIRECTLY here — no indirection
+        // This MUST be after mixer.update() to override animation
+        if (armBones.left && armBones.right && _targetPose && THREE) {
+            var e = new THREE.Euler();
+            // Left arm
+            e.set(_targetPose.lx, _targetPose.ly, _targetPose.lz);
+            armBones.left.quaternion.setFromEuler(e);
+            // Right arm
+            e.set(_targetPose.rx, _targetPose.ry, _targetPose.rz);
+            armBones.right.quaternion.setFromEuler(e);
+        }
+
         updateBlink(dt);
         updateExpression(dt);
         if (lipSync && window.KVoice && KVoice.isSpeaking()) lipSync.update();
