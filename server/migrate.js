@@ -230,6 +230,167 @@ CREATE TABLE IF NOT EXISTS page_views (
     created_at TIMESTAMPTZ DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_page_views_date ON page_views(created_at);
+
+-- ═══ SUBSCRIPTIONS (CRITICĂ — plăți, abonamente, refund) ═══
+CREATE TABLE IF NOT EXISTS subscriptions (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    plan TEXT NOT NULL DEFAULT 'free',
+    status TEXT NOT NULL DEFAULT 'active',
+    stripe_customer_id TEXT,
+    stripe_subscription_id TEXT,
+    stripe_price_id TEXT,
+    current_period_start TIMESTAMPTZ,
+    current_period_end TIMESTAMPTZ,
+    cancel_at TIMESTAMPTZ,
+    canceled_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now(),
+    UNIQUE(user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_user ON subscriptions(user_id);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_stripe ON subscriptions(stripe_customer_id);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_status ON subscriptions(status);
+
+-- ═══ REFERRALS ═══
+CREATE TABLE IF NOT EXISTS referrals (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    code TEXT NOT NULL UNIQUE,
+    used_by UUID,
+    bonus_days INTEGER DEFAULT 0,
+    redeemed_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_referrals_user ON referrals(user_id);
+CREATE INDEX IF NOT EXISTS idx_referrals_code ON referrals(code);
+
+-- ═══ ADMIN CODES ═══
+CREATE TABLE IF NOT EXISTS admin_codes (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    code TEXT NOT NULL UNIQUE,
+    type TEXT NOT NULL DEFAULT 'promo',
+    value TEXT,
+    uses_remaining INTEGER DEFAULT 1,
+    expires_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_admin_codes_code ON admin_codes(code);
+
+-- ═══ BRAIN MEMORY (AI persistent memory) ═══
+CREATE TABLE IF NOT EXISTS brain_memory (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id TEXT,
+    memory_type TEXT NOT NULL DEFAULT 'general',
+    content TEXT NOT NULL,
+    metadata JSONB DEFAULT '{}',
+    importance NUMERIC DEFAULT 0.5,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_brain_memory_user ON brain_memory(user_id);
+CREATE INDEX IF NOT EXISTS idx_brain_memory_type ON brain_memory(memory_type);
+CREATE INDEX IF NOT EXISTS idx_brain_memory_date ON brain_memory(created_at DESC);
+
+-- ═══ LEARNED FACTS (AI knowledge base) ═══
+CREATE TABLE IF NOT EXISTS learned_facts (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    category TEXT NOT NULL DEFAULT 'general',
+    fact TEXT NOT NULL,
+    source TEXT,
+    confidence NUMERIC DEFAULT 0.8,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_learned_facts_cat ON learned_facts(category);
+
+-- ═══ MESSENGER USERS ═══
+CREATE TABLE IF NOT EXISTS messenger_users (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    sender_id TEXT NOT NULL UNIQUE,
+    name TEXT,
+    language TEXT DEFAULT 'ro',
+    character TEXT DEFAULT 'kelion',
+    message_count INTEGER DEFAULT 0,
+    is_subscribed BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_messenger_users_sid ON messenger_users(sender_id);
+
+CREATE OR REPLACE FUNCTION increment_messenger_message_count(p_sender_id TEXT)
+RETURNS void LANGUAGE plpgsql AS $$
+BEGIN
+    UPDATE messenger_users SET message_count = message_count + 1, updated_at = now() WHERE sender_id = p_sender_id;
+END; $$;
+
+-- ═══ MESSENGER MESSAGES ═══
+CREATE TABLE IF NOT EXISTS messenger_messages (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    sender_id TEXT NOT NULL,
+    role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
+    content TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_messenger_messages_sid ON messenger_messages(sender_id, created_at DESC);
+
+-- ═══ MESSENGER SUBSCRIBERS ═══
+CREATE TABLE IF NOT EXISTS messenger_subscribers (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    sender_id TEXT NOT NULL UNIQUE,
+    active BOOLEAN DEFAULT true,
+    subscribed_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_messenger_subs_sid ON messenger_subscribers(sender_id);
+
+-- ═══ TELEGRAM MESSAGES ═══
+CREATE TABLE IF NOT EXISTS telegram_messages (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    chat_id TEXT NOT NULL,
+    user_id TEXT,
+    role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
+    content TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_telegram_messages_chat ON telegram_messages(chat_id, created_at DESC);
+
+-- ═══ MARKET CANDLES (Trading — unlimited storage) ═══
+CREATE TABLE IF NOT EXISTS market_candles (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    asset TEXT NOT NULL,
+    timeframe TEXT NOT NULL,
+    open_time TIMESTAMPTZ NOT NULL,
+    close_time TIMESTAMPTZ,
+    open NUMERIC NOT NULL,
+    high NUMERIC NOT NULL,
+    low NUMERIC NOT NULL,
+    close NUMERIC NOT NULL,
+    volume NUMERIC DEFAULT 0,
+    ticks INTEGER DEFAULT 0,
+    UNIQUE(asset, timeframe, open_time)
+);
+CREATE INDEX IF NOT EXISTS idx_market_candles_asset ON market_candles(asset, timeframe, open_time DESC);
+
+-- ═══ MARKET LEARNINGS (AI trading adaptive weights) ═══
+CREATE TABLE IF NOT EXISTS market_learnings (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    type TEXT NOT NULL,
+    data JSONB DEFAULT '{}',
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_market_learnings_type ON market_learnings(type, created_at DESC);
+
+-- ═══ MARKET PATTERNS (pattern recognition memory) ═══
+CREATE TABLE IF NOT EXISTS market_patterns (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    asset TEXT NOT NULL,
+    timeframe TEXT,
+    pattern_type TEXT NOT NULL,
+    context JSONB DEFAULT '{}',
+    outcome TEXT,
+    confidence NUMERIC DEFAULT 0.5,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_market_patterns_asset ON market_patterns(asset, pattern_type);
+CREATE INDEX IF NOT EXISTS idx_market_patterns_type ON market_patterns(pattern_type, created_at DESC);
 `;
 
 async function runMigration() {
