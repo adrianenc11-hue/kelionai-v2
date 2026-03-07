@@ -453,8 +453,7 @@
                 currentModel.rotation.z += (Math.sin(t * Math.PI * 2) * 0.08 - currentModel.rotation.z) * 0.2;
                 currentModel.rotation.x += (angle * 0.05 - currentModel.rotation.x) * 0.15;
             } else if (gestureData === 'shrug') {
-                // Shoulders up — slight upward movement + tilt
-                currentModel.position.y += (angle * 0.02) * 0.3;
+                // Shoulders up — tilt only, NO vertical movement
                 currentModel.rotation.z += (angle * 0.06 - currentModel.rotation.z) * 0.15;
             } else if (gestureData === 'think') {
                 // Head tilt + look slightly down (contemplation)
@@ -652,7 +651,8 @@
         _breathPhase += dt * BREATH_SPEED;
         if (_spineBone) {
             var breathOffset = Math.sin(_breathPhase * Math.PI * 2) * BREATH_AMOUNT;
-            _spineBone.position.y = (_spineBone.position.y || 0) + breathOffset;
+            // Breathing: subtle rotation only, NO vertical position change
+            _spineBone.rotation.x = (_spineBone.rotation.x || 0) + breathOffset * 0.5;
         }
         // Also subtle chest expansion via morph if available
         setMorph('jawOpen', Math.max(0, Math.sin(_breathPhase * Math.PI * 2) * 0.01));
