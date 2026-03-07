@@ -17,23 +17,59 @@ const weatherLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-// POST /api/weather
+// POST /api/weather — with IP geolocation fallback (no GPS popup needed)
 router.post("/", weatherLimiter, validate(weatherSchema), async (req, res) => {
   try {
     const { getUserFromToken, brain } = req.app.locals;
     const user = await getUserFromToken(req).catch(() => null);
-    const { city } = req.body;
-    if (!city) return res.status(400).json({ error: "City is required" });
-    const geo = await (
-      await fetch(
-        "https://geocoding-api.open-meteo.com/v1/search?name=" +
-        encodeURIComponent(city) +
-        "&count=1&language=ro",
-      )
-    ).json();
-    if (!geo.results?.[0])
-      return res.status(404).json({ error: '"' + city + '" not found' });
-    const { latitude, longitude, name, country } = geo.results[0];
+    let { city, lat, lng } = req.body;
+    let latitude, longitude, name, country;
+
+    // Priority: lat/lng (GPS) > city name > IP geolocation
+    if (lat && lng) {
+      // Client sent GPS coordinates directly
+      latitude = lat;
+      longitude = lng;
+      // Reverse geocode to get city name
+      try {
+        const revGeo = await (await fetch(
+          `https://geocoding-api.open-meteo.com/v1/reverse?latitude=${lat}&longitude=${lng}&count=1`
+        )).json();
+        name = revGeo.results?.[0]?.name || "Current Location";
+        country = revGeo.results?.[0]?.country || "";
+      } catch {
+        name = "Current Location";
+        country = "";
+      }
+    } else if (city) {
+      // City name given — geocode it
+      const geo = await (
+        await fetch(
+          "https://geocoding-api.open-meteo.com/v1/search?name=" +
+          encodeURIComponent(city) +
+          "&count=1&language=ro",
+        )
+      ).json();
+      if (!geo.results?.[0])
+        return res.status(404).json({ error: '"' + city + '" not found' });
+      ({ latitude, longitude, name, country } = geo.results[0]);
+    } else {
+      // No city, no GPS → fallback to IP geolocation (no popup needed)
+      try {
+        const clientIP = req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || req.ip;
+        const ipGeo = await (await fetch(`http://ip-api.com/json/${clientIP}?fields=city,country,lat,lon`)).json();
+        if (ipGeo.city) {
+          latitude = ipGeo.lat;
+          longitude = ipGeo.lon;
+          name = ipGeo.city;
+          country = ipGeo.country || "";
+        } else {
+          return res.status(400).json({ error: "Could not determine location. Send city name or enable GPS." });
+        }
+      } catch {
+        return res.status(400).json({ error: "City is required (IP geolocation failed)" });
+      }
+    }
     const wx = await (
       await fetch(
         "https://api.open-meteo.com/v1/forecast?latitude=" +

@@ -80,7 +80,9 @@ const searchSchema = z.object({
 });
 
 const weatherSchema = z.object({
-  city: z.string().min(1).max(200),
+  city: z.string().min(1).max(200).optional(),
+  lat: z.number().min(-90).max(90).optional(),
+  lng: z.number().min(-180).max(180).optional(),
 });
 
 const imagineSchema = z.object({
