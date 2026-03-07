@@ -606,20 +606,9 @@
     function animate() {
         requestAnimationFrame(animate);
         var dt = clock.getDelta();
-        if (mixer) mixer.update(dt);
-
-        // ═══ INLINE ARM OVERRIDE ═══════════════════════════════════
-        // Set arm bone quaternions DIRECTLY here — no indirection
-        // This MUST be after mixer.update() to override animation
-        if (armBones.left && armBones.right && _targetPose && THREE) {
-            var e = new THREE.Euler();
-            // Left arm
-            e.set(_targetPose.lx, _targetPose.ly, _targetPose.lz);
-            armBones.left.quaternion.setFromEuler(e);
-            // Right arm
-            e.set(_targetPose.rx, _targetPose.ry, _targetPose.rz);
-            armBones.right.quaternion.setFromEuler(e);
-        }
+        // NO MIXER — GLB animation was overriding ALL bone changes
+        // Avatar is fully static. ALL movement comes from brain via
+        // [GESTURE:xxx] [POSE:xxx] [EXPRESSION:xxx] tags only.
 
         updateBlink(dt);
         updateExpression(dt);
