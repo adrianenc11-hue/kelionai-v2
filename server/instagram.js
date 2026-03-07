@@ -114,6 +114,13 @@ async function handleIncomingDM(msg) {
   // Send reply
   await sendDM(senderId, reply);
 
+  // ═══ BRAIN INTEGRATION — save DM memory ═══
+  if (brain) {
+    brain.saveMemory(null, "text", "Instagram DM " + senderId + ": " + text.substring(0, 200) + " | Reply: " + reply.substring(0, 300), {
+      platform: "instagram", type: "dm"
+    }).catch(() => { });
+  }
+
   // Log to Supabase
   if (supabaseAdmin) {
     try {
