@@ -904,6 +904,24 @@ router.get("/joke", async (req, res) => {
   res.json({ joke, language: lang });
 });
 
+// ═══ SEND MESSAGE API (Admin) ═══
+router.post("/send", async (req, res) => {
+  try {
+    const { to, message } = req.body;
+    if (!to || !message) {
+      return res.status(400).json({ error: "to (phone number) and message are required" });
+    }
+    if (!WA_TOKEN || !PHONE_NUMBER_ID) {
+      return res.status(503).json({ error: "WhatsApp not configured (missing WA_ACCESS_TOKEN or WA_PHONE_NUMBER_ID)" });
+    }
+    await sendTextMessage(to, message);
+    stats.repliesSent++;
+    res.json({ success: true, to, messageLength: message.length });
+  } catch (e) {
+    res.status(500).json({ error: "Send failed: " + e.message });
+  }
+});
+
 // ═══ HEALTH ENDPOINT ═══
 router.get("/health", (req, res) => {
   res.json({
