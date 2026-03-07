@@ -80,9 +80,9 @@ body {
 
 /* ── Avatar Area (sus-stânga) ── */
 #avatar-area {
-    flex: 1;
+    flex: 2;
     position: relative;
-    min-height: 320px;
+    min-height: 400px;
     background: radial-gradient(ellipse at center bottom, rgba(99, 102, 241, 0.04) 0%, transparent 70%);
 }
 
@@ -210,10 +210,10 @@ body {
     font-weight: 600;
 }
 
-/* ── Chat Area (jos-stânga, MARE) ── */
+/* ── Chat Area (jos-stânga, compact) ── */
 #chat-area {
-    flex: 1;
-    min-height: 250px;
+    flex: 0 0 auto;
+    max-height: 200px;
     display: flex;
     flex-direction: column;
     background: rgba(5, 5, 16, 0.85);
@@ -281,7 +281,7 @@ body {
     padding: 10px 12px;
     background: rgba(5, 5, 16, 0.6);
     border-top: 1px solid rgba(99, 102, 241, 0.06);
-    margin-bottom: 50px;
+    margin-bottom: 0;
     position: relative;
     z-index: 100;
 }
