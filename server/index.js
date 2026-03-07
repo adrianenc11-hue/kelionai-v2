@@ -618,6 +618,71 @@ app.get("/api/media/status", adminAuth, (req, res) => {
   });
 });
 
+// ═══ MEDIA PUBLISH ENDPOINT ═══
+app.post("/api/media/publish", adminAuth, async (req, res) => {
+  try {
+    const { platform, content, imageUrl, caption } = req.body;
+    if (!platform || !content) {
+      return res.status(400).json({ error: "platform and content are required" });
+    }
+
+    const results = {};
+
+    if (platform === "facebook" || platform === "all") {
+      try {
+        const fbResult = await fbPage.publish({ message: content, link: imageUrl });
+        results.facebook = { success: true, data: fbResult };
+      } catch (e) {
+        results.facebook = { success: false, error: e.message };
+      }
+    }
+
+    if (platform === "instagram" || platform === "all") {
+      try {
+        const igResult = await instagram.publish({
+          caption: caption || content,
+          imageUrl: imageUrl,
+        });
+        results.instagram = { success: true, data: igResult };
+      } catch (e) {
+        results.instagram = { success: false, error: e.message };
+      }
+    }
+
+    res.json({ published: true, platform, results });
+  } catch (e) {
+    res.status(500).json({ error: "Publish failed: " + e.message });
+  }
+});
+
+// ═══ VOICE CLONE LIST (alias for /api/voice/clone GET) ═══
+app.get("/api/voice-clone/list", async (req, res) => {
+  try {
+    const { getUserFromToken, supabaseAdmin } = req.app.locals;
+    const user = await getUserFromToken(req);
+    if (!user || !supabaseAdmin) return res.json({ voices: [] });
+
+    const { data } = await supabaseAdmin
+      .from("user_preferences")
+      .select("value")
+      .eq("user_id", user.id)
+      .eq("key", "cloned_voice_id");
+
+    const voices = (data || [])
+      .filter((d) => d.value && d.value.voice_id)
+      .map((d) => ({
+        voiceId: d.value.voice_id,
+        name: d.value.name,
+        createdAt: d.value.created_at,
+      }));
+
+    res.json({ voices });
+  } catch {
+    res.json({ voices: [] });
+  }
+});
+
+
 // ═══ COOKIE CONSENT ENDPOINT ═══
 app.post(
   "/api/cookie-consent",
@@ -823,6 +888,7 @@ const SPA_ROUTES = new Set([
   "/onboarding",
   "/settings",
   "/developer",
+  "/landing",
   "/error",
 ]);
 
