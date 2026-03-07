@@ -134,7 +134,7 @@
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 3)); // CINEMATIC: up to 3x for 4K/retina
 
         camera = new THREE.PerspectiveCamera(30, w / h, 0.1, 100);
-        camera.position.set(0, 0, 1.8); // Closer for bigger avatar in viewport
+        camera.position.set(0, 0.2, 1.8); // Y=0.2 moves avatar up in viewport
         renderer.outputColorSpace = THREE.SRGBColorSpace;
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
         renderer.toneMappingExposure = 1.2;
@@ -529,34 +529,33 @@
 
         // MetaPerson / Avaturn models use different bone orientations than RPM
         var poses = {
-            // BUSINESS: hands relaxed by body, professional stance
-            relaxed: { lz: 1.5, rz: -1.5, lx: 0.15, rx: 0.15, ly: 0, ry: 0 },
-            presenting: { lz: 1.0, rz: -1.0, lx: -0.1, rx: -0.1, ly: 0, ry: 0 },
-            crossed: { lz: 1.5, rz: -1.5, lx: 0.5, rx: 0.5, ly: 0.3, ry: -0.3 },
-            open: { lz: 0.6, rz: -0.6, lx: -0.1, rx: -0.1, ly: 0, ry: 0 }
+            // BUSINESS: hands relaxed by body — X-axis rotates DOWN for MetaPerson
+            relaxed: { lz: 0, rz: 0, lx: 1.5, rx: 1.5, ly: 0.2, ry: -0.2 },
+            presenting: { lz: 0, rz: 0, lx: 1.0, rx: 1.0, ly: 0.1, ry: -0.1 },
+            crossed: { lz: 0.3, rz: -0.3, lx: 1.4, rx: 1.4, ly: 0.4, ry: -0.4 },
+            open: { lz: 0, rz: 0, lx: 0.5, rx: 0.5, ly: 0, ry: 0 }
         };
         _targetPose = poses[currentPose] || poses.relaxed;
         _enforcePose(); // Apply immediately
         console.log('[Avatar] Pose set:', currentPose);
     }
 
-    // Cached target pose for per-frame enforcement
-    var _targetPose = { lz: 1.5, rz: -1.5, lx: 0.15, rx: 0.15, ly: 0, ry: 0 };
+    // Default pose values (arms by body)
+    var _targetPose = { lz: 0, rz: 0, lx: 1.5, rx: 1.5, ly: 0.2, ry: -0.2 };
 
-    // Called EVERY frame after mixer.update() to override animation arm defaults
+    // Called EVERY frame after mixer.update() — instant override
     function _enforcePose() {
         if (!_targetPose) return;
         var p = _targetPose;
-        var lerp = 0.15;
         if (armBones.left) {
-            armBones.left.rotation.x += (p.lx - armBones.left.rotation.x) * lerp;
-            armBones.left.rotation.y += (p.ly - armBones.left.rotation.y) * lerp;
-            armBones.left.rotation.z += (p.lz - armBones.left.rotation.z) * lerp;
+            armBones.left.rotation.x = p.lx;
+            armBones.left.rotation.y = p.ly;
+            armBones.left.rotation.z = p.lz;
         }
         if (armBones.right) {
-            armBones.right.rotation.x += (p.rx - armBones.right.rotation.x) * lerp;
-            armBones.right.rotation.y += (p.ry - armBones.right.rotation.y) * lerp;
-            armBones.right.rotation.z += (p.rz - armBones.right.rotation.z) * lerp;
+            armBones.right.rotation.x = p.rx;
+            armBones.right.rotation.y = p.ry;
+            armBones.right.rotation.z = p.rz;
         }
     }
 

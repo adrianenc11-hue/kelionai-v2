@@ -210,11 +210,17 @@ body {
     font-weight: 600;
 }
 
-/* ── Chat Area — hidden, messages go to monitor ── */
+/* ── Chat Area — minimal, just input row at bottom ── */
 #chat-area {
     flex: 0 0 auto;
-    max-height: 0;
-    overflow: hidden;
+    background: transparent;
+}
+
+#chat-overlay {
+    display: none;
+}
+
+#thinking {
     display: none;
 }
 
