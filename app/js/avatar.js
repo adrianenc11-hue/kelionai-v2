@@ -155,6 +155,9 @@
                 const maxDim = Math.max(size.x, size.y, size.z);
                 if (maxDim > 0) currentModel.scale.setScalar(1.2 / maxDim);
 
+                // Shift model down for head+torso framing
+                currentModel.position.y -= 0.15;
+
                 currentModel.traverse((child) => {
                     if (child.isMesh) {
                         child.visible = true;
