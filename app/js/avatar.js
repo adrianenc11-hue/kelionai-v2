@@ -6,8 +6,8 @@
     'use strict';
 
     const MODELS = {
-        kelion: '/models/k-male.glb',
-        kira: '/models/k-female.glb'
+        kelion: '/models/k-male-live.glb',
+        kira: '/models/k-female-live.glb'
     };
 
     let scene, camera, renderer, clock;
@@ -314,7 +314,13 @@
 
                 if (gltf.animations && gltf.animations.length) {
                     mixer = new THREE.AnimationMixer(currentModel);
-                    gltf.animations.forEach(clip => mixer.clipAction(clip).play());
+                    console.log('[Avatar] 🎬 Animation clips:', gltf.animations.length);
+                    gltf.animations.forEach(function (clip, i) {
+                        console.log('[Avatar]   Clip ' + i + ': "' + clip.name + '" ' + clip.duration.toFixed(1) + 's, tracks=' + clip.tracks.length);
+                        mixer.clipAction(clip).play();
+                    });
+                } else {
+                    console.log('[Avatar] ⚠️ No animation clips in model');
                 }
 
                 document.getElementById('avatar-name').textContent = name === 'kira' ? 'Kira' : 'Kelion';
