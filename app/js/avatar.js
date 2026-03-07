@@ -172,7 +172,7 @@
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 3)); // CINEMATIC: up to 3x for 4K/retina
 
         camera = new THREE.PerspectiveCamera(30, w / h, 0.1, 100);
-        camera.position.set(0, -0.1, 1.8); // Original values — avatar panel is 70% height
+        camera.position.set(0, -0.1, 1.8); // Negative Y = avatar appears higher
         renderer.outputColorSpace = THREE.SRGBColorSpace;
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
         renderer.toneMappingExposure = 1.2;
