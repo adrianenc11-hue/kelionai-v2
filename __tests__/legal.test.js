@@ -11,7 +11,7 @@ describe("GET /api/legal/terms", () => {
   test("returns 200 with terms of service JSON", async () => {
     const res = await request(app).get("/api/legal/terms");
     expect(res.status).toBe(200);
-    expect(res.body.title).toContain("Termeni");
+    expect(res.body.title).toContain("Terms of Service");
     expect(res.body.version).toBe("1.0");
     expect(res.body.sections).toBeInstanceOf(Array);
     expect(res.body.sections.length).toBeGreaterThan(0);
@@ -30,7 +30,7 @@ describe("GET /api/legal/privacy", () => {
   test("returns 200 with privacy policy JSON", async () => {
     const res = await request(app).get("/api/legal/privacy");
     expect(res.status).toBe(200);
-    expect(res.body.title).toContain("Confidențialitate");
+    expect(res.body.title).toContain("Privacy Policy");
     expect(res.body.version).toBe("1.0");
     expect(res.body.sections).toBeInstanceOf(Array);
     expect(res.body.sections.length).toBeGreaterThan(0);

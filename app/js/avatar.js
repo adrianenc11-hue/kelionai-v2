@@ -51,6 +51,57 @@
     let isPresenting = false;
     var PRESENT_ANGLE = 8 * Math.PI / 180; // 8 degrees right
 
+    // ══ INNOVATIVE: Eye Tracking (mouse follow) ══════════════
+    var _mouseX = 0, _mouseY = 0;
+    var _eyeBones = { left: null, right: null };
+    var _headBone = null;
+    var _spineBone = null;
+    document.addEventListener('mousemove', function (e) {
+        // Normalize to -1..1 from viewport center
+        _mouseX = (e.clientX / window.innerWidth) * 2 - 1;
+        _mouseY = -((e.clientY / window.innerHeight) * 2 - 1);
+    });
+
+    // ══ INNOVATIVE: Micro-expressions ═════════════════════════
+    var _microTimer = 0;
+    var _nextMicro = 3 + Math.random() * 5; // 3-8s between twitches
+    var _microActive = false;
+    var _microMorph = '';
+    var _microValue = 0;
+    var _microDuration = 0;
+    var _microElapsed = 0;
+    var MICRO_EXPRESSIONS = [
+        { morph: 'browInnerUp', max: 0.15, duration: 0.3 },
+        { morph: 'browOuterUpLeft', max: 0.12, duration: 0.25 },
+        { morph: 'browOuterUpRight', max: 0.12, duration: 0.25 },
+        { morph: 'cheekSquintLeft', max: 0.1, duration: 0.2 },
+        { morph: 'cheekSquintRight', max: 0.1, duration: 0.2 },
+        { morph: 'noseSneerLeft', max: 0.08, duration: 0.15 },
+        { morph: 'noseSneerRight', max: 0.08, duration: 0.15 },
+        { morph: 'mouthPressLeft', max: 0.06, duration: 0.2 },
+        { morph: 'mouthSmileLeft', max: 0.08, duration: 0.3 },
+        { morph: 'eyeSquintLeft', max: 0.1, duration: 0.2 },
+        { morph: 'eyeSquintRight', max: 0.1, duration: 0.2 }
+    ];
+
+    // ══ INNOVATIVE: Eye Saccades ══════════════════════════════
+    var _saccadeTimer = 0;
+    var _nextSaccade = 0.5 + Math.random() * 2; // 0.5-2.5s
+    var _saccadeTargetX = 0, _saccadeTargetY = 0;
+    var _saccadeCurrentX = 0, _saccadeCurrentY = 0;
+
+    // ══ INNOVATIVE: Breathing ═════════════════════════════════
+    var _breathPhase = 0;
+    var BREATH_SPEED = 0.8; // ~4s per full cycle
+    var BREATH_AMOUNT = 0.003; // Very subtle
+
+    // Expression intensity table (smarter than fixed 0.5)
+    var EXPRESSION_INTENSITY = {
+        happy: 0.5, thinking: 0.35, concerned: 0.4, neutral: 0,
+        laughing: 0.7, surprised: 0.6, playful: 0.5,
+        sad: 0.45, determined: 0.4, loving: 0.5, sleepy: 0.3
+    };
+
     function init() {
         const canvas = document.getElementById('avatar-canvas');
         if (!canvas || !window.THREE) {
@@ -78,9 +129,9 @@
         scene = new THREE.Scene();
         clock = new THREE.Clock();
 
-        renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+        renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'high-performance' });
         renderer.setSize(w, h);
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 3)); // CINEMATIC: up to 3x for 4K/retina
 
         camera = new THREE.PerspectiveCamera(35, w / h, 0.1, 100);
         camera.position.set(0, 0, 2.5);
@@ -252,6 +303,7 @@
 
                 // ARM POSE — find bones and set default relaxed pose
                 findArmBones();
+                _findEyeAndSpineBones(); // NEW: find eye/head/spine for life system
                 setPose('relaxed');
 
                 scene.add(currentModel);
@@ -313,7 +365,10 @@
     }
 
     function setExpression(name, intensity) {
-        intensity = intensity || 0.5;
+        // Smart intensity — use table if no explicit override
+        if (intensity === undefined || intensity === null) {
+            intensity = EXPRESSION_INTENSITY[name] || 0.5;
+        }
         var expressions = {
             happy: { 'cheekSquintLeft': 0.3, 'cheekSquintRight': 0.3, 'mouthSmileLeft': 0.2, 'mouthSmileRight': 0.2 },
             thinking: { 'browInnerUp': 0.3, 'eyeSquintLeft': 0.15, 'eyeSquintRight': 0.15 },
@@ -439,6 +494,35 @@
         console.log('[Avatar] Arm bones found:', !!armBones.left, !!armBones.right);
     }
 
+    // ══ Find eye bones, head bone, spine bone for life system ══
+    function _findEyeAndSpineBones() {
+        if (!currentModel) return;
+        _eyeBones = { left: null, right: null };
+        _headBone = null;
+        _spineBone = null;
+        currentModel.traverse(function (bone) {
+            if (!bone.isBone) return;
+            var bn = (bone.name || '').toLowerCase();
+            // Eye bones
+            if (bn.indexOf('lefteye') !== -1 || bn.indexOf('left_eye') !== -1 || bn === 'eye_l') {
+                _eyeBones.left = bone;
+            }
+            if (bn.indexOf('righteye') !== -1 || bn.indexOf('right_eye') !== -1 || bn === 'eye_r') {
+                _eyeBones.right = bone;
+            }
+            // Head bone
+            if (!_headBone && (bn === 'head' || bn.indexOf('head') !== -1) && bn.indexOf('headtop') === -1) {
+                _headBone = bone;
+            }
+            // Spine (for breathing)
+            if (!_spineBone && (bn === 'spine' || bn === 'spine1' || bn === 'spine2' || bn.indexOf('spine') !== -1)) {
+                _spineBone = bone;
+            }
+        });
+        console.log('[Avatar] Life system bones — eyes:', !!_eyeBones.left, !!_eyeBones.right,
+            '| head:', !!_headBone, '| spine:', !!_spineBone);
+    }
+
     function setPose(pose) {
         currentPose = pose || 'relaxed';
         if (!armBones.left && !armBones.right) findArmBones();
@@ -487,6 +571,78 @@
 
         updateGesture(dt);
         updateMoodLighting();
+
+        // ══ INNOVATIVE: Micro-expressions ═════════════════════
+        _microTimer += dt;
+        if (!_microActive && _microTimer >= _nextMicro) {
+            // Start a random micro-expression
+            var me = MICRO_EXPRESSIONS[Math.floor(Math.random() * MICRO_EXPRESSIONS.length)];
+            _microMorph = me.morph;
+            _microDuration = me.duration;
+            _microValue = me.max;
+            _microElapsed = 0;
+            _microActive = true;
+            _microTimer = 0;
+            _nextMicro = 3 + Math.random() * 5;
+        }
+        if (_microActive) {
+            _microElapsed += dt;
+            var t = _microElapsed / _microDuration;
+            if (t >= 1) {
+                _microActive = false;
+                setMorph(_microMorph, 0);
+            } else {
+                // Bell curve: rise then fall
+                var intensity = Math.sin(t * Math.PI) * _microValue;
+                setMorph(_microMorph, intensity);
+            }
+        }
+
+        // ══ INNOVATIVE: Eye Saccades ══════════════════════════
+        _saccadeTimer += dt;
+        if (_saccadeTimer >= _nextSaccade) {
+            _saccadeTimer = 0;
+            _nextSaccade = 0.5 + Math.random() * 2;
+            // Small random target shift
+            _saccadeTargetX = (Math.random() - 0.5) * 0.04;
+            _saccadeTargetY = (Math.random() - 0.5) * 0.02;
+        }
+        _saccadeCurrentX += (_saccadeTargetX - _saccadeCurrentX) * 0.3;
+        _saccadeCurrentY += (_saccadeTargetY - _saccadeCurrentY) * 0.3;
+
+        // ══ INNOVATIVE: Eye Tracking (mouse follow via bones) ═
+        if (_eyeBones.left || _eyeBones.right) {
+            var eyeYaw = _mouseX * 0.15 + _saccadeCurrentX;   // max 15° horizontal
+            var eyePitch = _mouseY * 0.08 + _saccadeCurrentY;  // max 8° vertical
+            if (_eyeBones.left) {
+                _eyeBones.left.rotation.y += (eyeYaw - _eyeBones.left.rotation.y) * 0.15;
+                _eyeBones.left.rotation.x += (eyePitch - _eyeBones.left.rotation.x) * 0.15;
+            }
+            if (_eyeBones.right) {
+                _eyeBones.right.rotation.y += (eyeYaw - _eyeBones.right.rotation.y) * 0.15;
+                _eyeBones.right.rotation.x += (eyePitch - _eyeBones.right.rotation.x) * 0.15;
+            }
+        } else {
+            // Fallback: use morph targets for eye direction
+            setMorph('eyeLookOutLeft', Math.max(0, _mouseX * 0.3 + _saccadeCurrentX));
+            setMorph('eyeLookInLeft', Math.max(0, -_mouseX * 0.3 - _saccadeCurrentX));
+            setMorph('eyeLookOutRight', Math.max(0, -_mouseX * 0.3 - _saccadeCurrentX));
+            setMorph('eyeLookInRight', Math.max(0, _mouseX * 0.3 + _saccadeCurrentX));
+            setMorph('eyeLookUpLeft', Math.max(0, _mouseY * 0.2 + _saccadeCurrentY));
+            setMorph('eyeLookUpRight', Math.max(0, _mouseY * 0.2 + _saccadeCurrentY));
+            setMorph('eyeLookDownLeft', Math.max(0, -_mouseY * 0.2 - _saccadeCurrentY));
+            setMorph('eyeLookDownRight', Math.max(0, -_mouseY * 0.2 - _saccadeCurrentY));
+        }
+
+        // ══ INNOVATIVE: Breathing ═════════════════════════════
+        _breathPhase += dt * BREATH_SPEED;
+        if (_spineBone) {
+            var breathOffset = Math.sin(_breathPhase * Math.PI * 2) * BREATH_AMOUNT;
+            _spineBone.position.y = (_spineBone.position.y || 0) + breathOffset;
+        }
+        // Also subtle chest expansion via morph if available
+        setMorph('jawOpen', Math.max(0, Math.sin(_breathPhase * Math.PI * 2) * 0.01));
+
         if (currentModel) {
             var targetY = 0;
             var targetX = 0;
@@ -495,24 +651,25 @@
                 // Look towards monitor (right side)
                 targetY = -PRESENT_ANGLE;
             } else if (isAttentive) {
-                // Look straight at user
-                targetY = 0;
-                targetX = 0;
+                // Look at user — add subtle mouse-follow to head too
+                targetY = _mouseX * 0.04;
+                targetX = _mouseY * 0.02;
             } else {
-                // Subtle idle sway
+                // Enhanced idle sway — slightly more alive than before
                 var t = clock.elapsedTime;
-                targetY = Math.sin(t * 0.3) * 0.02;
-                targetX = Math.sin(t * 0.2) * 0.01;
+                targetY = Math.sin(t * 0.3) * 0.025 + Math.sin(t * 0.7) * 0.01;
+                targetX = Math.sin(t * 0.2) * 0.012 + Math.cos(t * 0.5) * 0.005;
             }
 
             currentModel.rotation.y += (targetY - currentModel.rotation.y) * 0.08;
             currentModel.rotation.x += (targetX - currentModel.rotation.x) * 0.08;
         }
-        // FORCE mouth closed — cached indices, no string comparisons
+        // SMOOTH mouth close — exponential decay instead of instant zero
         var _lipRan = (lipSync && window.KVoice && KVoice.isSpeaking());
         if (!_lipRan) {
             for (var ci = 0; ci < _mouthMorphCache.length; ci++) {
-                _mouthMorphCache[ci].mesh.morphTargetInfluences[_mouthMorphCache[ci].idx] = 0;
+                var curr = _mouthMorphCache[ci].mesh.morphTargetInfluences[_mouthMorphCache[ci].idx];
+                _mouthMorphCache[ci].mesh.morphTargetInfluences[_mouthMorphCache[ci].idx] = curr * 0.85;
             }
         }
         renderer.render(scene, camera);

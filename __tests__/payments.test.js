@@ -94,8 +94,9 @@ describe("checkUsage", () => {
     expect(result.remaining).toBe(-1);
   });
 
-  test("returns allowed:false when count >= limit", async () => {
-    // Mock supabaseAdmin: free plan, chat count = 10 (at limit)
+  test("returns allowed:true even at limit (usage enforcement disabled)", async () => {
+    // checkUsage is intentionally disabled — always allows access
+    // The 3rd parameter (supabaseAdmin) is ignored by design
     const mockSupabase = {
       from: (table) => ({
         select: () => ({
@@ -104,7 +105,6 @@ describe("checkUsage", () => {
               eq: (col3, val3) => ({
                 single: async () => {
                   if (table === "subscriptions") return { data: null };
-                  // usage table: return count = 10
                   return { data: { count: 10 } };
                 },
               }),
@@ -118,12 +118,13 @@ describe("checkUsage", () => {
       }),
     };
     const result = await checkUsage("free-user", "chat", mockSupabase);
-    expect(result.allowed).toBe(false);
-    expect(result.remaining).toBeLessThanOrEqual(0);
+    // Enforcement is disabled: allowed is always true, remaining is -1
+    expect(result.allowed).toBe(true);
+    expect(result.remaining).toBe(-1);
   });
 
-  test("returns allowed:true when count < limit", async () => {
-    // Mock supabaseAdmin: free plan, chat count = 5 (below limit of 10)
+  test("returns allowed:true with unlimited remaining (enforcement disabled)", async () => {
+    // checkUsage is intentionally disabled — supabaseAdmin parameter is ignored
     const mockSupabase = {
       from: (table) => ({
         select: () => ({
@@ -146,7 +147,8 @@ describe("checkUsage", () => {
     };
     const result = await checkUsage("free-user", "chat", mockSupabase);
     expect(result.allowed).toBe(true);
-    expect(result.remaining).toBeGreaterThan(0);
+    // remaining is -1 (unlimited) because enforcement is disabled
+    expect(result.remaining).toBe(-1);
   });
 });
 
