@@ -906,6 +906,23 @@ app.post("/api/trading/learner/save", adminAuth, async (req, res) => {
 
 // ═══ SPORTS BOT — REMOVED (no real utility without betting integration) ═══
 
+// GET /api/media/history — Media history from brain
+app.get("/api/media/history", async (req, res) => {
+  const { supabaseAdmin } = req.app.locals;
+  if (!supabaseAdmin) return res.status(503).json({ error: "No database connection" });
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("media_history")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(50);
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ media: data || [], count: (data || []).length });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // 404 for unknown API routes — must come before the catch-all
 app.use("/api", (req, res, _next) => {
   res.status(404).json({ error: "API endpoint not found" });
@@ -918,11 +935,12 @@ app.use("/api", (req, res, _next) => {
 app.get("/privacy", (req, res) => res.redirect(301, "/privacy/"));
 app.get("/terms", (req, res) => res.redirect(301, "/terms/"));
 app.get("/gdpr", (req, res) => res.redirect(301, "/gdpr/"));
+app.get("/cookie-policy", (req, res) => res.redirect(301, "/cookie-policy/"));
 app.get("/premium", (req, res) => res.redirect(301, "/pricing/"));
 
 // ═══ STANDALONE LEGAL PAGES — explicit handlers (not relying on express.static) ═══
 const _legalPages = {};
-for (const page of ["privacy", "terms", "gdpr"]) {
+for (const page of ["privacy", "terms", "gdpr", "cookie-policy"]) {
   const filePath = path.join(__dirname, "..", "app", page, "index.html");
   if (fs.existsSync(filePath)) {
     _legalPages[page] = fs.readFileSync(filePath, "utf8");
@@ -941,6 +959,10 @@ app.get("/terms/", (req, res) => {
 app.get("/gdpr/", (req, res) => {
   if (!_legalPages.gdpr) return res.status(404).type("html").send(_raw404Html);
   res.type("html").send(_legalPages.gdpr);
+});
+app.get("/cookie-policy/", (req, res) => {
+  if (!_legalPages["cookie-policy"]) return res.status(404).type("html").send(_raw404Html);
+  res.type("html").send(_legalPages["cookie-policy"]);
 });
 
 // ═══ SPA ROUTE WHITELIST — only serve index.html for known UI routes ═══
