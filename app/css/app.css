@@ -82,7 +82,7 @@ body {
 #avatar-area {
     flex: 1;
     position: relative;
-    min-height: 200px;
+    min-height: 320px;
     background: radial-gradient(ellipse at center bottom, rgba(99, 102, 241, 0.04) 0%, transparent 70%);
 }
 
@@ -90,6 +90,37 @@ body {
     width: 100%;
     height: 100%;
     display: block;
+}
+
+/* ── Speech subtitle overlay ── */
+#speech-subtitle {
+    position: absolute;
+    bottom: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    max-width: 90%;
+    padding: 6px 18px;
+    background: rgba(0, 0, 0, 0.65);
+    color: #fff;
+    font-size: 0.85rem;
+    line-height: 1.4;
+    border-radius: 8px;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    z-index: 10;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    font-family: inherit;
+    letter-spacing: 0.01em;
+}
+
+#speech-subtitle.visible {
+    opacity: 1;
 }
 
 #avatar-label {
@@ -788,9 +819,9 @@ body {
     }
 
     #avatar-area {
-        height: 35vh;
-        max-height: 280px;
-        min-height: 180px;
+        height: 45vh;
+        max-height: 380px;
+        min-height: 220px;
         flex: none;
     }
 
@@ -830,8 +861,8 @@ body {
 
 @media (max-width: 480px) {
     #avatar-area {
-        height: 28vh;
-        max-height: 220px;
+        height: 38vh;
+        max-height: 300px;
     }
 
     .navbar-links {

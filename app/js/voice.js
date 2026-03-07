@@ -7,6 +7,34 @@
     let pendingAudioBuffer = null, pendingAudioAvatar = null, pendingAudioText = null;
     let recognition = null, isListeningForWake = false, isProcessing = false;
 
+    // ─── Subtitle overlay ───────────────────────────────────
+    var _subtitleEl = null;
+    var _subtitleTimer = null;
+    function _ensureSubtitleEl() {
+        if (_subtitleEl && document.body.contains(_subtitleEl)) return _subtitleEl;
+        _subtitleEl = document.createElement('div');
+        _subtitleEl.id = 'speech-subtitle';
+        _subtitleEl.setAttribute('aria-live', 'polite');
+        var parent = document.getElementById('avatar-area') || document.querySelector('.left-panel') || document.body;
+        parent.style.position = parent.style.position || 'relative';
+        parent.appendChild(_subtitleEl);
+        return _subtitleEl;
+    }
+    function showSubtitle(text) {
+        if (!text) return;
+        if (_subtitleTimer) { clearTimeout(_subtitleTimer); _subtitleTimer = null; }
+        var el = _ensureSubtitleEl();
+        // Truncate to ~120 chars for single line
+        var display = text.length > 120 ? text.substring(0, 117) + '...' : text;
+        el.textContent = display;
+        el.classList.add('visible');
+    }
+    function hideSubtitle() {
+        if (!_subtitleEl) return;
+        _subtitleEl.classList.remove('visible');
+        _subtitleTimer = setTimeout(function () { if (_subtitleEl) _subtitleEl.textContent = ''; }, 600);
+    }
+
     function getAudioContext() {
         if (!sharedAudioCtx) sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
         if (sharedAudioCtx.state === 'suspended') sharedAudioCtx.resume();
@@ -185,8 +213,9 @@
             }
             console.log('[Voice] AudioContext state:', ctx.state);
 
+            showSubtitle(ttsText);
             await playAudioBuffer(arrayBuf, ttsText);
-        } catch (e) { console.error('[Voice]', e); stopAllLipSync(); isSpeaking = false; resumeWakeDetection(); }
+        } catch (e) { console.error('[Voice]', e); stopAllLipSync(); hideSubtitle(); isSpeaking = false; resumeWakeDetection(); }
     }
 
     async function playAudioBuffer(arrayBuf, fallbackText) {
@@ -227,13 +256,13 @@
             }
         }
 
-        currentSourceNode.onended = () => { stopAllLipSync(); isSpeaking = false; currentSourceNode = null; KAvatar.setExpression('neutral'); KAvatar.setPresenting(false); resumeWakeDetection(); };
+        currentSourceNode.onended = () => { stopAllLipSync(); hideSubtitle(); isSpeaking = false; currentSourceNode = null; KAvatar.setExpression('neutral'); KAvatar.setPresenting(false); resumeWakeDetection(); };
         currentSourceNode.start(0);
         // Dispatch event for synchronized text reveal
         window.dispatchEvent(new CustomEvent('audio-start', { detail: { duration: audioBuf.duration } }));
         // Safety timeout: stop lip sync even if onended doesn't fire
         var audioDurationMs = Math.ceil(audioBuf.duration * 1000) + 500;
-        setTimeout(function () { if (isSpeaking) { stopAllLipSync(); isSpeaking = false; currentSourceNode = null; KAvatar.setExpression('neutral'); KAvatar.setPresenting(false); resumeWakeDetection(); } }, audioDurationMs);
+        setTimeout(function () { if (isSpeaking) { stopAllLipSync(); hideSubtitle(); isSpeaking = false; currentSourceNode = null; KAvatar.setExpression('neutral'); KAvatar.setPresenting(false); resumeWakeDetection(); } }, audioDurationMs);
         console.log('[Voice] ✅ Audio playing (' + arrayBuf.byteLength + 'B, ' + Math.round(audioBuf.duration) + 's)');
     }
 
@@ -275,7 +304,7 @@
 
     function stopSpeaking() {
         if (currentSourceNode) try { currentSourceNode.stop(); } catch (e) { } currentSourceNode = null;
-        stopAllLipSync(); isSpeaking = false; KAvatar.setExpression('neutral'); KAvatar.setPresenting(false);
+        stopAllLipSync(); hideSubtitle(); isSpeaking = false; KAvatar.setExpression('neutral'); KAvatar.setPresenting(false);
     }
 
     // ─── Mute / Unmute (instant via AudioContext suspend/resume) ─────────
