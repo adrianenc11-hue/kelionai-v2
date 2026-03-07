@@ -100,7 +100,7 @@
     // ══ INNOVATIVE: Breathing ═════════════════════════════════
     var _breathPhase = 0;
     var BREATH_SPEED = 0.8; // ~4s per full cycle
-    var BREATH_AMOUNT = 0.003; // Very subtle
+    var BREATH_AMOUNT = 0.015; // Visible chest movement
 
     // Expression intensity table (smarter than fixed 0.5)
     var EXPRESSION_INTENSITY = {
@@ -650,10 +650,10 @@
 
         // ══ Head Tracking (head follows mouse subtly) ═════════════
         if (_headBone) {
-            var headYaw = _mouseX * 0.06;
-            var headPitch = _mouseY * 0.03;
-            _headBone.rotation.y += (headYaw - _headBone.rotation.y) * 0.04;
-            _headBone.rotation.x += (headPitch - _headBone.rotation.x) * 0.04;
+            var headYaw = _mouseX * 0.25;
+            var headPitch = _mouseY * 0.12;
+            _headBone.rotation.y += (headYaw - _headBone.rotation.y) * 0.08;
+            _headBone.rotation.x += (headPitch - _headBone.rotation.x) * 0.08;
         }
 
         // ══ Micro-expressions (subtle face twitches) ══════════════
@@ -695,8 +695,8 @@
 
         // ══ Eye Tracking (mouse follow + saccades) ═══════════════
         if (_eyeBones.left || _eyeBones.right) {
-            var eyeYaw = _mouseX * 0.15 + _saccadeCurrentX;
-            var eyePitch = _mouseY * 0.08 + _saccadeCurrentY;
+            var eyeYaw = _mouseX * 0.35 + _saccadeCurrentX;
+            var eyePitch = _mouseY * 0.2 + _saccadeCurrentY;
             if (_eyeBones.left) {
                 _eyeBones.left.rotation.y += (eyeYaw - _eyeBones.left.rotation.y) * 0.1;
                 _eyeBones.left.rotation.x += (eyePitch - _eyeBones.left.rotation.x) * 0.1;
