@@ -426,42 +426,40 @@
                         <button class="avatar-pill" data-avatar="kira">Kira</button>
                     </div>
                 </div>
-                <div id="chat-area" style="display:none"></div>
+                <!-- Chat overlay — floats on top of avatar -->
+                <div id="chat-overlay"
+                    style="position:absolute;bottom:8px;left:0;right:0;max-height:45%;overflow-y:auto;padding:8px 10px;z-index:20;">
+                </div>
             </div>
-            <div id="display-panel">
-                <div id="display-header">
-                    <span id="display-title" data-i18n="monitor.title">Monitor</span>
-                </div>
-                <div id="display-content">
-                    <!-- Chat messages display (centered in monitor) -->
-                    <div id="chat-overlay" style="flex:1;overflow-y:auto;padding:16px;"></div>
-                    <div id="monitor-image" style="display:none"></div>
-                    <div id="monitor-map" style="display:none"></div>
-                    <div id="monitor-text" style="display:none"></div>
-                    <div id="monitor-search" style="display:none"></div>
-                    <div id="monitor-weather" style="display:none"></div>
-                    <div id="monitor-iframe" style="display:none"><iframe id="monitor-iframe-src" src=""
-                            allow="autoplay; encrypted-media" allowfullscreen
-                            style="width:100%;height:100%;border:none;border-radius:8px"></iframe></div>
-                    <div id="monitor-audio" style="display:none">
-                        <div id="radio-info" style="text-align:center;padding:20px">
-                            <div style="font-size:3rem" id="radio-logo">📻</div>
-                            <div id="radio-name" style="font-size:1.3rem;font-weight:600;margin:10px 0;color:#fff">
-                            </div><audio id="radio-player" controls autoplay style="width:100%;margin-top:10px"></audio>
-                        </div>
-                    </div>
-                    <div id="monitor-video" style="display:none"><iframe id="monitor-video-src" src=""
-                            allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen
-                            style="width:100%;height:100%;border:none;border-radius:8px"></iframe></div>
-                    <div id="monitor-default">
-                        <div class="welcome-icon animate-float">🎯</div>
-                        <p data-i18n="monitor.default.text">The monitor will display content when the AI assistant
-                            shares information.</p>
-                        <small data-i18n="monitor.default.hint">Say "what's ahead" or "show me a map"</small>
+        </div>
+        <div id="display-panel">
+            <div id="display-header">
+                <span id="display-title" data-i18n="monitor.title">Monitor</span>
+            </div>
+            <div id="display-content">
+                <!-- Chat messages moved to left panel overlay -->
+                <div id="monitor-image" style="display:none"></div>
+                <div id="monitor-map" style="display:none"></div>
+                <div id="monitor-text" style="display:none"></div>
+                <div id="monitor-search" style="display:none"></div>
+                <div id="monitor-weather" style="display:none"></div>
+                <div id="monitor-iframe" style="display:none"><iframe id="monitor-iframe-src" src=""
+                        allow="autoplay; encrypted-media" allowfullscreen
+                        style="width:100%;height:100%;border:none;border-radius:8px"></iframe></div>
+                <div id="monitor-audio" style="display:none">
+                    <div id="radio-info" style="text-align:center;padding:20px">
+                        <div style="font-size:3rem" id="radio-logo">📻</div>
+                        <div id="radio-name" style="font-size:1.3rem;font-weight:600;margin:10px 0;color:#fff">
+                        </div><audio id="radio-player" controls autoplay style="width:100%;margin-top:10px"></audio>
                     </div>
                 </div>
-                <!-- Live subtitle bar -->
-                <div id="live-subtitle" style="
+                <div id="monitor-video" style="display:none"><iframe id="monitor-video-src" src=""
+                        allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen
+                        style="width:100%;height:100%;border:none;border-radius:8px"></iframe></div>
+                <div id="monitor-default" style="display:none"></div>
+            </div>
+            <!-- Live subtitle bar -->
+            <div id="live-subtitle" style="
                         position:absolute; bottom:0; left:0; right:0;
                         background:rgba(0,0,0,0.75);
                         color:#fff; font-size:0.95rem;
@@ -472,31 +470,30 @@
                         font-family:'Inter',system-ui,sans-serif;
                         display:none;
                     ">
-                    <span id="subtitle-speaker" style="color:#00ffff;font-weight:600;margin-right:8px;"></span>
-                    <span id="subtitle-text"></span>
-                </div>
-                <!-- Thinking indicator -->
-                <div id="thinking" style="display:none;padding:8px 16px;">
-                    <div class="thinking-dots"><span></span><span></span><span></span></div>
-                    <span data-i18n="thinking.text">Thinking...</span>
-                </div>
-                <!-- Input row at bottom of monitor -->
-                <div id="input-row"
-                    style="padding:8px 12px;border-top:1px solid rgba(99,102,241,0.1);margin-bottom:8px;">
-                    <button id="btn-mic-toggle" title="Microphone ON/OFF" aria-label="Toggle microphone"
-                        style="background:none;border:2px solid #555;border-radius:50%;width:36px;height:36px;cursor:pointer;font-size:1.1rem;color:#888;transition:all 0.3s;">🎙️</button>
-                    <div id="mic-level" title="Mic level" style="display:none">
-                        <span></span><span></span><span></span><span></span><span></span>
-                    </div>
-                    <input type="text" id="text-input" data-i18n-placeholder="input.placeholder"
-                        placeholder="Type or speak..." autocomplete="off">
-                    <button id="btn-send" title="Send" aria-label="Send message"
-                        style="background:none;border:none;cursor:pointer;font-size:1.3rem;color:var(--kelion-text-secondary);padding:0 6px;transition:color 0.2s;">➤</button>
-                    <button id="btn-plus" title="Import / Export" aria-label="Files"
-                        style="background:none;border:none;cursor:pointer;font-size:1.3rem;color:var(--kelion-text-secondary);padding:0 4px;">+</button>
-                </div>
+                <span id="subtitle-speaker" style="color:#00ffff;font-weight:600;margin-right:8px;"></span>
+                <span id="subtitle-text"></span>
             </div>
-        </div><!-- /#main-content -->
+            <!-- Thinking indicator -->
+            <div id="thinking" style="display:none;padding:8px 16px;">
+                <div class="thinking-dots"><span></span><span></span><span></span></div>
+                <span data-i18n="thinking.text">Thinking...</span>
+            </div>
+            <!-- Input row at bottom of monitor -->
+            <div id="input-row" style="padding:8px 12px;border-top:1px solid rgba(99,102,241,0.1);margin-bottom:8px;">
+                <button id="btn-mic-toggle" title="Microphone ON/OFF" aria-label="Toggle microphone"
+                    style="background:none;border:2px solid #555;border-radius:50%;width:36px;height:36px;cursor:pointer;font-size:1.1rem;color:#888;transition:all 0.3s;">🎙️</button>
+                <div id="mic-level" title="Mic level" style="display:none">
+                    <span></span><span></span><span></span><span></span><span></span>
+                </div>
+                <input type="text" id="text-input" data-i18n-placeholder="input.placeholder"
+                    placeholder="Type or speak..." autocomplete="off">
+                <button id="btn-send" title="Send" aria-label="Send message"
+                    style="background:none;border:none;cursor:pointer;font-size:1.3rem;color:var(--kelion-text-secondary);padding:0 6px;transition:color 0.2s;">➤</button>
+                <button id="btn-plus" title="Import / Export" aria-label="Files"
+                    style="background:none;border:none;cursor:pointer;font-size:1.3rem;color:var(--kelion-text-secondary);padding:0 4px;">+</button>
+            </div>
+        </div>
+    </div><!-- /#main-content -->
     </div><!-- /#app-layout -->
 
     <!-- GUEST TIMER BAR — removed (server-side limits apply) -->
