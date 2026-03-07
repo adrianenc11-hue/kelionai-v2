@@ -78,11 +78,11 @@ body {
     background: rgba(5, 5, 16, 0.5);
 }
 
-/* ── Avatar Area (top of left panel, fixed height) ── */
+/* ── Avatar Area (large, top of left panel) ── */
 #avatar-area {
-    flex: 0 0 380px;
+    flex: 7;
     position: relative;
-    min-height: 300px;
+    min-height: 0;
     background: radial-gradient(ellipse at center bottom, rgba(99, 102, 241, 0.04) 0%, transparent 70%);
     overflow: hidden;
 }
