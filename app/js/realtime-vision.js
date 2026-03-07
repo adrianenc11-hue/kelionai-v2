@@ -123,9 +123,8 @@ const RealtimeVision = (() => {
                 detail: { predictions, description: desc }
             }));
 
-            if (desc) {
-                speakIfNew(desc);
-            }
+            // Face tracking only — no voice announcements
+            // if (desc) speakIfNew(desc);
         } catch (e) {
             console.warn('[VISION] Detection error:', e.message);
         }
@@ -139,20 +138,19 @@ const RealtimeVision = (() => {
 
             const cameraOk = await initCamera();
             if (!cameraOk) {
-                speakIfNew('Camera access denied. Please allow camera access.');
+                console.warn('[VISION] Camera access denied');
                 return false;
             }
 
             const modelOk = await loadModel();
             if (!modelOk) {
-                speakIfNew('The detection model could not be loaded.');
+                console.warn('[VISION] Model could not be loaded');
                 return false;
             }
 
             isRunning = true;
             intervalId = setInterval(detect, intervalMs);
             console.log(`[VISION] ✅ Real-time detection started (${intervalMs}ms interval)`);
-            speakIfNew('Real-time vision is active.');
             return true;
         },
 

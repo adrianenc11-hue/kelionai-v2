@@ -113,6 +113,9 @@ app.use((req, res, next) => {
           "https://api.deepseek.com",
           "https://geocoding-api.open-meteo.com",
           "https://api.open-meteo.com",
+          "https://storage.googleapis.com",
+          "https://tfhub.dev",
+          "https://www.kaggle.com",
         ],
         frameSrc: [
           "'self'",
