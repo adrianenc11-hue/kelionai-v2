@@ -102,6 +102,57 @@ router.get("/privacy", (req, res) => {
   });
 });
 
+// ═══ COOKIE POLICY ═══
+router.get("/cookie-policy", (req, res) => {
+  res.json({
+    title: "Cookie Policy — KelionAI",
+    version: "1.0",
+    effectiveDate: "2026-03-01",
+    sections: [
+      {
+        title: "1. What Are Cookies",
+        content:
+          "Cookies are small text files placed on your device when you visit a website. They help us provide essential functionality, remember your preferences, and improve your experience.",
+      },
+      {
+        title: "2. Cookies We Use",
+        content:
+          "KelionAI uses only <strong>strictly necessary cookies</strong>: authentication session token (sb-access-token), language preference, theme preference (dark/light), and onboarding status. We do NOT use any advertising, tracking, or analytics cookies.",
+      },
+      {
+        title: "3. Essential Cookies",
+        content:
+          "<strong>sb-access-token</strong> — Supabase authentication session (expires on logout). <strong>kelion_lang</strong> — Your preferred language (persistent). <strong>kelion_theme</strong> — Dark/light mode preference (persistent). <strong>kelion_onboarded</strong> — Whether you completed onboarding (persistent).",
+      },
+      {
+        title: "4. Third-Party Cookies",
+        content:
+          "Stripe (payment processing) may place essential cookies during checkout. Google Fonts loads web fonts. No third-party tracking or advertising cookies are used.",
+      },
+      {
+        title: "5. Cookie Consent",
+        content:
+          "Since we only use strictly necessary cookies (exempt under GDPR Art. 5(3) and ePrivacy Directive), explicit consent is not required. You can still disable cookies in your browser settings, but this may affect functionality.",
+      },
+      {
+        title: "6. Managing Cookies",
+        content:
+          "You can delete or block cookies through your browser settings. Instructions: Chrome (Settings → Privacy → Cookies), Firefox (Options → Privacy), Safari (Preferences → Privacy). Disabling authentication cookies will require you to log in again.",
+      },
+      {
+        title: "7. Changes to This Policy",
+        content:
+          "We may update this Cookie Policy. Changes will be posted on this page with an updated effective date.",
+      },
+      {
+        title: "8. Contact",
+        content:
+          "Questions about cookies? Contact us at privacy@kelionai.app.",
+      },
+    ],
+  });
+});
+
 // ═══ GDPR: EXPORT ALL USER DATA ═══
 router.get("/gdpr/export", async (req, res) => {
   try {
