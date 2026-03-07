@@ -432,10 +432,59 @@ router.post("/refund", async (req, res) => {
     const { userId, reason } = req.body;
     if (!userId) return res.status(400).json({ error: "userId required" });
 
-    // Cancel subscription
-    const { error: subError } = await supabaseAdmin
+    // Get subscription details
+    const { data: sub } = await supabaseAdmin
       .from("subscriptions")
-      .update({ status: "refunded", cancelled_at: new Date().toISOString() })
+      .select("*")
+      .eq("user_id", userId)
+      .eq("status", "active")
+      .single();
+
+    if (!sub) return res.status(404).json({ error: "Nicio subscripție activă găsită." });
+
+    const maxRefundDays = parseInt(process.env.REFUND_MAX_DAYS || "15", 10);
+    const billingType = sub.billing_type || (sub.plan_interval === "year" ? "annual" : "monthly");
+    const subStartDate = new Date(sub.created_at);
+    const now = new Date();
+    const daysSinceStart = Math.floor((now - subStartDate) / 86400000);
+
+    let refundAmount = 0;
+    let message = "";
+
+    if (billingType === "monthly") {
+      // ── LUNAR: no refund, just cancel ──
+      refundAmount = 0;
+      message = "Abonament lunar anulat. Fără rambursare (conform politicii).";
+
+    } else {
+      // ── ANUAL: refund diferența lunilor rămase ──
+      if (daysSinceStart > maxRefundDays) {
+        return res.status(400).json({
+          error: "Perioada de refund a expirat! Maxim " + maxRefundDays + " zile de la activare. Au trecut " + daysSinceStart + " zile."
+        });
+      }
+
+      const totalAmount = parseFloat(sub.amount) || 0;
+      const monthlyRate = totalAmount / 12;
+      // Current month counts as used
+      const monthsUsed = Math.max(1, Math.ceil(daysSinceStart / 30));
+      const monthsRemaining = Math.max(0, 12 - monthsUsed);
+      refundAmount = parseFloat((monthsRemaining * monthlyRate).toFixed(2));
+
+      message = "Abonament anual oprit. Luni folosite: " + monthsUsed +
+        ". Luni rămase: " + monthsRemaining +
+        ". Refund: £" + refundAmount.toFixed(2) + " din £" + totalAmount.toFixed(2) + ".";
+    }
+
+    // Cancel subscription
+    await supabaseAdmin
+      .from("subscriptions")
+      .update({
+        status: "refunded",
+        cancelled_at: now.toISOString(),
+        refund_amount: refundAmount,
+        refund_reason: reason || "Admin refund",
+      })
       .eq("user_id", userId);
 
     // Update user plan to free
@@ -443,17 +492,33 @@ router.post("/refund", async (req, res) => {
       user_metadata: { plan: "free" },
     });
 
+    // Process Stripe refund if applicable
+    if (refundAmount > 0 && process.env.STRIPE_SECRET_KEY && sub.stripe_subscription_id) {
+      try {
+        const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+        await stripe.refunds.create({
+          payment_intent: sub.stripe_payment_intent,
+          amount: Math.round(refundAmount * 100), // pence
+          reason: "requested_by_customer",
+        });
+        message += " (Stripe refund procesat)";
+      } catch (stripeErr) {
+        message += " (Stripe refund EȘUAT: " + stripeErr.message + " — procesează manual)";
+        logger.error({ component: "Admin", err: stripeErr.message }, "Stripe refund failed");
+      }
+    }
+
     // Log refund
     await supabaseAdmin.from("admin_logs").insert({
       action: "refund",
       user_id: userId,
-      details: reason || "Admin refund",
+      details: JSON.stringify({ reason, billingType, daysSinceStart, refundAmount, message }),
       admin_id: req.adminUser?.id,
-      created_at: new Date().toISOString(),
-    }).catch(() => { }); // table might not exist
+      created_at: now.toISOString(),
+    }).catch(() => { });
 
-    logger.info({ component: "Admin", userId, reason }, "Refund processed");
-    res.json({ success: true, message: "Refund procesat! Abonament anulat, plan setat la Free." });
+    logger.info({ component: "Admin", userId, billingType, refundAmount }, "Refund processed");
+    res.json({ success: true, refundAmount, billingType, message });
   } catch (e) {
     logger.error({ component: "Admin", err: e.message }, "Refund failed");
     res.status(500).json({ error: e.message });
