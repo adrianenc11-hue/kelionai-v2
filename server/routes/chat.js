@@ -189,7 +189,29 @@ router.post("/chat", chatLimiter, validate(chatSchema), async (req, res) => {
     let reply = null,
       engine = null;
 
-    // Claude Sonnet 4 (PRIMARY — best Romanian, most intelligent)
+    // GPT-5.4 (PRIMARY — fast + intelligent)
+    if (!reply && process.env.OPENAI_API_KEY) {
+      try {
+        const r = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer " + process.env.OPENAI_API_KEY,
+          },
+          body: JSON.stringify({
+            model: MODELS.OPENAI_CHAT,
+            max_tokens: 4096,
+            messages: [{ role: "system", content: systemPrompt }, ...msgs],
+          }),
+        });
+        const d = await r.json();
+        reply = d.choices?.[0]?.message?.content;
+        if (reply) engine = "GPT-5.4";
+      } catch (e) {
+        logger.warn({ component: "Chat", err: e.message }, "GPT-5.4");
+      }
+    }
+    // Claude Sonnet 4 (fallback #1)
     if (!reply && process.env.ANTHROPIC_API_KEY) {
       try {
         const r = await fetch("https://api.anthropic.com/v1/messages", {
@@ -211,28 +233,6 @@ router.post("/chat", chatLimiter, validate(chatSchema), async (req, res) => {
         if (reply) engine = "Claude";
       } catch (e) {
         logger.warn({ component: "Chat", err: e.message }, "Claude");
-      }
-    }
-    // GPT-4o-mini (fallback #1 — fast, good Romanian)
-    if (!reply && process.env.OPENAI_API_KEY) {
-      try {
-        const r = await fetch("https://api.openai.com/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: "Bearer " + process.env.OPENAI_API_KEY,
-          },
-          body: JSON.stringify({
-            model: MODELS.OPENAI_CHAT,
-            max_tokens: 4096,
-            messages: [{ role: "system", content: systemPrompt }, ...msgs],
-          }),
-        });
-        const d = await r.json();
-        reply = d.choices?.[0]?.message?.content;
-        if (reply) engine = "GPT-4o-mini";
-      } catch (e) {
-        logger.warn({ component: "Chat", err: e.message }, "GPT-4o-mini");
       }
     }
     // Groq Llama 3.3 70B (fallback #2 — ultra-fast but less intelligent)
