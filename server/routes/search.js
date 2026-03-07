@@ -22,7 +22,7 @@ const searchLimiter = rateLimit({
 // POST /api/search — Perplexity Sonar → Tavily → Serper → DuckDuckGo
 router.post("/", searchLimiter, validate(searchSchema), async (req, res) => {
   try {
-    const { getUserFromToken, supabaseAdmin } = req.app.locals;
+    const { getUserFromToken, supabaseAdmin, brain } = req.app.locals;
     const { query } = req.body;
     if (!query) return res.status(400).json({ error: "Query is required" });
 
@@ -68,6 +68,7 @@ router.post("/", searchLimiter, validate(searchSchema), async (req, res) => {
               "incrementUsage failed",
             ),
           );
+          if (brain && user?.id) brain.saveMemory(user.id, "search", "User a căutat: " + query + " → " + answer.substring(0, 300), { engine: "Perplexity" }).catch(() => { });
           return res.json({ results, answer, engine: "Perplexity" });
         }
       } catch (e) {
@@ -108,13 +109,15 @@ router.post("/", searchLimiter, validate(searchSchema), async (req, res) => {
               "incrementUsage failed",
             ),
           );
+          const tavilyAnswer = td.answer || "";
+          if (brain && user?.id) brain.saveMemory(user.id, "search", "User a căutat: " + query + " → " + tavilyAnswer.substring(0, 300), { engine: "Tavily" }).catch(() => { });
           return res.json({
             results: (td.results || []).map((x) => ({
               title: x.title,
               content: x.content,
               url: x.url,
             })),
-            answer: td.answer || "",
+            answer: tavilyAnswer,
             engine: "Tavily",
           });
         }
@@ -157,6 +160,7 @@ router.post("/", searchLimiter, validate(searchSchema), async (req, res) => {
               "incrementUsage failed",
             ),
           );
+          if (brain && user?.id) brain.saveMemory(user.id, "search", "User a căutat: " + query + " → " + answer.substring(0, 300), { engine: "Serper" }).catch(() => { });
           return res.json({ results, answer, engine: "Serper" });
         }
       } catch (e) {
@@ -170,8 +174,8 @@ router.post("/", searchLimiter, validate(searchSchema), async (req, res) => {
     // 4. DuckDuckGo (free fallback)
     const r = await fetch(
       "https://api.duckduckgo.com/?q=" +
-        encodeURIComponent(query) +
-        "&format=json&no_html=1&skip_disambig=1",
+      encodeURIComponent(query) +
+      "&format=json&no_html=1&skip_disambig=1",
     );
     const d = await r.json();
     const results = [];
@@ -195,6 +199,7 @@ router.post("/", searchLimiter, validate(searchSchema), async (req, res) => {
         "incrementUsage failed",
       ),
     );
+    if (brain && user?.id) brain.saveMemory(user.id, "search", "User a căutat: " + query + " → " + (d.Abstract || "").substring(0, 300), { engine: "DuckDuckGo" }).catch(() => { });
     res.json({ results, answer: d.Abstract || "", engine: "DuckDuckGo" });
   } catch {
     res.status(500).json({ error: "Search error" });

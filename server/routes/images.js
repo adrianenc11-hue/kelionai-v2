@@ -21,7 +21,7 @@ const imageLimiter = rateLimit({
 // POST /api/imagine — Together FLUX image generation
 router.post("/", imageLimiter, validate(imagineSchema), async (req, res) => {
   try {
-    const { getUserFromToken, supabaseAdmin } = req.app.locals;
+    const { getUserFromToken, supabaseAdmin, brain } = req.app.locals;
     const { prompt } = req.body;
     if (!prompt || !process.env.TOGETHER_API_KEY)
       return res.status(503).json({ error: "Image generation unavailable" });
@@ -63,6 +63,10 @@ router.post("/", imageLimiter, validate(imagineSchema), async (req, res) => {
         "incrementUsage failed",
       ),
     );
+    // ═══ BRAIN INTEGRATION — save what we generated ═══
+    if (brain && user?.id) {
+      brain.saveMemory(user.id, "visual", "Am generat imagine: " + prompt.substring(0, 400), { engine: "FLUX" }).catch(() => { });
+    }
     res.json({ image: "data:image/png;base64," + b64, prompt, engine: "FLUX" });
   } catch {
     res.status(500).json({ error: "Image error" });

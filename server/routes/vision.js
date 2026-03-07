@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-// KelionAI — Vision Routes
+// KelionAI — Vision Routes (Brain-integrated)
 // ═══════════════════════════════════════════════════════════════
 "use strict";
 
@@ -19,10 +19,10 @@ const apiLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-// POST /api/vision — GPT-5.4 Vision (primary) + Claude (fallback)
+// POST /api/vision — GPT-5.4 Vision (primary) + Claude (fallback) — BRAIN-POWERED
 router.post("/", apiLimiter, validate(visionSchema), async (req, res) => {
   try {
-    const { getUserFromToken, supabaseAdmin } = req.app.locals;
+    const { getUserFromToken, supabaseAdmin, brain } = req.app.locals;
     const { image, avatar = "kelion", language = "ro" } = req.body;
     if (!image)
       return res.status(503).json({ error: "Vision unavailable" });
@@ -37,18 +37,24 @@ router.post("/", apiLimiter, validate(visionSchema), async (req, res) => {
         upgrade: true,
       });
 
+    // Brain-aware prompt — includes personality + avatar context
     const LANGS = { ro: "română", en: "English" };
-    const prompt = `You are the EYES of a person. Describe EXACTLY what you see with MAXIMUM PRECISION.
+    const avatarName = avatar === "kira" ? "Kira" : "Kelion";
+    const prompt = `You are ${avatarName}, an AI assistant with real personality.
+You are looking through the user's camera — these are YOUR EYES.
+Describe EXACTLY what you see with MAXIMUM PRECISION.
 People: age, gender, clothing (exact colors), expression, gestures, what they hold.
 Objects: each object, color, size, position.
 Text: read ANY visible text.
 Hazards: obstacles, steps → "CAUTION:"
+At the END of your response, add an emotion tag based on what you see:
+[EMOTION:happy] if pleasant scene, [EMOTION:curious] if interesting, [EMOTION:concerned] if hazards, [EMOTION:surprised] if unexpected.
 Answer in ${LANGS[language] || "English"}, concise but detailed.`;
 
     let description = null;
     let engine = null;
 
-    // PRIMARY: GPT-5.4 Vision (most advanced, best for accessibility)
+    // PRIMARY: GPT-5.4 Vision
     if (process.env.OPENAI_API_KEY) {
       try {
         const r = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -121,16 +127,38 @@ Answer in ${LANGS[language] || "English"}, concise but detailed.`;
       }
     }
 
+    // ═══ BRAIN INTEGRATION — save visual memory + parse emotion ═══
+    let emotion = "neutral";
+    if (description) {
+      // Parse emotion tag from vision response
+      const emotionMatch = description.match(/\[EMOTION:(\w+)\]/i);
+      if (emotionMatch) {
+        emotion = emotionMatch[1].toLowerCase();
+        description = description.replace(/\[EMOTION:\w+\]/gi, "").trim();
+      }
+
+      // Save to brain memory so brain remembers what it saw
+      if (brain && user?.id) {
+        brain.saveMemory(user.id, "visual", "Am văzut: " + description.substring(0, 500), {
+          avatar, language, engine, emotion,
+        }).catch((e) => logger.warn({ component: "Vision", err: e.message }, "brain.saveMemory failed"));
+      }
+    }
+
     incrementUsage(user?.id, "vision", supabaseAdmin).catch((e) =>
       logger.warn(
         { component: "Vision", err: e.message },
         "incrementUsage failed",
       ),
     );
+
+    logger.info({ component: "Vision", engine, emotion, userId: user?.id }, "Vision analysis complete");
+
     res.json({
       description: description || "Could not analyze.",
       avatar,
       engine: engine || "none",
+      emotion,
     });
   } catch (e) {
     logger.error({ component: "Vision", err: e.message }, "Vision error");
