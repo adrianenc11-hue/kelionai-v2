@@ -163,6 +163,27 @@
 
     var speakSafetyTimer = null;
     var _speakId = 0; // atomic counter — prevents race condition overlap
+    var CHUNK_MAX = 450; // max chars per TTS chunk — ElevenLabs truncates at ~5000
+
+    // Split text into sentence chunks of ~CHUNK_MAX chars
+    function _chunkText(text) {
+        if (text.length <= CHUNK_MAX) return [text];
+        var chunks = [];
+        // Split on sentence boundaries
+        var sentences = text.split(/(?<=[.!?])\s+/);
+        var current = '';
+        for (var i = 0; i < sentences.length; i++) {
+            if (current.length + sentences[i].length > CHUNK_MAX && current.length > 0) {
+                chunks.push(current.trim());
+                current = sentences[i];
+            } else {
+                current += (current ? ' ' : '') + sentences[i];
+            }
+        }
+        if (current.trim()) chunks.push(current.trim());
+        return chunks.length ? chunks : [text.substring(0, CHUNK_MAX)];
+    }
+
     async function speak(text, avatar) {
         if (isSpeaking) stopSpeaking();
         if (!text || !text.trim()) return;
@@ -171,51 +192,87 @@
         if (speakSafetyTimer) clearTimeout(speakSafetyTimer);
         speakSafetyTimer = setTimeout(function () {
             if (isSpeaking) { console.warn('[Voice] Safety timeout'); stopSpeaking(); }
-        }, 30000);
+        }, 60000); // increased from 30s for multi-chunk
 
         try {
             const ttsText = cleanTextForTTS(text);
             if (!ttsText) { isSpeaking = false; resumeWakeDetection(); return; }
-            console.log('[Voice] Fetching TTS for:', ttsText.substring(0, 50) + '...');
-            const resp = await fetch(API_BASE + '/api/speak', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', ...(window.KAuth ? KAuth.getAuthHeaders() : {}) },
-                body: JSON.stringify({ text: ttsText, avatar: avatar || KAvatar.getCurrentAvatar(), language: detectedLanguage })
-            });
 
-            // If a newer speak() was called during our fetch, abort
-            if (thisId !== _speakId) {
-                console.log('[Voice] Stale TTS response (id ' + thisId + ' vs ' + _speakId + '), discarding');
-                return;
-            }
-
-            if (!resp.ok) {
-                console.warn('[Voice] TTS failed:', resp.status);
-                isSpeaking = false; resumeWakeDetection(); return;
-            }
-
-            const arrayBuf = await resp.arrayBuffer();
-            // Check again after arrayBuffer read
-            if (thisId !== _speakId) {
-                console.log('[Voice] Stale TTS buffer, discarding');
-                return;
-            }
-            console.log('[Voice] TTS received:', arrayBuf.byteLength, 'bytes');
-
-            // FORCE AudioContext running — try shared first, create new if needed
+            // FORCE AudioContext running before fetching
             var ctx = getAudioContext();
             try { await ctx.resume(); } catch (e) { }
             if (ctx.state !== 'running') {
-                console.warn('[Voice] Shared AudioContext stuck, creating new one');
                 sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
                 ctx = sharedAudioCtx;
                 try { await ctx.resume(); } catch (e) { }
             }
-            console.log('[Voice] AudioContext state:', ctx.state);
 
+            // Chunk the text and play each chunk sequentially
+            var chunks = _chunkText(ttsText);
+            console.log('[Voice] TTS chunked into', chunks.length, 'parts');
             showSubtitle(ttsText);
-            await playAudioBuffer(arrayBuf, ttsText);
+
+            for (var ci = 0; ci < chunks.length; ci++) {
+                if (thisId !== _speakId) { console.log('[Voice] Stale, aborting chunk', ci); return; }
+
+                console.log('[Voice] Fetching chunk', ci + 1, '/', chunks.length, ':', chunks[ci].substring(0, 40) + '...');
+                var resp = await fetch(API_BASE + '/api/speak', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', ...(window.KAuth ? KAuth.getAuthHeaders() : {}) },
+                    body: JSON.stringify({ text: chunks[ci], avatar: avatar || KAvatar.getCurrentAvatar(), language: detectedLanguage })
+                });
+
+                if (thisId !== _speakId) return;
+                if (!resp.ok) { console.warn('[Voice] TTS chunk', ci, 'failed:', resp.status); continue; }
+
+                var arrayBuf = await resp.arrayBuffer();
+                if (thisId !== _speakId) return;
+                console.log('[Voice] Chunk', ci + 1, 'received:', arrayBuf.byteLength, 'bytes');
+
+                // Play this chunk and wait for it to finish before next
+                await new Promise(function (resolve) {
+                    playAudioChunk(arrayBuf, chunks[ci], ci === chunks.length - 1, resolve);
+                });
+            }
         } catch (e) { console.error('[Voice]', e); stopAllLipSync(); hideSubtitle(); isSpeaking = false; resumeWakeDetection(); }
+    }
+
+    // Play a single audio chunk — calls onDone when finished
+    function playAudioChunk(arrayBuf, chunkText, isLast, onDone) {
+        var ctx = getAudioContext();
+        ctx.decodeAudioData(arrayBuf.slice(0), function (audioBuf) {
+            currentSourceNode = ctx.createBufferSource();
+            currentSourceNode.buffer = audioBuf;
+
+            var ls = KAvatar.getLipSync();
+            var fftOk = false;
+            if (ls && ls.connectToContext) {
+                try {
+                    var an = ls.connectToContext(ctx);
+                    if (an) { currentSourceNode.connect(an); an.connect(ctx.destination); fftOk = true; ls.start(); }
+                } catch (e) { }
+            }
+            if (!fftOk) { currentSourceNode.connect(ctx.destination); fallbackTextLipSync(chunkText); }
+
+            KAvatar.setExpression('happy', 0.3);
+            KAvatar.setPresenting(true);
+
+            currentSourceNode.onended = function () {
+                if (isLast) {
+                    stopAllLipSync(); hideSubtitle(); isSpeaking = false;
+                    currentSourceNode = null;
+                    KAvatar.setExpression('neutral'); KAvatar.setPresenting(false);
+                    resumeWakeDetection();
+                }
+                onDone();
+            };
+            currentSourceNode.start(0);
+            console.log('[Voice] ✅ Chunk playing (' + arrayBuf.byteLength + 'B, ' + Math.round(audioBuf.duration) + 's)');
+        }, function (err) {
+            console.warn('[Voice] Chunk decode failed');
+            if (isLast) { stopAllLipSync(); hideSubtitle(); isSpeaking = false; KAvatar.setExpression('neutral'); KAvatar.setPresenting(false); resumeWakeDetection(); }
+            onDone();
+        });
     }
 
     async function playAudioBuffer(arrayBuf, fallbackText) {
