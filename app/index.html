@@ -447,6 +447,21 @@
                         <small data-i18n="monitor.default.hint">Say "what's ahead" or "show me a map"</small>
                     </div>
                 </div>
+                <!-- Live subtitle bar -->
+                <div id="live-subtitle" style="
+                        position:absolute; bottom:0; left:0; right:0;
+                        background:rgba(0,0,0,0.75);
+                        color:#fff; font-size:0.95rem;
+                        padding:10px 20px;
+                        white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+                        z-index:10; backdrop-filter:blur(8px);
+                        border-top:1px solid rgba(255,255,255,0.08);
+                        font-family:'Inter',system-ui,sans-serif;
+                        display:none;
+                    ">
+                    <span id="subtitle-speaker" style="color:#00ffff;font-weight:600;margin-right:8px;"></span>
+                    <span id="subtitle-text"></span>
+                </div>
                 <!-- Thinking indicator -->
                 <div id="thinking" style="display:none;padding:8px 16px;">
                     <div class="thinking-dots"><span></span><span></span><span></span></div>
@@ -557,7 +572,7 @@
     <script src="/js/ticker.js"></script>
     <script src="/js/geolocation.js"></script>
     <script src="/js/voice-stream-client.js"></script>
-    <script src="/js/app.js"></script>
+    <script src="/js/app.js?v=20260307b"></script>
     <script src="/js/navbar.js"></script>
     <script src="/js/referral-ui.js"></script>
 
