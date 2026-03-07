@@ -82,8 +82,8 @@
         renderer.setSize(w, h);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
-        camera = new THREE.PerspectiveCamera(35, w / h, 0.1, 100);
-        camera.position.set(0, 0.1, 1.8);
+        camera = new THREE.PerspectiveCamera(30, w / h, 0.1, 100);
+        camera.position.set(0, 0.55, 1.2);
         renderer.outputColorSpace = THREE.SRGBColorSpace;
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
         renderer.toneMappingExposure = 1.2;
@@ -152,7 +152,10 @@
 
                 currentModel.position.sub(center);
                 const maxDim = Math.max(size.x, size.y, size.z);
-                if (maxDim > 0) currentModel.scale.setScalar(0.5 / maxDim);
+                if (maxDim > 0) currentModel.scale.setScalar(2.0 / maxDim);
+
+                // Offset model DOWN for bust framing (show chest-up, TV presenter style)
+                currentModel.position.y -= size.y * 0.35 * (2.0 / maxDim);
 
                 currentModel.traverse((child) => {
                     if (child.isMesh) {
