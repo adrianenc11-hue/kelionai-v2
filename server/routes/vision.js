@@ -8,6 +8,7 @@ const rateLimit = require("express-rate-limit");
 const logger = require("../logger");
 const { validate, visionSchema } = require("../validation");
 const { checkUsage, incrementUsage } = require("../payments");
+const { MODELS } = require("../config/models");
 
 const router = express.Router();
 
@@ -64,7 +65,7 @@ Answer in ${LANGS[language] || "English"}, concise but detailed.`;
             Authorization: "Bearer " + process.env.OPENAI_API_KEY,
           },
           body: JSON.stringify({
-            model: "gpt-5.4",
+            model: MODELS.OPENAI_VISION,
             max_tokens: 1024,
             messages: [
               {
@@ -99,7 +100,7 @@ Answer in ${LANGS[language] || "English"}, concise but detailed.`;
             "anthropic-version": "2023-06-01",
           },
           body: JSON.stringify({
-            model: "claude-sonnet-4-20250514",
+            model: MODELS.ANTHROPIC_CHAT,
             max_tokens: 1024,
             messages: [
               {

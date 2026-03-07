@@ -10,6 +10,7 @@ const logger = require("../logger");
 const { getVoiceId } = require("../config/voices");
 const { validate, speakSchema, listenSchema } = require("../validation");
 const { checkUsage, incrementUsage } = require("../payments");
+const { MODELS, VOICE_EMOTIONS } = require("../config/models");
 
 const router = express.Router();
 
@@ -47,16 +48,7 @@ router.post("/speak", ttsLimiter, validate(speakSchema), async (req, res) => {
         upgrade: true,
       });
 
-    const voiceSettings = {
-      happy: { stability: 0.4, similarity_boost: 0.8, style: 0.7 },
-      sad: { stability: 0.7, similarity_boost: 0.9, style: 0.3 },
-      laughing: { stability: 0.3, similarity_boost: 0.7, style: 0.9 },
-      thinking: { stability: 0.6, similarity_boost: 0.8, style: 0.4 },
-      excited: { stability: 0.3, similarity_boost: 0.8, style: 0.8 },
-      concerned: { stability: 0.7, similarity_boost: 0.9, style: 0.4 },
-      neutral: { stability: 0.5, similarity_boost: 0.75, style: 0.5 },
-    };
-    const selectedVoiceSettings = voiceSettings[mood] || voiceSettings.neutral;
+    const selectedVoiceSettings = VOICE_EMOTIONS[mood] || VOICE_EMOTIONS.neutral;
 
     // Check if user has a cloned voice — overrides default
     let vid = null;
@@ -101,7 +93,7 @@ router.post("/speak", ttsLimiter, validate(speakSchema), async (req, res) => {
             },
             body: JSON.stringify({
               text,
-              model_id: "eleven_multilingual_v2",
+              model_id: MODELS.ELEVENLABS_MODEL,
               voice_settings: selectedVoiceSettings,
             }),
           },
@@ -198,7 +190,7 @@ router.post("/listen", apiLimiter, validate(listenSchema), async (req, res) => {
         filename: "a.webm",
         contentType: "audio/webm",
       });
-      form.append("model", "whisper-large-v3");
+      form.append("model", MODELS.WHISPER);
       const r = await fetch(
         "https://api.groq.com/openai/v1/audio/transcriptions",
         {

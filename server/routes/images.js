@@ -7,6 +7,7 @@ const express = require("express");
 const rateLimit = require("express-rate-limit");
 const { validate, imagineSchema } = require("../validation");
 const { checkUsage, incrementUsage } = require("../payments");
+const { MODELS } = require("../config/models");
 
 const router = express.Router();
 
@@ -43,7 +44,7 @@ router.post("/", imageLimiter, validate(imagineSchema), async (req, res) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "black-forest-labs/FLUX.1-schnell",
+        model: MODELS.FLUX,
         prompt,
         width: 1024,
         height: 1024,

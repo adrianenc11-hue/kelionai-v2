@@ -8,6 +8,7 @@ const rateLimit = require("express-rate-limit");
 const logger = require("../logger");
 const { validate, searchSchema } = require("../validation");
 const { checkUsage, incrementUsage } = require("../payments");
+const { MODELS } = require("../config/models");
 
 const router = express.Router();
 
@@ -46,7 +47,7 @@ router.post("/", searchLimiter, validate(searchSchema), async (req, res) => {
             Authorization: "Bearer " + process.env.PERPLEXITY_API_KEY,
           },
           body: JSON.stringify({
-            model: "sonar",
+            model: MODELS.PERPLEXITY,
             messages: [{ role: "user", content: query }],
             max_tokens: 500,
           }),

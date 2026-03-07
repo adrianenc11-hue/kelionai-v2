@@ -7,6 +7,7 @@
 const WebSocket = require("ws");
 const logger = require("../logger");
 const { getVoiceId } = require("../config/voices");
+const { MODELS, PERSONAS } = require("../config/models");
 
 // ─── Deepgram STT (WebSocket Streaming) ───
 function createDeepgramSTT(onTranscript, language = "ro") {
@@ -55,16 +56,31 @@ function createDeepgramSTT(onTranscript, language = "ro") {
 }
 
 // ─── Groq LLM (Streaming Tokens) ───
-async function* streamGroqChat(messages, avatar = "kelion", language = "ro") {
+async function* streamGroqChat(messages, avatar = "kelion", language = "ro", brain = null, userId = null) {
     const key = process.env.GROQ_API_KEY;
     if (!key) throw new Error("GROQ_API_KEY not set");
 
-    const persona =
-        avatar === "kira"
-            ? "You are Kira, a creative and empathetic AI assistant. Respond naturally and warmly."
-            : "You are Kelion, a smart and professional AI assistant created by Adrian. Respond clearly and helpfully.";
+    const persona = PERSONAS[avatar] || PERSONAS.kelion;
 
-    const systemMsg = `${persona} Respond in ${language === "ro" ? "Romanian" : "English"}. Keep responses concise for voice conversation (2-3 sentences max). Do NOT use markdown, bullets, or special formatting — this is spoken aloud.`;
+    // Build memory context from brain if available
+    let memoryContext = "";
+    if (brain && userId) {
+        try {
+            const [memories, visualMem, audioMem, facts] = await Promise.all([
+                brain.loadMemory(userId, "text", 5),
+                brain.loadMemory(userId, "visual", 3),
+                brain.loadMemory(userId, "audio", 3),
+                brain.loadFacts(userId, 10),
+            ]);
+            memoryContext = brain.buildMemoryContext(memories, visualMem, audioMem, facts);
+        } catch (e) {
+            logger.warn({ component: "VoiceStream", err: e.message }, "Memory load failed");
+        }
+    }
+
+    const systemMsg = `${persona} Respond in ${language === "ro" ? "Romanian" : "English"}. Keep responses concise for voice conversation (2-3 sentences max). Do NOT use markdown, bullets, or special formatting — this is spoken aloud.
+At the END of your response, add [EMOTION:xxx] tag (happy/sad/thinking/curious/concerned/laughing/surprised/neutral).
+${memoryContext}`;
 
     const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
@@ -73,7 +89,7 @@ async function* streamGroqChat(messages, avatar = "kelion", language = "ro") {
             Authorization: `Bearer ${key}`,
         },
         body: JSON.stringify({
-            model: "llama-3.3-70b-versatile",
+            model: MODELS.GROQ_PRIMARY,
             messages: [{ role: "system", content: systemMsg }, ...messages],
             stream: true,
             temperature: 0.7,
@@ -83,14 +99,10 @@ async function* streamGroqChat(messages, avatar = "kelion", language = "ro") {
 
     if (!r.ok) throw new Error(`Groq ${r.status}: ${await r.text()}`);
 
-    const reader = r.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
 
-    while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
+    for await (const value of r.body) {
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split("\n");
         buffer = lines.pop() || "";
@@ -238,6 +250,7 @@ function createElevenLabsTTS(onAudio, voiceId) {
 // ═══════════════════════════════════════════════════════════════
 function setupVoiceStream(server, appLocals) {
     const wss = new WebSocket.Server({ noServer: true });
+    const brain = appLocals?.brain || null;
 
     // Handle upgrade requests for /api/voice-stream
     server.on("upgrade", (request, socket, head) => {
@@ -332,7 +345,9 @@ function setupVoiceStream(server, appLocals) {
                 for await (const token of streamGroqChat(
                     conversationHistory,
                     avatar,
-                    language
+                    language,
+                    brain,
+                    null  // userId — TODO: extract from WebSocket auth
                 )) {
                     fullReply += token;
                     sentenceBuffer += token;
@@ -358,18 +373,47 @@ function setupVoiceStream(server, appLocals) {
 
                 conversationHistory.push({ role: "assistant", content: fullReply });
 
+                // ═══ BRAIN INTEGRATION — parse emotion/gesture + save memory ═══
+                let emotion = "neutral";
+                let gestures = [];
+                const emotionMatch = fullReply.match(/\[EMOTION:(\w+)\]/i);
+                if (emotionMatch) {
+                    emotion = emotionMatch[1].toLowerCase();
+                    fullReply = fullReply.replace(/\[EMOTION:\w+\]/gi, "").trim();
+                }
+                const gestureMatches = fullReply.matchAll(/\[GESTURE:(\w+)\]/gi);
+                for (const gm of gestureMatches) gestures.push(gm[1].toLowerCase());
+                fullReply = fullReply.replace(/\[GESTURE:\w+\]/gi, "").trim();
+
+                // Send emotion + gestures to client
+                if (emotion !== "neutral") {
+                    clientWs.send(JSON.stringify({ type: "emotion", emotion }));
+                }
+                for (const g of gestures) {
+                    clientWs.send(JSON.stringify({ type: "gesture", gesture: g }));
+                }
+
+                // Save conversation to brain memory
+                if (brain) {
+                    brain.saveMemory(null, "audio", "Voice: " + userText.substring(0, 200) + " | Reply: " + fullReply.substring(0, 300), {
+                        avatar, language, emotion,
+                    }).catch(() => { });
+                }
+
                 const totalTime = Date.now() - llmStart;
                 clientWs.send(
                     JSON.stringify({
                         type: "turn_complete",
                         reply: fullReply,
+                        emotion,
+                        gestures,
                         totalTime,
                     })
                 );
 
                 logger.info(
-                    { component: "VoiceStream", totalTime, replyLen: fullReply.length },
-                    `Voice turn: ${totalTime}ms | ${fullReply.length}c`
+                    { component: "VoiceStream", totalTime, replyLen: fullReply.length, emotion },
+                    `Voice turn: ${totalTime}ms | ${fullReply.length}c | ${emotion}`
                 );
             } catch (e) {
                 logger.error({ component: "VoiceStream", err: e.message }, "Pipeline error");
