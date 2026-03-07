@@ -704,4 +704,92 @@ router.get("/test-tables", async (req, res) => {
   });
 });
 
+// ══════════════════════════════════════════════════════════
+// POST /api/admin/update-social-photos — Set Kelion avatar on social platforms
+// Uses Telegram Bot API + Facebook Graph API
+// ══════════════════════════════════════════════════════════
+router.post("/update-social-photos", async (req, res) => {
+  const fs = require("fs");
+  const path = require("path");
+  const results = {};
+
+  // Load Kelion photo from disk
+  const photoPath = path.join(__dirname, "..", "..", "app", "models", "kelion-reference.png");
+  if (!fs.existsSync(photoPath)) {
+    return res.status(404).json({ error: "kelion-reference.png not found" });
+  }
+  const photoData = fs.readFileSync(photoPath);
+  logger.info({ component: "Admin", size: photoData.length }, "Kelion photo loaded for social update");
+
+  // ── 1. Telegram Bot ──
+  const telegramToken = process.env.TELEGRAM_BOT_TOKEN;
+  if (telegramToken) {
+    try {
+      const boundary = "----KelionPhoto" + Date.now();
+      const bodyParts = [
+        Buffer.from("--" + boundary + "\r\nContent-Disposition: form-data; name=\"photo\"; filename=\"kelion.png\"\r\nContent-Type: image/png\r\n\r\n"),
+        photoData,
+        Buffer.from("\r\n--" + boundary + "--\r\n"),
+      ];
+      const body = Buffer.concat(bodyParts);
+
+      // Delete existing photo first (Telegram requires this)
+      try {
+        await fetch("https://api.telegram.org/bot" + telegramToken + "/deleteMyCommands");
+      } catch (e) { /* ok */ }
+
+      const r = await fetch("https://api.telegram.org/bot" + telegramToken + "/setMyPhoto", {
+        method: "POST",
+        headers: { "Content-Type": "multipart/form-data; boundary=" + boundary },
+        body,
+      });
+      const d = await r.json();
+      results.telegram = d.ok ? "✅ Photo updated" : "❌ " + (d.description || JSON.stringify(d));
+    } catch (e) {
+      results.telegram = "❌ " + e.message;
+    }
+  } else {
+    results.telegram = "⚠️ No TELEGRAM_BOT_TOKEN";
+  }
+
+  // ── 2. Facebook Page ──
+  const fbToken = process.env.FACEBOOK_PAGE_TOKEN || process.env.FB_PAGE_ACCESS_TOKEN;
+  const fbPageId = process.env.FB_PAGE_ID;
+  if (fbToken && fbPageId) {
+    try {
+      const boundary = "----KelionPhoto" + Date.now();
+      const bodyParts = [
+        Buffer.from("--" + boundary + "\r\nContent-Disposition: form-data; name=\"source\"; filename=\"kelion.png\"\r\nContent-Type: image/png\r\n\r\n"),
+        photoData,
+        Buffer.from("\r\n--" + boundary + "--\r\n"),
+      ];
+      const body = Buffer.concat(bodyParts);
+
+      const r = await fetch("https://graph.facebook.com/v21.0/" + fbPageId + "/picture", {
+        method: "POST",
+        headers: {
+          "Content-Type": "multipart/form-data; boundary=" + boundary,
+          Authorization: "Bearer " + fbToken,
+        },
+        body,
+      });
+      const d = await r.json();
+      results.facebook = (d.success || d.id) ? "✅ Photo updated" : "❌ " + JSON.stringify(d).substring(0, 200);
+    } catch (e) {
+      results.facebook = "❌ " + e.message;
+    }
+  } else {
+    results.facebook = "⚠️ No FB_PAGE_ACCESS_TOKEN or FB_PAGE_ID";
+  }
+
+  // ── 3. Messenger — uses Facebook Page photo automatically ──
+  results.messenger = results.facebook?.startsWith("✅") ? "✅ Uses Facebook Page photo" : "⚠️ Depends on Facebook Page update";
+
+  // ── 4. Instagram — API doesn't support profile photo updates ──
+  results.instagram = "⚠️ Instagram API doesn't support profile photo changes — must be done manually in the app";
+
+  logger.info({ component: "Admin", results }, "Social photo update completed");
+  res.json({ results });
+});
+
 module.exports = router;

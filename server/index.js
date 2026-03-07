@@ -607,33 +607,70 @@ app.get("/api/media/instagram/detect-account", async (req, res) => {
   const token = process.env.FB_PAGE_ACCESS_TOKEN;
   if (!token) return res.status(400).json({ error: "No FB_PAGE_ACCESS_TOKEN set" });
   try {
-    // Step 1: Get pages linked to this token
-    const pagesRes = await fetch(`https://graph.facebook.com/v21.0/me/accounts?access_token=${token}`);
-    const pagesData = await pagesRes.json();
-    if (pagesData.error) return res.json({ error: pagesData.error.message, step: "get_pages" });
+    const results = {};
 
-    const results = [];
-    for (const page of (pagesData.data || [])) {
-      // Step 2: Get Instagram Business Account for each page
-      const igRes = await fetch(
-        `https://graph.facebook.com/v21.0/${page.id}?fields=instagram_business_account,name&access_token=${token}`
-      );
-      const igData = await igRes.json();
-      results.push({
-        pageId: page.id,
-        pageName: page.name || igData.name,
-        instagramBusinessAccountId: igData.instagram_business_account?.id || null,
+    // Method 1: Direct /me with Page Token → gets page info + IG account
+    const meRes = await fetch(
+      `https://graph.facebook.com/v21.0/me?fields=id,name,instagram_business_account&access_token=${token}`
+    );
+    const meData = await meRes.json();
+    results.method1_me = meData;
+
+    if (meData.instagram_business_account?.id) {
+      return res.json({
+        found: true,
+        instagramAccountId: meData.instagram_business_account.id,
+        pageName: meData.name,
+        pageId: meData.id,
+        instruction: `Set INSTAGRAM_ACCOUNT_ID=${meData.instagram_business_account.id} in Railway env vars`,
       });
     }
 
-    const found = results.find(r => r.instagramBusinessAccountId);
+    // Method 2: Try with explicit FB_PAGE_ID if set
+    const pageId = process.env.FB_PAGE_ID;
+    if (pageId) {
+      const pgRes = await fetch(
+        `https://graph.facebook.com/v21.0/${pageId}?fields=instagram_business_account,name&access_token=${token}`
+      );
+      const pgData = await pgRes.json();
+      results.method2_pageId = pgData;
+
+      if (pgData.instagram_business_account?.id) {
+        return res.json({
+          found: true,
+          instagramAccountId: pgData.instagram_business_account.id,
+          pageName: pgData.name,
+          pageId: pageId,
+          instruction: `Set INSTAGRAM_ACCOUNT_ID=${pgData.instagram_business_account.id} in Railway env vars`,
+        });
+      }
+    }
+
+    // Method 3: List accounts (works with User Token only)
+    const acctRes = await fetch(
+      `https://graph.facebook.com/v21.0/me/accounts?fields=id,name,instagram_business_account&access_token=${token}`
+    );
+    const acctData = await acctRes.json();
+    results.method3_accounts = acctData.error ? { error: acctData.error.message } : acctData;
+
+    if (acctData.data) {
+      for (const page of acctData.data) {
+        if (page.instagram_business_account?.id) {
+          return res.json({
+            found: true,
+            instagramAccountId: page.instagram_business_account.id,
+            pageName: page.name,
+            pageId: page.id,
+            instruction: `Set INSTAGRAM_ACCOUNT_ID=${page.instagram_business_account.id} in Railway env vars`,
+          });
+        }
+      }
+    }
+
     res.json({
-      found: !!found,
-      instagramAccountId: found?.instagramBusinessAccountId || null,
-      instruction: found
-        ? `Set INSTAGRAM_ACCOUNT_ID=${found.instagramBusinessAccountId} in Railway env vars`
-        : "No Instagram Business Account linked to any FB pages under this token",
-      pages: results,
+      found: false,
+      instruction: "Could not auto-detect. Check that your FB Page is connected to an Instagram Business Account in Meta Business Suite.",
+      debug: results,
     });
   } catch (e) {
     res.status(500).json({ error: e.message });
