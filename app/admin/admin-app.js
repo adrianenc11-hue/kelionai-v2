@@ -8,7 +8,23 @@ var adminSecret = sessionStorage.getItem('kelion_admin_secret') || '';
 function hdrs() {
     var h = { 'Content-Type': 'application/json' };
     if (adminSecret) h['x-admin-secret'] = adminSecret;
-    try { var t = localStorage.getItem('sb-access-token'); if (t) h['Authorization'] = 'Bearer ' + t; } catch (e) { }
+    try {
+        // Try all known Supabase token storage keys
+        var keys = Object.keys(localStorage).filter(function (k) { return k.startsWith('sb-') && k.endsWith('-auth-token'); });
+        var t = null;
+        for (var i = 0; i < keys.length; i++) {
+            try {
+                var raw = localStorage.getItem(keys[i]);
+                if (raw) {
+                    var parsed = JSON.parse(raw);
+                    if (parsed && parsed.access_token) { t = parsed.access_token; break; }
+                }
+            } catch (e2) { }
+        }
+        // Fallback: direct token
+        if (!t) t = localStorage.getItem('sb-access-token');
+        if (t) h['Authorization'] = 'Bearer ' + t;
+    } catch (e) { }
     return h;
 }
 function esc(s) { var d = document.createElement('div'); d.textContent = s || '—'; return d.innerHTML; }
