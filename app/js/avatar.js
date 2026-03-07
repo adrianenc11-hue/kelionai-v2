@@ -591,9 +591,9 @@
     // Arms-down quaternions (calculated: rotate ~70° more downward from A-pose)
     var ARM_POSES = {
         relaxed: {
-            // Shoulders rotated so arms point straight down
-            ls: [0.6963, 0.1228, -0.6963, 0.1228],
-            rs: [0.6963, -0.1228, 0.6963, 0.1228],
+            // Shoulders natural — arms down but shoulders not drooping
+            ls: [0.6427, 0.3015, -0.6427, 0.2860],
+            rs: [0.6427, -0.3015, 0.6427, 0.2860],
             // Upper arms with slight natural bend
             la: [0.0, 0.0, 0.0, 1.0],
             ra: [0.0, 0.0, 0.0, 1.0]
