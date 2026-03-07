@@ -127,28 +127,30 @@
         }
 
         // Map frequency bands to visemes
+        // Support BOTH Oculus (viseme_XX) AND MetaPerson (XX) naming
         var visemes = {
             // Jaw open — driven by low freq (vowels)
             'jawOpen': low * 0.7,
             'mouthOpen': low * 0.5,
 
-            // Vowels — driven by low + mid
-            'viseme_aa': low * 0.8,                    // "A" — wide open
-            'viseme_O': low * 0.6 * (1 - mid * 0.5),  // "O" — rounded
-            'viseme_E': mid * 0.7 * (1 - low * 0.3),  // "E" — spread
-            'viseme_I': mid * 0.5 * (1 - low * 0.5),  // "I" — narrow
-            'viseme_U': low * 0.4 * mid * 0.3,        // "U" — pursed
+            // Vowels — driven by low + mid (both naming conventions)
+            'viseme_aa': low * 0.8, 'aa': low * 0.8,              // "A" — wide open
+            'viseme_O': low * 0.6 * (1 - mid * 0.5), 'oh': low * 0.6 * (1 - mid * 0.5),  // "O"
+            'viseme_E': mid * 0.7 * (1 - low * 0.3), 'E': mid * 0.7 * (1 - low * 0.3),  // "E"
+            'viseme_I': mid * 0.5 * (1 - low * 0.5), 'ih': mid * 0.5 * (1 - low * 0.5),  // "I"
+            'viseme_U': low * 0.4 * mid * 0.3, 'ou': low * 0.4 * mid * 0.3,              // "U"
 
-            // Consonants — driven by mid + hi
-            'viseme_PP': mid > 0.4 ? (1 - low) * 0.3 : 0,  // "P/B/M" — lips closed
-            'viseme_FF': hi * 0.5,                           // "F/V" — teeth on lip
-            'viseme_TH': hi * 0.3 * mid * 0.3,              // "TH" — tongue
-            'viseme_DD': mid * 0.4 * low * 0.3,             // "D/T" — tongue tap
-            'viseme_kk': mid * 0.3 * (1 - hi * 0.5),        // "K/G" — back tongue
-            'viseme_CH': hi * 0.6,                           // "CH/SH" — sibilant
-            'viseme_SS': hi * 0.7,                           // "S/Z" — hiss
-            'viseme_nn': mid * 0.3,                          // "N" — nasal
-            'viseme_RR': mid * 0.5 * low * 0.4,             // "R" — retroflex
+            // Consonants — driven by mid + hi (both naming conventions)
+            'viseme_PP': mid > 0.4 ? (1 - low) * 0.3 : 0, 'PP': mid > 0.4 ? (1 - low) * 0.3 : 0,
+            'viseme_FF': hi * 0.5, 'FF': hi * 0.5,
+            'viseme_TH': hi * 0.3 * mid * 0.3, 'TH': hi * 0.3 * mid * 0.3,
+            'viseme_DD': mid * 0.4 * low * 0.3, 'DD': mid * 0.4 * low * 0.3,
+            'viseme_kk': mid * 0.3 * (1 - hi * 0.5), 'kk': mid * 0.3 * (1 - hi * 0.5),
+            'viseme_CH': hi * 0.6, 'CH': hi * 0.6,
+            'viseme_SS': hi * 0.7, 'SS': hi * 0.7,
+            'viseme_nn': mid * 0.3, 'nn': mid * 0.3,
+            'viseme_RR': mid * 0.5 * low * 0.4, 'RR': mid * 0.5 * low * 0.4,
+            'viseme_sil': 0, 'sil': 0,
 
             // Supplementary ARKit
             'mouthSmile': mid * 0.15,
