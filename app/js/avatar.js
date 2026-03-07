@@ -542,12 +542,41 @@
     // Default pose values (arms by body)
     var _targetPose = { lx: 0, rx: 0, ly: 0, ry: 0, lz: 1.2, rz: -1.2 };
 
-    // Called EVERY frame after mixer.update() — QUATERNION override
-    // Animation mixer writes to bone.quaternion directly, so setting
-    // bone.rotation alone is ignored. Must force quaternion from Euler.
-    var _tmpEuler = typeof THREE !== 'undefined' ? new THREE.Euler() : null;
+    // Called EVERY frame after mixer.update() — FORCE arms to target position
+    // Uses lazy Euler init (THREE may not be ready at parse time)
+    var _tmpEuler = null;
+    var _mixerArmsStopped = false;
     function _enforcePose() {
-        if (!_targetPose || !_tmpEuler) return;
+        if (!_targetPose) return;
+        // Lazy init — THREE must be available by animation time
+        if (!_tmpEuler && typeof THREE !== 'undefined') {
+            _tmpEuler = new THREE.Euler();
+            console.log('[Avatar] _enforcePose: Euler initialized ✅');
+        }
+        if (!_tmpEuler) return;
+
+        // Stop mixer from animating arm bones (one-time)
+        if (!_mixerArmsStopped && mixer && mixer._actions) {
+            mixer._actions.forEach(function (action) {
+                if (!action || !action._clip) return;
+                var clip = action._clip;
+                var tracksToRemove = [];
+                clip.tracks.forEach(function (track, idx) {
+                    var tn = track.name.toLowerCase();
+                    if (tn.indexOf('leftarm') !== -1 || tn.indexOf('rightarm') !== -1 ||
+                        tn.indexOf('left_arm') !== -1 || tn.indexOf('right_arm') !== -1) {
+                        tracksToRemove.push(idx);
+                    }
+                });
+                // Remove arm tracks from clip (reverse order to keep indices valid)
+                for (var i = tracksToRemove.length - 1; i >= 0; i--) {
+                    clip.tracks.splice(tracksToRemove[i], 1);
+                    console.log('[Avatar] Removed arm track from animation clip');
+                }
+            });
+            _mixerArmsStopped = true;
+        }
+
         var p = _targetPose;
         if (armBones.left) {
             _tmpEuler.set(p.lx, p.ly, p.lz);
