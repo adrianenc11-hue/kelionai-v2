@@ -527,23 +527,30 @@
         currentPose = pose || 'relaxed';
         if (!armBones.left && !armBones.right) findArmBones();
 
+        // MetaPerson / Avaturn models use different bone orientations than RPM
+        // We try multiple approaches to bring arms down
         var poses = {
-            relaxed: { lz: 1.1, rz: -1.1, lx: -0.1, rx: -0.1 },  // arms down
-            presenting: { lz: 0.6, rz: -0.6, lx: -0.2, rx: -0.2 },  // arms slightly out
-            crossed: { lz: 1.3, rz: -1.3, lx: 0.3, rx: 0.3 },   // arms crossed in front
-            open: { lz: 0.4, rz: -0.4, lx: -0.15, rx: -0.15 }  // arms open, welcoming
+            // BUSINESS: hands relaxed by body, professional stance
+            relaxed: { lz: 1.2, rz: -1.2, lx: 0.1, rx: 0.1, ly: 0, ry: 0 },
+            // Presenting: one arm slightly out
+            presenting: { lz: 0.8, rz: -0.8, lx: -0.15, rx: -0.15, ly: 0, ry: 0 },
+            // Crossed: arms folded
+            crossed: { lz: 1.4, rz: -1.4, lx: 0.4, rx: 0.4, ly: 0.2, ry: -0.2 },
+            // Open: welcoming gesture
+            open: { lz: 0.5, rz: -0.5, lx: -0.1, rx: -0.1, ly: 0, ry: 0 }
         };
         var p = poses[currentPose] || poses.relaxed;
 
+        // Apply rotation on all three axes for MetaPerson compatibility
         if (armBones.left) {
-            armBones.left.rotation.z = p.lz;
-            armBones.left.rotation.x = p.lx;
+            armBones.left.rotation.set(p.lx, p.ly, p.lz);
         }
         if (armBones.right) {
-            armBones.right.rotation.z = p.rz;
-            armBones.right.rotation.x = p.rx;
+            armBones.right.rotation.set(p.rx, p.ry, p.rz);
         }
-        console.log('[Avatar] Pose set:', currentPose);
+        console.log('[Avatar] Pose set:', currentPose,
+            '| L:', armBones.left ? armBones.left.rotation.toArray().map(v => v.toFixed(2)) : 'none',
+            '| R:', armBones.right ? armBones.right.rotation.toArray().map(v => v.toFixed(2)) : 'none');
     }
 
     function updateExpression(dt) {
