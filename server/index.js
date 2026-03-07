@@ -782,6 +782,7 @@ app.get("/api/news/public", (req, res) => {
 });
 app.use("/api/news", adminAuth, newsModule.router);
 newsModule.setSupabase(supabaseAdmin);
+newsModule.setBrain(brain);
 newsModule.restoreCache();
 setMessengerSupabase(supabaseAdmin);
 setTelegramSupabase(supabaseAdmin);
