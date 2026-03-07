@@ -48,6 +48,30 @@ if (!WA_VERIFY_TOKEN) {
   );
 }
 
+// ═══ ADMIN OUTBOUND MESSAGE ENDPOINT ═══
+router.post("/send", express.json(), async (req, res) => {
+  // Simple auth via x-admin-secret
+  const adminSecret = req.headers["x-admin-secret"];
+  const expectedAdminSecret = process.env.ADMIN_SECRET;
+
+  if (!expectedAdminSecret || adminSecret !== expectedAdminSecret) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const { to, text } = req.body;
+  if (!to || !text) {
+    return res.status(400).json({ error: "Missing 'to' or 'text' in body" });
+  }
+
+  try {
+    await sendTextMessage(to, text);
+    res.json({ success: true, to, text });
+  } catch (e) {
+    logger.error({ component: "WhatsApp", err: e.message }, "Manual send error");
+    res.status(500).json({ error: "Send failed", details: e.message });
+  }
+});
+
 // ═══ CHARACTER SELECTION — backed by Supabase whatsapp_users.character ═══
 
 // ═══ CONVERSATION CONTEXT — stored in Supabase whatsapp_messages ═══
