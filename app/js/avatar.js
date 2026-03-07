@@ -134,7 +134,7 @@
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 3)); // CINEMATIC: up to 3x for 4K/retina
 
         camera = new THREE.PerspectiveCamera(30, w / h, 0.1, 100);
-        camera.position.set(0, 0.2, 1.8); // Y=0.2 moves avatar up in viewport
+        camera.position.set(0, -0.1, 1.8); // Negative Y = avatar appears higher
         renderer.outputColorSpace = THREE.SRGBColorSpace;
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
         renderer.toneMappingExposure = 1.2;
@@ -529,11 +529,11 @@
 
         // MetaPerson / Avaturn models use different bone orientations than RPM
         var poses = {
-            // BUSINESS: hands relaxed by body — X-axis rotates DOWN for MetaPerson
-            relaxed: { lz: 0, rz: 0, lx: 1.5, rx: 1.5, ly: 0.2, ry: -0.2 },
-            presenting: { lz: 0, rz: 0, lx: 1.0, rx: 1.0, ly: 0.1, ry: -0.1 },
-            crossed: { lz: 0.3, rz: -0.3, lx: 1.4, rx: 1.4, ly: 0.4, ry: -0.4 },
-            open: { lz: 0, rz: 0, lx: 0.5, rx: 0.5, ly: 0, ry: 0 }
+            // BUSINESS: try Y-axis for arms DOWN (Z and X both went forward)
+            relaxed: { lx: 0, rx: 0, ly: 0, ry: 0, lz: 1.2, rz: -1.2 },
+            presenting: { lx: 0, rx: 0, ly: 0, ry: 0, lz: 0.7, rz: -0.7 },
+            crossed: { lx: 0.3, rx: 0.3, ly: 0, ry: 0, lz: 1.4, rz: -1.4 },
+            open: { lx: 0, rx: 0, ly: 0, ry: 0, lz: 0.4, rz: -0.4 }
         };
         _targetPose = poses[currentPose] || poses.relaxed;
         _enforcePose(); // Apply immediately
@@ -541,7 +541,7 @@
     }
 
     // Default pose values (arms by body)
-    var _targetPose = { lz: 0, rz: 0, lx: 1.5, rx: 1.5, ly: 0.2, ry: -0.2 };
+    var _targetPose = { lx: 0, rx: 0, ly: 0, ry: 0, lz: 1.2, rz: -1.2 };
 
     // Called EVERY frame after mixer.update() — instant override
     function _enforcePose() {
