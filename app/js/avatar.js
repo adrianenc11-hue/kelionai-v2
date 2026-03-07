@@ -5,9 +5,10 @@
 (function () {
     'use strict';
 
+    const CACHE_BUST = Date.now();
     const MODELS = {
-        kelion: '/models/k-male.glb',
-        kira: '/models/k-female.glb'
+        kelion: '/models/k-male.glb?v=' + CACHE_BUST,
+        kira: '/models/k-female.glb?v=' + CACHE_BUST
     };
 
     let scene, camera, renderer, clock;
@@ -488,11 +489,11 @@
             if (!bone.isBone) return;
             var bn = (bone.name || '').toLowerCase();
             if (bn.indexOf('leftupperarm') !== -1 || bn.indexOf('left_upper_arm') !== -1 ||
-                bn.indexOf('lupperarm') !== -1 || bn === 'leftarm' || bn === 'left_arm') {
+                bn.indexOf('lupperarm') !== -1 || bn === 'leftarm' || bn === 'left_arm' || bn.indexOf('leftshoulder') !== -1) {
                 armBones.left = bone;
             }
             if (bn.indexOf('rightupperarm') !== -1 || bn.indexOf('right_upper_arm') !== -1 ||
-                bn.indexOf('rupperarm') !== -1 || bn === 'rightarm' || bn === 'right_arm') {
+                bn.indexOf('rupperarm') !== -1 || bn === 'rightarm' || bn === 'right_arm' || bn.indexOf('rightshoulder') !== -1) {
                 armBones.right = bone;
             }
         });
@@ -534,9 +535,9 @@
 
         // MetaPerson / Avaturn models use different bone orientations than RPM
         var poses = {
-            // BUSINESS: try Y-axis for arms DOWN (Z and X both went forward)
-            relaxed: { lx: 0, rx: 0, ly: 0, ry: 0, lz: 1.2, rz: -1.2 },
-            presenting: { lx: 0, rx: 0, ly: 0, ry: 0, lz: 0.7, rz: -0.7 },
+            // FOR METAPERSON: Arms down is usually Z=1.3 or Y=1.2. We apply X,Y,Z to cover axes.
+            relaxed: { lx: 0, rx: 0, ly: 0, ry: 0, lz: 1.35, rz: -1.35 },
+            presenting: { lx: 0, rx: 0, ly: 0, ry: 0, lz: 0.8, rz: -0.8 },
             crossed: { lx: 0.3, rx: 0.3, ly: 0, ry: 0, lz: 1.4, rz: -1.4 },
             open: { lx: 0, rx: 0, ly: 0, ry: 0, lz: 0.4, rz: -0.4 }
         };
