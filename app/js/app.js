@@ -176,7 +176,22 @@
             overlay.appendChild(msgEl);
             overlay.scrollTop = overlay.scrollHeight;
 
-            KAvatar.setExpression('happy', 0.3);
+            // ── BRAIN-DIRECTED AVATAR CONTROL ──
+            // Emotion from brain (replaces hardcoded 'happy')
+            var brainEmotion = data.emotion || 'happy';
+            KAvatar.setExpression(brainEmotion, 0.5);
+
+            // Gestures from brain (nod, shake, wave, tilt, etc.)
+            if (data.gestures && data.gestures.length > 0) {
+                data.gestures.forEach(function (g, i) {
+                    setTimeout(function () { KAvatar.playGesture(g); }, i * 800);
+                });
+            }
+
+            // Pose from brain (relaxed, presenting, crossed, open)
+            if (data.pose && KAvatar.setPose) {
+                KAvatar.setPose(data.pose);
+            }
 
             // Increment generation counter to prevent overlap
             var thisGen = ++_speakGeneration;
