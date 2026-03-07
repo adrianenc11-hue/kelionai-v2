@@ -181,7 +181,7 @@ router.post("/listen", apiLimiter, validate(listenSchema), async (req, res) => {
     const { audio } = req.body;
     if (!audio) return res.status(400).json({ error: "Audio is required" });
 
-    const { getUserFromToken, supabaseAdmin } = req.app.locals;
+    const { getUserFromToken, supabaseAdmin, brain } = req.app.locals;
     const user = await getUserFromToken(req);
     const usage = await checkUsage(user?.id, "stt", supabaseAdmin);
     if (!usage.allowed)
@@ -208,13 +208,22 @@ router.post("/listen", apiLimiter, validate(listenSchema), async (req, res) => {
         },
       );
       const d = await r.json();
+      const transcript = d.text || "";
+
+      // ═══ BRAIN INTEGRATION — save what we heard ═══
+      if (brain && user?.id && transcript.length > 2) {
+        brain.saveMemory(user.id, "audio", "User a spus prin voce: " + transcript.substring(0, 500), {
+          engine: "Groq-Whisper",
+        }).catch(() => { });
+      }
+
       incrementUsage(user?.id, "stt", supabaseAdmin).catch((e) =>
         logger.warn(
           { component: "Voice", err: e.message },
           "incrementUsage failed",
         ),
       );
-      return res.json({ text: d.text || "", engine: "Groq" });
+      return res.json({ text: transcript, engine: "Groq" });
     }
     res.status(503).json({ error: "Use Web Speech API" });
   } catch {

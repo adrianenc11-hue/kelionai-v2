@@ -26,7 +26,7 @@ router.post(
   express.json({ limit: "2mb" }),
   async (req, res) => {
     try {
-      const { getUserFromToken, supabaseAdmin } = req.app.locals;
+      const { getUserFromToken, supabaseAdmin, brain } = req.app.locals;
       const user = await getUserFromToken(req);
       if (!user) return res.status(401).json({ error: "Unauthorized" });
 
@@ -49,6 +49,11 @@ router.post(
             "Face save failed",
           );
         }
+      }
+
+      // ═══ BRAIN INTEGRATION — remember face registration ═══
+      if (brain) {
+        brain.saveFact(user.id, "User a înregistrat referința facială", "identity", "face-register").catch(() => { });
       }
 
       logger.info(
@@ -74,7 +79,7 @@ router.post(
   express.json({ limit: "2mb" }),
   async (req, res) => {
     try {
-      const { getUserFromToken, supabaseAdmin } = req.app.locals;
+      const { getUserFromToken, supabaseAdmin, brain } = req.app.locals;
       const { face } = req.body;
       if (!face) return res.status(400).json({ error: "face image required" });
 
@@ -155,6 +160,11 @@ router.post(
             "Face comparison failed",
           );
         }
+      }
+
+      // ═══ BRAIN INTEGRATION — remember who was recognized ═══
+      if (brain && user?.id && (ownerMatch || matchedUser)) {
+        brain.saveMemory(user.id, "context", "Recunoaștere facială: " + (matchedUser?.name || "Owner") + " identificat", { type: "identity" }).catch(() => { });
       }
 
       res.json({

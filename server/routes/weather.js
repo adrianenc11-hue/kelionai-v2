@@ -20,13 +20,15 @@ const weatherLimiter = rateLimit({
 // POST /api/weather
 router.post("/", weatherLimiter, validate(weatherSchema), async (req, res) => {
   try {
+    const { getUserFromToken, brain } = req.app.locals;
+    const user = await getUserFromToken(req).catch(() => null);
     const { city } = req.body;
     if (!city) return res.status(400).json({ error: "City is required" });
     const geo = await (
       await fetch(
         "https://geocoding-api.open-meteo.com/v1/search?name=" +
-          encodeURIComponent(city) +
-          "&count=1&language=ro",
+        encodeURIComponent(city) +
+        "&count=1&language=ro",
       )
     ).json();
     if (!geo.results?.[0])
@@ -35,10 +37,10 @@ router.post("/", weatherLimiter, validate(weatherSchema), async (req, res) => {
     const wx = await (
       await fetch(
         "https://api.open-meteo.com/v1/forecast?latitude=" +
-          latitude +
-          "&longitude=" +
-          longitude +
-          "&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&timezone=auto",
+        latitude +
+        "&longitude=" +
+        longitude +
+        "&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&timezone=auto",
       )
     ).json();
     const c = wx.current;
@@ -55,6 +57,13 @@ router.post("/", weatherLimiter, validate(weatherSchema), async (req, res) => {
       95: "Thunderstorm ⛈️",
     };
     const cond = codes[c.weather_code] || "?";
+    const weatherDesc = name + ", " + country + ": " + c.temperature_2m + "°C, " + cond + ", humidity " + c.relative_humidity_2m + "%, wind " + c.wind_speed_10m + " km/h";
+
+    // ═══ BRAIN INTEGRATION — save weather context ═══
+    if (brain && user?.id) {
+      brain.saveMemory(user.id, "context", "Vremea la " + weatherDesc, { type: "weather" }).catch(() => { });
+    }
+
     res.json({
       city: name,
       country,
@@ -62,19 +71,7 @@ router.post("/", weatherLimiter, validate(weatherSchema), async (req, res) => {
       humidity: c.relative_humidity_2m,
       wind: c.wind_speed_10m,
       condition: cond,
-      description:
-        name +
-        ", " +
-        country +
-        ": " +
-        c.temperature_2m +
-        "°C, " +
-        cond +
-        ", humidity " +
-        c.relative_humidity_2m +
-        "%, wind " +
-        c.wind_speed_10m +
-        " km/h",
+      description: weatherDesc,
     });
   } catch {
     res.status(500).json({ error: "Weather error" });

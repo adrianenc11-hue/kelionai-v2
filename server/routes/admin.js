@@ -168,7 +168,7 @@ router.get("/costs", async (req, res) => {
 router.get("/traffic", async (req, res) => {
   try {
     const { supabaseAdmin } = req.app.locals;
-    if (!supabaseAdmin) return res.json({ recent: [], uniqueToday: 0, totalToday: 0, activeConnections: 0 });
+    if (!supabaseAdmin) return res.json({ recent: [], uniqueToday: 0, totalToday: 0, activeConnections: 0, daily: [] });
 
     const today = new Date().toISOString().split("T")[0];
 
@@ -187,7 +187,23 @@ router.get("/traffic", async (req, res) => {
 
     const uniqueIps = new Set((todayData || []).map((d) => d.ip));
 
-    // Active connections from Prometheus
+    // Daily traffic (last 7 days)
+    const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().split("T")[0];
+    const { data: weekData } = await supabaseAdmin
+      .from("page_views")
+      .select("created_at")
+      .gte("created_at", weekAgo + "T00:00:00Z");
+
+    const dailyCounts = {};
+    (weekData || []).forEach(r => {
+      const day = r.created_at.split("T")[0];
+      dailyCounts[day] = (dailyCounts[day] || 0) + 1;
+    });
+    const daily = Object.entries(dailyCounts)
+      .map(([date, count]) => ({ date, count }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    // Active connections
     let activeConnections = 0;
     try {
       const { activeConnections: ac } = require("../metrics");
@@ -199,10 +215,11 @@ router.get("/traffic", async (req, res) => {
       uniqueToday: uniqueIps.size,
       totalToday: (todayData || []).length,
       activeConnections,
+      daily,
     });
   } catch (e) {
     logger.error({ component: "Admin", err: e.message }, "Traffic query failed");
-    res.json({ recent: [], uniqueToday: 0, totalToday: 0, activeConnections: 0 });
+    res.json({ recent: [], uniqueToday: 0, totalToday: 0, activeConnections: 0, daily: [] });
   }
 });
 
@@ -282,14 +299,239 @@ router.get("/revenue", async (req, res) => {
 });
 
 // ══════════════════════════════════════════════════════════
-// GET /api/admin/trading — Trading status
+// GET /api/admin/ai-status — Live status of all AI providers
+// Connected to Brain + Supabase ai_costs
 // ══════════════════════════════════════════════════════════
-router.get("/trading", (req, res) => {
-  res.json({
-    portfolio: "Not configured — add BINANCE_API_KEY",
-    pnl: "—",
-    signals: "Trade intelligence module available",
-  });
+router.get("/ai-status", async (req, res) => {
+  try {
+    const { brain, supabaseAdmin } = req.app.locals;
+
+    // Provider configs from brain
+    const providerKeys = {
+      "OpenAI": !!brain?.openaiKey,
+      "Anthropic": !!brain?.anthropicKey,
+      "Groq": !!brain?.groqKey,
+      "Perplexity": !!brain?.perplexityKey,
+      "Together": !!brain?.togetherKey,
+      "ElevenLabs": !!process.env.ELEVENLABS_API_KEY,
+      "DeepSeek": !!process.env.DEEPSEEK_API_KEY,
+      "Tavily": !!brain?.tavilyKey,
+      "Serper": !!brain?.serperKey,
+    };
+
+    // Get monthly costs per provider from Supabase
+    const monthStart = new Date().toISOString().substring(0, 7) + "-01";
+    let costByProvider = {};
+    if (supabaseAdmin) {
+      try {
+        const { data } = await supabaseAdmin
+          .from("ai_costs")
+          .select("provider, cost_usd")
+          .gte("created_at", monthStart + "T00:00:00Z");
+        (data || []).forEach(r => {
+          if (!costByProvider[r.provider]) costByProvider[r.provider] = 0;
+          costByProvider[r.provider] += parseFloat(r.cost_usd) || 0;
+        });
+      } catch (e) { /* table might not exist */ }
+    }
+
+    const providers = Object.entries(providerKeys).map(([name, hasKey]) => ({
+      name,
+      live: hasKey,
+      costMonth: costByProvider[name.toLowerCase()] || costByProvider[name] || 0,
+    }));
+
+    res.json({ providers });
+  } catch (e) {
+    logger.error({ component: "Admin", err: e.message }, "AI status failed");
+    res.json({ providers: [] });
+  }
+});
+
+// ══════════════════════════════════════════════════════════
+// CRUD /api/admin/codes — Admin codes management
+// Connected to Supabase admin_codes table
+// ══════════════════════════════════════════════════════════
+router.get("/codes", async (req, res) => {
+  try {
+    const { supabaseAdmin } = req.app.locals;
+    if (!supabaseAdmin) return res.json({ codes: [] });
+
+    const { data } = await supabaseAdmin
+      .from("admin_codes")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(50);
+
+    res.json({ codes: data || [] });
+  } catch (e) {
+    res.json({ codes: [] });
+  }
+});
+
+router.post("/codes", async (req, res) => {
+  try {
+    const { supabaseAdmin } = req.app.locals;
+    if (!supabaseAdmin) return res.status(500).json({ error: "No DB" });
+
+    const { type } = req.body;
+    const crypto = require("crypto");
+    const code = crypto.randomBytes(4).toString("hex").toUpperCase();
+
+    const { error } = await supabaseAdmin.from("admin_codes").insert({
+      code,
+      type: type || "admin",
+      used: false,
+      created_by: req.adminUser?.id || null,
+      created_at: new Date().toISOString(),
+    });
+
+    if (error) return res.status(500).json({ error: error.message });
+    logger.info({ component: "Admin", code, type }, "Admin code generated");
+    res.json({ code, type });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.delete("/codes/:id", async (req, res) => {
+  try {
+    const { supabaseAdmin } = req.app.locals;
+    if (!supabaseAdmin) return res.status(500).json({ error: "No DB" });
+
+    await supabaseAdmin.from("admin_codes").delete().eq("id", req.params.id);
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ══════════════════════════════════════════════════════════
+// POST /api/admin/refund — Refund user subscription
+// Cancels subscription in Supabase + logs reason
+// ══════════════════════════════════════════════════════════
+router.post("/refund", async (req, res) => {
+  try {
+    const { supabaseAdmin } = req.app.locals;
+    if (!supabaseAdmin) return res.status(500).json({ error: "No DB" });
+
+    const { userId, reason } = req.body;
+    if (!userId) return res.status(400).json({ error: "userId required" });
+
+    // Cancel subscription
+    const { error: subError } = await supabaseAdmin
+      .from("subscriptions")
+      .update({ status: "refunded", cancelled_at: new Date().toISOString() })
+      .eq("user_id", userId);
+
+    // Update user plan to free
+    await supabaseAdmin.auth.admin.updateUserById(userId, {
+      user_metadata: { plan: "free" },
+    });
+
+    // Log refund
+    await supabaseAdmin.from("admin_logs").insert({
+      action: "refund",
+      user_id: userId,
+      details: reason || "Admin refund",
+      admin_id: req.adminUser?.id,
+      created_at: new Date().toISOString(),
+    }).catch(() => { }); // table might not exist
+
+    logger.info({ component: "Admin", userId, reason }, "Refund processed");
+    res.json({ success: true, message: "Refund procesat! Abonament anulat, plan setat la Free." });
+  } catch (e) {
+    logger.error({ component: "Admin", err: e.message }, "Refund failed");
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ══════════════════════════════════════════════════════════
+// POST /api/admin/upgrade — Upgrade/downgrade user plan
+// Updates Supabase Auth metadata + subscriptions table
+// ══════════════════════════════════════════════════════════
+router.post("/upgrade", async (req, res) => {
+  try {
+    const { supabaseAdmin } = req.app.locals;
+    if (!supabaseAdmin) return res.status(500).json({ error: "No DB" });
+
+    const { userId, plan } = req.body;
+    if (!userId || !plan) return res.status(400).json({ error: "userId and plan required" });
+
+    // Update user metadata
+    const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+      user_metadata: { plan },
+    });
+    if (error) return res.status(500).json({ error: error.message });
+
+    // Upsert subscription
+    if (plan !== "free") {
+      await supabaseAdmin.from("subscriptions").upsert({
+        user_id: userId,
+        plan,
+        status: "active",
+        amount: plan === "premium" ? 29.99 : plan === "pro" ? 9.99 : 0,
+        created_at: new Date().toISOString(),
+      }, { onConflict: "user_id" }).catch(() => { });
+    } else {
+      await supabaseAdmin.from("subscriptions")
+        .update({ status: "cancelled", cancelled_at: new Date().toISOString() })
+        .eq("user_id", userId).catch(() => { });
+    }
+
+    logger.info({ component: "Admin", userId, plan }, "User plan updated");
+    res.json({ success: true, message: "Plan actualizat la " + plan + "!" });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ══════════════════════════════════════════════════════════
+// POST /api/admin/recharge — Recharge AI credits (Stripe)
+// Creates Stripe Checkout Session for £50, logs distribution
+// ══════════════════════════════════════════════════════════
+router.post("/recharge", async (req, res) => {
+  try {
+    const stripe = process.env.STRIPE_SECRET_KEY ? require("stripe")(process.env.STRIPE_SECRET_KEY) : null;
+
+    if (stripe) {
+      const session = await stripe.checkout.sessions.create({
+        payment_method_types: ["card"],
+        line_items: [{
+          price_data: {
+            currency: "gbp",
+            product_data: { name: "KelionAI — AI Credit Recharge", description: "Top-up £50 for AI API credits (proportional distribution)" },
+            unit_amount: 5000, // £50.00 in pence
+          },
+          quantity: 1,
+        }],
+        mode: "payment",
+        success_url: (process.env.APP_URL || "https://kelionai.app") + "/admin?recharge=success",
+        cancel_url: (process.env.APP_URL || "https://kelionai.app") + "/admin?recharge=cancelled",
+        metadata: { type: "ai_recharge", admin_id: req.adminUser?.id || "unknown" },
+      });
+
+      logger.info({ component: "Admin", sessionId: session.id }, "Recharge checkout created");
+      return res.json({ url: session.url });
+    }
+
+    // No Stripe — just log the recharge internally
+    const { supabaseAdmin } = req.app.locals;
+    if (supabaseAdmin) {
+      await supabaseAdmin.from("admin_logs").insert({
+        action: "recharge",
+        details: "£50 AI credit recharge (manual)",
+        admin_id: req.adminUser?.id,
+        created_at: new Date().toISOString(),
+      }).catch(() => { });
+    }
+
+    logger.info({ component: "Admin" }, "Recharge recorded (no Stripe)");
+    res.json({ success: true, message: "Recharge £50 înregistrată! (fără Stripe — adaugă manual credit pe API providers)" });
+  } catch (e) {
+    logger.error({ component: "Admin", err: e.message }, "Recharge failed");
+    res.status(500).json({ error: e.message });
+  }
 });
 
 module.exports = router;
