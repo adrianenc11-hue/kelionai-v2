@@ -193,6 +193,13 @@
                 KAvatar.setPose(data.pose);
             }
 
+            // Body actions from brain (per-limb IK: raiseLeftHand, wavRight, etc.)
+            if (data.bodyActions && data.bodyActions.length > 0 && KAvatar.playBodyAction) {
+                data.bodyActions.forEach(function (ba, i) {
+                    setTimeout(function () { KAvatar.playBodyAction(ba); }, i * 1500);
+                });
+            }
+
             // Increment generation counter to prevent overlap
             var thisGen = ++_speakGeneration;
 

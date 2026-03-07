@@ -382,6 +382,11 @@ router.post("/chat", chatLimiter, validate(chatSchema), async (req, res) => {
       pose = poseMatch[1].toLowerCase();
       reply = reply.replace(/\[POSE:\w+\]/gi, "").trim();
     }
+    // Parse [BODY:xxx] tags from AI reply (per-limb body actions)
+    let bodyActions = [];
+    const bodyMatches = reply.matchAll(/\[BODY:(\w+)\]/gi);
+    for (const bm of bodyMatches) bodyActions.push(bm[1]);
+    reply = reply.replace(/\[BODY:\w+\]/gi, "").trim();
     const response = {
       reply,
       avatar,
@@ -393,6 +398,7 @@ router.post("/chat", chatLimiter, validate(chatSchema), async (req, res) => {
       emotion,
       gestures,
       pose,
+      bodyActions,
     };
     if (monitorFromReply) {
       response.monitor = monitorFromReply;

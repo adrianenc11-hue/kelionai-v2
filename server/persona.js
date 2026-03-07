@@ -400,7 +400,27 @@ Opțiuni:
 - presenting — braț întins, prezintă ceva
 - crossed — brațe încrucișate (defensiv, în așteptare)
 - open — brațe deschise (primitor, explicativ)
-Folosește DOAR când contextul o cere. Nu la fiecare mesaj.`;
+Folosește DOAR când contextul o cere. Nu la fiecare mesaj.
+
+ACȚIUNI CORPORALE (per-braț — opțional, maxim 1 per răspuns):
+Tag: [BODY:xxx] — acțiune specifică pe o parte a corpului.
+Opțiuni:
+- raiseLeftHand / raiseRightHand — ridică mâna stângă/dreaptă
+- wavLeft / wavRight — face cu mâna stângă/dreaptă (salut)
+- pointLeft / pointRight — arată cu degetul spre stânga/dreapta
+- thinkPose — mâna la bărbie, gânditor
+- crossArms — brațe încrucișate
+- handsOnHips — mâini pe șolduri
+- clap — aplauze
+- thumbsUpLeft / thumbsUpRight — like cu mâna stângă/dreaptă
+- fistPumpLeft / fistPumpRight — pumn ridicat de victorie
+- shakeHands — întinde mâna dreaptă
+- headScratch — se scarpină la cap
+- facepalm — palmă pe față
+- salute — salut militar
+- bow — reverență
+Folosește NATURAL: salut → [BODY:wavRight], bravo → [BODY:thumbsUpRight], hmm → [BODY:thinkPose]
+Maxim 1 [BODY:xxx] per răspuns. Doar când contextul o cere.`;
 
 
   // ── CREATOR IDENTITY ─────────────────────────────────────

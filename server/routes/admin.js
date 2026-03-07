@@ -613,4 +613,95 @@ router.post("/recharge", async (req, res) => {
   }
 });
 
+// ══════════════════════════════════════════════════════════
+// GET /api/admin/test-tables — Test ALL Supabase tables
+// Runs SELECT on each table, collects errors per table
+// ══════════════════════════════════════════════════════════
+router.get("/test-tables", async (req, res) => {
+  const { supabaseAdmin } = req.app.locals;
+  if (!supabaseAdmin) return res.status(503).json({ error: "No Supabase connection" });
+
+  const TABLES = [
+    // Etapa 1 — Core (migrate.js existing)
+    "conversations",
+    "messages",
+    "user_preferences",
+    "api_keys",
+    "admin_logs",
+    "trades",
+    "profiles",
+    "media_history",
+    "telegram_users",
+    "whatsapp_users",
+    "whatsapp_messages",
+    "trade_intelligence",
+    "cookie_consents",
+    "metrics_snapshots",
+    "ai_costs",
+    "page_views",
+    // Etapa 2 — Newly added to migrate.js
+    "subscriptions",
+    "referrals",
+    "admin_codes",
+    "brain_memory",
+    "learned_facts",
+    "messenger_users",
+    "messenger_messages",
+    "messenger_subscribers",
+    "telegram_messages",
+    "market_candles",
+    "market_learnings",
+    "market_patterns",
+  ];
+
+  const results = [];
+  let passed = 0;
+  let failed = 0;
+
+  for (const table of TABLES) {
+    try {
+      const { data, error, count } = await supabaseAdmin
+        .from(table)
+        .select("*", { count: "exact", head: true });
+
+      if (error) {
+        failed++;
+        results.push({
+          table,
+          status: "❌ ERROR",
+          error: error.message,
+          code: error.code,
+          hint: error.hint || null,
+        });
+      } else {
+        passed++;
+        results.push({
+          table,
+          status: "✅ OK",
+          rowCount: count || 0,
+        });
+      }
+    } catch (e) {
+      failed++;
+      results.push({
+        table,
+        status: "💥 CRASH",
+        error: e.message,
+      });
+    }
+  }
+
+  res.json({
+    summary: {
+      total: TABLES.length,
+      passed,
+      failed,
+      allOk: failed === 0,
+      testedAt: new Date().toISOString(),
+    },
+    results,
+    errors: results.filter(r => r.status !== "✅ OK"),
+  });
+});
+
 module.exports = router;
