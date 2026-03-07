@@ -11,6 +11,7 @@ const { validate, chatSchema, memorySchema } = require("../validation");
 const { checkUsage, incrementUsage } = require("../payments");
 const { buildSystemPrompt } = require("../persona");
 const { KelionBrain } = require("../brain");
+const { MODELS } = require("../config/models");
 
 const router = express.Router();
 
@@ -198,7 +199,7 @@ router.post("/chat", chatLimiter, validate(chatSchema), async (req, res) => {
               Authorization: "Bearer " + process.env.GROQ_API_KEY,
             },
             body: JSON.stringify({
-              model: "llama-3.3-70b-versatile",
+              model: MODELS.GROQ_PRIMARY,
               max_tokens: 4096,
               messages: [{ role: "system", content: systemPrompt }, ...msgs],
             }),
@@ -221,7 +222,7 @@ router.post("/chat", chatLimiter, validate(chatSchema), async (req, res) => {
             Authorization: "Bearer " + process.env.OPENAI_API_KEY,
           },
           body: JSON.stringify({
-            model: "gpt-4o-mini",
+            model: MODELS.OPENAI_CHAT,
             max_tokens: 4096,
             messages: [{ role: "system", content: systemPrompt }, ...msgs],
           }),
@@ -244,7 +245,7 @@ router.post("/chat", chatLimiter, validate(chatSchema), async (req, res) => {
             "anthropic-version": "2023-06-01",
           },
           body: JSON.stringify({
-            model: "claude-sonnet-4-20250514",
+            model: MODELS.ANTHROPIC_CHAT,
             max_tokens: 4096,
             system: systemPrompt,
             messages: msgs,
@@ -267,7 +268,7 @@ router.post("/chat", chatLimiter, validate(chatSchema), async (req, res) => {
             Authorization: "Bearer " + process.env.DEEPSEEK_API_KEY,
           },
           body: JSON.stringify({
-            model: "deepseek-chat",
+            model: MODELS.DEEPSEEK,
             max_tokens: 4096,
             messages: [{ role: "system", content: systemPrompt }, ...msgs],
           }),
@@ -517,7 +518,7 @@ router.post(
               "anthropic-version": "2023-06-01",
             },
             body: JSON.stringify({
-              model: "claude-sonnet-4-20250514",
+              model: MODELS.ANTHROPIC_CHAT,
               max_tokens: 4096,
               system: systemPrompt,
               messages: msgs,
@@ -590,7 +591,7 @@ router.post(
                   Authorization: "Bearer " + process.env.OPENAI_API_KEY,
                 },
                 body: JSON.stringify({
-                  model: "gpt-4o",
+                  model: MODELS.OPENAI_FALLBACK,
                   max_tokens: 4096,
                   messages: [
                     { role: "system", content: systemPrompt },
@@ -628,7 +629,7 @@ router.post(
                 Authorization: "Bearer " + process.env.DEEPSEEK_API_KEY,
               },
               body: JSON.stringify({
-                model: "deepseek-chat",
+                model: MODELS.DEEPSEEK,
                 max_tokens: 4096,
                 messages: [{ role: "system", content: systemPrompt }, ...msgs],
               }),

@@ -471,7 +471,7 @@ async function transcribeAudio(audioBuffer, mimeType) {
   });
   form.append(
     "model",
-    process.env.GROQ_API_KEY ? "whisper-large-v3" : "whisper-1",
+    process.env.GROQ_API_KEY ? MODELS.WHISPER : MODELS.OPENAI_WHISPER,
   );
 
   const res = await fetch(`${baseUrl}/audio/transcriptions`, {
@@ -500,7 +500,7 @@ async function generateSpeech(text, lang, character) {
       headers: { "xi-api-key": apiKey, "Content-Type": "application/json" },
       body: JSON.stringify({
         text: text.slice(0, 1000),
-        model_id: "eleven_multilingual_v2",
+        model_id: MODELS.ELEVENLABS_MODEL,
         voice_settings: { stability: 0.5, similarity_boost: 0.75 },
       }),
     },

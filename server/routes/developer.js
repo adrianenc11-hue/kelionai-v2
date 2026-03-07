@@ -10,6 +10,7 @@ const fetch = require("node-fetch");
 const logger = require("../logger");
 const rateLimit = require("express-rate-limit");
 const { apiKeyAuth } = require("../middleware/apiKeyAuth");
+const { MODELS } = require("../config/models");
 
 const router = express.Router();
 
@@ -294,21 +295,21 @@ router.get("/v1/models", v1Limiter, apiKeyAuth, (req, res) => {
   const models = [];
   if (process.env.ANTHROPIC_API_KEY)
     models.push({
-      id: "claude-sonnet-4",
+      id: MODELS.ANTHROPIC_CHAT,
       name: "Claude Sonnet 4",
       provider: "Anthropic",
       primary: true,
     });
   if (process.env.OPENAI_API_KEY)
     models.push({
-      id: "gpt-4o",
+      id: MODELS.OPENAI_FALLBACK,
       name: "GPT-4o",
       provider: "OpenAI",
       primary: false,
     });
   if (process.env.DEEPSEEK_API_KEY)
     models.push({
-      id: "deepseek-chat",
+      id: MODELS.DEEPSEEK,
       name: "DeepSeek Chat",
       provider: "DeepSeek",
       primary: false,
@@ -403,7 +404,7 @@ router.post("/v1/chat", v1Limiter, apiKeyAuth, async (req, res) => {
             "anthropic-version": "2023-06-01",
           },
           body: JSON.stringify({
-            model: "claude-sonnet-4-20250514",
+            model: MODELS.ANTHROPIC_CHAT,
             max_tokens: 1024,
             system: systemPrompt,
             messages: msgs,
@@ -424,7 +425,7 @@ router.post("/v1/chat", v1Limiter, apiKeyAuth, async (req, res) => {
             Authorization: "Bearer " + process.env.OPENAI_API_KEY,
           },
           body: JSON.stringify({
-            model: "gpt-4o",
+            model: MODELS.OPENAI_FALLBACK,
             max_tokens: 1024,
             messages: [{ role: "system", content: systemPrompt }, ...msgs],
           }),

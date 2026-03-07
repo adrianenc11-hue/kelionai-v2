@@ -124,7 +124,7 @@ router.post("/speak", ttsLimiter, validate(speakSchema), async (req, res) => {
             Authorization: "Bearer " + process.env.OPENAI_API_KEY,
           },
           body: JSON.stringify({
-            model: "tts-1",
+            model: MODELS.OPENAI_TTS,
             input: text,
             voice: openaiVoice,
             response_format: "mp3",

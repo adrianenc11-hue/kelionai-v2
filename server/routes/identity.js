@@ -7,6 +7,7 @@
 const express = require("express");
 const rateLimit = require("express-rate-limit");
 const logger = require("../logger");
+const { MODELS } = require("../config/models");
 
 const router = express.Router();
 
@@ -110,7 +111,7 @@ router.post(
                   Authorization: "Bearer " + process.env.OPENAI_API_KEY,
                 },
                 body: JSON.stringify({
-                  model: "gpt-5.4",
+                  model: MODELS.OPENAI_VISION,
                   max_tokens: 10,
                   messages: [
                     {
