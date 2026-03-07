@@ -602,6 +602,43 @@ app.get("/api/media/facebook/health", (req, res) => {
 app.get("/api/media/instagram/health", (req, res) => {
   res.json(instagram.getHealth());
 });
+// Auto-detect Instagram Business Account ID from Graph API
+app.get("/api/media/instagram/detect-account", async (req, res) => {
+  const token = process.env.FB_PAGE_ACCESS_TOKEN;
+  if (!token) return res.status(400).json({ error: "No FB_PAGE_ACCESS_TOKEN set" });
+  try {
+    // Step 1: Get pages linked to this token
+    const pagesRes = await fetch(`https://graph.facebook.com/v21.0/me/accounts?access_token=${token}`);
+    const pagesData = await pagesRes.json();
+    if (pagesData.error) return res.json({ error: pagesData.error.message, step: "get_pages" });
+
+    const results = [];
+    for (const page of (pagesData.data || [])) {
+      // Step 2: Get Instagram Business Account for each page
+      const igRes = await fetch(
+        `https://graph.facebook.com/v21.0/${page.id}?fields=instagram_business_account,name&access_token=${token}`
+      );
+      const igData = await igRes.json();
+      results.push({
+        pageId: page.id,
+        pageName: page.name || igData.name,
+        instagramBusinessAccountId: igData.instagram_business_account?.id || null,
+      });
+    }
+
+    const found = results.find(r => r.instagramBusinessAccountId);
+    res.json({
+      found: !!found,
+      instagramAccountId: found?.instagramBusinessAccountId || null,
+      instruction: found
+        ? `Set INSTAGRAM_ACCOUNT_ID=${found.instagramBusinessAccountId} in Railway env vars`
+        : "No Instagram Business Account linked to any FB pages under this token",
+      pages: results,
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
 app.get("/api/media/status", adminAuth, (req, res) => {
   res.json({
     messenger: {
