@@ -9,6 +9,8 @@ const express = require("express");
 const rateLimit = require("express-rate-limit");
 const logger = require("./logger");
 const tradeEngine = require("./trade-executor");
+const wsEngine = require("./ws-engine");
+const marketLearner = require("./market-learner");
 
 const router = express.Router();
 
@@ -341,14 +343,16 @@ function analyzeSentiment(text) {
  * @returns {{ signal: 'STRONG BUY'|'BUY'|'HOLD'|'SELL'|'STRONG SELL', confidence: number }}
  */
 function calculateConfluence(signals) {
+  // Use adaptive weights from MarketLearner (Bayesian-updated) or defaults
+  const learned = marketLearner.getWeights();
   const weights = {
-    rsi: 15,
-    macd: 20,
-    bollinger: 15,
-    ema: 20,
-    fibonacci: 10,
-    volume: 10,
-    sentiment: 10,
+    rsi: learned.RSI || 15,
+    macd: learned.MACD || 20,
+    bollinger: learned.BollingerBands || 15,
+    ema: learned.EMACrossover || 20,
+    fibonacci: learned.Fibonacci || 10,
+    volume: learned.VolumeProfile || 10,
+    sentiment: learned.Sentiment || 10,
   };
   const scoreMap = { BUY: 1, HOLD: 0, SELL: -1 };
 
@@ -377,7 +381,7 @@ function calculateConfluence(signals) {
     }
   }
 
-  if (totalWeight === 0) return { signal: "HOLD", confidence: 0 };
+  if (totalWeight === 0) return { signal: "HOLD", confidence: 0, weightsUsed: weights };
 
   const normalized = weightedScore / totalWeight; // -1 to 1
   const confidence = Math.round(Math.abs(normalized) * 100);
@@ -388,7 +392,212 @@ function calculateConfluence(signals) {
   else if (normalized <= -0.6) signal = "STRONG SELL";
   else if (normalized <= -0.2) signal = "SELL";
 
-  return { signal, confidence };
+  return { signal, confidence, weightsUsed: weights };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SMART MONEY FLOW DETECTION (Wyckoff, Volume Divergence, Order Blocks)
+// ═══════════════════════════════════════════════════════════════
+
+function detectSmartMoney(prices, volumes) {
+  if (!prices || prices.length < 30 || !volumes || volumes.length < 30) {
+    return { phase: "unknown", signal: "HOLD", divergence: null, orderBlocks: [] };
+  }
+
+  const len = Math.min(prices.length, volumes.length);
+  const p = prices.slice(-len);
+  const v = volumes.slice(-len);
+  const last = p[p.length - 1];
+
+  // ── Volume Divergence ──
+  const priceTrend = (p[p.length - 1] - p[Math.max(0, p.length - 20)]) / p[Math.max(0, p.length - 20)];
+  const volAvgRecent = v.slice(-10).reduce((s, x) => s + x, 0) / 10;
+  const volAvgPast = v.slice(-30, -10).reduce((s, x) => s + x, 0) / 20;
+  const volTrend = volAvgPast > 0 ? (volAvgRecent - volAvgPast) / volAvgPast : 0;
+
+  let divergence = null;
+  if (priceTrend > 0.02 && volTrend < -0.15) divergence = "bearish_divergence";
+  else if (priceTrend < -0.02 && volTrend > 0.15) divergence = "bullish_divergence";
+
+  // ── Order Block Detection (high volume zones) ──
+  const avgVol = v.reduce((s, x) => s + x, 0) / v.length;
+  const orderBlocks = [];
+  for (let i = 5; i < p.length - 1; i++) {
+    if (v[i] > avgVol * 2.0) {
+      const wickRatio = Math.abs(p[i] - p[i - 1]) / (Math.abs(p[i] - p[Math.max(0, i - 5)]) || 1);
+      if (wickRatio > 0.3) {
+        orderBlocks.push({ price: p[i], volume: v[i], type: p[i] > p[i - 1] ? "demand" : "supply", index: i });
+      }
+    }
+  }
+  // Keep last 5 blocks
+  const recentBlocks = orderBlocks.slice(-5);
+
+  // ── Wyckoff Phase Detection ──
+  const priceRange = Math.max(...p.slice(-50)) - Math.min(...p.slice(-50));
+  const recentRange = Math.max(...p.slice(-10)) - Math.min(...p.slice(-10));
+  const rangeRatio = priceRange > 0 ? recentRange / priceRange : 0;
+  const priceChange20 = p.length >= 20 ? (p[p.length - 1] - p[p.length - 20]) / p[p.length - 20] : 0;
+
+  let phase = "neutral";
+  if (rangeRatio < 0.3 && volTrend < 0) phase = "accumulation";
+  else if (priceChange20 > 0.05 && volTrend > 0) phase = "markup";
+  else if (rangeRatio < 0.3 && volTrend > 0 && priceChange20 > 0) phase = "distribution";
+  else if (priceChange20 < -0.05 && volTrend > 0) phase = "markdown";
+
+  // ── Absorption Detection ──
+  let absorption = false;
+  if (p.length >= 3) {
+    const lastCandle = Math.abs(p[p.length - 1] - p[p.length - 2]);
+    const lastWick = Math.abs(p[p.length - 1] - p[p.length - 3]) - lastCandle;
+    if (lastWick > lastCandle * 1.5 && v[v.length - 1] > avgVol * 1.5) absorption = true;
+  }
+
+  // ── Signal from Smart Money ──
+  let signal = "HOLD";
+  if (phase === "accumulation" || divergence === "bullish_divergence") signal = "BUY";
+  else if (phase === "distribution" || divergence === "bearish_divergence") signal = "SELL";
+  else if (phase === "markup") signal = "BUY";
+  else if (phase === "markdown") signal = "SELL";
+
+  return {
+    phase,
+    signal,
+    divergence,
+    absorption,
+    volumeTrend: +(volTrend * 100).toFixed(1) + "%",
+    orderBlocks: recentBlocks.map(b => ({ price: +b.price.toFixed(2), type: b.type, volume: Math.round(b.volume) })),
+    priceTrend: +(priceTrend * 100).toFixed(2) + "%",
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// KELLY CRITERION POSITION SIZING
+// ═══════════════════════════════════════════════════════════════
+
+function kellyPosition(winRate, avgWin, avgLoss, balance, maxRiskPct = 0.05) {
+  if (!winRate || !avgWin || !avgLoss || avgLoss === 0 || balance <= 0) {
+    return { kellyPct: 0, halfKelly: 0, positionSize: 0, reason: "insufficient_data" };
+  }
+  const W = winRate;
+  const R = Math.abs(avgWin / avgLoss);
+  const kellyPct = W - ((1 - W) / R);
+  const halfKelly = Math.max(0, kellyPct / 2);
+  const cappedKelly = Math.min(halfKelly, maxRiskPct); // never more than 5% per trade
+  const positionSize = +(cappedKelly * balance).toFixed(2);
+
+  return {
+    kellyPct: +(kellyPct * 100).toFixed(2),
+    halfKellyPct: +(halfKelly * 100).toFixed(2),
+    cappedPct: +(cappedKelly * 100).toFixed(2),
+    positionSize,
+    balance,
+    reason: kellyPct <= 0 ? "negative_edge" : "ok",
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MULTI-TIMEFRAME ANALYSIS
+// ═══════════════════════════════════════════════════════════════
+
+async function analyzeMultiTimeframe(asset) {
+  const timeframes = ["1m", "5m", "15m", "1h", "4h", "1d"];
+  const results = {};
+  const scoreMap = { BUY: 1, "STRONG BUY": 2, HOLD: 0, SELL: -1, "STRONG SELL": -2 };
+  let totalScore = 0;
+  let tfCount = 0;
+
+  for (const tf of timeframes) {
+    try {
+      // Try ws-engine first (real-time)
+      let candles = wsEngine.getCandles(asset, tf, 100);
+      let prices = [], volumes = [];
+
+      if (candles && candles.length >= 20) {
+        prices = candles.map(c => c.close);
+        volumes = candles.map(c => c.volume || 0);
+      } else {
+        // Fallback: use fetchRealPrices for this asset
+        const data = await fetchRealPrices(asset, 100);
+        prices = data.prices;
+        volumes = data.volumes;
+      }
+
+      if (prices.length < 14) continue;
+
+      const rsi = calculateRSI(prices);
+      const macd = calculateMACD(prices);
+      const bollinger = calculateBollingerBands(prices);
+      const confluence = calculateConfluence({ rsi, macd, bollinger });
+
+      results[tf] = {
+        rsi: rsi.value,
+        rsiSignal: rsi.signal,
+        macdSignal: macd.crossSignal,
+        bollingerSignal: bollinger.signal,
+        confluence: confluence.signal,
+        confidence: confluence.confidence,
+        price: prices[prices.length - 1],
+      };
+
+      totalScore += scoreMap[confluence.signal] || 0;
+      tfCount++;
+    } catch (e) {
+      results[tf] = { error: e.message };
+    }
+  }
+
+  // Cross-TF alignment
+  const avgScore = tfCount > 0 ? totalScore / tfCount : 0;
+  let overallSignal = "HOLD";
+  if (avgScore >= 1.5) overallSignal = "STRONG BUY";
+  else if (avgScore >= 0.5) overallSignal = "BUY";
+  else if (avgScore <= -1.5) overallSignal = "STRONG SELL";
+  else if (avgScore <= -0.5) overallSignal = "SELL";
+
+  const alignment = tfCount > 0 ? Math.round((Math.abs(avgScore) / 2) * 100) : 0;
+
+  return {
+    asset,
+    timeframes: results,
+    overallSignal,
+    alignment: Math.min(alignment, 100),
+    tfAnalyzed: tfCount,
+    avgScore: +avgScore.toFixed(2),
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ADVANCED ENTRY/EXIT (DCA, Trailing Stop, Partial TP)
+// ═══════════════════════════════════════════════════════════════
+
+function calculateAdvancedEntry(entryPrice, signal, riskProfile) {
+  const profile = tradeEngine.getRiskProfile();
+  const p = profile.profiles?.[riskProfile] || profile.profiles?.moderate || { DEFAULT_STOP_LOSS_PCT: 0.03, DEFAULT_TAKE_PROFIT_PCT: 0.06 };
+  const slPct = p.DEFAULT_STOP_LOSS_PCT;
+  const tpPct = p.DEFAULT_TAKE_PROFIT_PCT;
+  const isBuy = signal.includes("BUY");
+  const dir = isBuy ? 1 : -1;
+
+  return {
+    strategy: "DCA_TRAILING_PARTIAL_TP",
+    dca: {
+      level1: { price: +(entryPrice * (1 - dir * 0.01)).toFixed(4), size: "40%" },
+      level2: { price: +(entryPrice * (1 - dir * 0.02)).toFixed(4), size: "35%" },
+      level3: { price: +(entryPrice * (1 - dir * 0.03)).toFixed(4), size: "25%" },
+    },
+    stopLoss: {
+      initial: +(entryPrice * (1 - dir * slPct)).toFixed(4),
+      breakEven: { trigger: +(entryPrice * (1 + dir * 0.02)).toFixed(4), moveTo: entryPrice },
+      trailing: { distance: "1.5%", activateAfter: "+2%" },
+    },
+    takeProfit: {
+      tp1: { price: +(entryPrice * (1 + dir * tpPct * 0.5)).toFixed(4), size: "50%" },
+      tp2: { price: +(entryPrice * (1 + dir * tpPct * 0.8)).toFixed(4), size: "30%" },
+      tp3: { price: +(entryPrice * (1 + dir * tpPct * 1.2)).toFixed(4), size: "20%" },
+    },
+    riskReward: +(tpPct / slPct).toFixed(2),
+  };
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -419,6 +628,20 @@ async function fetchRealPrices(asset, length = 300) {
       volumes: cached.volumes,
       source: cached.source,
     };
+  }
+
+  // ── PRIORITY 1: WS-ENGINE (real-time, lowest latency) ──
+  try {
+    const candles = wsEngine.getCandles(asset, "1m", length);
+    if (candles && candles.length >= Math.min(length * 0.5, 20)) {
+      const wsPrices = candles.map(c => c.close);
+      const wsVolumes = candles.map(c => c.volume || 0);
+      priceCache[cacheKey] = { prices: wsPrices, volumes: wsVolumes, source: "ws-engine-realtime", ts: Date.now() };
+      logger.info({ component: "Trading", asset, source: "ws-engine", points: wsPrices.length }, `⚡ ${asset}: ${wsPrices.length} real-time points from WS-Engine`);
+      return { prices: wsPrices, volumes: wsVolumes, source: "ws-engine-realtime" };
+    }
+  } catch (e) {
+    logger.debug({ component: "Trading", asset, err: e.message }, "WS-Engine not available, falling back");
   }
 
   let prices = [];
@@ -1621,6 +1844,138 @@ router.get("/projections", (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════════════════
+// FAZA 2 — INTELLIGENCE ROUTES
+// ═══════════════════════════════════════════════════════════════
+
+// GET /mta/:asset — Multi-Timeframe Analysis
+router.get("/mta/:asset", async (req, res) => {
+  try {
+    const asset = req.params.asset.toUpperCase();
+    const allAssets = Object.values(ASSETS).flat();
+    if (!allAssets.includes(asset) && !allAssets.includes(req.params.asset)) {
+      return res.status(400).json({ error: `Asset invalid: ${asset}` });
+    }
+    const mta = await analyzeMultiTimeframe(allAssets.includes(asset) ? asset : req.params.asset);
+    res.json({ ...mta, disclaimer: DISCLAIMER });
+  } catch (err) {
+    logger.error({ err: err.message }, "[Trading] MTA error");
+    res.status(500).json({ error: "Multi-Timeframe Analysis nu este disponibil." });
+  }
+});
+
+// GET /smart-money/:asset — Smart Money Flow Detection
+router.get("/smart-money/:asset", async (req, res) => {
+  try {
+    const asset = req.params.asset.toUpperCase();
+    const allAssets = Object.values(ASSETS).flat();
+    const realAsset = allAssets.includes(asset) ? asset : allAssets.includes(req.params.asset) ? req.params.asset : null;
+    if (!realAsset) return res.status(400).json({ error: `Asset invalid: ${asset}` });
+
+    const { prices, volumes, source } = await fetchRealPrices(realAsset, 300);
+    const smartMoney = detectSmartMoney(prices, volumes);
+    const advancedEntry = smartMoney.signal !== "HOLD"
+      ? calculateAdvancedEntry(prices[prices.length - 1], smartMoney.signal, tradeEngine.getRiskProfile().active)
+      : null;
+
+    res.json({
+      asset: realAsset,
+      dataSource: source,
+      smartMoney,
+      advancedEntry,
+      dataPoints: prices.length,
+      disclaimer: DISCLAIMER,
+    });
+  } catch (err) {
+    logger.error({ err: err.message }, "[Trading] Smart Money error");
+    res.status(500).json({ error: "Smart Money Analysis nu este disponibil." });
+  }
+});
+
+// GET /kelly/:asset — Kelly Criterion Position Sizing
+router.get("/kelly/:asset", async (req, res) => {
+  try {
+    const asset = req.params.asset.toUpperCase();
+    const allAssets = Object.values(ASSETS).flat();
+    const realAsset = allAssets.includes(asset) ? asset : allAssets.includes(req.params.asset) ? req.params.asset : null;
+    if (!realAsset) return res.status(400).json({ error: `Asset invalid: ${asset}` });
+
+    // Get win rate from market-learner or paper trades
+    const paperTrades = tradeEngine.getPaperTrades();
+    const assetTrades = paperTrades.filter(t => t.asset === realAsset || t.symbol?.includes(realAsset));
+    const closedTrades = assetTrades.filter(t => t.exitPrice);
+    const wins = closedTrades.filter(t => (t.pnl || 0) > 0);
+    const losses = closedTrades.filter(t => (t.pnl || 0) <= 0);
+
+    const winRate = closedTrades.length > 0 ? wins.length / closedTrades.length : 0.5;
+    const avgWin = wins.length > 0 ? wins.reduce((s, t) => s + Math.abs(t.pnl || 0), 0) / wins.length : 0.03;
+    const avgLoss = losses.length > 0 ? losses.reduce((s, t) => s + Math.abs(t.pnl || 0), 0) / losses.length : 0.02;
+    const balance = tradeEngine.getPaperBalance();
+
+    const kelly = kellyPosition(winRate, avgWin, avgLoss, balance);
+    const learnerAccuracy = marketLearner.getAccuracy(realAsset);
+
+    res.json({
+      asset: realAsset,
+      kelly,
+      tradeHistory: {
+        totalTrades: closedTrades.length,
+        wins: wins.length,
+        losses: losses.length,
+        winRate: +(winRate * 100).toFixed(1) + "%",
+        avgWin: +avgWin.toFixed(4),
+        avgLoss: +avgLoss.toFixed(4),
+      },
+      learnerAccuracy,
+      recommendation: kelly.reason === "ok"
+        ? `Invest ${kelly.cappedPct}% ($${kelly.positionSize}) per trade`
+        : "Nu exista edge matematic — reduce riscul sau nu tranzactiona",
+      disclaimer: DISCLAIMER,
+    });
+  } catch (err) {
+    logger.error({ err: err.message }, "[Trading] Kelly error");
+    res.status(500).json({ error: "Kelly Criterion nu este disponibil." });
+  }
+});
+
+// GET /learner/weights — Current adaptive weights from MarketLearner
+router.get("/learner/weights", (req, res) => {
+  try {
+    const report = marketLearner.getReport();
+    res.json({
+      weights: marketLearner.getWeights(),
+      report,
+      disclaimer: DISCLAIMER,
+    });
+  } catch (err) {
+    logger.error({ err: err.message }, "[Trading] Learner weights error");
+    res.status(500).json({ error: "Learner weights nu sunt disponibile." });
+  }
+});
+
+// GET /learner/accuracy/:asset — Accuracy per indicator for an asset
+router.get("/learner/accuracy/:asset", (req, res) => {
+  try {
+    const asset = req.params.asset.toUpperCase();
+    const accuracy = {};
+    for (const strategy of STRATEGIES) {
+      accuracy[strategy] = marketLearner.getAccuracy(asset, strategy);
+    }
+    const meanError = marketLearner.getMeanError(asset);
+
+    res.json({
+      asset,
+      accuracy,
+      meanPredictionError: meanError,
+      experienceLevel: marketLearner.getReport()?.experienceLevel || "beginner",
+      disclaimer: DISCLAIMER,
+    });
+  } catch (err) {
+    logger.error({ err: err.message }, "[Trading] Learner accuracy error");
+    res.status(500).json({ error: "Learner accuracy nu este disponibil." });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════
 // EXPORTS
 // ═══════════════════════════════════════════════════════════════
 module.exports = router;
@@ -1634,6 +1989,10 @@ module.exports.calculateFibonacci = calculateFibonacci;
 module.exports.analyzeVolume = analyzeVolume;
 module.exports.analyzeSentiment = analyzeSentiment;
 module.exports.calculateConfluence = calculateConfluence;
+module.exports.detectSmartMoney = detectSmartMoney;
+module.exports.kellyPosition = kellyPosition;
+module.exports.analyzeMultiTimeframe = analyzeMultiTimeframe;
+module.exports.calculateAdvancedEntry = calculateAdvancedEntry;
 module.exports.tradeEngine = tradeEngine;
 module.exports.tradeIntel = tradeIntel;
 module.exports.analyzeAsset = analyzeAsset;
