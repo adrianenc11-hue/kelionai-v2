@@ -39,9 +39,19 @@
     var BAND_MID = { start: 8, end: 25 };
     var BAND_HI = { start: 25, end: 45 };
 
-    // Smoothing
+    // Smoothing — CINEMATIC mode: dynamic attack/release for natural feel
     var prevValues = {};
-    var SMOOTH_FACTOR = 0.15; // much smoother than old 0.5
+    var SMOOTH_ATTACK = 0.25;   // faster attack for crisp consonants
+    var SMOOTH_RELEASE = 0.12;  // slower release for smooth vowel transitions
+
+    // ── Mouth opening clamp — prevents enormous jaw opening ──
+    var MAX_MOUTH_OPEN = 0.45;  // absolute max for jawOpen/mouthOpen
+    var MAX_VISEME_AA = 0.50;   // absolute max for wide-open vowel
+    var MAX_VISEME = 0.60;      // absolute max for any viseme
+
+    // ── Coarticulation — blend previous viseme into current ──
+    var _prevVisemes = {};
+    var COARTIC_BLEND = 0.15;  // 15% of previous shape bleeds into current
 
     function SimpleLipSync() { }
 
@@ -55,8 +65,8 @@
             audioCtx = ctx;
             if (audioCtx.state === 'suspended') audioCtx.resume();
             analyser = audioCtx.createAnalyser();
-            analyser.fftSize = 256;
-            analyser.smoothingTimeConstant = 0.4;
+            analyser.fftSize = 512;  // CINEMATIC: doubled for better frequency resolution
+            analyser.smoothingTimeConstant = 0.35;  // slightly less smoothing for snappier response
             dataArray = new Uint8Array(analyser.frequencyBinCount);
             console.log('[LipSync] Viseme engine connected, fftSize=256');
             return analyser;
@@ -74,8 +84,8 @@
             try {
                 var sourceNode = audioCtx.createMediaElementSource(audioEl);
                 analyser = audioCtx.createAnalyser();
-                analyser.fftSize = 256;
-                analyser.smoothingTimeConstant = 0.4;
+                analyser.fftSize = 512;  // CINEMATIC: doubled
+                analyser.smoothingTimeConstant = 0.35;
                 sourceNode.connect(analyser);
                 analyser.connect(audioCtx.destination);
                 dataArray = new Uint8Array(analyser.frequencyBinCount);
@@ -128,37 +138,40 @@
 
         // Map frequency bands to visemes
         // Support BOTH Oculus (viseme_XX) AND MetaPerson (XX) naming
-        var visemes = {
-            // Jaw open — driven by low freq (vowels)
-            'jawOpen': low * 0.7,
-            'mouthOpen': low * 0.5,
+        // ── Clamp helper — enforces max mouth opening ──
+        function clamp(v, max) { return Math.min(v, max || MAX_VISEME); }
 
-            // Vowels — driven by low + mid (both naming conventions)
-            'viseme_aa': low * 0.8, 'aa': low * 0.8,              // "A" — wide open
-            'viseme_O': low * 0.6 * (1 - mid * 0.5), 'oh': low * 0.6 * (1 - mid * 0.5),  // "O"
-            'viseme_E': mid * 0.7 * (1 - low * 0.3), 'E': mid * 0.7 * (1 - low * 0.3),  // "E"
-            'viseme_I': mid * 0.5 * (1 - low * 0.5), 'ih': mid * 0.5 * (1 - low * 0.5),  // "I"
-            'viseme_U': low * 0.4 * mid * 0.3, 'ou': low * 0.4 * mid * 0.3,              // "U"
+        var visemes = {
+            // Jaw open — driven by low freq (vowels) — CLAMPED
+            'jawOpen': clamp(low * 0.7, MAX_MOUTH_OPEN),
+            'mouthOpen': clamp(low * 0.5, MAX_MOUTH_OPEN),
+
+            // Vowels — driven by low + mid (both naming conventions) — CLAMPED
+            'viseme_aa': clamp(low * 0.8, MAX_VISEME_AA), 'aa': clamp(low * 0.8, MAX_VISEME_AA),
+            'viseme_O': clamp(low * 0.6 * (1 - mid * 0.5)), 'oh': clamp(low * 0.6 * (1 - mid * 0.5)),
+            'viseme_E': clamp(mid * 0.7 * (1 - low * 0.3)), 'E': clamp(mid * 0.7 * (1 - low * 0.3)),
+            'viseme_I': clamp(mid * 0.5 * (1 - low * 0.5)), 'ih': clamp(mid * 0.5 * (1 - low * 0.5)),
+            'viseme_U': clamp(low * 0.4 * mid * 0.3), 'ou': clamp(low * 0.4 * mid * 0.3),
 
             // Consonants — driven by mid + hi (both naming conventions)
-            'viseme_PP': mid > 0.4 ? (1 - low) * 0.3 : 0, 'PP': mid > 0.4 ? (1 - low) * 0.3 : 0,
-            'viseme_FF': hi * 0.5, 'FF': hi * 0.5,
-            'viseme_TH': hi * 0.3 * mid * 0.3, 'TH': hi * 0.3 * mid * 0.3,
-            'viseme_DD': mid * 0.4 * low * 0.3, 'DD': mid * 0.4 * low * 0.3,
-            'viseme_kk': mid * 0.3 * (1 - hi * 0.5), 'kk': mid * 0.3 * (1 - hi * 0.5),
-            'viseme_CH': hi * 0.6, 'CH': hi * 0.6,
-            'viseme_SS': hi * 0.7, 'SS': hi * 0.7,
-            'viseme_nn': mid * 0.3, 'nn': mid * 0.3,
-            'viseme_RR': mid * 0.5 * low * 0.4, 'RR': mid * 0.5 * low * 0.4,
+            'viseme_PP': mid > 0.4 ? clamp((1 - low) * 0.3) : 0, 'PP': mid > 0.4 ? clamp((1 - low) * 0.3) : 0,
+            'viseme_FF': clamp(hi * 0.5), 'FF': clamp(hi * 0.5),
+            'viseme_TH': clamp(hi * 0.3 * mid * 0.3), 'TH': clamp(hi * 0.3 * mid * 0.3),
+            'viseme_DD': clamp(mid * 0.4 * low * 0.3), 'DD': clamp(mid * 0.4 * low * 0.3),
+            'viseme_kk': clamp(mid * 0.3 * (1 - hi * 0.5)), 'kk': clamp(mid * 0.3 * (1 - hi * 0.5)),
+            'viseme_CH': clamp(hi * 0.6), 'CH': clamp(hi * 0.6),
+            'viseme_SS': clamp(hi * 0.7), 'SS': clamp(hi * 0.7),
+            'viseme_nn': clamp(mid * 0.3), 'nn': clamp(mid * 0.3),
+            'viseme_RR': clamp(mid * 0.5 * low * 0.4), 'RR': clamp(mid * 0.5 * low * 0.4),
             'viseme_sil': 0, 'sil': 0,
 
             // Supplementary ARKit
-            'mouthSmile': mid * 0.15,
-            'mouthFunnel': low * 0.3 * (1 - mid),
-            'mouthPucker': low * 0.2 * mid * 0.2
+            'mouthSmile': clamp(mid * 0.15),
+            'mouthFunnel': clamp(low * 0.3 * (1 - mid)),
+            'mouthPucker': clamp(low * 0.2 * mid * 0.2)
         };
 
-        // Apply with exponential smoothing
+        // Apply with CINEMATIC smoothing (dynamic attack/release + coarticulation)
         for (var m = 0; m < morphMeshes.length; m++) {
             var mesh = morphMeshes[m];
             if (!mesh.morphTargetDictionary || !mesh.morphTargetInfluences) continue;
@@ -166,12 +179,26 @@
                 var idx = mesh.morphTargetDictionary[name];
                 if (idx === undefined) continue;
                 var target = visemes[name];
+
+                // Coarticulation: blend 15% of previous viseme shape
+                var prevShape = _prevVisemes[name] || 0;
+                target = target * (1 - COARTIC_BLEND) + prevShape * COARTIC_BLEND;
+
                 var prev = prevValues[name] || 0;
-                var smoothed = prev + (target - prev) * SMOOTH_FACTOR;
+                // Dynamic smoothing: attack faster than release
+                var factor = (target > prev) ? SMOOTH_ATTACK : SMOOTH_RELEASE;
+                var smoothed = prev + (target - prev) * factor;
+
+                // CINEMATIC: add subtle asymmetry for realism (left side slightly ahead)
+                var asymOffset = (name.indexOf('Left') !== -1 || name.indexOf('left') !== -1) ? 0.02 : 0;
+                smoothed = Math.min(smoothed + asymOffset, 1);
+
                 mesh.morphTargetInfluences[idx] = smoothed;
                 prevValues[name] = smoothed;
             }
         }
+        // Store current visemes for next frame's coarticulation
+        for (var k in visemes) _prevVisemes[k] = visemes[k];
     };
 
     function _bandAvg(start, end) {

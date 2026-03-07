@@ -354,6 +354,20 @@ router.post("/chat", chatLimiter, validate(chatSchema), async (req, res) => {
     if (emotionMatch) {
       emotion = emotionMatch[1].toLowerCase();
       reply = reply.replace(/\[EMOTION:\w+\]/gi, "").trim();
+    } else {
+      // FALLBACK: auto-detect emotion from reply text when AI doesn't emit tags
+      const replyLow = reply.toLowerCase();
+      if (/😂|😄|😊|haha|:D|bravo|super|perfect|excelent|genial|fantastic/i.test(replyLow)) emotion = 'laughing';
+      else if (/❤|🥰|💕|te iubesc|love|drag|iubit/i.test(replyLow)) emotion = 'loving';
+      else if (/😢|😔|din păcate|unfortunately|îmi pare rău|sorry|scuze|regret/i.test(replyLow)) emotion = 'sad';
+      else if (/🤔|hmm|interesant|curios|interesting|oare|perhaps/i.test(replyLow)) emotion = 'thinking';
+      else if (/😮|wow|uau|incredibil|amazing|unbelievable|nu-mi vine/i.test(replyLow)) emotion = 'surprised';
+      else if (/😏|heh|glum|ironic|witty|😜/i.test(replyLow)) emotion = 'playful';
+      else if (/💪|determinat|going to|vom reuși|we will|hai să/i.test(replyLow)) emotion = 'determined';
+      else if (/😟|grijă|atenție|careful|warning|pericol|danger/i.test(replyLow)) emotion = 'concerned';
+      else if (/salut|bună|hello|hey|hi |welcome|👋/i.test(replyLow)) emotion = 'happy';
+      else if (/\?$/.test(reply.trim())) emotion = 'thinking';
+      else emotion = 'happy'; // default to happy, not neutral — feels more alive
     }
     // Parse [GESTURE:xxx] tags from AI reply (brain controls body language)
     let gestures = [];
