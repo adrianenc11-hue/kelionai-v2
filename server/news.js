@@ -48,8 +48,12 @@ let lastFetchedHour = -1; // UTC hour last fetched in
 
 // ═══ SUPABASE PERSISTENCE (optional) ═══
 let _supabase = null;
+let _brain = null;
 function setSupabase(client) {
   _supabase = client;
+}
+function setBrain(b) {
+  _brain = b;
 }
 
 // ═══ AUTO-PUBLISH CALLBACK ═══
@@ -345,10 +349,10 @@ function parseRSS(xml, _sourceName) {
     const url = linkMatch ? linkMatch[1].trim() : "";
     const description = descMatch
       ? descMatch[1]
-          .replace(/</g, " ")
-          .replace(/>/g, " ")
-          .replace(/\s+/g, " ")
-          .trim()
+        .replace(/</g, " ")
+        .replace(/>/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
       : "";
     const pubDateStr = pubMatch ? pubMatch[1].trim() : "";
     let publishedAt;
@@ -479,6 +483,14 @@ async function fetchAllSources() {
   );
   await persistCache();
 
+  // ═══ BRAIN INTEGRATION — save headline summary to memory ═══
+  if (_brain && articleCache.size > 0) {
+    const topHeadlines = getArticlesArray().slice(0, 5).map(a => a.title).join(" | ");
+    _brain.saveMemory(null, "context", "Știri noi: " + topHeadlines.substring(0, 400), {
+      platform: "news", type: "headlines", count: articleCache.size
+    }).catch(() => { });
+  }
+
   // ═══ AUTO-PUBLISH to all media channels ═══
   if (_onNewsFetched && articleCache.size > 0) {
     try {
@@ -546,7 +558,7 @@ function getNextFetchTimes() {
             0,
             0,
           ) -
-            offsetMin * 60000,
+          offsetMin * 60000,
         );
         const actualHour = parseInt(formatter.format(targetUtc), 10);
         if (actualHour === h && targetUtc > now) {
@@ -728,6 +740,7 @@ async function restoreCache() {
 module.exports = {
   router,
   setSupabase,
+  setBrain,
   restoreCache,
   getArticlesArray,
   onNewsFetched,

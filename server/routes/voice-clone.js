@@ -145,6 +145,12 @@ router.post("/voice/clone", upload.single("audio"), async (req, res) => {
       message:
         "Voice cloned successfully! All TTS responses will now use your voice.",
     });
+
+    // ═══ BRAIN INTEGRATION — save voice clone fact ═══
+    const brain = req.app.locals.brain;
+    if (brain && user?.id) {
+      brain.saveFact(user.id, "User a clonat vocea: " + voiceName + " (ID: " + voiceId + ")", "voice", "voice-clone").catch(() => { });
+    }
   } catch (e) {
     logger.error({ component: "VoiceClone", err: e.message }, "Clone error");
     res.status(500).json({ error: "Voice cloning error: " + e.message });
@@ -207,6 +213,12 @@ router.delete("/voice/clone", async (req, res) => {
       success: true,
       message: "Cloned voice removed. Default voices restored.",
     });
+
+    // ═══ BRAIN INTEGRATION — save voice delete memory ═══
+    const brain = req.app.locals.brain;
+    if (brain && user?.id) {
+      brain.saveMemory(user.id, "context", "User a șters vocea clonată (ID: " + voiceId + ")", { type: "voice-clone" }).catch(() => { });
+    }
   } catch (e) {
     logger.error({ component: "VoiceClone", err: e.message }, "Delete error");
     res.status(500).json({ error: "Error removing voice: " + e.message });

@@ -842,6 +842,65 @@ app.locals._getNewsArticles = newsModule.getArticlesArray;
 // ═══ TRADING BOT (admin only) ═══
 app.use("/api/trading", adminAuth, require("./trading"));
 
+// ═══ REAL-TIME ENGINE + MARKET LEARNER + FOREX ═══
+const wsEngine = require("./ws-engine");
+const marketLearner = require("./market-learner");
+const forexEngine = require("./forex-engine");
+
+// Initialize with Supabase
+if (app.locals.supabaseAdmin) {
+  wsEngine.setSupabase(app.locals.supabaseAdmin);
+  marketLearner.init(app.locals.supabaseAdmin).catch(e =>
+    logger.warn({ err: e.message }, "MarketLearner init warning"));
+}
+wsEngine.start();
+app.locals.wsEngine = wsEngine;
+app.locals.marketLearner = marketLearner;
+app.locals.forexEngine = forexEngine;
+
+// ── Forex routes ──
+app.get("/api/trading/forex/session", adminAuth, (req, res) => {
+  res.json(forexEngine.getCurrentSession());
+});
+app.get("/api/trading/forex/pairs", adminAuth, (req, res) => {
+  res.json({ pairs: forexEngine.getAllPairs(), bestNow: forexEngine.getBestPairsNow() });
+});
+app.post("/api/trading/forex/lot-size", adminAuth, (req, res) => {
+  const { pair, balance, riskPct, slPips } = req.body || {};
+  res.json(forexEngine.calculateLotSize(pair, balance || 10000, riskPct || 1, slPips || 20));
+});
+app.post("/api/trading/forex/check", adminAuth, (req, res) => {
+  const { pair, direction, bid, ask } = req.body || {};
+  res.json(forexEngine.preTradeCheck(pair, direction, bid, ask));
+});
+app.get("/api/trading/forex/account", adminAuth, async (req, res) => {
+  res.json(await forexEngine.getAccountSummary());
+});
+
+// ── WS Engine stats ──
+app.get("/api/trading/ws-stats", adminAuth, (req, res) => {
+  res.json(wsEngine.getStats());
+});
+app.get("/api/trading/ws-prices", adminAuth, (req, res) => {
+  res.json(wsEngine.getAllPrices());
+});
+app.get("/api/trading/ws-candles/:asset/:tf?", adminAuth, (req, res) => {
+  const candles = wsEngine.getCandles(req.params.asset, req.params.tf || "1m", 100);
+  res.json({ asset: req.params.asset, tf: req.params.tf || "1m", candles, count: candles.length });
+});
+
+// ── Learner routes ──
+app.get("/api/trading/learner", adminAuth, (req, res) => {
+  res.json(marketLearner.getReport());
+});
+app.get("/api/trading/learner/weights", adminAuth, (req, res) => {
+  res.json(marketLearner.getWeights());
+});
+app.post("/api/trading/learner/save", adminAuth, async (req, res) => {
+  await marketLearner.saveState();
+  res.json({ success: true, message: "Learning state saved" });
+});
+
 // ═══ SPORTS BOT — REMOVED (no real utility without betting integration) ═══
 
 // 404 for unknown API routes — must come before the catch-all
