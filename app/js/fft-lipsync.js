@@ -165,10 +165,25 @@
             'viseme_RR': clamp(mid * 0.5 * low * 0.4), 'RR': clamp(mid * 0.5 * low * 0.4),
             'viseme_sil': 0, 'sil': 0,
 
-            // Supplementary ARKit
+            // Supplementary ARKit — ALL remaining mouth morphs active
             'mouthSmile': clamp(mid * 0.15),
             'mouthFunnel': clamp(low * 0.3 * (1 - mid)),
-            'mouthPucker': clamp(low * 0.2 * mid * 0.2)
+            'mouthPucker': clamp(low * 0.2 * mid * 0.2),
+            'mouthClose': (low < 0.05 && mid < 0.05) ? 0.1 : 0,
+            'mouthRollLower': clamp(mid * 0.08),
+            'mouthRollUpper': clamp(mid * 0.05),
+            'mouthShrugLower': clamp(low * 0.12 * (1 - mid)),
+            'mouthShrugUpper': clamp(mid * 0.06),
+            'jawLeft': clamp(Math.sin(Date.now() * 0.003) * mid * 0.03),
+            'jawRight': clamp(Math.cos(Date.now() * 0.003) * mid * 0.03),
+            'mouthStretchLeft': clamp(low * 0.08),
+            'mouthStretchRight': clamp(low * 0.08),
+            'mouthLowerDownLeft': clamp(low * 0.12),
+            'mouthLowerDownRight': clamp(low * 0.12),
+            'mouthUpperUpLeft': clamp(mid * 0.06),
+            'mouthUpperUpRight': clamp(mid * 0.06),
+            'mouthDimpleLeft': clamp(mid * 0.04),
+            'mouthDimpleRight': clamp(mid * 0.04)
         };
 
         // Apply with CINEMATIC smoothing (dynamic attack/release + coarticulation)
