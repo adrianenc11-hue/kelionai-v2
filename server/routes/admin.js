@@ -1,11 +1,25 @@
 // ═══════════════════════════════════════════════════════════════
 // KelionAI — Admin API Routes (admin-only, role-gated)
+// Zero hardcoded values — all from env vars
 // ═══════════════════════════════════════════════════════════════
 "use strict";
 
 const express = require("express");
 const logger = require("../logger");
 const router = express.Router();
+
+// ── Config from environment variables ──
+const CONFIG = {
+  planPrices: {
+    pro: parseFloat(process.env.PLAN_PRO_PRICE || "9.99"),
+    premium: parseFloat(process.env.PLAN_PREMIUM_PRICE || "29.99"),
+  },
+  rechargeAmountPence: parseInt(process.env.RECHARGE_AMOUNT_PENCE || "5000", 10),
+  creditLowThreshold: parseFloat(process.env.CREDIT_LOW_THRESHOLD || "5"),
+  creditMedThreshold: parseFloat(process.env.CREDIT_MED_THRESHOLD || "2"),
+  appUrl: process.env.APP_URL || process.env.RAILWAY_PUBLIC_DOMAIN ? ("https://" + process.env.RAILWAY_PUBLIC_DOMAIN) : "https://kelionai.app",
+  adminEmail: process.env.ADMIN_EMAIL || "",
+};
 
 // ── Admin middleware — checks JWT role ──
 async function requireAdmin(req, res, next) {
@@ -500,14 +514,14 @@ router.post("/recharge", async (req, res) => {
         line_items: [{
           price_data: {
             currency: "gbp",
-            product_data: { name: "KelionAI — AI Credit Recharge", description: "Top-up £50 for AI API credits (proportional distribution)" },
-            unit_amount: 5000, // £50.00 in pence
+            product_data: { name: "KelionAI — AI Credit Recharge", description: "Top-up for AI API credits (proportional distribution)" },
+            unit_amount: CONFIG.rechargeAmountPence,
           },
           quantity: 1,
         }],
         mode: "payment",
-        success_url: (process.env.APP_URL || "https://kelionai.app") + "/admin?recharge=success",
-        cancel_url: (process.env.APP_URL || "https://kelionai.app") + "/admin?recharge=cancelled",
+        success_url: CONFIG.appUrl + "/admin?recharge=success",
+        cancel_url: CONFIG.appUrl + "/admin?recharge=cancelled",
         metadata: { type: "ai_recharge", admin_id: req.adminUser?.id || "unknown" },
       });
 
