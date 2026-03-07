@@ -8,7 +8,7 @@
 const MODELS = {
     // ── LLM ──
     GROQ_PRIMARY: "llama-3.3-70b-versatile",
-    OPENAI_CHAT: "gpt-4o-mini",
+    OPENAI_CHAT: "gpt-5.4",
     OPENAI_FALLBACK: "gpt-4o",
     OPENAI_VISION: "gpt-5.4",
     ANTHROPIC_CHAT: "claude-sonnet-4-20250514",
