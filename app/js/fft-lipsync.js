@@ -41,13 +41,13 @@
 
     // Smoothing — CINEMATIC mode: dynamic attack/release for natural feel
     var prevValues = {};
-    var SMOOTH_ATTACK = 0.25;   // faster attack for crisp consonants
-    var SMOOTH_RELEASE = 0.12;  // slower release for smooth vowel transitions
+    var SMOOTH_ATTACK = 0.12;   // slower attack for smoother lip movement
+    var SMOOTH_RELEASE = 0.08;  // very slow release for natural feel
 
     // ── Mouth opening clamp — prevents enormous jaw opening ──
-    var MAX_MOUTH_OPEN = 0.45;  // absolute max for jawOpen/mouthOpen
-    var MAX_VISEME_AA = 0.50;   // absolute max for wide-open vowel
-    var MAX_VISEME = 0.60;      // absolute max for any viseme
+    var MAX_MOUTH_OPEN = 0.25;  // absolute max for jawOpen/mouthOpen (was 0.45)
+    var MAX_VISEME_AA = 0.30;   // absolute max for wide-open vowel (was 0.50)
+    var MAX_VISEME = 0.35;      // absolute max for any viseme (was 0.60)
 
     // ── Coarticulation — blend previous viseme into current ──
     var _prevVisemes = {};
@@ -143,8 +143,8 @@
 
         var visemes = {
             // Jaw open — driven by low freq (vowels) — CLAMPED
-            'jawOpen': clamp(low * 0.7, MAX_MOUTH_OPEN),
-            'mouthOpen': clamp(low * 0.5, MAX_MOUTH_OPEN),
+            'jawOpen': clamp(low * 0.4, MAX_MOUTH_OPEN),
+            'mouthOpen': clamp(low * 0.3, MAX_MOUTH_OPEN),
 
             // Vowels — driven by low + mid (both naming conventions) — CLAMPED
             'viseme_aa': clamp(low * 0.8, MAX_VISEME_AA), 'aa': clamp(low * 0.8, MAX_VISEME_AA),
