@@ -133,8 +133,8 @@
         renderer.setSize(w, h);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 3)); // CINEMATIC: up to 3x for 4K/retina
 
-        camera = new THREE.PerspectiveCamera(35, w / h, 0.1, 100);
-        camera.position.set(0, 0, 2.5);
+        camera = new THREE.PerspectiveCamera(30, w / h, 0.1, 100);
+        camera.position.set(0, 0, 1.8); // Closer for bigger avatar in viewport
         renderer.outputColorSpace = THREE.SRGBColorSpace;
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
         renderer.toneMappingExposure = 1.2;
@@ -528,29 +528,36 @@
         if (!armBones.left && !armBones.right) findArmBones();
 
         // MetaPerson / Avaturn models use different bone orientations than RPM
-        // We try multiple approaches to bring arms down
         var poses = {
             // BUSINESS: hands relaxed by body, professional stance
-            relaxed: { lz: 1.2, rz: -1.2, lx: 0.1, rx: 0.1, ly: 0, ry: 0 },
-            // Presenting: one arm slightly out
-            presenting: { lz: 0.8, rz: -0.8, lx: -0.15, rx: -0.15, ly: 0, ry: 0 },
-            // Crossed: arms folded
-            crossed: { lz: 1.4, rz: -1.4, lx: 0.4, rx: 0.4, ly: 0.2, ry: -0.2 },
-            // Open: welcoming gesture
-            open: { lz: 0.5, rz: -0.5, lx: -0.1, rx: -0.1, ly: 0, ry: 0 }
+            relaxed: { lz: 1.5, rz: -1.5, lx: 0.15, rx: 0.15, ly: 0, ry: 0 },
+            presenting: { lz: 1.0, rz: -1.0, lx: -0.1, rx: -0.1, ly: 0, ry: 0 },
+            crossed: { lz: 1.5, rz: -1.5, lx: 0.5, rx: 0.5, ly: 0.3, ry: -0.3 },
+            open: { lz: 0.6, rz: -0.6, lx: -0.1, rx: -0.1, ly: 0, ry: 0 }
         };
-        var p = poses[currentPose] || poses.relaxed;
+        _targetPose = poses[currentPose] || poses.relaxed;
+        _enforcePose(); // Apply immediately
+        console.log('[Avatar] Pose set:', currentPose);
+    }
 
-        // Apply rotation on all three axes for MetaPerson compatibility
+    // Cached target pose for per-frame enforcement
+    var _targetPose = { lz: 1.5, rz: -1.5, lx: 0.15, rx: 0.15, ly: 0, ry: 0 };
+
+    // Called EVERY frame after mixer.update() to override animation arm defaults
+    function _enforcePose() {
+        if (!_targetPose) return;
+        var p = _targetPose;
+        var lerp = 0.15;
         if (armBones.left) {
-            armBones.left.rotation.set(p.lx, p.ly, p.lz);
+            armBones.left.rotation.x += (p.lx - armBones.left.rotation.x) * lerp;
+            armBones.left.rotation.y += (p.ly - armBones.left.rotation.y) * lerp;
+            armBones.left.rotation.z += (p.lz - armBones.left.rotation.z) * lerp;
         }
         if (armBones.right) {
-            armBones.right.rotation.set(p.rx, p.ry, p.rz);
+            armBones.right.rotation.x += (p.rx - armBones.right.rotation.x) * lerp;
+            armBones.right.rotation.y += (p.ry - armBones.right.rotation.y) * lerp;
+            armBones.right.rotation.z += (p.rz - armBones.right.rotation.z) * lerp;
         }
-        console.log('[Avatar] Pose set:', currentPose,
-            '| L:', armBones.left ? armBones.left.rotation.toArray().map(v => v.toFixed(2)) : 'none',
-            '| R:', armBones.right ? armBones.right.rotation.toArray().map(v => v.toFixed(2)) : 'none');
     }
 
     function updateExpression(dt) {
@@ -572,6 +579,7 @@
         requestAnimationFrame(animate);
         var dt = clock.getDelta();
         if (mixer) mixer.update(dt);
+        _enforcePose();  // MUST be after mixer.update — override animation arm positions
         updateBlink(dt);
         updateExpression(dt);
         if (lipSync && window.KVoice && KVoice.isSpeaking()) lipSync.update();
