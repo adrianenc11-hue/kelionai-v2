@@ -78,11 +78,11 @@ body {
     background: rgba(5, 5, 16, 0.5);
 }
 
-/* ── Avatar Area (sus-stânga) ── */
+/* ── Avatar Area (full height, subtitle-style) ── */
 #avatar-area {
-    flex: 2;
+    flex: 1;
     position: relative;
-    min-height: 400px;
+    min-height: 0;
     background: radial-gradient(ellipse at center bottom, rgba(99, 102, 241, 0.04) 0%, transparent 70%);
 }
 
@@ -210,15 +210,12 @@ body {
     font-weight: 600;
 }
 
-/* ── Chat Area (jos-stânga, compact) ── */
+/* ── Chat Area — hidden, messages go to monitor ── */
 #chat-area {
     flex: 0 0 auto;
-    max-height: 200px;
-    display: flex;
-    flex-direction: column;
-    background: rgba(5, 5, 16, 0.85);
-    backdrop-filter: blur(12px);
-    border-top: 1px solid rgba(99, 102, 241, 0.08);
+    max-height: 0;
+    overflow: hidden;
+    display: none;
 }
 
 #chat-overlay {
