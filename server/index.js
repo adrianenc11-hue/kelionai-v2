@@ -128,6 +128,7 @@ app.use((req, res, next) => {
         ],
         mediaSrc: ["'self'", "blob:"],
         workerSrc: ["'self'", "blob:"],
+        scriptSrcAttr: ["'unsafe-inline'"], // Required for admin panel onclick handlers
       },
     },
     crossOriginEmbedderPolicy: false,
