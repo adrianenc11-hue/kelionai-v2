@@ -11,6 +11,8 @@ const logger = require("./logger");
 const tradeEngine = require("./trade-executor");
 const wsEngine = require("./ws-engine");
 const marketLearner = require("./market-learner");
+const aiScorer = require("./ai-scoring");
+const perfTracker = require("./performance-tracker");
 
 const router = express.Router();
 
@@ -1976,6 +1978,185 @@ router.get("/learner/accuracy/:asset", (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════════════════
+// FAZA 3 — AI SCORING + PERFORMANCE + ALERTS
+// ═══════════════════════════════════════════════════════════════
+
+// GET /ai-score/:asset — AI-powered signal evaluation
+router.get("/ai-score/:asset", async (req, res) => {
+  try {
+    const asset = req.params.asset.toUpperCase();
+    const allAssets = Object.values(ASSETS).flat();
+    const realAsset = allAssets.includes(asset) ? asset : allAssets.includes(req.params.asset) ? req.params.asset : null;
+    if (!realAsset) return res.status(400).json({ error: `Asset invalid: ${asset}` });
+
+    // Gather all data for scoring
+    const analysis = await analyzeAsset(realAsset);
+    const { prices, volumes } = await fetchRealPrices(realAsset, 300);
+    const smartMoney = detectSmartMoney(prices, volumes);
+
+    let mta = null;
+    try { mta = await analyzeMultiTimeframe(realAsset); } catch (e) { /* optional */ }
+
+    const scoreResult = await aiScorer.scoreSignal({
+      asset: realAsset,
+      price: analysis.price,
+      confluence: analysis.confluence,
+      rsi: analysis.rsi,
+      macd: analysis.macd,
+      smartMoney,
+      mta,
+    });
+
+    // Record signal in learner
+    if (analysis.confluence?.signal !== "HOLD") {
+      for (const ind of STRATEGIES) {
+        const sig = analysis[ind.toLowerCase()]?.signal || analysis[ind.toLowerCase()]?.crossSignal;
+        if (sig) marketLearner.recordSignal(realAsset, ind, sig, analysis.price);
+      }
+    }
+
+    res.json({
+      asset: realAsset,
+      price: analysis.price,
+      aiScore: scoreResult,
+      confluence: analysis.confluence,
+      smartMoney: { phase: smartMoney.phase, signal: smartMoney.signal },
+      mta: mta ? { signal: mta.overallSignal, alignment: mta.alignment } : null,
+      advancedEntry: scoreResult.action.includes("BUY") || scoreResult.action.includes("SELL")
+        ? calculateAdvancedEntry(analysis.price, scoreResult.action.replace("_", " "), tradeEngine.getRiskProfile().active)
+        : null,
+      disclaimer: DISCLAIMER,
+    });
+  } catch (err) {
+    logger.error({ err: err.message }, "[Trading] AI Score error");
+    res.status(500).json({ error: "AI Scoring nu este disponibil." });
+  }
+});
+
+// GET /performance — Full performance report
+router.get("/performance", (req, res) => {
+  try {
+    const report = perfTracker.getReport();
+    res.json({
+      ...report,
+      aiScoringStats: aiScorer.getStats(),
+      learnerReport: marketLearner.getReport(),
+      disclaimer: DISCLAIMER,
+    });
+  } catch (err) {
+    logger.error({ err: err.message }, "[Trading] Performance error");
+    res.status(500).json({ error: "Performance report nu este disponibil." });
+  }
+});
+
+// GET /alert-check — Check for actionable alerts (signals > 70% confidence)
+router.get("/alert-check", async (req, res) => {
+  try {
+    const allAssets = Object.values(ASSETS).flat();
+    const alerts = [];
+
+    for (const asset of allAssets) {
+      try {
+        const analysis = await analyzeAsset(asset);
+        if (!analysis.confluence || analysis.confluence.signal === "HOLD") continue;
+        if (analysis.confluence.confidence < 70) continue;
+
+        const { prices, volumes } = await fetchRealPrices(asset, 100);
+        const smartMoney = detectSmartMoney(prices, volumes);
+
+        // Only alert if Smart Money agrees
+        const smAgrees = smartMoney.signal === analysis.confluence.signal.replace("STRONG ", "");
+
+        alerts.push({
+          asset,
+          signal: analysis.confluence.signal,
+          confidence: analysis.confluence.confidence,
+          price: analysis.price,
+          rsi: analysis.rsi?.value,
+          smartMoneyPhase: smartMoney.phase,
+          smartMoneyAgrees: smAgrees,
+          priority: smAgrees ? "HIGH" : "MEDIUM",
+          timestamp: new Date().toISOString(),
+        });
+      } catch (e) {
+        // Skip failed assets
+      }
+    }
+
+    alerts.sort((a, b) => b.confidence - a.confidence);
+
+    res.json({
+      alerts,
+      count: alerts.length,
+      highPriority: alerts.filter(a => a.priority === "HIGH").length,
+      checkedAt: new Date().toISOString(),
+      disclaimer: DISCLAIMER,
+    });
+  } catch (err) {
+    logger.error({ err: err.message }, "[Trading] Alert check error");
+    res.status(500).json({ error: "Alert check nu este disponibil." });
+  }
+});
+
+// GET /full-intelligence/:asset — Everything in one call
+router.get("/full-intelligence/:asset", async (req, res) => {
+  try {
+    const asset = req.params.asset.toUpperCase();
+    const allAssets = Object.values(ASSETS).flat();
+    const realAsset = allAssets.includes(asset) ? asset : allAssets.includes(req.params.asset) ? req.params.asset : null;
+    if (!realAsset) return res.status(400).json({ error: `Asset invalid: ${asset}` });
+
+    const [analysis, mta] = await Promise.all([
+      analyzeAsset(realAsset),
+      analyzeMultiTimeframe(realAsset).catch(() => null),
+    ]);
+
+    const { prices, volumes } = await fetchRealPrices(realAsset, 300);
+    const smartMoney = detectSmartMoney(prices, volumes);
+    const aiScore = await aiScorer.scoreSignal({
+      asset: realAsset, price: analysis.price, confluence: analysis.confluence,
+      rsi: analysis.rsi, macd: analysis.macd, smartMoney, mta,
+    });
+
+    const profile = tradeEngine.getRiskProfile();
+    const kelly = kellyPosition(
+      0.5, 0.03, 0.02, tradeEngine.getPaperBalance()
+    );
+
+    const advEntry = aiScore.action !== "HOLD"
+      ? calculateAdvancedEntry(analysis.price, aiScore.action.replace("_", " "), profile.active)
+      : null;
+
+    res.json({
+      asset: realAsset,
+      timestamp: new Date().toISOString(),
+      price: analysis.price,
+      dataSource: analysis.dataSource,
+      technicals: {
+        rsi: analysis.rsi,
+        macd: analysis.macd,
+        bollinger: analysis.bollinger,
+        ema: analysis.ema,
+        fibonacci: analysis.fibonacci,
+        volume: analysis.volume,
+      },
+      confluence: analysis.confluence,
+      multiTimeframe: mta,
+      smartMoney,
+      aiScore,
+      kelly,
+      advancedEntry: advEntry,
+      riskProfile: { name: profile.profiles?.[profile.active]?.name, risk: profile.active },
+      performance: perfTracker.getReport()?.summary,
+      disclaimer: DISCLAIMER,
+    });
+  } catch (err) {
+    logger.error({ err: err.message }, "[Trading] Full intelligence error");
+    res.status(500).json({ error: "Full intelligence nu este disponibil." });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════
 // EXPORTS
 // ═══════════════════════════════════════════════════════════════
 module.exports = router;
@@ -1993,6 +2174,8 @@ module.exports.detectSmartMoney = detectSmartMoney;
 module.exports.kellyPosition = kellyPosition;
 module.exports.analyzeMultiTimeframe = analyzeMultiTimeframe;
 module.exports.calculateAdvancedEntry = calculateAdvancedEntry;
+module.exports.aiScorer = aiScorer;
+module.exports.perfTracker = perfTracker;
 module.exports.tradeEngine = tradeEngine;
 module.exports.tradeIntel = tradeIntel;
 module.exports.analyzeAsset = analyzeAsset;

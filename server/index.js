@@ -853,6 +853,8 @@ if (app.locals.supabaseAdmin) {
   wsEngine.setSupabase(app.locals.supabaseAdmin);
   marketLearner.init(app.locals.supabaseAdmin).catch(e =>
     logger.warn({ err: e.message }, "MarketLearner init warning"));
+  const perfTracker = require("./performance-tracker");
+  perfTracker.init(app.locals.supabaseAdmin);
 }
 wsEngine.start();
 app.locals.wsEngine = wsEngine;
