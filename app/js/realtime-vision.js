@@ -85,7 +85,7 @@ const RealtimeVision = (() => {
 
         try {
             const stream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: 'environment', width: 640, height: 480 }
+                video: { facingMode: 'user', width: 640, height: 480 }
             });
             video.srcObject = stream;
             document.body.appendChild(video);

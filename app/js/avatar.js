@@ -60,10 +60,45 @@
     var _neckBone = null;
     var _fingerBones = { left: {}, right: {} };
     document.addEventListener('mousemove', function (e) {
-        // Normalize to -1..1 from viewport center
+        if (_faceTrackingActive) return; // Camera overrides mouse
         _mouseX = (e.clientX / window.innerWidth) * 2 - 1;
         _mouseY = -((e.clientY / window.innerHeight) * 2 - 1);
     });
+
+    // ══ Face Tracking via Camera ═══════════════════════════════
+    var _faceTrackingActive = false;
+    window.addEventListener('vision-detection', function (e) {
+        if (!e.detail || !e.detail.predictions) return;
+        var preds = e.detail.predictions;
+        // Find 'person' detection (coco-ssd class)
+        var person = null;
+        for (var i = 0; i < preds.length; i++) {
+            if (preds[i].class === 'person' && preds[i].score > 0.4) {
+                person = preds[i];
+                break;
+            }
+        }
+        if (person) {
+            _faceTrackingActive = true;
+            // bbox = [x, y, width, height]
+            // Face is at top-center of person bbox
+            var video = document.querySelector('video');
+            var vw = video ? video.videoWidth || 640 : 640;
+            var vh = video ? video.videoHeight || 480 : 480;
+            var faceCenterX = person.bbox[0] + person.bbox[2] / 2;
+            var faceCenterY = person.bbox[1] + person.bbox[3] * 0.2; // top 20% = face
+            // Normalize to -1..1 (MIRRORED on X because front camera is mirrored)
+            _mouseX = -((faceCenterX / vw) * 2 - 1);
+            _mouseY = -((faceCenterY / vh) * 2 - 1);
+        }
+    });
+    // Auto-start face tracking after avatar loads
+    setTimeout(function () {
+        if (typeof RealtimeVision !== 'undefined' && !RealtimeVision.active) {
+            RealtimeVision.start(200); // 5 FPS face tracking
+            console.log('[Avatar] Auto-started face tracking via camera');
+        }
+    }, 3000);
 
     // ══ INNOVATIVE: Micro-expressions ═════════════════════════
     var _microTimer = 0;
