@@ -606,9 +606,9 @@
     function animate() {
         requestAnimationFrame(animate);
         var dt = clock.getDelta();
-        // NO MIXER — GLB animation was overriding ALL bone changes
-        // Avatar is fully static. ALL movement comes from brain via
-        // [GESTURE:xxx] [POSE:xxx] [EXPRESSION:xxx] tags only.
+        // Mixer provides base idle animation from GLB model
+        // Brain controls changes via [GESTURE:xxx] [POSE:xxx] [EMOTION:xxx] tags
+        if (mixer) mixer.update(dt);
 
         updateBlink(dt);
         updateExpression(dt);
