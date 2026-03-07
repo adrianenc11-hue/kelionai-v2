@@ -640,10 +640,21 @@
         // All body movement comes from AI brain via [GESTURE:xxx] [POSE:xxx] tags.
         // Only natural functions remain: blink, lip sync, eye tracking.
 
-        // ══ Eye Tracking (natural — mouse follow via morphs) ═══
+        // ══ Eye Saccades (natural micro-movements) ══════════════
+        _saccadeTimer += dt;
+        if (_saccadeTimer >= _nextSaccade) {
+            _saccadeTimer = 0;
+            _nextSaccade = 0.5 + Math.random() * 2;
+            _saccadeTargetX = (Math.random() - 0.5) * 0.04;
+            _saccadeTargetY = (Math.random() - 0.5) * 0.02;
+        }
+        _saccadeCurrentX += (_saccadeTargetX - _saccadeCurrentX) * 0.3;
+        _saccadeCurrentY += (_saccadeTargetY - _saccadeCurrentY) * 0.3;
+
+        // ══ Eye Tracking (mouse follow + saccades) ═══════════════
         if (_eyeBones.left || _eyeBones.right) {
-            var eyeYaw = _mouseX * 0.12;
-            var eyePitch = _mouseY * 0.06;
+            var eyeYaw = _mouseX * 0.15 + _saccadeCurrentX;
+            var eyePitch = _mouseY * 0.08 + _saccadeCurrentY;
             if (_eyeBones.left) {
                 _eyeBones.left.rotation.y += (eyeYaw - _eyeBones.left.rotation.y) * 0.1;
                 _eyeBones.left.rotation.x += (eyePitch - _eyeBones.left.rotation.x) * 0.1;
