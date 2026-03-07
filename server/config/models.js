@@ -20,7 +20,7 @@ const MODELS = {
     DEEPGRAM_STT: "nova-3",
 
     // ── TTS ──
-    ELEVENLABS_MODEL: "eleven_multilingual_v2",
+    ELEVENLABS_MODEL: "eleven_turbo_v2_5",
     ELEVENLABS_FLASH: "eleven_flash_v2_5",
     CARTESIA_MODEL: "sonic-2",
     OPENAI_TTS: "tts-1",
