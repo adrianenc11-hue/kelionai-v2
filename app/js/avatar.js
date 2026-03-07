@@ -542,19 +542,20 @@
     // Default pose values (arms by body)
     var _targetPose = { lx: 0, rx: 0, ly: 0, ry: 0, lz: 1.2, rz: -1.2 };
 
-    // Called EVERY frame after mixer.update() — instant override
+    // Called EVERY frame after mixer.update() — QUATERNION override
+    // Animation mixer writes to bone.quaternion directly, so setting
+    // bone.rotation alone is ignored. Must force quaternion from Euler.
+    var _tmpEuler = typeof THREE !== 'undefined' ? new THREE.Euler() : null;
     function _enforcePose() {
-        if (!_targetPose) return;
+        if (!_targetPose || !_tmpEuler) return;
         var p = _targetPose;
         if (armBones.left) {
-            armBones.left.rotation.x = p.lx;
-            armBones.left.rotation.y = p.ly;
-            armBones.left.rotation.z = p.lz;
+            _tmpEuler.set(p.lx, p.ly, p.lz);
+            armBones.left.quaternion.setFromEuler(_tmpEuler);
         }
         if (armBones.right) {
-            armBones.right.rotation.x = p.rx;
-            armBones.right.rotation.y = p.ry;
-            armBones.right.rotation.z = p.rz;
+            _tmpEuler.set(p.rx, p.ry, p.rz);
+            armBones.right.quaternion.setFromEuler(_tmpEuler);
         }
     }
 
@@ -585,98 +586,45 @@
         updateGesture(dt);
         updateMoodLighting();
 
-        // ══ INNOVATIVE: Micro-expressions ═════════════════════
-        _microTimer += dt;
-        if (!_microActive && _microTimer >= _nextMicro) {
-            // Start a random micro-expression
-            var me = MICRO_EXPRESSIONS[Math.floor(Math.random() * MICRO_EXPRESSIONS.length)];
-            _microMorph = me.morph;
-            _microDuration = me.duration;
-            _microValue = me.max;
-            _microElapsed = 0;
-            _microActive = true;
-            _microTimer = 0;
-            _nextMicro = 3 + Math.random() * 5;
-        }
-        if (_microActive) {
-            _microElapsed += dt;
-            var t = _microElapsed / _microDuration;
-            if (t >= 1) {
-                _microActive = false;
-                setMorph(_microMorph, 0);
-            } else {
-                // Bell curve: rise then fall
-                var intensity = Math.sin(t * Math.PI) * _microValue;
-                setMorph(_microMorph, intensity);
-            }
-        }
+        // ══ BRAIN-ONLY MOVEMENT — no hardcoded body animations ══
+        // Micro-expressions, idle sway, breathing spine movement are DISABLED.
+        // All body movement comes from AI brain via [GESTURE:xxx] [POSE:xxx] tags.
+        // Only natural functions remain: blink, lip sync, eye tracking.
 
-        // ══ INNOVATIVE: Eye Saccades ══════════════════════════
-        _saccadeTimer += dt;
-        if (_saccadeTimer >= _nextSaccade) {
-            _saccadeTimer = 0;
-            _nextSaccade = 0.5 + Math.random() * 2;
-            // Small random target shift
-            _saccadeTargetX = (Math.random() - 0.5) * 0.04;
-            _saccadeTargetY = (Math.random() - 0.5) * 0.02;
-        }
-        _saccadeCurrentX += (_saccadeTargetX - _saccadeCurrentX) * 0.3;
-        _saccadeCurrentY += (_saccadeTargetY - _saccadeCurrentY) * 0.3;
-
-        // ══ INNOVATIVE: Eye Tracking (mouse follow via bones) ═
+        // ══ Eye Tracking (natural — mouse follow via morphs) ═══
         if (_eyeBones.left || _eyeBones.right) {
-            var eyeYaw = _mouseX * 0.15 + _saccadeCurrentX;   // max 15° horizontal
-            var eyePitch = _mouseY * 0.08 + _saccadeCurrentY;  // max 8° vertical
+            var eyeYaw = _mouseX * 0.12;
+            var eyePitch = _mouseY * 0.06;
             if (_eyeBones.left) {
-                _eyeBones.left.rotation.y += (eyeYaw - _eyeBones.left.rotation.y) * 0.15;
-                _eyeBones.left.rotation.x += (eyePitch - _eyeBones.left.rotation.x) * 0.15;
+                _eyeBones.left.rotation.y += (eyeYaw - _eyeBones.left.rotation.y) * 0.1;
+                _eyeBones.left.rotation.x += (eyePitch - _eyeBones.left.rotation.x) * 0.1;
             }
             if (_eyeBones.right) {
-                _eyeBones.right.rotation.y += (eyeYaw - _eyeBones.right.rotation.y) * 0.15;
-                _eyeBones.right.rotation.x += (eyePitch - _eyeBones.right.rotation.x) * 0.15;
+                _eyeBones.right.rotation.y += (eyeYaw - _eyeBones.right.rotation.y) * 0.1;
+                _eyeBones.right.rotation.x += (eyePitch - _eyeBones.right.rotation.x) * 0.1;
             }
         } else {
-            // Fallback: use morph targets for eye direction
-            setMorph('eyeLookOutLeft', Math.max(0, _mouseX * 0.3 + _saccadeCurrentX));
-            setMorph('eyeLookInLeft', Math.max(0, -_mouseX * 0.3 - _saccadeCurrentX));
-            setMorph('eyeLookOutRight', Math.max(0, -_mouseX * 0.3 - _saccadeCurrentX));
-            setMorph('eyeLookInRight', Math.max(0, _mouseX * 0.3 + _saccadeCurrentX));
-            setMorph('eyeLookUpLeft', Math.max(0, _mouseY * 0.2 + _saccadeCurrentY));
-            setMorph('eyeLookUpRight', Math.max(0, _mouseY * 0.2 + _saccadeCurrentY));
-            setMorph('eyeLookDownLeft', Math.max(0, -_mouseY * 0.2 - _saccadeCurrentY));
-            setMorph('eyeLookDownRight', Math.max(0, -_mouseY * 0.2 - _saccadeCurrentY));
+            // Fallback: morph-based eye direction
+            setMorph('eyeLookOutLeft', Math.max(0, _mouseX * 0.3));
+            setMorph('eyeLookInLeft', Math.max(0, -_mouseX * 0.3));
+            setMorph('eyeLookOutRight', Math.max(0, -_mouseX * 0.3));
+            setMorph('eyeLookInRight', Math.max(0, _mouseX * 0.3));
+            setMorph('eyeLookUpLeft', Math.max(0, _mouseY * 0.2));
+            setMorph('eyeLookUpRight', Math.max(0, _mouseY * 0.2));
+            setMorph('eyeLookDownLeft', Math.max(0, -_mouseY * 0.2));
+            setMorph('eyeLookDownRight', Math.max(0, -_mouseY * 0.2));
         }
 
-        // ══ INNOVATIVE: Breathing ═════════════════════════════
-        _breathPhase += dt * BREATH_SPEED;
-        if (_spineBone) {
-            var breathOffset = Math.sin(_breathPhase * Math.PI * 2) * BREATH_AMOUNT;
-            // Breathing: subtle rotation only, NO vertical position change
-            _spineBone.rotation.x = (_spineBone.rotation.x || 0) + breathOffset * 0.5;
-        }
-        // Also subtle chest expansion via morph if available
-        setMorph('jawOpen', Math.max(0, Math.sin(_breathPhase * Math.PI * 2) * 0.01));
-
-        if (currentModel) {
-            var targetY = 0;
-            var targetX = 0;
-
-            if (isPresenting) {
-                // Look towards monitor (right side)
-                targetY = -PRESENT_ANGLE;
-            } else if (isAttentive) {
-                // Look at user — add subtle mouse-follow to head too
-                targetY = _mouseX * 0.04;
-                targetX = _mouseY * 0.02;
-            } else {
-                // Enhanced idle sway — slightly more alive than before
-                var t = clock.elapsedTime;
-                targetY = Math.sin(t * 0.3) * 0.025 + Math.sin(t * 0.7) * 0.01;
-                targetX = Math.sin(t * 0.2) * 0.012 + Math.cos(t * 0.5) * 0.005;
-            }
-
-            currentModel.rotation.y += (targetY - currentModel.rotation.y) * 0.08;
-            currentModel.rotation.x += (targetX - currentModel.rotation.x) * 0.08;
+        // Body stays STILL — only brain-triggered gestures move the model
+        // (via updateGesture which is already called above)
+        if (currentModel && !isPresenting && !isAttentive && !activeGesture) {
+            // Return to neutral standing position (no sway, no lean)
+            currentModel.rotation.y += (0 - currentModel.rotation.y) * 0.05;
+            currentModel.rotation.x += (0 - currentModel.rotation.x) * 0.05;
+        } else if (currentModel && isPresenting) {
+            currentModel.rotation.y += (-PRESENT_ANGLE - currentModel.rotation.y) * 0.08;
+        } else if (currentModel && isAttentive) {
+            currentModel.rotation.y += (_mouseX * 0.04 - currentModel.rotation.y) * 0.05;
         }
         // SMOOTH mouth close — exponential decay instead of instant zero
         var _lipRan = (lipSync && window.KVoice && KVoice.isSpeaking());
