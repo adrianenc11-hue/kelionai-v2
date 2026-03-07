@@ -92,13 +92,8 @@
             _mouseY = -((faceCenterY / vh) * 2 - 1);
         }
     });
-    // Auto-start face tracking after avatar loads
-    setTimeout(function () {
-        if (typeof RealtimeVision !== 'undefined' && !RealtimeVision.active) {
-            RealtimeVision.start(200); // 5 FPS face tracking
-            console.log('[Avatar] Auto-started face tracking via camera');
-        }
-    }, 3000);
+    // Face tracking — starts ONLY when user explicitly requests it
+    // (not auto-start; camera turns on only via RealtimeVision.start())
 
     // ══ INNOVATIVE: Micro-expressions ═════════════════════════
     var _microTimer = 0;
