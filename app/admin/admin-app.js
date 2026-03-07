@@ -206,6 +206,16 @@ async function loadUptime() {
     } catch (e) { }
 }
 
+// ── TOGGLE SECTIONS (Accordion) ──
+function toggleSection(id) {
+    var panel = document.getElementById(id);
+    if (!panel) return;
+    var isOpen = panel.classList.contains('open');
+    panel.classList.toggle('open');
+    var arrow = panel.querySelector('.toggle-arrow');
+    if (arrow) arrow.textContent = isOpen ? '▶' : '▼';
+}
+
 // ── INIT ──
 loadAiStatus(); loadTraffic(); loadCredit(); loadClients(); loadCodes(); loadUptime();
 setInterval(function () { loadTraffic(); loadCredit(); loadUptime(); }, 30000);

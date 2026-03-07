@@ -566,3 +566,60 @@ body {
         transform: translateY(0);
     }
 }
+
+/* COLLAPSIBLE SECTIONS (Accordion) */
+.sections-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.section-panel {
+    background: var(--admin-card);
+    border: 1px solid var(--admin-border);
+    border-radius: 12px;
+    overflow: hidden;
+    transition: border-color 0.3s;
+}
+
+.section-panel:hover {
+    border-color: rgba(99, 102, 241, 0.3);
+}
+
+.section-toggle {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 20px;
+    background: transparent;
+    border: none;
+    color: var(--admin-accent2);
+    font-family: var(--admin-font);
+    font-size: 0.92rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.section-toggle:hover {
+    background: rgba(99, 102, 241, 0.06);
+}
+
+.toggle-arrow {
+    font-size: 0.7rem;
+    color: var(--admin-muted);
+    transition: transform 0.2s;
+}
+
+.section-body {
+    max-height: 0;
+    overflow: hidden;
+    padding: 0 20px;
+    transition: max-height 0.35s ease, padding 0.35s ease;
+}
+
+.section-panel.open .section-body {
+    max-height: 800px;
+    padding: 0 20px 16px;
+}

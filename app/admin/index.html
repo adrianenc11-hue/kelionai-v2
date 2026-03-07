@@ -54,125 +54,157 @@
             </div>
         </div>
 
-        <!-- MAIN GRID -->
-        <div class="main-grid">
+        <!-- COLLAPSIBLE SECTIONS -->
+        <div class="sections-list">
+
             <!-- AI STATUS -->
-            <div class="panel-card">
-                <h3>🤖 AI Providers — Status Live</h3>
-                <div id="ai-status-grid" class="ai-grid">
-                    <div class="ai-card loading">
-                        <div class="ai-name">Loading...</div>
+            <div class="section-panel open" id="sec-ai">
+                <button class="section-toggle" onclick="toggleSection('sec-ai')">
+                    <span>🤖 AI Providers — Status Live</span>
+                    <span class="toggle-arrow">▼</span>
+                </button>
+                <div class="section-body">
+                    <div id="ai-status-grid" class="ai-grid">
+                        <div class="ai-card loading">
+                            <div class="ai-name">Loading...</div>
+                        </div>
                     </div>
                 </div>
             </div>
 
             <!-- TRAFFIC -->
-            <div class="panel-card">
-                <h3>🌐 Trafic (ultimele 7 zile)</h3>
-                <div id="traffic-chart" class="traffic-chart"></div>
-                <div class="traffic-details">
-                    <div><span class="label">Unici azi:</span> <span id="traffic-unique">—</span></div>
-                    <div><span class="label">Total azi:</span> <span id="traffic-total">—</span></div>
-                    <div><span class="label">Conexiuni active:</span> <span id="traffic-active">—</span></div>
+            <div class="section-panel" id="sec-traffic">
+                <button class="section-toggle" onclick="toggleSection('sec-traffic')">
+                    <span>🌐 Trafic (ultimele 7 zile)</span>
+                    <span class="toggle-arrow">▶</span>
+                </button>
+                <div class="section-body">
+                    <div id="traffic-chart" class="traffic-chart"></div>
+                    <div class="traffic-details">
+                        <div><span class="label">Unici azi:</span> <span id="traffic-unique">—</span></div>
+                        <div><span class="label">Total azi:</span> <span id="traffic-total">—</span></div>
+                        <div><span class="label">Conexiuni active:</span> <span id="traffic-active">—</span></div>
+                    </div>
                 </div>
             </div>
 
             <!-- CREDIT REPORT -->
-            <div class="panel-card wide">
-                <div class="credit-header">
-                    <h3>📊 Credit per AI Provider</h3>
-                    <button class="recharge-btn" id="btn-recharge" onclick="recharge()">⚡ Reîncărcare</button>
+            <div class="section-panel" id="sec-credit">
+                <button class="section-toggle" onclick="toggleSection('sec-credit')">
+                    <span>📊 Credit per AI Provider</span>
+                    <span class="toggle-arrow">▶</span>
+                </button>
+                <div class="section-body">
+                    <div style="text-align:right;margin-bottom:10px">
+                        <button class="recharge-btn" id="btn-recharge" onclick="recharge()">⚡ Reîncărcare</button>
+                    </div>
+                    <table class="admin-table" id="credit-table">
+                        <thead>
+                            <tr>
+                                <th>Provider</th>
+                                <th>Status</th>
+                                <th>Requests</th>
+                                <th>Cost Luna ($)</th>
+                                <th>Cost Azi ($)</th>
+                                <th>Alert</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td colspan="6">Loading...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div id="credit-distribution" class="credit-dist"></div>
                 </div>
-                <table class="admin-table" id="credit-table">
-                    <thead>
-                        <tr>
-                            <th>Provider</th>
-                            <th>Status</th>
-                            <th>Requests</th>
-                            <th>Cost Luna ($)</th>
-                            <th>Cost Azi ($)</th>
-                            <th>Alert</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td colspan="6">Loading...</td>
-                        </tr>
-                    </tbody>
-                </table>
-                <div id="credit-distribution" class="credit-dist"></div>
             </div>
 
             <!-- CLIENTS & SUBSCRIPTIONS -->
-            <div class="panel-card wide">
-                <div class="credit-header">
-                    <h3>👥 Clienți & Abonamente</h3>
-                    <button class="admin-btn" onclick="loadClients()">🔄 Refresh</button>
+            <div class="section-panel" id="sec-clients">
+                <button class="section-toggle" onclick="toggleSection('sec-clients')">
+                    <span>👥 Clienți & Abonamente</span>
+                    <span class="toggle-arrow">▶</span>
+                </button>
+                <div class="section-body">
+                    <div style="text-align:right;margin-bottom:10px">
+                        <button class="admin-btn" onclick="loadClients()">🔄 Refresh</button>
+                    </div>
+                    <table class="admin-table" id="clients-table">
+                        <thead>
+                            <tr>
+                                <th>Email</th>
+                                <th>Plan</th>
+                                <th>Status</th>
+                                <th>Înregistrat</th>
+                                <th>Mesaje</th>
+                                <th>Acțiuni</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td colspan="6">Loading...</td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
-                <table class="admin-table" id="clients-table">
-                    <thead>
-                        <tr>
-                            <th>Email</th>
-                            <th>Plan</th>
-                            <th>Status</th>
-                            <th>Înregistrat</th>
-                            <th>Mesaje</th>
-                            <th>Acțiuni</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td colspan="6">Loading...</td>
-                        </tr>
-                    </tbody>
-                </table>
             </div>
 
             <!-- ADMIN CODES -->
-            <div class="panel-card wide">
-                <div class="credit-header">
-                    <h3>🔑 Coduri Admin</h3>
-                    <button class="admin-btn" onclick="generateCode()">➕ Generează Cod</button>
+            <div class="section-panel" id="sec-codes">
+                <button class="section-toggle" onclick="toggleSection('sec-codes')">
+                    <span>🔑 Coduri Admin</span>
+                    <span class="toggle-arrow">▶</span>
+                </button>
+                <div class="section-body">
+                    <div style="text-align:right;margin-bottom:10px">
+                        <button class="admin-btn" onclick="generateCode()">➕ Generează Cod</button>
+                    </div>
+                    <table class="admin-table" id="codes-table">
+                        <thead>
+                            <tr>
+                                <th>Cod</th>
+                                <th>Tip</th>
+                                <th>Status</th>
+                                <th>Creat</th>
+                                <th>Folosit de</th>
+                                <th>Acțiuni</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td colspan="6">Loading...</td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
-                <table class="admin-table" id="codes-table">
-                    <thead>
-                        <tr>
-                            <th>Cod</th>
-                            <th>Tip</th>
-                            <th>Status</th>
-                            <th>Creat</th>
-                            <th>Folosit de</th>
-                            <th>Acțiuni</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td colspan="6">Loading...</td>
-                        </tr>
-                    </tbody>
-                </table>
             </div>
 
             <!-- RECENT VISITS -->
-            <div class="panel-card wide">
-                <h3>📋 Vizite Recente</h3>
-                <table class="admin-table" id="visits-table">
-                    <thead>
-                        <tr>
-                            <th>Ora</th>
-                            <th>Pagina</th>
-                            <th>IP</th>
-                            <th>Țara</th>
-                            <th>Browser</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td colspan="5">Loading...</td>
-                        </tr>
-                    </tbody>
-                </table>
+            <div class="section-panel" id="sec-visits">
+                <button class="section-toggle" onclick="toggleSection('sec-visits')">
+                    <span>📋 Vizite Recente</span>
+                    <span class="toggle-arrow">▶</span>
+                </button>
+                <div class="section-body">
+                    <table class="admin-table" id="visits-table">
+                        <thead>
+                            <tr>
+                                <th>Ora</th>
+                                <th>Pagina</th>
+                                <th>IP</th>
+                                <th>Țara</th>
+                                <th>Browser</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td colspan="5">Loading...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
+
         </div>
     </div>
 
