@@ -742,6 +742,14 @@ router.get("/analysis", async (req, res) => {
     analysisHistory.push({ ts: entry.timestamp, assets: results.length });
     if (analysisHistory.length > MAX_HISTORY) analysisHistory.shift();
 
+    // ═══ BRAIN INTEGRATION — save analysis to memory ═══
+    if (brain) {
+      const topSignals = results.slice(0, 3).map(r => r.asset + ":" + r.confluence.signal + "(" + r.confluence.confidence + "%)").join(", ");
+      brain.saveMemory(null, "context", "Trading analysis: " + topSignals, {
+        platform: "trading", type: "analysis"
+      }).catch(() => { });
+    }
+
     res.json(entry);
   } catch (err) {
     logger.error({ err: err.message }, "[Trading] Analysis error");
@@ -1381,6 +1389,15 @@ router.post("/execute", async (req, res) => {
           reason: `Confluence too low: ${superConfluence.confidence}% (min: ${tradeEngine.CONFIG.MIN_CONFLUENCE}%)`,
         };
       }
+    }
+
+    // ═══ BRAIN INTEGRATION — save trade execution to memory ═══
+    const tradeBrain = req.app.locals.brain;
+    if (tradeBrain) {
+      const memo = symbol + " " + (tradeAction || "HOLD") + " @ $" + lastPrice + " | Confluence: " + superConfluence.confidence + "% | " + (result.executed ? "EXECUTED" : result.reason);
+      tradeBrain.saveMemory(null, "context", "Trade: " + memo, {
+        platform: "trading", type: "execution", symbol
+      }).catch(() => { });
     }
 
     res.json({
