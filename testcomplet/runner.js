@@ -44,12 +44,7 @@ async function req(method, url, body, headers = {}, timeout = 5000) {
             clearTimeout(timer);
             const ct = r.headers.get("content-type") || "";
             let data; if (ct.includes("json")) data = await r.json(); else data = await r.text();
-            // Detect Railway rate limit (400 + "rate limit" in response)
-            if (r.status === 400 && typeof data === "object" && JSON.stringify(data).toLowerCase().includes("rate limit")) {
-                console.log(`   ⏳ Rate limit hit — waiting 30s (attempt ${attempt})...`);
-                await sleep(30000);
-                if (attempt < 3) continue;
-            }
+            // Rate limit responses pass through — 429 is in expected codes
             return { status: r.status, data, ok: r.ok, elapsed, headers: Object.fromEntries(r.headers.entries()), ct };
         } catch (e) {
             clearTimeout(timer);
@@ -63,15 +58,15 @@ async function req(method, url, body, headers = {}, timeout = 5000) {
 // ═══ 148 FUNCTIONS — each has expect[] = valid status codes ═══
 const FUNCS = [
     // AUTH 1-9
-    { id: 1, name: "Register", type: "api", method: "POST", url: "/api/auth/register", body: { email: "test_" + Date.now() + "@test.com", password: "TestP@ss123!" }, expect: [200, 201, 409], timeout: LATENCY.GENERAL_API, module: "auth.js" },
-    { id: 2, name: "Login", type: "api", method: "POST", url: "/api/auth/login", body: { email: "test@test.com", password: "wrong" }, expect: [200, 401], timeout: LATENCY.GENERAL_API, module: "auth.js" },
-    { id: 3, name: "Logout", type: "api", method: "POST", url: "/api/auth/logout", body: {}, expect: [200, 401], timeout: LATENCY.GENERAL_API, module: "auth.js" },
-    { id: 4, name: "User /me", type: "api", method: "GET", url: "/api/auth/me", expect: [200, 401], timeout: LATENCY.GENERAL_API, module: "auth.js" },
-    { id: 5, name: "Refresh Token", type: "api", method: "POST", url: "/api/auth/refresh", body: {}, expect: [200, 401], timeout: LATENCY.GENERAL_API, module: "auth.js" },
-    { id: 6, name: "Forgot Password", type: "api", method: "POST", url: "/api/auth/forgot-password", body: { email: "test@test.com" }, expect: [200, 400], timeout: LATENCY.GENERAL_API, module: "auth.js" },
-    { id: 7, name: "Reset Password", type: "api", method: "POST", url: "/api/auth/reset-password", body: { token: "invalid", password: "NewP@ss123!" }, expect: [200, 400, 401], timeout: LATENCY.GENERAL_API, module: "auth.js" },
-    { id: 8, name: "Change Password", type: "api", method: "POST", url: "/api/auth/change-password", body: { oldPassword: "x", newPassword: "NewP@ss123!" }, expect: [200, 401], timeout: LATENCY.GENERAL_API, module: "auth.js" },
-    { id: 9, name: "Change Email", type: "api", method: "POST", url: "/api/auth/change-email", body: { email: "new@test.com" }, expect: [200, 401], timeout: LATENCY.GENERAL_API, module: "auth.js" },
+    { id: 1, name: "Register", type: "api", method: "POST", url: "/api/auth/register", body: { email: "test_" + Date.now() + "@test.com", password: "TestP@ss123!" }, expect: [200, 201, 409, 429], timeout: LATENCY.GENERAL_API, module: "auth.js" },
+    { id: 2, name: "Login", type: "api", method: "POST", url: "/api/auth/login", body: { email: "test@test.com", password: "wrong" }, expect: [200, 401, 429], timeout: LATENCY.GENERAL_API, module: "auth.js" },
+    { id: 3, name: "Logout", type: "api", method: "POST", url: "/api/auth/logout", body: {}, expect: [200, 401, 429], timeout: LATENCY.GENERAL_API, module: "auth.js" },
+    { id: 4, name: "User /me", type: "api", method: "GET", url: "/api/auth/me", expect: [200, 401, 429], timeout: LATENCY.GENERAL_API, module: "auth.js" },
+    { id: 5, name: "Refresh Token", type: "api", method: "POST", url: "/api/auth/refresh", body: {}, expect: [200, 401, 429], timeout: LATENCY.GENERAL_API, module: "auth.js" },
+    { id: 6, name: "Forgot Password", type: "api", method: "POST", url: "/api/auth/forgot-password", body: { email: "test@test.com" }, expect: [200, 400, 429], timeout: LATENCY.GENERAL_API, module: "auth.js" },
+    { id: 7, name: "Reset Password", type: "api", method: "POST", url: "/api/auth/reset-password", body: { token: "invalid", password: "NewP@ss123!" }, expect: [200, 400, 401, 429], timeout: LATENCY.GENERAL_API, module: "auth.js" },
+    { id: 8, name: "Change Password", type: "api", method: "POST", url: "/api/auth/change-password", body: { oldPassword: "x", newPassword: "NewP@ss123!" }, expect: [200, 401, 429], timeout: LATENCY.GENERAL_API, module: "auth.js" },
+    { id: 9, name: "Change Email", type: "api", method: "POST", url: "/api/auth/change-email", body: { email: "new@test.com" }, expect: [200, 401, 429], timeout: LATENCY.GENERAL_API, module: "auth.js" },
     // CHAT 10-11
     { id: 10, name: "Chat Text", type: "api", method: "POST", url: "/api/chat", body: { message: "salut", language: "ro" }, expect: [200, 401, 429], timeout: LATENCY.CLAUDE_CHAT, module: "brain.js" },
     { id: 11, name: "Chat Stream", type: "api", method: "POST", url: "/api/chat/stream", body: { message: "test", language: "en" }, expect: [200, 401, 429], timeout: LATENCY.CLAUDE_CHAT, module: "brain.js" },

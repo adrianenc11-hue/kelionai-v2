@@ -615,7 +615,7 @@
         // Mixer provides base idle animation from GLB model
         // Brain controls changes via [GESTURE:xxx] [POSE:xxx] [EMOTION:xxx] tags
         if (mixer) mixer.update(dt);
-
+        _enforcePose();
 
         updateBlink(dt);
         updateExpression(dt);
@@ -666,7 +666,7 @@
 
         // Body stays STILL — only brain-triggered gestures move the model
         // (via updateGesture which is already called above)
-        if (currentModel && !isPresenting && !isAttentive && !activeGesture) {
+        if (currentModel && !isPresenting && !isAttentive && !gestureActive) {
             // Return to neutral standing position (no sway, no lean)
             currentModel.rotation.y += (0 - currentModel.rotation.y) * 0.05;
             currentModel.rotation.x += (0 - currentModel.rotation.x) * 0.05;

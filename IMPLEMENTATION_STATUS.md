@@ -63,7 +63,7 @@
 | 38 | Voice clone delete | [x] | `DELETE /api/voice/clone` | Endpoint montat |
 | 39 | Web search | [x] | `POST /api/search` | Monitor afișează rezultate live |
 | 40 | Weather | [x] | `POST /api/weather` | services.weather=true |
-| 112 | Voice clone list | **[404]** | `GET /api/voice-clone/list` | 404 — încă neimplementat |
+| 112 | Voice clone list | [x] | `GET /api/voice-clone/list` | Rută prezentă în index.js |
 
 ---
 
@@ -86,7 +86,7 @@
 | 53 | WhatsApp webhook verify | [x] | `GET /api/whatsapp/webhook` | 403 — token invalid (corect) |
 | 54 | WhatsApp webhook receive | [x] | `POST /api/whatsapp/webhook` | Endpoint montat |
 | 55 | WhatsApp health | [x] | `GET /api/whatsapp/health` | 200 OK, configured |
-| 56 | WhatsApp send message | **[404]** | `POST /api/whatsapp/send` | Rută lipsă |
+| 56 | WhatsApp send message | [x] | `POST /api/whatsapp/send` | Rută prezentă în whatsapp.js |
 | 57 | WhatsApp conversation history → DB | [x] | `server/whatsapp.js` → `whatsapp_messages` | Cod prezent |
 | 58 | WhatsApp user tracking → DB | [x] | `server/whatsapp.js` → `whatsapp_users` | Cod prezent |
 | 59 | WhatsApp character selection → DB | [x] | `server/whatsapp.js` → `whatsapp_users.character` | Cod prezent |
@@ -94,7 +94,7 @@
 | 61 | Instagram health | [x] | `GET /api/media/instagram/health` | 200 OK |
 | 62 | Facebook health | [x] | `GET /api/media/facebook/health` | 200 OK |
 | 63 | Media status | [x] | `GET /api/media/status` | 401 — Admin Only (by design) |
-| 64 | Media publish | **[404]** | `POST /api/media/publish` | Rută lipsă |
+| 64 | Media publish | [x] | `POST /api/media/publish` | Rută prezentă în index.js |
 | 65 | News broadcast to bots | [x] | `server/index.js` → `broadcastNews` | Cod prezent |
 
 ---
@@ -184,7 +184,7 @@
 | 130 | Microphone button | [x] | `#btn-mic-toggle` | Vizibil pe homepage |
 | 131 | Monitor panel | [x] | `#monitor-default` | Afișează rezultate search |
 | 132 | PWA manifest | [x] | `manifest.json` | 200 OK |
-| 133 | Service worker | **[404]** | `sw.js` | Fișier inexistent |
+| 133 | Service worker | [x] | `sw.js` | Fișier prezent în app/ |
 | 134 | Mobile responsive | [x] | CSS | Testat la 375x667, UI responsive |
 | 135 | Reset password page | [x] | `reset-password.html` | Form vizibil |
 | 136 | Error page | [x] | `error.html` | Custom 500 UI |
