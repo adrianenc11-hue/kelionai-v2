@@ -80,7 +80,7 @@
                 method: 'POST',
                 headers: Object.assign({ 'Content-Type': 'application/json' }, window.KAuth.getAuthHeaders()),
                 body: JSON.stringify({ disabled: true })
-            }).catch(function () {});
+            }).catch(function () { });
         }
     }
 
@@ -122,6 +122,10 @@
     }
 
     function init() {
+        // TEMPORARILY DISABLED — will be re-enabled later
+        hideBar();
+        return;
+
         bar = getBar();
         textEl = getTextEl();
         disableBtn = getDisableBtn();
