@@ -246,21 +246,17 @@
             var mesh = morphMeshes[m];
             if (!mesh.morphTargetDictionary || !mesh.morphTargetInfluences) continue;
 
-            // Reset ALL viseme + mouth morphs smoothly
+            // Hard reset ALL viseme + mouth morphs to zero
             var allMorphs = VISEME_MORPHS.concat(ARKIT_MOUTH).concat(LEGACY_MOUTH);
             for (var i = 0; i < allMorphs.length; i++) {
                 var idx = mesh.morphTargetDictionary[allMorphs[i]];
                 if (idx !== undefined) {
-                    var current = mesh.morphTargetInfluences[idx];
-                    mesh.morphTargetInfluences[idx] = current * 0.85; // smooth close
+                    mesh.morphTargetInfluences[idx] = 0;
                 }
             }
         }
-        // Decay prevValues
-        for (var key in prevValues) {
-            prevValues[key] *= 0.85;
-            if (prevValues[key] < 0.01) prevValues[key] = 0;
-        }
+        // Clear prevValues
+        prevValues = {};
     };
 
     SimpleLipSync.prototype.dispose = function () {
