@@ -329,6 +329,9 @@ router.post("/checkout", async (req, res) => {
       subscription_data: {
         metadata: { user_id: user.id, plan: normalizedPlan },
       },
+      // Subscriptions auto-generate invoices — enable email receipts in Stripe Dashboard
+      // Settings → Emails → "Email customers for successful payments"
+      allow_promotion_codes: true,
     };
 
     if (customerId) sessionParams.customer = customerId;
