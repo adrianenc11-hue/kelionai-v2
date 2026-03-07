@@ -72,16 +72,14 @@ const RealtimeVision = (() => {
         video = document.createElement('video');
         video.setAttribute('autoplay', '');
         video.setAttribute('playsinline', '');
+        // HIDDEN — no visible preview, camera works internally only
         video.style.position = 'fixed';
-        video.style.bottom = '10px';
-        video.style.right = '10px';
-        video.style.width = '160px';
-        video.style.height = '120px';
-        video.style.borderRadius = '12px';
-        video.style.border = '2px solid rgba(0,255,136,0.5)';
-        video.style.zIndex = '9999';
-        video.style.objectFit = 'cover';
-        video.style.opacity = '0.8';
+        video.style.width = '1px';
+        video.style.height = '1px';
+        video.style.top = '-9999px';
+        video.style.left = '-9999px';
+        video.style.opacity = '0';
+        video.style.pointerEvents = 'none';
 
         try {
             const stream = await navigator.mediaDevices.getUserMedia({
