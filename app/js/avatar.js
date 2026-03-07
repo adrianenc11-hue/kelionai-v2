@@ -448,27 +448,23 @@
             }
             var angle = Math.sin(t * Math.PI);
             if (gestureData === 'nod') {
-                currentModel.rotation.x += (angle * 0.15 - currentModel.rotation.x) * 0.2;
+                currentModel.rotation.x += (angle * 0.06 - currentModel.rotation.x) * 0.15;
             } else if (gestureData === 'shake') {
-                currentModel.rotation.y += (Math.sin(t * Math.PI * 3) * 0.12 - currentModel.rotation.y) * 0.2;
+                currentModel.rotation.y += (Math.sin(t * Math.PI * 3) * 0.05 - currentModel.rotation.y) * 0.15;
             } else if (gestureData === 'tilt') {
-                currentModel.rotation.z += (angle * 0.1 - currentModel.rotation.z) * 0.15;
+                currentModel.rotation.z += (angle * 0.04 - currentModel.rotation.z) * 0.12;
             } else if (gestureData === 'lookAway') {
-                currentModel.rotation.y += (Math.sin(t * Math.PI) * 0.2 - currentModel.rotation.y) * 0.15;
+                currentModel.rotation.y += (Math.sin(t * Math.PI) * 0.08 - currentModel.rotation.y) * 0.12;
             } else if (gestureData === 'wave') {
-                // Subtle head tilt + slight body sway (friendly wave)
-                currentModel.rotation.z += (Math.sin(t * Math.PI * 2) * 0.08 - currentModel.rotation.z) * 0.2;
-                currentModel.rotation.x += (angle * 0.05 - currentModel.rotation.x) * 0.15;
+                currentModel.rotation.z += (Math.sin(t * Math.PI * 2) * 0.03 - currentModel.rotation.z) * 0.15;
+                currentModel.rotation.x += (angle * 0.02 - currentModel.rotation.x) * 0.12;
             } else if (gestureData === 'shrug') {
-                // Shoulders up — tilt only, NO vertical movement
-                currentModel.rotation.z += (angle * 0.06 - currentModel.rotation.z) * 0.15;
+                currentModel.rotation.z += (angle * 0.03 - currentModel.rotation.z) * 0.12;
             } else if (gestureData === 'think') {
-                // Head tilt + look slightly down (contemplation)
-                currentModel.rotation.z += (angle * 0.08 - currentModel.rotation.z) * 0.12;
-                currentModel.rotation.x += (angle * 0.1 - currentModel.rotation.x) * 0.12;
+                currentModel.rotation.z += (angle * 0.04 - currentModel.rotation.z) * 0.10;
+                currentModel.rotation.x += (angle * 0.04 - currentModel.rotation.x) * 0.10;
             } else if (gestureData === 'point') {
-                // Slight forward lean + head nod (indicating)
-                currentModel.rotation.x += (angle * 0.12 - currentModel.rotation.x) * 0.2;
+                currentModel.rotation.x += (angle * 0.05 - currentModel.rotation.x) * 0.15;
             }
         } else if (gestureQueue.length > 0) {
             gestureData = gestureQueue.shift();
