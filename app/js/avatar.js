@@ -6,8 +6,8 @@
     'use strict';
 
     const MODELS = {
-        kelion: '/models/k-male-live.glb',
-        kira: '/models/k-female-live.glb'
+        kelion: '/models/k-male.glb',
+        kira: '/models/k-female.glb'
     };
 
     let scene, camera, renderer, clock;
