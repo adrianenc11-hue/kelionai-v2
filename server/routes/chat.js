@@ -117,6 +117,7 @@ router.post("/chat", chatLimiter, validate(chatSchema), async (req, res) => {
       conversationId,
       imageBase64,
       audioBase64,
+      geo,
     } = req.body;
     if (!message) return res.status(400).json({ error: "Message is required" });
     const user = await getUserFromToken(req);
@@ -168,7 +169,8 @@ router.post("/chat", chatLimiter, validate(chatSchema), async (req, res) => {
     // Combine user_preferences + brain memory + capabilities
     const brainMemory = brain._currentMemoryContext || "";
     const capabilities = KelionBrain.CAPABILITIES_PROMPT();
-    const fullMemoryContext = [capabilities, memoryContext, brainMemory].filter(Boolean).join("\n");
+    const geoContext = geo && geo.lat ? `[USER LOCATION: lat=${geo.lat}, lng=${geo.lng}, accuracy=${geo.accuracy || 'unknown'}m]` : '';
+    const fullMemoryContext = [capabilities, geoContext, memoryContext, brainMemory].filter(Boolean).join("\n");
     const systemPrompt = buildSystemPrompt(
       avatar,
       language,
