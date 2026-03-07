@@ -14,6 +14,7 @@
 // THINKING LOOP: Analyze → Decompose → Plan → Execute → Verify → Learn
 // ═══════════════════════════════════════════════════════════════
 const logger = require("./logger");
+const { MODELS } = require("./config/models");
 
 class KelionBrain {
   constructor(config) {
@@ -437,7 +438,7 @@ Reply STRICTLY with JSON:
             Authorization: "Bearer " + this.groqKey,
           },
           body: JSON.stringify({
-            model: "llama-3.3-70b-versatile",
+            model: MODELS.GROQ_PRIMARY,
             max_tokens: 250,
             messages: [{ role: "user", content: prompt }],
           }),
@@ -456,7 +457,7 @@ Reply STRICTLY with JSON:
             "anthropic-version": "2023-06-01",
           },
           body: JSON.stringify({
-            model: "claude-sonnet-4-20250514",
+            model: MODELS.ANTHROPIC_CHAT,
             max_tokens: 250,
             messages: [{ role: "user", content: prompt }],
           }),
@@ -2775,7 +2776,7 @@ Reply STRICTLY with JSON:
             "anthropic-version": "2023-06-01",
           },
           body: JSON.stringify({
-            model: "claude-sonnet-4-20250514",
+            model: MODELS.ANTHROPIC_CHAT,
             max_tokens: 1000,
             messages: [
               {
@@ -2847,7 +2848,7 @@ Reply STRICTLY with JSON:
             Authorization: `Bearer ${this.openaiKey}`,
           },
           body: JSON.stringify({
-            model: "gpt-5.4",
+            model: MODELS.OPENAI_VISION,
             max_tokens: 1000,
             messages: [
               {
@@ -2920,7 +2921,7 @@ Reply STRICTLY with JSON:
             },
             body: JSON.stringify({
               text: text.substring(0, 500),
-              model_id: "eleven_multilingual_v2",
+              model_id: MODELS.ELEVENLABS_MODEL,
               voice_settings: { stability: 0.5, similarity_boost: 0.75 },
             }),
           },
@@ -2996,7 +2997,7 @@ Reply STRICTLY with JSON:
           filename: "audio.webm",
           contentType: "audio/webm",
         });
-        form.append("model", "whisper-large-v3");
+        form.append("model", MODELS.WHISPER);
 
         const r = await fetch(
           "https://api.groq.com/openai/v1/audio/transcriptions",
@@ -3049,7 +3050,7 @@ Reply STRICTLY with JSON:
           filename: "audio.webm",
           contentType: "audio/webm",
         });
-        form.append("model", "whisper-1");
+        form.append("model", MODELS.OPENAI_WHISPER);
 
         const r = await fetch(
           "https://api.openai.com/v1/audio/transcriptions",
@@ -3132,7 +3133,7 @@ Reply STRICTLY with JSON:
             "anthropic-version": "2023-06-01",
           },
           body: JSON.stringify({
-            model: "claude-sonnet-4-20250514",
+            model: MODELS.ANTHROPIC_CHAT,
             max_tokens: 500,
             messages: [
               {
@@ -3218,7 +3219,7 @@ Reply STRICTLY with JSON:
             "anthropic-version": "2023-06-01",
           },
           body: JSON.stringify({
-            model: "claude-sonnet-4-20250514",
+            model: MODELS.ANTHROPIC_CHAT,
             max_tokens: 300,
             messages: [
               {
@@ -3715,7 +3716,7 @@ Raspunde STRICT JSON. Daca nimic: {}`;
             Authorization: "Bearer " + this.groqKey,
           },
           body: JSON.stringify({
-            model: "llama-3.3-70b-versatile",
+            model: MODELS.GROQ_PRIMARY,
             max_tokens: 150,
             messages: [{ role: "user", content: learnPrompt }],
           }),
@@ -3734,7 +3735,7 @@ Raspunde STRICT JSON. Daca nimic: {}`;
             "anthropic-version": "2023-06-01",
           },
           body: JSON.stringify({
-            model: "claude-sonnet-4-20250514",
+            model: MODELS.ANTHROPIC_CHAT,
             max_tokens: 150,
             messages: [{ role: "user", content: learnPrompt }],
           }),

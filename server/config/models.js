@@ -9,12 +9,14 @@ const MODELS = {
     // ── LLM ──
     GROQ_PRIMARY: "llama-3.3-70b-versatile",
     OPENAI_CHAT: "gpt-4o-mini",
+    OPENAI_FALLBACK: "gpt-4o",
     OPENAI_VISION: "gpt-5.4",
     ANTHROPIC_CHAT: "claude-sonnet-4-20250514",
     DEEPSEEK: "deepseek-chat",
 
     // ── STT ──
     WHISPER: "whisper-large-v3",
+    OPENAI_WHISPER: "whisper-1",
     DEEPGRAM_STT: "nova-3",
 
     // ── TTS ──
@@ -25,6 +27,7 @@ const MODELS = {
 
     // ── Image Generation ──
     FLUX: "black-forest-labs/FLUX.1-schnell",
+    DALL_E: "dall-e-3",
 
     // ── Search ──
     PERPLEXITY: "sonar",
