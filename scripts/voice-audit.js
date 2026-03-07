@@ -93,15 +93,14 @@ async function runAudit() {
             }),
         });
 
-        const reader = r.body.getReader();
+        if (!r.ok) throw new Error(`Groq HTTP ${r.status}`);
+
         const decoder = new TextDecoder();
         let buffer = "";
         let firstToken = false;
 
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            buffer += decoder.decode(value, { stream: true });
+        for await (const chunk of r.body) {
+            buffer += decoder.decode(chunk, { stream: true });
             const lines = buffer.split("\n");
             buffer = lines.pop() || "";
 
