@@ -250,6 +250,10 @@
                     console.log('[Avatar] Kira mirror fix applied to', meshesToMirror.length, 'meshes');
                 }
 
+                // ARM POSE — find bones and set default relaxed pose
+                findArmBones();
+                setPose('relaxed');
+
                 scene.add(currentModel);
                 onResize(); // Force canvas resize after model load
 
@@ -376,6 +380,8 @@
                 gestureTimer = 0;
                 gestureData = null;
                 currentModel.rotation.z += (-currentModel.rotation.z) * 0.1;
+                currentModel.rotation.x += (-currentModel.rotation.x) * 0.1;
+                currentModel.rotation.y += (-currentModel.rotation.y) * 0.1;
                 return;
             }
             var angle = Math.sin(t * Math.PI);
@@ -387,13 +393,73 @@
                 currentModel.rotation.z += (angle * 0.1 - currentModel.rotation.z) * 0.15;
             } else if (gestureData === 'lookAway') {
                 currentModel.rotation.y += (Math.sin(t * Math.PI) * 0.2 - currentModel.rotation.y) * 0.15;
+            } else if (gestureData === 'wave') {
+                // Subtle head tilt + slight body sway (friendly wave)
+                currentModel.rotation.z += (Math.sin(t * Math.PI * 2) * 0.08 - currentModel.rotation.z) * 0.2;
+                currentModel.rotation.x += (angle * 0.05 - currentModel.rotation.x) * 0.15;
+            } else if (gestureData === 'shrug') {
+                // Shoulders up — slight upward movement + tilt
+                currentModel.position.y += (angle * 0.02) * 0.3;
+                currentModel.rotation.z += (angle * 0.06 - currentModel.rotation.z) * 0.15;
+            } else if (gestureData === 'think') {
+                // Head tilt + look slightly down (contemplation)
+                currentModel.rotation.z += (angle * 0.08 - currentModel.rotation.z) * 0.12;
+                currentModel.rotation.x += (angle * 0.1 - currentModel.rotation.x) * 0.12;
+            } else if (gestureData === 'point') {
+                // Slight forward lean + head nod (indicating)
+                currentModel.rotation.x += (angle * 0.12 - currentModel.rotation.x) * 0.2;
             }
         } else if (gestureQueue.length > 0) {
             gestureData = gestureQueue.shift();
             gestureActive = true;
             gestureTimer = 0;
-            gestureDuration = gestureData === 'shake' ? 1.0 : 0.6;
+            gestureDuration = gestureData === 'shake' ? 1.0 : gestureData === 'wave' ? 1.2 : gestureData === 'think' ? 1.5 : 0.6;
         }
+    }
+
+    // ── Pose system (body posture) ────────────────────────────
+    var currentPose = 'relaxed';
+    var armBones = { left: null, right: null };
+
+    function findArmBones() {
+        if (!currentModel) return;
+        armBones = { left: null, right: null };
+        currentModel.traverse(function (bone) {
+            if (!bone.isBone) return;
+            var bn = (bone.name || '').toLowerCase();
+            if (bn.indexOf('leftupperarm') !== -1 || bn.indexOf('left_upper_arm') !== -1 ||
+                bn.indexOf('lupperarm') !== -1 || bn === 'leftarm' || bn === 'left_arm') {
+                armBones.left = bone;
+            }
+            if (bn.indexOf('rightupperarm') !== -1 || bn.indexOf('right_upper_arm') !== -1 ||
+                bn.indexOf('rupperarm') !== -1 || bn === 'rightarm' || bn === 'right_arm') {
+                armBones.right = bone;
+            }
+        });
+        console.log('[Avatar] Arm bones found:', !!armBones.left, !!armBones.right);
+    }
+
+    function setPose(pose) {
+        currentPose = pose || 'relaxed';
+        if (!armBones.left && !armBones.right) findArmBones();
+
+        var poses = {
+            relaxed: { lz: 1.1, rz: -1.1, lx: -0.1, rx: -0.1 },  // arms down
+            presenting: { lz: 0.6, rz: -0.6, lx: -0.2, rx: -0.2 },  // arms slightly out
+            crossed: { lz: 1.3, rz: -1.3, lx: 0.3, rx: 0.3 },   // arms crossed in front
+            open: { lz: 0.4, rz: -0.4, lx: -0.15, rx: -0.15 }  // arms open, welcoming
+        };
+        var p = poses[currentPose] || poses.relaxed;
+
+        if (armBones.left) {
+            armBones.left.rotation.z = p.lz;
+            armBones.left.rotation.x = p.lx;
+        }
+        if (armBones.right) {
+            armBones.right.rotation.z = p.rz;
+            armBones.right.rotation.x = p.rx;
+        }
+        console.log('[Avatar] Pose set:', currentPose);
     }
 
     function updateExpression(dt) {
@@ -477,6 +543,8 @@
         setMorph: setMorph,
         setAttentive: function (v) { isAttentive = v; },
         setPresenting: function (v) { isPresenting = v; },
+        setPose: setPose,
+        findArmBones: findArmBones,
         getLipSync: function () { return lipSync; },
         getTextLipSync: function () { return textLipSync; },
         getMorphMeshes: function () { return morphMeshes; },

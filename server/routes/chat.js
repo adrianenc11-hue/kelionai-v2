@@ -355,6 +355,18 @@ router.post("/chat", chatLimiter, validate(chatSchema), async (req, res) => {
       emotion = emotionMatch[1].toLowerCase();
       reply = reply.replace(/\[EMOTION:\w+\]/gi, "").trim();
     }
+    // Parse [GESTURE:xxx] tags from AI reply (brain controls body language)
+    let gestures = [];
+    const gestureMatches = reply.matchAll(/\[GESTURE:(\w+)\]/gi);
+    for (const gm of gestureMatches) gestures.push(gm[1].toLowerCase());
+    reply = reply.replace(/\[GESTURE:\w+\]/gi, "").trim();
+    // Parse [POSE:xxx] tag (arms_down, arms_crossed, presenting, relaxed, etc.)
+    let pose = null;
+    const poseMatch = reply.match(/\[POSE:(\w+)\]/i);
+    if (poseMatch) {
+      pose = poseMatch[1].toLowerCase();
+      reply = reply.replace(/\[POSE:\w+\]/gi, "").trim();
+    }
     const response = {
       reply,
       avatar,
@@ -364,6 +376,8 @@ router.post("/chat", chatLimiter, validate(chatSchema), async (req, res) => {
       totalTime,
       conversationId: savedConvId,
       emotion,
+      gestures,
+      pose,
     };
     if (monitorFromReply) {
       response.monitor = monitorFromReply;
