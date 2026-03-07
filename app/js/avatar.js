@@ -616,18 +616,7 @@
         // Brain controls changes via [GESTURE:xxx] [POSE:xxx] [EMOTION:xxx] tags
         if (mixer) mixer.update(dt);
 
-        // Arms override — MUST be after mixer.update
-        // Uses rotation.x/y/z direct assign (the method that works)
-        if (armBones.left && _targetPose) {
-            armBones.left.rotation.x = _targetPose.lx;
-            armBones.left.rotation.y = _targetPose.ly;
-            armBones.left.rotation.z = _targetPose.lz;
-        }
-        if (armBones.right && _targetPose) {
-            armBones.right.rotation.x = _targetPose.rx;
-            armBones.right.rotation.y = _targetPose.ry;
-            armBones.right.rotation.z = _targetPose.rz;
-        }
+
         updateBlink(dt);
         updateExpression(dt);
         if (lipSync && window.KVoice && KVoice.isSpeaking()) lipSync.update();
