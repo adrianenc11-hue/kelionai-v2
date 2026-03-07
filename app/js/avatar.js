@@ -171,8 +171,8 @@
         renderer.setSize(w, h);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 3)); // CINEMATIC: up to 3x for 4K/retina
 
-        camera = new THREE.PerspectiveCamera(38, w / h, 0.1, 100);
-        camera.position.set(0, 0.15, 2.0); // Y=0.15 frames face, Z=2.0 shows bust
+        camera = new THREE.PerspectiveCamera(45, w / h, 0.1, 100);
+        camera.position.set(0, 0.0, 2.4); // FOV 45 + Z=2.4 shows full bust with shoulders
         renderer.outputColorSpace = THREE.SRGBColorSpace;
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
         renderer.toneMappingExposure = 1.2;
