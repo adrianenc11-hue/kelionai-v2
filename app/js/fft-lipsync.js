@@ -45,9 +45,9 @@
     var SMOOTH_RELEASE = 0.08;  // very slow release for natural feel
 
     // ── Mouth opening clamp — prevents enormous jaw opening ──
-    var MAX_MOUTH_OPEN = 0.25;  // absolute max for jawOpen/mouthOpen (was 0.45)
-    var MAX_VISEME_AA = 0.30;   // absolute max for wide-open vowel (was 0.50)
-    var MAX_VISEME = 0.35;      // absolute max for any viseme (was 0.60)
+    var MAX_MOUTH_OPEN = 0.15;  // absolute max for jawOpen/mouthOpen — prevents face distortion
+    var MAX_VISEME_AA = 0.20;   // absolute max for wide-open vowel
+    var MAX_VISEME = 0.25;      // absolute max for any viseme
 
     // ── Coarticulation — blend previous viseme into current ──
     var _prevVisemes = {};
@@ -297,26 +297,26 @@
 
     // Romanian phoneme → viseme mapping (which visemes to activate)
     var PHONEME_VISEME = {
-        'a': { viseme_aa: 0.8, jawOpen: 0.6 },
-        'ă': { viseme_aa: 0.5, jawOpen: 0.4 },
-        'â': { viseme_aa: 0.4, jawOpen: 0.3 },
-        'î': { viseme_I: 0.5, jawOpen: 0.2 },
-        'e': { viseme_E: 0.7, jawOpen: 0.3 },
-        'i': { viseme_I: 0.5, jawOpen: 0.15 },
-        'o': { viseme_O: 0.7, mouthFunnel: 0.4, jawOpen: 0.4 },
-        'u': { viseme_U: 0.6, mouthPucker: 0.4, jawOpen: 0.2 },
-        'b': { viseme_PP: 0.6 }, 'p': { viseme_PP: 0.6 }, 'm': { viseme_PP: 0.5 },
-        'f': { viseme_FF: 0.6 }, 'v': { viseme_FF: 0.5 },
-        's': { viseme_SS: 0.5 }, 'z': { viseme_SS: 0.4 },
-        'ș': { viseme_CH: 0.5 }, 'ț': { viseme_SS: 0.3, viseme_DD: 0.3 },
-        't': { viseme_DD: 0.4 }, 'd': { viseme_DD: 0.4 },
-        'n': { viseme_nn: 0.5 }, 'l': { viseme_nn: 0.3, jawOpen: 0.2 },
-        'r': { viseme_RR: 0.5, jawOpen: 0.2 },
-        'c': { viseme_kk: 0.4 }, 'g': { viseme_kk: 0.4 },
-        'h': { jawOpen: 0.3 }, 'j': { viseme_CH: 0.3 },
-        'k': { viseme_kk: 0.4 },
-        ' ': { viseme_sil: 0.1 },
-        '.': {}, ',': { viseme_sil: 0.05 }, '!': {}, '?': {}
+        'a': { viseme_aa: 0.20, jawOpen: 0.15 },
+        'ă': { viseme_aa: 0.12, jawOpen: 0.10 },
+        'â': { viseme_aa: 0.10, jawOpen: 0.08 },
+        'î': { viseme_I: 0.12, jawOpen: 0.05 },
+        'e': { viseme_E: 0.18, jawOpen: 0.08 },
+        'i': { viseme_I: 0.12, jawOpen: 0.04 },
+        'o': { viseme_O: 0.18, mouthFunnel: 0.10, jawOpen: 0.10 },
+        'u': { viseme_U: 0.15, mouthPucker: 0.10, jawOpen: 0.05 },
+        'b': { viseme_PP: 0.15 }, 'p': { viseme_PP: 0.15 }, 'm': { viseme_PP: 0.12 },
+        'f': { viseme_FF: 0.15 }, 'v': { viseme_FF: 0.12 },
+        's': { viseme_SS: 0.12 }, 'z': { viseme_SS: 0.10 },
+        'ș': { viseme_CH: 0.12 }, 'ț': { viseme_SS: 0.08, viseme_DD: 0.08 },
+        't': { viseme_DD: 0.10 }, 'd': { viseme_DD: 0.10 },
+        'n': { viseme_nn: 0.12 }, 'l': { viseme_nn: 0.08, jawOpen: 0.05 },
+        'r': { viseme_RR: 0.12, jawOpen: 0.05 },
+        'c': { viseme_kk: 0.10 }, 'g': { viseme_kk: 0.10 },
+        'h': { jawOpen: 0.08 }, 'j': { viseme_CH: 0.08 },
+        'k': { viseme_kk: 0.10 },
+        ' ': { viseme_sil: 0.05 },
+        '.': {}, ',': { viseme_sil: 0.02 }, '!': {}, '?': {}
     };
 
     TextLipSync.prototype.speak = function (text) {
