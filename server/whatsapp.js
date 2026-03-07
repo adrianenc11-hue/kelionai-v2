@@ -11,6 +11,7 @@ const fetch = require("node-fetch");
 const FormData = require("form-data");
 const logger = require("./logger");
 const { getVoiceId } = require("./config/voices");
+const { MODELS } = require("./config/models");
 
 const router = express.Router();
 
@@ -639,7 +640,7 @@ router.post("/webhook", async (req, res) => {
                         "Content-Type": "application/json",
                       },
                       body: JSON.stringify({
-                        model: "gpt-5.4",
+                        model: MODELS.OPENAI_VISION,
                         messages: [
                           {
                             role: "user",
@@ -806,6 +807,13 @@ router.post("/webhook", async (req, res) => {
           // Send text response always
           await sendTextMessage(phone, reply);
           stats.repliesSent++;
+
+          // ═══ BRAIN INTEGRATION — save chat memory ═══
+          if (brain) {
+            brain.saveMemory(null, "text", "WhatsApp " + phone + ": " + userText.substring(0, 200) + " | Reply: " + reply.substring(0, 300), {
+              platform: "whatsapp", character
+            }).catch(() => { });
+          }
 
           // If voice message → also send audio response
           if (respondWithAudio) {

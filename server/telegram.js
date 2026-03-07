@@ -561,6 +561,13 @@ router.post("/webhook", async (req, res) => {
 
     await sendMessage(chatId, escapeHtml(reply), { parseMode: undefined });
 
+    // ═══ BRAIN INTEGRATION — save chat memory ═══
+    if (brain) {
+      brain.saveMemory(null, "text", "Telegram " + userName + ": " + text.substring(0, 200) + " | Reply: " + reply.substring(0, 300), {
+        platform: "telegram", userId: String(userId)
+      }).catch(() => { });
+    }
+
     // ═══ SAVE MESSAGE TO DB ═══
     await addToHistory(chatId, "user", text);
     await addToHistory(chatId, "assistant", reply);

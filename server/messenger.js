@@ -9,6 +9,7 @@ const logger = require("./logger");
 const pdfParse = require("pdf-parse");
 const mammoth = require("mammoth");
 const { getVoiceId } = require("./config/voices");
+const { MODELS } = require("./config/models");
 
 const router = express.Router();
 
@@ -401,7 +402,7 @@ async function analyzeImage(imageBuffer, caption, mimeType) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gpt-5.4",
+        model: MODELS.OPENAI_VISION,
         messages: [
           {
             role: "user",
@@ -1392,6 +1393,14 @@ router.post("/webhook", async function (req, res) {
         await sendMessage(senderId, reply, replyQuickReplies);
         addToHistory(senderId, character === "kira" ? "Kira" : "Kelion", reply);
         stats.repliesSent++;
+
+        // ═══ BRAIN INTEGRATION — save chat memory ═══
+        const brainRef = req.app.locals.brain;
+        if (brainRef) {
+          brainRef.saveMemory(null, "text", "Messenger " + (senderName || senderId) + ": " + (userText || "").substring(0, 200) + " | Reply: " + reply.substring(0, 300), {
+            platform: "messenger", character
+          }).catch(() => { });
+        }
 
         // FEATURE 2: VOICE REPLY when user sent audio
         if (receivedAudio) {
