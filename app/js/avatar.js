@@ -487,24 +487,25 @@
                 return;
             }
             var angle = Math.sin(t * Math.PI);
+            // DAMPENED: reduced amplitudes ~60% + slower lerp to avoid bouncy puppet effect
             if (gestureData === 'nod') {
-                currentModel.rotation.x += (angle * 0.06 - currentModel.rotation.x) * 0.15;
+                currentModel.rotation.x += (angle * 0.025 - currentModel.rotation.x) * 0.08;
             } else if (gestureData === 'shake') {
-                currentModel.rotation.y += (Math.sin(t * Math.PI * 3) * 0.05 - currentModel.rotation.y) * 0.15;
+                currentModel.rotation.y += (Math.sin(t * Math.PI * 3) * 0.02 - currentModel.rotation.y) * 0.08;
             } else if (gestureData === 'tilt') {
-                currentModel.rotation.z += (angle * 0.04 - currentModel.rotation.z) * 0.12;
+                currentModel.rotation.z += (angle * 0.015 - currentModel.rotation.z) * 0.06;
             } else if (gestureData === 'lookAway') {
-                currentModel.rotation.y += (Math.sin(t * Math.PI) * 0.08 - currentModel.rotation.y) * 0.12;
+                currentModel.rotation.y += (Math.sin(t * Math.PI) * 0.03 - currentModel.rotation.y) * 0.06;
             } else if (gestureData === 'wave') {
-                currentModel.rotation.z += (Math.sin(t * Math.PI * 2) * 0.03 - currentModel.rotation.z) * 0.15;
-                currentModel.rotation.x += (angle * 0.02 - currentModel.rotation.x) * 0.12;
+                currentModel.rotation.z += (Math.sin(t * Math.PI * 2) * 0.012 - currentModel.rotation.z) * 0.08;
+                currentModel.rotation.x += (angle * 0.008 - currentModel.rotation.x) * 0.06;
             } else if (gestureData === 'shrug') {
-                currentModel.rotation.z += (angle * 0.03 - currentModel.rotation.z) * 0.12;
+                currentModel.rotation.z += (angle * 0.012 - currentModel.rotation.z) * 0.06;
             } else if (gestureData === 'think') {
-                currentModel.rotation.z += (angle * 0.04 - currentModel.rotation.z) * 0.10;
-                currentModel.rotation.x += (angle * 0.04 - currentModel.rotation.x) * 0.10;
+                currentModel.rotation.z += (angle * 0.015 - currentModel.rotation.z) * 0.05;
+                currentModel.rotation.x += (angle * 0.015 - currentModel.rotation.x) * 0.05;
             } else if (gestureData === 'point') {
-                currentModel.rotation.x += (angle * 0.05 - currentModel.rotation.x) * 0.15;
+                currentModel.rotation.x += (angle * 0.02 - currentModel.rotation.x) * 0.08;
             }
         } else if (gestureQueue.length > 0) {
             gestureData = gestureQueue.shift();
@@ -680,10 +681,10 @@
 
         // ══ Head Tracking (head follows mouse subtly) ═════════════
         if (_headBone) {
-            var headYaw = _mouseX * 0.25;
-            var headPitch = _mouseY * 0.12;
-            _headBone.rotation.y += (headYaw - _headBone.rotation.y) * 0.08;
-            _headBone.rotation.x += (headPitch - _headBone.rotation.x) * 0.08;
+            var headYaw = _mouseX * 0.15;   // was 0.25 — subtler head turn
+            var headPitch = _mouseY * 0.08; // was 0.12 — subtler pitch
+            _headBone.rotation.y += (headYaw - _headBone.rotation.y) * 0.04; // was 0.08 — smoother
+            _headBone.rotation.x += (headPitch - _headBone.rotation.x) * 0.04;
         }
 
         // ══ Micro-expressions (subtle face twitches) ══════════════
@@ -750,13 +751,14 @@
         // Body stays STILL — only brain-triggered gestures move the model
         // (via updateGesture which is already called above)
         if (currentModel && !isPresenting && !isAttentive && !gestureActive) {
-            // Return to neutral standing position (no sway, no lean)
-            currentModel.rotation.y += (0 - currentModel.rotation.y) * 0.05;
-            currentModel.rotation.x += (0 - currentModel.rotation.x) * 0.05;
+            // Return to neutral — very gentle, no snapping
+            currentModel.rotation.y += (0 - currentModel.rotation.y) * 0.02; // was 0.05
+            currentModel.rotation.x += (0 - currentModel.rotation.x) * 0.02;
+            currentModel.rotation.z += (0 - currentModel.rotation.z) * 0.02;
         } else if (currentModel && isPresenting) {
-            currentModel.rotation.y += (-PRESENT_ANGLE - currentModel.rotation.y) * 0.08;
+            currentModel.rotation.y += (-PRESENT_ANGLE - currentModel.rotation.y) * 0.04; // was 0.08
         } else if (currentModel && isAttentive) {
-            currentModel.rotation.y += (_mouseX * 0.04 - currentModel.rotation.y) * 0.05;
+            currentModel.rotation.y += (_mouseX * 0.02 - currentModel.rotation.y) * 0.03; // was 0.04/0.05
         }
         // SMOOTH mouth close — exponential decay instead of instant zero
         var _lipRan = (lipSync && window.KVoice && KVoice.isSpeaking());
