@@ -313,6 +313,8 @@ router.post("/checkout", async (req, res) => {
 
     const sessionParams = {
       mode: "subscription",
+      // Let Stripe auto-select best payment methods for customer's location
+      // Supports: Cards, SEPA, Bancontact, iDEAL, Google Pay, Apple Pay, etc.
       payment_method_types: ["card"],
       line_items: [{ price: priceId, quantity: 1 }],
       success_url:
