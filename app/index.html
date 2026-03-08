@@ -442,56 +442,55 @@
                     </div>
                 </div>
             </div>
-        </div>
-        <div id="display-panel">
-            <div id="display-header">
-                <span id="display-title" data-i18n="monitor.title">Monitor</span>
-            </div>
-            <!-- Chat messages (main zone) -->
-            <div id="chat-overlay"></div>
-            <div id="display-content">
-                <!-- Monitor panels (used inline in chat) -->
-                <div id="monitor-image" style="display:none"></div>
-                <div id="monitor-map" style="display:none"></div>
-                <div id="monitor-text" style="display:none"></div>
-                <div id="monitor-search" style="display:none"></div>
-                <div id="monitor-weather" style="display:none"></div>
-                <div id="monitor-iframe" style="display:none"><iframe id="monitor-iframe-src" src=""
-                        allow="autoplay; encrypted-media" allowfullscreen
-                        style="width:100%;height:100%;border:none;border-radius:8px"></iframe></div>
-                <div id="monitor-audio" style="display:none">
-                    <div id="radio-info" style="text-align:center;padding:20px">
-                        <div style="font-size:3rem" id="radio-logo">📻</div>
-                        <div id="radio-name" style="font-size:1.3rem;font-weight:600;margin:10px 0;color:#fff">
-                        </div><audio id="radio-player" controls autoplay style="width:100%;margin-top:10px"></audio>
-                    </div>
+            <div id="display-panel">
+                <div id="display-header">
+                    <span id="display-title" data-i18n="monitor.title">Monitor</span>
                 </div>
-                <div id="monitor-video" style="display:none"><iframe id="monitor-video-src" src=""
-                        allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen
-                        style="width:100%;height:100%;border:none;border-radius:8px"></iframe></div>
-                <div id="monitor-default" style="display:none"></div>
+                <!-- Chat messages (main zone) -->
+                <div id="chat-overlay"></div>
+                <div id="display-content">
+                    <!-- Monitor panels (used inline in chat) -->
+                    <div id="monitor-image" style="display:none"></div>
+                    <div id="monitor-map" style="display:none"></div>
+                    <div id="monitor-text" style="display:none"></div>
+                    <div id="monitor-search" style="display:none"></div>
+                    <div id="monitor-weather" style="display:none"></div>
+                    <div id="monitor-iframe" style="display:none"><iframe id="monitor-iframe-src" src=""
+                            allow="autoplay; encrypted-media" allowfullscreen
+                            style="width:100%;height:100%;border:none;border-radius:8px"></iframe></div>
+                    <div id="monitor-audio" style="display:none">
+                        <div id="radio-info" style="text-align:center;padding:20px">
+                            <div style="font-size:3rem" id="radio-logo">📻</div>
+                            <div id="radio-name" style="font-size:1.3rem;font-weight:600;margin:10px 0;color:#fff">
+                            </div><audio id="radio-player" controls autoplay style="width:100%;margin-top:10px"></audio>
+                        </div>
+                    </div>
+                    <div id="monitor-video" style="display:none"><iframe id="monitor-video-src" src=""
+                            allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen
+                            style="width:100%;height:100%;border:none;border-radius:8px"></iframe></div>
+                    <div id="monitor-default" style="display:none"></div>
+                </div>
+                <!-- Thinking indicator -->
+                <div id="thinking" style="display:none;padding:8px 16px;">
+                    <div class="thinking-dots"><span></span><span></span><span></span></div>
+                    <span data-i18n="thinking.text">Thinking...</span>
+                </div>
             </div>
-            <!-- Thinking indicator -->
-            <div id="thinking" style="display:none;padding:8px 16px;">
-                <div class="thinking-dots"><span></span><span></span><span></span></div>
-                <span data-i18n="thinking.text">Thinking...</span>
+        </div><!-- /#main-content -->
+        <!-- Input row — FULL WIDTH at page bottom -->
+        <div id="input-row" style="padding:8px 16px;border-top:1px solid rgba(99,102,241,0.1);">
+            <button id="btn-mic-toggle" title="Microphone ON/OFF" aria-label="Toggle microphone"
+                style="background:none;border:2px solid #555;border-radius:50%;width:36px;height:36px;cursor:pointer;font-size:1.1rem;color:#888;transition:all 0.3s;">🎙️</button>
+            <div id="mic-level" title="Mic level" style="display:none">
+                <span></span><span></span><span></span><span></span><span></span>
             </div>
+            <input type="text" id="text-input" data-i18n-placeholder="input.placeholder" placeholder="Type or speak..."
+                autocomplete="off">
+            <button id="btn-send" title="Send" aria-label="Send message"
+                style="background:none;border:none;cursor:pointer;font-size:1.3rem;color:var(--kelion-text-secondary);padding:0 6px;transition:color 0.2s;">➤</button>
+            <button id="btn-plus" title="Import / Export" aria-label="Files"
+                style="background:none;border:none;cursor:pointer;font-size:1.3rem;color:var(--kelion-text-secondary);padding:0 4px;">+</button>
         </div>
-    </div><!-- /#main-content -->
-    <!-- Input row — FULL WIDTH at page bottom -->
-    <div id="input-row" style="padding:8px 16px;border-top:1px solid rgba(99,102,241,0.1);">
-        <button id="btn-mic-toggle" title="Microphone ON/OFF" aria-label="Toggle microphone"
-            style="background:none;border:2px solid #555;border-radius:50%;width:36px;height:36px;cursor:pointer;font-size:1.1rem;color:#888;transition:all 0.3s;">🎙️</button>
-        <div id="mic-level" title="Mic level" style="display:none">
-            <span></span><span></span><span></span><span></span><span></span>
-        </div>
-        <input type="text" id="text-input" data-i18n-placeholder="input.placeholder" placeholder="Type or speak..."
-            autocomplete="off">
-        <button id="btn-send" title="Send" aria-label="Send message"
-            style="background:none;border:none;cursor:pointer;font-size:1.3rem;color:var(--kelion-text-secondary);padding:0 6px;transition:color 0.2s;">➤</button>
-        <button id="btn-plus" title="Import / Export" aria-label="Files"
-            style="background:none;border:none;cursor:pointer;font-size:1.3rem;color:var(--kelion-text-secondary);padding:0 4px;">+</button>
-    </div>
     </div><!-- /#app-layout -->
 
     <!-- GUEST TIMER BAR — removed (server-side limits apply) -->

@@ -348,9 +348,9 @@
                 }
 
                 // ARM POSE — find bones and set default relaxed pose
-                findArmBones();
-                _findEyeAndSpineBones(); // NEW: find eye/head/spine for life system
-                setPose('relaxed');
+                try { if (typeof findArmBones === 'function') findArmBones(); } catch (e) { console.warn('[Avatar] findArmBones skipped:', e.message); }
+                try { if (typeof _findEyeAndSpineBones === 'function') _findEyeAndSpineBones(); } catch (e) { console.warn('[Avatar] _findEyeAndSpineBones skipped:', e.message); }
+                try { if (typeof setPose === 'function') setPose('relaxed'); } catch (e) { console.warn('[Avatar] setPose skipped:', e.message); }
 
                 scene.add(currentModel);
                 onResize(); // Force canvas resize after model load
