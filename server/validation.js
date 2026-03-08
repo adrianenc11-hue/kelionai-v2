@@ -20,7 +20,7 @@ const refreshSchema = z.object({
 });
 
 const chatSchema = z.object({
-  message: z.string().min(1).max(10000),
+  message: z.string().max(10000).default(""),
   avatar: z.enum(["kelion", "kira"]).optional(),
   history: z
     .array(
@@ -34,6 +34,9 @@ const chatSchema = z.object({
   language: z.string().min(2).max(10).optional(),
   conversationId: z.string().nullish(),
   geo: z.any().optional(),
+  imageBase64: z.string().optional(),
+  imageMimeType: z.string().max(100).optional(),
+  audioBase64: z.string().optional(),
 });
 
 const speakSchema = z.object({

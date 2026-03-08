@@ -112,6 +112,138 @@
         }
     }
 
+    // ═══════════════════════════════════════════════════════════
+    // MEDIA UPLOAD SYSTEM — Images, Files, Paste, Drag & Drop
+    // Sends imageBase64 to /api/chat → brain-v4 → Gemini Vision
+    // ═══════════════════════════════════════════════════════════
+    var pendingMedia = null; // { base64, mimeType, name, size, previewUrl }
+
+    function handleFileAttach(file) {
+        if (!file) return;
+        // Max 20MB for direct base64 (Gemini limit ~20MB inline)
+        if (file.size > 20 * 1024 * 1024) {
+            addMessage('assistant', '⚠️ Fișierul e prea mare (max 20MB). Încearcă un fișier mai mic.');
+            return;
+        }
+        var reader = new FileReader();
+        reader.onload = function (e) {
+            var dataUrl = e.target.result;
+            var base64 = dataUrl.split(',')[1];
+            var mimeType = file.type || 'application/octet-stream';
+            pendingMedia = {
+                base64: base64,
+                mimeType: mimeType,
+                name: file.name,
+                size: file.size,
+                previewUrl: file.type.startsWith('image/') ? dataUrl : null
+            };
+            showMediaPreview();
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function showMediaPreview() {
+        removeMediaPreview(); // clean previous
+        if (!pendingMedia) return;
+        var preview = document.createElement('div');
+        preview.id = 'media-preview';
+        preview.style.cssText = 'display:flex;align-items:center;gap:8px;padding:6px 12px;margin:0 16px 4px;background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.2);border-radius:10px;font-size:0.8rem;color:#a5b4fc;';
+        var content = '';
+        if (pendingMedia.previewUrl) {
+            content += '<img src="' + pendingMedia.previewUrl + '" style="width:40px;height:40px;object-fit:cover;border-radius:6px">';
+        } else {
+            content += '<span style="font-size:1.4rem">📎</span>';
+        }
+        var sizeStr = pendingMedia.size > 1024 * 1024
+            ? (pendingMedia.size / (1024 * 1024)).toFixed(1) + ' MB'
+            : (pendingMedia.size / 1024).toFixed(0) + ' KB';
+        content += '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + pendingMedia.name + ' (' + sizeStr + ')</span>';
+        content += '<button onclick="window._clearPendingMedia()" style="background:none;border:none;color:#f87171;cursor:pointer;font-size:1rem;padding:2px 6px" title="Elimină">✕</button>';
+        preview.innerHTML = content;
+        var inputRow = document.getElementById('input-row');
+        if (inputRow) inputRow.parentNode.insertBefore(preview, inputRow);
+    }
+
+    function removeMediaPreview() {
+        var el = document.getElementById('media-preview');
+        if (el) el.remove();
+    }
+
+    window._clearPendingMedia = function () {
+        pendingMedia = null;
+        removeMediaPreview();
+        var fi = document.getElementById('file-input-hidden');
+        if (fi) fi.value = '';
+    };
+
+    // Wire btn-plus → file picker
+    (function () {
+        var btnPlus = document.getElementById('btn-plus');
+        var fileInput = document.getElementById('file-input-hidden');
+        if (btnPlus && fileInput) {
+            btnPlus.title = 'Atașează fișier (imagine, PDF, audio, arhivă)';
+            btnPlus.textContent = '📎';
+            btnPlus.addEventListener('click', function (e) {
+                e.preventDefault();
+                fileInput.click();
+            });
+            fileInput.addEventListener('change', function () {
+                if (fileInput.files && fileInput.files[0]) {
+                    handleFileAttach(fileInput.files[0]);
+                }
+            });
+        }
+    })();
+
+    // Paste handler — paste images from clipboard
+    document.addEventListener('paste', function (e) {
+        if (!e.clipboardData || !e.clipboardData.items) return;
+        for (var i = 0; i < e.clipboardData.items.length; i++) {
+            var item = e.clipboardData.items[i];
+            if (item.type.indexOf('image') !== -1) {
+                e.preventDefault();
+                var blob = item.getAsFile();
+                if (blob) {
+                    blob.name = blob.name || 'clipboard-image.png';
+                    handleFileAttach(blob);
+                }
+                break;
+            }
+        }
+    });
+
+    // Drag & drop handler — connected to existing drop-zone
+    (function () {
+        var dropZone = document.getElementById('drop-zone');
+        var body = document.body;
+        var dragCounter = 0;
+
+        body.addEventListener('dragenter', function (e) {
+            e.preventDefault();
+            dragCounter++;
+            if (dropZone) dropZone.classList.remove('hidden');
+        });
+        body.addEventListener('dragleave', function (e) {
+            e.preventDefault();
+            dragCounter--;
+            if (dragCounter <= 0) {
+                dragCounter = 0;
+                if (dropZone) dropZone.classList.add('hidden');
+            }
+        });
+        body.addEventListener('dragover', function (e) {
+            e.preventDefault();
+        });
+        body.addEventListener('drop', function (e) {
+            e.preventDefault();
+            dragCounter = 0;
+            if (dropZone) dropZone.classList.add('hidden');
+            if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) {
+                handleFileAttach(e.dataTransfer.files[0]);
+            }
+        });
+    })();
+
 
 
     // ═══════════════════════════════════════════════════════════
@@ -126,17 +258,40 @@
         if (window.KVoice) KVoice.stopSpeaking();
         KAvatar.setExpression('thinking', 0.5);
 
+        // Capture pending media before clearing
+        var mediaToSend = pendingMedia;
+        if (mediaToSend) {
+            window._clearPendingMedia();
+            // If no text message, add default
+            if (!message || !message.trim()) {
+                message = 'Analizează această imagine';
+            }
+            // Show image preview in chat
+            if (mediaToSend.previewUrl) {
+                addMessage('user', message + '\n<img src="' + mediaToSend.previewUrl + '" style="max-width:200px;max-height:150px;border-radius:8px;margin-top:6px;display:block">');
+            } else {
+                addMessage('user', message + ' 📎 ' + mediaToSend.name);
+            }
+        }
+
         try {
+            var payload = {
+                message,
+                avatar: KAvatar.getCurrentAvatar(),
+                history: chatHistory.slice(-20),
+                language: language || (window.i18n ? i18n.getLanguage() : 'ro'),
+                conversationId: currentConversationId,
+                geo: window.KGeo ? KGeo.getCached() : null
+            };
+            // Attach media if present
+            if (mediaToSend) {
+                payload.imageBase64 = mediaToSend.base64;
+                payload.imageMimeType = mediaToSend.mimeType;
+            }
+
             const resp = await fetch(API_BASE + '/api/chat', {
                 method: 'POST', headers: authHeaders(),
-                body: JSON.stringify({
-                    message,
-                    avatar: KAvatar.getCurrentAvatar(),
-                    history: chatHistory.slice(-20),
-                    language: language || (window.i18n ? i18n.getLanguage() : 'ro'),
-                    conversationId: currentConversationId,
-                    geo: window.KGeo ? KGeo.getCached() : null
-                })
+                body: JSON.stringify(payload)
             });
 
             showThinking(false);
