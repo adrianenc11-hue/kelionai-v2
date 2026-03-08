@@ -11,6 +11,7 @@ const { validate, chatSchema, memorySchema } = require("../validation");
 const { checkUsage, incrementUsage } = require("../payments");
 const { buildSystemPrompt } = require("../persona");
 const { KelionBrain } = require("../brain");
+const { thinkV4 } = require("../brain-v4");
 const { MODELS } = require("../config/models");
 
 const router = express.Router();
@@ -136,7 +137,9 @@ router.post("/chat", chatLimiter, validate(chatSchema), async (req, res) => {
         upgrade: true,
       });
 
-    const thought = await brain.think(
+    // ═══ BRAIN V4: Claude Tool Calling — one call does everything ═══
+    const thought = await thinkV4(
+      brain,
       message,
       avatar,
       history,
@@ -147,141 +150,9 @@ router.post("/chat", chatLimiter, validate(chatSchema), async (req, res) => {
       isAdmin,
     );
 
-    let memoryContext = "";
-    if (user && supabaseAdmin) {
-      try {
-        const { data: prefs } = await supabaseAdmin
-          .from("user_preferences")
-          .select("key, value")
-          .eq("user_id", user.id)
-          .limit(30);
-        if (prefs?.length > 0)
-          memoryContext = prefs
-            .map((p) => `${p.key}: ${JSON.stringify(p.value)}`)
-            .join("; ");
-      } catch (e) {
-        logger.warn(
-          { component: "Chat", err: e.message },
-          "user_preferences read failed",
-        );
-      }
-    }
-    // Combine user_preferences + brain memory + capabilities
-    const brainMemory = brain._currentMemoryContext || "";
-    const capabilities = KelionBrain.CAPABILITIES_PROMPT();
-    const geoContext = geo && geo.lat ? `[USER LOCATION: lat=${geo.lat}, lng=${geo.lng}, accuracy=${geo.accuracy || 'unknown'}m]` : '';
-    const fullMemoryContext = [capabilities, geoContext, memoryContext, brainMemory].filter(Boolean).join("\n");
-    const systemPrompt = buildSystemPrompt(
-      avatar,
-      language,
-      fullMemoryContext,
-      { failedTools: thought.failedTools },
-      thought.chainOfThought,
-    );
-
-    const compressedHist = thought.compressedHistory || history.slice(-20);
-    const msgs = compressedHist.map((h) => ({
-      role: h.role === "ai" ? "assistant" : h.role,
-      content: h.content,
-    }));
-    msgs.push({ role: "user", content: thought.enrichedMessage });
-
-    let reply = null,
-      engine = null;
-
-    // GPT-5.4 (PRIMARY — fast + intelligent)
-    if (!reply && process.env.OPENAI_API_KEY) {
-      try {
-        const r = await fetch("https://api.openai.com/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: "Bearer " + process.env.OPENAI_API_KEY,
-          },
-          body: JSON.stringify({
-            model: MODELS.OPENAI_CHAT,
-            max_tokens: 4096,
-            messages: [{ role: "system", content: systemPrompt }, ...msgs],
-          }),
-        });
-        const d = await r.json();
-        reply = d.choices?.[0]?.message?.content;
-        if (reply) engine = "GPT-5.4";
-      } catch (e) {
-        logger.warn({ component: "Chat", err: e.message }, "GPT-5.4");
-      }
-    }
-    // Claude Sonnet 4 (fallback #1)
-    if (!reply && process.env.ANTHROPIC_API_KEY) {
-      try {
-        const r = await fetch("https://api.anthropic.com/v1/messages", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-api-key": process.env.ANTHROPIC_API_KEY,
-            "anthropic-version": "2023-06-01",
-          },
-          body: JSON.stringify({
-            model: MODELS.ANTHROPIC_CHAT,
-            max_tokens: 4096,
-            system: systemPrompt,
-            messages: msgs,
-          }),
-        });
-        const d = await r.json();
-        reply = d.content?.[0]?.text;
-        if (reply) engine = "Claude";
-      } catch (e) {
-        logger.warn({ component: "Chat", err: e.message }, "Claude");
-      }
-    }
-    // Groq Llama 3.3 70B (fallback #2 — ultra-fast but less intelligent)
-    if (!reply && process.env.GROQ_API_KEY) {
-      try {
-        const r = await fetch(
-          "https://api.groq.com/openai/v1/chat/completions",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: "Bearer " + process.env.GROQ_API_KEY,
-            },
-            body: JSON.stringify({
-              model: MODELS.GROQ_PRIMARY,
-              max_tokens: 4096,
-              messages: [{ role: "system", content: systemPrompt }, ...msgs],
-            }),
-          },
-        );
-        const d = await r.json();
-        reply = d.choices?.[0]?.message?.content;
-        if (reply) engine = "Groq-Llama";
-      } catch (e) {
-        logger.warn({ component: "Chat", err: e.message }, "Groq-Llama");
-      }
-    }
-    // DeepSeek (fallback #3)
-    if (!reply && process.env.DEEPSEEK_API_KEY) {
-      try {
-        const r = await fetch("https://api.deepseek.com/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: "Bearer " + process.env.DEEPSEEK_API_KEY,
-          },
-          body: JSON.stringify({
-            model: MODELS.DEEPSEEK,
-            max_tokens: 4096,
-            messages: [{ role: "system", content: systemPrompt }, ...msgs],
-          }),
-        });
-        const d = await r.json();
-        reply = d.choices?.[0]?.message?.content;
-        if (reply) engine = "DeepSeek";
-      } catch (e) {
-        logger.warn({ component: "Chat", err: e.message }, "DeepSeek");
-      }
-    }
+    // V4 returns the final reply directly from Claude (tool calling + response in one)
+    let reply = thought.enrichedMessage;
+    let engine = thought.agent === "v4-claude-tools" ? "Claude-V4" : "V3-Fallback";
 
     if (!reply) return res.status(503).json({ error: "AI unavailable" });
 
