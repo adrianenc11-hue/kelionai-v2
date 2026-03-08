@@ -1288,7 +1288,7 @@ if (require.main === module) {
       { component: "Process", err: err.stack },
       "Uncaught Exception: " + err.message,
     );
-    process.exit(1);
+    // DO NOT exit — keep server alive, Railway will restart if truly broken
   });
 
   process.on("unhandledRejection", (reason) => {
@@ -1296,7 +1296,7 @@ if (require.main === module) {
       { component: "Process", reason: String(reason) },
       "Unhandled Rejection: " + reason,
     );
-    process.exit(1);
+    // DO NOT exit — keep server alive
   });
 
   // ── Create HTTP server for WebSocket support ──
@@ -1325,6 +1325,9 @@ if (require.main === module) {
       app.locals.circuitSuccess = circuitSuccess;
       app.locals.circuitFailure = circuitFailure;
       app.locals.enqueueTask = enqueueTask;
+      // Prevent Railway proxy timeouts
+      server.keepAliveTimeout = 65000; // 65s (Railway proxy = 60s)
+      server.headersTimeout = 70000;   // 70s > keepAliveTimeout
       server.listen(PORT, "0.0.0.0", () => {
         logger.info(
           {
@@ -1345,6 +1348,11 @@ if (require.main === module) {
         );
         // Smoke test internal routes (async, non-blocking)
         smokeTest(PORT).catch(() => { });
+        // Self-ping keepalive — prevent Railway idle sleep (every 4 min)
+        const APP_URL = process.env.APP_URL || `http://localhost:${PORT}`;
+        setInterval(() => {
+          fetch(`${APP_URL}/api/health`).catch(() => { });
+        }, 4 * 60 * 1000).unref();
         // Auto-register Telegram webhook
         if (process.env.TELEGRAM_BOT_TOKEN && process.env.APP_URL) {
           const webhookUrl = `${process.env.APP_URL}/api/telegram/webhook`;
