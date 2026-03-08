@@ -121,18 +121,10 @@
                             window.location.href = '/admin';
                             return;
                         }
-                        var secret = prompt('🛡️ Admin Secret Key:');
+                        var secret = prompt('🛡️ Introdu parola Admin:');
                         if (!secret || !secret.trim()) return;
-                        fetch('/api/admin/ai-status', { headers: { 'x-admin-secret': secret.trim() } })
-                            .then(function (r) {
-                                if (r.ok) {
-                                    sessionStorage.setItem('kelion_admin_secret', secret.trim());
-                                    window.location.href = '/admin';
-                                } else {
-                                    alert('❌ Invalid admin secret. Access denied.');
-                                }
-                            })
-                            .catch(function () { alert('❌ Connection error.'); });
+                        sessionStorage.setItem('kelion_admin_secret', secret.trim());
+                        window.location.href = '/admin';
                     });
                     navArea.appendChild(adminBtn);
                     console.log('[Identity] Admin button added (owner recognized)');
