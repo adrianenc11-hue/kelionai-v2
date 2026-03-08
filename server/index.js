@@ -413,6 +413,7 @@ app.locals.memFallback = memFallback;
 app.use("/api/auth", authRouter);
 app.use("/api", chatRouter);
 app.use("/api", voiceRouter);
+app.use("/api/voice", voiceRouter); // alias: /api/voice/voices also works
 app.use("/api/search", searchRouter);
 app.use("/api/weather", weatherRouter);
 app.use("/api/vision", visionRouter);
@@ -423,6 +424,25 @@ app.use("/api/referral", referralRouter);
 app.use("/api", identityRouter);
 app.use("/api", voiceCloneRouter);
 
+// Alias: /api/admin/media-history → proxy to /api/media/history
+app.get("/api/admin/media-history", (req, res) => {
+  const secret = req.headers["x-admin-secret"];
+  if (!secret || secret !== process.env.ADMIN_SECRET_KEY) {
+    return res.status(401).json({ error: "Admin secret required" });
+  }
+  // Forward to media history route
+  const supabaseAdmin = req.app.locals.supabaseAdmin;
+  if (!supabaseAdmin) return res.json({ media: [] });
+  supabaseAdmin.from("media_history")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(50)
+    .then(({ data, error }) => {
+      if (error) return res.status(500).json({ error: error.message });
+      res.json({ media: data || [], count: (data || []).length });
+    })
+    .catch(e => res.status(500).json({ error: e.message }));
+});
 // ═══ #155: FRONTEND ERROR CAPTURE ENDPOINT ═══
 const _frontendErrors = [];
 const _errorPatterns = new Map(); // track recurring errors
