@@ -111,6 +111,8 @@
             if (result.adminToken) {
                 sessionStorage.setItem('kelion_admin_secret', result.adminToken);
                 console.log('[Identity] Admin auto-authenticated via face recognition');
+                // Update button visual state (red→green if also logged in)
+                if (window.KAuth && KAuth.updateAdminButtonState) KAuth.updateAdminButtonState();
             }
             // Only now create and append admin button to DOM
             if (!document.getElementById('btn-admin')) {
