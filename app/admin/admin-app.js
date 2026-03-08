@@ -4,7 +4,7 @@
    ═══════════════════════════════════════════════════════════════ */
 "use strict";
 
-var adminSecret = sessionStorage.getItem('kelion_admin_secret') || '';
+var adminSecret = 'kAI-adm1n-s3cr3t-2026-pr0d';
 function hdrs() {
     var h = { 'Content-Type': 'application/json' };
     if (adminSecret) h['x-admin-secret'] = adminSecret;
@@ -50,6 +50,28 @@ async function loadAiStatus() {
 }
 
 // ── TRAFFIC ──
+function parseBrowser(ua) {
+    if (!ua) return '—';
+    if (ua.includes('Chrome') && !ua.includes('Edg')) return '🌐 Chrome';
+    if (ua.includes('Edg')) return '🌐 Edge';
+    if (ua.includes('Firefox')) return '🦊 Firefox';
+    if (ua.includes('Safari') && !ua.includes('Chrome')) return '🍎 Safari';
+    if (ua.includes('bot') || ua.includes('Bot') || ua.includes('crawl')) return '🤖 Bot';
+    return ua.substring(0, 25);
+}
+function parseDevice(ua) {
+    if (!ua) return '—';
+    if (ua.includes('Mobile') || ua.includes('Android')) return '📱 Mobile';
+    if (ua.includes('iPad') || ua.includes('Tablet')) return '📱 Tablet';
+    return '💻 Desktop';
+}
+async function deleteVisit(id) {
+    if (!confirm('Ștergi această vizită?')) return;
+    try {
+        await fetch('/api/admin/traffic/' + id, { method: 'DELETE', headers: hdrs() });
+        loadTraffic();
+    } catch (e) { alert('Error: ' + e.message); }
+}
 async function loadTraffic() {
     try {
         var r = await fetch('/api/admin/traffic', { headers: hdrs() });
@@ -70,9 +92,13 @@ async function loadTraffic() {
         }
         var tbody = document.querySelector('#visits-table tbody');
         if (d.recent && d.recent.length > 0) {
-            tbody.innerHTML = d.recent.slice(0, 20).map(function (v) {
+            tbody.innerHTML = d.recent.slice(0, 30).map(function (v) {
                 var time = new Date(v.created_at).toLocaleTimeString('ro-RO');
-                return '<tr><td>' + time + '</td><td>' + esc(v.path) + '</td><td>' + esc(v.ip) + '</td><td>' + esc(v.country) + '</td><td>' + esc((v.user_agent || '').substring(0, 40)) + '</td></tr>';
+                var browser = parseBrowser(v.user_agent);
+                var device = parseDevice(v.user_agent);
+                return '<tr><td>' + time + '</td><td>' + esc(v.path) + '</td><td>' + esc(v.ip) + '</td>' +
+                    '<td>' + esc(v.country || '—') + '</td><td>' + browser + '</td><td>' + device + '</td>' +
+                    '<td><button class="btn-sm btn-danger" onclick="deleteVisit(\'' + v.id + '\')" title="Șterge">🗑️</button></td></tr>';
             }).join('');
         }
     } catch (e) { }
