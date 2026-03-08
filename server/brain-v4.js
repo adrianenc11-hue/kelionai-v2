@@ -1574,6 +1574,31 @@ async function thinkV4(brain, message, avatar, history, language, userId, conver
         if (toolsUsed.length > 2) confidence += 0.1;
         confidence = Math.min(1.0, confidence);
 
+        // ── Multi-AI Consensus for complex/critical queries ──
+        // Triggers when: query used 2+ tools OR frustration is high OR no tools verified data
+        let consensusEngine = null;
+        const isComplex = toolsUsed.length >= 2 || frustration >= 3;
+        const needsVerification = toolsUsed.length === 0 && message.length > 80;
+        if ((isComplex || needsVerification) && typeof brain.multiAIConsensus === "function") {
+            try {
+                const consensusResult = await brain.multiAIConsensus(
+                    `Verify and improve this answer if needed. User question: "${message.substring(0, 300)}"\nCurrent answer: "${finalResponse.substring(0, 500)}"\nProvide ONLY the improved answer text, nothing else.`,
+                    800,
+                );
+                if (consensusResult && consensusResult.text) {
+                    consensusEngine = consensusResult.engine;
+                    if (consensusResult.consensus) confidence = Math.min(1.0, confidence + 0.1);
+                    // Use consensus answer only if it's substantially different and longer
+                    if (consensusResult.text.length > finalResponse.length * 1.3) {
+                        finalResponse = consensusResult.text;
+                        logger.info({ component: "BrainV4", engine: consensusEngine }, "🤝 Consensus answer used");
+                    }
+                }
+            } catch (e) {
+                logger.warn({ component: "BrainV4", err: e.message }, "Consensus check failed (non-blocking)");
+            }
+        }
+
         logger.info(
             { component: "BrainV4", tools: toolsUsed, rounds: toolResults.length, thinkTime, tokens: totalTokens },
             `🧠 V4 Think: ${toolsUsed.length} tools | ${thinkTime}ms | ${totalTokens} tokens`,
