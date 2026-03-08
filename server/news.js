@@ -58,6 +58,61 @@ function setBrain(b) {
   _brain = b;
 }
 
+// ═══ AI TRANSLATION (Claude) ═══
+// Detects non-Romanian articles and translates title+summary
+const RO_PATTERN = /[ăîâșțĂÎÂȘȚ]|\b(și|pentru|este|care|sau|din|acest|într-|într|într-un|despre|fără|după|când|unde)\b/i;
+
+function isRomanian(text) {
+  if (!text || text.length < 10) return true;
+  return RO_PATTERN.test(text);
+}
+
+async function translateToRomanian(title, summary) {
+  const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
+  if (!ANTHROPIC_KEY) return { title, summary };
+  if (isRomanian(title)) return { title, summary };
+
+  try {
+    const prompt = `Translate the following news headline and summary to Romanian. Return ONLY a JSON object with "title" and "summary" keys. Keep it natural, journalistic style.
+
+Title: ${title}
+Summary: ${summary || ""}`;
+
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": ANTHROPIC_KEY,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-3-5-haiku-20241022",
+        max_tokens: 300,
+        messages: [{ role: "user", content: prompt }],
+      }),
+      timeout: 10000,
+    });
+
+    if (!res.ok) return { title, summary };
+    const data = await res.json();
+    const text = data.content?.[0]?.text || "";
+
+    // Extract JSON from response
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      return {
+        title: parsed.title || title,
+        summary: parsed.summary || summary,
+      };
+    }
+    return { title, summary };
+  } catch (e) {
+    logger.warn({ component: "News", err: e.message }, "Translation failed (using original)");
+    return { title, summary };
+  }
+}
+
 // ═══ AUTO-PUBLISH CALLBACK ═══
 let _onNewsFetched = null;
 function onNewsFetched(callback) {
@@ -187,21 +242,25 @@ function recordTitleSource(title, source) {
 }
 
 // ═══ ADD ARTICLE TO CACHE ═══
-function addArticle(raw, source) {
+async function addArticle(raw, source) {
   const title = (raw.title || "").slice(0, 120);
   if (!title) return;
   if (isSuspiciousTitle(title)) return;
   if (isHttpOnly(raw.url)) return;
   if (isDuplicate(title)) return;
 
-  const id = makeId(title);
-  const { isBreaking, confirmedBy } = checkBreaking(title);
-  recordTitleSource(title, source);
+  // Translate non-Romanian articles
+  const translated = await translateToRomanian(title, (raw.summary || raw.description || "").slice(0, 300));
+
+  const id = makeId(translated.title);
+  const { isBreaking, confirmedBy } = checkBreaking(translated.title);
+  recordTitleSource(translated.title, source);
 
   const article = {
     id,
-    title,
-    summary: (raw.summary || raw.description || "").slice(0, 300),
+    title: translated.title,
+    summary: translated.summary,
+    originalTitle: title !== translated.title ? title : undefined,
     source,
     url: raw.url || "",
     publishedAt: raw.publishedAt || new Date().toISOString(),
@@ -432,23 +491,23 @@ async function fetchAllSources() {
     fetchMediaStack(),
   ]);
 
-  const processArticles = (articles, source) => {
+  const processArticles = async (articles, source) => {
     if (!Array.isArray(articles)) return;
-    for (const a of articles) addArticle(a, source);
+    for (const a of articles) await addArticle(a, source);
   };
 
   if (newsapiArticles.status === "fulfilled")
-    processArticles(newsapiArticles.value, "NewsAPI");
+    await processArticles(newsapiArticles.value, "NewsAPI");
   if (gnewsArticles.status === "fulfilled")
-    processArticles(gnewsArticles.value, "GNews");
+    await processArticles(gnewsArticles.value, "GNews");
   if (rssResults.status === "fulfilled") {
     for (const { name, articles } of rssResults.value)
-      processArticles(articles, name);
+      await processArticles(articles, name);
   }
   if (currentsArticles.status === "fulfilled")
-    processArticles(currentsArticles.value, "Currents");
+    await processArticles(currentsArticles.value, "Currents");
   if (mediastackArticles.status === "fulfilled")
-    processArticles(mediastackArticles.value, "MediaStack");
+    await processArticles(mediastackArticles.value, "MediaStack");
 
   lastFetchTime = Date.now();
   logger.info(
