@@ -2404,6 +2404,27 @@ Reply STRICTLY with JSON:
     }
   }
 
+  // Helper: log AI cost to Supabase
+  async _logCost(provider, model, inputTokens, outputTokens, costUsd, userId) {
+    if (!this.supabaseAdmin) return;
+    try {
+      await this.supabaseAdmin.from("ai_costs").insert({
+        user_id: userId || "system",
+        provider: provider,
+        model: model || "unknown",
+        input_tokens: inputTokens || 0,
+        output_tokens: outputTokens || 0,
+        cost_usd: costUsd || 0,
+        created_at: new Date().toISOString(),
+      });
+    } catch (e) {
+      logger.warn(
+        { component: "Brain", err: e.message },
+        "ok — ai_costs insert failed",
+      );
+    }
+  }
+
   // ── OPEN URL ON MONITOR ──
   async _openURL(url) {
     this.toolStats.openURL = (this.toolStats.openURL || 0) + 1;
