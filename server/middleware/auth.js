@@ -11,7 +11,12 @@ const crypto = require("crypto");
  * `x-admin-secret` request header.  Uses a timing-safe comparison to
  * prevent timing-based secret enumeration attacks.
  */
+// ═══ TEMPORARILY DISABLED (trial period) — re-enable by removing bypass below ═══
 function adminAuth(req, res, next) {
+  // BYPASS: admin auth disabled temporarily
+  return next();
+
+  /* ── ORIGINAL AUTH (uncomment to re-enable) ──
   const secret = req.headers["x-admin-secret"];
   const expected = process.env.ADMIN_SECRET_KEY;
   if (!secret || !expected) {
@@ -30,6 +35,7 @@ function adminAuth(req, res, next) {
     return res.status(401).json({ error: "Unauthorized" });
   }
   next();
+  */
 }
 
 module.exports = { adminAuth };

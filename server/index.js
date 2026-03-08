@@ -426,10 +426,11 @@ app.use("/api", voiceCloneRouter);
 
 // Alias: /api/admin/media-history → proxy to /api/media/history
 app.get("/api/admin/media-history", (req, res) => {
-  const secret = req.headers["x-admin-secret"];
-  if (!secret || secret !== process.env.ADMIN_SECRET_KEY) {
-    return res.status(401).json({ error: "Admin secret required" });
-  }
+  // ═══ TEMPORARILY DISABLED (trial period) ═══
+  // const secret = req.headers["x-admin-secret"];
+  // if (!secret || secret !== process.env.ADMIN_SECRET_KEY) {
+  //   return res.status(401).json({ error: "Admin secret required" });
+  // }
   // Forward to media history route
   const supabaseAdmin = req.app.locals.supabaseAdmin;
   if (!supabaseAdmin) return res.json({ media: [] });
