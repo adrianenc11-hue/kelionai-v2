@@ -113,6 +113,260 @@ class KelionBrain {
 
     logger.info({ component: "Brain" },
       "🧠 Brain v3.0 initialized: LearningStore + AutonomousMonitor + MultiAgent + UserProfiles");
+
+    // ── Tool Registry (loaded from Supabase brain_tools) ──
+    this._toolRegistry = new Map(); // id → tool
+    this._toolCache = new Map();    // cacheKey → { data, timestamp }
+    this._toolCacheTTL = 5 * 60 * 1000; // 5 min cache
+
+    // Plan quota limits (messages per month)
+    this.PLAN_LIMITS = { free: 50, pro: 500, premium: Infinity };
+
+    // Load tool registry on startup
+    this._loadToolRegistry().catch(() => { });
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // TOOL REGISTRY — Central Engine Core
+  // ═══════════════════════════════════════════════════════════
+
+  /** Load all tools from Supabase brain_tools table */
+  async _loadToolRegistry() {
+    if (!this.supabaseAdmin) return;
+    try {
+      const { data, error } = await this.supabaseAdmin
+        .from("brain_tools")
+        .select("*")
+        .eq("is_active", true)
+        .order("priority", { ascending: true });
+
+      if (error || !data) return;
+      this._toolRegistry.clear();
+      for (const tool of data) {
+        this._toolRegistry.set(tool.id, tool);
+      }
+      logger.info({ component: "Brain", tools: data.length },
+        `🔧 Loaded ${data.length} tools from registry`);
+    } catch (e) {
+      logger.warn({ component: "Brain", err: e.message }, "Tool registry load failed");
+    }
+  }
+
+  /** Get best tool for a category (respects priority + fallback) */
+  getToolByCategory(category) {
+    const tools = [];
+    for (const tool of this._toolRegistry.values()) {
+      if (tool.category === category && tool.is_active) tools.push(tool);
+    }
+    tools.sort((a, b) => a.priority - b.priority);
+    return tools[0] || null;
+  }
+
+  /** Get tool by ID */
+  getTool(toolId) {
+    return this._toolRegistry.get(toolId) || null;
+  }
+
+  /** Get tool endpoint URL — central method replacing all hardcoded URLs */
+  getToolUrl(toolId) {
+    const tool = this._toolRegistry.get(toolId);
+    return tool ? tool.endpoint : null;
+  }
+
+  /**
+   * Call a tool with automatic logging, stats, fallback, and caching
+   * This is the ONLY way external APIs should be called
+   */
+  async callTool(toolId, params = {}, userId = null) {
+    let tool = this._toolRegistry.get(toolId);
+    if (!tool) {
+      // Fallback: try to find by category
+      logger.warn({ component: "Brain", toolId }, `Tool ${toolId} not found`);
+      return { success: false, error: "Tool not found", data: null };
+    }
+
+    // ── Cache check ──
+    const cacheKey = `${toolId}:${JSON.stringify(params)}`;
+    const cached = this._toolCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < this._toolCacheTTL) {
+      logger.info({ component: "Brain", toolId }, `📦 Cache hit for ${tool.name}`);
+      return { success: true, data: cached.data, fromCache: true };
+    }
+
+    // ── Execute with fallback chain ──
+    let attempts = 0;
+    const maxAttempts = 3;
+
+    while (tool && attempts < maxAttempts) {
+      attempts++;
+      const start = Date.now();
+      try {
+        // Build auth headers
+        const headers = { "Content-Type": "application/json" };
+        if (tool.auth_type === "api_key" && tool.auth_env_key) {
+          const key = process.env[tool.auth_env_key];
+          if (!key) throw new Error(`Missing env: ${tool.auth_env_key}`);
+          const headerName = tool.config?.header || "Authorization";
+          headers[headerName] = headerName === "Authorization" ? `Bearer ${key}` : key;
+        } else if (tool.auth_type === "bearer" && tool.auth_env_key) {
+          headers["Authorization"] = `Bearer ${process.env[tool.auth_env_key]}`;
+        }
+
+        // Build request
+        const fetchOpts = { method: tool.method, headers, signal: AbortSignal.timeout(15000) };
+        let url = tool.endpoint;
+
+        if (tool.method === "GET" && params.query) {
+          const qs = new URLSearchParams(params).toString();
+          url = `${url}?${qs}`;
+        } else if (tool.method === "POST") {
+          fetchOpts.body = JSON.stringify(params);
+        }
+
+        const response = await fetch(url, fetchOpts);
+        const latency = Date.now() - start;
+
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+
+        // ── Success: update stats + cache ──
+        this._toolCache.set(cacheKey, { data, timestamp: Date.now() });
+        this._updateToolStats(tool.id, latency, true);
+
+        // Log to memory
+        if (this.supabaseAdmin && userId) {
+          this.supabaseAdmin.from("brain_memory").insert({
+            user_id: userId,
+            memory_type: "tool_call",
+            content: `Used ${tool.name}: ${JSON.stringify(params).substring(0, 200)}`,
+            metadata: { tool_id: tool.id, latency_ms: latency, success: true },
+            importance: 0.3,
+          }).then(() => { }).catch(() => { });
+        }
+
+        return { success: true, data, latency, tool: tool.name };
+
+      } catch (e) {
+        const latency = Date.now() - start;
+        logger.warn({ component: "Brain", tool: tool.id, err: e.message, latency },
+          `⚠️ ${tool.name} failed (${latency}ms): ${e.message}`);
+        this._updateToolStats(tool.id, latency, false);
+
+        // ── Fallback to next tool ──
+        if (tool.fallback_tool_id) {
+          const fallback = this._toolRegistry.get(tool.fallback_tool_id);
+          if (fallback) {
+            logger.info({ component: "Brain", from: tool.id, to: fallback.id },
+              `🔄 Fallback: ${tool.name} → ${fallback.name}`);
+            tool = fallback;
+            continue;
+          }
+        }
+        return { success: false, error: e.message, data: null, tool: tool.name };
+      }
+    }
+    return { success: false, error: "All attempts exhausted", data: null };
+  }
+
+  /** Update tool stats in DB (async, non-blocking) */
+  _updateToolStats(toolId, latencyMs, success) {
+    if (!this.supabaseAdmin) return;
+    const updates = {
+      total_calls: this._toolRegistry.get(toolId)?.total_calls + 1 || 1,
+      last_used_at: new Date().toISOString(),
+      avg_latency_ms: latencyMs,
+    };
+    if (!success) updates.total_errors = (this._toolRegistry.get(toolId)?.total_errors || 0) + 1;
+
+    this.supabaseAdmin.from("brain_tools").update(updates)
+      .eq("id", toolId).then(() => { }).catch(() => { });
+
+    // Update local cache
+    const local = this._toolRegistry.get(toolId);
+    if (local) {
+      local.total_calls = updates.total_calls;
+      local.last_used_at = updates.last_used_at;
+      local.avg_latency_ms = latencyMs;
+      if (!success) local.total_errors = updates.total_errors;
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // QUOTA SYSTEM — Messages per plan per month
+  // ═══════════════════════════════════════════════════════════
+
+  /** Check if user has remaining quota */
+  async checkQuota(userId) {
+    if (!this.supabaseAdmin || !userId) return { allowed: true, remaining: Infinity };
+
+    const month = new Date().toISOString().slice(0, 7); // '2026-03'
+
+    // Get user plan
+    let plan = "free";
+    try {
+      const { data: sub } = await this.supabaseAdmin
+        .from("subscriptions")
+        .select("plan")
+        .eq("user_id", userId)
+        .eq("status", "active")
+        .single();
+      if (sub?.plan) plan = sub.plan;
+    } catch { }
+
+    const limit = this.PLAN_LIMITS[plan] || 50;
+
+    // Get current usage
+    try {
+      const { data: usage } = await this.supabaseAdmin
+        .from("brain_usage")
+        .select("message_count")
+        .eq("user_id", userId)
+        .eq("month", month)
+        .single();
+
+      const count = usage?.message_count || 0;
+      return {
+        allowed: count < limit,
+        remaining: Math.max(0, limit - count),
+        used: count,
+        limit,
+        plan,
+      };
+    } catch {
+      return { allowed: true, remaining: limit, used: 0, limit, plan };
+    }
+  }
+
+  /** Increment user message count for current month */
+  async incrementUsage(userId, toolCalls = 0, tokensUsed = 0) {
+    if (!this.supabaseAdmin || !userId) return;
+    const month = new Date().toISOString().slice(0, 7);
+
+    try {
+      // Upsert: insert or increment
+      const { data: existing } = await this.supabaseAdmin
+        .from("brain_usage")
+        .select("id, message_count, tool_calls, tokens_used")
+        .eq("user_id", userId)
+        .eq("month", month)
+        .single();
+
+      if (existing) {
+        await this.supabaseAdmin.from("brain_usage").update({
+          message_count: (existing.message_count || 0) + 1,
+          tool_calls: (existing.tool_calls || 0) + toolCalls,
+          tokens_used: (existing.tokens_used || 0) + tokensUsed,
+          updated_at: new Date().toISOString(),
+        }).eq("id", existing.id);
+      } else {
+        await this.supabaseAdmin.from("brain_usage").insert({
+          user_id: userId, month,
+          message_count: 1, tool_calls: toolCalls, tokens_used: tokensUsed,
+        });
+      }
+    } catch (e) {
+      logger.warn({ component: "Brain", err: e.message }, "Usage tracking failed");
+    }
   }
 
   // ═══════════════════════════════════════════════════════════
