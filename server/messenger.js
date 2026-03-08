@@ -353,12 +353,12 @@ async function getSenderProfile(senderId) {
   const token = process.env.FB_PAGE_ACCESS_TOKEN;
   if (!token) return null;
   try {
-    const res = await fetch(
+    const res = await withTimeout(fetch(
       "https://graph.facebook.com/v21.0/" +
       senderId +
       "?fields=first_name,last_name&access_token=" +
       token,
-    );
+    ), 5000, "getSenderProfile");
     if (res.ok) {
       const data = await res.json();
       return data.first_name
@@ -536,7 +536,7 @@ async function sendMessage(recipientId, text, quickReplies) {
       })
       .slice(0, 13);
   }
-  const res = await fetch(
+  const res = await withTimeout(fetch(
     "https://graph.facebook.com/v21.0/me/messages?access_token=" + token,
     {
       method: "POST",
@@ -546,7 +546,7 @@ async function sendMessage(recipientId, text, quickReplies) {
         message: message,
       }),
     },
-  );
+  ), 10000, "sendMessage");
   if (!res.ok) {
     const body = await res.text();
     logger.error(
@@ -561,7 +561,7 @@ async function sendTypingOn(recipientId) {
   const token = process.env.FB_PAGE_ACCESS_TOKEN;
   if (!token) return;
   try {
-    await fetch(
+    await withTimeout(fetch(
       "https://graph.facebook.com/v21.0/me/messages?access_token=" + token,
       {
         method: "POST",
@@ -571,7 +571,7 @@ async function sendTypingOn(recipientId) {
           sender_action: "typing_on",
         }),
       },
-    );
+    ), 5000, "sendTypingOn");
   } catch (e) {
     logger.warn(
       { component: "Messenger", err: e.message },
@@ -698,7 +698,7 @@ async function sendGenericTemplate(recipientId, elements) {
   const token = process.env.FB_PAGE_ACCESS_TOKEN;
   if (!token) return;
   try {
-    const res = await fetch(
+    const res = await withTimeout(fetch(
       "https://graph.facebook.com/v21.0/me/messages?access_token=" + token,
       {
         method: "POST",
@@ -716,7 +716,7 @@ async function sendGenericTemplate(recipientId, elements) {
           },
         }),
       },
-    );
+    ), 10000, "sendGenericTemplate");
     if (!res.ok) {
       const body = await res.text();
       logger.error(
@@ -737,7 +737,7 @@ async function _sendButtonTemplate(recipientId, text, buttons) {
   const token = process.env.FB_PAGE_ACCESS_TOKEN;
   if (!token) return;
   try {
-    const res = await fetch(
+    const res = await withTimeout(fetch(
       "https://graph.facebook.com/v21.0/me/messages?access_token=" + token,
       {
         method: "POST",
@@ -756,7 +756,7 @@ async function _sendButtonTemplate(recipientId, text, buttons) {
           },
         }),
       },
-    );
+    ), 10000, "sendButtonTemplate");
     if (!res.ok) {
       const body = await res.text();
       logger.error(
@@ -777,7 +777,7 @@ async function setupPersistentMenu() {
   const token = process.env.FB_PAGE_ACCESS_TOKEN;
   if (!token) return { error: "No page token configured" };
   try {
-    const res = await fetch(
+    const res = await withTimeout(fetch(
       "https://graph.facebook.com/v21.0/me/messenger_profile?access_token=" +
       token,
       {
@@ -807,7 +807,7 @@ async function setupPersistentMenu() {
           ],
         }),
       },
-    );
+    ), 10000, "setupPersistentMenu");
     const data = await res.json();
     logger.info(
       { component: "Messenger", result: data },
@@ -959,7 +959,7 @@ async function generateImage(prompt) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return null;
   try {
-    const res = await fetch("https://api.openai.com/v1/images/generations", {
+    const res = await withTimeout(fetch("https://api.openai.com/v1/images/generations", {
       method: "POST",
       headers: {
         Authorization: "Bearer " + apiKey,
@@ -972,7 +972,7 @@ async function generateImage(prompt) {
         size: "1024x1024",
         response_format: "url",
       }),
-    });
+    }), 30000, "generateImage:DALL-E");
     if (res.ok) {
       const data = await res.json();
       return data.data && data.data[0] && data.data[0].url;
@@ -1013,13 +1013,13 @@ router.get("/subscribe", async function (req, res) {
   if (!token)
     return res.status(500).json({ error: "FB_PAGE_ACCESS_TOKEN not set" });
   try {
-    const meRes = await fetch(
+    const meRes = await withTimeout(fetch(
       "https://graph.facebook.com/v21.0/me?access_token=" + token,
-    );
+    ), 10000, "subscribe:getPageId");
     const me = await meRes.json();
     if (!me.id)
       return res.status(500).json({ error: "Cannot get page ID", details: me });
-    const subRes = await fetch(
+    const subRes = await withTimeout(fetch(
       "https://graph.facebook.com/v21.0/" + me.id + "/subscribed_apps",
       {
         method: "POST",
@@ -1030,7 +1030,7 @@ router.get("/subscribe", async function (req, res) {
           access_token: token,
         }),
       },
-    );
+    ), 10000, "subscribe:subscribeApps");
     const result = await subRes.json();
     logger.info(
       { component: "Messenger", pageId: me.id, result: result },

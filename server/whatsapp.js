@@ -348,7 +348,7 @@ async function sendTextMessage(to, text) {
     );
     return;
   }
-  const res = await fetch(`${GRAPH_API}/${PHONE_NUMBER_ID}/messages`, {
+  const res = await withTimeout(fetch(`${GRAPH_API}/${PHONE_NUMBER_ID}/messages`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${WA_TOKEN}`,
@@ -360,7 +360,7 @@ async function sendTextMessage(to, text) {
       type: "text",
       text: { body: text.slice(0, 4096) },
     }),
-  });
+  }), 10000, "sendTextMessage");
   if (res.ok) {
     logger.info({ component: "WhatsApp", to }, "Text message sent");
   } else {
@@ -375,7 +375,7 @@ async function sendTextMessage(to, text) {
 // ═══ SEND WHATSAPP AUDIO MESSAGE ═══
 async function sendAudioMessage(to, mediaId) {
   if (!WA_TOKEN || !PHONE_NUMBER_ID) return;
-  const res = await fetch(`${GRAPH_API}/${PHONE_NUMBER_ID}/messages`, {
+  const res = await withTimeout(fetch(`${GRAPH_API}/${PHONE_NUMBER_ID}/messages`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${WA_TOKEN}`,
@@ -387,7 +387,7 @@ async function sendAudioMessage(to, mediaId) {
       type: "audio",
       audio: { id: mediaId },
     }),
-  });
+  }), 10000, "sendAudioMessage");
   if (res.ok) {
     logger.info({ component: "WhatsApp", to }, "Audio message sent");
   } else {

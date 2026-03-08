@@ -481,13 +481,47 @@ async function runMigration() {
     });
 
     try {
-        logger.info({ component: "Migration" }, "�� Running database migration...");
+        logger.info({ component: "Migration" }, "🔄 Running database migration...");
         await pool.query(MIGRATION_SQL);
+        logger.info({ component: "Migration" }, "✅ CREATE TABLE IF NOT EXISTS — all 35+ tables processed");
+
+        // ── POST-MIGRATION: Verify every table actually works ──
+        const ALL_TABLES = [
+            "conversations", "messages", "user_preferences", "api_keys",
+            "admin_logs", "trades", "profiles", "media_history",
+            "telegram_users", "whatsapp_users", "whatsapp_messages",
+            "trade_intelligence", "cookie_consents", "metrics_snapshots",
+            "ai_costs", "page_views", "subscriptions", "referrals",
+            "admin_codes", "brain_memory", "learned_facts",
+            "messenger_users", "messenger_messages", "messenger_subscribers",
+            "telegram_messages", "market_candles", "market_learnings", "market_patterns",
+            "brain_profiles", "brain_learnings", "brain_metrics",
+        ];
+
+        const healthy = [];
+        const broken = [];
+
+        for (const table of ALL_TABLES) {
+            try {
+                const result = await pool.query(`SELECT COUNT(*) AS cnt FROM ${table} LIMIT 1`);
+                const count = parseInt(result.rows[0]?.cnt || "0", 10);
+                healthy.push({ table, rows: count });
+            } catch (e) {
+                broken.push({ table, error: e.message.substring(0, 100) });
+            }
+        }
+
+        if (broken.length > 0) {
+            logger.warn(
+                { component: "Migration", broken },
+                `⚠️ ${broken.length} tables BROKEN: ${broken.map(b => b.table).join(", ")}`,
+            );
+        }
         logger.info(
-            { component: "Migration" },
-            "✅ Tables created/verified: conversations, messages, user_preferences, api_keys",
+            { component: "Migration", healthy: healthy.length, broken: broken.length },
+            `✅ Health check: ${healthy.length} OK, ${broken.length} broken out of ${ALL_TABLES.length} tables`,
         );
-        logger.info({ component: "Migration" }, "✅ RLS policies applied");
+
         return true;
     } catch (e) {
         logger.error(
