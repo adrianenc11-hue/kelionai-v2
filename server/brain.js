@@ -399,6 +399,45 @@ class KelionBrain {
 - METRICS: Performance metrics and analytics
 - SECURITY: Security auditing
 - DEVELOPER_API: API key management and docs
+
+=== SKILL: PRODUCȚIE MEDIA (IMAGINE/POSTER/LOGO/ILUSTRAȚIE) ===
+Când utilizatorul cere producție de conținut vizual, URMEZI OBLIGATORIU acest flow:
+
+PASUL 1 — IDENTIFICARE: Recunoaște tipul de cerere:
+  • Imagine/poză/foto → generare AI
+  • Logo/avatar/icon → design grafic
+  • Poster/banner/flyer → material promoțional
+  • Ilustrație/desen → artistic
+
+PASUL 2 — CLARIFICARE (NU genera imediat!): Întreabă TOATE acestea:
+  📐 DIMENSIUNE: Ce format dorești?
+    - 1024×1024 (pătrat — ideal pentru social media, profil)
+    - 1792×1024 (landscape — banner, desktop wallpaper)
+    - 1024×1792 (portret — story Instagram, poster vertical)
+  🎨 STIL: Ce estetică preferi?
+    - Realist/fotografic, Cartoon/animat, Acuarelă, Oil painting
+    - Cyberpunk/neon, Minimalist/clean, Retro/vintage, 3D render
+    - Pixel art, Vector flat, Artistic abstract
+  🌈 CULORI: Ai preferințe? (tonuri calde/reci, paletă specifică, dark/light)
+  📝 DETALII SPECIFICE: Ce elemente TREBUIE să apară?
+    - Subiect principal, fundal, text de inclus, obiecte secundare, atmosferă/mood
+  🎯 SCOP: Pentru ce va fi folosit? (social media, print, web, prezentare)
+
+PASUL 3 — CONFIRMARE: Rezumă ce vei genera și cere OK-ul userului:
+  "Voi genera: [descriere completă]. Dimensiune: [X]. Stil: [Y]. Confirm?"
+
+PASUL 4 — GENERARE: Doar DUPĂ confirmare, generează cu promptul detaliat.
+
+PASUL 5 — FEEDBACK POST-GENERARE (OBLIGATORIU):
+  După ce ai generat, ÎNTREABĂ MEREU:
+  "Ți se potrivește? Vrei să modific ceva?"
+  Sugerează posibile ajustări: culori, compoziție, stil, adăugare/eliminare elemente.
+  Dacă utilizatorul cere modificări, re-generează cu promptul ajustat.
+  Repetă până utilizatorul e mulțumit.
+
+EXCEPȚIE: Dacă utilizatorul dă deja o descriere COMPLETĂ și DETALIATĂ (30+ cuvinte, cu stil, culori, elemente specifice), poți genera direct fără clarificări. Dar PASUL 5 (feedback) rămâne OBLIGATORIU mereu.
+===
+
 When asked "what can you do?" list these real capabilities. Use them proactively when relevant.`;
   }
 
@@ -2174,7 +2213,7 @@ Reply STRICTLY with JSON:
     if (results.weather)
       ctx += `\n[DATE METEO REALE]: ${results.weather.description}`;
     if (results.imagine)
-      ctx += `\n[Am generat imaginea pe monitor. Descrie-o scurt.]`;
+      ctx += `\n[Am generat imaginea pe monitor. Descrie-o scurt, apoi OBLIGATORIU întreabă utilizatorul: "Ți se potrivește rezultatul? Vrei să modific ceva — culori, stil, compoziție, detalii?". Oferă 2-3 sugestii concrete de ajustare.]`;
     if (analysis?.needsImageClarification)
       ctx += `\n[IMPORTANT: Utilizatorul vrea o imagine dar cererea e vagă. NU genera încă! Întreabă-l despre: 1) Dimensiune/format (pătrat, landscape, portret, banner), 2) Stil (realist, cartoon, acuarelă, cyberpunk, minimalist, etc.), 3) Culori predominante, 4) Detalii specifice (text, fundal, personaje, obiect principal). Fii prietenos și creativ cu sugestiile.]`;
     if (results.map) ctx += `\n[Harta "${results.map.place}" pe monitor.]`;
