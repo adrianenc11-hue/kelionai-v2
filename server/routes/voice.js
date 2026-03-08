@@ -238,6 +238,8 @@ router.post("/listen", apiLimiter, validate(listenSchema), async (req, res) => {
         contentType: "audio/webm",
       });
       form.append("model", MODELS.WHISPER);
+      form.append("language", "ro");
+      form.append("prompt", "Aceasta este o conversație în limba română cu KelionAI.");
       const r = await fetch(
         "https://api.groq.com/openai/v1/audio/transcriptions",
         {
