@@ -48,6 +48,12 @@ const { router: whatsappRouter, setSupabase: setWhatsappSupabase } = require("./
 const fbPage = require("./facebook-page");
 const instagram = require("./instagram");
 const developerRouter = require("./routes/developer");
+const {
+  ipBlacklistMiddleware, compressionMiddleware, staticCacheMiddleware,
+  gracefulDegradationMiddleware, getCircuitStats, getBlacklistStats,
+  getLoadStats, getQueueStats, circuitAllow, circuitSuccess, circuitFailure,
+  enqueueTask,
+} = require("./scalability");
 
 // ═══ EXTRACTED ROUTE MODULES ═══
 const chatRouter = require("./routes/chat");
@@ -65,6 +71,11 @@ const voiceCloneRouter = require("./routes/voice-clone");
 
 const app = express();
 app.set("trust proxy", 1);
+
+// ═══ LEVEL 2-4 SCALABILITY MIDDLEWARE ═══
+app.use(ipBlacklistMiddleware);        // Auto-ban abusive IPs (>500 req/min)
+app.use(gracefulDegradationMiddleware); // 503 when overloaded
+app.use(staticCacheMiddleware);        // Cache-Control headers for static files
 
 // ═══ HTTPS FORCE REDIRECT ═══
 app.use((req, res, next) => {
@@ -1285,6 +1296,15 @@ if (require.main === module) {
       app.locals.cacheGet = cacheGet;
       app.locals.cacheSet = cacheSet;
       app.locals.getCacheStats = getCacheStats;
+      // Scalability stats + functions
+      app.locals.getCircuitStats = getCircuitStats;
+      app.locals.getBlacklistStats = getBlacklistStats;
+      app.locals.getLoadStats = getLoadStats;
+      app.locals.getQueueStats = getQueueStats;
+      app.locals.circuitAllow = circuitAllow;
+      app.locals.circuitSuccess = circuitSuccess;
+      app.locals.circuitFailure = circuitFailure;
+      app.locals.enqueueTask = enqueueTask;
       server.listen(PORT, "0.0.0.0", () => {
         logger.info(
           {
