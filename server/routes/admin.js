@@ -1068,4 +1068,90 @@ router.get("/brain-health", (req, res) => {
   }
 });
 
+// ══════════════════════════════════════════════════════════
+// GET /api/admin/media — Media history & stats
+// ══════════════════════════════════════════════════════════
+router.get("/media", async (req, res) => {
+  try {
+    const { supabaseAdmin } = req.app.locals;
+    if (!supabaseAdmin) return res.json({ recent: [], stats: {}, totalCount: 0 });
+
+    // Recent media
+    const { data: recent } = await supabaseAdmin
+      .from("media_history")
+      .select("id, user_id, type, prompt, url, created_at")
+      .order("created_at", { ascending: false })
+      .limit(50);
+
+    // Stats by type
+    const stats = {};
+    (recent || []).forEach((m) => {
+      stats[m.type] = (stats[m.type] || 0) + 1;
+    });
+
+    // Total count
+    const { count } = await supabaseAdmin
+      .from("media_history")
+      .select("id", { count: "exact", head: true });
+
+    res.json({ recent: recent || [], stats, totalCount: count || 0 });
+  } catch (e) {
+    logger.error({ component: "Admin", err: e.message }, "Media query failed");
+    res.json({ recent: [], stats: {}, totalCount: 0 });
+  }
+});
+
+// ══════════════════════════════════════════════════════════
+// GET /api/admin/trading — Trading stats & recent trades
+// ══════════════════════════════════════════════════════════
+router.get("/trading", async (req, res) => {
+  try {
+    const { supabaseAdmin } = req.app.locals;
+    if (!supabaseAdmin) return res.json({ recentTrades: [], stats: {}, intelligence: [] });
+
+    // Recent trades
+    const { data: trades } = await supabaseAdmin
+      .from("trades")
+      .select("id, user_id, symbol, side, quantity, price, status, pnl, created_at")
+      .order("created_at", { ascending: false })
+      .limit(50);
+
+    // Trade intelligence (recent analyses)
+    const { data: intel } = await supabaseAdmin
+      .from("trade_intelligence")
+      .select("id, symbol, signal, confidence, analysis, created_at")
+      .order("created_at", { ascending: false })
+      .limit(20);
+
+    // Compute stats
+    const totalTrades = (trades || []).length;
+    const totalPnl = (trades || []).reduce((s, t) => s + (parseFloat(t.pnl) || 0), 0);
+    const winTrades = (trades || []).filter((t) => (parseFloat(t.pnl) || 0) > 0).length;
+    const lossTrades = (trades || []).filter((t) => (parseFloat(t.pnl) || 0) < 0).length;
+    const activeTrades = (trades || []).filter((t) => t.status === "open" || t.status === "active").length;
+
+    // Binance config status
+    const binanceConfigured = !!process.env.BINANCE_API_KEY;
+    const binanceMode = process.env.BINANCE_TESTNET === "true" ? "testnet" : "live";
+
+    res.json({
+      recentTrades: trades || [],
+      intelligence: intel || [],
+      stats: {
+        totalTrades,
+        totalPnl: totalPnl.toFixed(2),
+        winRate: totalTrades > 0 ? ((winTrades / totalTrades) * 100).toFixed(1) : "0",
+        winTrades,
+        lossTrades,
+        activeTrades,
+        binanceConfigured,
+        binanceMode,
+      },
+    });
+  } catch (e) {
+    logger.error({ component: "Admin", err: e.message }, "Trading query failed");
+    res.json({ recentTrades: [], stats: {}, intelligence: [] });
+  }
+});
+
 module.exports = router;

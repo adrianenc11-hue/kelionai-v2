@@ -620,6 +620,27 @@ body {
 }
 
 .section-panel.open .section-body {
-    max-height: 800px;
+    max-height: 2000px;
     padding: 0 20px 16px;
+}
+
+/* MINI STATS (inline cards for media/trading) */
+.mini-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 14px;
+}
+
+.mini-stat {
+    background: var(--admin-surface);
+    border: 1px solid var(--admin-border);
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 0.82rem;
+}
+
+.mini-stat .label {
+    color: var(--admin-muted);
+    margin-right: 6px;
 }
