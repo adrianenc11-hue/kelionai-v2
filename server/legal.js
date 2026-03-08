@@ -81,7 +81,7 @@ router.get("/privacy", (req, res) => {
       {
         title: "5. Data Sharing",
         content:
-          "Anthropic/OpenAI (AI processing), ElevenLabs (text-to-speech), Stripe (payments), Supabase (storage). We never sell personal data.",
+          "Google/OpenAI (AI processing), ElevenLabs (text-to-speech), Stripe (payments), Supabase (storage). We never sell personal data.",
       },
       {
         title: "6. Your Rights (GDPR)",

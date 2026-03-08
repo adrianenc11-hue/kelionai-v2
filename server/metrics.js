@@ -94,7 +94,7 @@ const aiRequestsTotal = new client.Counter({
 // AI response latency
 const aiLatency = new client.Histogram({
   name: "kelionai_ai_latency_seconds",
-  help: "AI API response time (Claude/OpenAI)",
+  help: "AI API response time (Gemini/OpenAI)",
   labelNames: ["provider"],
   buckets: [0.5, 1, 2, 3, 5, 10, 20],
   registers: [register],

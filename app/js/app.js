@@ -187,6 +187,7 @@
             // ── SYNCED VOICE + TEXT ──
             // Create empty message — text will be revealed with voice
             const overlay = document.getElementById('chat-overlay');
+            overlay.innerHTML = ''; // Clear previous — max 1 phrase on screen
             const msgEl = document.createElement('div');
             msgEl.className = 'msg assistant';
             msgEl.innerHTML = '';
@@ -405,6 +406,7 @@
     // ─── UI ──────────────────────────────────────────────────
     function addMessage(type, text) {
         var o = document.getElementById('chat-overlay');
+        o.innerHTML = ''; // Clear previous — max 1 phrase on screen at a time
         var m = document.createElement('div');
         m.className = 'msg ' + type;
         if (type === 'assistant') {
@@ -414,8 +416,8 @@
         }
         o.appendChild(m);
         o.scrollTop = o.scrollHeight;
-        // ── Live subtitle ──
-        updateSubtitle(type, text);
+        // Auto-clear text after 5 seconds
+        setTimeout(function () { if (o.contains(m)) o.removeChild(m); }, 5000);
     }
     function updateSubtitle(/* type, text */) {
         // Disabled — messages already visible in chat overlay, subtitle caused duplicate display
@@ -563,7 +565,7 @@
                 var statusDot = document.getElementById('status-dot');
                 if (statusText) statusText.textContent = 'Online' + (d.brain !== 'healthy' ? ' ⚠️' : '');
                 if (statusDot) statusDot.style.background = d.brain === 'healthy' ? '#00ff88' : '#ffaa00';
-                if (d.services && !d.services.ai_claude) useStreaming = false;
+                if (d.services && !d.services.ai_gemini) useStreaming = false;
             }
         } catch (e) {
             var statusText = document.getElementById('status-text');

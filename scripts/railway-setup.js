@@ -26,7 +26,7 @@ const AUTO_GENERATE = ["ADMIN_TOKEN"];
 
 // Variabile obligatorii (nu pot fi sărite)
 const REQUIRED_KEYS = [
-  "ANTHROPIC_API_KEY",
+  "GOOGLE_AI_KEY",
   "SUPABASE_URL",
   "SUPABASE_ANON_KEY",
   "SUPABASE_SERVICE_KEY",

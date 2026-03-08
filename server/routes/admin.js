@@ -94,7 +94,7 @@ router.get("/brain", (req, res) => {
       uptime: (Date.now() - brain.startTime) / 1000,
       conversationCount: brain.conversationCount || 0,
       providers: {
-        anthropic: !!brain.anthropicKey,
+        gemini: !!(process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY),
         openai: !!brain.openaiKey,
         groq: !!brain.groqKey,
         perplexity: !!brain.perplexityKey,
@@ -413,7 +413,7 @@ router.get("/ai-status", async (req, res) => {
     // Provider configs from brain
     const providerKeys = {
       "OpenAI": !!brain?.openaiKey,
-      "Anthropic": !!brain?.anthropicKey,
+      "Google": !!(process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY),
       "Groq": !!brain?.groqKey,
       "Perplexity": !!brain?.perplexityKey,
       "Together": !!brain?.togetherKey,
@@ -914,7 +914,7 @@ const AUDIT_PATTERNS = [
 const AUDIT_WHITELIST = [
   /^\s*\/\//, /^\s*\*/, /process\.env\./, /require\(/,
   /api\.telegram\.org/, /api\.stripe\.com/, /graph\.facebook\.com/,
-  /api\.openai\.com/, /api\.anthropic\.com/, /api\.elevenlabs\.io/,
+  /api\.openai\.com/, /generativelanguage\.googleapis\.com/, /api\.elevenlabs\.io/,
   /api\.groq\.com/, /api\.together\.ai/, /api\.perplexity\.ai/,
   /api\.tavily\.com/, /api\.deepgram\.com/, /api\.cartesia\.ai/,
   /api\.serper\.dev/, /cdn\.jsdelivr\.net/, /unpkg\.com/,

@@ -47,15 +47,10 @@ async function run() {
     // ═══ 🔴 OBLIGATORII ═══
     console.log('── 🔴 OBLIGATORII ──\n');
 
-    await testKey('ANTHROPIC_API_KEY', async (key) => {
-        const r = await fetch('https://api.anthropic.com/v1/messages', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
-            body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 5, messages: [{ role: 'user', content: 'Hi' }] }),
-        });
-        if (r.status === 200) return { ok: true, detail: 'Claude API working' };
-        if (r.status === 401) return { ok: false, detail: 'INVALID KEY (401 Unauthorized)' };
-        if (r.status === 403) return { ok: false, detail: 'FORBIDDEN — key disabled or expired' };
+    await testKey('GOOGLE_AI_KEY', async (key) => {
+        const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
+        if (r.status === 200) return { ok: true, detail: 'Gemini API working' };
+        if (r.status === 400 || r.status === 403) return { ok: false, detail: 'INVALID KEY or API not enabled' };
         if (r.status === 429) return { ok: true, detail: 'Rate limited but key valid' };
         const body = await r.text().catch(() => '');
         return { ok: false, detail: `HTTP ${r.status}: ${body.slice(0, 100)}` };
