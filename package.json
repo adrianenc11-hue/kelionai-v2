@@ -4,8 +4,9 @@
     "description": "KelionAI — Asistent AI accesibil cu avatari 3D",
     "main": "server/index.js",
     "scripts": {
+        "prestart": "node scripts/pre-start-audit.js",
         "dev": "node server/index.js",
-        "start": "node server/index.js",
+        "start": "node scripts/pre-start-audit.js && node server/index.js",
         "gate": "node scripts/gate.js",
         "lint": "npx eslint server/",
         "typecheck": "node -e \"console.log('typecheck: N/A (JS-only project)')\"",
