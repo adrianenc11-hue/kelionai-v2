@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════════════════
-   KelionAI v3 — Premium App Styles
-   Chat mare stânga, avatar 3D sus-stânga, monitor dreapta
+   KelionAI v4 — Glassmorphism Premium Design
+   Frosted glass panels, ambient glow, gradient borders
    ═══════════════════════════════════════════════════════════════ */
 
 .hidden {
@@ -74,8 +74,10 @@ body {
     height: 100%;
     display: flex;
     flex-direction: column;
-    border-right: 1px solid rgba(99, 102, 241, 0.08);
-    background: rgba(5, 5, 16, 0.5);
+    border-right: 1px solid rgba(99, 102, 241, 0.12);
+    background: rgba(8, 8, 24, 0.7);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
 }
 
 /* ── Avatar Area (full height, subtitle-style) ── */
@@ -83,7 +85,8 @@ body {
     flex: 1;
     position: relative;
     min-height: 0;
-    background: radial-gradient(ellipse at center bottom, rgba(99, 102, 241, 0.04) 0%, transparent 70%);
+    background: radial-gradient(ellipse at center bottom, rgba(99, 102, 241, 0.08) 0%, rgba(6, 182, 212, 0.03) 40%, transparent 80%);
+    box-shadow: inset 0 -40px 80px -20px rgba(99, 102, 241, 0.06);
 }
 
 #avatar-canvas {
@@ -239,12 +242,12 @@ body {
 }
 
 .msg {
-    padding: 10px 14px;
-    border-radius: 14px;
+    padding: 12px 16px;
+    border-radius: 16px;
     max-width: 92%;
     font-size: 0.88rem;
     line-height: 1.55;
-    animation: msgFadeIn 0.3s ease;
+    animation: msgFadeIn 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .msg.user {
@@ -252,16 +255,18 @@ body {
     background: var(--kelion-gradient);
     color: white;
     border-bottom-right-radius: 4px;
-    box-shadow: 0 2px 12px rgba(99, 102, 241, 0.2);
+    box-shadow: 0 4px 20px rgba(99, 102, 241, 0.25), 0 0 0 1px rgba(99, 102, 241, 0.1);
 }
 
 .msg.ai,
 .msg.assistant {
     align-self: flex-start;
-    background: rgba(15, 15, 40, 0.8);
-    border: 1px solid rgba(99, 102, 241, 0.1);
+    background: rgba(12, 12, 35, 0.65);
+    border: 1px solid rgba(99, 102, 241, 0.12);
     border-bottom-left-radius: 4px;
-    backdrop-filter: blur(8px);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
 }
 
 @keyframes msgFadeIn {
@@ -281,9 +286,11 @@ body {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 10px 12px;
-    background: rgba(5, 5, 16, 0.6);
-    border-top: 1px solid rgba(99, 102, 241, 0.06);
+    padding: 12px 14px;
+    background: rgba(8, 8, 24, 0.75);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-top: 1px solid rgba(99, 102, 241, 0.1);
     margin-bottom: 0;
     position: relative;
     z-index: 100;
@@ -377,16 +384,18 @@ body {
 
 #text-input {
     flex: 1;
-    padding: 10px 16px;
-    background: rgba(10, 10, 30, 0.5);
-    border: 1px solid rgba(99, 102, 241, 0.12);
+    padding: 11px 18px;
+    background: rgba(10, 10, 30, 0.4);
+    border: 1px solid rgba(99, 102, 241, 0.15);
     border-radius: 999px;
     color: var(--kelion-text);
     font-size: 0.88rem;
     font-family: var(--kelion-font);
     outline: none;
     min-width: 0;
-    transition: var(--kelion-transition);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
 }
 
 #text-input::placeholder {
@@ -394,15 +403,15 @@ body {
 }
 
 #text-input:focus {
-    border-color: var(--kelion-primary);
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
-    background: rgba(10, 10, 30, 0.7);
+    border-color: rgba(99, 102, 241, 0.4);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.08), 0 0 20px rgba(99, 102, 241, 0.1);
+    background: rgba(10, 10, 30, 0.6);
 }
 
 #btn-send,
 #btn-upload {
-    width: 38px;
-    height: 38px;
+    width: 40px;
+    height: 40px;
     border-radius: 50%;
     border: none;
     background: var(--kelion-gradient);
@@ -413,14 +422,14 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: var(--kelion-transition);
-    box-shadow: 0 2px 12px rgba(99, 102, 241, 0.25);
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 16px rgba(99, 102, 241, 0.3), 0 0 0 1px rgba(99, 102, 241, 0.1);
 }
 
 #btn-send:hover,
 #btn-upload:hover {
-    transform: scale(1.05);
-    box-shadow: 0 4px 20px rgba(99, 102, 241, 0.4);
+    transform: scale(1.08);
+    box-shadow: 0 6px 28px rgba(99, 102, 241, 0.45), 0 0 0 1px rgba(99, 102, 241, 0.2);
 }
 
 /* ── Thinking ── */
@@ -476,17 +485,19 @@ body {
     height: 100%;
     display: flex;
     flex-direction: column;
-    background: var(--bg-display);
+    background: rgba(3, 3, 12, 0.9);
+    border-left: 1px solid rgba(99, 102, 241, 0.06);
 }
 
 #display-header {
-    height: 44px;
+    height: 46px;
     display: flex;
     align-items: center;
-    padding: 0 18px;
-    border-bottom: 1px solid rgba(99, 102, 241, 0.06);
-    background: rgba(5, 5, 16, 0.6);
-    backdrop-filter: blur(8px);
+    padding: 0 20px;
+    border-bottom: 1px solid rgba(99, 102, 241, 0.08);
+    background: rgba(8, 8, 24, 0.7);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
 }
 
 #display-title {
