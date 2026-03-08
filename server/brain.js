@@ -619,6 +619,17 @@ When asked "what can you do?" list these real capabilities. Use them proactively
     this._currentMediaData = mediaData || {};
 
     try {
+      // Step -1: QUOTA CHECK — verify user has remaining messages
+      const quota = await this.checkQuota(userId);
+      if (!quota.allowed) {
+        logger.info({ component: "Brain", userId, used: quota.used, limit: quota.limit },
+          `⛔ Quota exceeded for user (${quota.plan})`);
+        const upgradeMsg = language === "ro"
+          ? `Ai atins limita de ${quota.limit} mesaje/lună pe planul ${quota.plan.toUpperCase()}. Upgradeează la ${quota.plan === "free" ? "Pro" : "Premium"} pentru mai multe mesaje! 🚀`
+          : `You've reached your ${quota.limit} messages/month limit on the ${quota.plan.toUpperCase()} plan. Upgrade to ${quota.plan === "free" ? "Pro" : "Premium"} for more messages! 🚀`;
+        return { reply: upgradeMsg, emotion: "neutral", toolsUsed: [], confidence: 1.0 };
+      }
+
       // Step 0: LOAD MEMORY + USER PROFILE — brain wakes up with full context
       const [memories, visualMem, audioMem, facts, profile] = await Promise.all([
         this.loadMemory(userId, "text", 10),
@@ -749,6 +760,9 @@ When asked "what can you do?" list these real capabilities. Use them proactively
         )
         .replace(/\n{3,}/g, "\n\n")
         .trim();
+
+      // Track usage (non-blocking)
+      this.incrementUsage(userId, Object.keys(results).length, 0).catch(() => { });
 
       return {
         enrichedMessage: cleanReply,
@@ -2305,11 +2319,12 @@ Reply STRICTLY with JSON:
       /(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/,
     );
     if (ytMatch) {
-      const embedUrl = `https://www.youtube.com/embed/${ytMatch[1]}?autoplay=1`;
+      const ytEmbed = this.getToolUrl("youtube_embed") || "https://www.youtube.com/embed";
+      const embedUrl = `${ytEmbed}/${ytMatch[1]}?autoplay=1`;
       await this._logMedia("video", embedUrl, query);
       return {
         type: "video",
-        url: `https://youtube.com/watch?v=${ytMatch[1]}`,
+        url: `${this.getToolUrl("youtube_embed") ? "https://youtube.com" : "https://youtube.com"}/watch?v=${ytMatch[1]}`,
         embedUrl,
         videoId: ytMatch[1],
         title: query,
@@ -2334,8 +2349,10 @@ Reply STRICTLY with JSON:
     }
 
     // Search YouTube via API or construct search URL
-    const searchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
-    const embedSearch = `https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(query)}`;
+    const ytSearchBase = this.getToolUrl("youtube_search") || "https://www.youtube.com/results";
+    const ytEmbedBase = this.getToolUrl("youtube_embed") || "https://www.youtube.com/embed";
+    const searchUrl = `${ytSearchBase}?search_query=${encodeURIComponent(query)}`;
+    const embedSearch = `${ytEmbedBase}?listType=search&list=${encodeURIComponent(query)}`;
     await this._logMedia("video", searchUrl, query);
 
     return {
@@ -3942,7 +3959,7 @@ Reply STRICTLY with JSON:
     // 3️⃣ SERPER — Fast: raw Google results, very cheap
     if (!result && this.serperKey) {
       try {
-        const r = await fetch("https://google.serper.dev/search", {
+        const r = await fetch(this.getToolUrl("serper_search") || "https://google.serper.dev/search", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -4003,16 +4020,18 @@ Reply STRICTLY with JSON:
 
   async _weather(city) {
     this.toolStats.weather++;
+    const geoUrl = this.getToolUrl("open_meteo_geo") || "https://geocoding-api.open-meteo.com/v1/search";
     const geo = await (
       await fetch(
-        `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=ro`,
+        `${geoUrl}?name=${encodeURIComponent(city)}&count=1&language=ro`,
       )
     ).json();
     if (!geo.results?.[0]) throw new Error("City not found");
     const { latitude, longitude, name, country } = geo.results[0];
+    const forecastUrl = this.getToolUrl("open_meteo_forecast") || "https://api.open-meteo.com/v1/forecast";
     const wx = await (
       await fetch(
-        `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&daily=temperature_2m_max,temperature_2m_min,weather_code&timezone=auto&forecast_days=3`,
+        `${forecastUrl}?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&daily=temperature_2m_max,temperature_2m_min,weather_code&timezone=auto&forecast_days=3`,
       )
     ).json();
     const c = wx.current;
