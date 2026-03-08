@@ -45,9 +45,9 @@
     var SMOOTH_RELEASE = 0.08;  // very slow release for natural feel
 
     // ── Mouth opening clamp — prevents enormous jaw opening ──
-    var MAX_MOUTH_OPEN = 0.15;  // absolute max for jawOpen/mouthOpen — prevents face distortion
-    var MAX_VISEME_AA = 0.20;   // absolute max for wide-open vowel
-    var MAX_VISEME = 0.25;      // absolute max for any viseme
+    var MAX_MOUTH_OPEN = 0.08;  // absolute max for jawOpen/mouthOpen — prevents face distortion
+    var MAX_VISEME_AA = 0.12;   // absolute max for wide-open vowel
+    var MAX_VISEME = 0.15;      // absolute max for any viseme
 
     // ── Coarticulation — blend previous viseme into current ──
     var _prevVisemes = {};

@@ -20,9 +20,9 @@
     var ASYMMETRY_OFFSET = 0.015; // left side leads slightly
 
     // ── Clamp constants — prevents face distortion ──
-    var MAX_JAW = 0.22;
-    var MAX_VOWEL = 0.30;
-    var MAX_VISEME = 0.35;
+    var MAX_JAW = 0.12;
+    var MAX_VOWEL = 0.18;
+    var MAX_VISEME = 0.22;
 
     // ── Character → Phoneme class mapping ──
     // Groups: V_OPEN, V_MID, V_CLOSE, V_ROUND, V_TIGHT, C_BILABIAL, C_LABIO,
@@ -60,13 +60,13 @@
     // Each maps to multiple morph targets with calibrated weights
     var PHONEME_VISEMES = {
         'V_OPEN': {
-            viseme_aa: 0.28, aa: 0.28,
-            jawOpen: 0.20, mouthOpen: 0.15,
-            mouthLowerDownLeft: 0.08, mouthLowerDownRight: 0.08
+            viseme_aa: 0.18, aa: 0.18,
+            jawOpen: 0.10, mouthOpen: 0.08,
+            mouthLowerDownLeft: 0.05, mouthLowerDownRight: 0.05
         },
         'V_MID': {
-            viseme_E: 0.22, E: 0.22,
-            jawOpen: 0.12, mouthOpen: 0.08,
+            viseme_E: 0.15, E: 0.15,
+            jawOpen: 0.07, mouthOpen: 0.05,
             mouthStretchLeft: 0.06, mouthStretchRight: 0.06
         },
         'V_CLOSE': {
@@ -76,8 +76,8 @@
             mouthSmileLeft: 0.04, mouthSmileRight: 0.04
         },
         'V_ROUND': {
-            viseme_O: 0.25, oh: 0.25,
-            jawOpen: 0.14, mouthFunnel: 0.15,
+            viseme_O: 0.16, oh: 0.16,
+            jawOpen: 0.08, mouthFunnel: 0.10,
             mouthPucker: 0.06
         },
         'V_TIGHT': {
