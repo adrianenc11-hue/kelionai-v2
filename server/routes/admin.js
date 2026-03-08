@@ -483,25 +483,32 @@ router.get("/ai-status", async (req, res) => {
       } catch (e) { /* table might not exist */ }
     }
 
-    // Known credit limits per provider (env vars or defaults)
-    const creditLimits = {
+    // Read credit limits from Supabase provider_credits table (fallback to env vars)
+    let creditByProvider = {};
+    if (supabaseAdmin) {
+      try {
+        const { data: credits } = await supabaseAdmin.from("provider_credits").select("provider, credit_usd");
+        (credits || []).forEach(c => { creditByProvider[c.provider] = parseFloat(c.credit_usd) || 0; });
+      } catch (e) { /* table might not exist yet */ }
+    }
+
+    // Fallback defaults if table empty
+    const defaultCredits = {
       "OpenAI": parseFloat(process.env.OPENAI_CREDIT || "5"),
-      "Google": parseFloat(process.env.GOOGLE_CREDIT || "0"),
-      "Groq": parseFloat(process.env.GROQ_CREDIT || "0"),
+      "Google": 0, "Groq": 0,
       "Perplexity": parseFloat(process.env.PERPLEXITY_CREDIT || "5"),
       "Together": parseFloat(process.env.TOGETHER_CREDIT || "5"),
       "ElevenLabs": parseFloat(process.env.ELEVENLABS_CREDIT || "5"),
       "DeepSeek": parseFloat(process.env.DEEPSEEK_CREDIT || "2"),
-      "Tavily": parseFloat(process.env.TAVILY_CREDIT || "0"),
-      "Serper": parseFloat(process.env.SERPER_CREDIT || "0"),
+      "Tavily": 0, "Serper": 0,
     };
 
     const providers = Object.entries(providerKeys).map(([name, hasKey]) => {
       const costMonth = costByProvider[name.toLowerCase()] || costByProvider[name] || 0;
-      const limit = creditLimits[name] || 0;
+      const limit = creditByProvider[name] !== undefined ? creditByProvider[name] : (defaultCredits[name] || 0);
       const credit = Math.max(0, limit - costMonth);
       const creditLabel = limit > 0
-        ? '$' + credit.toFixed(2) + ' / $' + limit.toFixed(0)
+        ? '$' + credit.toFixed(2) + ' / $' + limit.toFixed(2)
         : 'Free tier';
       return { name, live: hasKey, costMonth, credit, creditLabel, creditLimit: limit };
     });
@@ -510,6 +517,31 @@ router.get("/ai-status", async (req, res) => {
   } catch (e) {
     logger.error({ component: "Admin", err: e.message }, "AI status failed");
     res.json({ providers: [] });
+  }
+});
+
+// ══════════════════════════════════════════════════════════
+// POST /api/admin/provider-credit — Update credit for a provider
+// ══════════════════════════════════════════════════════════
+router.post("/provider-credit", async (req, res) => {
+  try {
+    const { supabaseAdmin } = req.app.locals;
+    if (!supabaseAdmin) return res.status(500).json({ error: "No DB" });
+    const { provider, amount } = req.body;
+    if (!provider || amount == null) return res.status(400).json({ error: "provider and amount required" });
+
+    const credit = parseFloat(amount);
+    if (isNaN(credit) || credit < 0) return res.status(400).json({ error: "Invalid amount" });
+
+    // Upsert into provider_credits
+    const { error } = await supabaseAdmin
+      .from("provider_credits")
+      .upsert({ provider, credit_usd: credit, updated_at: new Date().toISOString(), updated_by: "admin" }, { onConflict: "provider" });
+
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ ok: true, provider, credit_usd: credit });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
   }
 });
 
