@@ -30,6 +30,7 @@ const rateLimit = require("express-rate-limit");
 const { supabase, supabaseAdmin } = require("./supabase");
 const { runMigration } = require("./migrate");
 const { KelionBrain } = require("./brain");
+const { validateEnv, setupGracefulShutdown, smokeTest } = require("./startup-checks");
 
 const logger = require("./logger");
 const { router: paymentsRouter } = require("./payments");
@@ -366,6 +367,7 @@ const brain = new KelionBrain({
   supabaseAdmin,
 });
 logger.info({ component: "Brain" }, "🧠 Engine initialized");
+validateEnv();
 
 // ═══ AUTH HELPER ═══
 async function getUserFromToken(req) {
@@ -1201,6 +1203,7 @@ if (require.main === module) {
   const { setupVoiceStream } = require("./routes/voice-stream");
   setupVoiceStream(server, app.locals);
   logger.info({ component: "VoiceStream" }, "WebSocket voice pipeline mounted on /api/voice-stream");
+  setupGracefulShutdown(server);
 
   runMigration()
     .then((migrated) => {
@@ -1223,6 +1226,8 @@ if (require.main === module) {
           },
           "KelionAI v2.5 started on port " + PORT + " (with voice streaming)",
         );
+        // Smoke test internal routes (async, non-blocking)
+        smokeTest(PORT).catch(() => { });
         // Auto-register Telegram webhook
         if (process.env.TELEGRAM_BOT_TOKEN && process.env.APP_URL) {
           const webhookUrl = `${process.env.APP_URL}/api/telegram/webhook`;

@@ -12,13 +12,23 @@ const logger = require("./logger");
 const router = express.Router();
 const APP_URL = process.env.APP_URL || '';
 
+// ═══ TIMEOUT HELPER — prevents hanging on slow/dead APIs ═══
+function withTimeout(promise, ms = 10000, label = "operation") {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms),
+    ),
+  ]);
+}
+
 // ═══ AUTO-REGISTER WEBHOOK ON STARTUP ═══
 if (process.env.TELEGRAM_BOT_TOKEN) {
   const webhookUrl =
     (process.env.APP_URL) + "/api/telegram/webhook";
   setTimeout(async () => {
     try {
-      const res = await fetch(
+      const res = await withTimeout(fetch(
         `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/setWebhook`,
         {
           method: "POST",
@@ -28,7 +38,7 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
             allowed_updates: ["message", "callback_query"],
           }),
         },
-      );
+      ), 10000, "telegram:autoRegisterWebhook");
       const data = await res.json();
       logger.info(
         { component: "Telegram", success: data.ok, webhookUrl },
@@ -228,14 +238,14 @@ async function sendMessage(chatId, text, options = {}) {
     if (options.replyMarkup)
       body.reply_markup = JSON.stringify(options.replyMarkup);
 
-    const res = await fetch(
+    const res = await withTimeout(fetch(
       `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       },
-    );
+    ), 10000, "telegram:sendMessage");
     if (res.ok) {
       stats.repliesSent++;
       logger.info({ component: "Telegram", chatId }, "Message sent");
@@ -469,7 +479,7 @@ router.post("/webhook", async (req, res) => {
       }
       // Answer callback to remove loading state
       if (BOT_TOKEN) {
-        await fetch(
+        await withTimeout(fetch(
           `https://api.telegram.org/bot${BOT_TOKEN}/answerCallbackQuery`,
           {
             method: "POST",
@@ -478,7 +488,7 @@ router.post("/webhook", async (req, res) => {
               callback_query_id: update.callback_query.id,
             }),
           },
-        );
+        ), 5000, "telegram:answerCallback");
       }
       return;
     }
@@ -652,7 +662,7 @@ router.get("/setup", async (req, res) => {
   const webhookUrl =
     (process.env.APP_URL) + "/api/telegram/webhook";
   try {
-    const response = await fetch(
+    const response = await withTimeout(fetch(
       `https://api.telegram.org/bot${BOT_TOKEN}/setWebhook`,
       {
         method: "POST",
@@ -662,7 +672,7 @@ router.get("/setup", async (req, res) => {
           allowed_updates: ["message", "callback_query"],
         }),
       },
-    );
+    ), 10000, "telegram:setupWebhook");
     const data = await response.json();
     res.json({ success: data.ok, webhookUrl, result: data });
   } catch (e) {
