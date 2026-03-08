@@ -68,6 +68,8 @@ const { adminAuth } = require("./middleware/auth");
 const healthRouter = require("./routes/health");
 const identityRouter = require("./routes/identity");
 const voiceCloneRouter = require("./routes/voice-clone");
+const messengerBot = require("./messenger");
+const instagramBot = require("./instagram");
 
 const app = express();
 app.set("trust proxy", 1);
@@ -405,7 +407,12 @@ app.locals.getUserFromToken = getUserFromToken;
 app.locals.supabase = supabase;
 app.locals.supabaseAdmin = supabaseAdmin;
 app.locals.brain = brain;
-instagram.setBrain(brain);
+
+// ═══ MESSENGER + INSTAGRAM INTEGRATION ═══
+messengerBot.setSupabase(supabaseAdmin || supabase);
+instagramBot.setBrain(brain);
+instagramBot.setSupabase(supabaseAdmin || supabase);
+
 app.locals.memFallback = memFallback;
 
 // ═══ ROUTE MODULES ═══
@@ -422,6 +429,10 @@ app.use("/api/health", healthRouter);
 app.use("/api/referral", referralRouter);
 app.use("/api", identityRouter);
 app.use("/api", voiceCloneRouter);
+
+// ═══ MESSENGER + INSTAGRAM WEBHOOKS ═══
+app.use("/api/messenger", messengerBot.router);
+app.use("/api/instagram", instagramBot.router);
 
 // Alias: /api/admin/media-history → proxy to /api/media/history
 app.get("/api/admin/media-history", (req, res) => {
