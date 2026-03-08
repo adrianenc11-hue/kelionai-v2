@@ -66,6 +66,7 @@ const authRouter = require("./routes/auth");
 const adminApiRouter = require("./routes/admin");
 const { adminAuth } = require("./middleware/auth");
 const healthRouter = require("./routes/health");
+const exportRouter = require("./routes/export");
 const identityRouter = require("./routes/identity");
 const voiceCloneRouter = require("./routes/voice-clone");
 const messengerBot = require("./messenger");
@@ -429,6 +430,7 @@ app.use("/api/health", healthRouter);
 app.use("/api/referral", referralRouter);
 app.use("/api", identityRouter);
 app.use("/api", voiceCloneRouter);
+app.use("/api/export", exportRouter);
 
 // ═══ MESSENGER + INSTAGRAM WEBHOOKS ═══
 app.use("/api/messenger", messengerBot.router);
