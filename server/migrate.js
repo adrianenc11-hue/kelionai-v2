@@ -115,6 +115,11 @@ CREATE TABLE IF NOT EXISTS profiles (
 );
 CREATE INDEX IF NOT EXISTS idx_profiles_user ON profiles(user_id);
 
+-- Add missing columns for face recognition + admin role
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'user';
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS face_reference TEXT;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS preferred_language TEXT DEFAULT 'ro';
+
 -- ═══ MEDIA HISTORY (Monitor Activity) ═══
 CREATE TABLE IF NOT EXISTS media_history (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
