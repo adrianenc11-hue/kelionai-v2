@@ -177,6 +177,22 @@
         if (adminBtn) adminBtn.addEventListener('click', function () {
             if (adminBtn.dataset.locked === 'false') {
                 window.location.href = '/admin';
+            } else if (currentUser) {
+                // Logged in but face not recognized — password fallback
+                var secret = prompt('🔐 Recunoașterea facială nu a funcționat.\nIntrodu parola Admin:');
+                if (!secret || !secret.trim()) return;
+                // Verify against API
+                fetch('/api/admin/ai-status', { headers: { 'x-admin-secret': secret.trim() } })
+                    .then(function (r) {
+                        if (r.ok) {
+                            sessionStorage.setItem('kelion_admin_secret', secret.trim());
+                            updateAdminButtonState();
+                            window.location.href = '/admin';
+                        } else {
+                            alert('❌ Parolă incorectă.');
+                        }
+                    })
+                    .catch(function () { alert('❌ Eroare conexiune.'); });
             }
         });
         // Auto-enter when both avatars are 100% loaded (or 10s max)
