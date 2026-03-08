@@ -107,6 +107,11 @@
         if (!result) return;
 
         if (result.isOwner) {
+            // Auto-store admin token from face recognition (no password needed)
+            if (result.adminToken) {
+                sessionStorage.setItem('kelion_admin_secret', result.adminToken);
+                console.log('[Identity] Admin auto-authenticated via face recognition');
+            }
             // Only now create and append admin button to DOM
             if (!document.getElementById('btn-admin')) {
                 const navArea = document.getElementById('nav-area') || document.querySelector('.ctrl-buttons');
@@ -117,17 +122,10 @@
                     adminBtn.title = 'Admin';
                     adminBtn.textContent = '⚙️';
                     adminBtn.addEventListener('click', function () {
-                        if (sessionStorage.getItem('kelion_admin_secret')) {
-                            window.location.href = '/admin';
-                            return;
-                        }
-                        var secret = prompt('🛡️ Introdu parola Admin:');
-                        if (!secret || !secret.trim()) return;
-                        sessionStorage.setItem('kelion_admin_secret', secret.trim());
                         window.location.href = '/admin';
                     });
                     navArea.appendChild(adminBtn);
-                    console.log('[Identity] Admin button added (owner recognized)');
+                    console.log('[Identity] Admin button added (owner recognized by face)');
                 }
             }
         } else {
