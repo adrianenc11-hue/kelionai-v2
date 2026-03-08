@@ -32,10 +32,14 @@ function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
 
 // ── AI STATUS ──
 async function rechargeProvider(name, currentCredit) {
-    var newAmount = prompt('💳 ' + name + ' — Credit: $' + currentCredit.toFixed(2) + '\n\nIntrodu noul credit ($):', '');
+    var mins = { OpenAI: 5, Perplexity: 5, Together: 5, ElevenLabs: 5, DeepSeek: 2, Google: 0, Groq: 0, Tavily: 0, Serper: 0 };
+    var min = mins[name] || 0;
+    var hint = min > 0 ? ' (min $' + min + ')' : ' (free tier)';
+    var newAmount = prompt('💳 ' + name + hint + '\nCredit actual: $' + currentCredit.toFixed(2) + '\n\nSumă nouă ($):', '');
     if (newAmount === null || newAmount === '') return;
     var amount = parseFloat(newAmount);
     if (isNaN(amount) || amount < 0) return;
+    if (min > 0 && amount < min) { alert('⚠️ Minimul pentru ' + name + ' este $' + min); return; }
     try {
         await fetch('/api/admin/provider-credit', {
             method: 'POST', headers: hdrs(),
