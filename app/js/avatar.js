@@ -196,15 +196,19 @@
         bottomLight.position.set(0, -2, 1);
         scene.add(bottomLight);
 
-        // Business office background texture
+        // Per-avatar background textures
+        var bgTextures = { kelion: '/models/avatar-bg.png', kira: '/models/avatar-bg-kira.png' };
         var bgLoader = new THREE.TextureLoader();
-        bgLoader.load('/models/avatar-bg.png', function (tex) {
-            tex.colorSpace = THREE.SRGBColorSpace;
-            scene.background = tex;
-        }, null, function () {
-            // Fallback to solid color if image fails
-            scene.background = new THREE.Color(0x060614);
-        });
+        function _loadAvatarBg(name) {
+            var src = bgTextures[name] || bgTextures.kelion;
+            bgLoader.load(src, function (tex) {
+                tex.colorSpace = THREE.SRGBColorSpace;
+                scene.background = tex;
+            }, null, function () {
+                scene.background = new THREE.Color(0x060614);
+            });
+        }
+        _loadAvatarBg('kelion');
 
         // Lip sync — simple, uses Smile morph
         if (window.SimpleLipSync) lipSync = new SimpleLipSync();
@@ -234,6 +238,7 @@
     function loadAvatar(name) {
         if (!MODELS[name]) return Promise.resolve();
         currentAvatar = name;
+        if (_loadAvatarBg) _loadAvatarBg(name); // Switch background per avatar
 
         if (currentModel) { scene.remove(currentModel); currentModel = null; }
         morphMeshes = [];
