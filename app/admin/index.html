@@ -218,6 +218,95 @@
                 </div>
             </div>
 
+            <!-- MEDIA HISTORY -->
+            <div class="section-panel" id="sec-media">
+                <button class="section-toggle" onclick="toggleSection('sec-media')">
+                    <span>🎨 Media History</span>
+                    <span class="toggle-arrow">▶</span>
+                </button>
+                <div class="section-body">
+                    <div class="mini-stats" id="media-stats">
+                        <div class="mini-stat"><span class="label">Total generated:</span> <span
+                                id="media-total">—</span></div>
+                        <div class="mini-stat"><span class="label">Images:</span> <span id="media-images">—</span></div>
+                        <div class="mini-stat"><span class="label">TTS Audio:</span> <span id="media-tts">—</span></div>
+                        <div class="mini-stat"><span class="label">Other:</span> <span id="media-other">—</span></div>
+                    </div>
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Type</th>
+                                <th>User</th>
+                                <th>Prompt</th>
+                                <th>URL</th>
+                            </tr>
+                        </thead>
+                        <tbody id="media-tbody">
+                            <tr>
+                                <td colspan="5">Loading...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- TRADING -->
+            <div class="section-panel" id="sec-trading">
+                <button class="section-toggle" onclick="toggleSection('sec-trading')">
+                    <span>📈 Trading Intelligence</span>
+                    <span class="toggle-arrow">▶</span>
+                </button>
+                <div class="section-body">
+                    <div class="mini-stats" id="trading-stats">
+                        <div class="mini-stat"><span class="label">Total trades:</span> <span id="trade-total">—</span>
+                        </div>
+                        <div class="mini-stat"><span class="label">Active:</span> <span id="trade-active">—</span></div>
+                        <div class="mini-stat"><span class="label">P&amp;L:</span> <span id="trade-pnl">—</span></div>
+                        <div class="mini-stat"><span class="label">Win rate:</span> <span id="trade-winrate">—</span>
+                        </div>
+                        <div class="mini-stat"><span class="label">Binance:</span> <span id="trade-binance">—</span>
+                        </div>
+                    </div>
+                    <h4 style="margin:16px 0 8px;color:#a5b4fc;font-size:0.9rem">Recent Trades</h4>
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Symbol</th>
+                                <th>Side</th>
+                                <th>Qty</th>
+                                <th>Price</th>
+                                <th>Status</th>
+                                <th>P&amp;L</th>
+                            </tr>
+                        </thead>
+                        <tbody id="trading-tbody">
+                            <tr>
+                                <td colspan="7">Loading...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <h4 style="margin:16px 0 8px;color:#a5b4fc;font-size:0.9rem">AI Trade Intelligence</h4>
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Symbol</th>
+                                <th>Signal</th>
+                                <th>Confidence</th>
+                                <th>Analysis</th>
+                            </tr>
+                        </thead>
+                        <tbody id="intel-tbody">
+                            <tr>
+                                <td colspan="5">Loading...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
         </div>
     </div>
 

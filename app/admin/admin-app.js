@@ -288,8 +288,86 @@ async function runAutoFix() {
     } catch (e) { alert('Fix failed: ' + e.message); }
 }
 
+// ── MEDIA HISTORY ──
+async function loadMedia() {
+    try {
+        var r = await fetch('/api/admin/media', { headers: hdrs() });
+        var d = await r.json();
+
+        document.getElementById('media-total').textContent = d.totalCount || 0;
+        document.getElementById('media-images').textContent = (d.stats.image || 0) + (d.stats.vision || 0);
+        document.getElementById('media-tts').textContent = d.stats.tts || 0;
+        var otherCount = d.totalCount - (d.stats.image || 0) - (d.stats.vision || 0) - (d.stats.tts || 0);
+        document.getElementById('media-other').textContent = Math.max(0, otherCount);
+
+        var tb = document.getElementById('media-tbody');
+        if (!d.recent || d.recent.length === 0) {
+            tb.innerHTML = '<tr><td colspan="5" style="color:#666;text-align:center">No media generated yet</td></tr>';
+            return;
+        }
+        tb.innerHTML = d.recent.map(function (m) {
+            var date = new Date(m.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+            var urlCell = m.url ? '<a href="' + esc(m.url) + '" target="_blank" style="color:#06B6D4">View</a>' : '—';
+            var prompt = m.prompt ? esc(m.prompt).substring(0, 60) + (m.prompt.length > 60 ? '…' : '') : '—';
+            return '<tr><td>' + esc(date) + '</td><td>' + esc(m.type || '—') + '</td><td style="font-size:0.7rem">' + esc((m.user_id || '').substring(0, 8)) + '</td><td>' + prompt + '</td><td>' + urlCell + '</td></tr>';
+        }).join('');
+    } catch (e) {
+        document.getElementById('media-tbody').innerHTML = '<tr><td colspan="5" style="color:#f66">Error loading media</td></tr>';
+    }
+}
+
+// ── TRADING ──
+async function loadTrading() {
+    try {
+        var r = await fetch('/api/admin/trading', { headers: hdrs() });
+        var d = await r.json();
+        var s = d.stats || {};
+
+        document.getElementById('trade-total').textContent = s.totalTrades || 0;
+        document.getElementById('trade-active').textContent = s.activeTrades || 0;
+        var pnlVal = parseFloat(s.totalPnl) || 0;
+        var pnlEl = document.getElementById('trade-pnl');
+        pnlEl.textContent = (pnlVal >= 0 ? '+' : '') + pnlVal.toFixed(2) + ' $';
+        pnlEl.style.color = pnlVal >= 0 ? '#10B981' : '#EF4444';
+        document.getElementById('trade-winrate').textContent = (s.winRate || 0) + '%';
+        var binanceEl = document.getElementById('trade-binance');
+        binanceEl.textContent = s.binanceConfigured ? (s.binanceMode === 'testnet' ? '🟡 Testnet' : '🟢 Live') : '🔴 Not configured';
+
+        // Recent trades
+        var tb = document.getElementById('trading-tbody');
+        if (!d.recentTrades || d.recentTrades.length === 0) {
+            tb.innerHTML = '<tr><td colspan="7" style="color:#666;text-align:center">No trades yet</td></tr>';
+        } else {
+            tb.innerHTML = d.recentTrades.slice(0, 20).map(function (t) {
+                var date = new Date(t.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+                var pnl = parseFloat(t.pnl) || 0;
+                var pnlColor = pnl > 0 ? '#10B981' : pnl < 0 ? '#EF4444' : '#888';
+                var sideColor = t.side === 'buy' ? '#10B981' : '#EF4444';
+                return '<tr><td>' + esc(date) + '</td><td><strong>' + esc(t.symbol || '—') + '</strong></td><td style="color:' + sideColor + '">' + esc((t.side || '—').toUpperCase()) + '</td><td>' + esc(t.quantity || '—') + '</td><td>$' + esc(parseFloat(t.price || 0).toFixed(2)) + '</td><td>' + esc(t.status || '—') + '</td><td style="color:' + pnlColor + '">' + (pnl >= 0 ? '+' : '') + pnl.toFixed(2) + '</td></tr>';
+            }).join('');
+        }
+
+        // Intelligence
+        var ib = document.getElementById('intel-tbody');
+        if (!d.intelligence || d.intelligence.length === 0) {
+            ib.innerHTML = '<tr><td colspan="5" style="color:#666;text-align:center">No intelligence data yet</td></tr>';
+        } else {
+            ib.innerHTML = d.intelligence.slice(0, 10).map(function (i) {
+                var date = new Date(i.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+                var signalColor = i.signal === 'buy' ? '#10B981' : i.signal === 'sell' ? '#EF4444' : '#F59E0B';
+                var analysis = i.analysis ? esc(String(i.analysis)).substring(0, 80) + '…' : '—';
+                return '<tr><td>' + esc(date) + '</td><td><strong>' + esc(i.symbol || '—') + '</strong></td><td style="color:' + signalColor + '">' + esc((i.signal || '—').toUpperCase()) + '</td><td>' + esc(Math.round((i.confidence || 0) * 100)) + '%</td><td style="font-size:0.78rem">' + analysis + '</td></tr>';
+            }).join('');
+        }
+    } catch (e) {
+        document.getElementById('trading-tbody').innerHTML = '<tr><td colspan="7" style="color:#f66">Error loading trades</td></tr>';
+    }
+}
+
 // ── INIT ──
-loadAiStatus(); loadTraffic(); loadCredit(); loadClients(); loadCodes(); loadUptime(); loadAudit();
+loadAiStatus(); loadTraffic(); loadCredit(); loadClients(); loadCodes(); loadUptime(); loadAudit(); loadMedia(); loadTrading();
 setInterval(function () { loadTraffic(); loadCredit(); loadUptime(); }, 30000);
 setInterval(loadAiStatus, 60000);
 setInterval(loadAudit, 6 * 60 * 60 * 1000); // refresh audit every 6h
+setInterval(function () { loadMedia(); loadTrading(); }, 60000); // refresh media/trading every 60s
+
