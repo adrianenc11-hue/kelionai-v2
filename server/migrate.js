@@ -391,68 +391,117 @@ CREATE TABLE IF NOT EXISTS market_patterns (
 );
 CREATE INDEX IF NOT EXISTS idx_market_patterns_asset ON market_patterns(asset, pattern_type);
 CREATE INDEX IF NOT EXISTS idx_market_patterns_type ON market_patterns(pattern_type, created_at DESC);
+
+-- ═══ BRAIN v3.0 — INTELLIGENCE TABLES ═══
+
+-- User profiling (learned from conversations)
+CREATE TABLE IF NOT EXISTS brain_profiles (
+    user_id TEXT PRIMARY KEY,
+    profession TEXT,
+    interests JSONB DEFAULT '[]'::jsonb,
+    communication_style TEXT DEFAULT 'neutral',
+    expertise_level TEXT DEFAULT 'general',
+    top_topics JSONB DEFAULT '[]'::jsonb,
+    preferred_languages JSONB DEFAULT '[]'::jsonb,
+    emotional_baseline TEXT DEFAULT 'neutral',
+    timezone TEXT,
+    updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Pattern learning (what tools work for which tasks)
+CREATE TABLE IF NOT EXISTS brain_learnings (
+    pattern_key TEXT PRIMARY KEY,
+    complexity TEXT,
+    topics TEXT,
+    best_tools JSONB DEFAULT '[]'::jsonb,
+    success_rate FLOAT DEFAULT 0.5,
+    avg_latency INT DEFAULT 0,
+    count INT DEFAULT 1,
+    updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Autonomous monitor metrics (health snapshots)
+CREATE TABLE IF NOT EXISTS brain_metrics (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    timestamp TIMESTAMPTZ DEFAULT now(),
+    uptime_sec INT,
+    conversations INT,
+    error_rate FLOAT,
+    memory_mb INT,
+    tool_stats JSONB,
+    tool_errors JSONB
+);
+CREATE INDEX IF NOT EXISTS idx_brain_metrics_ts ON brain_metrics(timestamp DESC);
+
+-- Add user_id column to learned_facts if missing (for per-user facts)
+DO $$ BEGIN
+    ALTER TABLE learned_facts ADD COLUMN IF NOT EXISTS user_id TEXT;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+CREATE INDEX IF NOT EXISTS idx_learned_facts_user ON learned_facts(user_id);
+
 `;
 
 async function runMigration() {
-  // Build connection string from Supabase URL or explicit DB vars
-  let connectionString = process.env.DATABASE_URL;
+    // Build connection string from Supabase URL or explicit DB vars
+    let connectionString = process.env.DATABASE_URL;
 
-  if (!connectionString && process.env.SUPABASE_URL) {
-    // Extract project ref from Supabase URL
-    const match = process.env.SUPABASE_URL.match(
-      /https:\/\/([^.]+)\.supabase\.co/,
-    );
-    if (match) {
-      const ref = match[1];
-      const password =
-        process.env.SUPABASE_DB_PASSWORD || process.env.DB_PASSWORD;
-      if (!password) {
+    if (!connectionString && process.env.SUPABASE_URL) {
+        // Extract project ref from Supabase URL
+        const match = process.env.SUPABASE_URL.match(
+            /https:\/\/([^.]+)\.supabase\.co/,
+        );
+        if (match) {
+            const ref = match[1];
+            const password =
+                process.env.SUPABASE_DB_PASSWORD || process.env.DB_PASSWORD;
+            if (!password) {
+                logger.warn(
+                    { component: "Migration" },
+                    "⚠️ No DB password configured — skipping migration",
+                );
+                return false;
+            }
+            connectionString = `postgresql://postgres:${encodeURIComponent(password)}@db.${ref}.supabase.co:5432/postgres`;
+        }
+    }
+
+    if (!connectionString) {
         logger.warn(
-          { component: "Migration" },
-          "⚠️ No DB password configured — skipping migration",
+            { component: "Migration" },
+            "⚠️ No database connection — skipping migration",
         );
         return false;
-      }
-      connectionString = `postgresql://postgres:${encodeURIComponent(password)}@db.${ref}.supabase.co:5432/postgres`;
     }
-  }
 
-  if (!connectionString) {
-    logger.warn(
-      { component: "Migration" },
-      "⚠️ No database connection — skipping migration",
-    );
-    return false;
-  }
+    const pool = new Pool({
+        connectionString,
+        ssl: { rejectUnauthorized: false },
+        connectionTimeoutMillis: 10000,
+    });
 
-  const pool = new Pool({
-    connectionString,
-    ssl: { rejectUnauthorized: false },
-    connectionTimeoutMillis: 10000,
-  });
-
-  try {
-    logger.info({ component: "Migration" }, "�� Running database migration...");
-    await pool.query(MIGRATION_SQL);
-    logger.info(
-      { component: "Migration" },
-      "✅ Tables created/verified: conversations, messages, user_preferences, api_keys",
-    );
-    logger.info({ component: "Migration" }, "✅ RLS policies applied");
-    return true;
-  } catch (e) {
-    logger.error(
-      { component: "Migration", err: e.message },
-      "❌ Migration failed",
-    );
-    logger.warn(
-      { component: "Migration" },
-      "⚠️ Server will continue without persistent storage",
-    );
-    return false;
-  } finally {
-    await pool.end();
-  }
+    try {
+        logger.info({ component: "Migration" }, "�� Running database migration...");
+        await pool.query(MIGRATION_SQL);
+        logger.info(
+            { component: "Migration" },
+            "✅ Tables created/verified: conversations, messages, user_preferences, api_keys",
+        );
+        logger.info({ component: "Migration" }, "✅ RLS policies applied");
+        return true;
+    } catch (e) {
+        logger.error(
+            { component: "Migration", err: e.message },
+            "❌ Migration failed",
+        );
+        logger.warn(
+            { component: "Migration" },
+            "⚠️ Server will continue without persistent storage",
+        );
+        return false;
+    } finally {
+        await pool.end();
+    }
 }
 
 module.exports = { runMigration };
