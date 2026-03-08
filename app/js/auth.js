@@ -49,8 +49,15 @@
         var adminBtn = document.getElementById('btn-admin');
         if (!adminBtn) return;
         var isLoggedIn = !!currentUser;
+        var isAdminRole = isLoggedIn && currentUser.role === 'admin';
         var faceConfirmed = !!sessionStorage.getItem('kelion_admin_secret');
-        var unlocked = isLoggedIn && faceConfirmed;
+        var unlocked = isAdminRole && faceConfirmed;
+        // Only show for admin users
+        if (!isAdminRole) {
+            adminBtn.style.display = 'none';
+            return;
+        }
+        adminBtn.style.display = '';
         adminBtn.dataset.locked = unlocked ? 'false' : 'true';
         if (unlocked) {
             adminBtn.style.background = 'rgba(16,185,129,0.15)';
@@ -67,8 +74,7 @@
             adminBtn.style.cursor = 'not-allowed';
             adminBtn.style.opacity = '0.7';
             adminBtn.innerHTML = '🔒 Admin';
-            var hint = !isLoggedIn ? 'Autentifică-te mai întâi' : 'Confirmare facială necesară';
-            adminBtn.title = 'Admin Panel — ' + hint;
+            adminBtn.title = 'Admin Panel — Introdu cod admin în chat';
         }
     }
 
