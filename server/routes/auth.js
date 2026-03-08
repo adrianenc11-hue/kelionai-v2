@@ -67,10 +67,14 @@ router.post(
         });
       }
 
+      const redirectUrl = process.env.APP_URL || 'https://kelionai.app';
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
-        options: { data: { full_name: name || email.split("@")[0] } },
+        options: {
+          data: { full_name: name || email.split("@")[0] },
+          emailRedirectTo: redirectUrl
+        },
       });
       if (error) {
         // Don't expose whether email is already registered

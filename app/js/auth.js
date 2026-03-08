@@ -175,7 +175,49 @@
     }
 
     async function init() {
-        initUI(); const u = await checkSession();
+        initUI();
+
+        // ── Handle Supabase email confirmation callback ──
+        // When user clicks email link, Supabase redirects to: https://kelionai.app/#access_token=...&refresh_token=...&type=signup
+        var hash = window.location.hash;
+        if (hash && hash.includes('access_token=')) {
+            try {
+                var hashParams = new URLSearchParams(hash.substring(1));
+                var accessToken = hashParams.get('access_token');
+                var refreshTokenVal = hashParams.get('refresh_token');
+                var expiresAt = hashParams.get('expires_at');
+                var tokenType = hashParams.get('type'); // 'signup', 'recovery', etc.
+
+                if (accessToken) {
+                    console.log('[Auth] Email callback detected, type:', tokenType);
+                    // Save tokens to session
+                    var session = {
+                        access_token: accessToken,
+                        refresh_token: refreshTokenVal || '',
+                        expires_at: expiresAt || ''
+                    };
+                    saveSession(session, null);
+
+                    // Fetch user info with the new token
+                    try {
+                        var r = await fetch(API + '/api/auth/me', {
+                            headers: { 'Authorization': 'Bearer ' + accessToken }
+                        });
+                        if (r.ok) {
+                            var d = await r.json();
+                            currentUser = d.user;
+                            saveSession(session, d.user);
+                            console.log('[Auth] ✅ Email confirmed, user:', d.user.email);
+                        }
+                    } catch (e) { console.warn('[Auth] User fetch after callback failed:', e.message); }
+
+                    // Clean URL hash
+                    window.history.replaceState(null, '', window.location.pathname + window.location.search);
+                }
+            } catch (e) { console.warn('[Auth] Hash parse error:', e.message); }
+        }
+
+        const u = await checkSession();
         if (u) { document.getElementById('auth-screen')?.classList.add('hidden'); document.getElementById('app-layout')?.classList.remove('hidden'); updateUI(); }
         else { document.getElementById('auth-screen')?.classList.remove('hidden'); document.getElementById('app-layout')?.classList.add('hidden'); updateUI(); }
         const params = new URLSearchParams(window.location.search);
