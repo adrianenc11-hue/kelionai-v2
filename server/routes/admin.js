@@ -966,4 +966,43 @@ router.post("/audit-hardcoded/fix", (req, res) => {
   }
 });
 
+// ── GET: Brain health and intelligence status ──
+router.get("/brain-health", (req, res) => {
+  try {
+    // Access brain instance from app
+    const brain = req.app?.get?.("brain") || req.app?.locals?.brain;
+    if (!brain || !brain.autonomousMonitor) {
+      return res.json({
+        status: "ok",
+        message: "Brain health endpoint active, but brain instance not attached to app",
+        note: "Wire app.set('brain', brainInstance) in index.js for full metrics",
+      });
+    }
+
+    const monitorStatus = brain.autonomousMonitor.getStatus();
+    const circuitBreakers = brain.learningStore
+      ? Object.entries(brain.learningStore.circuitBreakers)
+        .filter(([_, cb]) => cb.open)
+        .map(([tool, cb]) => ({ tool, failures: cb.failures }))
+      : [];
+
+    res.json({
+      version: "3.0",
+      uptime: Math.round((Date.now() - brain.startTime) / 1000),
+      conversations: brain.conversationCount,
+      learningsExtracted: brain.learningsExtracted,
+      toolStats: brain.toolStats,
+      toolErrors: brain.toolErrors,
+      circuitBreakers,
+      monitor: monitorStatus,
+      profilesCached: brain._profileCache ? brain._profileCache.size : 0,
+      journalSize: brain.journal ? brain.journal.length : 0,
+      learnedPatterns: brain.learningStore ? brain.learningStore.patterns.length : 0,
+      agents: brain.agents ? Object.keys(brain.agents) : [],
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;
