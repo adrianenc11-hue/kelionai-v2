@@ -364,10 +364,26 @@ async function loadTrading() {
     }
 }
 
-// ── INIT ──
-loadAiStatus(); loadTraffic(); loadCredit(); loadClients(); loadCodes(); loadUptime(); loadAudit(); loadMedia(); loadTrading();
-setInterval(function () { loadTraffic(); loadCredit(); loadUptime(); }, 30000);
-setInterval(loadAiStatus, 60000);
-setInterval(loadAudit, 6 * 60 * 60 * 1000); // refresh audit every 6h
-setInterval(function () { loadMedia(); loadTrading(); }, 60000); // refresh media/trading every 60s
+// ── INIT — Auth-guarded (#156: prevent 403 flood) ──
+var _adminIntervals = [];
+async function initAdmin() {
+    // Check auth before loading anything
+    try {
+        var testR = await fetch('/api/admin/ai-status', { headers: hdrs() });
+        if (testR.status === 401 || testR.status === 403) {
+            document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;color:#f66;font-size:1.5rem;background:#0a0a14;"><div>🔒 Admin access denied</div><div style="font-size:0.9rem;color:#888;margin-top:8px">Please enter admin code in chat first.</div><a href="/" style="margin-top:16px;color:#a5b4fc;text-decoration:none;">← Back to KelionAI</a></div>';
+            return;
+        }
+    } catch (e) {
+        console.warn('[Admin] Auth check failed:', e.message);
+    }
+    // Auth OK — load all sections
+    loadAiStatus(); loadTraffic(); loadCredit(); loadClients(); loadCodes(); loadUptime(); loadAudit(); loadMedia(); loadTrading();
+    _adminIntervals.push(setInterval(function () { loadTraffic(); loadCredit(); loadUptime(); }, 30000));
+    _adminIntervals.push(setInterval(loadAiStatus, 60000));
+    _adminIntervals.push(setInterval(loadAudit, 6 * 60 * 60 * 1000));
+    _adminIntervals.push(setInterval(function () { loadMedia(); loadTrading(); }, 60000));
+}
+initAdmin();
+
 

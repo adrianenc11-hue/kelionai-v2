@@ -407,6 +407,55 @@ app.use("/api/referral", referralRouter);
 app.use("/api", identityRouter);
 app.use("/api", voiceCloneRouter);
 
+// ═══ #155: FRONTEND ERROR CAPTURE ENDPOINT ═══
+const _frontendErrors = [];
+const _errorPatterns = new Map(); // track recurring errors
+app.post("/api/brain/errors", express.json(), (req, res) => {
+  const { type, message, source, line, url, timestamp } = req.body || {};
+  if (!message) return res.status(400).json({ error: "No message" });
+
+  const err = { type, message: String(message).substring(0, 500), source, line, url, timestamp, ip: req.ip };
+  _frontendErrors.push(err);
+  if (_frontendErrors.length > 200) _frontendErrors.splice(0, 100); // keep last 100
+
+  // Track patterns for self-healing
+  const key = `${source}:${line}:${message.substring(0, 50)}`;
+  const count = (_errorPatterns.get(key) || 0) + 1;
+  _errorPatterns.set(key, count);
+
+  // #154: Self-Healing Brain — log critical patterns
+  if (count >= 5) {
+    logger.warn({ component: "SelfHeal", key, count, message }, "🔴 Recurring frontend error detected — needs fix");
+    // Store in Supabase for brain analysis
+    if (supabaseAdmin) {
+      supabaseAdmin.from("brain_memory").insert({
+        user_id: "00000000-0000-0000-0000-000000000000",
+        memory_type: "error_pattern",
+        content: `RECURRING ERROR (${count}x): ${message} at ${source}:${line}`,
+        context: { source, line, url, count },
+        importance: 9,
+      }).then().catch(() => { });
+    }
+  }
+
+  logger.info({ component: "FrontendError", type, source, line }, message);
+  res.json({ ok: true });
+});
+
+// #154: Self-Healing Brain — Admin endpoint to view error patterns
+app.get("/api/admin/frontend-errors", adminAuth, (req, res) => {
+  const patterns = [];
+  _errorPatterns.forEach((count, key) => {
+    patterns.push({ key, count });
+  });
+  patterns.sort((a, b) => b.count - a.count);
+  res.json({
+    total: _frontendErrors.length,
+    recentErrors: _frontendErrors.slice(-20),
+    patterns: patterns.slice(0, 30),
+  });
+});
+
 // ═══ BRAIN DASHBOARD (live monitoring) ═══
 app.get("/dashboard", adminAuth, (req, res) => {
   res.send(`<!DOCTYPE html>
