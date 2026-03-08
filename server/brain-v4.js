@@ -1487,6 +1487,9 @@ async function thinkV4(brain, message, avatar, history, language, userId, conver
 
         let currentMessages = claudeMessages;
 
+        // ── Set media data so tool handlers can access uploaded images ──
+        brain._currentMediaData = mediaData || {};
+
         for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
             const claudeBody = {
                 model: MODELS.ANTHROPIC_CHAT,
