@@ -5,11 +5,22 @@
 
 const express = require("express");
 const rateLimit = require("express-rate-limit");
+const logger = require("../logger");
 const { validate, imagineSchema } = require("../validation");
 const { checkUsage, incrementUsage } = require("../payments");
 const { MODELS } = require("../config/models");
 
 const router = express.Router();
+
+// ═══ TIMEOUT HELPER — prevents hanging on slow/dead APIs ═══
+function withTimeout(promise, ms = 10000, label = "operation") {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms),
+    ),
+  ]);
+}
 
 const imageLimiter = rateLimit({
   windowMs: 60 * 1000,
@@ -37,7 +48,7 @@ router.post("/", imageLimiter, validate(imagineSchema), async (req, res) => {
         upgrade: true,
       });
 
-    const r = await fetch("https://api.together.xyz/v1/images/generations", {
+    const r = await withTimeout(fetch("https://api.together.xyz/v1/images/generations", {
       method: "POST",
       headers: {
         Authorization: "Bearer " + process.env.TOGETHER_API_KEY,
@@ -52,7 +63,7 @@ router.post("/", imageLimiter, validate(imagineSchema), async (req, res) => {
         n: 1,
         response_format: "b64_json",
       }),
-    });
+    }), 30000, "generateImage:FLUX");
     if (!r.ok)
       return res.status(503).json({ error: "Image generation failed" });
     const d = await r.json();

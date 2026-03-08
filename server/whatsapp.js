@@ -61,6 +61,27 @@ if (!WA_VERIFY_TOKEN) {
   );
 }
 
+// ═══ TOKEN HEALTH CHECK AT STARTUP ═══
+if (WA_TOKEN && PHONE_NUMBER_ID) {
+  setTimeout(async () => {
+    try {
+      const res = await withTimeout(
+        fetch(`${GRAPH_API}/${PHONE_NUMBER_ID}?access_token=${WA_TOKEN}`),
+        5000, "wa:tokenHealthCheck"
+      );
+      if (res.ok) {
+        const data = await res.json();
+        logger.info({ component: "WhatsApp", phoneId: data.id, name: data.display_phone_number || data.verified_name }, "✅ Token VALID — WhatsApp ready");
+      } else {
+        const err = await res.text().catch(() => "(no body)");
+        logger.error({ component: "WhatsApp", status: res.status, body: err }, "❌ Token INVALID or EXPIRED — WhatsApp will NOT work");
+      }
+    } catch (e) {
+      logger.error({ component: "WhatsApp", err: e.message }, "❌ Token health check FAILED");
+    }
+  }, 3000);
+}
+
 // ═══ ADMIN OUTBOUND MESSAGE ENDPOINT ═══
 router.post("/send", express.json(), async (req, res) => {
   // Simple auth via x-admin-secret

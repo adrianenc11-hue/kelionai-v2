@@ -23,6 +23,27 @@ function withTimeout(promise, ms = 10000, label = "operation") {
   ]);
 }
 
+// ═══ TOKEN HEALTH CHECK AT STARTUP ═══
+if (process.env.FB_PAGE_ACCESS_TOKEN) {
+  setTimeout(async () => {
+    try {
+      const res = await withTimeout(
+        fetch("https://graph.facebook.com/v21.0/me?access_token=" + process.env.FB_PAGE_ACCESS_TOKEN),
+        5000, "fb:tokenHealthCheck"
+      );
+      if (res.ok) {
+        const data = await res.json();
+        logger.info({ component: "Messenger", pageId: data.id, name: data.name }, "✅ Token VALID — Messenger ready");
+      } else {
+        const err = await res.text().catch(() => "(no body)");
+        logger.error({ component: "Messenger", status: res.status, body: err }, "❌ Token INVALID or EXPIRED — Messenger will NOT work");
+      }
+    } catch (e) {
+      logger.error({ component: "Messenger", err: e.message }, "❌ Token health check FAILED");
+    }
+  }, 4000);
+}
+
 // STATS (counters only — no unbounded Sets)
 const stats = { messagesReceived: 0, repliesSent: 0, uniqueSenders: 0 };
 

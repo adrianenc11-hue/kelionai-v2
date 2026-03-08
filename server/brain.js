@@ -764,10 +764,22 @@ When asked "what can you do?" list these real capabilities. Use them proactively
       // Track usage (non-blocking)
       this.incrementUsage(userId, Object.keys(results).length, 0).catch(() => { });
 
+      // ── Anti-Hallucination: tag data sources ──
+      const sourceTags = [];
+      const toolsUsedList = Object.keys(results);
+      if (toolsUsedList.length > 0) {
+        sourceTags.push("VERIFIED");
+        for (const t of toolsUsedList) sourceTags.push(`SOURCE:${t}`);
+      }
+      if (memoryContext && memoryContext.length > 20) sourceTags.push("FROM_MEMORY");
+      if (toolsUsedList.length === 0 && (!memoryContext || memoryContext.length < 20)) {
+        sourceTags.push("ASSUMPTION");
+      }
+
       return {
         enrichedMessage: cleanReply,
-        enrichedContext: enriched, // full context for AI use
-        toolsUsed: Object.keys(results),
+        enrichedContext: enriched,
+        toolsUsed: toolsUsedList,
         monitor: this.extractMonitor(results),
         analysis,
         chainOfThought,
@@ -775,6 +787,7 @@ When asked "what can you do?" list these real capabilities. Use them proactively
         failedTools: plan.filter((p) => !results[p.tool]).map((p) => p.tool),
         thinkTime,
         confidence,
+        sourceTags,
         agent: agent ? agent.name : "default",
         profileLoaded: !!profile,
       };
