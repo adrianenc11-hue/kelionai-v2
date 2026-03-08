@@ -8,7 +8,7 @@
 "use strict";
 
 const BASE =
-  process.env.BASE_URL || process.env.API_BASE_URL || "https://kelionai.app";
+  process.env.BASE_URL || process.env.API_BASE_URL || process.env.APP_URL;
 
 const PROBES = [
   {

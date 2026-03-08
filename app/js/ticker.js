@@ -2,7 +2,7 @@
     'use strict';
 
     var AD_MESSAGES = [
-        '🚀 Upgrade to Pro — 100 messages/day + voice + memory → kelionai.app/upgrade',
+        '🚀 Upgrade to Pro — 100 messages/day + voice + memory → /upgrade',
         '🎤 Kira is waiting for you — upgrade and unlock the second avatar',
         '💾 Your conversations aren\'t saved — upgrade to Pro to keep your memory',
         '🌍 KelionAI speaks 6 languages — Pro unlocks all native voices',

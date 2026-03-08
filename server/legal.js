@@ -86,7 +86,7 @@ router.get("/privacy", (req, res) => {
       {
         title: "6. Your Rights (GDPR)",
         content:
-          "Access, rectification, erasure, portability, restriction, and objection. Contact: privacy@kelionai.app.",
+          `Access, rectification, erasure, portability, restriction, and objection. Contact: privacy@${(process.env.APP_URL || '').replace('https://', '')}.`,
       },
       {
         title: "7. Data Retention",
@@ -147,7 +147,7 @@ router.get("/cookie-policy", (req, res) => {
       {
         title: "8. Contact",
         content:
-          "Questions about cookies? Contact us at privacy@kelionai.app.",
+          `Questions about cookies? Contact us at privacy@${(process.env.APP_URL || '').replace('https://', '')}.`,
       },
     ],
   });

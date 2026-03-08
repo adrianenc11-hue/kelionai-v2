@@ -257,7 +257,7 @@ function formatCaption(article) {
   if (article.summary) caption += `${article.summary}\n\n`;
   if (article.source) caption += `📌 Sursă: ${article.source}\n`;
   caption += `\n🤖 KelionAI — Asistentul tău AI personal\n`;
-  caption += `🌐 Link în bio: kelionai.app\n\n`;
+  caption += `🌐 Link în bio: ${process.env.APP_URL}\n\n`;
   caption += `${tags}${catTag}`;
 
   return caption;

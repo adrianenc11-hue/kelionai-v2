@@ -349,7 +349,7 @@ const COMMANDS = {
       `• Știri în timp real\n` +
       `• Meteo, sport, trading\n\n` +
       `🌐 <b>Website:</b> ${APP_URL}\n` +
-      `📧 <b>Contact:</b> support@kelionai.app`;
+      `📧 <b>Contact:</b> ${APP_URL.replace('https://', 'support@')}`;
     await sendMessage(chatId, msg);
   },
 
@@ -376,7 +376,7 @@ const COMMANDS = {
         msg += "\n\n";
       }
       msg += `🔄 Actualizat automat la 05:00, 12:00, 18:00\n\n`;
-      msg += `🌐 <i>Mai multe pe <a href="${APP_URL}">kelionai.app</a> — AI cu avatar 3D!</i>`;
+      msg += `🌐 <i>Mai multe pe <a href="${APP_URL}">${APP_URL}</a> — AI cu avatar 3D!</i>`;
       await sendMessage(chatId, msg);
     } catch (e) {
       logger.error(
@@ -442,7 +442,7 @@ function faqReply(text) {
     return `💰 <b>Planuri KelionAI:</b>\n\n• <b>Free</b> — gratuit, 10 chat-uri/zi\n• <b>Pro</b> — €9.99/lună, 100 chat-uri/zi\n• <b>Premium</b> — €19.99/lună, nelimitat\n\n🌐 Detalii: ${APP_URL}/pricing/`;
   }
   if (/contact|support|ajutor|problema/.test(t)) {
-    return "📧 Contactează-ne: support@kelionai.app\nSuntem disponibili luni-vineri.";
+    return `📧 Contactează-ne: ${APP_URL.replace('https://', 'support@')}\nSuntem disponibili luni-vineri.`;
   }
   if (/ce e[șs]ti|cine e[șs]ti/.test(t)) {
     return `🤖 Sunt <b>KelionAI</b> — asistentul tău AI personal cu avatar 3D, suport vocal și multilingv!\n\n🌐 Încearcă: ${APP_URL}`;

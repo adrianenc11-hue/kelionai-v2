@@ -59,7 +59,7 @@ function formatNewsPost(article) {
   if (article.summary) post += `${article.summary}\n\n`;
   if (article.source) post += `📌 Sursă: ${article.source}\n`;
   post += `\n🤖 KelionAI — Asistentul tău AI personal\n`;
-  post += `🌐 kelionai.app${category}`;
+  post += `🌐 Link în bio: ${process.env.APP_URL}${category}`;
 
   return { message: post, link: article.url || null };
 }

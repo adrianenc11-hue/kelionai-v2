@@ -1,5 +1,5 @@
 const fetch = require('node-fetch');
-const BASE = 'https://kelionai.app';
+const BASE = process.env.APP_URL || process.env.BASE_URL;
 
 async function measure(label, fn) {
     const start = Date.now();

@@ -1076,7 +1076,7 @@ router.post("/webhook", async (req, res) => {
               await sendTextMessage(
                 phone,
                 `⭐ Ai folosit ${FREE_MESSAGES_LIMIT} mesaje gratuite!\n\n` +
-                `Continuă cu funcții premium pe kelionai.app:\n` +
+                `Continuă cu funcții premium pe ${process.env.APP_URL}:\n` +
                 `• 💬 Chat nelimitat cu AI\n` +
                 `• 🎭 Avatare 3D\n` +
                 `• 🔊 Voce naturală\n\n` +

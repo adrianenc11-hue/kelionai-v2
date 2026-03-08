@@ -9,7 +9,7 @@ const { test, expect } = require("@playwright/test");
 let siteIsUp = true;
 test.beforeAll(async ({ request }) => {
   try {
-    const r = await request.get("https://kelionai.app/api/health", {
+    const r = await request.get((process.env.BASE_URL || process.env.APP_URL) + "/api/health", {
       timeout: 15000,
     });
     if (r.status() >= 500) siteIsUp = false;

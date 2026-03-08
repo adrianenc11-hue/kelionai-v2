@@ -222,7 +222,7 @@ async function sendInviteEmail({ to, senderName, code, expiresAt }) {
   }
 
   const from =
-    process.env.EMAIL_FROM || process.env.SMTP_USER || "noreply@kelionai.app";
+    process.env.EMAIL_FROM || process.env.SMTP_USER || `noreply@${(process.env.APP_URL || '').replace('https://', '')}`;
 
   try {
     const info = await transport.sendMail({ from, to, subject, html });
@@ -315,7 +315,7 @@ async function applyReferralBonus(code, recipientUserId, supabaseAdmin) {
         if (senderUser && senderUser.email) {
           const transport = getMailTransport();
           if (transport) {
-            const from = process.env.EMAIL_FROM || process.env.SMTP_USER || "noreply@kelionai.app";
+            const from = process.env.EMAIL_FROM || process.env.SMTP_USER || `noreply@${(process.env.APP_URL || '').replace('https://', '')}`;
             await transport.sendMail({
               from,
               to: senderUser.email,

@@ -16,7 +16,7 @@ module.exports = defineConfig({
   ],
   outputDir: 'test-results/',
   use: {
-    baseURL: process.env.BASE_URL || 'https://kelionai.app',
+    baseURL: process.env.BASE_URL || process.env.APP_URL,
     actionTimeout: 20000,
     navigationTimeout: 120000,
     screenshot: 'on',
