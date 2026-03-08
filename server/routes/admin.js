@@ -22,7 +22,13 @@ const CONFIG = {
 };
 
 // ── Admin middleware — checks JWT role OR admin secret key ──
+// ═══ TEMPORARILY DISABLED (trial period) — re-enable by removing bypass below ═══
 async function requireAdmin(req, res, next) {
+  // BYPASS: admin auth disabled temporarily
+  req.adminUser = { id: "admin-bypass", role: "admin" };
+  return next();
+
+  /* ── ORIGINAL AUTH (uncomment to re-enable) ──
   // Method 1: Admin Secret Key (from x-admin-secret header)
   const secret = req.headers["x-admin-secret"];
   const expectedSecret = process.env.ADMIN_SECRET_KEY;
@@ -50,6 +56,7 @@ async function requireAdmin(req, res, next) {
   } catch { }
 
   return res.status(403).json({ error: "Admin access required" });
+  */
 }
 
 router.use(requireAdmin);
