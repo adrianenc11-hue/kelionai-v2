@@ -225,39 +225,72 @@
                 if (thisId !== _speakId) return;
                 if (!resp.ok) { console.warn('[Voice] TTS chunk', ci, 'failed:', resp.status); continue; }
 
-                var arrayBuf = await resp.arrayBuffer();
+                // Parse JSON response (audio base64 + alignment)
+                var data = await resp.json();
                 if (thisId !== _speakId) return;
-                console.log('[Voice] Chunk', ci + 1, 'received:', arrayBuf.byteLength, 'bytes');
+                if (!data.audio) { console.warn('[Voice] TTS chunk', ci, 'has no audio'); continue; }
+
+                // Decode base64 audio to ArrayBuffer
+                var binaryStr = atob(data.audio);
+                var arrayBuf = new ArrayBuffer(binaryStr.length);
+                var bytes = new Uint8Array(arrayBuf);
+                for (var bi = 0; bi < binaryStr.length; bi++) bytes[bi] = binaryStr.charCodeAt(bi);
+
+                var chunkAlignment = data.alignment || null;
+                console.log('[Voice] Chunk', ci + 1, 'received:', arrayBuf.byteLength, 'bytes',
+                    chunkAlignment ? '+ alignment (' + (chunkAlignment.characters ? chunkAlignment.characters.length : 0) + ' chars)' : '(no alignment)');
 
                 // Play this chunk and wait for it to finish before next
                 await new Promise(function (resolve) {
-                    playAudioChunk(arrayBuf, chunks[ci], ci === chunks.length - 1, resolve);
+                    playAudioChunk(arrayBuf, chunks[ci], ci === chunks.length - 1, resolve, chunkAlignment);
                 });
             }
         } catch (e) { console.error('[Voice]', e); stopAllLipSync(); hideSubtitle(); isSpeaking = false; resumeWakeDetection(); }
     }
 
     // Play a single audio chunk — calls onDone when finished
-    function playAudioChunk(arrayBuf, chunkText, isLast, onDone) {
+    function playAudioChunk(arrayBuf, chunkText, isLast, onDone, alignment) {
         var ctx = getAudioContext();
         ctx.decodeAudioData(arrayBuf.slice(0), function (audioBuf) {
             currentSourceNode = ctx.createBufferSource();
             currentSourceNode.buffer = audioBuf;
 
-            var ls = KAvatar.getLipSync();
-            var fftOk = false;
-            if (ls && ls.connectToContext) {
+            // ── Professional lip sync with alignment (ElevenLabs) ──
+            var usingAlignment = false;
+            if (alignment && window.AlignmentLipSync) {
                 try {
-                    var an = ls.connectToContext(ctx);
-                    if (an) { currentSourceNode.connect(an); an.connect(ctx.destination); fftOk = true; ls.start(); }
-                } catch (e) { }
+                    AlignmentLipSync.setMorphMeshes(KAvatar.getMorphMeshes());
+                    AlignmentLipSync.setAudioContext(ctx);
+                    AlignmentLipSync.load(alignment);
+                    currentSourceNode.connect(ctx.destination);
+                    AlignmentLipSync.start(ctx.currentTime);
+                    usingAlignment = true;
+                    console.log('[Voice] 🎬 Using AlignmentLipSync (professional)');
+                } catch (e) {
+                    console.warn('[Voice] AlignmentLipSync failed, falling back to FFT:', e.message);
+                }
             }
-            if (!fftOk) { currentSourceNode.connect(ctx.destination); fallbackTextLipSync(chunkText); }
+
+            // ── Fallback: FFT-based lip sync ──
+            if (!usingAlignment) {
+                var ls = KAvatar.getLipSync();
+                var fftOk = false;
+                if (ls && ls.connectToContext) {
+                    try {
+                        var an = ls.connectToContext(ctx);
+                        if (an) { currentSourceNode.connect(an); an.connect(ctx.destination); fftOk = true; ls.start(); }
+                    } catch (e) { }
+                }
+                if (!fftOk) { currentSourceNode.connect(ctx.destination); fallbackTextLipSync(chunkText); }
+            }
 
             KAvatar.setExpression('happy', 0.3);
             KAvatar.setPresenting(true);
 
             currentSourceNode.onended = function () {
+                if (usingAlignment && window.AlignmentLipSync) {
+                    try { AlignmentLipSync.stop(); } catch (e) { }
+                }
                 if (isLast) {
                     stopAllLipSync(); hideSubtitle(); isSpeaking = false;
                     currentSourceNode = null;
@@ -267,7 +300,7 @@
                 onDone();
             };
             currentSourceNode.start(0);
-            console.log('[Voice] ✅ Chunk playing (' + arrayBuf.byteLength + 'B, ' + Math.round(audioBuf.duration) + 's)');
+            console.log('[Voice] ✅ Chunk playing (' + arrayBuf.byteLength + 'B, ' + Math.round(audioBuf.duration) + 's' + (usingAlignment ? ', ALIGNED' : '') + ')');
         }, function (err) {
             console.warn('[Voice] Chunk decode failed');
             if (isLast) { stopAllLipSync(); hideSubtitle(); isSpeaking = false; KAvatar.setExpression('neutral'); KAvatar.setPresenting(false); resumeWakeDetection(); }
@@ -351,6 +384,7 @@
         var ls = KAvatar.getLipSync(), ts = KAvatar.getTextLipSync();
         if (ls) try { ls.stop(); } catch (e) { }
         if (ts) try { ts.stop(); } catch (e) { }
+        if (window.AlignmentLipSync) try { AlignmentLipSync.stop(); } catch (e) { }
         KAvatar.setMorph('Smile', 0);
     }
 

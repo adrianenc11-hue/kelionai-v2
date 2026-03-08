@@ -78,13 +78,14 @@ router.post("/speak", ttsLimiter, validate(speakSchema), async (req, res) => {
     if (!vid) vid = getVoiceId(avatar, language);
 
     let buf = null;
+    let alignment = null;
     let ttsEngine = "ElevenLabs";
 
-    // ── TRY 1: ElevenLabs (premium quality) ──
+    // ── TRY 1: ElevenLabs with timestamps (premium quality + lip sync alignment) ──
     if (process.env.ELEVENLABS_API_KEY) {
       try {
         const r = await fetch(
-          "https://api.elevenlabs.io/v1/text-to-speech/" + vid,
+          "https://api.elevenlabs.io/v1/text-to-speech/" + vid + "/with-timestamps",
           {
             method: "POST",
             headers: {
@@ -99,7 +100,16 @@ router.post("/speak", ttsLimiter, validate(speakSchema), async (req, res) => {
           },
         );
         if (r.ok) {
-          buf = Buffer.from(await r.arrayBuffer());
+          const data = await r.json();
+          // data = { audio_base64, alignment, normalized_alignment }
+          if (data.audio_base64) {
+            buf = Buffer.from(data.audio_base64, "base64");
+            alignment = data.alignment || null;
+            logger.info(
+              { component: "Speak", alignmentChars: alignment?.characters?.length || 0 },
+              "ElevenLabs alignment received: " + (alignment?.characters?.length || 0) + " chars",
+            );
+          }
         } else {
           const errBody = await r.text().catch(() => "");
           logger.warn(
@@ -112,7 +122,7 @@ router.post("/speak", ttsLimiter, validate(speakSchema), async (req, res) => {
       }
     }
 
-    // ── TRY 2: OpenAI TTS (fallback) ──
+    // ── TRY 2: OpenAI TTS (fallback — no alignment available) ──
     let openaiErr = "no OPENAI_API_KEY";
     if (!buf && process.env.OPENAI_API_KEY) {
       try {
@@ -133,6 +143,7 @@ router.post("/speak", ttsLimiter, validate(speakSchema), async (req, res) => {
         if (r2.ok) {
           buf = Buffer.from(await r2.arrayBuffer());
           ttsEngine = "OpenAI";
+          alignment = null; // OpenAI has no alignment data
         } else {
           openaiErr = r2.status + ": " + (await r2.text().catch(() => "")).substring(0, 200);
           logger.error(
@@ -149,8 +160,8 @@ router.post("/speak", ttsLimiter, validate(speakSchema), async (req, res) => {
     if (!buf) return res.status(503).json({ error: "TTS unavailable", openai: openaiErr });
 
     logger.info(
-      { component: "Speak", bytes: buf.length, avatar, mood, engine: ttsEngine },
-      ttsEngine + " | " + buf.length + " bytes | " + avatar,
+      { component: "Speak", bytes: buf.length, avatar, mood, engine: ttsEngine, hasAlignment: !!alignment },
+      ttsEngine + " | " + buf.length + " bytes | " + avatar + (alignment ? " | ALIGNED" : ""),
     );
     incrementUsage(user?.id, "tts", supabaseAdmin).catch((e) =>
       logger.warn(
@@ -158,8 +169,12 @@ router.post("/speak", ttsLimiter, validate(speakSchema), async (req, res) => {
         "incrementUsage failed",
       ),
     );
-    res.set({ "Content-Type": "audio/mpeg", "Content-Length": buf.length });
-    res.send(buf);
+    // Return JSON with base64 audio + alignment data for professional lip sync
+    res.json({
+      audio: buf.toString("base64"),
+      alignment: alignment,
+      engine: ttsEngine,
+    });
   } catch {
     res.status(500).json({ error: "TTS error" });
   }
