@@ -93,6 +93,8 @@ async function loadCredit() {
                 return '<tr><td><strong>' + p.provider + '</strong></td><td>🟢</td><td>' + p.requests + '</td>' +
                     '<td>$' + p.cost_usd.toFixed(4) + '</td><td>$' + (p.cost_today || 0).toFixed(4) + '</td><td>' + al + '</td></tr>';
             }).join('');
+        } else {
+            tbody.innerHTML = '<tr><td colspan="6" style="color:#888;text-align:center">No cost data this month</td></tr>';
         }
         if (d.totalMonth > 0) {
             var el = document.getElementById('credit-distribution');
@@ -105,7 +107,10 @@ async function loadCredit() {
                     '<span class="dist-amount">£' + amt + ' (' + pct + '%)</span></div>';
             });
         }
-    } catch (e) { }
+    } catch (e) {
+        var tb = document.querySelector('#credit-table tbody');
+        if (tb) tb.innerHTML = '<tr><td colspan="6" style="color:#f66;text-align:center">Error loading costs</td></tr>';
+    }
 }
 
 // ── CLIENTS ──
@@ -293,16 +298,20 @@ async function loadMedia() {
     try {
         var r = await fetch('/api/admin/media', { headers: hdrs() });
         var d = await r.json();
+        var stats = d.stats || {};
 
         document.getElementById('media-total').textContent = d.totalCount || 0;
-        document.getElementById('media-images').textContent = (d.stats.image || 0) + (d.stats.vision || 0);
-        document.getElementById('media-tts').textContent = d.stats.tts || 0;
-        var otherCount = d.totalCount - (d.stats.image || 0) - (d.stats.vision || 0) - (d.stats.tts || 0);
+        document.getElementById('media-images').textContent = (stats.image || 0) + (stats.vision || 0);
+        document.getElementById('media-tts').textContent = stats.tts || 0;
+        var otherCount = (d.totalCount || 0) - (stats.image || 0) - (stats.vision || 0) - (stats.tts || 0);
         document.getElementById('media-other').textContent = Math.max(0, otherCount);
 
         var tb = document.getElementById('media-tbody');
         if (!d.recent || d.recent.length === 0) {
-            tb.innerHTML = '<tr><td colspan="5" style="color:#666;text-align:center">No media generated yet</td></tr>';
+            var msg = (d.totalCount > 0)
+                ? d.totalCount + ' records in database (details restricted by row-level security)'
+                : 'No media generated yet';
+            tb.innerHTML = '<tr><td colspan="5" style="color:#888;text-align:center">' + msg + '</td></tr>';
             return;
         }
         tb.innerHTML = d.recent.map(function (m) {
