@@ -591,6 +591,26 @@
         _computeArmDownQuaternions();
     }
 
+    // ══ Find eye, head, neck, spine bones ══════════════════════
+    function _findEyeAndSpineBones() {
+        if (!currentModel) return;
+        _eyeBones = { left: null, right: null };
+        _headBone = null;
+        _spineBone = null;
+        _neckBone = null;
+        currentModel.traverse(function (bone) {
+            if (!bone.isBone) return;
+            var nm = bone.name;
+            if (nm === 'LeftEye' || nm === 'Eye_L' || nm === 'leftEye') _eyeBones.left = bone;
+            if (nm === 'RightEye' || nm === 'Eye_R' || nm === 'rightEye') _eyeBones.right = bone;
+            if (nm === 'Head' || nm === 'head') _headBone = bone;
+            if (nm === 'Neck' || nm === 'neck') _neckBone = bone;
+            if (!_spineBone && (nm === 'Spine1' || nm === 'Spine2' || nm === 'Spine' || nm === 'spine')) _spineBone = bone;
+        });
+        console.log('[Avatar] Bones found — Head:', !!_headBone, 'Neck:', !!_neckBone,
+            'Spine:', !!_spineBone, 'LeftEye:', !!_eyeBones.left, 'RightEye:', !!_eyeBones.right);
+    }
+
     // ══ Compute arms-down quaternions dynamically from A-pose rest ══
     // MetaPerson models come in A-pose. We rotate shoulders ~55° downward
     // around their local Z axis to bring arms to a natural hanging position.
@@ -721,126 +741,143 @@
         }
     }
 
+    // ══ Body Action system — stub for brain-triggered actions ══
+    var _bodyActionActive = false;
+    var _bodyActionTimer = 0;
+    function updateBodyAction(dt) {
+        // Body actions are triggered by [BODY:xxx] tags from AI responses
+        // They work through the gesture/pose system already implemented
+        if (!_bodyActionActive) return;
+        _bodyActionTimer += dt;
+        if (_bodyActionTimer > 2.0) { _bodyActionActive = false; _bodyActionTimer = 0; }
+    }
+
     function animate() {
         requestAnimationFrame(animate);
+        if (!renderer || !scene || !camera) return; // Guard against init race
         var dt = clock.getDelta();
-        // Mixer provides base idle animation from GLB model
-        // Brain controls changes via [GESTURE:xxx] [POSE:xxx] [EMOTION:xxx] tags
-        if (mixer) mixer.update(dt);
-        _enforcePose();
+        try {
+            // Mixer provides base idle animation from GLB model
+            // Brain controls changes via [GESTURE:xxx] [POSE:xxx] [EMOTION:xxx] tags
+            if (mixer) mixer.update(dt);
+            _enforcePose();
 
-        updateBlink(dt);
-        updateExpression(dt);
-        // Professional lip sync: alignment-driven (priority) or FFT fallback
-        if (window.AlignmentLipSync && AlignmentLipSync.isActive()) {
-            AlignmentLipSync.update();
-        } else if (lipSync && window.KVoice && KVoice.isSpeaking()) {
-            lipSync.update();
-        }
+            updateBlink(dt);
+            updateExpression(dt);
+            // Professional lip sync: alignment-driven (priority) or FFT fallback
+            if (window.AlignmentLipSync && AlignmentLipSync.isActive()) {
+                AlignmentLipSync.update();
+            } else if (lipSync && window.KVoice && KVoice.isSpeaking()) {
+                lipSync.update();
+            }
 
-        updateGesture(dt);
-        updateBodyAction(dt);
-        updateMoodLighting();
+            updateGesture(dt);
+            updateBodyAction(dt);
+            updateMoodLighting();
 
-        // ══ BRAIN-ONLY MOVEMENT — no hardcoded body animations ══
-        // Only natural functions remain: blink, lip sync, eye tracking, breathing, micro-expressions.
+            // ══ BRAIN-ONLY MOVEMENT — no hardcoded body animations ══
+            // Only natural functions remain: blink, lip sync, eye tracking, breathing, micro-expressions.
 
-        // ══ Breathing (Spine bone gentle movement) ═══════════════
-        _breathPhase += dt * BREATH_SPEED;
-        if (_spineBone) {
-            var breathVal = Math.sin(_breathPhase * Math.PI * 2) * BREATH_AMOUNT;
-            _spineBone.rotation.x += (breathVal - (_spineBone.rotation.x - (_spineBone._baseRotX || 0))) * 0.1;
-            if (!_spineBone._baseRotX) _spineBone._baseRotX = _spineBone.rotation.x;
-        }
+            // ══ Breathing (Spine bone gentle movement) ═══════════════
+            _breathPhase += dt * BREATH_SPEED;
+            if (_spineBone) {
+                var breathVal = Math.sin(_breathPhase * Math.PI * 2) * BREATH_AMOUNT;
+                _spineBone.rotation.x += (breathVal - (_spineBone.rotation.x - (_spineBone._baseRotX || 0))) * 0.1;
+                if (!_spineBone._baseRotX) _spineBone._baseRotX = _spineBone.rotation.x;
+            }
 
-        // ══ Head Tracking (head follows mouse subtly) ═════════════
-        if (_headBone) {
-            var headYaw = _mouseX * 0.15;   // was 0.25 — subtler head turn
-            var headPitch = _mouseY * 0.08; // was 0.12 — subtler pitch
-            _headBone.rotation.y += (headYaw - _headBone.rotation.y) * 0.04; // was 0.08 — smoother
-            _headBone.rotation.x += (headPitch - _headBone.rotation.x) * 0.04;
-        }
+            // ══ Head Tracking (head follows mouse subtly) ═════════════
+            if (_headBone) {
+                var headYaw = _mouseX * 0.15;   // was 0.25 — subtler head turn
+                var headPitch = _mouseY * 0.08; // was 0.12 — subtler pitch
+                _headBone.rotation.y += (headYaw - _headBone.rotation.y) * 0.04; // was 0.08 — smoother
+                _headBone.rotation.x += (headPitch - _headBone.rotation.x) * 0.04;
+            }
 
-        // ══ Micro-expressions (subtle face twitches) ══════════════
-        _microTimer += dt;
-        if (!_microActive && _microTimer >= _nextMicro) {
-            _microActive = true;
-            _microTimer = 0;
-            _microElapsed = 0;
-            var me = MICRO_EXPRESSIONS[Math.floor(Math.random() * MICRO_EXPRESSIONS.length)];
-            _microMorph = me.morph;
-            _microValue = me.max;
-            _microDuration = me.duration;
-            _nextMicro = 3 + Math.random() * 5;
-        }
-        if (_microActive) {
-            _microElapsed += dt;
-            var mt = _microElapsed / _microDuration;
-            if (mt >= 1) {
-                _microActive = false;
-                setMorph(_microMorph, 0);
+            // ══ Micro-expressions (subtle face twitches) ══════════════
+            _microTimer += dt;
+            if (!_microActive && _microTimer >= _nextMicro) {
+                _microActive = true;
+                _microTimer = 0;
+                _microElapsed = 0;
+                var me = MICRO_EXPRESSIONS[Math.floor(Math.random() * MICRO_EXPRESSIONS.length)];
+                _microMorph = me.morph;
+                _microValue = me.max;
+                _microDuration = me.duration;
+                _nextMicro = 3 + Math.random() * 5;
+            }
+            if (_microActive) {
+                _microElapsed += dt;
+                var mt = _microElapsed / _microDuration;
+                if (mt >= 1) {
+                    _microActive = false;
+                    setMorph(_microMorph, 0);
+                } else {
+                    setMorph(_microMorph, Math.sin(mt * Math.PI) * _microValue);
+                }
+            }
+
+            // ══ Finger Pose (enforce every frame) ═══════════════════
+            _enforceFingerPose();
+
+            // ══ Eye Saccades (natural micro-movements) ══════════════
+            _saccadeTimer += dt;
+            if (_saccadeTimer >= _nextSaccade) {
+                _saccadeTimer = 0;
+                _nextSaccade = 0.5 + Math.random() * 2;
+                _saccadeTargetX = (Math.random() - 0.5) * 0.04;
+                _saccadeTargetY = (Math.random() - 0.5) * 0.02;
+            }
+            _saccadeCurrentX += (_saccadeTargetX - _saccadeCurrentX) * 0.3;
+            _saccadeCurrentY += (_saccadeTargetY - _saccadeCurrentY) * 0.3;
+
+            // ══ Eye Tracking (mouse follow + saccades) ═══════════════
+            if (_eyeBones.left || _eyeBones.right) {
+                var eyeYaw = _mouseX * 0.35 + _saccadeCurrentX;
+                var eyePitch = _mouseY * 0.2 + _saccadeCurrentY;
+                if (_eyeBones.left) {
+                    _eyeBones.left.rotation.y += (eyeYaw - _eyeBones.left.rotation.y) * 0.1;
+                    _eyeBones.left.rotation.x += (eyePitch - _eyeBones.left.rotation.x) * 0.1;
+                }
+                if (_eyeBones.right) {
+                    _eyeBones.right.rotation.y += (eyeYaw - _eyeBones.right.rotation.y) * 0.1;
+                    _eyeBones.right.rotation.x += (eyePitch - _eyeBones.right.rotation.x) * 0.1;
+                }
             } else {
-                setMorph(_microMorph, Math.sin(mt * Math.PI) * _microValue);
+                // Fallback: morph-based eye direction
+                setMorph('eyeLookOutLeft', Math.max(0, _mouseX * 0.3));
+                setMorph('eyeLookInLeft', Math.max(0, -_mouseX * 0.3));
+                setMorph('eyeLookOutRight', Math.max(0, -_mouseX * 0.3));
+                setMorph('eyeLookInRight', Math.max(0, _mouseX * 0.3));
+                setMorph('eyeLookUpLeft', Math.max(0, _mouseY * 0.2));
+                setMorph('eyeLookUpRight', Math.max(0, _mouseY * 0.2));
+                setMorph('eyeLookDownLeft', Math.max(0, -_mouseY * 0.2));
+                setMorph('eyeLookDownRight', Math.max(0, -_mouseY * 0.2));
             }
-        }
 
-        // ══ Finger Pose (enforce every frame) ═══════════════════
-        _enforceFingerPose();
-
-        // ══ Eye Saccades (natural micro-movements) ══════════════
-        _saccadeTimer += dt;
-        if (_saccadeTimer >= _nextSaccade) {
-            _saccadeTimer = 0;
-            _nextSaccade = 0.5 + Math.random() * 2;
-            _saccadeTargetX = (Math.random() - 0.5) * 0.04;
-            _saccadeTargetY = (Math.random() - 0.5) * 0.02;
-        }
-        _saccadeCurrentX += (_saccadeTargetX - _saccadeCurrentX) * 0.3;
-        _saccadeCurrentY += (_saccadeTargetY - _saccadeCurrentY) * 0.3;
-
-        // ══ Eye Tracking (mouse follow + saccades) ═══════════════
-        if (_eyeBones.left || _eyeBones.right) {
-            var eyeYaw = _mouseX * 0.35 + _saccadeCurrentX;
-            var eyePitch = _mouseY * 0.2 + _saccadeCurrentY;
-            if (_eyeBones.left) {
-                _eyeBones.left.rotation.y += (eyeYaw - _eyeBones.left.rotation.y) * 0.1;
-                _eyeBones.left.rotation.x += (eyePitch - _eyeBones.left.rotation.x) * 0.1;
+            // Body stays STILL — only brain-triggered gestures move the model
+            // (via updateGesture which is already called above)
+            if (currentModel && !isPresenting && !isAttentive && !gestureActive) {
+                // Return to neutral — very gentle, no snapping
+                currentModel.rotation.y += (0 - currentModel.rotation.y) * 0.02; // was 0.05
+                currentModel.rotation.x += (0 - currentModel.rotation.x) * 0.02;
+                currentModel.rotation.z += (0 - currentModel.rotation.z) * 0.02;
+            } else if (currentModel && isPresenting) {
+                currentModel.rotation.y += (-PRESENT_ANGLE - currentModel.rotation.y) * 0.04; // was 0.08
+            } else if (currentModel && isAttentive) {
+                currentModel.rotation.y += (_mouseX * 0.02 - currentModel.rotation.y) * 0.03; // was 0.04/0.05
             }
-            if (_eyeBones.right) {
-                _eyeBones.right.rotation.y += (eyeYaw - _eyeBones.right.rotation.y) * 0.1;
-                _eyeBones.right.rotation.x += (eyePitch - _eyeBones.right.rotation.x) * 0.1;
+            // SMOOTH mouth close — exponential decay instead of instant zero
+            var _lipRan = (window.AlignmentLipSync && AlignmentLipSync.isActive()) || (lipSync && window.KVoice && KVoice.isSpeaking());
+            if (!_lipRan) {
+                for (var ci = 0; ci < _mouthMorphCache.length; ci++) {
+                    var curr = _mouthMorphCache[ci].mesh.morphTargetInfluences[_mouthMorphCache[ci].idx];
+                    _mouthMorphCache[ci].mesh.morphTargetInfluences[_mouthMorphCache[ci].idx] = curr * 0.85;
+                }
             }
-        } else {
-            // Fallback: morph-based eye direction
-            setMorph('eyeLookOutLeft', Math.max(0, _mouseX * 0.3));
-            setMorph('eyeLookInLeft', Math.max(0, -_mouseX * 0.3));
-            setMorph('eyeLookOutRight', Math.max(0, -_mouseX * 0.3));
-            setMorph('eyeLookInRight', Math.max(0, _mouseX * 0.3));
-            setMorph('eyeLookUpLeft', Math.max(0, _mouseY * 0.2));
-            setMorph('eyeLookUpRight', Math.max(0, _mouseY * 0.2));
-            setMorph('eyeLookDownLeft', Math.max(0, -_mouseY * 0.2));
-            setMorph('eyeLookDownRight', Math.max(0, -_mouseY * 0.2));
-        }
-
-        // Body stays STILL — only brain-triggered gestures move the model
-        // (via updateGesture which is already called above)
-        if (currentModel && !isPresenting && !isAttentive && !gestureActive) {
-            // Return to neutral — very gentle, no snapping
-            currentModel.rotation.y += (0 - currentModel.rotation.y) * 0.02; // was 0.05
-            currentModel.rotation.x += (0 - currentModel.rotation.x) * 0.02;
-            currentModel.rotation.z += (0 - currentModel.rotation.z) * 0.02;
-        } else if (currentModel && isPresenting) {
-            currentModel.rotation.y += (-PRESENT_ANGLE - currentModel.rotation.y) * 0.04; // was 0.08
-        } else if (currentModel && isAttentive) {
-            currentModel.rotation.y += (_mouseX * 0.02 - currentModel.rotation.y) * 0.03; // was 0.04/0.05
-        }
-        // SMOOTH mouth close — exponential decay instead of instant zero
-        var _lipRan = (window.AlignmentLipSync && AlignmentLipSync.isActive()) || (lipSync && window.KVoice && KVoice.isSpeaking());
-        if (!_lipRan) {
-            for (var ci = 0; ci < _mouthMorphCache.length; ci++) {
-                var curr = _mouthMorphCache[ci].mesh.morphTargetInfluences[_mouthMorphCache[ci].idx];
-                _mouthMorphCache[ci].mesh.morphTargetInfluences[_mouthMorphCache[ci].idx] = curr * 0.85;
-            }
+        } catch (e) {
+            // Don't let errors kill the render loop
+            if (!animate._errLogged) { console.error('[Avatar] Animate error:', e.message); animate._errLogged = true; }
         }
         renderer.render(scene, camera);
     }
