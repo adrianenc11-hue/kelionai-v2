@@ -400,22 +400,9 @@
         // ── Live subtitle ──
         updateSubtitle(type, text);
     }
-    function updateSubtitle(type, text) {
-        var sub = document.getElementById('live-subtitle');
-        var spk = document.getElementById('subtitle-speaker');
-        var stx = document.getElementById('subtitle-text');
-        if (!sub || !spk || !stx) return;
-        sub.style.display = 'block';
-        if (type === 'user') {
-            spk.textContent = 'Tu:';
-            spk.style.color = '#a78bfa';
-        } else {
-            var av = (window.KAvatar && KAvatar.getCurrentAvatar && KAvatar.getCurrentAvatar() === 'kira') ? 'Kira:' : 'Kelion:';
-            spk.textContent = av;
-            spk.style.color = '#00ffff';
-        }
-        var plain = text.replace(/<[^>]*>/g, '').replace(/\[.*?\]/g, '').trim();
-        stx.textContent = plain;
+    function updateSubtitle(/* type, text */) {
+        // Disabled — messages already visible in chat overlay, subtitle caused duplicate display
+        return;
     }
     function showThinking(v) { document.getElementById('thinking').classList.toggle('active', v); }
     function hideWelcome() { var w = document.getElementById('welcome'); if (w) w.classList.add('hidden'); }
