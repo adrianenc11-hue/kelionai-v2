@@ -31,6 +31,25 @@ function esc(s) { var d = document.createElement('div'); d.textContent = s || '�
 function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
 
 // ── AI STATUS ──
+async function rechargeProvider(name, currentCredit) {
+    var newAmount = prompt('💳 Reîncarcă credit pentru ' + name + '\n\nCredit actual: $' + currentCredit.toFixed(2) + '\n\nIntrodu noul credit total ($):', currentCredit.toFixed(2));
+    if (newAmount === null) return;
+    var amount = parseFloat(newAmount);
+    if (isNaN(amount) || amount < 0) { alert('Sumă invalidă'); return; }
+    try {
+        var r = await fetch('/api/admin/provider-credit', {
+            method: 'POST', headers: hdrs(),
+            body: JSON.stringify({ provider: name, amount: amount })
+        });
+        var d = await r.json();
+        if (d.ok) {
+            alert('✅ Credit actualizat: ' + name + ' → $' + amount.toFixed(2));
+            loadAiStatus();
+        } else {
+            alert('❌ Eroare: ' + (d.error || 'necunoscută'));
+        }
+    } catch (e) { alert('Eroare: ' + e.message); }
+}
 async function loadAiStatus() {
     try {
         var r = await fetch('/api/admin/ai-status', { headers: hdrs() });
@@ -45,7 +64,10 @@ async function loadAiStatus() {
                 '<div class="ai-name">' + p.name + '</div>' +
                 '<div class="ai-detail">' + (p.live ? '🟢 Live' : '🔴 Off') + '</div>' +
                 '<div class="ai-cost">$' + (p.costMonth || 0).toFixed(2) + '/mo</div>' +
-                '<div class="ai-credit" style="font-size:0.7rem;margin-top:4px;color:' + creditColor + ';font-weight:600">💳 Credit: ' + (p.creditLabel || '—') + '</div>';
+                '<div class="ai-credit" onclick="rechargeProvider(\'' + p.name + '\',' + (p.creditLimit || 0) + ')" ' +
+                'style="font-size:0.7rem;margin-top:4px;color:' + creditColor + ';font-weight:600;cursor:pointer" ' +
+                'title="Click pentru a reîncărca creditul">' +
+                '💳 Credit: ' + (p.creditLabel || '—') + '</div>';
             grid.appendChild(card);
         });
     } catch (e) { document.getElementById('ai-status-grid').innerHTML = '<div class="ai-card off"><div class="ai-name">Error</div></div>'; }
