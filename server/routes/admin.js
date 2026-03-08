@@ -1076,12 +1076,31 @@ router.get("/media", async (req, res) => {
     const { supabaseAdmin } = req.app.locals;
     if (!supabaseAdmin) return res.json({ recent: [], stats: {}, totalCount: 0 });
 
-    // Recent media
-    const { data: recent } = await supabaseAdmin
+    // Total count first (this works even with RLS)
+    const { count } = await supabaseAdmin
       .from("media_history")
-      .select("id, user_id, type, prompt, url, created_at")
+      .select("id", { count: "exact", head: true });
+
+    // Recent media — select columns that actually exist in the table
+    // brain._logMedia inserts: user_id, type, url, title, created_at
+    const { data: recent, error: selErr } = await supabaseAdmin
+      .from("media_history")
+      .select("id, user_id, type, url, title, created_at")
       .order("created_at", { ascending: false })
       .limit(50);
+
+    if (selErr) {
+      logger.warn({ component: "Admin", err: selErr.message, code: selErr.code }, "Media select failed — trying minimal query");
+      // Fallback: select only basic columns
+      const { data: fallbackRecent } = await supabaseAdmin
+        .from("media_history")
+        .select("id, type, created_at")
+        .order("created_at", { ascending: false })
+        .limit(50);
+      const stats = {};
+      (fallbackRecent || []).forEach((m) => { stats[m.type] = (stats[m.type] || 0) + 1; });
+      return res.json({ recent: (fallbackRecent || []).map(m => ({ ...m, prompt: m.title || "—", url: null })), stats, totalCount: count || 0 });
+    }
 
     // Stats by type
     const stats = {};
@@ -1089,12 +1108,10 @@ router.get("/media", async (req, res) => {
       stats[m.type] = (stats[m.type] || 0) + 1;
     });
 
-    // Total count
-    const { count } = await supabaseAdmin
-      .from("media_history")
-      .select("id", { count: "exact", head: true });
+    // Map title -> prompt for frontend compatibility
+    const mapped = (recent || []).map(m => ({ ...m, prompt: m.title || "—" }));
 
-    res.json({ recent: recent || [], stats, totalCount: count || 0 });
+    res.json({ recent: mapped, stats, totalCount: count || 0 });
   } catch (e) {
     logger.error({ component: "Admin", err: e.message }, "Media query failed");
     res.json({ recent: [], stats: {}, totalCount: 0 });

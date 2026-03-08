@@ -193,6 +193,16 @@ router.post("/chat", chatLimiter, validate(chatSchema), async (req, res) => {
         brain.saveMemory(user.id, "audio", "Voice said: " + message.substring(0, 500), { avatar }).catch(() => { });
       }
     }
+    // Log AI cost for this chat interaction
+    const estimatedTokens = Math.ceil((message.length + reply.length) / 4);
+    brain._logCost(
+      engine === "Claude-V4" ? "Anthropic" : "OpenAI",
+      engine,
+      Math.ceil(message.length / 4),
+      Math.ceil(reply.length / 4),
+      estimatedTokens * 0.000003, // approximate cost
+      user?.id
+    ).catch(() => { });
     incrementUsage(user?.id, "chat", supabaseAdmin).catch((e) =>
       logger.warn(
         { component: "Chat", err: e.message },
@@ -456,6 +466,12 @@ router.post(
           logger.warn({ component: "Stream", err: e.message }, "Claude");
         }
       }
+      // Log Claude streaming cost
+      if (fullReply) {
+        const estInputTok = Math.ceil(msgs.reduce((s, m) => s + (m.content || '').length, 0) / 4);
+        const estOutputTok = Math.ceil(fullReply.length / 4);
+        brain._logCost("Anthropic", "claude-streaming", estInputTok, estOutputTok, (estInputTok * 3 + estOutputTok * 15) / 1000000, user?.id).catch(() => { });
+      }
 
       // Fallback: non-streaming GPT-5.4 (via OPENAI_FALLBACK) or DeepSeek
       if (!fullReply) {
@@ -495,6 +511,12 @@ router.post(
               "GPT-5.4 fallback failed",
             );
           }
+          // Log OpenAI cost
+          if (fullReply) {
+            const estInputTok = Math.ceil(msgs.reduce((s, m) => s + (m.content || '').length, 0) / 4);
+            const estOutputTok = Math.ceil(fullReply.length / 4);
+            brain._logCost("OpenAI", "gpt-5.4-fallback", estInputTok, estOutputTok, (estInputTok * 5 + estOutputTok * 15) / 1000000, user?.id).catch(() => { });
+          }
         }
       }
       if (!fullReply && process.env.DEEPSEEK_API_KEY) {
@@ -529,6 +551,12 @@ router.post(
             { component: "Stream", err: e.message },
             "DeepSeek fallback failed",
           );
+        }
+        // Log DeepSeek cost
+        if (fullReply) {
+          const estInputTok = Math.ceil(msgs.reduce((s, m) => s + (m.content || '').length, 0) / 4);
+          const estOutputTok = Math.ceil(fullReply.length / 4);
+          brain._logCost("DeepSeek", "deepseek", estInputTok, estOutputTok, (estInputTok * 0.14 + estOutputTok * 0.28) / 1000000, user?.id).catch(() => { });
         }
       }
 
