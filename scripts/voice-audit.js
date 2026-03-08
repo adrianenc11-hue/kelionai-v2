@@ -46,7 +46,7 @@ async function runAudit() {
             }),
         })
     );
-    console.log(`  🧠  CHAT (Groq→GPT→Claude):     ${oldChat.ms}ms  [${oldChat.status}]`);
+    console.log(`  🧠  CHAT (Groq→GPT→Gemini):     ${oldChat.ms}ms  [${oldChat.status}]`);
 
     const oldTTS = await measureHTTP("  TTS  /api/speak", () =>
         fetch(`${BASE}/api/speak`, {

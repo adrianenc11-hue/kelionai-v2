@@ -2,7 +2,7 @@
 
 // ═══════════════════════════════════════════════════════════════════════════
 // KelionAI — AI SCORING ENGINE
-// Uses Claude/GPT to evaluate trading signals with market context
+// Uses Gemini/GPT to evaluate trading signals with market context
 // Returns confidence score 0-100 + reasoning
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -10,8 +10,8 @@ const logger = require("./logger");
 
 class AIScoring {
     constructor() {
-        this.apiKey = process.env.ANTHROPIC_API_KEY || "";
-        this.model = "claude-3-5-haiku-20241022"; // Fast + cheap for scoring
+        this.apiKey = process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY || "";
+        this.model = "gemini-2.5-flash"; // Fast + cheap for scoring
         this.scoreCache = new Map();
         this.cacheTTL = 5 * 60 * 1000; // 5 min cache per asset
         this.stats = { totalScored: 0, avgScore: 0, lastScoredAt: null };
@@ -36,17 +36,12 @@ class AIScoring {
 
         try {
             const prompt = this._buildPrompt(signalData);
-            const response = await fetch("https://api.anthropic.com/v1/messages", {
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent?key=${this.apiKey}`, {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "x-api-key": this.apiKey,
-                    "anthropic-version": "2023-06-01",
-                },
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    model: this.model,
-                    max_tokens: 300,
-                    messages: [{ role: "user", content: prompt }],
+                    contents: [{ role: "user", parts: [{ text: prompt }] }],
+                    generationConfig: { maxOutputTokens: 300 },
                 }),
             });
 
@@ -56,7 +51,7 @@ class AIScoring {
             }
 
             const data = await response.json();
-            const text = data.content?.[0]?.text || "";
+            const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
             const result = this._parseResponse(text, signalData);
 
             this.scoreCache.set(cacheKey, { result, ts: Date.now() });
@@ -100,7 +95,7 @@ Reply in JSON format ONLY:
                     action: parsed.action || data.confluence?.signal || "HOLD",
                     riskLevel: parsed.risk || "medium",
                     reasoning: parsed.reason || "AI analysis complete",
-                    source: "claude-ai",
+                    source: "gemini-ai",
                 };
             }
         } catch (e) {

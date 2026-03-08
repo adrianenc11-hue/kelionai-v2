@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════════
 // KelionAI — BRAIN ENGINE v4.0
-// CLAUDE TOOL CALLING — No more 5-layer pipeline
-// Claude decides which tools to call, executes them, responds directly
+// GEMINI TOOL CALLING — No more 5-layer pipeline
+// Gemini decides which tools to call, executes them, responds directly
 // ═══════════════════════════════════════════════════════════════
 "use strict";
 
@@ -10,7 +10,17 @@ const { MODELS } = require("./config/models");
 const { buildSystemPrompt } = require("./persona");
 const vm = require("vm");
 
-// ── Tool Definitions for Claude ──
+// ── Tool Definitions for Gemini (functionDeclarations format) ──
+// Converter: transforms existing input_schema to Gemini parameters format
+function toGeminiTools(defs) {
+    return defs.map(d => ({
+        name: d.name,
+        description: d.description,
+        parameters: d.input_schema,
+    }));
+}
+
+// ── Tool Definitions (shared format — converted at API call time) ──
 const TOOL_DEFINITIONS = [
     {
         name: "search_web",
@@ -1040,7 +1050,7 @@ async function executeTool(brain, toolName, toolInput, userId) {
                 return { events: calendar.events.slice(-20), total: calendar.events.length };
             }
             case "create_document": {
-                // Claude will generate the document content based on the description
+                // Gemini will generate the document content based on the description
                 // We store it in DB for retrieval
                 if (!brain.supabaseAdmin) return { error: "Database not connected" };
                 const docKey = `doc:${toolInput.title.replace(/\s+/g, "_").toLowerCase()}`;
@@ -1098,7 +1108,7 @@ async function executeTool(brain, toolName, toolInput, userId) {
                 return { contacts: contacts.items.slice(-20), total: contacts.items.length };
             }
             case "translate_document": {
-                // Claude handles translation natively — just return the instruction for the AI
+                // Gemini handles translation natively — just return the instruction for the AI
                 return { action: "translate", text: toolInput.text, from: toolInput.from || "auto", to: toolInput.to, style: toolInput.style || "formal", message: `Translate the following text to ${toolInput.to}: ${toolInput.text.substring(0, 2000)}` };
             }
             case "summarize_document": {
@@ -1409,7 +1419,7 @@ function extractMonitor(toolResults) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// MAIN: thinkV4 — Claude Tool Calling loop
+// MAIN: thinkV4 — Gemini Tool Calling loop
 // ═══════════════════════════════════════════════════════════════
 async function thinkV4(brain, message, avatar, history, language, userId, conversationId, mediaData = {}, isAdmin = false) {
     brain.conversationCount++;
@@ -1458,102 +1468,113 @@ async function thinkV4(brain, message, avatar, history, language, userId, conver
         const emotionBlock = emotionHint ? `\n[EMOTIONAL CONTEXT] User mood: ${emotionalTone}. ${emotionHint}` : "";
         const systemPrompt = buildSystemPrompt(avatar, language, memoryBlock + emotionBlock, "", null);
 
-        // ── 5. Prepare messages for Claude ──
+        // ── 5. Prepare messages for Gemini ──
         // Compress history to last 20 messages max
         const recentHistory = (history || []).slice(-20).map(h => ({
-            role: h.role === "user" ? "user" : "assistant",
-            content: typeof h.content === "string" ? h.content : JSON.stringify(h.content),
+            role: h.role === "user" ? "user" : "model",
+            parts: [{ text: typeof h.content === "string" ? h.content : JSON.stringify(h.content) }],
         }));
 
         // Handle vision: if image is provided, add it to the message
-        const userContent = [];
+        const userParts = [];
         if (mediaData.imageBase64) {
-            userContent.push({
-                type: "image",
-                source: { type: "base64", media_type: mediaData.imageMimeType || "image/jpeg", data: mediaData.imageBase64 },
+            userParts.push({
+                inlineData: { mimeType: mediaData.imageMimeType || "image/jpeg", data: mediaData.imageBase64 },
             });
         }
-        userContent.push({ type: "text", text: message });
+        userParts.push({ text: message });
 
-        const claudeMessages = [...recentHistory, { role: "user", content: userContent.length === 1 ? message : userContent }];
+        const geminiMessages = [...recentHistory, { role: "user", parts: userParts }];
 
-        // ── 6. CALL CLAUDE WITH TOOLS ──
-        // First call: Claude decides what tools to use
+        // ── 6. CALL GEMINI WITH TOOLS ──
+        // First call: Gemini decides what tools to use
         let toolsUsed = [];
         let toolResults = [];
         let finalResponse = "";
         let totalTokens = 0;
         const MAX_TOOL_ROUNDS = 3; // Prevent infinite loops
 
-        let currentMessages = claudeMessages;
+        let currentMessages = geminiMessages;
 
         // ── Set media data so tool handlers can access uploaded images ──
         brain._currentMediaData = mediaData || {};
 
+        const geminiApiKey = process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
+        if (!geminiApiKey) {
+            throw new Error("GOOGLE_AI_KEY not configured — cannot call Gemini API");
+        }
+
+        const geminiModel = MODELS.GEMINI_CHAT;
+        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiApiKey}`;
+        const geminiTools = [{ functionDeclarations: toGeminiTools(TOOL_DEFINITIONS) }];
+
         for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-            const claudeBody = {
-                model: MODELS.ANTHROPIC_CHAT,
-                max_tokens: 2048,
-                system: systemPrompt,
-                messages: currentMessages,
-                tools: TOOL_DEFINITIONS,
+            const geminiBody = {
+                contents: currentMessages,
+                tools: geminiTools,
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+                generationConfig: {
+                    maxOutputTokens: 2048,
+                    temperature: 0.7,
+                },
             };
 
-            const r = await fetch("https://api.anthropic.com/v1/messages", {
+            const r = await fetch(geminiUrl, {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "x-api-key": brain.anthropicKey,
-                    "anthropic-version": "2023-06-01",
-                },
-                body: JSON.stringify(claudeBody),
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(geminiBody),
             });
 
             if (!r.ok) {
                 const errText = await r.text().catch(() => "unknown");
-                throw new Error(`Claude API ${r.status}: ${errText.substring(0, 200)}`);
+                throw new Error(`Gemini API ${r.status}: ${errText.substring(0, 200)}`);
             }
 
             const response = await r.json();
-            totalTokens += (response.usage?.input_tokens || 0) + (response.usage?.output_tokens || 0);
+            totalTokens += (response.usageMetadata?.promptTokenCount || 0) + (response.usageMetadata?.candidatesTokenCount || 0);
 
-            // Check stop reason
-            if (response.stop_reason === "end_turn" || response.stop_reason !== "tool_use") {
-                // Claude finished — extract text response
-                finalResponse = response.content
-                    .filter(b => b.type === "text")
-                    .map(b => b.text)
+            const candidate = response.candidates?.[0];
+            if (!candidate?.content?.parts) {
+                // No content — check for safety block or empty response
+                const blockReason = candidate?.finishReason || response.promptFeedback?.blockReason;
+                if (blockReason) logger.warn({ component: "BrainV4", blockReason }, "Gemini blocked response");
+                break;
+            }
+
+            const parts = candidate.content.parts;
+
+            // Check if Gemini wants to use tools (functionCall parts)
+            const functionCalls = parts.filter(p => p.functionCall);
+            if (functionCalls.length === 0) {
+                // No tool calls — extract text response
+                finalResponse = parts
+                    .filter(p => p.text)
+                    .map(p => p.text)
                     .join("\n");
                 break;
             }
 
-            // Claude wants to use tools
-            const toolUseBlocks = response.content.filter(b => b.type === "tool_use");
-            if (toolUseBlocks.length === 0) {
-                finalResponse = response.content.filter(b => b.type === "text").map(b => b.text).join("\n");
-                break;
-            }
-
             // Execute all requested tools in parallel
-            const toolPromises = toolUseBlocks.map(async (block) => {
-                const result = await executeTool(brain, block.name, block.input, userId);
-                toolsUsed.push(block.name);
-                toolResults.push({ name: block.name, result });
-                brain.toolStats[block.name] = (brain.toolStats[block.name] || 0) + 1;
+            const toolPromises = functionCalls.map(async (fc) => {
+                const result = await executeTool(brain, fc.functionCall.name, fc.functionCall.args || {}, userId);
+                toolsUsed.push(fc.functionCall.name);
+                toolResults.push({ name: fc.functionCall.name, result });
+                brain.toolStats[fc.functionCall.name] = (brain.toolStats[fc.functionCall.name] || 0) + 1;
                 return {
-                    type: "tool_result",
-                    tool_use_id: block.id,
-                    content: typeof result === "string" ? result : JSON.stringify(result).substring(0, 4000),
+                    functionResponse: {
+                        name: fc.functionCall.name,
+                        response: typeof result === "string" ? { result } : JSON.parse(JSON.stringify(result, (_, v) => typeof v === "string" ? v.substring(0, 4000) : v)),
+                    },
                 };
             });
 
-            const toolResultBlocks = await Promise.all(toolPromises);
+            const toolResponseParts = await Promise.all(toolPromises);
 
-            // Add assistant response + tool results to conversation
+            // Add model response + tool results to conversation
             currentMessages = [
                 ...currentMessages,
-                { role: "assistant", content: response.content },
-                { role: "user", content: toolResultBlocks },
+                { role: "model", parts: candidate.content.parts },
+                { role: "user", parts: toolResponseParts },
             ];
         }
 
@@ -1620,13 +1641,13 @@ async function thinkV4(brain, message, avatar, history, language, userId, conver
                 isEmotional: emotionalTone !== "neutral",
                 frustrationLevel: frustration,
             },
-            chainOfThought: null, // Claude does it internally
+            chainOfThought: null, // Gemini does it internally
             compressedHistory: recentHistory,
             failedTools: toolResults.filter(r => r.result?.error).map(r => r.name),
             thinkTime,
             confidence,
             sourceTags: toolsUsed.length > 0 ? ["VERIFIED", ...toolsUsed.map(t => `SOURCE:${t}`)] : ["ASSUMPTION"],
-            agent: "v4-claude-tools",
+            agent: "v4-gemini-tools",
             profileLoaded: !!profile,
         };
     } catch (e) {

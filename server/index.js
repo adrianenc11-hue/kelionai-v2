@@ -115,7 +115,6 @@ app.use((req, res, next) => {
           "blob:",
           "https://api.openai.com",
           "https://generativelanguage.googleapis.com",
-          "https://api.anthropic.com",
           "https://api.elevenlabs.io",
           "https://api.groq.com",
           "https://api.perplexity.ai",
@@ -374,7 +373,7 @@ _memCleanupInterval.unref();
 
 // ═══ BRAIN INITIALIZATION ═══
 const brain = new KelionBrain({
-  anthropicKey: process.env.ANTHROPIC_API_KEY,
+  geminiKey: process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY,
   openaiKey: process.env.OPENAI_API_KEY,
   groqKey: process.env.GROQ_API_KEY,
   perplexityKey: process.env.PERPLEXITY_API_KEY,
@@ -1332,7 +1331,7 @@ if (require.main === module) {
             component: "Server",
             port: PORT,
             ai: {
-              claude: !!process.env.ANTHROPIC_API_KEY,
+              gemini: !!(process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY),
               gpt4o: !!process.env.OPENAI_API_KEY,
               deepseek: !!process.env.DEEPSEEK_API_KEY,
             },

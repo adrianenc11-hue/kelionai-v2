@@ -293,11 +293,11 @@ router.get("/v1/status", (req, res) => {
 // GET /api/v1/models — list available AI models (requires API key)
 router.get("/v1/models", v1Limiter, apiKeyAuth, (req, res) => {
   const models = [];
-  if (process.env.ANTHROPIC_API_KEY)
+  if (process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY)
     models.push({
-      id: MODELS.ANTHROPIC_CHAT,
-      name: "Claude Sonnet 4",
-      provider: "Anthropic",
+      id: MODELS.GEMINI_CHAT,
+      name: "Gemini 2.5 Flash",
+      provider: "Google",
       primary: true,
     });
   if (process.env.OPENAI_API_KEY)
@@ -394,24 +394,21 @@ router.post("/v1/chat", v1Limiter, apiKeyAuth, async (req, res) => {
 
     let reply = null;
 
-    if (!reply && process.env.ANTHROPIC_API_KEY) {
+    const geminiKey = process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
+    if (!reply && geminiKey) {
       try {
-        const r = await fetch("https://api.anthropic.com/v1/messages", {
+        const geminiModel = MODELS.GEMINI_CHAT || "gemini-2.5-flash";
+        const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiKey}`, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-api-key": process.env.ANTHROPIC_API_KEY,
-            "anthropic-version": "2023-06-01",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            model: MODELS.ANTHROPIC_CHAT,
-            max_tokens: 1024,
-            system: systemPrompt,
-            messages: msgs,
+            contents: msgs.map(m => ({ role: m.role === "assistant" ? "model" : m.role, parts: [{ text: m.content }] })),
+            systemInstruction: { parts: [{ text: systemPrompt }] },
+            generationConfig: { maxOutputTokens: 1024 },
           }),
         });
         const d = await r.json();
-        reply = d.content?.[0]?.text;
+        reply = d.candidates?.[0]?.content?.parts?.[0]?.text;
       } catch (e) {
         logger.warn({ component: "Developer", err: e.message }, "fallthrough");
       }

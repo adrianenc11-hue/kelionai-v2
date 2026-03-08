@@ -18,7 +18,7 @@ const ENV_GROUPS = {
     ],
     ai: [
         { key: "OPENAI_API_KEY", label: "GPT (chat, TTS, STT, vision)" },
-        { key: "ANTHROPIC_API_KEY", label: "Claude (chat fallback)" },
+        { key: "GOOGLE_AI_KEY", label: "Gemini (chat, vision, tools)" },
         { key: "GROQ_API_KEY", label: "Groq (fast reasoning)" },
     ],
     search: [
@@ -77,7 +77,7 @@ function validateEnv() {
     const hasAI = ENV_GROUPS.ai.some(v => process.env[v.key]);
     if (!hasAI) {
         logger.error({ component: "EnvCheck" },
-            "❌ CRITICAL: No AI provider key configured (OPENAI/ANTHROPIC/GROQ) — chat will not work");
+            "❌ CRITICAL: No AI provider key configured (OPENAI/GOOGLE_AI/GROQ) — chat will not work");
     }
 
     logger.info({ component: "EnvCheck", ok: results.ok.length, missing: results.missing.length },

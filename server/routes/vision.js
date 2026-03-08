@@ -30,7 +30,7 @@ const apiLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-// POST /api/vision — GPT-5.4 Vision (primary) + Claude (fallback) — BRAIN-POWERED
+// POST /api/vision — GPT-5.4 Vision (primary) + Gemini (fallback) — BRAIN-POWERED
 router.post("/", apiLimiter, validate(visionSchema), async (req, res) => {
   try {
     const { getUserFromToken, supabaseAdmin, brain } = req.app.locals;
@@ -99,42 +99,30 @@ Answer in ${LANGS[language] || "English"}, concise but detailed.`;
       }
     }
 
-    // FALLBACK: Claude Vision
-    if (!description && process.env.ANTHROPIC_API_KEY) {
+    // FALLBACK: Gemini Vision
+    const geminiKey = process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
+    if (!description && geminiKey) {
       try {
-        const r = await withTimeout(fetch("https://api.anthropic.com/v1/messages", {
+        const geminiModel = MODELS.GEMINI_VISION || "gemini-2.5-flash";
+        const r = await withTimeout(fetch(`https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiKey}`, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-api-key": process.env.ANTHROPIC_API_KEY,
-            "anthropic-version": "2023-06-01",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            model: MODELS.ANTHROPIC_CHAT,
-            max_tokens: 1024,
-            messages: [
-              {
-                role: "user",
-                content: [
-                  {
-                    type: "image",
-                    source: {
-                      type: "base64",
-                      media_type: "image/jpeg",
-                      data: image,
-                    },
-                  },
-                  { type: "text", text: prompt },
-                ],
-              },
-            ],
+            contents: [{
+              role: "user",
+              parts: [
+                { inlineData: { mimeType: "image/jpeg", data: image } },
+                { text: prompt },
+              ],
+            }],
+            generationConfig: { maxOutputTokens: 1024 },
           }),
-        }), 20000, "vision:Claude");
+        }), 20000, "vision:Gemini");
         const d = await r.json();
-        description = d.content?.[0]?.text;
-        if (description) engine = "Claude";
+        description = d.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (description) engine = "Gemini";
       } catch (e) {
-        logger.warn({ component: "Vision", err: e.message }, "Claude Vision fallback failed");
+        logger.warn({ component: "Vision", err: e.message }, "Gemini Vision fallback failed");
       }
     }
 

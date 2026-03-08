@@ -58,7 +58,7 @@ function setBrain(b) {
   _brain = b;
 }
 
-// ═══ AI TRANSLATION (Claude) ═══
+// ═══ AI TRANSLATION (Gemini) ═══
 // Detects non-Romanian articles and translates title+summary
 const RO_PATTERN = /[ăîâșțĂÎÂȘȚ]|\b(și|pentru|este|care|sau|din|acest|într-|într|într-un|despre|fără|după|când|unde)\b/i;
 
@@ -68,8 +68,8 @@ function isRomanian(text) {
 }
 
 async function translateToRomanian(title, summary) {
-  const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
-  if (!ANTHROPIC_KEY) return { title, summary };
+  const GEMINI_KEY = process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
+  if (!GEMINI_KEY) return { title, summary };
   if (isRomanian(title)) return { title, summary };
 
   try {
@@ -78,24 +78,19 @@ async function translateToRomanian(title, summary) {
 Title: ${title}
 Summary: ${summary || ""}`;
 
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_KEY}`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": ANTHROPIC_KEY,
-        "anthropic-version": "2023-06-01",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "claude-3-5-haiku-20241022",
-        max_tokens: 300,
-        messages: [{ role: "user", content: prompt }],
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: { maxOutputTokens: 300 },
       }),
       timeout: 10000,
     });
 
     if (!res.ok) return { title, summary };
     const data = await res.json();
-    const text = data.content?.[0]?.text || "";
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
 
     // Extract JSON from response
     const jsonMatch = text.match(/\{[\s\S]*\}/);

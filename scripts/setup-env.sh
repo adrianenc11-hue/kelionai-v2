@@ -105,11 +105,11 @@ ask_key() {
 
 # ─── Secțiunea AI ─────────────────────────────────────────────
 step "🤖 Configurare AI"
-ask_key "ANTHROPIC_API_KEY" \
-    "Claude 3.5 Sonnet — AI principal pentru chat și analiză imagini" \
-    "https://console.anthropic.com/settings/keys" \
+ask_key "GOOGLE_AI_KEY" \
+    "Google Gemini — AI principal pentru chat, vision și tool calling" \
+    "https://aistudio.google.com/apikey" \
     "false" \
-    "sk-ant-"
+    "AIza"
 
 ask_key "OPENAI_API_KEY" \
     "GPT-4o — AI alternativ + Whisper pentru transcriere voce" \
@@ -124,10 +124,10 @@ ask_key "DEEPSEEK_API_KEY" \
     "sk-"
 
 # Verifică că cel puțin un AI e configurat
-if [ -z "${ENV_VARS[ANTHROPIC_API_KEY]:-}" ] && \
+if [ -z "${ENV_VARS[GOOGLE_AI_KEY]:-}" ] && \
    [ -z "${ENV_VARS[OPENAI_API_KEY]:-}" ] && \
    [ -z "${ENV_VARS[DEEPSEEK_API_KEY]:-}" ]; then
-    err "Este necesară cel puțin o cheie AI (Anthropic, OpenAI sau DeepSeek)!"
+    err "Este necesară cel puțin o cheie AI (Google AI, OpenAI sau DeepSeek)!"
     exit 1
 fi
 
@@ -287,7 +287,7 @@ cat > "$ENV_FILE" << ENVEOF
 # ───────────────────────────────────────────────
 # 🤖 AI
 # ───────────────────────────────────────────────
-ANTHROPIC_API_KEY=${ENV_VARS[ANTHROPIC_API_KEY]:-}
+GOOGLE_AI_KEY=${ENV_VARS[GOOGLE_AI_KEY]:-}
 OPENAI_API_KEY=${ENV_VARS[OPENAI_API_KEY]:-}
 DEEPSEEK_API_KEY=${ENV_VARS[DEEPSEEK_API_KEY]:-}
 

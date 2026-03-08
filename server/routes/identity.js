@@ -73,7 +73,7 @@ router.post(
 );
 
 // ═══ POST /api/identity/check ═══
-// Compare submitted face against registered users using Claude Vision
+// Compare submitted face against registered users using Vision AI
 router.post(
   "/identity/check",
   identityLimiter,

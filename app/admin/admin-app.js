@@ -115,7 +115,7 @@ async function loadCredit() {
                 '<strong>💳 Reîncărcare minimă per provider:</strong><br>' +
                 '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;margin-top:8px;color:#ccc;">' +
                 '<span>🟢 <b>OpenAI</b> — min $5</span>' +
-                '<span>🟣 <b>Anthropic</b> — min $5</span>' +
+                '<span>🔵 <b>Google Gemini</b> — free tier available</span>' +
                 '<span>🟠 <b>Groq</b> — free tier / $5 paid</span>' +
                 '<span>🔵 <b>DeepSeek</b> — min $2</span>' +
                 '<span>🔴 <b>Perplexity</b> — min $5</span>' +

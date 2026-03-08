@@ -138,7 +138,7 @@ router.post("/chat", chatLimiter, validate(chatSchema), async (req, res) => {
         upgrade: true,
       });
 
-    // ═══ BRAIN V4: Claude Tool Calling — one call does everything ═══
+    // ═══ BRAIN V4: Gemini Tool Calling — one call does everything ═══
     const thought = await thinkV4(
       brain,
       message,
@@ -151,9 +151,9 @@ router.post("/chat", chatLimiter, validate(chatSchema), async (req, res) => {
       isAdmin,
     );
 
-    // V4 returns the final reply directly from Claude (tool calling + response in one)
+    // V4 returns the final reply directly from Gemini (tool calling + response in one)
     let reply = thought.enrichedMessage;
-    let engine = thought.agent === "v4-claude-tools" ? "Claude-V4" : "V3-Fallback";
+    let engine = thought.agent === "v4-gemini-tools" ? "Gemini-V4" : "V3-Fallback";
 
     if (!reply) return res.status(503).json({ error: "AI unavailable" });
 
@@ -197,7 +197,7 @@ router.post("/chat", chatLimiter, validate(chatSchema), async (req, res) => {
     // Log AI cost for this chat interaction
     const estimatedTokens = Math.ceil((message.length + reply.length) / 4);
     brain._logCost(
-      engine === "Claude-V4" ? "Anthropic" : "OpenAI",
+      engine === "Gemini-V4" ? "Google" : "OpenAI",
       engine,
       Math.ceil(message.length / 4),
       Math.ceil(reply.length / 4),
@@ -394,37 +394,31 @@ router.post(
 
       let fullReply = "";
 
-      // AI Chain: Claude (streaming nativ) → GPT-5.4 fallback → DeepSeek (backup)
+      // AI Chain: Gemini (streaming nativ) → GPT-5.4 fallback → DeepSeek (backup)
       // NOTĂ: Chain-ul pe /chat/stream diferă INTENȚIONAT de /chat.
-      // /chat: GPT-5.4→Claude→Groq→DeepSeek (optimizat pe viteză, non-streaming)
-      // /chat/stream: Claude→GPT-5.4→DeepSeek (Claude face streaming nativ word-by-word)
-      // Try Claude streaming
-      if (process.env.ANTHROPIC_API_KEY) {
+      // /chat: Gemini V4 cu tool calling (prin brain-v4.js)
+      // /chat/stream: Gemini→GPT-5.4→DeepSeek (streaming word-by-word)
+      // Try Gemini streaming
+      const geminiKey = process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
+      if (geminiKey) {
         try {
-          const r = await fetch("https://api.anthropic.com/v1/messages", {
+          const geminiModel = MODELS.GEMINI_CHAT || "gemini-2.5-flash";
+          const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:streamGenerateContent?alt=sse&key=${geminiKey}`, {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "x-api-key": process.env.ANTHROPIC_API_KEY,
-              "anthropic-version": "2023-06-01",
-            },
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              model: MODELS.ANTHROPIC_CHAT,
-              max_tokens: 4096,
-              system: systemPrompt,
-              messages: msgs,
-              stream: true,
+              contents: msgs.map(m => ({ role: m.role === "assistant" ? "model" : m.role, parts: [{ text: m.content }] })),
+              systemInstruction: { parts: [{ text: systemPrompt }] },
+              generationConfig: { maxOutputTokens: 4096, temperature: 0.7 },
             }),
           });
 
           if (r.ok && r.body) {
             res.write(
-              `data: ${JSON.stringify({ type: "start", engine: "Claude" })}\n\n`,
+              `data: ${JSON.stringify({ type: "start", engine: "Gemini" })}\n\n`,
             );
             let buffer = "";
 
-            // Node 18+ fetch returns Web ReadableStream, not Node.js Readable
-            // Convert to Node.js Readable if needed
             const { Readable } = require("stream");
             const nodeStream =
               typeof r.body.on === "function"
@@ -443,13 +437,11 @@ router.post(
                   if (data === "[DONE]") continue;
                   try {
                     const parsed = JSON.parse(data);
-                    if (
-                      parsed.type === "content_block_delta" &&
-                      parsed.delta?.text
-                    ) {
-                      fullReply += parsed.delta.text;
+                    const text = parsed.candidates?.[0]?.content?.parts?.[0]?.text;
+                    if (text) {
+                      fullReply += text;
                       res.write(
-                        `data: ${JSON.stringify({ type: "chunk", text: parsed.delta.text })}\n\n`,
+                        `data: ${JSON.stringify({ type: "chunk", text })}\n\n`,
                       );
                     }
                   } catch (e) {
@@ -465,14 +457,14 @@ router.post(
             });
           }
         } catch (e) {
-          logger.warn({ component: "Stream", err: e.message }, "Claude");
+          logger.warn({ component: "Stream", err: e.message }, "Gemini");
         }
       }
-      // Log Claude streaming cost
+      // Log Gemini streaming cost
       if (fullReply) {
         const estInputTok = Math.ceil(msgs.reduce((s, m) => s + (m.content || '').length, 0) / 4);
         const estOutputTok = Math.ceil(fullReply.length / 4);
-        brain._logCost("Anthropic", "claude-streaming", estInputTok, estOutputTok, (estInputTok * 3 + estOutputTok * 15) / 1000000, user?.id).catch(() => { });
+        brain._logCost("Google", "gemini-streaming", estInputTok, estOutputTok, (estInputTok * 0.075 + estOutputTok * 0.3) / 1000000, user?.id).catch(() => { });
       }
 
       // Fallback: non-streaming GPT-5.4 (via OPENAI_FALLBACK) or DeepSeek

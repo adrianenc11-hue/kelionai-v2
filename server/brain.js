@@ -19,7 +19,7 @@ const { UserProfile, LearningStore, AutonomousMonitor } = require("./brain-profi
 
 class KelionBrain {
   constructor(config) {
-    this.anthropicKey = config.anthropicKey;
+    this.geminiKey = config.geminiKey;
     this.openaiKey = config.openaiKey;
     this.groqKey = config.groqKey;
     this.perplexityKey = config.perplexityKey;
@@ -729,27 +729,23 @@ When asked "what can you do?" list these real capabilities. Use them proactively
   // ═══════════════════════════════════════════════════════════
   async multiAIConsensus(prompt, maxTokens = 600) {
     const providers = [];
-    // Provider 1: Claude (high quality)
-    if (this.anthropicKey) {
+    // Provider 1: Gemini (high quality)
+    const geminiKey = process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
+    if (geminiKey) {
       providers.push({
-        name: "Claude",
+        name: "Gemini",
         fn: async () => {
-          const r = await fetch("https://api.anthropic.com/v1/messages", {
+          const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODELS.GEMINI_CHAT}:generateContent?key=${geminiKey}`, {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "x-api-key": this.anthropicKey,
-              "anthropic-version": "2023-06-01",
-            },
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              model: MODELS.ANTHROPIC_CHAT,
-              max_tokens: maxTokens,
-              messages: [{ role: "user", content: prompt }],
+              contents: [{ role: "user", parts: [{ text: prompt }] }],
+              generationConfig: { maxOutputTokens: maxTokens },
             }),
           });
           if (!r.ok) return null;
           const d = await r.json();
-          return d.content?.[0]?.text || null;
+          return d.candidates?.[0]?.content?.parts?.[0]?.text || null;
         },
       });
     }
@@ -1041,7 +1037,7 @@ When asked "what can you do?" list these real capabilities. Use them proactively
   // Uses Groq Llama for ultra-fast structured thinking
   // ═══════════════════════════════════════════════════════════
   async chainOfThought(message, toolResults, analysis, history, language) {
-    const aiKey = this.groqKey || this.openaiKey || this.anthropicKey;
+    const aiKey = this.groqKey || this.openaiKey || this.geminiKey;
     if (!aiKey) return null;
     this.toolStats.chainOfThought++;
 
@@ -1083,7 +1079,7 @@ Think step by step:
 Reply STRICTLY with JSON:
 {"surface":"...","deep_need":"...","tone":"...","key_info":["..."],"anticipate":"...","plan":["..."]}`;
 
-      // Use Groq (fastest) → GPT (fallback) → Claude (last resort)
+      // Use Groq (fastest) → GPT (fallback) → Gemini (last resort)
       let r, d, txt;
       if (this.groqKey) {
         r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -1103,23 +1099,21 @@ Reply STRICTLY with JSON:
           txt = d.choices?.[0]?.message?.content?.trim();
         }
       }
-      if (!txt && this.anthropicKey) {
-        r = await fetch("https://api.anthropic.com/v1/messages", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-api-key": this.anthropicKey,
-            "anthropic-version": "2023-06-01",
-          },
-          body: JSON.stringify({
-            model: MODELS.ANTHROPIC_CHAT,
-            max_tokens: 250,
-            messages: [{ role: "user", content: prompt }],
-          }),
-        });
-        if (r.ok) {
-          d = await r.json();
-          txt = d.content?.[0]?.text?.trim();
+      if (!txt) {
+        const geminiKey = process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
+        if (geminiKey) {
+          r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODELS.GEMINI_CHAT}:generateContent?key=${geminiKey}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{ role: "user", parts: [{ text: prompt }] }],
+              generationConfig: { maxOutputTokens: 250 },
+            }),
+          });
+          if (r.ok) {
+            d = await r.json();
+            txt = d.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+          }
         }
       }
       if (!txt) return null;
@@ -2962,7 +2956,7 @@ Reply STRICTLY with JSON:
     const mem = process.memoryUsage();
 
     const services = {
-      ai_claude: !!process.env.ANTHROPIC_API_KEY,
+      ai_gemini: !!(process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY),
       ai_openai: !!process.env.OPENAI_API_KEY,
       tts: !!process.env.ELEVENLABS_API_KEY,
       stt: !!process.env.GROQ_API_KEY,
@@ -3563,7 +3557,7 @@ Reply STRICTLY with JSON:
   // ═══════════════════════════════════════════════════════════
 
   // ── VISION — High precision for accessibility (blind users) ──
-  // Calls Claude Vision API when image is provided in context
+  // Calls Gemini Vision API when image is provided in context
   async _vision(imageBase64, userId) {
     this.toolStats.vision = (this.toolStats.vision || 0) + 1;
 
@@ -3580,44 +3574,28 @@ Reply STRICTLY with JSON:
       };
     }
 
-    // Call Claude Vision API for high-precision analysis
-    if (this.anthropicKey) {
+    // Call Gemini Vision API for high-precision analysis
+    const geminiKey = process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
+    if (geminiKey) {
       try {
-        const r = await fetch("https://api.anthropic.com/v1/messages", {
+        const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODELS.GEMINI_VISION}:generateContent?key=${geminiKey}`, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-api-key": this.anthropicKey,
-            "anthropic-version": "2023-06-01",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            model: MODELS.ANTHROPIC_CHAT,
-            max_tokens: 1000,
-            messages: [
-              {
-                role: "user",
-                content: [
-                  {
-                    type: "image",
-                    source: {
-                      type: "base64",
-                      media_type: "image/jpeg",
-                      data: imageBase64,
-                    },
-                  },
-                  {
-                    type: "text",
-                    text: "Descrie în detaliu maxim ce vezi în această imagine. Menționează: persoane, obiecte, culori, text vizibil, obstacole, distanțe estimate, pericole potențiale. Răspunde în română cu precizie maximă — informația ajută o persoană cu deficiențe de vedere.",
-                  },
-                ],
-              },
-            ],
+            contents: [{
+              role: "user",
+              parts: [
+                { inlineData: { mimeType: "image/jpeg", data: imageBase64 } },
+                { text: "Descrie în detaliu maxim ce vezi în această imagine. Menționează: persoane, obiecte, culori, text vizibil, obstacole, distanțe estimate, pericole potențiale. Răspunde în română cu precizie maximă — informația ajută o persoană cu deficiențe de vedere." },
+              ],
+            }],
+            generationConfig: { maxOutputTokens: 1000 },
           }),
         });
         if (r.ok) {
           const data = await r.json();
           const description =
-            data.content?.[0]?.text || "Nu am putut analiza imaginea.";
+            data.candidates?.[0]?.content?.parts?.[0]?.text || "Nu am putut analiza imaginea.";
           // Supabase usage log
           if (this.supabaseAdmin) {
             try {
@@ -3641,14 +3619,14 @@ Reply STRICTLY with JSON:
             description,
             precision: "high",
             accessibility: true,
-            engine: "Claude Vision",
+            engine: "Gemini Vision",
             summary: description.substring(0, 200),
           };
         }
       } catch (e) {
         logger.warn(
           { component: "Brain", err: e.message },
-          "Claude Vision failed",
+          "Gemini Vision failed",
         );
       }
     }
@@ -3708,7 +3686,7 @@ Reply STRICTLY with JSON:
       type: "vision",
       status: "no_api",
       summary:
-        "Nicio cheie API vision configurată (ANTHROPIC_API_KEY sau OPENAI_API_KEY).",
+        "Nicio cheie API vision configurată (GOOGLE_AI_KEY sau OPENAI_API_KEY).",
     };
   }
 
@@ -3897,7 +3875,7 @@ Reply STRICTLY with JSON:
     };
   }
 
-  // ── FACE CHECK — Identify user via Claude Vision + Supabase profiles ──
+  // ── FACE CHECK — Identify user via Gemini Vision + Supabase profiles ──
   async _faceCheck(imageBase64) {
     this.toolStats.faceCheck = (this.toolStats.faceCheck || 0) + 1;
 
@@ -3926,8 +3904,9 @@ Reply STRICTLY with JSON:
       };
     }
 
-    // Use Claude Vision to describe the face
-    if (this.anthropicKey) {
+    // Use Gemini Vision to describe the face
+    const geminiKey = process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
+    if (geminiKey) {
       try {
         const knownList = knownFaces
           .map(
@@ -3940,37 +3919,23 @@ Reply STRICTLY with JSON:
             ? `Descrie persoana din imagine (vârstă, gen, păr, ochelari, trăsături distinctive). Apoi compară cu aceste persoane cunoscute:\n${knownList}\nRăspunde: MATCH: [nume] sau NO_MATCH dacă nu e nimeni cunoscut.`
             : "Descrie persoana din imagine: vârstă estimată, gen, culoare păr, ochelari da/nu, trăsături distinctive. Răspunde concis în română.";
 
-        const r = await fetch("https://api.anthropic.com/v1/messages", {
+        const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODELS.GEMINI_VISION}:generateContent?key=${geminiKey}`, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-api-key": this.anthropicKey,
-            "anthropic-version": "2023-06-01",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            model: MODELS.ANTHROPIC_CHAT,
-            max_tokens: 500,
-            messages: [
-              {
-                role: "user",
-                content: [
-                  {
-                    type: "image",
-                    source: {
-                      type: "base64",
-                      media_type: "image/jpeg",
-                      data: imageBase64,
-                    },
-                  },
-                  { type: "text", text: prompt },
-                ],
-              },
-            ],
+            contents: [{
+              role: "user",
+              parts: [
+                { inlineData: { mimeType: "image/jpeg", data: imageBase64 } },
+                { text: prompt },
+              ],
+            }],
+            generationConfig: { maxOutputTokens: 500 },
           }),
         });
         if (r.ok) {
           const data = await r.json();
-          const description = data.content?.[0]?.text || "";
+          const description = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
           const isMatch = description.includes("MATCH:");
           const matchName = isMatch
             ? description.match(/MATCH:\s*(.+)/)?.[1]?.trim()
@@ -3982,7 +3947,7 @@ Reply STRICTLY with JSON:
             name: matchName || "Necunoscut",
             description,
             knownFaces: knownFaces.length,
-            engine: "Claude Vision",
+            engine: "Gemini Vision",
             summary: isMatch
               ? `Identificat: ${matchName}`
               : `Necunoscut — ${knownFaces.length} fețe în baza de date.`,
@@ -4000,7 +3965,7 @@ Reply STRICTLY with JSON:
       type: "faceCheck",
       status: "no_api",
       knownFaces: knownFaces.length,
-      summary: "ANTHROPIC_API_KEY necesară pentru recunoaștere facială.",
+      summary: "GOOGLE_AI_KEY necesară pentru recunoaștere facială.",
     };
   }
 
@@ -4022,44 +3987,28 @@ Reply STRICTLY with JSON:
       };
     }
 
-    // Use Claude Vision to extract face description as "encoding"
+    // Use Gemini Vision to extract face description as "encoding"
     let faceDescription = null;
-    if (this.anthropicKey) {
+    const geminiKey2 = process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
+    if (geminiKey2) {
       try {
-        const r = await fetch("https://api.anthropic.com/v1/messages", {
+        const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODELS.GEMINI_VISION}:generateContent?key=${geminiKey2}`, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-api-key": this.anthropicKey,
-            "anthropic-version": "2023-06-01",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            model: MODELS.ANTHROPIC_CHAT,
-            max_tokens: 300,
-            messages: [
-              {
-                role: "user",
-                content: [
-                  {
-                    type: "image",
-                    source: {
-                      type: "base64",
-                      media_type: "image/jpeg",
-                      data: imageBase64,
-                    },
-                  },
-                  {
-                    type: "text",
-                    text: 'Descrie fața persoanei pentru recunoaștere viitoare: vârstă estimată, gen, culoare păr, lung/scurt, ochelari da/nu, barbă/mustață, forme faciale distinctive, cicatrici sau semne particulare. Format JSON: {"age":X,"gender":"","hair":"","glasses":false,"facial_hair":"","distinctive":"","description":"text liber"}',
-                  },
-                ],
-              },
-            ],
+            contents: [{
+              role: "user",
+              parts: [
+                { inlineData: { mimeType: "image/jpeg", data: imageBase64 } },
+                { text: 'Descrie fața persoanei pentru recunoaștere viitoare: vârstă estimată, gen, culoare păr, lung/scurt, ochelari da/nu, barbă/mustață, forme faciale distinctive, cicatrici sau semne particulare. Format JSON: {"age":X,"gender":"","hair":"","glasses":false,"facial_hair":"","distinctive":"","description":"text liber"}' },
+              ],
+            }],
+            generationConfig: { maxOutputTokens: 300 },
           }),
         });
         if (r.ok) {
           const data = await r.json();
-          const text = data.content?.[0]?.text || "";
+          const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
           try {
             const jsonMatch = text.match(/\{[\s\S]*\}/);
             faceDescription = jsonMatch
@@ -4081,7 +4030,7 @@ Reply STRICTLY with JSON:
       return {
         type: "faceRegister",
         status: "no_api",
-        summary: "ANTHROPIC_API_KEY necesară pentru encoding facial.",
+        summary: "GOOGLE_AI_KEY necesară pentru encoding facial.",
       };
     }
 
@@ -4103,7 +4052,7 @@ Reply STRICTLY with JSON:
           type: "faceRegister",
           status: "registered",
           encoding: faceDescription,
-          engine: "Claude Vision",
+          engine: "Gemini Vision",
           summary: `Față înregistrată: ${faceDescription.description?.substring(0, 80) || "OK"}`,
         };
       } catch (e) {
@@ -4509,7 +4458,7 @@ Reply STRICTLY with JSON:
       !this.supabaseAdmin ||
       !userId ||
       userMessage.length < 15 ||
-      (!this.groqKey && !this.anthropicKey)
+      (!this.groqKey && !this.geminiKey)
     )
       return;
 
@@ -4550,23 +4499,21 @@ Raspunde STRICT JSON. Daca nimic: {}`;
           txt = d.choices?.[0]?.message?.content?.trim();
         }
       }
-      if (!txt && this.anthropicKey) {
-        r = await fetch("https://api.anthropic.com/v1/messages", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-api-key": this.anthropicKey,
-            "anthropic-version": "2023-06-01",
-          },
-          body: JSON.stringify({
-            model: MODELS.ANTHROPIC_CHAT,
-            max_tokens: 150,
-            messages: [{ role: "user", content: learnPrompt }],
-          }),
-        });
-        if (r.ok) {
-          d = await r.json();
-          txt = d.content?.[0]?.text?.trim();
+      if (!txt) {
+        const geminiKey = process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
+        if (geminiKey) {
+          r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODELS.GEMINI_CHAT}:generateContent?key=${geminiKey}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{ role: "user", parts: [{ text: learnPrompt }] }],
+              generationConfig: { maxOutputTokens: 150 },
+            }),
+          });
+          if (r.ok) {
+            d = await r.json();
+            txt = d.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+          }
         }
       }
       if (!txt || txt === "{}") return;

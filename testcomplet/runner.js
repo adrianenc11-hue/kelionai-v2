@@ -24,7 +24,7 @@ const TEST_TYPES = [
     "Upgrade / Rollback"
 ];
 
-const LATENCY = { ELEVENLABS_TTS: 5000, GROQ_WHISPER: 5000, CLAUDE_CHAT: 15000, OPENAI_CHAT: 15000, TOGETHER_FLUX: 25000, PERPLEXITY: 5000, GENERAL_API: 5000, INTERNAL: 1000 };
+const LATENCY = { ELEVENLABS_TTS: 5000, GROQ_WHISPER: 5000, GEMINI_CHAT: 15000, OPENAI_CHAT: 15000, TOGETHER_FLUX: 25000, PERPLEXITY: 5000, GENERAL_API: 5000, INTERNAL: 1000 };
 
 let state = { total: 148, tested: 0, passed: 0, failed: 0, inProgress: "", results: [] };
 function save() { fs.writeFileSync(RESULTS_PATH, JSON.stringify(state, null, 2)); }
@@ -68,15 +68,15 @@ const FUNCS = [
     { id: 8, name: "Change Password", type: "api", method: "POST", url: "/api/auth/change-password", body: { oldPassword: "x", newPassword: "NewP@ss123!" }, expect: [200, 401, 429], timeout: LATENCY.GENERAL_API, module: "auth.js" },
     { id: 9, name: "Change Email", type: "api", method: "POST", url: "/api/auth/change-email", body: { email: "new@test.com" }, expect: [200, 401, 429], timeout: LATENCY.GENERAL_API, module: "auth.js" },
     // CHAT 10-11
-    { id: 10, name: "Chat Text", type: "api", method: "POST", url: "/api/chat", body: { message: "salut", language: "ro" }, expect: [200, 401, 429], timeout: LATENCY.CLAUDE_CHAT, module: "brain.js" },
-    { id: 11, name: "Chat Stream", type: "api", method: "POST", url: "/api/chat/stream", body: { message: "test", language: "en" }, expect: [200, 401, 429], timeout: LATENCY.CLAUDE_CHAT, module: "brain.js" },
+    { id: 10, name: "Chat Text", type: "api", method: "POST", url: "/api/chat", body: { message: "salut", language: "ro" }, expect: [200, 401, 429], timeout: LATENCY.GEMINI_CHAT, module: "brain.js" },
+    { id: 11, name: "Chat Stream", type: "api", method: "POST", url: "/api/chat/stream", body: { message: "test", language: "en" }, expect: [200, 401, 429], timeout: LATENCY.GEMINI_CHAT, module: "brain.js" },
     // VOCE 12-16
     { id: 12, name: "TTS Speak", type: "api", method: "POST", url: "/api/speak", body: { text: "Test", avatar: "kelion", mood: "neutral", language: "ro" }, expect: [200, 401, 429], timeout: LATENCY.ELEVENLABS_TTS, module: "voice.js" },
     { id: 13, name: "STT Listen", type: "api", method: "POST", url: "/api/listen", body: { text: "test fallback" }, expect: [200, 400, 401], timeout: LATENCY.GROQ_WHISPER, module: "voice.js" },
     { id: 14, name: "Clone Create", type: "api", method: "POST", url: "/api/voice/clone", body: { name: "test" }, expect: [200, 400, 401], timeout: LATENCY.GENERAL_API, module: "voice.js" },
     { id: 15, name: "Clone Delete", type: "api", method: "DELETE", url: "/api/voice/clone", expect: [200, 401, 404], timeout: LATENCY.GENERAL_API, module: "voice.js" },
     { id: 16, name: "Clone Status", type: "api", method: "GET", url: "/api/voice/clone", expect: [200, 401], timeout: LATENCY.GENERAL_API, module: "voice.js" },
-    { id: 17, name: "Vision", type: "api", method: "POST", url: "/api/vision", body: { image: "data:image/png;base64,iVBOR" }, expect: [200, 400, 401, 429], timeout: LATENCY.CLAUDE_CHAT, module: "brain.js" },
+    { id: 17, name: "Vision", type: "api", method: "POST", url: "/api/vision", body: { image: "data:image/png;base64,iVBOR" }, expect: [200, 400, 401, 429], timeout: LATENCY.GEMINI_CHAT, module: "brain.js" },
     { id: 18, name: "Image Gen", type: "api", method: "POST", url: "/api/imagine", body: { prompt: "test cat" }, expect: [200, 401, 429], timeout: LATENCY.TOGETHER_FLUX, module: "brain.js" },
     { id: 19, name: "Web Search", type: "api", method: "POST", url: "/api/search", body: { query: "test" }, expect: [200, 401, 429], timeout: LATENCY.PERPLEXITY, module: "brain.js" },
     { id: 20, name: "Weather", type: "api", method: "POST", url: "/api/weather", body: { city: "Bucharest" }, expect: [200, 401, 429], timeout: LATENCY.GENERAL_API, module: "weather.js" },
