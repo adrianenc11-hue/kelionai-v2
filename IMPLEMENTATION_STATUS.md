@@ -229,7 +229,21 @@
 
 ---
 
+## Etapa 7 — TODO (Viitor)
+
+| # | Funcționalitate | Status | Detalii |
+|---|---|---|---|
+| 154 | Self-Healing Brain — auto-diagnostic + fix via GitHub API + auto-deploy | [ ] | Brain detectează erori → citește fișierul → trimite la Claude → commit fix pe branch → PR → auto-deploy. Necesită `GITHUB_TOKEN` în .env |
+| 155 | Frontend error capture → Brain | [ ] | `window.onerror` handler → POST `/api/brain/errors` → brain analizează |
+| 156 | Fix admin panel 403 flood | [ ] | `admin-app.js` — auth guard la INIT + setInterval |
+| 157 | Fix SW cache errors | [ ] | `sw.js` — try/catch pe addAll |
+| 158 | Investigat + fix avatar | [ ] | Avatar înlocuit cu poză — de verificat cauza |
+| 159 | Integrat multiAIConsensus în think() | [ ] | Funcția există dar nu e apelată din flow-ul principal |
+| 160 | Integrat frustrationLevel în prompt AI | [ ] | detectFrustration() rulează dar rezultatul nu ajunge la AI |
+
+---
+
 ## Notă
 
-> **Ultima actualizare:** 2026-03-08 08:21 UTC — 153/153 funcționalități confirmate
+> **Ultima actualizare:** 2026-03-08 11:10 UTC — 153/153 confirmate + 7 TODO noi
 > **Regula:** Niciun agent nu marchează [x] fără testare reală și confirmare utilizator.
