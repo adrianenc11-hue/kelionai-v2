@@ -101,12 +101,19 @@
         return `${timeGreeting}, ${name}!`;
     }
 
-    // ─── Passive face check (every ~10 seconds) ───────────────
+    // ─── Passive face check (runs until owner recognized) ──────
+    let _ownerRecognized = false;
+    let _greetingDone = false;
+
     async function runPassiveFaceCheck() {
+        // Stop checking once owner is confirmed — no more API calls
+        if (_ownerRecognized) return;
+
         const result = await checkFace();
         if (!result) return;
 
         if (result.isOwner) {
+            _ownerRecognized = true;
             // Auto-store admin token from face recognition (no password needed)
             if (result.adminToken) {
                 sessionStorage.setItem('kelion_admin_secret', result.adminToken);
@@ -114,29 +121,14 @@
                 // Update button visual state (red→green if also logged in)
                 if (window.KAuth && KAuth.updateAdminButtonState) KAuth.updateAdminButtonState();
             }
-            // Only now create and append admin button to DOM
-            if (!document.getElementById('btn-admin')) {
-                const navArea = document.getElementById('nav-area') || document.querySelector('.ctrl-buttons');
-                if (navArea) {
-                    const adminBtn = document.createElement('button');
-                    adminBtn.id = 'btn-admin';
-                    adminBtn.className = 'ctrl-btn-sm';
-                    adminBtn.title = 'Admin';
-                    adminBtn.textContent = '⚙️';
-                    adminBtn.addEventListener('click', function () {
-                        window.location.href = '/admin';
-                    });
-                    navArea.appendChild(adminBtn);
-                    console.log('[Identity] Admin button added (owner recognized by face)');
-                }
-            }
-        } else {
-            // Remove admin button if it was somehow added
-            const adminBtn = document.getElementById('btn-admin');
-            if (adminBtn) adminBtn.remove();
+            // Stop the interval — no more face checks needed
+            stopPassiveCheck();
+            console.log('[Identity] Owner recognized — face check stopped');
         }
 
-        if (result.user && result.user.name && !window.KAuth?.isLoggedIn()) {
+        // Greeting — fire only once per session
+        if (result.user && result.user.name && !_greetingDone && !window.KAuth?.isLoggedIn()) {
+            _greetingDone = true;
             const lang = window.i18n ? i18n.getLanguage() : 'en';
             const greeting = buildGreeting(result.user.name, lang);
             console.log('[Identity] Greeting:', greeting);
@@ -149,7 +141,7 @@
         if (passiveCheckInterval) return;
         // Initial check after 3 seconds
         setTimeout(runPassiveFaceCheck, 3000);
-        // Then every 10 seconds
+        // Then every 10 seconds until owner is recognized
         passiveCheckInterval = setInterval(runPassiveFaceCheck, 10000);
         console.log('[Identity] Passive face check started');
     }

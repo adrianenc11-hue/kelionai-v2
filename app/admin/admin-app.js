@@ -107,6 +107,21 @@ async function loadCredit() {
                     '<span class="dist-amount">£' + amt + ' (' + pct + '%)</span></div>';
             });
         }
+        // Min recharge info per provider
+        var infoEl = document.getElementById('credit-distribution');
+        if (!infoEl) infoEl = document.querySelector('#sec-credit .section-body');
+        if (infoEl) {
+            infoEl.innerHTML += '<div style="margin-top:16px;padding:12px 16px;background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.2);border-radius:10px;font-size:0.82rem;color:#a5b4fc;">' +
+                '<strong>💳 Reîncărcare minimă per provider:</strong><br>' +
+                '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;margin-top:8px;color:#ccc;">' +
+                '<span>🟢 <b>OpenAI</b> — min $5</span>' +
+                '<span>🟣 <b>Anthropic</b> — min $5</span>' +
+                '<span>🟠 <b>Groq</b> — free tier / $5 paid</span>' +
+                '<span>🔵 <b>DeepSeek</b> — min $2</span>' +
+                '<span>🔴 <b>Perplexity</b> — min $5</span>' +
+                '<span>🟡 <b>ElevenLabs</b> — min $5/mo</span>' +
+                '</div></div>';
+        }
     } catch (e) {
         var tb = document.querySelector('#credit-table tbody');
         if (tb) tb.innerHTML = '<tr><td colspan="6" style="color:#f66;text-align:center">Error loading costs</td></tr>';
