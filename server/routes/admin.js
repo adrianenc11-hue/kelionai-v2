@@ -53,6 +53,25 @@ async function requireAdmin(req, res, next) {
 
 router.use(requireAdmin);
 
+// ── Log ALL admin actions to Supabase ──
+router.use(async (req, res, next) => {
+  if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(req.method)) {
+    const { supabaseAdmin } = req.app.locals;
+    if (supabaseAdmin) {
+      try {
+        await supabaseAdmin.from("admin_logs").insert({
+          action: req.method + " " + req.path,
+          details: JSON.stringify({ body: req.body, params: req.params }),
+          admin_id: req.adminUser?.id || "admin",
+          source: "admin_panel",
+          created_at: new Date().toISOString(),
+        });
+      } catch { /* non-blocking */ }
+    }
+  }
+  next();
+});
+
 // ══════════════════════════════════════════════════════════
 // GET /api/admin/brain — Brain diagnostic
 // ══════════════════════════════════════════════════════════
@@ -620,6 +639,17 @@ router.post("/upgrade", async (req, res) => {
         .update({ status: "cancelled", cancelled_at: new Date().toISOString() })
         .eq("user_id", userId).catch(() => { });
     }
+
+    // Log upgrade to Supabase
+    try {
+      await supabaseAdmin.from("admin_logs").insert({
+        action: "upgrade",
+        user_id: userId,
+        details: JSON.stringify({ plan, previous: "unknown" }),
+        admin_id: req.adminUser?.id || "admin",
+        created_at: new Date().toISOString(),
+      });
+    } catch { }
 
     logger.info({ component: "Admin", userId, plan }, "User plan updated");
     res.json({ success: true, message: "Plan actualizat la " + plan + "!" });
