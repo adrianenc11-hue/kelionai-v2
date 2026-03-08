@@ -144,8 +144,8 @@ router.get("/", weatherLimiter, async (req, res) => {
       condition: cond,
       description: name + ", " + country + ": " + c.temperature_2m + "°C, " + cond + ", humidity " + c.relative_humidity_2m + "%, wind " + c.wind_speed_10m + " km/h",
     });
-  } catch {
-    res.status(500).json({ error: "Weather error" });
+  } catch (e) {
+    res.status(500).json({ error: "Weather error: " + (e.message || "unknown") });
   }
 });
 
