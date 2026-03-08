@@ -2,7 +2,7 @@
 // KelionAI — Service Worker (PWA Offline Support)
 // ═══════════════════════════════════════════════════════════════
 
-const CACHE_NAME = "kelionai-v2.5";
+const CACHE_NAME = "kelionai-v2.6";
 const OFFLINE_URLS = [
     "/",
     "/css/app.css",
@@ -11,6 +11,7 @@ const OFFLINE_URLS = [
     "/js/avatar.js",
     "/js/voice.js",
     "/js/fft-lipsync.js",
+    "/js/alignment-lipsync.js",
     "/manifest.json",
 ];
 

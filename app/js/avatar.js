@@ -679,7 +679,12 @@
 
         updateBlink(dt);
         updateExpression(dt);
-        if (lipSync && window.KVoice && KVoice.isSpeaking()) lipSync.update();
+        // Professional lip sync: alignment-driven (priority) or FFT fallback
+        if (window.AlignmentLipSync && AlignmentLipSync.isActive()) {
+            AlignmentLipSync.update();
+        } else if (lipSync && window.KVoice && KVoice.isSpeaking()) {
+            lipSync.update();
+        }
 
         updateGesture(dt);
         updateBodyAction(dt);
@@ -778,7 +783,7 @@
             currentModel.rotation.y += (_mouseX * 0.02 - currentModel.rotation.y) * 0.03; // was 0.04/0.05
         }
         // SMOOTH mouth close — exponential decay instead of instant zero
-        var _lipRan = (lipSync && window.KVoice && KVoice.isSpeaking());
+        var _lipRan = (window.AlignmentLipSync && AlignmentLipSync.isActive()) || (lipSync && window.KVoice && KVoice.isSpeaking());
         if (!_lipRan) {
             for (var ci = 0; ci < _mouthMorphCache.length; ci++) {
                 var curr = _mouthMorphCache[ci].mesh.morphTargetInfluences[_mouthMorphCache[ci].idx];
