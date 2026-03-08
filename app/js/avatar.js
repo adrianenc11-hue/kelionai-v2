@@ -172,7 +172,7 @@
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 3)); // CINEMATIC: up to 3x for 4K/retina
 
         camera = new THREE.PerspectiveCamera(30, w / h, 0.1, 100);
-        camera.position.set(0, -0.1, 1.8); // Negative Y = avatar appears higher
+        camera.position.set(0, -0.15, 1.25); // Closer for head+bust framing
         renderer.outputColorSpace = THREE.SRGBColorSpace;
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
         renderer.toneMappingExposure = 1.2;
@@ -245,7 +245,7 @@
                 if (maxDim > 0) currentModel.scale.setScalar(1.2 / maxDim);
 
                 // Shift model down for head+torso framing
-                currentModel.position.y -= 0.15;
+                currentModel.position.y -= 0.35;
 
                 currentModel.traverse((child) => {
                     if (child.isMesh) {
@@ -532,84 +532,105 @@
             leftForeArm: null, rightForeArm: null,
             leftHand: null, rightHand: null
         };
+        // Flexible bone matching for MetaPerson / Mixamo / generic models
+        var allBones = [];
         currentModel.traverse(function (bone) {
             if (!bone.isBone) return;
-            var bn = bone.name || '';
-            if (bn === 'LeftShoulder') armBones.leftShoulder = bone;
-            if (bn === 'RightShoulder') armBones.rightShoulder = bone;
-            if (bn === 'LeftArm') armBones.leftArm = bone;
-            if (bn === 'RightArm') armBones.rightArm = bone;
-            if (bn === 'LeftForeArm') armBones.leftForeArm = bone;
-            if (bn === 'RightForeArm') armBones.rightForeArm = bone;
-            if (bn === 'LeftHand') armBones.leftHand = bone;
-            if (bn === 'RightHand') armBones.rightHand = bone;
+            allBones.push(bone);
         });
-        console.log('[Avatar] Arm bones found — LS:', !!armBones.leftShoulder, 'RS:', !!armBones.rightShoulder,
-            'LA:', !!armBones.leftArm, 'RA:', !!armBones.rightArm,
-            'LFA:', !!armBones.leftForeArm, 'RFA:', !!armBones.rightForeArm,
-            'LH:', !!armBones.leftHand, 'RH:', !!armBones.rightHand);
-    }
+        console.log('[Avatar] All bones:', allBones.map(function (b) { return b.name; }).join(', '));
 
-    // ══ Find eye bones, head bone, spine bone for life system ══
-    function _findEyeAndSpineBones() {
-        if (!currentModel) return;
-        _eyeBones = { left: null, right: null };
-        _headBone = null;
-        _spineBone = null;
-        currentModel.traverse(function (bone) {
-            if (!bone.isBone) return;
-            var bn = (bone.name || '').toLowerCase();
-            if (bn.indexOf('lefteye') !== -1 || bn.indexOf('left_eye') !== -1 || bn === 'eye_l') _eyeBones.left = bone;
-            if (bn.indexOf('righteye') !== -1 || bn.indexOf('right_eye') !== -1 || bn === 'eye_r') _eyeBones.right = bone;
-            if (!_headBone && bn === 'head') _headBone = bone;
-            if (!_neckBone && (bn === 'neck' || bn === 'neck1')) _neckBone = bone;
-            if (!_spineBone && (bn === 'spine' || bn === 'spine1' || bn === 'spine2' || bn.indexOf('spine') !== -1)) _spineBone = bone;
-            // Finger bones
-            var fnRaw = bone.name || '';
-            var fingerNames = ['Thumb', 'Index', 'Middle', 'Ring', 'Pinky'];
-            for (var fi = 0; fi < fingerNames.length; fi++) {
-                for (var fj = 1; fj <= 4; fj++) {
-                    if (fnRaw === 'LeftHand' + fingerNames[fi] + fj) {
-                        if (!_fingerBones.left[fingerNames[fi]]) _fingerBones.left[fingerNames[fi]] = [];
-                        _fingerBones.left[fingerNames[fi]].push(bone);
-                    }
-                    if (fnRaw === 'RightHand' + fingerNames[fi] + fj) {
-                        if (!_fingerBones.right[fingerNames[fi]]) _fingerBones.right[fingerNames[fi]] = [];
-                        _fingerBones.right[fingerNames[fi]].push(bone);
-                    }
+        function findBone(patterns) {
+            for (var pi = 0; pi < patterns.length; pi++) {
+                for (var bi = 0; bi < allBones.length; bi++) {
+                    if (allBones[bi].name === patterns[pi]) return allBones[bi];
                 }
             }
-        });
-        console.log('[Avatar] Life system bones — eyes:', !!_eyeBones.left, !!_eyeBones.right,
-            '| head:', !!_headBone, '| neck:', !!_neckBone, '| spine:', !!_spineBone,
-            '| fingers L:', Object.keys(_fingerBones.left).length, 'R:', Object.keys(_fingerBones.right).length);
+            // Fuzzy fallback: case-insensitive contains
+            var lowerPatterns = patterns.map(function (p) { return p.toLowerCase(); });
+            for (var pi2 = 0; pi2 < lowerPatterns.length; pi2++) {
+                for (var bi2 = 0; bi2 < allBones.length; bi2++) {
+                    if (allBones[bi2].name.toLowerCase() === lowerPatterns[pi2]) return allBones[bi2];
+                }
+            }
+            return null;
+        }
+
+        armBones.leftShoulder = findBone(['LeftShoulder', 'Left_Shoulder', 'shoulder_l', 'shoulder.L']);
+        armBones.rightShoulder = findBone(['RightShoulder', 'Right_Shoulder', 'shoulder_r', 'shoulder.R']);
+        armBones.leftArm = findBone(['LeftArm', 'LeftArm1', 'Left_Arm', 'upperarm_l', 'upper_arm.L']);
+        armBones.rightArm = findBone(['RightArm', 'RightArm1', 'Right_Arm', 'upperarm_r', 'upper_arm.R']);
+        armBones.leftForeArm = findBone(['LeftForeArm', 'LeftForeArm1', 'Left_ForeArm', 'lowerarm_l', 'forearm.L']);
+        armBones.rightForeArm = findBone(['RightForeArm', 'RightForeArm1', 'Right_ForeArm', 'lowerarm_r', 'forearm.R']);
+        armBones.leftHand = findBone(['LeftHand', 'Left_Hand', 'hand_l', 'hand.L']);
+        armBones.rightHand = findBone(['RightHand', 'Right_Hand', 'hand_r', 'hand.R']);
+
+        console.log('[Avatar] Arm bones found — LS:', !!(armBones.leftShoulder && armBones.leftShoulder.name), 'RS:', !!(armBones.rightShoulder && armBones.rightShoulder.name),
+            'LA:', !!(armBones.leftArm && armBones.leftArm.name), 'RA:', !!(armBones.rightArm && armBones.rightArm.name),
+            'LFA:', !!(armBones.leftForeArm && armBones.leftForeArm.name), 'RFA:', !!(armBones.rightForeArm && armBones.rightForeArm.name),
+            'LH:', !!(armBones.leftHand && armBones.leftHand.name), 'RH:', !!(armBones.rightHand && armBones.rightHand.name));
+
+        // Auto-compute arms-down quaternions from current A-pose
+        _computeArmDownQuaternions();
     }
 
-    // MetaPerson bone quaternions for arms-down pose
-    // GLB default (A-pose): LeftShoulder Q=[0.5684, 0.4821, -0.4045, 0.5300]
-    // We need to rotate shoulders DOWN so arms hang by body
-    // Arms-down quaternions (calculated: rotate ~70° more downward from A-pose)
+    // ══ Compute arms-down quaternions dynamically from A-pose rest ══
+    // MetaPerson models come in A-pose. We rotate shoulders ~55° downward
+    // around their local Z axis to bring arms to a natural hanging position.
+    var _computedArmDown = null;
+
+    function _computeArmDownQuaternions() {
+        if (typeof THREE === 'undefined') return;
+        _computedArmDown = { ls: null, rs: null, la: null, ra: null, lfa: null, rfa: null };
+
+        // Shoulder rotation: rotate 55° around local Z to bring arms down
+        var shoulderAngle = -55 * Math.PI / 180; // negative = downward
+        var foreArmBend = -15 * Math.PI / 180; // slight natural bend
+
+        if (armBones.leftShoulder) {
+            var lsQ = armBones.leftShoulder.quaternion.clone();
+            var rotDown = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), shoulderAngle);
+            _computedArmDown.ls = lsQ.multiply(rotDown);
+            console.log('[Avatar] LS arms-down computed from rest:', _computedArmDown.ls.x.toFixed(4),
+                _computedArmDown.ls.y.toFixed(4), _computedArmDown.ls.z.toFixed(4), _computedArmDown.ls.w.toFixed(4));
+        }
+        if (armBones.rightShoulder) {
+            var rsQ = armBones.rightShoulder.quaternion.clone();
+            var rotDownR = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -shoulderAngle);
+            _computedArmDown.rs = rsQ.multiply(rotDownR);
+            console.log('[Avatar] RS arms-down computed from rest:', _computedArmDown.rs.x.toFixed(4),
+                _computedArmDown.rs.y.toFixed(4), _computedArmDown.rs.z.toFixed(4), _computedArmDown.rs.w.toFixed(4));
+        }
+        if (armBones.leftForeArm) {
+            var lfaQ = armBones.leftForeArm.quaternion.clone();
+            var rotBend = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), foreArmBend);
+            _computedArmDown.lfa = lfaQ.multiply(rotBend);
+        }
+        if (armBones.rightForeArm) {
+            var rfaQ = armBones.rightForeArm.quaternion.clone();
+            var rotBendR = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -foreArmBend);
+            _computedArmDown.rfa = rfaQ.multiply(rotBendR);
+        }
+    }
+
+    // MetaPerson bone quaternions for arm poses
+    // These are now computed dynamically in _computeArmDownQuaternions()
     var ARM_POSES = {
         relaxed: {
-            // Shoulders natural — arms down but shoulders not drooping
-            ls: [0.6427, 0.3015, -0.6427, 0.2860],
-            rs: [0.6427, -0.3015, 0.6427, 0.2860],
-            // Upper arms with slight natural bend
+            ls: null, rs: null,  // will be set by _computeArmDownQuaternions
             la: [0.0, 0.0, 0.0, 1.0],
             ra: [0.0, 0.0, 0.0, 1.0]
         },
         presenting: {
-            ls: [0.6533, 0.2706, -0.6533, 0.2706],
-            rs: [0.6533, -0.2706, 0.6533, 0.2706],
+            ls: null, rs: null,  // will be set by _computeArmDownQuaternions
             la: [0.0, 0.0, 0.0, 1.0],
             ra: [0.0, 0.0, 0.0, 1.0]
         },
         open: {
-            // Keep original A-pose (arms slightly out)
-            ls: [0.5684, 0.4821, -0.4045, 0.5300],
-            rs: [0.5684, -0.4821, 0.4045, 0.5300],
-            la: [0.0520, 0.0, -0.1045, 0.9932],
-            ra: [0.0520, 0.0, 0.1045, 0.9932]
+            // Keep original A-pose (null = don't override, stay in rest)
+            ls: null, rs: null,
+            la: [0.0, 0.0, 0.0, 1.0],
+            ra: [0.0, 0.0, 0.0, 1.0]
         }
     };
 
@@ -623,7 +644,6 @@
     var _mixerArmsStopped = false;
     function _enforcePose() {
         if (typeof THREE === 'undefined') return;
-        var p = ARM_POSES[currentPose] || ARM_POSES.relaxed;
 
         // Stop mixer from animating arm/shoulder bones (one-time)
         if (!_mixerArmsStopped && mixer && mixer._actions) {
@@ -647,11 +667,26 @@
             console.log('[Avatar] Stopped mixer arm/shoulder tracks');
         }
 
-        // Apply quaternions directly — no Euler conversion needed
-        if (armBones.leftShoulder) armBones.leftShoulder.quaternion.set(p.ls[0], p.ls[1], p.ls[2], p.ls[3]);
-        if (armBones.rightShoulder) armBones.rightShoulder.quaternion.set(p.rs[0], p.rs[1], p.rs[2], p.rs[3]);
-        if (armBones.leftArm) armBones.leftArm.quaternion.set(p.la[0], p.la[1], p.la[2], p.la[3]);
-        if (armBones.rightArm) armBones.rightArm.quaternion.set(p.ra[0], p.ra[1], p.ra[2], p.ra[3]);
+        // Apply computed arms-down quaternions (dynamic, model-agnostic)
+        if (_computedArmDown) {
+            if (armBones.leftShoulder && _computedArmDown.ls) {
+                armBones.leftShoulder.quaternion.copy(_computedArmDown.ls);
+            }
+            if (armBones.rightShoulder && _computedArmDown.rs) {
+                armBones.rightShoulder.quaternion.copy(_computedArmDown.rs);
+            }
+            if (armBones.leftForeArm && _computedArmDown.lfa) {
+                armBones.leftForeArm.quaternion.copy(_computedArmDown.lfa);
+            }
+            if (armBones.rightForeArm && _computedArmDown.rfa) {
+                armBones.rightForeArm.quaternion.copy(_computedArmDown.rfa);
+            }
+        }
+
+        // Apply upper arm quaternions from static pose table
+        var p = ARM_POSES[currentPose] || ARM_POSES.relaxed;
+        if (armBones.leftArm && p.la) armBones.leftArm.quaternion.set(p.la[0], p.la[1], p.la[2], p.la[3]);
+        if (armBones.rightArm && p.ra) armBones.rightArm.quaternion.set(p.ra[0], p.ra[1], p.ra[2], p.ra[3]);
     }
 
     function updateExpression(dt) {
