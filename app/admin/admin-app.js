@@ -32,23 +32,17 @@ function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
 
 // ── AI STATUS ──
 async function rechargeProvider(name, currentCredit) {
-    var newAmount = prompt('💳 Reîncarcă credit pentru ' + name + '\n\nCredit actual: $' + currentCredit.toFixed(2) + '\n\nIntrodu noul credit total ($):', currentCredit.toFixed(2));
-    if (newAmount === null) return;
+    var newAmount = prompt('💳 ' + name + ' — Credit: $' + currentCredit.toFixed(2) + '\n\nIntrodu noul credit ($):', '');
+    if (newAmount === null || newAmount === '') return;
     var amount = parseFloat(newAmount);
-    if (isNaN(amount) || amount < 0) { alert('Sumă invalidă'); return; }
+    if (isNaN(amount) || amount < 0) return;
     try {
-        var r = await fetch('/api/admin/provider-credit', {
+        await fetch('/api/admin/provider-credit', {
             method: 'POST', headers: hdrs(),
             body: JSON.stringify({ provider: name, amount: amount })
         });
-        var d = await r.json();
-        if (d.ok) {
-            alert('✅ Credit actualizat: ' + name + ' → $' + amount.toFixed(2));
-            loadAiStatus();
-        } else {
-            alert('❌ Eroare: ' + (d.error || 'necunoscută'));
-        }
-    } catch (e) { alert('Eroare: ' + e.message); }
+        loadAiStatus();
+    } catch (e) { }
 }
 async function loadAiStatus() {
     try {
