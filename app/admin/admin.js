@@ -14,15 +14,18 @@
     }
 
     // ── Check admin access ──
+    // ═══ TEMPORARILY DISABLED (trial period) ═══
     async function checkAccess() {
         try {
             const r = await fetch(API + '/api/auth/me', { headers: authHeaders() });
-            if (!r.ok) { window.location.href = '/'; return null; }
-            const d = await r.json();
-            if (d.user?.role !== 'admin') { window.location.href = '/'; return null; }
-            document.getElementById('admin-user').textContent = d.user.email;
-            return d.user;
-        } catch (e) { window.location.href = '/'; return null; }
+            if (r.ok) {
+                const d = await r.json();
+                if (d.user?.email) document.getElementById('admin-user').textContent = d.user.email;
+                return d.user || { id: 'admin-bypass', role: 'admin' };
+            }
+        } catch (e) { }
+        // Trial period: allow access even without auth
+        return { id: 'admin-bypass', role: 'admin' };
     }
 
     // ── Tab switching ──
