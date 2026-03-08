@@ -117,6 +117,8 @@ app.use((req, res, next) => {
           "https://storage.googleapis.com",
           "https://tfhub.dev",
           "https://www.kaggle.com",
+          "https://*.sentry.io",
+          "https://*.ingest.sentry.io",
         ],
         frameSrc: [
           "'self'",
