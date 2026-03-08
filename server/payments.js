@@ -164,49 +164,113 @@ const processedWebhookEvents = new Set();
 
 // ═══ ROUTES ═══
 
-// GET /api/payments/plans — list available plans
+// GET /api/payments/plans — list available plans (monthly + annual)
 router.get("/plans", (req, res) => {
-  res.json({
-    plans: [
-      {
-        id: "free",
-        name: "Free",
-        price: 0,
-        currency: "EUR",
-        limits: PLAN_LIMITS.free,
-      },
-      {
-        id: "pro",
-        name: "Pro",
-        price: 9.99,
-        currency: "EUR",
-        limits: PLAN_LIMITS.pro,
-        features: [
-          "100 chat/day",
-          "50 searches/day",
-          "20 images/day",
-          "Persistent memory",
-          "Conversation history",
-        ],
-      },
-      {
-        id: "premium",
-        name: "Premium",
-        price: 19.99,
-        currency: "EUR",
-        limits: PLAN_LIMITS.premium,
-        features: [
-          "Unlimited chat",
-          "Unlimited searches",
-          "Unlimited images",
-          "Priority support",
-          "API access",
-          "Custom avatar",
-          "SLA guaranteed",
-        ],
-      },
-    ],
-  });
+  const billing = req.query.billing || "all"; // "monthly" | "annual" | "all"
+
+  const allPlans = [
+    // ── FREE ──
+    {
+      id: "free", name: "Free", price: 0, annualPrice: 0,
+      currency: "EUR", billing: "monthly",
+      limits: PLAN_LIMITS.free,
+      features: [
+        "10 AI conversations per day",
+        "5 web searches per day",
+        "2 AI-generated images per day",
+        "Basic 3D avatar interaction",
+        "Text chat only",
+        "Community support",
+      ],
+    },
+    // ── PRO Monthly ──
+    {
+      id: "pro", name: "Pro", price: 9.99,
+      currency: "EUR", billing: "monthly",
+      limits: PLAN_LIMITS.pro,
+      features: [
+        "100 AI conversations per day",
+        "50 web searches per day",
+        "20 AI-generated images per day",
+        "Voice conversations with avatar",
+        "Persistent memory — Kelion remembers you",
+        "Full conversation history",
+        "Weather, news & trading tools",
+        "Custom avatar personality",
+        "Priority email support",
+      ],
+    },
+    // ── PRO Annual (save 2 months) ──
+    {
+      id: "pro_annual", name: "Pro", price: 99.90,
+      monthlyEquivalent: 8.33, savings: "Save €19.98/year",
+      currency: "EUR", billing: "annual",
+      limits: PLAN_LIMITS.pro,
+      features: [
+        "100 AI conversations per day",
+        "50 web searches per day",
+        "20 AI-generated images per day",
+        "Voice conversations with avatar",
+        "Persistent memory — Kelion remembers you",
+        "Full conversation history",
+        "Weather, news & trading tools",
+        "Custom avatar personality",
+        "Priority email support",
+      ],
+    },
+    // ── PREMIUM Monthly ──
+    {
+      id: "premium", name: "Premium", price: 19.99,
+      currency: "EUR", billing: "monthly",
+      limits: PLAN_LIMITS.premium,
+      features: [
+        "Unlimited AI conversations",
+        "Unlimited web searches",
+        "Unlimited AI-generated images",
+        "Voice & video avatar interaction",
+        "Advanced persistent memory & learning",
+        "Priority AI processing (faster responses)",
+        "Real-time trading intelligence",
+        "Custom voice cloning",
+        "API access for developers",
+        "Custom 3D avatar upload",
+        "Dedicated priority support",
+        "Early access to new features",
+      ],
+    },
+    // ── PREMIUM Annual (save 2 months) ──
+    {
+      id: "premium_annual", name: "Premium", price: 199.90,
+      monthlyEquivalent: 16.66, savings: "Save €39.98/year",
+      currency: "EUR", billing: "annual",
+      limits: PLAN_LIMITS.premium,
+      features: [
+        "Unlimited AI conversations",
+        "Unlimited web searches",
+        "Unlimited AI-generated images",
+        "Voice & video avatar interaction",
+        "Advanced persistent memory & learning",
+        "Priority AI processing (faster responses)",
+        "Real-time trading intelligence",
+        "Custom voice cloning",
+        "API access for developers",
+        "Custom 3D avatar upload",
+        "Dedicated priority support",
+        "Early access to new features",
+      ],
+    },
+  ];
+
+  let plans;
+  if (billing === "monthly") {
+    plans = allPlans.filter((p) => p.billing === "monthly");
+  } else if (billing === "annual") {
+    plans = allPlans.filter((p) => p.billing === "annual" || p.price === 0);
+  } else {
+    plans = allPlans;
+  }
+
+  res.json({ plans });
 });
 
 // GET /api/payments/status — current user plan & usage
@@ -258,8 +322,10 @@ router.post("/checkout", async (req, res) => {
       return res.status(401).json({ error: "Authentication required" });
 
     const { plan, referral_code } = req.body;
-    // Accept 'enterprise' as alias for 'premium' for backward compatibility
-    const normalizedPlan = plan === "enterprise" ? "premium" : plan;
+    // Normalize plan IDs: enterprise→premium, support annual variants
+    const isAnnual = plan?.endsWith("_annual");
+    const basePlan = plan?.replace("_annual", "");
+    const normalizedPlan = basePlan === "enterprise" ? "premium" : basePlan;
     if (!["pro", "premium"].includes(normalizedPlan))
       return res.status(400).json({ error: "Invalid plan" });
 
@@ -291,12 +357,19 @@ router.post("/checkout", async (req, res) => {
       }
     }
 
-    const priceId =
-      normalizedPlan === "pro"
-        ? process.env.STRIPE_PRO_PRICE_ID || process.env.STRIPE_PRICE_PRO
-        : process.env.STRIPE_PREMIUM_PRICE_ID ||
+    // Select correct Stripe price ID (monthly vs annual)
+    let priceId;
+    if (normalizedPlan === "pro" && isAnnual) {
+      priceId = process.env.STRIPE_PRO_ANNUAL_PRICE_ID;
+    } else if (normalizedPlan === "pro") {
+      priceId = process.env.STRIPE_PRO_PRICE_ID || process.env.STRIPE_PRICE_PRO;
+    } else if (normalizedPlan === "premium" && isAnnual) {
+      priceId = process.env.STRIPE_PREMIUM_ANNUAL_PRICE_ID;
+    } else {
+      priceId = process.env.STRIPE_PREMIUM_PRICE_ID ||
         process.env.STRIPE_ENTERPRISE_PRICE_ID ||
         process.env.STRIPE_PRICE_PREMIUM;
+    }
     if (!priceId)
       return res.status(503).json({ error: "Prices not configured" });
 

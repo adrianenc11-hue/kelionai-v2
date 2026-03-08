@@ -1,6 +1,8 @@
 (function () {
     'use strict';
 
+    var currentBilling = 'monthly';
+
     function renderPlans(plans, status) {
         var container = document.getElementById('pricing-plans');
         if (!container) return;
@@ -13,30 +15,48 @@
             return;
         }
 
+        // Filter plans by current billing period
+        var filtered = plans.filter(function (p) {
+            if (p.price === 0) return true; // Always show Free
+            return p.billing === currentBilling;
+        });
+
         container.innerHTML = '';
 
-        plans.forEach(function (p) {
-            var isCurrent = p.id === currentPlan;
+        filtered.forEach(function (p) {
+            var basePlanId = p.id.replace('_annual', '');
+            var isCurrent = basePlanId === currentPlan;
             var card = document.createElement('div');
             card.className = 'plan-card' +
-                (p.id === 'pro' ? ' featured' : '') +
+                (basePlanId === 'pro' ? ' featured' : '') +
+                (basePlanId === 'premium' ? ' premium-card' : '') +
                 (isCurrent ? ' current' : '');
 
-            var badgeHtml = p.id === 'pro' ? '<div class="plan-badge">Recommended</div>' :
-                p.id === 'enterprise' ? '<div class="plan-badge">Business</div>' : '';
+            var badgeHtml = basePlanId === 'pro' ? '<div class="plan-badge">Most Popular</div>' :
+                basePlanId === 'premium' ? '<div class="plan-badge premium-badge">Best Value</div>' : '';
 
-            var priceHtml = p.price === 0
-                ? '<div class="plan-price">Free</div>'
-                : '<div class="plan-price"><span class="currency">€</span>' + KShared.esc(p.price) + '<small>/month</small></div>';
+            // Savings badge for annual
+            if (p.savings) {
+                badgeHtml += '<div class="savings-badge">' + KShared.esc(p.savings) + '</div>';
+            }
 
-            var features = p.features || [
-                p.limits.chat === -1 ? 'Unlimited chat' : p.limits.chat + ' chats/day',
-                p.limits.search === -1 ? 'Unlimited searches' : p.limits.search + ' searches/day',
-                p.limits.image === -1 ? 'Unlimited images' : p.limits.image + ' images/day'
-            ];
+            var priceHtml;
+            if (p.price === 0) {
+                priceHtml = '<div class="plan-price">Free</div>' +
+                    '<div class="plan-price-sub">Forever</div>';
+            } else if (p.billing === 'annual') {
+                priceHtml = '<div class="plan-price"><span class="currency">€</span>' +
+                    KShared.esc(p.monthlyEquivalent) +
+                    '<small>/month</small></div>' +
+                    '<div class="plan-price-sub">Billed €' + KShared.esc(p.price) + '/year</div>';
+            } else {
+                priceHtml = '<div class="plan-price"><span class="currency">€</span>' +
+                    KShared.esc(p.price) +
+                    '<small>/month</small></div>';
+            }
 
-            var featuresHtml = features.map(function (f) {
-                return '<li>' + KShared.esc(f) + '</li>';
+            var featuresHtml = (p.features || []).map(function (f) {
+                return '<li><span class="feature-check">✓</span> ' + KShared.esc(f) + '</li>';
             }).join('');
 
             var btnHtml;
@@ -50,7 +70,7 @@
             } else if (p.price === 0) {
                 btnHtml = '<button class="plan-btn free-plan" disabled>Included</button>';
             } else {
-                btnHtml = '<button class="plan-btn upgrade" data-plan="' + KShared.esc(p.id) + '">Upgrade to ' + KShared.esc(p.name) + '</button>';
+                btnHtml = '<button class="plan-btn upgrade" data-plan="' + KShared.esc(p.id) + '">Get ' + KShared.esc(p.name) + '</button>';
             }
 
             card.innerHTML = badgeHtml +
@@ -71,6 +91,34 @@
             var manageBtn = card.querySelector('.plan-btn.manage');
             if (manageBtn) {
                 manageBtn.addEventListener('click', KShared.openPortal);
+            }
+        });
+    }
+
+    function renderToggle() {
+        var hero = document.querySelector('.pricing-hero');
+        if (!hero || document.getElementById('billing-toggle')) return;
+
+        var toggle = document.createElement('div');
+        toggle.id = 'billing-toggle';
+        toggle.className = 'billing-toggle';
+        toggle.innerHTML =
+            '<button class="toggle-btn active" data-billing="monthly">Monthly</button>' +
+            '<button class="toggle-btn" data-billing="annual">Annual <span class="toggle-save">Save 17%</span></button>';
+        hero.appendChild(toggle);
+
+        toggle.addEventListener('click', function (e) {
+            var btn = e.target.closest('.toggle-btn');
+            if (!btn) return;
+            currentBilling = btn.getAttribute('data-billing');
+
+            toggle.querySelectorAll('.toggle-btn').forEach(function (b) {
+                b.classList.toggle('active', b === btn);
+            });
+
+            // Re-render with cached data
+            if (window._cachedPlans && window._cachedStatus !== undefined) {
+                renderPlans(window._cachedPlans, window._cachedStatus);
             }
         });
     }
@@ -124,9 +172,13 @@
 
     async function init() {
         checkPaymentResult();
+        renderToggle();
 
         var plans = await KShared.loadPlans();
         var status = await KShared.loadStatus();
+
+        window._cachedPlans = plans;
+        window._cachedStatus = status;
 
         showStatus(status);
         renderPlans(plans, status);
