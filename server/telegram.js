@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════════
 // KelionAI v2 — TELEGRAM BOT
-// Webhook: https://kelionai.app/api/telegram/webhook
+// Webhook: configured via APP_URL env var
 // Commands: /start, /help, /stiri, /breaking, /despre
 // ═══════════════════════════════════════════════════════════════
 "use strict";

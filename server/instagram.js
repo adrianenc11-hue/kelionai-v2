@@ -268,7 +268,7 @@ async function postNews(article, imageUrl) {
   const caption = formatCaption(article);
 
   // Default image if none provided
-  const img = imageUrl || "https://kelionai.app/img/kelionai-share.png";
+  const img = imageUrl || (process.env.APP_URL + "/img/kelionai-share.png");
 
   const containerId = await createMediaContainer(img, caption);
   if (!containerId) return null;

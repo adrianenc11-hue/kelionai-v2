@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════════
 // KelionAI v2.5 — WHATSAPP BOT (Cloud API)
 // Text + Audio (STT/TTS) + Video (camera analysis)
-// Webhook: https://kelionai.app/api/whatsapp/webhook
+// Webhook: configured via APP_URL env var
 // ═══════════════════════════════════════════════════════════════
 "use strict";
 
@@ -972,7 +972,7 @@ router.post("/webhook", async (req, res) => {
             }
           } else {
             reply =
-              "Sunt KelionAI! Pentru experiența completă vizitează https://kelionai.app";
+              `Sunt KelionAI! Pentru experiența completă vizitează ${process.env.APP_URL}`;
           }
 
           // Prefix polite intervention phrase for unsolicited group responses
@@ -1080,7 +1080,7 @@ router.post("/webhook", async (req, res) => {
                 `• 💬 Chat nelimitat cu AI\n` +
                 `• 🎭 Avatare 3D\n` +
                 `• 🔊 Voce naturală\n\n` +
-                `🌐 Abonează-te: https://kelionai.app/pricing`,
+                `🌐 Abonează-te: ${process.env.APP_URL}/pricing`,
               );
             }, 3000);
           }

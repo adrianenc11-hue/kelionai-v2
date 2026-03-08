@@ -2616,7 +2616,7 @@ Reply STRICTLY with JSON:
         totalEndpoints: endpoints.length,
         totalKeys,
         endpoints,
-        baseUrl: "https://kelionai.app/api/v1",
+        baseUrl: (process.env.APP_URL || '') + "/api/v1",
         authMethod: "Bearer API key",
         summary: `Developer API: ${endpoints.length} endpoints | ${totalKeys} API keys active | Auth: Bearer token | Base: /api/v1`,
       };
