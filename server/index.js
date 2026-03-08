@@ -180,7 +180,7 @@ app.use(
 app.use("/api/payments/webhook", express.raw({ type: "application/json" }));
 // Messenger webhook needs raw body for HMAC-SHA256 validation
 app.use("/api/messenger/webhook", express.raw({ type: "application/json" }));
-app.use(express.json({ limit: "10mb" }));
+app.use(express.json({ limit: "25mb" }));
 
 // ═══ HTTP REQUEST LOGGING + TRAFFIC TRACKING ═══
 app.use((req, res, next) => {
