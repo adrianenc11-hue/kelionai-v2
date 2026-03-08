@@ -8,6 +8,7 @@
     let isCheckingFace = false;
 
     // ─── Capture face photo from front camera ────────────────
+    // Takes multiple captures silently, picks the best quality
     async function capturePhoto() {
         let stream = null;
         try {
@@ -16,14 +17,33 @@
             video.srcObject = stream;
             video.setAttribute('playsinline', '');
             await video.play();
-            await new Promise(r => setTimeout(r, 800)); // Wait for camera to warm up
+            await new Promise(r => setTimeout(r, 800));
 
-            const canvas = document.createElement('canvas');
-            canvas.width = 320; canvas.height = 240;
-            canvas.getContext('2d').drawImage(video, 0, 0, 320, 240);
-
-            const photoBase64 = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
-            return photoBase64;
+            // Take 3 captures, pick best quality (highest variance = sharpest)
+            let bestPhoto = null;
+            let bestScore = 0;
+            for (let i = 0; i < 3; i++) {
+                if (i > 0) await new Promise(r => setTimeout(r, 300));
+                const canvas = document.createElement('canvas');
+                canvas.width = 320; canvas.height = 240;
+                const ctx2d = canvas.getContext('2d');
+                ctx2d.drawImage(video, 0, 0, 320, 240);
+                // Calculate image quality score (pixel variance = sharpness)
+                const imgData = ctx2d.getImageData(0, 0, 320, 240).data;
+                let sum = 0, sumSq = 0, count = imgData.length / 4;
+                for (let j = 0; j < imgData.length; j += 4) {
+                    const v = (imgData[j] + imgData[j + 1] + imgData[j + 2]) / 3;
+                    sum += v; sumSq += v * v;
+                }
+                const mean = sum / count;
+                const variance = (sumSq / count) - (mean * mean);
+                const photo = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
+                if (variance > bestScore) {
+                    bestScore = variance;
+                    bestPhoto = photo;
+                }
+            }
+            return bestPhoto;
         } catch (e) {
             console.warn('[Identity] Camera access error:', e.message);
             return null;

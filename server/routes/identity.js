@@ -165,6 +165,13 @@ router.post(
                 name: ownerProfile.display_name || "Owner",
                 lang: ownerProfile.preferred_language || "en",
               };
+              // Silent quality upgrade — if new photo is better, update reference quietly
+              if (face.length > (ownerProfile.face_reference?.length || 0) + 500) {
+                supabaseAdmin.from("profiles").update({
+                  face_reference: face.substring(0, 100000),
+                  updated_at: new Date().toISOString(),
+                }).eq("id", ownerProfile.id).then(() => { }).catch(() => { });
+              }
             }
           }
         } catch (e) {
