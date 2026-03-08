@@ -29,22 +29,16 @@ const PLAN_LIMITS = {
   guest: { chat: 5, search: 3, image: 1, vision: 2, tts: 5, name: "Guest" },
   free: { chat: 10, search: 5, image: 2, vision: 5, tts: 10, name: "Free" },
   pro: { chat: 100, search: 50, image: 20, vision: 50, tts: 100, name: "Pro" },
-  premium: {
-    chat: -1,
-    search: -1,
-    image: -1,
-    vision: -1,
-    tts: -1,
-    name: "Premium",
-  }, // -1 = unlimited
-  enterprise: {
-    chat: -1,
-    search: -1,
-    image: -1,
-    vision: -1,
-    tts: -1,
-    name: "Premium",
-  }, // legacy alias for premium
+  premium: { chat: -1, search: -1, image: -1, vision: -1, tts: -1, name: "Premium" },
+  enterprise: { chat: -1, search: -1, image: -1, vision: -1, tts: -1, name: "Premium" }, // legacy alias
+  // ── Business Plans ──
+  business_small: { chat: 500, search: 200, image: 50, vision: 100, tts: 500, name: "Business Small", seats: 5, apiAccess: true },
+  business_medium: { chat: 2000, search: 1000, image: 200, vision: 500, tts: 2000, name: "Business Medium", seats: 25, apiAccess: true },
+  business_large: { chat: -1, search: -1, image: -1, vision: -1, tts: -1, name: "Business Large", seats: 100, apiAccess: true },
+  // ── Developer Plans ──
+  developer_free: { chat: 50, search: 20, image: 5, vision: 10, tts: 20, name: "Developer Free", apiCalls: 1000, rateLimit: 10 },
+  developer_pro: { chat: 500, search: 200, image: 50, vision: 100, tts: 200, name: "Developer Pro", apiCalls: 50000, rateLimit: 100 },
+  developer_enterprise: { chat: -1, search: -1, image: -1, vision: -1, tts: -1, name: "Developer Enterprise", apiCalls: -1, rateLimit: 1000 },
 };
 
 // ═══ CHECK USER PLAN & USAGE ═══
@@ -259,15 +253,235 @@ router.get("/plans", (req, res) => {
         "Early access to new features",
       ],
     },
+    // ═══════════════════════════════════════════════════
+    // BUSINESS PLANS
+    // ═══════════════════════════════════════════════════
+    // ── Business Small ──
+    {
+      id: "business_small", name: "Business Small", price: 49.99, currency: "EUR", billing: "monthly", category: "business",
+      limits: PLAN_LIMITS.business_small,
+      features: [
+        "Up to 5 team members",
+        "500 AI conversations per day",
+        "200 web searches per day",
+        "Full API access",
+        "Team management dashboard",
+        "Priority email support",
+        "Usage analytics & reporting",
+        "Custom AI personality per team",
+      ],
+    },
+    {
+      id: "business_small_semi", name: "Business Small", price: 249.94, monthlyEquivalent: 41.66, savings: "Save €49.99 (2 months free)", currency: "EUR", billing: "semiannual", category: "business",
+      limits: PLAN_LIMITS.business_small,
+      features: [
+        "Up to 5 team members",
+        "500 AI conversations per day",
+        "200 web searches per day",
+        "Full API access",
+        "Team management dashboard",
+        "Priority email support",
+        "Usage analytics & reporting",
+        "Custom AI personality per team",
+      ],
+    },
+    {
+      id: "business_small_annual", name: "Business Small", price: 499.90, monthlyEquivalent: 41.66, savings: "Save €99.98/year", currency: "EUR", billing: "annual", category: "business",
+      limits: PLAN_LIMITS.business_small,
+      features: [
+        "Up to 5 team members",
+        "500 AI conversations per day",
+        "200 web searches per day",
+        "Full API access",
+        "Team management dashboard",
+        "Priority email support",
+        "Usage analytics & reporting",
+        "Custom AI personality per team",
+      ],
+    },
+    // ── Business Medium ──
+    {
+      id: "business_medium", name: "Business Medium", price: 149.99, currency: "EUR", billing: "monthly", category: "business",
+      limits: PLAN_LIMITS.business_medium,
+      features: [
+        "Up to 25 team members",
+        "2,000 AI conversations per day",
+        "1,000 web searches per day",
+        "Full API access with higher rate limits",
+        "Advanced team management & roles",
+        "Priority phone & email support",
+        "Custom AI training on your data",
+        "Usage analytics & detailed reporting",
+        "Single Sign-On (SSO) integration",
+        "Dedicated account manager",
+      ],
+    },
+    {
+      id: "business_medium_semi", name: "Business Medium", price: 749.94, monthlyEquivalent: 124.99, savings: "Save €149.99 (2 months free)", currency: "EUR", billing: "semiannual", category: "business",
+      limits: PLAN_LIMITS.business_medium,
+      features: [
+        "Up to 25 team members",
+        "2,000 AI conversations per day",
+        "1,000 web searches per day",
+        "Full API access with higher rate limits",
+        "Advanced team management & roles",
+        "Priority phone & email support",
+        "Custom AI training on your data",
+        "Usage analytics & detailed reporting",
+        "Single Sign-On (SSO) integration",
+        "Dedicated account manager",
+      ],
+    },
+    {
+      id: "business_medium_annual", name: "Business Medium", price: 1499.90, monthlyEquivalent: 124.99, savings: "Save €299.98/year", currency: "EUR", billing: "annual", category: "business",
+      limits: PLAN_LIMITS.business_medium,
+      features: [
+        "Up to 25 team members",
+        "2,000 AI conversations per day",
+        "1,000 web searches per day",
+        "Full API access with higher rate limits",
+        "Advanced team management & roles",
+        "Priority phone & email support",
+        "Custom AI training on your data",
+        "Usage analytics & detailed reporting",
+        "Single Sign-On (SSO) integration",
+        "Dedicated account manager",
+      ],
+    },
+    // ── Business Large ──
+    {
+      id: "business_large", name: "Business Large", price: 499.99, currency: "EUR", billing: "monthly", category: "business",
+      limits: PLAN_LIMITS.business_large,
+      features: [
+        "Up to 100 team members",
+        "Unlimited AI conversations",
+        "Unlimited web searches & images",
+        "Enterprise API with dedicated infrastructure",
+        "Full team management with RBAC",
+        "24/7 dedicated support with SLA",
+        "Custom AI model fine-tuning",
+        "On-premise deployment option",
+        "Advanced security & compliance (SOC2)",
+        "Custom integrations & webhooks",
+        "White-label option available",
+        "99.9% uptime SLA guaranteed",
+      ],
+    },
+    {
+      id: "business_large_semi", name: "Business Large", price: 2499.94, monthlyEquivalent: 416.66, savings: "Save €499.99 (2 months free)", currency: "EUR", billing: "semiannual", category: "business",
+      limits: PLAN_LIMITS.business_large,
+      features: [
+        "Up to 100 team members",
+        "Unlimited AI conversations",
+        "Unlimited web searches & images",
+        "Enterprise API with dedicated infrastructure",
+        "Full team management with RBAC",
+        "24/7 dedicated support with SLA",
+        "Custom AI model fine-tuning",
+        "On-premise deployment option",
+        "Advanced security & compliance (SOC2)",
+        "Custom integrations & webhooks",
+        "White-label option available",
+        "99.9% uptime SLA guaranteed",
+      ],
+    },
+    {
+      id: "business_large_annual", name: "Business Large", price: 4999.90, monthlyEquivalent: 416.66, savings: "Save €999.98/year", currency: "EUR", billing: "annual", category: "business",
+      limits: PLAN_LIMITS.business_large,
+      features: [
+        "Up to 100 team members",
+        "Unlimited AI conversations",
+        "Unlimited web searches & images",
+        "Enterprise API with dedicated infrastructure",
+        "Full team management with RBAC",
+        "24/7 dedicated support with SLA",
+        "Custom AI model fine-tuning",
+        "On-premise deployment option",
+        "Advanced security & compliance (SOC2)",
+        "Custom integrations & webhooks",
+        "White-label option available",
+        "99.9% uptime SLA guaranteed",
+      ],
+    },
+    // ═══════════════════════════════════════════════════
+    // DEVELOPER PLANS
+    // ═══════════════════════════════════════════════════
+    {
+      id: "developer_free", name: "Developer Free", price: 0, currency: "EUR", billing: "monthly", category: "developer",
+      limits: PLAN_LIMITS.developer_free,
+      features: [
+        "1,000 API calls per month",
+        "10 requests per second rate limit",
+        "REST API access",
+        "API key management",
+        "Basic documentation & examples",
+        "Community support on Discord",
+      ],
+    },
+    {
+      id: "developer_pro", name: "Developer Pro", price: 29.99, currency: "EUR", billing: "monthly", category: "developer",
+      limits: PLAN_LIMITS.developer_pro,
+      features: [
+        "50,000 API calls per month",
+        "100 requests per second rate limit",
+        "REST & WebSocket API access",
+        "Multiple API keys (up to 10)",
+        "Full SDK (JavaScript, Python, cURL)",
+        "Webhook notifications",
+        "Usage dashboard & analytics",
+        "Priority developer support",
+      ],
+    },
+    {
+      id: "developer_pro_annual", name: "Developer Pro", price: 299.90, monthlyEquivalent: 24.99, savings: "Save €59.98/year", currency: "EUR", billing: "annual", category: "developer",
+      limits: PLAN_LIMITS.developer_pro,
+      features: [
+        "50,000 API calls per month",
+        "100 requests per second rate limit",
+        "REST & WebSocket API access",
+        "Multiple API keys (up to 10)",
+        "Full SDK (JavaScript, Python, cURL)",
+        "Webhook notifications",
+        "Usage dashboard & analytics",
+        "Priority developer support",
+      ],
+    },
+    {
+      id: "developer_enterprise", name: "Developer Enterprise", price: 199.99, currency: "EUR", billing: "monthly", category: "developer",
+      limits: PLAN_LIMITS.developer_enterprise,
+      features: [
+        "Unlimited API calls",
+        "1,000 requests per second rate limit",
+        "REST, WebSocket & gRPC API access",
+        "Unlimited API keys",
+        "Full SDK with enterprise support",
+        "Custom model endpoints",
+        "Dedicated API infrastructure",
+        "24/7 developer support with SLA",
+        "Custom webhook integrations",
+        "IP whitelisting & advanced security",
+      ],
+    },
   ];
 
-  let plans;
+  // Filter by category and billing period
+  const category = req.query.category || "all"; // "personal" | "business" | "developer" | "all"
+  let plans = allPlans;
+
+  if (category === "personal") {
+    plans = plans.filter((p) => !p.category || p.category === "personal");
+  } else if (category === "business") {
+    plans = plans.filter((p) => p.category === "business");
+  } else if (category === "developer") {
+    plans = plans.filter((p) => p.category === "developer");
+  }
+
   if (billing === "monthly") {
-    plans = allPlans.filter((p) => p.billing === "monthly");
+    plans = plans.filter((p) => p.billing === "monthly");
   } else if (billing === "annual") {
-    plans = allPlans.filter((p) => p.billing === "annual" || p.price === 0);
-  } else {
-    plans = allPlans;
+    plans = plans.filter((p) => p.billing === "annual" || p.price === 0);
+  } else if (billing === "semiannual") {
+    plans = plans.filter((p) => p.billing === "semiannual" || p.price === 0);
   }
 
   res.json({ plans });
@@ -742,6 +956,123 @@ router.post("/redeem", async (req, res) => {
     });
   } catch {
     res.status(500).json({ error: "Redeem error" });
+  }
+});
+
+// ═══ DEVELOPER API KEY MANAGEMENT ═══
+
+// POST /api/payments/developer/keys — generate a new API key
+router.post("/developer/keys", async (req, res) => {
+  try {
+    const { getUserFromToken, supabaseAdmin } = req.app.locals;
+    const user = await getUserFromToken(req);
+    if (!user) return res.status(401).json({ error: "Authentication required" });
+    if (!supabaseAdmin) return res.status(503).json({ error: "Database unavailable" });
+
+    const { name, scopes } = req.body;
+    if (!name) return res.status(400).json({ error: "Key name is required" });
+
+    // Check user's developer plan for key limits
+    const planInfo = await getUserPlan(user.id, supabaseAdmin);
+    const plan = planInfo.plan || "free";
+    const limits = { free: 1, developer_free: 1, developer_pro: 10, developer_enterprise: -1 };
+    const maxKeys = limits[plan] || 1;
+
+    // Count existing active keys
+    const { data: existingKeys } = await supabaseAdmin
+      .from("developer_keys")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("status", "active");
+
+    if (maxKeys !== -1 && (existingKeys || []).length >= maxKeys) {
+      return res.status(403).json({
+        error: `Key limit reached (${maxKeys}). Upgrade your developer plan for more keys.`,
+        limit: maxKeys,
+        current: (existingKeys || []).length,
+      });
+    }
+
+    // Generate secure API key
+    const crypto = require("crypto");
+    const keyValue = "kelion_" + crypto.randomBytes(32).toString("hex");
+    const keyHash = crypto.createHash("sha256").update(keyValue).digest("hex");
+
+    const { data: newKey, error } = await supabaseAdmin
+      .from("developer_keys")
+      .insert({
+        user_id: user.id,
+        name: name.substring(0, 50),
+        key_hash: keyHash,
+        key_prefix: keyValue.substring(0, 12) + "...",
+        scopes: scopes || ["chat", "search", "image"],
+        status: "active",
+        created_at: new Date().toISOString(),
+        last_used_at: null,
+        usage_count: 0,
+      })
+      .select("id, name, key_prefix, scopes, status, created_at")
+      .single();
+
+    if (error) throw error;
+
+    // Return full key ONLY on creation (never shown again)
+    res.json({
+      key: keyValue,
+      id: newKey.id,
+      name: newKey.name,
+      prefix: newKey.key_prefix,
+      scopes: newKey.scopes,
+      warning: "Save this key now. It will not be shown again.",
+    });
+
+    logger.info({ component: "Developer", userId: user.id }, `🔑 New API key created: ${name}`);
+  } catch (e) {
+    logger.error({ component: "Developer", err: e.message }, "Key generation error");
+    res.status(500).json({ error: "Key generation failed" });
+  }
+});
+
+// GET /api/payments/developer/keys — list user's API keys
+router.get("/developer/keys", async (req, res) => {
+  try {
+    const { getUserFromToken, supabaseAdmin } = req.app.locals;
+    const user = await getUserFromToken(req);
+    if (!user) return res.status(401).json({ error: "Authentication required" });
+    if (!supabaseAdmin) return res.status(503).json({ error: "Database unavailable" });
+
+    const { data: keys } = await supabaseAdmin
+      .from("developer_keys")
+      .select("id, name, key_prefix, scopes, status, created_at, last_used_at, usage_count")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false });
+
+    res.json({ keys: keys || [] });
+  } catch {
+    res.status(500).json({ error: "Failed to list keys" });
+  }
+});
+
+// DELETE /api/payments/developer/keys/:id — revoke an API key
+router.delete("/developer/keys/:id", async (req, res) => {
+  try {
+    const { getUserFromToken, supabaseAdmin } = req.app.locals;
+    const user = await getUserFromToken(req);
+    if (!user) return res.status(401).json({ error: "Authentication required" });
+    if (!supabaseAdmin) return res.status(503).json({ error: "Database unavailable" });
+
+    const { error } = await supabaseAdmin
+      .from("developer_keys")
+      .update({ status: "revoked" })
+      .eq("id", req.params.id)
+      .eq("user_id", user.id);
+
+    if (error) throw error;
+
+    logger.info({ component: "Developer", userId: user.id }, `🔑 API key revoked: ${req.params.id}`);
+    res.json({ success: true, message: "API key revoked successfully" });
+  } catch {
+    res.status(500).json({ error: "Failed to revoke key" });
   }
 });
 

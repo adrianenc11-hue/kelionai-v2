@@ -1014,10 +1014,11 @@ app.get("/terms", (req, res) => res.redirect(301, "/terms/"));
 app.get("/gdpr", (req, res) => res.redirect(301, "/gdpr/"));
 app.get("/cookie-policy", (req, res) => res.redirect(301, "/cookie-policy/"));
 app.get("/premium", (req, res) => res.redirect(301, "/pricing/"));
+app.get("/refund-policy", (req, res) => res.redirect(301, "/refund-policy/"));
 
 // ═══ STANDALONE LEGAL PAGES — explicit handlers (not relying on express.static) ═══
 const _legalPages = {};
-for (const page of ["privacy", "terms", "gdpr", "cookie-policy"]) {
+for (const page of ["privacy", "terms", "gdpr", "cookie-policy", "refund-policy"]) {
   const filePath = path.join(__dirname, "..", "app", page, "index.html");
   if (fs.existsSync(filePath)) {
     _legalPages[page] = fs.readFileSync(filePath, "utf8");
@@ -1040,6 +1041,10 @@ app.get("/gdpr/", (req, res) => {
 app.get("/cookie-policy/", (req, res) => {
   if (!_legalPages["cookie-policy"]) return res.status(404).type("html").send(_raw404Html);
   res.type("html").send(_legalPages["cookie-policy"]);
+});
+app.get("/refund-policy/", (req, res) => {
+  if (!_legalPages["refund-policy"]) return res.status(404).type("html").send(_raw404Html);
+  res.type("html").send(_legalPages["refund-policy"]);
 });
 
 // ═══ SPA ROUTE WHITELIST — only serve index.html for known UI routes ═══
