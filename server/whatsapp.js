@@ -940,7 +940,7 @@ router.post("/webhook", async (req, res) => {
           // ═══ AI RESPONSE (with conversation context) ═══
           let reply;
           const brain = req.app.locals.brain;
-          const context = getContextSummary(chatId);
+          const context = await getContextSummary(chatId);
           const detectedLangForPrompt = detectLanguage(userText);
           const prompt = context
             ? `[Conversation context:\n${context}]\n\nUser: ${userText}`
@@ -1144,7 +1144,7 @@ router.get("/health", (req, res) => {
       activeUsers: stats.uniqueUsers,
     },
     webhookUrl:
-      (process.env.APP_URL || "https://kelionai.app") + "/api/whatsapp/webhook",
+      (process.env.APP_URL) + "/api/whatsapp/webhook",
   });
 });
 

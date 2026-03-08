@@ -181,7 +181,7 @@ function getMailTransport() {
 }
 
 async function sendInviteEmail({ to, senderName, code, expiresAt }) {
-  const appUrl = process.env.APP_URL || "https://kelionai.app";
+  const appUrl = process.env.APP_URL;
   const inviteLink = `${appUrl}/?invite=${encodeURIComponent(code)}`;
   const expiryDate = new Date(expiresAt).toLocaleDateString("en-US");
 

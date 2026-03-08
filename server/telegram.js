@@ -10,11 +10,12 @@ const fetch = require("node-fetch");
 const logger = require("./logger");
 
 const router = express.Router();
+const APP_URL = process.env.APP_URL || '';
 
 // ═══ AUTO-REGISTER WEBHOOK ON STARTUP ═══
 if (process.env.TELEGRAM_BOT_TOKEN) {
   const webhookUrl =
-    (process.env.APP_URL || "https://kelionai.app") + "/api/telegram/webhook";
+    (process.env.APP_URL) + "/api/telegram/webhook";
   setTimeout(async () => {
     try {
       const res = await fetch(
@@ -276,7 +277,7 @@ const COMMANDS = {
       replyMarkup: {
         inline_keyboard: [
           [
-            { text: "🌐 Deschide KelionAI", url: "https://kelionai.app" },
+            { text: "🌐 Deschide KelionAI", url: APP_URL },
             { text: "📰 Știri", callback_data: "cmd_stiri" },
             { text: "😂 Banc", callback_data: "cmd_banc" },
           ],
@@ -312,7 +313,7 @@ const COMMANDS = {
           inline_keyboard: [
             [
               { text: "😂 Alt banc", callback_data: "cmd_banc" },
-              { text: "🌐 KelionAI", url: "https://kelionai.app" },
+              { text: "🌐 KelionAI", url: APP_URL },
             ],
           ],
         },
@@ -332,7 +333,7 @@ const COMMANDS = {
       `/stiri — Ultimele 5 știri\n` +
       `/breaking — Doar breaking news\n` +
       `/despre — Despre KelionAI\n\n` +
-      `🌐 Versiunea completă: https://kelionai.app`;
+      `🌐 Versiunea completă: ${APP_URL}`;
     await sendMessage(chatId, msg);
   },
 
@@ -347,7 +348,7 @@ const COMMANDS = {
       `• Generare imagini AI\n` +
       `• Știri în timp real\n` +
       `• Meteo, sport, trading\n\n` +
-      `🌐 <b>Website:</b> https://kelionai.app\n` +
+      `🌐 <b>Website:</b> ${APP_URL}\n` +
       `📧 <b>Contact:</b> support@kelionai.app`;
     await sendMessage(chatId, msg);
   },
@@ -375,7 +376,7 @@ const COMMANDS = {
         msg += "\n\n";
       }
       msg += `🔄 Actualizat automat la 05:00, 12:00, 18:00\n\n`;
-      msg += `🌐 <i>Mai multe pe <a href="https://kelionai.app">kelionai.app</a> — AI cu avatar 3D!</i>`;
+      msg += `🌐 <i>Mai multe pe <a href="${APP_URL}">kelionai.app</a> — AI cu avatar 3D!</i>`;
       await sendMessage(chatId, msg);
     } catch (e) {
       logger.error(
@@ -438,13 +439,13 @@ function getNewsArticles(app) {
 function faqReply(text) {
   const t = (text || "").toLowerCase();
   if (/pre[tț]|cost|plan|abonam/.test(t)) {
-    return "💰 <b>Planuri KelionAI:</b>\n\n• <b>Free</b> — gratuit, 10 chat-uri/zi\n• <b>Pro</b> — €9.99/lună, 100 chat-uri/zi\n• <b>Premium</b> — €19.99/lună, nelimitat\n\n🌐 Detalii: https://kelionai.app/pricing/";
+    return `💰 <b>Planuri KelionAI:</b>\n\n• <b>Free</b> — gratuit, 10 chat-uri/zi\n• <b>Pro</b> — €9.99/lună, 100 chat-uri/zi\n• <b>Premium</b> — €19.99/lună, nelimitat\n\n🌐 Detalii: ${APP_URL}/pricing/`;
   }
   if (/contact|support|ajutor|problema/.test(t)) {
     return "📧 Contactează-ne: support@kelionai.app\nSuntem disponibili luni-vineri.";
   }
   if (/ce e[șs]ti|cine e[șs]ti/.test(t)) {
-    return "🤖 Sunt <b>KelionAI</b> — asistentul tău AI personal cu avatar 3D, suport vocal și multilingv!\n\n🌐 Încearcă: https://kelionai.app";
+    return `🤖 Sunt <b>KelionAI</b> — asistentul tău AI personal cu avatar 3D, suport vocal și multilingv!\n\n🌐 Încearcă: ${APP_URL}`;
   }
   return null; // No FAQ match, use Brain AI
 }
@@ -552,11 +553,11 @@ router.post("/webhook", async (req, res) => {
           "Brain unavailable",
         );
         reply =
-          "🤖 Momentan sunt ocupat. Încearcă din nou sau vizitează https://kelionai.app";
+          `🤖 Momentan sunt ocupat. Încearcă din nou sau vizitează ${APP_URL}`;
       }
     } else {
       reply =
-        "🤖 Sunt KelionAI! Pentru experiența completă vizitează https://kelionai.app";
+        `🤖 Sunt KelionAI! Pentru experiența completă vizitează ${APP_URL}`;
     }
 
     await sendMessage(chatId, escapeHtml(reply), { parseMode: undefined });
@@ -614,19 +615,19 @@ router.post("/webhook", async (req, res) => {
         await sendMessage(
           chatId,
           `⭐ <b>Ai folosit ${FREE_MESSAGES_LIMIT} mesaje gratuite azi!</b>\n\n` +
-          `Continuă cu funcții premium pe kelionai.app:\n` +
+          `Continuă cu funcții premium pe ${APP_URL}:\n` +
           `• 💬 Chat nelimitat cu AI\n` +
           `• 🎭 Avatare 3D — Kelion & Kira\n` +
           `• 🔊 Voce naturală\n` +
           `• 🖼️ Generare imagini\n\n` +
-          `🌐 Abonează-te: https://kelionai.app/pricing`,
+          `🌐 Abonează-te: ${APP_URL}/pricing`,
           {
             replyMarkup: {
               inline_keyboard: [
                 [
                   {
                     text: "💎 Vezi planurile",
-                    url: "https://kelionai.app/pricing",
+                    url: APP_URL + "/pricing",
                   },
                 ],
               ],
@@ -649,7 +650,7 @@ router.get("/setup", async (req, res) => {
     return res.json({ error: "TELEGRAM_BOT_TOKEN not set" });
   }
   const webhookUrl =
-    (process.env.APP_URL || "https://kelionai.app") + "/api/telegram/webhook";
+    (process.env.APP_URL) + "/api/telegram/webhook";
   try {
     const response = await fetch(
       `https://api.telegram.org/bot${BOT_TOKEN}/setWebhook`,
@@ -681,7 +682,7 @@ router.get("/health", (req, res) => {
       activeUsers: stats.uniqueUsers,
     },
     webhookUrl:
-      (process.env.APP_URL || "https://kelionai.app") + "/api/telegram/webhook",
+      (process.env.APP_URL) + "/api/telegram/webhook",
   });
 });
 
@@ -695,7 +696,7 @@ async function broadcastNews(articles) {
     if (a.url) msg += `🔗 <a href="${a.url}">citește</a>\n`;
     msg += "\n";
   }
-  msg += `\n🤖 <i>KelionAI — kelionai.app</i>`;
+  msg += `\n🤖 <i>KelionAI — ${APP_URL}</i>`;
   await broadcastToChannel(msg);
 }
 

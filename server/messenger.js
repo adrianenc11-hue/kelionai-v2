@@ -368,7 +368,10 @@ async function getSenderProfile(senderId) {
 async function downloadMediaFromUrl(url) {
   try {
     const res = await fetch(url);
-    if (res.ok) return res.buffer();
+    if (res.ok) {
+      const ab = await res.arrayBuffer();
+      return Buffer.from(ab);
+    }
   } catch (e) {
     logger.error(
       { component: "Messenger", err: e.message },
@@ -1347,7 +1350,7 @@ router.post("/webhook", async function (req, res) {
           reply = visionResponse;
         } else {
           const brain = req.app.locals.brain;
-          const context = getContextSummary(senderId);
+          const context = await getContextSummary(senderId);
           const prompt = context
             ? "[Context:\n" + context + "]\nUser: " + userText
             : userText;
@@ -1532,7 +1535,7 @@ router.get("/health", function (req, res) {
     ttsEnabled: !!process.env.ELEVENLABS_API_KEY,
     stats: getStats(),
     webhookUrl:
-      (process.env.APP_URL || "https://kelionai.app") +
+      (process.env.APP_URL) +
       "/api/messenger/webhook",
   });
 });
