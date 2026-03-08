@@ -440,6 +440,61 @@ EXCEPTION WHEN OTHERS THEN NULL;
 END $$;
 CREATE INDEX IF NOT EXISTS idx_learned_facts_user ON learned_facts(user_id);
 
+-- ═══ BRAIN TOOLS REGISTRY (central engine — all external endpoints) ═══
+CREATE TABLE IF NOT EXISTS brain_tools (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    category TEXT NOT NULL,
+    endpoint TEXT NOT NULL,
+    method TEXT DEFAULT 'POST',
+    auth_type TEXT DEFAULT 'api_key',
+    auth_env_key TEXT,
+    priority INT DEFAULT 1,
+    fallback_tool_id TEXT,
+    is_active BOOLEAN DEFAULT true,
+    cost_per_call NUMERIC DEFAULT 0,
+    success_rate FLOAT DEFAULT 1.0,
+    avg_latency_ms INT DEFAULT 0,
+    total_calls INT DEFAULT 0,
+    total_errors INT DEFAULT 0,
+    last_used_at TIMESTAMPTZ,
+    config JSONB DEFAULT '{}',
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_brain_tools_cat ON brain_tools(category, priority);
+
+-- Seed brain tools (ON CONFLICT = skip if already exists)
+INSERT INTO brain_tools (id, name, category, endpoint, method, auth_type, auth_env_key, priority, fallback_tool_id, config) VALUES
+    ('serper_search', 'Google Search (Serper)', 'search', 'https://google.serper.dev/search', 'POST', 'api_key', 'SERPER_API_KEY', 1, 'tavily_search', '{"header":"X-API-KEY"}'),
+    ('tavily_search', 'Tavily Search', 'search', 'https://api.tavily.com/search', 'POST', 'api_key', 'TAVILY_API_KEY', 2, 'perplexity_search', '{}'),
+    ('perplexity_search', 'Perplexity Search', 'search', 'https://api.perplexity.ai/chat/completions', 'POST', 'bearer', 'PERPLEXITY_API_KEY', 3, NULL, '{}'),
+    ('open_meteo_geo', 'OpenMeteo Geocoding', 'weather', 'https://geocoding-api.open-meteo.com/v1/search', 'GET', 'none', NULL, 1, NULL, '{}'),
+    ('open_meteo_forecast', 'OpenMeteo Forecast', 'weather', 'https://api.open-meteo.com/v1/forecast', 'GET', 'none', NULL, 1, NULL, '{}'),
+    ('open_meteo_reverse', 'OpenMeteo Reverse Geo', 'weather', 'https://geocoding-api.open-meteo.com/v1/reverse', 'GET', 'none', NULL, 1, NULL, '{}'),
+    ('ip_api', 'IP Geolocation', 'geo', 'http://ip-api.com/json', 'GET', 'none', NULL, 1, NULL, '{}'),
+    ('youtube_search', 'YouTube Search', 'media', 'https://www.youtube.com/results', 'GET', 'none', NULL, 1, NULL, '{}'),
+    ('youtube_embed', 'YouTube Embed', 'media', 'https://www.youtube.com/embed', 'GET', 'none', NULL, 1, NULL, '{}'),
+    ('google_search', 'Google Web Search', 'search', 'https://www.google.com/search', 'GET', 'none', NULL, 4, NULL, '{}'),
+    ('google_maps', 'Google Maps Embed', 'maps', 'https://www.google.com/maps/embed/v1/place', 'GET', 'api_key', 'GOOGLE_MAPS_KEY', 1, 'openstreetmap', '{}'),
+    ('openstreetmap', 'OpenStreetMap Search', 'maps', 'https://www.openstreetmap.org/search', 'GET', 'none', NULL, 2, NULL, '{}'),
+    ('newsdata_api', 'NewsData.io', 'news', 'https://newsdata.io/api/1/news', 'GET', 'api_key', 'NEWSDATA_API_KEY', 1, NULL, '{}'),
+    ('cryptopanic', 'CryptoPanic News', 'trading', 'https://cryptopanic.com/api/v1/posts', 'GET', 'api_key', 'CRYPTOPANIC_API_KEY', 1, NULL, '{}')
+ON CONFLICT (id) DO NOTHING;
+
+-- ═══ BRAIN USAGE (quota per user per month) ═══
+CREATE TABLE IF NOT EXISTS brain_usage (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    month TEXT NOT NULL,
+    message_count INT DEFAULT 0,
+    tool_calls INT DEFAULT 0,
+    tokens_used INT DEFAULT 0,
+    cost_usd NUMERIC DEFAULT 0,
+    updated_at TIMESTAMPTZ DEFAULT now(),
+    UNIQUE(user_id, month)
+);
+CREATE INDEX IF NOT EXISTS idx_brain_usage_user ON brain_usage(user_id, month);
+
 `;
 
 async function runMigration() {
