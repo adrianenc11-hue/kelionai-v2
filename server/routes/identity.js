@@ -85,7 +85,18 @@ router.post(
       if (!face) return res.status(400).json({ error: "face image required" });
 
       const user = await getUserFromToken(req);
-      const isOwner = user?.role === "admin";
+
+      // Check role from profiles table (auth.users.role is always 'authenticated')
+      let isOwner = false;
+      if (user && supabaseAdmin) {
+        const { data: userProfile } = await supabaseAdmin
+          .from("profiles")
+          .select("role")
+          .eq("id", user.id)
+          .single();
+        isOwner = userProfile?.role === "admin";
+        logger.info({ component: "Identity", userId: user.id, profileRole: userProfile?.role, isOwner }, "Face check: role lookup");
+      }
 
       // Check if this is the owner by comparing face with stored reference
       let ownerMatch = false;
@@ -96,7 +107,7 @@ router.post(
           // Get owner profile (admin role)
           const { data: ownerProfile } = await supabaseAdmin
             .from("profiles")
-            .select("id, display_name, face_reference, preferred_language")
+            .select("id, display_name, face_reference, preferred_language, role")
             .eq("role", "admin")
             .single();
 
