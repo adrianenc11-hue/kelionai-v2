@@ -10,6 +10,23 @@
     let currentConversationId = null, useStreaming = true, historyOpen = false;
     let adminSecret = null; // stored when admin mode is active
 
+    // ── #155: FRONTEND ERROR CAPTURE → Brain ──
+    var _errCount = 0, _errResetTimer = null;
+    function reportError(type, message, source, line, col) {
+        if (_errCount >= 5) return; // max 5 per minute
+        _errCount++;
+        if (!_errResetTimer) _errResetTimer = setTimeout(function () { _errCount = 0; _errResetTimer = null; }, 60000);
+        try {
+            navigator.sendBeacon(API_BASE + '/api/brain/errors', JSON.stringify({
+                type: type, message: String(message).substring(0, 500),
+                source: source || '', line: line || 0, col: col || 0,
+                url: location.pathname, timestamp: new Date().toISOString(), ua: navigator.userAgent.substring(0, 100)
+            }));
+        } catch (e) { /* silent */ }
+    }
+    window.onerror = function (msg, src, line, col) { reportError('uncaught', msg, src, line, col); };
+    window.addEventListener('unhandledrejection', function (e) { reportError('promise', e.reason?.message || String(e.reason), '', 0, 0); });
+
     function adminHeaders() { return { ...authHeaders(), 'x-admin-secret': adminSecret || '' }; }
 
     function authHeaders() { return { 'Content-Type': 'application/json', ...(window.KAuth ? KAuth.getAuthHeaders() : {}) }; }
