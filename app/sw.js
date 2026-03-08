@@ -15,12 +15,18 @@ const OFFLINE_URLS = [
     "/manifest.json",
 ];
 
-// Install — cache core assets
+// Install — cache core assets (fault-tolerant)
 self.addEventListener("install", (event) => {
     event.waitUntil(
         caches.open(CACHE_NAME).then((cache) => {
             console.log("[SW] Caching core assets");
-            return cache.addAll(OFFLINE_URLS);
+            return Promise.all(
+                OFFLINE_URLS.map((url) =>
+                    cache.add(url).catch((err) => {
+                        console.warn("[SW] Failed to cache:", url, err.message);
+                    })
+                )
+            );
         })
     );
     self.skipWaiting();
