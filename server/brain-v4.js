@@ -306,6 +306,327 @@ const TOOL_DEFINITIONS = [
             required: ["action", "equipment"],
         },
     },
+    // ═══ OFFICE / SECRETARY TOOLS ═══
+    {
+        name: "send_email",
+        description: "Compose and send an email. Can draft, review, or send immediately. Supports HTML formatting, attachments description, CC/BCC. Requires RESEND_API_KEY or SMTP configured.",
+        input_schema: {
+            type: "object",
+            properties: {
+                action: { type: "string", description: "Action: 'draft' (preview), 'send' (send now), 'reply' (reply to last)" },
+                to: { type: "string", description: "Recipient email address" },
+                subject: { type: "string", description: "Email subject" },
+                body: { type: "string", description: "Email body (can include HTML)" },
+                cc: { type: "string", description: "CC recipients (comma separated)" },
+                priority: { type: "string", description: "Priority: 'high', 'normal', 'low'" },
+            },
+            required: ["action", "to", "subject", "body"],
+        },
+    },
+    {
+        name: "manage_calendar",
+        description: "Manage calendar events and appointments. Create, list, update, delete events. Set reminders. Check availability. Find free slots.",
+        input_schema: {
+            type: "object",
+            properties: {
+                action: { type: "string", description: "Action: 'create', 'list', 'update', 'delete', 'today', 'week', 'find_free', 'remind'" },
+                title: { type: "string", description: "Event title" },
+                date: { type: "string", description: "Date: 'YYYY-MM-DD' or 'today', 'tomorrow', 'monday'" },
+                time: { type: "string", description: "Time: 'HH:MM' (24h format)" },
+                duration: { type: "number", description: "Duration in minutes (default 60)" },
+                location: { type: "string", description: "Meeting location or URL" },
+                notes: { type: "string", description: "Additional notes" },
+                recurring: { type: "string", description: "Recurrence: 'daily', 'weekly', 'monthly', 'none'" },
+            },
+            required: ["action"],
+        },
+    },
+    {
+        name: "create_document",
+        description: "Create professional documents: letters, memos, reports, invoices, proposals, contracts, meeting minutes, certificates. Generates structured, formatted content ready to export.",
+        input_schema: {
+            type: "object",
+            properties: {
+                type: { type: "string", description: "Document type: 'letter', 'memo', 'report', 'invoice', 'proposal', 'contract', 'minutes', 'certificate', 'cv', 'cover_letter'" },
+                title: { type: "string", description: "Document title" },
+                recipient: { type: "string", description: "Who the document is for" },
+                content: { type: "string", description: "Key content/details to include" },
+                language: { type: "string", description: "Language: 'ro', 'en', 'de', 'fr'" },
+                format: { type: "string", description: "Format: 'professional', 'formal', 'casual', 'legal'" },
+            },
+            required: ["type", "title"],
+        },
+    },
+    {
+        name: "task_manager",
+        description: "Manage tasks and TODO lists. Create, update, complete, prioritize, assign tasks. Track deadlines, organize by project/category.",
+        input_schema: {
+            type: "object",
+            properties: {
+                action: { type: "string", description: "Action: 'add', 'list', 'complete', 'update', 'delete', 'prioritize', 'overdue', 'today', 'search'" },
+                task: { type: "string", description: "Task description" },
+                project: { type: "string", description: "Project/category name" },
+                priority: { type: "string", description: "Priority: 'urgent', 'high', 'medium', 'low'" },
+                deadline: { type: "string", description: "Deadline: 'YYYY-MM-DD' or 'today', 'tomorrow', 'next_week'" },
+                assigned_to: { type: "string", description: "Who is responsible" },
+                status: { type: "string", description: "Status: 'todo', 'in_progress', 'done', 'blocked'" },
+            },
+            required: ["action"],
+        },
+    },
+    {
+        name: "contact_book",
+        description: "Manage contacts and address book. Add, search, update, categorize contacts. Store phone, email, company, notes. Mini CRM functionality.",
+        input_schema: {
+            type: "object",
+            properties: {
+                action: { type: "string", description: "Action: 'add', 'search', 'update', 'delete', 'list', 'categorize'" },
+                name: { type: "string", description: "Contact name" },
+                phone: { type: "string", description: "Phone number" },
+                email: { type: "string", description: "Email address" },
+                company: { type: "string", description: "Company/organization" },
+                category: { type: "string", description: "Category: 'client', 'supplier', 'colleague', 'personal', 'medical', 'government'" },
+                notes: { type: "string", description: "Additional notes" },
+            },
+            required: ["action"],
+        },
+    },
+    {
+        name: "translate_document",
+        description: "Translate text or documents between languages. Supports: Romanian, English, German, French, Spanish, Italian, Hungarian. Preserves formatting and technical terminology.",
+        input_schema: {
+            type: "object",
+            properties: {
+                text: { type: "string", description: "Text to translate" },
+                from: { type: "string", description: "Source language: 'ro', 'en', 'de', 'fr', 'es', 'it', 'hu', 'auto'" },
+                to: { type: "string", description: "Target language: 'ro', 'en', 'de', 'fr', 'es', 'it', 'hu'" },
+                style: { type: "string", description: "Style: 'formal', 'casual', 'technical', 'legal', 'medical'" },
+            },
+            required: ["text", "to"],
+        },
+    },
+    {
+        name: "summarize_document",
+        description: "Summarize long documents, emails, reports, meeting notes. Extract key points, action items, decisions, deadlines.",
+        input_schema: {
+            type: "object",
+            properties: {
+                text: { type: "string", description: "Text to summarize" },
+                style: { type: "string", description: "Style: 'bullet_points', 'executive_summary', 'action_items', 'key_decisions', 'full'" },
+                length: { type: "string", description: "Length: 'short' (1-3 sentences), 'medium' (paragraph), 'detailed' (full page)" },
+            },
+            required: ["text", "style"],
+        },
+    },
+    // ═══ DRAWING & MS OFFICE TOOLS ═══
+    {
+        name: "draw_diagram",
+        description: "Create technical drawings, diagrams, flowcharts, circuit schematics, UML, organizational charts, network diagrams, Gantt charts. Generates Mermaid diagram code or SVG description. Can also analyze and improve uploaded diagrams.",
+        input_schema: {
+            type: "object",
+            properties: {
+                type: { type: "string", description: "Diagram type: 'flowchart', 'circuit', 'sequence', 'class', 'state', 'er', 'gantt', 'pie', 'network', 'org_chart', 'mind_map', 'block_diagram', 'pcb_layout', 'wiring_diagram'" },
+                description: { type: "string", description: "What the diagram should show" },
+                action: { type: "string", description: "Action: 'create', 'modify', 'analyze' (if image uploaded)" },
+                style: { type: "string", description: "Style: 'technical', 'simple', 'detailed', 'presentation'" },
+            },
+            required: ["type", "description"],
+        },
+    },
+    {
+        name: "create_spreadsheet",
+        description: "Generate spreadsheet data compatible with Excel/Google Sheets. Creates tables, calculations, formulas, data analysis. Outputs CSV or structured data. Can create: budgets, inventories, measurement logs, price lists, schedules, grade books, financial reports.",
+        input_schema: {
+            type: "object",
+            properties: {
+                title: { type: "string", description: "Spreadsheet title" },
+                type: { type: "string", description: "Type: 'budget', 'inventory', 'schedule', 'price_list', 'measurement_log', 'financial', 'grades', 'timesheet', 'custom'" },
+                columns: { type: "string", description: "Column names, comma separated" },
+                data: { type: "string", description: "Data to include or instructions for generating data" },
+                formulas: { type: "string", description: "Excel formulas or calculations needed: 'SUM', 'AVERAGE', 'total', 'subtotals'" },
+            },
+            required: ["title", "type"],
+        },
+    },
+    {
+        name: "create_presentation",
+        description: "Generate presentation outlines and content for PowerPoint/Google Slides. Creates slide structure with titles, bullet points, speaker notes. Can generate for: business, technical, medical, educational, project updates.",
+        input_schema: {
+            type: "object",
+            properties: {
+                title: { type: "string", description: "Presentation title" },
+                topic: { type: "string", description: "Main topic and key points to cover" },
+                slides: { type: "number", description: "Number of slides (default 10)" },
+                audience: { type: "string", description: "Target audience: 'executives', 'technical', 'students', 'clients', 'medical_staff'" },
+                style: { type: "string", description: "Style: 'professional', 'educational', 'pitch', 'report', 'training'" },
+                language: { type: "string", description: "Language: 'ro', 'en', 'de', 'fr'" },
+            },
+            required: ["title", "topic"],
+        },
+    },
+    {
+        name: "file_converter",
+        description: "Convert between formats: text to HTML, markdown to HTML, CSV to table, JSON to table, numbers to chart data. Format data for different outputs.",
+        input_schema: {
+            type: "object",
+            properties: {
+                input_format: { type: "string", description: "Input format: 'text', 'markdown', 'csv', 'json', 'html', 'table'" },
+                output_format: { type: "string", description: "Output format: 'html', 'markdown', 'csv', 'json', 'table', 'excel_formula'" },
+                data: { type: "string", description: "Data to convert" },
+            },
+            required: ["input_format", "output_format", "data"],
+        },
+    },
+    // ═══ CAMERA / VISION / R&D INSPECTION TOOLS ═══
+    {
+        name: "pcb_inspection",
+        description: "Inspect PCB (printed circuit board) from camera/photo. Detects: cold solder joints, solder bridges, missing components, tombstoning, wrong polarity, damaged traces, via issues, contamination. Quality classes: IPC-A-610 Class 1/2/3. Requires image upload.",
+        input_schema: {
+            type: "object",
+            properties: {
+                board_type: { type: "string", description: "Board type: 'smt', 'through_hole', 'mixed', 'bga', 'flex', 'rigid_flex'" },
+                class: { type: "string", description: "IPC class: 'class1' (consumer), 'class2' (industrial), 'class3' (high-rel/medical/military)" },
+                focus: { type: "string", description: "Focus: 'solder_quality', 'component_placement', 'trace_integrity', 'contamination', 'full_inspection'" },
+            },
+            required: ["focus"],
+        },
+    },
+    {
+        name: "thermal_analysis",
+        description: "Analyze thermal camera images. Identifies: hotspots, cold spots, thermal gradients, insulation failures, overheating components, electrical faults. For: electronics, building inspection, mechanical, medical thermography. Requires thermal image upload.",
+        input_schema: {
+            type: "object",
+            properties: {
+                domain: { type: "string", description: "Domain: 'electronics', 'building', 'mechanical', 'electrical', 'medical', 'solar_panel'" },
+                focus: { type: "string", description: "Focus: 'hotspot_detection', 'thermal_gradient', 'insulation', 'overheating', 'comparison', 'full_analysis'" },
+                max_temp: { type: "number", description: "Maximum acceptable temperature in °C" },
+            },
+            required: ["domain", "focus"],
+        },
+    },
+    {
+        name: "microscope_analysis",
+        description: "Analyze microscope images. Supports: optical microscopy, SEM, TEM, fluorescence, metallurgical. Identifies: grain structure, defects, contamination, dimensions, surface topology, crystallography. For: materials science, biology, electronics, quality control.",
+        input_schema: {
+            type: "object",
+            properties: {
+                microscope_type: { type: "string", description: "Type: 'optical', 'sem', 'tem', 'fluorescence', 'metallurgical', 'stereo', 'confocal'" },
+                sample: { type: "string", description: "Sample type: 'metal', 'semiconductor', 'biological', 'polymer', 'ceramic', 'composite', 'pcb'" },
+                magnification: { type: "string", description: "Magnification level if known: '10x', '100x', '1000x', '10000x'" },
+                focus: { type: "string", description: "Focus: 'grain_structure', 'defect_detection', 'measurement', 'surface_analysis', 'contamination', 'full_analysis'" },
+            },
+            required: ["microscope_type", "focus"],
+        },
+    },
+    {
+        name: "visual_quality_check",
+        description: "Visual quality inspection from camera/photo. Checks: surface finish, dimensional accuracy, assembly quality, paint/coating, packaging, labeling. Returns PASS/FAIL with defect list. For manufacturing QC, incoming inspection, outgoing inspection.",
+        input_schema: {
+            type: "object",
+            properties: {
+                product_type: { type: "string", description: "Product type: 'electronic_device', 'mechanical_part', 'medical_device', 'packaging', 'assembly', 'raw_material'" },
+                standard: { type: "string", description: "Quality standard: 'iso9001', 'iec62368', 'iec60601' (medical), 'mil_std', 'custom'" },
+                criteria: { type: "string", description: "Inspection criteria or checklist items" },
+            },
+            required: ["product_type"],
+        },
+    },
+    {
+        name: "compare_images",
+        description: "Compare two states of the same item: before/after repair, golden sample vs production, reference vs actual. Identifies differences, deviations, changes. For QC, repair verification, reverse engineering.",
+        input_schema: {
+            type: "object",
+            properties: {
+                context: { type: "string", description: "Context: 'before_after', 'golden_vs_production', 'reference_vs_actual', 'revision_comparison'" },
+                focus: { type: "string", description: "What to compare: 'dimensions', 'components', 'surface', 'color', 'layout', 'full'" },
+            },
+            required: ["context"],
+        },
+    },
+    // ═══ EDUCATION / TEACHING TOOLS ═══
+    {
+        name: "quiz_generator",
+        description: "Generate tests, quizzes, and exams for any subject and level. Supports: Romanian curriculum (școală, liceu, BAC, admitere), international (GCSE, A-Level, AP, IB, SAT). Subjects: math, physics, chemistry, biology, Romanian, English, history, geography, IT/CS. Generates questions with answers and grading rubric.",
+        input_schema: {
+            type: "object",
+            properties: {
+                subject: { type: "string", description: "Subject: 'matematica', 'fizica', 'chimie', 'biologie', 'romana', 'engleza', 'istorie', 'geografie', 'informatica', 'math', 'physics', 'chemistry', 'biology', 'english', 'history', 'computer_science'" },
+                level: { type: "string", description: "Level: 'clasa5-8', 'clasa9-12', 'bac', 'admitere', 'gcse', 'a_level', 'ap', 'ib', 'university', 'masters'" },
+                topic: { type: "string", description: "Specific topic, e.g. 'Ecuatii de gradul 2', 'Legile lui Newton', 'Romantismul'" },
+                question_count: { type: "number", description: "Number of questions (default 10)" },
+                type: { type: "string", description: "Question type: 'multiple_choice', 'open_ended', 'true_false', 'fill_blank', 'essay', 'mixed', 'problems'" },
+                difficulty: { type: "string", description: "Difficulty: 'easy', 'medium', 'hard', 'exam_level'" },
+                include_answers: { type: "boolean", description: "Include answer key (default true)" },
+            },
+            required: ["subject", "level", "topic"],
+        },
+    },
+    {
+        name: "grade_book",
+        description: "Manage student grades, calculate averages, generate reports. Digital catalog. Tracks: note, absențe, medii semestriale/anuale, clasament, statistici. For teachers and students.",
+        input_schema: {
+            type: "object",
+            properties: {
+                action: { type: "string", description: "Action: 'add_grade', 'add_absence', 'calculate_average', 'report', 'ranking', 'statistics', 'list'" },
+                student: { type: "string", description: "Student name" },
+                subject: { type: "string", description: "Subject name" },
+                grade: { type: "number", description: "Grade (1-10 for RO, 0-100 for international)" },
+                date: { type: "string", description: "Date: YYYY-MM-DD" },
+                semester: { type: "string", description: "Semester: '1', '2', 'annual'" },
+                class_name: { type: "string", description: "Class: '9A', '11B', 'Year 10'" },
+            },
+            required: ["action"],
+        },
+    },
+    {
+        name: "lesson_planner",
+        description: "Create lesson plans (‘planuri de lecție’) following Romanian curriculum (OMEN) or international standards. Includes: objectives, activities, timing, materials, assessment, differentiation. Can generate annual/semester plans, unit plans, daily plans.",
+        input_schema: {
+            type: "object",
+            properties: {
+                type: { type: "string", description: "Plan type: 'daily', 'unit', 'semester', 'annual'" },
+                subject: { type: "string", description: "Subject" },
+                grade_level: { type: "string", description: "Grade: 'clasa1', 'clasa5', 'clasa9', 'year7', 'grade10'" },
+                topic: { type: "string", description: "Topic or unit" },
+                duration: { type: "number", description: "Duration in minutes (default 50)" },
+                curriculum: { type: "string", description: "Curriculum: 'romania', 'uk', 'us', 'ib', 'cambridge'" },
+                language: { type: "string", description: "Language: 'ro', 'en', 'de', 'fr', 'hu'" },
+            },
+            required: ["subject", "grade_level", "topic"],
+        },
+    },
+    {
+        name: "flashcards",
+        description: "Create flashcard sets for spaced repetition learning. Generate cards from any topic, track progress, test knowledge. Supports any language and subject.",
+        input_schema: {
+            type: "object",
+            properties: {
+                action: { type: "string", description: "Action: 'create', 'review', 'test', 'list', 'stats'" },
+                set_name: { type: "string", description: "Flashcard set name" },
+                topic: { type: "string", description: "Topic to create cards for" },
+                count: { type: "number", description: "Number of cards to generate (default 20)" },
+                language: { type: "string", description: "Language: 'ro', 'en', 'de', 'fr'" },
+                difficulty: { type: "string", description: "Difficulty: 'beginner', 'intermediate', 'advanced'" },
+            },
+            required: ["action"],
+        },
+    },
+    {
+        name: "exercise_generator",
+        description: "Generate practice exercises and problems with step-by-step solutions. Math, physics, chemistry calculations with full working. From simple arithmetic to university-level problems. Shows methodology and formulas used.",
+        input_schema: {
+            type: "object",
+            properties: {
+                subject: { type: "string", description: "Subject: 'math', 'physics', 'chemistry', 'engineering', 'electronics', 'statistics'" },
+                topic: { type: "string", description: "Topic, e.g. 'integrals', 'circuit analysis', 'stoichiometry', 'beam deflection'" },
+                count: { type: "number", description: "Number of exercises (default 5)" },
+                difficulty: { type: "string", description: "Difficulty: 'easy', 'medium', 'hard', 'competition', 'olympiad'" },
+                show_solution: { type: "boolean", description: "Include step-by-step solutions (default true)" },
+                level: { type: "string", description: "Level: 'school', 'highschool', 'university', 'postgrad'" },
+            },
+            required: ["subject", "topic"],
+        },
+    },
 ];
 
 // ── Tool executor: maps tool names to brain methods ──
@@ -505,6 +826,293 @@ async function executeTool(brain, toolName, toolInput, userId) {
                     return { equipment: toolInput.equipment, parameter: toolInput.parameter || "all", stats, recent: filtered.slice(-10), pass_rate: filtered.length > 0 ? ((filtered.filter(m => m.status === "PASS").length / filtered.filter(m => m.status).length) * 100).toFixed(1) + "%" : "N/A" };
                 }
                 return { error: "Unknown action. Use: record, history, trend, report" };
+            }
+            // ═══ OFFICE / SECRETARY TOOLS ═══
+            case "send_email": {
+                const apiKey = process.env.RESEND_API_KEY;
+                if (!apiKey) return { error: "Email not configured. Set RESEND_API_KEY in .env" };
+                if (toolInput.action === "draft") {
+                    return { status: "draft", to: toolInput.to, subject: toolInput.subject, body: toolInput.body, cc: toolInput.cc || null, message: "Draft ready. Say 'send' to send it." };
+                }
+                try {
+                    const emailBody = { from: process.env.EMAIL_FROM || "KelionAI <noreply@kelionai.app>", to: toolInput.to.split(",").map(e => e.trim()), subject: toolInput.subject, html: toolInput.body };
+                    if (toolInput.cc) emailBody.cc = toolInput.cc.split(",").map(e => e.trim());
+                    const r = await fetch("https://api.resend.com/emails", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+                        body: JSON.stringify(emailBody),
+                    });
+                    const result = await r.json();
+                    if (!r.ok) return { error: result.message || "Email failed", status: r.status };
+                    return { status: "sent", id: result.id, to: toolInput.to, subject: toolInput.subject };
+                } catch (emailErr) {
+                    return { error: emailErr.message };
+                }
+            }
+            case "manage_calendar": {
+                if (!brain.supabaseAdmin) return { error: "Database not connected" };
+                const calKey = `calendar:${userId || "system"}`;
+                const { data: existing } = await brain.supabaseAdmin.from("user_preferences").select("value").eq("user_id", userId || "system").eq("key", calKey).maybeSingle();
+                const calendar = existing?.value || { events: [] };
+                if (toolInput.action === "create") {
+                    const event = { id: Date.now().toString(36), title: toolInput.title, date: toolInput.date, time: toolInput.time, duration: toolInput.duration || 60, location: toolInput.location, notes: toolInput.notes, recurring: toolInput.recurring || "none", created: new Date().toISOString() };
+                    calendar.events.push(event);
+                    await brain.supabaseAdmin.from("user_preferences").upsert({ user_id: userId || "system", key: calKey, value: calendar }, { onConflict: "user_id,key" });
+                    return { status: "created", event };
+                }
+                if (toolInput.action === "list" || toolInput.action === "today" || toolInput.action === "week") {
+                    const now = new Date();
+                    const today = now.toISOString().split("T")[0];
+                    let filtered = calendar.events;
+                    if (toolInput.action === "today") filtered = filtered.filter(e => e.date === today || e.date === "today");
+                    if (toolInput.action === "week") { const weekEnd = new Date(now.getTime() + 7 * 86400000).toISOString().split("T")[0]; filtered = filtered.filter(e => e.date >= today && e.date <= weekEnd); }
+                    return { events: filtered.slice(-20), total: filtered.length };
+                }
+                if (toolInput.action === "delete") {
+                    calendar.events = calendar.events.filter(e => e.title !== toolInput.title);
+                    await brain.supabaseAdmin.from("user_preferences").upsert({ user_id: userId || "system", key: calKey, value: calendar }, { onConflict: "user_id,key" });
+                    return { status: "deleted", title: toolInput.title };
+                }
+                return { events: calendar.events.slice(-20), total: calendar.events.length };
+            }
+            case "create_document": {
+                // Claude will generate the document content based on the description
+                // We store it in DB for retrieval
+                if (!brain.supabaseAdmin) return { error: "Database not connected" };
+                const docKey = `doc:${toolInput.title.replace(/\s+/g, "_").toLowerCase()}`;
+                const doc = { type: toolInput.type, title: toolInput.title, recipient: toolInput.recipient, content: toolInput.content, language: toolInput.language || "ro", format: toolInput.format || "professional", created: new Date().toISOString() };
+                await brain.supabaseAdmin.from("user_preferences").upsert({ user_id: userId || "system", key: docKey, value: doc }, { onConflict: "user_id,key" });
+                return { status: "created", type: toolInput.type, title: toolInput.title, message: "Document generated and saved. Tell me if you want to modify or export it." };
+            }
+            case "task_manager": {
+                if (!brain.supabaseAdmin) return { error: "Database not connected" };
+                const taskKey = `tasks:${userId || "system"}`;
+                const { data: existing } = await brain.supabaseAdmin.from("user_preferences").select("value").eq("user_id", userId || "system").eq("key", taskKey).maybeSingle();
+                const tasks = existing?.value || { items: [] };
+                if (toolInput.action === "add") {
+                    const item = { id: Date.now().toString(36), task: toolInput.task, project: toolInput.project || "general", priority: toolInput.priority || "medium", deadline: toolInput.deadline, assigned_to: toolInput.assigned_to, status: "todo", created: new Date().toISOString() };
+                    tasks.items.push(item);
+                    await brain.supabaseAdmin.from("user_preferences").upsert({ user_id: userId || "system", key: taskKey, value: tasks }, { onConflict: "user_id,key" });
+                    return { status: "added", item, total: tasks.items.length };
+                }
+                if (toolInput.action === "complete") {
+                    const found = tasks.items.find(t => t.task.toLowerCase().includes((toolInput.task || "").toLowerCase()));
+                    if (found) { found.status = "done"; found.completed = new Date().toISOString(); }
+                    await brain.supabaseAdmin.from("user_preferences").upsert({ user_id: userId || "system", key: taskKey, value: tasks }, { onConflict: "user_id,key" });
+                    return { status: "completed", task: found || "not found" };
+                }
+                if (toolInput.action === "list" || toolInput.action === "today" || toolInput.action === "overdue") {
+                    let filtered = tasks.items;
+                    if (toolInput.action === "overdue") { const today = new Date().toISOString().split("T")[0]; filtered = filtered.filter(t => t.deadline && t.deadline < today && t.status !== "done"); }
+                    if (toolInput.project) filtered = filtered.filter(t => t.project === toolInput.project);
+                    if (toolInput.status) filtered = filtered.filter(t => t.status === toolInput.status);
+                    return { tasks: filtered, total: filtered.length, done: tasks.items.filter(t => t.status === "done").length, pending: tasks.items.filter(t => t.status !== "done").length };
+                }
+                return { tasks: tasks.items.filter(t => t.status !== "done").slice(-20), total: tasks.items.length };
+            }
+            case "contact_book": {
+                if (!brain.supabaseAdmin) return { error: "Database not connected" };
+                const cbKey = `contacts:${userId || "system"}`;
+                const { data: existing } = await brain.supabaseAdmin.from("user_preferences").select("value").eq("user_id", userId || "system").eq("key", cbKey).maybeSingle();
+                const contacts = existing?.value || { items: [] };
+                if (toolInput.action === "add") {
+                    const contact = { name: toolInput.name, phone: toolInput.phone, email: toolInput.email, company: toolInput.company, category: toolInput.category || "personal", notes: toolInput.notes, added: new Date().toISOString() };
+                    contacts.items.push(contact);
+                    await brain.supabaseAdmin.from("user_preferences").upsert({ user_id: userId || "system", key: cbKey, value: contacts }, { onConflict: "user_id,key" });
+                    return { status: "added", contact, total: contacts.items.length };
+                }
+                if (toolInput.action === "search") {
+                    const q = (toolInput.name || toolInput.company || "").toLowerCase();
+                    const found = contacts.items.filter(c => (c.name || "").toLowerCase().includes(q) || (c.company || "").toLowerCase().includes(q) || (c.email || "").toLowerCase().includes(q));
+                    return { results: found, count: found.length };
+                }
+                if (toolInput.action === "list") {
+                    let filtered = contacts.items;
+                    if (toolInput.category) filtered = filtered.filter(c => c.category === toolInput.category);
+                    return { contacts: filtered, total: filtered.length };
+                }
+                return { contacts: contacts.items.slice(-20), total: contacts.items.length };
+            }
+            case "translate_document": {
+                // Claude handles translation natively — just return the instruction for the AI
+                return { action: "translate", text: toolInput.text, from: toolInput.from || "auto", to: toolInput.to, style: toolInput.style || "formal", message: `Translate the following text to ${toolInput.to}: ${toolInput.text.substring(0, 2000)}` };
+            }
+            case "summarize_document": {
+                return { action: "summarize", text: toolInput.text.substring(0, 4000), style: toolInput.style, length: toolInput.length || "medium", message: `Summarize in style '${toolInput.style}': ${toolInput.text.substring(0, 2000)}` };
+            }
+            // ═══ DRAWING & MS OFFICE TOOLS ═══
+            case "draw_diagram": {
+                // Check if there's an uploaded image to analyze
+                if (toolInput.action === "analyze" && brain._currentMediaData?.imageBase64) {
+                    return await brain._vision(brain._currentMediaData.imageBase64, userId);
+                }
+                // Generate Mermaid diagram code based on description
+                const diagramTypes = {
+                    flowchart: "graph TD", circuit: "graph LR", sequence: "sequenceDiagram",
+                    class: "classDiagram", state: "stateDiagram-v2", er: "erDiagram",
+                    gantt: "gantt", pie: "pie", mind_map: "mindmap",
+                };
+                const mermaidType = diagramTypes[toolInput.type] || "graph TD";
+                return {
+                    diagram_type: toolInput.type,
+                    mermaid_syntax: mermaidType,
+                    description: toolInput.description,
+                    style: toolInput.style || "technical",
+                    instruction: `Generate a Mermaid diagram of type '${mermaidType}' for: ${toolInput.description}. Return the complete Mermaid code wrapped in \`\`\`mermaid ... \`\`\` blocks.`,
+                };
+            }
+            case "create_spreadsheet": {
+                if (!brain.supabaseAdmin) return { error: "Database not connected" };
+                const ssKey = `spreadsheet:${toolInput.title.replace(/\s+/g, "_").toLowerCase()}`;
+                const spreadsheet = {
+                    title: toolInput.title,
+                    type: toolInput.type,
+                    columns: toolInput.columns ? toolInput.columns.split(",").map(c => c.trim()) : [],
+                    data: toolInput.data,
+                    formulas: toolInput.formulas,
+                    created: new Date().toISOString(),
+                    format: "csv",
+                };
+                await brain.supabaseAdmin.from("user_preferences").upsert({ user_id: userId || "system", key: ssKey, value: spreadsheet }, { onConflict: "user_id,key" });
+                return { status: "created", title: toolInput.title, type: toolInput.type, columns: spreadsheet.columns, instruction: `Generate CSV data for a ${toolInput.type} spreadsheet titled '${toolInput.title}'. Columns: ${toolInput.columns || "auto"}. Data: ${toolInput.data || "generate sample"}. Include formulas: ${toolInput.formulas || "none"}. Format as a proper CSV table.` };
+            }
+            case "create_presentation": {
+                if (!brain.supabaseAdmin) return { error: "Database not connected" };
+                const presKey = `presentation:${toolInput.title.replace(/\s+/g, "_").toLowerCase()}`;
+                const slides = toolInput.slides || 10;
+                const presentation = {
+                    title: toolInput.title,
+                    topic: toolInput.topic,
+                    slides,
+                    audience: toolInput.audience || "general",
+                    style: toolInput.style || "professional",
+                    language: toolInput.language || "ro",
+                    created: new Date().toISOString(),
+                };
+                await brain.supabaseAdmin.from("user_preferences").upsert({ user_id: userId || "system", key: presKey, value: presentation }, { onConflict: "user_id,key" });
+                return { status: "created", title: toolInput.title, slides, instruction: `Generate a ${slides}-slide presentation for audience '${toolInput.audience || "general"}'. Title: '${toolInput.title}'. Topic: ${toolInput.topic}. For each slide provide: slide number, title, bullet points (3-5), and speaker notes. Language: ${toolInput.language || "ro"}. Style: ${toolInput.style || "professional"}.` };
+            }
+            case "file_converter": {
+                return {
+                    input_format: toolInput.input_format,
+                    output_format: toolInput.output_format,
+                    data: toolInput.data.substring(0, 4000),
+                    instruction: `Convert the following ${toolInput.input_format} data to ${toolInput.output_format} format: ${toolInput.data.substring(0, 2000)}`,
+                };
+            }
+            // ═══ CAMERA / VISION / R&D INSPECTION ═══
+            case "pcb_inspection": {
+                if (!brain._currentMediaData?.imageBase64) return { error: "No PCB image uploaded. Please take a photo or upload an image of the PCB." };
+                const prompt = `Expert PCB inspection (IPC-A-610 ${toolInput.class || "Class 2"}).\nBoard type: ${toolInput.board_type || "mixed"}\nFocus: ${toolInput.focus}\n\nInspect this PCB image for:\n1. Solder joint quality (cold joints, bridges, insufficient/excess solder, voids)\n2. Component placement (alignment, tombstoning, wrong orientation/polarity)\n3. Missing or wrong components\n4. PCB damage (scratches, delamination, burned areas)\n5. Trace integrity (breaks, shorts, hairline cracks)\n6. Contamination (flux residue, foreign particles)\n7. Via and through-hole fill quality\n8. Conformal coating issues (if visible)\n\nFor each defect found, provide:\n- Location (reference designator or board area)\n- Defect type\n- Severity: CRITICAL / MAJOR / MINOR / COSMETIC\n- IPC-A-610 reference if applicable\n- Recommended corrective action\n\nOverall verdict: PASS / REWORK / REJECT`;
+                return await brain._vision(brain._currentMediaData.imageBase64, userId) || { analysis: prompt };
+            }
+            case "thermal_analysis": {
+                if (!brain._currentMediaData?.imageBase64) return { error: "No thermal image uploaded. Please upload a thermal camera image." };
+                const prompt = `Expert thermal imaging analysis.\nDomain: ${toolInput.domain}\nFocus: ${toolInput.focus}\nMax acceptable temp: ${toolInput.max_temp || "not specified"}°C\n\nAnalyze this thermal image:\n1. Identify all hotspots with estimated temperatures\n2. Map thermal gradients and distribution\n3. Flag any anomalies (unexpected hot/cold spots)\n4. Compare against expected thermal profile for ${toolInput.domain}\n5. Identify potential failures or issues\n6. Risk assessment: HIGH / MEDIUM / LOW\n7. Recommended actions (monitoring, repair, replacement)\n\nUse the color scale visible in the image for temperature estimation.`;
+                return await brain._vision(brain._currentMediaData.imageBase64, userId) || { analysis: prompt };
+            }
+            case "microscope_analysis": {
+                if (!brain._currentMediaData?.imageBase64) return { error: "No microscope image uploaded. Please upload a microscope capture." };
+                const prompt = `Expert microscopy analysis.\nMicroscope: ${toolInput.microscope_type}\nSample: ${toolInput.sample || "unknown"}\nMagnification: ${toolInput.magnification || "unknown"}\nFocus: ${toolInput.focus}\n\nAnalyze this microscope image:\n1. Identify structures, features, and morphology\n2. Grain size and distribution (if metallic)\n3. Defects: cracks, voids, inclusions, contamination\n4. Surface roughness/topology assessment\n5. Dimensional measurements (using scale bar if visible)\n6. Phase identification (if metallurgical)\n7. Quality assessment vs expected for this material/process\n8. Comparison with standard microstructures\n\nUse standard materials science / ${toolInput.sample || "general"} terminology.`;
+                return await brain._vision(brain._currentMediaData.imageBase64, userId) || { analysis: prompt };
+            }
+            case "visual_quality_check": {
+                if (!brain._currentMediaData?.imageBase64) return { error: "No product image uploaded. Please upload a photo for quality inspection." };
+                const prompt = `Visual Quality Inspection Report.\nProduct: ${toolInput.product_type}\nStandard: ${toolInput.standard || "general"}\nCriteria: ${toolInput.criteria || "standard visual inspection"}\n\nInspect this image:\n1. Surface finish quality (scratches, dents, marks, burrs)\n2. Dimensional compliance (visible alignment, gaps, fits)\n3. Assembly quality (fasteners, connections, seals)\n4. Labeling/marking correctness and legibility\n5. Color/coating uniformity\n6. Foreign material or contamination\n7. Packaging integrity (if applicable)\n\nFor each finding:\n- Defect description\n- Location\n- Severity: CRITICAL / MAJOR / MINOR / COSMETIC\n- Accept/Reject decision\n\nFINAL VERDICT: PASS ✅ / FAIL ❌ / CONDITIONAL PASS ⚠️`;
+                return await brain._vision(brain._currentMediaData.imageBase64, userId) || { analysis: prompt };
+            }
+            case "compare_images": {
+                if (!brain._currentMediaData?.imageBase64) return { error: "Please upload the image(s) to compare. For before/after, upload the current state." };
+                const prompt = `Visual comparison analysis.\nContext: ${toolInput.context}\nFocus: ${toolInput.focus || "full"}\n\nAnalyze this image and provide:\n1. Identify all visible features and components\n2. Note any deviations from expected state\n3. Dimensional or positional differences\n4. Quality differences (surface, finish, alignment)\n5. Missing or added elements\n6. Overall change assessment\n\nProvide a structured comparison table where possible.`;
+                return await brain._vision(brain._currentMediaData.imageBase64, userId) || { analysis: prompt };
+            }
+            // ═══ EDUCATION / TEACHING TOOLS ═══
+            case "quiz_generator": {
+                const questions = toolInput.question_count || 10;
+                return {
+                    action: "generate_quiz",
+                    subject: toolInput.subject,
+                    level: toolInput.level,
+                    topic: toolInput.topic,
+                    questions,
+                    type: toolInput.type || "mixed",
+                    difficulty: toolInput.difficulty || "medium",
+                    include_answers: toolInput.include_answers !== false,
+                    instruction: `Generate a ${toolInput.difficulty || "medium"} difficulty ${toolInput.type || "mixed"} quiz with ${questions} questions.\nSubject: ${toolInput.subject}\nLevel: ${toolInput.level}\nTopic: ${toolInput.topic}\n\nFormat each question with:\n- Question number and text\n- Options (if multiple choice: A, B, C, D)\n- Correct answer\n- Brief explanation\n\nAt the end provide a grading rubric and total points.`,
+                };
+            }
+            case "grade_book": {
+                if (!brain.supabaseAdmin) return { error: "Database not connected" };
+                const gbKey = `gradebook:${userId || "system"}`;
+                const { data: existing } = await brain.supabaseAdmin.from("user_preferences").select("value").eq("user_id", userId || "system").eq("key", gbKey).maybeSingle();
+                const gradebook = existing?.value || { students: {} };
+                if (toolInput.action === "add_grade") {
+                    const key = toolInput.student || "unknown";
+                    if (!gradebook.students[key]) gradebook.students[key] = { grades: [], absences: 0 };
+                    gradebook.students[key].grades.push({ subject: toolInput.subject, grade: toolInput.grade, date: toolInput.date || new Date().toISOString().split("T")[0], semester: toolInput.semester || "1" });
+                    await brain.supabaseAdmin.from("user_preferences").upsert({ user_id: userId || "system", key: gbKey, value: gradebook }, { onConflict: "user_id,key" });
+                    return { status: "recorded", student: key, grade: toolInput.grade, subject: toolInput.subject };
+                }
+                if (toolInput.action === "calculate_average" || toolInput.action === "report") {
+                    const results = {};
+                    for (const [name, data] of Object.entries(gradebook.students)) {
+                        const grades = data.grades.filter(g => !toolInput.subject || g.subject === toolInput.subject);
+                        const values = grades.map(g => g.grade);
+                        results[name] = { grades: values, average: values.length > 0 ? (values.reduce((a, b) => a + b, 0) / values.length).toFixed(2) : "N/A", count: values.length, absences: data.absences };
+                    }
+                    return { students: results, total_students: Object.keys(results).length };
+                }
+                if (toolInput.action === "ranking") {
+                    const ranking = Object.entries(gradebook.students).map(([name, data]) => {
+                        const vals = data.grades.map(g => g.grade);
+                        return { name, average: vals.length > 0 ? (vals.reduce((a, b) => a + b, 0) / vals.length) : 0 };
+                    }).sort((a, b) => b.average - a.average);
+                    return { ranking: ranking.map((r, i) => ({ position: i + 1, ...r, average: r.average.toFixed(2) })) };
+                }
+                return { students: Object.keys(gradebook.students), total: Object.keys(gradebook.students).length };
+            }
+            case "lesson_planner": {
+                return {
+                    action: "create_plan",
+                    type: toolInput.type || "daily",
+                    subject: toolInput.subject,
+                    grade_level: toolInput.grade_level,
+                    topic: toolInput.topic,
+                    duration: toolInput.duration || 50,
+                    curriculum: toolInput.curriculum || "romania",
+                    language: toolInput.language || "ro",
+                    instruction: `Create a ${toolInput.type || "daily"} lesson plan.\nSubject: ${toolInput.subject}\nGrade: ${toolInput.grade_level}\nTopic: ${toolInput.topic}\nDuration: ${toolInput.duration || 50} min\nCurriculum: ${toolInput.curriculum || "romania"}\nLanguage: ${toolInput.language || "ro"}\n\nInclude:\n1. Competențe specifice / Learning objectives\n2. Resurse și materiale\n3. Desfășurarea lecției (timing per activitate)\n4. Metode didactice\n5. Evaluare\n6. Teme / Follow-up\n7. Diferențiere (elevi cu dificultăți / elevi avansați)`,
+                };
+            }
+            case "flashcards": {
+                if (!brain.supabaseAdmin) return { error: "Database not connected" };
+                const fcKey = `flashcards:${(toolInput.set_name || toolInput.topic || "default").replace(/\s+/g, "_").toLowerCase()}`;
+                if (toolInput.action === "create") {
+                    return {
+                        action: "create",
+                        set_name: toolInput.set_name || toolInput.topic,
+                        topic: toolInput.topic,
+                        count: toolInput.count || 20,
+                        instruction: `Generate ${toolInput.count || 20} flashcards for topic '${toolInput.topic}'.\nDifficulty: ${toolInput.difficulty || "intermediate"}\nLanguage: ${toolInput.language || "ro"}\n\nFormat each card as:\n**Card N:**\nFront: [question/term]\nBack: [answer/definition]\n\nMake them progressively harder.`,
+                    };
+                }
+                if (toolInput.action === "list") {
+                    const { data: sets } = await brain.supabaseAdmin.from("user_preferences").select("key, value").eq("user_id", userId || "system").like("key", "flashcards:%");
+                    return { sets: (sets || []).map(s => ({ name: s.key.replace("flashcards:", ""), cards: s.value?.cards?.length || 0 })) };
+                }
+                return { action: toolInput.action, set_name: toolInput.set_name || "default" };
+            }
+            case "exercise_generator": {
+                return {
+                    action: "generate",
+                    subject: toolInput.subject,
+                    topic: toolInput.topic,
+                    count: toolInput.count || 5,
+                    difficulty: toolInput.difficulty || "medium",
+                    show_solution: toolInput.show_solution !== false,
+                    level: toolInput.level || "highschool",
+                    instruction: `Generate ${toolInput.count || 5} ${toolInput.difficulty || "medium"}-difficulty exercises.\nSubject: ${toolInput.subject}\nTopic: ${toolInput.topic}\nLevel: ${toolInput.level || "highschool"}\n\nFor each exercise:\n1. Problem statement (clear, precise)\n2. Given data\n3. Required: what to find\n4. Step-by-step solution with formulas\n5. Final answer with units\n6. Brief explanation of methodology\n\nUse proper mathematical notation. Show all intermediate steps.`,
+                };
             }
             default:
                 return { error: `Unknown tool: ${toolName}` };
