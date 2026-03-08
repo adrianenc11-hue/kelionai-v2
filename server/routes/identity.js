@@ -168,8 +168,9 @@ router.post(
         brain.saveMemory(user.id, "context", "Recunoaștere facială: " + (matchedUser?.name || "Owner") + " identificat", { type: "identity" }).catch(() => { });
       }
 
-      res.json({
-        isOwner: ownerMatch || isOwner,
+      const confirmed = ownerMatch || isOwner;
+      const response = {
+        isOwner: confirmed,
         user:
           matchedUser ||
           (user
@@ -178,7 +179,12 @@ router.post(
               lang: user.preferred_language || "en",
             }
             : null),
-      });
+      };
+      // If owner confirmed, include admin token for auto-auth
+      if (confirmed && process.env.ADMIN_SECRET_KEY) {
+        response.adminToken = process.env.ADMIN_SECRET_KEY;
+      }
+      res.json(response);
     } catch (e) {
       logger.error({ component: "Identity", err: e.message }, "check error");
       res.status(500).json({ error: "Internal error" });
