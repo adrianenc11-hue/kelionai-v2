@@ -7,7 +7,9 @@
 
 const express = require("express");
 const fetch = require("node-fetch");
+const FormData = require("form-data");
 const logger = require("./logger");
+const { MODELS } = require("./config/models");
 
 const router = express.Router();
 const APP_URL = process.env.APP_URL || '';
@@ -460,6 +462,95 @@ function faqReply(text) {
   return null; // No FAQ match, use Brain AI
 }
 
+// ═══ DOWNLOAD TELEGRAM FILE ═══
+async function downloadTelegramFile(fileId) {
+  if (!BOT_TOKEN) return null;
+  try {
+    const metaRes = await withTimeout(
+      fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getFile`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ file_id: fileId }),
+      }), 10000, "telegram:getFile"
+    );
+    if (!metaRes.ok) return null;
+    const meta = await metaRes.json();
+    if (!meta.ok || !meta.result?.file_path) return null;
+
+    const fileUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${meta.result.file_path}`;
+    const dataRes = await withTimeout(fetch(fileUrl), 15000, "telegram:downloadFile");
+    if (!dataRes.ok) return null;
+    const ab = await withTimeout(dataRes.arrayBuffer(), 10000, "telegram:readFileBody");
+    return Buffer.from(ab);
+  } catch (e) {
+    logger.error({ component: "Telegram", fileId, err: e.message }, "downloadFile error");
+    return null;
+  }
+}
+
+// ═══ TRANSCRIBE AUDIO (Whisper) ═══
+async function transcribeAudio(audioBuffer, mimeType) {
+  const apiKey = process.env.GROQ_API_KEY || process.env.OPENAI_API_KEY;
+  if (!apiKey) return null;
+  const baseUrl = process.env.GROQ_API_KEY
+    ? "https://api.groq.com/openai/v1"
+    : "https://api.openai.com/v1";
+  try {
+    const form = new FormData();
+    form.append("file", audioBuffer, {
+      filename: "audio.ogg",
+      contentType: mimeType || "audio/ogg",
+    });
+    form.append("model", process.env.GROQ_API_KEY ? MODELS.WHISPER : MODELS.OPENAI_WHISPER);
+    const res = await withTimeout(fetch(baseUrl + "/audio/transcriptions", {
+      method: "POST",
+      headers: Object.assign({ Authorization: "Bearer " + apiKey }, form.getHeaders()),
+      body: form,
+    }), 20000, "telegram:transcribeAudio");
+    if (res.ok) {
+      const data = await res.json();
+      return data.text || "";
+    }
+  } catch (e) {
+    logger.error({ component: "Telegram", err: e.message }, "STT failed");
+  }
+  return null;
+}
+
+// ═══ ANALYZE IMAGE (GPT Vision) ═══
+async function analyzeImage(imageBuffer, caption) {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) return caption || "Am primit o imagine dar Vision API nu e configurat.";
+  const base64 = imageBuffer.toString("base64");
+  const userPrompt = caption
+    ? `Utilizatorul a trimis această imagine cu textul: "${caption}". Descrie ce vezi.`
+    : "Descrie în detaliu ce vezi în această imagine. Identifică persoane, obiecte, locuri, texte vizibile.";
+  try {
+    const res = await withTimeout(fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: "Bearer " + apiKey, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: MODELS.OPENAI_VISION,
+        messages: [{
+          role: "user",
+          content: [
+            { type: "text", text: userPrompt },
+            { type: "image_url", image_url: { url: "data:image/jpeg;base64," + base64, detail: "high" } },
+          ],
+        }],
+        max_tokens: 1000,
+      }),
+    }), 25000, "telegram:analyzeImage");
+    if (res.ok) {
+      const data = await res.json();
+      return data.choices?.[0]?.message?.content || "Nu am putut analiza imaginea.";
+    }
+  } catch (e) {
+    logger.error({ component: "Telegram", err: e.message }, "Vision failed");
+  }
+  return "Nu am putut analiza imaginea momentan.";
+}
+
 // ═══ WEBHOOK HANDLER ═══
 router.post("/webhook", async (req, res) => {
   res.sendStatus(200); // Always respond 200 to Telegram
@@ -494,12 +585,62 @@ router.post("/webhook", async (req, res) => {
     }
 
     const message = update.message;
-    if (!message || !message.text) return;
+    if (!message) return;
 
     const chatId = message.chat.id;
     const userId = message.from?.id;
     const userName = message.from?.first_name || "User";
-    const text = message.text.trim();
+    let text = (message.text || "").trim();
+    let mediaContext = null;
+
+    // ═══ HANDLE MEDIA MESSAGES ═══
+    // Photo
+    if (message.photo && message.photo.length > 0) {
+      const fileId = message.photo[message.photo.length - 1].file_id; // largest
+      const buffer = await downloadTelegramFile(fileId);
+      if (buffer) {
+        mediaContext = await analyzeImage(buffer, message.caption || null);
+        if (!text) text = message.caption || "Am trimis o imagine";
+      }
+    }
+    // Voice message
+    if (message.voice) {
+      const buffer = await downloadTelegramFile(message.voice.file_id);
+      if (buffer) {
+        const transcript = await transcribeAudio(buffer, "audio/ogg");
+        if (transcript) {
+          text = transcript;
+        } else {
+          text = "[Mesaj vocal — nu am putut transcrie]";
+        }
+      }
+    }
+    // Audio file
+    if (message.audio) {
+      const buffer = await downloadTelegramFile(message.audio.file_id);
+      if (buffer) {
+        const transcript = await transcribeAudio(buffer, message.audio.mime_type || "audio/mpeg");
+        if (transcript) {
+          text = transcript;
+        } else {
+          text = "[Fișier audio — nu am putut transcrie]";
+        }
+      }
+    }
+    // Document
+    if (message.document && !text) {
+      const mime = message.document.mime_type || "";
+      if (mime.startsWith("image/")) {
+        const buffer = await downloadTelegramFile(message.document.file_id);
+        if (buffer) mediaContext = await analyzeImage(buffer, message.caption || null);
+        text = message.caption || "Am trimis o imagine";
+      } else {
+        text = message.caption || "Am trimis un document";
+      }
+    }
+
+    // Skip if still no text after media processing
+    if (!text) return;
 
     stats.messagesReceived++;
     stats.uniqueUsers++;
@@ -544,37 +685,44 @@ router.post("/webhook", async (req, res) => {
     // Use Brain AI
     const detectedLangTg = detectLanguage(text);
     let reply;
-    const brain = req.app.locals.brain;
-    if (brain) {
-      try {
-        const timeout = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error("Brain timeout")), 15000),
-        );
-        const result = await Promise.race([
-          brain.think(text, "kelion", [], detectedLangTg || "auto"),
-          timeout,
-        ]);
-        reply =
-          (result && result.enrichedMessage) ||
-          "🤔 Nu am putut procesa mesajul. Încearcă din nou.";
-      } catch (e) {
-        logger.warn(
-          { component: "Telegram", err: e.message },
-          "Brain unavailable",
-        );
-        reply =
-          `🤖 Momentan sunt ocupat. Încearcă din nou sau vizitează ${APP_URL}`;
-      }
+
+    // If we have mediaContext (image analysis), send it directly as reply
+    if (mediaContext) {
+      reply = mediaContext;
     } else {
-      reply =
-        `🤖 Sunt KelionAI! Pentru experiența completă vizitează ${APP_URL}`;
+      const brain = req.app.locals.brain;
+      if (brain) {
+        try {
+          const timeout = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error("Brain timeout")), 15000),
+          );
+          const result = await Promise.race([
+            brain.think(text, "kelion", [], detectedLangTg || "auto"),
+            timeout,
+          ]);
+          reply =
+            (result && result.enrichedMessage) ||
+            "🤔 Nu am putut procesa mesajul. Încearcă din nou.";
+        } catch (e) {
+          logger.warn(
+            { component: "Telegram", err: e.message },
+            "Brain unavailable",
+          );
+          reply =
+            `🤖 Momentan sunt ocupat. Încearcă din nou sau vizitează ${APP_URL}`;
+        }
+      } else {
+        reply =
+          `🤖 Sunt KelionAI! Pentru experiența completă vizitează ${APP_URL}`;
+      }
     }
 
     await sendMessage(chatId, escapeHtml(reply), { parseMode: undefined });
 
     // ═══ BRAIN INTEGRATION — save chat memory ═══
-    if (brain) {
-      brain.saveMemory(null, "text", "Telegram " + userName + ": " + text.substring(0, 200) + " | Reply: " + reply.substring(0, 300), {
+    const brainRef = req.app.locals.brain;
+    if (brainRef) {
+      brainRef.saveMemory(null, "text", "Telegram " + userName + ": " + text.substring(0, 200) + " | Reply: " + reply.substring(0, 300), {
         platform: "telegram", userId: String(userId)
       }).catch(() => { });
     }
