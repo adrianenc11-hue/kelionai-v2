@@ -403,12 +403,54 @@ When asked "what can you do?" list these real capabilities. Use them proactively
   }
 
   // ═══════════════════════════════════════════════════════════
-  // MEMORY SYSTEM — Load/Save to Supabase (Enhanced with relevance scoring)
+  // ═══════════════════════════════════════════════════════════
+  // EMBEDDING HELPER — OpenAI text-embedding-3-small (1536 dims)
+  // ═══════════════════════════════════════════════════════════
+  async getEmbedding(text) {
+    if (!process.env.OPENAI_API_KEY || !text) return null;
+    try {
+      const r = await fetch("https://api.openai.com/v1/embeddings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
+        body: JSON.stringify({ model: "text-embedding-3-small", input: text.substring(0, 500) }),
+      });
+      if (!r.ok) return null;
+      const d = await r.json();
+      return d.data?.[0]?.embedding || null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // MEMORY SYSTEM — Load/Save to Supabase (Enhanced with pgvector semantic search)
   // ═══════════════════════════════════════════════════════════
   async loadMemory(userId, type, limit = 10, contextHint = "") {
     if (!userId || !this.supabaseAdmin) return [];
     try {
-      // Fetch more than needed so we can re-rank by relevance
+      // ── TRY SEMANTIC SEARCH (pgvector) if contextHint provided ──
+      if (contextHint && contextHint.length > 5) {
+        try {
+          const embedding = await this.getEmbedding(contextHint);
+          if (embedding) {
+            const { data: vectorResults, error: vecErr } = await this.supabaseAdmin.rpc("match_memories", {
+              query_embedding: embedding,
+              match_user_id: userId,
+              match_type: type,
+              match_count: limit,
+              match_threshold: 0.3,
+            });
+            if (!vecErr && vectorResults && vectorResults.length > 0) {
+              logger.info({ component: "Brain", count: vectorResults.length, type }, "🧠 pgvector semantic memory hit");
+              return vectorResults;
+            }
+          }
+        } catch (vecE) {
+          // pgvector not available or function doesn't exist yet — fallback silently
+        }
+      }
+
+      // ── FALLBACK: keyword-based relevance scoring ──
       const fetchLimit = Math.min(limit * 3, 50);
       const { data, error } = await this.supabaseAdmin
         .from("brain_memory")
@@ -426,13 +468,11 @@ When asked "what can you do?" list these real capabilities. Use them proactively
       // Relevance scoring: boost memories that share keywords with current context
       const hintWords = contextHint.toLowerCase().split(/\s+/).filter(w => w.length > 3);
       const scored = data.map((m) => {
-        let score = (m.importance || 5) / 10; // base: importance (0-1)
-        // Recency bonus: memories from last hour get +0.3, last day +0.15
+        let score = (m.importance || 5) / 10;
         const ageHours = (Date.now() - new Date(m.created_at).getTime()) / 3600000;
         if (ageHours < 1) score += 0.3;
         else if (ageHours < 24) score += 0.15;
         else if (ageHours < 168) score += 0.05;
-        // Keyword relevance bonus
         if (hintWords.length > 0 && m.content) {
           const contentLow = m.content.toLowerCase();
           const matchCount = hintWords.filter(w => contentLow.includes(w)).length;
@@ -441,7 +481,6 @@ When asked "what can you do?" list these real capabilities. Use them proactively
         return { ...m, _relevanceScore: score };
       });
 
-      // Sort by relevance score (highest first) and take top N
       scored.sort((a, b) => b._relevanceScore - a._relevanceScore);
       return scored.slice(0, limit);
     } catch (e) {
@@ -453,13 +492,17 @@ When asked "what can you do?" list these real capabilities. Use them proactively
   async saveMemory(userId, type, content, context = {}, importance = 5) {
     if (!userId || !this.supabaseAdmin || !content) return;
     try {
-      await this.supabaseAdmin.from("brain_memory").insert({
+      // Generate embedding for semantic search (async, non-blocking)
+      const embedding = await this.getEmbedding(content);
+      const row = {
         user_id: userId,
         memory_type: type,
         content: content.substring(0, 2000),
         context,
         importance,
-      });
+      };
+      if (embedding) row.embedding = embedding;
+      await this.supabaseAdmin.from("brain_memory").insert(row);
     } catch (e) {
       logger.warn({ component: "Brain", err: e.message }, "saveMemory error");
     }
