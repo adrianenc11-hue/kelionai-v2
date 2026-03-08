@@ -15,6 +15,7 @@
 // ═══════════════════════════════════════════════════════════════
 const logger = require("./logger");
 const { MODELS } = require("./config/models");
+const { UserProfile, LearningStore, AutonomousMonitor } = require("./brain-profile");
 
 class KelionBrain {
   constructor(config) {
@@ -56,18 +57,62 @@ class KelionBrain {
     // ── Self-Improvement Journal ──
     this.journal = []; // { timestamp, event, lesson, applied }
     this.strategies = {
-      // learned optimal strategies
-      searchRefinement: [], // queries that worked better after refinement
-      emotionResponses: {}, // what worked for each emotional state
-      toolCombinations: {}, // which tool combos work best together
-      failureRecoveries: [], // successful recovery strategies
+      searchRefinement: [],
+      emotionResponses: {},
+      toolCombinations: {},
+      failureRecoveries: [],
     };
 
     // ── Conversation Summarizer ──
-    this.conversationSummaries = new Map(); // conversationId → compressed summary
+    this.conversationSummaries = new Map();
 
     // ── Learning Rate Limiter ──
-    this.lastLearnTime = new Map(); // userId → timestamp of last learning extraction
+    this.lastLearnTime = new Map();
+
+    // ══ BRAIN v3.0 — Intelligence Systems ══
+
+    // ── Learning Store (pattern learning + circuit breaker) ──
+    this.learningStore = new LearningStore();
+    this.learningStore.load(this.supabaseAdmin).catch(() => { });
+
+    // ── Autonomous Monitor (30min health loop) ──
+    this.autonomousMonitor = new AutonomousMonitor(this);
+    this.autonomousMonitor.start();
+
+    // ── User Profile Cache ──
+    this._profileCache = new Map(); // userId → { profile, loadedAt }
+    this._profileTTL = 10 * 60 * 1000; // cache profiles for 10 min
+
+    // ── Multi-Agent Profiles ──
+    this.agents = {
+      research: {
+        name: "ResearchAgent",
+        systemPrompt: "You are a precise research analyst. Focus on facts, sources, verification. Cite sources when possible. Be thorough but concise.",
+        preferredTools: ["search", "memory"],
+        triggerTopics: ["news", "science", "history", "facts", "research"],
+      },
+      creative: {
+        name: "CreativeAgent",
+        systemPrompt: "You are a creative artist and storyteller. Use vivid language, metaphors, and imagination. Be expressive and engaging.",
+        preferredTools: ["imagine", "video"],
+        triggerTopics: ["art", "music", "story", "creative", "design", "imagine"],
+      },
+      analytics: {
+        name: "AnalyticsAgent",
+        systemPrompt: "You are a data analyst. Focus on numbers, trends, comparisons. Use structured data presentation. Be precise with statistics.",
+        preferredTools: ["search", "weather", "trade"],
+        triggerTopics: ["trading", "finance", "data", "statistics", "costs", "analysis"],
+      },
+      support: {
+        name: "SupportAgent",
+        systemPrompt: "You are a helpful support agent. Be patient, empathetic, and solution-focused. Guide users step by step.",
+        preferredTools: ["memory"],
+        triggerTopics: ["help", "error", "problem", "support", "how to", "tutorial"],
+      },
+    };
+
+    logger.info({ component: "Brain" },
+      "🧠 Brain v3.0 initialized: LearningStore + AutonomousMonitor + MultiAgent + UserProfiles");
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -227,6 +272,81 @@ When asked "what can you do?" list these real capabilities. Use them proactively
   }
 
   // ═══════════════════════════════════════════════════════════
+  // BRAIN v3.0 — Intelligence Helper Methods
+  // ═══════════════════════════════════════════════════════════
+
+  // Cached user profile loading (TTL = 10 min)
+  async _loadProfileCached(userId) {
+    if (!userId || !this.supabaseAdmin) return null;
+    const cached = this._profileCache.get(userId);
+    if (cached && Date.now() - cached.loadedAt < this._profileTTL) {
+      return cached.profile;
+    }
+    try {
+      const profile = await UserProfile.load(userId, this.supabaseAdmin);
+      this._profileCache.set(userId, { profile, loadedAt: Date.now() });
+      // Clean old cache entries (keep max 100)
+      if (this._profileCache.size > 100) {
+        const oldest = [...this._profileCache.entries()]
+          .sort((a, b) => a[1].loadedAt - b[1].loadedAt)[0];
+        if (oldest) this._profileCache.delete(oldest[0]);
+      }
+      return profile;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // Multi-agent: select best agent based on analysis topics
+  _selectAgent(analysis) {
+    if (!analysis || !analysis.topics || analysis.topics.length === 0) return null;
+    const topics = analysis.topics.map(t => t.toLowerCase());
+
+    let bestAgent = null;
+    let bestScore = 0;
+
+    for (const [key, agent] of Object.entries(this.agents)) {
+      let score = 0;
+      for (const topic of topics) {
+        for (const trigger of agent.triggerTopics) {
+          if (topic.includes(trigger) || trigger.includes(topic)) {
+            score++;
+          }
+        }
+      }
+      if (score > bestScore) {
+        bestScore = score;
+        bestAgent = agent;
+      }
+    }
+
+    return bestScore > 0 ? bestAgent : null;
+  }
+
+  // Confidence scoring: how confident is the brain in its response
+  _scoreConfidence(analysis, results, chainOfThought) {
+    let score = 0.5; // baseline
+
+    // Tools successfully returned results
+    const toolCount = Object.keys(results).length;
+    if (toolCount > 0) score += 0.15;
+    if (toolCount > 2) score += 0.1;
+
+    // Chain of thought ran (=deep reasoning)
+    if (chainOfThought) score += 0.1;
+
+    // High confidence flags
+    if (analysis.isGreeting) score = 0.95; // greetings are easy
+    if (analysis.isEmergency) score = Math.max(score, 0.9); // must be confident
+
+    // Low confidence flags
+    if (analysis.needsSearch && !results.search) score -= 0.2; // needed search but didn't get it
+    if (analysis.complexity === "complex" && !chainOfThought) score -= 0.15;
+
+    return Math.max(0.1, Math.min(1.0, Math.round(score * 100) / 100));
+  }
+
+  // ═══════════════════════════════════════════════════════════
   // MAIN ENTRY — Complete thinking loop
   // ═══════════════════════════════════════════════════════════
   async think(
@@ -245,18 +365,33 @@ When asked "what can you do?" list these real capabilities. Use them proactively
     this._currentMediaData = mediaData || {};
 
     try {
-      // Step 0: LOAD MEMORY — brain wakes up with context
-      const [memories, visualMem, audioMem, facts] = await Promise.all([
+      // Step 0: LOAD MEMORY + USER PROFILE — brain wakes up with full context
+      const [memories, visualMem, audioMem, facts, profile] = await Promise.all([
         this.loadMemory(userId, "text", 10),
         this.loadMemory(userId, "visual", 5),
         this.loadMemory(userId, "audio", 5),
         this.loadFacts(userId, 15),
+        this._loadProfileCached(userId),
       ]);
       const memoryContext = this.buildMemoryContext(memories, visualMem, audioMem, facts);
       this._currentMemoryContext = memoryContext;
+      this._currentProfile = profile;
+
+      // Inject profile context into memory
+      const profileContext = profile ? profile.toContextString() : "";
+      if (profileContext) {
+        this._currentMemoryContext = profileContext + " || " + memoryContext;
+      }
 
       // Step 1: ANALYZE intent deeply
       const analysis = this.analyzeIntent(message, language);
+
+      // Step 1.5: MULTI-AGENT — select best agent for this task
+      const agent = this._selectAgent(analysis);
+      if (agent) {
+        this._currentAgentPrompt = agent.systemPrompt;
+        logger.info({ component: "Brain", agent: agent.name }, `🤖 Delegated to ${agent.name}`);
+      }
 
       // Step 2: DECOMPOSE complex tasks into sub-tasks
       let subTasks = [{ message, analysis }];
@@ -264,16 +399,37 @@ When asked "what can you do?" list these real capabilities. Use them proactively
         subTasks = await this.decomposeTask(message, analysis, language);
       }
 
-      // Step 3: PLAN tools for each sub-task
-      const plan = this.buildPlan(
+      // Step 2.5: LEARNING — check if we have learned patterns for this type
+      const learnedTools = this.learningStore.recommendTools(analysis);
+      if (learnedTools) {
+        logger.info({ component: "Brain", learned: learnedTools }, "📚 Using learned tool pattern");
+      }
+
+      // Step 3: PLAN tools for each sub-task (with circuit breaker)
+      let plan = this.buildPlan(
         subTasks,
         userId,
         this._currentMediaData,
         isAdmin,
       );
 
+      // Filter out circuit-broken tools
+      plan = plan.filter(step => {
+        if (this.learningStore.isToolBlocked(step.tool)) {
+          logger.warn({ component: "Brain", tool: step.tool }, `⚡ Tool ${step.tool} circuit-broken — skipped`);
+          return false;
+        }
+        return true;
+      });
+
       // Step 4: EXECUTE tools in parallel
       const results = await this.executePlan(plan);
+
+      // Record tool outcomes for learning
+      for (const step of plan) {
+        if (results[step.tool]) this.learningStore.recordToolSuccess(step.tool);
+        else this.learningStore.recordToolFailure(step.tool);
+      }
 
       // Step 5: CHAIN-OF-THOUGHT — pre-reason only for complex+tools or emergencies
       let chainOfThought = null;
@@ -299,16 +455,26 @@ When asked "what can you do?" list these real capabilities. Use them proactively
         analysis,
       );
 
+      // Step 6.5: CONFIDENCE SCORING
+      const confidence = this._scoreConfidence(analysis, results, chainOfThought);
+
       // Step 7: COMPRESS conversation if too long
       const compressedHistory = this.compressHistory(history, conversationId);
 
-      // Step 8: SELF-EVALUATE (async — doesn't block response)
+      // Step 8: SELF-EVALUATE + LEARN (async — doesn't block response)
       const thinkTime = Date.now() - startTime;
       this.journalEntry(
         "think_complete",
-        `${analysis.complexity} task, ${plan.length} tools, ${thinkTime}ms`,
-        { tools: Object.keys(results), complexity: analysis.complexity },
+        `${analysis.complexity} task, ${plan.length} tools, ${thinkTime}ms, confidence:${confidence}`,
+        { tools: Object.keys(results), complexity: analysis.complexity, confidence },
       );
+
+      // Learn from this conversation (async)
+      this.learningStore.recordOutcome(analysis, Object.keys(results), true, thinkTime, this.supabaseAdmin).catch(() => { });
+      if (profile) {
+        profile.updateFromConversation(message, language, analysis);
+        profile.save(this.supabaseAdmin).catch(() => { });
+      }
 
       logger.info(
         {
@@ -340,6 +506,9 @@ When asked "what can you do?" list these real capabilities. Use them proactively
         compressedHistory,
         failedTools: plan.filter((p) => !results[p.tool]).map((p) => p.tool),
         thinkTime,
+        confidence,
+        agent: agent ? agent.name : "default",
+        profileLoaded: !!profile,
       };
     } catch (e) {
       const thinkTime = Date.now() - startTime;
