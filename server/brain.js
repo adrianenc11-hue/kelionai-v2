@@ -2957,13 +2957,17 @@ Reply STRICTLY with JSON:
     return { type: "health", ...result };
   }
 
-  // ── TRADE INTELLIGENCE — Real analysis from trade-intelligence.js ──
+  // ── TRADE INTELLIGENCE — FULL integration with all trading modules ──
   async _tradeIntelligence() {
     try {
       const ti = require("./trade-intelligence");
+      const wsEngine = require("./ws-engine");
+      const marketLearner = require("./market-learner");
+      const forexEngine = require("./forex-engine");
+      const perfTracker = require("./performance-tracker");
       const results = {};
 
-      // Fetch market news sentiment
+      // 1. Market News Sentiment
       try {
         const news = await ti.fetchMarketNews("crypto");
         if (news && news.length > 0) {
@@ -2976,45 +2980,137 @@ Reply STRICTLY with JSON:
         results.sentimentError = e.message;
       }
 
-      // Economic calendar risks
+      // 2. Economic Calendar Risks
       try {
         results.calendarRisks = ti.getEconomicCalendarRisks();
       } catch (e) {
         results.calendarError = e.message;
       }
 
-      const summary = `Sentiment: ${results.sentiment?.toFixed(2) || "N/A"} | News: ${results.newsCount || 0} articles | Calendar risks: ${results.calendarRisks?.events?.length || 0}`;
+      // 3. Technical Analysis for key crypto assets
+      const assets = ["BTC", "ETH", "SOL"];
+      const cgIds = { BTC: "bitcoin", ETH: "ethereum", SOL: "solana" };
+      results.technicalAnalysis = {};
+      for (const asset of assets) {
+        try {
+          let prices = [], volumes = [];
+          // Try WS-Engine first (real-time)
+          try {
+            const candles = wsEngine.getCandles ? wsEngine.getCandles(asset, "1m", 100) : null;
+            if (candles && candles.length >= 20) {
+              prices = candles.map(c => c.close);
+              volumes = candles.map(c => c.volume || 0);
+            }
+          } catch (_) { /* fallback */ }
+          // Fallback: CoinGecko
+          if (prices.length < 14) {
+            try {
+              const r = await fetch(`https://api.coingecko.com/api/v3/coins/${cgIds[asset]}/market_chart?vs_currency=usd&days=7`);
+              if (r.ok) {
+                const d = await r.json();
+                prices = (d.prices || []).map(p => p[1]).slice(-100);
+                volumes = (d.total_volumes || []).map(v => v[1]).slice(-100);
+              }
+            } catch (_) { /* no data */ }
+          }
+          if (prices.length >= 14) {
+            const rsi = this._calcRSI(prices);
+            const macd = this._calcMACD(prices);
+            const last = prices[prices.length - 1];
+            // Confluence
+            const scoreMap = { BUY: 1, SELL: -1, HOLD: 0 };
+            const signals = [rsi.signal, macd.crossSignal].filter(Boolean);
+            const avg = signals.length > 0 ? signals.reduce((s, sig) => s + (scoreMap[sig] || 0), 0) / signals.length : 0;
+            let confluence = "HOLD";
+            if (avg >= 0.5) confluence = "BUY";
+            else if (avg <= -0.5) confluence = "SELL";
 
-      // Save to Supabase
+            results.technicalAnalysis[asset] = {
+              price: Math.round(last * 100) / 100,
+              rsi: rsi.value, rsiSignal: rsi.signal,
+              macdSignal: macd.crossSignal,
+              confluence, confidence: Math.round(Math.abs(avg) * 100),
+            };
+          }
+        } catch (e) {
+          results.technicalAnalysis[asset] = { error: e.message };
+        }
+      }
+
+      // 4. MarketLearner adaptive weights
+      try {
+        results.learnedWeights = marketLearner.getWeights ? marketLearner.getWeights() : {};
+      } catch (_) { }
+
+      // 5. Forex Session Info
+      try {
+        results.forex = {
+          currentSession: forexEngine.getCurrentSession ? forexEngine.getCurrentSession() : null,
+          bestPairs: forexEngine.getBestPairsNow ? forexEngine.getBestPairsNow() : null,
+        };
+      } catch (_) { }
+
+      // 6. Performance Stats
+      try {
+        if (perfTracker.getStats) results.performance = perfTracker.getStats();
+      } catch (_) { }
+
+      // 7. WS-Engine status
+      try {
+        results.realTimeStatus = {
+          connected: wsEngine.isConnected ? wsEngine.isConnected() : false,
+          assetsTracking: wsEngine.getTrackedAssets ? wsEngine.getTrackedAssets() : [],
+        };
+      } catch (_) { }
+
+      const btc = results.technicalAnalysis?.BTC || {};
+      const summary = `BTC: $${btc.price || "?"} RSI:${btc.rsi || "?"} (${btc.rsiSignal || "?"}) MACD:${btc.macdSignal || "?"} Confluence:${btc.confluence || "?"} (${btc.confidence || 0}%) | Sentiment:${results.sentiment?.toFixed(2) || "N/A"} | Forex:${results.forex?.currentSession?.name || "?"}`;
+
       if (this.supabaseAdmin) {
         try {
           await this.supabaseAdmin.from("trade_intelligence").insert({
-            asset: "BTC",
-            analysis_type: "full_scan",
-            result: results,
-            sentiment_score: results.sentiment || 0,
-            confidence: results.newsCount > 5 ? 0.8 : 0.5,
-            created_at: new Date().toISOString(),
+            asset: "MULTI", analysis_type: "full_brain_scan",
+            result: results, sentiment_score: results.sentiment || 0,
+            confidence: btc.confidence || 50, created_at: new Date().toISOString(),
           });
-          await this.supabaseAdmin.from("admin_logs").insert({
-            action: "trade_intelligence",
-            details: summary,
-            source: "brain_chat",
-            created_at: new Date().toISOString(),
-          });
-        } catch (e) {
-          logger.warn({ component: "Brain", err: e.message }, "ok");
-        }
+        } catch (_) { }
       }
 
       return { type: "tradeIntelligence", data: results, summary };
     } catch (e) {
-      return {
-        type: "tradeIntelligence",
-        error: e.message,
-        summary: `Eroare: ${e.message}`,
-      };
+      return { type: "tradeIntelligence", error: e.message, summary: `Eroare: ${e.message}` };
     }
+  }
+
+  // ── Inline TA helpers (avoid circular dependency with trading.js Router) ──
+  _calcRSI(prices, period = 14) {
+    if (!prices || prices.length < period + 1) return { value: 50, signal: "HOLD" };
+    let gains = 0, losses = 0;
+    for (let i = 1; i <= period; i++) {
+      const d = prices[i] - prices[i - 1];
+      if (d >= 0) gains += d; else losses += Math.abs(d);
+    }
+    let avgG = gains / period, avgL = losses / period;
+    for (let i = period + 1; i < prices.length; i++) {
+      const d = prices[i] - prices[i - 1];
+      avgG = (avgG * (period - 1) + (d >= 0 ? d : 0)) / period;
+      avgL = (avgL * (period - 1) + (d < 0 ? Math.abs(d) : 0)) / period;
+    }
+    if (avgL === 0) return { value: 100, signal: "SELL" };
+    const v = 100 - 100 / (1 + avgG / avgL);
+    return { value: Math.round(v * 100) / 100, signal: v < 30 ? "BUY" : v > 70 ? "SELL" : "HOLD" };
+  }
+
+  _calcMACD(prices) {
+    if (!prices || prices.length < 35) return { crossSignal: "HOLD" };
+    const ema = (p, per) => { const k = 2 / (per + 1); const e = [p[0]]; for (let i = 1; i < p.length; i++) e.push(p[i] * k + e[i - 1] * (1 - k)); return e; };
+    const fast = ema(prices, 12), slow = ema(prices, 26);
+    const macdLine = fast.map((v, i) => v - slow[i]);
+    const sig = ema(macdLine.slice(25), 9);
+    const li = macdLine.length - 1, si = sig.length - 1;
+    const prev = (macdLine[li - 1] || 0) <= (sig[si - 1] || 0);
+    const curr = macdLine[li] > sig[si];
+    return { crossSignal: prev && curr ? "BUY" : !prev && !curr ? "SELL" : "HOLD" };
   }
 
   // ── COOKIE CONSENT — GDPR Cookie Management ──
