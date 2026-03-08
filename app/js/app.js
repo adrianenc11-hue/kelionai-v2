@@ -465,12 +465,32 @@
                     hideWelcome(); addMessage('user', '🔑 [cod admin]');
                     if (codeData.action === 'enter') {
                         adminSecret = codeData.secret;
+                        sessionStorage.setItem('kelion_admin_secret', codeData.secret);
                         addMessage('assistant', '🔓 ' + codeData.message + ' Ai acces la: diagnoza brain, credit AI, trafic site.');
                         if (window.KVoice) KVoice.speak('Admin mode activat! Ai acces complet.');
+                        // Unlock admin button
+                        var ab = document.getElementById('btn-admin');
+                        if (ab) {
+                            ab.dataset.locked = 'false';
+                            ab.style.cssText = 'padding:8px 14px;font-size:0.85rem;background:rgba(16,185,129,0.2);border:1px solid rgba(16,185,129,0.5);border-radius:8px;color:#34d399;cursor:pointer;font-family:var(--kelion-font);transition:all 0.4s;opacity:1;';
+                            ab.title = 'Admin Panel — Unlocked';
+                            ab.textContent = '🛡️ Admin';
+                            ab.onclick = function () { window.open('/admin/', '_blank'); };
+                        }
                     } else if (codeData.action === 'exit') {
                         adminSecret = null;
+                        sessionStorage.removeItem('kelion_admin_secret');
                         addMessage('assistant', '🔒 ' + codeData.message);
                         if (window.KVoice) KVoice.speak('Admin mode dezactivat.');
+                        // Re-lock admin button
+                        var ab2 = document.getElementById('btn-admin');
+                        if (ab2) {
+                            ab2.dataset.locked = 'true';
+                            ab2.style.cssText = 'padding:8px 14px;font-size:0.85rem;background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);border-radius:8px;color:#fca5a5;cursor:not-allowed;font-family:var(--kelion-font);transition:all 0.4s;opacity:0.7;';
+                            ab2.title = 'Admin Panel — Locked';
+                            ab2.textContent = '🔒 Admin';
+                            ab2.onclick = null;
+                        }
                     }
                     return;
                 }
