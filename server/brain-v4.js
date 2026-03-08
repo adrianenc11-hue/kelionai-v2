@@ -627,6 +627,170 @@ const TOOL_DEFINITIONS = [
             required: ["subject", "topic"],
         },
     },
+    // ═══ LEGAL / JURIDIC ═══
+    {
+        name: "legal_consultant",
+        description: "Legal consultation tool. Romanian law (Cod Civil, Cod Penal, Codul Muncii, GDPR, OUG), EU law, international. Drafts contracts, analyzes clauses, explains legal terms. ⚠️ For informational purposes only, not legal advice.",
+        input_schema: {
+            type: "object",
+            properties: {
+                action: { type: "string", description: "Action: 'explain_law', 'draft_contract', 'analyze_contract', 'rights', 'procedure', 'deadline', 'template'" },
+                domain: { type: "string", description: "Legal domain: 'civil', 'penal', 'muncii', 'comercial', 'fiscal', 'gdpr', 'proprietate', 'familie', 'administrativ'" },
+                question: { type: "string", description: "Legal question or document to analyze" },
+                jurisdiction: { type: "string", description: "Jurisdiction: 'romania', 'eu', 'us', 'uk', 'germany'" },
+            },
+            required: ["action", "question"],
+        },
+    },
+    // ═══ FINANCE / ACCOUNTING ═══
+    {
+        name: "financial_calculator",
+        description: "Financial calculations: loan/mortgage calculator, compound interest, ROI, NPV, IRR, depreciation, tax estimation, currency conversion, inflation adjustment. Supports RON, EUR, USD, GBP.",
+        input_schema: {
+            type: "object",
+            properties: {
+                calculation: { type: "string", description: "Type: 'loan', 'mortgage', 'compound_interest', 'roi', 'npv', 'irr', 'depreciation', 'tax', 'currency', 'inflation', 'salary_net', 'vat'" },
+                parameters: { type: "string", description: "JSON parameters, e.g. '{\"amount\": 100000, \"rate\": 5.5, \"years\": 30, \"currency\": \"RON\"}'" },
+            },
+            required: ["calculation", "parameters"],
+        },
+    },
+    // ═══ AUTOMOTIVE ═══
+    {
+        name: "car_diagnostic",
+        description: "Car diagnostic helper. Decode OBD-II error codes, diagnose symptoms, maintenance schedules, repair estimates, technical specs lookup. Works with any car make/model.",
+        input_schema: {
+            type: "object",
+            properties: {
+                action: { type: "string", description: "Action: 'decode_obd', 'diagnose_symptom', 'maintenance', 'specs', 'recall', 'repair_estimate', 'fluid_specs'" },
+                code: { type: "string", description: "OBD-II code, e.g. 'P0300', 'P0420', 'C0035'" },
+                car: { type: "string", description: "Car make/model/year, e.g. 'Dacia Duster 2022', 'BMW 320d 2019'" },
+                symptom: { type: "string", description: "Symptom description, e.g. 'engine shaking at idle', 'squeaking brakes'" },
+            },
+            required: ["action"],
+        },
+    },
+    // ═══ CYBERSECURITY ═══
+    {
+        name: "security_audit",
+        description: "Cybersecurity analysis tool. Check password strength, analyze URLs for phishing, review code for vulnerabilities, OWASP guidelines, security headers check, SSL/TLS analysis, data breach lookup.",
+        input_schema: {
+            type: "object",
+            properties: {
+                action: { type: "string", description: "Action: 'password_strength', 'phishing_check', 'code_review', 'headers_check', 'ssl_check', 'owasp', 'breach_check', 'encryption_advice'" },
+                target: { type: "string", description: "URL, password, code snippet, or email to analyze" },
+                context: { type: "string", description: "Additional context, e.g. 'web application', 'api', 'mobile app', 'iot device'" },
+            },
+            required: ["action", "target"],
+        },
+    },
+    // ═══ ARCHITECTURE / CONSTRUCTION ═══
+    {
+        name: "structural_calculator",
+        description: "Architecture and construction calculations. Beam load, concrete mix, material quantities, energy efficiency rating (certificate energetic), cost estimation (deviz), surface area, volume calculations. Romanian building standards (CR-0, P100).",
+        input_schema: {
+            type: "object",
+            properties: {
+                calculation: { type: "string", description: "Type: 'beam_load', 'concrete_mix', 'material_quantity', 'energy_rating', 'cost_estimate', 'surface_area', 'foundation', 'insulation', 'electrical_load', 'plumbing'" },
+                parameters: { type: "string", description: "JSON with dimensions, materials, loads, etc." },
+                standard: { type: "string", description: "Standard: 'romania_cr0', 'eurocode', 'aci', 'bs'" },
+            },
+            required: ["calculation", "parameters"],
+        },
+    },
+    // ═══ MARKETING / SEO ═══
+    {
+        name: "marketing_analyzer",
+        description: "Marketing and SEO tool. Generate ad copy, social media posts, SEO analysis, keyword research, competitor analysis, A/B test ideas, email campaigns, brand naming, hashtag generation.",
+        input_schema: {
+            type: "object",
+            properties: {
+                action: { type: "string", description: "Action: 'seo_audit', 'keywords', 'ad_copy', 'social_post', 'email_campaign', 'competitor', 'brand_name', 'hashtags', 'content_calendar', 'ab_test'" },
+                topic: { type: "string", description: "Product, service, or brand" },
+                platform: { type: "string", description: "Platform: 'google', 'facebook', 'instagram', 'tiktok', 'linkedin', 'youtube', 'twitter'" },
+                audience: { type: "string", description: "Target audience" },
+                language: { type: "string", description: "Language: 'ro', 'en', 'de', 'fr'" },
+            },
+            required: ["action", "topic"],
+        },
+    },
+    // ═══ HEALTH / FITNESS ═══
+    {
+        name: "health_tracker",
+        description: "Health and fitness tracking. BMI, calorie needs, workout plans, body fat estimation, heart rate zones, hydration calculator, sleep analysis. Stores history in database. ⚠️ Not medical advice.",
+        input_schema: {
+            type: "object",
+            properties: {
+                action: { type: "string", description: "Action: 'bmi', 'calories', 'workout_plan', 'body_fat', 'heart_zones', 'hydration', 'sleep', 'log_weight', 'log_workout', 'progress'" },
+                parameters: { type: "string", description: "JSON: '{\"weight_kg\": 80, \"height_cm\": 175, \"age\": 30, \"gender\": \"M\", \"activity\": \"moderate\"}'" },
+                goal: { type: "string", description: "Goal: 'lose_weight', 'gain_muscle', 'maintain', 'endurance', 'flexibility'" },
+            },
+            required: ["action"],
+        },
+    },
+    // ═══ COOKING / NUTRITION ═══
+    {
+        name: "recipe_generator",
+        description: "Generate recipes based on ingredients, diet restrictions, cuisine type. Calculates nutrition, scales portions, suggests substitutions. Supports Romanian, Mediterranean, Asian, etc.",
+        input_schema: {
+            type: "object",
+            properties: {
+                action: { type: "string", description: "Action: 'generate', 'scale', 'substitute', 'meal_plan', 'nutrition', 'shopping_list'" },
+                ingredients: { type: "string", description: "Available ingredients, comma separated" },
+                cuisine: { type: "string", description: "Cuisine: 'romaneasca', 'italian', 'asian', 'mexican', 'french', 'mediterranean', 'any'" },
+                diet: { type: "string", description: "Diet: 'normal', 'vegetarian', 'vegan', 'keto', 'paleo', 'gluten_free', 'diabetic', 'low_sodium'" },
+                servings: { type: "number", description: "Number of servings" },
+            },
+            required: ["action"],
+        },
+    },
+    // ═══ MUSIC / AUDIO ═══
+    {
+        name: "music_theory",
+        description: "Music theory and audio analysis. Chord progressions, scale identification, key detection, tempo/BPM, song structure analysis, transposition, ear training exercises, music notation.",
+        input_schema: {
+            type: "object",
+            properties: {
+                action: { type: "string", description: "Action: 'chords', 'scales', 'key_detection', 'transpose', 'progression', 'tempo', 'ear_training', 'notation', 'song_structure'" },
+                input: { type: "string", description: "Musical input: chord names, scale, notes, song title" },
+                key: { type: "string", description: "Musical key: 'C', 'Am', 'Eb', 'F#m'" },
+                instrument: { type: "string", description: "Instrument: 'piano', 'guitar', 'bass', 'ukulele', 'violin', 'any'" },
+            },
+            required: ["action"],
+        },
+    },
+    // ═══ 3D PRINTING ═══
+    {
+        name: "print3d_helper",
+        description: "3D printing assistant. Material selection (PLA, ABS, PETG, TPU, Nylon, Resin), print settings optimizer, troubleshooting (stringing, warping, layer adhesion), cost estimation, STL analysis recommendations.",
+        input_schema: {
+            type: "object",
+            properties: {
+                action: { type: "string", description: "Action: 'material_select', 'settings', 'troubleshoot', 'cost_estimate', 'design_tips', 'compare_materials', 'post_processing'" },
+                printer: { type: "string", description: "Printer type: 'fdm', 'sla', 'sls', 'any'" },
+                material: { type: "string", description: "Material: 'pla', 'abs', 'petg', 'tpu', 'nylon', 'resin', 'pc', 'asa'" },
+                problem: { type: "string", description: "Problem description for troubleshooting" },
+                dimensions: { type: "string", description: "Part dimensions: 'LxWxH in mm'" },
+            },
+            required: ["action"],
+        },
+    },
+    // ═══ AGRICULTURE ═══
+    {
+        name: "agro_advisor",
+        description: "Agriculture advisor. Crop planning, soil analysis interpretation, pest/disease identification (from photo), fertilizer calculator, irrigation planning, harvest timing, weather impact on crops. Supports Romanian agriculture.",
+        input_schema: {
+            type: "object",
+            properties: {
+                action: { type: "string", description: "Action: 'crop_plan', 'soil_analysis', 'pest_identify', 'fertilizer', 'irrigation', 'harvest', 'weather_impact', 'rotation', 'organic'" },
+                crop: { type: "string", description: "Crop: 'wheat', 'corn', 'sunflower', 'rapeseed', 'potato', 'tomato', 'grape', 'apple', 'any'" },
+                location: { type: "string", description: "Location/region" },
+                soil_type: { type: "string", description: "Soil type: 'clay', 'sandy', 'loam', 'silt', 'chalky', 'peat'" },
+                area: { type: "string", description: "Area in hectares" },
+            },
+            required: ["action"],
+        },
+    },
 ];
 
 // ── Tool executor: maps tool names to brain methods ──
@@ -1113,6 +1277,112 @@ async function executeTool(brain, toolName, toolInput, userId) {
                     level: toolInput.level || "highschool",
                     instruction: `Generate ${toolInput.count || 5} ${toolInput.difficulty || "medium"}-difficulty exercises.\nSubject: ${toolInput.subject}\nTopic: ${toolInput.topic}\nLevel: ${toolInput.level || "highschool"}\n\nFor each exercise:\n1. Problem statement (clear, precise)\n2. Given data\n3. Required: what to find\n4. Step-by-step solution with formulas\n5. Final answer with units\n6. Brief explanation of methodology\n\nUse proper mathematical notation. Show all intermediate steps.`,
                 };
+            }
+            // ═══ LEGAL ═══
+            case "legal_consultant": {
+                const searchQuery = `${toolInput.domain || ""} ${toolInput.question} ${toolInput.jurisdiction || "romania"} law legislation`;
+                const searchResult = await brain._search(searchQuery);
+                return { action: toolInput.action, domain: toolInput.domain, jurisdiction: toolInput.jurisdiction || "romania", research: searchResult, disclaimer: "⚠️ Informativ — nu constituie consiliere juridică. Consultați un avocat." };
+            }
+            // ═══ FINANCE ═══
+            case "financial_calculator": {
+                try {
+                    const params = JSON.parse(toolInput.parameters);
+                    const calc = toolInput.calculation;
+                    let result = {};
+                    if (calc === "loan" || calc === "mortgage") {
+                        const P = params.amount || 100000; const r = (params.rate || 5) / 100 / 12; const n = (params.years || 30) * 12;
+                        const monthly = P * (r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
+                        result = { monthly_payment: monthly.toFixed(2), total_paid: (monthly * n).toFixed(2), total_interest: (monthly * n - P).toFixed(2), currency: params.currency || "RON" };
+                    } else if (calc === "compound_interest") {
+                        const A = (params.principal || 10000) * Math.pow(1 + (params.rate || 5) / 100, params.years || 10);
+                        result = { final_amount: A.toFixed(2), profit: (A - (params.principal || 10000)).toFixed(2) };
+                    } else if (calc === "salary_net") {
+                        const gross = params.amount || 5000; const cas = gross * 0.25; const cass = gross * 0.10; const tax = (gross - cas - cass) * 0.10;
+                        result = { gross, cas: cas.toFixed(0), cass: cass.toFixed(0), tax: tax.toFixed(0), net: (gross - cas - cass - tax).toFixed(0), currency: "RON" };
+                    } else {
+                        result = { instruction: `Calculate ${calc} with parameters: ${JSON.stringify(params)}` };
+                    }
+                    return result;
+                } catch (e) { return { error: "Invalid parameters: " + e.message }; }
+            }
+            // ═══ AUTOMOTIVE ═══
+            case "car_diagnostic": {
+                if (toolInput.action === "decode_obd" && toolInput.code) {
+                    return await brain._search(`OBD-II code ${toolInput.code} meaning cause fix ${toolInput.car || ""}`);
+                }
+                if (toolInput.action === "diagnose_symptom") {
+                    return await brain._search(`car ${toolInput.car || ""} ${toolInput.symptom} cause diagnosis fix`);
+                }
+                if (toolInput.action === "maintenance" || toolInput.action === "specs") {
+                    return await brain._search(`${toolInput.car || "car"} ${toolInput.action} schedule specifications`);
+                }
+                return await brain._search(`${toolInput.car || "car"} ${toolInput.action} ${toolInput.symptom || toolInput.code || ""}`);
+            }
+            // ═══ CYBERSECURITY ═══
+            case "security_audit": {
+                if (toolInput.action === "password_strength") {
+                    const p = toolInput.target; const score = { length: p.length >= 12, upper: /[A-Z]/.test(p), lower: /[a-z]/.test(p), digit: /\d/.test(p), special: /[!@#$%^&*]/.test(p), noCommon: !/password|123456|qwerty/i.test(p) };
+                    const strength = Object.values(score).filter(Boolean).length;
+                    return { score: strength + "/6", rating: strength >= 5 ? "STRONG" : strength >= 3 ? "MEDIUM" : "WEAK", details: score, recommendations: strength < 5 ? "Add more complexity: uppercase, numbers, special characters, min 12 chars" : "Good password!" };
+                }
+                return await brain._search(`cybersecurity ${toolInput.action} ${toolInput.target} ${toolInput.context || ""} best practices OWASP`);
+            }
+            // ═══ ARCHITECTURE ═══
+            case "structural_calculator": {
+                try {
+                    const params = JSON.parse(toolInput.parameters);
+                    return { calculation: toolInput.calculation, parameters: params, standard: toolInput.standard || "eurocode", instruction: `Perform ${toolInput.calculation} calculation with: ${JSON.stringify(params)}. Standard: ${toolInput.standard || "eurocode"}. Show all formulas and steps.` };
+                } catch (e) { return { error: "Invalid parameters: " + e.message }; }
+            }
+            // ═══ MARKETING ═══
+            case "marketing_analyzer": {
+                if (toolInput.action === "keywords" || toolInput.action === "seo_audit" || toolInput.action === "competitor") {
+                    return await brain._search(`${toolInput.action} ${toolInput.topic} ${toolInput.platform || ""} ${toolInput.audience || ""}`);
+                }
+                return { action: toolInput.action, topic: toolInput.topic, platform: toolInput.platform, audience: toolInput.audience, language: toolInput.language || "ro", instruction: `Generate ${toolInput.action} for '${toolInput.topic}'. Platform: ${toolInput.platform || "all"}. Audience: ${toolInput.audience || "general"}. Language: ${toolInput.language || "ro"}.` };
+            }
+            // ═══ HEALTH ═══
+            case "health_tracker": {
+                if (toolInput.action === "bmi" || toolInput.action === "calories" || toolInput.action === "body_fat" || toolInput.action === "heart_zones") {
+                    try {
+                        const p = JSON.parse(toolInput.parameters || "{}");
+                        if (toolInput.action === "bmi") {
+                            const bmi = (p.weight_kg || 75) / Math.pow((p.height_cm || 175) / 100, 2);
+                            return { bmi: bmi.toFixed(1), category: bmi < 18.5 ? "Underweight" : bmi < 25 ? "Normal" : bmi < 30 ? "Overweight" : "Obese", disclaimer: "⚠️ Nu e sfat medical" };
+                        }
+                        if (toolInput.action === "calories") {
+                            const bmr = p.gender === "F" ? 447.6 + 9.25 * (p.weight_kg || 65) + 3.1 * (p.height_cm || 165) - 4.33 * (p.age || 30) : 88.36 + 13.4 * (p.weight_kg || 80) + 4.8 * (p.height_cm || 175) - 5.68 * (p.age || 30);
+                            const multipliers = { sedentary: 1.2, light: 1.375, moderate: 1.55, active: 1.725, very_active: 1.9 };
+                            const tdee = bmr * (multipliers[p.activity] || 1.55);
+                            return { bmr: bmr.toFixed(0), tdee: tdee.toFixed(0), lose_weight: (tdee - 500).toFixed(0), gain_muscle: (tdee + 300).toFixed(0) };
+                        }
+                    } catch (e) { return { error: "Invalid parameters" }; }
+                }
+                return { action: toolInput.action, goal: toolInput.goal, instruction: `Generate ${toolInput.action} plan for goal: ${toolInput.goal || "general health"}` };
+            }
+            // ═══ COOKING ═══
+            case "recipe_generator": {
+                return { action: toolInput.action, ingredients: toolInput.ingredients, cuisine: toolInput.cuisine || "romaneasca", diet: toolInput.diet || "normal", servings: toolInput.servings || 4, instruction: `${toolInput.action === "generate" ? "Generate a recipe" : toolInput.action} for ${toolInput.cuisine || "Romanian"} cuisine. Ingredients: ${toolInput.ingredients || "any"}. Diet: ${toolInput.diet || "normal"}. Servings: ${toolInput.servings || 4}. Include nutrition per serving.` };
+            }
+            // ═══ MUSIC ═══
+            case "music_theory": {
+                return { action: toolInput.action, input: toolInput.input, key: toolInput.key, instrument: toolInput.instrument, instruction: `Music theory: ${toolInput.action}. Input: ${toolInput.input || "any"}. Key: ${toolInput.key || "C"}. Instrument: ${toolInput.instrument || "any"}. Provide notation, diagrams, and practical examples.` };
+            }
+            // ═══ 3D PRINTING ═══
+            case "print3d_helper": {
+                if (toolInput.action === "troubleshoot" && toolInput.problem) {
+                    return await brain._search(`3d printing ${toolInput.printer || "fdm"} ${toolInput.material || ""} ${toolInput.problem} fix solution`);
+                }
+                return { action: toolInput.action, printer: toolInput.printer || "fdm", material: toolInput.material, dimensions: toolInput.dimensions, instruction: `3D printing: ${toolInput.action}. Printer: ${toolInput.printer || "FDM"}. Material: ${toolInput.material || "PLA"}. ${toolInput.problem || toolInput.dimensions || ""}` };
+            }
+            // ═══ AGRICULTURE ═══
+            case "agro_advisor": {
+                if (toolInput.action === "pest_identify" && brain._currentMediaData?.imageBase64) {
+                    return await brain._vision(brain._currentMediaData.imageBase64, userId);
+                }
+                const agriQuery = `${toolInput.action} ${toolInput.crop || ""} ${toolInput.location || "Romania"} ${toolInput.soil_type || ""} agriculture farming`;
+                return await brain._search(agriQuery);
             }
             default:
                 return { error: `Unknown tool: ${toolName}` };
