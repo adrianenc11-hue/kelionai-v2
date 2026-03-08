@@ -792,4 +792,178 @@ router.post("/update-social-photos", async (req, res) => {
   res.json({ results });
 });
 
+// ══════════════════════════════════════════════════════════════
+// BRAIN AUTO-AUDIT — Scans + Auto-fixes hardcoded values
+// Runs: on deploy + every 6 hours. Results in admin dashboard.
+// GET  /api/admin/audit-hardcoded     → view results
+// POST /api/admin/audit-hardcoded/fix → auto-replace known patterns
+// ══════════════════════════════════════════════════════════════
+const fs = require("fs");
+const auditPath = require("path");
+
+const AUDIT_PATTERNS = [
+  { name: "Hardcoded URL", regex: /["'`]https?:\/\/(?!(?:api\.|graph\.|cdn\.))[a-z0-9][a-z0-9.-]*\.(app|com|io|net|org|dev|co)[^\s"'`]*/gi, severity: "HIGH" },
+  { name: "API Key (sk-/sk_)", regex: /["'`](sk[-_][a-zA-Z0-9_-]{20,})["'`]/g, severity: "CRITICAL" },
+  { name: "Bearer token literal", regex: /["'`]Bearer\s+[a-zA-Z0-9._-]{20,}["'`]/g, severity: "CRITICAL" },
+  { name: "Hardcoded domain", regex: /kelionai\.app/gi, severity: "HIGH" },
+  { name: "localhost reference", regex: /["'`](?:https?:\/\/)?localhost[:\d]*["'`]/gi, severity: "MEDIUM" },
+  { name: "Hardcoded IP", regex: /["'`]\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}["'`]/g, severity: "MEDIUM" },
+];
+
+const AUDIT_WHITELIST = [
+  /^\s*\/\//, /^\s*\*/, /process\.env\./, /require\(/,
+  /api\.telegram\.org/, /api\.stripe\.com/, /graph\.facebook\.com/,
+  /api\.openai\.com/, /api\.anthropic\.com/, /api\.elevenlabs\.io/,
+  /api\.groq\.com/, /api\.together\.ai/, /api\.perplexity\.ai/,
+  /api\.tavily\.com/, /api\.deepgram\.com/, /api\.cartesia\.ai/,
+  /api\.serper\.dev/, /cdn\.jsdelivr\.net/, /unpkg\.com/,
+  /fonts\.googleapis\.com/, /sentry\.io/, /supabase\.co/,
+  /newsapi\.org/, /gnews\.io/, /api\.binance/, /coingecko/,
+  /currentsapi/, /mediastack/, /guardianapis/,
+  /support@kelionai/, /privacy@kelionai/, /noreply@kelionai/,
+];
+
+let _lastAudit = null;
+
+function scanHardcoded() {
+  const root = auditPath.join(__dirname, "..", "..");
+  const dirs = ["server", "app/js", "app/admin"];
+  const findings = { CRITICAL: [], HIGH: [], MEDIUM: [], LOW: [] };
+  let total = 0, filesScanned = 0;
+
+  for (const dir of dirs) {
+    const absDir = auditPath.join(root, dir);
+    if (!fs.existsSync(absDir)) continue;
+    const walk = (d) => {
+      for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+        const fp = auditPath.join(d, e.name);
+        if (fp.includes("node_modules")) continue;
+        if (e.isDirectory()) { walk(fp); continue; }
+        if (!e.name.endsWith(".js")) continue;
+        filesScanned++;
+        const lines = fs.readFileSync(fp, "utf8").split("\n");
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (AUDIT_WHITELIST.some(re => re.test(line))) continue;
+          for (const p of AUDIT_PATTERNS) {
+            p.regex.lastIndex = 0;
+            if (p.regex.test(line)) {
+              findings[p.severity].push({
+                file: auditPath.relative(root, fp).replace(/\\/g, "/"),
+                line: i + 1,
+                pattern: p.name,
+                snippet: line.trim().substring(0, 120),
+              });
+              total++;
+            }
+          }
+        }
+      }
+    };
+    walk(absDir);
+  }
+
+  _lastAudit = {
+    total, filesScanned,
+    critical: findings.CRITICAL.length,
+    high: findings.HIGH.length,
+    medium: findings.MEDIUM.length,
+    low: findings.LOW.length,
+    clean: total === 0,
+    scannedAt: new Date().toISOString(),
+    findings,
+  };
+  return _lastAudit;
+}
+
+function fixHardcoded() {
+  const root = auditPath.join(__dirname, "..", "..");
+  const dirs = ["server", "app/js", "app/admin"];
+  const fixes = [];
+
+  for (const dir of dirs) {
+    const absDir = auditPath.join(root, dir);
+    if (!fs.existsSync(absDir)) continue;
+    const walk = (d) => {
+      for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+        const fp = auditPath.join(d, e.name);
+        if (fp.includes("node_modules")) continue;
+        if (e.isDirectory()) { walk(fp); continue; }
+        if (!e.name.endsWith(".js")) continue;
+        let content = fs.readFileSync(fp, "utf8");
+        const original = content;
+        // Replace known hardcoded patterns line by line
+        content = content.split("\n").map(line => {
+          if (AUDIT_WHITELIST.some(re => re.test(line))) return line;
+          // "https://kelionai.app/path" → process.env.APP_URL + "/path"
+          line = line.replace(/"https:\/\/kelionai\.app(\/[^"]*)"/g, (m, path) =>
+            path ? `(process.env.APP_URL + "${path}")` : `process.env.APP_URL`
+          );
+          // 'https://kelionai.app/path' → process.env.APP_URL + '/path'
+          line = line.replace(/'https:\/\/kelionai\.app(\/[^']*)'/g, (m, path) =>
+            path ? `(process.env.APP_URL + '${path}')` : `process.env.APP_URL`
+          );
+          // Inside template literals: https://kelionai.app → ${process.env.APP_URL}
+          if (line.includes("`")) {
+            line = line.replace(/https:\/\/kelionai\.app/g, "${process.env.APP_URL}");
+            line = line.replace(/(?<!@)(?<!\.)kelionai\.app(?!["'])/g, "${process.env.APP_URL}");
+          }
+          return line;
+        }).join("\n");
+
+        if (content !== original) {
+          fs.writeFileSync(fp, content, "utf8");
+          fixes.push(auditPath.relative(root, fp).replace(/\\/g, "/"));
+          logger.info({ component: "Audit", file: fixes[fixes.length - 1] }, "Auto-fixed hardcoded values");
+        }
+      }
+    };
+    walk(absDir);
+  }
+  return { fixedFiles: fixes, count: fixes.length, fixedAt: new Date().toISOString() };
+}
+
+// ── Startup scan ──
+try {
+  const r = scanHardcoded();
+  if (r.total > 0) {
+    logger.warn({ component: "Audit", total: r.total, critical: r.critical, high: r.high },
+      `⚠️ Hardcoded audit: ${r.total} findings (${r.critical} critical, ${r.high} high)`);
+  } else {
+    logger.info({ component: "Audit" }, "✅ Hardcoded audit: CLEAN — zero findings");
+  }
+} catch (e) { logger.warn({ component: "Audit", err: e.message }, "Startup audit failed"); }
+
+// ── Periodic scan every 6 hours ──
+setInterval(() => {
+  try {
+    const r = scanHardcoded();
+    if (r.total > 0) {
+      logger.warn({ component: "Audit", total: r.total, critical: r.critical },
+        `⚠️ Periodic audit: ${r.total} hardcoded findings`);
+    } else {
+      logger.info({ component: "Audit" }, "✅ Periodic audit: CLEAN");
+    }
+  } catch (e) { logger.warn({ component: "Audit", err: e.message }, "Periodic audit failed"); }
+}, 6 * 60 * 60 * 1000);
+
+// ── Endpoints ──
+router.get("/audit-hardcoded", (req, res) => {
+  try { res.json(_lastAudit || scanHardcoded()); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.post("/audit-hardcoded/fix", (req, res) => {
+  try {
+    const fix = fixHardcoded();
+    const after = scanHardcoded();
+    logger.info({ component: "Audit", fixed: fix.count, remaining: after.total },
+      `Auto-fix: ${fix.count} files fixed, ${after.total} remaining`);
+    res.json({ fix, afterScan: after });
+  } catch (e) {
+    logger.error({ component: "Audit", err: e.message }, "Auto-fix failed");
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;
