@@ -17,7 +17,7 @@ const CONFIG = {
   rechargeAmountPence: parseInt(process.env.RECHARGE_AMOUNT_PENCE || "5000", 10),
   creditLowThreshold: parseFloat(process.env.CREDIT_LOW_THRESHOLD || "5"),
   creditMedThreshold: parseFloat(process.env.CREDIT_MED_THRESHOLD || "2"),
-  appUrl: process.env.APP_URL || process.env.RAILWAY_PUBLIC_DOMAIN ? ("https://" + process.env.RAILWAY_PUBLIC_DOMAIN) : "https://kelionai.app",
+  appUrl: process.env.APP_URL || (process.env.RAILWAY_PUBLIC_DOMAIN ? ("https://" + process.env.RAILWAY_PUBLIC_DOMAIN) : ""),
   adminEmail: process.env.ADMIN_EMAIL || "",
 };
 

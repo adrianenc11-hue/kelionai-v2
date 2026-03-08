@@ -318,9 +318,9 @@ router.post("/checkout", async (req, res) => {
       payment_method_types: ["card"],
       line_items: [{ price: priceId, quantity: 1 }],
       success_url:
-        (process.env.APP_URL || "https://kelionai.app") + "/?payment=success",
+        (process.env.APP_URL) + "/?payment=success",
       cancel_url:
-        (process.env.APP_URL || "https://kelionai.app") + "/?payment=cancel",
+        (process.env.APP_URL) + "/?payment=cancel",
       metadata: {
         user_id: user.id,
         plan: normalizedPlan,
@@ -371,7 +371,7 @@ router.post("/portal", async (req, res) => {
 
     const session = await stripe.billingPortal.sessions.create({
       customer: data.stripe_customer_id,
-      return_url: (process.env.APP_URL || "https://kelionai.app") + "/",
+      return_url: (process.env.APP_URL) + "/",
     });
 
     res.json({ url: session.url });

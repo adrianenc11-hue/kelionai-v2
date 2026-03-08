@@ -67,7 +67,7 @@ router.post(
         });
       }
 
-      const redirectUrl = process.env.APP_URL || 'https://kelionai.app';
+      const redirectUrl = process.env.APP_URL;
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -198,7 +198,7 @@ router.post(
       if (!supabase)
         return res.status(503).json({ error: "Auth service unavailable" });
       const redirectTo =
-        (process.env.APP_URL || "https://kelionai.app") +
+        (process.env.APP_URL) +
         "/reset-password.html";
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo,
