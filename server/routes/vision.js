@@ -12,6 +12,16 @@ const { MODELS } = require("../config/models");
 
 const router = express.Router();
 
+// ═══ TIMEOUT HELPER — prevents hanging on slow/dead APIs ═══
+function withTimeout(promise, ms = 10000, label = "operation") {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms),
+    ),
+  ]);
+}
+
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 20,
@@ -58,7 +68,7 @@ Answer in ${LANGS[language] || "English"}, concise but detailed.`;
     // PRIMARY: GPT-5.4 Vision
     if (process.env.OPENAI_API_KEY) {
       try {
-        const r = await fetch("https://api.openai.com/v1/chat/completions", {
+        const r = await withTimeout(fetch("https://api.openai.com/v1/chat/completions", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -80,7 +90,7 @@ Answer in ${LANGS[language] || "English"}, concise but detailed.`;
               },
             ],
           }),
-        });
+        }), 25000, "vision:GPT-5.4");
         const d = await r.json();
         description = d.choices?.[0]?.message?.content;
         if (description) engine = "GPT-5.4";
@@ -92,7 +102,7 @@ Answer in ${LANGS[language] || "English"}, concise but detailed.`;
     // FALLBACK: Claude Vision
     if (!description && process.env.ANTHROPIC_API_KEY) {
       try {
-        const r = await fetch("https://api.anthropic.com/v1/messages", {
+        const r = await withTimeout(fetch("https://api.anthropic.com/v1/messages", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -119,7 +129,7 @@ Answer in ${LANGS[language] || "English"}, concise but detailed.`;
               },
             ],
           }),
-        });
+        }), 20000, "vision:Claude");
         const d = await r.json();
         description = d.content?.[0]?.text;
         if (description) engine = "Claude";

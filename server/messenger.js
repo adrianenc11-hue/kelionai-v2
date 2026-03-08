@@ -13,6 +13,16 @@ const { MODELS } = require("./config/models");
 
 const router = express.Router();
 
+// ═══ TIMEOUT HELPER — prevents hanging on slow/dead APIs ═══
+function withTimeout(promise, ms = 10000, label = "operation") {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms),
+    ),
+  ]);
+}
+
 // STATS (counters only — no unbounded Sets)
 const stats = { messagesReceived: 0, repliesSent: 0, uniqueSenders: 0 };
 
@@ -367,9 +377,9 @@ async function getSenderProfile(senderId) {
 // DOWNLOAD MEDIA FROM URL
 async function downloadMediaFromUrl(url) {
   try {
-    const res = await fetch(url);
+    const res = await withTimeout(fetch(url), 10000, "downloadMediaFromUrl");
     if (res.ok) {
-      const ab = await res.arrayBuffer();
+      const ab = await withTimeout(res.arrayBuffer(), 10000, "downloadMediaFromUrl:readBody");
       return Buffer.from(ab);
     }
   } catch (e) {
@@ -398,7 +408,7 @@ async function analyzeImage(imageBuffer, caption, mimeType) {
     : "Descrie in detaliu ce vezi in aceasta imagine. Identifica persoane, obiecte, locuri, texte vizibile, culori, actiuni.";
 
   try {
-    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    const res = await withTimeout(fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         Authorization: "Bearer " + apiKey,
@@ -423,7 +433,7 @@ async function analyzeImage(imageBuffer, caption, mimeType) {
         ],
         max_tokens: 1000,
       }),
-    });
+    }), 25000, "analyzeImage");
     if (res.ok) {
       const data = await res.json();
       return (
@@ -458,14 +468,14 @@ async function transcribeAudio(audioBuffer, mimeType) {
     process.env.GROQ_API_KEY ? MODELS.WHISPER : MODELS.OPENAI_WHISPER,
   );
   try {
-    const res = await fetch(baseUrl + "/audio/transcriptions", {
+    const res = await withTimeout(fetch(baseUrl + "/audio/transcriptions", {
       method: "POST",
       headers: Object.assign(
         { Authorization: "Bearer " + apiKey },
         form.getHeaders(),
       ),
       body: form,
-    });
+    }), 20000, "transcribeAudio");
     if (res.ok) {
       const data = await res.json();
       return data.text || "";
@@ -575,7 +585,7 @@ async function sendAudioMessage(recipientId, audioUrl) {
   const token = process.env.FB_PAGE_ACCESS_TOKEN;
   if (!token) return;
   try {
-    const res = await fetch(
+    const res = await withTimeout(fetch(
       "https://graph.facebook.com/v21.0/me/messages?access_token=" + token,
       {
         method: "POST",
@@ -590,7 +600,7 @@ async function sendAudioMessage(recipientId, audioUrl) {
           },
         }),
       },
-    );
+    ), 10000, "sendAudioMessage");
     if (!res.ok) {
       const body = await res.text();
       logger.error(
@@ -613,7 +623,7 @@ async function generateAndSendVoice(recipientId, text, character) {
   const appUrl = process.env.APP_URL;
   try {
     const voiceId = getVoiceId(character);
-    const res = await fetch(
+    const res = await withTimeout(fetch(
       "https://api.elevenlabs.io/v1/text-to-speech/" + voiceId,
       {
         method: "POST",
@@ -624,9 +634,9 @@ async function generateAndSendVoice(recipientId, text, character) {
           voice_settings: { stability: 0.5, similarity_boost: 0.75 },
         }),
       },
-    );
+    ), 12000, "generateVoice:elevenlabs");
     if (!res.ok) return;
-    const audioBuffer = Buffer.from(await res.arrayBuffer());
+    const audioBuffer = Buffer.from(await withTimeout(res.arrayBuffer(), 10000, "generateVoice:readBody"));
     const audioId = crypto.randomBytes(16).toString("hex");
     mediaBuffers.set(audioId, {
       buffer: audioBuffer,
@@ -652,7 +662,7 @@ async function sendImageMessage(recipientId, imageUrl) {
   const token = process.env.FB_PAGE_ACCESS_TOKEN;
   if (!token) return;
   try {
-    const res = await fetch(
+    const res = await withTimeout(fetch(
       "https://graph.facebook.com/v21.0/me/messages?access_token=" + token,
       {
         method: "POST",
@@ -667,7 +677,7 @@ async function sendImageMessage(recipientId, imageUrl) {
           },
         }),
       },
-    );
+    ), 10000, "sendImageMessage");
     if (!res.ok) {
       const body = await res.text();
       logger.error(
