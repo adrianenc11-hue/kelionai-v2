@@ -140,7 +140,28 @@
         if (startBtn) startBtn.addEventListener('click', enterApp);
         // Admin button → navigate to admin panel
         var adminBtn = document.getElementById('btn-admin');
-        if (adminBtn) adminBtn.addEventListener('click', function () { window.location.href = '/admin'; });
+        if (adminBtn) adminBtn.addEventListener('click', function () {
+            // Check if already authenticated
+            if (sessionStorage.getItem('kelion_admin_secret')) {
+                window.location.href = '/admin';
+                return;
+            }
+            var secret = prompt('🛡️ Admin Secret Key:');
+            if (!secret || !secret.trim()) return;
+            // Verify the secret against the API
+            fetch('/api/admin/ai-status', { headers: { 'x-admin-secret': secret.trim() } })
+                .then(function (r) {
+                    if (r.ok) {
+                        sessionStorage.setItem('kelion_admin_secret', secret.trim());
+                        window.location.href = '/admin';
+                    } else {
+                        alert('❌ Invalid admin secret. Access denied.');
+                    }
+                })
+                .catch(function () {
+                    alert('❌ Connection error. Try again.');
+                });
+        });
         // Auto-enter when both avatars are 100% loaded (or 10s max)
         window.addEventListener('avatars-ready', function () {
             console.log('[Auth] Avatars ready — auto-entering app');
