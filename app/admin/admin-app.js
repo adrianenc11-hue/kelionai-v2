@@ -128,8 +128,9 @@ async function loadClients() {
             return '<tr><td>' + esc(u.email) + '</td><td>' + pb + '</td><td><span class="badge badge-ok">Active</span></td>' +
                 '<td>' + date + '</td><td>' + (u.message_count || 0) + '</td>' +
                 '<td class="action-cell">' +
-                '<button class="btn-sm" onclick="upgradePlan(\'' + u.id + '\',\'' + esc(u.email).replace(/'/g, '') + '\')">⬆️</button>' +
-                '<button class="btn-sm btn-danger" onclick="openRefund(\'' + u.id + '\',\'' + esc(u.email).replace(/'/g, '') + '\',\'' + plan + '\')">💸</button>' +
+                '<button class="btn-sm" onclick="upgradePlan(\'' + u.id + '\',\'' + esc(u.email).replace(/'/g, '') + '\')" title="Upgrade">⬆️</button>' +
+                '<button class="btn-sm btn-danger" onclick="openRefund(\'' + u.id + '\',\'' + esc(u.email).replace(/'/g, '') + '\',\'' + plan + '\')" title="Refund">💸</button>' +
+                '<button class="btn-sm btn-delete" onclick="deleteUser(\'' + u.id + '\',\'' + esc(u.email).replace(/'/g, '') + '\')" title="Șterge user">🗑️</button>' +
                 '</td></tr>';
         }).join('');
     } catch (e) { console.error('Clients:', e); }
@@ -166,6 +167,16 @@ function upgradePlan(uid, email) {
     })
         .then(function (r) { return r.json(); })
         .then(function (d) { alert(d.message || 'Done!'); loadClients(); });
+}
+async function deleteUser(uid, email) {
+    if (!confirm('Sigur vrei să ȘTERGI userul ' + email + '?\n\nAceastă acțiune este IREVERSIBILĂ!')) return;
+    if (!confirm('CONFIRMARE FINALĂ:\n\nȘterge definitiv ' + email + '?\n\nToate datele vor fi pierdute.')) return;
+    try {
+        var r = await fetch('/api/admin/users/' + uid, { method: 'DELETE', headers: hdrs() });
+        var d = await r.json();
+        if (r.ok) { alert('✅ User ' + email + ' șters.'); loadClients(); }
+        else { alert('❌ Eroare: ' + (d.error || 'necunoscută')); }
+    } catch (e) { alert('Eroare: ' + e.message); }
 }
 
 // ── CODES ──

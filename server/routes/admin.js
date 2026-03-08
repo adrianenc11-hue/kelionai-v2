@@ -294,6 +294,54 @@ router.get("/users", async (req, res) => {
 });
 
 // ══════════════════════════════════════════════════════════
+// DELETE /api/admin/users/:id — Delete user completely
+// ══════════════════════════════════════════════════════════
+router.delete("/users/:id", async (req, res) => {
+  try {
+    const { supabaseAdmin } = req.app.locals;
+    if (!supabaseAdmin) return res.status(500).json({ error: "No database" });
+
+    const userId = req.params.id;
+    if (!userId) return res.status(400).json({ error: "User ID required" });
+
+    // Get user info before deletion (for logging)
+    const { data: userData } = await supabaseAdmin.auth.admin.getUserById(userId);
+    const email = userData?.user?.email || "unknown";
+
+    // Clean up related data (ignore errors — tables may not exist)
+    const tables = [
+      { table: "conversations", column: "user_id" },
+      { table: "user_preferences", column: "user_id" },
+      { table: "subscriptions", column: "user_id" },
+      { table: "referrals", column: "user_id" },
+      { table: "brain_profiles", column: "user_id" },
+    ];
+    for (const t of tables) {
+      try { await supabaseAdmin.from(t.table).delete().eq(t.column, userId); } catch { }
+    }
+
+    // Delete from Supabase Auth
+    const { error } = await supabaseAdmin.auth.admin.deleteUser(userId);
+    if (error) return res.status(500).json({ error: error.message });
+
+    // Log the action
+    try {
+      await supabaseAdmin.from("admin_logs").insert({
+        action: "delete_user",
+        details: { userId, email },
+        admin_id: req.adminUser?.id || "admin",
+      });
+    } catch { }
+
+    logger.info({ component: "Admin", userId, email }, `🗑️ User ${email} deleted`);
+    res.json({ success: true, deleted: email });
+  } catch (e) {
+    logger.error({ component: "Admin", err: e.message }, "Delete user failed");
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ══════════════════════════════════════════════════════════
 // GET /api/admin/revenue — Revenue stats
 // ══════════════════════════════════════════════════════════
 router.get("/revenue", async (req, res) => {
