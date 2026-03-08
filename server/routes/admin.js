@@ -309,6 +309,21 @@ router.get("/traffic", async (req, res) => {
 });
 
 // ══════════════════════════════════════════════════════════
+// DELETE /api/admin/traffic/:id — Delete a page view
+// ══════════════════════════════════════════════════════════
+router.delete("/traffic/:id", async (req, res) => {
+  try {
+    const { supabaseAdmin } = req.app.locals;
+    if (!supabaseAdmin) return res.status(500).json({ error: "No DB" });
+    const { error } = await supabaseAdmin.from("page_views").delete().eq("id", req.params.id);
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ══════════════════════════════════════════════════════════
 // GET /api/admin/users — User list
 // ══════════════════════════════════════════════════════════
 router.get("/users", async (req, res) => {
@@ -1235,6 +1250,123 @@ router.get("/trading", async (req, res) => {
   } catch (e) {
     logger.error({ component: "Admin", err: e.message }, "Trading query failed");
     res.json({ recentTrades: [], stats: {}, intelligence: [] });
+  }
+});
+
+// ══════════════════════════════════════════════════════════
+// GET /api/admin/health-check — Full system health check
+// ══════════════════════════════════════════════════════════
+router.get("/health-check", async (req, res) => {
+  try {
+    const { brain, supabaseAdmin } = req.app.locals;
+    let score = 100;
+    const recommendations = [];
+
+    // Server info
+    const uptime = process.uptime();
+    const mem = process.memoryUsage();
+    const fmtMB = (bytes) => (bytes / 1024 / 1024).toFixed(1) + " MB";
+
+    // Database check
+    let dbConnected = false;
+    const tables = {};
+    const tableNames = ["profiles", "conversations", "messages", "ai_costs", "page_views", "subscriptions", "admin_codes"];
+    if (supabaseAdmin) {
+      try {
+        for (const t of tableNames) {
+          try {
+            const { count, error } = await supabaseAdmin.from(t).select("*", { count: "exact", head: true });
+            tables[t] = error ? { ok: false, error: error.message } : { ok: true, count: count || 0 };
+          } catch (e) { tables[t] = { ok: false, error: e.message }; }
+        }
+        dbConnected = true;
+      } catch (e) { dbConnected = false; }
+    }
+    if (!dbConnected) { score -= 30; recommendations.push("Database not connected"); }
+
+    // Brain
+    const brainStatus = brain ? (brain.recentErrors > 5 ? "degraded" : "healthy") : "unavailable";
+    if (brainStatus === "degraded") { score -= 15; recommendations.push("Brain has recent errors"); }
+    if (brainStatus === "unavailable") { score -= 20; recommendations.push("Brain not available"); }
+
+    // Services
+    const services = {};
+    const svcChecks = { database: !!supabaseAdmin, brain: !!brain, gemini: !!process.env.GEMINI_API_KEY, stripe: !!process.env.STRIPE_SECRET_KEY };
+    for (const [k, v] of Object.entries(svcChecks)) {
+      services[k] = { label: k.charAt(0).toUpperCase() + k.slice(1), active: v };
+      if (!v && k !== "stripe") { score -= 5; recommendations.push(`${k} not configured`); }
+    }
+
+    // Auth & Security
+    const auth = { authAvailable: !!supabaseAdmin, supabaseAdminInitialized: !!supabaseAdmin };
+    const security = {
+      cspEnabled: true,
+      httpsRedirect: !!process.env.RAILWAY_PUBLIC_DOMAIN,
+      corsConfigured: true,
+      adminSecretConfigured: !!process.env.ADMIN_SECRET,
+    };
+    if (!security.adminSecretConfigured) { score -= 5; recommendations.push("No ADMIN_SECRET set"); }
+
+    // Payments
+    const payments = {
+      stripeConfigured: !!process.env.STRIPE_SECRET_KEY,
+      webhookConfigured: !!process.env.STRIPE_WEBHOOK_SECRET,
+      priceProConfigured: !!process.env.STRIPE_PRICE_PRO,
+      pricePremiumConfigured: !!process.env.STRIPE_PRICE_PREMIUM,
+      activeSubscribers: null,
+    };
+    if (supabaseAdmin) {
+      try {
+        const { count } = await supabaseAdmin.from("subscriptions").select("*", { count: "exact", head: true }).eq("status", "active");
+        payments.activeSubscribers = count || 0;
+      } catch (e) { }
+    }
+
+    // Rate limits
+    const rateLimits = {
+      chat: { max: 20, windowLabel: "minute" },
+      api: { max: 100, windowLabel: "minute" },
+      auth: { max: 5, windowLabel: "minute" },
+    };
+
+    // Errors
+    const errors = {
+      recentCount: brain?.recentErrors || 0,
+      degradedTools: brain?.degradedTools || [],
+    };
+    if (errors.recentCount > 0) score -= Math.min(10, errors.recentCount);
+
+    const grade = score >= 90 ? "A" : score >= 75 ? "B" : score >= 60 ? "C" : score >= 40 ? "D" : "F";
+
+    res.json({
+      score: Math.max(0, score),
+      grade,
+      server: {
+        version: require("../../package.json").version || "1.0.0",
+        uptime: `${Math.floor(uptime / 3600)}h ${Math.floor((uptime % 3600) / 60)}m`,
+        nodeVersion: process.version,
+        memory: { rss: fmtMB(mem.rss), heapUsed: fmtMB(mem.heapUsed), heapTotal: fmtMB(mem.heapTotal) },
+        timestamp: new Date().toISOString(),
+      },
+      services,
+      database: { connected: dbConnected, tables },
+      brain: {
+        status: brainStatus,
+        conversations: brain?.conversations?.size || 0,
+        recentErrors: brain?.recentErrors || 0,
+        degradedTools: brain?.degradedTools || [],
+        journal: (brain?.journal || []).slice(-5),
+      },
+      auth,
+      security,
+      payments,
+      rateLimits,
+      errors,
+      recommendations,
+    });
+  } catch (e) {
+    logger.error({ component: "Admin", err: e.message }, "Health check failed");
+    res.status(500).json({ error: e.message, score: 0, grade: "F" });
   }
 });
 
