@@ -12,6 +12,8 @@ const FormData = require("form-data");
 const logger = require("./logger");
 const { getVoiceId } = require("./config/voices");
 const { MODELS } = require("./config/models");
+const pdfParse = require("pdf-parse");
+const mammoth = require("mammoth");
 
 const router = express.Router();
 
@@ -559,6 +561,36 @@ async function generateSpeech(text, lang, character) {
   }
 }
 
+// ═══ EXTRACT DOCUMENT TEXT (PDF, DOCX, TXT, CSV, JSON, MD) ═══
+async function extractDocumentText(buffer, mimeType, filename) {
+  const ext = (filename || "").split(".").pop().toLowerCase();
+  try {
+    if (mimeType === "application/pdf" || ext === "pdf") {
+      const data = await pdfParse(buffer);
+      return (data.text || "").slice(0, 3000);
+    }
+    if (
+      mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+      ext === "docx"
+    ) {
+      const result = await mammoth.extractRawText({ buffer: buffer });
+      return (result.value || "").slice(0, 3000);
+    }
+    if (
+      ["txt", "csv", "json", "md", "xml", "html", "log"].includes(ext) ||
+      (mimeType && mimeType.startsWith("text/"))
+    ) {
+      return buffer.toString("utf8").slice(0, 3000);
+    }
+  } catch (e) {
+    logger.warn(
+      { component: "WhatsApp", err: e.message },
+      "Document extraction failed",
+    );
+  }
+  return null;
+}
+
 // ═══ ANALYZE VIDEO (extract audio, transcribe) ═══
 async function analyzeVideo(videoBuffer) {
   // For video: extract audio track and transcribe
@@ -672,7 +704,7 @@ router.post("/webhook", async (req, res) => {
               userText = "[Video processing error]";
             }
           } else if (msgType === "image") {
-            // Image → download and analyze with GPT-4o Vision
+            // Image → download and analyze with GPT-5.4 Vision
             try {
               const imageBuffer = await downloadMedia(msg.image.id);
               if (imageBuffer) {
@@ -681,37 +713,41 @@ router.post("/webhook", async (req, res) => {
                 const mimeType = msg.image.mime_type || "image/jpeg";
                 const openaiKey = process.env.OPENAI_API_KEY;
                 if (openaiKey) {
-                  const visionRes = await fetch(
-                    "https://api.openai.com/v1/chat/completions",
-                    {
-                      method: "POST",
-                      headers: {
-                        Authorization: `Bearer ${openaiKey}`,
-                        "Content-Type": "application/json",
-                      },
-                      body: JSON.stringify({
-                        model: MODELS.OPENAI_VISION,
-                        messages: [
-                          {
-                            role: "user",
-                            content: [
-                              {
-                                type: "image_url",
-                                image_url: {
-                                  url: `data:${mimeType};base64,${b64}`,
+                  const visionRes = await withTimeout(
+                    fetch(
+                      "https://api.openai.com/v1/chat/completions",
+                      {
+                        method: "POST",
+                        headers: {
+                          Authorization: `Bearer ${openaiKey}`,
+                          "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify({
+                          model: MODELS.OPENAI_VISION,
+                          messages: [
+                            {
+                              role: "user",
+                              content: [
+                                {
+                                  type: "image_url",
+                                  image_url: {
+                                    url: `data:${mimeType};base64,${b64}`,
+                                  },
                                 },
-                              },
-                              {
-                                type: "text",
-                                text:
-                                  caption || "Describe this image in detail.",
-                              },
-                            ],
-                          },
-                        ],
-                        max_tokens: 500,
-                      }),
-                    },
+                                {
+                                  type: "text",
+                                  text:
+                                    caption || "Describe this image in detail.",
+                                },
+                              ],
+                            },
+                          ],
+                          max_tokens: 500,
+                        }),
+                      },
+                    ),
+                    15000,
+                    "imageVision",
                   );
                   if (visionRes.ok) {
                     const visionData = await visionRes.json();
@@ -739,8 +775,99 @@ router.post("/webhook", async (req, res) => {
               );
               userText = msg.image.caption || "Describe this image";
             }
+          } else if (msgType === "sticker") {
+            // Sticker → try to analyze with Vision, fallback to text acknowledgment
+            try {
+              const stickerBuffer = await downloadMedia(msg.sticker.id);
+              if (stickerBuffer && process.env.OPENAI_API_KEY) {
+                const b64 = stickerBuffer.toString("base64");
+                const mimeType = msg.sticker.mime_type || "image/webp";
+                const visionRes = await withTimeout(
+                  fetch("https://api.openai.com/v1/chat/completions", {
+                    method: "POST",
+                    headers: {
+                      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+                      "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                      model: MODELS.OPENAI_VISION,
+                      messages: [{
+                        role: "user",
+                        content: [
+                          { type: "image_url", image_url: { url: `data:${mimeType};base64,${b64}` } },
+                          { type: "text", text: "This is a WhatsApp sticker. Briefly describe what it shows (emotion, character, action)." },
+                        ],
+                      }],
+                      max_tokens: 150,
+                    }),
+                  }),
+                  10000,
+                  "stickerVision",
+                );
+                if (visionRes.ok) {
+                  const visionData = await visionRes.json();
+                  const desc = visionData.choices?.[0]?.message?.content || "a sticker";
+                  userText = `[User sent a sticker: ${desc}]`;
+                } else {
+                  userText = "[User sent a sticker]";
+                }
+              } else {
+                userText = "[User sent a sticker]";
+              }
+            } catch (e) {
+              logger.warn({ component: "WhatsApp", err: e.message }, "Sticker analysis failed");
+              userText = "[User sent a sticker]";
+            }
+          } else if (msgType === "document") {
+            // Document → download and extract text (PDF, DOCX, TXT, CSV, JSON, MD)
+            try {
+              const docBuffer = await downloadMedia(msg.document.id);
+              const filename = msg.document.filename || "document";
+              const mimeType = msg.document.mime_type || "";
+              const caption = msg.document.caption || "";
+              if (docBuffer) {
+                const docText = await extractDocumentText(docBuffer, mimeType, filename);
+                if (docText) {
+                  userText = caption
+                    ? `${caption}\n[Document "${filename}" content:\n${docText}]`
+                    : `[Document "${filename}" content:\n${docText}]`;
+                } else {
+                  userText = caption
+                    ? `${caption}\n[User sent a document: ${filename} (${mimeType}) — format not supported for text extraction]`
+                    : `[User sent a document: ${filename} (${mimeType}) — format not supported for text extraction]`;
+                }
+              } else {
+                userText = `[User sent a document: ${filename} — could not download]`;
+              }
+            } catch (e) {
+              logger.error({ component: "WhatsApp", err: e.message }, "Document processing failed");
+              userText = "[User sent a document — processing error]";
+            }
+          } else if (msgType === "location") {
+            // Location → format coordinates and provide context
+            const loc = msg.location;
+            const lat = loc.latitude;
+            const lng = loc.longitude;
+            const name = loc.name || "";
+            const address = loc.address || "";
+            userText = name
+              ? `[User shared location: ${name}${address ? ", " + address : ""} (${lat}, ${lng})]`
+              : `[User shared location: coordinates ${lat}, ${lng}${address ? " — " + address : ""}]`;
+          } else if (msgType === "contacts") {
+            // Contacts → acknowledge and describe
+            const contacts = msg.contacts || [];
+            const names = contacts.map(c => {
+              const fn = c.name?.formatted_name || c.name?.first_name || "Unknown";
+              const phone = c.phones?.[0]?.phone || "";
+              return phone ? `${fn} (${phone})` : fn;
+            }).join(", ");
+            userText = `[User shared contact(s): ${names}]`;
+          } else if (msgType === "reaction") {
+            // Reactions → silently acknowledge (don't generate a full AI response)
+            continue;
           } else {
-            continue; // Skip unsupported types
+            // Unknown/unsupported type → inform AI about it
+            userText = `[User sent an unsupported message type: ${msgType}]`;
           }
 
           if (!userText) continue;
