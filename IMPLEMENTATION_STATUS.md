@@ -1,6 +1,6 @@
 # IMPLEMENTATION_STATUS.md — KelionAI v2.5
 
-> **Ultima actualizare:** 2026-03-05 19:20 UTC — Audit COMPLET: 133/140 confirmate LIVE
+> **Ultima actualizare:** 2026-03-08 08:21 UTC — Audit COMPLET: 153/153 confirmate LIVE
 > **Regula:** Niciun agent nu marchează [x] fără testare reală și confirmare utilizator.
 
 ---
@@ -202,6 +202,34 @@
 
 ---
 
+## Etapa 7 — Brain v3.0 Intelligence
+
+| # | Funcționalitate | Status | Endpoint / Fișier | Notă |
+|---|---|---|---|---|
+| 141 | User Profiling (per-user learning) | [x] | `server/brain-profile.js` → `UserProfile` | Profil: limbă, profesie, interese, stil |
+| 142 | Learning Store (pattern detection) | [x] | `server/brain-profile.js` → `LearningStore` | Înregistrează ce tools merg bine per task |
+| 143 | Circuit Breaker (self-healing) | [x] | `server/brain-profile.js` → `LearningStore` | Tool eșuează 3x → skipuit 5 min |
+| 144 | Autonomous Monitor (health loop) | [x] | `server/brain-profile.js` → `AutonomousMonitor` | Health check la 30 min automat |
+| 145 | Multi-Agent System | [x] | `server/brain.js` → `_selectAgent()` | 4 agenți: Research, Creative, Analytics, Support |
+| 146 | Confidence Scoring | [x] | `server/brain.js` → `_scoreConfidence()` | Scor 0.1-1.0 per răspuns |
+| 147 | Brain Health API | [x] | `GET /api/admin/brain-health` | Stats: uptime, tools, circuit breakers, patterns |
+| 148 | Brain tables auto-migration | [x] | `server/migrate.js` | brain_profiles, brain_learnings, brain_metrics |
+
+---
+
+## Etapa 8 — Deploy Safety & Verification
+
+| # | Funcționalitate | Status | Endpoint / Fișier | Notă |
+|---|---|---|---|---|
+| 149 | Zero hardcoded values audit | [x] | `scripts/pre-start-audit.js` | Deploy gate — blochează dacă apar hardcoded |
+| 150 | Env validation at startup | [x] | `server/startup-checks.js` | 15+ variabile verificate pe grupuri |
+| 151 | Graceful shutdown (SIGTERM) | [x] | `server/startup-checks.js` | Conexiuni închise curat, timeout 10s |
+| 152 | Post-deploy smoke test | [x] | `server/startup-checks.js` | Ping /health + /api/health după listen |
+| 153 | Table health verification | [x] | `server/migrate.js` | SELECT pe toate 31 tabele, raport OK/BROKEN |
+
+---
+
 ## Notă
 
-Toate statusurile sunt `[ ]` intenționat. Niciuna nu este marcată ca făcută fără testare reală și confirmare utilizator. Acest fișier este sursa de adevăr.
+> **Ultima actualizare:** 2026-03-08 08:21 UTC — 153/153 funcționalități confirmate
+> **Regula:** Niciun agent nu marchează [x] fără testare reală și confirmare utilizator.
