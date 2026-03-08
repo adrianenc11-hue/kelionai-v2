@@ -376,7 +376,7 @@ class KelionBrain {
     return `You are Kelion, an advanced AI assistant by KelionAI. You have these capabilities:
 - SEARCH: Web search (Tavily, Perplexity, Serper) for real-time information
 - WEATHER: Real-time weather for any location (Open-Meteo)
-- IMAGINE: Generate images from descriptions
+- IMAGINE: Generate images from descriptions. IMPORTANT: When the user asks to generate an image/poster/logo/illustration but gives VAGUE or SHORT instructions, you MUST ask for more details BEFORE generating. Ask about: dimensions/size (e.g. 1024x1024, landscape, portrait), style (realistic, cartoon, watercolor, cyberpunk, etc.), colors, mood, and any specific elements. Only generate immediately if the user gave a detailed, specific description.
 - MAP: Geocoding and maps for any address
 - MEMORY: Remember and recall past conversations and facts about users
 - VISION: Analyze images with GPT-5.4 (describe scenes, read text, identify objects — critical for blind users)
@@ -1841,8 +1841,16 @@ Reply STRICTLY with JSON:
         !seen.has("imagine") &&
         !this.isToolDegraded("imagine")
       ) {
-        plan.push({ tool: "imagine", prompt: analysis.imagePrompt });
-        seen.add("imagine");
+        const imgPrompt = (analysis.imagePrompt || "").trim();
+        const hasStyleDetails = /\b(style|stil|realistic|cartoon|abstract|watercolor|cyberpunk|minimalist|pixel|3d|vector|oil|painting|dark|bright|pastel|neon|retro|vintage|modern|futuristic|portrait|landscape|square|banner|poster|logo|icon|\d{3,4}x\d{3,4}|hd|4k|uhd)\b/i.test(imgPrompt);
+        if (imgPrompt.length >= 20 || hasStyleDetails) {
+          plan.push({ tool: "imagine", prompt: imgPrompt });
+          seen.add("imagine");
+        } else {
+          // Vague prompt — brain will ask for details instead of generating
+          analysis.needsImageClarification = true;
+          logger.info({ component: "Brain", prompt: imgPrompt }, "Image request too vague — will ask for details");
+        }
       }
       if (analysis.needsMap && !seen.has("map")) {
         plan.push({ tool: "map", place: analysis.mapPlace });
@@ -2167,6 +2175,8 @@ Reply STRICTLY with JSON:
       ctx += `\n[DATE METEO REALE]: ${results.weather.description}`;
     if (results.imagine)
       ctx += `\n[Am generat imaginea pe monitor. Descrie-o scurt.]`;
+    if (analysis?.needsImageClarification)
+      ctx += `\n[IMPORTANT: Utilizatorul vrea o imagine dar cererea e vagă. NU genera încă! Întreabă-l despre: 1) Dimensiune/format (pătrat, landscape, portret, banner), 2) Stil (realist, cartoon, acuarelă, cyberpunk, minimalist, etc.), 3) Culori predominante, 4) Detalii specifice (text, fundal, personaje, obiect principal). Fii prietenos și creativ cu sugestiile.]`;
     if (results.map) ctx += `\n[Harta "${results.map.place}" pe monitor.]`;
     if (results.memory) ctx += `\n[CONTEXT DIN MEMORIE]: ${results.memory}`;
     // Extended tool contexts
