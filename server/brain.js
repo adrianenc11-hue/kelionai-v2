@@ -2412,8 +2412,8 @@ Reply STRICTLY with JSON:
         user_id: userId || "system",
         provider: provider,
         model: model || "unknown",
-        input_tokens: inputTokens || 0,
-        output_tokens: outputTokens || 0,
+        tokens_in: inputTokens || 0,
+        tokens_out: outputTokens || 0,
         cost_usd: costUsd || 0,
         created_at: new Date().toISOString(),
       });
