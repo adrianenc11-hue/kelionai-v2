@@ -7,7 +7,7 @@ const express = require("express");
 const rateLimit = require("express-rate-limit");
 const FormData = require("form-data");
 const logger = require("../logger");
-const { getVoiceId } = require("../config/voices");
+const { getVoiceId, VOICES } = require("../config/voices");
 const { validate, speakSchema, listenSchema } = require("../validation");
 const { checkUsage, incrementUsage } = require("../payments");
 const { MODELS, VOICE_EMOTIONS } = require("../config/models");
@@ -27,6 +27,38 @@ const apiLimiter = rateLimit({
   message: { error: "Too many API requests. Please wait 15 minutes." },
   standardHeaders: true,
   legacyHeaders: false,
+});
+
+// GET /api/voices — list all available TTS voices
+router.get("/voices", (req, res) => {
+  const LANG_NAMES = {
+    ro: "Romanian", en: "English", es: "Spanish", fr: "French",
+    de: "German", it: "Italian", pt: "Portuguese", ru: "Russian",
+    ja: "Japanese", zh: "Chinese", ko: "Korean", ar: "Arabic",
+    hi: "Hindi", tr: "Turkish", pl: "Polish", nl: "Dutch",
+    sv: "Swedish", no: "Norwegian", da: "Danish", fi: "Finnish",
+    cs: "Czech", sk: "Slovak", hu: "Hungarian", hr: "Croatian",
+    bg: "Bulgarian", el: "Greek", he: "Hebrew", uk: "Ukrainian",
+    vi: "Vietnamese", th: "Thai", id: "Indonesian", ms: "Malay",
+    sw: "Swahili",
+  };
+  const voices = [];
+  for (const [lang, avatars] of Object.entries(VOICES)) {
+    for (const [avatar, voiceId] of Object.entries(avatars)) {
+      voices.push({
+        language: lang,
+        languageName: LANG_NAMES[lang] || lang,
+        avatar,
+        voiceId,
+        engine: "ElevenLabs",
+      });
+    }
+  }
+  res.json({
+    count: voices.length,
+    engines: ["ElevenLabs", "OpenAI"],
+    voices,
+  });
 });
 
 // POST /api/speak — TTS via ElevenLabs

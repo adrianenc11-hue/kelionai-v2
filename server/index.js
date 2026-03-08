@@ -763,6 +763,17 @@ app.get("/api/voice-clone/list", async (req, res) => {
   }
 });
 
+// ═══ RADIO STATIONS ENDPOINT ═══
+app.get("/api/radio/stations", (req, res) => {
+  res.json({
+    stations: [
+      { name: "RadioZU", url: "https://www.radiozu.ro", country: "RO", genre: "Pop/Dance" },
+      { name: "Kiss FM", url: "https://www.kissfm.ro", country: "RO", genre: "Pop/Hits" },
+      { name: "Spotify", url: "https://open.spotify.com", country: "Global", genre: "All" },
+    ],
+  });
+});
+
 
 // ═══ COOKIE CONSENT ENDPOINT ═══
 app.post(
