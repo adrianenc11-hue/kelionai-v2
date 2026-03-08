@@ -1,5 +1,5 @@
 // KelionAI v2.4 — MESSENGER BOT (Full AI: Text + Audio + Video + Image + Documents)
-// Webhook: https://kelionai.app/api/messenger/webhook
+// Webhook: configured via APP_URL env var
 "use strict";
 
 const express = require("express");
@@ -610,7 +610,7 @@ async function sendAudioMessage(recipientId, audioUrl) {
 async function generateAndSendVoice(recipientId, text, character) {
   const apiKey = process.env.ELEVENLABS_API_KEY;
   if (!apiKey) return;
-  const appUrl = process.env.APP_URL || "https://kelionai.app";
+  const appUrl = process.env.APP_URL;
   try {
     const voiceId = getVoiceId(character);
     const res = await fetch(
@@ -787,8 +787,8 @@ async function setupPersistentMenu() {
                 { type: "postback", title: "👩‍💻 Kira", payload: "SWITCH_KIRA" },
                 {
                   type: "web_url",
-                  title: "🌐 kelionai.app",
-                  url: "https://kelionai.app",
+                  title: "🌐 KelionAI",
+                  url: process.env.APP_URL,
                 },
                 { type: "postback", title: "📰 Știri", payload: "GET_NEWS" },
                 { type: "postback", title: "❓ Ajutor", payload: "GET_HELP" },
@@ -856,7 +856,7 @@ async function handlePostback(senderId, payload, appLocals) {
         '📰 Scrie "stiri" — iti trimit ultimele stiri\n' +
         '🤖 Scrie "kelion" sau "kira" — schimba asistentul\n' +
         '🔔 Scrie "aboneaza-ma" — notificari stiri\n\n' +
-        "🌐 Mai multe pe kelionai.app",
+        `🌐 Mai multe pe ${process.env.APP_URL}`,
         ["💬 Chat", "📰 Știri", "🌐 Site"],
       );
     }
@@ -879,16 +879,16 @@ function buildNewsElements(articles) {
     return {
       title: (a.title || "Știre").slice(0, 80),
       subtitle: (a.description || a.summary || "").slice(0, 80),
-      image_url: a.image || a.imageUrl || "https://kelionai.app/og-image.jpg",
+      image_url: a.image || a.imageUrl || (process.env.APP_URL + "/og-image.jpg"),
       default_action: {
         type: "web_url",
-        url: a.url || a.link || "https://kelionai.app",
+        url: a.url || a.link || process.env.APP_URL,
       },
       buttons: [
         {
           type: "web_url",
           title: "🔗 Citeste",
-          url: a.url || a.link || "https://kelionai.app",
+          url: a.url || a.link || process.env.APP_URL,
         },
       ],
     };
@@ -1382,7 +1382,7 @@ router.post("/webhook", async function (req, res) {
               reply = "Momentan sunt ocupat. Incearca din nou.";
             }
           } else {
-            reply = "Sunt KelionAI! Viziteaza https://kelionai.app";
+            reply = `Sunt KelionAI! Viziteaza ${process.env.APP_URL}`;
           }
         }
 
@@ -1472,7 +1472,7 @@ router.post("/webhook", async function (req, res) {
                 " mesaje gratuite!\n\n" +
                 "Continua cu functii premium pe kelionai.app:\n" +
                 "Chat nelimitat cu AI\nAvatare 3D\nVoce naturala\n\n" +
-                "Aboneaza-te: https://kelionai.app/pricing",
+                `Aboneaza-te: ${process.env.APP_URL}/pricing`,
                 ["💎 Upgrade", "🌐 Site"],
               );
             } catch (ex) {

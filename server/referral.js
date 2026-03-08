@@ -333,7 +333,7 @@ async function applyReferralBonus(code, recipientUserId, supabaseAdmin) {
   </div>
   <p style="color:#aaa;font-size:0.85rem;margin:0 0 16px">Keep inviting friends for even more free days!</p>
   <div style="text-align:center">
-    <a href="https://kelionai.app" style="display:inline-block;background:linear-gradient(135deg,#6366F1,#06B6D4);color:#fff;font-weight:bold;padding:12px 28px;border-radius:10px;text-decoration:none">Open KelionAI</a>
+    <a href="${appUrl}" style="display:inline-block;background:linear-gradient(135deg,#6366F1,#06B6D4);color:#fff;font-weight:bold;padding:12px 28px;border-radius:10px;text-decoration:none">Open KelionAI</a>
   </div>
 </div>
 </body></html>`
