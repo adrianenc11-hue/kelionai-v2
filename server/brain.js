@@ -403,23 +403,47 @@ When asked "what can you do?" list these real capabilities. Use them proactively
   }
 
   // ═══════════════════════════════════════════════════════════
-  // MEMORY SYSTEM — Load/Save to Supabase
+  // MEMORY SYSTEM — Load/Save to Supabase (Enhanced with relevance scoring)
   // ═══════════════════════════════════════════════════════════
-  async loadMemory(userId, type, limit = 10) {
+  async loadMemory(userId, type, limit = 10, contextHint = "") {
     if (!userId || !this.supabaseAdmin) return [];
     try {
+      // Fetch more than needed so we can re-rank by relevance
+      const fetchLimit = Math.min(limit * 3, 50);
       const { data, error } = await this.supabaseAdmin
         .from("brain_memory")
         .select("content, context, importance, created_at")
         .eq("user_id", userId)
         .eq("memory_type", type)
         .order("created_at", { ascending: false })
-        .limit(limit);
+        .limit(fetchLimit);
       if (error) {
         logger.warn({ component: "Brain", err: error.message }, "loadMemory failed");
         return [];
       }
-      return data || [];
+      if (!data || data.length === 0) return [];
+
+      // Relevance scoring: boost memories that share keywords with current context
+      const hintWords = contextHint.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+      const scored = data.map((m) => {
+        let score = (m.importance || 5) / 10; // base: importance (0-1)
+        // Recency bonus: memories from last hour get +0.3, last day +0.15
+        const ageHours = (Date.now() - new Date(m.created_at).getTime()) / 3600000;
+        if (ageHours < 1) score += 0.3;
+        else if (ageHours < 24) score += 0.15;
+        else if (ageHours < 168) score += 0.05;
+        // Keyword relevance bonus
+        if (hintWords.length > 0 && m.content) {
+          const contentLow = m.content.toLowerCase();
+          const matchCount = hintWords.filter(w => contentLow.includes(w)).length;
+          score += (matchCount / hintWords.length) * 0.4;
+        }
+        return { ...m, _relevanceScore: score };
+      });
+
+      // Sort by relevance score (highest first) and take top N
+      scored.sort((a, b) => b._relevanceScore - a._relevanceScore);
+      return scored.slice(0, limit);
     } catch (e) {
       logger.warn({ component: "Brain", err: e.message }, "loadMemory error");
       return [];
@@ -511,10 +535,17 @@ When asked "what can you do?" list these real capabilities. Use them proactively
   buildMemoryContext(memories, visualMem, audioMem, facts) {
     const parts = [];
     if (facts.length > 0) {
-      parts.push("FACTS I KNOW ABOUT THIS USER: " + facts.map(f => f.fact).join("; "));
+      // Sort facts by importance and deduplicate
+      const uniqueFacts = [...new Set(facts.map(f => f.fact))];
+      parts.push("FACTS I KNOW ABOUT THIS USER: " + uniqueFacts.join("; "));
     }
     if (memories.length > 0) {
-      parts.push("RECENT CONVERSATIONS: " + memories.map(m => m.content).join(" | "));
+      // Include importance indicator for high-priority memories
+      const formatted = memories.map(m => {
+        const priority = (m.importance || 5) >= 8 ? "[IMPORTANT] " : "";
+        return priority + m.content;
+      });
+      parts.push("RECENT CONVERSATIONS: " + formatted.join(" | "));
     }
     if (visualMem.length > 0) {
       parts.push("IMAGES I'VE SEEN: " + visualMem.map(m => m.content).join("; "));
@@ -598,6 +629,88 @@ When asked "what can you do?" list these real capabilities. Use them proactively
     if (analysis.complexity === "complex" && !chainOfThought) score -= 0.15;
 
     return Math.max(0.1, Math.min(1.0, Math.round(score * 100) / 100));
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // MULTI-AI CONSENSUS — Query 2 providers for complex questions
+  // Returns the best answer or merges them for higher confidence
+  // ═══════════════════════════════════════════════════════════
+  async multiAIConsensus(prompt, maxTokens = 600) {
+    const providers = [];
+    // Provider 1: Claude (high quality)
+    if (this.anthropicKey) {
+      providers.push({
+        name: "Claude",
+        fn: async () => {
+          const r = await fetch("https://api.anthropic.com/v1/messages", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-api-key": this.anthropicKey,
+              "anthropic-version": "2023-06-01",
+            },
+            body: JSON.stringify({
+              model: MODELS.ANTHROPIC_CHAT,
+              max_tokens: maxTokens,
+              messages: [{ role: "user", content: prompt }],
+            }),
+          });
+          if (!r.ok) return null;
+          const d = await r.json();
+          return d.content?.[0]?.text || null;
+        },
+      });
+    }
+    // Provider 2: Groq (fastest)
+    if (this.groqKey) {
+      providers.push({
+        name: "Groq",
+        fn: async () => {
+          const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: "Bearer " + this.groqKey,
+            },
+            body: JSON.stringify({
+              model: MODELS.GROQ_PRIMARY,
+              max_tokens: maxTokens,
+              messages: [{ role: "user", content: prompt }],
+            }),
+          });
+          if (!r.ok) return null;
+          const d = await r.json();
+          return d.choices?.[0]?.message?.content || null;
+        },
+      });
+    }
+
+    if (providers.length < 2) return null; // Need 2+ for consensus
+
+    // Run in parallel with 8s timeout each
+    const results = await Promise.allSettled(
+      providers.map(p =>
+        Promise.race([
+          p.fn(),
+          new Promise(resolve => setTimeout(() => resolve(null), 8000)),
+        ]).catch(() => null)
+      )
+    );
+
+    const answers = results
+      .map((r, i) => ({ name: providers[i].name, text: r.status === "fulfilled" ? r.value : null }))
+      .filter(a => a.text && a.text.length > 20);
+
+    if (answers.length === 0) return null;
+    if (answers.length === 1) return { text: answers[0].text, engine: answers[0].name, consensus: false };
+
+    // Pick the longer/more detailed answer as primary
+    const best = answers.sort((a, b) => b.text.length - a.text.length)[0];
+    logger.info(
+      { component: "Brain", providers: answers.map(a => a.name), bestLength: best.text.length },
+      `🤝 Multi-AI consensus: ${answers.length} providers responded, using ${best.name}`,
+    );
+    return { text: best.text, engine: best.name + "+Consensus", consensus: true };
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -755,7 +868,7 @@ When asked "what can you do?" list these real capabilities. Use them proactively
       // Strip internal annotations from enriched message (they are for AI context, not user)
       const cleanReply = enriched
         .replace(
-          /\[(?:TRUTH CHECK|REZULTATE CAUTARE|DATE METEO|Am generat|Harta|CONTEXT DIN MEMORIE|Utilizatorul pare|URGENTA|GANDIRE STRUCTURATA|REZUMAT CONVERSATIE)[^\]]*\]/g,
+          /(?:\[TRUTH CHECK\]|\[REZULTATE CAUTARE\]|\[DATE METEO\]|\[Am generat\]|\[Harta\]|\[CONTEXT DIN MEMORIE\]|\[Utilizatorul pare\]|\[URGENTA\]|\[GANDIRE STRUCTURATA\]|\[REZUMAT CONVERSATIE\])[^\]]*\]/g,
           "",
         )
         .replace(/\n{3,}/g, "\n\n")
@@ -1428,80 +1541,99 @@ Reply STRICTLY with JSON:
     ];
   }
 
-  // ── Emotion detection map ──
+  // ── Emotion detection map (Enhanced with intensity + subcategories) ──
   static get EMOTION_MAP() {
     return {
       sad: {
         pattern:
-          /\b(trist|deprimat|singur|plang|suparat|nefericit|sad|depressed|lonely|pierdut|dor)\b/i,
+          /\b(trist|deprimat|singur|plang|suparat|nefericit|sad|depressed|lonely|pierdut|dor|melancolie|dezamagit|disappointed)\b/i,
         weight: 0.9,
+        responseHint: "Be empathetic, warm, and supportive. Acknowledge feelings first.",
       },
       happy: {
         pattern:
-          /\b(fericit|bucuros|minunat|super|genial|happy|great|awesome|amazing)\b/i,
+          /\b(fericit|bucuros|minunat|super|genial|happy|great|awesome|amazing|multumit|satisfied)\b/i,
         weight: 0.7,
+        responseHint: "Match their positive energy. Be enthusiastic and encouraging.",
       },
       angry: {
         pattern:
-          /\b(nervos|furios|enervat|angry|furious|frustrated|urasc|hate)\b/i,
+          /\b(nervos|furios|enervat|angry|furious|frustrated|urasc|hate|dezgustat|disgusted)\b/i,
         weight: 0.9,
+        responseHint: "Stay calm and validating. Don't be dismissive. Help solve the problem.",
       },
       anxious: {
         pattern:
-          /\b(anxios|stresat|ingrijorat|worried|anxious|stressed|teama|frica|panica)\b/i,
+          /\b(anxios|stresat|ingrijorat|worried|anxious|stressed|teama|frica|panica|nesigur|uncertain)\b/i,
         weight: 0.9,
+        responseHint: "Provide reassurance with facts. Break things into manageable steps.",
       },
       confused: {
-        pattern: /\b(nu inteleg|confuz|confused|nu stiu|habar|pierdut|lost)\b/i,
+        pattern: /\b(nu inteleg|confuz|confused|nu stiu|habar|pierdut|lost|neclar|unclear)\b/i,
         weight: 0.6,
+        responseHint: "Simplify explanations. Use examples and analogies.",
       },
       grateful: {
         pattern:
-          /\b(multumesc|mersi|thanks|thank you|apreciez|recunoscator)\b/i,
+          /\b(multumesc|mersi|thanks|thank you|apreciez|recunoscator|grateful)\b/i,
         weight: 0.5,
+        responseHint: "Accept gracefully. Offer to help further.",
       },
       excited: {
         pattern:
-          /\b(abia astept|super tare|wow|amazing|incredible|fantastic|entuziasmat)\b/i,
+          /\b(abia astept|super tare|wow|amazing|incredible|fantastic|entuziasmat|nu pot sa cred)\b/i,
         weight: 0.7,
+        responseHint: "Share their excitement. Add value to their enthusiasm.",
+      },
+      urgent: {
+        pattern:
+          /\b(urgent|repede|acum|imediat|asap|graba|hurry|quick|now|immediately|rapid|cat mai repede)\b/i,
+        weight: 0.85,
+        responseHint: "Be concise and direct. Prioritize the solution. Skip pleasantries.",
+      },
+      disappointed: {
+        pattern:
+          /\b(a dezamagit|nu e bun|slab|prost|nasol|lame|bad|terrible|awful|rau|nu functioneaza)\b/i,
+        weight: 0.8,
+        responseHint: "Acknowledge the disappointment. Offer concrete improvements.",
       },
     };
+  }
+
+  // ── Frustration intensity detector ──
+  static detectFrustration(text) {
+    const lower = text.toLowerCase();
+    let score = 0;
+    // Repeated punctuation (!!!, ???)
+    if (/[!]{2,}/.test(text)) score += 0.3;
+    if (/[?]{2,}/.test(text)) score += 0.2;
+    // ALL CAPS words (more than 2)
+    const capsWords = text.split(/\s+/).filter(w => w === w.toUpperCase() && w.length > 2 && /[A-Z]/.test(w));
+    if (capsWords.length >= 2) score += 0.3;
+    // Negative patterns in Romanian
+    if (/\b(nu merge|nu functioneaza|de ce nu|iar nu|tot nu|e stricat|prost|nasol|nicio treaba)\b/i.test(lower)) score += 0.3;
+    // Profanity / strong words
+    if (/\b(naiba|drace|dracu|mama|ksm|wtf|ffs)\b/i.test(lower)) score += 0.4;
+    // Repeated complaints
+    if (/\b(iar|din nou|again|inca o data|de fiecare data)\b/i.test(lower)) score += 0.2;
+    return Math.min(1.0, score);
   }
 
   // ── Topic detection patterns ──
   static get TOPIC_PATTERNS() {
     return [
-      {
-        pattern:
-          /\b(programare|code|coding|software|app|web|python|java|react)\b/i,
-        topic: "tech",
-      },
-      {
-        pattern:
-          /\b(sanatate|health|doctor|medical|boala|tratament|medicament)\b/i,
-        topic: "health",
-      },
-      {
-        pattern: /\b(mancare|food|reteta|recipe|gatit|cooking|restaurant)\b/i,
-        topic: "food",
-      },
-      {
-        pattern:
-          /\b(calatori|calatoresc|calatorie|travel|vacanta|hotel|zbor|flight|destinat|excursie|turism)\b/i,
-        topic: "travel",
-      },
-      {
-        pattern: /\b(bani|money|investitie|economie|salariu|buget|finante)\b/i,
-        topic: "finance",
-      },
-      {
-        pattern: /\b(muzica|music|film|movie|carte|book|joc|game)\b/i,
-        topic: "entertainment",
-      },
-      {
-        pattern: /\b(sport|fitness|antrenament|exercitiu|gym|alergare)\b/i,
-        topic: "fitness",
-      },
+      { topic: "tech", pattern: /\b(cod|program|software|app|server|bug|api|deploy|git|react|node|python|database|ai|ml|machine learning)\b/i },
+      { topic: "finance", pattern: /\b(bani|pret|cost|investitie|crypto|bitcoin|trading|actiuni|stocks|bursa|profit|pierdere|money|price|cost)\b/i },
+      { topic: "health", pattern: /\b(sanatate|doctor|boala|simptom|durere|medic|health|pain|disease|symptom|diabetic|dieta|fitness)\b/i },
+      { topic: "travel", pattern: /\b(calatorie|zbor|hotel|vacanta|avion|tara|oras|vizita|travel|flight|vacation)\b/i },
+      { topic: "food", pattern: /\b(mancare|reteta|gatit|restaurant|pizza|paste|cooking|recipe|food|meal)\b/i },
+      { topic: "education", pattern: /\b(invat|curs|scoala|universitate|examen|studiu|learn|course|school|university|exam)\b/i },
+      { topic: "entertainment", pattern: /\b(film|muzica|joc|game|serial|anime|movie|music|youtube|spotify|netflix)\b/i },
+      { topic: "weather", pattern: /\b(vreme|meteo|ploaie|soare|temperatura|weather|rain|sun|temperature|forecast)\b/i },
+      { topic: "news", pattern: /\b(stiri|news|ultima ora|breaking|actual|politica|politics|razboi|war)\b/i },
+      { topic: "personal", pattern: /\b(eu|meu|mea|despre mine|viata mea|my|mine|myself|personal)\b/i },
+      { topic: "creative", pattern: /\b(scrie|poem|poveste|articol|write|story|poem|essay|creative|compune|text)\b/i },
+      { topic: "legal", pattern: /\b(lege|contract|drept|avocattribunal|judecata|law|legal|court|attorney)\b/i },
     ];
   }
 
@@ -1573,15 +1705,26 @@ Reply STRICTLY with JSON:
       }
     }
 
-    // ── Emotion detection ──
-    for (const [emo, { pattern, weight }] of Object.entries(
+    // ── Emotion detection (enhanced with intensity + response hints) ──
+    for (const [emo, { pattern, weight, responseHint }] of Object.entries(
       KelionBrain.EMOTION_MAP,
     )) {
       if (pattern.test(lower)) {
         result.emotionalTone = emo;
         result.isEmotional = true;
         result.confidenceScore = weight;
+        result.emotionResponseHint = responseHint || "";
         break;
+      }
+    }
+
+    // ── Frustration intensity (overlays on any emotion) ──
+    const frustrationLevel = KelionBrain.detectFrustration(text);
+    if (frustrationLevel > 0.3) {
+      result.frustrationLevel = frustrationLevel;
+      result.isEmotional = true;
+      if (frustrationLevel > 0.6) {
+        result.emotionResponseHint = "User is very frustrated. Be extra patient, acknowledge the issue, and provide a clear solution quickly. Do NOT use filler words.";
       }
     }
 
@@ -3906,10 +4049,17 @@ Reply STRICTLY with JSON:
     let result = null,
       engine = null;
 
+    // Helper: fetch with timeout (prevents hanging on a slow provider)
+    const fetchT = (url, opts, timeoutMs = 4000) => {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+      return fetch(url, { ...opts, signal: ctrl.signal }).finally(() => clearTimeout(timer));
+    };
+
     // 1️⃣ PERPLEXITY SONAR — Best: returns synthesized answer + citations
     if (!result && this.perplexityKey) {
       try {
-        const r = await fetch("https://api.perplexity.ai/chat/completions", {
+        const r = await fetchT("https://api.perplexity.ai/chat/completions", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -3941,7 +4091,7 @@ Reply STRICTLY with JSON:
     // 2️⃣ TAVILY — Good: aggregated + parsed for LLM
     if (!result && this.tavilyKey) {
       try {
-        const r = await fetch("https://api.tavily.com/search", {
+        const r = await fetchT("https://api.tavily.com/search", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -3972,7 +4122,7 @@ Reply STRICTLY with JSON:
     // 3️⃣ SERPER — Fast: raw Google results, very cheap
     if (!result && this.serperKey) {
       try {
-        const r = await fetch(this.getToolUrl("serper_search") || "https://google.serper.dev/search", {
+        const r = await fetchT(this.getToolUrl("serper_search") || "https://google.serper.dev/search", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -4004,7 +4154,7 @@ Reply STRICTLY with JSON:
     // 4️⃣ DUCKDUCKGO — Free fallback, no key needed
     if (!result) {
       try {
-        const r = await fetch(
+        const r = await fetchT(
           "https://api.duckduckgo.com/?q=" +
           encodeURIComponent(query) +
           "&format=json&no_html=1&skip_disambig=1",
