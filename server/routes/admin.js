@@ -59,6 +59,35 @@ async function requireAdmin(req, res, next) {
   */
 }
 
+// ── POST /verify-code — validate admin access/exit code (pre-auth) ──
+router.post("/verify-code", express.json(), (req, res) => {
+  const { code } = req.body || {};
+  const accessCode = process.env.ADMIN_ACCESS_CODE || process.env.ADMIN_EXIT_CODE;
+  const exitCode = process.env.ADMIN_EXIT_CODE || process.env.ADMIN_ACCESS_CODE;
+  const secret = process.env.ADMIN_SECRET_KEY;
+
+  if (!code) return res.status(400).json({ error: "Code required" });
+
+  if (code === accessCode && secret) {
+    logger.info({ component: "Admin" }, "Admin access granted via code");
+    return res.json({
+      action: "enter",
+      secret,
+      message: "Admin mode activat!",
+    });
+  }
+  if (code === exitCode) {
+    logger.info({ component: "Admin" }, "Admin access revoked via exit code");
+    return res.json({
+      action: "exit",
+      message: "Admin mode dezactivat.",
+    });
+  }
+
+  // Not a valid admin code — return 404 so frontend falls through to normal chat
+  return res.status(404).json({ error: "Invalid code" });
+});
+
 router.use(requireAdmin);
 
 // ── Log ALL admin actions to Supabase ──
