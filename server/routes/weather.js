@@ -118,4 +118,35 @@ router.post("/", weatherLimiter, validate(weatherSchema), async (req, res) => {
   }
 });
 
+// GET /api/weather?city=X — convenience GET endpoint
+router.get("/", weatherLimiter, async (req, res) => {
+  try {
+    const city = req.query.city;
+    if (!city) return res.status(400).json({ error: "city query parameter required. Example: /api/weather?city=Bucharest" });
+
+    const { brain } = req.app.locals;
+    const geoSearchUrl = brain?.getToolUrl("open_meteo_geo") || "https://geocoding-api.open-meteo.com/v1/search";
+    const geo = await (await fetch(geoSearchUrl + "?name=" + encodeURIComponent(city) + "&count=1&language=ro")).json();
+    if (!geo.results?.[0]) return res.status(404).json({ error: '"' + city + '" not found' });
+    const { latitude, longitude, name, country } = geo.results[0];
+
+    const forecastUrl = brain?.getToolUrl("open_meteo_forecast") || "https://api.open-meteo.com/v1/forecast";
+    const wx = await (await fetch(forecastUrl + "?latitude=" + latitude + "&longitude=" + longitude + "&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&timezone=auto")).json();
+    const c = wx.current;
+    const codes = { 0: "Clear ☀️", 1: "Mostly clear 🌤️", 2: "Partly cloudy ⛅", 3: "Cloudy ☁️", 45: "Foggy 🌫️", 51: "Drizzle 🌦️", 61: "Rain 🌧️", 71: "Snow 🌨️", 80: "Showers 🌦️", 95: "Thunderstorm ⛈️" };
+    const cond = codes[c.weather_code] || "?";
+
+    res.json({
+      city: name, country,
+      temperature: c.temperature_2m,
+      humidity: c.relative_humidity_2m,
+      wind: c.wind_speed_10m,
+      condition: cond,
+      description: name + ", " + country + ": " + c.temperature_2m + "°C, " + cond + ", humidity " + c.relative_humidity_2m + "%, wind " + c.wind_speed_10m + " km/h",
+    });
+  } catch {
+    res.status(500).json({ error: "Weather error" });
+  }
+});
+
 module.exports = router;
