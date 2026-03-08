@@ -172,7 +172,7 @@
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 3)); // CINEMATIC: up to 3x for 4K/retina
 
         camera = new THREE.PerspectiveCamera(25, w / h, 0.1, 100);
-        camera.position.set(0, -0.10, 1.15); // Tighter framing — arms closer to body
+        camera.position.set(0, -0.05, 1.15); // Raised framing — avatar higher in panel
         renderer.outputColorSpace = THREE.SRGBColorSpace;
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
         renderer.toneMappingExposure = 1.2;
@@ -253,7 +253,7 @@
                 if (maxDim > 0) currentModel.scale.setScalar(1.2 / maxDim);
 
                 // Shift model down for head+torso framing
-                currentModel.position.y -= 0.35;
+                currentModel.position.y -= 0.18; // Less shift = avatar higher in frame
 
                 currentModel.traverse((child) => {
                     if (child.isMesh) {
