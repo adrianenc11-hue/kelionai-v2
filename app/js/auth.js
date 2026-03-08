@@ -45,10 +45,38 @@
         catch (e) { return user; }
     }
 
+    function updateAdminButtonState() {
+        var adminBtn = document.getElementById('btn-admin');
+        if (!adminBtn) return;
+        var isLoggedIn = !!currentUser;
+        var faceConfirmed = !!sessionStorage.getItem('kelion_admin_secret');
+        var unlocked = isLoggedIn && faceConfirmed;
+        adminBtn.dataset.locked = unlocked ? 'false' : 'true';
+        if (unlocked) {
+            adminBtn.style.background = 'rgba(16,185,129,0.15)';
+            adminBtn.style.borderColor = 'rgba(16,185,129,0.4)';
+            adminBtn.style.color = '#6ee7b7';
+            adminBtn.style.cursor = 'pointer';
+            adminBtn.style.opacity = '1';
+            adminBtn.innerHTML = '🛡️ Admin';
+            adminBtn.title = 'Admin Panel — Acces activat';
+        } else {
+            adminBtn.style.background = 'rgba(239,68,68,0.12)';
+            adminBtn.style.borderColor = 'rgba(239,68,68,0.3)';
+            adminBtn.style.color = '#fca5a5';
+            adminBtn.style.cursor = 'not-allowed';
+            adminBtn.style.opacity = '0.7';
+            adminBtn.innerHTML = '🔒 Admin';
+            var hint = !isLoggedIn ? 'Autentifică-te mai întâi' : 'Confirmare facială necesară';
+            adminBtn.title = 'Admin Panel — ' + hint;
+        }
+    }
+
     function updateUI() {
-        const n = document.getElementById('user-name'), b = document.getElementById('btn-auth'), adminBtn = document.getElementById('btn-admin');
-        if (currentUser) { if (n) n.textContent = currentUser.name || currentUser.email; if (b) { b.textContent = '👋 Logout'; b.title = 'Logoff'; } if (adminBtn) adminBtn.style.display = currentUser.role === 'admin' ? '' : 'none'; }
-        else { if (n) n.textContent = 'Guest'; if (b) { b.textContent = '🔑 Login'; b.title = 'Login'; } if (adminBtn) adminBtn.style.display = 'none'; }
+        const n = document.getElementById('user-name'), b = document.getElementById('btn-auth');
+        if (currentUser) { if (n) n.textContent = currentUser.name || currentUser.email; if (b) { b.textContent = '👋 Logout'; b.title = 'Logoff'; } }
+        else { if (n) n.textContent = 'Guest'; if (b) { b.textContent = '🔑 Login'; b.title = 'Login'; } }
+        updateAdminButtonState();
     }
 
     function initUI() {
@@ -141,15 +169,9 @@
         // Admin button → navigate to admin panel
         var adminBtn = document.getElementById('btn-admin');
         if (adminBtn) adminBtn.addEventListener('click', function () {
-            // Check if already authenticated
-            if (sessionStorage.getItem('kelion_admin_secret')) {
+            if (adminBtn.dataset.locked === 'false') {
                 window.location.href = '/admin';
-                return;
             }
-            var secret = prompt('🛡️ Introdu parola Admin:');
-            if (!secret || !secret.trim()) return;
-            sessionStorage.setItem('kelion_admin_secret', secret.trim());
-            window.location.href = '/admin';
         });
         // Auto-enter when both avatars are 100% loaded (or 10s max)
         window.addEventListener('avatars-ready', function () {
@@ -251,7 +273,7 @@
         setInterval(async () => { if (sessionStorage.getItem('kelion_token') && isTokenExpired()) { const ok = await refreshToken(); if (!ok) { updateUI(); document.getElementById('auth-screen')?.classList.remove('hidden'); document.getElementById('app-layout')?.classList.add('hidden'); } } }, 5 * 60 * 1000);
     }
 
-    window.KAuth = { init, register, login, logout, checkSession, getAuthHeaders, getUser: () => currentUser, isLoggedIn: () => !!currentUser, forgotPassword, changePassword, changeEmail };
+    window.KAuth = { init, register, login, logout, checkSession, getAuthHeaders, getUser: () => currentUser, isLoggedIn: () => !!currentUser, forgotPassword, changePassword, changeEmail, updateAdminButtonState };
 })();
 
 // ═══════════════════════════════════════════════════════════════
