@@ -22,6 +22,20 @@
     let initRetryCount = 0;
     const MAX_INIT_RETRIES = 50; // up to 5s total
 
+    // Per-avatar background textures (IIFE scope — accessible from init + loadAvatar)
+    var bgTextures = { kelion: '/models/avatar-bg.png', kira: '/models/avatar-bg-kira.png' };
+    var bgLoader = null;
+    function _loadAvatarBg(name) {
+        if (!bgLoader || !scene) return;
+        var src = bgTextures[name] || bgTextures.kelion;
+        bgLoader.load(src, function (tex) {
+            tex.colorSpace = THREE.SRGBColorSpace;
+            scene.background = tex;
+        }, null, function () {
+            scene.background = new THREE.Color(0x060614);
+        });
+    }
+
     // Blink
     let blinkTimer = 0, nextBlink = 2 + Math.random() * 4, blinkPhase = 0, blinkValue = 0;
 
@@ -196,18 +210,8 @@
         bottomLight.position.set(0, -2, 1);
         scene.add(bottomLight);
 
-        // Per-avatar background textures
-        var bgTextures = { kelion: '/models/avatar-bg.png', kira: '/models/avatar-bg-kira.png' };
-        var bgLoader = new THREE.TextureLoader();
-        function _loadAvatarBg(name) {
-            var src = bgTextures[name] || bgTextures.kelion;
-            bgLoader.load(src, function (tex) {
-                tex.colorSpace = THREE.SRGBColorSpace;
-                scene.background = tex;
-            }, null, function () {
-                scene.background = new THREE.Color(0x060614);
-            });
-        }
+        // Init texture loader and load initial background
+        bgLoader = new THREE.TextureLoader();
         _loadAvatarBg('kelion');
 
         // Lip sync — simple, uses Smile morph

@@ -232,7 +232,53 @@ function toggleSection(id) {
     if (arrow) arrow.textContent = isOpen ? '▶' : '▼';
 }
 
+// ── CODE AUDIT ──
+async function loadAudit() {
+    var el = document.getElementById('audit-results');
+    if (!el) return;
+    try {
+        var r = await fetch('/api/admin/audit-hardcoded', { headers: hdrs() });
+        var d = await r.json();
+        if (d.clean) {
+            el.innerHTML = '<div style="text-align:center;padding:20px;color:#00ff88;font-size:1.2rem">' +
+                '✅ CLEAN — Zero hardcoded values<br>' +
+                '<small style="color:#888">' + d.filesScanned + ' files scanned · ' + d.scannedAt + '</small></div>';
+        } else {
+            var html = '<div style="display:flex;gap:12px;margin-bottom:12px;flex-wrap:wrap">' +
+                '<div class="badge badge-danger">🔴 Critical: ' + d.critical + '</div>' +
+                '<div class="badge badge-warn">🟠 High: ' + d.high + '</div>' +
+                '<div class="badge">🟡 Medium: ' + d.medium + '</div>' +
+                '<small style="color:#888;align-self:center">' + d.filesScanned + ' files · ' + d.scannedAt + '</small>' +
+                '</div>';
+            var all = [].concat(d.findings.CRITICAL || [], d.findings.HIGH || [], d.findings.MEDIUM || []);
+            if (all.length > 0) {
+                html += '<table class="data-table"><thead><tr><th>File</th><th>Line</th><th>Pattern</th><th>Code</th></tr></thead><tbody>';
+                all.forEach(function (f) {
+                    var sev = f.pattern.includes('Key') || f.pattern.includes('Bearer') ? 'badge-danger' : f.pattern.includes('domain') || f.pattern.includes('URL') ? 'badge-warn' : '';
+                    html += '<tr><td><code>' + esc(f.file) + '</code></td><td>' + f.line + '</td>' +
+                        '<td><span class="badge ' + sev + '">' + esc(f.pattern) + '</span></td>' +
+                        '<td><code style="font-size:0.7rem;word-break:break-all">' + esc(f.snippet) + '</code></td></tr>';
+                });
+                html += '</tbody></table>';
+                html += '<button class="btn-sm" onclick="runAutoFix()" style="margin-top:8px;background:#6366f1">🔧 Auto-Fix All</button>';
+            }
+            el.innerHTML = html;
+        }
+    } catch (e) { el.innerHTML = '<div style="color:#f87171">Error loading audit: ' + e.message + '</div>'; }
+}
+
+async function runAutoFix() {
+    if (!confirm('Brain-ul va înlocui automat valorile hardcodate cu process.env.APP_URL. Continui?')) return;
+    try {
+        var r = await fetch('/api/admin/audit-hardcoded/fix', { method: 'POST', headers: hdrs() });
+        var d = await r.json();
+        alert('Fixed ' + d.fix.count + ' files! Remaining: ' + d.afterScan.total + ' findings.');
+        loadAudit();
+    } catch (e) { alert('Fix failed: ' + e.message); }
+}
+
 // ── INIT ──
-loadAiStatus(); loadTraffic(); loadCredit(); loadClients(); loadCodes(); loadUptime();
+loadAiStatus(); loadTraffic(); loadCredit(); loadClients(); loadCodes(); loadUptime(); loadAudit();
 setInterval(function () { loadTraffic(); loadCredit(); loadUptime(); }, 30000);
 setInterval(loadAiStatus, 60000);
+setInterval(loadAudit, 6 * 60 * 60 * 1000); // refresh audit every 6h
