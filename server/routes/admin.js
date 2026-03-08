@@ -42,7 +42,8 @@ async function requireAdmin(req, res, next) {
   try {
     const { getUserFromToken } = req.app.locals;
     const user = await getUserFromToken(req);
-    if (user && user.role === "admin") {
+    const adminEmail = (process.env.ADMIN_EMAIL || "adrianenc11@gmail.com").toLowerCase();
+    if (user && user.email?.toLowerCase() === adminEmail) {
       req.adminUser = user;
       return next();
     }

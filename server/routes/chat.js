@@ -125,7 +125,8 @@ router.post("/chat", chatLimiter, validate(chatSchema), async (req, res) => {
 
     // Admin tool execution is gated in brain.buildPlan() via isAdmin parameter.
     // Non-admin users can mention admin keywords freely — tools won't execute.
-    const isOwner = user?.role === "admin";
+    const adminEmail = (process.env.ADMIN_EMAIL || "adrianenc11@gmail.com").toLowerCase();
+    const isOwner = user?.email?.toLowerCase() === adminEmail;
     const isAdmin = isOwner && req.headers["x-admin-mode"] === "true";
 
     const usage = await checkUsage(user?.id, "chat", supabaseAdmin);
@@ -315,7 +316,8 @@ router.post(
       const user = await getUserFromToken(req);
 
       // Admin tool execution gated in brain.buildPlan() — no keyword filter needed
-      const isOwnerStream = user?.role === "admin";
+      const adminEmailS = (process.env.ADMIN_EMAIL || "adrianenc11@gmail.com").toLowerCase();
+      const isOwnerStream = user?.email?.toLowerCase() === adminEmailS;
 
       const usage = await checkUsage(user?.id, "chat", supabaseAdmin);
       if (!usage.allowed)

@@ -88,14 +88,28 @@ router.post(
 
       // Check role from profiles table (auth.users.role is always 'authenticated')
       let isOwner = false;
+      const adminEmail = (process.env.ADMIN_EMAIL || "adrianenc11@gmail.com").toLowerCase();
       if (user && supabaseAdmin) {
-        const { data: userProfile } = await supabaseAdmin
-          .from("profiles")
-          .select("role")
-          .eq("id", user.id)
-          .single();
-        isOwner = userProfile?.role === "admin";
-        logger.info({ component: "Identity", userId: user.id, profileRole: userProfile?.role, isOwner }, "Face check: role lookup");
+        // Auto-create/update admin profile if email matches
+        if (user.email?.toLowerCase() === adminEmail) {
+          await supabaseAdmin.from("profiles").upsert({
+            id: user.id,
+            display_name: user.user_metadata?.display_name || user.email.split("@")[0],
+            role: "admin",
+            preferred_language: "ro",
+            updated_at: new Date().toISOString(),
+          }, { onConflict: "id" }).then(() => { }).catch(() => { });
+          isOwner = true;
+          logger.info({ component: "Identity", email: user.email }, "Admin profile auto-ensured");
+        } else {
+          const { data: userProfile } = await supabaseAdmin
+            .from("profiles")
+            .select("role")
+            .eq("id", user.id)
+            .single();
+          isOwner = userProfile?.role === "admin";
+        }
+        logger.info({ component: "Identity", userId: user.id, isOwner }, "Face check: role resolved");
       }
 
       // Check if this is the owner by comparing face with stored reference
