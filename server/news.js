@@ -29,6 +29,8 @@ const RSS_SOURCES = [
   { url: "https://stirileprotv.ro/rss", name: "ProTV" },
   { url: "https://www.hotnews.ro/rss/site.xml", name: "HotNews" },
   { url: "https://www.g4media.ro/feed", name: "G4Media" },
+  { url: "https://feeds.bbci.co.uk/news/rss.xml", name: "BBC News" },
+  { url: "https://feeds.bbci.co.uk/news/world/rss.xml", name: "BBC World" },
 ];
 
 const CATEGORIES = [
@@ -280,31 +282,7 @@ async function fetchGNews() {
   }
 }
 
-// ═══ FETCH FROM Guardian ═══
-async function fetchGuardian() {
-  const key = process.env.GUARDIAN_KEY;
-  if (!key) return [];
-  try {
-    const res = await fetch(
-      `https://content.guardianapis.com/search?api-key=${key}&lang=ro&show-fields=trailText`,
-      { timeout: 8000 },
-    );
-    if (!res.ok) return [];
-    const data = await res.json();
-    return ((data.response || {}).results || []).map((a) => ({
-      title: a.webTitle,
-      summary: (a.fields || {}).trailText || "",
-      url: a.webUrl,
-      publishedAt: a.webPublicationDate,
-    }));
-  } catch (e) {
-    logger.warn(
-      { component: "News", source: "Guardian", err: e.message },
-      "Guardian fetch failed",
-    );
-    return [];
-  }
-}
+// Guardian removed — no API key available
 
 // ═══ FETCH RSS (built-in https) ═══
 function fetchRSS(url) {
@@ -443,14 +421,12 @@ async function fetchAllSources() {
   const [
     newsapiArticles,
     gnewsArticles,
-    guardianArticles,
     rssResults,
     currentsArticles,
     mediastackArticles,
   ] = await Promise.allSettled([
     fetchNewsAPI(),
     fetchGNews(),
-    fetchGuardian(),
     fetchAllRSS(),
     fetchCurrents(),
     fetchMediaStack(),
@@ -465,8 +441,6 @@ async function fetchAllSources() {
     processArticles(newsapiArticles.value, "NewsAPI");
   if (gnewsArticles.status === "fulfilled")
     processArticles(gnewsArticles.value, "GNews");
-  if (guardianArticles.status === "fulfilled")
-    processArticles(guardianArticles.value, "Guardian");
   if (rssResults.status === "fulfilled") {
     for (const { name, articles } of rssResults.value)
       processArticles(articles, name);
