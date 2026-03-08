@@ -511,10 +511,10 @@ router.post(
 
       let fullReply = "";
 
-      // AI Chain: Claude (streaming nativ) → GPT-4o (fallback) → DeepSeek (backup)
+      // AI Chain: Claude (streaming nativ) → GPT-5.4 fallback → DeepSeek (backup)
       // NOTĂ: Chain-ul pe /chat/stream diferă INTENȚIONAT de /chat.
-      // /chat: Groq→GPT-4o-mini→Claude→DeepSeek (optimizat pe viteză, non-streaming)
-      // /chat/stream: Claude→GPT-4o→DeepSeek (Claude face streaming nativ word-by-word)
+      // /chat: GPT-5.4→Claude→Groq→DeepSeek (optimizat pe viteză, non-streaming)
+      // /chat/stream: Claude→GPT-5.4→DeepSeek (Claude face streaming nativ word-by-word)
       // Try Claude streaming
       if (process.env.ANTHROPIC_API_KEY) {
         try {
@@ -586,7 +586,7 @@ router.post(
         }
       }
 
-      // Fallback: non-streaming GPT-4o or DeepSeek
+      // Fallback: non-streaming GPT-5.4 (via OPENAI_FALLBACK) or DeepSeek
       if (!fullReply) {
         if (process.env.OPENAI_API_KEY) {
           try {
@@ -612,7 +612,7 @@ router.post(
             fullReply = d.choices?.[0]?.message?.content || "";
             if (fullReply) {
               res.write(
-                `data: ${JSON.stringify({ type: "start", engine: "GPT-4o" })}\n\n`,
+                `data: ${JSON.stringify({ type: "start", engine: "GPT-5.4" })}\n\n`,
               );
               res.write(
                 `data: ${JSON.stringify({ type: "chunk", text: fullReply })}\n\n`,
@@ -621,7 +621,7 @@ router.post(
           } catch (e) {
             logger.warn(
               { component: "Stream", err: e.message },
-              "GPT-4o fallback failed",
+              "GPT-5.4 fallback failed",
             );
           }
         }

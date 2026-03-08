@@ -378,7 +378,7 @@ async function downloadMediaFromUrl(url) {
   return null;
 }
 
-// ANALYZE IMAGE WITH GPT-4o VISION
+// ANALYZE IMAGE WITH GPT-5.4 VISION
 async function analyzeImage(imageBuffer, caption, mimeType) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey)

@@ -171,8 +171,8 @@
         renderer.setSize(w, h);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 3)); // CINEMATIC: up to 3x for 4K/retina
 
-        camera = new THREE.PerspectiveCamera(30, w / h, 0.1, 100);
-        camera.position.set(0, -0.15, 1.25); // Closer for head+bust framing
+        camera = new THREE.PerspectiveCamera(25, w / h, 0.1, 100);
+        camera.position.set(0, -0.10, 1.15); // Tighter framing — arms closer to body
         renderer.outputColorSpace = THREE.SRGBColorSpace;
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
         renderer.toneMappingExposure = 1.2;
@@ -196,7 +196,15 @@
         bottomLight.position.set(0, -2, 1);
         scene.add(bottomLight);
 
-        scene.background = new THREE.Color(0x060614);
+        // Business office background texture
+        var bgLoader = new THREE.TextureLoader();
+        bgLoader.load('/models/avatar-bg.png', function (tex) {
+            tex.colorSpace = THREE.SRGBColorSpace;
+            scene.background = tex;
+        }, null, function () {
+            // Fallback to solid color if image fails
+            scene.background = new THREE.Color(0x060614);
+        });
 
         // Lip sync — simple, uses Smile morph
         if (window.SimpleLipSync) lipSync = new SimpleLipSync();
