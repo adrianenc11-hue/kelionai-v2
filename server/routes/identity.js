@@ -39,7 +39,7 @@ router.post(
           await supabaseAdmin.from("profiles").upsert(
             {
               id: user.id,
-              face_reference: face.substring(0, 500), // store truncated hash/reference
+              face_reference: face.substring(0, 100000), // full face image base64 (320x240 JPEG ~10-30KB)
               updated_at: new Date().toISOString(),
             },
             { onConflict: "id" },
@@ -100,7 +100,19 @@ router.post(
             .eq("role", "admin")
             .single();
 
-          if (ownerProfile?.face_reference && process.env.OPENAI_API_KEY) {
+          // Auto-update face_reference if too short (was truncated by old bug)
+          if (ownerProfile && isOwner && face.length > 1000 && (!ownerProfile.face_reference || ownerProfile.face_reference.length < 1000)) {
+            await supabaseAdmin.from("profiles").update({
+              face_reference: face.substring(0, 100000),
+              updated_at: new Date().toISOString(),
+            }).eq("id", ownerProfile.id);
+            logger.info({ component: "Identity" }, "Auto-updated face_reference (was truncated)");
+            // Since we're the authenticated admin, grant access directly
+            ownerMatch = true;
+            matchedUser = { name: ownerProfile.display_name || "Owner", lang: ownerProfile.preferred_language || "en" };
+          }
+
+          if (!ownerMatch && ownerProfile?.face_reference && ownerProfile.face_reference.length > 1000 && process.env.OPENAI_API_KEY) {
             // Use OpenAI Vision to compare faces
             const r = await fetch(
               "https://api.openai.com/v1/chat/completions",
