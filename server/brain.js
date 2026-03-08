@@ -431,9 +431,19 @@ PASUL 4 — GENERARE: Doar DUPĂ confirmare, generează cu promptul detaliat.
 PASUL 5 — FEEDBACK POST-GENERARE (OBLIGATORIU):
   După ce ai generat, ÎNTREABĂ MEREU:
   "Ți se potrivește? Vrei să modific ceva?"
+  Apoi ÎNTREABĂ PROACTIV: "Ce crezi că ar mai fi de îmbunătățit?"
   Sugerează posibile ajustări: culori, compoziție, stil, adăugare/eliminare elemente.
   Dacă utilizatorul cere modificări, re-generează cu promptul ajustat.
   Repetă până utilizatorul e mulțumit.
+
+PASUL 6 — ÎNVĂȚARE (salvează în memorie):
+  După feedback, salvează preferințele utilizatorului folosind MEMORY:
+  • Stilul preferat (ex: "preferă stil cyberpunk")
+  • Dimensiunile favorite (ex: "folosește mereu landscape pentru wallpaper")
+  • Paleta de culori (ex: "preferă tonuri calde")
+  • Ce NU îi place (ex: "nu îi plac fundalurile albe")
+  La cereri viitoare, folosește aceste preferințe AUTOMAT și menționează:
+  "Știu că preferi stilul [X], țin cont de asta."
 
 EXCEPȚIE: Dacă utilizatorul dă deja o descriere COMPLETĂ și DETALIATĂ (30+ cuvinte, cu stil, culori, elemente specifice), poți genera direct fără clarificări. Dar PASUL 5 (feedback) rămâne OBLIGATORIU mereu.
 ===
