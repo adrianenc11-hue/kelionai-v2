@@ -26,6 +26,16 @@ const WA_VERIFY_TOKEN =
   process.env.WA_VERIFY_TOKEN || process.env.WHATSAPP_VERIFY_TOKEN || null;
 const GRAPH_API = "https://graph.facebook.com/v21.0";
 
+// ═══ TIMEOUT HELPER — prevents hanging on slow/dead APIs ═══
+function withTimeout(promise, ms = 10000, label = "operation") {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms),
+    ),
+  ]);
+}
+
 // ═══ STATS (counters only — no unbounded Sets) ═══
 const stats = { messagesReceived: 0, repliesSent: 0, uniqueUsers: 0 };
 
@@ -391,10 +401,14 @@ async function sendAudioMessage(to, mediaId) {
 async function downloadMedia(mediaId) {
   if (!WA_TOKEN) return null;
   try {
-    // Step 1: get media URL
-    const metaRes = await fetch(`${GRAPH_API}/${mediaId}`, {
-      headers: { Authorization: `Bearer ${WA_TOKEN}` },
-    });
+    // Step 1: get media URL (timeout 10s)
+    const metaRes = await withTimeout(
+      fetch(`${GRAPH_API}/${mediaId}`, {
+        headers: { Authorization: `Bearer ${WA_TOKEN}` },
+      }),
+      10000,
+      "downloadMedia:getMeta",
+    );
     if (!metaRes.ok) {
       logger.error(
         { component: "WhatsApp", mediaId, status: metaRes.status },
@@ -404,10 +418,14 @@ async function downloadMedia(mediaId) {
     }
     const meta = await metaRes.json();
 
-    // Step 2: download binary
-    const dataRes = await fetch(meta.url, {
-      headers: { Authorization: `Bearer ${WA_TOKEN}` },
-    });
+    // Step 2: download binary (timeout 15s — audio files can be large)
+    const dataRes = await withTimeout(
+      fetch(meta.url, {
+        headers: { Authorization: `Bearer ${WA_TOKEN}` },
+      }),
+      15000,
+      "downloadMedia:download",
+    );
     if (!dataRes.ok) {
       logger.error(
         { component: "WhatsApp", mediaId, status: dataRes.status },
@@ -415,7 +433,8 @@ async function downloadMedia(mediaId) {
       );
       return null;
     }
-    return dataRes.buffer();
+    const ab = await withTimeout(dataRes.arrayBuffer(), 15000, "downloadMedia:readBody");
+    return Buffer.from(ab);
   } catch (e) {
     logger.error(
       { component: "WhatsApp", mediaId, err: e.message },
@@ -435,11 +454,15 @@ async function uploadMedia(buffer, mimeType) {
       contentType: mimeType || "audio/ogg",
     });
     form.append("messaging_product", "whatsapp");
-    const res = await fetch(`${GRAPH_API}/${PHONE_NUMBER_ID}/media`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${WA_TOKEN}`, ...form.getHeaders() },
-      body: form,
-    });
+    const res = await withTimeout(
+      fetch(`${GRAPH_API}/${PHONE_NUMBER_ID}/media`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${WA_TOKEN}`, ...form.getHeaders() },
+        body: form,
+      }),
+      12000,
+      "uploadMedia",
+    );
     if (res.ok) {
       const data = await res.json();
       return data.id || null;
@@ -460,31 +483,45 @@ async function uploadMedia(buffer, mimeType) {
 // ═══ SPEECH-TO-TEXT (Whisper via OpenAI or Groq) ═══
 async function transcribeAudio(audioBuffer, mimeType) {
   const apiKey = process.env.GROQ_API_KEY || process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    logger.error({ component: "WhatsApp" }, "No STT API key configured (GROQ_API_KEY or OPENAI_API_KEY)");
+    return null;
+  }
   const baseUrl = process.env.GROQ_API_KEY
     ? "https://api.groq.com/openai/v1"
     : "https://api.openai.com/v1";
 
-  const form = new FormData();
-  form.append("file", audioBuffer, {
-    filename: "audio.ogg",
-    contentType: mimeType || "audio/ogg",
-  });
-  form.append(
-    "model",
-    process.env.GROQ_API_KEY ? MODELS.WHISPER : MODELS.OPENAI_WHISPER,
-  );
+  try {
+    const form = new FormData();
+    form.append("file", audioBuffer, {
+      filename: "audio.ogg",
+      contentType: mimeType || "audio/ogg",
+    });
+    form.append(
+      "model",
+      process.env.GROQ_API_KEY ? MODELS.WHISPER : MODELS.OPENAI_WHISPER,
+    );
 
-  const res = await fetch(`${baseUrl}/audio/transcriptions`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, ...form.getHeaders() },
-    body: form,
-  });
-  if (res.ok) {
-    const data = await res.json();
-    return data.text || "";
+    const res = await withTimeout(
+      fetch(`${baseUrl}/audio/transcriptions`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${apiKey}`, ...form.getHeaders() },
+        body: form,
+      }),
+      20000,
+      "transcribeAudio",
+    );
+    if (res.ok) {
+      const data = await res.json();
+      return data.text || "";
+    }
+    const errBody = await res.text().catch(() => "(no body)");
+    logger.error({ component: "WhatsApp", status: res.status, body: errBody }, "STT failed");
+    return null;
+  } catch (e) {
+    logger.error({ component: "WhatsApp", err: e.message }, "transcribeAudio error");
+    return null;
   }
-  logger.error({ component: "WhatsApp", status: res.status }, "STT failed");
-  return null;
 }
 
 // ═══ TEXT-TO-SPEECH (ElevenLabs) ═══
@@ -493,20 +530,33 @@ async function generateSpeech(text, lang, character) {
   if (!apiKey) return null;
   const voiceId = getVoiceId(character);
 
-  const res = await fetch(
-    `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
-    {
-      method: "POST",
-      headers: { "xi-api-key": apiKey, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        text: text.slice(0, 1000),
-        model_id: MODELS.ELEVENLABS_MODEL,
-        voice_settings: { stability: 0.5, similarity_boost: 0.75 },
-      }),
-    },
-  );
-  if (res.ok) return res.buffer();
-  return null;
+  try {
+    const res = await withTimeout(
+      fetch(
+        `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
+        {
+          method: "POST",
+          headers: { "xi-api-key": apiKey, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            text: text.slice(0, 1000),
+            model_id: MODELS.ELEVENLABS_MODEL,
+            voice_settings: { stability: 0.5, similarity_boost: 0.75 },
+          }),
+        },
+      ),
+      12000,
+      "generateSpeech",
+    );
+    if (res.ok) {
+      const ab = await withTimeout(res.arrayBuffer(), 10000, "generateSpeech:readBody");
+      return Buffer.from(ab);
+    }
+    logger.error({ component: "WhatsApp", status: res.status }, "TTS API failed");
+    return null;
+  } catch (e) {
+    logger.error({ component: "WhatsApp", err: e.message }, "generateSpeech error");
+    return null;
+  }
 }
 
 // ═══ ANALYZE VIDEO (extract audio, transcribe) ═══

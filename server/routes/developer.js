@@ -303,7 +303,7 @@ router.get("/v1/models", v1Limiter, apiKeyAuth, (req, res) => {
   if (process.env.OPENAI_API_KEY)
     models.push({
       id: MODELS.OPENAI_FALLBACK,
-      name: "GPT-4o",
+      name: "GPT-5.4",
       provider: "OpenAI",
       primary: false,
     });
