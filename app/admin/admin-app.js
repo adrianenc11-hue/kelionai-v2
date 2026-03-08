@@ -57,15 +57,16 @@ async function loadAiStatus() {
         d.providers.forEach(function (p) {
             var card = document.createElement('div');
             card.className = 'ai-card ' + (p.live ? 'live' : 'off');
-            var creditColor = p.creditLimit > 0 ? (p.credit > 1 ? '#10B981' : p.credit > 0 ? '#F59E0B' : '#EF4444') : '#888';
+            var creditColor = p.creditLimit > 0 ? (p.credit > (p.creditLimit * 0.5) ? '#10B981' : p.credit > (p.creditLimit * 0.2) ? '#F59E0B' : '#EF4444') : '#888';
+            var creditIcon = p.creditLimit > 0 ? (p.credit > (p.creditLimit * 0.5) ? '🟢' : p.credit > (p.creditLimit * 0.2) ? '🟡' : '🔴') : '⚪';
             card.innerHTML = '<div class="ai-status-dot ' + (p.live ? 'dot-live' : 'dot-off') + '"></div>' +
                 '<div class="ai-name">' + p.name + '</div>' +
                 '<div class="ai-detail">' + (p.live ? '🟢 Live' : '🔴 Off') + '</div>' +
                 '<div class="ai-cost">$' + (p.costMonth || 0).toFixed(2) + '/mo</div>' +
                 '<div class="ai-credit" onclick="rechargeProvider(\'' + p.name + '\',' + (p.creditLimit || 0) + ')" ' +
-                'style="font-size:0.7rem;margin-top:4px;color:' + creditColor + ';font-weight:600;cursor:pointer" ' +
-                'title="Click pentru a reîncărca creditul">' +
-                '💳 Credit: ' + (p.creditLabel || '—') + '</div>';
+                'style="font-size:0.75rem;margin-top:4px;color:' + creditColor + ';font-weight:600;cursor:pointer;padding:3px 6px;border-radius:6px;background:rgba(255,255,255,0.04)" ' +
+                'title="Click pentru a reîncărca">' +
+                creditIcon + ' $' + (p.credit || 0).toFixed(2) + '</div>';
             grid.appendChild(card);
         });
     } catch (e) { document.getElementById('ai-status-grid').innerHTML = '<div class="ai-card off"><div class="ai-name">Error</div></div>'; }
