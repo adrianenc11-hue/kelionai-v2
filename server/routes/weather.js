@@ -32,8 +32,9 @@ router.post("/", weatherLimiter, validate(weatherSchema), async (req, res) => {
       longitude = lng;
       // Reverse geocode to get city name
       try {
+        const revGeoUrl = brain?.getToolUrl("open_meteo_reverse") || "https://geocoding-api.open-meteo.com/v1/reverse";
         const revGeo = await (await fetch(
-          `https://geocoding-api.open-meteo.com/v1/reverse?latitude=${lat}&longitude=${lng}&count=1`
+          `${revGeoUrl}?latitude=${lat}&longitude=${lng}&count=1`
         )).json();
         name = revGeo.results?.[0]?.name || "Current Location";
         country = revGeo.results?.[0]?.country || "";
@@ -43,9 +44,10 @@ router.post("/", weatherLimiter, validate(weatherSchema), async (req, res) => {
       }
     } else if (city) {
       // City name given — geocode it
+      const geoSearchUrl = brain?.getToolUrl("open_meteo_geo") || "https://geocoding-api.open-meteo.com/v1/search";
       const geo = await (
         await fetch(
-          "https://geocoding-api.open-meteo.com/v1/search?name=" +
+          geoSearchUrl + "?name=" +
           encodeURIComponent(city) +
           "&count=1&language=ro",
         )
@@ -57,7 +59,8 @@ router.post("/", weatherLimiter, validate(weatherSchema), async (req, res) => {
       // No city, no GPS → fallback to IP geolocation (no popup needed)
       try {
         const clientIP = req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || req.ip;
-        const ipGeo = await (await fetch(`http://ip-api.com/json/${clientIP}?fields=city,country,lat,lon`)).json();
+        const ipApiUrl = brain?.getToolUrl("ip_api") || "http://ip-api.com/json";
+        const ipGeo = await (await fetch(`${ipApiUrl}/${clientIP}?fields=city,country,lat,lon`)).json();
         if (ipGeo.city) {
           latitude = ipGeo.lat;
           longitude = ipGeo.lon;
@@ -70,9 +73,10 @@ router.post("/", weatherLimiter, validate(weatherSchema), async (req, res) => {
         return res.status(400).json({ error: "City is required (IP geolocation failed)" });
       }
     }
+    const forecastUrl = brain?.getToolUrl("open_meteo_forecast") || "https://api.open-meteo.com/v1/forecast";
     const wx = await (
       await fetch(
-        "https://api.open-meteo.com/v1/forecast?latitude=" +
+        forecastUrl + "?latitude=" +
         latitude +
         "&longitude=" +
         longitude +

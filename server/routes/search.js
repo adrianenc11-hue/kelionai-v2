@@ -40,7 +40,7 @@ router.post("/", searchLimiter, validate(searchSchema), async (req, res) => {
     // 1. Perplexity Sonar
     if (process.env.PERPLEXITY_API_KEY) {
       try {
-        const r = await fetch("https://api.perplexity.ai/chat/completions", {
+        const r = await fetch(brain?.getToolUrl("perplexity_search") || "https://api.perplexity.ai/chat/completions", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -83,7 +83,7 @@ router.post("/", searchLimiter, validate(searchSchema), async (req, res) => {
     // 2. Tavily
     if (process.env.TAVILY_API_KEY) {
       try {
-        const tr = await fetch("https://api.tavily.com/search", {
+        const tr = await fetch(brain?.getToolUrl("tavily_search") || "https://api.tavily.com/search", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -133,7 +133,7 @@ router.post("/", searchLimiter, validate(searchSchema), async (req, res) => {
     // 3. Serper
     if (process.env.SERPER_API_KEY) {
       try {
-        const sr = await fetch("https://google.serper.dev/search", {
+        const sr = await fetch(brain?.getToolUrl("serper_search") || "https://google.serper.dev/search", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
