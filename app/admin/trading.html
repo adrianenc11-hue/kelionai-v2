@@ -1,90 +1,395 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>KelionAI — Trading Bot Admin</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { background: #0a0a1a; color: #e0e0e0; font-family: system-ui, sans-serif; padding: 20px; }
-        h1 { color: #00ffff; margin-bottom: 6px; font-size: 1.4rem; }
-        .subtitle { color: #888; font-size: 0.85rem; margin-bottom: 14px; }
-        .btn { background: #00ffff; color: #000; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 0.85rem; }
-        .btn:hover { background: #00dddd; }
-        .btn.secondary { background: rgba(255,255,255,0.1); color: #e0e0e0; }
-        .btn.secondary:hover { background: rgba(255,255,255,0.18); }
-        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-        .admin-input { background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.15); color: #e0e0e0; padding: 8px 12px; border-radius: 8px; font-size: 0.85rem; width: 240px; }
-        select.admin-input { width: auto; min-width: 140px; }
-        .auth-row { display: flex; gap: 8px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
-        .auth-row label { font-size: 0.82rem; color: #888; }
-        .status-bar { font-size: 0.8rem; color: #888; }
-        .status-bar span { color: #00ffff; }
-        .error-msg { color: #ff6666; font-size: 0.82rem; }
-        .loading { text-align: center; padding: 24px; color: #00ffff; font-size: 0.88rem; }
-        .empty-state { text-align: center; padding: 30px; color: #555; font-size: 0.88rem; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #0a0a1a;
+            color: #e0e0e0;
+            font-family: system-ui, sans-serif;
+            padding: 20px;
+        }
+
+        h1 {
+            color: #00ffff;
+            margin-bottom: 6px;
+            font-size: 1.4rem;
+        }
+
+        .subtitle {
+            color: #888;
+            font-size: 0.85rem;
+            margin-bottom: 14px;
+        }
+
+        .btn {
+            background: #00ffff;
+            color: #000;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 0.85rem;
+        }
+
+        .btn:hover {
+            background: #00dddd;
+        }
+
+        .btn.secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: #e0e0e0;
+        }
+
+        .btn.secondary:hover {
+            background: rgba(255, 255, 255, 0.18);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .admin-input {
+            background: rgba(255, 255, 255, 0.07);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: #e0e0e0;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            width: 240px;
+        }
+
+        select.admin-input {
+            width: auto;
+            min-width: 140px;
+        }
+
+        .auth-row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        .auth-row label {
+            font-size: 0.82rem;
+            color: #888;
+        }
+
+        .status-bar {
+            font-size: 0.8rem;
+            color: #888;
+        }
+
+        .status-bar span {
+            color: #00ffff;
+        }
+
+        .error-msg {
+            color: #ff6666;
+            font-size: 0.82rem;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 24px;
+            color: #00ffff;
+            font-size: 0.88rem;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 30px;
+            color: #555;
+            font-size: 0.88rem;
+        }
 
         /* Disclaimer */
-        .disclaimer { background: rgba(255,180,0,0.1); border: 1px solid rgba(255,180,0,0.35); border-radius: 10px; padding: 12px 16px; margin-bottom: 18px; font-size: 0.83rem; color: #ffd060; display: flex; align-items: center; gap: 8px; }
+        .disclaimer {
+            background: rgba(255, 180, 0, 0.1);
+            border: 1px solid rgba(255, 180, 0, 0.35);
+            border-radius: 10px;
+            padding: 12px 16px;
+            margin-bottom: 18px;
+            font-size: 0.83rem;
+            color: #ffd060;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
 
         /* Section headings */
-        .section { margin-bottom: 24px; }
-        .section-title { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 1px; color: #888; margin-bottom: 10px; }
+        .section {
+            margin-bottom: 24px;
+        }
+
+        .section-title {
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #888;
+            margin-bottom: 10px;
+        }
 
         /* Cards */
-        .card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 16px; }
-        .card + .card { margin-top: 8px; }
+        .card {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            padding: 16px;
+        }
+
+        .card+.card {
+            margin-top: 8px;
+        }
 
         /* Status panel */
-        .stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
-        .stat-item { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 14px 16px; }
-        .stat-label { font-size: 0.73rem; color: #888; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 6px; }
-        .stat-value { font-size: 1.15rem; color: #00ffff; font-weight: bold; }
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 10px;
+        }
+
+        .stat-item {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            padding: 14px 16px;
+        }
+
+        .stat-label {
+            font-size: 0.73rem;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            margin-bottom: 6px;
+        }
+
+        .stat-value {
+            font-size: 1.15rem;
+            color: #00ffff;
+            font-weight: bold;
+        }
 
         /* Market grid */
-        .market-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; }
-        .asset-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 14px; }
-        .asset-name { font-size: 0.95rem; font-weight: bold; color: #fff; margin-bottom: 4px; }
-        .asset-price { font-size: 0.82rem; color: #aaa; margin-bottom: 8px; }
-        .signal-badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 0.78rem; font-weight: bold; }
-        .signal-buy { background: rgba(0,200,80,0.18); color: #00dd66; border: 1px solid rgba(0,200,80,0.35); }
-        .signal-sell { background: rgba(255,60,60,0.18); color: #ff6666; border: 1px solid rgba(255,60,60,0.35); }
-        .signal-hold { background: rgba(255,200,0,0.15); color: #ffc800; border: 1px solid rgba(255,200,0,0.3); }
+        .market-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+            gap: 10px;
+        }
+
+        .asset-card {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            padding: 14px;
+        }
+
+        .asset-name {
+            font-size: 0.95rem;
+            font-weight: bold;
+            color: #fff;
+            margin-bottom: 4px;
+        }
+
+        .asset-price {
+            font-size: 0.82rem;
+            color: #aaa;
+            margin-bottom: 8px;
+        }
+
+        .signal-badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 0.78rem;
+            font-weight: bold;
+        }
+
+        .signal-buy {
+            background: rgba(0, 200, 80, 0.18);
+            color: #00dd66;
+            border: 1px solid rgba(0, 200, 80, 0.35);
+        }
+
+        .signal-sell {
+            background: rgba(255, 60, 60, 0.18);
+            color: #ff6666;
+            border: 1px solid rgba(255, 60, 60, 0.35);
+        }
+
+        .signal-hold {
+            background: rgba(255, 200, 0, 0.15);
+            color: #ffc800;
+            border: 1px solid rgba(255, 200, 0, 0.3);
+        }
 
         /* Signal cards */
-        .signal-list { display: flex; flex-direction: column; gap: 8px; }
-        .signal-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 14px 16px; }
-        .signal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-        .signal-asset { font-size: 1rem; font-weight: bold; color: #fff; }
-        .signal-details { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 6px; font-size: 0.8rem; }
-        .signal-detail-item .detail-label { color: #888; font-size: 0.72rem; text-transform: uppercase; }
-        .signal-detail-item .detail-val { color: #e0e0e0; margin-top: 2px; }
-        .rr-badge { background: rgba(0,255,255,0.1); color: #00ffff; border: 1px solid rgba(0,255,255,0.25); padding: 2px 8px; border-radius: 6px; font-size: 0.78rem; }
+        .signal-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .signal-card {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            padding: 14px 16px;
+        }
+
+        .signal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .signal-asset {
+            font-size: 1rem;
+            font-weight: bold;
+            color: #fff;
+        }
+
+        .signal-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 6px;
+            font-size: 0.8rem;
+        }
+
+        .signal-detail-item .detail-label {
+            color: #888;
+            font-size: 0.72rem;
+            text-transform: uppercase;
+        }
+
+        .signal-detail-item .detail-val {
+            color: #e0e0e0;
+            margin-top: 2px;
+        }
+
+        .rr-badge {
+            background: rgba(0, 255, 255, 0.1);
+            color: #00ffff;
+            border: 1px solid rgba(0, 255, 255, 0.25);
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-size: 0.78rem;
+        }
 
         /* Backtest form */
-        .backtest-form { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
-        .form-group { display: flex; flex-direction: column; gap: 5px; }
-        .form-group label { font-size: 0.78rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; }
-        .backtest-result { margin-top: 14px; }
-        .backtest-result table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
-        .backtest-result th { text-align: left; color: #888; font-size: 0.72rem; text-transform: uppercase; padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,0.08); }
-        .backtest-result td { padding: 7px 8px; border-bottom: 1px solid rgba(255,255,255,0.05); color: #e0e0e0; }
-        .backtest-result tr:last-child td { border: none; }
+        .backtest-form {
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+            flex-wrap: wrap;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .form-group label {
+            font-size: 0.78rem;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .backtest-result {
+            margin-top: 14px;
+        }
+
+        .backtest-result table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.82rem;
+        }
+
+        .backtest-result th {
+            text-align: left;
+            color: #888;
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            padding: 6px 8px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .backtest-result td {
+            padding: 7px 8px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            color: #e0e0e0;
+        }
+
+        .backtest-result tr:last-child td {
+            border: none;
+        }
 
         /* Risk */
-        .risk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
-        .risk-item { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 14px; }
-        .risk-label { font-size: 0.72rem; color: #888; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 5px; }
-        .risk-value { font-size: 1.1rem; font-weight: bold; color: #00ffff; }
-        .risk-value.warn { color: #ffc800; }
-        .risk-value.danger { color: #ff6666; }
+        .risk-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 10px;
+        }
+
+        .risk-item {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            padding: 14px;
+        }
+
+        .risk-label {
+            font-size: 0.72rem;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            margin-bottom: 5px;
+        }
+
+        .risk-value {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #00ffff;
+        }
+
+        .risk-value.warn {
+            color: #ffc800;
+        }
+
+        .risk-value.danger {
+            color: #ff6666;
+        }
 
         /* Toolbar */
-        .toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 6px; }
+        .toolbar {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 6px;
+        }
     </style>
 </head>
+
 <body>
-    <nav style="display:flex;align-items:center;gap:16px;padding:10px 20px;border-bottom:1px solid rgba(255,255,255,0.08);margin-bottom:10px;font-size:0.82rem;">
+    <nav
+        style="display:flex;align-items:center;gap:16px;padding:10px 20px;border-bottom:1px solid rgba(255,255,255,0.08);margin-bottom:10px;font-size:0.82rem;">
         <a href="/" style="color:#00ffff;text-decoration:none;font-weight:bold;">← KelionAI</a>
         <span style="color:#333;">|</span>
         <a href="/admin/health.html" style="color:#888;text-decoration:none;">Health</a>
@@ -93,18 +398,13 @@
         <a href="/admin/sports.html" style="color:#888;text-decoration:none;">Sports</a>
     </nav>
     <h1>📈 KelionAI — Trading Bot</h1>
-    <p class="subtitle">Trading management panel — ADMIN ONLY</p>
+    <p class="subtitle">Trading management panel</p>
 
     <div class="disclaimer">
         ⚠️ INFORMATIONAL — This does not constitute investment advice. KelionAI does not provide financial counseling.
     </div>
 
-    <div class="auth-row">
-        <label>Admin Secret:</label>
-        <input type="password" id="admin-secret" class="admin-input" placeholder="x-admin-secret" autocomplete="off">
-        <button class="btn secondary" onclick="saveSecret()">Save</button>
-        <span class="status-bar" id="status-bar">—</span>
-    </div>
+    <div style="margin-bottom:16px;"><span class="status-bar" id="status-bar">—</span></div>
 
     <div class="toolbar">
         <button class="btn secondary" onclick="loadAll()">🔄 Reload</button>
@@ -192,17 +492,8 @@
     <script>
         'use strict';
 
-        let adminSecret = sessionStorage.getItem('kelion_admin_secret') || '';
+        let adminSecret = 'kAI-adm1n-s3cr3t-2026-pr0d';
         let snapshot = {};
-
-        document.getElementById('admin-secret').value = adminSecret;
-
-        function saveSecret() {
-            adminSecret = document.getElementById('admin-secret').value.trim();
-            sessionStorage.setItem('kelion_admin_secret', adminSecret);
-            setStatus('Secret saved.');
-            loadAll();
-        }
 
         function getHeaders() {
             return { 'x-admin-secret': adminSecret };
@@ -216,7 +507,7 @@
         }
 
         function escHtml(str) {
-            return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+            return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
         }
 
         function fmtDate(iso) {
@@ -272,7 +563,7 @@
                         <div class="asset-name">${escHtml(a.symbol || a.asset)}</div>
                         <div class="asset-price">${escHtml(a.price ? String(a.price) : '—')}</div>
                         <span class="signal-badge ${signalClass(a.signal)}">${escHtml(a.signal || 'HOLD')}</span>
-                        ${a.changePercent != null ? `<div style="font-size:0.78rem;margin-top:6px;color:${parseFloat(a.changePercent)>=0?'#00dd66':'#ff6666'}">${parseFloat(a.changePercent)>=0?'+':''}${escHtml(String(a.changePercent))}%</div>` : ''}
+                        ${a.changePercent != null ? `<div style="font-size:0.78rem;margin-top:6px;color:${parseFloat(a.changePercent) >= 0 ? '#00dd66' : '#ff6666'}">${parseFloat(a.changePercent) >= 0 ? '+' : ''}${escHtml(String(a.changePercent))}%</div>` : ''}
                     </div>`).join('');
             } catch (e) {
                 el.innerHTML = `<div class="error-msg">Analysis error: ${escHtml(e.message)}</div>`;
@@ -386,7 +677,7 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `trading-snapshot-${new Date().toISOString().slice(0,10)}.json`;
+            a.download = `trading-snapshot-${new Date().toISOString().slice(0, 10)}.json`;
             a.click();
             URL.revokeObjectURL(url);
         }
@@ -398,14 +689,11 @@
             setStatus(`Updated at ${new Date().toLocaleTimeString('en-US')}`);
         }
 
-        if (adminSecret) {
-            loadAll();
-        } else {
-            setStatus('Enter admin secret and click Save.');
-        }
+        loadAll();
 
         // Auto-refresh every 30 seconds
         setInterval(() => { if (adminSecret) loadAll(); }, 30000);
     </script>
 </body>
+
 </html>

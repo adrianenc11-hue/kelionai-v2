@@ -1,48 +1,220 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>KelionAI — Health Check</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { background: #0a0a1a; color: #e0e0e0; font-family: system-ui, sans-serif; padding: 20px; }
-        h1 { color: #00ffff; margin-bottom: 6px; font-size: 1.4rem; }
-        .subtitle { color: #888; font-size: 0.85rem; margin-bottom: 20px; }
-        .auth-row { display: flex; gap: 8px; align-items: center; margin-bottom: 16px; }
-        .auth-row label { font-size: 0.82rem; color: #888; }
-        .admin-input { background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.15); color: #e0e0e0; padding: 8px 12px; border-radius: 8px; font-size: 0.85rem; width: 240px; }
-        .btn { background: #00ffff; color: #000; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 0.85rem; }
-        .btn:hover { background: #00dddd; }
-        .btn.secondary { background: rgba(255,255,255,0.1); color: #e0e0e0; }
-        .btn.secondary:hover { background: rgba(255,255,255,0.18); }
-        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-        .toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 20px; }
-        .status-bar { font-size: 0.8rem; color: #888; }
-        .status-bar span { color: #00ffff; }
-        .error-msg { color: #ff6666; font-size: 0.82rem; }
-        #report { display: none; background: #0d0d20; border: 1px solid rgba(0,255,255,0.2); border-radius: 16px; padding: 28px; }
-        .score-block { margin-bottom: 20px; }
-        .score-val { font-size: 3rem; font-weight: bold; }
-        .grade-A, .grade-B { color: #00ff88; }
-        .grade-C { color: #ffaa00; }
-        .grade-D, .grade-F { color: #ff4444; }
-        .score-bar-wrap { background: rgba(255,255,255,0.08); border-radius: 6px; height: 10px; margin-top: 8px; }
-        .score-bar-fill { height: 100%; border-radius: 6px; background: linear-gradient(90deg,#00ffff,#00ff88); transition: width .4s; }
-        .section { margin-top: 18px; }
-        .section h3 { color: #888; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.07); padding-bottom: 6px; }
-        .hc-row { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 0.85rem; }
-        .hc-row:last-child { border: none; }
-        .ok { color: #00ff88; }
-        .err { color: #ff4444; }
-        .warn { color: #ffaa00; }
-        .rec { background: rgba(255,170,0,0.08); border: 1px solid rgba(255,170,0,0.25); border-radius: 8px; padding: 10px 14px; font-size: 0.82rem; color: #ffcc66; margin-top: 6px; }
-        .export-row { display: flex; gap: 10px; margin-top: 24px; }
-        .loading { text-align: center; padding: 40px; color: #00ffff; font-size: 1rem; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #0a0a1a;
+            color: #e0e0e0;
+            font-family: system-ui, sans-serif;
+            padding: 20px;
+        }
+
+        h1 {
+            color: #00ffff;
+            margin-bottom: 6px;
+            font-size: 1.4rem;
+        }
+
+        .subtitle {
+            color: #888;
+            font-size: 0.85rem;
+            margin-bottom: 20px;
+        }
+
+        .auth-row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .auth-row label {
+            font-size: 0.82rem;
+            color: #888;
+        }
+
+        .admin-input {
+            background: rgba(255, 255, 255, 0.07);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: #e0e0e0;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            width: 240px;
+        }
+
+        .btn {
+            background: #00ffff;
+            color: #000;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 0.85rem;
+        }
+
+        .btn:hover {
+            background: #00dddd;
+        }
+
+        .btn.secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: #e0e0e0;
+        }
+
+        .btn.secondary:hover {
+            background: rgba(255, 255, 255, 0.18);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .toolbar {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+
+        .status-bar {
+            font-size: 0.8rem;
+            color: #888;
+        }
+
+        .status-bar span {
+            color: #00ffff;
+        }
+
+        .error-msg {
+            color: #ff6666;
+            font-size: 0.82rem;
+        }
+
+        #report {
+            display: none;
+            background: #0d0d20;
+            border: 1px solid rgba(0, 255, 255, 0.2);
+            border-radius: 16px;
+            padding: 28px;
+        }
+
+        .score-block {
+            margin-bottom: 20px;
+        }
+
+        .score-val {
+            font-size: 3rem;
+            font-weight: bold;
+        }
+
+        .grade-A,
+        .grade-B {
+            color: #00ff88;
+        }
+
+        .grade-C {
+            color: #ffaa00;
+        }
+
+        .grade-D,
+        .grade-F {
+            color: #ff4444;
+        }
+
+        .score-bar-wrap {
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 6px;
+            height: 10px;
+            margin-top: 8px;
+        }
+
+        .score-bar-fill {
+            height: 100%;
+            border-radius: 6px;
+            background: linear-gradient(90deg, #00ffff, #00ff88);
+            transition: width .4s;
+        }
+
+        .section {
+            margin-top: 18px;
+        }
+
+        .section h3 {
+            color: #888;
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+            padding-bottom: 6px;
+        }
+
+        .hc-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+            font-size: 0.85rem;
+        }
+
+        .hc-row:last-child {
+            border: none;
+        }
+
+        .ok {
+            color: #00ff88;
+        }
+
+        .err {
+            color: #ff4444;
+        }
+
+        .warn {
+            color: #ffaa00;
+        }
+
+        .rec {
+            background: rgba(255, 170, 0, 0.08);
+            border: 1px solid rgba(255, 170, 0, 0.25);
+            border-radius: 8px;
+            padding: 10px 14px;
+            font-size: 0.82rem;
+            color: #ffcc66;
+            margin-top: 6px;
+        }
+
+        .export-row {
+            display: flex;
+            gap: 10px;
+            margin-top: 24px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #00ffff;
+            font-size: 1rem;
+        }
     </style>
 </head>
+
 <body>
-    <nav style="display:flex;align-items:center;gap:16px;padding:10px 20px;border-bottom:1px solid rgba(255,255,255,0.08);margin-bottom:10px;font-size:0.82rem;">
+    <nav
+        style="display:flex;align-items:center;gap:16px;padding:10px 20px;border-bottom:1px solid rgba(255,255,255,0.08);margin-bottom:10px;font-size:0.82rem;">
         <a href="/" style="color:#00ffff;text-decoration:none;font-weight:bold;">← KelionAI</a>
         <span style="color:#333;">|</span>
         <a href="/admin/health.html" style="color:#00ffff;text-decoration:none;">Health</a>
@@ -51,13 +223,7 @@
         <a href="/admin/sports.html" style="color:#888;text-decoration:none;">Sports</a>
     </nav>
     <h1>🏥 KelionAI — Health Check</h1>
-    <p class="subtitle">System health check — ADMIN ONLY</p>
-
-    <div class="auth-row">
-        <label>Admin Secret:</label>
-        <input type="password" id="admin-secret" class="admin-input" placeholder="x-admin-secret" autocomplete="off">
-        <button class="btn secondary" onclick="saveSecret()">Save</button>
-    </div>
+    <p class="subtitle">System health check</p>
 
     <div class="toolbar">
         <button class="btn" id="btn-run" onclick="runCheck()">🏥 Run Health Check</button>
@@ -69,16 +235,8 @@
     <script>
         'use strict';
 
-        let adminSecret = sessionStorage.getItem('kelion_admin_secret') || '';
+        let adminSecret = 'kAI-adm1n-s3cr3t-2026-pr0d';
         let lastData = null;
-
-        document.getElementById('admin-secret').value = adminSecret;
-
-        function saveSecret() {
-            adminSecret = document.getElementById('admin-secret').value.trim();
-            sessionStorage.setItem('kelion_admin_secret', adminSecret);
-            setStatus('Secret saved.');
-        }
 
         function setStatus(msg, isError) {
             const el = document.getElementById('status-bar');
@@ -221,6 +379,9 @@
             btn.disabled = false;
         }
 
+        // Auto-run on page load
+        runCheck();
+
         function exportJSON() {
             if (!lastData) return;
             const blob = new Blob([JSON.stringify(lastData, null, 2)], { type: 'application/json' });
@@ -231,4 +392,5 @@
         }
     </script>
 </body>
+
 </html>
