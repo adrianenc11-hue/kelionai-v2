@@ -28,6 +28,7 @@ const crypto = require("crypto");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 const { supabase, supabaseAdmin } = require("./supabase");
+const { initCache, cacheGet, cacheSet, getCacheStats } = require("./cache");
 const { runMigration } = require("./migrate");
 const { KelionBrain } = require("./brain");
 const { validateEnv, setupGracefulShutdown, smokeTest } = require("./startup-checks");
@@ -1275,6 +1276,11 @@ if (require.main === module) {
   runMigration()
     .then((migrated) => {
       logConfigHealth();
+      // Initialize cache layer (Redis if REDIS_URL set, else in-memory)
+      initCache().catch(e => logger.warn({ err: e.message }, "Cache init warning"));
+      app.locals.cacheGet = cacheGet;
+      app.locals.cacheSet = cacheSet;
+      app.locals.getCacheStats = getCacheStats;
       server.listen(PORT, "0.0.0.0", () => {
         logger.info(
           {
