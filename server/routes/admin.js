@@ -483,11 +483,28 @@ router.get("/ai-status", async (req, res) => {
       } catch (e) { /* table might not exist */ }
     }
 
-    const providers = Object.entries(providerKeys).map(([name, hasKey]) => ({
-      name,
-      live: hasKey,
-      costMonth: costByProvider[name.toLowerCase()] || costByProvider[name] || 0,
-    }));
+    // Known credit limits per provider (env vars or defaults)
+    const creditLimits = {
+      "OpenAI": parseFloat(process.env.OPENAI_CREDIT || "5"),
+      "Google": parseFloat(process.env.GOOGLE_CREDIT || "0"),
+      "Groq": parseFloat(process.env.GROQ_CREDIT || "0"),
+      "Perplexity": parseFloat(process.env.PERPLEXITY_CREDIT || "5"),
+      "Together": parseFloat(process.env.TOGETHER_CREDIT || "5"),
+      "ElevenLabs": parseFloat(process.env.ELEVENLABS_CREDIT || "5"),
+      "DeepSeek": parseFloat(process.env.DEEPSEEK_CREDIT || "2"),
+      "Tavily": parseFloat(process.env.TAVILY_CREDIT || "0"),
+      "Serper": parseFloat(process.env.SERPER_CREDIT || "0"),
+    };
+
+    const providers = Object.entries(providerKeys).map(([name, hasKey]) => {
+      const costMonth = costByProvider[name.toLowerCase()] || costByProvider[name] || 0;
+      const limit = creditLimits[name] || 0;
+      const credit = Math.max(0, limit - costMonth);
+      const creditLabel = limit > 0
+        ? '$' + credit.toFixed(2) + ' / $' + limit.toFixed(0)
+        : 'Free tier';
+      return { name, live: hasKey, costMonth, credit, creditLabel, creditLimit: limit };
+    });
 
     res.json({ providers });
   } catch (e) {

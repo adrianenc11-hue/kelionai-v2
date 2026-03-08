@@ -40,10 +40,12 @@ async function loadAiStatus() {
         d.providers.forEach(function (p) {
             var card = document.createElement('div');
             card.className = 'ai-card ' + (p.live ? 'live' : 'off');
+            var creditColor = p.creditLimit > 0 ? (p.credit > 1 ? '#10B981' : p.credit > 0 ? '#F59E0B' : '#EF4444') : '#888';
             card.innerHTML = '<div class="ai-status-dot ' + (p.live ? 'dot-live' : 'dot-off') + '"></div>' +
                 '<div class="ai-name">' + p.name + '</div>' +
                 '<div class="ai-detail">' + (p.live ? '🟢 Live' : '🔴 Off') + '</div>' +
-                '<div class="ai-cost">$' + (p.costMonth || 0).toFixed(2) + '/mo</div>';
+                '<div class="ai-cost">$' + (p.costMonth || 0).toFixed(2) + '/mo</div>' +
+                '<div class="ai-credit" style="font-size:0.7rem;margin-top:4px;color:' + creditColor + ';font-weight:600">💳 Credit: ' + (p.creditLabel || '—') + '</div>';
             grid.appendChild(card);
         });
     } catch (e) { document.getElementById('ai-status-grid').innerHTML = '<div class="ai-card off"><div class="ai-name">Error</div></div>'; }
@@ -124,29 +126,17 @@ async function loadCredit() {
         }
         if (d.totalMonth > 0) {
             var el = document.getElementById('credit-distribution');
-            el.innerHTML = '<h4 style="margin:12px 0 8px;color:#06b6d4">Distribuție £50:</h4>';
+            var distHtml = '<h4 style="margin:12px 0 8px;color:#06b6d4">Distribuție costuri:</h4>';
             d.byProvider.forEach(function (p) {
                 var pct = ((p.cost_usd / d.totalMonth) * 100).toFixed(1);
-                var amt = ((p.cost_usd / d.totalMonth) * 50).toFixed(2);
-                el.innerHTML += '<div class="dist-row"><span class="dist-name">' + p.provider + '</span>' +
+                distHtml += '<div class="dist-row"><span class="dist-name">' + p.provider + '</span>' +
                     '<div class="dist-bar-wrap"><div class="dist-bar" style="width:' + pct + '%"></div></div>' +
-                    '<span class="dist-amount">£' + amt + ' (' + pct + '%)</span></div>';
+                    '<span class="dist-amount">$' + p.cost_usd.toFixed(2) + ' (' + pct + '%)</span></div>';
             });
-        }
-        // Min recharge info per provider
-        var infoEl = document.getElementById('credit-distribution');
-        if (!infoEl) infoEl = document.querySelector('#sec-credit .section-body');
-        if (infoEl) {
-            infoEl.innerHTML += '<div style="margin-top:16px;padding:12px 16px;background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.2);border-radius:10px;font-size:0.82rem;color:#a5b4fc;">' +
-                '<strong>💳 Reîncărcare minimă per provider:</strong><br>' +
-                '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;margin-top:8px;color:#ccc;">' +
-                '<span>🟢 <b>OpenAI</b> — min $5</span>' +
-                '<span>🔵 <b>Google Gemini</b> — free tier available</span>' +
-                '<span>🟠 <b>Groq</b> — free tier / $5 paid</span>' +
-                '<span>🔵 <b>DeepSeek</b> — min $2</span>' +
-                '<span>🔴 <b>Perplexity</b> — min $5</span>' +
-                '<span>🟡 <b>ElevenLabs</b> — min $5/mo</span>' +
-                '</div></div>';
+            el.innerHTML = distHtml;
+        } else {
+            var el = document.getElementById('credit-distribution');
+            if (el) el.innerHTML = '';
         }
     } catch (e) {
         var tb = document.querySelector('#credit-table tbody');
