@@ -2195,7 +2195,7 @@ Reply STRICTLY with JSON:
       result = {
         action: "privacy",
         summary:
-          "Politica de confidențialitate: Colectăm email, conversații AI, preferințe. Zero tracking, zero publicitate. Cookie-uri doar pentru autentificare. Date stocate în Supabase (EU). Drepturile tale: acces, rectificare, ștergere, portabilitate. Contact: privacy@kelionai.app.",
+          `Politica de confidențialitate: Colectăm email, conversații AI, preferințe. Zero tracking, zero publicitate. Cookie-uri doar pentru autentificare. Date stocate în Supabase (EU). Drepturile tale: acces, rectificare, ștergere, portabilitate. Contact: privacy@${(process.env.APP_URL || '').replace('https://', '')}.`,
         url: "/api/legal/privacy",
       };
     } else if (action === "exportData") {
@@ -2475,7 +2475,7 @@ Reply STRICTLY with JSON:
           enabled: true,
           details: "X-Frame-Options, X-XSS-Protection, HSTS etc.",
         },
-        cors: { enabled: true, details: `Origins: kelionai.app, localhost` },
+        cors: { enabled: true, details: `Origins: ${process.env.APP_URL || 'configured'}, localhost` },
         rateGlobal: { enabled: true, details: "200 requests / 15 min per IP" },
         rateChat: { enabled: true, details: "30 requests / min per IP" },
         rateAuth: { enabled: true, details: "10 requests / 15 min per IP" },

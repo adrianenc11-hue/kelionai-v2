@@ -1470,7 +1470,7 @@ router.post("/webhook", async function (req, res) {
                 "Ai folosit " +
                 FREE_MESSAGES_LIMIT +
                 " mesaje gratuite!\n\n" +
-                "Continua cu functii premium pe kelionai.app:\n" +
+                `Continua cu functii premium pe ${process.env.APP_URL}:\n` +
                 "Chat nelimitat cu AI\nAvatare 3D\nVoce naturala\n\n" +
                 `Aboneaza-te: ${process.env.APP_URL}/pricing`,
                 ["💎 Upgrade", "🌐 Site"],

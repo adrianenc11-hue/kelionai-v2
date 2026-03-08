@@ -6,7 +6,7 @@ require("dotenv").config();
 const WebSocket = require("ws");
 // Use native fetch (Node 18+) — node-fetch lacks ReadableStream.getReader()
 
-const BASE = process.env.APP_URL || "https://kelionai.app";
+const BASE = process.env.APP_URL || process.env.BASE_URL;
 const WS_URL = BASE.replace("https://", "wss://").replace("http://", "ws://");
 
 async function measureHTTP(label, fn) {

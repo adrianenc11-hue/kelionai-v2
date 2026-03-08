@@ -9,7 +9,7 @@ const path = require("path");
 const { execSync } = require("child_process");
 
 const RESULTS_PATH = path.join(__dirname, "results.json");
-const BASE = "https://kelionai.app";
+const BASE = process.env.APP_URL || process.env.BASE_URL;
 const ADMIN_CODE = process.env.ADMIN_EXIT_CODE || process.env.ADMIN_ACCESS_CODE || "";
 const ADMIN_SECRET = process.env.ADMIN_SECRET_KEY || "";
 const SERVER_DIR = path.resolve(__dirname, "..", "server");
