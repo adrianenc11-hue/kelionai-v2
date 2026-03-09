@@ -417,6 +417,8 @@ class KelionBrain {
 - PROACTIVE: Context-aware suggestions based on user patterns and time of day
 - TRUTH_GUARD: Automatic fact-checking — verifies claims against sources, detects unsupported assertions, calculates factual score
 - SMART_ROUTING: Automatically selects the optimal AI model (fast/balanced/premium) based on task complexity
+- PROJECT_MEMORY: Tracks user's projects, tech stack, status — knows what you're working on
+- PROCEDURAL_MEMORY: Remembers how past tasks were solved, reuses proven solutions
 
 === SKILL: PRODUCȚIE MEDIA (IMAGINE/POSTER/LOGO/ILUSTRAȚIE) ===
 Când utilizatorul cere producție de conținut vizual, URMEZI OBLIGATORIU acest flow:
@@ -867,6 +869,12 @@ When asked "what can you do?" list these real capabilities. Use them proactively
         this._currentMemoryContext = profileContext + " || " + memoryContext;
       }
 
+      // Inject project context (async, non-blocking if table doesn't exist yet)
+      const projectCtx = await this._projectContext(userId).catch(() => "");
+      if (projectCtx) {
+        this._currentMemoryContext = this._currentMemoryContext + "\n" + projectCtx;
+      }
+
       // Step 1: ANALYZE intent deeply
       const analysis = this.analyzeIntent(message, language);
 
@@ -1013,6 +1021,20 @@ When asked "what can you do?" list these real capabilities. Use them proactively
         profile.updateFromConversation(message, language, analysis);
         profile.save(this.supabaseAdmin).catch(() => { });
       }
+
+      // PROCEDURAL MEMORY: Save how this task was solved
+      const toolsUsedForProcedure = Object.keys(results).filter(k => results[k]);
+      if (toolsUsedForProcedure.length > 0 && analysis.complexity !== "simple") {
+        const taskType = analysis.topics?.[0] || analysis.complexity || "general";
+        this._saveProcedure(
+          userId, taskType, message.substring(0, 200),
+          toolsUsedForProcedure.map(t => ({ tool: t, success: !!results[t] })),
+          toolsUsedForProcedure, true, thinkTime, analysis.complexity
+        ).catch(() => { });
+      }
+
+      // PROJECT MEMORY: Auto-detect project mentions
+      this._autoDetectProject(userId, message, analysis, toolsUsedForProcedure).catch(() => { });
 
       logger.info(
         {
@@ -3507,6 +3529,227 @@ Rules:
   }
 
   // ═══════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════
+  // 9.7 PROJECT MEMORY — Track user projects and context
+  // Kelion knows what projects you're working on, their status,
+  // tech stack, and recent activity
+  // ═══════════════════════════════════════════════════════════
+
+  /**
+   * Load all projects for a user from Supabase.
+   * Returns: [{ id, name, description, tech_stack, status, notes, last_activity }]
+   */
+  async _loadProjects(userId) {
+    if (!this.supabaseAdmin || !userId) return [];
+    try {
+      const { data, error } = await this.supabaseAdmin
+        .from("brain_projects")
+        .select("*")
+        .eq("user_id", userId)
+        .order("last_activity", { ascending: false })
+        .limit(20);
+      if (error) throw error;
+      return data || [];
+    } catch (e) {
+      logger.warn({ component: "ProjectMemory", err: e.message }, "Failed to load projects");
+      return [];
+    }
+  }
+
+  /**
+   * Create or update a project in user's project memory.
+   * Extracts project info from conversation context.
+   */
+  async _saveProject(userId, projectData) {
+    if (!this.supabaseAdmin || !userId) return null;
+    try {
+      const { name, description, tech_stack, status, notes, files_touched } = projectData;
+      if (!name) return null;
+
+      const { data, error } = await this.supabaseAdmin
+        .from("brain_projects")
+        .upsert({
+          user_id: userId,
+          name: name.toLowerCase().trim(),
+          description: description || null,
+          tech_stack: tech_stack || [],
+          status: status || "active",
+          notes: notes || null,
+          files_touched: files_touched || [],
+          last_activity: new Date().toISOString(),
+        }, { onConflict: "user_id,name" })
+        .select()
+        .single();
+
+      if (error) throw error;
+      logger.info({ component: "ProjectMemory", project: name }, `📁 Project saved: ${name}`);
+      return data;
+    } catch (e) {
+      logger.warn({ component: "ProjectMemory", err: e.message }, "Failed to save project");
+      return null;
+    }
+  }
+
+  /**
+   * Auto-detect project from conversation and update memory.
+   * Runs after each conversation to keep project memory fresh.
+   */
+  async _autoDetectProject(userId, message, analysis, toolsUsed) {
+    if (!this.supabaseAdmin || !userId) return;
+    try {
+      // Detect project-related keywords
+      const projectPatterns = [
+        /(?:proiect(?:ul)?|project)\s+["""]?([a-zA-Z0-9_\- ]+)["""]?/i,
+        /(?:lucrez|work(?:ing)?)\s+(?:la|on|pe)\s+["""]?([a-zA-Z0-9_\- ]+)["""]?/i,
+        /(?:aplicat|app|site|website|platform)\s+["""]?([a-zA-Z0-9_\- ]+)["""]?/i,
+      ];
+
+      let projectName = null;
+      for (const pattern of projectPatterns) {
+        const match = message.match(pattern);
+        if (match && match[1] && match[1].length > 2 && match[1].length < 50) {
+          projectName = match[1].trim();
+          break;
+        }
+      }
+
+      if (!projectName) return;
+
+      // Detect tech stack from message
+      const techKeywords = ["node", "react", "vue", "angular", "python", "django", "flask", "java", "spring",
+        "supabase", "firebase", "postgresql", "mongodb", "docker", "railway", "vercel", "next.js",
+        "express", "fastify", "tailwind", "typescript", "javascript", "html", "css", "three.js"];
+      const detectedTech = techKeywords.filter(t => message.toLowerCase().includes(t));
+
+      await this._saveProject(userId, {
+        name: projectName,
+        tech_stack: detectedTech,
+        notes: `Last mentioned: ${message.substring(0, 100)}...`,
+        files_touched: [],
+      });
+    } catch (e) {
+      // Non-blocking
+    }
+  }
+
+  /**
+   * Build project context string for AI prompt injection.
+   * Returns a concise summary of active projects.
+   */
+  async _projectContext(userId) {
+    const projects = await this._loadProjects(userId);
+    if (projects.length === 0) return "";
+
+    const lines = ["[PROIECTE ACTIVE ALE UTILIZATORULUI]"];
+    for (const p of projects.slice(0, 5)) {
+      const tech = Array.isArray(p.tech_stack) && p.tech_stack.length > 0 ? ` (${p.tech_stack.join(", ")})` : "";
+      const age = Math.round((Date.now() - new Date(p.last_activity).getTime()) / 3600000);
+      const ageStr = age < 1 ? "recent" : age < 24 ? `${age}h ago` : `${Math.round(age / 24)}d ago`;
+      lines.push(`- ${p.name}${tech} [${p.status}] — last: ${ageStr}`);
+      if (p.notes) lines.push(`  nota: ${p.notes.substring(0, 80)}`);
+    }
+    return lines.join("\n");
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // 9.7b PROCEDURAL MEMORY — How tasks were solved (reusable)
+  // Records successful task resolution patterns for future reuse
+  // ═══════════════════════════════════════════════════════════
+
+  /**
+   * Save a procedure (how a task was solved) for future reuse.
+   */
+  async _saveProcedure(userId, taskType, taskDescription, solutionSteps, toolsUsed, success, durationMs, complexity) {
+    if (!this.supabaseAdmin) return null;
+    try {
+      const { data, error } = await this.supabaseAdmin
+        .from("brain_procedures")
+        .insert({
+          user_id: userId || "global",
+          task_type: taskType,
+          task_description: taskDescription.substring(0, 500),
+          solution_steps: solutionSteps || [],
+          tools_used: toolsUsed || [],
+          success: success !== false,
+          duration_ms: durationMs || 0,
+          complexity: complexity || "medium",
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      logger.info({ component: "ProceduralMemory", type: taskType, success },
+        `📝 Procedure saved: ${taskType} (${success ? "✓" : "✗"})`);
+      return data;
+    } catch (e) {
+      logger.warn({ component: "ProceduralMemory", err: e.message }, "Failed to save procedure");
+      return null;
+    }
+  }
+
+  /**
+   * Find similar past procedures that could help solve the current task.
+   * Uses task_type matching + keyword similarity.
+   * Returns: [{ task_description, solution_steps, tools_used, success_rate }]
+   */
+  async _findProcedure(taskType, taskDescription, userId = "global") {
+    if (!this.supabaseAdmin) return [];
+    try {
+      // Search by task_type first (exact match)
+      const { data: exactMatches } = await this.supabaseAdmin
+        .from("brain_procedures")
+        .select("*")
+        .eq("task_type", taskType)
+        .eq("success", true)
+        .or(`user_id.eq.${userId},user_id.eq.global`)
+        .order("reuse_count", { ascending: false })
+        .limit(3);
+
+      if (exactMatches && exactMatches.length > 0) {
+        // Increment reuse count for the top match
+        await this.supabaseAdmin
+          .from("brain_procedures")
+          .update({ reuse_count: (exactMatches[0].reuse_count || 0) + 1 })
+          .eq("id", exactMatches[0].id)
+          .catch(() => { });
+
+        return exactMatches.map(p => ({
+          description: p.task_description,
+          steps: p.solution_steps,
+          tools: p.tools_used,
+          complexity: p.complexity,
+          reuseCount: p.reuse_count,
+          age: Math.round((Date.now() - new Date(p.created_at).getTime()) / 86400000),
+        }));
+      }
+
+      // Fallback: keyword search in task_description
+      const keywords = taskDescription.toLowerCase().split(/\s+/).filter(w => w.length > 3).slice(0, 5);
+      if (keywords.length === 0) return [];
+
+      const orFilter = keywords.map(k => `task_description.ilike.%${k}%`).join(",");
+      const { data: fuzzyMatches } = await this.supabaseAdmin
+        .from("brain_procedures")
+        .select("*")
+        .eq("success", true)
+        .or(orFilter)
+        .order("created_at", { ascending: false })
+        .limit(3);
+
+      return (fuzzyMatches || []).map(p => ({
+        description: p.task_description,
+        steps: p.solution_steps,
+        tools: p.tools_used,
+        complexity: p.complexity,
+        reuseCount: p.reuse_count,
+        age: Math.round((Date.now() - new Date(p.created_at).getTime()) / 86400000),
+      }));
+    } catch (e) {
+      logger.warn({ component: "ProceduralMemory", err: e.message }, "Failed to find procedure");
+      return [];
+    }
+  }
+
   // 9.8 EMAIL — Send emails via environment-configured provider
   // Supports: Resend, SendGrid, or SMTP fallback
   // ═══════════════════════════════════════════════════════════

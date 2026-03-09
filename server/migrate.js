@@ -500,6 +500,39 @@ CREATE TABLE IF NOT EXISTS brain_usage (
 );
 CREATE INDEX IF NOT EXISTS idx_brain_usage_user ON brain_usage(user_id, month);
 
+-- ═══ BRAIN PROJECTS (Project Memory — what projects the user has) ═══
+CREATE TABLE IF NOT EXISTS brain_projects (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    description TEXT,
+    tech_stack JSONB DEFAULT '[]'::jsonb,
+    status TEXT DEFAULT 'active',
+    notes TEXT,
+    files_touched JSONB DEFAULT '[]'::jsonb,
+    last_activity TIMESTAMPTZ DEFAULT now(),
+    created_at TIMESTAMPTZ DEFAULT now(),
+    UNIQUE(user_id, name)
+);
+CREATE INDEX IF NOT EXISTS idx_brain_projects_user ON brain_projects(user_id, last_activity DESC);
+
+-- ═══ BRAIN PROCEDURES (Procedural Memory — how tasks were solved) ═══
+CREATE TABLE IF NOT EXISTS brain_procedures (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id TEXT NOT NULL DEFAULT 'global',
+    task_type TEXT NOT NULL,
+    task_description TEXT NOT NULL,
+    solution_steps JSONB DEFAULT '[]'::jsonb,
+    tools_used JSONB DEFAULT '[]'::jsonb,
+    success BOOLEAN DEFAULT true,
+    duration_ms INT DEFAULT 0,
+    complexity TEXT DEFAULT 'medium',
+    reuse_count INT DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_brain_procedures_type ON brain_procedures(task_type, success);
+CREATE INDEX IF NOT EXISTS idx_brain_procedures_user ON brain_procedures(user_id, created_at DESC);
+
 `;
 
 async function runMigration() {
@@ -556,6 +589,7 @@ async function runMigration() {
             "messenger_users", "messenger_messages", "messenger_subscribers",
             "telegram_messages", "market_candles", "market_learnings", "market_patterns",
             "brain_profiles", "brain_learnings", "brain_metrics",
+            "brain_tools", "brain_usage", "brain_projects", "brain_procedures",
         ];
 
         const healthy = [];
