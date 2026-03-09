@@ -1074,6 +1074,7 @@ function fixHardcoded() {
   const root = auditPath.join(__dirname, "..", "..");
   const dirs = ["server", "app/js", "app/admin"];
   const fixes = [];
+  const backups = [];
 
   for (const dir of dirs) {
     const absDir = auditPath.join(root, dir);
@@ -1106,15 +1107,24 @@ function fixHardcoded() {
         }).join("\n");
 
         if (content !== original) {
+          // Create backup before modifying
+          const bakPath = fp + ".bak";
+          try {
+            fs.writeFileSync(bakPath, original, "utf8");
+            backups.push(auditPath.relative(root, bakPath).replace(/\\/g, "/"));
+          } catch (bakErr) {
+            logger.warn({ component: "Audit", file: fp, err: bakErr.message }, "Backup failed — skipping file");
+            continue;
+          }
           fs.writeFileSync(fp, content, "utf8");
           fixes.push(auditPath.relative(root, fp).replace(/\\/g, "/"));
-          logger.info({ component: "Audit", file: fixes[fixes.length - 1] }, "Auto-fixed hardcoded values");
+          logger.info({ component: "Audit", file: fixes[fixes.length - 1] }, "Auto-fixed hardcoded values (backup created)");
         }
       }
     };
     walk(absDir);
   }
-  return { fixedFiles: fixes, count: fixes.length, fixedAt: new Date().toISOString() };
+  return { fixedFiles: fixes, backups, count: fixes.length, fixedAt: new Date().toISOString() };
 }
 
 // ── Startup scan ──
@@ -1163,36 +1173,49 @@ router.post("/audit-hardcoded/fix", (req, res) => {
 // ── GET: Brain health and intelligence status ──
 router.get("/brain-health", (req, res) => {
   try {
-    // Access brain instance from app
-    const brain = req.app?.get?.("brain") || req.app?.locals?.brain;
-    if (!brain || !brain.autonomousMonitor) {
+    const brain = req.app?.locals?.brain;
+    if (!brain) {
       return res.json({
-        status: "ok",
-        message: "Brain health endpoint active, but brain instance not attached to app",
-        note: "Wire app.set('brain', brainInstance) in index.js for full metrics",
+        status: "unavailable",
+        message: "Brain instance nu este inițializat",
+        uptime: 0,
+        conversations: 0,
+        toolStats: {},
+        toolErrors: {},
+        circuitBreakers: [],
+        profilesCached: 0,
+        journalSize: 0,
+        learnedPatterns: 0,
+        agents: [],
       });
     }
 
-    const monitorStatus = brain.autonomousMonitor.getStatus();
-    const circuitBreakers = brain.learningStore
+    // Safe access with fallbacks for all optional properties
+    const hasMonitor = !!(brain.autonomousMonitor?.getStatus);
+    const monitorStatus = hasMonitor ? brain.autonomousMonitor.getStatus() : { status: "not-available" };
+
+    const hasLearningStore = !!(brain.learningStore?.circuitBreakers);
+    const circuitBreakers = hasLearningStore
       ? Object.entries(brain.learningStore.circuitBreakers)
-        .filter(([_, cb]) => cb.open)
-        .map(([tool, cb]) => ({ tool, failures: cb.failures }))
+        .filter(([_, cb]) => cb?.open)
+        .map(([tool, cb]) => ({ tool, failures: cb?.failures || 0 }))
       : [];
 
     res.json({
-      version: "3.0",
-      uptime: Math.round((Date.now() - brain.startTime) / 1000),
-      conversations: brain.conversationCount,
-      learningsExtracted: brain.learningsExtracted,
-      toolStats: brain.toolStats,
-      toolErrors: brain.toolErrors,
+      status: brain.recentErrors > 5 ? "degraded" : "healthy",
+      uptime: brain.startTime ? Math.round((Date.now() - brain.startTime) / 1000) : Math.round(process.uptime()),
+      conversations: brain.conversationCount || brain.conversations?.size || 0,
+      learningsExtracted: brain.learningsExtracted || 0,
+      toolStats: brain.toolStats || {},
+      toolErrors: brain.toolErrors || {},
       circuitBreakers,
       monitor: monitorStatus,
-      profilesCached: brain._profileCache ? brain._profileCache.size : 0,
-      journalSize: brain.journal ? brain.journal.length : 0,
-      learnedPatterns: brain.learningStore ? brain.learningStore.patterns.length : 0,
+      profilesCached: brain._profileCache?.size || 0,
+      journalSize: brain.journal?.length || 0,
+      learnedPatterns: brain.learningStore?.patterns?.length || 0,
       agents: brain.agents ? Object.keys(brain.agents) : [],
+      recentErrors: brain.recentErrors || 0,
+      memoryEntries: brain._memoryCount || 0,
     });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -1368,15 +1391,34 @@ router.get("/health-check", async (req, res) => {
       try {
         const { count } = await supabaseAdmin.from("subscriptions").select("*", { count: "exact", head: true }).eq("status", "active");
         payments.activeSubscribers = count || 0;
-      } catch (e) { }
+      } catch (e) { logger.warn({ component: "Admin", err: e.message }, "Subscription count query failed"); }
     }
 
-    // Rate limits
+    // Rate limits — real values from express-rate-limit in index.js
     const rateLimits = {
-      chat: { max: 20, windowLabel: "minute" },
-      api: { max: 100, windowLabel: "minute" },
-      auth: { max: 5, windowLabel: "minute" },
+      global: { max: 200, windowMs: 15 * 60 * 1000, windowLabel: "15 minute", note: "Singurul rate limiter general din index.js" },
+      newsFetch: { max: 1, windowMs: 14 * 60 * 1000, windowLabel: "14 minute", note: "Configurat în news.js fetchLimiter" },
     };
+
+    // Brain-driven recommendations
+    if (brain && typeof brain.think === "function") {
+      try {
+        const diagnosticPrompt = `Ești sistemul de monitorizare KelionAI. Analizează rapid:
+- Uptime: ${Math.floor(uptime)}s, Memorie RSS: ${fmtMB(mem.rss)}, Heap: ${fmtMB(mem.heapUsed)}/${fmtMB(mem.heapTotal)}
+- DB conectat: ${dbConnected}, Tabele ok: ${Object.values(tables).filter(t => t.ok).length}/${Object.keys(tables).length}
+- Brain status: ${brainStatus}, Erori recente: ${brain.recentErrors || 0}
+- Servicii: ${Object.entries(svcChecks).map(([k, v]) => k + ":" + (v ? "OK" : "LIPSĂ")).join(", ")}
+Răspunde în maxim 3 recomandări scurte, fiecare pe un rând. Doar probleme reale, nu generalități.`;
+        const brainResult = await Promise.race([
+          brain.think(diagnosticPrompt, "kelion", [], "ro"),
+          new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 5000)),
+        ]);
+        if (brainResult?.enrichedMessage) {
+          const brainRecs = brainResult.enrichedMessage.split("\n").filter(l => l.trim()).slice(0, 3);
+          recommendations.push(...brainRecs.map(r => "🧠 " + r.replace(/^[-•*\d.)\s]+/, "").trim()));
+        }
+      } catch { /* Brain diagnostic timeout — non-blocking */ }
+    }
 
     // Errors
     const errors = {
