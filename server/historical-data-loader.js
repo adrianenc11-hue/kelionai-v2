@@ -83,7 +83,8 @@ async function ensureTable() {
 /**
  * Fetch FULL history from Yahoo Finance for a single asset
  */
-async function fetchYahooHistory(assetName) {
+async function fetchYahooHistory(assetName, retryCount = 0) {
+    const MAX_RETRIES = 3;
     const config = YAHOO_SYMBOLS[assetName];
     if (!config) {
         logger.warn(`No Yahoo symbol for ${assetName}`);
@@ -97,15 +98,24 @@ async function fetchYahooHistory(assetName) {
     const encodedSymbol = encodeURIComponent(config.symbol);
     const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodedSymbol}?period1=${sinceEpoch}&period2=${nowEpoch}&interval=1d&includePrePost=false`;
 
-    logger.info({ asset: assetName, symbol: config.symbol, encodedSymbol, since: config.since }, `Fetching ${assetName} history...`);
+    logger.info({ asset: assetName, symbol: config.symbol, retry: retryCount, since: config.since }, `Fetching ${assetName} history...`);
 
     try {
         const res = await fetch(url, {
             headers: {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept": "application/json",
             },
-            signal: AbortSignal.timeout(30000), // 30s timeout per asset
+            signal: AbortSignal.timeout(30000),
         });
+
+        // Rate limited — retry with exponential backoff
+        if (res.status === 429 && retryCount < MAX_RETRIES) {
+            const waitSec = 10 * Math.pow(2, retryCount); // 10s, 20s, 40s
+            logger.warn({ asset: assetName, waitSec, retry: retryCount + 1 }, `Yahoo 429 rate limit — waiting ${waitSec}s then retry`);
+            await new Promise(r => setTimeout(r, waitSec * 1000));
+            return fetchYahooHistory(assetName, retryCount + 1);
+        }
 
         if (!res.ok) {
             const body = await res.text().catch(() => "");
@@ -130,7 +140,7 @@ async function fetchYahooHistory(assetName) {
 
         const rows = [];
         for (let i = 0; i < timestamps.length; i++) {
-            if (closes[i] == null) continue; // skip null days
+            if (closes[i] == null) continue;
             const d = new Date(timestamps[i] * 1000);
             rows.push({
                 asset: assetName,
@@ -147,7 +157,13 @@ async function fetchYahooHistory(assetName) {
         logger.info({ asset: assetName, count: rows.length, from: rows[0]?.date, to: rows[rows.length - 1]?.date }, `${assetName}: ${rows.length} daily candles`);
         return rows;
     } catch (e) {
-        logger.error({ err: e.message, asset: assetName }, `Failed fetching ${assetName}`);
+        if (retryCount < MAX_RETRIES) {
+            const waitSec = 10 * Math.pow(2, retryCount);
+            logger.warn({ asset: assetName, err: e.message, waitSec }, `Fetch error — retrying in ${waitSec}s`);
+            await new Promise(r => setTimeout(r, waitSec * 1000));
+            return fetchYahooHistory(assetName, retryCount + 1);
+        }
+        logger.error({ err: e.message, asset: assetName }, `Failed fetching ${assetName} after ${MAX_RETRIES} retries`);
         return [];
     }
 }
@@ -230,8 +246,8 @@ async function loadAllHistory() {
                 };
             }
 
-            // Rate limit: wait 1s between assets (Yahoo can throttle)
-            await new Promise(r => setTimeout(r, 1000));
+            // Rate limit: wait 5s between assets to avoid Yahoo 429
+            await new Promise(r => setTimeout(r, 5000));
         } catch (e) {
             results[asset] = { error: e.message };
         }
