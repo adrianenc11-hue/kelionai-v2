@@ -1792,6 +1792,11 @@ router.post("/history/load", async (req, res) => {
   }
 });
 
+// ═══ DOWNLOAD PROGRESS — live counter per asset ═══
+router.get("/history/progress", (req, res) => {
+  res.json(histLoader.getProgress());
+});
+
 // ═══ HISTORICAL DATA SUMMARY ═══
 router.get("/history/summary", async (req, res) => {
   try {
