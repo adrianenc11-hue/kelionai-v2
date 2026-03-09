@@ -285,6 +285,42 @@ async function calculateGeopoliticalRisk() {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// TRADING STRATEGY ADJUSTMENT based on geopolitical risk
+// ═══════════════════════════════════════════════════════════════
+function adjustStrategyForRisk(riskScore, originalConfidence, originalSignal) {
+    if (riskScore >= 70) {
+        return {
+            confidence: Math.round(originalConfidence * 0.5),
+            signal: originalSignal.includes("BUY") ? "HOLD" : originalSignal,
+            geoAdjusted: true,
+            reason: "Geopolitical risk EXTREME — blocked BUY, reduced confidence",
+        };
+    }
+    if (riskScore >= 50) {
+        return {
+            confidence: Math.round(originalConfidence * 0.7),
+            signal: originalSignal === "STRONG BUY" ? "BUY" : originalSignal,
+            geoAdjusted: true,
+            reason: "Geopolitical risk HIGH — reduced confidence",
+        };
+    }
+    if (riskScore >= 30) {
+        return {
+            confidence: Math.round(originalConfidence * 0.9),
+            signal: originalSignal,
+            geoAdjusted: true,
+            reason: "Geopolitical risk elevated — slight caution",
+        };
+    }
+    return {
+        confidence: originalConfidence,
+        signal: originalSignal,
+        geoAdjusted: false,
+        reason: null,
+    };
+}
+
+// ═══════════════════════════════════════════════════════════════
 // HISTORICAL MARKET EVENTS DATABASE — 20 years of real events
 // Brain scans this permanently for strategy pattern recognition
 // ═══════════════════════════════════════════════════════════════
