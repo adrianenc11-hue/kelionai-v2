@@ -1881,6 +1881,23 @@ router.get("/paper/history", (req, res) => {
   res.json(paperTrading.getTradeHistory());
 });
 
+router.post("/paper/reset", (req, res) => {
+  const { createClient } = require("@supabase/supabase-js");
+  const sbUrl = process.env.SUPABASE_URL || "https://nqlobybfwmtkmsqadqqr.supabase.co";
+  const sbKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5xbG9ieWJmd210a21zcWFkcXFyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTg3MzAyMiwiZXhwIjoyMDg3NDQ5MDIyfQ.AngYdhgIOXas4UssEP1ENLiZCW9CYPgecvYej3PvLOQ";
+  const sb = createClient(sbUrl, sbKey);
+  res.json(paperTrading.reset(sb));
+});
+
+router.post("/paper/switch", (req, res) => {
+  const { createClient } = require("@supabase/supabase-js");
+  const sbUrl = process.env.SUPABASE_URL || "https://nqlobybfwmtkmsqadqqr.supabase.co";
+  const sbKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5xbG9ieWJmd210a21zcWFkcXFyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTg3MzAyMiwiZXhwIjoyMDg3NDQ5MDIyfQ.AngYdhgIOXas4UssEP1ENLiZCW9CYPgecvYej3PvLOQ";
+  const sb = createClient(sbUrl, sbKey);
+  const mode = req.body?.mode || req.query?.mode || "PAPER";
+  res.json(paperTrading.switchMode(mode, sb));
+});
+
 // ═══ INVESTMENT SIMULATOR — 100€ backtesting across all assets/periods ═══
 router.get("/simulate", async (req, res) => {
   try {

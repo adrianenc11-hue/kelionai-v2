@@ -3,6 +3,7 @@
  * 
  * ON → bot trades automatically, learns, tracks P&L
  * OFF → bot stops trading but keeps collected data
+ * RESET → clears all paper data when switching demo→real
  * 
  * Uses all active tools: RSI, EMA, SMA, Momentum, Bollinger, 
  * Open Interest, Whale Activity, Geopolitical Risk, Fear & Greed
@@ -298,4 +299,49 @@ module.exports = {
     getState,
     getTradeHistory,
     checkAndTrade,
+    reset,
+    switchMode,
 };
+
+/**
+ * RESET — clear all paper trading data (when switching demo→real)
+ */
+function reset(supabase) {
+    turnOff(); // stop if running
+    state.cash = state.startBalance;
+    state.positions = {};
+    state.trades = [];
+    state.totalPnL = 0;
+    state.winCount = 0;
+    state.lossCount = 0;
+    state.startedAt = null;
+    state.lastSignalCheck = null;
+
+    // Clear Supabase table too
+    if (supabase) {
+        supabase.from("trading_paper_trades").delete().neq("id", 0).catch(() => { });
+    }
+
+    logger.info("[PaperTrading] RESET — all paper data cleared");
+    return { status: "reset", state: getState() };
+}
+
+/**
+ * Switch mode: PAPER ↔ REAL
+ * When switching to REAL → auto-clears all paper data
+ */
+function switchMode(newMode, supabase) {
+    if (newMode === "REAL" && state.mode === "PAPER") {
+        reset(supabase); // auto-clear paper data
+        state.mode = "REAL";
+        logger.info("[PaperTrading] Switched to REAL mode — paper data cleared");
+        return { status: "switched_to_real", state: getState() };
+    } else if (newMode === "PAPER") {
+        state.mode = "PAPER";
+        state.cash = state.startBalance; // fresh start
+        logger.info("[PaperTrading] Switched to PAPER mode — fresh start");
+        return { status: "switched_to_paper", state: getState() };
+    }
+    return { status: "no_change", mode: state.mode, state: getState() };
+}
+
