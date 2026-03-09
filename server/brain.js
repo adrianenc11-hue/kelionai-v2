@@ -1982,6 +1982,10 @@ Reply STRICTLY with JSON:
           plan.push({ tool: "adminNews" });
           seen.add("adminNews");
         }
+        if (analysis.needsTradeIntelligence && !seen.has("tradeIntelligence")) {
+          plan.push({ tool: "tradeIntelligence" });
+          seen.add("tradeIntelligence");
+        }
       }
       // Table 3: Non-AI function tools
       if (analysis.needsAuth && !seen.has("authAction")) {
@@ -2007,10 +2011,6 @@ Reply STRICTLY with JSON:
       if (analysis.needsHealthCheck && !seen.has("healthCheck")) {
         plan.push({ tool: "healthCheck" });
         seen.add("healthCheck");
-      }
-      if (analysis.needsTradeIntelligence && !seen.has("tradeIntelligence")) {
-        plan.push({ tool: "tradeIntelligence" });
-        seen.add("tradeIntelligence");
       }
       if (analysis.needsCookieConsent && !seen.has("cookieConsent")) {
         plan.push({ tool: "cookieConsent" });
@@ -3054,7 +3054,7 @@ Reply STRICTLY with JSON:
               prices = candles.map(c => c.close);
               volumes = candles.map(c => c.volume || 0);
             }
-          } catch (_) { /* fallback */ }
+          } catch (_wsErr) { logger.warn({ component: "Brain", err: _wsErr.message }, "WS candles fallback"); }
           // Fallback: CoinGecko
           if (prices.length < 14) {
             try {
@@ -3064,7 +3064,7 @@ Reply STRICTLY with JSON:
                 prices = (d.prices || []).map(p => p[1]).slice(-100);
                 volumes = (d.total_volumes || []).map(v => v[1]).slice(-100);
               }
-            } catch (_) { /* no data */ }
+            } catch (_cgErr) { logger.warn({ component: "Brain", err: _cgErr.message }, "CoinGecko price fallback"); }
           }
           if (prices.length >= 14) {
             const rsi = this._calcRSI(prices);
@@ -3093,7 +3093,7 @@ Reply STRICTLY with JSON:
       // 4. MarketLearner adaptive weights
       try {
         results.learnedWeights = marketLearner.getWeights ? marketLearner.getWeights() : {};
-      } catch (_) { }
+      } catch (_lwErr) { logger.warn({ component: "Brain", err: _lwErr.message }, "MarketLearner weights error"); }
 
       // 5. Forex Session Info
       try {
@@ -3101,12 +3101,12 @@ Reply STRICTLY with JSON:
           currentSession: forexEngine.getCurrentSession ? forexEngine.getCurrentSession() : null,
           bestPairs: forexEngine.getBestPairsNow ? forexEngine.getBestPairsNow() : null,
         };
-      } catch (_) { }
+      } catch (_fxErr) { logger.warn({ component: "Brain", err: _fxErr.message }, "Forex session error"); }
 
       // 6. Performance Stats
       try {
         if (perfTracker.getStats) results.performance = perfTracker.getStats();
-      } catch (_) { }
+      } catch (_pfErr) { logger.warn({ component: "Brain", err: _pfErr.message }, "PerfTracker stats error"); }
 
       // 7. WS-Engine status
       try {
@@ -3114,7 +3114,7 @@ Reply STRICTLY with JSON:
           connected: wsEngine.isConnected ? wsEngine.isConnected() : false,
           assetsTracking: wsEngine.getTrackedAssets ? wsEngine.getTrackedAssets() : [],
         };
-      } catch (_) { }
+      } catch (_wsStatErr) { logger.warn({ component: "Brain", err: _wsStatErr.message }, "WS-Engine status error"); }
 
       const btc = results.technicalAnalysis?.BTC || {};
       const summary = `BTC: $${btc.price || "?"} RSI:${btc.rsi || "?"} (${btc.rsiSignal || "?"}) MACD:${btc.macdSignal || "?"} Confluence:${btc.confluence || "?"} (${btc.confidence || 0}%) | Sentiment:${results.sentiment?.toFixed(2) || "N/A"} | Forex:${results.forex?.currentSession?.name || "?"}`;
@@ -3126,7 +3126,7 @@ Reply STRICTLY with JSON:
             result: results, sentiment_score: results.sentiment || 0,
             confidence: btc.confidence || 50, created_at: new Date().toISOString(),
           });
-        } catch (_) { }
+        } catch (_tiDbErr) { logger.warn({ component: "Brain", err: _tiDbErr.message }, "Trade intelligence DB insert error"); }
       }
 
       return { type: "tradeIntelligence", data: results, summary };
