@@ -419,6 +419,17 @@
                 }
             }, 4000);
 
+            // ── AGENT ACTIVITY BADGE ──
+            if (data.reasoning && data.reasoning.agent) {
+                var agentBadge = document.createElement('div');
+                agentBadge.className = 'agent-badge';
+                var agentIcon = data.reasoning.agent.icon || '🧠';
+                var agentName = data.reasoning.agent.name || 'Kelion';
+                var modelInfo = data.reasoning.modelRoute ? (' · ' + data.reasoning.modelRoute.provider + '/' + data.reasoning.modelRoute.model) : '';
+                agentBadge.innerHTML = '<span class="agent-icon">' + agentIcon + '</span> <span class="agent-name">' + escapeHtml(agentName) + '</span>' + '<span class="agent-model">' + escapeHtml(modelInfo) + '</span>';
+                overlay.appendChild(agentBadge);
+            }
+
             // ── REASONING TRANSPARENCY UI ──
             if (data.reasoning && data.reasoning.reasonTrace && data.reasoning.reasonTrace.length > 0) {
                 setTimeout(function () {

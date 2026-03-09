@@ -327,6 +327,8 @@ router.post("/chat", chatLimiter, validate(chatSchema), async (req, res) => {
         criticVerdict: thought.criticReport?.verdict || null,
         criticScore: thought.criticReport?.overallScore || null,
         criticSuggestions: (thought.criticReport?.suggestions || []).slice(0, 3),
+        agent: thought.agent || null,
+        modelRoute: thought.modelRoute ? { provider: thought.modelRoute.provider, model: thought.modelRoute.model } : null,
       },
     };
     if (monitorFromReply) {
