@@ -1104,6 +1104,20 @@ When asked "what can you do?" list these real capabilities. Use them proactively
         // Step 6.5: CONFIDENCE SCORING
         confidence = this._scoreConfidence(analysis, allResults, chainOfThought);
 
+        // Step 6.5b: MULTI-AI CONSENSUS — for complex queries with low confidence
+        if (analysis.complexity === "complex" && confidence < 0.6 && iteration === 0) {
+          try {
+            const consensusAnswer = await this.multiAIConsensus(message, 600);
+            if (consensusAnswer) {
+              enriched += `\n[MULTI-AI CONSENSUS]: ${consensusAnswer}`;
+              confidence = Math.min(1.0, confidence + 0.2); // boost confidence
+              logger.info({ component: "Brain", confidence }, "🤝 Multi-AI consensus used to boost confidence");
+            }
+          } catch (e) {
+            logger.warn({ component: "Brain", err: e.message }, "Multi-AI consensus failed (non-critical)");
+          }
+        }
+
         // Step 6.6: SELF-REFLECTION — evaluate if response is complete
         // Only reflect on iteration 1+ and if complex or low confidence
         if (iteration < MAX_ITERATIONS - 1 && (analysis.complexity === "complex" || confidence < 0.6)) {
@@ -2792,6 +2806,10 @@ Reply STRICTLY with JSON:
 
     if (analysis.isEmotional && analysis.emotionalTone !== "neutral") {
       ctx += `\n[Utilizatorul pare ${analysis.emotionalTone}. Adapteaza tonul empatic.]`;
+    }
+    if (analysis.frustrationLevel && analysis.frustrationLevel > 0.3) {
+      const level = analysis.frustrationLevel > 0.7 ? "FOARTE FRUSTRAT" : analysis.frustrationLevel > 0.5 ? "frustrat" : "ușor iritat";
+      ctx += `\n[⚠️ ATENȚIE: Utilizatorul este ${level} (nivel: ${(analysis.frustrationLevel * 100).toFixed(0)}%). ${analysis.emotionResponseHint || "Fii empatic, recunoaște problema, oferă soluții concrete rapid. NU folosi cuvinte de umplutură."}]`;
     }
     if (analysis.isEmergency) {
       ctx += `\n[URGENTA! Prioritizeaza siguranta. Ofera instructiuni clare.]`;
