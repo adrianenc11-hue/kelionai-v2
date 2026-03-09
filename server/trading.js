@@ -13,6 +13,7 @@ const wsEngine = require("./ws-engine");
 const marketLearner = require("./market-learner");
 const aiScorer = require("./ai-scoring");
 const perfTracker = require("./performance-tracker");
+const tradePersist = require("./trade-persistence");
 
 const router = express.Router();
 
@@ -41,6 +42,9 @@ const STRATEGIES = [
 let analysisCache = null;
 let cacheTsMs = 0;
 const CACHE_TTL_MS = 5 * 60 * 1000;
+
+// Init Supabase tables for trading persistence
+tradePersist.ensureTables().catch(() => { });
 
 // ═══ HISTORY ═══
 const analysisHistory = [];
@@ -935,6 +939,9 @@ router.get("/analysis", async (req, res) => {
     analysisHistory.push({ ts: entry.timestamp, assets: results.length });
     if (analysisHistory.length > MAX_HISTORY) analysisHistory.shift();
 
+    // ═══ PERSIST TO SUPABASE ═══
+    tradePersist.saveAllAnalyses(results).catch(() => { });
+
     // ═══ BRAIN INTEGRATION — save analysis to memory ═══
     if (brain) {
       const topSignals = results.slice(0, 3).map(r => r.asset + ":" + r.confluence.signal + "(" + r.confluence.confidence + "%)").join(", ");
@@ -1022,6 +1029,9 @@ router.get("/signals", async (req, res) => {
       })
       .filter((s) => s.signal !== "HOLD")
       .sort((a, b) => b.confidence - a.confidence);
+
+    // ═══ PERSIST SIGNALS TO SUPABASE ═══
+    signals.forEach(s => tradePersist.saveSignal(s).catch(() => { }));
 
     res.json({ signals, count: signals.length, disclaimer: DISCLAIMER });
   } catch (err) {
