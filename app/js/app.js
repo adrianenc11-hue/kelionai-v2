@@ -419,6 +419,26 @@
                 }
             }, 4000);
 
+            // ── REASONING TRANSPARENCY UI ──
+            if (data.reasoning && data.reasoning.reasonTrace && data.reasoning.reasonTrace.length > 0) {
+                setTimeout(function () {
+                    var reasonEl = document.createElement('div');
+                    reasonEl.className = 'reason-trace';
+                    // Confidence badge
+                    var badge = data.reasoning.confidenceBadge === 'high' ? '🟢' : data.reasoning.confidenceBadge === 'medium' ? '🟡' : '🔴';
+                    var badgeLabel = data.reasoning.confidenceBadge === 'high' ? 'Confident' : data.reasoning.confidenceBadge === 'medium' ? 'Moderate' : 'Low';
+                    var badgeHtml = '<span class="confidence-badge ' + data.reasoning.confidenceBadge + '" title="Confidence: ' + badgeLabel + '">' + badge + '</span>';
+                    // Trace items
+                    var traceItems = data.reasoning.reasonTrace.map(function (t) { return '<div class="trace-item">' + escapeHtml(t) + '</div>'; }).join('');
+                    reasonEl.innerHTML = '<div class="reason-header" onclick="this.parentElement.classList.toggle(\'expanded\')">' + badgeHtml + ' <span class="reason-toggle">🔍 Reasoning</span><span class="reason-arrow">▸</span></div>' +
+                        '<div class="reason-body">' + traceItems + '</div>';
+                    overlay.appendChild(reasonEl);
+                    overlay.scrollTop = overlay.scrollHeight;
+                    // Auto-remove with the message
+                    setTimeout(function () { if (overlay.contains(reasonEl)) overlay.removeChild(reasonEl); }, 8000);
+                }, 1500); // Slight delay after message appears
+            }
+
         } catch (e) {
             showThinking(false);
             addMessage('assistant', 'Connection error.');

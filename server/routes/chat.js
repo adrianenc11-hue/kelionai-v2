@@ -283,6 +283,28 @@ router.post("/chat", chatLimiter, validate(chatSchema), async (req, res) => {
       gestures,
       pose,
       bodyActions,
+      // UI TRANSPARENCY: Reasoning metadata
+      reasoning: {
+        complexity: thought.complexityLevel?.name || thought.analysis?.complexity || "medium",
+        complexityLevel: thought.complexityLevel?.level || 2,
+        model: thought.modelRoute?.provider || engine,
+        toolsUsed: thought.toolsUsed || [],
+        confidence: thought.confidence || 0,
+        // Confidence badge: 🟢 high (>0.7), 🟡 medium (0.4-0.7), 🔴 low (<0.4)
+        confidenceBadge: (thought.confidence || 0) > 0.7 ? "high" : (thought.confidence || 0) > 0.4 ? "medium" : "low",
+        sourceTags: thought.sourceTags || [],
+        truthVerdict: thought.truthReport?.verdict || null,
+        truthScore: thought.truthReport?.factualScore || null,
+        unsupportedClaims: (thought.truthReport?.unsupportedClaims || []).length,
+        reasonTrace: [
+          thought.toolsUsed?.length > 0 ? `🔍 Tools: ${thought.toolsUsed.join(", ")}` : null,
+          thought.chainOfThought ? "🧠 Chain of Thought activat" : null,
+          thought.complexityLevel ? `📊 Complexitate: ${thought.complexityLevel.name} (L${thought.complexityLevel.level})` : null,
+          thought.modelRoute ? `🤖 Model: ${thought.modelRoute.provider}/${thought.modelRoute.model}` : null,
+          thought.truthReport?.verdict ? `🛡️ Truth Guard: ${thought.truthReport.verdict} (${Math.round((thought.truthReport.factualScore || 0) * 100)}%)` : null,
+          `⏱️ Think: ${thought.thinkTime}ms`,
+        ].filter(Boolean),
+      },
     };
     if (monitorFromReply) {
       response.monitor = monitorFromReply;
