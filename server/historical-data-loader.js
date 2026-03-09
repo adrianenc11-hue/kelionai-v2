@@ -32,8 +32,24 @@ const YAHOO_SYMBOLS = {
 
 let supabase = null;
 
+// Live download progress — exposed to admin page
+const downloadProgress = {
+    active: false,
+    currentAsset: null,
+    currentAssetIndex: 0,
+    totalAssets: Object.keys(YAHOO_SYMBOLS).length,
+    assetsCompleted: {},
+    startedAt: null,
+    lastUpdate: null,
+    totalRowsInserted: 0,
+};
+
 function init(supabaseClient) {
     supabase = supabaseClient;
+}
+
+function getProgress() {
+    return { ...downloadProgress };
 }
 
 /**
@@ -210,7 +226,17 @@ async function loadAllHistory() {
     const results = {};
     const assets = Object.keys(YAHOO_SYMBOLS);
 
-    for (const asset of assets) {
+    // Update progress
+    downloadProgress.active = true;
+    downloadProgress.startedAt = new Date().toISOString();
+    downloadProgress.totalRowsInserted = 0;
+    downloadProgress.assetsCompleted = {};
+
+    for (let i = 0; i < assets.length; i++) {
+        const asset = assets[i];
+        downloadProgress.currentAsset = asset;
+        downloadProgress.currentAssetIndex = i + 1;
+        downloadProgress.lastUpdate = new Date().toISOString();
         try {
             // Check what we already have
             const { data: existing } = await supabase
@@ -232,13 +258,17 @@ async function loadAllHistory() {
 
             if (newRows.length > 0) {
                 const { inserted } = await storeInSupabase(newRows);
+                downloadProgress.totalRowsInserted += inserted;
+                const dateRange = { from: allRows[0]?.date, to: allRows[allRows.length - 1]?.date };
+                downloadProgress.assetsCompleted[asset] = { rows: inserted, range: dateRange };
                 results[asset] = {
                     totalFetched: allRows.length,
                     newInserted: inserted,
-                    dateRange: { from: allRows[0]?.date, to: allRows[allRows.length - 1]?.date },
+                    dateRange,
                     lastExisting: lastDate || "none",
                 };
             } else {
+                downloadProgress.assetsCompleted[asset] = { rows: 0, status: 'up-to-date' };
                 results[asset] = {
                     status: "up-to-date",
                     lastDate,
@@ -253,6 +283,9 @@ async function loadAllHistory() {
         }
     }
 
+    downloadProgress.active = false;
+    downloadProgress.currentAsset = null;
+    downloadProgress.lastUpdate = new Date().toISOString();
     return { assets: results, timestamp: new Date().toISOString() };
 }
 
@@ -327,5 +360,6 @@ module.exports = {
     loadAllHistory,
     getHistory,
     getHistorySummary,
+    getProgress,
     YAHOO_SYMBOLS,
 };
