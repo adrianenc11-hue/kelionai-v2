@@ -3108,14 +3108,14 @@ Rules:
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${resendKey}` },
           body: JSON.stringify({
-            from: process.env.EMAIL_FROM || "Kelion AI <noreply@kelionai.app>",
+            from: process.env.EMAIL_FROM || `Kelion AI <noreply@${(process.env.APP_URL || '').replace(/^https?:\/\//, '')}>`,
             to: [to],
             subject,
             html: `<div style="font-family:Inter,sans-serif;max-width:600px;margin:0 auto;padding:20px">
               <h2 style="color:#6366f1">🧠 KelionAI</h2>
               <div style="line-height:1.6">${body.replace(/\n/g, "<br>")}</div>
               <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0">
-              <p style="font-size:12px;color:#9ca3af">Trimis de Kelion AI — kelionai.app</p>
+              <p style="font-size:12px;color:#9ca3af">Trimis de Kelion AI — ${process.env.APP_URL || 'kelion'}</p>
             </div>`,
           }),
           signal: AbortSignal.timeout(8000),
@@ -3140,7 +3140,7 @@ Rules:
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${sgKey}` },
           body: JSON.stringify({
             personalizations: [{ to: [{ email: to }] }],
-            from: { email: process.env.EMAIL_FROM || "noreply@kelionai.app", name: "Kelion AI" },
+            from: { email: process.env.EMAIL_FROM || `noreply@${(process.env.APP_URL || '').replace(/^https?:\/\//, '')}`, name: "Kelion AI" },
             subject,
             content: [{ type: "text/html", value: body.replace(/\n/g, "<br>") }],
           }),
@@ -3428,7 +3428,7 @@ Rules:
     try {
       const r = await fetch(url, {
         headers: {
-          "User-Agent": "Mozilla/5.0 (compatible; KelionAI/1.0; +https://kelionai.app)",
+          "User-Agent": `Mozilla/5.0 (compatible; KelionAI/1.0; +${process.env.APP_URL || 'https://kelion'})`,
           Accept: "text/html,application/xhtml+xml,text/plain",
         },
         signal: AbortSignal.timeout(10000),
