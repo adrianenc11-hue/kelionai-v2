@@ -41,17 +41,17 @@
 
     // Smoothing — CINEMATIC mode: dynamic attack/release for natural feel
     var prevValues = {};
-    var SMOOTH_ATTACK = 0.08;   // TEST-A (Brain): faster attack
-    var SMOOTH_RELEASE = 0.04;  // TEST-A (Brain): faster release
+    var SMOOTH_ATTACK = 0.25;   // TEST-B: FAST attack — lips respond instantly
+    var SMOOTH_RELEASE = 0.20;  // TEST-B: FAST release — mouth closes quickly
 
     // ── Mouth opening clamp — prevents enormous jaw opening ──
-    var MAX_MOUTH_OPEN = 0.04;  // TEST-A (Brain): reduced
-    var MAX_VISEME_AA = 0.06;   // TEST-A (Brain): reduced
-    var MAX_VISEME = 0.08;      // TEST-A (Brain): reduced
+    var MAX_MOUTH_OPEN = 0.15;  // TEST-B: VISIBLE jaw movement
+    var MAX_VISEME_AA = 0.25;   // TEST-B: VISIBLE vowels
+    var MAX_VISEME = 0.35;      // TEST-B: VISIBLE lip shapes
 
     // ── Coarticulation — blend previous viseme into current ──
     var _prevVisemes = {};
-    var COARTIC_BLEND = 0.10;  // TEST-A (Brain): reduced from 0.15
+    var COARTIC_BLEND = 0.12;  // TEST-B: slightly reduced for clearer shapes
 
     function SimpleLipSync() { }
 
