@@ -1528,6 +1528,29 @@ router.get("/history", (req, res) => {
   });
 });
 
+// ═══ SUPABASE FULL HISTORY — all data since account creation ═══
+router.get("/history/full", async (req, res) => {
+  try {
+    const analyses = await tradePersist.getRecentAnalyses(null, 1000);
+    const trades = await tradePersist.getTradeHistory(500);
+    const strategyStats = await tradePersist.getStrategyStats();
+    res.json({
+      analyses: analyses.length,
+      trades: trades.length,
+      recentAnalyses: analyses.slice(0, 50),
+      recentTrades: trades,
+      strategyStats,
+      source: "supabase",
+      dataRange: analyses.length > 0
+        ? { from: analyses[analyses.length - 1]?.created_at, to: analyses[0]?.created_at }
+        : null,
+    });
+  } catch (e) {
+    logger.error({ err: e.message }, "[Trading] Full history error");
+    res.status(500).json({ error: "History not available" });
+  }
+});
+
 // ═══════════════════════════════════════════════════════════════
 // TRADE EXECUTION ROUTES — Full integration of ALL modules
 // ═══════════════════════════════════════════════════════════════
