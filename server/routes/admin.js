@@ -1461,4 +1461,80 @@ Răspunde în maxim 3 recomandări scurte, fiecare pe un rând. Doar probleme re
   }
 });
 
+// ══════════════════════════════════════════════════════════
+// GET /api/admin/memories — Brain Memory Panel
+// Browse, search, and filter brain memories
+// ══════════════════════════════════════════════════════════
+router.get("/memories", async (req, res) => {
+  try {
+    const { supabaseAdmin } = req.app.locals;
+    if (!supabaseAdmin) return res.json({ memories: [], facts: [], totalMemories: 0, totalFacts: 0 });
+
+    const { type, search, limit = 50, offset = 0 } = req.query;
+
+    // Query brain_memory table
+    let memQuery = supabaseAdmin
+      .from("brain_memory")
+      .select("id, user_id, type, content, importance, created_at, tags", { count: "exact" })
+      .order("created_at", { ascending: false })
+      .range(parseInt(offset), parseInt(offset) + parseInt(limit) - 1);
+
+    if (type && type !== "all") memQuery = memQuery.eq("type", type);
+    if (search) memQuery = memQuery.ilike("content", `%${search}%`);
+
+    const { data: memories, count: totalMemories, error: memErr } = await memQuery;
+    if (memErr) logger.warn({ component: "Admin", err: memErr.message }, "Memory query error");
+
+    // Query learned_facts table
+    let factQuery = supabaseAdmin
+      .from("learned_facts")
+      .select("id, fact, category, source, confidence, created_at", { count: "exact" })
+      .order("created_at", { ascending: false })
+      .limit(parseInt(limit));
+
+    if (search) factQuery = factQuery.ilike("fact", `%${search}%`);
+
+    const { data: facts, count: totalFacts, error: factErr } = await factQuery;
+    if (factErr) logger.warn({ component: "Admin", err: factErr.message }, "Facts query error");
+
+    // Stats by type
+    const typeStats = {};
+    (memories || []).forEach(m => {
+      typeStats[m.type || "unknown"] = (typeStats[m.type || "unknown"] || 0) + 1;
+    });
+
+    res.json({
+      memories: memories || [],
+      facts: facts || [],
+      totalMemories: totalMemories || 0,
+      totalFacts: totalFacts || 0,
+      typeStats,
+      types: ["text", "visual", "code", "procedure", "preference", "fact", "emotion", "context"],
+    });
+  } catch (e) {
+    logger.error({ component: "Admin", err: e.message }, "Memory panel query failed");
+    res.json({ memories: [], facts: [], totalMemories: 0, totalFacts: 0, error: e.message });
+  }
+});
+
+// DELETE /api/admin/memories/:id — Remove a specific memory
+router.delete("/memories/:id", async (req, res) => {
+  try {
+    const { supabaseAdmin } = req.app.locals;
+    if (!supabaseAdmin) return res.status(503).json({ error: "No DB" });
+
+    const { error } = await supabaseAdmin
+      .from("brain_memory")
+      .delete()
+      .eq("id", req.params.id);
+
+    if (error) return res.status(500).json({ error: error.message });
+
+    logger.info({ component: "Admin", memoryId: req.params.id }, "Memory deleted");
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;
