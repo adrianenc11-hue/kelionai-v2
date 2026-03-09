@@ -419,6 +419,12 @@ class KelionBrain {
 - SMART_ROUTING: Automatically selects the optimal AI model (fast/balanced/premium) based on task complexity
 - PROJECT_MEMORY: Tracks user's projects, tech stack, status — knows what you're working on
 - PROCEDURAL_MEMORY: Remembers how past tasks were solved, reuses proven solutions
+- CRITIC_AGENT: Independent quality validation — checks consistency, relevance, safety. Can block dangerous content. 5 verdicts: APPROVED → CAUTION → REJECTED
+- COST_GUARDRAILS: Budget management per user plan (Free/Pro/Enterprise). Auto-downgrades to cheaper models when budget is high
+- POLICY_ENGINE: Per-plan tool access control. Free users have limited tools, Pro/Enterprise have full access
+- CALENDAR: Create, list, and delete calendar events. Supports natural language time ("mâine la 3", "next Monday at 10am"). Falls back to reminders if Google Calendar is not configured
+- DOCUMENT_GEN: Generate professional documents, reports, proposals, memos. Uses AI to create structured content in markdown or text format
+- SOURCE_CITATIONS: Automatically extracts and displays clickable source links from search results and tool outputs
 
 === SKILL: PRODUCȚIE MEDIA (IMAGINE/POSTER/LOGO/ILUSTRAȚIE) ===
 Când utilizatorul cere producție de conținut vizual, URMEZI OBLIGATORIU acest flow:
@@ -4401,6 +4407,128 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
       logger.warn({ component: "ProceduralMemory", err: e.message }, "Failed to find procedure");
       return [];
     }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // 9.7b WORKSPACE MEMORY — Persistent project context
+  // Saves project structure, tech stack, patterns for each user
+  // ═══════════════════════════════════════════════════════════
+
+  /**
+   * Save workspace context for a user.
+   * Stores file structure, tech stack, patterns, and key files.
+   */
+  async _saveWorkspace(userId, workspaceName, context) {
+    if (!this.supabaseAdmin || !userId) return false;
+    try {
+      const wsData = {
+        name: workspaceName,
+        techStack: context.techStack || [],
+        keyFiles: context.keyFiles || [],
+        patterns: context.patterns || [],
+        structure: context.structure || "",
+        lastUpdated: new Date().toISOString(),
+      };
+
+      // Upsert: update if exists, insert if new
+      const { data: existing } = await this.supabaseAdmin
+        .from("brain_memory")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("type", "workspace")
+        .ilike("content", `%"name":"${workspaceName}"%`)
+        .limit(1);
+
+      if (existing && existing.length > 0) {
+        await this.supabaseAdmin
+          .from("brain_memory")
+          .update({ content: JSON.stringify(wsData) })
+          .eq("id", existing[0].id);
+      } else {
+        await this.supabaseAdmin
+          .from("brain_memory")
+          .insert({ user_id: userId, type: "workspace", content: JSON.stringify(wsData) });
+      }
+
+      logger.info({ component: "Workspace", name: workspaceName, userId }, `📂 Workspace saved: ${workspaceName}`);
+      return true;
+    } catch (e) {
+      logger.warn({ component: "Workspace", err: e.message }, "Workspace save failed");
+      return false;
+    }
+  }
+
+  /**
+   * Load workspace context for a user.
+   * Returns the most recent workspace or a specific one by name.
+   */
+  async _loadWorkspace(userId, workspaceName = null) {
+    if (!this.supabaseAdmin || !userId) return null;
+    try {
+      let query = this.supabaseAdmin
+        .from("brain_memory")
+        .select("content, created_at")
+        .eq("user_id", userId)
+        .eq("type", "workspace")
+        .order("created_at", { ascending: false })
+        .limit(5);
+
+      if (workspaceName) {
+        query = query.ilike("content", `%"name":"${workspaceName}"%`);
+      }
+
+      const { data } = await query;
+      if (!data || data.length === 0) return null;
+
+      const workspaces = data.map(w => {
+        try { return JSON.parse(w.content); } catch { return null; }
+      }).filter(Boolean);
+
+      return workspaceName ? workspaces[0] : workspaces;
+    } catch (e) {
+      logger.warn({ component: "Workspace", err: e.message }, "Workspace load failed");
+      return null;
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // 9.7c ACTION CONFIRMATION — Require approval for risky ops
+  // Returns a confirmation request instead of executing directly
+  // ═══════════════════════════════════════════════════════════
+
+  static get RISKY_ACTIONS() {
+    return {
+      email: { risk: "medium", message: "📧 Trimite email către {to}? Subiect: {subject}" },
+      codeExec: { risk: "high", message: "⚠️ Execut cod JavaScript în sandbox? Codul poate accesa date locale." },
+      dbQuery: { risk: "medium", message: "🗄️ Interoghez baza de date? Query-ul ar putea expune date sensibile." },
+      calendarDelete: { risk: "medium", message: "🗑️ Șterg evenimentul din calendar? Acțiunea e ireversibilă." },
+    };
+  }
+
+  /**
+   * Check if an action needs user confirmation.
+   * Returns confirmation message if risky, null if safe to proceed.
+   */
+  _needsConfirmation(toolName, step, userPlan = "free") {
+    // Admin and Enterprise skip confirmations
+    if (userPlan === "admin" || userPlan === "enterprise") return null;
+
+    const risky = KelionBrain.RISKY_ACTIONS[toolName];
+    if (!risky) return null;
+
+    // Build the confirmation message with step context
+    let msg = risky.message;
+    Object.keys(step).forEach(k => {
+      msg = msg.replace(`{${k}}`, step[k] || "");
+    });
+
+    return {
+      needsConfirmation: true,
+      tool: toolName,
+      risk: risky.risk,
+      message: msg,
+      originalStep: step,
+    };
   }
 
   // 9.8 EMAIL — Send emails via environment-configured provider
