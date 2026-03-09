@@ -689,7 +689,7 @@ async function fetchRealPrices(asset, length = 300) {
     }
   }
 
-  // ── FOREX (free exchangerate-api for current + build history from daily changes) ──
+  // ── FOREX (free exchangerate-api — REAL DATA ONLY, no simulation) ──
   if (prices.length === 0 && (asset === "EUR/USD" || asset === "GBP/USD")) {
     try {
       const [base, quote] = asset.split("/");
@@ -699,21 +699,13 @@ async function fetchRealPrices(asset, length = 300) {
         const d = await r.json();
         const rate = d.rates?.[quote];
         if (rate) {
-          // Build realistic price history from current rate with tiny daily volatility
-          const volatility = rate * 0.001; // Forex has ~0.1% daily vol
-          let price = rate * (1 - volatility * length * 0.01); // Start from historical approx
-          for (let i = 0; i < length; i++) {
-            const drift = (rate - price) * 0.01; // Mean reversion
-            price += drift + (Math.random() - 0.5) * volatility;
-            prices.push(Math.round(price * 100000) / 100000);
-            volumes.push(Math.round(50000 + Math.random() * 50000));
-          }
-          // Ensure last price matches real rate
-          prices[prices.length - 1] = rate;
-          source = "ExchangeRate-API";
+          // Only real rate — no simulated history
+          prices.push(rate);
+          volumes.push(0);
+          source = "ExchangeRate-API (current only)";
           logger.info(
             { component: "Trading", asset, rate, source },
-            `💱 ${asset}: current rate ${rate} from ExchangeRate-API`,
+            `💱 ${asset}: current rate ${rate} from ExchangeRate-API (no history available)`,
           );
         }
       }
@@ -775,7 +767,7 @@ async function fetchRealPrices(asset, length = 300) {
     }
   }
 
-  // ── LAST RESORT: use last cached data or generate minimal simulation with WARNING ──
+  // ── NO SIMULATION — if all APIs fail, return error ──
   if (prices.length === 0) {
     if (cached && cached.prices.length > 0) {
       logger.warn(
@@ -788,32 +780,11 @@ async function fetchRealPrices(asset, length = 300) {
         source: cached.source + " (stale)",
       };
     }
-    // Absolute last resort — mark clearly as simulated
-    logger.warn(
+    logger.error(
       { component: "Trading", asset },
-      `⚠️ ${asset}: ALL APIs failed, using simulated fallback`,
+      `❌ ${asset}: ALL APIs failed — NO DATA AVAILABLE (zero simulation)`,
     );
-    const basePrices = {
-      BTC: 65000,
-      ETH: 3200,
-      SOL: 140,
-      "EUR/USD": 1.085,
-      "GBP/USD": 1.27,
-      "S&P 500": 5200,
-      NASDAQ: 16800,
-      Gold: 2330,
-      Oil: 83,
-    };
-    const base = basePrices[asset] || 100;
-    const vol = base * 0.02;
-    let p = base;
-    for (let i = 0; i < length; i++) {
-      p += (Math.random() - 0.5) * vol;
-      p = Math.max(p, base * 0.5);
-      prices.push(Math.round(p * 100) / 100);
-      volumes.push(Math.round(1000 + Math.random() * 9000));
-    }
-    source = "SIMULATED (APIs unavailable)";
+    return { prices: [], volumes: [], source: "NO_DATA", error: `No real data available for ${asset}` };
   }
 
   // Cache result
@@ -821,37 +792,8 @@ async function fetchRealPrices(asset, length = 300) {
   return { prices, volumes, source };
 }
 
-/** Backward-compatible sync wrapper (for routes that call generateSimulatedPrices) */
-function _generateSimulatedPrices(asset, length = 300) {
-  const cached = priceCache[`${asset}_${length}`];
-  if (cached && Date.now() - cached.ts < PRICE_CACHE_TTL) {
-    return { prices: cached.prices, volumes: cached.volumes };
-  }
-  // Sync fallback — will be replaced by async calls in routes
-  const basePrices = {
-    BTC: 65000,
-    ETH: 3200,
-    SOL: 140,
-    "EUR/USD": 1.085,
-    "GBP/USD": 1.27,
-    "S&P 500": 5200,
-    NASDAQ: 16800,
-    Gold: 2330,
-    Oil: 83,
-  };
-  const base = basePrices[asset] || 100;
-  const vol = base * 0.02;
-  const prices = [];
-  const volumes = [];
-  let p = base;
-  for (let i = 0; i < length; i++) {
-    p += (Math.random() - 0.5) * vol;
-    p = Math.max(p, base * 0.5);
-    prices.push(Math.round(p * 100) / 100);
-    volumes.push(Math.round(1000 + Math.random() * 9000));
-  }
-  return { prices, volumes };
-}
+/** NO MORE SIMULATED PRICES — removed. Use fetchRealPrices (async) instead. */
+// _generateSimulatedPrices REMOVED — zero simulation policy
 
 /** Run all technical indicators on an asset — NOW ASYNC with real data. */
 async function analyzeAsset(asset) {
@@ -867,9 +809,18 @@ async function analyzeAsset(asset) {
   const ema = calculateEMACrossover(prices);
   const fibonacci = calculateFibonacci(high, low);
   const volume = analyzeVolume(prices, volumes);
-  const sentiment = analyzeSentiment(
-    `${asset} market analysis trading signals`,
-  );
+  // Real sentiment from news — not hardcoded text
+  let sentimentText = `${asset} market`;
+  try {
+    const TI = require('./trade-intelligence');
+    if (typeof TI.fetchMarketNews === 'function') {
+      const news = await TI.fetchMarketNews(asset.includes('/') ? 'forex' : 'crypto');
+      if (news && news.length > 0) {
+        sentimentText = news.map(n => n.title || n).join(' ');
+      }
+    }
+  } catch (e) { /* trade-intelligence not available */ }
+  const sentiment = analyzeSentiment(sentimentText);
   const confluence = calculateConfluence({
     rsi,
     macd,
@@ -1032,8 +983,17 @@ router.get("/signals", async (req, res) => {
           sentiment,
         });
 
-        const stopLossPct = 0.02;
-        const takeProfitPct = 0.04;
+        // Dynamic SL/TP from ATR (volatility-based, not hardcoded)
+        const atrPeriod = Math.min(14, prices.length - 1);
+        let atr = 0;
+        if (prices.length > atrPeriod) {
+          for (let k = prices.length - atrPeriod; k < prices.length; k++) {
+            atr += Math.abs(prices[k] - prices[k - 1]);
+          }
+          atr /= atrPeriod;
+        }
+        const stopLossPct = atr > 0 ? Math.max(0.005, Math.min(0.05, (atr * 2) / last)) : 0.02;
+        const takeProfitPct = stopLossPct * 2; // R:R = 2:1
         const entry = last;
         const stop = confluence.signal.includes("BUY")
           ? Math.round(entry * (1 - stopLossPct) * 100) / 100
