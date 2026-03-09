@@ -428,10 +428,12 @@ app.locals.supabase = supabase;
 app.locals.supabaseAdmin = supabaseAdmin;
 app.locals.brain = brain;
 
-// ═══ MESSENGER + INSTAGRAM INTEGRATION ═══
+// ═══ MESSENGER + INSTAGRAM + WHATSAPP + TELEGRAM INTEGRATION ═══
 messengerBot.setSupabase(supabaseAdmin || supabase);
 instagramBot.setBrain(brain);
 instagramBot.setSupabase(supabaseAdmin || supabase);
+setWhatsappSupabase(supabaseAdmin || supabase);
+setTelegramSupabase(supabaseAdmin || supabase);
 
 app.locals.memFallback = memFallback;
 
