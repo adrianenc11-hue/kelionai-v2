@@ -302,8 +302,12 @@ router.post("/chat", chatLimiter, validate(chatSchema), async (req, res) => {
           thought.complexityLevel ? `📊 Complexitate: ${thought.complexityLevel.name} (L${thought.complexityLevel.level})` : null,
           thought.modelRoute ? `🤖 Model: ${thought.modelRoute.provider}/${thought.modelRoute.model}` : null,
           thought.truthReport?.verdict ? `🛡️ Truth Guard: ${thought.truthReport.verdict} (${Math.round((thought.truthReport.factualScore || 0) * 100)}%)` : null,
+          thought.criticReport?.verdict ? `🎭 Critic: ${thought.criticReport.verdict} (${Math.round((thought.criticReport.overallScore || 0) * 100)}%)` : null,
           `⏱️ Think: ${thought.thinkTime}ms`,
         ].filter(Boolean),
+        criticVerdict: thought.criticReport?.verdict || null,
+        criticScore: thought.criticReport?.overallScore || null,
+        criticSuggestions: (thought.criticReport?.suggestions || []).slice(0, 3),
       },
     };
     if (monitorFromReply) {
