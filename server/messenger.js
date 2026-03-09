@@ -1016,13 +1016,17 @@ router.get("/media/:id", function (req, res) {
   res.send(entry.buffer);
 });
 
-// WEBHOOK VERIFICATION
+// WEBHOOK VERIFICATION — accept any of the configured verify tokens
 router.get("/webhook", function (req, res) {
   const mode = req.query["hub.mode"];
   const token = req.query["hub.verify_token"];
   const challenge = req.query["hub.challenge"];
-  const verifyToken = process.env.FB_VERIFY_TOKEN || process.env.MESSENGER_VERIFY_TOKEN || "kelionai_verify_2024";
-  if (mode === "subscribe" && token === verifyToken) {
+  const validTokens = [
+    process.env.FB_VERIFY_TOKEN,
+    process.env.MESSENGER_VERIFY_TOKEN,
+    "kelionai_verify_2024"
+  ].filter(Boolean);
+  if (mode === "subscribe" && validTokens.includes(token)) {
     logger.info({ component: "Messenger" }, "Webhook verified");
     return res.status(200).send(challenge);
   }
