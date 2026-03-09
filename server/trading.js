@@ -801,7 +801,27 @@ async function fetchRealPrices(asset, length = 300) {
 
 /** Run all technical indicators on an asset — NOW ASYNC with real data. */
 async function analyzeAsset(asset) {
-  const { prices, volumes, source } = await fetchRealPrices(asset, 300);
+  const { prices, volumes, source, error: fetchError } = await fetchRealPrices(asset, 300);
+
+  // Guard: no data available — return safe response, don't crash
+  if (!prices || prices.length < 2) {
+    const currentPrice = prices?.[0] || 0;
+    return {
+      asset, symbol: asset, price: currentPrice,
+      signal: "HOLD", confidence: 0, changePercent: 0,
+      rsi: { value: 50, signal: "HOLD" },
+      macd: { crossSignal: "HOLD" },
+      bollinger: { signal: "HOLD" },
+      ema: { signal: "HOLD" },
+      fibonacci: { signal: "HOLD" },
+      volume: { phase: "neutral", signal: "HOLD" },
+      sentiment: { label: "neutral" },
+      confluence: { signal: "HOLD", confidence: 0 },
+      dataSource: source || "NO_DATA",
+      error: fetchError || "Insufficient price data for analysis",
+    };
+  }
+
   const high = Math.max(...prices);
   const low = Math.min(...prices);
   const last = prices[prices.length - 1];
@@ -970,6 +990,8 @@ router.get("/signals", async (req, res) => {
     const signals = allAssets
       .map((asset, idx) => {
         const { prices, volumes } = allData[idx];
+        // Guard: skip assets with no real price data
+        if (!prices || prices.length < 2) return null;
         const high = Math.max(...prices);
         const low = Math.min(...prices);
         const last = prices[prices.length - 1];
@@ -1027,7 +1049,7 @@ router.get("/signals", async (req, res) => {
           timestamp: new Date().toISOString(),
         };
       })
-      .filter((s) => s.signal !== "HOLD")
+      .filter((s) => s && s.signal !== "HOLD")
       .sort((a, b) => b.confidence - a.confidence);
 
     // ═══ PERSIST SIGNALS TO SUPABASE ═══
