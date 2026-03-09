@@ -1397,6 +1397,8 @@ Reply STRICTLY with JSON:
       needsDbQuery: false,
       dbQuestion: "",
       needsReminder: false,
+      needsCalendar: false,
+      needsDocGen: false,
       reminderText: "",
       reminderTime: "",
       needsEmail: false,
@@ -1899,6 +1901,38 @@ Reply STRICTLY with JSON:
           return { scrapeURL: urlMatch ? urlMatch[0] : "" };
         },
       },
+      // ── CALENDAR ──
+      {
+        flag: "needsCalendar",
+        triggers: [
+          /\b(calendar|eveniment|programeaz[aă]|schedule|appointment|întâlnire|meeting|adaug[aă].*calendar|ce.*am.*program|agenda|events)\b/i,
+        ],
+        extract: (text) => {
+          const timeMatch = text.match(/\b(?:pe|on|la|at|in|pentru|mâine|maine|tomorrow|azi|today|luni|marți|miercuri|joi|vineri|sâmbătă|duminică)\s*(\d{1,2}[:.]\d{2})?/i);
+          const titleMatch = text.match(/(?:programeaz[aă]|adaug[aă]|schedule|create)\s+(?:un\s+)?(?:eveniment|meeting|event)?\s*[:"']?\s*(.+?)(?:\s+(?:pe|la|on|at|pentru|mâine|maine)|\s*$)/i);
+          return {
+            calendarTitle: titleMatch ? titleMatch[1].trim() : text.substring(0, 60),
+            calendarTime: timeMatch ? timeMatch[0] : "",
+            calendarAction: /\b(list|ce am|agenda|events|arată|show)\b/i.test(text) ? "list" : "create",
+          };
+        },
+      },
+      // ── DOCUMENT GENERATION ──
+      {
+        flag: "needsDocGen",
+        triggers: [
+          /\b(genereaz[aă]|creaz[aă]|scrie|draft|generate|create)\s*(un\s+)?(document|raport|report|plan|memo|scrisoare|letter|propunere|proposal|cv|resume)\b/i,
+          /\b(f[aă].*raport|make.*report|write.*document)\b/i,
+        ],
+        extract: (text) => {
+          const titleMatch = text.match(/(?:document|raport|report|plan|memo|propunere|proposal)\s*(?:despre|about|pentru|privind|on)?\s*[:"']?\s*(.+)/i);
+          return {
+            docTitle: titleMatch ? titleMatch[1].trim().substring(0, 80) : "Document",
+            docContent: text,
+            docFormat: /\b(text|txt)\b/i.test(text) ? "text" : "markdown",
+          };
+        },
+      },
     ];
   }
 
@@ -2342,6 +2376,20 @@ Reply STRICTLY with JSON:
         plan.push({ tool: "webScrape", url: analysis.scrapeURL });
         seen.add("webScrape");
       }
+      // P3 tools: calendar, document generation
+      if (analysis.needsCalendar && !seen.has("calendarCreate") && !seen.has("calendarList")) {
+        if (analysis.calendarAction === "list") {
+          plan.push({ tool: "calendarList", userId, maxResults: 10 });
+          seen.add("calendarList");
+        } else {
+          plan.push({ tool: "calendarCreate", title: analysis.calendarTitle, startTime: analysis.calendarTime, userId });
+          seen.add("calendarCreate");
+        }
+      }
+      if (analysis.needsDocGen && !seen.has("generateDoc")) {
+        plan.push({ tool: "generateDoc", title: analysis.docTitle || "Document", content: analysis.docContent || message, format: analysis.docFormat || "markdown", userId });
+        seen.add("generateDoc");
+      }
     }
 
     // Check for known good combinations from journal
@@ -2528,6 +2576,15 @@ Reply STRICTLY with JSON:
         return this._ragSearch(step.query || "", step.userId);
       case "webScrape":
         return this._webScrape(step.url || "", true);
+      // P3 tools: calendar, document generation
+      case "calendarCreate":
+        return this._calendarCreate(step.title || "", step.startTime, step.endTime, step.description, step.userId);
+      case "calendarList":
+        return this._calendarList(step.userId, step.maxResults || 10);
+      case "calendarDelete":
+        return this._calendarDelete(step.eventId, step.userId);
+      case "generateDoc":
+        return this._generateDocument(step.title || "Report", step.content || "", step.format || "markdown", step.userId);
       default:
         return null;
     }
@@ -3205,6 +3262,257 @@ Rules:
       }
     } catch (e) {
       logger.warn({ component: "Brain", err: e.message }, "Reminder check failed");
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // 9.4b GOOGLE CALENDAR — Create, list, delete events
+  // Uses Google Calendar API with service account or API key
+  // ═══════════════════════════════════════════════════════════
+
+  /**
+   * Create a Google Calendar event.
+   * Supports natural language time parsing.
+   */
+  async _calendarCreate(title, startTime, endTime, description = "", userId = null) {
+    this.toolStats.calendarCreate = (this.toolStats.calendarCreate || 0) + 1;
+    const calKey = process.env.GOOGLE_CALENDAR_API_KEY;
+    const calId = process.env.GOOGLE_CALENDAR_ID || "primary";
+
+    if (!calKey) {
+      // Fallback: save as reminder in DB
+      logger.info({ component: "Calendar" }, "No Google Calendar API key — saving as reminder");
+      await this._scheduleReminder(userId, `📅 ${title}`, startTime, "push");
+      return { saved: true, fallback: "reminder", title, startTime, message: `📅 Am salvat "${title}" ca reminder. Configurează GOOGLE_CALENDAR_API_KEY pentru integrare completă.` };
+    }
+
+    try {
+      // Parse natural language times
+      const start = new Date(startTime || Date.now() + 3600000); // Default: +1h
+      const end = endTime ? new Date(endTime) : new Date(start.getTime() + 3600000); // Default: 1h duration
+
+      if (isNaN(start.getTime())) {
+        return { error: true, message: `Nu am putut interpreta data: "${startTime}". Încearcă format ISO (2025-03-15T14:00:00).` };
+      }
+
+      const event = {
+        summary: title,
+        description: description || `Created by KelionAI for ${userId || "user"}`,
+        start: { dateTime: start.toISOString(), timeZone: "Europe/Bucharest" },
+        end: { dateTime: end.toISOString(), timeZone: "Europe/Bucharest" },
+      };
+
+      const r = await fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calId)}/events?key=${calKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(event),
+        signal: AbortSignal.timeout(8000),
+      });
+
+      if (!r.ok) {
+        const errBody = await r.text().catch(() => "");
+        logger.warn({ component: "Calendar", status: r.status, err: errBody }, "Calendar API error");
+        // Fallback to reminder on API error
+        await this._scheduleReminder(userId, `📅 ${title}`, startTime, "push");
+        return { saved: true, fallback: "reminder", title, startTime, message: `📅 Calendar API indisponibil — salvat ca reminder: "${title}" la ${start.toLocaleString("ro-RO")}` };
+      }
+
+      const data = await r.json();
+      logger.info({ component: "Calendar", eventId: data.id, title }, `📅 Event created: ${title}`);
+
+      return {
+        created: true,
+        eventId: data.id,
+        title: data.summary,
+        start: data.start?.dateTime,
+        end: data.end?.dateTime,
+        link: data.htmlLink,
+        message: `📅 Am creat evenimentul "${title}" pe ${start.toLocaleDateString("ro-RO")} la ${start.toLocaleTimeString("ro-RO", { hour: "2-digit", minute: "2-digit" })}.`,
+      };
+    } catch (e) {
+      logger.warn({ component: "Calendar", err: e.message }, "Calendar create failed");
+      // Always fallback to reminder
+      await this._scheduleReminder(userId, `📅 ${title}`, startTime, "push").catch(() => { });
+      return { saved: true, fallback: "reminder", title, message: `📅 Salvat ca reminder: "${title}"` };
+    }
+  }
+
+  /**
+   * List upcoming Google Calendar events.
+   */
+  async _calendarList(userId = null, maxResults = 10) {
+    this.toolStats.calendarList = (this.toolStats.calendarList || 0) + 1;
+    const calKey = process.env.GOOGLE_CALENDAR_API_KEY;
+    const calId = process.env.GOOGLE_CALENDAR_ID || "primary";
+
+    if (!calKey) {
+      // Fallback: list reminders from DB
+      if (!this.supabaseAdmin) return { events: [], message: "Nu am acces la calendar." };
+      try {
+        const { data } = await this.supabaseAdmin
+          .from("brain_memory")
+          .select("content, created_at")
+          .eq("type", "reminder")
+          .order("created_at", { ascending: false })
+          .limit(maxResults);
+
+        const events = (data || []).map(r => {
+          try {
+            const p = JSON.parse(r.content);
+            return { title: p.text, time: p.triggerAt, status: p.status };
+          } catch { return null; }
+        }).filter(Boolean);
+
+        return { events, source: "reminders", message: `📋 ${events.length} reminder(e) active. Configurează GOOGLE_CALENDAR_API_KEY pentru Google Calendar.` };
+      } catch (e) {
+        return { events: [], error: e.message };
+      }
+    }
+
+    try {
+      const now = new Date().toISOString();
+      const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calId)}/events?key=${calKey}&timeMin=${now}&maxResults=${maxResults}&singleEvents=true&orderBy=startTime`;
+
+      const r = await fetch(url, { signal: AbortSignal.timeout(8000) });
+      if (!r.ok) throw new Error(`Calendar API ${r.status}`);
+
+      const data = await r.json();
+      const events = (data.items || []).map(e => ({
+        id: e.id,
+        title: e.summary,
+        start: e.start?.dateTime || e.start?.date,
+        end: e.end?.dateTime || e.end?.date,
+        description: e.description?.substring(0, 100),
+        link: e.htmlLink,
+      }));
+
+      logger.info({ component: "Calendar", count: events.length }, `📋 Listed ${events.length} events`);
+      return { events, source: "google", message: `📋 ${events.length} eveniment(e) viitoare.` };
+    } catch (e) {
+      logger.warn({ component: "Calendar", err: e.message }, "Calendar list failed");
+      return { events: [], error: e.message };
+    }
+  }
+
+  /**
+   * Delete a Google Calendar event by ID.
+   */
+  async _calendarDelete(eventId, userId = null) {
+    this.toolStats.calendarDelete = (this.toolStats.calendarDelete || 0) + 1;
+    const calKey = process.env.GOOGLE_CALENDAR_API_KEY;
+    const calId = process.env.GOOGLE_CALENDAR_ID || "primary";
+
+    if (!calKey || !eventId) {
+      return { deleted: false, message: "Nu pot șterge — lipsește API key sau event ID." };
+    }
+
+    try {
+      const r = await fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calId)}/events/${eventId}?key=${calKey}`, {
+        method: "DELETE",
+        signal: AbortSignal.timeout(8000),
+      });
+
+      if (r.status === 204 || r.ok) {
+        logger.info({ component: "Calendar", eventId }, `🗑️ Event deleted: ${eventId}`);
+        return { deleted: true, eventId, message: `🗑️ Evenimentul a fost șters.` };
+      }
+
+      return { deleted: false, message: `Calendar API a returnat ${r.status}` };
+    } catch (e) {
+      logger.warn({ component: "Calendar", err: e.message }, "Calendar delete failed");
+      return { deleted: false, error: e.message };
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // 9.4c DOCUMENT GENERATION — Create formatted reports
+  // Generates markdown/text documents from user data with AI
+  // ═══════════════════════════════════════════════════════════
+
+  /**
+   * Generate a structured document/report.
+   * Uses AI to create professional formatted content.
+   */
+  async _generateDocument(title, content, format = "markdown", userId = null) {
+    this.toolStats.generateDoc = (this.toolStats.generateDoc || 0) + 1;
+
+    try {
+      const prompt = `Generate a professional ${format} document with the following specifications:
+
+Title: ${title}
+Content/Instructions: ${content.substring(0, 2000)}
+Format: ${format}
+
+Rules:
+- Use clear headings and structure
+- Include a header with title and date (${new Date().toLocaleDateString("ro-RO")})
+- Be comprehensive but concise
+- Use Romanian if the content is in Romanian, otherwise English
+- For markdown: use proper ## headers, bullet points, tables where appropriate
+- For text: use clean formatting with separators
+
+Generate the complete document now:`;
+
+      let docContent = null;
+
+      // Try Gemini first (best for long-form content)
+      if (this.geminiKey) {
+        const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${this.geminiKey}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { maxOutputTokens: 4096, temperature: 0.3 },
+          }),
+          signal: AbortSignal.timeout(15000),
+        });
+        const d = await r.json();
+        docContent = d.candidates?.[0]?.content?.parts?.[0]?.text;
+      }
+
+      // Fallback to Groq
+      if (!docContent && this.groqKey) {
+        const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${this.groqKey}` },
+          body: JSON.stringify({
+            model: "llama-3.3-70b-versatile",
+            messages: [{ role: "user", content: prompt }],
+            max_tokens: 4096,
+            temperature: 0.3,
+          }),
+          signal: AbortSignal.timeout(15000),
+        });
+        const d = await r.json();
+        docContent = d.choices?.[0]?.message?.content;
+      }
+
+      if (!docContent) {
+        return { generated: false, message: "Nu am putut genera documentul — niciun model AI disponibil." };
+      }
+
+      // Save to brain memory for retrieval
+      if (this.supabaseAdmin && userId) {
+        await this.supabaseAdmin.from("brain_memory").insert({
+          user_id: userId,
+          type: "document",
+          content: JSON.stringify({ title, format, body: docContent.substring(0, 10000), createdAt: new Date().toISOString() }),
+        }).catch(() => { });
+      }
+
+      logger.info({ component: "DocGen", title, format, length: docContent.length }, `📄 Document generated: ${title} (${docContent.length}c)`);
+
+      return {
+        generated: true,
+        title,
+        format,
+        content: docContent,
+        length: docContent.length,
+        message: `📄 Document "${title}" generat (${format}, ${docContent.length} caractere).`,
+      };
+    } catch (e) {
+      logger.warn({ component: "DocGen", err: e.message }, "Document generation failed");
+      return { generated: false, error: e.message };
     }
   }
 
