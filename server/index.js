@@ -350,21 +350,23 @@ app.get("/admin/", (req, res) => {
   if (!_rawAdminHtml) return res.status(404).send("Admin page not found");
   res.type("html").send(_rawAdminHtml);
 });
-app.use("/admin", express.static(path.join(__dirname, "..", "app", "admin")));
-
-// Admin trading page — serve with CSP nonce injection
+// Admin trading page — serve with relaxed CSP (before express.static)
 const _rawTradingHtml = fs.existsSync(path.join(__dirname, "..", "app", "admin", "trading.html"))
   ? fs.readFileSync(path.join(__dirname, "..", "app", "admin", "trading.html"), "utf8")
   : null;
 app.get("/admin/trading.html", (req, res) => {
   if (!_rawTradingHtml) return res.status(404).send("Trading page not found");
-  const nonce = res.locals.cspNonce || "";
-  const html = _rawTradingHtml.replace(
-    /<script\b(?![^>]*\bnonce=)/g,
-    `<script nonce="${nonce}"`,
+  // Override CSP to allow inline scripts for admin pages
+  res.setHeader("Content-Security-Policy",
+    "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net; " +
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+    "font-src 'self' https://fonts.gstatic.com; " +
+    "img-src 'self' data: blob: https: http:; " +
+    "connect-src 'self' https:;"
   );
-  res.type("html").send(html);
+  res.type("html").send(_rawTradingHtml);
 });
+app.use("/admin", express.static(path.join(__dirname, "..", "app", "admin")));
 
 app.use(express.static(path.join(__dirname, "..", "app")));
 app.use("/api", globalLimiter);
