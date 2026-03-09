@@ -833,12 +833,9 @@
             const detailsEl = document.getElementById('modal-details');
             const tvSymbol = TV_SYMBOLS[symbol] || 'BINANCE:BTCUSDT';
 
-            // TradingView widget
-            chartEl.innerHTML = `<iframe src="https://s.tradingview.com/widgetembed/?hideideas=1&overrides={}" style="width:100%;height:100%;border:none;"
-                srcdoc='<html><body style="margin:0"><div class="tradingview-widget-container"><div id="tv"></div></div>
-                <script src="https://s.tradingview.com/tv.js"><\/script>
-                <script>new TradingView.widget({container_id:"tv",autosize:true,symbol:"${tvSymbol}",interval:"60",timezone:"Etc/UTC",theme:"dark",style:"1",locale:"en",toolbar_bg:"#0a0a1a",enable_publishing:false,hide_top_toolbar:false,hide_legend:false,save_image:false,backgroundColor:"#0a0a1a",gridColor:"rgba(255,255,255,0.05)"})<\/script></body></html>'
-            ></iframe>`;
+            // TradingView widget — direct embed URL (no CSP issues)
+            const tvUrl = `https://s.tradingview.com/widgetembed/?frameElementId=tv_chart&symbol=${encodeURIComponent(tvSymbol)}&interval=60&hidesidetoolbar=0&symboledit=1&saveimage=0&toolbarbg=0a0a1a&studies=[]&theme=dark&style=1&timezone=Etc%2FUTC&studies_overrides={}&overrides={}&enabled_features=[]&disabled_features=[]&locale=en&utm_source=kelionai.app&utm_medium=widget_new&utm_campaign=chart`;
+            chartEl.innerHTML = `<iframe src="${tvUrl}" style="width:100%;height:100%;border:none;" allowtransparency="true" frameborder="0" allow="autoplay; encrypted-media"></iframe>`;
 
             // Find asset data from snapshot
             const assets = snapshot.analysis?.assets || [];

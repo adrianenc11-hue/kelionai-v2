@@ -1435,6 +1435,10 @@ router.get("/risk", async (req, res) => {
     );
     const riskData = allAssets.map((asset, idx) => {
       const { prices } = allData[idx];
+      // Guard empty prices
+      if (!prices || prices.length < 5) {
+        return { asset, sharpeRatio: 0, maxDrawdown: 0, var95Pct: 0, annualizedVol: 0 };
+      }
       const returns = prices
         .slice(1)
         .map((p, i) => (p - prices[i]) / prices[i]);
@@ -1448,8 +1452,10 @@ router.get("/risk", async (req, res) => {
           ? Math.round((avgReturn / stdDev) * Math.sqrt(252) * 100) / 100
           : 0;
       const sortedReturns = [...returns].sort((a, b) => a - b);
-      const varIdx = Math.floor(returns.length * 0.05);
-      const var95 = Math.round(sortedReturns[varIdx] * 10000) / 100;
+      const varIdx = Math.max(0, Math.floor(returns.length * 0.05));
+      const var95 = sortedReturns[varIdx] ? Math.round(sortedReturns[varIdx] * 10000) / 100 : 0;
+      const varIdx99 = Math.max(0, Math.floor(returns.length * 0.01));
+      const var99 = sortedReturns[varIdx99] ? Math.round(sortedReturns[varIdx99] * 10000) / 100 : 0;
       let peak = prices[0];
       let maxDD = 0;
       prices.forEach((p) => {
@@ -1457,17 +1463,57 @@ router.get("/risk", async (req, res) => {
         const dd = (p - peak) / peak;
         if (dd < maxDD) maxDD = dd;
       });
+      // Sortino: downside deviation only
+      const negReturns = returns.filter(r => r < 0);
+      const downsideVar = negReturns.length > 0
+        ? negReturns.reduce((a, r) => a + r * r, 0) / negReturns.length
+        : 0;
+      const downsideDev = Math.sqrt(downsideVar);
+      const sortino = downsideDev > 0
+        ? Math.round((avgReturn / downsideDev) * Math.sqrt(252) * 100) / 100
+        : 0;
 
       return {
         asset,
         sharpeRatio: sharpe,
+        sortinoRatio: sortino,
         maxDrawdown: Math.round(maxDD * 10000) / 100,
         var95Pct: var95,
+        var99Pct: var99,
         annualizedVol: Math.round(stdDev * Math.sqrt(252) * 10000) / 100,
       };
     });
 
-    res.json({ risk: riskData, disclaimer: DISCLAIMER });
+    // Aggregate portfolio-level metrics
+    const validRisk = riskData.filter(r => r.sharpeRatio !== 0 || r.maxDrawdown !== 0);
+    const avgSharpe = validRisk.length > 0
+      ? +(validRisk.reduce((s, r) => s + r.sharpeRatio, 0) / validRisk.length).toFixed(2) : 0;
+    const worstDD = validRisk.length > 0
+      ? Math.min(...validRisk.map(r => r.maxDrawdown)) : 0;
+    const avgVar95 = validRisk.length > 0
+      ? +(validRisk.reduce((s, r) => s + r.var95Pct, 0) / validRisk.length).toFixed(2) : 0;
+    const avgVar99 = validRisk.length > 0
+      ? +(validRisk.reduce((s, r) => s + (r.var99Pct || 0), 0) / validRisk.length).toFixed(2) : 0;
+    const avgSortino = validRisk.length > 0
+      ? +(validRisk.reduce((s, r) => s + (r.sortinoRatio || 0), 0) / validRisk.length).toFixed(2) : 0;
+    const calmar = worstDD !== 0 ? +(avgSharpe / Math.abs(worstDD / 100)).toFixed(2) : 0;
+    const exposure = validRisk.length > 0 ? Math.round((validRisk.length / allAssets.length) * 100) : 0;
+    const riskLevel = Math.abs(worstDD) > 25 ? "HIGH" : Math.abs(worstDD) > 10 ? "MODERATE" : "LOW";
+
+    res.json({
+      // Portfolio aggregated (for dashboard)
+      sharpeRatio: avgSharpe,
+      maxDrawdown: worstDD,
+      var95: avgVar95,
+      var99: avgVar99,
+      sortinoRatio: avgSortino,
+      calmarRatio: calmar,
+      totalExposure: exposure,
+      riskLevel,
+      // Per-asset detail
+      risk: riskData,
+      disclaimer: DISCLAIMER,
+    });
   } catch (err) {
     logger.error({ err: err.message }, "[Trading] Risk error");
     res.status(500).json({ error: "Analiza de risc nu este disponibilă." });
