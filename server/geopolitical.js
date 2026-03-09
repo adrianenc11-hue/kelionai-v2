@@ -135,7 +135,7 @@ async function fetchFredData() {
     const cached = getCached("fred");
     if (cached) return cached;
 
-    const apiKey = process.env.FRED_API_KEY;
+    const apiKey = process.env.FRED_API_KEY || "6f9630a3e8524e7e2d0e74df3c4af9aa";
     // Even without API key, return known schedule
     const result = {
         indicators: {},
