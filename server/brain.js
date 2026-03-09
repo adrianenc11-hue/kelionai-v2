@@ -2596,9 +2596,16 @@ Reply STRICTLY with JSON:
     // Action confirmation check for risky operations
     const confirmCheck = this._needsConfirmation(step.tool, step, step.userPlan || "free");
     if (confirmCheck) {
-      logger.info({ component: "ActionConfirm", tool: step.tool, risk: confirmCheck.risk }, `⚠️ Risky action: ${step.tool}`);
-      // In future: this could pause and ask user. For now, log and allow with warning
-      step._riskWarning = confirmCheck.message;
+      logger.info({ component: "ActionConfirm", tool: step.tool, risk: confirmCheck.risk }, `⚠️ Blocked risky action: ${step.tool}`);
+      // BLOCK the action — return warning instead of executing
+      return {
+        blocked: true,
+        needsConfirmation: true,
+        tool: step.tool,
+        risk: confirmCheck.risk,
+        message: confirmCheck.message,
+        instruction: "Utilizatorul trebuie să confirme explicit această acțiune înainte de execuție.",
+      };
     }
 
     const timeouts = {
