@@ -297,6 +297,79 @@ body {
     }
 }
 
+/* ── Reasoning Trace (UI Transparency) ── */
+.reason-trace {
+    align-self: flex-start;
+    max-width: 85%;
+    margin-top: -8px;
+    animation: msgFadeIn 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.reason-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    background: rgba(99, 102, 241, 0.06);
+    border: 1px solid rgba(99, 102, 241, 0.1);
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.72rem;
+    color: var(--kelion-text-secondary);
+    transition: all 0.25s ease;
+    user-select: none;
+}
+
+.reason-header:hover {
+    background: rgba(99, 102, 241, 0.12);
+    border-color: rgba(99, 102, 241, 0.2);
+}
+
+.confidence-badge {
+    font-size: 0.65rem;
+    line-height: 1;
+}
+
+.reason-toggle {
+    font-size: 0.7rem;
+    opacity: 0.7;
+}
+
+.reason-arrow {
+    font-size: 0.6rem;
+    transition: transform 0.25s ease;
+    margin-left: auto;
+    opacity: 0.5;
+}
+
+.reason-trace.expanded .reason-arrow {
+    transform: rotate(90deg);
+}
+
+.reason-body {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.35s ease, padding 0.25s ease;
+    padding: 0 12px;
+}
+
+.reason-trace.expanded .reason-body {
+    max-height: 200px;
+    padding: 6px 12px 8px;
+}
+
+.trace-item {
+    font-size: 0.68rem;
+    color: var(--kelion-text-muted);
+    padding: 2px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    line-height: 1.5;
+}
+
+.trace-item:last-child {
+    border-bottom: none;
+}
+
 /* ── Input Row Premium ── */
 #input-row {
     display: flex;
