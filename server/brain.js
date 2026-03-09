@@ -83,33 +83,8 @@ class KelionBrain {
     this._profileCache = new Map(); // userId → { profile, loadedAt }
     this._profileTTL = 10 * 60 * 1000; // cache profiles for 10 min
 
-    // ── Multi-Agent Profiles ──
-    this.agents = {
-      research: {
-        name: "ResearchAgent",
-        systemPrompt: "You are a precise research analyst. Focus on facts, sources, verification. Cite sources when possible. Be thorough but concise.",
-        preferredTools: ["search", "memory"],
-        triggerTopics: ["news", "science", "history", "facts", "research"],
-      },
-      creative: {
-        name: "CreativeAgent",
-        systemPrompt: "You are a creative artist and storyteller. Use vivid language, metaphors, and imagination. Be expressive and engaging.",
-        preferredTools: ["imagine", "video"],
-        triggerTopics: ["art", "music", "story", "creative", "design", "imagine"],
-      },
-      analytics: {
-        name: "AnalyticsAgent",
-        systemPrompt: "You are a data analyst. Focus on numbers, trends, comparisons. Use structured data presentation. Be precise with statistics.",
-        preferredTools: ["search", "weather", "trade"],
-        triggerTopics: ["trading", "finance", "data", "statistics", "costs", "analysis"],
-      },
-      support: {
-        name: "SupportAgent",
-        systemPrompt: "You are a helpful support agent. Be patient, empathetic, and solution-focused. Guide users step by step.",
-        preferredTools: ["memory"],
-        triggerTopics: ["help", "error", "problem", "support", "how to", "tutorial"],
-      },
-    };
+    // ── Multi-Agent Profiles (references AGENTS static getter) ──
+    this.agents = KelionBrain.AGENTS;
 
     logger.info({ component: "Brain" },
       "🧠 Brain v3.0 initialized: LearningStore + AutonomousMonitor + MultiAgent + UserProfiles");
@@ -1032,11 +1007,12 @@ When asked "what can you do?" list these real capabilities. Use them proactively
         `🎯 Complexity: ${complexityResult.name} (L${complexityResult.level}) → ${modelRoute.provider}/${modelRoute.model} | Budget: ${budgetResult.percentUsed}%`);
 
       // Step 1.5: MULTI-AGENT — select best agent for this task
-      const agent = this._selectAgent(analysis);
-      if (agent) {
-        this._currentAgentPrompt = agent.systemPrompt;
-        logger.info({ component: "Brain", agent: agent.name }, `🤖 Delegated to ${agent.name}`);
-      }
+      const agentSelection = this._selectAgent(analysis, message);
+      this._currentAgentPrompt = agentSelection.systemPrompt || "";
+      this._currentAgentName = agentSelection.name || "General Assistant";
+      this._currentAgentIcon = agentSelection.icon || "🧠";
+      logger.info({ component: "Brain", agent: agentSelection.name, key: agentSelection.agent },
+        `${agentSelection.icon} Agent: ${agentSelection.name}`);
 
       // Step 2: DECOMPOSE complex tasks into sub-tasks
       let subTasks = [{ message, analysis }];
@@ -1287,7 +1263,7 @@ When asked "what can you do?" list these real capabilities. Use them proactively
         thinkTime,
         confidence,
         sourceTags,
-        agent: agent ? agent.name : "default",
+        agent: { name: this._currentAgentName, icon: this._currentAgentIcon, key: agentSelection?.agent || "general" },
         profileLoaded: !!profile,
         truthReport,
         criticReport,
@@ -2753,7 +2729,14 @@ Reply STRICTLY with JSON:
   // 6. CONTEXT BUILDER — Assembles enriched message
   // ═══════════════════════════════════════════════════════════
   buildEnrichedContext(message, results, chainOfThought, analysis) {
-    let ctx = message;
+    let ctx = "";
+
+    // Inject active agent's specialized prompt
+    if (this._currentAgentPrompt) {
+      ctx += `[AGENT ACTIV: ${this._currentAgentName || "Kelion"} ${this._currentAgentIcon || ""}]\n${this._currentAgentPrompt}\n\n`;
+    }
+
+    ctx += message;
 
     if (results.search)
       ctx += `\n[REZULTATE CAUTARE WEB REALE]:\n${results.search}\nFoloseste datele real. Citeaza sursele.`;
@@ -5078,7 +5061,103 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
   }
 
   // ═══════════════════════════════════════════════════════════
-  // 9.13 WEB SCRAPE — Enhanced web content extraction
+  // 9.13 MULTI-AGENT SYSTEM — Specialized agent routing
+  // Selects the best agent persona based on task type
+  // ═══════════════════════════════════════════════════════════
+
+  static get AGENTS() {
+    return {
+      general: {
+        name: "General Assistant",
+        icon: "🧠",
+        systemPrompt: "Ești Kelion, un asistent AI general. Răspunde clar, concis și prietenos.",
+        strengths: ["conversație", "întrebări generale", "recomandări"],
+      },
+      code: {
+        name: "Code Engineer",
+        icon: "💻",
+        systemPrompt: "Ești un inginer software expert. Scrie cod curat, explicat pas cu pas. Sugerează best practices, testare, și securitate. Folosește cod blocks cu syntax highlighting.",
+        strengths: ["programare", "debugging", "arhitectură", "devops"],
+      },
+      creative: {
+        name: "Creative Director",
+        icon: "🎨",
+        systemPrompt: "Ești un director creativ. Generează idei originale, texte inspirate, concepte vizuale. Gândește out-of-the-box.",
+        strengths: ["copywriting", "branding", "design", "storytelling"],
+      },
+      research: {
+        name: "Research Analyst",
+        icon: "🔍",
+        systemPrompt: "Ești un analist de cercetare. Prezintă fapte verificabile cu surse. Compară opțiuni obiectiv. Structurează informația clar.",
+        strengths: ["analiză", "comparații", "rapoarte", "fact-checking"],
+      },
+      trading: {
+        name: "Trading Analyst",
+        icon: "📈",
+        systemPrompt: "Ești un analist financiar. Analizează piețe, tendințe, indicatori tehnici. Prezintă riscuri clar. Nu da sfaturi financiare directe.",
+        strengths: ["crypto", "forex", "acțiuni", "analiză tehnică"],
+      },
+      tutor: {
+        name: "Tutor Agent",
+        icon: "📚",
+        systemPrompt: `Ești un tutore pedagogic. Regulile tale:
+1. ÎNTREABĂ ce știe deja utilizatorul despre subiect
+2. EXPLICĂ conceptele de la simplu la complex
+3. FOLOSEȘTE analogii și exemple din viața reală
+4. VERIFICĂ înțelegerea: după fiecare concept, pune o întrebare de verificare
+5. ADAPTEAZĂ nivelul: dacă utilizatorul știe deja, treci mai departe
+6. STRUCTUREAZĂ în pași: numerotează etapele clar
+7. ÎNCURAJEAZĂ: "Bravo!", "Exact!", "Aproape, dar..."
+8. La final: oferă un REZUMAT + 3 exerciții practice`,
+        strengths: ["învățare", "explicare", "tutoriale", "educație"],
+      },
+    };
+  }
+
+  /**
+   * Select the best agent for the current task based on intent analysis.
+   * Returns the agent key and metadata.
+   */
+  _selectAgent(analysis, message) {
+    const msgLower = (message || "").toLowerCase();
+
+    // Explicit tutor mode triggers
+    const tutorTriggers = [
+      "învață-mă", "explică-mi", "cum funcționează", "ce este", "ce înseamnă",
+      "teach me", "explain", "how does", "what is", "tutorial",
+      "pas cu pas", "step by step", "de la zero", "from scratch",
+      "nu înțeleg", "i don't understand", "ajută-mă să înțeleg",
+    ];
+    if (tutorTriggers.some(t => msgLower.includes(t))) {
+      return { agent: "tutor", ...KelionBrain.AGENTS.tutor };
+    }
+
+    // Code-related
+    if (analysis.needsCodeExec || /\b(cod|code|functie|function|bug|debug|api|npm|git|deploy|server|database|sql|react|node|python|javascript|css|html)\b/i.test(msgLower)) {
+      return { agent: "code", ...KelionBrain.AGENTS.code };
+    }
+
+    // Trading/finance
+    if (analysis.needsMarketData || /\b(bitcoin|btc|eth|crypto|trading|forex|acțiuni|stocks|piață|market|binance|preț|price)\b/i.test(msgLower)) {
+      return { agent: "trading", ...KelionBrain.AGENTS.trading };
+    }
+
+    // Research
+    if (analysis.needsSearch || analysis.needsRagSearch || /\b(caută|search|compară|compare|analiză|analysis|raport|report|studiu|study)\b/i.test(msgLower)) {
+      return { agent: "research", ...KelionBrain.AGENTS.research };
+    }
+
+    // Creative
+    if (analysis.needsImagine || /\b(scrie|write|text|articol|blog|slogan|brand|logo|design|creativ|creative|poveste|story)\b/i.test(msgLower)) {
+      return { agent: "creative", ...KelionBrain.AGENTS.creative };
+    }
+
+    // Default: general
+    return { agent: "general", ...KelionBrain.AGENTS.general };
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // 9.14 WEB SCRAPE — Enhanced web content extraction
   // Fetches URL, extracts text, and optionally summarizes
   // ═══════════════════════════════════════════════════════════
   async _webScrape(url, summarize = false) {
