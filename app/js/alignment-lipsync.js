@@ -14,15 +14,15 @@
     var _prevValues = {};
 
     // ── Smoothing constants ──
-    var SMOOTH_ATTACK = 0.18;    // how fast visemes open
-    var SMOOTH_RELEASE = 0.12;   // how fast visemes close
-    var COARTIC_BLEND = 0.20;    // 20% blend from previous shape
-    var ASYMMETRY_OFFSET = 0.015; // left side leads slightly
+    var SMOOTH_ATTACK = 0.30;    // FAST — lips snap to shape
+    var SMOOTH_RELEASE = 0.25;   // FAST — mouth closes quickly
+    var COARTIC_BLEND = 0.15;    // 15% blend from previous shape
+    var ASYMMETRY_OFFSET = 0.015;
 
-    // ── Clamp constants — prevents face distortion ──
-    var MAX_JAW = 0.12;
-    var MAX_VOWEL = 0.18;
-    var MAX_VISEME = 0.22;
+    // ── Clamp constants — RAISED for visible lip movement ──
+    var MAX_JAW = 0.30;          // was 0.12 — NOW VISIBLE
+    var MAX_VOWEL = 0.40;        // was 0.18 — NOW VISIBLE
+    var MAX_VISEME = 0.45;       // was 0.22 — NOW VISIBLE
 
     // ── Character → Phoneme class mapping ──
     // Groups: V_OPEN, V_MID, V_CLOSE, V_ROUND, V_TIGHT, C_BILABIAL, C_LABIO,
@@ -329,7 +329,7 @@
                 if (aidx === undefined) continue;
                 var current = mesh.morphTargetInfluences[aidx];
                 if (current > 0.001) {
-                    mesh.morphTargetInfluences[aidx] = current * 0.88; // exponential decay
+                    mesh.morphTargetInfluences[aidx] = current * 0.70; // FASTER decay
                     _prevValues[morphName] = mesh.morphTargetInfluences[aidx];
                 }
             }
