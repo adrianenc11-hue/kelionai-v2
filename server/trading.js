@@ -17,6 +17,7 @@ const tradePersist = require("./trade-persistence");
 const histLoader = require("./historical-data-loader");
 const geopolitical = require("./geopolitical");
 const investSim = require("./investment-simulator");
+const paperTrading = require("./paper-trading");
 
 const router = express.Router();
 
@@ -1855,6 +1856,29 @@ router.post("/history/load", async (req, res) => {
 // ═══ DOWNLOAD PROGRESS — live counter per asset ═══
 router.get("/history/progress", (req, res) => {
   res.json(histLoader.getProgress());
+});
+
+// ═══ PAPER TRADING — ON/OFF 24/7 automated trading ═══
+router.post("/paper/on", (req, res) => {
+  const { createClient } = require("@supabase/supabase-js");
+  const sbUrl = process.env.SUPABASE_URL || "https://nqlobybfwmtkmsqadqqr.supabase.co";
+  const sbKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5xbG9ieWJmd210a21zcWFkcXFyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTg3MzAyMiwiZXhwIjoyMDg3NDQ5MDIyfQ.AngYdhgIOXas4UssEP1ENLiZCW9CYPgecvYej3PvLOQ";
+  const sb = createClient(sbUrl, sbKey);
+  const result = paperTrading.turnOn(sb);
+  res.json(result);
+});
+
+router.post("/paper/off", (req, res) => {
+  const result = paperTrading.turnOff();
+  res.json(result);
+});
+
+router.get("/paper/status", (req, res) => {
+  res.json(paperTrading.getState());
+});
+
+router.get("/paper/history", (req, res) => {
+  res.json(paperTrading.getTradeHistory());
 });
 
 // ═══ INVESTMENT SIMULATOR — 100€ backtesting across all assets/periods ═══
