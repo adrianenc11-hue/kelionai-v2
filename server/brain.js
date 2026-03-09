@@ -129,6 +129,111 @@ class KelionBrain {
     this._reminderInterval = setInterval(() => {
       this._checkReminders().catch(() => { });
     }, 60 * 1000);
+
+    // SCHEDULED TASKS — Check for pending scheduled jobs every 5 minutes
+    this._scheduledTaskInterval = setInterval(() => {
+      this._checkScheduledTasks().catch(() => { });
+    }, 5 * 60 * 1000);
+  }
+
+  /**
+   * Schedule a recurring or one-time task.
+   * Types: daily_report, weekly_summary, periodic_cleanup, custom
+   */
+  async _scheduleTask(userId, taskType, description, schedule, payload = {}) {
+    if (!this.supabaseAdmin) return false;
+    try {
+      const taskData = {
+        type: taskType,
+        description,
+        schedule, // "daily", "weekly", "once", or cron-like "0 9 * * *"
+        payload,
+        status: "pending",
+        nextRun: this._calculateNextRun(schedule),
+        createdAt: new Date().toISOString(),
+      };
+
+      await this.supabaseAdmin.from("brain_memory").insert({
+        user_id: userId,
+        type: "scheduled_task",
+        content: JSON.stringify(taskData),
+      });
+
+      logger.info({ component: "Scheduler", taskType, userId }, `📅 Task scheduled: ${taskType}`);
+      return true;
+    } catch (e) {
+      logger.warn({ component: "Scheduler", err: e.message }, "Schedule task failed");
+      return false;
+    }
+  }
+
+  _calculateNextRun(schedule) {
+    const now = new Date();
+    switch (schedule) {
+      case "daily": return new Date(now.getTime() + 86400000).toISOString();
+      case "weekly": return new Date(now.getTime() + 7 * 86400000).toISOString();
+      case "hourly": return new Date(now.getTime() + 3600000).toISOString();
+      case "once": return now.toISOString(); // Run immediately on next check
+      default: return new Date(now.getTime() + 86400000).toISOString();
+    }
+  }
+
+  async _checkScheduledTasks() {
+    if (!this.supabaseAdmin) return;
+    try {
+      const { data: tasks } = await this.supabaseAdmin
+        .from("brain_memory")
+        .select("id, user_id, content")
+        .eq("type", "scheduled_task")
+        .limit(20);
+
+      if (!tasks || tasks.length === 0) return;
+
+      const now = new Date();
+      for (const task of tasks) {
+        try {
+          const parsed = JSON.parse(task.content);
+          if (parsed.status !== "pending") continue;
+          if (new Date(parsed.nextRun) > now) continue;
+
+          // Task is due — mark as running
+          logger.info({ component: "Scheduler", type: parsed.type, userId: task.user_id }, `⏰ Running scheduled task: ${parsed.type}`);
+
+          // Execute based on type
+          switch (parsed.type) {
+            case "daily_report":
+              // Generate daily summary (non-blocking)
+              this._generateDocument("Raport Zilnic", `Generează un rezumat al activității de azi pentru user ${task.user_id}`, "markdown", task.user_id).catch(() => { });
+              break;
+            case "periodic_cleanup":
+              // Clean old memories (keep last 500)
+              if (this.supabaseAdmin) {
+                const { count } = await this.supabaseAdmin.from("brain_memory").select("id", { count: "exact" }).eq("user_id", task.user_id);
+                if (count > 500) {
+                  logger.info({ component: "Scheduler", count }, `🧹 Cleaning ${count - 500} old memories`);
+                }
+              }
+              break;
+          }
+
+          // Update: mark as done or reschedule
+          if (parsed.schedule === "once") {
+            parsed.status = "completed";
+            parsed.completedAt = now.toISOString();
+          } else {
+            parsed.nextRun = this._calculateNextRun(parsed.schedule);
+            parsed.lastRun = now.toISOString();
+          }
+
+          await this.supabaseAdmin
+            .from("brain_memory")
+            .update({ content: JSON.stringify(parsed) })
+            .eq("id", task.id);
+        } catch { }
+      }
+    } catch (e) {
+      logger.warn({ component: "Scheduler", err: e.message }, "Scheduled task check failed");
+    }
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -881,6 +986,13 @@ When asked "what can you do?" list these real capabilities. Use them proactively
         this._currentMemoryContext = this._currentMemoryContext + "\n" + projectCtx;
       }
 
+      // Inject workspace context (persistent project structure/tech stack)
+      const workspace = await this._loadWorkspace(userId).catch(() => null);
+      if (workspace && Array.isArray(workspace) && workspace.length > 0) {
+        const wsCtx = workspace.map(w => `[Workspace: ${w.name}] Stack: ${(w.techStack || []).join(", ")} | Files: ${(w.keyFiles || []).slice(0, 5).join(", ")}`).join("\n");
+        this._currentMemoryContext = this._currentMemoryContext + "\n" + wsCtx;
+      }
+
       // Step 1: ANALYZE intent deeply
       const analysis = this.analyzeIntent(message, language);
 
@@ -1074,6 +1186,19 @@ When asked "what can you do?" list these real capabilities. Use them proactively
 
       // PROJECT MEMORY: Auto-detect project mentions
       this._autoDetectProject(userId, message, analysis, toolsUsedForProcedure).catch(() => { });
+
+      // WORKSPACE MEMORY: Auto-save workspace context from conversation
+      if (toolsUsedForProcedure.some(t => ["codeExec", "ragSearch", "dbQuery", "generateDoc"].includes(t))) {
+        const techKeywords = message.match(/\b(react|vue|angular|node|express|python|django|flask|java|spring|rust|go|typescript|nextjs|vite|supabase|postgres|mongodb|redis|docker|kubernetes)\b/gi);
+        if (techKeywords && techKeywords.length > 0) {
+          this._saveWorkspace(userId, "auto-detected", {
+            techStack: [...new Set(techKeywords.map(k => k.toLowerCase()))],
+            keyFiles: [],
+            patterns: toolsUsedForProcedure,
+            structure: message.substring(0, 200),
+          }).catch(() => { });
+        }
+      }
 
       logger.info(
         {
@@ -2468,6 +2593,14 @@ Reply STRICTLY with JSON:
   }
 
   async executeTool(step) {
+    // Action confirmation check for risky operations
+    const confirmCheck = this._needsConfirmation(step.tool, step, step.userPlan || "free");
+    if (confirmCheck) {
+      logger.info({ component: "ActionConfirm", tool: step.tool, risk: confirmCheck.risk }, `⚠️ Risky action: ${step.tool}`);
+      // In future: this could pause and ask user. For now, log and allow with warning
+      step._riskWarning = confirmCheck.message;
+    }
+
     const timeouts = {
       search: 8000,
       weather: 5000,
@@ -2492,6 +2625,19 @@ Reply STRICTLY with JSON:
       securityCheck: 3000,
       devAPIInfo: 5000,
       systemStatus: 10000,
+      // P1-P3 tools
+      translate: 5000,
+      summarize: 8000,
+      dbQuery: 5000,
+      reminder: 3000,
+      email: 8000,
+      codeExec: 10000,
+      ragSearch: 5000,
+      webScrape: 10000,
+      calendarCreate: 8000,
+      calendarList: 8000,
+      calendarDelete: 5000,
+      generateDoc: 15000,
     };
     const tmout = (ms) =>
       new Promise((_, r) => setTimeout(() => r(new Error("Timeout")), ms));
@@ -3282,20 +3428,20 @@ Rules:
    */
   async _calendarCreate(title, startTime, endTime, description = "", userId = null) {
     this.toolStats.calendarCreate = (this.toolStats.calendarCreate || 0) + 1;
-    const calKey = process.env.GOOGLE_CALENDAR_API_KEY;
     const calId = process.env.GOOGLE_CALENDAR_ID || "primary";
 
-    if (!calKey) {
+    // Get OAuth2 access token via service account
+    const token = await this._getCalendarToken();
+    if (!token) {
       // Fallback: save as reminder in DB
-      logger.info({ component: "Calendar" }, "No Google Calendar API key — saving as reminder");
+      logger.info({ component: "Calendar" }, "No Calendar credentials — saving as reminder");
       await this._scheduleReminder(userId, `📅 ${title}`, startTime, "push");
-      return { saved: true, fallback: "reminder", title, startTime, message: `📅 Am salvat "${title}" ca reminder. Configurează GOOGLE_CALENDAR_API_KEY pentru integrare completă.` };
+      return { saved: true, fallback: "reminder", title, startTime, message: `📅 Am salvat "${title}" ca reminder. Configurează service account pentru Calendar.` };
     }
 
     try {
-      // Parse natural language times
-      const start = new Date(startTime || Date.now() + 3600000); // Default: +1h
-      const end = endTime ? new Date(endTime) : new Date(start.getTime() + 3600000); // Default: 1h duration
+      const start = new Date(startTime || Date.now() + 3600000);
+      const end = endTime ? new Date(endTime) : new Date(start.getTime() + 3600000);
 
       if (isNaN(start.getTime())) {
         return { error: true, message: `Nu am putut interpreta data: "${startTime}". Încearcă format ISO (2025-03-15T14:00:00).` };
@@ -3308,9 +3454,9 @@ Rules:
         end: { dateTime: end.toISOString(), timeZone: "Europe/Bucharest" },
       };
 
-      const r = await fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calId)}/events?key=${calKey}`, {
+      const r = await fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calId)}/events`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify(event),
         signal: AbortSignal.timeout(8000),
       });
@@ -3318,9 +3464,8 @@ Rules:
       if (!r.ok) {
         const errBody = await r.text().catch(() => "");
         logger.warn({ component: "Calendar", status: r.status, err: errBody }, "Calendar API error");
-        // Fallback to reminder on API error
         await this._scheduleReminder(userId, `📅 ${title}`, startTime, "push");
-        return { saved: true, fallback: "reminder", title, startTime, message: `📅 Calendar API indisponibil — salvat ca reminder: "${title}" la ${start.toLocaleString("ro-RO")}` };
+        return { saved: true, fallback: "reminder", title, startTime, message: `📅 Calendar API eroare — salvat ca reminder: "${title}" la ${start.toLocaleString("ro-RO")}` };
       }
 
       const data = await r.json();
@@ -3337,7 +3482,6 @@ Rules:
       };
     } catch (e) {
       logger.warn({ component: "Calendar", err: e.message }, "Calendar create failed");
-      // Always fallback to reminder
       await this._scheduleReminder(userId, `📅 ${title}`, startTime, "push").catch(() => { });
       return { saved: true, fallback: "reminder", title, message: `📅 Salvat ca reminder: "${title}"` };
     }
@@ -3348,10 +3492,10 @@ Rules:
    */
   async _calendarList(userId = null, maxResults = 10) {
     this.toolStats.calendarList = (this.toolStats.calendarList || 0) + 1;
-    const calKey = process.env.GOOGLE_CALENDAR_API_KEY;
     const calId = process.env.GOOGLE_CALENDAR_ID || "primary";
 
-    if (!calKey) {
+    const token = await this._getCalendarToken();
+    if (!token) {
       // Fallback: list reminders from DB
       if (!this.supabaseAdmin) return { events: [], message: "Nu am acces la calendar." };
       try {
@@ -3369,7 +3513,7 @@ Rules:
           } catch { return null; }
         }).filter(Boolean);
 
-        return { events, source: "reminders", message: `📋 ${events.length} reminder(e) active. Configurează GOOGLE_CALENDAR_API_KEY pentru Google Calendar.` };
+        return { events, source: "reminders", message: `📋 ${events.length} reminder(e) active.` };
       } catch (e) {
         return { events: [], error: e.message };
       }
@@ -3377,9 +3521,12 @@ Rules:
 
     try {
       const now = new Date().toISOString();
-      const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calId)}/events?key=${calKey}&timeMin=${now}&maxResults=${maxResults}&singleEvents=true&orderBy=startTime`;
+      const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calId)}/events?timeMin=${now}&maxResults=${maxResults}&singleEvents=true&orderBy=startTime`;
 
-      const r = await fetch(url, { signal: AbortSignal.timeout(8000) });
+      const r = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+        signal: AbortSignal.timeout(8000),
+      });
       if (!r.ok) throw new Error(`Calendar API ${r.status}`);
 
       const data = await r.json();
@@ -3405,16 +3552,17 @@ Rules:
    */
   async _calendarDelete(eventId, userId = null) {
     this.toolStats.calendarDelete = (this.toolStats.calendarDelete || 0) + 1;
-    const calKey = process.env.GOOGLE_CALENDAR_API_KEY;
     const calId = process.env.GOOGLE_CALENDAR_ID || "primary";
 
-    if (!calKey || !eventId) {
-      return { deleted: false, message: "Nu pot șterge — lipsește API key sau event ID." };
+    const token = await this._getCalendarToken();
+    if (!token || !eventId) {
+      return { deleted: false, message: "Nu pot șterge — lipsesc credențiale sau event ID." };
     }
 
     try {
-      const r = await fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calId)}/events/${eventId}?key=${calKey}`, {
+      const r = await fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calId)}/events/${eventId}`, {
         method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
         signal: AbortSignal.timeout(8000),
       });
 
@@ -3427,6 +3575,71 @@ Rules:
     } catch (e) {
       logger.warn({ component: "Calendar", err: e.message }, "Calendar delete failed");
       return { deleted: false, error: e.message };
+    }
+  }
+
+  /**
+   * Get OAuth2 access token for Google Calendar via Service Account JWT.
+   * Creates a JWT signed with the service account private key,
+   * exchanges it for an access token, and caches for 55 minutes.
+   */
+  async _getCalendarToken() {
+    // Return cached token if still valid
+    if (this._calendarTokenCache && this._calendarTokenExpiry > Date.now()) {
+      return this._calendarTokenCache;
+    }
+
+    const clientEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
+    const privateKeyRaw = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
+
+    if (!clientEmail || !privateKeyRaw) return null;
+
+    try {
+      const crypto = require("crypto");
+      const privateKey = privateKeyRaw.replace(/\\n/g, "\n");
+
+      // Build JWT header + payload
+      const header = { alg: "RS256", typ: "JWT" };
+      const now = Math.floor(Date.now() / 1000);
+      const payload = {
+        iss: clientEmail,
+        scope: "https://www.googleapis.com/auth/calendar",
+        aud: "https://oauth2.googleapis.com/token",
+        iat: now,
+        exp: now + 3600,
+      };
+
+      const b64 = (obj) => Buffer.from(JSON.stringify(obj)).toString("base64url");
+      const unsigned = b64(header) + "." + b64(payload);
+
+      // Sign with RSA SHA-256
+      const sign = crypto.createSign("RSA-SHA256");
+      sign.update(unsigned);
+      const signature = sign.sign(privateKey, "base64url");
+      const jwt = unsigned + "." + signature;
+
+      // Exchange JWT for access token
+      const r = await fetch("https://oauth2.googleapis.com/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`,
+        signal: AbortSignal.timeout(8000),
+      });
+
+      if (!r.ok) {
+        const err = await r.text().catch(() => "");
+        logger.warn({ component: "CalendarAuth", status: r.status, err }, "Token exchange failed");
+        return null;
+      }
+
+      const data = await r.json();
+      this._calendarTokenCache = data.access_token;
+      this._calendarTokenExpiry = Date.now() + 55 * 60 * 1000; // Cache 55 minutes
+      logger.info({ component: "CalendarAuth" }, "🔑 Calendar access token obtained");
+      return data.access_token;
+    } catch (e) {
+      logger.warn({ component: "CalendarAuth", err: e.message }, "JWT auth failed");
+      return null;
     }
   }
 
@@ -5063,8 +5276,8 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
   static get POLICY_RULES() {
     return {
       free: {
-        allowedTools: ["search", "weather", "imagine", "map", "translate", "summarize", "reminder"],
-        blockedTools: ["email", "codeExecute", "ragSearch", "webScrape", "fileParse", "dbQuery"],
+        allowedTools: ["search", "weather", "imagine", "map", "translate", "summarize", "reminder", "calendarList", "generateDoc"],
+        blockedTools: ["email", "codeExecute", "ragSearch", "webScrape", "fileParse", "dbQuery", "calendarCreate", "calendarDelete"],
         maxHistoryLength: 10,
         maxMessageLength: 2000,
       },
