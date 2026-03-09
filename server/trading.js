@@ -16,6 +16,7 @@ const perfTracker = require("./performance-tracker");
 const tradePersist = require("./trade-persistence");
 const histLoader = require("./historical-data-loader");
 const geopolitical = require("./geopolitical");
+const investSim = require("./investment-simulator");
 
 const router = express.Router();
 
@@ -76,6 +77,63 @@ try {
         .then(r => logger.info({ riskScore: r.currentRisk?.riskScore, level: r.currentRisk?.riskLevel }, "[BrainScan] Geopolitical scan complete"))
         .catch(e => logger.debug({ err: e.message }, "[BrainScan] Scan failed"));
     }, 15 * 60 * 1000);
+
+    // AUTO-RESEARCH: Run investment simulation every 6 hours
+    // Results saved as per-asset rules to Supabase
+    const RESEARCH_MS = 6 * 60 * 60 * 1000; // 6 hours
+    const runResearch = async () => {
+      try {
+        logger.info("[AutoResearch] Starting investment simulation...");
+        const simResults = await investSim.runFullSimulation(sb);
+
+        // Save per-asset rules to Supabase with lifecycle tracking
+        if (simResults.brainRules && simResults.brainRules.length > 0) {
+          for (const rule of simResults.brainRules) {
+            // Check if rule exists — to promote status
+            const { data: existing } = await sb
+              .from("trading_brain_rules")
+              .select("*")
+              .eq("rule_name", rule.rule)
+              .eq("asset", rule.asset)
+              .limit(1)
+              .catch(() => ({ data: null }));
+
+            const promoted = investSim.updateRuleStatus(existing?.[0], rule);
+
+            await sb.from("trading_brain_rules").upsert({
+              rule_name: promoted.rule,
+              asset: promoted.asset,
+              type: promoted.type,
+              description: promoted.description,
+              action: promoted.action,
+              status: promoted.status, // POTENTIAL → TESTING → CONFIRMED
+              confirmations: promoted.confirmations,
+              source: "auto_research",
+              simulation_data: JSON.stringify(promoted.data),
+              first_seen: promoted.first_seen,
+              last_confirmed: promoted.last_confirmed,
+              updated_at: new Date().toISOString(),
+            }, { onConflict: "rule_name,asset" }).catch(() => {
+              // Table might not exist yet
+            });
+          }
+          const statusCounts = { POTENTIAL: 0, TESTING: 0, CONFIRMED: 0 };
+          simResults.brainRules.forEach(r => statusCounts[r.status] = (statusCounts[r.status] || 0) + 1);
+          logger.info({ rules: simResults.brainRules.length, ...statusCounts }, "[AutoResearch] Rules saved");
+        }
+
+        logger.info({
+          assets: Object.keys(simResults.simulation || {}).length,
+          bestReturn: simResults.bestStrategies?.[0]?.returnPct,
+          rulesGenerated: simResults.brainRules?.length,
+        }, "[AutoResearch] Simulation complete");
+      } catch (e) {
+        logger.error({ err: e.message }, "[AutoResearch] Simulation failed");
+      }
+    };
+    // First research run 5 min after boot (after data collection starts)
+    setTimeout(runResearch, 5 * 60 * 1000);
+    setInterval(runResearch, RESEARCH_MS);
   }
 } catch (e) {
   logger.warn("[Trading] Historical loader init failed: " + e.message);
@@ -1795,6 +1853,57 @@ router.post("/history/load", async (req, res) => {
 // ═══ DOWNLOAD PROGRESS — live counter per asset ═══
 router.get("/history/progress", (req, res) => {
   res.json(histLoader.getProgress());
+});
+
+// ═══ INVESTMENT SIMULATOR — 100€ backtesting across all assets/periods ═══
+router.get("/simulate", async (req, res) => {
+  try {
+    const { createClient } = require("@supabase/supabase-js");
+    if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      return res.json({ error: "Supabase not configured", simulation: {} });
+    }
+    const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+    const results = await investSim.runFullSimulation(sb);
+    res.json(results);
+  } catch (e) {
+    logger.error({ err: e.message }, "[Simulate] Simulation failed");
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ═══ BRAIN RULES — per-asset rules accumulated from auto-research ═══
+router.get("/brain-rules", async (req, res) => {
+  try {
+    const { createClient } = require("@supabase/supabase-js");
+    if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      return res.json({ rules: [], note: "Supabase not configured" });
+    }
+    const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+    const { data, error } = await sb
+      .from("trading_brain_rules")
+      .select("*")
+      .order("confirmations", { ascending: false });
+
+    if (error) return res.json({ rules: [], error: error.message });
+
+    // Group by status
+    const grouped = {
+      CONFIRMED: (data || []).filter(r => r.status === "CONFIRMED"),
+      TESTING: (data || []).filter(r => r.status === "TESTING"),
+      POTENTIAL: (data || []).filter(r => r.status === "POTENTIAL"),
+    };
+
+    res.json({
+      rules: data || [],
+      grouped,
+      totalRules: (data || []).length,
+      confirmed: grouped.CONFIRMED.length,
+      testing: grouped.TESTING.length,
+      potential: grouped.POTENTIAL.length,
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // ═══ HISTORICAL DATA SUMMARY ═══
