@@ -48,7 +48,7 @@ const CACHE_TTL_MS = 5 * 60 * 1000;
 // Init Supabase tables for trading persistence
 tradePersist.ensureTables().catch(() => { });
 
-// Init historical data loader with Supabase
+// Init historical data loader with Supabase + AUTO-LEARNING
 try {
   const { createClient } = require("@supabase/supabase-js");
   if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -56,6 +56,26 @@ try {
     histLoader.init(sb);
     histLoader.ensureTable().catch(() => { });
     logger.info("[Trading] Historical data loader initialized");
+
+    // AUTO-LEARNING: Collect new price data every 24 hours
+    const DAY_MS = 24 * 60 * 60 * 1000;
+    setTimeout(() => {
+      histLoader.loadAllHistory()
+        .then(r => logger.info({ assets: Object.keys(r.assets || {}).length }, "[AutoLearn] Daily data collection complete"))
+        .catch(e => logger.error({ err: e.message }, "[AutoLearn] Daily collection failed"));
+    }, 60000); // First run 1 min after boot
+    setInterval(() => {
+      histLoader.loadAllHistory()
+        .then(r => logger.info({ assets: Object.keys(r.assets || {}).length }, "[AutoLearn] Daily data collection complete"))
+        .catch(e => logger.error({ err: e.message }, "[AutoLearn] Daily collection failed"));
+    }, DAY_MS);
+
+    // BRAIN SCAN: Geopolitical risk check every 15 minutes
+    setInterval(() => {
+      geopolitical.brainScan()
+        .then(r => logger.info({ riskScore: r.currentRisk?.riskScore, level: r.currentRisk?.riskLevel }, "[BrainScan] Geopolitical scan complete"))
+        .catch(e => logger.debug({ err: e.message }, "[BrainScan] Scan failed"));
+    }, 15 * 60 * 1000);
   }
 } catch (e) {
   logger.warn("[Trading] Historical loader init failed: " + e.message);

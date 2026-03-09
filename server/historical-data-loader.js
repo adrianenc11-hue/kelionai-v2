@@ -93,26 +93,30 @@ async function fetchYahooHistory(assetName) {
     const sinceEpoch = Math.floor(new Date(config.since).getTime() / 1000);
     const nowEpoch = Math.floor(Date.now() / 1000);
 
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${config.symbol}?period1=${sinceEpoch}&period2=${nowEpoch}&interval=1d&includePrePost=false`;
+    // URL-encode the symbol properly (= → %3D, ^ → %5E)
+    const encodedSymbol = encodeURIComponent(config.symbol);
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodedSymbol}?period1=${sinceEpoch}&period2=${nowEpoch}&interval=1d&includePrePost=false`;
 
-    logger.info(`Fetching ${assetName} history from ${config.since}...`);
+    logger.info({ asset: assetName, symbol: config.symbol, encodedSymbol, since: config.since }, `Fetching ${assetName} history...`);
 
     try {
         const res = await fetch(url, {
             headers: {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
             },
+            signal: AbortSignal.timeout(30000), // 30s timeout per asset
         });
 
         if (!res.ok) {
-            logger.error(`Yahoo returned ${res.status} for ${assetName}`);
+            const body = await res.text().catch(() => "");
+            logger.error({ asset: assetName, status: res.status, body: body.slice(0, 200) }, `Yahoo returned ${res.status} for ${assetName}`);
             return [];
         }
 
         const json = await res.json();
         const result = json.chart?.result?.[0];
         if (!result || !result.timestamp) {
-            logger.warn(`No data for ${assetName}`);
+            logger.warn({ asset: assetName, chartError: json.chart?.error }, `No data for ${assetName}`);
             return [];
         }
 
@@ -140,10 +144,10 @@ async function fetchYahooHistory(assetName) {
             });
         }
 
-        logger.info(`${assetName}: ${rows.length} daily candles (${config.since} → today)`);
+        logger.info({ asset: assetName, count: rows.length, from: rows[0]?.date, to: rows[rows.length - 1]?.date }, `${assetName}: ${rows.length} daily candles`);
         return rows;
     } catch (e) {
-        logger.error({ err: e.message }, `Failed fetching ${assetName}`);
+        logger.error({ err: e.message, asset: assetName }, `Failed fetching ${assetName}`);
         return [];
     }
 }
