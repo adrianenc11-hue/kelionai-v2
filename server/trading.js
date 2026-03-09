@@ -1003,18 +1003,39 @@ async function analyzeAsset(asset) {
   const ema = calculateEMACrossover(prices);
   const fibonacci = calculateFibonacci(high, low);
   const volume = analyzeVolume(prices, volumes);
+
   // Real sentiment from news — not hardcoded text
   let sentimentText = `${asset} market`;
+  let newsHeadlines = [];
   try {
     const TI = require('./trade-intelligence');
     if (typeof TI.fetchMarketNews === 'function') {
       const news = await TI.fetchMarketNews(asset.includes('/') ? 'forex' : 'crypto');
       if (news && news.length > 0) {
-        sentimentText = news.map(n => n.title || n).join(' ');
+        newsHeadlines = news.map(n => n.title || n);
+        sentimentText = newsHeadlines.join(' ');
       }
     }
   } catch (e) { /* trade-intelligence not available */ }
   const sentiment = analyzeSentiment(sentimentText);
+
+  // ── NEW TOOLS: Open Interest, Whale Detection, Enhanced Sentiment ──
+  let openInterest = null;
+  let whaleActivity = null;
+  let enhancedSentiment = null;
+
+  try {
+    [openInterest, whaleActivity] = await Promise.all([
+      fetchOpenInterest(asset),
+      detectWhaleActivity(asset),
+    ]);
+    if (newsHeadlines.length > 0) {
+      enhancedSentiment = enhancedSentimentScore(newsHeadlines);
+    }
+  } catch (e) {
+    logger.debug({ asset, err: e.message }, "Advanced tools partial failure");
+  }
+
   const confluence = calculateConfluence({
     rsi,
     macd,
@@ -1043,6 +1064,9 @@ async function analyzeAsset(asset) {
     fibonacci,
     volume,
     sentiment,
+    openInterest,
+    whaleActivity,
+    enhancedSentiment,
     confluence,
     dataSource: source,
   };
