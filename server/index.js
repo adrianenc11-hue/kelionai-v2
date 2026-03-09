@@ -99,6 +99,8 @@ app.use((req, res, next) => {
 });
 
 app.use((req, res, next) => {
+  // Skip Helmet CSP for admin pages (they need inline scripts)
+  if (req.path.startsWith("/admin")) return next();
   helmet({
     contentSecurityPolicy: {
       directives: {
