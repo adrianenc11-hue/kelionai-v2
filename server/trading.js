@@ -14,6 +14,7 @@ const marketLearner = require("./market-learner");
 const aiScorer = require("./ai-scoring");
 const perfTracker = require("./performance-tracker");
 const tradePersist = require("./trade-persistence");
+const histLoader = require("./historical-data-loader");
 
 const router = express.Router();
 
@@ -45,6 +46,19 @@ const CACHE_TTL_MS = 5 * 60 * 1000;
 
 // Init Supabase tables for trading persistence
 tradePersist.ensureTables().catch(() => { });
+
+// Init historical data loader with Supabase
+try {
+  const { createClient } = require("@supabase/supabase-js");
+  if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+    histLoader.init(sb);
+    histLoader.ensureTable().catch(() => { });
+    logger.info("[Trading] Historical data loader initialized");
+  }
+} catch (e) {
+  logger.warn("[Trading] Historical loader init failed: " + e.message);
+}
 
 // ═══ HISTORY ═══
 const analysisHistory = [];
@@ -1526,6 +1540,43 @@ router.get("/history", (req, res) => {
     history: analysisHistory.slice(-20),
     total: analysisHistory.length,
   });
+});
+
+// ═══ LOAD FULL HISTORICAL DATA FROM YAHOO FINANCE → SUPABASE ═══
+router.post("/history/load", async (req, res) => {
+  try {
+    res.json({ status: "loading", message: "Historical data import started in background" });
+    // Run in background — don't block the response
+    histLoader.loadAllHistory().then(result => {
+      logger.info({ result: JSON.stringify(result).slice(0, 500) }, "[Trading] Historical data load complete");
+    }).catch(e => {
+      logger.error({ err: e.message }, "[Trading] Historical data load failed");
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ═══ HISTORICAL DATA SUMMARY ═══
+router.get("/history/summary", async (req, res) => {
+  try {
+    const summary = await histLoader.getHistorySummary();
+    res.json({ summary, source: "supabase" });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ═══ HISTORICAL PRICES FOR SPECIFIC ASSET ═══
+router.get("/history/prices/:asset", async (req, res) => {
+  try {
+    const asset = decodeURIComponent(req.params.asset);
+    const limit = parseInt(req.query.limit) || null;
+    const data = await histLoader.getHistory(asset, limit);
+    res.json({ asset, count: data.length, prices: data });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // ═══ SUPABASE FULL HISTORY — all data since account creation ═══
