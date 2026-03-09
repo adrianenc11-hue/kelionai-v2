@@ -882,13 +882,36 @@ When asked "what can you do?" list these real capabilities. Use them proactively
       const complexityResult = this._scoreComplexity(analysis, message);
       analysis.complexity = complexityResult.name;
       analysis.complexityLevel = complexityResult.level;
-      const modelRoute = this._routeModel(complexityResult);
+      let modelRoute = this._routeModel(complexityResult);
+
+      // Step 1c: COST GUARDRAILS — check budget and auto-downgrade if needed
+      const userPlan = isAdmin ? "admin" : (profile?.plan || "free");
+      const budgetResult = await this._checkBudget(userId, userPlan).catch(() => ({
+        allowed: true, remaining: 999, percentUsed: 0, shouldDowngrade: false, maxToolsPerMsg: 10
+      }));
+
+      if (!budgetResult.allowed) {
+        logger.warn({ component: "CostGuardrails", userId, plan: userPlan }, "💰 Budget exceeded — blocking");
+        return {
+          enrichedMessage: "⚠️ Ai depășit limita zilnică de utilizare. Răspunsurile vor fi disponibile mâine, sau poți face upgrade la un plan superior.",
+          toolsUsed: [], monitor: { content: "" }, analysis, chainOfThought: null,
+          compressedHistory: history.slice(-5), failedTools: [], thinkTime: Date.now() - start,
+          confidence: 0, sourceTags: ["BUDGET_EXCEEDED"], agent: "default", profileLoaded: !!profile,
+          truthReport: null, criticReport: null, complexityLevel: complexityResult, modelRoute,
+        };
+      }
+
+      // Auto-downgrade model if budget > 80%
+      if (budgetResult.shouldDowngrade) {
+        modelRoute = this._autoDowngrade(modelRoute, budgetResult);
+      }
 
       logger.info({
         component: "Brain", complexity: complexityResult.name, level: complexityResult.level,
-        model: modelRoute.provider, reasoning: complexityResult.reasoning
+        model: modelRoute.provider, reasoning: complexityResult.reasoning,
+        budget: budgetResult.percentUsed + "%", downgraded: !!modelRoute.downgraded
       },
-        `🎯 Complexity: ${complexityResult.name} (L${complexityResult.level}) → ${modelRoute.provider}/${modelRoute.model}`);
+        `🎯 Complexity: ${complexityResult.name} (L${complexityResult.level}) → ${modelRoute.provider}/${modelRoute.model} | Budget: ${budgetResult.percentUsed}%`);
 
       // Step 1.5: MULTI-AGENT — select best agent for this task
       const agent = this._selectAgent(analysis);
@@ -925,6 +948,16 @@ When asked "what can you do?" list these real capabilities. Use them proactively
         }
         return true;
       });
+
+      // Step 3b: POLICY ENGINE — filter tools by user plan
+      plan = this._filterPlanByPolicy(plan, userPlan, isAdmin);
+
+      // Step 3c: Limit tools per message based on plan
+      if (plan.length > budgetResult.maxToolsPerMsg) {
+        logger.info({ component: "PolicyEngine", before: plan.length, max: budgetResult.maxToolsPerMsg },
+          `✂️ Trimming plan: ${plan.length} → ${budgetResult.maxToolsPerMsg} tools (${userPlan} plan)`);
+        plan = plan.slice(0, budgetResult.maxToolsPerMsg);
+      }
 
       // ═══ AGENTIC LOOP — Multi-turn tool chaining ═══
       // Brain can iterate: execute → reflect → re-plan → execute again
@@ -4487,6 +4520,185 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
         "ok — ai_costs insert failed",
       );
     }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // 9.9 COST GUARDRAILS — Budget limits and cost-aware routing
+  // Prevents runaway costs with per-user daily/monthly budgets
+  // ═══════════════════════════════════════════════════════════
+
+  static get BUDGET_LIMITS() {
+    return {
+      free: { dailyUsd: 0.05, monthlyUsd: 1.0, maxToolsPerMsg: 3, label: "Free" },
+      pro: { dailyUsd: 0.50, monthlyUsd: 10.0, maxToolsPerMsg: 8, label: "Pro" },
+      enterprise: { dailyUsd: 5.00, monthlyUsd: 100.0, maxToolsPerMsg: 20, label: "Enterprise" },
+      admin: { dailyUsd: 50.0, monthlyUsd: 500.0, maxToolsPerMsg: 50, label: "Admin" },
+    };
+  }
+
+  /**
+   * Get total cost for a user today from ai_costs table.
+   * Returns: { totalUsd, callCount }
+   */
+  async _getDailyCost(userId) {
+    if (!this.supabaseAdmin || !userId) return { totalUsd: 0, callCount: 0 };
+    try {
+      const todayStart = new Date();
+      todayStart.setUTCHours(0, 0, 0, 0);
+
+      const { data, error } = await this.supabaseAdmin
+        .from("ai_costs")
+        .select("cost_usd")
+        .eq("user_id", userId)
+        .gte("created_at", todayStart.toISOString());
+
+      if (error) throw error;
+      const totalUsd = (data || []).reduce((sum, r) => sum + (r.cost_usd || 0), 0);
+      return { totalUsd, callCount: (data || []).length };
+    } catch (e) {
+      logger.warn({ component: "CostGuardrails", err: e.message }, "getDailyCost failed");
+      return { totalUsd: 0, callCount: 0 };
+    }
+  }
+
+  /**
+   * Check if user is within their budget.
+   * Returns: { allowed, remaining, percentUsed, plan, shouldDowngrade }
+   */
+  async _checkBudget(userId, plan = "free") {
+    const limits = KelionBrain.BUDGET_LIMITS[plan] || KelionBrain.BUDGET_LIMITS.free;
+    const { totalUsd, callCount } = await this._getDailyCost(userId);
+    const remaining = Math.max(0, limits.dailyUsd - totalUsd);
+    const percentUsed = limits.dailyUsd > 0 ? (totalUsd / limits.dailyUsd) * 100 : 0;
+
+    const result = {
+      allowed: totalUsd < limits.dailyUsd,
+      remaining: remaining,
+      percentUsed: Math.round(percentUsed),
+      totalUsd: totalUsd,
+      dailyLimit: limits.dailyUsd,
+      plan: limits.label,
+      callCount,
+      shouldDowngrade: percentUsed >= 80, // Switch to cheaper model above 80%
+      maxToolsPerMsg: limits.maxToolsPerMsg,
+    };
+
+    if (percentUsed >= 90) {
+      logger.warn({ component: "CostGuardrails", userId, percentUsed: result.percentUsed, totalUsd },
+        `💰 Budget alert: ${result.percentUsed}% used ($${totalUsd.toFixed(4)}/$${limits.dailyUsd})`);
+    }
+
+    return result;
+  }
+
+  /**
+   * Auto-downgrade model selection when budget is high.
+   * Modifies the route to use the cheapest available model.
+   */
+  _autoDowngrade(modelRoute, budgetResult) {
+    if (!budgetResult.shouldDowngrade) return modelRoute;
+
+    // If budget > 80%, force Groq (cheapest)
+    if (this.groqKey) {
+      const downgraded = {
+        ...modelRoute,
+        provider: "groq",
+        model: "llama-3.3-70b-versatile",
+        apiKey: this.groqKey,
+        endpoint: "https://api.groq.com/openai/v1/chat/completions",
+        reason: `Budget ${budgetResult.percentUsed}% — downgraded to free model`,
+        maxTokens: Math.min(modelRoute.maxTokens, 500),
+        costPerToken: 0.00000027,
+        downgraded: true,
+      };
+      logger.info({ component: "CostGuardrails", from: modelRoute.provider, to: "groq", budget: budgetResult.percentUsed },
+        `💸 Auto-downgrade: ${modelRoute.provider} → groq (budget ${budgetResult.percentUsed}%)`);
+      return downgraded;
+    }
+
+    return modelRoute;
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // 9.10 POLICY ENGINE — Per-user/per-tool access control
+  // Enforces what each user can do based on plan and rules
+  // ═══════════════════════════════════════════════════════════
+
+  static get POLICY_RULES() {
+    return {
+      free: {
+        allowedTools: ["search", "weather", "imagine", "map", "translate", "summarize", "reminder"],
+        blockedTools: ["email", "codeExecute", "ragSearch", "webScrape", "fileParse", "dbQuery"],
+        maxHistoryLength: 10,
+        maxMessageLength: 2000,
+      },
+      pro: {
+        allowedTools: "all",
+        blockedTools: ["codeExecute"], // Still restricted — security sensitive
+        maxHistoryLength: 30,
+        maxMessageLength: 8000,
+      },
+      enterprise: {
+        allowedTools: "all",
+        blockedTools: [],
+        maxHistoryLength: 50,
+        maxMessageLength: 15000,
+      },
+      admin: {
+        allowedTools: "all",
+        blockedTools: [],
+        maxHistoryLength: 100,
+        maxMessageLength: 50000,
+      },
+    };
+  }
+
+  /**
+   * Check if user can use a specific tool under their current policy.
+   * Returns: { allowed, reason, plan }
+   */
+  _checkPolicy(toolName, plan = "free", isAdmin = false) {
+    if (isAdmin) return { allowed: true, reason: "admin", plan: "admin" };
+
+    const rules = KelionBrain.POLICY_RULES[plan] || KelionBrain.POLICY_RULES.free;
+
+    // Check blocked tools
+    if (rules.blockedTools && rules.blockedTools.includes(toolName)) {
+      return {
+        allowed: false,
+        reason: `Tool "${toolName}" requires ${plan === "free" ? "Pro" : "Enterprise"} plan`,
+        plan,
+        upgrade: true,
+      };
+    }
+
+    // Check allowed tools (if not "all")
+    if (rules.allowedTools !== "all" && !rules.allowedTools.includes(toolName)) {
+      return {
+        allowed: false,
+        reason: `Tool "${toolName}" not available on ${plan} plan`,
+        plan,
+        upgrade: true,
+      };
+    }
+
+    return { allowed: true, reason: "policy_ok", plan };
+  }
+
+  /**
+   * Filter a plan's tools based on policy — removes tools user can't access.
+   * Returns: filtered plan array
+   */
+  _filterPlanByPolicy(plan, userPlan = "free", isAdmin = false) {
+    if (isAdmin) return plan;
+    return plan.filter(step => {
+      const check = this._checkPolicy(step.tool, userPlan, isAdmin);
+      if (!check.allowed) {
+        logger.info({ component: "PolicyEngine", tool: step.tool, plan: userPlan },
+          `🔒 Policy blocked: ${step.tool} (${check.reason})`);
+      }
+      return check.allowed;
+    });
   }
 
   // ── OPEN URL ON MONITOR ──
