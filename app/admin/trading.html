@@ -593,6 +593,23 @@
         </div>
     </div>
 
+
+    <!-- GEOPOLITICAL RISK -->
+    <div class="section">
+        <div class="section-title">🌍 Geopolitical Risk & Sources</div>
+        <div id="geo-risk-header" style="display:flex;gap:12px;margin-bottom:12px;flex-wrap:wrap;">
+            <div class="loading">Loading geopolitical data...</div>
+        </div>
+        <div class="section-title" style="font-size:0.85rem;margin-top:8px;">📡 Monitored Sources</div>
+        <div id="geo-sources" class="risk-grid" style="margin-bottom:10px;">
+            <div class="loading">Loading...</div>
+        </div>
+        <div class="section-title" style="font-size:0.85rem;margin-top:8px;">📰 Recent Events</div>
+        <div id="geo-events" style="max-height:200px;overflow-y:auto;">
+            <div class="loading">Loading...</div>
+        </div>
+    </div>
+
     <!-- RISK DASHBOARD -->
     <div class="section">
         <div class="section-title">🛡 Risk Dashboard</div>
@@ -873,8 +890,65 @@
 
         document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
 
+        // ═══ GEOPOLITICAL ═══
+        async function loadGeo() {
+            try {
+                const r = await fetch('/api/trading/geopolitical');
+                const d = await r.json();
+
+                // Risk header
+                const riskColor = d.riskScore >= 70 ? '#ff4444' : d.riskScore >= 50 ? '#ff8800' : d.riskScore >= 30 ? '#ffcc00' : '#00ff88';
+                document.getElementById('geo-risk-header').innerHTML = `
+                    <div class="risk-item" style="border-color:${riskColor}">
+                        <div class="risk-label">GEO RISK SCORE</div>
+                        <div class="risk-value" style="color:${riskColor}">${d.riskScore}/100</div>
+                    </div>
+                    <div class="risk-item" style="border-color:${riskColor}">
+                        <div class="risk-label">RISK LEVEL</div>
+                        <div class="risk-value" style="color:${riskColor}">${d.riskLevel}</div>
+                    </div>
+                    <div class="risk-item" style="flex:2">
+                        <div class="risk-label">RECOMMENDATION</div>
+                        <div class="risk-value" style="font-size:0.8rem;color:#e0e0e0">${d.recommendation || '—'}</div>
+                    </div>
+                    ${d.fearGreed ? `<div class="risk-item">
+                        <div class="risk-label">FEAR & GREED</div>
+                        <div class="risk-value" style="color:${d.fearGreed.value <= 25 ? '#ff4444' : d.fearGreed.value >= 75 ? '#00ff88' : '#ffcc00'}">${d.fearGreed.value} (${d.fearGreed.label})</div>
+                    </div>` : ''}`;
+
+                // Sources
+                if (d.monitoredSources) {
+                    document.getElementById('geo-sources').innerHTML = d.monitoredSources.map(s => {
+                        const statusColor = s.status === 'ACTIVE' ? '#00ff88' : s.status === 'NO_KEY' ? '#ff8800' : '#ff4444';
+                        return `<div class="risk-item">
+                            <div class="risk-label">${escHtml(s.name)}</div>
+                            <div class="risk-value" style="font-size:0.75rem;color:#aaa">${escHtml(s.type)}</div>
+                            <div style="color:${statusColor};font-size:0.7rem;margin-top:4px">● ${s.status}${s.events ? ' (' + s.events + ' events)' : ''}${s.value != null ? ' — ' + s.value : ''}</div>
+                        </div>`;
+                    }).join('');
+                }
+
+                // Events
+                if (d.gdeltEvents && d.gdeltEvents.length > 0) {
+                    document.getElementById('geo-events').innerHTML = d.gdeltEvents.map(e => `
+                        <div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.05);font-size:0.78rem;">
+                            <span style="color:${e.category === 'MILITARY' ? '#ff4444' : e.category === 'SANCTIONS' ? '#ff8800' : '#aaa'};font-weight:bold">[${e.category}]</span>
+                            <span style="color:#e0e0e0">${escHtml(e.title?.substring(0, 100))}</span>
+                            <span style="color:#666;font-size:0.65rem;margin-left:6px">${escHtml(e.source)}</span>
+                        </div>`).join('');
+                } else {
+                    document.getElementById('geo-events').innerHTML = '<div style="color:#666">No high-impact events in last 24h</div>';
+                }
+            } catch (e) {
+                document.getElementById('geo-risk-header').innerHTML = '<div style="color:#ff4444">Geopolitical data unavailable</div>';
+            }
+        }
+
+        // Load geopolitical on page load
+        if (adminSecret) loadGeo();
+
         // Auto-refresh every 30 seconds
-        setInterval(() => { if (adminSecret) loadAll(); }, 30000);
+        setInterval(() => { if (adminSecret) { loadAll(); loadGeo(); } }, 30000);
     </script>
 </body>
 

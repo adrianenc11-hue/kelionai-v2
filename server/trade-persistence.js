@@ -110,6 +110,23 @@ async function ensureTables() {
         CREATE INDEX IF NOT EXISTS idx_signals_asset ON trading_signals(asset, created_at DESC);
         CREATE INDEX IF NOT EXISTS idx_trades_asset ON trading_trades(asset, opened_at DESC);
         CREATE INDEX IF NOT EXISTS idx_perf_date ON trading_performance(date DESC);
+
+        CREATE TABLE IF NOT EXISTS trading_price_history (
+          id BIGSERIAL PRIMARY KEY,
+          asset TEXT NOT NULL,
+          date DATE NOT NULL,
+          open DOUBLE PRECISION,
+          high DOUBLE PRECISION,
+          low DOUBLE PRECISION,
+          close DOUBLE PRECISION NOT NULL,
+          volume DOUBLE PRECISION,
+          source TEXT DEFAULT 'yahoo_finance',
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          UNIQUE(asset, date)
+        );
+        CREATE INDEX IF NOT EXISTS idx_price_history_asset ON trading_price_history(asset);
+        CREATE INDEX IF NOT EXISTS idx_price_history_date ON trading_price_history(date);
+        CREATE INDEX IF NOT EXISTS idx_price_history_asset_date ON trading_price_history(asset, date);
       `,
         });
 

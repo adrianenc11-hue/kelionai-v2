@@ -15,6 +15,7 @@ const aiScorer = require("./ai-scoring");
 const perfTracker = require("./performance-tracker");
 const tradePersist = require("./trade-persistence");
 const histLoader = require("./historical-data-loader");
+const geopolitical = require("./geopolitical");
 
 const router = express.Router();
 
@@ -1083,13 +1084,65 @@ router.get("/signals", async (req, res) => {
       .filter((s) => s && s.signal !== "HOLD")
       .sort((a, b) => b.confidence - a.confidence);
 
+    // ═══ GEOPOLITICAL RISK ADJUSTMENT ═══
+    let geoRisk = null;
+    try {
+      geoRisk = await geopolitical.calculateGeopoliticalRisk();
+      if (geoRisk.riskScore >= 30) {
+        signals.forEach(s => {
+          const adj = geopolitical.adjustStrategyForRisk(geoRisk.riskScore, s.confidence, s.signal);
+          s.confidence = adj.confidence;
+          s.signal = adj.signal;
+          s.geoAdjusted = adj.geoAdjusted;
+          s.geoReason = adj.reason;
+        });
+      }
+    } catch (e) {
+      logger.warn("[Trading] Geopolitical risk check failed: " + e.message);
+    }
+
     // ═══ PERSIST SIGNALS TO SUPABASE ═══
     signals.forEach(s => tradePersist.saveSignal(s).catch(() => { }));
 
-    res.json({ signals, count: signals.length, disclaimer: DISCLAIMER });
+    res.json({ signals, count: signals.length, geoRisk: geoRisk ? { score: geoRisk.riskScore, level: geoRisk.riskLevel, recommendation: geoRisk.recommendation } : null, disclaimer: DISCLAIMER });
   } catch (err) {
     logger.error({ err: err.message }, "[Trading] Signals error");
     res.status(500).json({ error: "Semnalele nu sunt disponibile." });
+  }
+});
+
+// GET /geopolitical — geopolitical risk + all monitored sources
+router.get("/geopolitical", async (req, res) => {
+  try {
+    const [risk, gdelt, fearGreed, fred] = await Promise.all([
+      geopolitical.calculateGeopoliticalRisk(),
+      geopolitical.fetchGdeltEvents(),
+      geopolitical.fetchFearGreed(),
+      geopolitical.fetchFredData(),
+    ]);
+
+    res.json({
+      riskScore: risk.riskScore,
+      riskLevel: risk.riskLevel,
+      recommendation: risk.recommendation,
+      factors: risk.factors,
+      monitoredSources: [
+        { name: "GDELT Project", type: "Geopolitical Events", url: "gdeltproject.org", status: gdelt.events?.length > 0 ? "ACTIVE" : "NO_DATA", events: gdelt.count },
+        { name: "Fear & Greed Index", type: "Market Sentiment", url: "alternative.me", status: fearGreed.current ? "ACTIVE" : "NO_DATA", value: fearGreed.current?.value, label: fearGreed.current?.label },
+        { name: "FRED (St. Louis Fed)", type: "Macro Economic", url: "fred.stlouisfed.org", status: fred.hasApiKey ? "ACTIVE" : "NO_KEY", indicators: Object.keys(fred.indicators || {}).length },
+        { name: "CoinGecko", type: "Crypto Prices", url: "coingecko.com", status: "ACTIVE" },
+        { name: "Yahoo Finance", type: "Stocks/Commodities/Forex", url: "finance.yahoo.com", status: "ACTIVE" },
+        { name: "ExchangeRate-API", type: "Forex Rates", url: "exchangerate-api.com", status: "ACTIVE" },
+        { name: "CryptoPanic", type: "Crypto News Sentiment", url: "cryptopanic.com", status: process.env.CRYPTOPANIC_API_KEY ? "ACTIVE" : "NO_KEY" },
+      ],
+      gdeltEvents: (gdelt.events || []).slice(0, 10),
+      fearGreed: fearGreed.current,
+      fredIndicators: fred.indicators || {},
+      disclaimer: DISCLAIMER,
+    });
+  } catch (err) {
+    logger.error({ err: err.message }, "[Trading] Geopolitical error");
+    res.status(500).json({ error: "Geopolitical data unavailable" });
   }
 });
 
