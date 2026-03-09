@@ -415,6 +415,8 @@ class KelionBrain {
 - WEB_SCRAPE: Extract and summarize content from any web page
 - FILE_PARSE: Parse and analyze CSV, JSON, TXT, PDF files
 - PROACTIVE: Context-aware suggestions based on user patterns and time of day
+- TRUTH_GUARD: Automatic fact-checking — verifies claims against sources, detects unsupported assertions, calculates factual score
+- SMART_ROUTING: Automatically selects the optimal AI model (fast/balanced/premium) based on task complexity
 
 === SKILL: PRODUCȚIE MEDIA (IMAGINE/POSTER/LOGO/ILUSTRAȚIE) ===
 Când utilizatorul cere producție de conținut vizual, URMEZI OBLIGATORIU acest flow:
@@ -868,6 +870,18 @@ When asked "what can you do?" list these real capabilities. Use them proactively
       // Step 1: ANALYZE intent deeply
       const analysis = this.analyzeIntent(message, language);
 
+      // Step 1b: COMPLEXITY SCORING (5-tier: simple→medium→complex→critical→highRisk)
+      const complexityResult = this._scoreComplexity(analysis, message);
+      analysis.complexity = complexityResult.name;
+      analysis.complexityLevel = complexityResult.level;
+      const modelRoute = this._routeModel(complexityResult);
+
+      logger.info({
+        component: "Brain", complexity: complexityResult.name, level: complexityResult.level,
+        model: modelRoute.provider, reasoning: complexityResult.reasoning
+      },
+        `🎯 Complexity: ${complexityResult.name} (L${complexityResult.level}) → ${modelRoute.provider}/${modelRoute.model}`);
+
       // Step 1.5: MULTI-AGENT — select best agent for this task
       const agent = this._selectAgent(analysis);
       if (agent) {
@@ -1012,7 +1026,7 @@ When asked "what can you do?" list these real capabilities. Use them proactively
       );
 
       // Strip internal annotations from enriched message (they are for AI context, not user)
-      const cleanReply = enriched
+      let cleanReply = enriched
         .replace(
           /(?:\[TRUTH CHECK\]|\[REZULTATE CAUTARE\]|\[DATE METEO\]|\[Am generat\]|\[Harta\]|\[CONTEXT DIN MEMORIE\]|\[Utilizatorul pare\]|\[URGENTA\]|\[GANDIRE STRUCTURATA\]|\[REZUMAT CONVERSATIE\])[^\]]*\]/g,
           "",
@@ -1035,6 +1049,22 @@ When asked "what can you do?" list these real capabilities. Use them proactively
         sourceTags.push("ASSUMPTION");
       }
 
+      // Step 9: TRUTH GUARD — Verify response quality (async, non-blocking for simple tasks)
+      let truthReport = null;
+      if (complexityResult.level >= 2 && cleanReply.length > 50) {
+        truthReport = await this._truthCheck(cleanReply, results, analysis).catch(() => null);
+        if (truthReport && truthReport.verdict === "FAIL") {
+          sourceTags.push("TRUTH_FAIL");
+          // Add warning to response
+          const warningNote = "\n\n⚠️ *Verificarea automată indică incertitudine în unele afirmații. Verifică sursele.*";
+          if (!cleanReply.includes("⚠️")) {
+            cleanReply += warningNote;
+          }
+        } else if (truthReport && truthReport.verdict === "WARNING") {
+          sourceTags.push("TRUTH_WARNING");
+        }
+      }
+
       return {
         enrichedMessage: cleanReply,
         enrichedContext: enriched,
@@ -1049,6 +1079,9 @@ When asked "what can you do?" list these real capabilities. Use them proactively
         sourceTags,
         agent: agent ? agent.name : "default",
         profileLoaded: !!profile,
+        truthReport,
+        complexityLevel: complexityResult,
+        modelRoute,
       };
     } catch (e) {
       const thinkTime = Date.now() - startTime;
@@ -3093,6 +3126,384 @@ Rules:
     } catch (e) {
       logger.warn({ component: "Brain", err: e.message }, "Reminder check failed");
     }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // 9.5 TRUTH GUARD — Fact verification & claim validation
+  // Verifies AI response quality: checks claims against sources,
+  // detects unsupported assertions, calculates factual score
+  // ═══════════════════════════════════════════════════════════
+
+  /**
+   * Extract verifiable claims from AI response text.
+   * Returns array of { claim, type, verifiable }
+   */
+  _extractClaims(responseText) {
+    if (!responseText || responseText.length < 30) return [];
+
+    const claims = [];
+    const sentences = responseText
+      .replace(/["""]/g, '"')
+      .split(/[.!?]\s+/)
+      .map(s => s.trim())
+      .filter(s => s.length > 15 && s.length < 500);
+
+    for (const sentence of sentences) {
+      // Detect factual claims
+      const isStatistic = /\b(\d+[\.,]?\d*\s*(%|procent|milioane|miliard|lei|usd|\$|euro|€))/i.test(sentence);
+      const isDate = /\b(in\s+\d{4}|pe\s+\d{1,2}|din\s+(ianuarie|februarie|martie|aprilie|mai|iunie|iulie|august|septembrie|octombrie|noiembrie|decembrie))/i.test(sentence);
+      const isAbsolute = /\b(intotdeauna|niciodata|toți|nimeni|cel mai|always|never|everyone|nobody|every|all|none)\b/i.test(sentence);
+      const isComparison = /\b(mai\s+(bun|mare|mic|rapid|ieftin|scump)|better|worse|faster|cheaper|more\s+than)\b/i.test(sentence);
+      const isCausal = /\b(deoarece|pentru\s+ca|cauza|duce\s+la|because|causes|leads\s+to|results\s+in)\b/i.test(sentence);
+      const isDefinition = /\b(este|sunt|inseamna|represents|means|is\s+a|are\s+the)\b/i.test(sentence);
+
+      if (isStatistic || isDate || isAbsolute || isComparison || isCausal) {
+        claims.push({
+          claim: sentence.substring(0, 200),
+          type: isStatistic ? "statistic" : isDate ? "temporal" : isAbsolute ? "absolute" : isComparison ? "comparison" : "causal",
+          verifiable: true,
+          riskLevel: isAbsolute ? "high" : isStatistic ? "medium" : "low",
+        });
+      } else if (isDefinition && sentence.length > 30) {
+        claims.push({
+          claim: sentence.substring(0, 200),
+          type: "definition",
+          verifiable: true,
+          riskLevel: "low",
+        });
+      }
+    }
+
+    return claims.slice(0, 10); // Max 10 claims to check
+  }
+
+  /**
+   * Truth Guard: Validate response against actual data sources.
+   * Returns: { factualScore, completenessScore, confidenceScore,
+   *            verifiedClaims, unsupportedClaims, evidenceMap, flags, verdict }
+   */
+  async _truthCheck(responseText, toolResults, analysis, sources = []) {
+    const startTime = Date.now();
+    const report = {
+      factualScore: 1.0,
+      completenessScore: 1.0,
+      confidenceScore: 1.0,
+      verifiedClaims: [],
+      unsupportedClaims: [],
+      evidenceMap: {},
+      flags: [],
+      verdict: "PASS",
+      checkedAt: new Date().toISOString(),
+      durationMs: 0,
+    };
+
+    try {
+      // 1. Extract claims from response
+      const claims = this._extractClaims(responseText);
+      if (claims.length === 0) {
+        report.flags.push("NO_VERIFIABLE_CLAIMS");
+        report.durationMs = Date.now() - startTime;
+        return report;
+      }
+
+      // 2. Build evidence base from tool results
+      const evidence = {};
+      const toolKeys = Object.keys(toolResults || {});
+      for (const key of toolKeys) {
+        const result = toolResults[key];
+        if (!result) continue;
+        const text = typeof result === "string" ? result : JSON.stringify(result).substring(0, 3000);
+        evidence[key] = text;
+      }
+
+      // 3. Check each claim against evidence using fast AI
+      const aiKey = this.groqKey || this.geminiKey;
+      const useGroq = !!this.groqKey;
+
+      if (aiKey && claims.length > 0) {
+        const claimTexts = claims.map((c, i) => `${i + 1}. [${c.type}] "${c.claim}"`).join("\n");
+        const evidenceText = toolKeys.map(k => `[${k}]: ${(evidence[k] || "").substring(0, 500)}`).join("\n");
+
+        const prompt = `You are a fact-checking system. Check if these claims from an AI response are supported by the provided evidence.
+
+CLAIMS:
+${claimTexts}
+
+EVIDENCE FROM TOOLS:
+${evidenceText || "(no tool evidence available)"}
+
+For each claim, respond with EXACTLY this JSON format:
+{"results": [{"id": 1, "supported": true/false, "confidence": 0.0-1.0, "reason": "brief reason"}]}
+
+Rules:
+- "supported": true if evidence clearly supports the claim
+- "supported": false if claim has no evidence OR contradicts evidence
+- If no evidence exists for a claim, mark it "supported": false with confidence 0.5
+- Be strict: if claim adds information not in evidence, mark unsupported`;
+
+        try {
+          let aiResponse;
+          if (useGroq) {
+            const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+              method: "POST",
+              headers: { "Content-Type": "application/json", Authorization: `Bearer ${this.groqKey}` },
+              body: JSON.stringify({
+                model: "llama-3.3-70b-versatile",
+                messages: [{ role: "user", content: prompt }],
+                max_tokens: 500,
+                temperature: 0.1,
+                response_format: { type: "json_object" },
+              }),
+              signal: AbortSignal.timeout(5000),
+            });
+            const d = await r.json();
+            aiResponse = d.choices?.[0]?.message?.content;
+          } else {
+            const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${this.geminiKey}`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                contents: [{ parts: [{ text: prompt }] }],
+                generationConfig: { maxOutputTokens: 500, temperature: 0.1, responseMimeType: "application/json" },
+              }),
+              signal: AbortSignal.timeout(5000),
+            });
+            const d = await r.json();
+            aiResponse = d.candidates?.[0]?.content?.parts?.[0]?.text;
+          }
+
+          if (aiResponse) {
+            const parsed = JSON.parse(aiResponse);
+            const results = parsed.results || parsed;
+
+            let supported = 0;
+            let total = 0;
+
+            for (const r of (Array.isArray(results) ? results : [])) {
+              const claim = claims[(r.id || 1) - 1];
+              if (!claim) continue;
+              total++;
+
+              if (r.supported) {
+                supported++;
+                report.verifiedClaims.push({ claim: claim.claim, confidence: r.confidence || 0.8, source: "tool_evidence" });
+                report.evidenceMap[claim.claim.substring(0, 60)] = { verified: true, confidence: r.confidence };
+              } else {
+                report.unsupportedClaims.push({ claim: claim.claim, reason: r.reason || "No evidence", riskLevel: claim.riskLevel });
+                report.evidenceMap[claim.claim.substring(0, 60)] = { verified: false, reason: r.reason };
+              }
+            }
+
+            report.factualScore = total > 0 ? supported / total : 1.0;
+          }
+        } catch (e) {
+          report.flags.push("AI_CHECK_FAILED");
+          logger.warn({ component: "TruthGuard", err: e.message }, "AI fact-check failed");
+        }
+      }
+
+      // 4. Check completeness — did the response address the analysis needs?
+      const requestedTools = [];
+      if (analysis?.needsSearch) requestedTools.push("search");
+      if (analysis?.needsWeather) requestedTools.push("weather");
+      if (analysis?.needsImage) requestedTools.push("imagine");
+      if (analysis?.needsMap) requestedTools.push("map");
+      if (analysis?.needsTranslate) requestedTools.push("translate");
+      if (analysis?.needsDbQuery) requestedTools.push("dbQuery");
+
+      const executedTools = toolKeys;
+      const missingTools = requestedTools.filter(t => !executedTools.includes(t));
+      if (missingTools.length > 0) {
+        report.flags.push(`MISSING_TOOLS:${missingTools.join(",")}`);
+        report.completenessScore = 1 - (missingTools.length / Math.max(requestedTools.length, 1));
+      }
+
+      // 5. Check for "false success" patterns
+      const falseSuccessPatterns = [
+        /am (facut|realizat|completat|terminat|rezolvat)/i,
+        /totul (e|este) (ok|bine|gata|functional|implementat)/i,
+        /deploy (complet|reusit|finalizat)/i,
+        /merge perfect/i,
+        /i (did|have|completed|finished)/i,
+      ];
+
+      for (const pattern of falseSuccessPatterns) {
+        if (pattern.test(responseText) && toolKeys.length === 0) {
+          report.flags.push("POSSIBLE_FALSE_SUCCESS");
+          report.factualScore *= 0.5;
+          break;
+        }
+      }
+
+      // 6. Detect absolute claims without evidence
+      const absoluteClaims = report.unsupportedClaims.filter(c => c.riskLevel === "high");
+      if (absoluteClaims.length > 0) {
+        report.flags.push(`HIGH_RISK_CLAIMS:${absoluteClaims.length}`);
+        report.factualScore *= 0.7;
+      }
+
+      // 7. Overall confidence
+      report.confidenceScore = (report.factualScore * 0.5 + report.completenessScore * 0.3 + (toolKeys.length > 0 ? 0.2 : 0));
+
+      // 8. Final verdict
+      if (report.factualScore < 0.3) report.verdict = "FAIL";
+      else if (report.factualScore < 0.6) report.verdict = "WARNING";
+      else if (report.flags.length > 2) report.verdict = "CAUTION";
+      else report.verdict = "PASS";
+
+      report.durationMs = Date.now() - startTime;
+
+      logger.info({
+        component: "TruthGuard",
+        factualScore: report.factualScore.toFixed(2),
+        completeness: report.completenessScore.toFixed(2),
+        verified: report.verifiedClaims.length,
+        unsupported: report.unsupportedClaims.length,
+        flags: report.flags,
+        verdict: report.verdict,
+        ms: report.durationMs,
+      }, `🛡️ Truth Guard: ${report.verdict} | factual:${(report.factualScore * 100).toFixed(0)}% | ${report.verifiedClaims.length}✓ ${report.unsupportedClaims.length}✗`);
+
+      return report;
+    } catch (e) {
+      report.flags.push("CHECK_ERROR");
+      report.durationMs = Date.now() - startTime;
+      logger.warn({ component: "TruthGuard", err: e.message }, "Truth check error");
+      return report;
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // 9.6 SMART MODEL ROUTING — Choose optimal model per task
+  // Routes to fast/balanced/premium model based on complexity,
+  // cost sensitivity, and task type
+  // ═══════════════════════════════════════════════════════════
+
+  // Complexity levels (5-tier)
+  static get COMPLEXITY_LEVELS() {
+    return {
+      simple: { level: 1, model: "fast", maxTokens: 300, description: "Simple Q&A, greetings, status" },
+      medium: { level: 2, model: "fast", maxTokens: 500, description: "Factual questions, lookups" },
+      complex: { level: 3, model: "balanced", maxTokens: 800, description: "Analysis, multi-tool tasks" },
+      critical: { level: 4, model: "premium", maxTokens: 1200, description: "Important decisions, multi-step" },
+      highRisk: { level: 5, model: "premium", maxTokens: 1500, description: "Financial, legal, medical, irreversible" },
+    };
+  }
+
+  /**
+   * Score task complexity on 5-level scale.
+   * Returns: { level, name, model, maxTokens, reasoning }
+   */
+  _scoreComplexity(analysis, message) {
+    let score = 1;
+    const reasons = [];
+
+    // Count active intents
+    const activeIntents = Object.keys(analysis).filter(k => k.startsWith("needs") && analysis[k] === true).length;
+    if (activeIntents >= 4) { score += 2; reasons.push(`${activeIntents} intents`); }
+    else if (activeIntents >= 2) { score += 1; reasons.push(`${activeIntents} intents`); }
+
+    // Message length and complexity signals
+    if (message.length > 500) { score += 1; reasons.push("long message"); }
+    if (message.split(/[.!?]/).length > 5) { score += 1; reasons.push("multi-sentence"); }
+
+    // High-risk domains
+    if (/\b(invest|trading|tranzact|bani|money|financ|legal|juridic|medical|sanatate|health|sterge|delete|remove)\b/i.test(message)) {
+      score += 2;
+      reasons.push("high-risk domain");
+    }
+
+    // Multi-step indicators
+    if (/\b(mai intai|apoi|dupa|pasul|step|fase|etap|plan)\b/i.test(message)) {
+      score += 1;
+      reasons.push("multi-step");
+    }
+
+    // Analytical requests
+    if (/\b(analiz|compar|evalueaz|decide|recomand|strateg|optimiz|diagnostic)\b/i.test(message)) {
+      score += 1;
+      reasons.push("analytical");
+    }
+
+    // Cap at 5
+    score = Math.min(score, 5);
+
+    const levels = ["simple", "medium", "complex", "critical", "highRisk"];
+    const name = levels[score - 1] || "simple";
+    const config = KelionBrain.COMPLEXITY_LEVELS[name];
+
+    return {
+      level: score,
+      name,
+      model: config.model,
+      maxTokens: config.maxTokens,
+      reasoning: reasons.join(", ") || "default",
+    };
+  }
+
+  /**
+   * Route to the optimal AI model based on complexity and available providers.
+   * Returns: { provider, model, apiKey, endpoint, reason }
+   */
+  _routeModel(complexityResult) {
+    const tier = complexityResult.model; // "fast", "balanced", "premium"
+
+    // Fast tier: Groq (free/cheap, low latency)
+    if (tier === "fast" && this.groqKey) {
+      return {
+        provider: "groq",
+        model: "llama-3.3-70b-versatile",
+        apiKey: this.groqKey,
+        endpoint: "https://api.groq.com/openai/v1/chat/completions",
+        reason: `Fast model for ${complexityResult.name} task`,
+        maxTokens: complexityResult.maxTokens,
+        costPerToken: 0.00000027,
+      };
+    }
+
+    // Balanced tier: Gemini (good quality/cost ratio)
+    if ((tier === "balanced" || tier === "fast") && this.geminiKey) {
+      return {
+        provider: "gemini",
+        model: "gemini-2.0-flash",
+        apiKey: this.geminiKey,
+        endpoint: `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent`,
+        reason: `Balanced model for ${complexityResult.name} task`,
+        maxTokens: complexityResult.maxTokens,
+        costPerToken: 0.0000003,
+      };
+    }
+
+    // Premium tier: OpenAI (highest quality for critical tasks)
+    if (tier === "premium" && this.openaiKey) {
+      return {
+        provider: "openai",
+        model: "gpt-4o",
+        apiKey: this.openaiKey,
+        endpoint: "https://api.openai.com/v1/chat/completions",
+        reason: `Premium model for ${complexityResult.name} task`,
+        maxTokens: complexityResult.maxTokens,
+        costPerToken: 0.000005,
+      };
+    }
+
+    // Fallback chain: Gemini → Groq → OpenAI
+    if (this.geminiKey) {
+      return {
+        provider: "gemini", model: "gemini-2.0-flash", apiKey: this.geminiKey,
+        endpoint: `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent`,
+        reason: "Fallback to Gemini", maxTokens: complexityResult.maxTokens, costPerToken: 0.0000003
+      };
+    }
+    if (this.groqKey) {
+      return {
+        provider: "groq", model: "llama-3.3-70b-versatile", apiKey: this.groqKey,
+        endpoint: "https://api.groq.com/openai/v1/chat/completions",
+        reason: "Fallback to Groq", maxTokens: complexityResult.maxTokens, costPerToken: 0.00000027
+      };
+    }
+
+    return { provider: "none", model: "none", reason: "No AI provider available", maxTokens: 300, costPerToken: 0 };
   }
 
   // ═══════════════════════════════════════════════════════════
