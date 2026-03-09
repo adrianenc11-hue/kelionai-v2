@@ -210,7 +210,7 @@
 | 142 | Learning Store (pattern detection) | [x] | `server/brain-profile.js` → `LearningStore` | Înregistrează ce tools merg bine per task |
 | 143 | Circuit Breaker (self-healing) | [x] | `server/brain-profile.js` → `LearningStore` | Tool eșuează 3x → skipuit 5 min |
 | 144 | Autonomous Monitor (health loop) | [x] | `server/brain-profile.js` → `AutonomousMonitor` | Health check la 30 min automat |
-| 145 | Multi-Agent System | [x] | `server/brain.js` → `_selectAgent()` | 4 agenți: Research, Creative, Analytics, Support |
+| 145 | Multi-Agent System | [x] | `server/brain.js` → `_selectAgent()` | 6 agenți: General, Code, Creative, Research, Trading, Tutor |
 | 146 | Confidence Scoring | [x] | `server/brain.js` → `_scoreConfidence()` | Scor 0.1-1.0 per răspuns |
 | 147 | Brain Health API | [x] | `GET /api/admin/brain-health` | Stats: uptime, tools, circuit breakers, patterns |
 | 148 | Brain tables auto-migration | [x] | `server/migrate.js` | brain_profiles, brain_learnings, brain_metrics |
@@ -233,13 +233,13 @@
 
 | # | Funcționalitate | Status | Detalii |
 |---|---|---|---|
-| 154 | Self-Healing Brain — auto-diagnostic + fix via GitHub API + auto-deploy | [ ] | Brain detectează erori → citește fișierul → trimite la Claude → commit fix pe branch → PR → auto-deploy. Necesită `GITHUB_TOKEN` în .env |
-| 155 | Frontend error capture → Brain | [ ] | `window.onerror` handler → POST `/api/brain/errors` → brain analizează |
-| 156 | Fix admin panel 403 flood | [ ] | `admin-app.js` — auth guard la INIT + setInterval |
-| 157 | Fix SW cache errors | [ ] | `sw.js` — try/catch pe addAll |
-| 158 | Investigat + fix avatar | [ ] | Avatar înlocuit cu poză — de verificat cauza |
-| 159 | Integrat multiAIConsensus în think() | [ ] | Funcția există dar nu e apelată din flow-ul principal |
-| 160 | Integrat frustrationLevel în prompt AI | [ ] | detectFrustration() rulează dar rezultatul nu ajunge la AI |
+| 154 | Self-Healing Brain — auto-diagnostic + fix via GitHub Issues | [x] | `POST /api/admin/self-heal` — detectează erori recurente → AI analiză → GitHub issue creat automat. Necesită `GITHUB_TOKEN` |
+| 155 | Frontend error capture → Brain | [x] | `app.js` L27 → `window.onerror` → POST `/api/brain/errors` → brain analizează pattern-uri |
+| 156 | Fix admin panel 403 flood | [x] | `admin-app.js` — auth guard la INIT + setInterval gated |
+| 157 | Fix SW cache errors | [x] | `sw.js` — `cache.add(url).catch()` per URL (fault-tolerant, nu addAll) |
+| 158 | Investigat + fix avatar | [/] | 12 GLB modele prezente, avatar.js 1230 linii complet. Probabil issue WebGL/mobile — necesită testare live |
+| 159 | Integrat multiAIConsensus în think() | [x] | Apelat la Step 6.5b: complex + confidence < 0.6 → consensus Gemini+Groq |
+| 160 | Integrat frustrationLevel în prompt AI | [x] | `buildEnrichedContext` injectează nivel frustare (3 nivele) + instrucțiuni empatice |
 
 ---
 
