@@ -3598,11 +3598,13 @@ Rules:
       const crypto = require("crypto");
       const privateKey = privateKeyRaw.replace(/\\n/g, "\n");
 
-      // Build JWT header + payload
+      // Build JWT header + payload (with domain-wide delegation)
       const header = { alg: "RS256", typ: "JWT" };
       const now = Math.floor(Date.now() / 1000);
+      const calendarOwner = process.env.GOOGLE_CALENDAR_OWNER || "contact@kelionai.app";
       const payload = {
         iss: clientEmail,
+        sub: calendarOwner, // Domain-wide delegation: act as this user
         scope: "https://www.googleapis.com/auth/calendar",
         aud: "https://oauth2.googleapis.com/token",
         iat: now,
