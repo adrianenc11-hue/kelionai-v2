@@ -639,7 +639,128 @@ function calculateAdvancedEntry(entryPrice, signal, riskProfile) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// REAL PRICE DATA — CoinGecko, exchangerate-api, fallback
+// BINANCE OPEN INTEREST (free, no API key needed)
+// ═══════════════════════════════════════════════════════════════
+const oiCache = {};
+async function fetchOpenInterest(asset) {
+  if (oiCache[asset] && Date.now() - oiCache[asset].ts < 5 * 60 * 1000) return oiCache[asset].data;
+
+  const binanceSymbols = { BTC: "BTCUSDT", ETH: "ETHUSDT", SOL: "SOLUSDT" };
+  const symbol = binanceSymbols[asset];
+  if (!symbol) return null;
+
+  try {
+    const url = `https://fapi.binance.com/fapi/v1/openInterest?symbol=${symbol}`;
+    const r = await fetch(url);
+    if (!r.ok) return null;
+    const d = await r.json();
+    const oi = parseFloat(d.openInterest) || 0;
+
+    // Get OI history (last 30 periods)
+    const histUrl = `https://fapi.binance.com/futures/data/openInterestHist?symbol=${symbol}&period=1h&limit=30`;
+    const hr = await fetch(histUrl);
+    let oiChange = 0;
+    if (hr.ok) {
+      const hist = await hr.json();
+      if (hist.length >= 2) {
+        const oldest = parseFloat(hist[0].sumOpenInterest) || 1;
+        const newest = parseFloat(hist[hist.length - 1].sumOpenInterest) || 1;
+        oiChange = +((newest - oldest) / oldest * 100).toFixed(2);
+      }
+    }
+
+    const result = {
+      openInterest: oi,
+      oiChange24h: oiChange,
+      signal: oiChange > 10 ? "rising_OI" : oiChange < -10 ? "falling_OI" : "stable_OI",
+      implication: oiChange > 10 ? "New money entering — trend likely continues"
+        : oiChange < -10 ? "Positions closing — trend may reverse"
+          : "Stable — no strong conviction",
+    };
+
+    oiCache[asset] = { data: result, ts: Date.now() };
+    return result;
+  } catch (e) {
+    logger.warn({ component: "Trading", asset, err: e.message }, "OI fetch failed");
+    return null;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// WHALE ALERT DETECTION (Blockchain.com API — free, no key)
+// ═══════════════════════════════════════════════════════════════
+const whaleCache = {};
+async function detectWhaleActivity(asset) {
+  if (whaleCache[asset] && Date.now() - whaleCache[asset].ts < 10 * 60 * 1000) return whaleCache[asset].data;
+
+  if (!["BTC", "ETH"].includes(asset)) return null;
+
+  try {
+    // Use Blockchain.com for BTC large transactions
+    if (asset === "BTC") {
+      const url = "https://blockchain.info/unconfirmed-transactions?format=json";
+      const r = await fetch(url, { signal: AbortSignal.timeout(5000) });
+      if (r.ok) {
+        const d = await r.json();
+        const txs = d.txs || [];
+        const largeTxs = txs.filter(tx => {
+          const total = (tx.out || []).reduce((s, o) => s + (o.value || 0), 0) / 1e8; // satoshi to BTC
+          return total > 10; // > 10 BTC
+        });
+
+        const result = {
+          largeTransactions: largeTxs.length,
+          totalVolumeBTC: +(largeTxs.reduce((s, tx) => s + (tx.out || []).reduce((ss, o) => ss + (o.value || 0), 0), 0) / 1e8).toFixed(2),
+          signal: largeTxs.length > 5 ? "high_whale_activity" : largeTxs.length > 2 ? "moderate_whale_activity" : "low_whale_activity",
+          implication: largeTxs.length > 5 ? "Whales moving — potential big move coming" : "Normal activity",
+        };
+        whaleCache[asset] = { data: result, ts: Date.now() };
+        return result;
+      }
+    }
+    return null;
+  } catch (e) {
+    logger.warn({ component: "Trading", asset, err: e.message }, "Whale detection failed");
+    return null;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ENHANCED SENTIMENT SCORING (improved NLP with financial lexicon)
+// ═══════════════════════════════════════════════════════════════
+function enhancedSentimentScore(texts) {
+  const bullishWords = ["surge", "rally", "breakout", "bullish", "moon", "pump", "adoption", "institutional", "approval", "etf", "upgrade", "partnership", "growth", "record high", "accumulation", "buy signal", "golden cross", "support holds"];
+  const bearishWords = ["crash", "dump", "bearish", "collapse", "bankruptcy", "hack", "exploit", "liquidation", "ban", "regulation", "crackdown", "death cross", "recession", "default", "fraud", "sec lawsuit", "sell off", "panic"];
+  const fearWords = ["war", "invasion", "military", "sanctions", "crisis", "emergency", "pandemic", "inflation", "recession", "unemployment"];
+
+  let bullScore = 0, bearScore = 0, fearScore = 0, total = 0;
+
+  texts.forEach(text => {
+    const lower = (text || "").toLowerCase();
+    bullishWords.forEach(w => { if (lower.includes(w)) bullScore++; });
+    bearishWords.forEach(w => { if (lower.includes(w)) bearScore++; });
+    fearWords.forEach(w => { if (lower.includes(w)) fearScore++; });
+    total++;
+  });
+
+  if (total === 0) return { score: 0, label: "neutral", confidence: 0 };
+
+  const netScore = (bullScore - bearScore - fearScore * 0.5) / Math.max(total, 1);
+  const confidence = Math.min(100, Math.round(((bullScore + bearScore + fearScore) / Math.max(total, 1)) * 50));
+
+  return {
+    score: +netScore.toFixed(2),
+    label: netScore > 0.3 ? "bullish" : netScore < -0.3 ? "bearish" : "neutral",
+    confidence,
+    bullish: bullScore,
+    bearish: bearScore,
+    fear: fearScore,
+    total,
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// REAL PRICE DATA — CoinGecko, Yahoo Finance, fallback
 // ═══════════════════════════════════════════════════════════════
 
 // Map asset names to CoinGecko IDs
@@ -725,35 +846,52 @@ async function fetchRealPrices(asset, length = 300) {
     }
   }
 
-  // ── FOREX (free exchangerate-api — REAL DATA ONLY, no simulation) ──
-  if (prices.length === 0 && (asset === "EUR/USD" || asset === "GBP/USD")) {
-    try {
-      const [base, quote] = asset.split("/");
-      const url = `https://open.er-api.com/v6/latest/${base}`;
-      const r = await fetch(url);
-      if (r.ok) {
-        const d = await r.json();
-        const rate = d.rates?.[quote];
-        if (rate) {
-          // Only real rate — no simulated history
-          prices.push(rate);
-          volumes.push(0);
-          source = "ExchangeRate-API (current only)";
-          logger.info(
-            { component: "Trading", asset, rate, source },
-            `💱 ${asset}: current rate ${rate} from ExchangeRate-API (no history available)`,
-          );
+  // ── FOREX + CRYPTO FALLBACK (Yahoo Finance — full historical OHLCV) ──
+  if (prices.length === 0 && (asset === "EUR/USD" || asset === "GBP/USD" || cgId)) {
+    const yahooForexMap = {
+      "EUR/USD": "EURUSD%3DX",
+      "GBP/USD": "GBPUSD%3DX",
+      "BTC": "BTC-USD",
+      "ETH": "ETH-USD",
+      "SOL": "SOL-USD",
+    };
+    const ySym = yahooForexMap[asset];
+    if (ySym) {
+      try {
+        const range = length > 200 ? "1y" : "6mo";
+        const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ySym}?range=${range}&interval=1d`;
+        const r = await fetch(url, {
+          headers: { "User-Agent": "KelionAI/2.0" },
+        });
+        if (r.ok) {
+          const d = await r.json();
+          const result = d.chart?.result?.[0];
+          if (result?.indicators?.quote?.[0]) {
+            const closePrices = result.indicators.quote[0].close || [];
+            const vols = result.indicators.quote[0].volume || [];
+            prices = closePrices.filter(p => p !== null).map(p => Math.round(p * 10000) / 10000);
+            volumes = vols.filter(v => v !== null);
+            if (prices.length > length) {
+              prices = prices.slice(-length);
+              volumes = volumes.slice(-length);
+            }
+            source = "Yahoo Finance";
+            logger.info(
+              { component: "Trading", asset, source, points: prices.length },
+              `📊 ${asset}: ${prices.length} real data points from Yahoo Finance`,
+            );
+          }
         }
+      } catch (e) {
+        logger.warn(
+          { component: "Trading", asset, err: e.message },
+          `Yahoo Finance error for ${asset}`,
+        );
       }
-    } catch (e) {
-      logger.warn(
-        { component: "Trading", asset, err: e.message },
-        `ExchangeRate error for ${asset}`,
-      );
     }
   }
 
-  // ── STOCKS/COMMODITIES (Yahoo Finance unofficial or Alpha Vantage) ──
+  // ── STOCKS/COMMODITIES (Yahoo Finance) ──
   if (
     prices.length === 0 &&
     ["S&P 500", "NASDAQ", "Gold", "Oil"].includes(asset)
