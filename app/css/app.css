@@ -297,6 +297,37 @@ body {
     }
 }
 
+/* ── Agent Activity Badge ── */
+.agent-badge {
+    align-self: flex-start;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    margin-top: -6px;
+    margin-bottom: 2px;
+    background: rgba(139, 92, 246, 0.08);
+    border: 1px solid rgba(139, 92, 246, 0.15);
+    border-radius: 12px;
+    font-size: 0.65rem;
+    color: rgba(139, 92, 246, 0.8);
+    animation: msgFadeIn 0.3s ease;
+}
+
+.agent-icon {
+    font-size: 0.75rem;
+}
+
+.agent-name {
+    font-weight: 600;
+    letter-spacing: 0.3px;
+}
+
+.agent-model {
+    opacity: 0.5;
+    font-size: 0.6rem;
+}
+
 /* ── Reasoning Trace (UI Transparency) ── */
 .reason-trace {
     align-self: flex-start;
