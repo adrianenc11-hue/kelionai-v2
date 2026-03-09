@@ -859,6 +859,7 @@ async function analyzeAsset(asset) {
   const high = Math.max(...prices);
   const low = Math.min(...prices);
   const last = prices[prices.length - 1];
+  const prev = prices.length > 1 ? prices[prices.length - 2] : last;
 
   const rsi = calculateRSI(prices);
   const macd = calculateMACD(prices);
@@ -879,9 +880,17 @@ async function analyzeAsset(asset) {
     sentiment,
   });
 
+  // Format price based on asset type
+  const fmtPrice = asset.includes('/') ? +last.toFixed(5) : +last.toFixed(2);
+  const changePercent = prev !== 0 ? +((last - prev) / prev * 100).toFixed(2) : 0;
+
   return {
     asset,
-    price: last,
+    symbol: asset,
+    price: fmtPrice,
+    signal: confluence.signal,
+    confidence: confluence.confidence,
+    changePercent,
     rsi,
     macd,
     bollinger,
@@ -900,11 +909,19 @@ async function analyzeAsset(asset) {
 
 // GET /status
 router.get("/status", (req, res) => {
+  const positions = tradeEngine.getPositions ? tradeEngine.getPositions() : [];
+  const uptimeSec = process.uptime();
+  const hrs = Math.floor(uptimeSec / 3600);
+  const mins = Math.floor((uptimeSec % 3600) / 60);
   res.json({
     active: true,
+    status: "ACTIVE",
     version: "1.0",
     strategies: STRATEGIES,
     assets: ASSETS,
+    activeTrades: Array.isArray(positions) ? positions.length : 0,
+    uptime: `${hrs}h ${mins}m`,
+    lastUpdate: analysisCache ? new Date(cacheTsMs).toISOString() : new Date().toISOString(),
     lastAnalysis: analysisCache ? new Date(cacheTsMs).toISOString() : null,
     cacheAge: analysisCache
       ? Math.round((Date.now() - cacheTsMs) / 1000) + "s"
@@ -1025,14 +1042,21 @@ router.get("/signals", async (req, res) => {
           ? Math.round(entry * (1 + takeProfitPct) * 100) / 100
           : Math.round(entry * (1 - takeProfitPct) * 100) / 100;
 
+        // Format prices based on asset type
+        const fmt = asset.includes('/') ? 5 : 2;
         return {
           asset,
+          symbol: asset,
           signal: confluence.signal,
           confidence: confluence.confidence,
-          entry,
-          stopLoss: stop,
-          takeProfit: target,
+          entry: +entry.toFixed(fmt),
+          target: +target.toFixed(fmt),
+          stopLoss: +stop.toFixed(fmt),
+          takeProfit: +target.toFixed(fmt),
+          riskReward: +(takeProfitPct / stopLossPct).toFixed(1),
+          timeframe: "4h",
           rsi: rsi.value,
+          generatedAt: new Date().toISOString(),
           timestamp: new Date().toISOString(),
         };
       })
