@@ -1087,6 +1087,30 @@ When asked "what can you do?" list these real capabilities. Use them proactively
         }
       }
 
+      // Step 10: CRITIC AGENT — Independent quality validation (medium+ complexity)
+      let criticReport = null;
+      if (complexityResult.level >= 2 && cleanReply.length > 30) {
+        criticReport = await this.criticEvaluate(message, cleanReply, analysis, toolsUsedList).catch(() => null);
+        if (criticReport) {
+          // Critic can override confidence
+          if (criticReport.overallScore < confidence) {
+            confidence = (confidence * 0.6) + (criticReport.overallScore * 0.4);
+          }
+          // Add safety disclaimers if needed
+          if (criticReport.safety && !criticReport.safety.safe) {
+            if (criticReport.safety.severity === "critical") {
+              cleanReply = "⚠️ Conținut blocat de Critic Agent din motive de siguranță.";
+              sourceTags.push("CRITIC_BLOCKED");
+            } else if (criticReport.safety.severity === "high" && !cleanReply.includes("medic") && !cleanReply.includes("doctor")) {
+              cleanReply += "\n\n*⚕️ Notă: Consultă un specialist pentru sfaturi medicale/financiare.*";
+            }
+          }
+          if (criticReport.verdict === "REJECTED" || criticReport.verdict === "NEEDS_REVISION") {
+            sourceTags.push("CRITIC_" + criticReport.verdict);
+          }
+        }
+      }
+
       return {
         enrichedMessage: cleanReply,
         enrichedContext: enriched,
@@ -1102,6 +1126,7 @@ When asked "what can you do?" list these real capabilities. Use them proactively
         agent: agent ? agent.name : "default",
         profileLoaded: !!profile,
         truthReport,
+        criticReport,
         complexityLevel: complexityResult,
         modelRoute,
       };
@@ -3529,6 +3554,293 @@ Rules:
   }
 
   // ═══════════════════════════════════════════════════════════
+  // 9.6b CRITIC AGENT — Independent response validation layer
+  // Separate from Truth Guard: evaluates quality, consistency,
+  // relevance, safety, and completeness of AI responses
+  // ═══════════════════════════════════════════════════════════
+
+  /**
+   * Check if response contradicts itself.
+   * Returns: { consistent, issues[] }
+   */
+  _checkConsistency(responseText) {
+    const issues = [];
+
+    // Split into sentences
+    const sentences = responseText.split(/[.!?]\s+/).filter(s => s.length > 10);
+    if (sentences.length < 2) return { consistent: true, issues: [] };
+
+    // Check for direct contradictions
+    const contradictionPairs = [
+      [/\b(da|yes)\b/i, /\b(nu|no)\b/i],
+      [/\b(poate|can)\b/i, /\b(nu (se )?poate|cannot|can't)\b/i],
+      [/\b(sigur|certainly|definitely)\b/i, /\b(nesigur|uncertain|maybe|poate)\b/i],
+      [/\b(recoman[d]|suggest|advise)\b/i, /\b(nu recoman[d]|do not suggest|avoid)\b/i],
+      [/\b(crescut|increased|grew)\b/i, /\b(scazut|decreased|dropped)\b/i],
+    ];
+
+    for (let i = 0; i < sentences.length - 1; i++) {
+      for (let j = i + 1; j < Math.min(sentences.length, i + 4); j++) {
+        for (const [pattern1, pattern2] of contradictionPairs) {
+          if (
+            (pattern1.test(sentences[i]) && pattern2.test(sentences[j])) ||
+            (pattern2.test(sentences[i]) && pattern1.test(sentences[j]))
+          ) {
+            // Check if they refer to the same topic (share 2+ words)
+            const words_i = sentences[i].toLowerCase().split(/\s+/).filter(w => w.length > 3);
+            const words_j = sentences[j].toLowerCase().split(/\s+/).filter(w => w.length > 3);
+            const shared = words_i.filter(w => words_j.includes(w));
+            if (shared.length >= 2) {
+              issues.push({
+                type: "contradiction",
+                sentence1: sentences[i].substring(0, 80),
+                sentence2: sentences[j].substring(0, 80),
+                sharedContext: shared.join(", "),
+              });
+            }
+          }
+        }
+      }
+    }
+
+    return { consistent: issues.length === 0, issues };
+  }
+
+  /**
+   * Check if response actually addresses the user's question.
+   * Returns: { relevant, score 0-1, reason }
+   */
+  _checkRelevance(userMessage, responseText) {
+    if (!userMessage || !responseText) return { relevant: true, score: 1.0, reason: "no input" };
+
+    // Extract key topics from user message
+    const userWords = userMessage.toLowerCase()
+      .replace(/[^\w\săîâșț]/g, "")
+      .split(/\s+/)
+      .filter(w => w.length > 3 && !["care", "este", "sunt", "asta", "acesta", "aceasta", "pentru", "despre", "this", "that", "what", "from", "with", "have"].includes(w));
+
+    if (userWords.length === 0) return { relevant: true, score: 1.0, reason: "short query" };
+
+    // Check how many user topic words appear in response
+    const responseLower = responseText.toLowerCase();
+    const found = userWords.filter(w => responseLower.includes(w));
+    const score = found.length / userWords.length;
+
+    // Question type detection
+    const isQuestion = /\?|ce |cum |cand |unde |cine |de ce |cat |how |what |when |where |who |why /.test(userMessage.toLowerCase());
+
+    // If it's a question but response looks like a generic filler, flag it
+    const genericFillers = [
+      /nu am informatii/i,
+      /nu stiu exact/i,
+      /as putea sa/i,
+      /in general/i,
+      /depinde de/i,
+    ];
+    const isGeneric = genericFillers.some(p => p.test(responseText)) && responseText.length < 200;
+
+    if (isQuestion && isGeneric) {
+      return { relevant: false, score: 0.3, reason: "generic filler to specific question" };
+    }
+
+    return {
+      relevant: score >= 0.2,
+      score: Math.min(score * 1.5, 1.0), // Boost slightly — partial matches are ok
+      reason: score < 0.2 ? `low topic overlap (${found.length}/${userWords.length})` : "topic match ok",
+    };
+  }
+
+  /**
+   * Check response for harmful, dangerous, or inappropriate content.
+   * Returns: { safe, flags[], severity }
+   */
+  _checkSafety(responseText) {
+    const flags = [];
+
+    // Financial advice without disclaimers
+    if (/\b(invest|cumpara|vinde|buy|sell|trading)\b/i.test(responseText) &&
+      !/\b(risc|risk|disclaimer|nu constituie sfat|not financial advice|prudenta|careful)\b/i.test(responseText)) {
+      flags.push({ type: "financial_no_disclaimer", severity: "medium" });
+    }
+
+    // Medical advice without disclaimers
+    if (/\b(medica[lm]|tratament|pastil|diagnos|boal|symptom|treatment|pill|medicine)\b/i.test(responseText) &&
+      !/\b(doctor|medic|specialist|consulta|profesionist|professional|nu inlocui)\b/i.test(responseText)) {
+      flags.push({ type: "medical_no_disclaimer", severity: "high" });
+    }
+
+    // Dangerous instructions
+    if (/\b(exploziv|arma|otrav|hack|sparg|bomb|weapon|poison|exploit|vulnerability)\b/i.test(responseText)) {
+      flags.push({ type: "dangerous_content", severity: "critical" });
+    }
+
+    // Personal data exposure patterns
+    if (/\b(\d{13,16}|\d{3}-\d{2}-\d{4}|[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,})\b/i.test(responseText)) {
+      flags.push({ type: "possible_pii", severity: "medium" });
+    }
+
+    const maxSeverity = flags.reduce((max, f) => {
+      const order = { low: 0, medium: 1, high: 2, critical: 3 };
+      return order[f.severity] > order[max] ? f.severity : max;
+    }, "low");
+
+    return {
+      safe: flags.length === 0 || maxSeverity === "low",
+      flags,
+      severity: flags.length > 0 ? maxSeverity : "none",
+    };
+  }
+
+  /**
+   * Full Critic Agent evaluation — runs all checks and produces a verdict.
+   * Returns: { verdict, overallScore, consistency, relevance, safety, suggestions[], durationMs }
+   */
+  async criticEvaluate(userMessage, responseText, analysis, toolsUsed = []) {
+    const startTime = Date.now();
+
+    const report = {
+      verdict: "APPROVED",
+      overallScore: 1.0,
+      consistency: null,
+      relevance: null,
+      safety: null,
+      suggestions: [],
+      durationMs: 0,
+    };
+
+    try {
+      // 1. Consistency check
+      report.consistency = this._checkConsistency(responseText);
+      if (!report.consistency.consistent) {
+        report.suggestions.push("⚠️ Răspunsul conține posibile contradicții");
+        report.overallScore *= 0.7;
+      }
+
+      // 2. Relevance check
+      report.relevance = this._checkRelevance(userMessage, responseText);
+      if (!report.relevance.relevant) {
+        report.suggestions.push("⚠️ Răspunsul nu pare să adreseze direct întrebarea");
+        report.overallScore *= 0.5;
+      } else {
+        report.overallScore *= report.relevance.score;
+      }
+
+      // 3. Safety check
+      report.safety = this._checkSafety(responseText);
+      if (!report.safety.safe) {
+        if (report.safety.severity === "critical") {
+          report.suggestions.push("🚫 Conținut potențial periculos detectat");
+          report.overallScore *= 0.1;
+        } else if (report.safety.severity === "high") {
+          report.suggestions.push("⚠️ Sfat medical/financiar fără disclaimer adecvat");
+          report.overallScore *= 0.5;
+        } else {
+          report.suggestions.push("ℹ️ Verifică conținutul pentru date personale");
+          report.overallScore *= 0.8;
+        }
+      }
+
+      // 4. Length/quality heuristics
+      if (responseText.length < 20 && userMessage.length > 50) {
+        report.suggestions.push("ℹ️ Răspuns prea scurt pentru o întrebare detaliată");
+        report.overallScore *= 0.7;
+      }
+
+      // 5. AI-powered deep critique (for complex tasks only)
+      if (analysis?.complexityLevel >= 3 && (this.groqKey || this.geminiKey)) {
+        try {
+          const prompt = `You are a response critic. Rate this AI response on a 1-10 scale.
+
+USER ASKED: "${userMessage.substring(0, 200)}"
+AI REPLIED: "${responseText.substring(0, 500)}"
+
+Respond with EXACTLY this JSON:
+{"score": 1-10, "issues": ["issue1", "issue2"], "missing": ["what should have been included"]}
+
+Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropriateness.`;
+
+          const useGroq = !!this.groqKey;
+          let aiResponse;
+
+          if (useGroq) {
+            const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+              method: "POST",
+              headers: { "Content-Type": "application/json", Authorization: `Bearer ${this.groqKey}` },
+              body: JSON.stringify({
+                model: "llama-3.3-70b-versatile",
+                messages: [{ role: "user", content: prompt }],
+                max_tokens: 300,
+                temperature: 0.1,
+                response_format: { type: "json_object" },
+              }),
+              signal: AbortSignal.timeout(4000),
+            });
+            const d = await r.json();
+            aiResponse = d.choices?.[0]?.message?.content;
+          } else {
+            const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${this.geminiKey}`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                contents: [{ parts: [{ text: prompt }] }],
+                generationConfig: { maxOutputTokens: 300, temperature: 0.1, responseMimeType: "application/json" },
+              }),
+              signal: AbortSignal.timeout(4000),
+            });
+            const d = await r.json();
+            aiResponse = d.candidates?.[0]?.content?.parts?.[0]?.text;
+          }
+
+          if (aiResponse) {
+            const critique = JSON.parse(aiResponse);
+            const aiScore = (critique.score || 7) / 10;
+            report.overallScore = (report.overallScore * 0.6) + (aiScore * 0.4);
+            if (critique.issues && Array.isArray(critique.issues)) {
+              for (const issue of critique.issues.slice(0, 3)) {
+                report.suggestions.push("🤖 " + issue);
+              }
+            }
+            if (critique.missing && Array.isArray(critique.missing)) {
+              for (const m of critique.missing.slice(0, 2)) {
+                report.suggestions.push("📝 Lipsește: " + m);
+              }
+            }
+          }
+        } catch (e) {
+          // AI critique failed — use heuristic score only
+          logger.warn({ component: "CriticAgent", err: e.message }, "AI critique failed");
+        }
+      }
+
+      // 6. Final verdict
+      if (report.overallScore < 0.2) report.verdict = "REJECTED";
+      else if (report.overallScore < 0.4) report.verdict = "NEEDS_REVISION";
+      else if (report.overallScore < 0.6) report.verdict = "CAUTION";
+      else if (report.overallScore < 0.8) report.verdict = "APPROVED_WITH_NOTES";
+      else report.verdict = "APPROVED";
+
+      report.durationMs = Date.now() - startTime;
+
+      logger.info({
+        component: "CriticAgent",
+        verdict: report.verdict,
+        score: report.overallScore.toFixed(2),
+        consistent: report.consistency?.consistent,
+        relevant: report.relevance?.relevant,
+        safe: report.safety?.safe,
+        suggestions: report.suggestions.length,
+        ms: report.durationMs,
+      }, `🎭 Critic: ${report.verdict} | score:${(report.overallScore * 100).toFixed(0)}% | ${report.suggestions.length} notes | ${report.durationMs}ms`);
+
+      return report;
+    } catch (e) {
+      report.durationMs = Date.now() - startTime;
+      report.suggestions.push("Critic evaluation error: " + e.message);
+      logger.warn({ component: "CriticAgent", err: e.message }, "Critic evaluation error");
+      return report;
+    }
+  }
+
   // ═══════════════════════════════════════════════════════════
   // 9.7 PROJECT MEMORY — Track user projects and context
   // Kelion knows what projects you're working on, their status,
