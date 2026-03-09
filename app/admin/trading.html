@@ -195,6 +195,118 @@
             border: 1px solid rgba(255, 255, 255, 0.08);
             border-radius: 10px;
             padding: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .asset-card:hover {
+            background: rgba(0, 255, 255, 0.06);
+            border-color: rgba(0, 255, 255, 0.25);
+            transform: translateY(-2px);
+        }
+
+        .data-source {
+            font-size: 0.65rem;
+            color: #555;
+            margin-top: 6px;
+        }
+
+        .data-source.real {
+            color: #00dd66;
+        }
+
+        .data-source.stale {
+            color: #ffc800;
+        }
+
+        .data-source.nodata {
+            color: #ff6666;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .modal-overlay.open {
+            display: flex;
+        }
+
+        .modal-content {
+            background: #0d0d24;
+            border: 1px solid rgba(0, 255, 255, 0.2);
+            border-radius: 14px;
+            width: 100%;
+            max-width: 900px;
+            max-height: 90vh;
+            overflow-y: auto;
+            padding: 24px;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .modal-close {
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            color: #fff;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 1.1rem;
+        }
+
+        .modal-close:hover {
+            background: rgba(255, 60, 60, 0.3);
+        }
+
+        .chart-container {
+            width: 100%;
+            height: 400px;
+            margin-bottom: 16px;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .detail-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 10px;
+        }
+
+        .detail-item {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 8px;
+            padding: 10px;
+        }
+
+        .detail-label2 {
+            font-size: 0.7rem;
+            color: #888;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+
+        .detail-val2 {
+            font-size: 1rem;
+            color: #00ffff;
+            font-weight: bold;
         }
 
         .asset-name {
@@ -489,6 +601,18 @@
         </div>
     </div>
 
+    <!-- ASSET DETAIL MODAL -->
+    <div class="modal-overlay" id="asset-modal" onclick="if(event.target===this)closeModal()">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modal-title" style="color:#00ffff;margin:0;">—</h2>
+                <button class="modal-close" onclick="closeModal()">✕</button>
+            </div>
+            <div class="chart-container" id="chart-container"></div>
+            <div class="detail-grid" id="modal-details"></div>
+        </div>
+    </div>
+
     <script>
         'use strict';
 
@@ -558,13 +682,18 @@
                 snapshot.analysis = data;
                 const assets = data.assets || data.analysis || [];
                 if (!assets.length) { el.innerHTML = '<div class="empty-state">No analysis available.</div>'; return; }
-                el.innerHTML = assets.map(a => `
-                    <div class="asset-card">
+                el.innerHTML = assets.map(a => {
+                    const srcClass = !a.dataSource ? '' : a.dataSource.includes('SIMULATED') || a.dataSource === 'NO_DATA' ? 'nodata' : a.dataSource.includes('stale') ? 'stale' : 'real';
+                    const srcLabel = a.dataSource || 'unknown';
+                    return `
+                    <div class="asset-card" onclick="openAssetDetail('${escHtml(a.symbol || a.asset)}')">
                         <div class="asset-name">${escHtml(a.symbol || a.asset)}</div>
                         <div class="asset-price">${escHtml(a.price ? String(a.price) : '—')}</div>
                         <span class="signal-badge ${signalClass(a.signal)}">${escHtml(a.signal || 'HOLD')}</span>
                         ${a.changePercent != null ? `<div style="font-size:0.78rem;margin-top:6px;color:${parseFloat(a.changePercent) >= 0 ? '#00dd66' : '#ff6666'}">${parseFloat(a.changePercent) >= 0 ? '+' : ''}${escHtml(String(a.changePercent))}%</div>` : ''}
-                    </div>`).join('');
+                        <div class="data-source ${srcClass}">📡 ${escHtml(srcLabel)}</div>
+                    </div>`;
+                }).join('');
             } catch (e) {
                 el.innerHTML = `<div class="error-msg">Analysis error: ${escHtml(e.message)}</div>`;
             }
@@ -690,6 +819,62 @@
         }
 
         loadAll();
+
+        // ═══ ASSET DETAIL MODAL ═══
+        const TV_SYMBOLS = {
+            BTC: 'BINANCE:BTCUSDT', ETH: 'BINANCE:ETHUSDT', SOL: 'BINANCE:SOLUSDT',
+            'EUR/USD': 'FX:EURUSD', 'GBP/USD': 'FX:GBPUSD',
+            'S&P 500': 'SP:SPX', NASDAQ: 'NASDAQ:IXIC', Gold: 'TVC:GOLD', Oil: 'TVC:USOIL'
+        };
+
+        function openAssetDetail(symbol) {
+            document.getElementById('modal-title').textContent = '📊 ' + symbol;
+            const chartEl = document.getElementById('chart-container');
+            const detailsEl = document.getElementById('modal-details');
+            const tvSymbol = TV_SYMBOLS[symbol] || 'BINANCE:BTCUSDT';
+
+            // TradingView widget
+            chartEl.innerHTML = `<iframe src="https://s.tradingview.com/widgetembed/?hideideas=1&overrides={}" style="width:100%;height:100%;border:none;"
+                srcdoc='<html><body style="margin:0"><div class="tradingview-widget-container"><div id="tv"></div></div>
+                <script src="https://s.tradingview.com/tv.js"><\/script>
+                <script>new TradingView.widget({container_id:"tv",autosize:true,symbol:"${tvSymbol}",interval:"60",timezone:"Etc/UTC",theme:"dark",style:"1",locale:"en",toolbar_bg:"#0a0a1a",enable_publishing:false,hide_top_toolbar:false,hide_legend:false,save_image:false,backgroundColor:"#0a0a1a",gridColor:"rgba(255,255,255,0.05)"})<\/script></body></html>'
+            ></iframe>`;
+
+            // Find asset data from snapshot
+            const assets = snapshot.analysis?.assets || [];
+            const a = assets.find(x => (x.symbol || x.asset) === symbol) || {};
+            const signals = snapshot.signals?.signals || [];
+            const sig = signals.find(x => (x.symbol || x.asset) === symbol) || {};
+
+            detailsEl.innerHTML = [
+                { label: 'Price', value: a.price || sig.entry || '—' },
+                { label: 'Signal', value: a.signal || sig.signal || '—' },
+                { label: 'Confidence', value: (a.confidence || sig.confidence || '—') + '%' },
+                { label: 'RSI', value: a.rsi?.value ?? sig.rsi ?? '—' },
+                { label: 'MACD Signal', value: a.macd?.crossSignal || '—' },
+                { label: 'Bollinger', value: a.bollinger?.signal || '—' },
+                { label: 'EMA Cross', value: a.ema?.signal || '—' },
+                { label: 'Volume Phase', value: a.volume?.phase || '—' },
+                { label: 'Sentiment', value: a.sentiment?.label || '—' },
+                { label: 'Entry', value: sig.entry || '—' },
+                { label: 'Target', value: sig.target || '—' },
+                { label: 'Stop Loss', value: sig.stopLoss || '—' },
+                { label: 'Data Source', value: a.dataSource || '—' },
+                { label: 'Change %', value: a.changePercent != null ? a.changePercent + '%' : '—' },
+            ].map(d => `<div class="detail-item">
+                <div class="detail-label2">${escHtml(d.label)}</div>
+                <div class="detail-val2">${escHtml(String(d.value))}</div>
+            </div>`).join('');
+
+            document.getElementById('asset-modal').classList.add('open');
+        }
+
+        function closeModal() {
+            document.getElementById('asset-modal').classList.remove('open');
+            document.getElementById('chart-container').innerHTML = '';
+        }
+
+        document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
 
         // Auto-refresh every 30 seconds
         setInterval(() => { if (adminSecret) loadAll(); }, 30000);
