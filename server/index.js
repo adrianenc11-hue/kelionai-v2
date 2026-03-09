@@ -71,6 +71,7 @@ const identityRouter = require("./routes/identity");
 const voiceCloneRouter = require("./routes/voice-clone");
 const messengerBot = require("./messenger");
 const instagramBot = require("./instagram");
+const tradingRouter = require("./trading");
 
 const app = express();
 app.set("trust proxy", 1);
@@ -351,6 +352,20 @@ app.get("/admin/", (req, res) => {
 });
 app.use("/admin", express.static(path.join(__dirname, "..", "app", "admin")));
 
+// Admin trading page — serve with CSP nonce injection
+const _rawTradingHtml = fs.existsSync(path.join(__dirname, "..", "app", "admin", "trading.html"))
+  ? fs.readFileSync(path.join(__dirname, "..", "app", "admin", "trading.html"), "utf8")
+  : null;
+app.get("/admin/trading.html", (req, res) => {
+  if (!_rawTradingHtml) return res.status(404).send("Trading page not found");
+  const nonce = res.locals.cspNonce || "";
+  const html = _rawTradingHtml.replace(
+    /<script\b(?![^>]*\bnonce=)/g,
+    `<script nonce="${nonce}"`,
+  );
+  res.type("html").send(html);
+});
+
 app.use(express.static(path.join(__dirname, "..", "app")));
 app.use("/api", globalLimiter);
 const PORT = process.env.PORT || 3000;
@@ -435,6 +450,7 @@ app.use("/api/export", exportRouter);
 // ═══ MESSENGER + INSTAGRAM WEBHOOKS ═══
 app.use("/api/messenger", messengerBot.router);
 app.use("/api/instagram", instagramBot.router);
+app.use("/api/trading", tradingRouter);
 
 // Alias: /api/admin/media-history → proxy to /api/media/history
 app.get("/api/admin/media-history", (req, res) => {
