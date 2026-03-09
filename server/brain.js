@@ -7798,9 +7798,12 @@ Raspunde STRICT JSON. Daca nimic: {}`;
       timestamp: new Date().toISOString(),
       positions: [],
       portfolio: null,
+      supabaseHistory: null,
+      strategyAnalysis: null,
+      botAdjustments: null,
     };
     try {
-      // Try to get portfolio from Binance
+      // ═══ 1. BINANCE PORTFOLIO ═══
       if (process.env.BINANCE_API_KEY) {
         const crypto = require("crypto");
         const timestamp = Date.now();
@@ -7830,24 +7833,153 @@ Raspunde STRICT JSON. Daca nimic: {}`;
             }));
         }
       }
-      // Get recent trades from Supabase
+
+      // ═══ 2. READ ALL SUPABASE TRADE HISTORY ═══
       if (this.supabaseAdmin) {
-        const { data: trades } = await this.supabaseAdmin
-          .from("trades")
-          .select("*")
+        const history = {};
+
+        // Recent analyses (last 200)
+        const { data: analyses } = await this.supabaseAdmin
+          .from("trading_analyses")
+          .select("asset, signal, confidence, data_source, created_at")
           .order("created_at", { ascending: false })
-          .limit(10);
-        result.recentTrades = trades || [];
+          .limit(200);
+        history.analyses = analyses || [];
+
+        // Recent signals (last 100)
+        const { data: signals } = await this.supabaseAdmin
+          .from("trading_signals")
+          .select("asset, signal, confidence, entry_price, target_price, stop_loss, created_at")
+          .order("created_at", { ascending: false })
+          .limit(100);
+        history.signals = signals || [];
+
+        // All trades
+        const { data: trades } = await this.supabaseAdmin
+          .from("trading_trades")
+          .select("*")
+          .order("opened_at", { ascending: false })
+          .limit(500);
+        history.trades = trades || [];
+
+        // Strategy performance logs  
+        const { data: stratLogs } = await this.supabaseAdmin
+          .from("trading_strategy_log")
+          .select("strategy, outcome, pnl, confidence, created_at")
+          .order("created_at", { ascending: false })
+          .limit(200);
+        history.strategyLogs = stratLogs || [];
+
+        // Daily performance
+        const { data: perf } = await this.supabaseAdmin
+          .from("trading_performance")
+          .select("*")
+          .order("date", { ascending: false })
+          .limit(30);
+        history.dailyPerformance = perf || [];
+
+        history.totalAnalyses = history.analyses.length;
+        history.totalSignals = history.signals.length;
+        history.totalTrades = history.trades.length;
+        history.dataRange = history.analyses.length > 0
+          ? { from: history.analyses[history.analyses.length - 1]?.created_at, to: history.analyses[0]?.created_at }
+          : null;
+
+        result.supabaseHistory = history;
+        result.recentTrades = history.trades.slice(0, 10);
+
+        // ═══ 3. BRAIN ANALYZES PERFORMANCE → STRATEGY ADJUSTMENTS ═══
+        if (history.trades.length > 0) {
+          const closedTrades = history.trades.filter(t => t.status === "closed" && t.pnl != null);
+          const wins = closedTrades.filter(t => t.pnl > 0);
+          const losses = closedTrades.filter(t => t.pnl <= 0);
+          const totalPnl = closedTrades.reduce((s, t) => s + (t.pnl || 0), 0);
+          const winRate = closedTrades.length > 0 ? Math.round((wins.length / closedTrades.length) * 100) : 0;
+
+          // Best and worst strategies
+          const stratPerf = {};
+          closedTrades.forEach(t => {
+            const s = t.strategy || "unknown";
+            if (!stratPerf[s]) stratPerf[s] = { wins: 0, losses: 0, pnl: 0 };
+            if (t.pnl > 0) stratPerf[s].wins++;
+            else stratPerf[s].losses++;
+            stratPerf[s].pnl += t.pnl || 0;
+          });
+
+          const bestStrategy = Object.entries(stratPerf)
+            .sort((a, b) => b[1].pnl - a[1].pnl)[0];
+          const worstStrategy = Object.entries(stratPerf)
+            .sort((a, b) => a[1].pnl - b[1].pnl)[0];
+
+          result.strategyAnalysis = {
+            totalTrades: closedTrades.length,
+            wins: wins.length,
+            losses: losses.length,
+            winRate,
+            totalPnl: +totalPnl.toFixed(2),
+            bestStrategy: bestStrategy ? { name: bestStrategy[0], ...bestStrategy[1] } : null,
+            worstStrategy: worstStrategy ? { name: worstStrategy[0], ...worstStrategy[1] } : null,
+            strategiesAnalyzed: Object.keys(stratPerf).length,
+          };
+
+          // ═══ 4. BOT CONTROL — ADJUST RISK PROFILE BASED ON PERFORMANCE ═══
+          try {
+            const tradeExecutor = require("./trade-executor");
+            const marketLearner = require("./market-learner");
+            const adjustments = [];
+
+            // If win rate < 40%, switch to conservative
+            if (winRate < 40 && closedTrades.length >= 5) {
+              tradeExecutor.setRiskProfile("conservative");
+              adjustments.push("Risk → CONSERVATIVE (win rate " + winRate + "%)");
+            }
+            // If win rate > 65%, can be more aggressive
+            else if (winRate > 65 && closedTrades.length >= 10) {
+              tradeExecutor.setRiskProfile("aggressive");
+              adjustments.push("Risk → AGGRESSIVE (win rate " + winRate + "%)");
+            }
+
+            // Update indicator weights based on which signals led to wins
+            const signalAccuracy = {};
+            closedTrades.forEach(t => {
+              if (t.raw_data?.indicators) {
+                Object.entries(t.raw_data.indicators).forEach(([ind, sig]) => {
+                  if (!signalAccuracy[ind]) signalAccuracy[ind] = { correct: 0, total: 0 };
+                  signalAccuracy[ind].total++;
+                  if (t.pnl > 0) signalAccuracy[ind].correct++;
+                });
+              }
+            });
+
+            // Feed accuracy back to market learner
+            Object.entries(signalAccuracy).forEach(([ind, stats]) => {
+              if (stats.total >= 3) {
+                const accuracy = stats.correct / stats.total;
+                marketLearner.recordOutcome(ind, accuracy > 0.5 ? "win" : "loss");
+                adjustments.push(`${ind}: accuracy ${Math.round(accuracy * 100)}% → weight updated`);
+              }
+            });
+
+            result.botAdjustments = adjustments.length > 0 ? adjustments : ["No adjustments needed yet"];
+          } catch (e) {
+            result.botAdjustments = ["Control loop error: " + e.message];
+          }
+        } else {
+          result.strategyAnalysis = { note: "No closed trades yet — brain will analyze after first trades" };
+          result.botAdjustments = ["Waiting for trade data to optimize strategy"];
+        }
       }
     } catch (e) {
       result.error = e.message;
     }
     await this._logAdminAction("trading", { action }, result);
     const posCount = result.portfolio?.length || 0;
+    const histCount = result.supabaseHistory?.totalAnalyses || 0;
+    const tradeCount = result.supabaseHistory?.totalTrades || 0;
     return {
       type: "adminTrading",
       data: result,
-      summary: `${posCount} active pe Binance${result.recentTrades?.length ? `, ${result.recentTrades.length} trade-uri recente` : ""}`,
+      summary: `${posCount} active pe Binance, ${histCount} analize în Supabase, ${tradeCount} trade-uri, ${result.botAdjustments?.[0] || "brain monitoring"}`,
     };
   }
 
