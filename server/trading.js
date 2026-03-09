@@ -360,10 +360,19 @@ function calculateConfluence(signals) {
     volume: learned.VolumeProfile || 10,
     sentiment: learned.Sentiment || 10,
   };
-  const scoreMap = { BUY: 1, HOLD: 0, SELL: -1 };
+  // Extended scoreMap: handle all possible signal types
+  const scoreMap = {
+    "STRONG BUY": 1, "BUY": 0.7, "HOLD": 0, "SELL": -0.7, "STRONG SELL": -1,
+    "OVERBOUGHT": -0.5, "OVERSOLD": 0.5,
+    "bullish": 0.7, "bearish": -0.7, "neutral": 0,
+    "BULLISH": 0.7, "BEARISH": -0.7,
+    "accumulation": 0.5, "distribution": -0.5,
+    "above_upper": -0.3, "below_lower": 0.3,
+  };
 
   let weightedScore = 0;
   let totalWeight = 0;
+  let activeSignals = 0;
 
   const map = {
     rsi: signals.rsi?.signal,
@@ -371,7 +380,7 @@ function calculateConfluence(signals) {
     bollinger: signals.bollinger?.signal,
     ema: signals.ema?.signal,
     fibonacci: signals.fibonacci?.signal,
-    volume: signals.volume?.signal,
+    volume: signals.volume?.signal || signals.volume?.phase,
     sentiment:
       signals.sentiment?.label === "bullish"
         ? "BUY"
@@ -384,21 +393,29 @@ function calculateConfluence(signals) {
     if (sig && scoreMap[sig] !== undefined) {
       weightedScore += scoreMap[sig] * weights[key];
       totalWeight += weights[key];
+      if (scoreMap[sig] !== 0) activeSignals++;
+    } else if (sig) {
+      // Unknown signal — count weight but score 0 (neutral)
+      totalWeight += weights[key];
     }
   }
 
   if (totalWeight === 0) return { signal: "HOLD", confidence: 0, weightsUsed: weights };
 
   const normalized = weightedScore / totalWeight; // -1 to 1
-  const confidence = Math.round(Math.abs(normalized) * 100);
+  // Confidence: scale to 0-100 based on agreement strength
+  const rawConfidence = Math.abs(normalized) * 100;
+  // Boost confidence when multiple signals agree
+  const agreementBonus = Math.min(20, activeSignals * 5);
+  const confidence = Math.min(100, Math.round(rawConfidence + agreementBonus));
 
   let signal = "HOLD";
-  if (normalized >= 0.6) signal = "STRONG BUY";
-  else if (normalized >= 0.2) signal = "BUY";
-  else if (normalized <= -0.6) signal = "STRONG SELL";
-  else if (normalized <= -0.2) signal = "SELL";
+  if (normalized >= 0.5) signal = "STRONG BUY";
+  else if (normalized >= 0.15) signal = "BUY";
+  else if (normalized <= -0.5) signal = "STRONG SELL";
+  else if (normalized <= -0.15) signal = "SELL";
 
-  return { signal, confidence, weightsUsed: weights };
+  return { signal, confidence, weightsUsed: weights, activeSignals };
 }
 
 // ═══════════════════════════════════════════════════════════════
