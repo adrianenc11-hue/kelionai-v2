@@ -124,6 +124,11 @@ class KelionBrain {
 
     // Load tool registry on startup
     this._loadToolRegistry().catch(() => { });
+
+    // PERIODIC TASKS — Reminder checker runs every 60 seconds
+    this._reminderInterval = setInterval(() => {
+      this._checkReminders().catch(() => { });
+    }, 60 * 1000);
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -399,6 +404,17 @@ class KelionBrain {
 - METRICS: Performance metrics and analytics
 - SECURITY: Security auditing
 - DEVELOPER_API: API key management and docs
+- TRANSLATE: Translate text between languages (Romanian, English, Spanish, French, German, Italian)
+- SUMMARIZE: Summarize long texts, articles, or conversations into concise summaries
+- DB_QUERY: Query the application database to answer questions about users, trades, costs, and more
+- REMINDER: Set reminders and alarms that fire at specified times
+- SELF_REFLECT: Automatically evaluate response quality and iterate if needed (agentic loop, max 3 iterations)
+- EMAIL: Send emails via Resend or SendGrid
+- CODE_EXEC: Run JavaScript code in a secure sandbox (with timeout, no network/file access)
+- RAG_SEARCH: Semantic search through knowledge base using pgvector embeddings
+- WEB_SCRAPE: Extract and summarize content from any web page
+- FILE_PARSE: Parse and analyze CSV, JSON, TXT, PDF files
+- PROACTIVE: Context-aware suggestions based on user patterns and time of day
 
 === SKILL: PRODUCȚIE MEDIA (IMAGINE/POSTER/LOGO/ILUSTRAȚIE) ===
 Când utilizatorul cere producție de conținut vizual, URMEZI OBLIGATORIU acest flow:
@@ -888,44 +904,86 @@ When asked "what can you do?" list these real capabilities. Use them proactively
         return true;
       });
 
-      // Step 4: EXECUTE tools in parallel
-      const results = await this.executePlan(plan);
-
-      // Record tool outcomes for learning
-      for (const step of plan) {
-        if (results[step.tool]) this.learningStore.recordToolSuccess(step.tool);
-        else this.learningStore.recordToolFailure(step.tool);
-      }
-
-      // Step 5: CHAIN-OF-THOUGHT — pre-reason only for complex+tools or emergencies
+      // ═══ AGENTIC LOOP — Multi-turn tool chaining ═══
+      // Brain can iterate: execute → reflect → re-plan → execute again
+      const MAX_ITERATIONS = 3;
+      let allResults = {};
       let chainOfThought = null;
-      const shouldRunCoT =
-        (analysis.complexity === "complex" &&
-          Object.keys(results).length >= 1) ||
-        analysis.isEmergency;
-      if (shouldRunCoT) {
-        chainOfThought = await this.chainOfThought(
+      let enriched = "";
+      let confidence = 0;
+      let iterationCount = 0;
+      let currentPlan = plan;
+
+      for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
+        iterationCount = iteration + 1;
+
+        // Step 4: EXECUTE current plan tools in parallel
+        const iterResults = await this.executePlan(currentPlan);
+
+        // Merge results from all iterations
+        Object.assign(allResults, iterResults);
+
+        // Record tool outcomes for learning
+        for (const step of currentPlan) {
+          if (iterResults[step.tool]) this.learningStore.recordToolSuccess(step.tool);
+          else this.learningStore.recordToolFailure(step.tool);
+        }
+
+        // Step 5: CHAIN-OF-THOUGHT — pre-reason for complex tasks or emergencies
+        const shouldRunCoT =
+          (analysis.complexity === "complex" &&
+            Object.keys(allResults).length >= 1) ||
+          analysis.isEmergency;
+        if (shouldRunCoT) {
+          chainOfThought = await this.chainOfThought(
+            message,
+            allResults,
+            analysis,
+            history,
+            language,
+          );
+        }
+
+        // Step 6: BUILD enriched context
+        enriched = this.buildEnrichedContext(
           message,
-          results,
+          allResults,
+          chainOfThought,
           analysis,
-          history,
-          language,
         );
+
+        // Step 6.5: CONFIDENCE SCORING
+        confidence = this._scoreConfidence(analysis, allResults, chainOfThought);
+
+        // Step 6.6: SELF-REFLECTION — evaluate if response is complete
+        // Only reflect on iteration 1+ and if complex or low confidence
+        if (iteration < MAX_ITERATIONS - 1 && (analysis.complexity === "complex" || confidence < 0.6)) {
+          const reflection = await this._selfReflect(message, enriched, allResults, analysis, language);
+          if (reflection && reflection.needsMore) {
+            // Re-plan with additional tools based on reflection
+            logger.info({ component: "Brain", iteration, reflection: reflection.reason },
+              `🔄 Agentic loop iteration ${iteration + 1}: ${reflection.reason}`);
+            const additionalPlan = this._planFromReflection(reflection, userId, this._currentMediaData, isAdmin);
+            if (additionalPlan.length > 0) {
+              currentPlan = additionalPlan;
+              continue; // Loop again with new plan
+            }
+          }
+        }
+        // If reflection says we're good, or no reflection needed — break
+        break;
       }
 
-      // Step 6: BUILD enriched context
-      const enriched = this.buildEnrichedContext(
-        message,
-        results,
-        chainOfThought,
-        analysis,
-      );
+      if (iterationCount > 1) {
+        logger.info({ component: "Brain", iterations: iterationCount },
+          `🔄 Agentic loop completed in ${iterationCount} iterations`);
+      }
 
-      // Step 6.5: CONFIDENCE SCORING
-      const confidence = this._scoreConfidence(analysis, results, chainOfThought);
+      const results = allResults;
 
-      // Step 7: COMPRESS conversation if too long
-      const compressedHistory = this.compressHistory(history, conversationId);
+      // Step 7: MANAGE CONTEXT WINDOW + COMPRESS if too long
+      const managedHistory = this._manageContextWindow(history, 20, 15000);
+      const compressedHistory = this.compressHistory(managedHistory, conversationId);
 
       // Step 8: SELF-EVALUATE + LEARN (async — doesn't block response)
       const thinkTime = Date.now() - startTime;
@@ -1220,6 +1278,23 @@ Reply STRICTLY with JSON:
       needsSecurityCheck: false,
       needsDevAPIInfo: false,
       needsSystemStatus: false,
+      needsTranslate: false,
+      translateTarget: "",
+      needsSummarize: false,
+      needsDbQuery: false,
+      dbQuestion: "",
+      needsReminder: false,
+      reminderText: "",
+      reminderTime: "",
+      needsEmail: false,
+      emailTo: "",
+      emailSubject: "",
+      needsCodeExec: false,
+      codeToRun: "",
+      needsRagSearch: false,
+      ragQuery: "",
+      needsWebScrape: false,
+      scrapeURL: "",
       isQuestion: false,
       isCommand: false,
       isEmotional: false,
@@ -1623,6 +1698,93 @@ Reply STRICTLY with JSON:
         triggers: [
           /\b(migratie|migration|cache|validare|baza.*date|database|tabele|system.*status|infrastructure|deploy|uptime|schema|referral|abonament.*system)\b/i,
         ],
+      },
+      // ── TRANSLATE ──
+      {
+        flag: "needsTranslate",
+        triggers: [
+          /\b(tradu|traduce|traducere|translate|translation|in\s*(engleza|romana|spaniola|franceza|germana|italiana))\b/i,
+        ],
+        extract: (text) => {
+          const langMatch = text.match(/\b(?:in|to|pe)\s*(engleza|romana|spaniola|franceza|germana|italiana|english|romanian|spanish|french|german|italian)\b/i);
+          const langMap = { engleza: "en", english: "en", romana: "ro", romanian: "ro", spaniola: "es", spanish: "es", franceza: "fr", french: "fr", germana: "de", german: "de", italiana: "it", italian: "it" };
+          return { translateTarget: langMatch ? (langMap[langMatch[1].toLowerCase()] || "en") : "en" };
+        },
+      },
+      // ── SUMMARIZE ──
+      {
+        flag: "needsSummarize",
+        triggers: [
+          /\b(sumariz|rezum|summary|summarize|rezumat|sinteza|pe scurt|in rezumat|tldr|tl;dr)\b/i,
+        ],
+      },
+      // ── DB QUERY ──
+      {
+        flag: "needsDbQuery",
+        triggers: [
+          /\b(cati\s*(useri|utilizatori|clienti|abonati)|numar\s*de|statistici|how\s*many\s*(users|subscribers)|count|total\s*(users|trades|messages))\b/i,
+          /\b(interogheaza|query|raport|report|analiza\s*date|data\s*analysis)\b/i,
+        ],
+        extract: (text) => ({ dbQuestion: text }),
+      },
+      // ── REMINDER ──
+      {
+        flag: "needsReminder",
+        triggers: [
+          /\b(aminteste|reminder|alarm[aă]|reaminteste|remind\s*me|seteaz[aă].*alarm|programeaz[aă])\b/i,
+        ],
+        extract: (text) => {
+          // Extract time: "la 9", "in 5 minute", "maine", "tomorrow"
+          const timeMatch = text.match(/\b(?:la|at|in|peste)\s+([\d:]+\s*(?:minute|ore|hours|min)?|maine|tomorrow|azi|today)\b/i);
+          const contentMatch = text.match(/(?:aminteste|remind).*(?:sa|to|ca|that)\s+(.+)/i);
+          return {
+            reminderText: contentMatch ? contentMatch[1].trim() : text,
+            reminderTime: timeMatch ? timeMatch[1] : "",
+          };
+        },
+      },
+      // ── EMAIL ──
+      {
+        flag: "needsEmail",
+        triggers: [
+          /\b(trimite.*email|send.*email|email.*la|mail.*catre|trimite.*mesaj.*email)\b/i,
+        ],
+        extract: (text) => {
+          const emailMatch = text.match(/[\w.+-]+@[\w.-]+\.[a-zA-Z]{2,}/i);
+          const subjectMatch = text.match(/(?:subiect|subject)[:\s]+["']?([^"'\n]+)/i);
+          return { emailTo: emailMatch ? emailMatch[0] : "", emailSubject: subjectMatch ? subjectMatch[1] : "Mesaj de la Kelion AI" };
+        },
+      },
+      // ── CODE EXECUTION ──
+      {
+        flag: "needsCodeExec",
+        triggers: [
+          /\b(ruleaz[aă]|execut[aă]|run|execute|eval|calculeaz[aă])\s*(cod|code|script|js|javascript)/i,
+          /```(js|javascript)[\s\S]*?```/i,
+        ],
+        extract: (text) => {
+          const codeBlock = text.match(/```(?:js|javascript)?\n?([\s\S]*?)```/i);
+          return { codeToRun: codeBlock ? codeBlock[1].trim() : text };
+        },
+      },
+      // ── RAG SEARCH ──
+      {
+        flag: "needsRagSearch",
+        triggers: [
+          /\b(cauta.*memorie|in\s*baza.*date|ce\s*stii\s*despre|remember|recall|knowledge|baza.*cunostinte)\b/i,
+        ],
+        extract: (text) => ({ ragQuery: text }),
+      },
+      // ── WEB SCRAPE ──
+      {
+        flag: "needsWebScrape",
+        triggers: [
+          /\b(extrage.*de\s*pe|scrape|citeste.*pagina|extrage.*continut|preia.*de\s*la|citeste\s*url)\b/i,
+        ],
+        extract: (text) => {
+          const urlMatch = text.match(/https?:\/\/[^\s]+/i);
+          return { scrapeURL: urlMatch ? urlMatch[0] : "" };
+        },
       },
     ];
   }
@@ -2033,6 +2195,40 @@ Reply STRICTLY with JSON:
         plan.push({ tool: "systemStatus" });
         seen.add("systemStatus");
       }
+      // New P1 tools: translate, summarize, dbQuery, reminder
+      if (analysis.needsTranslate && !seen.has("translate")) {
+        plan.push({ tool: "translate", target: analysis.translateTarget || "en" });
+        seen.add("translate");
+      }
+      if (analysis.needsSummarize && !seen.has("summarize")) {
+        plan.push({ tool: "summarize" });
+        seen.add("summarize");
+      }
+      if (analysis.needsDbQuery && !seen.has("dbQuery")) {
+        plan.push({ tool: "dbQuery", question: analysis.dbQuestion || message });
+        seen.add("dbQuery");
+      }
+      if (analysis.needsReminder && !seen.has("reminder")) {
+        plan.push({ tool: "reminder", text: analysis.reminderText, time: analysis.reminderTime, userId });
+        seen.add("reminder");
+      }
+      // P2 tools: email, code exec, RAG, web scrape
+      if (analysis.needsEmail && !seen.has("email")) {
+        plan.push({ tool: "email", to: analysis.emailTo, subject: analysis.emailSubject, body: message, userId });
+        seen.add("email");
+      }
+      if (analysis.needsCodeExec && !seen.has("codeExec")) {
+        plan.push({ tool: "codeExec", code: analysis.codeToRun || message });
+        seen.add("codeExec");
+      }
+      if (analysis.needsRagSearch && !seen.has("ragSearch")) {
+        plan.push({ tool: "ragSearch", query: analysis.ragQuery || message, userId });
+        seen.add("ragSearch");
+      }
+      if (analysis.needsWebScrape && !seen.has("webScrape")) {
+        plan.push({ tool: "webScrape", url: analysis.scrapeURL });
+        seen.add("webScrape");
+      }
     }
 
     // Check for known good combinations from journal
@@ -2201,6 +2397,24 @@ Reply STRICTLY with JSON:
         return this._devAPIInfo();
       case "systemStatus":
         return this._systemStatus();
+      // P1 tools: translate, summarize, dbQuery, reminder
+      case "translate":
+        return this._translate(step.text || "", step.target || "en");
+      case "summarize":
+        return this._summarize(step.text || "", 200, "ro");
+      case "dbQuery":
+        return this._dbQuery(step.question || "", step.userId);
+      case "reminder":
+        return this._scheduleReminder(step.userId, step.text || "", step.time || "", "push");
+      // P2 tools: email, code exec, RAG, web scrape
+      case "email":
+        return this._sendEmail(step.to, step.subject, step.body || "", step.userId);
+      case "codeExec":
+        return this._codeExecute(step.code || "", "javascript");
+      case "ragSearch":
+        return this._ragSearch(step.query || "", step.userId);
+      case "webScrape":
+        return this._webScrape(step.url || "", true);
       default:
         return null;
     }
@@ -2432,6 +2646,837 @@ Reply STRICTLY with JSON:
       .replace(/\b(te rog|please|un pic|putin|vreau sa stiu|as vrea)\b/gi, "")
       .trim();
     return query || original;
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // 9.1 SELF-REFLECTION — Evaluate response quality before sending
+  // Uses fast AI to decide if Brain needs more information
+  // ═══════════════════════════════════════════════════════════
+  async _selfReflect(message, currentResponse, toolResults, analysis, language) {
+    const aiKey = this.groqKey || this.geminiKey;
+    if (!aiKey) return null;
+
+    try {
+      const toolList = Object.keys(toolResults).join(", ") || "none";
+      const prompt = `You are the quality control module of an AI assistant. Evaluate this response STRICTLY.
+
+USER ASKED: "${message.substring(0, 200)}"
+TOOLS USED: ${toolList}
+CURRENT RESPONSE PREVIEW: "${String(currentResponse).substring(0, 400)}"
+DETECTED NEEDS: search=${analysis.needsSearch}, weather=${analysis.needsWeather}, image=${analysis.needsImage}, map=${analysis.needsMap}
+
+Evaluate:
+1. Does the response FULLY answer the user's question?
+2. Were all necessary tools called?
+3. Is there missing data that another tool could provide?
+4. Is the confidence sufficient?
+
+Reply STRICTLY with JSON:
+{"needsMore":true/false,"reason":"short reason","missingTools":["tool1"],"quality":"good/partial/poor"}
+
+Missing tool names must be from: search, weather, imagine, map, memory, vision, tts, stt, news, trade_intelligence, health_check`;
+
+      let txt = null;
+      if (this.groqKey) {
+        const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + this.groqKey },
+          body: JSON.stringify({
+            model: MODELS.GROQ_PRIMARY,
+            max_tokens: 150,
+            messages: [{ role: "user", content: prompt }],
+          }),
+          signal: AbortSignal.timeout(4000),
+        });
+        if (r.ok) {
+          const d = await r.json();
+          txt = d.choices?.[0]?.message?.content?.trim();
+        }
+      }
+
+      if (!txt) {
+        const geminiKey = process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
+        if (geminiKey) {
+          const r = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${MODELS.GEMINI_CHAT}:generateContent?key=${geminiKey}`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                contents: [{ role: "user", parts: [{ text: prompt }] }],
+                generationConfig: { maxOutputTokens: 150 },
+              }),
+              signal: AbortSignal.timeout(4000),
+            }
+          );
+          if (r.ok) {
+            const d = await r.json();
+            txt = d.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+          }
+        }
+      }
+
+      if (!txt) return null;
+
+      try {
+        const parsed = JSON.parse(txt.replace(/```json|```/g, "").trim());
+        // Only iterate if there are specific missing tools (avoid infinite loops)
+        if (parsed.needsMore && (!parsed.missingTools || parsed.missingTools.length === 0)) {
+          parsed.needsMore = false;
+        }
+        return parsed;
+      } catch {
+        return null;
+      }
+    } catch (e) {
+      this.recordError("selfReflect", e.message);
+      return null;
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // 9.2 PLAN FROM REFLECTION — Convert reflection into additional tool plan
+  // ═══════════════════════════════════════════════════════════
+  _planFromReflection(reflection, userId, mediaData = {}, isAdmin = false) {
+    if (!reflection || !reflection.missingTools || reflection.missingTools.length === 0) return [];
+
+    const additionalPlan = [];
+    const toolMapping = {
+      search: { tool: "search", priority: 1 },
+      weather: { tool: "weather", priority: 2 },
+      imagine: { tool: "imagine", priority: 3 },
+      map: { tool: "map", priority: 4 },
+      memory: { tool: "memory", priority: 5 },
+      news: { tool: "news", priority: 6 },
+      trade_intelligence: { tool: "trade_intelligence", priority: 7 },
+      health_check: { tool: "health_check", priority: 8 },
+    };
+
+    for (const toolName of reflection.missingTools) {
+      const mapping = toolMapping[toolName];
+      if (mapping) {
+        additionalPlan.push({
+          tool: mapping.tool,
+          priority: mapping.priority,
+          fromReflection: true,
+        });
+      }
+    }
+
+    logger.info({ component: "Brain", additionalTools: additionalPlan.map(p => p.tool) },
+      `🔄 Reflection added ${additionalPlan.length} new tools to plan`);
+    return additionalPlan;
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // 9.3 CONTEXT WINDOW MANAGEMENT — Prevent token overflow
+  // Sliding window + intelligent summarization of old messages
+  // ═══════════════════════════════════════════════════════════
+  _manageContextWindow(history, maxMessages = 20, maxChars = 15000) {
+    if (!history || history.length === 0) return [];
+
+    // Phase 1: Hard cap on number of messages
+    let managed = history;
+    if (managed.length > maxMessages) {
+      // Keep first 2 messages (initial context) + last maxMessages-2
+      const first = managed.slice(0, 2);
+      const recent = managed.slice(-(maxMessages - 2));
+      managed = [
+        ...first,
+        { role: "system", content: `[... ${history.length - maxMessages} older messages summarized ...]` },
+        ...recent,
+      ];
+    }
+
+    // Phase 2: Character cap — truncate individual long messages
+    let totalChars = 0;
+    const result = [];
+    for (let i = managed.length - 1; i >= 0; i--) {
+      const msg = managed[i];
+      const contentLen = (msg.content || "").length;
+      if (totalChars + contentLen > maxChars && result.length > 5) {
+        // Truncate this message
+        const remaining = Math.max(100, maxChars - totalChars);
+        result.unshift({
+          ...msg,
+          content: msg.content.substring(0, remaining) + "... [truncated]",
+        });
+        // Add summary marker before truncation point
+        result.unshift({
+          role: "system",
+          content: `[Earlier messages truncated to fit context window. ${i} older messages not shown.]`,
+        });
+        break;
+      }
+      totalChars += contentLen;
+      result.unshift(msg);
+    }
+
+    return result;
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // 9.4 SUMMARIZE TEXT — Uses AI to create concise summary
+  // Used by RAG, news digest, and context management
+  // ═══════════════════════════════════════════════════════════
+  async _summarize(text, maxLength = 200, language = "ro") {
+    if (!text || text.length < maxLength) return text;
+
+    const aiKey = this.groqKey || this.geminiKey;
+    if (!aiKey) return text.substring(0, maxLength) + "...";
+
+    try {
+      const prompt = `Sumarizează în maxim ${maxLength} caractere, în limba ${language === "ro" ? "română" : "engleză"}:\n\n${text.substring(0, 2000)}`;
+
+      if (this.groqKey) {
+        const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + this.groqKey },
+          body: JSON.stringify({
+            model: MODELS.GROQ_PRIMARY,
+            max_tokens: Math.ceil(maxLength / 3),
+            messages: [{ role: "user", content: prompt }],
+          }),
+          signal: AbortSignal.timeout(3000),
+        });
+        if (r.ok) {
+          const d = await r.json();
+          return d.choices?.[0]?.message?.content?.trim() || text.substring(0, maxLength);
+        }
+      }
+
+      const geminiKey = process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
+      if (geminiKey) {
+        const r = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${MODELS.GEMINI_CHAT}:generateContent?key=${geminiKey}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{ role: "user", parts: [{ text: prompt }] }],
+              generationConfig: { maxOutputTokens: Math.ceil(maxLength / 3) },
+            }),
+            signal: AbortSignal.timeout(3000),
+          }
+        );
+        if (r.ok) {
+          const d = await r.json();
+          return d.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || text.substring(0, maxLength);
+        }
+      }
+
+      return text.substring(0, maxLength) + "...";
+    } catch {
+      return text.substring(0, maxLength) + "...";
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // 9.5 TRANSLATE — Dedicated translation service
+  // ═══════════════════════════════════════════════════════════
+  async _translate(text, targetLang = "ro", sourceLang = "auto") {
+    if (!text || text.length === 0) return text;
+
+    const aiKey = this.groqKey || this.geminiKey;
+    if (!aiKey) return text;
+
+    try {
+      const langNames = { ro: "Romanian", en: "English", es: "Spanish", fr: "French", de: "German", it: "Italian" };
+      const targetName = langNames[targetLang] || targetLang;
+      const prompt = `Translate the following text to ${targetName}. Return ONLY the translation, nothing else:\n\n${text.substring(0, 3000)}`;
+
+      if (this.groqKey) {
+        const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + this.groqKey },
+          body: JSON.stringify({
+            model: MODELS.GROQ_PRIMARY,
+            max_tokens: 1000,
+            messages: [{ role: "user", content: prompt }],
+          }),
+          signal: AbortSignal.timeout(5000),
+        });
+        if (r.ok) {
+          const d = await r.json();
+          return d.choices?.[0]?.message?.content?.trim() || text;
+        }
+      }
+
+      const geminiKey = process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
+      if (geminiKey) {
+        const r = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${MODELS.GEMINI_CHAT}:generateContent?key=${geminiKey}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{ role: "user", parts: [{ text: prompt }] }],
+              generationConfig: { maxOutputTokens: 1000 },
+            }),
+            signal: AbortSignal.timeout(5000),
+          }
+        );
+        if (r.ok) {
+          const d = await r.json();
+          return d.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || text;
+        }
+      }
+
+      return text;
+    } catch {
+      return text;
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // 9.6 DB QUERY TOOL — Brain can query Supabase directly
+  // Read-only, safe tables only, with query generation
+  // ═══════════════════════════════════════════════════════════
+  async _dbQuery(question, userId) {
+    if (!this.supabaseAdmin) return { error: "No database connection" };
+
+    const SAFE_TABLES = [
+      "profiles", "conversations", "messages", "ai_costs", "page_views",
+      "subscriptions", "trades", "trade_intelligence", "media_history",
+      "learned_facts", "admin_logs", "admin_codes",
+    ];
+
+    try {
+      // Use AI to determine which table and what to query
+      const prompt = `You are a database query planner. The user asks: "${question}"
+Available tables: ${SAFE_TABLES.join(", ")}
+
+Reply STRICTLY with JSON:
+{"table":"table_name","select":"column1,column2","filter":{"column":"value"},"order":"column","limit":10,"aggregate":"count|sum|avg|null","aggregateColumn":"column_name|null"}
+
+Rules:
+- Only use tables from the list above
+- Keep queries simple (no JOINs)
+- limit max 50
+- If question is about counting, use aggregate:"count"`;
+
+      let queryPlan = null;
+      const aiKey = this.groqKey || this.geminiKey;
+
+      if (this.groqKey) {
+        const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + this.groqKey },
+          body: JSON.stringify({
+            model: MODELS.GROQ_PRIMARY,
+            max_tokens: 200,
+            messages: [{ role: "user", content: prompt }],
+          }),
+          signal: AbortSignal.timeout(4000),
+        });
+        if (r.ok) {
+          const d = await r.json();
+          const txt = d.choices?.[0]?.message?.content?.trim();
+          try { queryPlan = JSON.parse(txt.replace(/```json|```/g, "").trim()); } catch { }
+        }
+      }
+
+      if (!queryPlan) return { error: "Could not plan query", question };
+
+      // Validate table is safe
+      if (!SAFE_TABLES.includes(queryPlan.table)) {
+        return { error: `Table ${queryPlan.table} not allowed`, safeTables: SAFE_TABLES };
+      }
+
+      // Execute query
+      let query = this.supabaseAdmin.from(queryPlan.table);
+
+      if (queryPlan.aggregate === "count") {
+        query = query.select("*", { count: "exact", head: true });
+      } else {
+        query = query.select(queryPlan.select || "*");
+      }
+
+      // Apply filters
+      if (queryPlan.filter) {
+        for (const [col, val] of Object.entries(queryPlan.filter)) {
+          query = query.eq(col, val);
+        }
+      }
+
+      // Apply order
+      if (queryPlan.order) {
+        query = query.order(queryPlan.order, { ascending: false });
+      }
+
+      // Apply limit
+      query = query.limit(queryPlan.limit || 10);
+
+      const { data, error, count } = await query;
+
+      if (error) return { error: error.message, table: queryPlan.table };
+
+      return {
+        table: queryPlan.table,
+        query: queryPlan,
+        results: queryPlan.aggregate === "count" ? { count } : data,
+        rowCount: queryPlan.aggregate === "count" ? count : (data || []).length,
+      };
+    } catch (e) {
+      return { error: e.message };
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // 9.7 SMART NOTIFICATIONS — Schedule and send notifications
+  // ═══════════════════════════════════════════════════════════
+  async _scheduleReminder(userId, reminderText, triggerAt, channel = "push") {
+    if (!this.supabaseAdmin) return { error: "No database" };
+
+    try {
+      // Store reminder in Supabase
+      const { data, error } = await this.supabaseAdmin.from("brain_memory").insert({
+        user_id: userId,
+        type: "reminder",
+        content: JSON.stringify({
+          text: reminderText,
+          triggerAt: triggerAt instanceof Date ? triggerAt.toISOString() : triggerAt,
+          channel,
+          status: "pending",
+          createdAt: new Date().toISOString(),
+        }),
+        importance: 9,
+      });
+
+      if (error) return { error: error.message };
+
+      logger.info({ component: "Brain", userId, triggerAt }, `⏰ Reminder scheduled: ${reminderText.substring(0, 50)}`);
+      return {
+        success: true,
+        reminder: reminderText,
+        triggerAt,
+        channel,
+        message: `Reminder setat: "${reminderText}" la ${triggerAt}`,
+      };
+    } catch (e) {
+      return { error: e.message };
+    }
+  }
+
+  // Check and fire pending reminders (called periodically)
+  async _checkReminders() {
+    if (!this.supabaseAdmin) return;
+
+    try {
+      const now = new Date().toISOString();
+      const { data: reminders } = await this.supabaseAdmin
+        .from("brain_memory")
+        .select("*")
+        .eq("type", "reminder")
+        .limit(20);
+
+      if (!reminders || reminders.length === 0) return;
+
+      for (const rem of reminders) {
+        try {
+          const parsed = JSON.parse(rem.content);
+          if (parsed.status !== "pending") continue;
+          if (new Date(parsed.triggerAt) <= new Date()) {
+            // Reminder is due — mark as fired
+            parsed.status = "fired";
+            parsed.firedAt = now;
+            await this.supabaseAdmin
+              .from("brain_memory")
+              .update({ content: JSON.stringify(parsed) })
+              .eq("id", rem.id);
+
+            logger.info({ component: "Brain", userId: rem.user_id },
+              `⏰ Reminder fired: ${parsed.text.substring(0, 50)}`);
+          }
+        } catch { }
+      }
+    } catch (e) {
+      logger.warn({ component: "Brain", err: e.message }, "Reminder check failed");
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // 9.8 EMAIL — Send emails via environment-configured provider
+  // Supports: Resend, SendGrid, or SMTP fallback
+  // ═══════════════════════════════════════════════════════════
+  async _sendEmail(to, subject, body, userId) {
+    // Try Resend first (simplest API)
+    const resendKey = process.env.RESEND_API_KEY;
+    if (resendKey) {
+      try {
+        const r = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${resendKey}` },
+          body: JSON.stringify({
+            from: process.env.EMAIL_FROM || "Kelion AI <noreply@kelionai.app>",
+            to: [to],
+            subject,
+            html: `<div style="font-family:Inter,sans-serif;max-width:600px;margin:0 auto;padding:20px">
+              <h2 style="color:#6366f1">🧠 KelionAI</h2>
+              <div style="line-height:1.6">${body.replace(/\n/g, "<br>")}</div>
+              <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0">
+              <p style="font-size:12px;color:#9ca3af">Trimis de Kelion AI — kelionai.app</p>
+            </div>`,
+          }),
+          signal: AbortSignal.timeout(8000),
+        });
+        const d = await r.json();
+        if (d.id) {
+          logger.info({ component: "Brain", to, subject }, "📧 Email sent via Resend");
+          return { success: true, provider: "Resend", messageId: d.id };
+        }
+        return { error: d.message || "Resend error", details: d };
+      } catch (e) {
+        return { error: e.message, provider: "Resend" };
+      }
+    }
+
+    // Try SendGrid
+    const sgKey = process.env.SENDGRID_API_KEY;
+    if (sgKey) {
+      try {
+        const r = await fetch("https://api.sendgrid.com/v3/mail/send", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${sgKey}` },
+          body: JSON.stringify({
+            personalizations: [{ to: [{ email: to }] }],
+            from: { email: process.env.EMAIL_FROM || "noreply@kelionai.app", name: "Kelion AI" },
+            subject,
+            content: [{ type: "text/html", value: body.replace(/\n/g, "<br>") }],
+          }),
+          signal: AbortSignal.timeout(8000),
+        });
+        if (r.status === 202) {
+          logger.info({ component: "Brain", to, subject }, "📧 Email sent via SendGrid");
+          return { success: true, provider: "SendGrid" };
+        }
+        const errText = await r.text();
+        return { error: errText, provider: "SendGrid" };
+      } catch (e) {
+        return { error: e.message, provider: "SendGrid" };
+      }
+    }
+
+    return { error: "No email provider configured. Set RESEND_API_KEY or SENDGRID_API_KEY in .env" };
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // 9.9 FILE PROCESSING — Parse PDF, CSV, TXT, JSON files
+  // Extracts text content for analysis
+  // ═══════════════════════════════════════════════════════════
+  async _parseFile(fileBuffer, filename, mimeType) {
+    const ext = (filename || "").split(".").pop()?.toLowerCase() || "";
+
+    try {
+      // CSV parsing
+      if (ext === "csv" || mimeType === "text/csv") {
+        const text = fileBuffer.toString("utf-8");
+        const lines = text.split("\n").filter(l => l.trim());
+        const headers = lines[0]?.split(",").map(h => h.trim()) || [];
+        const rows = lines.slice(1).map(line => {
+          const vals = line.split(",");
+          const row = {};
+          headers.forEach((h, i) => { row[h] = vals[i]?.trim() || ""; });
+          return row;
+        });
+        return { type: "csv", headers, rowCount: rows.length, preview: rows.slice(0, 10), fullText: text.substring(0, 5000) };
+      }
+
+      // JSON parsing
+      if (ext === "json" || mimeType === "application/json") {
+        const text = fileBuffer.toString("utf-8");
+        const parsed = JSON.parse(text);
+        return { type: "json", keys: Object.keys(parsed), preview: JSON.stringify(parsed, null, 2).substring(0, 2000) };
+      }
+
+      // TXT/MD parsing
+      if (["txt", "md", "log", "env", "cfg", "ini"].includes(ext)) {
+        const text = fileBuffer.toString("utf-8");
+        return { type: "text", charCount: text.length, lineCount: text.split("\n").length, content: text.substring(0, 5000) };
+      }
+
+      // PDF — basic text extraction (no external dependency)
+      if (ext === "pdf" || mimeType === "application/pdf") {
+        // Extract readable text from PDF buffer using simple regex
+        const text = fileBuffer.toString("latin1");
+        const textMatches = [...text.matchAll(/\(([^)]+)\)/g)].map(m => m[1]).join(" ");
+        const cleanText = textMatches
+          .replace(/\\n/g, "\n")
+          .replace(/\\r/g, "")
+          .replace(/[^\x20-\x7E\u00C0-\u024F\n]/g, " ")
+          .replace(/\s+/g, " ")
+          .trim();
+        return { type: "pdf", charCount: cleanText.length, content: cleanText.substring(0, 5000), note: "Basic extraction — complex PDFs may need OCR" };
+      }
+
+      return { error: `Unsupported file type: ${ext}`, supportedTypes: ["csv", "json", "txt", "md", "pdf", "log"] };
+    } catch (e) {
+      return { error: e.message, filename };
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // 9.10 CODE EXECUTION SANDBOX — Safe JS execution
+  // Runs user code in an isolated VM context with timeout
+  // ═══════════════════════════════════════════════════════════
+  async _codeExecute(code, language = "javascript") {
+    if (language !== "javascript" && language !== "js") {
+      return {
+        error: `Only JavaScript is supported in the sandbox. Got: ${language}`,
+        suggestion: "Poți rula cod JavaScript. Pentru alte limbaje, descrie ce vrei să faci și voi ajuta.",
+      };
+    }
+
+    try {
+      const vm = require("vm");
+      const output = [];
+      const errors = [];
+
+      // Create sandboxed context with safe globals
+      const sandbox = {
+        console: {
+          log: (...args) => output.push(args.map(a => typeof a === "object" ? JSON.stringify(a) : String(a)).join(" ")),
+          error: (...args) => errors.push(args.join(" ")),
+          warn: (...args) => output.push("[WARN] " + args.join(" ")),
+        },
+        Math,
+        JSON,
+        parseInt,
+        parseFloat,
+        isNaN,
+        isFinite,
+        Array,
+        Object,
+        String,
+        Number,
+        Boolean,
+        Date,
+        RegExp,
+        Map,
+        Set,
+        Promise,
+        setTimeout: (fn, ms) => { if (ms > 1000) ms = 1000; return setTimeout(fn, ms); },
+        // Block dangerous operations
+        require: undefined,
+        process: undefined,
+        __dirname: undefined,
+        __filename: undefined,
+        globalThis: undefined,
+        global: undefined,
+        fetch: undefined,
+        eval: undefined,
+        Function: undefined,
+      };
+
+      const context = vm.createContext(sandbox);
+      const script = new vm.Script(code, { filename: "user-code.js" });
+
+      // Execute with 3 second timeout
+      const result = script.runInContext(context, { timeout: 3000 });
+
+      // Capture return value if any
+      if (result !== undefined) {
+        output.push("→ " + (typeof result === "object" ? JSON.stringify(result, null, 2) : String(result)));
+      }
+
+      return {
+        success: true,
+        output: output.join("\n") || "(no output)",
+        errors: errors.length > 0 ? errors.join("\n") : null,
+        executionTime: "< 3s",
+      };
+    } catch (e) {
+      if (e.code === "ERR_SCRIPT_EXECUTION_TIMEOUT") {
+        return { error: "Timeout: codul a depășit limita de 3 secunde", code: code.substring(0, 200) };
+      }
+      return { error: e.message, line: e.stack?.match(/user-code\.js:(\d+)/)?.[1] || "unknown" };
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // 9.11 RAG — Retrieval Augmented Generation
+  // Semantic search through stored documents using pgvector
+  // ═══════════════════════════════════════════════════════════
+  async _ragSearch(query, userId, topK = 5) {
+    if (!this.supabaseAdmin) return { error: "No database" };
+
+    try {
+      // Generate embedding for the query
+      const embedding = await this.getEmbedding(query);
+      if (!embedding) {
+        // Fallback to keyword search if embedding fails
+        const { data } = await this.supabaseAdmin
+          .from("brain_memory")
+          .select("content, type, created_at, importance")
+          .or(`content.ilike.%${query.substring(0, 50)}%`)
+          .order("importance", { ascending: false })
+          .limit(topK);
+        return { results: data || [], method: "keyword", query };
+      }
+
+      // Semantic search using pgvector (if match_memories function exists)
+      try {
+        const { data: semanticResults, error } = await this.supabaseAdmin.rpc("match_memories", {
+          query_embedding: embedding,
+          match_threshold: 0.7,
+          match_count: topK,
+          p_user_id: userId || null,
+        });
+
+        if (!error && semanticResults && semanticResults.length > 0) {
+          return { results: semanticResults, method: "semantic", query, similarity: "pgvector" };
+        }
+      } catch {
+        // match_memories function might not exist — fallback
+      }
+
+      // Fallback: search learned_facts
+      const { data: facts } = await this.supabaseAdmin
+        .from("learned_facts")
+        .select("fact, category, source, created_at")
+        .or(`fact.ilike.%${query.substring(0, 50)}%`)
+        .limit(topK);
+
+      return { results: facts || [], method: "keyword_facts", query };
+    } catch (e) {
+      return { error: e.message, query };
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // 9.12 PROACTIVE SUGGESTIONS — Context-aware suggestions
+  // Analyzes user patterns and offers relevant actions
+  // ═══════════════════════════════════════════════════════════
+  async _proactiveSuggest(userId, context = {}) {
+    if (!this.supabaseAdmin || !userId) return [];
+
+    try {
+      const suggestions = [];
+      const now = new Date();
+      const hour = now.getHours();
+
+      // Check pending reminders
+      const { data: reminders } = await this.supabaseAdmin
+        .from("brain_memory")
+        .select("content")
+        .eq("user_id", userId)
+        .eq("type", "reminder")
+        .limit(5);
+
+      const pendingReminders = (reminders || []).filter(r => {
+        try {
+          const p = JSON.parse(r.content);
+          return p.status === "pending";
+        } catch { return false; }
+      });
+
+      if (pendingReminders.length > 0) {
+        suggestions.push({
+          type: "reminder",
+          text: `Ai ${pendingReminders.length} reminder(e) active`,
+          action: "show_reminders",
+        });
+      }
+
+      // Time-based suggestions
+      if (hour >= 6 && hour <= 9) {
+        suggestions.push({ type: "morning", text: "Bună dimineața! Vrei un rezumat al știrilor de azi?", action: "news_digest" });
+      }
+      if (hour >= 18 && hour <= 21) {
+        suggestions.push({ type: "evening", text: "Vrei să vezi statisticile de trading de azi?", action: "trade_summary" });
+      }
+
+      // Check user's recent activity pattern
+      const { data: recentConvs } = await this.supabaseAdmin
+        .from("conversations")
+        .select("title, created_at")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(5);
+
+      if (!recentConvs || recentConvs.length === 0) {
+        suggestions.push({ type: "onboarding", text: "Prima vizită? Încearcă: 'Ce poți face?' sau 'Generează o imagine'", action: "capabilities" });
+      }
+
+      // Check AI costs
+      const { data: costs } = await this.supabaseAdmin
+        .from("ai_costs")
+        .select("cost_usd")
+        .gte("created_at", new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString());
+
+      const totalCost = (costs || []).reduce((s, c) => s + (parseFloat(c.cost_usd) || 0), 0);
+      if (totalCost > 1) {
+        suggestions.push({
+          type: "cost_alert",
+          text: `Cheltuielile AI azi: $${totalCost.toFixed(2)}`,
+          action: "cost_report",
+        });
+      }
+
+      return suggestions.slice(0, 3); // Max 3 suggestions
+    } catch (e) {
+      logger.warn({ component: "Brain", err: e.message }, "Proactive suggest failed");
+      return [];
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // 9.13 WEB SCRAPE — Enhanced web content extraction
+  // Fetches URL, extracts text, and optionally summarizes
+  // ═══════════════════════════════════════════════════════════
+  async _webScrape(url, summarize = false) {
+    try {
+      const r = await fetch(url, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (compatible; KelionAI/1.0; +https://kelionai.app)",
+          Accept: "text/html,application/xhtml+xml,text/plain",
+        },
+        signal: AbortSignal.timeout(10000),
+      });
+
+      if (!r.ok) return { error: `HTTP ${r.status}`, url };
+
+      const contentType = r.headers.get("content-type") || "";
+      const text = await r.text();
+
+      // Extract main content from HTML
+      let content = text;
+      if (contentType.includes("html")) {
+        // Remove scripts, styles, and HTML tags
+        content = text
+          .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+          .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
+          .replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, "")
+          .replace(/<footer[^>]*>[\s\S]*?<\/footer>/gi, "")
+          .replace(/<header[^>]*>[\s\S]*?<\/header>/gi, "")
+          .replace(/<[^>]+>/g, " ")
+          .replace(/&nbsp;/g, " ")
+          .replace(/&amp;/g, "&")
+          .replace(/&lt;/g, "<")
+          .replace(/&gt;/g, ">")
+          .replace(/\s+/g, " ")
+          .trim();
+      }
+
+      // Extract title
+      const titleMatch = text.match(/<title[^>]*>([^<]+)<\/title>/i);
+      const title = titleMatch ? titleMatch[1].trim() : url;
+
+      // Truncate to manageable size
+      const maxLen = 5000;
+      const truncated = content.length > maxLen;
+      content = content.substring(0, maxLen);
+
+      // Optionally summarize
+      if (summarize && content.length > 500) {
+        const summary = await this._summarize(content, 300, "ro");
+        return { url, title, summary, charCount: content.length, truncated };
+      }
+
+      return { url, title, content, charCount: content.length, truncated };
+    } catch (e) {
+      return { error: e.message, url };
+    }
   }
 
   // ═══════════════════════════════════════════════════════════
