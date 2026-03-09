@@ -516,6 +516,75 @@
         ⚠️ INFORMATIONAL — This does not constitute investment advice. KelionAI does not provide financial counseling.
     </div>
 
+    <!-- ═══ PAPER TRADING — Balance + ON/OFF ═══ -->
+    <div
+        style="background:linear-gradient(135deg,rgba(0,255,255,0.08),rgba(0,200,100,0.06));border:1px solid rgba(0,255,255,0.2);border-radius:14px;padding:20px;margin-bottom:18px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+            <div>
+                <div style="font-size:0.72rem;color:#888;text-transform:uppercase;letter-spacing:1px;">💰 Paper Trading
+                    Balance</div>
+                <div id="pt-balance" onclick="openTradeHistory()"
+                    style="font-size:2.2rem;font-weight:bold;color:#00ffff;cursor:pointer;transition:all 0.2s;"
+                    onmouseover="this.style.color='#00ff88'" onmouseout="this.style.color='#00ffff'"
+                    title="Click to see trade history">
+                    €100.00
+                </div>
+                <div style="display:flex;gap:16px;margin-top:6px;font-size:0.8rem;">
+                    <span>P&L: <b id="pt-pnl" style="color:#00dd66;">€0.00</b></span>
+                    <span>Return: <b id="pt-return" style="color:#00dd66;">0%</b></span>
+                    <span>Trades: <b id="pt-trades" style="color:#00ffff;">0</b></span>
+                    <span>Win: <b id="pt-winrate" style="color:#ffc800;">0%</b></span>
+                </div>
+                <div style="font-size:0.7rem;color:#555;margin-top:4px;">
+                    Mode: <b id="pt-mode" style="color:#ffc800;">PAPER</b> ·
+                    Last check: <span id="pt-lastcheck">—</span> ·
+                    <span id="pt-positions" style="color:#aaa;">0 positions open</span>
+                </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px;align-items:center;">
+                <button id="pt-toggle" class="btn" onclick="toggleBot()"
+                    style="font-size:1rem;padding:12px 28px;border-radius:12px;min-width:120px;">
+                    ▶ START BOT
+                </button>
+                <div style="display:flex;gap:6px;">
+                    <button class="btn secondary" onclick="resetBot()" style="font-size:0.72rem;padding:4px 10px;">🔄
+                        Reset</button>
+                    <button class="btn secondary" onclick="switchBotMode()" style="font-size:0.72rem;padding:4px 10px;"
+                        id="pt-switch">📊 → REAL</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Trade History Modal -->
+    <div id="trade-history-modal" class="modal-overlay" onclick="if(event.target===this)this.classList.remove('open')">
+        <div class="modal-content" style="max-height:80vh;overflow-y:auto;">
+            <div class="modal-header">
+                <h3>📜 Trade History — Pierdut / Câștigat / Total</h3>
+                <button class="modal-close"
+                    onclick="document.getElementById('trade-history-modal').classList.remove('open')">✕</button>
+            </div>
+            <div id="trade-summary"
+                style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px;">
+            </div>
+            <table style="width:100%;border-collapse:collapse;font-size:0.82rem;" id="trade-table">
+                <thead>
+                    <tr style="border-bottom:1px solid rgba(255,255,255,0.1);">
+                        <th style="text-align:left;padding:8px;color:#888;font-size:0.72rem;">DATE</th>
+                        <th style="text-align:left;padding:8px;color:#888;font-size:0.72rem;">ASSET</th>
+                        <th style="text-align:left;padding:8px;color:#888;font-size:0.72rem;">ACTION</th>
+                        <th style="text-align:right;padding:8px;color:#888;font-size:0.72rem;">PRICE</th>
+                        <th style="text-align:right;padding:8px;color:#888;font-size:0.72rem;">VALUE</th>
+                        <th style="text-align:right;padding:8px;color:#888;font-size:0.72rem;">PIERDUT</th>
+                        <th style="text-align:right;padding:8px;color:#888;font-size:0.72rem;">CÂȘTIGAT</th>
+                        <th style="text-align:right;padding:8px;color:#888;font-size:0.72rem;">TOTAL</th>
+                    </tr>
+                </thead>
+                <tbody id="trade-tbody"></tbody>
+            </table>
+        </div>
+    </div>
+
     <div style="margin-bottom:16px;"><span class="status-bar" id="status-bar">—</span></div>
 
     <div class="toolbar">
@@ -946,6 +1015,110 @@
 
         // Load geopolitical on page load
         if (adminSecret) loadGeo();
+
+        // ═══ PAPER TRADING FUNCTIONS ═══
+        let _ptActive = false;
+        async function updatePaperUI() {
+            try {
+                const r = await fetch('/api/trading/paper/status', { headers: hdrs() });
+                const d = await r.json();
+                if (!d || d.error) return;
+                _ptActive = d.active;
+                document.getElementById('pt-balance').textContent = '€' + (d.portfolioValue || 100).toFixed(2);
+                const pnl = d.totalPnL || 0;
+                const pnlEl = document.getElementById('pt-pnl');
+                pnlEl.textContent = (pnl >= 0 ? '+' : '') + '€' + pnl.toFixed(2);
+                pnlEl.style.color = pnl >= 0 ? '#00dd66' : '#ff4444';
+                const ret = d.returnPct || 0;
+                const retEl = document.getElementById('pt-return');
+                retEl.textContent = (ret >= 0 ? '+' : '') + ret.toFixed(1) + '%';
+                retEl.style.color = ret >= 0 ? '#00dd66' : '#ff4444';
+                document.getElementById('pt-trades').textContent = d.totalTrades || 0;
+                document.getElementById('pt-winrate').textContent = (d.winRate || 0) + '%';
+                document.getElementById('pt-mode').textContent = d.mode || 'PAPER';
+                document.getElementById('pt-positions').textContent = (d.openPositions || 0) + ' positions open';
+                document.getElementById('pt-lastcheck').textContent = d.lastSignalCheck ? new Date(d.lastSignalCheck).toLocaleTimeString() : '—';
+                const btn = document.getElementById('pt-toggle');
+                if (d.active) {
+                    btn.innerHTML = '⏹ STOP BOT';
+                    btn.style.background = '#ff4444';
+                    btn.style.color = '#fff';
+                } else {
+                    btn.innerHTML = '▶ START BOT';
+                    btn.style.background = '#00ffff';
+                    btn.style.color = '#000';
+                }
+                const sw = document.getElementById('pt-switch');
+                sw.textContent = d.mode === 'PAPER' ? '📊 → REAL' : '🧪 → PAPER';
+            } catch (e) { /* API not available yet */ }
+        }
+
+        async function toggleBot() {
+            const endpoint = _ptActive ? '/api/trading/paper/off' : '/api/trading/paper/on';
+            try {
+                const r = await fetch(endpoint, { method: 'POST', headers: hdrs() });
+                const d = await r.json();
+                if (d.error) { alert('Error: ' + d.error); return; }
+                updatePaperUI();
+            } catch (e) { alert('Error: ' + e.message); }
+        }
+
+        async function resetBot() {
+            if (!confirm('Reset all paper trading data? This clears all trades and positions.')) return;
+            try {
+                await fetch('/api/trading/paper/reset', { method: 'POST', headers: hdrs() });
+                updatePaperUI();
+            } catch (e) { alert('Error: ' + e.message); }
+        }
+
+        async function switchBotMode() {
+            const newMode = document.getElementById('pt-mode').textContent === 'PAPER' ? 'REAL' : 'PAPER';
+            if (newMode === 'REAL' && !confirm('Switch to REAL mode? This will clear all paper trades.')) return;
+            try {
+                await fetch('/api/trading/paper/switch?mode=' + newMode, { method: 'POST', headers: hdrs() });
+                updatePaperUI();
+            } catch (e) { alert('Error: ' + e.message); }
+        }
+
+        async function openTradeHistory() {
+            document.getElementById('trade-history-modal').classList.add('open');
+            try {
+                const r = await fetch('/api/trading/paper/history', { headers: hdrs() });
+                const d = await r.json();
+                const summary = d.summary || {};
+                document.getElementById('trade-summary').innerHTML = `
+                    <div class="stat-item"><div class="stat-label">Total Trades</div><div class="stat-value">${summary.totalTrades || 0}</div></div>
+                    <div class="stat-item"><div class="stat-label">Câștigat</div><div class="stat-value" style="color:#00dd66">€${(summary.totalWon || 0).toFixed(2)}</div></div>
+                    <div class="stat-item"><div class="stat-label">Pierdut</div><div class="stat-value" style="color:#ff4444">€${(summary.totalLost || 0).toFixed(2)}</div></div>
+                    <div class="stat-item"><div class="stat-label">NET Total</div><div class="stat-value" style="color:${(summary.netPnL || 0) >= 0 ? '#00dd66' : '#ff4444'}">€${(summary.netPnL || 0).toFixed(2)}</div></div>
+                `;
+                const trades = d.trades || [];
+                let runningTotal = 0;
+                document.getElementById('trade-tbody').innerHTML = trades.length === 0
+                    ? '<tr><td colspan="8" style="text-align:center;padding:20px;color:#666;">No trades yet. Start the bot to begin trading.</td></tr>'
+                    : trades.map(t => {
+                        if (t.pnl != null) runningTotal += t.pnl;
+                        const lost = t.pnl != null && t.pnl < 0 ? t.pnl.toFixed(2) : '—';
+                        const won = t.pnl != null && t.pnl > 0 ? '+' + t.pnl.toFixed(2) : '—';
+                        return `<tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+                            <td style="padding:6px 8px;color:#888;font-size:0.75rem;">${new Date(t.date).toLocaleString()}</td>
+                            <td style="padding:6px 8px;color:#fff;font-weight:bold;">${escHtml(t.asset)}</td>
+                            <td style="padding:6px 8px;color:${t.action === 'BUY' ? '#00dd66' : '#ff4444'};font-weight:bold;">${t.action}</td>
+                            <td style="padding:6px 8px;text-align:right;color:#aaa;">€${t.price?.toFixed(2) || '—'}</td>
+                            <td style="padding:6px 8px;text-align:right;color:#e0e0e0;">€${t.value?.toFixed(2) || '—'}</td>
+                            <td style="padding:6px 8px;text-align:right;color:#ff4444;">${lost}</td>
+                            <td style="padding:6px 8px;text-align:right;color:#00dd66;">${won}</td>
+                            <td style="padding:6px 8px;text-align:right;color:${runningTotal >= 0 ? '#00dd66' : '#ff4444'};font-weight:bold;">€${runningTotal.toFixed(2)}</td>
+                        </tr>`;
+                    }).join('');
+            } catch (e) {
+                document.getElementById('trade-tbody').innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px;color:#ff4444;">API not available — deploy pending</td></tr>';
+            }
+        }
+
+        // Paper trading auto-refresh
+        if (adminSecret) updatePaperUI();
+        setInterval(() => { if (adminSecret) updatePaperUI(); }, 5000);
 
         // Auto-refresh every 30 seconds
         setInterval(() => { if (adminSecret) { loadAll(); loadGeo(); } }, 30000);
