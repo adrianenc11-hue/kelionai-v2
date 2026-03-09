@@ -4,7 +4,7 @@
    ═══════════════════════════════════════════════════════════════ */
 "use strict";
 
-var adminSecret = 'kAI-adm1n-s3cr3t-2026-pr0d';
+var adminSecret = (document.querySelector('meta[name="admin-secret"]') || {}).content || sessionStorage.getItem('kelion_admin_secret') || '';
 function hdrs() {
     var h = { 'Content-Type': 'application/json' };
     if (adminSecret) h['x-admin-secret'] = adminSecret;
@@ -425,6 +425,81 @@ async function loadTrading() {
     }
 }
 
+// ── MEMORY PANEL ──
+async function loadMemories(typeFilter, searchQuery) {
+    try {
+        var url = '/api/admin/memories?limit=50';
+        if (typeFilter && typeFilter !== 'all') url += '&type=' + encodeURIComponent(typeFilter);
+        if (searchQuery) url += '&search=' + encodeURIComponent(searchQuery);
+        var r = await fetch(url, { headers: hdrs() });
+        var d = await r.json();
+
+        // Stats
+        var statsEl = document.getElementById('memory-stats');
+        if (statsEl) {
+            statsEl.innerHTML = '<span class="badge badge-ok">🧠 ' + (d.totalMemories || 0) + ' memories</span> ' +
+                '<span class="badge">📚 ' + (d.totalFacts || 0) + ' facts</span>';
+        }
+
+        // Type filters
+        var filtersEl = document.getElementById('memory-filters');
+        if (filtersEl && d.types) {
+            filtersEl.innerHTML = '<button class="btn-sm' + (!typeFilter || typeFilter === 'all' ? ' active' : '') + '" onclick="loadMemories(\'all\')">📊 All</button> ' +
+                d.types.map(function (t) {
+                    var count = d.typeStats[t] || 0;
+                    var active = typeFilter === t ? ' active' : '';
+                    return '<button class="btn-sm' + active + '" onclick="loadMemories(\'' + t + '\')">' + t + ' (' + count + ')</button>';
+                }).join(' ');
+        }
+
+        // Memories table
+        var tb = document.getElementById('memories-tbody');
+        if (!d.memories || d.memories.length === 0) {
+            tb.innerHTML = '<tr><td colspan="5" style="color:#888;text-align:center">No memories found</td></tr>';
+        } else {
+            tb.innerHTML = d.memories.map(function (m) {
+                var date = new Date(m.created_at).toLocaleString('ro-RO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+                var content = esc(m.content || '').substring(0, 120) + (m.content && m.content.length > 120 ? '…' : '');
+                var imp = m.importance >= 8 ? '<span class="badge badge-danger">⭐ ' + m.importance + '</span>' :
+                    m.importance >= 5 ? '<span class="badge badge-warn">' + m.importance + '</span>' :
+                        '<span class="badge">' + (m.importance || 0) + '</span>';
+                return '<tr><td>' + esc(date) + '</td><td><span class="badge badge-ok">' + esc(m.type || '?') + '</span></td>' +
+                    '<td style="font-size:0.78rem">' + content + '</td><td>' + imp + '</td>' +
+                    '<td><button class="btn-sm btn-danger" onclick="deleteMemory(\'' + m.id + '\')">🗑️</button></td></tr>';
+            }).join('');
+        }
+
+        // Facts table
+        var ftb = document.getElementById('facts-tbody');
+        if (ftb) {
+            if (!d.facts || d.facts.length === 0) {
+                ftb.innerHTML = '<tr><td colspan="4" style="color:#888;text-align:center">No facts learned yet</td></tr>';
+            } else {
+                ftb.innerHTML = d.facts.map(function (f) {
+                    var date = new Date(f.created_at).toLocaleString('ro-RO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+                    return '<tr><td>' + esc(date) + '</td><td>' + esc(f.category || '—') + '</td>' +
+                        '<td style="font-size:0.78rem">' + esc((f.fact || '').substring(0, 150)) + '</td>' +
+                        '<td>' + esc(f.source || '—') + '</td></tr>';
+                }).join('');
+            }
+        }
+    } catch (e) {
+        var tb = document.getElementById('memories-tbody');
+        if (tb) tb.innerHTML = '<tr><td colspan="5" style="color:#f66">Error: ' + e.message + '</td></tr>';
+    }
+}
+async function deleteMemory(id) {
+    if (!confirm('Ștergi această memorie?')) return;
+    try {
+        await fetch('/api/admin/memories/' + id, { method: 'DELETE', headers: hdrs() });
+        loadMemories();
+    } catch (e) { alert('Error: ' + e.message); }
+}
+function searchMemories() {
+    var q = document.getElementById('memory-search');
+    loadMemories(null, q ? q.value : '');
+}
+
 // ── INIT — Auth-guarded (#156: prevent 403 flood) ──
 var _adminIntervals = [];
 async function initAdmin() {
@@ -439,11 +514,12 @@ async function initAdmin() {
         console.warn('[Admin] Auth check failed:', e.message);
     }
     // Auth OK — load all sections
-    loadAiStatus(); loadTraffic(); loadCredit(); loadClients(); loadCodes(); loadUptime(); loadAudit(); loadMedia(); loadTrading();
+    loadAiStatus(); loadTraffic(); loadCredit(); loadClients(); loadCodes(); loadUptime(); loadAudit(); loadMedia(); loadTrading(); loadMemories();
     _adminIntervals.push(setInterval(function () { loadTraffic(); loadCredit(); loadUptime(); }, 30000));
     _adminIntervals.push(setInterval(loadAiStatus, 60000));
     _adminIntervals.push(setInterval(loadAudit, 6 * 60 * 60 * 1000));
     _adminIntervals.push(setInterval(function () { loadMedia(); loadTrading(); }, 60000));
+    _adminIntervals.push(setInterval(loadMemories, 120000)); // refresh memories every 2min
 }
 initAdmin();
 
