@@ -361,12 +361,13 @@ app.get("/admin/trading.html", (req, res) => {
   // Override CSP to allow inline scripts for admin pages
   res.setHeader("Content-Security-Policy",
     "default-src 'self'; " +
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://s.tradingview.com; " +
-    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://*.tradingview.com; " +
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://*.tradingview.com; " +
     "font-src 'self' https://fonts.gstatic.com; " +
     "img-src 'self' data: blob: https: http:; " +
     "connect-src 'self' https:; " +
-    "frame-src 'self' https://s.tradingview.com blob:;"
+    "frame-src 'self' https://*.tradingview.com blob:; " +
+    "child-src 'self' https://*.tradingview.com blob:;"
   );
   res.type("html").send(_rawTradingHtml);
 });
