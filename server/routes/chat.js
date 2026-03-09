@@ -271,6 +271,25 @@ router.post("/chat", chatLimiter, validate(chatSchema), async (req, res) => {
     const bodyMatches = reply.matchAll(/\[BODY:(\w+)\]/gi);
     for (const bm of bodyMatches) bodyActions.push(bm[1]);
     reply = reply.replace(/\[BODY:\w+\]/gi, "").trim();
+    // Extract source citations from tool results
+    const citations = [];
+    if (thought.monitor?.searchResults) {
+      (Array.isArray(thought.monitor.searchResults) ? thought.monitor.searchResults : []).forEach(r => {
+        if (r.url) citations.push({ title: r.title || r.url, url: r.url, type: 'search' });
+      });
+    }
+    // Extract URLs from enrichedMessage
+    try {
+      const urlMatches = (thought.enrichedMessage || '').match(/https?:\/\/[^\s)"\]]+/g);
+      if (urlMatches) {
+        urlMatches.slice(0, 5).forEach(u => {
+          if (!citations.find(c => c.url === u)) {
+            try { citations.push({ title: new URL(u).hostname, url: u, type: 'inline' }); } catch { }
+          }
+        });
+      }
+    } catch { }
+
     const response = {
       reply,
       avatar,
@@ -290,12 +309,12 @@ router.post("/chat", chatLimiter, validate(chatSchema), async (req, res) => {
         model: thought.modelRoute?.provider || engine,
         toolsUsed: thought.toolsUsed || [],
         confidence: thought.confidence || 0,
-        // Confidence badge: 🟢 high (>0.7), 🟡 medium (0.4-0.7), 🔴 low (<0.4)
         confidenceBadge: (thought.confidence || 0) > 0.7 ? "high" : (thought.confidence || 0) > 0.4 ? "medium" : "low",
         sourceTags: thought.sourceTags || [],
         truthVerdict: thought.truthReport?.verdict || null,
         truthScore: thought.truthReport?.factualScore || null,
         unsupportedClaims: (thought.truthReport?.unsupportedClaims || []).length,
+        citations: citations.slice(0, 5),
         reasonTrace: [
           thought.toolsUsed?.length > 0 ? `🔍 Tools: ${thought.toolsUsed.join(", ")}` : null,
           thought.chainOfThought ? "🧠 Chain of Thought activat" : null,

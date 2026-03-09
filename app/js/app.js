@@ -430,12 +430,28 @@
                     var badgeHtml = '<span class="confidence-badge ' + data.reasoning.confidenceBadge + '" title="Confidence: ' + badgeLabel + '">' + badge + '</span>';
                     // Trace items
                     var traceItems = data.reasoning.reasonTrace.map(function (t) { return '<div class="trace-item">' + escapeHtml(t) + '</div>'; }).join('');
+                    // Source citations (clickable links)
+                    var citationsHtml = '';
+                    if (data.reasoning.citations && data.reasoning.citations.length > 0) {
+                        citationsHtml = '<div class="trace-citations"><span class="cite-label">📎 Surse:</span>';
+                        data.reasoning.citations.forEach(function (c) {
+                            citationsHtml += '<a class="cite-pill" href="' + escapeHtml(c.url) + '" target="_blank" rel="noopener">' + escapeHtml(c.title) + '</a>';
+                        });
+                        citationsHtml += '</div>';
+                    }
+                    // Critic suggestions
+                    var criticHtml = '';
+                    if (data.reasoning.criticSuggestions && data.reasoning.criticSuggestions.length > 0) {
+                        criticHtml = '<div class="trace-critic">';
+                        data.reasoning.criticSuggestions.forEach(function (s) {
+                            criticHtml += '<div class="trace-item critic-note">' + escapeHtml(s) + '</div>';
+                        });
+                        criticHtml += '</div>';
+                    }
                     reasonEl.innerHTML = '<div class="reason-header" onclick="this.parentElement.classList.toggle(\'expanded\')">' + badgeHtml + ' <span class="reason-toggle">🔍 Reasoning</span><span class="reason-arrow">▸</span></div>' +
-                        '<div class="reason-body">' + traceItems + '</div>';
+                        '<div class="reason-body">' + traceItems + criticHtml + citationsHtml + '</div>';
                     overlay.appendChild(reasonEl);
                     overlay.scrollTop = overlay.scrollHeight;
-                    // Auto-remove with the message
-                    setTimeout(function () { if (overlay.contains(reasonEl)) overlay.removeChild(reasonEl); }, 8000);
                 }, 1500); // Slight delay after message appears
             }
 
