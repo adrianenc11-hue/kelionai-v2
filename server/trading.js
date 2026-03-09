@@ -52,8 +52,10 @@ tradePersist.ensureTables().catch(() => { });
 // Init historical data loader with Supabase + AUTO-LEARNING
 try {
   const { createClient } = require("@supabase/supabase-js");
-  if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+  const SUPABASE_URL = process.env.SUPABASE_URL || "https://nqlobybfwmtkmsqadqqr.supabase.co";
+  const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5xbG9ieWJmd210a21zcWFkcXFyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTg3MzAyMiwiZXhwIjoyMDg3NDQ5MDIyfQ.AngYdhgIOXas4UssEP1ENLiZCW9CYPgecvYej3PvLOQ";
+  if (SUPABASE_URL && SUPABASE_KEY) {
+    const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
     histLoader.init(sb);
     histLoader.ensureTable().catch(() => { });
     logger.info("[Trading] Historical data loader initialized");
@@ -1859,10 +1861,9 @@ router.get("/history/progress", (req, res) => {
 router.get("/simulate", async (req, res) => {
   try {
     const { createClient } = require("@supabase/supabase-js");
-    if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      return res.json({ error: "Supabase not configured", simulation: {} });
-    }
-    const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+    const sbUrl = process.env.SUPABASE_URL || "https://nqlobybfwmtkmsqadqqr.supabase.co";
+    const sbKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5xbG9ieWJmd210a21zcWFkcXFyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTg3MzAyMiwiZXhwIjoyMDg3NDQ5MDIyfQ.AngYdhgIOXas4UssEP1ENLiZCW9CYPgecvYej3PvLOQ";
+    const sb = createClient(sbUrl, sbKey);
     const results = await investSim.runFullSimulation(sb);
     res.json(results);
   } catch (e) {
@@ -1875,10 +1876,9 @@ router.get("/simulate", async (req, res) => {
 router.get("/brain-rules", async (req, res) => {
   try {
     const { createClient } = require("@supabase/supabase-js");
-    if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      return res.json({ rules: [], note: "Supabase not configured" });
-    }
-    const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+    const sbUrl = process.env.SUPABASE_URL || "https://nqlobybfwmtkmsqadqqr.supabase.co";
+    const sbKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5xbG9ieWJmd210a21zcWFkcXFyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTg3MzAyMiwiZXhwIjoyMDg3NDQ5MDIyfQ.AngYdhgIOXas4UssEP1ENLiZCW9CYPgecvYej3PvLOQ";
+    const sb = createClient(sbUrl, sbKey);
     const { data, error } = await sb
       .from("trading_brain_rules")
       .select("*")
