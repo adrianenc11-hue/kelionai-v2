@@ -872,7 +872,7 @@
             if (!_lipRan) {
                 for (var ci = 0; ci < _mouthMorphCache.length; ci++) {
                     var curr = _mouthMorphCache[ci].mesh.morphTargetInfluences[_mouthMorphCache[ci].idx];
-                    _mouthMorphCache[ci].mesh.morphTargetInfluences[_mouthMorphCache[ci].idx] = curr * 0.85;
+                    _mouthMorphCache[ci].mesh.morphTargetInfluences[_mouthMorphCache[ci].idx] = curr * 0.70; // TEST-A: faster mouth close
                 }
             }
         } catch (e) {
