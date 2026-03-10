@@ -959,6 +959,14 @@
     //       lfa=LeftForeArm, rfa=RightForeArm, lh=LeftHand, rh=RightHand
     // fingerL/fingerR = finger pose for that hand
     var BODY_ACTIONS = {
+        resetArms: {
+            dur: 0.6, hold: 0.2,
+            ls: _RELAXED_Q.ls, rs: _RELAXED_Q.rs,
+            la: _RELAXED_Q.la, ra: _RELAXED_Q.ra,
+            lfa: _RELAXED_Q.lfa, rfa: _RELAXED_Q.rfa,
+            lh: _RELAXED_Q.lh, rh: _RELAXED_Q.rh,
+            fingerL: 'relaxed', fingerR: 'relaxed'
+        },
         raiseLeftHand: {
             dur: 1.0, hold: 1.0,
             ls: [0.5, 0.5, -0.5, 0.5], la: [0.0, 0.0, -0.3, 0.95],
