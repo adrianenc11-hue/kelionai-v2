@@ -403,6 +403,16 @@
                 });
             }
 
+            // ── #53 BRAIN-MAP: Populate brain thinking panel ──
+            if (typeof addBrainNode === 'function') {
+                var now = new Date().toLocaleTimeString();
+                addBrainNode('Response · ' + now, fullReply.substring(0, 80) + (fullReply.length > 80 ? '…' : ''));
+                if (brainEmotion && brainEmotion !== 'happy') addBrainNode('Emotion', '🎭 ' + brainEmotion);
+                if (data.gestures && data.gestures.length) addBrainNode('Gestures', '👋 ' + data.gestures.join(', '));
+                if (data.bodyActions && data.bodyActions.length) addBrainNode('Body', '🏃 ' + data.bodyActions.join(', '));
+                if (data.tools_used && data.tools_used.length) addBrainNode('Tools', '🔧 ' + data.tools_used.join(', '));
+            }
+
             // Increment generation counter to prevent overlap
             var thisGen = ++_speakGeneration;
             var _textRevealed = false; // guard: only ONE source writes text
