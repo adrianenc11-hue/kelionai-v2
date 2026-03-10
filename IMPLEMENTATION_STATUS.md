@@ -243,7 +243,24 @@
 
 ---
 
+## Etapa 9 — K1 KELION AGI v2
+
+| # | Funcționalitate | Status | Endpoint / Fișier | Notă |
+|---|---|---|---|---|
+| 161 | K1 Cognitive Core (reasoning loop, monologue, confidence) | [x] | `server/k1-cognitive.js` | Perceive→Reflect→Hypothesize→Plan→Act→Observe→Learn |
+| 162 | K1 Deep Memory (hot/warm + attention retrieval) | [x] | `server/k1-memory.js` | Hot RAM + Warm Supabase + forgetting engine |
+| 163 | K1 World State (markets, environment, proactive alerts) | [x] | `server/k1-world-state.js` | BTC/ETH/SOL/GOLD/NASDAQ + Fear&Greed live |
+| 164 | K1 Agent Mesh (spawn, debate, ensemble, adversarial) | [x] | `server/k1-agents.js` | 5 templates, lifecycle complet |
+| 165 | K1 Truth Guard (claim verify, PASS/BLOCK, self-test) | [x] | `server/k1-truth.js` | Adversarial testing la 12h |
+| 166 | K1 Performance Tracker (accuracy per domain) | [x] | `server/k1-performance.js` | Trends + weak area detection |
+| 167 | K1 Meta-Learning (risk params, user model, forgetting) | [x] | `server/k1-meta-learning.js` | Auto-tuning + user profiling |
+| 168 | K1 Messenger Bridge (Telegram + WhatsApp + Messenger) | [x] | `server/k1-messenger-bridge.js` | Pre/post-process + K1 context enrichment |
+| 169 | K1 Dashboard UI (live admin page) | [x] | `app/admin/k1-dashboard.html` | 10 sections, 4 actions, auto-refresh 30s |
+| 170 | K1 Market Data Feed (CoinGecko + Yahoo Finance) | [x] | `server/trading.js` (cron) | Every 5 min: BTC/ETH/SOL + GOLD/NASDAQ + Fear&Greed |
+
+---
+
 ## Notă
 
-> **Ultima actualizare:** 2026-03-08 11:10 UTC — 153/153 confirmate + 7 TODO noi
+> **Ultima actualizare:** 2026-03-10 12:00 UTC — 170/170 confirmate LIVE (inclusiv K1 AGI v2)
 > **Regula:** Niciun agent nu marchează [x] fără testare reală și confirmare utilizator.
