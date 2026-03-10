@@ -10,7 +10,7 @@ const logger = require("./logger");
 
 const PAGE_TOKEN = process.env.FB_PAGE_ACCESS_TOKEN; // Same token — Instagram uses FB token
 const IG_ACCOUNT_ID = process.env.INSTAGRAM_ACCOUNT_ID;
-const VERIFY_TOKEN = process.env.FB_VERIFY_TOKEN || "kelionai_verify_2024";
+const VERIFY_TOKEN = process.env.FB_VERIFY_TOKEN || null; // SECURITY: no hardcoded fallback — set FB_VERIFY_TOKEN in env
 
 let brain = null;
 let supabaseAdmin = null;
@@ -33,6 +33,10 @@ router.get("/webhook", (req, res) => {
   const mode = req.query["hub.mode"];
   const token = req.query["hub.verify_token"];
   const challenge = req.query["hub.challenge"];
+  if (!VERIFY_TOKEN) {
+    logger.warn({ component: "Instagram" }, "Webhook verify attempt but FB_VERIFY_TOKEN not set");
+    return res.sendStatus(403);
+  }
   if (mode === "subscribe" && token === VERIFY_TOKEN) {
     logger.info({ component: "Instagram" }, "Webhook verified");
     return res.status(200).send(challenge);

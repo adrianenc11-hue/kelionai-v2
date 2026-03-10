@@ -50,16 +50,25 @@ async function postToPage(message, link) {
   }
 }
 
-// ═══ FORMAT NEWS FOR FACEBOOK ═══
+// ═══ FORMAT NEWS FOR FACEBOOK (FULL ARTICLE) ═══
 function formatNewsPost(article) {
   const emoji = article.isBreaking ? "🔴 BREAKING" : "📰";
   const category = article.category ? ` #${article.category}` : "";
 
   let post = `${emoji} ${article.title}\n\n`;
-  if (article.summary) post += `${article.summary}\n\n`;
+
+  // Include full content if available, otherwise summary
+  if (article.fullContent) {
+    // Facebook post limit ~63,206 chars, but 2000 is optimal
+    post += `${article.fullContent.slice(0, 1800)}\n\n`;
+  } else if (article.summary) {
+    post += `${article.summary}\n\n`;
+  }
+
   if (article.source) post += `📌 Sursă: ${article.source}\n`;
+  if (article.url) post += `🔗 Original: ${article.url}\n`;
   post += `\n🤖 KelionAI — Asistentul tău AI personal\n`;
-  post += `🌐 Link în bio: ${process.env.APP_URL}${category}`;
+  post += `🌐 ${process.env.APP_URL || "https://kelionai.app"}${category}`;
 
   return { message: post, link: article.url || null };
 }

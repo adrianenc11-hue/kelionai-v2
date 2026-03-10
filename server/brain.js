@@ -2771,7 +2771,7 @@ Reply STRICTLY with JSON:
       case "email":
         return this._sendEmail(step.to, step.subject, step.body || "", step.userId);
       case "codeExec":
-        return this._codeExecute(step.code || "", "javascript");
+        return this._execCode(step.code || "");
       case "ragSearch":
         return this._ragSearch(step.query || "", step.userId);
       case "webScrape":
@@ -2787,6 +2787,27 @@ Reply STRICTLY with JSON:
         return this._calendarDelete(step.eventId, step.userId);
       case "generateDoc":
         return this._generateDocument(step.title || "Report", step.content || "", step.format || "markdown", step.userId);
+      // ═══ P4 tools: IDE-parity (kira-tools) ═══
+      case "terminal":
+        return this._terminal(step.command || step.cmd || "");
+      case "deepBrowse":
+        return this._deepBrowse(step.url || "", step);
+      case "browseMultiple":
+        return this._browseMultiple(step.urls || [], step);
+      case "renderPage":
+        return this._renderPage(step.url || "", step);
+      case "git":
+        return this._git(step.action || "status", step.n);
+      case "codeSearch":
+        return this._codeSearch(step.query || "", step.path);
+      case "projectTree":
+        return this._projectTree(step.path || ".", step.depth);
+      case "projectFile":
+        return this._readProjectFile(step.filePath || step.path || "");
+      case "runTests":
+        return this._runTests(step.suite || "");
+      case "scrapeArticle":
+        return this._scrapeFullArticle(step.url || "");
       default:
         return null;
     }
@@ -5040,6 +5061,132 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
         default:
           return kiraTools.listFiles();
       }
+    } catch (e) {
+      return { error: e.message };
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // CODE EXECUTION — JS sandbox via kira-tools (wired to brain)
+  // ═══════════════════════════════════════════════════════════
+  _execCode(code) {
+    try {
+      logger.info({ component: "Brain", codeLen: (code || "").length }, "🔧 Executing code via kiraTools");
+      return kiraTools.executeJS(code);
+    } catch (e) {
+      return { error: e.message };
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // ADMIN TERMINAL — Shell commands via kira-tools (admin-only)
+  // ═══════════════════════════════════════════════════════════
+  _terminal(command) {
+    try {
+      logger.info({ component: "Brain", cmd: (command || "").slice(0, 50) }, "💻 Terminal command");
+      return kiraTools.adminTerminal(command);
+    } catch (e) {
+      return { error: e.message };
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // DEEP BROWSE — Enhanced web browsing via kira-tools (wired)
+  // ═══════════════════════════════════════════════════════════
+  async _deepBrowse(url, options) {
+    try {
+      logger.info({ component: "Brain", url }, "🌐 Deep browsing URL");
+      return await kiraTools.deepBrowse(url, options);
+    } catch (e) {
+      return { error: e.message };
+    }
+  }
+
+  async _browseMultiple(urls, options) {
+    try {
+      return await kiraTools.browseMultiple(urls, options);
+    } catch (e) {
+      return { error: e.message };
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // PUPPETEER RENDER — Full browser rendering (Puppeteer/fallback)
+  // ═══════════════════════════════════════════════════════════
+  async _renderPage(url, options) {
+    try {
+      logger.info({ component: "Brain", url }, "🖥️ Rendering page with Puppeteer");
+      return await kiraTools.renderPage(url, options);
+    } catch (e) {
+      return { error: e.message };
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // GIT OPERATIONS — Git status/log/diff via kira-tools
+  // ═══════════════════════════════════════════════════════════
+  _git(action, n) {
+    try {
+      switch (action) {
+        case "status": return kiraTools.gitStatus();
+        case "log": return kiraTools.gitLog(n);
+        case "diff": return kiraTools.gitDiff();
+        default: return kiraTools.gitStatus();
+      }
+    } catch (e) {
+      return { error: e.message };
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // CODE SEARCH — grep + find via kira-tools
+  // ═══════════════════════════════════════════════════════════
+  _codeSearch(query, searchPath) {
+    try {
+      logger.info({ component: "Brain", query: (query || "").slice(0, 50) }, "🔍 Code search");
+      return kiraTools.projectSearch(query, searchPath);
+    } catch (e) {
+      return { error: e.message };
+    }
+  }
+
+  _projectTree(dirPath, depth) {
+    try {
+      return kiraTools.projectTree(dirPath, depth);
+    } catch (e) {
+      return { error: e.message };
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // PROJECT FILE — Read any project file (admin-only)
+  // ═══════════════════════════════════════════════════════════
+  _readProjectFile(filePath) {
+    try {
+      return kiraTools.readProjectFile(filePath);
+    } catch (e) {
+      return { error: e.message };
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // TEST RUNNER — Run tests via kira-tools (admin-only)
+  // ═══════════════════════════════════════════════════════════
+  _runTests(suite) {
+    try {
+      logger.info({ component: "Brain", suite }, "🧪 Running tests");
+      return kiraTools.runTests(suite);
+    } catch (e) {
+      return { error: e.message };
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // FULL ARTICLE SCRAPER — Scrape complete article text
+  // ═══════════════════════════════════════════════════════════
+  async _scrapeFullArticle(url) {
+    try {
+      return await kiraTools.scrapeFullArticle(url);
     } catch (e) {
       return { error: e.message };
     }

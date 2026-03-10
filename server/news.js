@@ -519,14 +519,34 @@ async function fetchAllSources() {
     }).catch(() => { });
   }
 
-  // ═══ AUTO-PUBLISH to all media channels ═══
+  // ═══ AUTO-PUBLISH to all media channels (with FULL content) ═══
   if (_onNewsFetched && articleCache.size > 0) {
     try {
       const topArticles = getArticlesArray().slice(0, 5);
+
+      // Scrape full content for each article before publishing
+      const kiraTools = require("./kira-tools");
+      for (const article of topArticles) {
+        if (article.url && !article.fullContent) {
+          try {
+            const scraped = await kiraTools.scrapeFullArticle(article.url);
+            if (scraped.success && scraped.content) {
+              article.fullContent = scraped.content;
+              // Update cache with full content
+              if (articleCache.has(article.id)) {
+                articleCache.get(article.id).fullContent = scraped.content;
+              }
+            }
+          } catch (scrapeErr) {
+            logger.warn({ component: "News", url: article.url, err: scrapeErr.message }, "Article scrape failed (using summary)");
+          }
+        }
+      }
+
       await _onNewsFetched(topArticles);
       logger.info(
         { component: "News", published: topArticles.length },
-        "📢 Auto-published to media channels",
+        "📢 Auto-published to media channels (with full content)",
       );
     } catch (e) {
       logger.warn(
