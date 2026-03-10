@@ -1877,8 +1877,9 @@ router.get("/paper/status", (req, res) => {
   res.json(paperTrading.getState());
 });
 
-router.get("/paper/history", (req, res) => {
-  res.json(paperTrading.getTradeHistory());
+router.get("/paper/history", async (req, res) => {
+  const { supabaseAdmin } = req.app.locals;
+  res.json(await paperTrading.getTradeHistory(supabaseAdmin));
 });
 
 router.post("/paper/reset", (req, res) => {

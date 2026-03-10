@@ -148,6 +148,7 @@ function getState() {
 
 /**
  * Turn ON the bot — starts 24/7 automated trading
+ * Restores state from Supabase on startup
  */
 function turnOn(supabase) {
     if (state.active) return { status: "already_on", state: getState() };
@@ -156,6 +157,13 @@ function turnOn(supabase) {
     state.startedAt = new Date().toISOString();
     if (state.cash === 0 && Object.keys(state.positions).length === 0) {
         state.cash = state.startBalance; // reset if empty
+    }
+
+    // Restore state from Supabase (survive restarts)
+    if (supabase) {
+        restoreFromDB(supabase).catch(e => {
+            logger.error({ err: e.message }, "[PaperTrading] Failed to restore from DB");
+        });
     }
 
     logger.info({ balance: state.cash }, "[PaperTrading] BOT ON — starting 24/7 trading");
@@ -414,6 +422,7 @@ async function saveTrade(supabase, trade) {
             pnl: trade.pnl,
             hold_time: trade.holdTime || null,
             created_at: trade.date,
+            mode: state.mode || "PAPER",
         });
     } catch (e) {
         // Table might not exist yet — will auto-create
@@ -428,23 +437,56 @@ function timeDiff(start, end) {
     return `${hours}h ${mins}m`;
 }
 
-function getTradeHistory() {
-    const wins = state.trades.filter(t => t.pnl > 0);
-    const losses = state.trades.filter(t => t.pnl < 0);
-    const totalWon = wins.reduce((s, t) => s + t.pnl, 0);
-    const totalLost = losses.reduce((s, t) => s + t.pnl, 0);
+/**
+ * Get trade history — reads from Supabase (permanent record)
+ * Falls back to in-memory state if Supabase unavailable
+ */
+async function getTradeHistory(supabase) {
+    let trades = state.trades; // fallback
+
+    // Read from Supabase — permanent history (never deleted)
+    if (supabase) {
+        try {
+            const { data } = await supabase
+                .from("trading_paper_trades")
+                .select("*")
+                .order("created_at", { ascending: true })
+                .limit(500);
+            if (data && data.length > 0) {
+                trades = data.map(r => ({
+                    id: r.trade_id || r.id,
+                    asset: r.asset,
+                    action: r.action,
+                    price: r.price,
+                    qty: r.qty,
+                    value: r.value,
+                    confidence: r.confidence,
+                    pnl: r.pnl,
+                    holdTime: r.hold_time,
+                    date: r.created_at,
+                    mode: r.mode || "PAPER",
+                }));
+            }
+        } catch (e) { /* fallback to RAM */ }
+    }
+
+    const closedTrades = trades.filter(t => t.pnl !== null);
+    const wins = closedTrades.filter(t => t.pnl > 0);
+    const losses = closedTrades.filter(t => t.pnl < 0);
+    const totalWon = wins.reduce((s, t) => s + (t.pnl || 0), 0);
+    const totalLost = losses.reduce((s, t) => s + (t.pnl || 0), 0);
 
     return {
-        trades: state.trades,
+        trades,
         summary: {
-            totalTrades: state.trades.length,
+            totalTrades: trades.length,
             wins: wins.length,
             losses: losses.length,
             totalWon: +totalWon.toFixed(2),
             totalLost: +totalLost.toFixed(2),
             netPnL: +(totalWon + totalLost).toFixed(2),
-            winRate: state.trades.filter(t => t.pnl !== null).length > 0
-                ? +(wins.length / state.trades.filter(t => t.pnl !== null).length * 100).toFixed(1) : 0,
+            winRate: closedTrades.length > 0
+                ? +(wins.length / closedTrades.length * 100).toFixed(1) : 0,
         },
     };
 }
@@ -462,7 +504,8 @@ module.exports = {
 };
 
 /**
- * RESET — clear all paper trading data (when switching demo→real)
+ * RESET — clears in-memory simulation state only
+ * Supabase trade history is NEVER deleted (permanent record)
  */
 function reset(supabase) {
     turnOff(); // stop if running
@@ -475,13 +518,88 @@ function reset(supabase) {
     state.startedAt = null;
     state.lastSignalCheck = null;
 
-    // Clear Supabase table too
-    if (supabase) {
-        supabase.from("trading_paper_trades").delete().neq("id", 0).catch(() => { });
-    }
+    // NOTE: Supabase trade history is NEVER deleted
+    // Real history persists forever — only in-memory simulation resets
 
-    logger.info("[PaperTrading] RESET — all paper data cleared");
+    logger.info("[PaperTrading] RESET — simulation state cleared (DB history preserved)");
     return { status: "reset", state: getState() };
+}
+
+/**
+ * Restore state from Supabase after server restart
+ * Reads last known trades and recalculates balance
+ */
+async function restoreFromDB(supabase) {
+    try {
+        const { data: trades } = await supabase
+            .from("trading_paper_trades")
+            .select("*")
+            .eq("mode", state.mode)
+            .order("created_at", { ascending: true });
+
+        if (!trades || trades.length === 0) {
+            logger.info("[PaperTrading] No previous trades in DB — starting fresh");
+            return;
+        }
+
+        // Rebuild state from trade history
+        let cash = state.startBalance;
+        let totalPnL = 0;
+        let winCount = 0;
+        let lossCount = 0;
+        const positions = {};
+        const memTrades = [];
+
+        for (const r of trades) {
+            const trade = {
+                id: r.trade_id || r.id,
+                asset: r.asset,
+                action: r.action,
+                price: r.price,
+                qty: r.qty,
+                value: r.value,
+                confidence: r.confidence,
+                pnl: r.pnl,
+                holdTime: r.hold_time,
+                date: r.created_at,
+            };
+            memTrades.push(trade);
+
+            if (r.action === "BUY") {
+                cash -= r.value;
+                positions[r.asset] = {
+                    qty: r.qty,
+                    avgPrice: r.price,
+                    currentPrice: r.price,
+                    openDate: r.created_at,
+                };
+            } else if (r.action === "SELL") {
+                cash += r.value;
+                if (r.pnl !== null) {
+                    totalPnL += r.pnl;
+                    if (r.pnl > 0) winCount++;
+                    else lossCount++;
+                }
+                delete positions[r.asset];
+            }
+        }
+
+        state.trades = memTrades;
+        state.cash = cash;
+        state.positions = positions;
+        state.totalPnL = totalPnL;
+        state.winCount = winCount;
+        state.lossCount = lossCount;
+
+        logger.info({
+            trades: memTrades.length,
+            cash: +cash.toFixed(2),
+            positions: Object.keys(positions).length,
+            pnl: +totalPnL.toFixed(2),
+        }, `[PaperTrading] Restored ${memTrades.length} trades from DB`);
+    } catch (e) {
+        logger.error({ err: e.message }, "[PaperTrading] DB restore failed");
+    }
 }
 
 /**
