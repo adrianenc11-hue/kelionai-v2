@@ -278,7 +278,7 @@
             var payload = {
                 message,
                 avatar: KAvatar.getCurrentAvatar(),
-                history: chatHistory.slice(-20),
+                history: chatHistory.slice(-50),
                 language: language || (window.i18n ? i18n.getLanguage() : 'ro'),
                 conversationId: currentConversationId,
                 geo: window.KGeo ? KGeo.getCached() : null
