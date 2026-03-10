@@ -883,4 +883,4 @@ async function broadcastNews(articles) {
   await broadcastToChannel(msg);
 }
 
-module.exports = { router, broadcastNews, setSupabase };
+module.exports = { router, broadcastNews, setSupabase, sendMessage, CHANNEL_ID };

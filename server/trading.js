@@ -3374,13 +3374,21 @@ async function k1MarketDataFeed() {
 setTimeout(k1MarketDataFeed, 10 * 1000);
 setInterval(k1MarketDataFeed, 5 * 60 * 1000);
 
-// K1 Proactive Alerts: Check every 5 min for alerts to broadcast
-setInterval(() => {
+// K1 Proactive Alerts: Check every 5 min — REAL Telegram broadcast
+setInterval(async () => {
   try {
     const k1Bridge = require("./k1-messenger-bridge");
     const proactive = k1Bridge.getProactiveMessages();
     if (proactive.length > 0) {
-      logger.info({ count: proactive.length, msgs: proactive.map(m => m.text.slice(0, 80)) }, "[K1-Proactive] Alerts ready for broadcast");
+      const tg = require("./telegram");
+      const chatId = tg.CHANNEL_ID || process.env.TELEGRAM_ADMIN_CHAT_ID;
+      if (chatId && tg.sendMessage) {
+        for (const msg of proactive) {
+          const text = `🔔 <b>K1 Alert</b>\n\n${msg.text}\n\n<i>Priority: ${msg.priority || "normal"} | ${new Date().toLocaleTimeString("ro-RO")}</i>`;
+          await tg.sendMessage(chatId, text);
+        }
+        logger.info({ count: proactive.length }, "[K1-Proactive] Alerts sent to Telegram");
+      }
     }
   } catch { }
 }, 5 * 60 * 1000);
