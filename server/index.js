@@ -202,18 +202,26 @@ app.use((req, res, next) => {
       },
       `${req.method} ${req.path} ${res.statusCode} ${duration}ms`,
     );
-    // Track page views for admin traffic panel (skip API/static assets)
-    if (req.method === "GET" && !req.path.startsWith("/api/") && !req.path.match(/\.(js|css|png|jpg|svg|ico|woff2?)$/i) && supabaseAdmin) {
-      supabaseAdmin.from("page_views").insert({
-        ip: req.ip || req.headers["x-forwarded-for"] || "unknown",
-        path: req.path,
-        user_agent: (req.get("user-agent") || "").substring(0, 300),
-        country: req.headers["cf-ipcountry"] || req.headers["x-vercel-ip-country"] || null,
-      }).then(({ error }) => {
-        if (error) logger.warn({ component: "PageViews", err: error.message, code: error.code }, "page_views insert failed");
-      }).catch((e) => {
-        logger.warn({ component: "PageViews", err: e.message }, "page_views insert exception");
-      });
+    // Track page views for admin traffic panel (skip API/static/health/bots)
+    if (req.method === "GET" && !req.path.startsWith("/api/") && !req.path.match(/\.(js|css|png|jpg|svg|ico|woff2?|map|json|webmanifest)$/i) && supabaseAdmin) {
+      // Skip health checks, service worker, and bot traffic
+      const ua = (req.get("user-agent") || "").toLowerCase();
+      const isBot = /bot|crawl|spider|node-fetch|uptimerobot|healthcheck|pingdom|monitoring|curl|wget/i.test(ua);
+      const isHealth = req.path === "/health" || req.path === "/sw.js" || req.path === "/manifest.json" || req.path === "/favicon.svg";
+      if (!isBot && !isHealth) {
+        const realIp = req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || req.ip || "unknown";
+        supabaseAdmin.from("page_views").insert({
+          ip: realIp,
+          path: req.path,
+          user_agent: (req.get("user-agent") || "").substring(0, 300),
+          country: req.headers["cf-ipcountry"] || req.headers["x-vercel-ip-country"] || null,
+          referrer: (req.get("referer") || req.get("referrer") || "").substring(0, 500) || null,
+        }).then(({ error }) => {
+          if (error) logger.warn({ component: "PageViews", err: error.message, code: error.code }, "page_views insert failed");
+        }).catch((e) => {
+          logger.warn({ component: "PageViews", err: e.message }, "page_views insert exception");
+        });
+      }
     }
   });
   next();
