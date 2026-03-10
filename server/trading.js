@@ -3201,6 +3201,60 @@ router.post("/k1/performance/record", (req, res) => {
   res.json({ recorded: true, report: k1Perf.getReport() });
 });
 
+// ═══════════════════════════════════════════════════════════════
+// K1 FAZA 3: EVOLUTION — Meta-Learning, User Model, Scheduled Jobs
+// ═══════════════════════════════════════════════════════════════
+const k1Meta = require("./k1-meta-learning");
+
+// Start scheduled jobs (forgetting@6h, self-test@12h)
+setTimeout(() => {
+  try {
+    const sb = require("./supabase");
+    k1Meta.startScheduledJobs(sb);
+  } catch { }
+}, 15000); // 15s after boot
+
+router.get("/k1/evolution", (req, res) => {
+  res.json(k1Meta.getEvolutionReport());
+});
+
+router.get("/k1/user", (req, res) => {
+  res.json(k1Meta.getUserModel());
+});
+
+router.get("/k1/strategies", (req, res) => {
+  res.json(k1Meta.getStrategies());
+});
+
+router.post("/k1/user/interaction", (req, res) => {
+  const { domain, wasCorrection, correctionNote } = req.body || {};
+  k1Meta.recordUserInteraction({ domain, wasCorrection, correctionNote });
+  res.json({ recorded: true, model: k1Meta.getUserModel() });
+});
+
+router.post("/k1/risk/adjust", (req, res) => {
+  const { pnlPct, reason, holdHours } = req.body || {};
+  k1Meta.adjustRisk({ pnlPct, reason, holdHours });
+  res.json({ adjusted: true, strategies: k1Meta.getStrategies() });
+});
+
+// ═══ FULL K1 DASHBOARD — Tot într-un singur endpoint ═══
+router.get("/k1/dashboard", (req, res) => {
+  res.json({
+    cognitive: {
+      monologue: k1Cognitive.getMonologue(10),
+      metaCognition: k1Cognitive.getMetaCognition(),
+    },
+    world: k1World.getWorldState(),
+    memory: k1Memory.getStats(),
+    agents: k1Agents.getStats(),
+    truth: k1Truth.getSelfTestHistory(),
+    performance: k1Perf.getReport(),
+    evolution: k1Meta.getEvolutionReport(),
+    alerts: k1World.getAlerts(),
+  });
+});
+
 module.exports = router;
 module.exports.detectSmartMoney = detectSmartMoney;
 module.exports.kellyPosition = kellyPosition;
