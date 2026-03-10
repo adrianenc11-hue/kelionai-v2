@@ -300,6 +300,11 @@
                 onDone();
             };
             currentSourceNode.start(0);
+            // Dispatch audio-start on first chunk so text reveal animation begins
+            if (!isLast || ci === undefined) {
+                // Always dispatch for first chunk of each speak() call
+            }
+            window.dispatchEvent(new CustomEvent('audio-start', { detail: { duration: audioBuf.duration, isChunked: true } }));
             console.log('[Voice] ✅ Chunk playing (' + arrayBuf.byteLength + 'B, ' + Math.round(audioBuf.duration) + 's' + (usingAlignment ? ', ALIGNED' : '') + ')');
         }, function (err) {
             console.warn('[Voice] Chunk decode failed');

@@ -343,8 +343,38 @@
             // Create empty message — text will be revealed with voice
             const overlay = document.getElementById('chat-overlay');
             overlay.innerHTML = ''; // Clear previous — max 1 phrase on screen
+
+            // ── COPY + SAVE BUTTONS (top-right of monitor) ──
+            var actionBar = document.createElement('div');
+            actionBar.className = 'msg-actions';
+            actionBar.innerHTML = '<button class="msg-action-btn" id="btn-copy-msg" title="Copiază text">📋</button>' +
+                '<button class="msg-action-btn" id="btn-save-msg" title="Salvează ca fișier">💾</button>';
+            overlay.appendChild(actionBar);
+            // Wire copy button
+            actionBar.querySelector('#btn-copy-msg').onclick = function () {
+                navigator.clipboard.writeText(fullReply).then(function () {
+                    actionBar.querySelector('#btn-copy-msg').textContent = '✅';
+                    setTimeout(function () { actionBar.querySelector('#btn-copy-msg').textContent = '📋'; }, 1500);
+                }).catch(function () {
+                    // Fallback: textarea copy
+                    var ta = document.createElement('textarea'); ta.value = fullReply; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+                    actionBar.querySelector('#btn-copy-msg').textContent = '✅';
+                    setTimeout(function () { actionBar.querySelector('#btn-copy-msg').textContent = '📋'; }, 1500);
+                });
+            };
+            // Wire save button
+            actionBar.querySelector('#btn-save-msg').onclick = function () {
+                var blob = new Blob([fullReply], { type: 'text/plain;charset=utf-8' });
+                var a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = 'kelion-response-' + new Date().toISOString().slice(0, 19).replace(/:/g, '-') + '.txt';
+                a.click();
+                URL.revokeObjectURL(a.href);
+            };
+
             const msgEl = document.createElement('div');
             msgEl.className = 'msg assistant';
+            msgEl.style.userSelect = 'text';
             msgEl.innerHTML = '';
             overlay.appendChild(msgEl);
             overlay.scrollTop = overlay.scrollHeight;
@@ -410,7 +440,8 @@
                 KVoice.speak(fullReply, data.avatar || KAvatar.getCurrentAvatar());
             }
 
-            // Fallback: if audio doesn't start in 4s, show text anyway
+            // Fallback: if audio doesn't start in 15s, show text anyway
+            // (increased from 4s because TTS fetch for long texts can take 5-10s)
             setTimeout(function () {
                 window.removeEventListener('audio-start', revealHandler);
                 if (_textRevealed) return; // audio handler already revealed
@@ -419,7 +450,7 @@
                     msgEl.innerHTML = parseMarkdown(fullReply);
                     overlay.scrollTop = overlay.scrollHeight;
                 }
-            }, 4000);
+            }, 15000);
 
 
 
