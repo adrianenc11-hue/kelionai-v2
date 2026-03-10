@@ -682,6 +682,18 @@ router.post("/webhook", async (req, res) => {
         if (_userCache.has(userId)) _userCache.get(userId).messageCount = msgCount;
       } catch (e) { /* ignore */ }
     }
+    // ═══ K1 COGNITIVE BRIDGE — Pre-process prin reasoning loop ═══
+    const k1Bridge = require("./k1-messenger-bridge");
+    let k1Context = null;
+    try {
+      k1Context = await k1Bridge.preProcess(text, {
+        platform: "telegram",
+        userId: String(userId),
+        userName,
+        supabase: req.app.locals.supabaseAdmin || req.app.locals.supabase,
+      });
+    } catch { }
+
     // Use Brain AI
     const detectedLangTg = detectLanguage(text);
     let reply;
@@ -696,8 +708,11 @@ router.post("/webhook", async (req, res) => {
           const timeout = new Promise((_, reject) =>
             setTimeout(() => reject(new Error("Brain timeout")), 15000),
           );
+          // Enrich context with K1 data
+          const k1SystemCtx = k1Context ? k1Bridge.getK1SystemContext(k1Context) : "";
+          const enrichedText = k1SystemCtx ? text + k1SystemCtx : text;
           const result = await Promise.race([
-            brain.think(text, "kelion", [], detectedLangTg || "auto"),
+            brain.think(enrichedText, "kelion", [], detectedLangTg || "auto"),
             timeout,
           ]);
           reply =
@@ -716,6 +731,16 @@ router.post("/webhook", async (req, res) => {
           `🤖 Sunt KelionAI! Pentru experiența completă vizitează ${APP_URL}`;
       }
     }
+
+    // ═══ K1 POST-PROCESS — Confidence + Memory save ═══
+    try {
+      await k1Bridge.postProcess(reply, {
+        platform: "telegram",
+        userId: String(userId),
+        domain: k1Context?.k1?.domain || "general",
+        supabase: req.app.locals.supabaseAdmin || req.app.locals.supabase,
+      });
+    } catch { }
 
     await sendMessage(chatId, escapeHtml(reply), { parseMode: undefined });
 
