@@ -37,10 +37,50 @@ const STRATEGIES = [
   "MACD",
   "BollingerBands",
   "EMACrossover",
+  "SmartConfluence",
   "Fibonacci",
   "VolumeProfile",
   "Sentiment",
 ];
+
+/**
+ * SmartConfluence: Combines RSI + MACD + Bollinger + EMA with voting.
+ * BUY only if 3/4 indicators agree. Much fewer false signals.
+ */
+function calculateSmartConfluence(prices, volumes) {
+  const rsi = calculateRSI(prices);
+  const macd = calculateMACD(prices);
+  const bollinger = calculateBollingerBands(prices);
+  const ema = calculateEMACrossover(prices);
+
+  const indicators = [
+    { name: 'RSI', signal: rsi.signal },
+    { name: 'MACD', signal: macd.crossSignal },
+    { name: 'Bollinger', signal: bollinger.signal },
+    { name: 'EMA', signal: ema.signal },
+  ];
+
+  let buyVotes = 0, sellVotes = 0;
+  indicators.forEach(ind => {
+    if (ind.signal === 'BUY' || ind.signal === 'STRONG BUY') buyVotes++;
+    if (ind.signal === 'SELL' || ind.signal === 'STRONG SELL') sellVotes++;
+  });
+
+  const confidence = Math.max(buyVotes, sellVotes) / indicators.length * 100;
+  let signal = 'HOLD';
+  if (buyVotes >= 3) signal = buyVotes === 4 ? 'STRONG BUY' : 'BUY';
+  else if (sellVotes >= 3) signal = sellVotes === 4 ? 'STRONG SELL' : 'SELL';
+
+  return {
+    signal,
+    confidence: Math.round(confidence),
+    buyVotes,
+    sellVotes,
+    indicators: indicators.map(i => i.name + '=' + i.signal).join(','),
+    rsiValue: rsi.value,
+    rsiMomentum: rsi.momentum,
+  };
+}
 
 // ═══ CACHE ═══
 let analysisCache = null;
@@ -185,7 +225,7 @@ function calculateEMA(prices, period) {
  */
 function calculateRSI(prices, period = 14) {
   if (!prices || prices.length < period + 1) {
-    return { value: 50, signal: "HOLD" };
+    return { value: 50, signal: "HOLD", momentum: "neutral" };
   }
   let gains = 0;
   let losses = 0;
@@ -197,23 +237,37 @@ function calculateRSI(prices, period = 14) {
   let avgGain = gains / period;
   let avgLoss = losses / period;
 
+  // Track RSI history for momentum
+  const rsiHistory = [];
   for (let i = period + 1; i < prices.length; i++) {
     const diff = prices[i] - prices[i - 1];
     const gain = diff >= 0 ? diff : 0;
     const loss = diff < 0 ? Math.abs(diff) : 0;
     avgGain = (avgGain * (period - 1) + gain) / period;
     avgLoss = (avgLoss * (period - 1) + loss) / period;
+    if (avgLoss === 0) { rsiHistory.push(100); continue; }
+    rsiHistory.push(100 - 100 / (1 + avgGain / avgLoss));
   }
 
-  if (avgLoss === 0) return { value: 100, signal: "SELL" };
+  if (avgLoss === 0) return { value: 100, signal: "SELL", momentum: "overbought" };
   const rs = avgGain / avgLoss;
   const value = 100 - 100 / (1 + rs);
 
-  let signal = "HOLD";
-  if (value < 30) signal = "BUY";
-  else if (value > 70) signal = "SELL";
+  // Momentum: RSI rising or falling over last 3 bars
+  const momentum = rsiHistory.length >= 3
+    ? (rsiHistory[rsiHistory.length - 1] > rsiHistory[rsiHistory.length - 3] ? "rising" : "falling")
+    : "neutral";
 
-  return { value: Math.round(value * 100) / 100, signal };
+  // Optimized thresholds with STRONG signals
+  let signal = "HOLD";
+  if (value < 25) signal = "STRONG BUY";        // Extreme oversold
+  else if (value < 35 && momentum === "rising") signal = "BUY";  // Oversold + momentum up
+  else if (value < 35) signal = "HOLD";          // Oversold but still falling = don't catch knife
+  else if (value > 75) signal = "STRONG SELL";   // Extreme overbought
+  else if (value > 65 && momentum === "falling") signal = "SELL"; // Overbought + momentum down
+  else if (value > 65) signal = "HOLD";          // Overbought but still rising = let it run
+
+  return { value: Math.round(value * 100) / 100, signal, momentum };
 }
 
 /**
@@ -1599,14 +1653,11 @@ router.post("/backtest", async (req, res) => {
         signal = calculateBollingerBands(slice).signal;
       } else if (strategy === "EMACrossover") {
         signal = calculateEMACrossover(slice).signal;
+      } else if (strategy === "SmartConfluence") {
+        signal = calculateSmartConfluence(slice, volumes.slice(0, i + 1)).signal;
       } else {
-        signal = calculateConfluence({
-          rsi: calculateRSI(slice),
-          macd: calculateMACD(slice),
-          bollinger: calculateBollingerBands(slice),
-          ema: calculateEMACrossover(slice),
-          volume: analyzeVolume(slice, volumes.slice(0, i + 1)),
-        }).signal;
+        // Fallback for Fibonacci/VolumeProfile/Sentiment
+        signal = calculateSmartConfluence(slice, volumes.slice(0, i + 1)).signal;
       }
 
       const price = prices[i];
@@ -1930,8 +1981,37 @@ router.post("/paper/on", (req, res) => {
 
 router.post("/paper/off", (req, res) => {
   const result = paperTrading.turnOff();
+  // Save active=false to Supabase so it doesn't auto-restart
+  try {
+    const { supabaseAdmin } = req.app.locals;
+    if (supabaseAdmin) {
+      supabaseAdmin.from("trading_state").upsert({
+        id: "paper_bot", active: false, updated_at: new Date().toISOString()
+      }, { onConflict: "id" }).catch(() => { });
+    }
+  } catch { }
   res.json(result);
 });
+
+// ═══ AUTO-RESTART — survives deploys! ═══
+// On boot: check Supabase if bot was active before restart → auto-start
+setTimeout(async () => {
+  try {
+    const { createClient } = require("@supabase/supabase-js");
+    const sbUrl = process.env.SUPABASE_URL || "https://nqlobybfwmtkmsqadqqr.supabase.co";
+    const sbKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5xbG9ieWJmd210a21zcWFkcXFyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTg3MzAyMiwiZXhwIjoyMDg3NDQ5MDIyfQ.AngYdhgIOXas4UssEP1ENLiZCW9CYPgecvYej3PvLOQ";
+    const sb = createClient(sbUrl, sbKey);
+    const { data } = await sb.from("trading_state").select("active, mode").eq("id", "paper_bot").single();
+    if (data && data.active === true) {
+      logger.info("[Trading] 🔄 Auto-restart: bot was active before deploy — restarting automatically");
+      paperTrading.turnOn(sb);
+    } else {
+      logger.info("[Trading] Bot was OFF before deploy — staying off");
+    }
+  } catch (e) {
+    logger.warn({ err: e.message }, "[Trading] Auto-restart check failed (table may not exist yet)");
+  }
+}, 10000); // 10s after boot to let DB connections initialize
 
 router.get("/paper/status", (req, res) => {
   res.json(paperTrading.getState());
