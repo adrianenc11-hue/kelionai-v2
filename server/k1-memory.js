@@ -196,9 +196,13 @@ async function forget(supabase, options = {}) {
     const cutoff = new Date(Date.now() - maxAge * 24 * 60 * 60 * 1000).toISOString();
     let deleted = 0;
     let compressed = 0;
+    let archived = 0;
 
     try {
-        // Șterge memorii vechi neimportante
+        // 1. Archive important memories to COLD before forgetting
+        archived = await archiveToCold(supabase, { maxAge: 30 });
+
+        // 2. Șterge memorii vechi neimportante
         const { data: old } = await supabase
             .from("k1_memory")
             .delete()
@@ -208,7 +212,7 @@ async function forget(supabase, options = {}) {
 
         deleted = old?.length || 0;
 
-        // Comprimă memorii vechi importante → summary
+        // 3. Comprimă memorii vechi importante → summary
         const { data: toCompress } = await supabase
             .from("k1_memory")
             .select("*")
@@ -235,8 +239,100 @@ async function forget(supabase, options = {}) {
         logger.warn({ err: e.message }, "[K1-Memory] Forgetting engine error");
     }
 
-    logger.info({ deleted, compressed }, "[K1-Memory] 🧹 Forgetting cycle complete");
-    return { deleted, compressed };
+    logger.info({ deleted, compressed, archived }, "[K1-Memory] 🧹 Forgetting cycle complete");
+    return { deleted, compressed, archived };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// COLD MEMORY — Long-term archive (summarized, forever)
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Archive warm memories older than N days into cold summaries
+ */
+async function archiveToCold(supabase, options = {}) {
+    if (!supabase) return 0;
+    const { maxAge = 30 } = options;
+    const cutoff = new Date(Date.now() - maxAge * 24 * 60 * 60 * 1000).toISOString();
+
+    try {
+        // Get old important warm memories not yet archived
+        const { data: oldWarm } = await supabase
+            .from("k1_memory")
+            .select("*")
+            .gte("importance", 5)
+            .lt("created_at", cutoff)
+            .neq("type", "cold_archive")
+            .neq("type", "compressed")
+            .order("created_at", { ascending: true })
+            .limit(100);
+
+        if (!oldWarm || oldWarm.length < 3) return 0;
+
+        // Group by domain and summarize
+        const byDomain = {};
+        for (const m of oldWarm) {
+            const d = m.domain || "general";
+            if (!byDomain[d]) byDomain[d] = [];
+            byDomain[d].push(m);
+        }
+
+        let archived = 0;
+        for (const [domain, memories] of Object.entries(byDomain)) {
+            if (memories.length < 2) continue;
+
+            // Create cold archive summary
+            const contentParts = memories.map(m =>
+                `[${m.type}] ${(m.content || "").slice(0, 150)}`
+            );
+            const avgImportance = Math.round(memories.reduce((s, m) => s + (m.importance || 5), 0) / memories.length);
+            const dateRange = `${memories[0].created_at?.slice(0, 10)} → ${memories[memories.length - 1].created_at?.slice(0, 10)}`;
+
+            await supabase.from("k1_memory").insert({
+                content: `[COLD ARCHIVE | ${domain} | ${dateRange} | ${memories.length} items]\n${contentParts.join("\n")}`.slice(0, 2000),
+                type: "cold_archive",
+                domain,
+                importance: Math.max(avgImportance, 6),
+                tags: ["cold", "archive", "auto"],
+                source: "forgetting-engine",
+                metadata: { originalCount: memories.length, dateRange, archivedAt: new Date().toISOString() },
+                created_at: new Date().toISOString(),
+            });
+
+            // Delete originals
+            const ids = memories.map(m => m.id);
+            await supabase.from("k1_memory").delete().in("id", ids);
+            archived += memories.length;
+        }
+
+        if (archived > 0) {
+            logger.info({ archived }, "[K1-Memory] ❄️ Cold archive created");
+        }
+        return archived;
+    } catch (e) {
+        logger.warn({ err: e.message }, "[K1-Memory] Cold archive error");
+        return 0;
+    }
+}
+
+/**
+ * Search COLD memory archives
+ */
+async function searchCold(supabase, query, options = {}) {
+    if (!supabase || !query) return [];
+    const { limit = 5 } = options;
+    try {
+        const { data } = await supabase
+            .from("k1_memory")
+            .select("*")
+            .in("type", ["cold_archive", "compressed"])
+            .ilike("content", `%${query.slice(0, 50)}%`)
+            .order("importance", { ascending: false })
+            .limit(limit);
+        return data || [];
+    } catch {
+        return [];
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -277,6 +373,7 @@ function getStats() {
         hotMaxCapacity: MAX_HOT,
         oldestHot: hotMemory[0]?.timestamp || null,
         newestHot: hotMemory[hotMemory.length - 1]?.timestamp || null,
+        tiers: ["hot (RAM)", "warm (Supabase 30d)", "cold (archive forever)"],
     };
 }
 
@@ -287,6 +384,8 @@ module.exports = {
     saveToWarm,
     retrieve,
     forget,
+    archiveToCold,
+    searchCold,
     getStats,
     createMemoryTable,
 };

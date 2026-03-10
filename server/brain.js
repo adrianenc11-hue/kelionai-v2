@@ -4119,7 +4119,7 @@ Rules:
       };
     }
 
-    // Balanced tier: Gemini (good quality/cost ratio)
+    // Balanced tier: Gemini Flash (good quality/cost ratio)
     if ((tier === "balanced" || tier === "fast") && this.geminiKey) {
       return {
         provider: "gemini",
@@ -4132,7 +4132,20 @@ Rules:
       };
     }
 
-    // Premium tier: OpenAI (highest quality for critical tasks)
+    // Premium tier: Gemini 2.5 Pro — DEEP REASONING for complex tasks
+    if (tier === "premium" && this.geminiKey) {
+      return {
+        provider: "gemini",
+        model: "gemini-2.5-pro-preview-06-05",
+        apiKey: this.geminiKey,
+        endpoint: `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro-preview-06-05:generateContent`,
+        reason: `🧠 Deep reasoning (Gemini Pro) for ${complexityResult.name} task`,
+        maxTokens: Math.max(complexityResult.maxTokens, 4000),
+        costPerToken: 0.00000125,
+      };
+    }
+
+    // Premium fallback: OpenAI GPT-4o if no Gemini
     if (tier === "premium" && this.openaiKey) {
       return {
         provider: "openai",
@@ -4145,7 +4158,7 @@ Rules:
       };
     }
 
-    // Fallback chain: Gemini → Groq → OpenAI
+    // Fallback chain: Gemini Flash → Groq → OpenAI
     if (this.geminiKey) {
       return {
         provider: "gemini", model: "gemini-2.0-flash", apiKey: this.geminiKey,
