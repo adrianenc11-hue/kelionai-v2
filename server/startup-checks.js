@@ -90,7 +90,7 @@ function validateEnv() {
 function setupGracefulShutdown(server) {
     let shuttingDown = false;
 
-    const shutdown = (signal) => {
+    const shutdown = async (signal) => {
         if (shuttingDown) return;
         shuttingDown = true;
         logger.info({ component: "Shutdown", signal }, `🛑 ${signal} received — shutting down gracefully`);
@@ -100,6 +100,14 @@ function setupGracefulShutdown(server) {
             const k1Meta = require("./k1-meta-learning");
             k1Meta.stopScheduledJobs();
             logger.info({ component: "Shutdown" }, "✅ K1 scheduled jobs stopped");
+        } catch { }
+
+        // Save K1 state before exit
+        try {
+            const k1Persist = require("./k1-persistence");
+            const sb = require("./supabase");
+            await k1Persist.saveState(sb);
+            logger.info({ component: "Shutdown" }, "✅ K1 state saved to Supabase");
         } catch { }
 
         // Stop accepting new connections

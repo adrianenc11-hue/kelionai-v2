@@ -288,8 +288,140 @@ function getStats() {
     };
 }
 
+// ═══════════════════════════════════════════════════════════════
+// REAL LLM EXECUTION — Apelează Gemini API pentru agents
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Apelează Gemini API cu un prompt
+ */
+async function callGemini(systemPrompt, userPrompt, maxTokens = 600) {
+    const key = process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
+    if (!key) throw new Error("No Gemini API key");
+
+    const model = "gemini-2.0-flash";
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+
+    const r = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+            systemInstruction: { parts: [{ text: systemPrompt }] },
+            generationConfig: { maxOutputTokens: maxTokens, temperature: 0.7 },
+        }),
+        signal: AbortSignal.timeout(15000),
+    });
+
+    if (!r.ok) throw new Error(`Gemini ${r.status}`);
+    const d = await r.json();
+    return d.candidates?.[0]?.content?.parts?.[0]?.text || null;
+}
+
+/**
+ * EXECUTE DEBATE — Agenții PRO + CONTRA discută real via Gemini, Executive sintetizează
+ */
+async function executeDebate(task, options = {}) {
+    const debate = setupDebate(task, options);
+    const startTime = Date.now();
+
+    k1Cognitive.think(`Executing debate via Gemini: "${task.slice(0, 80)}"`, { phase: "ACT" });
+
+    // Run PRO and CONTRA in parallel via Gemini
+    const [proResult, conResult] = await Promise.allSettled([
+        callGemini(debate.proAgent.prompt.systemPrompt, debate.proAgent.prompt.userPrompt, 800),
+        callGemini(debate.conAgent.prompt.systemPrompt, debate.conAgent.prompt.userPrompt, 800),
+    ]);
+
+    const proText = proResult.status === "fulfilled" ? proResult.value : "Fără argument PRO (eroare API)";
+    const conText = conResult.status === "fulfilled" ? conResult.value : "Fără argument CONTRA (eroare API)";
+
+    // Complete PRO and CONTRA agents
+    complete(debate.proAgent.id, proText, proResult.status === "fulfilled" ? 75 : 20);
+    complete(debate.conAgent.id, conText, conResult.status === "fulfilled" ? 75 : 20);
+
+    // Brief the Judge with both arguments
+    brief(debate.judgeAgent.id,
+        `DEZBATERE pe tema: "${task}"\n\n` +
+        `📗 ARGUMENT PRO:\n${proText}\n\n` +
+        `📕 ARGUMENT CONTRA:\n${conText}\n\n` +
+        `Sintetizează o concluzie finală. Care parte are dreptate și de ce? Dă un verdict clar.`
+    );
+
+    // Judge synthesizes via Gemini
+    let verdict;
+    try {
+        const judgePrompt = getExecutionPrompt(debate.judgeAgent.id);
+        verdict = await callGemini(judgePrompt.systemPrompt, judgePrompt.userPrompt, 1000);
+        complete(debate.judgeAgent.id, verdict, 85);
+    } catch (e) {
+        verdict = `Sinteză automată: PRO a argumentat pentru, CONTRA a adus contraargumente. Concluzia necesită evaluare umană.`;
+        complete(debate.judgeAgent.id, verdict, 30);
+    }
+
+    const elapsed = Date.now() - startTime;
+    k1Cognitive.think(`Debate finalizat în ${elapsed}ms — Verdict: ${(verdict || "").slice(0, 100)}`, { phase: "OBSERVE" });
+
+    logger.info({ elapsed, task: task.slice(0, 60) }, "[K1-Agents] Debate executed via Gemini");
+
+    return {
+        pattern: "debate",
+        task,
+        pro: { agentId: debate.proAgent.id, response: proText },
+        contra: { agentId: debate.conAgent.id, response: conText },
+        verdict: { agentId: debate.judgeAgent.id, response: verdict },
+        elapsed,
+        llmPowered: true,
+    };
+}
+
+/**
+ * EXECUTE ENSEMBLE — 3 agenți răspund independent via Gemini, cel mai bun câștigă
+ */
+async function executeEnsemble(task, agentTypes = ["research", "trading", "critic"]) {
+    const ensemble = setupEnsemble(task, agentTypes);
+    const startTime = Date.now();
+
+    k1Cognitive.think(`Executing ensemble (${agentTypes.join(", ")}) via Gemini`, { phase: "ACT" });
+
+    // Run all agents in parallel
+    const results = await Promise.allSettled(
+        ensemble.agents.map(a => callGemini(a.prompt.systemPrompt, a.prompt.userPrompt, 800))
+    );
+
+    const responses = results.map((r, i) => ({
+        agentId: ensemble.agents[i].id,
+        type: ensemble.agents[i].type,
+        response: r.status === "fulfilled" ? r.value : null,
+        success: r.status === "fulfilled" && r.value,
+    }));
+
+    // Complete agents
+    responses.forEach(r => {
+        complete(r.agentId, r.response || "N/A", r.success ? 70 : 20);
+    });
+
+    // Pick best: longest successful response (heuristic for detail)
+    const successful = responses.filter(r => r.success);
+    const best = successful.sort((a, b) => (b.response?.length || 0) - (a.response?.length || 0))[0] || responses[0];
+
+    const elapsed = Date.now() - startTime;
+    k1Cognitive.think(`Ensemble finalizat în ${elapsed}ms — Best: ${best?.type}`, { phase: "OBSERVE" });
+
+    return {
+        pattern: "ensemble",
+        task,
+        responses,
+        best: best,
+        consensus: successful.length >= 2,
+        elapsed,
+        llmPowered: true,
+    };
+}
+
 module.exports = {
     spawn, brief, getExecutionPrompt, complete, evaluate, kill,
     setupDebate, setupEnsemble, setupAdversarial,
+    executeDebate, executeEnsemble,
     getActiveAgents, getAgent, getTemplates, getStats,
 };

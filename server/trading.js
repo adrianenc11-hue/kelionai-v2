@@ -3148,17 +3148,28 @@ router.delete("/k1/agents/:id", (req, res) => {
   res.json(result);
 });
 
-// Swarm patterns
-router.post("/k1/agents/debate", (req, res) => {
+// Swarm patterns — REAL LLM EXECUTION
+router.post("/k1/agents/debate", async (req, res) => {
   const { task } = req.body || {};
   if (!task) return res.status(400).json({ error: "task required" });
-  res.json(k1Agents.setupDebate(task));
+  try {
+    const result = await k1Agents.executeDebate(task);
+    res.json(result);
+  } catch (e) {
+    // Fallback to setup-only if Gemini fails
+    res.json({ ...k1Agents.setupDebate(task), llmPowered: false, error: e.message });
+  }
 });
 
-router.post("/k1/agents/ensemble", (req, res) => {
+router.post("/k1/agents/ensemble", async (req, res) => {
   const { task, types } = req.body || {};
   if (!task) return res.status(400).json({ error: "task required" });
-  res.json(k1Agents.setupEnsemble(task, types));
+  try {
+    const result = await k1Agents.executeEnsemble(task, types);
+    res.json(result);
+  } catch (e) {
+    res.json({ ...k1Agents.setupEnsemble(task, types), llmPowered: false, error: e.message });
+  }
 });
 
 router.post("/k1/agents/adversarial", (req, res) => {
@@ -3205,6 +3216,16 @@ router.post("/k1/performance/record", (req, res) => {
 // K1 FAZA 3: EVOLUTION — Meta-Learning, User Model, Scheduled Jobs
 // ═══════════════════════════════════════════════════════════════
 const k1Meta = require("./k1-meta-learning");
+const k1Persist = require("./k1-persistence");
+
+// K1 Persistence: Load saved state 5s after boot (before market feed at 10s)
+setTimeout(async () => {
+  try {
+    const sb = require("./supabase");
+    await k1Persist.loadState(sb);
+    logger.info("[K1] State loaded from Supabase");
+  } catch { }
+}, 5000);
 
 // Start scheduled jobs (forgetting@6h, self-test@12h)
 setTimeout(() => {
@@ -3360,8 +3381,15 @@ setInterval(() => {
     const proactive = k1Bridge.getProactiveMessages();
     if (proactive.length > 0) {
       logger.info({ count: proactive.length, msgs: proactive.map(m => m.text.slice(0, 80)) }, "[K1-Proactive] Alerts ready for broadcast");
-      // Future: wire to Telegram bot.sendMessage / WhatsApp API
     }
+  } catch { }
+}, 5 * 60 * 1000);
+
+// K1 Persistence: Save state every 5 min
+setInterval(async () => {
+  try {
+    const sb = require("./supabase");
+    await k1Persist.saveState(sb);
   } catch { }
 }, 5 * 60 * 1000);
 
