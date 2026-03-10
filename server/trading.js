@@ -3009,6 +3009,105 @@ router.delete("/brain/tasks/:id", (req, res) => {
   res.json({ success: true });
 });
 
+// ═══════════════════════════════════════════════════════════════
+// K1 COGNITIVE CORE — AGI Foundation endpoints
+// ═══════════════════════════════════════════════════════════════
+const k1Cognitive = require("./k1-cognitive");
+const k1World = require("./k1-world-state");
+const k1Memory = require("./k1-memory");
+
+// Status complet K1
+router.get("/k1/status", (req, res) => {
+  res.json({
+    cognitive: {
+      monologue: k1Cognitive.getMonologue(10),
+      metaCognition: k1Cognitive.getMetaCognition(),
+    },
+    world: k1World.getWorldState(),
+    memory: k1Memory.getStats(),
+    alerts: k1World.getAlerts(),
+  });
+});
+
+// World state
+router.get("/k1/world", (req, res) => {
+  res.json(k1World.getWorldState());
+});
+
+router.get("/k1/alerts", (req, res) => {
+  const unread = req.query.unread === "true";
+  res.json(k1World.getAlerts(unread));
+});
+
+router.post("/k1/alerts/read", (req, res) => {
+  k1World.markAlertsRead();
+  res.json({ success: true });
+});
+
+// Memory — retrieve
+router.get("/k1/memory", async (req, res) => {
+  const { q, domain, limit } = req.query;
+  const { supabaseAdmin } = req.app.locals;
+  const results = await k1Memory.retrieve(supabaseAdmin, q || "", {
+    domain, limit: parseInt(limit) || 10,
+  });
+  res.json({ results, stats: k1Memory.getStats() });
+});
+
+// Memory — save
+router.post("/k1/memory", async (req, res) => {
+  const { content, type, domain, importance, tags } = req.body || {};
+  if (!content) return res.status(400).json({ error: "Content required" });
+
+  // Save to hot
+  k1Memory.addToHot({ content, type, domain, importance, tags });
+
+  // Save to warm (Supabase)
+  const { supabaseAdmin } = req.app.locals;
+  const saved = await k1Memory.saveToWarm(supabaseAdmin, { content, type, domain, importance, tags });
+
+  res.json({ hot: true, warm: !!saved, id: saved?.id });
+});
+
+// Reasoning loop — procesare cognitivă
+router.post("/k1/think", (req, res) => {
+  const { input, domain } = req.body || {};
+  if (!input) return res.status(400).json({ error: "Input required" });
+
+  const result = k1Cognitive.reason(input, { domain });
+
+  // Salvăm gândul în memory
+  k1Memory.addToHot({
+    content: `[THOUGHT] ${input.slice(0, 200)}`,
+    type: "reasoning",
+    domain: result.reasoning.domain,
+    importance: 6,
+  });
+
+  res.json(result);
+});
+
+// Feedback — userul confirmă sau corectează
+router.post("/k1/feedback", (req, res) => {
+  const { domain, wasCorrect } = req.body || {};
+  if (!domain || wasCorrect === undefined) return res.status(400).json({ error: "domain + wasCorrect required" });
+
+  k1Cognitive.recordFeedback(domain, wasCorrect);
+  res.json({ recorded: true, meta: k1Cognitive.getMetaCognition() });
+});
+
+// Meta-cognition — auto-evaluare
+router.get("/k1/meta", (req, res) => {
+  res.json(k1Cognitive.getMetaCognition());
+});
+
+// Forgetting engine — cleanup manual
+router.post("/k1/memory/forget", async (req, res) => {
+  const { supabaseAdmin } = req.app.locals;
+  const result = await k1Memory.forget(supabaseAdmin, req.body || {});
+  res.json(result);
+});
+
 module.exports = router;
 module.exports.detectSmartMoney = detectSmartMoney;
 module.exports.kellyPosition = kellyPosition;
