@@ -345,8 +345,21 @@ async function checkAndTrade(supabase) {
                     shouldClose = true;
                     closeReason = `TAKE-PROFIT (${pnlPct.toFixed(1)}%)`;
                 }
+                // ═══ TRAILING STOP — protect gains ═══
+                // Track highest price since entry
+                else {
+                    if (!pos.highestPrice || price > pos.highestPrice) {
+                        pos.highestPrice = price;
+                    }
+                    const fromPeak = ((price - pos.highestPrice) / pos.highestPrice) * 100;
+                    // If was up +5% but dropped 3% from peak → close
+                    if (pnlPct > 0 && pos.highestPrice > pos.avgPrice * 1.03 && fromPeak <= -3) {
+                        shouldClose = true;
+                        closeReason = `TRAILING-STOP (peak: +${((pos.highestPrice - pos.avgPrice) / pos.avgPrice * 100).toFixed(1)}%, now: ${pnlPct.toFixed(1)}%)`;
+                    }
+                }
                 // Time limit: 24 hours
-                else if (holdHours >= 24) {
+                if (!shouldClose && holdHours >= 24) {
                     shouldClose = true;
                     closeReason = `TIME-LIMIT (${holdHours.toFixed(1)}h)`;
                 }
