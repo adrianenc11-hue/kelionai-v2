@@ -170,6 +170,66 @@ function turnOn(supabase) {
     // First check immediately
     setTimeout(() => checkAndTrade(supabase).catch(() => { }), 5000);
 
+    // ═══ SESSION SCHEDULER — pre-market warmup 5s before open ═══
+    state._sessionInterval = setInterval(() => {
+        if (!state.active) return;
+        const now = new Date();
+        const utcH = now.getUTCHours();
+        const utcM = now.getUTCMinutes();
+        const utcS = now.getUTCSeconds();
+        const day = now.getUTCDay();
+
+        for (const asset of TRADE_ASSETS) {
+            const mh = MARKET_HOURS[asset];
+            if (!mh || mh.always) continue; // skip crypto (24/7)
+            if (!mh.days.includes(day)) continue; // skip weekends
+
+            // Calculate seconds until market open
+            const openH = mh.open;
+            const secsUntilOpen = (openH - utcH) * 3600 + (0 - utcM) * 60 + (0 - utcS);
+
+            // Pre-market warmup: 5 seconds before open
+            if (secsUntilOpen > 0 && secsUntilOpen <= 5) {
+                logger.info({ asset, type: mh.type, opensIn: secsUntilOpen + "s" },
+                    `🔔 PRE-MARKET WARMUP: ${asset} opens in ${secsUntilOpen}s — fetching latest data`);
+
+                // Trigger immediate data refresh for this asset
+                getCurrentPrice(asset, supabase).then(price => {
+                    if (price) {
+                        logger.info({ asset, price }, `📊 ${asset} pre-open price: $${price}`);
+                    }
+                }).catch(() => { });
+            }
+
+            // Log market open event
+            if (secsUntilOpen === 0 || (utcH === openH && utcM === 0 && utcS < 30)) {
+                if (!state._openLogged) state._openLogged = {};
+                const todayKey = `${asset}-${now.toISOString().slice(0, 10)}`;
+                if (!state._openLogged[todayKey]) {
+                    state._openLogged[todayKey] = true;
+                    logger.info({ asset, type: mh.type, hour: openH },
+                        `🔔 MARKET OPEN: ${asset} (${mh.type}) — trading session started`);
+                    // Immediate trade check on open
+                    checkAndTrade(supabase).catch(() => { });
+                }
+            }
+
+            // Log market close event
+            if (utcH === mh.close && utcM === 0 && utcS < 30) {
+                if (!state._closeLogged) state._closeLogged = {};
+                const todayKey = `${asset}-${now.toISOString().slice(0, 10)}-close`;
+                if (!state._closeLogged[todayKey]) {
+                    state._closeLogged[todayKey] = true;
+                    logger.info({ asset, type: mh.type, hour: mh.close },
+                        `🔕 MARKET CLOSE: ${asset} (${mh.type}) — session ended`);
+                }
+            }
+        }
+
+        // Log forex session changes
+        logSessionChanges();
+    }, 10 * 1000); // Check every 10 seconds for precise timing
+
     return { status: "on", state: getState() };
 }
 
@@ -183,6 +243,10 @@ function turnOff() {
     if (state.intervalId) {
         clearInterval(state.intervalId);
         state.intervalId = null;
+    }
+    if (state._sessionInterval) {
+        clearInterval(state._sessionInterval);
+        state._sessionInterval = null;
     }
 
     logger.info({ pnl: state.totalPnL, trades: state.trades.length }, "[PaperTrading] BOT OFF");
