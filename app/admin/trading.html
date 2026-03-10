@@ -1020,7 +1020,7 @@
         let _ptActive = false;
         async function updatePaperUI() {
             try {
-                const r = await fetch('/api/trading/paper/status', { headers: hdrs() });
+                const r = await fetch('/api/trading/paper/status', { headers: getHeaders() });
                 const d = await r.json();
                 if (!d || d.error) return;
                 _ptActive = d.active;
@@ -1056,7 +1056,7 @@
         async function toggleBot() {
             const endpoint = _ptActive ? '/api/trading/paper/off' : '/api/trading/paper/on';
             try {
-                const r = await fetch(endpoint, { method: 'POST', headers: hdrs() });
+                const r = await fetch(endpoint, { method: 'POST', headers: getHeaders() });
                 const d = await r.json();
                 if (d.error) { alert('Error: ' + d.error); return; }
                 updatePaperUI();
@@ -1066,7 +1066,7 @@
         async function resetBot() {
             if (!confirm('Reset all paper trading data? This clears all trades and positions.')) return;
             try {
-                await fetch('/api/trading/paper/reset', { method: 'POST', headers: hdrs() });
+                await fetch('/api/trading/paper/reset', { method: 'POST', headers: getHeaders() });
                 updatePaperUI();
             } catch (e) { alert('Error: ' + e.message); }
         }
@@ -1075,7 +1075,7 @@
             const newMode = document.getElementById('pt-mode').textContent === 'PAPER' ? 'REAL' : 'PAPER';
             if (newMode === 'REAL' && !confirm('Switch to REAL mode? This will clear all paper trades.')) return;
             try {
-                await fetch('/api/trading/paper/switch?mode=' + newMode, { method: 'POST', headers: hdrs() });
+                await fetch('/api/trading/paper/switch?mode=' + newMode, { method: 'POST', headers: getHeaders() });
                 updatePaperUI();
             } catch (e) { alert('Error: ' + e.message); }
         }
@@ -1083,7 +1083,7 @@
         async function openTradeHistory() {
             document.getElementById('trade-history-modal').classList.add('open');
             try {
-                const r = await fetch('/api/trading/paper/history', { headers: hdrs() });
+                const r = await fetch('/api/trading/paper/history', { headers: getHeaders() });
                 const d = await r.json();
                 const summary = d.summary || {};
                 document.getElementById('trade-summary').innerHTML = `
