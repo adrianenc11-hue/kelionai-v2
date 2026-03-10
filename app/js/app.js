@@ -606,6 +606,9 @@
 
     // ─── UI ──────────────────────────────────────────────────
     function addMessage(type, text) {
+        // Strip any leaked system instructions from display
+        text = (text || '').replace(/\[SYSTEM INSTRUCTION[^\]]*\][\s\S]*?\[END SYSTEM INSTRUCTION\]\s*/gi, '').replace(/\[AGENT ACTIV[^\]]*\]\s*/gi, '').trim();
+        if (!text) return; // Don't show empty messages
         var o = document.getElementById('chat-overlay');
         o.innerHTML = ''; // Clear previous — max 1 phrase on screen at a time
         var m = document.createElement('div');

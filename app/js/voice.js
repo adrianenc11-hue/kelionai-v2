@@ -22,6 +22,9 @@
     }
     function showSubtitle(text) {
         if (!text) return;
+        // Strip any leaked system instructions
+        text = (text || '').replace(/\[SYSTEM INSTRUCTION[^\]]*\][\s\S]*?\[END SYSTEM INSTRUCTION\]\s*/gi, '').replace(/\[AGENT ACTIV[^\]]*\]\s*/gi, '').trim();
+        if (!text) return;
         if (_subtitleTimer) { clearTimeout(_subtitleTimer); _subtitleTimer = null; }
         var el = _ensureSubtitleEl();
         // Truncate to ~120 chars for single line
@@ -151,6 +154,8 @@
     // ─── SPEAK — AudioContext (bypass autoplay!) ─────────────
     function cleanTextForTTS(text) {
         return text
+            .replace(/\[SYSTEM INSTRUCTION[^\]]*\][\s\S]*?\[END SYSTEM INSTRUCTION\]\s*/gi, '') // strip system prompts
+            .replace(/\[AGENT ACTIV[^\]]*\]\s*/gi, '')
             .replace(/```[\s\S]*?```/g, '')         // code blocks
             .replace(/`[^`]+`/g, '')                 // inline code
             .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // [text](url) → text
