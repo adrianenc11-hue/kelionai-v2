@@ -271,24 +271,6 @@ router.post("/chat", chatLimiter, validate(chatSchema), async (req, res) => {
     const bodyMatches = reply.matchAll(/\[BODY:(\w+)\]/gi);
     for (const bm of bodyMatches) bodyActions.push(bm[1]);
     reply = reply.replace(/\[BODY:\w+\]/gi, "").trim();
-    // Extract source citations from tool results
-    const citations = [];
-    if (thought.monitor?.searchResults) {
-      (Array.isArray(thought.monitor.searchResults) ? thought.monitor.searchResults : []).forEach(r => {
-        if (r.url) citations.push({ title: r.title || r.url, url: r.url, type: 'search' });
-      });
-    }
-    // Extract URLs from enrichedMessage
-    try {
-      const urlMatches = (thought.enrichedMessage || '').match(/https?:\/\/[^\s)"\]]+/g);
-      if (urlMatches) {
-        urlMatches.slice(0, 5).forEach(u => {
-          if (!citations.find(c => c.url === u)) {
-            try { citations.push({ title: new URL(u).hostname, url: u, type: 'inline' }); } catch { }
-          }
-        });
-      }
-    } catch { }
 
     const response = {
       reply,
@@ -302,34 +284,6 @@ router.post("/chat", chatLimiter, validate(chatSchema), async (req, res) => {
       gestures,
       pose,
       bodyActions,
-      // UI TRANSPARENCY: Reasoning metadata
-      reasoning: {
-        complexity: thought.complexityLevel?.name || thought.analysis?.complexity || "medium",
-        complexityLevel: thought.complexityLevel?.level || 2,
-        model: thought.modelRoute?.provider || engine,
-        toolsUsed: thought.toolsUsed || [],
-        confidence: thought.confidence || 0,
-        confidenceBadge: (thought.confidence || 0) > 0.7 ? "high" : (thought.confidence || 0) > 0.4 ? "medium" : "low",
-        sourceTags: thought.sourceTags || [],
-        truthVerdict: thought.truthReport?.verdict || null,
-        truthScore: thought.truthReport?.factualScore || null,
-        unsupportedClaims: (thought.truthReport?.unsupportedClaims || []).length,
-        citations: citations.slice(0, 5),
-        reasonTrace: [
-          thought.toolsUsed?.length > 0 ? `🔍 Tools: ${thought.toolsUsed.join(", ")}` : null,
-          thought.chainOfThought ? "🧠 Chain of Thought activat" : null,
-          thought.complexityLevel ? `📊 Complexitate: ${thought.complexityLevel.name} (L${thought.complexityLevel.level})` : null,
-          thought.modelRoute ? `🤖 Model: ${thought.modelRoute.provider}/${thought.modelRoute.model}` : null,
-          thought.truthReport?.verdict ? `🛡️ Truth Guard: ${thought.truthReport.verdict} (${Math.round((thought.truthReport.factualScore || 0) * 100)}%)` : null,
-          thought.criticReport?.verdict ? `🎭 Critic: ${thought.criticReport.verdict} (${Math.round((thought.criticReport.overallScore || 0) * 100)}%)` : null,
-          `⏱️ Think: ${thought.thinkTime}ms`,
-        ].filter(Boolean),
-        criticVerdict: thought.criticReport?.verdict || null,
-        criticScore: thought.criticReport?.overallScore || null,
-        criticSuggestions: (thought.criticReport?.suggestions || []).slice(0, 3),
-        agent: thought.agent || null,
-        modelRoute: thought.modelRoute ? { provider: thought.modelRoute.provider, model: thought.modelRoute.model } : null,
-      },
     };
     if (monitorFromReply) {
       response.monitor = monitorFromReply;

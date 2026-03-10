@@ -421,52 +421,8 @@
                 }
             }, 4000);
 
-            // ── AGENT ACTIVITY BADGE ──
-            if (data.reasoning && data.reasoning.agent) {
-                var agentBadge = document.createElement('div');
-                agentBadge.className = 'agent-badge';
-                var agentIcon = data.reasoning.agent.icon || '🧠';
-                var agentName = data.reasoning.agent.name || 'Kelion';
-                var modelInfo = data.reasoning.modelRoute ? (' · ' + data.reasoning.modelRoute.provider + '/' + data.reasoning.modelRoute.model) : '';
-                agentBadge.innerHTML = '<span class="agent-icon">' + agentIcon + '</span> <span class="agent-name">' + escapeHtml(agentName) + '</span>' + '<span class="agent-model">' + escapeHtml(modelInfo) + '</span>';
-                overlay.appendChild(agentBadge);
-            }
 
-            // ── REASONING TRANSPARENCY UI ──
-            if (data.reasoning && data.reasoning.reasonTrace && data.reasoning.reasonTrace.length > 0) {
-                setTimeout(function () {
-                    var reasonEl = document.createElement('div');
-                    reasonEl.className = 'reason-trace';
-                    // Confidence badge
-                    var badge = data.reasoning.confidenceBadge === 'high' ? '🟢' : data.reasoning.confidenceBadge === 'medium' ? '🟡' : '🔴';
-                    var badgeLabel = data.reasoning.confidenceBadge === 'high' ? 'Confident' : data.reasoning.confidenceBadge === 'medium' ? 'Moderate' : 'Low';
-                    var badgeHtml = '<span class="confidence-badge ' + data.reasoning.confidenceBadge + '" title="Confidence: ' + badgeLabel + '">' + badge + '</span>';
-                    // Trace items
-                    var traceItems = data.reasoning.reasonTrace.map(function (t) { return '<div class="trace-item">' + escapeHtml(t) + '</div>'; }).join('');
-                    // Source citations (clickable links)
-                    var citationsHtml = '';
-                    if (data.reasoning.citations && data.reasoning.citations.length > 0) {
-                        citationsHtml = '<div class="trace-citations"><span class="cite-label">📎 Surse:</span>';
-                        data.reasoning.citations.forEach(function (c) {
-                            citationsHtml += '<a class="cite-pill" href="' + escapeHtml(c.url) + '" target="_blank" rel="noopener">' + escapeHtml(c.title) + '</a>';
-                        });
-                        citationsHtml += '</div>';
-                    }
-                    // Critic suggestions
-                    var criticHtml = '';
-                    if (data.reasoning.criticSuggestions && data.reasoning.criticSuggestions.length > 0) {
-                        criticHtml = '<div class="trace-critic">';
-                        data.reasoning.criticSuggestions.forEach(function (s) {
-                            criticHtml += '<div class="trace-item critic-note">' + escapeHtml(s) + '</div>';
-                        });
-                        criticHtml += '</div>';
-                    }
-                    reasonEl.innerHTML = '<div class="reason-header" onclick="this.parentElement.classList.toggle(\'expanded\')">' + badgeHtml + ' <span class="reason-toggle">🔍 Reasoning</span><span class="reason-arrow">▸</span></div>' +
-                        '<div class="reason-body">' + traceItems + criticHtml + citationsHtml + '</div>';
-                    overlay.appendChild(reasonEl);
-                    overlay.scrollTop = overlay.scrollHeight;
-                }, 1500); // Slight delay after message appears
-            }
+
 
         } catch (e) {
             showThinking(false);
