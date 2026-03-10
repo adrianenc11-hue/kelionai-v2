@@ -3255,6 +3255,75 @@ router.get("/k1/dashboard", (req, res) => {
   });
 });
 
+// ═══════════════════════════════════════════════════════════════
+// K1 MARKET DATA FEED — Pipe real prices to K1 World State
+// Runs every 5 minutes, uses existing fetchRealPrices + CoinGecko
+// ═══════════════════════════════════════════════════════════════
+
+async function k1MarketDataFeed() {
+  try {
+    const marketData = {};
+    const cryptoAssets = ["BTC", "ETH", "SOL"];
+
+    // Fetch latest price for each crypto asset
+    await Promise.all(cryptoAssets.map(async (asset) => {
+      try {
+        const { prices } = await fetchRealPrices(asset, 10);
+        if (prices && prices.length > 1) {
+          const last = prices[prices.length - 1];
+          const prev = prices[0];
+          const change24h = prev > 0 ? +((last - prev) / prev * 100).toFixed(2) : 0;
+          let signal = "HOLD";
+          if (change24h > 3) signal = "BUY";
+          else if (change24h < -3) signal = "SELL";
+          marketData[asset.toLowerCase()] = { price: last, change24h, signal };
+        }
+      } catch { }
+    }));
+
+    // Fetch Fear&Greed index
+    try {
+      const fgRes = await fetch("https://api.alternative.me/fng/?limit=1");
+      if (fgRes.ok) {
+        const fgData = await fgRes.json();
+        if (fgData.data && fgData.data[0]) {
+          const fg = fgData.data[0];
+          const fgVal = parseInt(fg.value, 10);
+          marketData.fearGreed = {
+            value: fgVal,
+            label: fg.value_classification || "Neutral",
+            signal: fgVal <= 25 ? "BUY" : fgVal >= 75 ? "SELL" : "HOLD",
+          };
+        }
+      }
+    } catch { }
+
+    // Update K1 World State with real market data
+    if (Object.keys(marketData).length > 0) {
+      k1World.updateMarkets(marketData);
+      logger.info({ assets: Object.keys(marketData).join(",") }, "[K1-Feed] Market data updated");
+    }
+
+    // Update K1 system state with bot status
+    try {
+      k1World.updateSystem({
+        botActive: tradeEngine.isActive(),
+        botMode: tradeEngine.isPaperMode() ? "PAPER" : "LIVE",
+        botBalance: tradeEngine.getPaperBalance(),
+        openPositions: tradeEngine.getOpenPositions().length,
+        activeModules: ["cognitive", "memory", "world", "agents", "truth", "performance", "meta-learning"],
+      });
+    } catch { }
+
+  } catch (err) {
+    logger.warn({ err: err.message }, "[K1-Feed] Market data feed error");
+  }
+}
+
+// K1 Feed: First run 10s after boot, then every 5 minutes
+setTimeout(k1MarketDataFeed, 10 * 1000);
+setInterval(k1MarketDataFeed, 5 * 60 * 1000);
+
 module.exports = router;
 module.exports.detectSmartMoney = detectSmartMoney;
 module.exports.kellyPosition = kellyPosition;
