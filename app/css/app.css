@@ -1624,6 +1624,28 @@ body {
     padding: 44px;
 }
 
+.pricing-annual {
+    font-size: 0.78rem;
+    color: var(--kelion-text-muted);
+    margin: -8px 0 14px;
+}
+
+.pricing-annual small {
+    font-weight: 400;
+    color: var(--kelion-text-muted);
+}
+
+.annual-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 100px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    background: rgba(16, 185, 129, 0.15);
+    color: var(--kelion-success);
+    margin-left: 4px;
+}
+
 .pricing-referral {
     text-align: center;
     margin-top: 14px;

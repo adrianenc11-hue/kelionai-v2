@@ -403,7 +403,7 @@ router.post(
       const geminiKey = process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
       if (geminiKey) {
         try {
-          const geminiModel = MODELS.GEMINI_CHAT || "gemini-2.5-flash";
+          const geminiModel = MODELS.GEMINI_CHAT || "gemini-3.1-flash";
           const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:streamGenerateContent?alt=sse&key=${geminiKey}`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },

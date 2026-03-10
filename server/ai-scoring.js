@@ -7,11 +7,12 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 const logger = require("./logger");
+const { MODELS } = require("./config/models");
 
 class AIScoring {
     constructor() {
         this.apiKey = process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY || "";
-        this.model = "gemini-2.5-flash"; // Fast + cheap for scoring
+        this.model = MODELS.GEMINI_CHAT; // Centralized from config/models.js
         this.scoreCache = new Map();
         this.cacheTTL = 5 * 60 * 1000; // 5 min cache per asset
         this.stats = { totalScored: 0, avgScore: 0, lastScoredAt: null };

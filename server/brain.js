@@ -811,6 +811,174 @@ When asked "what can you do?" list these real capabilities. Use them proactively
     return bestScore > 0 ? bestAgent : null;
   }
 
+  // ═══════════════════════════════════════════════════════════
+  // AGENT DELEGATION — Inter-agent communication (Tier 0)
+  // Agent General detects topic → delegates to specialist
+  // Max 2 delegations per conversation (anti-loop)
+  // ═══════════════════════════════════════════════════════════
+  async _delegateToAgent(fromAgent, targetAgentKey, subtask, conversationContext = {}) {
+    // Anti-loop protection
+    const delegationCount = conversationContext._delegationCount || 0;
+    if (delegationCount >= 2) {
+      logger.warn({ component: "Brain", from: fromAgent, to: targetAgentKey },
+        "⚠️ Delegation limit reached (max 2) — handling directly");
+      return null;
+    }
+
+    const targetAgent = this.agents[targetAgentKey];
+    if (!targetAgent) {
+      logger.warn({ component: "Brain", targetAgentKey }, "Target agent not found");
+      return null;
+    }
+
+    logger.info({ component: "Brain", from: fromAgent, to: targetAgentKey, subtask: subtask.substring(0, 80) },
+      `🔄 Delegating: ${fromAgent} → ${targetAgent.name}`);
+
+    // Build delegated prompt with specialist persona
+    const geminiKey = process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
+    if (!geminiKey) return null;
+
+    try {
+      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODELS.GEMINI_CHAT}:generateContent?key=${geminiKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{
+            role: "user",
+            parts: [{ text: `${targetAgent.systemPrompt}\n\n${subtask}` }],
+          }],
+          generationConfig: { maxOutputTokens: 800, temperature: 0.5 },
+        }),
+        signal: AbortSignal.timeout(15000),
+      });
+
+      if (!r.ok) return null;
+      const data = await r.json();
+      const response = data?.candidates?.[0]?.content?.parts?.[0]?.text || null;
+
+      if (response) {
+        // Log delegation success
+        this.journal.push({
+          timestamp: new Date().toISOString(),
+          event: "agent_delegation",
+          lesson: `Delegated from ${fromAgent} to ${targetAgent.name}: success`,
+          applied: true,
+        });
+        if (this.journal.length > 50) this.journal.shift();
+      }
+
+      return {
+        response,
+        delegatedTo: targetAgent.name,
+        delegationCount: delegationCount + 1,
+      };
+    } catch (e) {
+      logger.warn({ component: "Brain", err: e.message }, "Delegation failed");
+      return null;
+    }
+  }
+
+  /**
+   * Detect if current message should be delegated to a specialist
+   * Returns { shouldDelegate, targetAgent, subtask } or null
+   */
+  _shouldDelegate(message, currentAgent, analysis) {
+    if (!analysis || !analysis.topics) return null;
+
+    const topics = analysis.topics.map(t => t.toLowerCase());
+    const msg = message.toLowerCase();
+
+    // Trading delegation
+    if ((topics.some(t => t.includes("trading") || t.includes("crypto") || t.includes("bitcoin")) ||
+         msg.includes("bitcoin") || msg.includes("trading") || msg.includes("crypto")) &&
+        currentAgent !== "trader") {
+      return { shouldDelegate: true, targetAgent: "trader", subtask: message };
+    }
+
+    // Creative delegation
+    if ((topics.some(t => t.includes("creative") || t.includes("poem") || t.includes("story")) ||
+         msg.includes("scrie o") || msg.includes("write a") || msg.includes("poem")) &&
+        currentAgent !== "creative") {
+      return { shouldDelegate: true, targetAgent: "creative", subtask: message };
+    }
+
+    // Research delegation
+    if ((topics.some(t => t.includes("research") || t.includes("analyze") || t.includes("compare")) ||
+         msg.includes("cercetează") || msg.includes("analizează") || msg.includes("compară")) &&
+        currentAgent !== "research") {
+      return { shouldDelegate: true, targetAgent: "research", subtask: message };
+    }
+
+    return null;
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // WHITE-LABEL — Multi-tenant configuration (Tier 1)
+  // Each tenant (domain) has custom branding
+  // ═══════════════════════════════════════════════════════════
+  _tenantConfigCache = new Map(); // hostname → { config, loadedAt }
+
+  async getTenantConfig(hostname) {
+    if (!hostname) return this._defaultTenantConfig();
+
+    // Check cache (5 min TTL)
+    const cached = this._tenantConfigCache.get(hostname);
+    if (cached && Date.now() - cached.loadedAt < 5 * 60 * 1000) {
+      return cached.config;
+    }
+
+    // Try Supabase
+    if (this.supabaseAdmin) {
+      try {
+        const { data } = await this.supabaseAdmin
+          .from("tenants")
+          .select("*")
+          .eq("domain", hostname)
+          .eq("is_active", true)
+          .single();
+
+        if (data) {
+          const config = {
+            name: data.name || "KelionAI",
+            domain: data.domain,
+            logo: data.logo_url || null,
+            primaryColor: data.primary_color || "#6366f1",
+            secondaryColor: data.secondary_color || "#06b6d4",
+            defaultAvatar: data.default_avatar || "kira",
+            defaultLanguage: data.default_language || "en",
+            maxMessagesPerDay: data.max_messages_per_day || 50,
+            features: data.features || {},
+            customSystemPrompt: data.custom_system_prompt || null,
+            branding: {
+              hideKelionBranding: data.hide_branding || false,
+              customFooter: data.custom_footer || null,
+            },
+          };
+          this._tenantConfigCache.set(hostname, { config, loadedAt: Date.now() });
+          return config;
+        }
+      } catch { }
+    }
+
+    return this._defaultTenantConfig();
+  }
+
+  _defaultTenantConfig() {
+    return {
+      name: "KelionAI",
+      domain: null,
+      logo: null,
+      primaryColor: "#6366f1",
+      secondaryColor: "#06b6d4",
+      defaultAvatar: "kira",
+      defaultLanguage: "en",
+      maxMessagesPerDay: 50,
+      features: {},
+      customSystemPrompt: null,
+      branding: { hideKelionBranding: false, customFooter: null },
+    };
+  }
+
   // Confidence scoring: how confident is the brain in its response
   _scoreConfidence(analysis, results, chainOfThought) {
     let score = 0.5; // baseline

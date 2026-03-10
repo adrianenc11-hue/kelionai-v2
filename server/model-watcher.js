@@ -8,32 +8,33 @@
 const logger = require("pino")({ name: "model-watcher" });
 
 // Current models we use
+const { MODELS } = require("./config/models");
 const CURRENT_MODELS = {
     gemini: {
         name: "Gemini",
-        version: process.env.GEMINI_MODEL || "gemini-2.0-flash",
+        version: MODELS.GEMINI_CHAT,
         provider: "Google",
         apiKeyEnv: "GOOGLE_AI_KEY",
     },
-    claude: {
-        name: "Claude",
-        version: "claude-3.5-sonnet",
-        provider: "Anthropic",
-        apiKeyEnv: "ANTHROPIC_API_KEY",
-    },
     openai: {
         name: "GPT",
-        version: "gpt-4o",
+        version: MODELS.OPENAI_CHAT,
         provider: "OpenAI",
         apiKeyEnv: "OPENAI_API_KEY",
+    },
+    groq: {
+        name: "Groq",
+        version: MODELS.GROQ_PRIMARY,
+        provider: "Groq",
+        apiKeyEnv: "GROQ_API_KEY",
     },
 };
 
 // Known latest stable versions (updated manually or via check)
 let latestVersions = {
-    gemini: { version: "gemini-2.5-pro", released: "2025-03", status: "stable" },
-    claude: { version: "claude-3.5-sonnet-20241022", released: "2024-10", status: "stable" },
-    openai: { version: "gpt-4o-2024-11-20", released: "2024-11", status: "stable" },
+    gemini: { version: "gemini-3.1-flash", released: "2026-03", status: "stable" },
+    openai: { version: "gpt-5.4", released: "2026-03", status: "stable" },
+    groq: { version: "llama-3.3-70b-versatile", released: "2026-02", status: "stable" },
 };
 
 let lastCheck = null;
@@ -114,8 +115,8 @@ async function checkForUpdates() {
                     .map(m => m.name.replace("models/", ""));
 
                 // Find latest flash and pro
-                const latestPro = models.find(m => m.includes("gemini-2.5-pro")) || models.find(m => m.includes("gemini-2.0-pro"));
-                const latestFlash = models.find(m => m.includes("gemini-2.5-flash")) || models.find(m => m.includes("gemini-2.0-flash"));
+                const latestPro = models.find(m => m.includes("gemini-3.1-pro")) || models.find(m => m.includes("gemini-3.0-pro"));
+                const latestFlash = models.find(m => m.includes("gemini-3.1-flash")) || models.find(m => m.includes("gemini-3.0-flash"));
 
                 if (latestPro) {
                     latestVersions.gemini = { version: latestPro, released: new Date().toISOString().slice(0, 7), status: "stable" };

@@ -72,6 +72,12 @@ const voiceCloneRouter = require("./routes/voice-clone");
 const messengerBot = require("./messenger");
 const instagramBot = require("./instagram");
 const tradingRouter = require("./trading");
+const { router: marketplaceRouter } = require("./agent-marketplace");
+const { router: pluginRouter, restorePlugins } = require("./plugin-system");
+const autonomousRunner = require("./autonomous-runner");
+const multimodalRouter = require("./routes/multimodal");
+const browserAgent = require("./browser-agent");
+const sharedSessions = require("./shared-sessions");
 
 const app = express();
 app.set("trust proxy", 1);
@@ -477,6 +483,98 @@ app.use("/api/export", exportRouter);
 app.use("/api/messenger", messengerBot.router);
 app.use("/api/instagram", instagramBot.router);
 app.use("/api/trading", tradingRouter);
+app.use("/api/marketplace", marketplaceRouter);
+app.use("/api/plugins", pluginRouter);
+app.use("/api/multimodal", multimodalRouter);
+
+// ═══ AUTONOMOUS TASKS API ═══
+app.post("/api/autonomous/start", express.json(), async (req, res) => {
+  try {
+    const user = await getUserFromToken(req).catch(() => null);
+    const userId = user?.id || req.body.userId || "anonymous";
+    const result = await autonomousRunner.startTask(brain, userId, req.body.goal, req.body.options);
+    res.json(result);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+app.get("/api/autonomous/status/:taskId", (req, res) => {
+  const status = autonomousRunner.getTaskStatus(req.params.taskId);
+  if (!status) return res.status(404).json({ error: "Task not found" });
+  res.json(status);
+});
+app.post("/api/autonomous/cancel/:taskId", async (req, res) => {
+  const user = await getUserFromToken(req).catch(() => null);
+  const result = autonomousRunner.cancelTask(req.params.taskId, user?.id || "anonymous");
+  res.json(result);
+});
+app.get("/api/autonomous/tasks", async (req, res) => {
+  const user = await getUserFromToken(req).catch(() => null);
+  res.json({ tasks: autonomousRunner.getUserTasks(user?.id || "anonymous") });
+});
+
+// ═══ COMPUTER USE API (Browser Agent) ═══
+app.post("/api/browser/navigate", express.json(), async (req, res) => {
+  try {
+    const result = await browserAgent.navigate(req.body.url, req.body.options);
+    res.json(result);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+app.post("/api/browser/click", express.json(), async (req, res) => {
+  const result = await browserAgent.click(req.body.sessionId, req.body.selector);
+  res.json(result);
+});
+app.post("/api/browser/type", express.json(), async (req, res) => {
+  const result = await browserAgent.type(req.body.sessionId, req.body.selector, req.body.text);
+  res.json(result);
+});
+app.post("/api/browser/submit", express.json(), async (req, res) => {
+  const result = await browserAgent.submitForm(req.body.sessionId, req.body.formSelector, req.body.data);
+  res.json(result);
+});
+app.get("/api/browser/screenshot/:sessionId", async (req, res) => {
+  const result = await browserAgent.screenshot(req.params.sessionId);
+  res.json(result);
+});
+app.post("/api/browser/extract", express.json(), async (req, res) => {
+  const result = await browserAgent.extract(req.body.sessionId, req.body.selectors);
+  res.json(result);
+});
+app.get("/api/browser/status", (_req, res) => {
+  res.json({ fullMode: browserAgent.isFullMode(), engine: browserAgent.isFullMode() ? "puppeteer" : "fetch-fallback" });
+});
+
+// ═══ SHARED SESSIONS API (Real-time Collaboration) ═══
+app.post("/api/sessions/create", express.json(), async (req, res) => {
+  const user = await getUserFromToken(req).catch(() => null);
+  const result = sharedSessions.createRoom(user?.id || "anonymous", req.body);
+  res.json(result);
+});
+app.post("/api/sessions/join", express.json(), async (req, res) => {
+  const user = await getUserFromToken(req).catch(() => null);
+  const result = sharedSessions.joinRoom(req.body.roomId, user?.id || "anonymous", req.body.name || user?.email);
+  res.json(result);
+});
+app.post("/api/sessions/leave", express.json(), async (req, res) => {
+  const user = await getUserFromToken(req).catch(() => null);
+  sharedSessions.leaveRoom(req.body.roomId, user?.id || "anonymous");
+  res.json({ success: true });
+});
+app.post("/api/sessions/message", express.json(), async (req, res) => {
+  const user = await getUserFromToken(req).catch(() => null);
+  const result = sharedSessions.sendMessage(req.body.roomId, user?.id || "anonymous", req.body.content, req.body.type || "user");
+  res.json(result);
+});
+app.get("/api/sessions/:roomId", (req, res) => {
+  const info = sharedSessions.getRoomInfo(req.params.roomId);
+  if (!info) return res.status(404).json({ error: "Room not found" });
+  res.json(info);
+});
+app.get("/api/sessions", async (req, res) => {
+  const user = await getUserFromToken(req).catch(() => null);
+  res.json({
+    myRooms: sharedSessions.getUserRooms(user?.id || "anonymous"),
+    publicRooms: sharedSessions.listPublicRooms(),
+  });
+});
 
 // Alias: /api/admin/health → /api/health (audit fix)
 app.use("/api/admin/health", healthRouter);
