@@ -161,6 +161,21 @@ async function analyzeAndLearn(supabase) {
             learnedRules[asset] = rules;
         }
 
+        // ═══ ASK GEMINI AI FOR REAL RECOMMENDATIONS ═══
+        const aiAdvice = await askGeminiForAdvice(assetPerformance, learnedRules);
+        if (aiAdvice) {
+            // Apply AI recommendations to learned rules
+            for (const [asset, advice] of Object.entries(aiAdvice)) {
+                if (learnedRules[asset]) {
+                    if (advice.minConfidence) learnedRules[asset].minConfidence = advice.minConfidence;
+                    if (advice.maxAllocation) learnedRules[asset].maxAllocation = advice.maxAllocation;
+                    if (advice.enabled !== undefined) learnedRules[asset].enabled = advice.enabled;
+                    if (advice.notes) learnedRules[asset].notes = `🤖 AI: ${advice.notes}`;
+                }
+            }
+            logger.info({ assets: Object.keys(aiAdvice).length }, "[Learner] Gemini AI recommendations applied");
+        }
+
         // ═══ SAVE TO SUPABASE ═══
         for (const [asset, rules] of Object.entries(learnedRules)) {
             const perf = assetPerformance[asset] || {};
@@ -177,6 +192,7 @@ async function analyzeAndLearn(supabase) {
                     total_pnl: perf.totalPnL || 0,
                     total_trades: perf.totalTrades || 0,
                     notes: rules.notes || "",
+                    ai_advice: aiAdvice?.[asset]?.notes || "",
                     updated_at: new Date().toISOString(),
                 }, { onConflict: "asset" });
             } catch (e) { /* table might not exist */ }
@@ -188,11 +204,13 @@ async function analyzeAndLearn(supabase) {
             assetsAnalyzed: Object.keys(assetPerformance).length,
             performance: assetPerformance,
             rules: learnedRules,
+            aiAdvice: aiAdvice || null,
         };
 
         logger.info({
             assets: Object.keys(assetPerformance).length,
             trades: trades.length,
+            aiActive: !!aiAdvice,
             bestAsset: Object.entries(assetPerformance).sort((a, b) => b[1].winRate - a[1].winRate)[0]?.[0],
             worstAsset: Object.entries(assetPerformance).sort((a, b) => a[1].winRate - b[1].winRate)[0]?.[0],
         }, "[Learner] Analysis complete — rules updated");
@@ -202,6 +220,92 @@ async function analyzeAndLearn(supabase) {
         logger.error({ err: e.message }, "[Learner] Analysis failed");
         return { error: e.message };
     }
+}
+
+/**
+ * Ask Gemini AI for trading recommendations
+ * Sends performance data, gets back adjusted rules per asset
+ */
+async function askGeminiForAdvice(assetPerformance, currentRules) {
+    const geminiKey = process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
+    if (!geminiKey) {
+        logger.info("[Learner] No Gemini API key — skipping AI analysis");
+        return null;
+    }
+
+    try {
+        const perfSummary = Object.entries(assetPerformance).map(([asset, p]) => (
+            `${asset}: ${p.totalTrades} trades, WR=${p.winRate}%, PnL=€${p.totalPnL}, Sharpe=${p.sharpe}, PF=${p.profitFactor}, Grade=${p.grade}`
+        )).join("\n");
+
+        const rulesSummary = Object.entries(currentRules).map(([asset, r]) => (
+            `${asset}: confidence=${r.minConfidence}%, allocation=${(r.maxAllocation * 100).toFixed(0)}%, enabled=${r.enabled}`
+        )).join("\n");
+
+        const prompt = `You are an AI trading strategy advisor for a paper trading bot.
+
+CURRENT PERFORMANCE PER ASSET:
+${perfSummary}
+
+CURRENT RULES:
+${rulesSummary}
+
+MARKET CONTEXT: Current UTC hour is ${new Date().getUTCHours()}. Active sessions: ${getActiveSessionNames()}.
+
+Analyze the performance and provide SPECIFIC recommendations for each asset.
+For each asset, provide:
+- minConfidence (50-90): lower = more trades, higher = fewer but better trades
+- maxAllocation (0.05-0.35): percentage of cash to risk per trade
+- enabled (true/false): should bot trade this asset?
+- notes: brief explanation of your recommendation (max 50 words)
+
+RESPOND ONLY WITH VALID JSON in this exact format:
+{
+  "BTC": {"minConfidence": 55, "maxAllocation": 0.25, "enabled": true, "notes": "Strong momentum..."},
+  "ETH": {"minConfidence": 60, "maxAllocation": 0.2, "enabled": true, "notes": "Stable performance..."}
+}`;
+
+        const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                contents: [{ parts: [{ text: prompt }] }],
+                generationConfig: { temperature: 0.3, maxOutputTokens: 1500 },
+            }),
+        });
+
+        if (!r.ok) {
+            logger.warn({ status: r.status }, "[Learner] Gemini API error");
+            return null;
+        }
+
+        const data = await r.json();
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+
+        // Extract JSON from response (handle markdown code blocks)
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) {
+            logger.warn("[Learner] Gemini returned no valid JSON");
+            return null;
+        }
+
+        const advice = JSON.parse(jsonMatch[0]);
+        logger.info({ assets: Object.keys(advice).length }, "[Learner] 🤖 Gemini AI advice received");
+        return advice;
+    } catch (e) {
+        logger.warn({ err: e.message }, "[Learner] Gemini analysis failed (will use rule-based)");
+        return null;
+    }
+}
+
+function getActiveSessionNames() {
+    const hour = new Date().getUTCHours();
+    const sessions = [];
+    if (hour >= 0 && hour < 9) sessions.push("Tokyo");
+    if (hour >= 7 && hour < 16) sessions.push("London");
+    if (hour >= 13 && hour < 22) sessions.push("New York");
+    if (hour >= 22 || hour < 7) sessions.push("Sydney");
+    return sessions.join(", ") || "none";
 }
 
 /**
