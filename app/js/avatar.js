@@ -624,24 +624,41 @@
         if (typeof THREE === 'undefined') return;
         _computedArmDown = { ls: null, rs: null, la: null, ra: null, lfa: null, rfa: null };
 
-        // Shoulder rotation: rotate 75° around local Z to bring arms fully down
-        var shoulderAngle = -75 * Math.PI / 180; // negative = downward from A-pose
+        // Shoulder (clavicle) rotation: small adjustment
+        var shoulderAngle = -15 * Math.PI / 180; // subtle clavicle down
+        // Upper arm rotation: THIS is the main rotation to bring arms down from T/A-pose
+        var armAngle = -65 * Math.PI / 180; // 65° down from horizontal
         var foreArmBend = -20 * Math.PI / 180; // natural slight bend at elbow
 
+        // Rotate LEFT SHOULDER (clavicle — small bone)
         if (armBones.leftShoulder) {
             var lsQ = armBones.leftShoulder.quaternion.clone();
             var rotDown = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), shoulderAngle);
             _computedArmDown.ls = lsQ.multiply(rotDown);
-            console.log('[Avatar] LS arms-down computed from rest:', _computedArmDown.ls.x.toFixed(4),
-                _computedArmDown.ls.y.toFixed(4), _computedArmDown.ls.z.toFixed(4), _computedArmDown.ls.w.toFixed(4));
         }
+        // Rotate RIGHT SHOULDER
         if (armBones.rightShoulder) {
             var rsQ = armBones.rightShoulder.quaternion.clone();
             var rotDownR = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -shoulderAngle);
             _computedArmDown.rs = rsQ.multiply(rotDownR);
-            console.log('[Avatar] RS arms-down computed from rest:', _computedArmDown.rs.x.toFixed(4),
-                _computedArmDown.rs.y.toFixed(4), _computedArmDown.rs.z.toFixed(4), _computedArmDown.rs.w.toFixed(4));
         }
+
+        // Rotate LEFT ARM (upper arm — THIS is the main fix!)
+        if (armBones.leftArm) {
+            var laQ = armBones.leftArm.quaternion.clone();
+            var rotArmDown = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), armAngle);
+            _computedArmDown.la = laQ.multiply(rotArmDown);
+            console.log('[Avatar] LA (upper arm) rotated', (armAngle * 180 / Math.PI).toFixed(0), '° down');
+        }
+        // Rotate RIGHT ARM (upper arm)
+        if (armBones.rightArm) {
+            var raQ = armBones.rightArm.quaternion.clone();
+            var rotArmDownR = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -armAngle);
+            _computedArmDown.ra = raQ.multiply(rotArmDownR);
+            console.log('[Avatar] RA (upper arm) rotated', (-armAngle * 180 / Math.PI).toFixed(0), '° down');
+        }
+
+        // Forearm bend (natural elbow bend)
         if (armBones.leftForeArm) {
             var lfaQ = armBones.leftForeArm.quaternion.clone();
             var rotBend = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), foreArmBend);
