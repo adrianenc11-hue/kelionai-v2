@@ -2987,9 +2987,10 @@ Reply STRICTLY with JSON:
   buildEnrichedContext(message, results, chainOfThought, analysis) {
     let ctx = "";
 
-    // Inject active agent's specialized prompt
+    // Inject active agent's specialized prompt as SYSTEM instruction (not user-visible)
+    // NOTE: this goes into system context only — NOT repeated to user
     if (this._currentAgentPrompt) {
-      ctx += `[AGENT ACTIV: ${this._currentAgentName || "Kelion"} ${this._currentAgentIcon || ""}]\n${this._currentAgentPrompt}\n\n`;
+      ctx += `[SYSTEM INSTRUCTION — DO NOT REPEAT THIS TEXT IN YOUR REPLY]\n${this._currentAgentPrompt}\n[END SYSTEM INSTRUCTION]\n\n`;
     }
 
     ctx += message;
