@@ -95,6 +95,13 @@ function setupGracefulShutdown(server) {
         shuttingDown = true;
         logger.info({ component: "Shutdown", signal }, `🛑 ${signal} received — shutting down gracefully`);
 
+        // Stop K1 scheduled jobs (forgetting, self-test)
+        try {
+            const k1Meta = require("./k1-meta-learning");
+            k1Meta.stopScheduledJobs();
+            logger.info({ component: "Shutdown" }, "✅ K1 scheduled jobs stopped");
+        } catch { }
+
         // Stop accepting new connections
         server.close(() => {
             logger.info({ component: "Shutdown" }, "✅ HTTP server closed");

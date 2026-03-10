@@ -149,7 +149,13 @@ async function postProcess(response, options = {}) {
         isFactual: /\$[\d,]+|[\d.]+%|RSI|MACD/i.test(response || ""),
     });
 
-    // 4. Optional: add confidence badge
+    // 4. Meta-learning: score template + tool usage
+    try {
+        k1Meta.useTemplate(`${domain}_analysis`, confidence.score > 70);
+        k1Meta.scoreTools("llm_response", domain, confidence.score);
+    } catch { }
+
+    // 5. Optional: add confidence badge
     let enhancedResponse = response;
     if (addBadge && typeof response === "string" && confidence.score < 60) {
         enhancedResponse = `${response}\n\n${confidence.emoji} _Confidence: ${confidence.score}%_`;
