@@ -44,9 +44,30 @@ const STRATEGIES = [
 ];
 
 /**
- * SmartConfluence: Combines RSI + MACD + Bollinger + EMA with voting.
- * BUY only if 3/4 indicators agree. Much fewer false signals.
+ * SmartConfluence v2: RSI + MACD + Bollinger + EMA + Fear&Greed (5 indicators).
+ * BUY only if 3/5+ indicators agree. Much fewer false signals.
+ * Fear&Greed updates async from cache (updated every 30min).
  */
+let _fgCache = { signal: 'HOLD', value: 50, ts: 0 };
+async function updateFearGreedCache() {
+  try {
+    const r = await fetch('https://api.alternative.me/fng/?limit=1', { signal: AbortSignal.timeout(5000) });
+    if (r.ok) {
+      const d = await r.json();
+      const val = parseInt(d.data?.[0]?.value || 50);
+      let sig = 'HOLD';
+      if (val <= 25) sig = 'STRONG BUY';   // Extreme fear = buy opportunity
+      else if (val <= 40) sig = 'BUY';
+      else if (val >= 75) sig = 'STRONG SELL'; // Extreme greed = sell
+      else if (val >= 60) sig = 'SELL';
+      _fgCache = { signal: sig, value: val, label: d.data[0].value_classification, ts: Date.now() };
+    }
+  } catch { }
+}
+// Update Fear&Greed every 30 min
+setInterval(updateFearGreedCache, 30 * 60 * 1000);
+setTimeout(updateFearGreedCache, 5000); // first update 5s after boot
+
 function calculateSmartConfluence(prices, volumes) {
   const rsi = calculateRSI(prices);
   const macd = calculateMACD(prices);
@@ -58,6 +79,7 @@ function calculateSmartConfluence(prices, volumes) {
     { name: 'MACD', signal: macd.crossSignal },
     { name: 'Bollinger', signal: bollinger.signal },
     { name: 'EMA', signal: ema.signal },
+    { name: 'Fear&Greed', signal: _fgCache.signal },
   ];
 
   let buyVotes = 0, sellVotes = 0;
@@ -68,15 +90,17 @@ function calculateSmartConfluence(prices, volumes) {
 
   const confidence = Math.max(buyVotes, sellVotes) / indicators.length * 100;
   let signal = 'HOLD';
-  if (buyVotes >= 3) signal = buyVotes === 4 ? 'STRONG BUY' : 'BUY';
-  else if (sellVotes >= 3) signal = sellVotes === 4 ? 'STRONG SELL' : 'SELL';
+  if (buyVotes >= 3) signal = buyVotes >= 4 ? 'STRONG BUY' : 'BUY';
+  else if (sellVotes >= 3) signal = sellVotes >= 4 ? 'STRONG SELL' : 'SELL';
 
   return {
     signal,
     confidence: Math.round(confidence),
     buyVotes,
     sellVotes,
+    totalIndicators: indicators.length,
     indicators: indicators.map(i => i.name + '=' + i.signal).join(','),
+    fearGreed: _fgCache.value,
     rsiValue: rsi.value,
     rsiMomentum: rsi.momentum,
   };
@@ -2868,6 +2892,124 @@ module.exports.calculateFibonacci = calculateFibonacci;
 module.exports.analyzeVolume = analyzeVolume;
 module.exports.analyzeSentiment = analyzeSentiment;
 module.exports.calculateConfluence = calculateConfluence;
+// ═══════════════════════════════════════════════════════════════
+// AI MODEL WATCHER — Check current vs latest model versions
+// ═══════════════════════════════════════════════════════════════
+const modelWatcher = require("./model-watcher");
+
+router.get("/models", (req, res) => {
+  res.json(modelWatcher.getModelStatus());
+});
+
+router.post("/models/check", async (req, res) => {
+  const result = await modelWatcher.checkForUpdates();
+  res.json(result);
+});
+
+// ═══════════════════════════════════════════════════════════════
+// BRAIN TASK QUEUE — Task management with lifecycle
+// ═══════════════════════════════════════════════════════════════
+const brainTasks = [];
+let taskIdCounter = 1;
+
+router.get("/brain/tasks", (req, res) => {
+  const status = req.query.status; // filter by status
+  const filtered = status ? brainTasks.filter(t => t.status === status) : brainTasks;
+  res.json({
+    total: brainTasks.length,
+    pending: brainTasks.filter(t => t.status === "pending").length,
+    inProgress: brainTasks.filter(t => t.status === "in_progress").length,
+    completed: brainTasks.filter(t => t.status === "completed").length,
+    failed: brainTasks.filter(t => t.status === "failed").length,
+    tasks: filtered.slice(-50), // last 50
+  });
+});
+
+router.post("/brain/tasks", (req, res) => {
+  const { title, description, priority = "normal", assignTo = "auto", source = "admin" } = req.body || {};
+  if (!title) return res.status(400).json({ error: "Title required" });
+
+  const task = {
+    id: taskIdCounter++,
+    title,
+    description: description || "",
+    priority, // low, normal, high, urgent
+    status: "pending",
+    assignTo, // auto, gemini, tool, sub-agent
+    assignedTo: null,
+    source, // admin, monitor, bot, user
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    attempts: 0,
+    maxAttempts: 3,
+    result: null,
+    feedback: null,
+    history: [{ action: "created", at: new Date().toISOString(), by: source }],
+  };
+
+  // Auto-assign based on type
+  if (assignTo === "auto") {
+    if (title.toLowerCase().includes("analyze") || title.toLowerCase().includes("research")) {
+      task.assignedTo = "gemini";
+    } else if (title.toLowerCase().includes("fix") || title.toLowerCase().includes("update")) {
+      task.assignedTo = "tool";
+    } else {
+      task.assignedTo = "gemini";
+    }
+  } else {
+    task.assignedTo = assignTo;
+  }
+  task.status = "assigned";
+  task.history.push({ action: "assigned", to: task.assignedTo, at: new Date().toISOString() });
+
+  brainTasks.push(task);
+  logger.info({ taskId: task.id, title, assignedTo: task.assignedTo }, "[BrainTasks] New task created");
+  res.json(task);
+});
+
+router.put("/brain/tasks/:id", (req, res) => {
+  const task = brainTasks.find(t => t.id === parseInt(req.params.id));
+  if (!task) return res.status(404).json({ error: "Task not found" });
+
+  const { status, result, feedback } = req.body || {};
+
+  if (status) {
+    task.status = status;
+    task.updatedAt = new Date().toISOString();
+    task.history.push({ action: "status_change", status, at: task.updatedAt });
+
+    // Escalation: if failed and attempts < max, retry
+    if (status === "failed") {
+      task.attempts++;
+      if (task.attempts < task.maxAttempts) {
+        task.status = "retry";
+        task.history.push({ action: "escalation", attempt: task.attempts, at: task.updatedAt });
+        logger.warn({ taskId: task.id, attempt: task.attempts }, "[BrainTasks] Task failed, retrying");
+      } else {
+        task.history.push({ action: "max_attempts_reached", at: task.updatedAt });
+        logger.error({ taskId: task.id }, "[BrainTasks] Task failed permanently after max attempts");
+      }
+    }
+  }
+  if (result) task.result = result;
+  if (feedback) {
+    task.feedback = feedback;
+    task.history.push({ action: "feedback", feedback, at: new Date().toISOString() });
+    // Learning: log what worked
+    logger.info({ taskId: task.id, feedback }, "[BrainTasks] Feedback recorded (learning)");
+  }
+
+  res.json(task);
+});
+
+router.delete("/brain/tasks/:id", (req, res) => {
+  const idx = brainTasks.findIndex(t => t.id === parseInt(req.params.id));
+  if (idx === -1) return res.status(404).json({ error: "Task not found" });
+  brainTasks.splice(idx, 1);
+  res.json({ success: true });
+});
+
+module.exports = router;
 module.exports.detectSmartMoney = detectSmartMoney;
 module.exports.kellyPosition = kellyPosition;
 module.exports.analyzeMultiTimeframe = analyzeMultiTimeframe;

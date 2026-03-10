@@ -661,6 +661,15 @@
                         <option value="9999">All History</option>
                     </select>
                 </div>
+                <div class="form-group">
+                    <label>Risk Profile</label>
+                    <select id="bt-risk" class="admin-input">
+                        <option value="conservative">🛡️ Conservative (SL 1% / TP 2%)</option>
+                        <option value="moderate" selected>⚖️ Moderate (SL 2% / TP 4%)</option>
+                        <option value="aggressive">🔥 Aggressive (SL 5% / TP 10%)</option>
+                        <option value="yolo">💀 YOLO (SL 10% / TP 20%)</option>
+                    </select>
+                </div>
                 <button class="btn" id="btn-backtest" onclick="runBacktest()">▶ Run Backtest</button>
             </div>
             <div class="backtest-result" id="backtest-result"></div>
@@ -833,6 +842,7 @@
                 strategy: document.getElementById('bt-strategy').value,
                 asset: document.getElementById('bt-asset').value,
                 period: document.getElementById('bt-period').value,
+                riskProfile: document.getElementById('bt-risk').value,
             };
             try {
                 const res = await fetch('/api/trading/backtest', {
