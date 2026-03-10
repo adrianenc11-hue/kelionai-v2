@@ -6,6 +6,7 @@ var MonitorManager = (function () {
     'use strict';
 
     var PANELS = ['monitor-image', 'monitor-map', 'monitor-text', 'monitor-search', 'monitor-weather', 'monitor-iframe', 'monitor-audio', 'monitor-video', 'monitor-default'];
+    var _lastContentHash = ''; // Dedup: prevent same content showing twice
 
     function showPanel(id) {
         PANELS.forEach(function (pid) {
@@ -150,6 +151,11 @@ var MonitorManager = (function () {
     }
 
     function show(content, type) {
+        // Dedup: skip if same content already displayed
+        var hash = String(content).substring(0, 200) + '|' + (type || '');
+        if (hash === _lastContentHash) return;
+        _lastContentHash = hash;
+
         if (type === 'image') {
             showImage(content);
         } else if (type === 'map') {

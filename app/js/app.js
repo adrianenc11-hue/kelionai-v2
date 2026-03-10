@@ -1039,7 +1039,8 @@
                 popup.id = 'plus-popup';
                 popup.style.cssText = 'position:absolute;bottom:44px;right:0;background:#1a1a2e;border:1px solid #333;border-radius:8px;padding:6px;z-index:100;display:flex;gap:6px;box-shadow:0 4px 16px rgba(0,0,0,0.5);';
                 popup.innerHTML = '<button id="plus-import" style="background:#2a2a4a;color:#a5b4fc;border:1px solid #444;border-radius:6px;padding:8px 16px;cursor:pointer;font-size:0.85rem;">📂 Adaugă fișier</button>' +
-                    '<button id="plus-export" style="background:#2a2a4a;color:#86efac;border:1px solid #444;border-radius:6px;padding:8px 16px;cursor:pointer;font-size:0.85rem;">💾 Salvează tot</button>';
+                    '<button id="plus-export" style="background:#2a2a4a;color:#86efac;border:1px solid #444;border-radius:6px;padding:8px 16px;cursor:pointer;font-size:0.85rem;">💾 Salvează tot</button>' +
+                    '<button id="plus-export-chat" style="background:#2a2a4a;color:#fbbf24;border:1px solid #444;border-radius:6px;padding:8px 16px;cursor:pointer;font-size:0.85rem;">📥 Export chat</button>';
                 plusBtn.parentElement.style.position = 'relative';
                 plusBtn.parentElement.appendChild(popup);
                 document.getElementById('plus-import').addEventListener('click', function () {
@@ -1049,6 +1050,14 @@
                 document.getElementById('plus-export').addEventListener('click', function () {
                     popup.remove();
                     if (window.MonitorManager) MonitorManager.downloadAsZip();
+                });
+                document.getElementById('plus-export-chat').addEventListener('click', function () {
+                    popup.remove();
+                    var blob = new Blob([JSON.stringify(chatHistory, null, 2)], { type: 'application/json' });
+                    var url = URL.createObjectURL(blob);
+                    var a = document.createElement('a');
+                    a.href = url; a.download = 'kelion-chat-' + new Date().toISOString().slice(0, 10) + '.json'; a.click();
+                    setTimeout(function () { URL.revokeObjectURL(url); }, 100);
                 });
                 // Close popup on click outside
                 setTimeout(function () {
