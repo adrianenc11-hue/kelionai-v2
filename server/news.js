@@ -9,6 +9,7 @@ const express = require("express");
 const fetch = require("node-fetch");
 const crypto = require("crypto");
 const logger = require("./logger");
+const { MODELS } = require("./config/models");
 const rateLimit = require("express-rate-limit");
 
 const router = express.Router();
@@ -78,7 +79,7 @@ async function translateToRomanian(title, summary) {
 Title: ${title}
 Summary: ${summary || ""}`;
 
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_KEY}`, {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODELS.GEMINI_CHAT}:generateContent?key=${GEMINI_KEY}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

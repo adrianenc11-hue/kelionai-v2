@@ -51,6 +51,7 @@
 
             card.innerHTML = '<h3 class="pricing-plan-name">' + p.name + '</h3>' +
                 '<div class="pricing-price">' + (p.price === 0 ? 'Free' : '€' + p.price + '<small>/month</small>') + '</div>' +
+                (p.price > 0 ? '<div class="pricing-annual">or €' + Math.round(p.price * 10) + '<small>/year</small> <span class="annual-badge">Save ~17%</span></div>' : '') +
                 '<ul class="pricing-features">' + featuresHtml + '</ul>' +
                 '<div class="pricing-action" data-plan="' + p.id + '"></div>';
 

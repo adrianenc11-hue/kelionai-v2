@@ -533,6 +533,81 @@ CREATE TABLE IF NOT EXISTS brain_procedures (
 CREATE INDEX IF NOT EXISTS idx_brain_procedures_type ON brain_procedures(task_type, success);
 CREATE INDEX IF NOT EXISTS idx_brain_procedures_user ON brain_procedures(user_id, created_at DESC);
 
+-- ═══ TIER 1: AGENT MARKETPLACE ═══
+CREATE TABLE IF NOT EXISTS marketplace_agents (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    name TEXT NOT NULL,
+    persona TEXT NOT NULL,
+    tools JSONB DEFAULT '[]'::jsonb,
+    model TEXT DEFAULT 'auto',
+    icon TEXT DEFAULT '🤖',
+    is_public BOOLEAN DEFAULT false,
+    creator_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    installs INTEGER DEFAULT 0,
+    rating NUMERIC DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_marketplace_public ON marketplace_agents(is_public, installs DESC);
+CREATE INDEX IF NOT EXISTS idx_marketplace_creator ON marketplace_agents(creator_id);
+
+CREATE TABLE IF NOT EXISTS user_installed_agents (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    agent_id UUID REFERENCES marketplace_agents(id) ON DELETE CASCADE,
+    installed_at TIMESTAMPTZ DEFAULT now(),
+    UNIQUE(user_id, agent_id)
+);
+CREATE INDEX IF NOT EXISTS idx_installed_agents_user ON user_installed_agents(user_id);
+
+-- ═══ TIER 1: PLUGIN SYSTEM ═══
+CREATE TABLE IF NOT EXISTS brain_plugins (
+    id TEXT PRIMARY KEY,
+    manifest JSONB NOT NULL DEFAULT '{}',
+    status TEXT DEFAULT 'active' CHECK (status IN ('active', 'disabled', 'error')),
+    installed_by TEXT,
+    installed_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_brain_plugins_status ON brain_plugins(status);
+
+-- ═══ TIER 0: AUTONOMOUS TASKS ═══
+CREATE TABLE IF NOT EXISTS autonomous_tasks (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    goal TEXT NOT NULL,
+    status TEXT DEFAULT 'running' CHECK (status IN ('running', 'completed', 'failed', 'cancelled')),
+    current_step INTEGER DEFAULT 0,
+    steps JSONB DEFAULT '[]'::jsonb,
+    result JSONB,
+    error TEXT,
+    started_at TIMESTAMPTZ DEFAULT now(),
+    completed_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_autonomous_user ON autonomous_tasks(user_id, started_at DESC);
+CREATE INDEX IF NOT EXISTS idx_autonomous_status ON autonomous_tasks(status);
+
+-- ═══ TIER 1: WHITE-LABEL TENANTS ═══
+CREATE TABLE IF NOT EXISTS tenants (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    domain TEXT NOT NULL UNIQUE,
+    name TEXT NOT NULL DEFAULT 'KelionAI',
+    logo_url TEXT,
+    primary_color TEXT DEFAULT '#6366f1',
+    secondary_color TEXT DEFAULT '#06b6d4',
+    default_avatar TEXT DEFAULT 'kira',
+    default_language TEXT DEFAULT 'en',
+    max_messages_per_day INTEGER DEFAULT 50,
+    features JSONB DEFAULT '{}',
+    custom_system_prompt TEXT,
+    hide_branding BOOLEAN DEFAULT false,
+    custom_footer TEXT,
+    is_active BOOLEAN DEFAULT true,
+    owner_id UUID REFERENCES auth.users(id),
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_tenants_domain ON tenants(domain);
+CREATE INDEX IF NOT EXISTS idx_tenants_active ON tenants(is_active);
+
 `;
 
 async function runMigration() {
@@ -590,6 +665,8 @@ async function runMigration() {
             "telegram_messages", "market_candles", "market_learnings", "market_patterns",
             "brain_profiles", "brain_learnings", "brain_metrics",
             "brain_tools", "brain_usage", "brain_projects", "brain_procedures",
+            "marketplace_agents", "user_installed_agents", "brain_plugins",
+            "autonomous_tasks", "tenants",
         ];
 
         const healthy = [];

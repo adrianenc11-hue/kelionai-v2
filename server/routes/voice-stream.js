@@ -192,7 +192,7 @@ function createElevenLabsTTS(onAudio, voiceId) {
     if (!key) return null;
 
     const ws = new WebSocket(
-        `wss://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream-input?model_id=eleven_flash_v2_5&optimize_streaming_latency=4&output_format=pcm_24000`
+        `wss://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream-input?model_id=eleven_v3_conversational&optimize_streaming_latency=4&output_format=pcm_24000`
     );
 
     let ready = false;
