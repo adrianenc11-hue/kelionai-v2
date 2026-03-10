@@ -429,7 +429,10 @@
             document.getElementById('worldContent').innerHTML = `
             <table>
                 <tr><th>Asset</th><th>Price</th></tr>
-                ${Object.entries(mkts).map(([k, v]) => `<tr><td>${k.toUpperCase()}</td><td>$${v?.price || v || '—'}</td></tr>`).join('')}
+                ${Object.entries(mkts).map(([k, v]) => {
+                const price = typeof v === 'object' ? (v.price || v.last || JSON.stringify(v)) : v;
+                return `<tr><td>${k.toUpperCase()}</td><td>$${price || '—'}</td></tr>`;
+            }).join('')}
             </table>
             ${world.fearGreed ? `<div class="mini" style="margin-top:6px">Fear & Greed: <strong class="${world.fearGreed.value <= 25 ? 'red' : world.fearGreed.value >= 75 ? 'green' : 'yellow'}">${world.fearGreed.value}</strong> (${world.fearGreed.label || ''})</div>` : ''}
         `;
