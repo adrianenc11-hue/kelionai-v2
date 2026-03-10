@@ -176,16 +176,19 @@ router.get("/costs", async (req, res) => {
     // By provider this month
     const { data: providerData } = await supabaseAdmin
       .from("ai_costs")
-      .select("provider, tokens_in, tokens_out, cost_usd")
+      .select("provider, tokens_in, tokens_out, cost_usd, created_at")
       .gte("created_at", monthStart + "T00:00:00Z");
 
     const byProvider = {};
     (providerData || []).forEach((r) => {
-      if (!byProvider[r.provider]) byProvider[r.provider] = { provider: r.provider, requests: 0, tokens_in: 0, tokens_out: 0, cost_usd: 0 };
+      if (!byProvider[r.provider]) byProvider[r.provider] = { provider: r.provider, requests: 0, tokens_in: 0, tokens_out: 0, cost_usd: 0, cost_today: 0 };
       byProvider[r.provider].requests++;
       byProvider[r.provider].tokens_in += r.tokens_in || 0;
       byProvider[r.provider].tokens_out += r.tokens_out || 0;
       byProvider[r.provider].cost_usd += parseFloat(r.cost_usd) || 0;
+      if (r.created_at && r.created_at.startsWith(today)) {
+        byProvider[r.provider].cost_today += parseFloat(r.cost_usd) || 0;
+      }
     });
 
     // By user this month (top 10)

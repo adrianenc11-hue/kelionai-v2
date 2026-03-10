@@ -63,7 +63,7 @@ async function loadAiStatus() {
                 '<div class="ai-name">' + p.name + '</div>' +
                 '<div class="ai-detail">' + (p.live ? '🟢 Live' : '🔴 Off') + '</div>' +
                 '<div class="ai-cost">$' + (p.costMonth || 0).toFixed(2) + '/mo</div>' +
-                '<div class="ai-credit" onclick="rechargeProvider(\'' + p.name + '\',' + (p.creditLimit || 0) + ')" ' +
+                '<div class="ai-credit" onclick="rechargeProvider(\'' + p.name + '\',' + (p.credit || 0) + ')" ' +
                 'style="font-size:0.75rem;margin-top:4px;color:' + creditColor + ';font-weight:600;cursor:pointer;padding:3px 6px;border-radius:6px;background:rgba(255,255,255,0.04)" ' +
                 'title="Click pentru a reîncărca">' +
                 creditIcon + ' $' + (p.credit || 0).toFixed(2) + '</div>';
