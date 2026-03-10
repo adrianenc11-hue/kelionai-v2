@@ -958,14 +958,28 @@ router.post("/webhook", async (req, res) => {
           const knownUser = await getKnownUser(phone, _supabase);
           const character = (knownUser && knownUser.character) || "kelion";
 
+          // ═══ K1 COGNITIVE BRIDGE — Pre-process prin reasoning loop ═══
+          const k1Bridge = require("./k1-messenger-bridge");
+          let k1Context = null;
+          try {
+            k1Context = await k1Bridge.preProcess(userText, {
+              platform: "whatsapp",
+              userId: phone,
+              userName: contactName || phone,
+              supabase: req.app.locals.supabaseAdmin || req.app.locals.supabase,
+            });
+          } catch { }
+
           // ═══ AI RESPONSE (with conversation context) ═══
           let reply;
           const brain = req.app.locals.brain;
           const context = await getContextSummary(chatId);
           const detectedLangForPrompt = detectLanguage(userText);
+          // Enrich prompt with K1 context
+          const k1SystemCtx = k1Context ? k1Bridge.getK1SystemContext(k1Context) : "";
           const prompt = context
-            ? `[Conversation context:\n${context}]\n\nUser: ${userText}`
-            : userText;
+            ? `[Conversation context:\n${context}]\n\nUser: ${userText}${k1SystemCtx}`
+            : userText + k1SystemCtx;
 
           if (brain) {
             try {
@@ -995,6 +1009,16 @@ router.post("/webhook", async (req, res) => {
             reply =
               `Sunt KelionAI! Pentru experiența completă vizitează ${process.env.APP_URL}`;
           }
+
+          // ═══ K1 POST-PROCESS — Confidence + Memory save ═══
+          try {
+            await k1Bridge.postProcess(reply, {
+              platform: "whatsapp",
+              userId: phone,
+              domain: k1Context?.k1?.domain || "general",
+              supabase: req.app.locals.supabaseAdmin || req.app.locals.supabase,
+            });
+          } catch { }
 
           // Prefix polite intervention phrase for unsolicited group responses
           if (isGroup && !getAddressedCharacter(userText)) {

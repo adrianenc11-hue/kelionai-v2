@@ -1024,7 +1024,6 @@ router.get("/webhook", function (req, res) {
   const validTokens = [
     process.env.FB_VERIFY_TOKEN,
     process.env.MESSENGER_VERIFY_TOKEN,
-    "kelionai_verify_2024"
   ].filter(Boolean);
   if (mode === "subscribe" && validTokens.includes(token)) {
     logger.info({ component: "Messenger" }, "Webhook verified");
@@ -1379,6 +1378,18 @@ router.post("/webhook", async function (req, res) {
           }
         }
 
+        // ═══ K1 COGNITIVE BRIDGE — Pre-process prin reasoning loop ═══
+        const k1Bridge = require("./k1-messenger-bridge");
+        let k1Context = null;
+        try {
+          k1Context = await k1Bridge.preProcess(userText || "", {
+            platform: "messenger",
+            userId: senderId,
+            userName: senderName || senderId,
+            supabase: req.app.locals.supabaseAdmin || req.app.locals.supabase,
+          });
+        } catch { }
+
         // AI RESPONSE
         let reply;
         const detectedLangForReply = detectLanguage(userText || "");
@@ -1387,9 +1398,10 @@ router.post("/webhook", async function (req, res) {
         } else {
           const brain = req.app.locals.brain;
           const context = await getContextSummary(senderId);
+          const k1SystemCtx = k1Context ? k1Bridge.getK1SystemContext(k1Context) : "";
           const prompt = context
-            ? "[Context:\n" + context + "]\nUser: " + userText
-            : userText;
+            ? "[Context:\n" + context + "]\nUser: " + userText + k1SystemCtx
+            : userText + k1SystemCtx;
 
           if (brain) {
             try {
@@ -1421,6 +1433,16 @@ router.post("/webhook", async function (req, res) {
             reply = `Sunt KelionAI! Viziteaza ${process.env.APP_URL}`;
           }
         }
+
+        // ═══ K1 POST-PROCESS — Confidence + Memory save ═══
+        try {
+          await k1Bridge.postProcess(reply, {
+            platform: "messenger",
+            userId: senderId,
+            domain: k1Context?.k1?.domain || "general",
+            supabase: req.app.locals.supabaseAdmin || req.app.locals.supabase,
+          });
+        } catch { }
 
         // DETERMINE QUICK REPLIES FOR RESPONSE
         const msgCount = await incrementUserMessageCount(senderId);
@@ -1564,7 +1586,7 @@ router.get("/health", function (req, res) {
         : "misconfigured",
     hasPageToken: !!process.env.FB_PAGE_ACCESS_TOKEN,
     hasAppSecret: !!process.env.FB_APP_SECRET,
-    hasVerifyToken: !!(process.env.FB_VERIFY_TOKEN || process.env.MESSENGER_VERIFY_TOKEN || true),
+    hasVerifyToken: !!(process.env.FB_VERIFY_TOKEN || process.env.MESSENGER_VERIFY_TOKEN),
     graphApiVersion: "v21.0",
     visionEnabled: !!process.env.OPENAI_API_KEY,
     sttEnabled: !!(process.env.GROQ_API_KEY || process.env.OPENAI_API_KEY),
