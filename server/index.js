@@ -461,6 +461,9 @@ app.use("/api/messenger", messengerBot.router);
 app.use("/api/instagram", instagramBot.router);
 app.use("/api/trading", tradingRouter);
 
+// Alias: /api/admin/health → /api/health (audit fix)
+app.use("/api/admin/health", healthRouter);
+
 // Alias: /api/admin/media-history → proxy to /api/media/history
 app.get("/api/admin/media-history", (req, res) => {
   // ═══ TEMPORARILY DISABLED (trial period) ═══

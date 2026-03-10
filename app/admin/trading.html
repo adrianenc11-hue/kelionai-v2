@@ -843,9 +843,9 @@
                 const data = await res.json();
                 snapshot.backtest = data;
                 const rows = [
-                    ['Total Trades', data.totalTrades ?? '—'],
+                    ['Total Trades', data.trades ?? data.totalTrades ?? '—'],
                     ['Win Rate', data.winRate != null ? data.winRate + '%' : '—'],
-                    ['Net Profit', data.netProfit != null ? data.netProfit + '%' : '—'],
+                    ['Net Profit', data.totalReturn != null ? '€' + data.totalReturn : (data.netProfit != null ? data.netProfit + '%' : '—')],
                     ['Max Drawdown', data.maxDrawdown != null ? data.maxDrawdown + '%' : '—'],
                     ['Sharpe Ratio', data.sharpeRatio ?? '—'],
                     ['Profit Factor', data.profitFactor ?? '—'],
@@ -1043,17 +1043,29 @@
                 document.getElementById('pt-positions').textContent = (d.openPositions || 0) + ' positions open';
                 document.getElementById('pt-lastcheck').textContent = d.lastSignalCheck ? new Date(d.lastSignalCheck).toLocaleTimeString() : '—';
                 const btn = document.getElementById('pt-toggle');
+                const mode = d.mode || 'PAPER';
+                const isReal = mode === 'REAL';
                 if (d.active) {
-                    btn.innerHTML = '⏹ STOP BOT';
+                    btn.innerHTML = '⏹ STOP ' + (isReal ? 'REAL' : 'TRAINING');
                     btn.style.background = '#ff4444';
                     btn.style.color = '#fff';
                 } else {
-                    btn.innerHTML = '▶ START BOT';
-                    btn.style.background = '#00ffff';
-                    btn.style.color = '#000';
+                    btn.innerHTML = '▶ START ' + (isReal ? 'REAL' : 'TRAINING');
+                    btn.style.background = isReal ? '#ff8800' : '#00ffff';
+                    btn.style.color = isReal ? '#fff' : '#000';
                 }
                 const sw = document.getElementById('pt-switch');
-                sw.textContent = d.mode === 'PAPER' ? '📊 → REAL' : '🧪 → PAPER';
+                if (isReal) {
+                    sw.textContent = '→ TRAINING MODE';
+                    sw.style.background = 'rgba(0,255,255,0.15)';
+                    sw.style.color = '#00ffff';
+                    sw.style.border = '1px solid rgba(0,255,255,0.3)';
+                } else {
+                    sw.textContent = '→ REAL MODE';
+                    sw.style.background = 'rgba(255,136,0,0.15)';
+                    sw.style.color = '#ff8800';
+                    sw.style.border = '1px solid rgba(255,136,0,0.3)';
+                }
             } catch (e) { /* API not available yet */ }
         }
 

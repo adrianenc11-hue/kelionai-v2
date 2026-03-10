@@ -856,8 +856,8 @@ const priceCache = {};
 const PRICE_CACHE_TTL = 5 * 60 * 1000;
 
 /**
- * Fetch REAL historical prices from CoinGecko (crypto) or exchangerate-api (forex).
- * Falls back to last known data or minimal simulation ONLY if all APIs fail.
+ * Fetch REAL historical prices from Supabase → CoinGecko → Yahoo → WS-Engine.
+ * PRIORITY 0: Supabase market_candles (stored real data — fastest, most reliable)
  */
 async function fetchRealPrices(asset, length = 300) {
   const cacheKey = `${asset}_${length}`;
@@ -868,6 +868,44 @@ async function fetchRealPrices(asset, length = 300) {
       volumes: cached.volumes,
       source: cached.source,
     };
+  }
+
+  // ── PRIORITY 0: SUPABASE market_candles (real stored data) ──
+  try {
+    const { supabaseAdmin } = require("./supabase");
+    if (supabaseAdmin) {
+      // Symbol mapping: UI uses BTC, DB might store as "bitcoin"
+      const SYMBOL_MAP = { BTC: "bitcoin", ETH: "ethereum", SOL: "solana" };
+      const symbolsToTry = [asset];
+      if (SYMBOL_MAP[asset]) symbolsToTry.push(SYMBOL_MAP[asset]);
+      // Also try reverse mapping
+      const reverseMap = Object.fromEntries(Object.entries(SYMBOL_MAP).map(([k, v]) => [v, k]));
+      if (reverseMap[asset]) symbolsToTry.push(reverseMap[asset]);
+
+      let bestData = null;
+      for (const sym of symbolsToTry) {
+        const { data, error } = await supabaseAdmin
+          .from("market_candles")
+          .select("close, volume")
+          .eq("symbol", sym)
+          .order("timestamp", { ascending: true })
+          .limit(length);
+        if (!error && data && data.length >= 20 && (!bestData || data.length > bestData.length)) {
+          bestData = data;
+          logger.info({ component: "Trading", asset, queriedAs: sym, points: data.length }, `💾 Found ${data.length} candles for ${asset} (queried as "${sym}")`);
+        }
+      }
+
+      if (bestData) {
+        const dbPrices = bestData.map(c => c.close);
+        const dbVolumes = bestData.map(c => c.volume || 0);
+        priceCache[cacheKey] = { prices: dbPrices, volumes: dbVolumes, source: "Supabase-market_candles", ts: Date.now() };
+        logger.info({ component: "Trading", asset, source: "Supabase", points: dbPrices.length }, `💾 ${asset}: ${dbPrices.length} real data points from Supabase`);
+        return { prices: dbPrices, volumes: dbVolumes, source: "Supabase-market_candles" };
+      }
+    }
+  } catch (e) {
+    logger.debug({ component: "Trading", asset, err: e.message }, "Supabase candles not available, falling back");
   }
 
   // ── PRIORITY 1: WS-ENGINE (real-time, lowest latency) ──
@@ -1486,6 +1524,27 @@ router.get("/portfolio", async (req, res) => {
   }
 });
 
+// GET /market — alias for /analysis (audit fix)
+router.get("/market", async (req, res) => {
+  try {
+    const allAssets = Object.values(ASSETS).flat();
+    const results = [];
+    for (const asset of allAssets.slice(0, 9)) {
+      try {
+        const { prices, source } = await fetchRealPrices(asset, 50);
+        const price = prices.length > 0 ? prices[prices.length - 1] : null;
+        const prevPrice = prices.length > 1 ? prices[prices.length - 2] : price;
+        const change = price && prevPrice ? +(((price - prevPrice) / prevPrice) * 100).toFixed(2) : 0;
+        results.push({ symbol: asset, price: price ? +price.toFixed(4) : null, changePercent: change, source });
+      } catch { results.push({ symbol: asset, price: null, changePercent: 0, source: "error" }); }
+    }
+    res.json({ assets: results, timestamp: new Date().toISOString() });
+  } catch (err) {
+    logger.error({ err: err.message }, "[Trading] Market data error");
+    res.status(500).json({ error: "Market data unavailable" });
+  }
+});
+
 // POST /backtest
 router.post("/backtest", async (req, res) => {
   try {
@@ -1523,7 +1582,8 @@ router.post("/backtest", async (req, res) => {
     const { prices, volumes } = await fetchRealPrices(asset, len + 50);
     const trades = [];
     let position = null;
-    let equity = 10000;
+    const startEquity = paperTrading.getState().startBalance || 100;
+    let equity = startEquity;
     let totalCommissions = 0;
     let totalSlippage = 0;
 
@@ -1602,7 +1662,7 @@ router.post("/backtest", async (req, res) => {
 
     const wins = trades.filter((t) => t.netPnlPct > 0).length;
     const losses = trades.filter((t) => t.netPnlPct <= 0).length;
-    const totalReturn = Math.round((equity - 10000) * 100) / 100;
+    const totalReturn = Math.round((equity - startEquity) * 100) / 100;
     const grossWins = trades
       .filter((t) => t.netPnlPct > 0)
       .reduce((s, t) => s + t.netPnlPct, 0);
@@ -1617,8 +1677,8 @@ router.post("/backtest", async (req, res) => {
         : 0;
 
     // Max drawdown from equity curve
-    let equityCurve = 10000;
-    let peakEquity = 10000;
+    let equityCurve = startEquity;
+    let peakEquity = startEquity;
     let maxDrawdown = 0;
     trades.forEach((t) => {
       equityCurve *= 1 + t.netPnlPct / 100;
