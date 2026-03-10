@@ -376,14 +376,14 @@ function setupVoiceStream(server, appLocals) {
                 // ═══ BRAIN INTEGRATION — parse emotion/gesture + save memory ═══
                 let emotion = "neutral";
                 let gestures = [];
-                const emotionMatch = fullReply.match(/\[EMOTION:(\w+)\]/i);
+                const emotionMatch = fullReply.match(/\[EMOTION:\s*(\w+)\]/i);
                 if (emotionMatch) {
                     emotion = emotionMatch[1].toLowerCase();
-                    fullReply = fullReply.replace(/\[EMOTION:\w+\]/gi, "").trim();
+                    fullReply = fullReply.replace(/\[EMOTION:\s*\w+\]/gi, "").trim();
                 }
-                const gestureMatches = fullReply.matchAll(/\[GESTURE:(\w+)\]/gi);
+                const gestureMatches = fullReply.matchAll(/\[GESTURE:\s*(\w+)\]/gi);
                 for (const gm of gestureMatches) gestures.push(gm[1].toLowerCase());
-                fullReply = fullReply.replace(/\[GESTURE:\w+\]/gi, "").trim();
+                fullReply = fullReply.replace(/\[GESTURE:\s*\w+\]/gi, "").trim();
 
                 // Send emotion + gestures to client
                 if (emotion !== "neutral") {
