@@ -381,6 +381,15 @@ app.get("/admin/trading.html", (req, res) => {
 });
 app.use("/admin", express.static(path.join(__dirname, "..", "app", "admin")));
 
+// Force no-cache on JS/CSS/HTML so deploys take effect immediately
+app.use((req, res, next) => {
+  if (req.path.match(/\.(js|css|html)$/)) {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+  }
+  next();
+});
 app.use(express.static(path.join(__dirname, "..", "app")));
 app.use("/api", globalLimiter);
 const PORT = process.env.PORT || 3000;
