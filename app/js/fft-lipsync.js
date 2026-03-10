@@ -41,13 +41,13 @@
 
     // Smoothing — CINEMATIC mode: dynamic attack/release for natural feel
     var prevValues = {};
-    var SMOOTH_ATTACK = 0.22;   // snappy attack for responsive lips
-    var SMOOTH_RELEASE = 0.12;  // natural release
+    var SMOOTH_ATTACK = 0.15;   // cinematic: slower attack for natural movement
+    var SMOOTH_RELEASE = 0.08;  // cinematic: very gentle release
 
     // ── Mouth opening clamp — REALISTIC values for visible movement ──
-    var MAX_MOUTH_OPEN = 0.35;  // jawOpen/mouthOpen — visible but not distorted
-    var MAX_VISEME_AA = 0.50;   // wide-open vowel ("aaa")
-    var MAX_VISEME = 0.55;      // any viseme morph
+    var MAX_MOUTH_OPEN = 0.15;  // cinematic: subtle jaw movement
+    var MAX_VISEME_AA = 0.25;   // cinematic: controlled vowel opening
+    var MAX_VISEME = 0.28;      // cinematic: never gaping
 
     // ── Coarticulation — blend previous viseme into current ──
     var _prevVisemes = {};
