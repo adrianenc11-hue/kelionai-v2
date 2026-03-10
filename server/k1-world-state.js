@@ -27,6 +27,10 @@ const worldState = {
         sol: { price: 0, change24h: 0, trend: "unknown", signal: "HOLD" },
         gold: { price: 0, change24h: 0, trend: "unknown", signal: "HOLD" },
         nasdaq: { price: 0, change24h: 0, trend: "unknown", signal: "HOLD" },
+        "sp500": { price: 0, change24h: 0, trend: "unknown", signal: "HOLD" },
+        oil: { price: 0, change24h: 0, trend: "unknown", signal: "HOLD" },
+        "eurusd": { price: 0, change24h: 0, trend: "unknown", signal: "HOLD" },
+        "gbpusd": { price: 0, change24h: 0, trend: "unknown", signal: "HOLD" },
         fearGreed: { value: 50, label: "Neutral", signal: "HOLD" },
     },
     system: {

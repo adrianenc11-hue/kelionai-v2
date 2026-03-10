@@ -3281,8 +3281,15 @@ async function k1MarketDataFeed() {
       } catch { }
     }));
 
-    // Fetch GOLD + NASDAQ via Yahoo Finance (free, no API key)
-    const yahooAssets = { gold: "GC=F", nasdaq: "^IXIC" };
+    // Fetch GOLD + NASDAQ + S&P500 + Oil + Forex via Yahoo Finance (free, no API key)
+    const yahooAssets = {
+      gold: "GC=F",
+      nasdaq: "^IXIC",
+      sp500: "^GSPC",
+      oil: "CL=F",
+      eurusd: "EURUSD=X",
+      gbpusd: "GBPUSD=X",
+    };
     await Promise.all(Object.entries(yahooAssets).map(async ([k, ticker]) => {
       try {
         const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=2d`;
