@@ -3108,6 +3108,99 @@ router.post("/k1/memory/forget", async (req, res) => {
   res.json(result);
 });
 
+// ═══════════════════════════════════════════════════════════════
+// K1 FAZA 2: INTELLIGENCE — Agents, Truth, Performance
+// ═══════════════════════════════════════════════════════════════
+const k1Agents = require("./k1-agents");
+const k1Truth = require("./k1-truth");
+const k1Perf = require("./k1-performance");
+
+// --- AGENTS ---
+router.get("/k1/agents", (req, res) => {
+  res.json({ agents: k1Agents.getActiveAgents(), stats: k1Agents.getStats(), templates: Object.keys(k1Agents.getTemplates()) });
+});
+
+router.post("/k1/agents/spawn", (req, res) => {
+  const { template, role, prompt, task } = req.body || {};
+  const agent = k1Agents.spawn(template || "research", { role, prompt, task });
+  if (agent.error) return res.status(400).json(agent);
+  if (task) k1Agents.brief(agent.id, task);
+  res.json(agent);
+});
+
+router.post("/k1/agents/:id/complete", (req, res) => {
+  const { result, confidence } = req.body || {};
+  const agent = k1Agents.complete(parseInt(req.params.id), result, confidence || 50);
+  if (agent.error) return res.status(404).json(agent);
+  res.json(agent);
+});
+
+router.post("/k1/agents/:id/evaluate", (req, res) => {
+  const { score, feedback } = req.body || {};
+  const agent = k1Agents.evaluate(parseInt(req.params.id), score || 50, feedback);
+  if (agent.error) return res.status(404).json(agent);
+  res.json(agent);
+});
+
+router.delete("/k1/agents/:id", (req, res) => {
+  const result = k1Agents.kill(parseInt(req.params.id), "manual");
+  if (result.error) return res.status(404).json(result);
+  res.json(result);
+});
+
+// Swarm patterns
+router.post("/k1/agents/debate", (req, res) => {
+  const { task } = req.body || {};
+  if (!task) return res.status(400).json({ error: "task required" });
+  res.json(k1Agents.setupDebate(task));
+});
+
+router.post("/k1/agents/ensemble", (req, res) => {
+  const { task, types } = req.body || {};
+  if (!task) return res.status(400).json({ error: "task required" });
+  res.json(k1Agents.setupEnsemble(task, types));
+});
+
+router.post("/k1/agents/adversarial", (req, res) => {
+  const { task } = req.body || {};
+  if (!task) return res.status(400).json({ error: "task required" });
+  res.json(k1Agents.setupAdversarial(task));
+});
+
+// --- TRUTH GUARD ---
+router.post("/k1/truth/verify", (req, res) => {
+  const { text, liveData } = req.body || {};
+  if (!text) return res.status(400).json({ error: "text required" });
+  res.json(k1Truth.verify(text, liveData || {}));
+});
+
+router.post("/k1/truth/self-test", (req, res) => {
+  const { domain } = req.body || {};
+  res.json(k1Truth.runSelfTest(domain || "trading"));
+});
+
+router.get("/k1/truth/history", (req, res) => {
+  res.json(k1Truth.getSelfTestHistory());
+});
+
+// --- PERFORMANCE ---
+router.get("/k1/performance", (req, res) => {
+  res.json(k1Perf.getReport());
+});
+
+router.get("/k1/performance/recommendations", (req, res) => {
+  res.json(k1Perf.getRecommendations());
+});
+
+router.post("/k1/performance/record", (req, res) => {
+  const { domain, correct, errorType, responseTimeMs } = req.body || {};
+  if (!domain) return res.status(400).json({ error: "domain required" });
+  k1Perf.recordTask(domain, responseTimeMs);
+  if (correct === true) k1Perf.recordCorrect(domain);
+  else if (correct === false) k1Perf.recordCorrection(domain, errorType || "unknown");
+  res.json({ recorded: true, report: k1Perf.getReport() });
+});
+
 module.exports = router;
 module.exports.detectSmartMoney = detectSmartMoney;
 module.exports.kellyPosition = kellyPosition;
