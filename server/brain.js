@@ -17,6 +17,10 @@ const logger = require("./logger");
 const { MODELS } = require("./config/models");
 const { UserProfile, LearningStore, AutonomousMonitor } = require("./brain-profile");
 
+// K1 AGI Integration — enriches every web chat with world state, memory, reasoning
+let k1Bridge;
+try { k1Bridge = require("./k1-messenger-bridge"); } catch { k1Bridge = null; }
+
 class KelionBrain {
   constructor(config) {
     this.geminiKey = config.geminiKey;
@@ -1014,6 +1018,27 @@ When asked "what can you do?" list these real capabilities. Use them proactively
       logger.info({ component: "Brain", agent: agentSelection.name, key: agentSelection.agent },
         `${agentSelection.icon} Agent: ${agentSelection.name}`);
 
+      // Step 1.6: K1 AGI CONTEXT — enrich with world state, K1 memory, alerts
+      let k1Context = null;
+      if (k1Bridge) {
+        try {
+          k1Context = await k1Bridge.preProcess(message, {
+            platform: "web",
+            userId,
+            domain: analysis.topics?.[0] || "general",
+            supabase: this.supabaseAdmin,
+          });
+          if (k1Context) {
+            const k1SystemCtx = k1Bridge.getK1SystemContext(k1Context);
+            if (k1SystemCtx) {
+              this._currentMemoryContext = (this._currentMemoryContext || "") + "\n" + k1SystemCtx;
+            }
+          }
+        } catch (k1Err) {
+          logger.warn({ component: "Brain", err: k1Err.message }, "K1 preProcess failed (non-critical)");
+        }
+      }
+
       // Step 2: DECOMPOSE complex tasks into sub-tasks
       let subTasks = [{ message, analysis }];
       if (analysis.complexity === "complex") {
@@ -1265,6 +1290,21 @@ When asked "what can you do?" list these real capabilities. Use them proactively
         }
       }
 
+      // K1 AGI POST-PROCESS — save to K1 memory, score templates, track performance
+      if (k1Bridge && k1Context) {
+        try {
+          await k1Bridge.postProcess(cleanReply, {
+            platform: "web",
+            userId,
+            domain: analysis.topics?.[0] || "general",
+            supabase: this.supabaseAdmin,
+            addBadge: false, // web chat handles its own UI
+          });
+        } catch (k1Err) {
+          logger.warn({ component: "Brain", err: k1Err.message }, "K1 postProcess failed (non-critical)");
+        }
+      }
+
       return {
         enrichedMessage: cleanReply,
         enrichedContext: enriched,
@@ -1283,6 +1323,7 @@ When asked "what can you do?" list these real capabilities. Use them proactively
         criticReport,
         complexityLevel: complexityResult,
         modelRoute,
+        k1Active: !!k1Context,
       };
     } catch (e) {
       const thinkTime = Date.now() - startTime;
