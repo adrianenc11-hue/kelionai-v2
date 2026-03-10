@@ -11,6 +11,7 @@
 
 const logger = require("pino")({ name: "paper-trading" });
 const investSim = require("./investment-simulator");
+const learner = require("./trading-learner");
 
 // ═══ STATE ═══
 const state = {
@@ -143,6 +144,7 @@ function getState() {
         recentTrades: state.trades.slice(-20),
         activeSessions: sessions.map(s => s.name),
         marketStatus,
+        learnedRules: learner.getAnalysisReport(),
     };
 }
 
@@ -166,7 +168,10 @@ function turnOn(supabase) {
         });
     }
 
-    logger.info({ balance: state.cash }, "[PaperTrading] BOT ON — starting 24/7 trading");
+    // Start self-learning engine
+    learner.startLearning(supabase);
+
+    logger.info({ balance: state.cash }, "[PaperTrading] BOT ON — trading + self-learning active");
 
     // Check signals every 5 minutes
     state.intervalId = setInterval(() => {
@@ -256,8 +261,9 @@ function turnOff() {
         clearInterval(state._sessionInterval);
         state._sessionInterval = null;
     }
+    learner.stopLearning();
 
-    logger.info({ pnl: state.totalPnL, trades: state.trades.length }, "[PaperTrading] BOT OFF");
+    logger.info({ pnl: state.totalPnL, trades: state.trades.length }, "[PaperTrading] BOT OFF — learning paused");
     return { status: "off", state: getState() };
 }
 
@@ -290,10 +296,13 @@ async function checkAndTrade(supabase) {
 
             const { signal, confidence } = investSim.generateSignal(prices);
 
-            // Execute trade based on signal
-            if (signal === "BUY" && confidence >= 60 && !state.positions[asset] && state.cash > 0 && marketOpen) {
-                // Allocate max 20% of cash per position
-                const allocation = Math.min(state.cash, state.cash * 0.2);
+            // Get learned rules for this asset
+            const rules = learner.getRulesForAsset(asset);
+
+            // Execute trade based on signal + learned rules
+            if (signal === "BUY" && confidence >= rules.minConfidence && !state.positions[asset] && state.cash > 0 && marketOpen && rules.enabled) {
+                // Allocate based on learned maxAllocation (auto-calibrated)
+                const allocation = Math.min(state.cash, state.cash * rules.maxAllocation);
                 if (allocation < 1) continue; // minimum €1
 
                 const qty = allocation / price;
@@ -325,7 +334,7 @@ async function checkAndTrade(supabase) {
                 // Save to Supabase
                 await saveTrade(supabase, trade);
 
-            } else if (signal === "SELL" && confidence >= 60 && state.positions[asset]) {
+            } else if (signal === "SELL" && confidence >= (rules.minConfidence - 10) && state.positions[asset]) {
                 // Close position
                 const pos = state.positions[asset];
                 const sellValue = pos.qty * price;

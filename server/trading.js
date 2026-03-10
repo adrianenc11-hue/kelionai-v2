@@ -1899,6 +1899,20 @@ router.post("/paper/switch", (req, res) => {
   res.json(paperTrading.switchMode(mode, sb));
 });
 
+// ═══ SELF-LEARNING ENGINE ═══
+const tradingLearner = require("./trading-learner");
+
+router.get("/paper/analysis", async (req, res) => {
+  const report = tradingLearner.getAnalysisReport();
+  res.json(report);
+});
+
+router.post("/paper/learn", async (req, res) => {
+  const { supabaseAdmin } = req.app.locals;
+  const result = await tradingLearner.analyzeAndLearn(supabaseAdmin);
+  res.json(result);
+});
+
 // ═══ INVESTMENT SIMULATOR — 100€ backtesting across all assets/periods ═══
 router.get("/simulate", async (req, res) => {
   try {
