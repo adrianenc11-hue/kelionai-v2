@@ -12,6 +12,7 @@
 const logger = require("pino")({ name: "paper-trading" });
 const investSim = require("./investment-simulator");
 const learner = require("./trading-learner");
+const marketData = require("./market-data");
 
 // ═══ STATE ═══
 const state = {
@@ -168,10 +169,13 @@ function turnOn(supabase) {
         });
     }
 
-    // Start self-learning engine
+    // Start real data downloader (every 4h)
+    marketData.startDownloader(supabase);
+
+    // Start self-learning engine (after data downloads)
     learner.startLearning(supabase);
 
-    logger.info({ balance: state.cash }, "[PaperTrading] BOT ON — trading + self-learning active");
+    logger.info({ balance: state.cash }, "[PaperTrading] BOT ON — trading + real data + self-learning active");
 
     // Check signals every 5 minutes
     state.intervalId = setInterval(() => {
@@ -182,6 +186,31 @@ function turnOn(supabase) {
 
     // First check immediately
     setTimeout(() => checkAndTrade(supabase).catch(() => { }), 5000);
+
+    // ═══ AUTOSAVE — save state to Supabase every 60 seconds ═══
+    state._autosaveInterval = setInterval(async () => {
+        try {
+            const totalPositionValue = Object.entries(state.positions).reduce((sum, [, pos]) => {
+                return sum + (pos.qty * (pos.currentPrice || pos.avgPrice));
+            }, 0);
+            await supabase.from("trading_state").upsert({
+                id: "paper_bot",
+                cash: +state.cash.toFixed(2),
+                positions: JSON.stringify(state.positions),
+                positions_value: +totalPositionValue.toFixed(2),
+                portfolio_value: +(state.cash + totalPositionValue).toFixed(2),
+                total_pnl: +state.totalPnL.toFixed(2),
+                win_count: state.winCount,
+                loss_count: state.lossCount,
+                total_trades: state.trades.length,
+                mode: state.mode,
+                active: state.active,
+                updated_at: new Date().toISOString(),
+            }, { onConflict: "id" });
+        } catch (e) { /* table may not exist yet */ }
+    }, 60 * 1000); // every 60 seconds
+
+    logger.info("[PaperTrading] 💾 Autosave enabled — state saved every 60s");
 
     // ═══ SESSION SCHEDULER — pre-market warmup 5s before open ═══
     state._sessionInterval = setInterval(() => {
@@ -261,14 +290,25 @@ function turnOff() {
         clearInterval(state._sessionInterval);
         state._sessionInterval = null;
     }
+    if (state._autosaveInterval) {
+        clearInterval(state._autosaveInterval);
+        state._autosaveInterval = null;
+    }
     learner.stopLearning();
+    marketData.stopDownloader();
 
-    logger.info({ pnl: state.totalPnL, trades: state.trades.length }, "[PaperTrading] BOT OFF — learning paused");
+    logger.info({ pnl: state.totalPnL, trades: state.trades.length }, "[PaperTrading] BOT OFF — all stopped");
     return { status: "off", state: getState() };
 }
 
 /**
  * Main trading cycle — called every 5 minutes when ON
+ * 
+ * AUTO-CLOSE RULES (no human intervention):
+ * - Stop-loss: close if position drops -5%
+ * - Take-profit: close if position gains +8%  
+ * - Time limit: close if position held > 24 hours
+ * - Signal SELL: close on bearish signal
  */
 async function checkAndTrade(supabase) {
     if (!state.active) return;
@@ -285,12 +325,67 @@ async function checkAndTrade(supabase) {
             const price = await getCurrentPrice(asset, supabase);
             if (!price || price <= 0) continue;
 
-            // Update position current price
+            // ═══ AUTO-CLOSE EXISTING POSITIONS ═══
             if (state.positions[asset]) {
                 state.positions[asset].currentPrice = price;
+                const pos = state.positions[asset];
+                const pnlPct = ((price - pos.avgPrice) / pos.avgPrice) * 100;
+                const holdHours = (Date.now() - new Date(pos.openDate).getTime()) / (1000 * 60 * 60);
+
+                let shouldClose = false;
+                let closeReason = "";
+
+                // Stop-loss: -5%
+                if (pnlPct <= -5) {
+                    shouldClose = true;
+                    closeReason = `STOP-LOSS (${pnlPct.toFixed(1)}%)`;
+                }
+                // Take-profit: +8%
+                else if (pnlPct >= 8) {
+                    shouldClose = true;
+                    closeReason = `TAKE-PROFIT (${pnlPct.toFixed(1)}%)`;
+                }
+                // Time limit: 24 hours
+                else if (holdHours >= 24) {
+                    shouldClose = true;
+                    closeReason = `TIME-LIMIT (${holdHours.toFixed(1)}h)`;
+                }
+
+                if (shouldClose) {
+                    const sellValue = pos.qty * price;
+                    const buyValue = pos.qty * pos.avgPrice;
+                    const pnl = sellValue - buyValue;
+
+                    state.cash += sellValue;
+                    state.totalPnL += pnl;
+                    if (pnl > 0) state.winCount++;
+                    else state.lossCount++;
+
+                    const trade = {
+                        id: state.trades.length + 1,
+                        asset,
+                        action: "SELL",
+                        price,
+                        qty: pos.qty,
+                        value: +sellValue.toFixed(2),
+                        confidence: 100,
+                        date: new Date().toISOString(),
+                        pnl: +pnl.toFixed(2),
+                        holdTime: timeDiff(pos.openDate, new Date().toISOString()),
+                        reason: closeReason,
+                    };
+                    state.trades.push(trade);
+                    delete state.positions[asset];
+
+                    logger.info({ asset, price, pnl: +pnl.toFixed(2), reason: closeReason },
+                        `[PaperTrading] AUTO-CLOSE ${asset} — ${closeReason} — PnL: €${pnl.toFixed(2)}`);
+
+                    await saveTrade(supabase, trade);
+                    continue; // Skip to next asset after closing
+                }
             }
 
-            // Get price history for signal generation
+            // ═══ GENERATE SIGNAL FOR NEW TRADES ═══
             const prices = await getRecentPrices(asset, supabase);
             if (!prices || prices.length < 50) continue;
 
@@ -299,11 +394,10 @@ async function checkAndTrade(supabase) {
             // Get learned rules for this asset
             const rules = learner.getRulesForAsset(asset);
 
-            // Execute trade based on signal + learned rules
+            // BUY: signal + confidence + no existing position + market open
             if (signal === "BUY" && confidence >= rules.minConfidence && !state.positions[asset] && state.cash > 0 && marketOpen && rules.enabled) {
-                // Allocate based on learned maxAllocation (auto-calibrated)
                 const allocation = Math.min(state.cash, state.cash * rules.maxAllocation);
-                if (allocation < 1) continue; // minimum €1
+                if (allocation < 1) continue;
 
                 const qty = allocation / price;
                 state.positions[asset] = {
@@ -324,18 +418,17 @@ async function checkAndTrade(supabase) {
                     value: +allocation.toFixed(2),
                     confidence,
                     date: new Date().toISOString(),
-                    pnl: null, // not closed yet
+                    pnl: null,
                 };
                 state.trades.push(trade);
 
-                logger.info({ asset, price, qty: +qty.toFixed(6), value: +allocation.toFixed(2) },
+                logger.info({ asset, price, qty: +qty.toFixed(6), value: +allocation.toFixed(2), confidence },
                     `[PaperTrading] BUY ${asset}`);
 
-                // Save to Supabase
                 await saveTrade(supabase, trade);
 
             } else if (signal === "SELL" && confidence >= (rules.minConfidence - 10) && state.positions[asset]) {
-                // Close position
+                // Signal-based SELL
                 const pos = state.positions[asset];
                 const sellValue = pos.qty * price;
                 const buyValue = pos.qty * pos.avgPrice;
@@ -357,6 +450,7 @@ async function checkAndTrade(supabase) {
                     date: new Date().toISOString(),
                     pnl: +pnl.toFixed(2),
                     holdTime: timeDiff(pos.openDate, new Date().toISOString()),
+                    reason: "SIGNAL-SELL",
                 };
                 state.trades.push(trade);
                 delete state.positions[asset];
@@ -367,7 +461,7 @@ async function checkAndTrade(supabase) {
                 await saveTrade(supabase, trade);
             }
         } catch (e) {
-            // Silent — don't crash the loop
+            logger.warn({ asset, err: e.message }, `[PaperTrading] Error processing ${asset}`);
         }
     }
 }

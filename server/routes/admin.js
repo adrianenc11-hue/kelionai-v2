@@ -1363,7 +1363,7 @@ router.get("/health-check", async (req, res) => {
 
     // Services
     const services = {};
-    const svcChecks = { database: !!supabaseAdmin, brain: !!brain, gemini: !!process.env.GEMINI_API_KEY, stripe: !!process.env.STRIPE_SECRET_KEY };
+    const svcChecks = { database: !!supabaseAdmin, brain: !!brain, gemini: !!(process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY), stripe: !!process.env.STRIPE_SECRET_KEY };
     for (const [k, v] of Object.entries(svcChecks)) {
       services[k] = { label: k.charAt(0).toUpperCase() + k.slice(1), active: v };
       if (!v && k !== "stripe") { score -= 5; recommendations.push(`${k} not configured`); }
@@ -1375,7 +1375,7 @@ router.get("/health-check", async (req, res) => {
       cspEnabled: true,
       httpsRedirect: !!process.env.RAILWAY_PUBLIC_DOMAIN,
       corsConfigured: true,
-      adminSecretConfigured: !!process.env.ADMIN_SECRET,
+      adminSecretConfigured: !!(process.env.ADMIN_SECRET_KEY || process.env.ADMIN_SECRET),
     };
     if (!security.adminSecretConfigured) { score -= 5; recommendations.push("No ADMIN_SECRET set"); }
 
@@ -1458,6 +1458,279 @@ Răspunde în maxim 3 recomandări scurte, fiecare pe un rând. Doar probleme re
   } catch (e) {
     logger.error({ component: "Admin", err: e.message }, "Health check failed");
     res.status(500).json({ error: e.message, score: 0, grade: "F" });
+  }
+});
+
+// ══════════════════════════════════════════════════════════════
+// AUTO-MONITOR — Brain análisis permanente del sistema
+// Saves health + trading state every 30 min to Supabase
+// Brain analyzes results and provides recommendations
+// ══════════════════════════════════════════════════════════════
+
+let _monitorHistory = []; // in-memory ring buffer (last 48 entries = 24h)
+const MONITOR_MAX = 48;
+
+async function collectMonitorSnapshot(supabaseAdmin, brain) {
+  try {
+    // 1. Collect health data
+    const mem = process.memoryUsage();
+    const uptime = process.uptime();
+
+    // Services status
+    const services = {
+      database: !!supabaseAdmin,
+      brain: !!brain,
+      gemini: !!(process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY),
+      stripe: !!process.env.STRIPE_SECRET_KEY,
+    };
+
+    // 2. Collect trading state
+    let tradingState = null;
+    if (supabaseAdmin) {
+      try {
+        const { data } = await supabaseAdmin
+          .from("trading_state")
+          .select("*")
+          .eq("id", "paper_bot")
+          .single();
+        tradingState = data;
+      } catch (e) { /* table may not exist */ }
+    }
+
+    // 3. Collect candle count
+    let candleCount = 0;
+    if (supabaseAdmin) {
+      try {
+        const { count } = await supabaseAdmin
+          .from("market_candles")
+          .select("*", { count: "exact", head: true });
+        candleCount = count || 0;
+      } catch (e) { /* table may not exist */ }
+    }
+
+    // 4. Build snapshot
+    const snapshot = {
+      timestamp: new Date().toISOString(),
+      health: {
+        score: Object.values(services).filter(v => v).length * 25,
+        memory_mb: +(mem.rss / 1024 / 1024).toFixed(1),
+        uptime_hours: +(uptime / 3600).toFixed(2),
+        services,
+        errors: brain?.recentErrors || 0,
+      },
+      trading: tradingState ? {
+        cash: tradingState.cash,
+        portfolio_value: tradingState.portfolio_value,
+        total_pnl: tradingState.total_pnl,
+        win_count: tradingState.win_count,
+        loss_count: tradingState.loss_count,
+        total_trades: tradingState.total_trades,
+        active: tradingState.active,
+      } : null,
+      data: {
+        candles: candleCount,
+      },
+    };
+
+    // 5. Save to ring buffer
+    _monitorHistory.push(snapshot);
+    if (_monitorHistory.length > MONITOR_MAX) _monitorHistory.shift();
+
+    // 6. Save to Supabase
+    if (supabaseAdmin) {
+      try {
+        await supabaseAdmin.from("system_monitor").insert({
+          snapshot: JSON.stringify(snapshot),
+          health_score: snapshot.health.score,
+          trading_pnl: snapshot.trading?.total_pnl || 0,
+          trading_trades: snapshot.trading?.total_trades || 0,
+          candle_count: snapshot.data.candles,
+          created_at: snapshot.timestamp,
+        });
+
+        // Keep only last 200 entries in DB
+        const { count } = await supabaseAdmin
+          .from("system_monitor")
+          .select("*", { count: "exact", head: true });
+        if (count && count > 200) {
+          const { data: old } = await supabaseAdmin
+            .from("system_monitor")
+            .select("id")
+            .order("created_at", { ascending: true })
+            .limit(count - 200);
+          if (old && old.length > 0) {
+            await supabaseAdmin
+              .from("system_monitor")
+              .delete()
+              .in("id", old.map(r => r.id));
+          }
+        }
+      } catch (e) { /* table may not exist yet */ }
+    }
+
+    logger.info({
+      component: "Monitor",
+      score: snapshot.health.score,
+      pnl: snapshot.trading?.total_pnl,
+      candles: snapshot.data.candles,
+    }, "📊 Auto-monitor snapshot saved");
+
+    return snapshot;
+  } catch (e) {
+    logger.warn({ component: "Monitor", err: e.message }, "Monitor snapshot failed");
+    return null;
+  }
+}
+
+// ── Start auto-monitor lazily on first admin request ──
+let _monitorInterval = null;
+let _monitorStarted = false;
+
+function ensureMonitorStarted(req) {
+  if (_monitorStarted) return;
+  _monitorStarted = true;
+  const { supabaseAdmin, brain } = req.app.locals;
+
+  // Initial snapshot
+  collectMonitorSnapshot(supabaseAdmin, brain).catch(() => { });
+
+  // Every 30 minutes
+  _monitorInterval = setInterval(async () => {
+    try {
+      await collectMonitorSnapshot(supabaseAdmin, brain);
+    } catch (e) { /* ok */ }
+  }, 30 * 60 * 1000);
+
+  logger.info({ component: "Monitor" }, "📊 Auto-monitor started — snapshots every 30 min");
+}
+
+// Middleware to start monitor on first admin request
+router.use((req, res, next) => {
+  ensureMonitorStarted(req);
+  next();
+});
+
+// ── GET /api/admin/monitor — Brain-analyzed current status ──
+router.get("/monitor", async (req, res) => {
+  try {
+    const { supabaseAdmin, brain } = req.app.locals;
+
+    // Collect fresh snapshot
+    const current = await collectMonitorSnapshot(supabaseAdmin, brain);
+
+    // Get history from DB for trend analysis
+    let history = [];
+    if (supabaseAdmin) {
+      try {
+        const { data } = await supabaseAdmin
+          .from("system_monitor")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .limit(48);
+        history = (data || []).map(r => {
+          try { return JSON.parse(r.snapshot); }
+          catch { return r; }
+        });
+      } catch (e) { history = _monitorHistory; }
+    } else {
+      history = _monitorHistory;
+    }
+
+    // ═══ BRAIN ANALYSIS ═══
+    let brainAnalysis = null;
+    if (brain && typeof brain.think === "function") {
+      try {
+        const tradingInfo = current?.trading
+          ? `Cash: €${current.trading.cash}, Portfolio: €${current.trading.portfolio_value}, P&L: €${current.trading.total_pnl}, Trades: ${current.trading.total_trades}, Wins: ${current.trading.win_count}, Losses: ${current.trading.loss_count}`
+          : "Trading bot nu este activ";
+
+        const historyTrend = history.length > 1
+          ? `Ultimele ${history.length} snapshot-uri: score-uri health = [${history.slice(0, 5).map(h => h.health?.score).join(", ")}], P&L trend = [${history.slice(0, 5).map(h => h.trading?.total_pnl || 0).join(", ")}]`
+          : "Fără istoric suficient";
+
+        const analysisPrompt = `Ești sistemul de monitorizare KelionAI. Analizează REAL și ONEST:
+
+STARE CURENTĂ:
+- Health Score: ${current?.health?.score || 0}/100
+- Memorie: ${current?.health?.memory_mb}MB
+- Uptime: ${current?.health?.uptime_hours}h
+- Erori recente: ${current?.health?.errors}
+- Candle-uri reale: ${current?.data?.candles}
+- ${tradingInfo}
+
+TREND: ${historyTrend}
+
+Răspunde STRICT în format JSON:
+{
+  "status": "HEALTHY|WARNING|CRITICAL",
+  "summary": "O propoziție clar cu starea reală",
+  "trading_opinion": "Opinia ta REALĂ despre performanța trading-ului",
+  "recommendations": ["max 3 recomandări concrete"],
+  "risk_level": "LOW|MEDIUM|HIGH",
+  "data_quality": "REAL|MIXED|FAKE"
+}
+
+IMPORTANT: Nu minți, nu ascunzi probleme. Dacă trading-ul pierde bani, spune clar.`;
+
+        const brainResult = await Promise.race([
+          brain.think(analysisPrompt, "kelion-monitor", [], "ro"),
+          new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 8000)),
+        ]);
+
+        if (brainResult?.enrichedMessage) {
+          const jsonMatch = brainResult.enrichedMessage.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            try { brainAnalysis = JSON.parse(jsonMatch[0]); }
+            catch { brainAnalysis = { raw: brainResult.enrichedMessage }; }
+          } else {
+            brainAnalysis = { raw: brainResult.enrichedMessage };
+          }
+        }
+      } catch (e) {
+        brainAnalysis = { error: e.message, status: "ANALYSIS_FAILED" };
+      }
+    } else {
+      brainAnalysis = { error: "Brain not available", status: "NO_BRAIN" };
+    }
+
+    res.json({
+      current,
+      brainAnalysis,
+      historyCount: history.length,
+      recentHistory: history.slice(0, 10),
+      autoMonitor: {
+        enabled: true,
+        interval: "30 minutes",
+        nextRun: _monitorInterval ? "Active" : "Not started",
+      },
+    });
+  } catch (e) {
+    logger.error({ component: "Monitor", err: e.message }, "Monitor route failed");
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── GET /api/admin/monitor/history — Full monitoring history ──
+router.get("/monitor/history", async (req, res) => {
+  try {
+    const { supabaseAdmin } = req.app.locals;
+    if (!supabaseAdmin) return res.json({ history: _monitorHistory, source: "memory" });
+
+    const { data, error } = await supabaseAdmin
+      .from("system_monitor")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(200);
+
+    if (error) return res.json({ history: _monitorHistory, source: "memory", dbError: error.message });
+
+    res.json({
+      history: data || [],
+      source: "database",
+      totalEntries: (data || []).length,
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
   }
 });
 

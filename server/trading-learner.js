@@ -375,20 +375,15 @@ async function autoBacktest(supabase) {
                             .eq("asset", asset)
                             .order("timestamp", { ascending: true })
                             .limit(365);
-                        if (data && data.length > 20) {
+                        if (data && data.length > 0) {
                             prices = data.map(d => d.close);
                         }
                     }
 
-                    // Fallback: generate from current price
-                    if (prices.length < 20) {
-                        const basePrice = asset === "BTC" ? 69000 : asset === "ETH" ? 2040 :
-                            asset === "SOL" ? 86 : asset === "Gold" ? 2700 :
-                                asset === "Oil" ? 70 : asset.includes("USD") ? 1.2 : 5000;
-                        for (let i = 0; i < 365; i++) {
-                            const noise = 1 + (Math.random() - 0.49) * 0.04;
-                            prices.push(basePrice * noise * (1 + i * 0.0001));
-                        }
+                    // NO FAKE DATA — skip if not enough real candles
+                    if (prices.length < 50) {
+                        logger.info({ asset, candles: prices.length }, `[Learner] Skipping ${asset} — need 50+ real candles, have ${prices.length}`);
+                        continue;
                     }
 
                     // Run strategy simulation
