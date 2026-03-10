@@ -267,11 +267,12 @@ router.get("/traffic", async (req, res) => {
       .order("created_at", { ascending: false })
       .limit(50);
 
-    // Today stats
-    const { data: todayData } = await supabaseAdmin
+    // Today stats (raise limit from default 1000 to get accurate count)
+    const { data: todayData, count: todayCount } = await supabaseAdmin
       .from("page_views")
-      .select("ip")
-      .gte("created_at", today + "T00:00:00Z");
+      .select("ip", { count: "exact", head: false })
+      .gte("created_at", today + "T00:00:00Z")
+      .limit(10000);
 
     const uniqueIps = new Set((todayData || []).map((d) => d.ip));
 
@@ -280,7 +281,8 @@ router.get("/traffic", async (req, res) => {
     const { data: weekData } = await supabaseAdmin
       .from("page_views")
       .select("created_at")
-      .gte("created_at", weekAgo + "T00:00:00Z");
+      .gte("created_at", weekAgo + "T00:00:00Z")
+      .limit(10000);
 
     const dailyCounts = {};
     (weekData || []).forEach(r => {
@@ -301,7 +303,7 @@ router.get("/traffic", async (req, res) => {
     res.json({
       recent: recent || [],
       uniqueToday: uniqueIps.size,
-      totalToday: (todayData || []).length,
+      totalToday: todayCount || (todayData || []).length,
       activeConnections,
       daily,
     });
