@@ -272,4 +272,158 @@ router.post("/listen", apiLimiter, validate(listenSchema), async (req, res) => {
   }
 });
 
+// ═══════════════════════════════════════════════════════════════
+// POST /api/lipsync — Generate viseme data from audio
+// Supports: Rhubarb (lip-sync-engine) + NVIDIA Audio2Face API
+// Returns: { visemes: [{time, duration, viseme, weight}], engine }
+// ═══════════════════════════════════════════════════════════════
+
+router.post("/lipsync", ttsLimiter, async (req, res) => {
+  try {
+    const { audioBase64, text, engine = "auto" } = req.body;
+
+    if (!audioBase64 && !text) {
+      return res.status(400).json({ error: "audioBase64 or text required" });
+    }
+
+    // ── Strategy 1: NVIDIA Audio2Face API (if configured) ──
+    if ((engine === "nvidia" || engine === "auto") && process.env.NVIDIA_A2F_API_KEY) {
+      try {
+        const a2fResult = await _nvidiaAudio2Face(audioBase64);
+        if (a2fResult.success) {
+          return res.json({
+            visemes: a2fResult.visemes,
+            blendshapes: a2fResult.blendshapes,
+            engine: "nvidia-audio2face",
+          });
+        }
+      } catch (e) {
+        logger.warn({ component: "LipSync", err: e.message }, "NVIDIA A2F failed, falling back");
+      }
+    }
+
+    // ── Strategy 2: Rhubarb lip-sync-engine (WASM, runs on server) ──
+    if (audioBase64) {
+      try {
+        const lipSyncEngine = require("lip-sync-engine");
+        const audioBuffer = Buffer.from(audioBase64, "base64");
+        const result = await lipSyncEngine.analyze(audioBuffer);
+        if (result && result.mouthCues) {
+          const visemes = result.mouthCues.map((cue) => ({
+            time: cue.start,
+            duration: cue.end - cue.start,
+            viseme: _rhubarbToOculus(cue.value),
+            weight: 0.8,
+            raw: cue.value,
+          }));
+          return res.json({ visemes, engine: "rhubarb" });
+        }
+      } catch (e) {
+        logger.warn({ component: "LipSync", err: e.message }, "Rhubarb engine failed, using text fallback");
+      }
+    }
+
+    // ── Strategy 3: Text-based phoneme estimation (fallback) ──
+    if (text) {
+      const visemes = _textToVisemes(text);
+      return res.json({ visemes, engine: "text-estimate" });
+    }
+
+    res.status(500).json({ error: "No lip sync engine available" });
+  } catch (e) {
+    logger.error({ component: "LipSync", err: e.message }, "Lip sync error");
+    res.status(500).json({ error: "Lip sync failed" });
+  }
+});
+
+// ── NVIDIA Audio2Face API integration ──
+async function _nvidiaAudio2Face(audioBase64) {
+  const apiKey = process.env.NVIDIA_A2F_API_KEY;
+  const endpoint = process.env.NVIDIA_A2F_ENDPOINT || "https://grpc.nvcf.nvidia.com/nvidia/audio2face";
+
+  const res = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+      "Accept": "application/json",
+    },
+    body: JSON.stringify({
+      audio: audioBase64,
+      config: {
+        face_params: { face_model: "default" },
+        emotion: { enable: true },
+      },
+    }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`NVIDIA A2F HTTP ${res.status}`);
+  }
+
+  const data = await res.json();
+  return {
+    success: true,
+    visemes: data.face_animation?.visemes || [],
+    blendshapes: data.face_animation?.blendshapes || [],
+  };
+}
+
+// ── Rhubarb shape → Oculus viseme mapping ──
+function _rhubarbToOculus(shape) {
+  const map = {
+    A: "viseme_PP",   // MBP
+    B: "viseme_kk",   // ETC  
+    C: "viseme_I",    // E
+    D: "viseme_aa",   // AI
+    E: "viseme_O",    // O
+    F: "viseme_U",    // WQ
+    G: "viseme_FF",   // FV
+    H: "viseme_TH",   // L
+    X: "viseme_sil",  // Silence
+  };
+  return map[shape] || "viseme_sil";
+}
+
+// ── Text → phoneme estimation (simple fallback) ──
+function _textToVisemes(text) {
+  const VOWEL_MAP = {
+    a: "viseme_aa", e: "viseme_E", i: "viseme_I",
+    o: "viseme_O", u: "viseme_U",
+    ă: "viseme_E", â: "viseme_I", î: "viseme_I",
+  };
+  const CONSONANT_MAP = {
+    m: "viseme_PP", b: "viseme_PP", p: "viseme_PP",
+    f: "viseme_FF", v: "viseme_FF",
+    t: "viseme_TH", d: "viseme_DD", n: "viseme_nn",
+    s: "viseme_SS", z: "viseme_SS", ș: "viseme_SS",
+    c: "viseme_kk", k: "viseme_kk", g: "viseme_kk",
+    r: "viseme_RR", l: "viseme_TH",
+  };
+  const AVG_CHAR_DURATION = 0.07; // ~70ms per character
+  const visemes = [];
+  let time = 0;
+
+  for (const ch of text.toLowerCase()) {
+    const v = VOWEL_MAP[ch] || CONSONANT_MAP[ch];
+    if (v) {
+      visemes.push({
+        time: parseFloat(time.toFixed(3)),
+        duration: AVG_CHAR_DURATION,
+        viseme: v,
+        weight: VOWEL_MAP[ch] ? 0.7 : 0.5,
+      });
+    } else if (ch === " " || ch === "," || ch === ".") {
+      visemes.push({
+        time: parseFloat(time.toFixed(3)),
+        duration: ch === "." ? 0.3 : 0.1,
+        viseme: "viseme_sil",
+        weight: 0.1,
+      });
+    }
+    time += AVG_CHAR_DURATION;
+  }
+  return visemes;
+}
+
 module.exports = router;
