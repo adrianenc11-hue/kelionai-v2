@@ -1464,9 +1464,10 @@ async function thinkV4(brain, message, avatar, history, language, userId, conver
         }
 
         // ── 4. Build system prompt with FULL context ──
+        const geoBlock = mediaData.geo ? `\n[USER LOCATION] Lat: ${mediaData.geo.lat}, Lng: ${mediaData.geo.lng}${mediaData.geo.accuracy ? ` (accuracy: ${Math.round(mediaData.geo.accuracy)}m)` : ''}. Use this for weather, nearby places, and location-aware responses.` : "";
         const memoryBlock = [profileContext, memoryContext].filter(Boolean).join(" || ");
         const emotionBlock = emotionHint ? `\n[EMOTIONAL CONTEXT] User mood: ${emotionalTone}. ${emotionHint}` : "";
-        const systemPrompt = buildSystemPrompt(avatar, language, memoryBlock + emotionBlock, "", null);
+        const systemPrompt = buildSystemPrompt(avatar, language, memoryBlock + emotionBlock + geoBlock, "", null);
 
         // ── 5. Prepare messages for Gemini ──
         // Compress history to last 20 messages max

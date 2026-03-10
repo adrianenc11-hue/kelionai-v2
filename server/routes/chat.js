@@ -147,7 +147,7 @@ router.post("/chat", chatLimiter, validate(chatSchema), async (req, res) => {
       language,
       user?.id,
       conversationId,
-      { imageBase64, audioBase64 },
+      { imageBase64, audioBase64, geo },
       isAdmin,
     );
 
