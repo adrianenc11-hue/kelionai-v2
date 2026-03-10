@@ -16,49 +16,49 @@ const logger = require("./logger");
 // ═══ RISK PROFILES ═══
 const RISK_PROFILES = {
   conservative: {
-    // 1% risk
+    // 1% risk — VERY SELECTIVE
     name: "CONSERVATIVE",
     emoji: "🛡️",
     riskPct: 1,
     MAX_RISK_PCT: 0.01,
-    MIN_CONFLUENCE: 70,
-    DEFAULT_STOP_LOSS_PCT: 0.01,
-    DEFAULT_TAKE_PROFIT_PCT: 0.02,
+    MIN_CONFLUENCE: 80,
+    DEFAULT_STOP_LOSS_PCT: 0.015,
+    DEFAULT_TAKE_PROFIT_PCT: 0.03,
     MAX_OPEN_POSITIONS: 2,
-    MAX_DAILY_TRADES: 5,
-    MAX_DAILY_LOSS_PCT: 0.03,
-    MAX_WEEKLY_LOSS_PCT: 0.05,
-    COOLDOWN_AFTER_LOSS_MS: 600000, // 10 min
-    MAX_VOLATILITY_PCT: 0.05,
+    MAX_DAILY_TRADES: 3,
+    MAX_DAILY_LOSS_PCT: 0.02,
+    MAX_WEEKLY_LOSS_PCT: 0.04,
+    COOLDOWN_AFTER_LOSS_MS: 900000, // 15 min
+    MAX_VOLATILITY_PCT: 0.04,
     projections: {
-      daily: 0.65,
-      weekly: 4.63,
-      monthly: 21.4,
-      sixMonths: 221,
-      yearly: 969,
+      daily: 0.5,
+      weekly: 3.5,
+      monthly: 16,
+      sixMonths: 150,
+      yearly: 600,
     },
   },
   moderate: {
-    // 2% risk (DEFAULT)
+    // 2% risk (DEFAULT) — OPTIMIZED from 60→75% confluence, wider SL/TP
     name: "MODERATE",
     emoji: "⚖️",
     riskPct: 2,
     MAX_RISK_PCT: 0.02,
-    MIN_CONFLUENCE: 60,
-    DEFAULT_STOP_LOSS_PCT: 0.02,
-    DEFAULT_TAKE_PROFIT_PCT: 0.04,
-    MAX_OPEN_POSITIONS: 3,
-    MAX_DAILY_TRADES: 10,
-    MAX_DAILY_LOSS_PCT: 0.05,
-    MAX_WEEKLY_LOSS_PCT: 0.1,
-    COOLDOWN_AFTER_LOSS_MS: 300000, // 5 min
-    MAX_VOLATILITY_PCT: 0.08,
+    MIN_CONFLUENCE: 75,
+    DEFAULT_STOP_LOSS_PCT: 0.03,
+    DEFAULT_TAKE_PROFIT_PCT: 0.09,
+    MAX_OPEN_POSITIONS: 2,
+    MAX_DAILY_TRADES: 5,
+    MAX_DAILY_LOSS_PCT: 0.04,
+    MAX_WEEKLY_LOSS_PCT: 0.08,
+    COOLDOWN_AFTER_LOSS_MS: 600000, // 10 min
+    MAX_VOLATILITY_PCT: 0.06,
     projections: {
-      daily: 1.3,
-      weekly: 9.47,
-      monthly: 47.6,
-      sixMonths: 931,
-      yearly: 11020,
+      daily: 1.0,
+      weekly: 7.0,
+      monthly: 35,
+      sixMonths: 500,
+      yearly: 5000,
     },
   },
   aggressive: {
@@ -591,7 +591,7 @@ function calculateStochastic(highs, lows, closes, kPeriod = 14, dPeriod = 3) {
   for (let i = dPeriod - 1; i < kValues.length; i++) {
     dValues.push(
       kValues.slice(i - dPeriod + 1, i + 1).reduce((a, b) => a + b, 0) /
-        dPeriod,
+      dPeriod,
     );
   }
   const d = dValues[dValues.length - 1] || k;
@@ -916,8 +916,8 @@ function calculateROC(closes, period = 12) {
   const value =
     closes[closes.length - 1 - period] !== 0
       ? ((closes[closes.length - 1] - closes[closes.length - 1 - period]) /
-          closes[closes.length - 1 - period]) *
-        100
+        closes[closes.length - 1 - period]) *
+      100
       : 0;
   let signal = "HOLD";
   if (value > 5) signal = "BUY";
@@ -1125,7 +1125,7 @@ function calculateSuperConfluence(indicators) {
 let exchange = null;
 let paperMode = true;
 const paperTrades = [];
-const paperBalance = { USDT: 10000 };
+const paperBalance = { USDT: 10000 }; // RESET: was depleted to ~40 with 0% win rate
 const openPositions = [];
 let dailyTrades = [];
 let dailyPnL = 0;
