@@ -475,7 +475,11 @@
 
     function updateMoodLighting() {
         if (!scene || !scene.background) return;
-        scene.background.lerp(targetBgColor, 0.05);
+        // Manual lerp — THREE.Color may not have .lerp() in all versions
+        var bg = scene.background;
+        bg.r += (targetBgColor.r - bg.r) * 0.05;
+        bg.g += (targetBgColor.g - bg.g) * 0.05;
+        bg.b += (targetBgColor.b - bg.b) * 0.05;
     }
 
     // ── Gesture system ───────────────────────────────────────
