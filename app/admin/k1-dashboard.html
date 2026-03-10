@@ -442,7 +442,19 @@
                 <tr><th>Asset</th><th>Price</th></tr>
                 ${marketRows}
             </table>
-            ${world.fearGreed ? `<div class="mini" style="margin-top:6px">Fear & Greed: <strong class="${world.fearGreed.value <= 25 ? 'red' : world.fearGreed.value >= 75 ? 'green' : 'yellow'}">${world.fearGreed.value}</strong> (${world.fearGreed.label || ''})</div>` : ''}
+            ${(() => {
+                    const fg = mkts.fearGreed || world.fearGreed;
+                    if (!fg) return '';
+                    const fgColor = fg.value <= 25 ? '#ff4444' : fg.value >= 75 ? '#00ff88' : '#ffcc00';
+                    return `<div style="margin-top:8px;padding:8px;background:rgba(255,255,255,0.03);border-radius:6px">
+                    <div class="mini">😱 Fear & Greed Index</div>
+                    <div style="display:flex;align-items:center;gap:8px;margin-top:4px">
+                        <span class="big" style="color:${fgColor}">${fg.value}</span>
+                        <span class="mini">${fg.label || ''}</span>
+                    </div>
+                    <div class="progress-bar" style="margin-top:4px"><div class="progress-fill" style="width:${fg.value}%;background:${fgColor}"></div></div>
+                </div>`;
+                })()}
         `;
 
             // Alerts

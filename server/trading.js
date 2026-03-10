@@ -3281,6 +3281,28 @@ async function k1MarketDataFeed() {
       } catch { }
     }));
 
+    // Fetch GOLD + NASDAQ via Yahoo Finance (free, no API key)
+    const yahooAssets = { gold: "GC=F", nasdaq: "^IXIC" };
+    await Promise.all(Object.entries(yahooAssets).map(async ([k, ticker]) => {
+      try {
+        const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=2d`;
+        const yRes = await fetch(url, { headers: { "User-Agent": "KelionAI/1.0" } });
+        if (yRes.ok) {
+          const yData = await yRes.json();
+          const meta = yData?.chart?.result?.[0]?.meta;
+          if (meta && meta.regularMarketPrice) {
+            const price = meta.regularMarketPrice;
+            const prevClose = meta.chartPreviousClose || meta.previousClose || price;
+            const change24h = prevClose > 0 ? +((price - prevClose) / prevClose * 100).toFixed(2) : 0;
+            let signal = "HOLD";
+            if (change24h > 2) signal = "BUY";
+            else if (change24h < -2) signal = "SELL";
+            marketData[k] = { price, change24h, signal };
+          }
+        }
+      } catch { }
+    }));
+
     // Fetch Fear&Greed index
     try {
       const fgRes = await fetch("https://api.alternative.me/fng/?limit=1");
