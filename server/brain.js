@@ -14,6 +14,7 @@
 // THINKING LOOP: Analyze → Decompose → Plan → Execute → Verify → Learn
 // ═══════════════════════════════════════════════════════════════
 const logger = require("./logger");
+const kiraTools = require("./kira-tools");
 const { MODELS } = require("./config/models");
 const { UserProfile, LearningStore, AutonomousMonitor } = require("./brain-profile");
 
@@ -1572,6 +1573,10 @@ Reply STRICTLY with JSON:
       ragQuery: "",
       needsWebScrape: false,
       scrapeURL: "",
+      needsFileOps: false,
+      fileAction: "",
+      fileName: "",
+      fileContent: "",
       isQuestion: false,
       isCommand: false,
       isEmotional: false,
@@ -2538,6 +2543,10 @@ Reply STRICTLY with JSON:
         plan.push({ tool: "webScrape", url: analysis.scrapeURL });
         seen.add("webScrape");
       }
+      if (analysis.needsFileOps && !seen.has("fileOps")) {
+        plan.push({ tool: "fileOps", action: analysis.fileAction, fileName: analysis.fileName, content: analysis.fileContent });
+        seen.add("fileOps");
+      }
       // P3 tools: calendar, document generation
       if (analysis.needsCalendar && !seen.has("calendarCreate") && !seen.has("calendarList")) {
         if (analysis.calendarAction === "list") {
@@ -2672,6 +2681,7 @@ Reply STRICTLY with JSON:
       codeExec: 10000,
       ragSearch: 5000,
       webScrape: 10000,
+      fileOps: 3000,
       calendarCreate: 8000,
       calendarList: 8000,
       calendarDelete: 5000,
@@ -2766,6 +2776,8 @@ Reply STRICTLY with JSON:
         return this._ragSearch(step.query || "", step.userId);
       case "webScrape":
         return this._webScrape(step.url || "", true);
+      case "fileOps":
+        return this._fileOps(step.action || "list", step.fileName, step.content);
       // P3 tools: calendar, document generation
       case "calendarCreate":
         return this._calendarCreate(step.title || "", step.startTime, step.endTime, step.description, step.userId);
@@ -5002,6 +5014,34 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
         return { error: "Timeout: codul a depășit limita de 3 secunde", code: code.substring(0, 200) };
       }
       return { error: e.message, line: e.stack?.match(/user-code\.js:(\d+)/)?.[1] || "unknown" };
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // FILE WORKSPACE — Sandboxed file operations via kira-tools
+  // ═══════════════════════════════════════════════════════════
+  _fileOps(action, fileName, content) {
+    try {
+      switch (action) {
+        case "write":
+        case "create":
+        case "save":
+          if (!fileName || !content) return { error: "fileName and content required" };
+          return kiraTools.writeFile(fileName, content);
+        case "read":
+        case "open":
+          if (!fileName) return { error: "fileName required" };
+          return kiraTools.readFile(fileName);
+        case "delete":
+        case "remove":
+          if (!fileName) return { error: "fileName required" };
+          return kiraTools.deleteFile(fileName);
+        case "list":
+        default:
+          return kiraTools.listFiles();
+      }
+    } catch (e) {
+      return { error: e.message };
     }
   }
 
