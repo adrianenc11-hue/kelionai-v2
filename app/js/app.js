@@ -375,11 +375,14 @@
 
             // Increment generation counter to prevent overlap
             var thisGen = ++_speakGeneration;
+            var _textRevealed = false; // guard: only ONE source writes text
 
             // Listen for audio-start event to sync text reveal
             var revealHandler = function (e) {
                 window.removeEventListener('audio-start', revealHandler);
                 if (thisGen !== _speakGeneration) return; // stale, skip
+                if (_textRevealed) return; // already shown by fallback
+                _textRevealed = true;
                 var duration = e.detail.duration;
                 var msPerChar = (duration * 1000) / fullReply.length;
                 var charIdx = 0;
@@ -394,8 +397,6 @@
                     }
                     msgEl.innerHTML = parseMarkdown(fullReply.substring(0, charIdx));
                     overlay.scrollTop = overlay.scrollHeight;
-                    // Update subtitle in real-time
-                    updateSubtitle('assistant', fullReply.substring(0, charIdx));
                 }, msPerChar);
             };
             window.addEventListener('audio-start', revealHandler);
@@ -403,16 +404,17 @@
             // Speak — triggers 'audio-start' event when audio actually starts
             if (window.KVoice) {
                 // Auto-switch TTS voice to match AI response language
-                // RO stays RO, other languages get their native voice
                 if (data.language && KVoice.setLanguage) {
                     KVoice.setLanguage(data.language);
                 }
                 KVoice.speak(fullReply, data.avatar || KAvatar.getCurrentAvatar());
             }
 
-            // Fallback: if audio doesn't start in 4s, show text anyway (was 6s)
+            // Fallback: if audio doesn't start in 4s, show text anyway
             setTimeout(function () {
                 window.removeEventListener('audio-start', revealHandler);
+                if (_textRevealed) return; // audio handler already revealed
+                _textRevealed = true;
                 if (!msgEl.innerHTML || msgEl.innerHTML === '') {
                     msgEl.innerHTML = parseMarkdown(fullReply);
                     overlay.scrollTop = overlay.scrollHeight;
@@ -666,12 +668,10 @@
                 });
                 if (codeResp.ok) {
                     var codeData = await codeResp.json();
-                    hideWelcome(); addMessage('user', '🔑 [cod admin]');
+                    hideWelcome(); addMessage('user', '🔑 •••••');
                     if (codeData.action === 'enter') {
                         adminSecret = codeData.secret;
                         sessionStorage.setItem('kelion_admin_secret', codeData.secret);
-                        addMessage('assistant', '🔓 ' + codeData.message + ' Ai acces la: diagnoza brain, credit AI, trafic site.');
-                        if (window.KVoice) KVoice.speak('Admin mode activat! Ai acces complet.');
                         // Unlock admin button
                         var ab = document.getElementById('btn-admin');
                         if (ab) {
@@ -684,8 +684,6 @@
                     } else if (codeData.action === 'exit') {
                         adminSecret = null;
                         sessionStorage.removeItem('kelion_admin_secret');
-                        addMessage('assistant', '🔒 ' + codeData.message);
-                        if (window.KVoice) KVoice.speak('Admin mode dezactivat.');
                         // Re-lock admin button
                         var ab2 = document.getElementById('btn-admin');
                         if (ab2) {
