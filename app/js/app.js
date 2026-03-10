@@ -308,7 +308,7 @@
             }
 
             const data = await resp.json();
-            const fullReply = data.reply || '';
+            let fullReply = (data.reply || '').replace(/\[SYSTEM INSTRUCTION[^\]]*\][\s\S]*?\[END SYSTEM INSTRUCTION\]\s*/gi, '').replace(/\[AGENT ACTIV[^\]]*\]\s*/gi, '').trim();
             if (data.conversationId) persistConvId(data.conversationId);
 
             if (!fullReply) {
