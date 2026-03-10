@@ -3353,6 +3353,18 @@ async function k1MarketDataFeed() {
 setTimeout(k1MarketDataFeed, 10 * 1000);
 setInterval(k1MarketDataFeed, 5 * 60 * 1000);
 
+// K1 Proactive Alerts: Check every 5 min for alerts to broadcast
+setInterval(() => {
+  try {
+    const k1Bridge = require("./k1-messenger-bridge");
+    const proactive = k1Bridge.getProactiveMessages();
+    if (proactive.length > 0) {
+      logger.info({ count: proactive.length, msgs: proactive.map(m => m.text.slice(0, 80)) }, "[K1-Proactive] Alerts ready for broadcast");
+      // Future: wire to Telegram bot.sendMessage / WhatsApp API
+    }
+  } catch { }
+}, 5 * 60 * 1000);
+
 module.exports = router;
 module.exports.detectSmartMoney = detectSmartMoney;
 module.exports.kellyPosition = kellyPosition;
@@ -3364,3 +3376,4 @@ module.exports.tradeEngine = tradeEngine;
 module.exports.tradeIntel = tradeIntel;
 module.exports.analyzeAsset = analyzeAsset;
 module.exports.fetchRealPrices = fetchRealPrices;
+module.exports.k1Meta = k1Meta; // For graceful shutdown
