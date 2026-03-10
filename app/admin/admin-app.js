@@ -521,6 +521,35 @@ async function initAdmin() {
     _adminIntervals.push(setInterval(function () { loadMedia(); loadTrading(); }, 60000));
     _adminIntervals.push(setInterval(loadMemories, 120000)); // refresh memories every 2min
 }
+// ── EXIT ADMIN — preserve user session ──
+function exitAdmin() {
+    // Stop all intervals
+    _adminIntervals.forEach(function (id) { clearInterval(id); });
+    _adminIntervals = [];
+    // Sync Supabase token from localStorage to sessionStorage
+    // so homepage auth.js checkSession() finds the user session
+    try {
+        var keys = Object.keys(localStorage).filter(function (k) { return k.startsWith('sb-') && k.endsWith('-auth-token'); });
+        for (var i = 0; i < keys.length; i++) {
+            try {
+                var raw = localStorage.getItem(keys[i]);
+                if (raw) {
+                    var parsed = JSON.parse(raw);
+                    if (parsed && parsed.access_token) {
+                        sessionStorage.setItem('kelion_token', parsed.access_token);
+                        if (parsed.refresh_token) sessionStorage.setItem('kelion_refresh_token', parsed.refresh_token);
+                        if (parsed.expires_at) sessionStorage.setItem('kelion_token_expires', String(parsed.expires_at));
+                        if (parsed.user) sessionStorage.setItem('kelion_user', JSON.stringify(parsed.user));
+                        console.log('[Admin] ✅ User session synced to sessionStorage');
+                        break;
+                    }
+                }
+            } catch (e2) { }
+        }
+    } catch (e) { console.warn('[Admin] Token sync failed:', e.message); }
+    window.location.href = '/';
+}
+
 initAdmin();
 
 
