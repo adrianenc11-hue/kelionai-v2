@@ -426,13 +426,21 @@
             // World State
             const world = d.world || {};
             const mkts = world.markets || {};
+            const marketRows = Object.entries(mkts)
+                .filter(([k]) => k !== 'fearGreed')
+                .map(([k, v]) => {
+                    if (typeof v === 'object' && v !== null) {
+                        const price = v.price !== undefined ? v.price : '—';
+                        const chg = v.change24h ? ` (${v.change24h > 0 ? '+' : ''}${v.change24h}%)` : '';
+                        const sig = v.signal && v.signal !== 'HOLD' ? ` ${v.signal}` : '';
+                        return `<tr><td>${k.toUpperCase()}</td><td>$${price}${chg}${sig}</td></tr>`;
+                    }
+                    return `<tr><td>${k.toUpperCase()}</td><td>$${v || '—'}</td></tr>`;
+                }).join('');
             document.getElementById('worldContent').innerHTML = `
             <table>
                 <tr><th>Asset</th><th>Price</th></tr>
-                ${Object.entries(mkts).map(([k, v]) => {
-                const price = typeof v === 'object' ? (v.price || v.last || JSON.stringify(v)) : v;
-                return `<tr><td>${k.toUpperCase()}</td><td>$${price || '—'}</td></tr>`;
-            }).join('')}
+                ${marketRows}
             </table>
             ${world.fearGreed ? `<div class="mini" style="margin-top:6px">Fear & Greed: <strong class="${world.fearGreed.value <= 25 ? 'red' : world.fearGreed.value >= 75 ? 'green' : 'yellow'}">${world.fearGreed.value}</strong> (${world.fearGreed.label || ''})</div>` : ''}
         `;
