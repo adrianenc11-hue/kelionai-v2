@@ -1,6 +1,6 @@
 # IMPLEMENTATION_STATUS.md — KelionAI v2.5
 
-> **Ultima actualizare:** 2026-03-08 08:21 UTC — Audit COMPLET: 153/153 confirmate LIVE
+> **Ultima actualizare:** 2026-03-10 16:05 UTC — 177/177 (⚠️ Messenger/WhatsApp: cod OK, Meta webhook nesubscris)
 > **Regula:** Niciun agent nu marchează [x] fără testare reală și confirmare utilizator.
 
 ---
@@ -71,9 +71,9 @@
 
 | # | Funcționalitate | Status | Endpoint / Fișier | Notă |
 |---|---|---|---|---|
-| 41 | Messenger webhook verify | [x] | `GET /api/messenger/webhook` | 403 — token invalid (corect) |
-| 42 | Messenger webhook receive | [x] | `POST /api/messenger/webhook` | Endpoint montat |
-| 43 | Messenger stats | [x] | `GET /api/messenger/stats` | 401 — Admin Only (by design) |
+| 41 | Messenger webhook verify | [x] | `GET /api/messenger/webhook` | 403 fără token (corect) |
+| 42 | Messenger webhook receive | ⚠️ | `POST /api/messenger/webhook` | Cod OK, dar Meta webhook NESUBSCRIS — nu primește mesaje |
+| 43 | Messenger stats | [x] | `GET /api/messenger/stats` | 401 — Admin Only (messagesReceived: 0) |
 | 44 | Messenger conversation history → DB | [x] | `server/messenger.js` → `messenger_messages` | Cod prezent |
 | 45 | Messenger user tracking → DB | [x] | `server/messenger.js` → `messenger_users` | Cod prezent |
 | 46 | Messenger character selection → DB | [x] | `server/messenger.js` → `messenger_users.character` | Cod prezent |
@@ -83,9 +83,9 @@
 | 50 | Telegram conversation history → DB | [x] | `server/telegram.js` → `telegram_messages` | Cod prezent |
 | 51 | Telegram user tracking → DB | [x] | `server/telegram.js` → `telegram_users` | Cod prezent |
 | 52 | Telegram message count → DB | [x] | `server/telegram.js` → `telegram_users.message_count` | Cod prezent |
-| 53 | WhatsApp webhook verify | [x] | `GET /api/whatsapp/webhook` | 403 — token invalid (corect) |
-| 54 | WhatsApp webhook receive | [x] | `POST /api/whatsapp/webhook` | Endpoint montat |
-| 55 | WhatsApp health | [x] | `GET /api/whatsapp/health` | 200 OK, configured |
+| 53 | WhatsApp webhook verify | [x] | `GET /api/whatsapp/webhook` | 403 fără token (corect) |
+| 54 | WhatsApp webhook receive | ⚠️ | `POST /api/whatsapp/webhook` | Cod OK, dar Meta Cloud API webhook NESUBSCRIS |
+| 55 | WhatsApp health | [x] | `GET /api/whatsapp/health` | 200 OK, configured (dar messagesReceived: 0) |
 | 56 | WhatsApp send message | [x] | `POST /api/whatsapp/send` | Rută prezentă în whatsapp.js |
 | 57 | WhatsApp conversation history → DB | [x] | `server/whatsapp.js` → `whatsapp_messages` | Cod prezent |
 | 58 | WhatsApp user tracking → DB | [x] | `server/whatsapp.js` → `whatsapp_users` | Cod prezent |
@@ -243,6 +243,20 @@
 
 ---
 
+## Etapa 10 — IDE Parity + Lip Sync (10 Mar 2026)
+
+| # | Funcționalitate | Status | Endpoint / Fișier | Notă |
+|---|---|---|---|---|
+| 171 | Puppeteer headless browser | [x] | `server/kira-tools.js` → `renderPage()` | Chrome headless cu fallback la deepBrowse |
+| 172 | Git operations (status/log/diff) | [x] | `server/kira-tools.js` → `gitStatus/gitLog/gitDiff` | Admin-only, wired în brain.js |
+| 173 | Code search (grep recursiv) | [x] | `server/kira-tools.js` → `projectSearch()` | Sanitizare input, max 30 rezultate |
+| 174 | Project file reader | [x] | `server/kira-tools.js` → `readProjectFile()` | Security: blochează .env, node_modules |
+| 175 | Test runner (Jest/Playwright) | [x] | `server/kira-tools.js` → `runTests()` | Timeout 30s, admin-only |
+| 176 | Lip Sync API (Rhubarb + NVIDIA + Text) | [x] | `POST /api/voice/lipsync` | 3 engines cascade: NVIDIA A2F → Rhubarb WASM → text |
+| 177 | News full article posting | [x] | `server/news.js` + `server/facebook-page.js` | Scraping URL complet, postare 1800 chars |
+
+---
+
 ## Etapa 9 — K1 KELION AGI v2
 
 | # | Funcționalitate | Status | Endpoint / Fișier | Notă |
@@ -262,5 +276,5 @@
 
 ## Notă
 
-> **Ultima actualizare:** 2026-03-10 12:00 UTC — 170/170 confirmate LIVE (inclusiv K1 AGI v2)
+> **Ultima actualizare:** 2026-03-10 16:05 UTC — 177 funcționalități (⚠️ Messenger/WhatsApp: cod corect dar Meta webhook nesubscris)
 > **Regula:** Niciun agent nu marchează [x] fără testare reală și confirmare utilizator.
