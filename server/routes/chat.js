@@ -235,10 +235,10 @@ router.post("/chat", chatLimiter, validate(chatSchema), async (req, res) => {
     }
     // Parse [EMOTION:xxx] tag from AI reply (brain decides the emotion)
     let emotion = "neutral";
-    const emotionMatch = reply.match(/\[EMOTION:(\w+)\]/i);
+    const emotionMatch = reply.match(/\[EMOTION:\s*(\w+)\]/i);
     if (emotionMatch) {
       emotion = emotionMatch[1].toLowerCase();
-      reply = reply.replace(/\[EMOTION:\w+\]/gi, "").trim();
+      reply = reply.replace(/\[EMOTION:\s*\w+\]/gi, "").trim();
     } else {
       // FALLBACK: auto-detect emotion from reply text when AI doesn't emit tags
       const replyLow = reply.toLowerCase();
@@ -256,21 +256,21 @@ router.post("/chat", chatLimiter, validate(chatSchema), async (req, res) => {
     }
     // Parse [GESTURE:xxx] tags from AI reply (brain controls body language)
     let gestures = [];
-    const gestureMatches = reply.matchAll(/\[GESTURE:(\w+)\]/gi);
+    const gestureMatches = reply.matchAll(/\[GESTURE:\s*(\w+)\]/gi);
     for (const gm of gestureMatches) gestures.push(gm[1].toLowerCase());
-    reply = reply.replace(/\[GESTURE:\w+\]/gi, "").trim();
+    reply = reply.replace(/\[GESTURE:\s*\w+\]/gi, "").trim();
     // Parse [POSE:xxx] tag (arms_down, arms_crossed, presenting, relaxed, etc.)
     let pose = null;
-    const poseMatch = reply.match(/\[POSE:(\w+)\]/i);
+    const poseMatch = reply.match(/\[POSE:\s*(\w+)\]/i);
     if (poseMatch) {
       pose = poseMatch[1].toLowerCase();
-      reply = reply.replace(/\[POSE:\w+\]/gi, "").trim();
+      reply = reply.replace(/\[POSE:\s*\w+\]/gi, "").trim();
     }
     // Parse [BODY:xxx] tags from AI reply (per-limb body actions)
     let bodyActions = [];
-    const bodyMatches = reply.matchAll(/\[BODY:(\w+)\]/gi);
+    const bodyMatches = reply.matchAll(/\[BODY:\s*(\w+)\]/gi);
     for (const bm of bodyMatches) bodyActions.push(bm[1]);
-    reply = reply.replace(/\[BODY:\w+\]/gi, "").trim();
+    reply = reply.replace(/\[BODY:\s*\w+\]/gi, "").trim();
 
     const response = {
       reply,

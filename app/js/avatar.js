@@ -620,9 +620,9 @@
         if (typeof THREE === 'undefined') return;
         _computedArmDown = { ls: null, rs: null, la: null, ra: null, lfa: null, rfa: null };
 
-        // Shoulder rotation: rotate 55° around local Z to bring arms down
-        var shoulderAngle = -55 * Math.PI / 180; // negative = downward
-        var foreArmBend = -15 * Math.PI / 180; // slight natural bend
+        // Shoulder rotation: rotate 75° around local Z to bring arms fully down
+        var shoulderAngle = -75 * Math.PI / 180; // negative = downward from A-pose
+        var foreArmBend = -20 * Math.PI / 180; // natural slight bend at elbow
 
         if (armBones.leftShoulder) {
             var lsQ = armBones.leftShoulder.quaternion.clone();
