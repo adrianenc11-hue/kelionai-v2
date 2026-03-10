@@ -31,12 +31,97 @@ const state = {
 // Assets to trade
 const TRADE_ASSETS = ["BTC", "ETH", "SOL", "Gold", "Oil", "S&P 500", "NASDAQ", "EUR/USD", "GBP/USD"];
 
+// ═══ MARKET HOURS (UTC) ═══
+const MARKET_HOURS = {
+    // Crypto: 24/7
+    "BTC": { type: "crypto", always: true },
+    "ETH": { type: "crypto", always: true },
+    "SOL": { type: "crypto", always: true },
+    // Forex: Sun 21:00 → Fri 21:00 UTC (effectively Mon-Fri)
+    "EUR/USD": { type: "forex", days: [1, 2, 3, 4, 5], open: 0, close: 23 },
+    "GBP/USD": { type: "forex", days: [1, 2, 3, 4, 5], open: 0, close: 23 },
+    // US Stocks: Mon-Fri 13:30-20:00 UTC (NYSE/NASDAQ)
+    "S&P 500": { type: "stocks", days: [1, 2, 3, 4, 5], open: 13, close: 20 },
+    "NASDAQ": { type: "stocks", days: [1, 2, 3, 4, 5], open: 13, close: 20 },
+    // Commodities: Mon-Fri ~01:00-22:00 UTC (with gaps)
+    "Gold": { type: "commodity", days: [1, 2, 3, 4, 5], open: 1, close: 22 },
+    "Oil": { type: "commodity", days: [1, 2, 3, 4, 5], open: 1, close: 22 },
+};
+
+// Forex sessions (UTC hours)
+const FOREX_SESSIONS = {
+    tokyo: { open: 0, close: 9, name: "Tokyo 🇯🇵", quality: "medium" },
+    london: { open: 7, close: 16, name: "London 🇬🇧", quality: "high" },
+    newYork: { open: 13, close: 22, name: "New York 🇺🇸", quality: "high" },
+    sydney: { open: 22, close: 7, name: "Sydney 🇦🇺", quality: "low" },
+};
+
+const OVERLAP_HOURS = {
+    "London-NY": { start: 13, end: 16, quality: "premium", emoji: "🔥" },
+    "Tokyo-London": { start: 7, end: 9, quality: "good", emoji: "⚡" },
+};
+
+// Session state tracking
+let _lastSessionLog = {};
+
+function isMarketOpen(asset) {
+    const mh = MARKET_HOURS[asset];
+    if (!mh || mh.always) return true; // crypto = always open
+
+    const now = new Date();
+    const day = now.getUTCDay(); // 0=Sun, 1=Mon...
+    const hour = now.getUTCHours();
+
+    // Check day
+    if (!mh.days.includes(day)) return false;
+
+    // Check hours
+    return hour >= mh.open && hour < mh.close;
+}
+
+function getActiveSessions() {
+    const hour = new Date().getUTCHours();
+    const active = [];
+    for (const [key, ses] of Object.entries(FOREX_SESSIONS)) {
+        const isOpen = ses.open < ses.close
+            ? (hour >= ses.open && hour < ses.close)
+            : (hour >= ses.open || hour < ses.close);
+        if (isOpen) active.push({ key, ...ses });
+    }
+    // Check overlaps
+    for (const [name, ov] of Object.entries(OVERLAP_HOURS)) {
+        if (hour >= ov.start && hour < ov.end) {
+            active.push({ key: name, name: `${ov.emoji} ${name} Overlap`, quality: ov.quality });
+        }
+    }
+    return active;
+}
+
+function logSessionChanges() {
+    const sessions = getActiveSessions();
+    const activeKeys = sessions.map(s => s.key).sort().join(",");
+    if (_lastSessionLog.keys !== activeKeys) {
+        const opened = sessions.filter(s => !(_lastSessionLog.sessions || []).find(ls => ls.key === s.key));
+        const closed = (_lastSessionLog.sessions || []).filter(ls => !sessions.find(s => s.key === ls.key));
+        opened.forEach(s => logger.info({ session: s.name, quality: s.quality }, `📈 Session OPENED: ${s.name}`));
+        closed.forEach(s => logger.info({ session: s.name }, `📉 Session CLOSED: ${s.name}`));
+        _lastSessionLog = { keys: activeKeys, sessions, time: new Date().toISOString() };
+    }
+    return sessions;
+}
+
 // ═══ CORE FUNCTIONS ═══
+
 
 function getState() {
     const totalPositionValue = Object.entries(state.positions).reduce((sum, [asset, pos]) => {
         return sum + (pos.qty * (pos.currentPrice || pos.avgPrice));
     }, 0);
+
+    // Session info
+    const sessions = getActiveSessions();
+    const marketStatus = {};
+    TRADE_ASSETS.forEach(a => { marketStatus[a] = isMarketOpen(a); });
 
     return {
         active: state.active,
@@ -56,6 +141,8 @@ function getState() {
         startedAt: state.startedAt,
         lastSignalCheck: state.lastSignalCheck,
         recentTrades: state.trades.slice(-20),
+        activeSessions: sessions.map(s => s.name),
+        marketStatus,
     };
 }
 
@@ -109,8 +196,13 @@ async function checkAndTrade(supabase) {
     if (!state.active) return;
     state.lastSignalCheck = new Date().toISOString();
 
+    // Log session open/close changes
+    logSessionChanges();
+
     for (const asset of TRADE_ASSETS) {
         try {
+            const marketOpen = isMarketOpen(asset);
+
             // Get current price from recent data
             const price = await getCurrentPrice(asset, supabase);
             if (!price || price <= 0) continue;
@@ -127,7 +219,7 @@ async function checkAndTrade(supabase) {
             const { signal, confidence } = investSim.generateSignal(prices);
 
             // Execute trade based on signal
-            if (signal === "BUY" && confidence >= 60 && !state.positions[asset] && state.cash > 0) {
+            if (signal === "BUY" && confidence >= 60 && !state.positions[asset] && state.cash > 0 && marketOpen) {
                 // Allocate max 20% of cash per position
                 const allocation = Math.min(state.cash, state.cash * 0.2);
                 if (allocation < 1) continue; // minimum €1
@@ -301,6 +393,8 @@ module.exports = {
     checkAndTrade,
     reset,
     switchMode,
+    getActiveSessions,
+    isMarketOpen,
 };
 
 /**
