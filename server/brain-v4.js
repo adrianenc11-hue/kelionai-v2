@@ -1467,11 +1467,13 @@ async function thinkV4(brain, message, avatar, history, language, userId, conver
         const geoBlock = mediaData.geo ? `\n[USER LOCATION] Lat: ${mediaData.geo.lat}, Lng: ${mediaData.geo.lng}${mediaData.geo.accuracy ? ` (accuracy: ${Math.round(mediaData.geo.accuracy)}m)` : ''}. Use this for weather, nearby places, and location-aware responses.` : "";
         const memoryBlock = [profileContext, memoryContext].filter(Boolean).join(" || ");
         const emotionBlock = emotionHint ? `\n[EMOTIONAL CONTEXT] User mood: ${emotionalTone}. ${emotionHint}` : "";
-        const systemPrompt = buildSystemPrompt(avatar, language, memoryBlock + emotionBlock + geoBlock, "", null);
+        const now = new Date();
+        const dateTimeBlock = `\n[CURRENT DATE & TIME] ${now.toLocaleDateString('ro-RO', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}, ora ${now.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Bucharest' })} (Romania). Folosește MEREU aceste date când userul întreabă de zi, dată sau oră.`;
+        const systemPrompt = buildSystemPrompt(avatar, language, memoryBlock + emotionBlock + geoBlock + dateTimeBlock, "", null);
 
         // ── 5. Prepare messages for Gemini ──
         // Compress history to last 20 messages max
-        const recentHistory = (history || []).slice(-20).map(h => ({
+        const recentHistory = (history || []).slice(-50).map(h => ({
             role: h.role === "user" ? "user" : "model",
             parts: [{ text: typeof h.content === "string" ? h.content : JSON.stringify(h.content) }],
         }));
