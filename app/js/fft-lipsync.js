@@ -41,17 +41,17 @@
 
     // Smoothing — CINEMATIC mode: dynamic attack/release for natural feel
     var prevValues = {};
-    var SMOOTH_ATTACK = 0.12;   // slower attack for smoother lip movement
-    var SMOOTH_RELEASE = 0.08;  // very slow release for natural feel
+    var SMOOTH_ATTACK = 0.22;   // snappy attack for responsive lips
+    var SMOOTH_RELEASE = 0.12;  // natural release
 
-    // ── Mouth opening clamp — prevents enormous jaw opening ──
-    var MAX_MOUTH_OPEN = 0.08;  // absolute max for jawOpen/mouthOpen — prevents face distortion
-    var MAX_VISEME_AA = 0.12;   // absolute max for wide-open vowel
-    var MAX_VISEME = 0.15;      // absolute max for any viseme
+    // ── Mouth opening clamp — REALISTIC values for visible movement ──
+    var MAX_MOUTH_OPEN = 0.35;  // jawOpen/mouthOpen — visible but not distorted
+    var MAX_VISEME_AA = 0.50;   // wide-open vowel ("aaa")
+    var MAX_VISEME = 0.55;      // any viseme morph
 
     // ── Coarticulation — blend previous viseme into current ──
     var _prevVisemes = {};
-    var COARTIC_BLEND = 0.15;  // 15% of previous shape bleeds into current
+    var COARTIC_BLEND = 0.10;  // 10% — less blend = more distinct shapes
 
     function SimpleLipSync() { }
 
@@ -142,48 +142,48 @@
         function clamp(v, max) { return Math.min(v, max || MAX_VISEME); }
 
         var visemes = {
-            // Jaw open — driven by low freq (vowels) — CLAMPED
-            'jawOpen': clamp(low * 0.4, MAX_MOUTH_OPEN),
-            'mouthOpen': clamp(low * 0.3, MAX_MOUTH_OPEN),
+            // Jaw open — driven by low freq (vowels)
+            'jawOpen': clamp(low * 0.7, MAX_MOUTH_OPEN),
+            'mouthOpen': clamp(low * 0.5, MAX_MOUTH_OPEN),
 
-            // Vowels — driven by low + mid (both naming conventions) — CLAMPED
-            'viseme_aa': clamp(low * 0.8, MAX_VISEME_AA), 'aa': clamp(low * 0.8, MAX_VISEME_AA),
-            'viseme_O': clamp(low * 0.6 * (1 - mid * 0.5)), 'oh': clamp(low * 0.6 * (1 - mid * 0.5)),
-            'viseme_E': clamp(mid * 0.7 * (1 - low * 0.3)), 'E': clamp(mid * 0.7 * (1 - low * 0.3)),
-            'viseme_I': clamp(mid * 0.5 * (1 - low * 0.5)), 'ih': clamp(mid * 0.5 * (1 - low * 0.5)),
-            'viseme_U': clamp(low * 0.4 * mid * 0.3), 'ou': clamp(low * 0.4 * mid * 0.3),
+            // Vowels — driven by low + mid (both naming conventions)
+            'viseme_aa': clamp(low * 1.2, MAX_VISEME_AA), 'aa': clamp(low * 1.2, MAX_VISEME_AA),
+            'viseme_O': clamp(low * 0.9 * (1 - mid * 0.3)), 'oh': clamp(low * 0.9 * (1 - mid * 0.3)),
+            'viseme_E': clamp(mid * 1.0 * (1 - low * 0.2)), 'E': clamp(mid * 1.0 * (1 - low * 0.2)),
+            'viseme_I': clamp(mid * 0.8 * (1 - low * 0.4)), 'ih': clamp(mid * 0.8 * (1 - low * 0.4)),
+            'viseme_U': clamp(low * 0.6 + mid * 0.3), 'ou': clamp(low * 0.6 + mid * 0.3),
 
             // Consonants — driven by mid + hi (both naming conventions)
-            'viseme_PP': mid > 0.4 ? clamp((1 - low) * 0.3) : 0, 'PP': mid > 0.4 ? clamp((1 - low) * 0.3) : 0,
-            'viseme_FF': clamp(hi * 0.5), 'FF': clamp(hi * 0.5),
-            'viseme_TH': clamp(hi * 0.3 * mid * 0.3), 'TH': clamp(hi * 0.3 * mid * 0.3),
-            'viseme_DD': clamp(mid * 0.4 * low * 0.3), 'DD': clamp(mid * 0.4 * low * 0.3),
-            'viseme_kk': clamp(mid * 0.3 * (1 - hi * 0.5)), 'kk': clamp(mid * 0.3 * (1 - hi * 0.5)),
-            'viseme_CH': clamp(hi * 0.6), 'CH': clamp(hi * 0.6),
-            'viseme_SS': clamp(hi * 0.7), 'SS': clamp(hi * 0.7),
-            'viseme_nn': clamp(mid * 0.3), 'nn': clamp(mid * 0.3),
-            'viseme_RR': clamp(mid * 0.5 * low * 0.4), 'RR': clamp(mid * 0.5 * low * 0.4),
+            'viseme_PP': mid > 0.3 ? clamp((1 - low) * 0.5) : 0, 'PP': mid > 0.3 ? clamp((1 - low) * 0.5) : 0,
+            'viseme_FF': clamp(hi * 0.8), 'FF': clamp(hi * 0.8),
+            'viseme_TH': clamp(hi * 0.5 + mid * 0.3), 'TH': clamp(hi * 0.5 + mid * 0.3),
+            'viseme_DD': clamp(mid * 0.6 + low * 0.2), 'DD': clamp(mid * 0.6 + low * 0.2),
+            'viseme_kk': clamp(mid * 0.5 * (1 - hi * 0.3)), 'kk': clamp(mid * 0.5 * (1 - hi * 0.3)),
+            'viseme_CH': clamp(hi * 0.9), 'CH': clamp(hi * 0.9),
+            'viseme_SS': clamp(hi * 1.0), 'SS': clamp(hi * 1.0),
+            'viseme_nn': clamp(mid * 0.5), 'nn': clamp(mid * 0.5),
+            'viseme_RR': clamp(mid * 0.7 + low * 0.3), 'RR': clamp(mid * 0.7 + low * 0.3),
             'viseme_sil': 0, 'sil': 0,
 
-            // Supplementary ARKit — ALL remaining mouth morphs active
-            'mouthSmile': clamp(mid * 0.15),
-            'mouthFunnel': clamp(low * 0.3 * (1 - mid)),
-            'mouthPucker': clamp(low * 0.2 * mid * 0.2),
-            'mouthClose': (low < 0.05 && mid < 0.05) ? 0.1 : 0,
-            'mouthRollLower': clamp(mid * 0.08),
-            'mouthRollUpper': clamp(mid * 0.05),
-            'mouthShrugLower': clamp(low * 0.12 * (1 - mid)),
-            'mouthShrugUpper': clamp(mid * 0.06),
-            'jawLeft': clamp(Math.sin(Date.now() * 0.003) * mid * 0.03),
-            'jawRight': clamp(Math.cos(Date.now() * 0.003) * mid * 0.03),
-            'mouthStretchLeft': clamp(low * 0.08),
-            'mouthStretchRight': clamp(low * 0.08),
-            'mouthLowerDownLeft': clamp(low * 0.12),
-            'mouthLowerDownRight': clamp(low * 0.12),
-            'mouthUpperUpLeft': clamp(mid * 0.06),
-            'mouthUpperUpRight': clamp(mid * 0.06),
-            'mouthDimpleLeft': clamp(mid * 0.04),
-            'mouthDimpleRight': clamp(mid * 0.04)
+            // Supplementary ARKit — visible mouth movement
+            'mouthSmile': clamp(mid * 0.25),
+            'mouthFunnel': clamp(low * 0.5 * (1 - mid)),
+            'mouthPucker': clamp(low * 0.35 + mid * 0.15),
+            'mouthClose': (low < 0.05 && mid < 0.05) ? 0.15 : 0,
+            'mouthRollLower': clamp(mid * 0.15),
+            'mouthRollUpper': clamp(mid * 0.10),
+            'mouthShrugLower': clamp(low * 0.20 * (1 - mid)),
+            'mouthShrugUpper': clamp(mid * 0.12),
+            'jawLeft': clamp(Math.sin(Date.now() * 0.003) * mid * 0.06),
+            'jawRight': clamp(Math.cos(Date.now() * 0.003) * mid * 0.06),
+            'mouthStretchLeft': clamp(low * 0.15),
+            'mouthStretchRight': clamp(low * 0.15),
+            'mouthLowerDownLeft': clamp(low * 0.22),
+            'mouthLowerDownRight': clamp(low * 0.22),
+            'mouthUpperUpLeft': clamp(mid * 0.12),
+            'mouthUpperUpRight': clamp(mid * 0.12),
+            'mouthDimpleLeft': clamp(mid * 0.08),
+            'mouthDimpleRight': clamp(mid * 0.08)
         };
 
         // Apply with CINEMATIC smoothing (dynamic attack/release + coarticulation)
