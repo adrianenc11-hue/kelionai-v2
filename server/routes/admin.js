@@ -646,7 +646,6 @@ router.post("/codes", async (req, res) => {
       code,
       type: type || "admin",
       used: false,
-      created_by: req.adminUser?.id || null,
       created_at: new Date().toISOString(),
     });
 
