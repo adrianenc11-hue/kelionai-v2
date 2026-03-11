@@ -30,43 +30,65 @@ function hdrs() {
 function esc(s) { var d = document.createElement('div'); d.textContent = s || '—'; return d.innerHTML; }
 function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
 
-// ── AI STATUS ──
-async function rechargeProvider(name, currentCredit) {
-    var mins = { OpenAI: 5, Perplexity: 5, Together: 5, ElevenLabs: 5, DeepSeek: 2, Google: 0, Groq: 0, Tavily: 0, Serper: 0 };
-    var min = mins[name] || 0;
-    var hint = min > 0 ? ' (min $' + min + ')' : ' (free tier)';
-    var newAmount = prompt('💳 ' + name + hint + '\nCredit actual: $' + currentCredit.toFixed(2) + '\n\nSumă nouă ($):', '');
-    if (newAmount === null || newAmount === '') return;
-    var amount = parseFloat(newAmount);
-    if (isNaN(amount) || amount < 0) return;
-    if (min > 0 && amount < min) { alert('⚠️ Minimul pentru ' + name + ' este $' + min); return; }
-    try {
-        await fetch('/api/admin/provider-credit', {
-            method: 'POST', headers: hdrs(),
-            body: JSON.stringify({ provider: name, amount: amount })
-        });
-        loadAiStatus();
-    } catch (e) { }
-}
+// ── AI STATUS ── (auto-monitoring, no manual buttons)
 async function loadAiStatus() {
     try {
         var r = await fetch('/api/admin/ai-status', { headers: hdrs() });
         var d = await r.json();
         var grid = document.getElementById('ai-status-grid');
         grid.innerHTML = '';
-        d.providers.forEach(function (p) {
+
+        // Month progress header
+        if (d.month) {
+            var mh = document.createElement('div');
+            mh.className = 'month-header';
+            mh.innerHTML = '📅 Luna: <strong>' + (d.month.current || '') + '</strong> — Ziua ' + 
+                (d.month.dayOfMonth || 0) + '/' + (d.month.daysInMonth || 30) + 
+                ' (' + (d.month.daysLeft || 0) + ' zile rămase) — ' +
+                '<span style="display:inline-block;width:100px;height:6px;background:#1f2937;border-radius:3px;vertical-align:middle">' +
+                '<span style="display:block;width:' + (d.month.monthProgress || 0) + '%;height:100%;background:' + 
+                ((d.month.monthProgress || 0) > 80 ? '#ef4444' : '#818cf8') + ';border-radius:3px"></span></span>';
+            grid.appendChild(mh);
+        }
+
+        (d.providers || []).forEach(function (p) {
             var card = document.createElement('div');
+            var borderColor = p.alertLevel === 'red' ? '#ef4444' : p.alertLevel === 'yellow' ? '#f59e0b' : '#10b981';
             card.className = 'ai-card ' + (p.live ? 'live' : 'off');
-            var creditColor = p.creditLimit > 0 ? (p.credit > (p.creditLimit * 0.5) ? '#10B981' : p.credit > (p.creditLimit * 0.2) ? '#F59E0B' : '#EF4444') : '#888';
-            var creditIcon = p.creditLimit > 0 ? (p.credit > (p.creditLimit * 0.5) ? '🟢' : p.credit > (p.creditLimit * 0.2) ? '🟡' : '🔴') : '⚪';
+            card.style.borderColor = borderColor;
+            card.style.cursor = 'pointer';
+
+            var tierLabel = p.tier === 'free' ? '🆓 Free' : '💳 Pay';
+            var costStr = '$' + (p.costMonth || 0).toFixed(4);
+            var reqStr = (p.requests || 0) + ' req';
+            var projStr = p.projectedMonth > 0 ? '~$' + p.projectedMonth.toFixed(2) + '/mo' : '';
+            var alertDot = p.alertLevel === 'red' ? '🔴' : p.alertLevel === 'yellow' ? '🟡' : '🟢';
+
             card.innerHTML = '<div class="ai-status-dot ' + (p.live ? 'dot-live' : 'dot-off') + '"></div>' +
                 '<div class="ai-name">' + p.name + '</div>' +
-                '<div class="ai-detail">' + (p.live ? '🟢 Live' : '🔴 Off') + '</div>' +
-                '<div class="ai-cost">$' + (p.costMonth || 0).toFixed(2) + '/mo</div>' +
-                '<div class="ai-credit" onclick="rechargeProvider(\'' + p.name + '\',' + (p.credit || 0) + ')" ' +
-                'style="font-size:0.75rem;margin-top:4px;color:' + creditColor + ';font-weight:600;cursor:pointer;padding:3px 6px;border-radius:6px;background:rgba(255,255,255,0.04)" ' +
-                'title="Click pentru a reîncărca">' +
-                creditIcon + ' $' + (p.credit || 0).toFixed(2) + '</div>';
+                '<div class="ai-detail" style="font-size:0.7rem;opacity:0.7">' + tierLabel + ' — ' + reqStr + '</div>' +
+                '<div class="ai-cost" style="font-size:0.8rem">' + costStr + '</div>' +
+                '<div class="ai-alert" style="font-size:0.7rem;margin-top:2px">' + alertDot + ' ' + (projStr || (p.unit || '')) + '</div>';
+
+            // Click to show details inline
+            card.addEventListener('click', function() {
+                var existing = card.querySelector('.ai-detail-panel');
+                if (existing) { existing.remove(); return; }
+                // Close other panels
+                document.querySelectorAll('.ai-detail-panel').forEach(function(el) { el.remove(); });
+                var panel = document.createElement('div');
+                panel.className = 'ai-detail-panel';
+                panel.style.cssText = 'margin-top:8px;padding:8px;background:rgba(0,0,0,0.3);border-radius:8px;font-size:0.72rem;line-height:1.5;text-align:left';
+                var details = '<div style="color:' + borderColor + ';font-weight:600">' + (p.alertMessage || '') + '</div>';
+                details += '<div>📊 Consum luna: <strong>' + costStr + '</strong> (' + reqStr + ')</div>';
+                if (p.projectedMonth > 0) details += '<div>📈 Proiecție: ~$' + p.projectedMonth.toFixed(4) + '/lună</div>';
+                if (p.freeQuota > 0) details += '<div>🎁 Cotă gratuită: ' + p.freeQuota.toLocaleString() + ' ' + (p.unit || '') + '</div>';
+                if (p.creditLimit > 0) details += '<div>💰 Credit: $' + p.credit.toFixed(2) + ' / $' + p.creditLimit.toFixed(2) + '</div>';
+                if (p.pricingUrl) details += '<div style="margin-top:4px"><a href="' + p.pricingUrl + '" target="_blank" style="color:#818cf8;text-decoration:underline">🔗 Dashboard provider</a></div>';
+                panel.innerHTML = details;
+                card.appendChild(panel);
+            });
+
             grid.appendChild(card);
         });
     } catch (e) { document.getElementById('ai-status-grid').innerHTML = '<div class="ai-card off"><div class="ai-name">Error</div></div>'; }
