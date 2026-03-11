@@ -491,15 +491,12 @@ async function getCurrentPrice(asset, supabase) {
             .order("date", { ascending: false })
             .limit(1);
         if (data?.[0]?.close) return data[0].close;
-    } catch (e) { /* fallback below */ }
+    } catch (e) { /* no data available */ }
 
-    // Fallback: use known approximate prices
-    const fallbackPrices = {
-        "BTC": 83000, "ETH": 2100, "SOL": 130,
-        "Gold": 2900, "Oil": 68, "S&P 500": 5600,
-        "NASDAQ": 17500, "EUR/USD": 1.08, "GBP/USD": 1.29,
-    };
-    return fallbackPrices[asset] || 0;
+    // NO FAKE FALLBACK — return 0 if no real price in DB
+    // Bot will skip assets without real data
+    logger.warn({ asset }, `[PaperTrading] No real price for ${asset} — skipping (no fallback)`);
+    return 0;
 }
 
 async function getRecentPrices(asset, supabase) {
@@ -511,18 +508,12 @@ async function getRecentPrices(asset, supabase) {
             .order("date", { ascending: true })
             .limit(100);
         if (data && data.length > 0) return data.map(d => d.close);
-    } catch (e) { /* fallback */ }
+    } catch (e) { /* no data available */ }
 
-    // If no history yet, generate synthetic data from current price
-    const price = await getCurrentPrice(asset, supabase);
-    if (!price) return null;
-    // Create simple synthetic history with noise
-    const synthetic = [];
-    for (let i = 100; i >= 0; i--) {
-        const noise = 1 + (Math.random() - 0.5) * 0.02;
-        synthetic.push(price * noise * (1 - i * 0.0003)); // slight downtrend for testing
-    }
-    return synthetic;
+    // NO SYNTHETIC DATA — return null if no real history
+    // Bot will skip this asset (requires 50+ real candles)
+    logger.info({ asset }, `[PaperTrading] No real price history for ${asset} — skipping (no synthetic data)`);
+    return null;
 }
 
 async function saveTrade(supabase, trade) {
