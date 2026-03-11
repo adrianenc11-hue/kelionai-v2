@@ -102,7 +102,12 @@ async function loadTraffic() {
         document.getElementById('traffic-unique').textContent = d.uniqueToday || 0;
         document.getElementById('traffic-total').textContent = d.totalToday || 0;
         document.getElementById('traffic-active').textContent = d.activeConnections || 0;
-        document.getElementById('val-views-today').textContent = d.totalToday || 0;
+        // Show all-time total in stats bar (recent count as proxy if todayTotal is 0)
+        var allTimeTotal = d.totalToday || 0;
+        if (d.daily && d.daily.length > 0) {
+            allTimeTotal = d.daily.reduce(function(s, x) { return s + x.count; }, 0);
+        }
+        document.getElementById('val-views-today').textContent = allTimeTotal || (d.recent ? d.recent.length : 0);
         var chart = document.getElementById('traffic-chart');
         if (d.daily && d.daily.length > 0) {
             var max = Math.max.apply(null, d.daily.map(function (x) { return x.count; })) || 1;
@@ -500,6 +505,53 @@ function searchMemories() {
     loadMemories(null, q ? q.value : '');
 }
 
+// ── BRAIN STATUS ──
+async function loadBrain() {
+    try {
+        var r = await fetch('/api/admin/brain', { headers: hdrs() });
+        var d = await r.json();
+        
+        // Uptime
+        var uptSec = d.uptime || 0;
+        var uptH = Math.floor(uptSec / 3600);
+        var uptM = Math.floor((uptSec % 3600) / 60);
+        document.getElementById('brain-uptime').textContent = uptH + 'h ' + uptM + 'm';
+        
+        // Conversations
+        document.getElementById('brain-conversations').textContent = d.conversationCount || 0;
+        var convEl = document.getElementById('val-conversations');
+        if (convEl) convEl.textContent = d.conversationCount || 0;
+        
+        // Provider count
+        var provActive = 0;
+        if (d.providers) {
+            Object.values(d.providers).forEach(function(v) { if (v) provActive++; });
+        }
+        document.getElementById('brain-providers').textContent = provActive + '/9';
+        
+        // Tool stats
+        var toolsEl = document.getElementById('brain-tools');
+        if (toolsEl && d.toolStats) {
+            toolsEl.innerHTML = Object.entries(d.toolStats).map(function(kv) {
+                var icon = kv[1] > 0 ? '🟢' : '⚪';
+                return '<span class="badge ' + (kv[1] > 0 ? 'badge-ok' : '') + '" style="font-size:0.78rem">' + icon + ' ' + kv[0] + ': ' + kv[1] + '</span>';
+            }).join('');
+        }
+        
+        // Provider keys
+        var keysEl = document.getElementById('brain-provider-keys');
+        if (keysEl && d.providers) {
+            keysEl.innerHTML = Object.entries(d.providers).map(function(kv) {
+                var icon = kv[1] ? '🟢' : '🔴';
+                return '<span class="badge ' + (kv[1] ? 'badge-ok' : 'badge-danger') + '" style="font-size:0.78rem">' + icon + ' ' + kv[0] + '</span>';
+            }).join('');
+        }
+    } catch (e) {
+        console.error('Brain load error:', e);
+        document.getElementById('brain-uptime').textContent = 'Error';
+    }
+}
+
 // ── INIT — Auth-guarded (#156: prevent 403 flood) ──
 var _adminIntervals = [];
 async function initAdmin() {
@@ -514,9 +566,10 @@ async function initAdmin() {
         console.warn('[Admin] Auth check failed:', e.message);
     }
     // Auth OK — load all sections
-    loadAiStatus(); loadTraffic(); loadCredit(); loadClients(); loadCodes(); loadUptime(); loadAudit(); loadMedia(); loadTrading(); loadMemories();
+    loadAiStatus(); loadBrain(); loadTraffic(); loadCredit(); loadClients(); loadCodes(); loadUptime(); loadAudit(); loadMedia(); loadTrading(); loadMemories();
     _adminIntervals.push(setInterval(function () { loadTraffic(); loadCredit(); loadUptime(); }, 30000));
     _adminIntervals.push(setInterval(loadAiStatus, 60000));
+    _adminIntervals.push(setInterval(loadBrain, 60000));
     _adminIntervals.push(setInterval(loadAudit, 6 * 60 * 60 * 1000));
     _adminIntervals.push(setInterval(function () { loadMedia(); loadTrading(); }, 60000));
     _adminIntervals.push(setInterval(loadMemories, 120000)); // refresh memories every 2min
