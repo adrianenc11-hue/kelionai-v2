@@ -216,7 +216,8 @@ async function fetchFearAndGreed() {
       "Fear & Greed fetch failed",
     );
   }
-  return { value: 50, label: "Neutral", signal: "HOLD", source: "fallback" };
+  // NO FAKE FALLBACK — return null if real API fails, trading will skip macro check
+  return null;
 }
 
 function detectMarketRegime(adx, atrPct, roc) {
