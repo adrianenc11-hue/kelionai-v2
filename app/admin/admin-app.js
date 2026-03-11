@@ -124,12 +124,8 @@ async function loadTraffic() {
         document.getElementById('traffic-unique').textContent = d.uniqueToday || 0;
         document.getElementById('traffic-total').textContent = d.totalToday || 0;
         document.getElementById('traffic-active').textContent = d.activeConnections || 0;
-        // Show all-time total in stats bar (recent count as proxy if todayTotal is 0)
-        var allTimeTotal = d.totalToday || 0;
-        if (d.daily && d.daily.length > 0) {
-            allTimeTotal = d.daily.reduce(function(s, x) { return s + x.count; }, 0);
-        }
-        document.getElementById('val-views-today').textContent = allTimeTotal || (d.recent ? d.recent.length : 0);
+        // Show all-time total in stats bar (real count from DB, excluding internal IPs)
+        document.getElementById('val-views-today').textContent = d.totalAllTime || d.totalToday || 0;
         var chart = document.getElementById('traffic-chart');
         if (d.daily && d.daily.length > 0) {
             var max = Math.max.apply(null, d.daily.map(function (x) { return x.count; })) || 1;
@@ -539,10 +535,13 @@ async function loadBrain() {
         var uptM = Math.floor((uptSec % 3600) / 60);
         document.getElementById('brain-uptime').textContent = uptH + 'h ' + uptM + 'm';
         
-        // Conversations
+        // Conversations (from DB — persists across deploys)
         document.getElementById('brain-conversations').textContent = d.conversationCount || 0;
         var convEl = document.getElementById('val-conversations');
         if (convEl) convEl.textContent = d.conversationCount || 0;
+        // Total messages badge (if element exists)
+        var msgEl = document.getElementById('brain-messages');
+        if (msgEl) msgEl.textContent = d.totalMessages || 0;
         
         // Provider count
         var provActive = 0;
