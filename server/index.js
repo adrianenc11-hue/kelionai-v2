@@ -240,6 +240,7 @@ const globalLimiter = rateLimit({
   message: { error: "Too many requests. Please try again later." },
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => req.path.startsWith("/admin/") || req.path.startsWith("/admin"),
 });
 
 const asyncHandler = (fn) => (req, res, next) => {
