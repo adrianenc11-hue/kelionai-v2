@@ -268,10 +268,10 @@ async function loadCodes() {
         var tbody = document.querySelector('#codes-table tbody');
         if (codes.length === 0) { tbody.innerHTML = '<tr><td colspan="6" style="color:#888">Niciun cod</td></tr>'; return; }
         tbody.innerHTML = codes.map(function (c) {
-            var sb = c.used ? '<span class="badge badge-warn">Folosit</span>' : '<span class="badge badge-ok">Activ</span>';
+            var sb = (c.uses_remaining != null && c.uses_remaining < 1) ? '<span class="badge badge-warn">Folosit</span>' : '<span class="badge badge-ok">Activ</span>';
             return '<tr><td><code>' + esc(c.code) + '</code></td><td>' + esc(c.type || 'admin') + '</td><td>' + sb + '</td>' +
                 '<td>' + (c.created_at ? new Date(c.created_at).toLocaleDateString('ro-RO') : '—') + '</td>' +
-                '<td>' + esc(c.used_by) + '</td>' +
+                '<td>' + esc(c.value || '—') + '</td>' +
                 '<td><button class="btn-sm btn-danger" onclick="deleteCode(\'' + c.id + '\')">🗑️</button></td></tr>';
         }).join('');
     } catch (e) { }
