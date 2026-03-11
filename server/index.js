@@ -354,17 +354,21 @@ app.get("/reset-password.html", (req, res) => {
   res.type("html").send(html);
 });
 
-// Admin panel — read at startup, serve as explicit GET (before express.static to prevent 301 redirect)
-const _rawAdminHtml = fs.existsSync(path.join(__dirname, "..", "app", "admin", "index.html"))
-  ? fs.readFileSync(path.join(__dirname, "..", "app", "admin", "index.html"), "utf8")
-  : null;
+// Admin panel — read from disk each request (prevents stale HTML after deploy)
+const _adminHtmlPath = path.join(__dirname, "..", "app", "admin", "index.html");
 app.get("/admin", (req, res) => {
-  if (!_rawAdminHtml) return res.status(404).send("Admin page not found");
-  res.type("html").send(_rawAdminHtml);
+  try {
+    const html = fs.readFileSync(_adminHtmlPath, "utf8");
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.type("html").send(html);
+  } catch (e) { res.status(404).send("Admin page not found"); }
 });
 app.get("/admin/", (req, res) => {
-  if (!_rawAdminHtml) return res.status(404).send("Admin page not found");
-  res.type("html").send(_rawAdminHtml);
+  try {
+    const html = fs.readFileSync(_adminHtmlPath, "utf8");
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.type("html").send(html);
+  } catch (e) { res.status(404).send("Admin page not found"); }
 });
 // Admin trading page — serve with relaxed CSP (before express.static)
 const _rawTradingHtml = fs.existsSync(path.join(__dirname, "..", "app", "admin", "trading.html"))
@@ -385,9 +389,8 @@ app.get("/admin/trading.html", (req, res) => {
   );
   res.type("html").send(_rawTradingHtml);
 });
-app.use("/admin", express.static(path.join(__dirname, "..", "app", "admin")));
-
 // Force no-cache on JS/CSS/HTML so deploys take effect immediately
+// IMPORTANT: must be BEFORE express.static so headers are set
 app.use((req, res, next) => {
   if (req.path.match(/\.(js|css|html)$/)) {
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
@@ -396,6 +399,7 @@ app.use((req, res, next) => {
   }
   next();
 });
+app.use("/admin", express.static(path.join(__dirname, "..", "app", "admin")));
 app.use(express.static(path.join(__dirname, "..", "app")));
 app.use("/api", globalLimiter);
 const PORT = process.env.PORT || 3000;
