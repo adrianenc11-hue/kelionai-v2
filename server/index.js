@@ -943,6 +943,41 @@ load();setInterval(load,5000);
 // ═══ PAYMENTS, LEGAL, MESSENGER & DEVELOPER ROUTES ═══
 app.use("/api/payments", paymentsRouter);
 app.use("/api/legal", legalRouter);
+
+// ═══ GDPR ROUTES ═══
+app.get("/api/gdpr/consent-status", async (req, res) => {
+  try {
+    const { getUserFromToken, supabaseAdmin } = req.app.locals;
+    const user = await getUserFromToken(req);
+    if (!user) return res.json({ consented: false, categories: {} });
+    if (!supabaseAdmin) return res.json({ consented: false, categories: {} });
+    const { data } = await supabaseAdmin.from("user_preferences")
+      .select("value").eq("user_id", user.id).eq("key", "gdpr_consent").maybeSingle();
+    res.json(data?.value || { consented: false, categories: { essential: true, analytics: false, marketing: false } });
+  } catch { res.json({ consented: false, categories: { essential: true } }); }
+});
+app.post("/api/gdpr/export", express.json(), async (req, res) => {
+  try {
+    const { getUserFromToken, supabaseAdmin } = req.app.locals;
+    const user = await getUserFromToken(req);
+    if (!user) return res.status(401).json({ error: "Authentication required" });
+    if (!supabaseAdmin) return res.status(503).json({ error: "Database unavailable" });
+    const { data: prefs } = await supabaseAdmin.from("user_preferences").select("*").eq("user_id", user.id);
+    const { data: convos } = await supabaseAdmin.from("conversations").select("id, created_at").eq("user_id", user.id);
+    res.json({ user: { id: user.id, email: user.email, created_at: user.created_at }, preferences: prefs || [], conversations: convos || [] });
+  } catch { res.status(500).json({ error: "Export error" }); }
+});
+app.post("/api/gdpr/delete", express.json(), async (req, res) => {
+  try {
+    const { getUserFromToken, supabaseAdmin } = req.app.locals;
+    const user = await getUserFromToken(req);
+    if (!user) return res.status(401).json({ error: "Authentication required" });
+    if (!supabaseAdmin) return res.status(503).json({ error: "Database unavailable" });
+    // Mark for deletion (actual deletion requires admin approval)
+    await supabaseAdmin.from("user_preferences").upsert({ user_id: user.id, key: "gdpr_delete_requested", value: { requestedAt: new Date().toISOString() } }, { onConflict: "user_id,key" });
+    res.json({ success: true, message: "Deletion request received. Your data will be removed within 30 days as per GDPR." });
+  } catch { res.status(500).json({ error: "Delete request error" }); }
+});
 app.use("/api/messenger", messengerRouter);
 app.use("/api/telegram", express.json(), telegramRouter);
 app.use("/api/whatsapp", whatsappRouter);

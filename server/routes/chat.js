@@ -303,6 +303,7 @@ router.post(
   chatLimiter,
   validate(chatSchema),
   async (req, res) => {
+    let heartbeat = null; // Declared outside try so finally can always clear it
     try {
       const { getUserFromToken, supabaseAdmin, brain } = req.app.locals;
       const {
@@ -336,8 +337,7 @@ router.post(
         "X-Accel-Buffering": "no",
       });
       // SSE heartbeat to prevent proxy/LB timeout during AI thinking
-      // eslint-disable-next-line no-unused-vars -- used in finally { clearInterval(heartbeat) }
-      const heartbeat = setInterval(() => res.write(":keepalive\n\n"), 15000);
+      heartbeat = setInterval(() => res.write(":keepalive\n\n"), 15000);
       // Send thinking indicator immediately so user sees activity
       res.write(`data: ${JSON.stringify({ type: "thinking" })}\n\n`);
 

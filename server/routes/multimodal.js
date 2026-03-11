@@ -159,4 +159,14 @@ router.get("/formats", (_req, res) => {
   });
 });
 
+// GET /api/multimodal/health — health check
+router.get("/health", (_req, res) => {
+  res.json({
+    status: "ok",
+    model: "gemini-3.1-pro",
+    maxUploadSize: "25MB",
+    supportedTypes: ["image", "video", "audio", "pdf"],
+  });
+});
+
 module.exports = router;

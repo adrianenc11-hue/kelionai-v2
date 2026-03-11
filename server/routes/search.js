@@ -207,4 +207,33 @@ router.post("/", searchLimiter, validate(searchSchema), async (req, res) => {
   }
 });
 
+// GET /api/search?q=... — alias for frontend convenience
+router.get("/", searchLimiter, async (req, res) => {
+  const q = req.query.q || req.query.query;
+  if (!q) return res.status(400).json({ error: "Missing q parameter" });
+  req.body = { query: q };
+  // Reuse POST handler by calling next route
+  try {
+    const { getUserFromToken, supabaseAdmin, brain } = req.app.locals;
+    const user = await getUserFromToken(req);
+    const { checkUsage, incrementUsage } = require("../payments");
+    const usage = await checkUsage(user?.id, "search", supabaseAdmin);
+    if (!usage.allowed)
+      return res.status(429).json({ error: "Search limit reached.", plan: usage.plan });
+
+    // DuckDuckGo fallback (simplest for GET alias)
+    const r = await fetch(
+      "https://api.duckduckgo.com/?q=" + encodeURIComponent(q) + "&format=json&no_html=1&skip_disambig=1"
+    );
+    const d = await r.json();
+    const results = [];
+    if (d.Abstract)
+      results.push({ title: d.Heading || q, content: d.Abstract, url: d.AbstractURL });
+    if (d.RelatedTopics)
+      for (const t of d.RelatedTopics.slice(0, 5))
+        if (t.Text) results.push({ title: t.Text.substring(0, 80), content: t.Text, url: t.FirstURL });
+    res.json({ results, answer: d.Abstract || "", engine: "DuckDuckGo" });
+  } catch { res.status(500).json({ error: "Search error" }); }
+});
+
 module.exports = router;

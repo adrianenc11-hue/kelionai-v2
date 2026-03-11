@@ -1076,6 +1076,25 @@ router.delete("/developer/keys/:id", async (req, res) => {
   }
 });
 
+// GET /api/payments/usage — alias for /status (for frontend compatibility)
+router.get("/usage", async (req, res) => {
+  try {
+    const { getUserFromToken, supabaseAdmin } = req.app.locals;
+    const user = await getUserFromToken(req);
+    if (!user) return res.json({ plan: "guest", limits: PLAN_LIMITS.guest });
+    const planInfo = await getUserPlan(user.id, supabaseAdmin);
+    const today = new Date().toISOString().split("T")[0];
+    const usage = { chat: 0, search: 0, image: 0, vision: 0, tts: 0 };
+    if (supabaseAdmin) {
+      try {
+        const { data } = await supabaseAdmin.from("usage").select("type, count").eq("user_id", user.id).eq("date", today);
+        if (data) data.forEach((d) => { usage[d.type] = d.count; });
+      } catch { }
+    }
+    res.json({ ...planInfo, usage });
+  } catch { res.status(500).json({ error: "Usage error" }); }
+});
+
 module.exports = {
   router,
   getUserPlan,

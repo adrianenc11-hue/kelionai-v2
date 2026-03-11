@@ -2403,6 +2403,12 @@ router.post("/execute", async (req, res) => {
   }
 });
 
+// GET /analyze/:asset — alias for /full-analysis/:asset
+router.get("/analyze/:asset?", (req, res) => res.redirect(307, `/api/trading/full-analysis/${req.params.asset || "BTC"}`));
+
+// GET /paper-trades — alias for /paper/history
+router.get("/paper-trades", (req, res) => res.redirect(307, "/api/trading/paper/history"));
+
 // GET /full-analysis — Read-only analysis (no execution)
 router.get("/full-analysis/:asset?", async (req, res) => {
   try {
@@ -3221,7 +3227,7 @@ const k1Persist = require("./k1-persistence");
 // K1 Persistence: Load saved state 5s after boot (before market feed at 10s)
 setTimeout(async () => {
   try {
-    const sb = require("./supabase");
+    const { supabaseAdmin: sb } = require("./supabase");
     await k1Persist.loadState(sb);
     logger.info("[K1] State loaded from Supabase");
   } catch { }
@@ -3230,7 +3236,7 @@ setTimeout(async () => {
 // Start scheduled jobs (forgetting@6h, self-test@12h)
 setTimeout(() => {
   try {
-    const sb = require("./supabase");
+    const { supabaseAdmin: sb } = require("./supabase");
     k1Meta.startScheduledJobs(sb);
   } catch { }
 }, 15000); // 15s after boot
@@ -3396,7 +3402,7 @@ setInterval(async () => {
 // K1 Persistence: Save state every 5 min
 setInterval(async () => {
   try {
-    const sb = require("./supabase");
+    const { supabaseAdmin: sb } = require("./supabase");
     await k1Persist.saveState(sb);
   } catch { }
 }, 5 * 60 * 1000);
