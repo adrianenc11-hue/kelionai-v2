@@ -33,9 +33,14 @@
                 <div class="stat-label">Total Users</div>
             </div>
             <div class="stat-card">
+                <div class="stat-icon">💬</div>
+                <div class="stat-value" id="val-conversations">—</div>
+                <div class="stat-label">Conversații</div>
+            </div>
+            <div class="stat-card">
                 <div class="stat-icon">👁️</div>
                 <div class="stat-value" id="val-views-today">—</div>
-                <div class="stat-label">Vizite Azi</div>
+                <div class="stat-label">Vizite (total)</div>
             </div>
             <div class="stat-card">
                 <div class="stat-icon">💰</div>
@@ -70,6 +75,26 @@
                             <div class="ai-name">Loading...</div>
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <!-- BRAIN STATUS -->
+            <div class="section-panel open" id="sec-brain">
+                <button class="section-toggle" onclick="toggleSection('sec-brain')">
+                    <span>🧠 Brain — Status Live</span>
+                    <span class="toggle-arrow">▼</span>
+                </button>
+                <a href="/admin/k1-dashboard.html" class="section-live-link" title="K1 Brain Dashboard">🔗 K1</a>
+                <div class="section-body">
+                    <div class="mini-stats" id="brain-stats">
+                        <div class="mini-stat"><span class="label">Uptime:</span> <span id="brain-uptime">—</span></div>
+                        <div class="mini-stat"><span class="label">Conversații:</span> <span id="brain-conversations">—</span></div>
+                        <div class="mini-stat"><span class="label">Providers activi:</span> <span id="brain-providers">—</span></div>
+                    </div>
+                    <h4 style="margin:12px 0 8px;color:#a78bfa;font-size:0.85rem">🔧 Tool Usage (sesiune curentă)</h4>
+                    <div id="brain-tools" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+                    <h4 style="margin:12px 0 8px;color:#a78bfa;font-size:0.85rem">🌐 Provider Keys</h4>
+                    <div id="brain-provider-keys" style="display:flex;gap:8px;flex-wrap:wrap"></div>
                 </div>
             </div>
 
