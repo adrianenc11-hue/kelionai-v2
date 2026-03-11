@@ -170,7 +170,7 @@ async function fetchYahooFinance(symbol, days) {
     try {
         const period1 = Math.floor(Date.now() / 1000) - days * 86400;
         const period2 = Math.floor(Date.now() / 1000);
-        const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?period1=${period1}&period2=${period2}&interval=1d`;
+        const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?period1=${period1}&period2=${period2}&interval=1d`;
         const r = await fetch(url, {
             headers: { "User-Agent": "Mozilla/5.0 (compatible; KelionAI/1.0)" }
         });
