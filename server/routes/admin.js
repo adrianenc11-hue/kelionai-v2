@@ -459,22 +459,29 @@ router.get("/ai-status", async (req, res) => {
   try {
     const { brain, supabaseAdmin } = req.app.locals;
 
-    // Provider configs from brain
-    const providerKeys = {
-      "OpenAI": !!brain?.openaiKey,
-      "Google": !!(process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY),
-      "Groq": !!brain?.groqKey,
-      "Perplexity": !!brain?.perplexityKey,
-      "Together": !!brain?.togetherKey,
-      "ElevenLabs": !!process.env.ELEVENLABS_API_KEY,
-      "DeepSeek": !!process.env.DEEPSEEK_API_KEY,
-      "Tavily": !!brain?.tavilyKey,
-      "Serper": !!brain?.serperKey,
+    // Provider subscription plans — REAL tiers and pricing URLs
+    const providerPlans = {
+      "OpenAI": { key: !!brain?.openaiKey, tier: "pay-as-you-go", freeQuota: 0, unit: "tokens", pricingUrl: "https://platform.openai.com/settings/organization/billing/overview" },
+      "Google": { key: !!(process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY), tier: "free", freeQuota: 1500, unit: "req/zi", pricingUrl: "https://aistudio.google.com/apikey" },
+      "Groq": { key: !!brain?.groqKey, tier: "free", freeQuota: 14400, unit: "req/zi", pricingUrl: "https://console.groq.com/settings/usage" },
+      "Perplexity": { key: !!brain?.perplexityKey, tier: "pay-as-you-go", freeQuota: 0, unit: "requests", pricingUrl: "https://www.perplexity.ai/settings/api" },
+      "Together": { key: !!brain?.togetherKey, tier: "pay-as-you-go", freeQuota: 0, unit: "tokens", pricingUrl: "https://api.together.ai/settings/billing" },
+      "ElevenLabs": { key: !!process.env.ELEVENLABS_API_KEY, tier: "free", freeQuota: 10000, unit: "caractere/lună", pricingUrl: "https://elevenlabs.io/subscription" },
+      "DeepSeek": { key: !!process.env.DEEPSEEK_API_KEY, tier: "pay-as-you-go", freeQuota: 0, unit: "tokens", pricingUrl: "https://platform.deepseek.com/usage" },
+      "Tavily": { key: !!brain?.tavilyKey, tier: "free", freeQuota: 1000, unit: "căutări/lună", pricingUrl: "https://tavily.com/#pricing" },
+      "Serper": { key: !!brain?.serperKey, tier: "free", freeQuota: 2500, unit: "căutări/lună", pricingUrl: "https://serper.dev/dashboard" },
     };
 
-    // Get monthly costs per provider from Supabase
-    const monthStart = new Date().toISOString().substring(0, 7) + "-01";
+    // Month tracking
+    const now = new Date();
+    const monthStart = now.toISOString().substring(0, 7) + "-01";
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const dayOfMonth = now.getDate();
+    const daysLeft = daysInMonth - dayOfMonth;
+
+    // Get monthly costs AND request counts per provider
     let costByProvider = {};
+    let requestsByProvider = {};
     if (supabaseAdmin) {
       try {
         const { data } = await supabaseAdmin
@@ -482,13 +489,16 @@ router.get("/ai-status", async (req, res) => {
           .select("provider, cost_usd")
           .gte("created_at", monthStart + "T00:00:00Z");
         (data || []).forEach(r => {
-          if (!costByProvider[r.provider]) costByProvider[r.provider] = 0;
-          costByProvider[r.provider] += parseFloat(r.cost_usd) || 0;
+          const pName = r.provider;
+          if (!costByProvider[pName]) costByProvider[pName] = 0;
+          if (!requestsByProvider[pName]) requestsByProvider[pName] = 0;
+          costByProvider[pName] += parseFloat(r.cost_usd) || 0;
+          requestsByProvider[pName]++;
         });
       } catch (e) { /* table might not exist */ }
     }
 
-    // Read credit limits from Supabase provider_credits table (fallback to env vars)
+    // Read credit limits from DB
     let creditByProvider = {};
     if (supabaseAdmin) {
       try {
@@ -497,28 +507,48 @@ router.get("/ai-status", async (req, res) => {
       } catch (e) { /* table might not exist yet */ }
     }
 
-    // Credits only from provider_credits DB table — zero defaults, no env var tricks
-    const defaultCredits = {
-      "OpenAI": 0, "Google": 0, "Groq": 0,
-      "Perplexity": 0, "Together": 0,
-      "ElevenLabs": 0, "DeepSeek": 0,
-      "Tavily": 0, "Serper": 0,
-    };
-
-    const providers = Object.entries(providerKeys).map(([name, hasKey]) => {
+    const providers = Object.entries(providerPlans).map(([name, plan]) => {
       const costMonth = costByProvider[name.toLowerCase()] || costByProvider[name] || 0;
-      const limit = creditByProvider[name] !== undefined ? creditByProvider[name] : (defaultCredits[name] || 0);
-      const credit = Math.max(0, limit - costMonth);
-      const creditLabel = limit > 0
-        ? '$' + credit.toFixed(2) + ' / $' + limit.toFixed(2)
-        : 'Free tier';
-      return { name, live: hasKey, costMonth, credit, creditLabel, creditLimit: limit };
+      const requests = requestsByProvider[name.toLowerCase()] || requestsByProvider[name] || 0;
+      const creditLimit = creditByProvider[name] || 0;
+      const remaining = Math.max(0, creditLimit - costMonth);
+
+      // Alert level
+      let alertLevel = "green";
+      let alertMessage = "";
+      if (creditLimit > 0) {
+        const usedPct = (costMonth / creditLimit) * 100;
+        if (usedPct >= 90) { alertLevel = "red"; alertMessage = "⚠️ Credit aproape epuizat! Reîncarcă urgent."; }
+        else if (usedPct >= 70) { alertLevel = "yellow"; alertMessage = "⚡ Consum ridicat — monitorizează."; }
+        else { alertMessage = "✅ Credit suficient."; }
+      } else if (plan.tier === "free") {
+        alertMessage = "🆓 Free tier — " + plan.freeQuota.toLocaleString() + " " + plan.unit;
+      } else {
+        alertLevel = costMonth > 1 ? "yellow" : "green";
+        alertMessage = "💳 Pay-as-you-go — " + (costMonth > 0 ? "$" + costMonth.toFixed(4) + " consumat" : "fără consum");
+      }
+
+      // Projected monthly cost
+      const dailyAvg = dayOfMonth > 0 ? costMonth / dayOfMonth : 0;
+      const projectedMonth = dailyAvg * daysInMonth;
+
+      return {
+        name, live: plan.key, costMonth: Math.round(costMonth * 10000) / 10000,
+        requests, credit: Math.round(remaining * 100) / 100, creditLimit,
+        tier: plan.tier, freeQuota: plan.freeQuota, unit: plan.unit,
+        alertLevel, alertMessage,
+        projectedMonth: Math.round(projectedMonth * 10000) / 10000,
+        pricingUrl: plan.pricingUrl,
+      };
     });
 
-    res.json({ providers });
+    res.json({
+      providers,
+      month: { current: now.toISOString().substring(0, 7), dayOfMonth, daysLeft, daysInMonth, monthProgress: Math.round((dayOfMonth / daysInMonth) * 100) },
+    });
   } catch (e) {
     logger.error({ component: "Admin", err: e.message }, "AI status failed");
-    res.json({ providers: [] });
+    res.json({ providers: [], month: {} });
   }
 });
 
