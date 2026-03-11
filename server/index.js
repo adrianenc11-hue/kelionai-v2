@@ -216,15 +216,43 @@ app.use((req, res, next) => {
       const isHealth = req.path === "/health" || req.path === "/sw.js" || req.path === "/manifest.json" || req.path === "/favicon.svg";
       if (!isBot && !isHealth) {
         const realIp = req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || req.ip || "unknown";
-        supabaseAdmin.from("page_views").insert({
-          ip: realIp,
-          path: req.path,
-          user_agent: (req.get("user-agent") || "").substring(0, 300),
-          country: req.headers["cf-ipcountry"] || req.headers["x-vercel-ip-country"] || null,
-          referrer: (req.get("referer") || req.get("referrer") || "").substring(0, 500) || null,
-        }).then(({ error }) => {
+        // Skip internal IPs entirely
+        if (realIp === "127.0.0.1" || realIp === "::1" || realIp === "::ffff:127.0.0.1") return;
+
+        // Country from CDN headers first, then IP geolocation
+        let country = req.headers["cf-ipcountry"] || req.headers["x-vercel-ip-country"] || null;
+
+        // Async insert — resolve country via ip-api.com if not from CDN
+        const insertView = async () => {
+          if (!country && realIp !== "unknown") {
+            // Check cache first
+            if (!global._geoCache) global._geoCache = {};
+            if (global._geoCache[realIp]) {
+              country = global._geoCache[realIp];
+            } else {
+              try {
+                const geoR = await fetch("http://ip-api.com/json/" + encodeURIComponent(realIp) + "?fields=countryCode", { signal: AbortSignal.timeout(2000) });
+                if (geoR.ok) {
+                  const geoD = await geoR.json();
+                  country = geoD.countryCode || null;
+                  if (country) global._geoCache[realIp] = country;
+                  // Keep cache small
+                  const keys = Object.keys(global._geoCache);
+                  if (keys.length > 500) { for (let i = 0; i < 200; i++) delete global._geoCache[keys[i]]; }
+                }
+              } catch (e) { /* geo lookup failed — ok, insert without */ }
+            }
+          }
+          const { error } = await supabaseAdmin.from("page_views").insert({
+            ip: realIp,
+            path: req.path,
+            user_agent: (req.get("user-agent") || "").substring(0, 300),
+            country: country,
+            referrer: (req.get("referer") || req.get("referrer") || "").substring(0, 500) || null,
+          });
           if (error) logger.warn({ component: "PageViews", err: error.message, code: error.code }, "page_views insert failed");
-        }).catch((e) => {
+        };
+        insertView().catch((e) => {
           logger.warn({ component: "PageViews", err: e.message }, "page_views insert exception");
         });
       }
@@ -438,6 +466,87 @@ const brain = new KelionBrain({
 });
 logger.info({ component: "Brain" }, "🧠 Engine initialized");
 validateEnv();
+
+// ═══ BRAIN STATE PERSISTENCE ═══
+// Save toolStats, journal, strategies to Supabase so they survive deploys
+async function saveBrainState() {
+  if (!supabaseAdmin || !brain) return;
+  try {
+    const state = {
+      toolStats: brain.toolStats || {},
+      toolErrors: brain.toolErrors || {},
+      journal: (brain.journal || []).slice(-50),
+      strategies: brain.strategies || {},
+      savedAt: new Date().toISOString(),
+    };
+    await supabaseAdmin.from("metrics_snapshots").insert({
+      metric_type: "brain_state",
+      metric_name: "full_state_snapshot",
+      value: 1,
+      labels: state,
+      created_at: new Date().toISOString(),
+    });
+    logger.info({ component: "Brain" }, "💾 Brain state saved to Supabase");
+  } catch (e) {
+    logger.warn({ component: "Brain", err: e.message }, "Brain state save failed");
+  }
+}
+
+async function restoreBrainState() {
+  if (!supabaseAdmin || !brain) return;
+  try {
+    const { data } = await supabaseAdmin
+      .from("metrics_snapshots")
+      .select("labels, created_at")
+      .eq("metric_type", "brain_state")
+      .eq("metric_name", "full_state_snapshot")
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    if (data && data.length > 0 && data[0].labels) {
+      const s = data[0].labels;
+      if (s.toolStats) {
+        // Merge — keep existing keys, add saved values
+        Object.entries(s.toolStats).forEach(([k, v]) => {
+          brain.toolStats[k] = (brain.toolStats[k] || 0) + (v || 0);
+        });
+      }
+      if (s.toolErrors) {
+        Object.entries(s.toolErrors).forEach(([k, v]) => {
+          brain.toolErrors[k] = (brain.toolErrors[k] || 0) + (v || 0);
+        });
+      }
+      if (s.journal && Array.isArray(s.journal)) {
+        brain.journal = [...(s.journal), ...(brain.journal || [])];
+      }
+      if (s.strategies) brain.strategies = { ...s.strategies, ...(brain.strategies || {}) };
+      logger.info({ component: "Brain", savedAt: s.savedAt }, "🔄 Brain state restored from Supabase");
+    } else {
+      logger.info({ component: "Brain" }, "No previous brain state found — fresh start");
+    }
+  } catch (e) {
+    logger.warn({ component: "Brain", err: e.message }, "Brain state restore failed");
+  }
+}
+
+// Restore state immediately
+restoreBrainState();
+
+// Periodic save every 5 minutes
+const _brainSaveInterval = setInterval(saveBrainState, 5 * 60 * 1000);
+_brainSaveInterval.unref();
+
+// Graceful shutdown — save state before exit
+process.on("SIGTERM", async () => {
+  logger.info({ component: "Server" }, "🛑 SIGTERM received — saving brain state...");
+  await saveBrainState();
+  process.exit(0);
+});
+process.on("SIGINT", async () => {
+  logger.info({ component: "Server" }, "🛑 SIGINT received — saving brain state...");
+  await saveBrainState();
+  process.exit(0);
+});
 
 // ═══ AUTH HELPER ═══
 async function getUserFromToken(req) {
