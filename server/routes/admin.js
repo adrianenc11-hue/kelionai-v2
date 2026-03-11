@@ -497,14 +497,14 @@ router.get("/ai-status", async (req, res) => {
       } catch (e) { /* table might not exist yet */ }
     }
 
-    // Fallback defaults if table empty
+    // No fake defaults — only show real credit if set in provider_credits table or env
     const defaultCredits = {
-      "OpenAI": parseFloat(process.env.OPENAI_CREDIT || "5"),
+      "OpenAI": parseFloat(process.env.OPENAI_CREDIT || "0"),
       "Google": 0, "Groq": 0,
-      "Perplexity": parseFloat(process.env.PERPLEXITY_CREDIT || "5"),
-      "Together": parseFloat(process.env.TOGETHER_CREDIT || "5"),
-      "ElevenLabs": parseFloat(process.env.ELEVENLABS_CREDIT || "5"),
-      "DeepSeek": parseFloat(process.env.DEEPSEEK_CREDIT || "2"),
+      "Perplexity": parseFloat(process.env.PERPLEXITY_CREDIT || "0"),
+      "Together": parseFloat(process.env.TOGETHER_CREDIT || "0"),
+      "ElevenLabs": parseFloat(process.env.ELEVENLABS_CREDIT || "0"),
+      "DeepSeek": parseFloat(process.env.DEEPSEEK_CREDIT || "0"),
       "Tavily": 0, "Serper": 0,
     };
 
