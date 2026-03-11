@@ -645,7 +645,7 @@ router.post("/codes", async (req, res) => {
     const { error } = await supabaseAdmin.from("admin_codes").insert({
       code,
       type: type || "admin",
-      used: false,
+      uses_remaining: 1,
       created_at: new Date().toISOString(),
     });
 
