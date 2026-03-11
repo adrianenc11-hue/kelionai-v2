@@ -112,16 +112,34 @@ router.use(async (req, res, next) => {
 // ══════════════════════════════════════════════════════════
 // GET /api/admin/brain — Brain diagnostic
 // ══════════════════════════════════════════════════════════
-router.get("/brain", (req, res) => {
+router.get("/brain", async (req, res) => {
   try {
-    const { brain } = req.app.locals;
+    const { brain, supabaseAdmin } = req.app.locals;
     if (!brain) return res.json({ toolStats: {}, toolErrors: {}, providers: {} });
+
+    // Get REAL conversation count from DB (not RAM which resets on deploy)
+    let conversationCount = brain.conversationCount || 0;
+    let totalMessages = 0;
+    if (supabaseAdmin) {
+      try {
+        const { count: convCount } = await supabaseAdmin
+          .from("conversations")
+          .select("id", { count: "exact", head: true });
+        conversationCount = convCount || 0;
+
+        const { count: msgCount } = await supabaseAdmin
+          .from("messages")
+          .select("id", { count: "exact", head: true });
+        totalMessages = msgCount || 0;
+      } catch (e) { /* tables might not exist */ }
+    }
 
     res.json({
       toolStats: brain.toolStats || {},
       toolErrors: brain.toolErrors || {},
       uptime: (Date.now() - brain.startTime) / 1000,
-      conversationCount: brain.conversationCount || 0,
+      conversationCount,
+      totalMessages,
       providers: {
         gemini: !!(process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY),
         openai: !!brain.openaiKey,
@@ -259,29 +277,35 @@ router.get("/traffic", async (req, res) => {
     if (!supabaseAdmin) return res.json({ recent: [], uniqueToday: 0, totalToday: 0, activeConnections: 0, daily: [] });
 
     const today = new Date().toISOString().split("T")[0];
+    // Internal IPs/paths to exclude from real traffic
+    const INTERNAL_IPS = ["127.0.0.1", "::1", "::ffff:127.0.0.1"];
+    const INTERNAL_PATHS = ["/health", "/metrics"];
 
-    // Recent 50 visits
+    // Recent 50 REAL visits (exclude internal)
     const { data: recent } = await supabaseAdmin
       .from("page_views")
       .select("*")
+      .not("ip", "in", "(" + INTERNAL_IPS.join(",") + ")")
       .order("created_at", { ascending: false })
       .limit(50);
 
-    // Today stats (raise limit from default 1000 to get accurate count)
+    // Today stats — REAL visitors only
     const { data: todayData, count: todayCount } = await supabaseAdmin
       .from("page_views")
       .select("ip", { count: "exact", head: false })
       .gte("created_at", today + "T00:00:00Z")
+      .not("ip", "in", "(" + INTERNAL_IPS.join(",") + ")")
       .limit(10000);
 
     const uniqueIps = new Set((todayData || []).map((d) => d.ip));
 
-    // Daily traffic (last 7 days)
+    // Daily traffic (last 7 days) — exclude internal
     const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().split("T")[0];
     const { data: weekData } = await supabaseAdmin
       .from("page_views")
-      .select("created_at")
+      .select("created_at, ip")
       .gte("created_at", weekAgo + "T00:00:00Z")
+      .not("ip", "in", "(" + INTERNAL_IPS.join(",") + ")")
       .limit(10000);
 
     const dailyCounts = {};
@@ -300,16 +324,27 @@ router.get("/traffic", async (req, res) => {
       activeConnections = (await ac.get()).values[0]?.value || 0;
     } catch (e) { /* metrics not available */ }
 
+    // Total ALL-TIME real visits
+    let totalAllTime = 0;
+    try {
+      const { count: allCount } = await supabaseAdmin
+        .from("page_views")
+        .select("id", { count: "exact", head: true })
+        .not("ip", "in", "(" + INTERNAL_IPS.join(",") + ")");
+      totalAllTime = allCount || 0;
+    } catch (e) { /* ok */ }
+
     res.json({
       recent: recent || [],
       uniqueToday: uniqueIps.size,
       totalToday: todayCount || (todayData || []).length,
+      totalAllTime,
       activeConnections,
       daily,
     });
   } catch (e) {
     logger.error({ component: "Admin", err: e.message }, "Traffic query failed");
-    res.json({ recent: [], uniqueToday: 0, totalToday: 0, activeConnections: 0, daily: [] });
+    res.json({ recent: [], uniqueToday: 0, totalToday: 0, totalAllTime: 0, activeConnections: 0, daily: [] });
   }
 });
 
@@ -1047,6 +1082,16 @@ const AUDIT_WHITELIST = [
   /newsapi\.org/, /gnews\.io/, /api\.binance/, /coingecko/,
   /currentsapi/, /mediastack/, /guardianapis/,
   /support@kelionai/, /privacy@kelionai/, /noreply@kelionai/,
+  // Additional legitimate API endpoints
+  /googleapis\.com/, /google\.com\/calendar/, /yahoo\.com/,
+  /api\.deepseek\.com/, /ip-api\.com/, /alternative\.me/,
+  /api\.coingecko\.com/, /query\.yahooapis/, /finance\.yahoo/,
+  /platform\.openai/, /aistudio\.google/, /console\.groq/,
+  /elevenlabs\.io/, /serper\.dev/, /tavily\.com/,
+  /api\.together/, /platform\.deepseek/, /deepgram\.com/,
+  /cartesia\.ai/, /googleapis/, /gstatic\.com/,
+  /tradingview\.com/, /cdn\./, /cdnjs\./,
+  /schema\.org/, /w3\.org/, /mozilla\.org/,
 ];
 
 let _lastAudit = null;
