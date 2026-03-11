@@ -17,7 +17,7 @@ const router = express.Router();
 // ═══ CONFIG ═══
 const FETCH_HOUR_RO = [5, 12, 18]; // 05:00, 12:00, 18:00 Romanian local time (UTC+2/UTC+3 DST)
 const CHECK_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
-const MIN_FETCH_GAP_MS = 14 * 60 * 1000; // prevent abuse: 14 min min gap
+const MIN_FETCH_GAP_MS = 5 * 60 * 1000; // 5 min gap (was 14 — too slow for testing)
 const ARTICLE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
 const MAX_ARTICLES = 100;
 const BREAKING_WINDOW_MS = 30 * 60 * 1000; // 30 minutes
@@ -117,9 +117,9 @@ function onNewsFetched(callback) {
 
 // ═══ RATE LIMITER for fetch endpoint ═══
 const fetchLimiter = rateLimit({
-  windowMs: 14 * 60 * 1000,
+  windowMs: 5 * 60 * 1000,
   max: 1,
-  message: { error: "Fetch permis o dată la 14 minute." },
+  message: { error: "Fetch permis o dată la 5 minute." },
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -489,7 +489,10 @@ async function fetchAllSources() {
 
   const processArticles = async (articles, source) => {
     if (!Array.isArray(articles)) return;
-    for (const a of articles) await addArticle(a, source);
+    // Process in parallel batches of 5 for speed
+    for (let i = 0; i < articles.length; i += 5) {
+      await Promise.all(articles.slice(i, i + 5).map(a => addArticle(a, source)));
+    }
   };
 
   if (newsapiArticles.status === "fulfilled")

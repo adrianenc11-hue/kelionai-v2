@@ -143,4 +143,24 @@ router.get("/pptx", async (req, res) => {
     }
 });
 
+// GET /api/export/history — export conversation history
+router.get("/history", async (req, res) => {
+    try {
+        const { getUserFromToken, supabaseAdmin } = req.app.locals;
+        const user = await getUserFromToken(req);
+        if (!user) return res.status(401).json({ error: "Authentication required" });
+        if (!supabaseAdmin) return res.status(500).json({ error: "Database not connected" });
+
+        const { data } = await supabaseAdmin.from("conversations")
+            .select("id, created_at, messages_text")
+            .eq("user_id", user.id)
+            .order("created_at", { ascending: false })
+            .limit(50);
+        res.json({ conversations: data || [], formats: ["pdf", "xlsx", "json"] });
+    } catch (e) {
+        logger.error({ component: "Export", err: e.message }, "History export failed");
+        res.status(500).json({ error: e.message });
+    }
+});
+
 module.exports = router;

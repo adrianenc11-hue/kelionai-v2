@@ -105,7 +105,7 @@ function setupGracefulShutdown(server) {
         // Save K1 state before exit
         try {
             const k1Persist = require("./k1-persistence");
-            const sb = require("./supabase");
+            const { supabaseAdmin: sb } = require("./supabase");
             await k1Persist.saveState(sb);
             logger.info({ component: "Shutdown" }, "✅ K1 state saved to Supabase");
         } catch { }
