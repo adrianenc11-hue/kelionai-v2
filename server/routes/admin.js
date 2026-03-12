@@ -50,7 +50,7 @@ async function requireAdmin(req, res, next) {
         req.adminUser = { id: "admin-secret", role: "admin" };
         return next();
       }
-    } catch {}
+    } catch { /* ignored */ }
   }
 
   // Method 2: JWT token with admin role
@@ -64,7 +64,7 @@ async function requireAdmin(req, res, next) {
       req.adminUser = user;
       return next();
     }
-  } catch {}
+  } catch { /* ignored */ }
 
   return res.status(403).json({ error: "Admin access required" });
 }
@@ -162,7 +162,7 @@ router.get("/brain", async (req, res) => {
           .from("messages")
           .select("id", { count: "exact", head: true });
         totalMessages = msgCount || 0;
-      } catch (e) {
+      } catch (_e) {
         /* tables might not exist */
       }
     }
@@ -187,7 +187,7 @@ router.get("/brain", async (req, res) => {
       journal: (brain.journal || []).slice(-10),
       strategies: brain.strategies || {},
     });
-  } catch (e) {
+  } catch (_e) {
     logger.error(
       { component: "Admin", err: e.message },
       "Brain diagnostic failed",
@@ -347,7 +347,7 @@ router.get("/costs", async (req, res) => {
       totalToday,
       totalMonth,
     });
-  } catch (e) {
+  } catch (_e) {
     logger.error({ component: "Admin", err: e.message }, "Costs query failed");
     res.json({
       byProvider: [],
@@ -377,7 +377,7 @@ router.get("/traffic", async (req, res) => {
     const today = new Date().toISOString().split("T")[0];
     // Internal IPs/paths to exclude from real traffic
     const INTERNAL_IPS = ["127.0.0.1", "::1", "::ffff:127.0.0.1"];
-    const INTERNAL_PATHS = ["/health", "/metrics"];
+    const _INTERNAL_PATHS = ["/health", "/metrics"];
 
     // Recent 50 REAL visits (exclude internal)
     const { data: recent } = await supabaseAdmin
@@ -422,7 +422,7 @@ router.get("/traffic", async (req, res) => {
     try {
       const { activeConnections: ac } = require("../metrics");
       activeConnections = (await ac.get()).values[0]?.value || 0;
-    } catch (e) {
+    } catch (_e) {
       /* metrics not available */
     }
 
@@ -434,7 +434,7 @@ router.get("/traffic", async (req, res) => {
         .select("id", { count: "exact", head: true })
         .not("ip", "in", "(" + INTERNAL_IPS.join(",") + ")");
       totalAllTime = allCount || 0;
-    } catch (e) {
+    } catch (_e) {
       /* ok */
     }
 
@@ -446,7 +446,7 @@ router.get("/traffic", async (req, res) => {
       activeConnections,
       daily,
     });
-  } catch (e) {
+  } catch (_e) {
     logger.error(
       { component: "Admin", err: e.message },
       "Traffic query failed",
@@ -475,7 +475,7 @@ router.delete("/traffic/:id", async (req, res) => {
       .eq("id", req.params.id);
     if (error) return res.status(500).json({ error: error.message });
     res.json({ ok: true });
-  } catch (e) {
+  } catch (_e) {
     res.status(500).json({ error: e.message });
   }
 });
@@ -518,12 +518,12 @@ router.get("/users", async (req, res) => {
       users.forEach((u) => {
         u.message_count = counts[u.id] || 0;
       });
-    } catch (e) {
+    } catch (_e) {
       /* no usage table */
     }
 
     res.json({ users });
-  } catch (e) {
+  } catch (_e) {
     logger.error({ component: "Admin", err: e.message }, "Users query failed");
     res.json({ users: [] });
   }
@@ -556,7 +556,7 @@ router.delete("/users/:id", async (req, res) => {
     for (const t of tables) {
       try {
         await supabaseAdmin.from(t.table).delete().eq(t.column, userId);
-      } catch {}
+      } catch { /* ignored */ }
     }
 
     // Delete from Supabase Auth
@@ -570,14 +570,14 @@ router.delete("/users/:id", async (req, res) => {
         details: { userId, email },
         admin_id: req.adminUser?.id || "admin",
       });
-    } catch {}
+    } catch { /* ignored */ }
 
     logger.info(
       { component: "Admin", userId, email },
       `🗑️ User ${email} deleted`,
     );
     res.json({ success: true, deleted: email });
-  } catch (e) {
+  } catch (_e) {
     logger.error({ component: "Admin", err: e.message }, "Delete user failed");
     res.status(500).json({ error: e.message });
   }
@@ -620,7 +620,7 @@ router.get("/revenue", async (req, res) => {
       churnRate: 0,
       recentPayments: payments || [],
     });
-  } catch (e) {
+  } catch (_e) {
     logger.error(
       { component: "Admin", err: e.message },
       "Revenue query failed",
@@ -717,8 +717,8 @@ router.get("/ai-status", async (req, res) => {
     const daysLeft = daysInMonth - dayOfMonth;
 
     // Get monthly costs AND request counts per provider
-    let costByProvider = {};
-    let requestsByProvider = {};
+    const costByProvider = {};
+    const requestsByProvider = {};
     if (supabaseAdmin) {
       try {
         const { data } = await supabaseAdmin
@@ -732,13 +732,13 @@ router.get("/ai-status", async (req, res) => {
           costByProvider[pName] += parseFloat(r.cost_usd) || 0;
           requestsByProvider[pName]++;
         });
-      } catch (e) {
+      } catch (_e) {
         /* table might not exist */
       }
     }
 
     // Read credit limits from DB
-    let creditByProvider = {};
+    const creditByProvider = {};
     if (supabaseAdmin) {
       try {
         const { data: credits } = await supabaseAdmin
@@ -747,7 +747,7 @@ router.get("/ai-status", async (req, res) => {
         (credits || []).forEach((c) => {
           creditByProvider[c.provider] = parseFloat(c.credit_usd) || 0;
         });
-      } catch (e) {
+      } catch (_e) {
         /* table might not exist yet */
       }
     }
@@ -817,7 +817,7 @@ router.get("/ai-status", async (req, res) => {
         monthProgress: Math.round((dayOfMonth / daysInMonth) * 100),
       },
     });
-  } catch (e) {
+  } catch (_e) {
     logger.error({ component: "Admin", err: e.message }, "AI status failed");
     res.json({ providers: [], month: {} });
   }
@@ -851,7 +851,7 @@ router.post("/provider-credit", async (req, res) => {
 
     if (error) return res.status(500).json({ error: error.message });
     res.json({ ok: true, provider, credit_usd: credit });
-  } catch (e) {
+  } catch (_e) {
     res.status(500).json({ error: e.message });
   }
 });
@@ -872,7 +872,7 @@ router.get("/codes", async (req, res) => {
       .limit(50);
 
     res.json({ codes: data || [] });
-  } catch (e) {
+  } catch (_e) {
     res.json({ codes: [] });
   }
 });
@@ -896,7 +896,7 @@ router.post("/codes", async (req, res) => {
     if (error) return res.status(500).json({ error: error.message });
     logger.info({ component: "Admin", code, type }, "Admin code generated");
     res.json({ code, type });
-  } catch (e) {
+  } catch (_e) {
     res.status(500).json({ error: e.message });
   }
 });
@@ -908,7 +908,7 @@ router.delete("/codes/:id", async (req, res) => {
 
     await supabaseAdmin.from("admin_codes").delete().eq("id", req.params.id);
     res.json({ success: true });
-  } catch (e) {
+  } catch (_e) {
     res.status(500).json({ error: e.message });
   }
 });
@@ -1049,7 +1049,7 @@ router.post("/refund", async (req, res) => {
       "Refund processed",
     );
     res.json({ success: true, refundAmount, billingType, message });
-  } catch (e) {
+  } catch (_e) {
     logger.error({ component: "Admin", err: e.message }, "Refund failed");
     res.status(500).json({ error: e.message });
   }
@@ -1106,11 +1106,11 @@ router.post("/upgrade", async (req, res) => {
         admin_id: req.adminUser?.id || "admin",
         created_at: new Date().toISOString(),
       });
-    } catch {}
+    } catch { /* ignored */ }
 
     logger.info({ component: "Admin", userId, plan }, "User plan updated");
     res.json({ success: true, message: "Plan actualizat la " + plan + "!" });
-  } catch (e) {
+  } catch (_e) {
     res.status(500).json({ error: e.message });
   }
 });
@@ -1178,7 +1178,7 @@ router.post("/recharge", async (req, res) => {
       message:
         "Recharge £50 înregistrată! (fără Stripe — adaugă manual credit pe API providers)",
     });
-  } catch (e) {
+  } catch (_e) {
     logger.error({ component: "Admin", err: e.message }, "Recharge failed");
     res.status(500).json({ error: e.message });
   }
@@ -1253,7 +1253,7 @@ router.get("/test-tables", async (req, res) => {
           rowCount: count || 0,
         });
       }
-    } catch (e) {
+    } catch (_e) {
       failed++;
       results.push({
         table,
@@ -1324,7 +1324,7 @@ router.post("/update-social-photos", async (req, res) => {
         await fetch(
           "https://api.telegram.org/bot" + telegramToken + "/deleteMyCommands",
         );
-      } catch (e) {
+      } catch (_e) {
         /* ok */
       }
 
@@ -1342,7 +1342,7 @@ router.post("/update-social-photos", async (req, res) => {
       results.telegram = d.ok
         ? "✅ Photo updated"
         : "❌ " + (d.description || JSON.stringify(d));
-    } catch (e) {
+    } catch (_e) {
       results.telegram = "❌ " + e.message;
     }
   } else {
@@ -1383,7 +1383,7 @@ router.post("/update-social-photos", async (req, res) => {
         d.success || d.id
           ? "✅ Photo updated"
           : "❌ " + JSON.stringify(d).substring(0, 200);
-    } catch (e) {
+    } catch (_e) {
       results.facebook = "❌ " + e.message;
     }
   } else {
@@ -1670,7 +1670,7 @@ try {
       "✅ Hardcoded audit: CLEAN — zero findings",
     );
   }
-} catch (e) {
+} catch (_e) {
   logger.warn({ component: "Audit", err: e.message }, "Startup audit failed");
 }
 
@@ -1687,7 +1687,7 @@ setInterval(
       } else {
         logger.info({ component: "Audit" }, "✅ Periodic audit: CLEAN");
       }
-    } catch (e) {
+    } catch (_e) {
       logger.warn(
         { component: "Audit", err: e.message },
         "Periodic audit failed",
@@ -1701,7 +1701,7 @@ setInterval(
 router.get("/audit-hardcoded", (req, res) => {
   try {
     res.json(_lastAudit || scanHardcoded());
-  } catch (e) {
+  } catch (_e) {
     res.status(500).json({ error: e.message });
   }
 });
@@ -1715,7 +1715,7 @@ router.post("/audit-hardcoded/fix", (req, res) => {
       `Auto-fix: ${fix.count} files fixed, ${after.total} remaining`,
     );
     res.json({ fix, afterScan: after });
-  } catch (e) {
+  } catch (_e) {
     logger.error({ component: "Audit", err: e.message }, "Auto-fix failed");
     res.status(500).json({ error: e.message });
   }
@@ -1772,7 +1772,7 @@ router.get("/brain-health", (req, res) => {
       recentErrors: brain.recentErrors || 0,
       memoryEntries: brain._memoryCount || 0,
     });
-  } catch (e) {
+  } catch (_e) {
     res.status(500).json({ error: e.message });
   }
 });
@@ -1838,7 +1838,7 @@ router.get("/media", async (req, res) => {
     }));
 
     res.json({ recent: mapped, stats, totalCount: count || 0 });
-  } catch (e) {
+  } catch (_e) {
     logger.error({ component: "Admin", err: e.message }, "Media query failed");
     res.json({ recent: [], stats: {}, totalCount: 0 });
   }
@@ -1905,7 +1905,7 @@ router.get("/trading", async (req, res) => {
         binanceMode,
       },
     });
-  } catch (e) {
+  } catch (_e) {
     logger.error(
       { component: "Admin", err: e.message },
       "Trading query failed",
@@ -1950,12 +1950,12 @@ router.get("/health-check", async (req, res) => {
             tables[t] = error
               ? { ok: false, error: error.message }
               : { ok: true, count: count || 0 };
-          } catch (e) {
+          } catch (_e) {
             tables[t] = { ok: false, error: e.message };
           }
         }
         dbConnected = true;
-      } catch (e) {
+      } catch (_e) {
         dbConnected = false;
       }
     }
@@ -2031,7 +2031,7 @@ router.get("/health-check", async (req, res) => {
           .select("*", { count: "exact", head: true })
           .eq("status", "active");
         payments.activeSubscribers = count || 0;
-      } catch (e) {
+      } catch (_e) {
         logger.warn(
           { component: "Admin", err: e.message },
           "Subscription count query failed",
@@ -2136,7 +2136,7 @@ Răspunde în maxim 3 recomandări scurte, fiecare pe un rând. Doar probleme re
       errors,
       recommendations,
     });
-  } catch (e) {
+  } catch (_e) {
     logger.error({ component: "Admin", err: e.message }, "Health check failed");
     res.status(500).json({ error: e.message, score: 0, grade: "F" });
   }
@@ -2148,7 +2148,7 @@ Răspunde în maxim 3 recomandări scurte, fiecare pe un rând. Doar probleme re
 // Brain analyzes results and provides recommendations
 // ══════════════════════════════════════════════════════════════
 
-let _monitorHistory = []; // in-memory ring buffer (last 48 entries = 24h)
+const _monitorHistory = []; // in-memory ring buffer (last 48 entries = 24h)
 const MONITOR_MAX = 48;
 
 async function collectMonitorSnapshot(supabaseAdmin, brain) {
@@ -2175,7 +2175,7 @@ async function collectMonitorSnapshot(supabaseAdmin, brain) {
           .eq("id", "paper_bot")
           .single();
         tradingState = data;
-      } catch (e) {
+      } catch (_e) {
         /* table may not exist */
       }
     }
@@ -2188,7 +2188,7 @@ async function collectMonitorSnapshot(supabaseAdmin, brain) {
           .from("market_candles")
           .select("*", { count: "exact", head: true });
         candleCount = count || 0;
-      } catch (e) {
+      } catch (_e) {
         /* table may not exist */
       }
     }
@@ -2255,7 +2255,7 @@ async function collectMonitorSnapshot(supabaseAdmin, brain) {
               );
           }
         }
-      } catch (e) {
+      } catch (_e) {
         /* table may not exist yet */
       }
     }
@@ -2271,7 +2271,7 @@ async function collectMonitorSnapshot(supabaseAdmin, brain) {
     );
 
     return snapshot;
-  } catch (e) {
+  } catch (_e) {
     logger.warn(
       { component: "Monitor", err: e.message },
       "Monitor snapshot failed",
@@ -2297,7 +2297,7 @@ function ensureMonitorStarted(req) {
     async () => {
       try {
         await collectMonitorSnapshot(supabaseAdmin, brain);
-      } catch (e) {
+      } catch (_e) {
         /* ok */
       }
     },
@@ -2340,7 +2340,7 @@ router.get("/monitor", async (req, res) => {
             return r;
           }
         });
-      } catch (e) {
+      } catch (_e) {
         history = _monitorHistory;
       }
     } else {
@@ -2409,7 +2409,7 @@ IMPORTANT: Nu minți, nu ascunzi probleme. Dacă trading-ul pierde bani, spune c
             brainAnalysis = { raw: brainResult.enrichedMessage };
           }
         }
-      } catch (e) {
+      } catch (_e) {
         brainAnalysis = { error: e.message, status: "ANALYSIS_FAILED" };
       }
     } else {
@@ -2427,7 +2427,7 @@ IMPORTANT: Nu minți, nu ascunzi probleme. Dacă trading-ul pierde bani, spune c
         nextRun: _monitorInterval ? "Active" : "Not started",
       },
     });
-  } catch (e) {
+  } catch (_e) {
     logger.error(
       { component: "Monitor", err: e.message },
       "Monitor route failed",
@@ -2461,7 +2461,7 @@ router.get("/monitor/history", async (req, res) => {
       source: "database",
       totalEntries: (data || []).length,
     });
-  } catch (e) {
+  } catch (_e) {
     res.status(500).json({ error: e.message });
   }
 });
@@ -2548,7 +2548,7 @@ router.get("/memories", async (req, res) => {
         "context",
       ],
     });
-  } catch (e) {
+  } catch (_e) {
     logger.error(
       { component: "Admin", err: e.message },
       "Memory panel query failed",
@@ -2581,7 +2581,7 @@ router.delete("/memories/:id", async (req, res) => {
       "Memory deleted",
     );
     res.json({ success: true });
-  } catch (e) {
+  } catch (_e) {
     res.status(500).json({ error: e.message });
   }
 });
@@ -2645,7 +2645,7 @@ Respond in this exact JSON format:
         const raw = await brain.singleProviderCall(analysisPrompt, 500);
         const jsonMatch = (raw || "").match(/\{[\s\S]*\}/);
         if (jsonMatch) aiAnalysis = JSON.parse(jsonMatch[0]);
-      } catch (_) {}
+      } catch { /* ignored */ }
     }
 
     // 3. Create a GitHub issue with the analysis (safe — doesn't auto-push code)
@@ -2695,7 +2695,7 @@ ${aiAnalysis ? JSON.stringify(aiAnalysis, null, 2) : "AI analysis unavailable"}
       errorsAnalyzed: errorPatterns.length,
       aiAnalysis: aiAnalysis,
     });
-  } catch (e) {
+  } catch (_e) {
     logger.error({ component: "SelfHeal", err: e.message }, "Self-heal failed");
     res.status(500).json({ error: e.message });
   }
@@ -2714,12 +2714,12 @@ router.get("/intelligence", (req, res) => {
     let patterns = "";
     let proactive = "";
 
-    try { performance = require("../k1-performance").getReport(); } catch {}
-    try { strategies = require("../k1-meta-learning").getStrategies(); } catch {}
-    try { evolution = require("../k1-meta-learning").getEvolutionReport(); } catch {}
-    try { userModel = require("../k1-meta-learning").getUserModel(); } catch {}
-    try { patterns = require("../k1-meta-learning").getPatternsText(); } catch {}
-    try { proactive = require("../k1-meta-learning").getProactiveSuggestion(); } catch {}
+    try { performance = require("../k1-performance").getReport(); } catch { /* ignored */ }
+    try { strategies = require("../k1-meta-learning").getStrategies(); } catch { /* ignored */ }
+    try { evolution = require("../k1-meta-learning").getEvolutionReport(); } catch { /* ignored */ }
+    try { userModel = require("../k1-meta-learning").getUserModel(); } catch { /* ignored */ }
+    try { patterns = require("../k1-meta-learning").getPatternsText(); } catch { /* ignored */ }
+    try { proactive = require("../k1-meta-learning").getProactiveSuggestion(); } catch { /* ignored */ }
 
     res.json({
       performance,
@@ -2730,7 +2730,7 @@ router.get("/intelligence", (req, res) => {
       proactive: proactive || "",
       timestamp: new Date().toISOString()
     });
-  } catch (e) {
+  } catch (_e) {
     logger.error({ component: "Intelligence", err: e.message }, "Intelligence data failed");
     res.status(500).json({ error: e.message });
   }
@@ -2751,7 +2751,7 @@ router.get("/conversations", async (req, res) => {
       .limit(200);
 
     res.json({ conversations: data || [], total: (data || []).length });
-  } catch (e) {
+  } catch (_e) {
     res.status(500).json({ error: e.message });
   }
 });
@@ -2806,7 +2806,7 @@ router.get("/conversations/export", async (req, res) => {
       total_messages: (msgs || []).length,
       conversations: exported
     });
-  } catch (e) {
+  } catch (_e) {
     logger.error({ component: "Admin", err: e.message }, "Conversation export failed");
     res.status(500).json({ error: e.message });
   }
@@ -2824,7 +2824,7 @@ router.post("/ab-tests", (req, res) => {
     const exp = abTest.createExperiment(req.body);
     notify("system", `🧪 New A/B test: ${exp.name}`);
     res.json({ experiment: exp });
-  } catch (e) {
+  } catch (_e) {
     res.status(400).json({ error: e.message });
   }
 });
