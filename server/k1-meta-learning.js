@@ -407,6 +407,87 @@ function resetAll() {
   logger.info("[K1-Meta] 🧒 Meta-learning reset — newborn mode");
 }
 
+// ═══════════════════════════════════════════════════════════════
+// PATTERN SYNTHESIS — Converts raw data into actionable rules
+// ═══════════════════════════════════════════════════════════════
+
+function synthesizePatterns() {
+  const rules = [];
+  const m = userModel;
+
+  // MINIMUM THRESHOLDS — no patterns until enough real data
+  if (m.totalInteractions < 5) return rules; // prea puține date
+
+  // 1. Preferred domain — doar dacă ≥10 interacțiuni reale
+  const sortedInterests = Object.entries(m.interests)
+    .filter(([, v]) => v >= 3) // minim 3 interacțiuni pe domeniu
+    .sort(([, a], [, b]) => b - a);
+  if (sortedInterests.length > 0 && m.totalInteractions >= 10) {
+    const top = sortedInterests[0];
+    const topPct = Math.round((top[1] / m.totalInteractions) * 100);
+    if (topPct > 40) {
+      rules.push(`Userul e interesat în principal de ${top[0]} (${topPct}% din ${m.totalInteractions} conversații).`);
+    }
+    if (sortedInterests.length > 1) {
+      const secondary = sortedInterests.slice(1, 3).map(([k]) => k).join(", ");
+      rules.push(`Interese secundare: ${secondary}.`);
+    }
+  }
+
+  // 2. Temporal patterns — doar dacă ≥5 ore distincte înregistrate
+  const hourEntries = Object.entries(m.temporal.activeHours).filter(([, v]) => v >= 2);
+  if (hourEntries.length >= 3) {
+    const topHours = hourEntries
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 3)
+      .map(([h]) => h + ":00");
+    rules.push(`Userul e cel mai activ la: ${topHours.join(", ")}.`);
+  }
+  const dayEntries = Object.entries(m.temporal.activeDays).filter(([, v]) => v >= 2);
+  if (dayEntries.length >= 2) {
+    const topDays = dayEntries
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 2)
+      .map(([d]) => d);
+    rules.push(`Zilele cele mai active: ${topDays.join(", ")}.`);
+  }
+
+  // 3. Correction rate — doar din date reale (≥5 interacțiuni)
+  if (m.totalCorrections > 0) {
+    if (m.correctionRate > 30) {
+      rules.push("Atenție: rată mare de corecții (" + m.correctionRate + "%). Verifică de două ori înainte de a răspunde.");
+    } else if (m.correctionRate > 15) {
+      rules.push("Userul corectează ocazional (" + m.correctionRate + "%). Reconfirmă când nu ești sigur.");
+    }
+  }
+
+  // 4. Corecții concrete — DOAR cele reale observate
+  if (m.communication.corrections.length > 0) {
+    const correctionNotes = m.communication.corrections
+      .slice(-5)
+      .filter(c => c.what && c.what !== "unknown")
+      .map(c => c.what);
+    if (correctionNotes.length > 0) {
+      rules.push("Corecții de reținut: " + correctionNotes.join("; ") + ".");
+    }
+  }
+
+  // 5. NU emitem preferredStyle / technicalLevel / riskProfile
+  //    Acestea sunt default-uri hardcodate, NU date reale observate.
+  //    Vor fi emise doar când implementăm detectarea automată din conversații.
+
+  return rules;
+}
+
+/**
+ * Get patterns as a text block for system prompt injection
+ */
+function getPatternsText() {
+  const rules = synthesizePatterns();
+  if (rules.length === 0) return "";
+  return "\n[LEARNED PATTERNS]\n" + rules.join("\n") + "\n[/LEARNED PATTERNS]";
+}
+
 module.exports = {
   useTemplate,
   scoreTools,
@@ -418,4 +499,6 @@ module.exports = {
   getStrategies,
   getEvolutionReport,
   resetAll,
+  synthesizePatterns,
+  getPatternsText,
 };

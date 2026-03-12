@@ -8,6 +8,7 @@
 const logger = require("./logger");
 const { MODELS } = require("./config/models");
 const { buildSystemPrompt, buildNewbornPrompt } = require("./persona");
+const { getPatternsText } = require("./k1-meta-learning");
 const vm = require("vm");
 
 // ── Tool Definitions for Gemini (functionDeclarations format) ──
@@ -2864,12 +2865,13 @@ async function thinkV4(
       : "";
     const now = new Date();
     const dateTimeBlock = `\n[CURRENT DATE & TIME] ${now.toLocaleDateString("ro-RO", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}, ora ${now.toLocaleTimeString("ro-RO", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Bucharest" })} (Romania). Folosește MEREU aceste date când userul întreabă de zi, dată sau oră.`;
+    const patternsBlock = getPatternsText();
     const systemPrompt = process.env.NEWBORN_MODE === "true"
-      ? buildNewbornPrompt(memoryBlock)
+      ? buildNewbornPrompt(memoryBlock + patternsBlock)
       : buildSystemPrompt(
           avatar,
           language,
-          memoryBlock + emotionBlock + geoBlock + dateTimeBlock,
+          memoryBlock + emotionBlock + geoBlock + dateTimeBlock + patternsBlock,
           "",
           null,
         );
