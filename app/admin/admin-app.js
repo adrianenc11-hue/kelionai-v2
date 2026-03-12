@@ -626,4 +626,84 @@ function exitAdmin() {
 
 initAdmin();
 
+// ══════════════════════════════════════════════════════════
+// REAL-TIME NOTIFICATIONS (SSE)
+// ══════════════════════════════════════════════════════════
+var _notifCount = 0;
+var _notifs = [];
+var _notifSSE = null;
 
+function initNotifications() {
+    if (typeof EventSource === 'undefined') return;
+    try {
+        _notifSSE = new EventSource('/api/admin/notifications/stream');
+        _notifSSE.onmessage = function(e) {
+            try {
+                var n = JSON.parse(e.data);
+                _notifs.unshift(n);
+                if (_notifs.length > 30) _notifs.pop();
+                _notifCount++;
+                updateNotifBadge();
+                renderNotifList();
+            } catch {}
+        };
+        _notifSSE.onerror = function() {
+            console.warn('[Notifications] SSE connection error — will retry');
+        };
+    } catch (e) {
+        console.warn('[Notifications] Init failed:', e.message);
+    }
+}
+
+function updateNotifBadge() {
+    var badge = document.getElementById('notif-badge');
+    if (!badge) return;
+    if (_notifCount > 0) {
+        badge.style.display = 'inline';
+        badge.textContent = _notifCount > 99 ? '99+' : _notifCount;
+    } else {
+        badge.style.display = 'none';
+    }
+}
+
+function toggleNotifications() {
+    var dd = document.getElementById('notif-dropdown');
+    if (!dd) return;
+    dd.style.display = dd.style.display === 'none' ? 'block' : 'none';
+    if (dd.style.display === 'block') { _notifCount = 0; updateNotifBadge(); }
+}
+
+function clearNotifications() {
+    _notifs = [];
+    _notifCount = 0;
+    updateNotifBadge();
+    renderNotifList();
+}
+
+function renderNotifList() {
+    var el = document.getElementById('notif-list');
+    if (!el) return;
+    if (_notifs.length === 0) {
+        el.innerHTML = '<div style="padding:12px;text-align:center;color:#666">No notifications</div>';
+        return;
+    }
+    var colors = { info: '#3b82f6', warn: '#f59e0b', error: '#ef4444', success: '#22c55e', trade: '#8b5cf6', user: '#06b6d4', system: '#6366f1' };
+    el.innerHTML = _notifs.map(function(n) {
+        var c = colors[n.type] || '#666';
+        var time = n.timestamp ? new Date(n.timestamp).toLocaleTimeString() : '';
+        return '<div style="padding:6px 8px;border-left:3px solid ' + c + ';margin-bottom:4px;border-radius:4px;background:rgba(255,255,255,0.02)">' +
+            '<div style="color:#e0e0e0">' + (n.message || '') + '</div>' +
+            '<div style="color:#666;font-size:0.7rem;margin-top:2px">' + time + '</div>' +
+        '</div>';
+    }).join('');
+}
+
+// Close dropdown on click outside
+document.addEventListener('click', function(e) {
+    var w = document.getElementById('notif-wrapper');
+    var dd = document.getElementById('notif-dropdown');
+    if (w && dd && !w.contains(e.target)) dd.style.display = 'none';
+});
+
+// Start SSE
+initNotifications();

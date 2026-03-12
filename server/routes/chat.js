@@ -13,6 +13,7 @@ const { buildSystemPrompt, buildNewbornPrompt } = require("../persona");
 const { KelionBrain } = require("../brain");
 const { thinkV4 } = require("../brain-v4");
 const { MODELS } = require("../config/models");
+const { notify } = require("../notifications");
 
 const router = express.Router();
 
@@ -218,6 +219,13 @@ router.post("/chat", chatLimiter, validate(chatSchema), async (req, res) => {
     if (reply) {
       reply = sanitizeReply(reply);
     }
+
+    // ── Push notification to admin ──
+    try {
+      notify("info", `💬 ${user?.email || "guest"}: ${(message || "").slice(0, 60)}`, {
+        userId: user?.id, avatar, engine: thought.agent
+      });
+    } catch { /* non-blocking */ }
     // #region agent log
     fetch("http://127.0.0.1:7257/ingest/9ae34db2-4176-48c4-a1ff-ca0fe87de92a", {
       method: "POST",

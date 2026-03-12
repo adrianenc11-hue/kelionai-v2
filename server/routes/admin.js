@@ -6,6 +6,7 @@
 
 const express = require("express");
 const logger = require("../logger");
+const { notify, sseHandler, getRecent } = require("../notifications");
 const router = express.Router();
 
 // ── Config from environment variables ──
@@ -97,6 +98,10 @@ router.post("/verify-code", express.json(), (req, res) => {
 });
 
 router.use(requireAdmin);
+
+// ── SSE Notifications Stream (must be BEFORE JSON middleware) ──
+router.get("/notifications/stream", sseHandler);
+router.get("/notifications", (req, res) => res.json({ notifications: getRecent(30) }));
 
 // ── Log ALL admin actions to Supabase ──
 router.use(async (req, res, next) => {
