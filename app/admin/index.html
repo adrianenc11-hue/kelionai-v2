@@ -45,8 +45,21 @@
 
                 </div>
                 <button class="admin-btn" onclick="location.reload()">🔄 Refresh</button>
+                <button class="admin-btn" id="theme-toggle" onclick="toggleTheme()">🌙</button>
             </div>
         </header>
+<script>
+function toggleTheme(){
+    document.body.classList.toggle('light-theme');
+    const isLight = document.body.classList.contains('light-theme');
+    localStorage.setItem('admin-theme', isLight ? 'light' : 'dark');
+    document.getElementById('theme-toggle').textContent = isLight ? '☀️' : '🌙';
+}
+if(localStorage.getItem('admin-theme') === 'light'){
+    document.body.classList.add('light-theme');
+    document.addEventListener('DOMContentLoaded', () => { const t = document.getElementById('theme-toggle'); if(t) t.textContent = '☀️'; });
+}
+</script>
 
         <!-- QUICK STATS -->
         <div class="stats-bar">

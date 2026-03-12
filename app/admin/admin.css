@@ -16,6 +16,16 @@
     --admin-font: 'Inter', -apple-system, sans-serif;
 }
 
+/* LIGHT THEME */
+body.light-theme {
+    --admin-bg: #f0f2f5;
+    --admin-surface: #ffffff;
+    --admin-card: #f8f9fc;
+    --admin-border: rgba(99, 102, 241, 0.2);
+    --admin-text: #1a1a2e;
+    --admin-muted: #6b7280;
+}
+
 * {
     margin: 0;
     padding: 0;
