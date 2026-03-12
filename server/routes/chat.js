@@ -9,7 +9,7 @@ const rateLimit = require("express-rate-limit");
 const logger = require("../logger");
 const { validate, chatSchema, memorySchema } = require("../validation");
 const { checkUsage, incrementUsage } = require("../payments");
-const { buildSystemPrompt } = require("../persona");
+const { buildSystemPrompt, buildNewbornPrompt } = require("../persona");
 const { KelionBrain } = require("../brain");
 const { thinkV4 } = require("../brain-v4");
 const { MODELS } = require("../config/models");
@@ -121,16 +121,20 @@ router.post("/chat", chatLimiter, validate(chatSchema), async (req, res) => {
       geo,
     } = req.body;
     if (!message) return res.status(400).json({ error: "Message is required" });
-    
+
     // ═══ K1 MODE INTERCEPT — admin says "K1" to talk to brain directly ═══
-    const isK1Admin = req.headers["x-admin-secret"] === process.env.ADMIN_SECRET_KEY;
+    const isK1Admin =
+      req.headers["x-admin-secret"] === process.env.ADMIN_SECRET_KEY;
     const isK1 = isK1Admin && /^k1[\s:,]/i.test(message.trim());
     if (isK1) {
       try {
         const brainChat = require("./brain-chat");
         const k1Message = message.replace(/^k1[\s:,]*/i, "").trim();
         // Forward to brain-chat internally
-        const fakeReq = { body: { message: k1Message, sessionId: "k1_chat_" + Date.now() }, app: req.app };
+        const fakeReq = {
+          body: { message: k1Message, sessionId: "k1_chat_" + Date.now() },
+          app: req.app,
+        };
         const fakeRes = {
           json: (data) => {
             // Return as K1 response with different voice marker
@@ -148,7 +152,10 @@ router.post("/chat", chatLimiter, validate(chatSchema), async (req, res) => {
         return;
       } catch (e) {
         // K1 not available, fall through to normal chat
-        logger.warn({ component: "Chat", err: e.message }, "K1 intercept failed, using normal chat");
+        logger.warn(
+          { component: "Chat", err: e.message },
+          "K1 intercept failed, using normal chat",
+        );
       }
     }
 
@@ -156,7 +163,9 @@ router.post("/chat", chatLimiter, validate(chatSchema), async (req, res) => {
 
     // Admin tool execution is gated in brain.buildPlan() via isAdmin parameter.
     // Non-admin users can mention admin keywords freely — tools won't execute.
-    const adminEmail = (process.env.ADMIN_EMAIL || "adrianenc11@gmail.com").toLowerCase();
+    const adminEmail = (
+      process.env.ADMIN_EMAIL || "adrianenc11@gmail.com"
+    ).toLowerCase();
     const isOwner = user?.email?.toLowerCase() === adminEmail;
     const isAdmin = isOwner && req.headers["x-admin-mode"] === "true";
 
@@ -184,7 +193,31 @@ router.post("/chat", chatLimiter, validate(chatSchema), async (req, res) => {
 
     // V4 returns the final reply directly from Gemini (tool calling + response in one)
     let reply = thought.enrichedMessage;
-    let engine = thought.agent === "v4-gemini-tools" ? "Gemini-V4" : "V3-Fallback";
+    let engine =
+      thought.agent === "v4-gemini-tools" ? "Gemini-V4" : "V3-Fallback";
+    // #region agent log
+    fetch("http://127.0.0.1:7257/ingest/9ae34db2-4176-48c4-a1ff-ca0fe87de92a", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Debug-Session-Id": "90d20d",
+      },
+      body: JSON.stringify({
+        sessionId: "90d20d",
+        runId: "brain-run-1",
+        hypothesisId: "H4",
+        location: "server/routes/chat.js:post-thinkV4",
+        message: "Chat route received thought",
+        data: {
+          engine,
+          hasReply: !!reply,
+          replyLen: (reply || "").length,
+          toolsUsed: (thought.toolsUsed || []).length,
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
 
     if (!reply) return res.status(503).json({ error: "AI unavailable" });
 
@@ -214,27 +247,53 @@ router.post("/chat", chatLimiter, validate(chatSchema), async (req, res) => {
       );
     // Save brain memory (text) + extract facts
     if (user?.id) {
-      brain.saveMemory(user.id, "text", "User: " + message.substring(0, 500) + " | Kelion: " + reply.substring(0, 500), { avatar, language, engine }).catch(() => { });
-      brain.extractAndSaveFacts(user.id, message, reply).catch(() => { });
+      brain
+        .saveMemory(
+          user.id,
+          "text",
+          "User: " +
+            message.substring(0, 500) +
+            " | Kelion: " +
+            reply.substring(0, 500),
+          { avatar, language, engine },
+        )
+        .catch(() => {});
+      brain.extractAndSaveFacts(user.id, message, reply).catch(() => {});
       // Save visual memory if image was analyzed
       if (imageBase64 && reply) {
-        brain.saveMemory(user.id, "visual", "Image analysis: " + reply.substring(0, 500), { avatar }).catch(() => { });
+        brain
+          .saveMemory(
+            user.id,
+            "visual",
+            "Image analysis: " + reply.substring(0, 500),
+            { avatar },
+          )
+          .catch(() => {});
       }
       // Save audio memory if voice was transcribed
       if (audioBase64 && message) {
-        brain.saveMemory(user.id, "audio", "Voice said: " + message.substring(0, 500), { avatar }).catch(() => { });
+        brain
+          .saveMemory(
+            user.id,
+            "audio",
+            "Voice said: " + message.substring(0, 500),
+            { avatar },
+          )
+          .catch(() => {});
       }
     }
     // Log AI cost for this chat interaction
     const estimatedTokens = Math.ceil((message.length + reply.length) / 4);
-    brain._logCost(
-      engine === "Gemini-V4" ? "Google" : "OpenAI",
-      engine,
-      Math.ceil(message.length / 4),
-      Math.ceil(reply.length / 4),
-      estimatedTokens * 0.000003, // approximate cost
-      user?.id
-    ).catch(() => { });
+    brain
+      ._logCost(
+        engine === "Gemini-V4" ? "Google" : "OpenAI",
+        engine,
+        Math.ceil(message.length / 4),
+        Math.ceil(reply.length / 4),
+        estimatedTokens * 0.000003, // approximate cost
+        user?.id,
+      )
+      .catch(() => {});
     incrementUsage(user?.id, "chat", supabaseAdmin).catch((e) =>
       logger.warn(
         { component: "Chat", err: e.message },
@@ -273,17 +332,42 @@ router.post("/chat", chatLimiter, validate(chatSchema), async (req, res) => {
     } else {
       // FALLBACK: auto-detect emotion from reply text when AI doesn't emit tags
       const replyLow = reply.toLowerCase();
-      if (/😂|😄|😊|haha|:D|bravo|super|perfect|excelent|genial|fantastic/i.test(replyLow)) emotion = 'laughing';
-      else if (/❤|🥰|💕|te iubesc|love|drag|iubit/i.test(replyLow)) emotion = 'loving';
-      else if (/😢|😔|din păcate|unfortunately|îmi pare rău|sorry|scuze|regret/i.test(replyLow)) emotion = 'sad';
-      else if (/🤔|hmm|interesant|curios|interesting|oare|perhaps/i.test(replyLow)) emotion = 'thinking';
-      else if (/😮|wow|uau|incredibil|amazing|unbelievable|nu-mi vine/i.test(replyLow)) emotion = 'surprised';
-      else if (/😏|heh|glum|ironic|witty|😜/i.test(replyLow)) emotion = 'playful';
-      else if (/💪|determinat|going to|vom reuși|we will|hai să/i.test(replyLow)) emotion = 'determined';
-      else if (/😟|grijă|atenție|careful|warning|pericol|danger/i.test(replyLow)) emotion = 'concerned';
-      else if (/salut|bună|hello|hey|hi |welcome|👋/i.test(replyLow)) emotion = 'happy';
-      else if (/\?$/.test(reply.trim())) emotion = 'thinking';
-      else emotion = 'happy'; // default to happy, not neutral — feels more alive
+      if (
+        /😂|😄|😊|haha|:D|bravo|super|perfect|excelent|genial|fantastic/i.test(
+          replyLow,
+        )
+      )
+        emotion = "laughing";
+      else if (/❤|🥰|💕|te iubesc|love|drag|iubit/i.test(replyLow))
+        emotion = "loving";
+      else if (
+        /😢|😔|din păcate|unfortunately|îmi pare rău|sorry|scuze|regret/i.test(
+          replyLow,
+        )
+      )
+        emotion = "sad";
+      else if (
+        /🤔|hmm|interesant|curios|interesting|oare|perhaps/i.test(replyLow)
+      )
+        emotion = "thinking";
+      else if (
+        /😮|wow|uau|incredibil|amazing|unbelievable|nu-mi vine/i.test(replyLow)
+      )
+        emotion = "surprised";
+      else if (/😏|heh|glum|ironic|witty|😜/i.test(replyLow))
+        emotion = "playful";
+      else if (
+        /💪|determinat|going to|vom reuși|we will|hai să/i.test(replyLow)
+      )
+        emotion = "determined";
+      else if (
+        /😟|grijă|atenție|careful|warning|pericol|danger/i.test(replyLow)
+      )
+        emotion = "concerned";
+      else if (/salut|bună|hello|hey|hi |welcome|👋/i.test(replyLow))
+        emotion = "happy";
+      else if (/\?$/.test(reply.trim())) emotion = "thinking";
+      else emotion = "happy"; // default to happy, not neutral — feels more alive
     }
     // Parse [GESTURE:xxx] tags from AI reply (brain controls body language)
     let gestures = [];
@@ -349,7 +433,9 @@ router.post(
       const user = await getUserFromToken(req);
 
       // Admin tool execution gated in brain.buildPlan() — no keyword filter needed
-      const adminEmailS = (process.env.ADMIN_EMAIL || "adrianenc11@gmail.com").toLowerCase();
+      const adminEmailS = (
+        process.env.ADMIN_EMAIL || "adrianenc11@gmail.com"
+      ).toLowerCase();
       const isOwnerStream = user?.email?.toLowerCase() === adminEmailS;
 
       const usage = await checkUsage(user?.id, "chat", supabaseAdmin);
@@ -410,13 +496,15 @@ router.post(
           );
         }
       }
-      const systemPrompt = buildSystemPrompt(
-        avatar,
-        language,
-        memoryContext,
-        { failedTools: thought.failedTools },
-        thought.chainOfThought,
-      );
+      const systemPrompt = process.env.NEWBORN_MODE === "true"
+        ? buildNewbornPrompt(memoryContext)
+        : buildSystemPrompt(
+            avatar,
+            language,
+            memoryContext,
+            { failedTools: thought.failedTools },
+            thought.chainOfThought,
+          );
       const compressedHist = thought.compressedHistory || history.slice(-10);
       const msgs = compressedHist.map((h) => ({
         role: h.role === "ai" ? "assistant" : h.role,
@@ -426,7 +514,11 @@ router.post(
 
       let fullReply = "";
       const heartbeat = setInterval(() => {
-        try { res.write(":heartbeat\n\n"); } catch { /* connection closed */ }
+        try {
+          res.write(":heartbeat\n\n");
+        } catch {
+          /* connection closed */
+        }
       }, 15000);
 
       // AI Chain: Gemini (streaming nativ) → GPT-5.4 fallback → DeepSeek (backup)
@@ -438,15 +530,21 @@ router.post(
       if (geminiKey) {
         try {
           const geminiModel = MODELS.GEMINI_CHAT || "gemini-3.1-flash";
-          const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:streamGenerateContent?alt=sse&key=${geminiKey}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: msgs.map(m => ({ role: m.role === "assistant" ? "model" : m.role, parts: [{ text: m.content }] })),
-              systemInstruction: { parts: [{ text: systemPrompt }] },
-              generationConfig: { maxOutputTokens: 4096, temperature: 0.7 },
-            }),
-          });
+          const r = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:streamGenerateContent?alt=sse&key=${geminiKey}`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                contents: msgs.map((m) => ({
+                  role: m.role === "assistant" ? "model" : m.role,
+                  parts: [{ text: m.content }],
+                })),
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+                generationConfig: { maxOutputTokens: 4096, temperature: 0.7 },
+              }),
+            },
+          );
 
           if (r.ok && r.body) {
             res.write(
@@ -472,7 +570,8 @@ router.post(
                   if (data === "[DONE]") continue;
                   try {
                     const parsed = JSON.parse(data);
-                    const text = parsed.candidates?.[0]?.content?.parts?.[0]?.text;
+                    const text =
+                      parsed.candidates?.[0]?.content?.parts?.[0]?.text;
                     if (text) {
                       fullReply += text;
                       res.write(
@@ -497,9 +596,20 @@ router.post(
       }
       // Log Gemini streaming cost
       if (fullReply) {
-        const estInputTok = Math.ceil(msgs.reduce((s, m) => s + (m.content || '').length, 0) / 4);
+        const estInputTok = Math.ceil(
+          msgs.reduce((s, m) => s + (m.content || "").length, 0) / 4,
+        );
         const estOutputTok = Math.ceil(fullReply.length / 4);
-        brain._logCost("Google", "gemini-streaming", estInputTok, estOutputTok, (estInputTok * 0.075 + estOutputTok * 0.3) / 1000000, user?.id).catch(() => { });
+        brain
+          ._logCost(
+            "Google",
+            "gemini-streaming",
+            estInputTok,
+            estOutputTok,
+            (estInputTok * 0.075 + estOutputTok * 0.3) / 1000000,
+            user?.id,
+          )
+          .catch(() => {});
       }
 
       // Fallback: non-streaming GPT-5.4 (via OPENAI_FALLBACK) or DeepSeek
@@ -542,9 +652,20 @@ router.post(
           }
           // Log OpenAI cost
           if (fullReply) {
-            const estInputTok = Math.ceil(msgs.reduce((s, m) => s + (m.content || '').length, 0) / 4);
+            const estInputTok = Math.ceil(
+              msgs.reduce((s, m) => s + (m.content || "").length, 0) / 4,
+            );
             const estOutputTok = Math.ceil(fullReply.length / 4);
-            brain._logCost("OpenAI", "gpt-5.4-fallback", estInputTok, estOutputTok, (estInputTok * 5 + estOutputTok * 15) / 1000000, user?.id).catch(() => { });
+            brain
+              ._logCost(
+                "OpenAI",
+                "gpt-5.4-fallback",
+                estInputTok,
+                estOutputTok,
+                (estInputTok * 5 + estOutputTok * 15) / 1000000,
+                user?.id,
+              )
+              .catch(() => {});
           }
         }
       }
@@ -583,9 +704,20 @@ router.post(
         }
         // Log DeepSeek cost
         if (fullReply) {
-          const estInputTok = Math.ceil(msgs.reduce((s, m) => s + (m.content || '').length, 0) / 4);
+          const estInputTok = Math.ceil(
+            msgs.reduce((s, m) => s + (m.content || "").length, 0) / 4,
+          );
           const estOutputTok = Math.ceil(fullReply.length / 4);
-          brain._logCost("DeepSeek", "deepseek", estInputTok, estOutputTok, (estInputTok * 0.14 + estOutputTok * 0.28) / 1000000, user?.id).catch(() => { });
+          brain
+            ._logCost(
+              "DeepSeek",
+              "deepseek",
+              estInputTok,
+              estOutputTok,
+              (estInputTok * 0.14 + estOutputTok * 0.28) / 1000000,
+              user?.id,
+            )
+            .catch(() => {});
         }
       }
 

@@ -16,11 +16,19 @@
 const logger = require("./logger");
 const kiraTools = require("./kira-tools");
 const { MODELS } = require("./config/models");
-const { UserProfile, LearningStore, AutonomousMonitor } = require("./brain-profile");
+const {
+  UserProfile,
+  LearningStore,
+  AutonomousMonitor,
+} = require("./brain-profile");
 
 // K1 AGI Integration — enriches every web chat with world state, memory, reasoning
 let k1Bridge;
-try { k1Bridge = require("./k1-messenger-bridge"); } catch { k1Bridge = null; }
+try {
+  k1Bridge = require("./k1-messenger-bridge");
+} catch {
+  k1Bridge = null;
+}
 
 class KelionBrain {
   constructor(config) {
@@ -78,7 +86,7 @@ class KelionBrain {
 
     // ── Learning Store (pattern learning + circuit breaker) ──
     this.learningStore = new LearningStore();
-    this.learningStore.load(this.supabaseAdmin).catch(() => { });
+    this.learningStore.load(this.supabaseAdmin).catch(() => {});
 
     // ── Autonomous Monitor (30min health loop) ──
     this.autonomousMonitor = new AutonomousMonitor(this);
@@ -91,29 +99,34 @@ class KelionBrain {
     // ── Multi-Agent Profiles (references AGENTS static getter) ──
     this.agents = KelionBrain.AGENTS;
 
-    logger.info({ component: "Brain" },
-      "🧠 Brain v3.0 initialized: LearningStore + AutonomousMonitor + MultiAgent + UserProfiles");
+    logger.info(
+      { component: "Brain" },
+      "🧠 Brain v3.0 initialized: LearningStore + AutonomousMonitor + MultiAgent + UserProfiles",
+    );
 
     // ── Tool Registry (loaded from Supabase brain_tools) ──
     this._toolRegistry = new Map(); // id → tool
-    this._toolCache = new Map();    // cacheKey → { data, timestamp }
+    this._toolCache = new Map(); // cacheKey → { data, timestamp }
     this._toolCacheTTL = 5 * 60 * 1000; // 5 min cache
 
     // Plan quota limits (messages per month)
     this.PLAN_LIMITS = { free: 50, pro: 500, premium: Infinity };
 
     // Load tool registry on startup
-    this._loadToolRegistry().catch(() => { });
+    this._loadToolRegistry().catch(() => {});
 
     // PERIODIC TASKS — Reminder checker runs every 60 seconds
     this._reminderInterval = setInterval(() => {
-      this._checkReminders().catch(() => { });
+      this._checkReminders().catch(() => {});
     }, 60 * 1000);
 
     // SCHEDULED TASKS — Check for pending scheduled jobs every 5 minutes
-    this._scheduledTaskInterval = setInterval(() => {
-      this._checkScheduledTasks().catch(() => { });
-    }, 5 * 60 * 1000);
+    this._scheduledTaskInterval = setInterval(
+      () => {
+        this._checkScheduledTasks().catch(() => {});
+      },
+      5 * 60 * 1000,
+    );
   }
 
   /**
@@ -139,10 +152,16 @@ class KelionBrain {
         content: JSON.stringify(taskData),
       });
 
-      logger.info({ component: "Scheduler", taskType, userId }, `📅 Task scheduled: ${taskType}`);
+      logger.info(
+        { component: "Scheduler", taskType, userId },
+        `📅 Task scheduled: ${taskType}`,
+      );
       return true;
     } catch (e) {
-      logger.warn({ component: "Scheduler", err: e.message }, "Schedule task failed");
+      logger.warn(
+        { component: "Scheduler", err: e.message },
+        "Schedule task failed",
+      );
       return false;
     }
   }
@@ -150,11 +169,16 @@ class KelionBrain {
   _calculateNextRun(schedule) {
     const now = new Date();
     switch (schedule) {
-      case "daily": return new Date(now.getTime() + 86400000).toISOString();
-      case "weekly": return new Date(now.getTime() + 7 * 86400000).toISOString();
-      case "hourly": return new Date(now.getTime() + 3600000).toISOString();
-      case "once": return now.toISOString(); // Run immediately on next check
-      default: return new Date(now.getTime() + 86400000).toISOString();
+      case "daily":
+        return new Date(now.getTime() + 86400000).toISOString();
+      case "weekly":
+        return new Date(now.getTime() + 7 * 86400000).toISOString();
+      case "hourly":
+        return new Date(now.getTime() + 3600000).toISOString();
+      case "once":
+        return now.toISOString(); // Run immediately on next check
+      default:
+        return new Date(now.getTime() + 86400000).toISOString();
     }
   }
 
@@ -177,20 +201,34 @@ class KelionBrain {
           if (new Date(parsed.nextRun) > now) continue;
 
           // Task is due — mark as running
-          logger.info({ component: "Scheduler", type: parsed.type, userId: task.user_id }, `⏰ Running scheduled task: ${parsed.type}`);
+          logger.info(
+            { component: "Scheduler", type: parsed.type, userId: task.user_id },
+            `⏰ Running scheduled task: ${parsed.type}`,
+          );
 
           // Execute based on type
           switch (parsed.type) {
             case "daily_report":
               // Generate daily summary (non-blocking)
-              this._generateDocument("Raport Zilnic", `Generează un rezumat al activității de azi pentru user ${task.user_id}`, "markdown", task.user_id).catch(() => { });
+              this._generateDocument(
+                "Raport Zilnic",
+                `Generează un rezumat al activității de azi pentru user ${task.user_id}`,
+                "markdown",
+                task.user_id,
+              ).catch(() => {});
               break;
             case "periodic_cleanup":
               // Clean old memories (keep last 500)
               if (this.supabaseAdmin) {
-                const { count } = await this.supabaseAdmin.from("brain_memory").select("id", { count: "exact" }).eq("user_id", task.user_id);
+                const { count } = await this.supabaseAdmin
+                  .from("brain_memory")
+                  .select("id", { count: "exact" })
+                  .eq("user_id", task.user_id);
                 if (count > 500) {
-                  logger.info({ component: "Scheduler", count }, `🧹 Cleaning ${count - 500} old memories`);
+                  logger.info(
+                    { component: "Scheduler", count },
+                    `🧹 Cleaning ${count - 500} old memories`,
+                  );
                 }
               }
               break;
@@ -209,10 +247,13 @@ class KelionBrain {
             .from("brain_memory")
             .update({ content: JSON.stringify(parsed) })
             .eq("id", task.id);
-        } catch { }
+        } catch {}
       }
     } catch (e) {
-      logger.warn({ component: "Scheduler", err: e.message }, "Scheduled task check failed");
+      logger.warn(
+        { component: "Scheduler", err: e.message },
+        "Scheduled task check failed",
+      );
     }
   }
 
@@ -235,10 +276,15 @@ class KelionBrain {
       for (const tool of data) {
         this._toolRegistry.set(tool.id, tool);
       }
-      logger.info({ component: "Brain", tools: data.length },
-        `🔧 Loaded ${data.length} tools from registry`);
+      logger.info(
+        { component: "Brain", tools: data.length },
+        `🔧 Loaded ${data.length} tools from registry`,
+      );
     } catch (e) {
-      logger.warn({ component: "Brain", err: e.message }, "Tool registry load failed");
+      logger.warn(
+        { component: "Brain", err: e.message },
+        "Tool registry load failed",
+      );
     }
   }
 
@@ -279,7 +325,10 @@ class KelionBrain {
     const cacheKey = `${toolId}:${JSON.stringify(params)}`;
     const cached = this._toolCache.get(cacheKey);
     if (cached && Date.now() - cached.timestamp < this._toolCacheTTL) {
-      logger.info({ component: "Brain", toolId }, `📦 Cache hit for ${tool.name}`);
+      logger.info(
+        { component: "Brain", toolId },
+        `📦 Cache hit for ${tool.name}`,
+      );
       return { success: true, data: cached.data, fromCache: true };
     }
 
@@ -297,13 +346,18 @@ class KelionBrain {
           const key = process.env[tool.auth_env_key];
           if (!key) throw new Error(`Missing env: ${tool.auth_env_key}`);
           const headerName = tool.config?.header || "Authorization";
-          headers[headerName] = headerName === "Authorization" ? `Bearer ${key}` : key;
+          headers[headerName] =
+            headerName === "Authorization" ? `Bearer ${key}` : key;
         } else if (tool.auth_type === "bearer" && tool.auth_env_key) {
           headers["Authorization"] = `Bearer ${process.env[tool.auth_env_key]}`;
         }
 
         // Build request
-        const fetchOpts = { method: tool.method, headers, signal: AbortSignal.timeout(15000) };
+        const fetchOpts = {
+          method: tool.method,
+          headers,
+          signal: AbortSignal.timeout(15000),
+        };
         let url = tool.endpoint;
 
         if (tool.method === "GET" && params.query) {
@@ -325,34 +379,50 @@ class KelionBrain {
 
         // Log to memory
         if (this.supabaseAdmin && userId) {
-          this.supabaseAdmin.from("brain_memory").insert({
-            user_id: userId,
-            memory_type: "tool_call",
-            content: `Used ${tool.name}: ${JSON.stringify(params).substring(0, 200)}`,
-            metadata: { tool_id: tool.id, latency_ms: latency, success: true },
-            importance: 0.3,
-          }).then(() => { }).catch(() => { });
+          this.supabaseAdmin
+            .from("brain_memory")
+            .insert({
+              user_id: userId,
+              memory_type: "tool_call",
+              content: `Used ${tool.name}: ${JSON.stringify(params).substring(0, 200)}`,
+              metadata: {
+                tool_id: tool.id,
+                latency_ms: latency,
+                success: true,
+              },
+              importance: 0.3,
+            })
+            .then(() => {})
+            .catch(() => {});
         }
 
         return { success: true, data, latency, tool: tool.name };
-
       } catch (e) {
         const latency = Date.now() - start;
-        logger.warn({ component: "Brain", tool: tool.id, err: e.message, latency },
-          `⚠️ ${tool.name} failed (${latency}ms): ${e.message}`);
+        logger.warn(
+          { component: "Brain", tool: tool.id, err: e.message, latency },
+          `⚠️ ${tool.name} failed (${latency}ms): ${e.message}`,
+        );
         this._updateToolStats(tool.id, latency, false);
 
         // ── Fallback to next tool ──
         if (tool.fallback_tool_id) {
           const fallback = this._toolRegistry.get(tool.fallback_tool_id);
           if (fallback) {
-            logger.info({ component: "Brain", from: tool.id, to: fallback.id },
-              `🔄 Fallback: ${tool.name} → ${fallback.name}`);
+            logger.info(
+              { component: "Brain", from: tool.id, to: fallback.id },
+              `🔄 Fallback: ${tool.name} → ${fallback.name}`,
+            );
             tool = fallback;
             continue;
           }
         }
-        return { success: false, error: e.message, data: null, tool: tool.name };
+        return {
+          success: false,
+          error: e.message,
+          data: null,
+          tool: tool.name,
+        };
       }
     }
     return { success: false, error: "All attempts exhausted", data: null };
@@ -366,10 +436,16 @@ class KelionBrain {
       last_used_at: new Date().toISOString(),
       avg_latency_ms: latencyMs,
     };
-    if (!success) updates.total_errors = (this._toolRegistry.get(toolId)?.total_errors || 0) + 1;
+    if (!success)
+      updates.total_errors =
+        (this._toolRegistry.get(toolId)?.total_errors || 0) + 1;
 
-    this.supabaseAdmin.from("brain_tools").update(updates)
-      .eq("id", toolId).then(() => { }).catch(() => { });
+    this.supabaseAdmin
+      .from("brain_tools")
+      .update(updates)
+      .eq("id", toolId)
+      .then(() => {})
+      .catch(() => {});
 
     // Update local cache
     const local = this._toolRegistry.get(toolId);
@@ -387,7 +463,8 @@ class KelionBrain {
 
   /** Check if user has remaining quota */
   async checkQuota(userId) {
-    if (!this.supabaseAdmin || !userId) return { allowed: true, remaining: Infinity };
+    if (!this.supabaseAdmin || !userId)
+      return { allowed: true, remaining: Infinity };
 
     const month = new Date().toISOString().slice(0, 7); // '2026-03'
 
@@ -401,7 +478,7 @@ class KelionBrain {
         .eq("status", "active")
         .single();
       if (sub?.plan) plan = sub.plan;
-    } catch { }
+    } catch {}
 
     const limit = this.PLAN_LIMITS[plan] || 50;
 
@@ -442,20 +519,29 @@ class KelionBrain {
         .single();
 
       if (existing) {
-        await this.supabaseAdmin.from("brain_usage").update({
-          message_count: (existing.message_count || 0) + 1,
-          tool_calls: (existing.tool_calls || 0) + toolCalls,
-          tokens_used: (existing.tokens_used || 0) + tokensUsed,
-          updated_at: new Date().toISOString(),
-        }).eq("id", existing.id);
+        await this.supabaseAdmin
+          .from("brain_usage")
+          .update({
+            message_count: (existing.message_count || 0) + 1,
+            tool_calls: (existing.tool_calls || 0) + toolCalls,
+            tokens_used: (existing.tokens_used || 0) + tokensUsed,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", existing.id);
       } else {
         await this.supabaseAdmin.from("brain_usage").insert({
-          user_id: userId, month,
-          message_count: 1, tool_calls: toolCalls, tokens_used: tokensUsed,
+          user_id: userId,
+          month,
+          message_count: 1,
+          tool_calls: toolCalls,
+          tokens_used: tokensUsed,
         });
       }
     } catch (e) {
-      logger.warn({ component: "Brain", err: e.message }, "Usage tracking failed");
+      logger.warn(
+        { component: "Brain", err: e.message },
+        "Usage tracking failed",
+      );
     }
   }
 
@@ -571,8 +657,14 @@ When asked "what can you do?" list these real capabilities. Use them proactively
     try {
       const r = await fetch("https://api.openai.com/v1/embeddings", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
-        body: JSON.stringify({ model: "text-embedding-3-small", input: text.substring(0, 500) }),
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: "text-embedding-3-small",
+          input: text.substring(0, 500),
+        }),
       });
       if (!r.ok) return null;
       const d = await r.json();
@@ -593,15 +685,19 @@ When asked "what can you do?" list these real capabilities. Use them proactively
         try {
           const embedding = await this.getEmbedding(contextHint);
           if (embedding) {
-            const { data: vectorResults, error: vecErr } = await this.supabaseAdmin.rpc("match_memories", {
-              query_embedding: embedding,
-              match_user_id: userId,
-              match_type: type,
-              match_count: limit,
-              match_threshold: 0.3,
-            });
+            const { data: vectorResults, error: vecErr } =
+              await this.supabaseAdmin.rpc("match_memories", {
+                query_embedding: embedding,
+                match_user_id: userId,
+                match_type: type,
+                match_count: limit,
+                match_threshold: 0.3,
+              });
             if (!vecErr && vectorResults && vectorResults.length > 0) {
-              logger.info({ component: "Brain", count: vectorResults.length, type }, "🧠 pgvector semantic memory hit");
+              logger.info(
+                { component: "Brain", count: vectorResults.length, type },
+                "🧠 pgvector semantic memory hit",
+              );
               return vectorResults;
             }
           }
@@ -620,22 +716,31 @@ When asked "what can you do?" list these real capabilities. Use them proactively
         .order("created_at", { ascending: false })
         .limit(fetchLimit);
       if (error) {
-        logger.warn({ component: "Brain", err: error.message }, "loadMemory failed");
+        logger.warn(
+          { component: "Brain", err: error.message },
+          "loadMemory failed",
+        );
         return [];
       }
       if (!data || data.length === 0) return [];
 
       // Relevance scoring: boost memories that share keywords with current context
-      const hintWords = contextHint.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+      const hintWords = contextHint
+        .toLowerCase()
+        .split(/\s+/)
+        .filter((w) => w.length > 3);
       const scored = data.map((m) => {
         let score = (m.importance || 5) / 10;
-        const ageHours = (Date.now() - new Date(m.created_at).getTime()) / 3600000;
+        const ageHours =
+          (Date.now() - new Date(m.created_at).getTime()) / 3600000;
         if (ageHours < 1) score += 0.3;
         else if (ageHours < 24) score += 0.15;
         else if (ageHours < 168) score += 0.05;
         if (hintWords.length > 0 && m.content) {
           const contentLow = m.content.toLowerCase();
-          const matchCount = hintWords.filter(w => contentLow.includes(w)).length;
+          const matchCount = hintWords.filter((w) =>
+            contentLow.includes(w),
+          ).length;
           score += (matchCount / hintWords.length) * 0.4;
         }
         return { ...m, _relevanceScore: score };
@@ -684,7 +789,12 @@ When asked "what can you do?" list these real capabilities. Use them proactively
     }
   }
 
-  async saveFact(userId, fact, category = "knowledge", source = "conversation") {
+  async saveFact(
+    userId,
+    fact,
+    category = "knowledge",
+    source = "conversation",
+  ) {
     if (!userId || !this.supabaseAdmin || !fact) return;
     try {
       // Avoid duplicates
@@ -716,18 +826,41 @@ When asked "what can you do?" list these real capabilities. Use them proactively
       // Use simple heuristics to extract facts (no extra AI call needed)
       const lower = message.toLowerCase();
       // Personal preferences
-      if (/\b(prefer|vreau|imi place|mi-ar placea|I like|I prefer)\b/i.test(message)) {
-        await this.saveFact(userId, "User said: " + message.substring(0, 200), "preference", "chat");
+      if (
+        /\b(prefer|vreau|imi place|mi-ar placea|I like|I prefer)\b/i.test(
+          message,
+        )
+      ) {
+        await this.saveFact(
+          userId,
+          "User said: " + message.substring(0, 200),
+          "preference",
+          "chat",
+        );
       }
       // Name sharing
-      const nameMatch = message.match(/\b(?:ma cheama|numele meu|my name is|I'm|I am)\s+([A-Z][a-z]+)/i);
+      const nameMatch = message.match(
+        /\b(?:ma cheama|numele meu|my name is|I'm|I am)\s+([A-Z][a-z]+)/i,
+      );
       if (nameMatch) {
-        await this.saveFact(userId, "User's name is " + nameMatch[1], "personal", "chat");
+        await this.saveFact(
+          userId,
+          "User's name is " + nameMatch[1],
+          "personal",
+          "chat",
+        );
       }
       // Location sharing
-      const locMatch = message.match(/\b(?:sunt din|locuiesc in|I live in|I'm from)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/i);
+      const locMatch = message.match(
+        /\b(?:sunt din|locuiesc in|I live in|I'm from)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/i,
+      );
       if (locMatch) {
-        await this.saveFact(userId, "User lives in " + locMatch[1], "personal", "chat");
+        await this.saveFact(
+          userId,
+          "User lives in " + locMatch[1],
+          "personal",
+          "chat",
+        );
       }
       this.learningsExtracted++;
     } catch (e) {
@@ -739,22 +872,26 @@ When asked "what can you do?" list these real capabilities. Use them proactively
     const parts = [];
     if (facts.length > 0) {
       // Sort facts by importance and deduplicate
-      const uniqueFacts = [...new Set(facts.map(f => f.fact))];
+      const uniqueFacts = [...new Set(facts.map((f) => f.fact))];
       parts.push("FACTS I KNOW ABOUT THIS USER: " + uniqueFacts.join("; "));
     }
     if (memories.length > 0) {
       // Include importance indicator for high-priority memories
-      const formatted = memories.map(m => {
+      const formatted = memories.map((m) => {
         const priority = (m.importance || 5) >= 8 ? "[IMPORTANT] " : "";
         return priority + m.content;
       });
       parts.push("RECENT CONVERSATIONS: " + formatted.join(" | "));
     }
     if (visualMem.length > 0) {
-      parts.push("IMAGES I'VE SEEN: " + visualMem.map(m => m.content).join("; "));
+      parts.push(
+        "IMAGES I'VE SEEN: " + visualMem.map((m) => m.content).join("; "),
+      );
     }
     if (audioMem.length > 0) {
-      parts.push("VOICE INTERACTIONS: " + audioMem.map(m => m.content).join("; "));
+      parts.push(
+        "VOICE INTERACTIONS: " + audioMem.map((m) => m.content).join("; "),
+      );
     }
     return parts.length > 0 ? "[MEMORY CONTEXT] " + parts.join(" || ") : "";
   }
@@ -775,8 +912,9 @@ When asked "what can you do?" list these real capabilities. Use them proactively
       this._profileCache.set(userId, { profile, loadedAt: Date.now() });
       // Clean old cache entries (keep max 100)
       if (this._profileCache.size > 100) {
-        const oldest = [...this._profileCache.entries()]
-          .sort((a, b) => a[1].loadedAt - b[1].loadedAt)[0];
+        const oldest = [...this._profileCache.entries()].sort(
+          (a, b) => a[1].loadedAt - b[1].loadedAt,
+        )[0];
         if (oldest) this._profileCache.delete(oldest[0]);
       }
       return profile;
@@ -787,8 +925,9 @@ When asked "what can you do?" list these real capabilities. Use them proactively
 
   // Multi-agent: select best agent based on analysis topics
   _selectAgent(analysis) {
-    if (!analysis || !analysis.topics || analysis.topics.length === 0) return null;
-    const topics = analysis.topics.map(t => t.toLowerCase());
+    if (!analysis || !analysis.topics || analysis.topics.length === 0)
+      return null;
+    const topics = analysis.topics.map((t) => t.toLowerCase());
 
     let bestAgent = null;
     let bestScore = 0;
@@ -816,41 +955,63 @@ When asked "what can you do?" list these real capabilities. Use them proactively
   // Agent General detects topic → delegates to specialist
   // Max 2 delegations per conversation (anti-loop)
   // ═══════════════════════════════════════════════════════════
-  async _delegateToAgent(fromAgent, targetAgentKey, subtask, conversationContext = {}) {
+  async _delegateToAgent(
+    fromAgent,
+    targetAgentKey,
+    subtask,
+    conversationContext = {},
+  ) {
     // Anti-loop protection
     const delegationCount = conversationContext._delegationCount || 0;
     if (delegationCount >= 2) {
-      logger.warn({ component: "Brain", from: fromAgent, to: targetAgentKey },
-        "⚠️ Delegation limit reached (max 2) — handling directly");
+      logger.warn(
+        { component: "Brain", from: fromAgent, to: targetAgentKey },
+        "⚠️ Delegation limit reached (max 2) — handling directly",
+      );
       return null;
     }
 
     const targetAgent = this.agents[targetAgentKey];
     if (!targetAgent) {
-      logger.warn({ component: "Brain", targetAgentKey }, "Target agent not found");
+      logger.warn(
+        { component: "Brain", targetAgentKey },
+        "Target agent not found",
+      );
       return null;
     }
 
-    logger.info({ component: "Brain", from: fromAgent, to: targetAgentKey, subtask: subtask.substring(0, 80) },
-      `🔄 Delegating: ${fromAgent} → ${targetAgent.name}`);
+    logger.info(
+      {
+        component: "Brain",
+        from: fromAgent,
+        to: targetAgentKey,
+        subtask: subtask.substring(0, 80),
+      },
+      `🔄 Delegating: ${fromAgent} → ${targetAgent.name}`,
+    );
 
     // Build delegated prompt with specialist persona
     const geminiKey = process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
     if (!geminiKey) return null;
 
     try {
-      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODELS.GEMINI_CHAT}:generateContent?key=${geminiKey}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{
-            role: "user",
-            parts: [{ text: `${targetAgent.systemPrompt}\n\n${subtask}` }],
-          }],
-          generationConfig: { maxOutputTokens: 800, temperature: 0.5 },
-        }),
-        signal: AbortSignal.timeout(15000),
-      });
+      const r = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${MODELS.GEMINI_CHAT}:generateContent?key=${geminiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [
+              {
+                role: "user",
+                parts: [{ text: `${targetAgent.systemPrompt}\n\n${subtask}` }],
+              },
+            ],
+            generationConfig: { maxOutputTokens: 800, temperature: 0.5 },
+          }),
+          signal: AbortSignal.timeout(15000),
+        },
+      );
 
       if (!r.ok) return null;
       const data = await r.json();
@@ -885,28 +1046,61 @@ When asked "what can you do?" list these real capabilities. Use them proactively
   _shouldDelegate(message, currentAgent, analysis) {
     if (!analysis || !analysis.topics) return null;
 
-    const topics = analysis.topics.map(t => t.toLowerCase());
+    const topics = analysis.topics.map((t) => t.toLowerCase());
     const msg = message.toLowerCase();
 
     // Trading delegation
-    if ((topics.some(t => t.includes("trading") || t.includes("crypto") || t.includes("bitcoin")) ||
-         msg.includes("bitcoin") || msg.includes("trading") || msg.includes("crypto")) &&
-        currentAgent !== "trader") {
+    if (
+      (topics.some(
+        (t) =>
+          t.includes("trading") ||
+          t.includes("crypto") ||
+          t.includes("bitcoin"),
+      ) ||
+        msg.includes("bitcoin") ||
+        msg.includes("trading") ||
+        msg.includes("crypto")) &&
+      currentAgent !== "trader"
+    ) {
       return { shouldDelegate: true, targetAgent: "trader", subtask: message };
     }
 
     // Creative delegation
-    if ((topics.some(t => t.includes("creative") || t.includes("poem") || t.includes("story")) ||
-         msg.includes("scrie o") || msg.includes("write a") || msg.includes("poem")) &&
-        currentAgent !== "creative") {
-      return { shouldDelegate: true, targetAgent: "creative", subtask: message };
+    if (
+      (topics.some(
+        (t) =>
+          t.includes("creative") || t.includes("poem") || t.includes("story"),
+      ) ||
+        msg.includes("scrie o") ||
+        msg.includes("write a") ||
+        msg.includes("poem")) &&
+      currentAgent !== "creative"
+    ) {
+      return {
+        shouldDelegate: true,
+        targetAgent: "creative",
+        subtask: message,
+      };
     }
 
     // Research delegation
-    if ((topics.some(t => t.includes("research") || t.includes("analyze") || t.includes("compare")) ||
-         msg.includes("cercetează") || msg.includes("analizează") || msg.includes("compară")) &&
-        currentAgent !== "research") {
-      return { shouldDelegate: true, targetAgent: "research", subtask: message };
+    if (
+      (topics.some(
+        (t) =>
+          t.includes("research") ||
+          t.includes("analyze") ||
+          t.includes("compare"),
+      ) ||
+        msg.includes("cercetează") ||
+        msg.includes("analizează") ||
+        msg.includes("compară")) &&
+      currentAgent !== "research"
+    ) {
+      return {
+        shouldDelegate: true,
+        targetAgent: "research",
+        subtask: message,
+      };
     }
 
     return null;
@@ -954,10 +1148,13 @@ When asked "what can you do?" list these real capabilities. Use them proactively
               customFooter: data.custom_footer || null,
             },
           };
-          this._tenantConfigCache.set(hostname, { config, loadedAt: Date.now() });
+          this._tenantConfigCache.set(hostname, {
+            config,
+            loadedAt: Date.now(),
+          });
           return config;
         }
-      } catch { }
+      } catch {}
     }
 
     return this._defaultTenantConfig();
@@ -1014,14 +1211,17 @@ When asked "what can you do?" list these real capabilities. Use them proactively
       providers.push({
         name: "Gemini",
         fn: async () => {
-          const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODELS.GEMINI_CHAT}:generateContent?key=${geminiKey}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [{ role: "user", parts: [{ text: prompt }] }],
-              generationConfig: { maxOutputTokens: maxTokens },
-            }),
-          });
+          const r = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${MODELS.GEMINI_CHAT}:generateContent?key=${geminiKey}`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                contents: [{ role: "user", parts: [{ text: prompt }] }],
+                generationConfig: { maxOutputTokens: maxTokens },
+              }),
+            },
+          );
           if (!r.ok) return null;
           const d = await r.json();
           return d.candidates?.[0]?.content?.parts?.[0]?.text || null;
@@ -1033,18 +1233,21 @@ When asked "what can you do?" list these real capabilities. Use them proactively
       providers.push({
         name: "Groq",
         fn: async () => {
-          const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: "Bearer " + this.groqKey,
+          const r = await fetch(
+            "https://api.groq.com/openai/v1/chat/completions",
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: "Bearer " + this.groqKey,
+              },
+              body: JSON.stringify({
+                model: MODELS.GROQ_PRIMARY,
+                max_tokens: maxTokens,
+                messages: [{ role: "user", content: prompt }],
+              }),
             },
-            body: JSON.stringify({
-              model: MODELS.GROQ_PRIMARY,
-              max_tokens: maxTokens,
-              messages: [{ role: "user", content: prompt }],
-            }),
-          });
+          );
           if (!r.ok) return null;
           const d = await r.json();
           return d.choices?.[0]?.message?.content || null;
@@ -1056,28 +1259,44 @@ When asked "what can you do?" list these real capabilities. Use them proactively
 
     // Run in parallel with 8s timeout each
     const results = await Promise.allSettled(
-      providers.map(p =>
+      providers.map((p) =>
         Promise.race([
           p.fn(),
-          new Promise(resolve => setTimeout(() => resolve(null), 8000)),
-        ]).catch(() => null)
-      )
+          new Promise((resolve) => setTimeout(() => resolve(null), 8000)),
+        ]).catch(() => null),
+      ),
     );
 
     const answers = results
-      .map((r, i) => ({ name: providers[i].name, text: r.status === "fulfilled" ? r.value : null }))
-      .filter(a => a.text && a.text.length > 20);
+      .map((r, i) => ({
+        name: providers[i].name,
+        text: r.status === "fulfilled" ? r.value : null,
+      }))
+      .filter((a) => a.text && a.text.length > 20);
 
     if (answers.length === 0) return null;
-    if (answers.length === 1) return { text: answers[0].text, engine: answers[0].name, consensus: false };
+    if (answers.length === 1)
+      return {
+        text: answers[0].text,
+        engine: answers[0].name,
+        consensus: false,
+      };
 
     // Pick the longer/more detailed answer as primary
     const best = answers.sort((a, b) => b.text.length - a.text.length)[0];
     logger.info(
-      { component: "Brain", providers: answers.map(a => a.name), bestLength: best.text.length },
+      {
+        component: "Brain",
+        providers: answers.map((a) => a.name),
+        bestLength: best.text.length,
+      },
       `🤝 Multi-AI consensus: ${answers.length} providers responded, using ${best.name}`,
     );
-    return { text: best.text, engine: best.name + "+Consensus", consensus: true };
+    return {
+      text: best.text,
+      engine: best.name + "+Consensus",
+      consensus: true,
+    };
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -1102,23 +1321,38 @@ When asked "what can you do?" list these real capabilities. Use them proactively
       // Step -1: QUOTA CHECK — verify user has remaining messages
       const quota = await this.checkQuota(userId);
       if (!quota.allowed) {
-        logger.info({ component: "Brain", userId, used: quota.used, limit: quota.limit },
-          `⛔ Quota exceeded for user (${quota.plan})`);
-        const upgradeMsg = language === "ro"
-          ? `Ai atins limita de ${quota.limit} mesaje/lună pe planul ${quota.plan.toUpperCase()}. Upgradeează la ${quota.plan === "free" ? "Pro" : "Premium"} pentru mai multe mesaje! 🚀`
-          : `You've reached your ${quota.limit} messages/month limit on the ${quota.plan.toUpperCase()} plan. Upgrade to ${quota.plan === "free" ? "Pro" : "Premium"} for more messages! 🚀`;
-        return { reply: upgradeMsg, emotion: "neutral", toolsUsed: [], confidence: 1.0 };
+        logger.info(
+          { component: "Brain", userId, used: quota.used, limit: quota.limit },
+          `⛔ Quota exceeded for user (${quota.plan})`,
+        );
+        const upgradeMsg =
+          language === "ro"
+            ? `Ai atins limita de ${quota.limit} mesaje/lună pe planul ${quota.plan.toUpperCase()}. Upgradeează la ${quota.plan === "free" ? "Pro" : "Premium"} pentru mai multe mesaje! 🚀`
+            : `You've reached your ${quota.limit} messages/month limit on the ${quota.plan.toUpperCase()} plan. Upgrade to ${quota.plan === "free" ? "Pro" : "Premium"} for more messages! 🚀`;
+        return {
+          reply: upgradeMsg,
+          emotion: "neutral",
+          toolsUsed: [],
+          confidence: 1.0,
+        };
       }
 
       // Step 0: LOAD MEMORY + USER PROFILE — brain wakes up with full context
-      const [memories, visualMem, audioMem, facts, profile] = await Promise.all([
-        this.loadMemory(userId, "text", 10),
-        this.loadMemory(userId, "visual", 5),
-        this.loadMemory(userId, "audio", 5),
-        this.loadFacts(userId, 15),
-        this._loadProfileCached(userId),
-      ]);
-      const memoryContext = this.buildMemoryContext(memories, visualMem, audioMem, facts);
+      const [memories, visualMem, audioMem, facts, profile] = await Promise.all(
+        [
+          this.loadMemory(userId, "text", 10),
+          this.loadMemory(userId, "visual", 5),
+          this.loadMemory(userId, "audio", 5),
+          this.loadFacts(userId, 15),
+          this._loadProfileCached(userId),
+        ],
+      );
+      const memoryContext = this.buildMemoryContext(
+        memories,
+        visualMem,
+        audioMem,
+        facts,
+      );
       this._currentMemoryContext = memoryContext;
       this._currentProfile = profile;
 
@@ -1131,13 +1365,19 @@ When asked "what can you do?" list these real capabilities. Use them proactively
       // Inject project context (async, non-blocking if table doesn't exist yet)
       const projectCtx = await this._projectContext(userId).catch(() => "");
       if (projectCtx) {
-        this._currentMemoryContext = this._currentMemoryContext + "\n" + projectCtx;
+        this._currentMemoryContext =
+          this._currentMemoryContext + "\n" + projectCtx;
       }
 
       // Inject workspace context (persistent project structure/tech stack)
       const workspace = await this._loadWorkspace(userId).catch(() => null);
       if (workspace && Array.isArray(workspace) && workspace.length > 0) {
-        const wsCtx = workspace.map(w => `[Workspace: ${w.name}] Stack: ${(w.techStack || []).join(", ")} | Files: ${(w.keyFiles || []).slice(0, 5).join(", ")}`).join("\n");
+        const wsCtx = workspace
+          .map(
+            (w) =>
+              `[Workspace: ${w.name}] Stack: ${(w.techStack || []).join(", ")} | Files: ${(w.keyFiles || []).slice(0, 5).join(", ")}`,
+          )
+          .join("\n");
         this._currentMemoryContext = this._currentMemoryContext + "\n" + wsCtx;
       }
 
@@ -1151,19 +1391,40 @@ When asked "what can you do?" list these real capabilities. Use them proactively
       let modelRoute = this._routeModel(complexityResult);
 
       // Step 1c: COST GUARDRAILS — check budget and auto-downgrade if needed
-      const userPlan = isAdmin ? "admin" : (profile?.plan || "free");
-      const budgetResult = await this._checkBudget(userId, userPlan).catch(() => ({
-        allowed: true, remaining: 999, percentUsed: 0, shouldDowngrade: false, maxToolsPerMsg: 10
-      }));
+      const userPlan = isAdmin ? "admin" : profile?.plan || "free";
+      const budgetResult = await this._checkBudget(userId, userPlan).catch(
+        () => ({
+          allowed: true,
+          remaining: 999,
+          percentUsed: 0,
+          shouldDowngrade: false,
+          maxToolsPerMsg: 10,
+        }),
+      );
 
       if (!budgetResult.allowed) {
-        logger.warn({ component: "CostGuardrails", userId, plan: userPlan }, "💰 Budget exceeded — blocking");
+        logger.warn(
+          { component: "CostGuardrails", userId, plan: userPlan },
+          "💰 Budget exceeded — blocking",
+        );
         return {
-          enrichedMessage: "⚠️ Ai depășit limita zilnică de utilizare. Răspunsurile vor fi disponibile mâine, sau poți face upgrade la un plan superior.",
-          toolsUsed: [], monitor: { content: "" }, analysis, chainOfThought: null,
-          compressedHistory: history.slice(-5), failedTools: [], thinkTime: Date.now() - start,
-          confidence: 0, sourceTags: ["BUDGET_EXCEEDED"], agent: "default", profileLoaded: !!profile,
-          truthReport: null, criticReport: null, complexityLevel: complexityResult, modelRoute,
+          enrichedMessage:
+            "⚠️ Ai depășit limita zilnică de utilizare. Răspunsurile vor fi disponibile mâine, sau poți face upgrade la un plan superior.",
+          toolsUsed: [],
+          monitor: { content: "" },
+          analysis,
+          chainOfThought: null,
+          compressedHistory: history.slice(-5),
+          failedTools: [],
+          thinkTime: Date.now() - start,
+          confidence: 0,
+          sourceTags: ["BUDGET_EXCEEDED"],
+          agent: "default",
+          profileLoaded: !!profile,
+          truthReport: null,
+          criticReport: null,
+          complexityLevel: complexityResult,
+          modelRoute,
         };
       }
 
@@ -1172,20 +1433,32 @@ When asked "what can you do?" list these real capabilities. Use them proactively
         modelRoute = this._autoDowngrade(modelRoute, budgetResult);
       }
 
-      logger.info({
-        component: "Brain", complexity: complexityResult.name, level: complexityResult.level,
-        model: modelRoute.provider, reasoning: complexityResult.reasoning,
-        budget: budgetResult.percentUsed + "%", downgraded: !!modelRoute.downgraded
-      },
-        `🎯 Complexity: ${complexityResult.name} (L${complexityResult.level}) → ${modelRoute.provider}/${modelRoute.model} | Budget: ${budgetResult.percentUsed}%`);
+      logger.info(
+        {
+          component: "Brain",
+          complexity: complexityResult.name,
+          level: complexityResult.level,
+          model: modelRoute.provider,
+          reasoning: complexityResult.reasoning,
+          budget: budgetResult.percentUsed + "%",
+          downgraded: !!modelRoute.downgraded,
+        },
+        `🎯 Complexity: ${complexityResult.name} (L${complexityResult.level}) → ${modelRoute.provider}/${modelRoute.model} | Budget: ${budgetResult.percentUsed}%`,
+      );
 
       // Step 1.5: MULTI-AGENT — select best agent for this task
       const agentSelection = this._selectAgent(analysis, message);
       this._currentAgentPrompt = agentSelection.systemPrompt || "";
       this._currentAgentName = agentSelection.name || "General Assistant";
       this._currentAgentIcon = agentSelection.icon || "🧠";
-      logger.info({ component: "Brain", agent: agentSelection.name, key: agentSelection.agent },
-        `${agentSelection.icon} Agent: ${agentSelection.name}`);
+      logger.info(
+        {
+          component: "Brain",
+          agent: agentSelection.name,
+          key: agentSelection.agent,
+        },
+        `${agentSelection.icon} Agent: ${agentSelection.name}`,
+      );
 
       // Step 1.6: K1 AGI CONTEXT — enrich with world state, K1 memory, alerts
       let k1Context = null;
@@ -1200,11 +1473,15 @@ When asked "what can you do?" list these real capabilities. Use them proactively
           if (k1Context) {
             const k1SystemCtx = k1Bridge.getK1SystemContext(k1Context);
             if (k1SystemCtx) {
-              this._currentMemoryContext = (this._currentMemoryContext || "") + "\n" + k1SystemCtx;
+              this._currentMemoryContext =
+                (this._currentMemoryContext || "") + "\n" + k1SystemCtx;
             }
           }
         } catch (k1Err) {
-          logger.warn({ component: "Brain", err: k1Err.message }, "K1 preProcess failed (non-critical)");
+          logger.warn(
+            { component: "Brain", err: k1Err.message },
+            "K1 preProcess failed (non-critical)",
+          );
         }
       }
 
@@ -1217,7 +1494,10 @@ When asked "what can you do?" list these real capabilities. Use them proactively
       // Step 2.5: LEARNING — check if we have learned patterns for this type
       const learnedTools = this.learningStore.recommendTools(analysis);
       if (learnedTools) {
-        logger.info({ component: "Brain", learned: learnedTools }, "📚 Using learned tool pattern");
+        logger.info(
+          { component: "Brain", learned: learnedTools },
+          "📚 Using learned tool pattern",
+        );
       }
 
       // Step 3: PLAN tools for each sub-task (with circuit breaker)
@@ -1229,9 +1509,12 @@ When asked "what can you do?" list these real capabilities. Use them proactively
       );
 
       // Filter out circuit-broken tools
-      plan = plan.filter(step => {
+      plan = plan.filter((step) => {
         if (this.learningStore.isToolBlocked(step.tool)) {
-          logger.warn({ component: "Brain", tool: step.tool }, `⚡ Tool ${step.tool} circuit-broken — skipped`);
+          logger.warn(
+            { component: "Brain", tool: step.tool },
+            `⚡ Tool ${step.tool} circuit-broken — skipped`,
+          );
           return false;
         }
         return true;
@@ -1242,8 +1525,14 @@ When asked "what can you do?" list these real capabilities. Use them proactively
 
       // Step 3c: Limit tools per message based on plan
       if (plan.length > budgetResult.maxToolsPerMsg) {
-        logger.info({ component: "PolicyEngine", before: plan.length, max: budgetResult.maxToolsPerMsg },
-          `✂️ Trimming plan: ${plan.length} → ${budgetResult.maxToolsPerMsg} tools (${userPlan} plan)`);
+        logger.info(
+          {
+            component: "PolicyEngine",
+            before: plan.length,
+            max: budgetResult.maxToolsPerMsg,
+          },
+          `✂️ Trimming plan: ${plan.length} → ${budgetResult.maxToolsPerMsg} tools (${userPlan} plan)`,
+        );
         plan = plan.slice(0, budgetResult.maxToolsPerMsg);
       }
 
@@ -1268,7 +1557,8 @@ When asked "what can you do?" list these real capabilities. Use them proactively
 
         // Record tool outcomes for learning
         for (const step of currentPlan) {
-          if (iterResults[step.tool]) this.learningStore.recordToolSuccess(step.tool);
+          if (iterResults[step.tool])
+            this.learningStore.recordToolSuccess(step.tool);
           else this.learningStore.recordToolFailure(step.tool);
         }
 
@@ -1296,31 +1586,61 @@ When asked "what can you do?" list these real capabilities. Use them proactively
         );
 
         // Step 6.5: CONFIDENCE SCORING
-        confidence = this._scoreConfidence(analysis, allResults, chainOfThought);
+        confidence = this._scoreConfidence(
+          analysis,
+          allResults,
+          chainOfThought,
+        );
 
         // Step 6.5b: MULTI-AI CONSENSUS — for complex queries with low confidence
-        if (analysis.complexity === "complex" && confidence < 0.6 && iteration === 0) {
+        if (
+          analysis.complexity === "complex" &&
+          confidence < 0.6 &&
+          iteration === 0
+        ) {
           try {
             const consensusAnswer = await this.multiAIConsensus(message, 600);
             if (consensusAnswer) {
               enriched += `\n[MULTI-AI CONSENSUS]: ${consensusAnswer}`;
               confidence = Math.min(1.0, confidence + 0.2); // boost confidence
-              logger.info({ component: "Brain", confidence }, "🤝 Multi-AI consensus used to boost confidence");
+              logger.info(
+                { component: "Brain", confidence },
+                "🤝 Multi-AI consensus used to boost confidence",
+              );
             }
           } catch (e) {
-            logger.warn({ component: "Brain", err: e.message }, "Multi-AI consensus failed (non-critical)");
+            logger.warn(
+              { component: "Brain", err: e.message },
+              "Multi-AI consensus failed (non-critical)",
+            );
           }
         }
 
         // Step 6.6: SELF-REFLECTION — evaluate if response is complete
         // Only reflect on iteration 1+ and if complex or low confidence
-        if (iteration < MAX_ITERATIONS - 1 && (analysis.complexity === "complex" || confidence < 0.6)) {
-          const reflection = await this._selfReflect(message, enriched, allResults, analysis, language);
+        if (
+          iteration < MAX_ITERATIONS - 1 &&
+          (analysis.complexity === "complex" || confidence < 0.6)
+        ) {
+          const reflection = await this._selfReflect(
+            message,
+            enriched,
+            allResults,
+            analysis,
+            language,
+          );
           if (reflection && reflection.needsMore) {
             // Re-plan with additional tools based on reflection
-            logger.info({ component: "Brain", iteration, reflection: reflection.reason },
-              `🔄 Agentic loop iteration ${iteration + 1}: ${reflection.reason}`);
-            const additionalPlan = this._planFromReflection(reflection, userId, this._currentMediaData, isAdmin);
+            logger.info(
+              { component: "Brain", iteration, reflection: reflection.reason },
+              `🔄 Agentic loop iteration ${iteration + 1}: ${reflection.reason}`,
+            );
+            const additionalPlan = this._planFromReflection(
+              reflection,
+              userId,
+              this._currentMediaData,
+              isAdmin,
+            );
             if (additionalPlan.length > 0) {
               currentPlan = additionalPlan;
               continue; // Loop again with new plan
@@ -1332,55 +1652,97 @@ When asked "what can you do?" list these real capabilities. Use them proactively
       }
 
       if (iterationCount > 1) {
-        logger.info({ component: "Brain", iterations: iterationCount },
-          `🔄 Agentic loop completed in ${iterationCount} iterations`);
+        logger.info(
+          { component: "Brain", iterations: iterationCount },
+          `🔄 Agentic loop completed in ${iterationCount} iterations`,
+        );
       }
 
       const results = allResults;
 
       // Step 7: MANAGE CONTEXT WINDOW + COMPRESS if too long
       const managedHistory = this._manageContextWindow(history, 20, 15000);
-      const compressedHistory = this.compressHistory(managedHistory, conversationId);
+      const compressedHistory = this.compressHistory(
+        managedHistory,
+        conversationId,
+      );
 
       // Step 8: SELF-EVALUATE + LEARN (async — doesn't block response)
       const thinkTime = Date.now() - startTime;
       this.journalEntry(
         "think_complete",
         `${analysis.complexity} task, ${plan.length} tools, ${thinkTime}ms, confidence:${confidence}`,
-        { tools: Object.keys(results), complexity: analysis.complexity, confidence },
+        {
+          tools: Object.keys(results),
+          complexity: analysis.complexity,
+          confidence,
+        },
       );
 
       // Learn from this conversation (async)
-      this.learningStore.recordOutcome(analysis, Object.keys(results), true, thinkTime, this.supabaseAdmin).catch(() => { });
+      this.learningStore
+        .recordOutcome(
+          analysis,
+          Object.keys(results),
+          true,
+          thinkTime,
+          this.supabaseAdmin,
+        )
+        .catch(() => {});
       if (profile) {
         profile.updateFromConversation(message, language, analysis);
-        profile.save(this.supabaseAdmin).catch(() => { });
+        profile.save(this.supabaseAdmin).catch(() => {});
       }
 
       // PROCEDURAL MEMORY: Save how this task was solved
-      const toolsUsedForProcedure = Object.keys(results).filter(k => results[k]);
-      if (toolsUsedForProcedure.length > 0 && analysis.complexity !== "simple") {
-        const taskType = analysis.topics?.[0] || analysis.complexity || "general";
+      const toolsUsedForProcedure = Object.keys(results).filter(
+        (k) => results[k],
+      );
+      if (
+        toolsUsedForProcedure.length > 0 &&
+        analysis.complexity !== "simple"
+      ) {
+        const taskType =
+          analysis.topics?.[0] || analysis.complexity || "general";
         this._saveProcedure(
-          userId, taskType, message.substring(0, 200),
-          toolsUsedForProcedure.map(t => ({ tool: t, success: !!results[t] })),
-          toolsUsedForProcedure, true, thinkTime, analysis.complexity
-        ).catch(() => { });
+          userId,
+          taskType,
+          message.substring(0, 200),
+          toolsUsedForProcedure.map((t) => ({
+            tool: t,
+            success: !!results[t],
+          })),
+          toolsUsedForProcedure,
+          true,
+          thinkTime,
+          analysis.complexity,
+        ).catch(() => {});
       }
 
       // PROJECT MEMORY: Auto-detect project mentions
-      this._autoDetectProject(userId, message, analysis, toolsUsedForProcedure).catch(() => { });
+      this._autoDetectProject(
+        userId,
+        message,
+        analysis,
+        toolsUsedForProcedure,
+      ).catch(() => {});
 
       // WORKSPACE MEMORY: Auto-save workspace context from conversation
-      if (toolsUsedForProcedure.some(t => ["codeExec", "ragSearch", "dbQuery", "generateDoc"].includes(t))) {
-        const techKeywords = message.match(/\b(react|vue|angular|node|express|python|django|flask|java|spring|rust|go|typescript|nextjs|vite|supabase|postgres|mongodb|redis|docker|kubernetes)\b/gi);
+      if (
+        toolsUsedForProcedure.some((t) =>
+          ["codeExec", "ragSearch", "dbQuery", "generateDoc"].includes(t),
+        )
+      ) {
+        const techKeywords = message.match(
+          /\b(react|vue|angular|node|express|python|django|flask|java|spring|rust|go|typescript|nextjs|vite|supabase|postgres|mongodb|redis|docker|kubernetes)\b/gi,
+        );
         if (techKeywords && techKeywords.length > 0) {
           this._saveWorkspace(userId, "auto-detected", {
-            techStack: [...new Set(techKeywords.map(k => k.toLowerCase()))],
+            techStack: [...new Set(techKeywords.map((k) => k.toLowerCase()))],
             keyFiles: [],
             patterns: toolsUsedForProcedure,
             structure: message.substring(0, 200),
-          }).catch(() => { });
+          }).catch(() => {});
         }
       }
 
@@ -1405,7 +1767,9 @@ When asked "what can you do?" list these real capabilities. Use them proactively
         .trim();
 
       // Track usage (non-blocking)
-      this.incrementUsage(userId, Object.keys(results).length, 0).catch(() => { });
+      this.incrementUsage(userId, Object.keys(results).length, 0).catch(
+        () => {},
+      );
 
       // ── Anti-Hallucination: tag data sources ──
       const sourceTags = [];
@@ -1414,19 +1778,28 @@ When asked "what can you do?" list these real capabilities. Use them proactively
         sourceTags.push("VERIFIED");
         for (const t of toolsUsedList) sourceTags.push(`SOURCE:${t}`);
       }
-      if (memoryContext && memoryContext.length > 20) sourceTags.push("FROM_MEMORY");
-      if (toolsUsedList.length === 0 && (!memoryContext || memoryContext.length < 20)) {
+      if (memoryContext && memoryContext.length > 20)
+        sourceTags.push("FROM_MEMORY");
+      if (
+        toolsUsedList.length === 0 &&
+        (!memoryContext || memoryContext.length < 20)
+      ) {
         sourceTags.push("ASSUMPTION");
       }
 
       // Step 9: TRUTH GUARD — Verify response quality (async, non-blocking for simple tasks)
       let truthReport = null;
       if (complexityResult.level >= 2 && cleanReply.length > 50) {
-        truthReport = await this._truthCheck(cleanReply, results, analysis).catch(() => null);
+        truthReport = await this._truthCheck(
+          cleanReply,
+          results,
+          analysis,
+        ).catch(() => null);
         if (truthReport && truthReport.verdict === "FAIL") {
           sourceTags.push("TRUTH_FAIL");
           // Add warning to response
-          const warningNote = "\n\n⚠️ *Verificarea automată indică incertitudine în unele afirmații. Verifică sursele.*";
+          const warningNote =
+            "\n\n⚠️ *Verificarea automată indică incertitudine în unele afirmații. Verifică sursele.*";
           if (!cleanReply.includes("⚠️")) {
             cleanReply += warningNote;
           }
@@ -1438,22 +1811,36 @@ When asked "what can you do?" list these real capabilities. Use them proactively
       // Step 10: CRITIC AGENT — Independent quality validation (medium+ complexity)
       let criticReport = null;
       if (complexityResult.level >= 2 && cleanReply.length > 30) {
-        criticReport = await this.criticEvaluate(message, cleanReply, analysis, toolsUsedList).catch(() => null);
+        criticReport = await this.criticEvaluate(
+          message,
+          cleanReply,
+          analysis,
+          toolsUsedList,
+        ).catch(() => null);
         if (criticReport) {
           // Critic can override confidence
           if (criticReport.overallScore < confidence) {
-            confidence = (confidence * 0.6) + (criticReport.overallScore * 0.4);
+            confidence = confidence * 0.6 + criticReport.overallScore * 0.4;
           }
           // Add safety disclaimers if needed
           if (criticReport.safety && !criticReport.safety.safe) {
             if (criticReport.safety.severity === "critical") {
-              cleanReply = "⚠️ Conținut blocat de Critic Agent din motive de siguranță.";
+              cleanReply =
+                "⚠️ Conținut blocat de Critic Agent din motive de siguranță.";
               sourceTags.push("CRITIC_BLOCKED");
-            } else if (criticReport.safety.severity === "high" && !cleanReply.includes("medic") && !cleanReply.includes("doctor")) {
-              cleanReply += "\n\n*⚕️ Notă: Consultă un specialist pentru sfaturi medicale/financiare.*";
+            } else if (
+              criticReport.safety.severity === "high" &&
+              !cleanReply.includes("medic") &&
+              !cleanReply.includes("doctor")
+            ) {
+              cleanReply +=
+                "\n\n*⚕️ Notă: Consultă un specialist pentru sfaturi medicale/financiare.*";
             }
           }
-          if (criticReport.verdict === "REJECTED" || criticReport.verdict === "NEEDS_REVISION") {
+          if (
+            criticReport.verdict === "REJECTED" ||
+            criticReport.verdict === "NEEDS_REVISION"
+          ) {
             sourceTags.push("CRITIC_" + criticReport.verdict);
           }
         }
@@ -1470,7 +1857,10 @@ When asked "what can you do?" list these real capabilities. Use them proactively
             addBadge: false, // web chat handles its own UI
           });
         } catch (k1Err) {
-          logger.warn({ component: "Brain", err: k1Err.message }, "K1 postProcess failed (non-critical)");
+          logger.warn(
+            { component: "Brain", err: k1Err.message },
+            "K1 postProcess failed (non-critical)",
+          );
         }
       }
 
@@ -1486,7 +1876,11 @@ When asked "what can you do?" list these real capabilities. Use them proactively
         thinkTime,
         confidence,
         sourceTags,
-        agent: { name: this._currentAgentName, icon: this._currentAgentIcon, key: agentSelection?.agent || "general" },
+        agent: {
+          name: this._currentAgentName,
+          icon: this._currentAgentIcon,
+          key: agentSelection?.agent || "general",
+        },
         profileLoaded: !!profile,
         truthReport,
         criticReport,
@@ -1602,16 +1996,20 @@ Reply STRICTLY with JSON:
         }
       }
       if (!txt) {
-        const geminiKey = process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
+        const geminiKey =
+          process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
         if (geminiKey) {
-          r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODELS.GEMINI_CHAT}:generateContent?key=${geminiKey}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [{ role: "user", parts: [{ text: prompt }] }],
-              generationConfig: { maxOutputTokens: 250 },
-            }),
-          });
+          r = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${MODELS.GEMINI_CHAT}:generateContent?key=${geminiKey}`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                contents: [{ role: "user", parts: [{ text: prompt }] }],
+                generationConfig: { maxOutputTokens: 250 },
+              }),
+            },
+          );
           if (r.ok) {
             d = await r.json();
             txt = d.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
@@ -2156,9 +2554,28 @@ Reply STRICTLY with JSON:
           /\b(tradu|traduce|traducere|translate|translation|in\s*(engleza|romana|spaniola|franceza|germana|italiana))\b/i,
         ],
         extract: (text) => {
-          const langMatch = text.match(/\b(?:in|to|pe)\s*(engleza|romana|spaniola|franceza|germana|italiana|english|romanian|spanish|french|german|italian)\b/i);
-          const langMap = { engleza: "en", english: "en", romana: "ro", romanian: "ro", spaniola: "es", spanish: "es", franceza: "fr", french: "fr", germana: "de", german: "de", italiana: "it", italian: "it" };
-          return { translateTarget: langMatch ? (langMap[langMatch[1].toLowerCase()] || "en") : "en" };
+          const langMatch = text.match(
+            /\b(?:in|to|pe)\s*(engleza|romana|spaniola|franceza|germana|italiana|english|romanian|spanish|french|german|italian)\b/i,
+          );
+          const langMap = {
+            engleza: "en",
+            english: "en",
+            romana: "ro",
+            romanian: "ro",
+            spaniola: "es",
+            spanish: "es",
+            franceza: "fr",
+            french: "fr",
+            germana: "de",
+            german: "de",
+            italiana: "it",
+            italian: "it",
+          };
+          return {
+            translateTarget: langMatch
+              ? langMap[langMatch[1].toLowerCase()] || "en"
+              : "en",
+          };
         },
       },
       // ── SUMMARIZE ──
@@ -2185,8 +2602,12 @@ Reply STRICTLY with JSON:
         ],
         extract: (text) => {
           // Extract time: "la 9", "in 5 minute", "maine", "tomorrow"
-          const timeMatch = text.match(/\b(?:la|at|in|peste)\s+([\d:]+\s*(?:minute|ore|hours|min)?|maine|tomorrow|azi|today)\b/i);
-          const contentMatch = text.match(/(?:aminteste|remind).*(?:sa|to|ca|that)\s+(.+)/i);
+          const timeMatch = text.match(
+            /\b(?:la|at|in|peste)\s+([\d:]+\s*(?:minute|ore|hours|min)?|maine|tomorrow|azi|today)\b/i,
+          );
+          const contentMatch = text.match(
+            /(?:aminteste|remind).*(?:sa|to|ca|that)\s+(.+)/i,
+          );
           return {
             reminderText: contentMatch ? contentMatch[1].trim() : text,
             reminderTime: timeMatch ? timeMatch[1] : "",
@@ -2201,8 +2622,15 @@ Reply STRICTLY with JSON:
         ],
         extract: (text) => {
           const emailMatch = text.match(/[\w.+-]+@[\w.-]+\.[a-zA-Z]{2,}/i);
-          const subjectMatch = text.match(/(?:subiect|subject)[:\s]+["']?([^"'\n]+)/i);
-          return { emailTo: emailMatch ? emailMatch[0] : "", emailSubject: subjectMatch ? subjectMatch[1] : "Mesaj de la Kelion AI" };
+          const subjectMatch = text.match(
+            /(?:subiect|subject)[:\s]+["']?([^"'\n]+)/i,
+          );
+          return {
+            emailTo: emailMatch ? emailMatch[0] : "",
+            emailSubject: subjectMatch
+              ? subjectMatch[1]
+              : "Mesaj de la Kelion AI",
+          };
         },
       },
       // ── CODE EXECUTION ──
@@ -2213,7 +2641,9 @@ Reply STRICTLY with JSON:
           /```(js|javascript)[\s\S]*?```/i,
         ],
         extract: (text) => {
-          const codeBlock = text.match(/```(?:js|javascript)?\n?([\s\S]*?)```/i);
+          const codeBlock = text.match(
+            /```(?:js|javascript)?\n?([\s\S]*?)```/i,
+          );
           return { codeToRun: codeBlock ? codeBlock[1].trim() : text };
         },
       },
@@ -2243,12 +2673,22 @@ Reply STRICTLY with JSON:
           /\b(calendar|eveniment|programeaz[aă]|schedule|appointment|întâlnire|meeting|adaug[aă].*calendar|ce.*am.*program|agenda|events)\b/i,
         ],
         extract: (text) => {
-          const timeMatch = text.match(/\b(?:pe|on|la|at|in|pentru|mâine|maine|tomorrow|azi|today|luni|marți|miercuri|joi|vineri|sâmbătă|duminică)\s*(\d{1,2}[:.]\d{2})?/i);
-          const titleMatch = text.match(/(?:programeaz[aă]|adaug[aă]|schedule|create)\s+(?:un\s+)?(?:eveniment|meeting|event)?\s*[:"']?\s*(.+?)(?:\s+(?:pe|la|on|at|pentru|mâine|maine)|\s*$)/i);
+          const timeMatch = text.match(
+            /\b(?:pe|on|la|at|in|pentru|mâine|maine|tomorrow|azi|today|luni|marți|miercuri|joi|vineri|sâmbătă|duminică)\s*(\d{1,2}[:.]\d{2})?/i,
+          );
+          const titleMatch = text.match(
+            /(?:programeaz[aă]|adaug[aă]|schedule|create)\s+(?:un\s+)?(?:eveniment|meeting|event)?\s*[:"']?\s*(.+?)(?:\s+(?:pe|la|on|at|pentru|mâine|maine)|\s*$)/i,
+          );
           return {
-            calendarTitle: titleMatch ? titleMatch[1].trim() : text.substring(0, 60),
+            calendarTitle: titleMatch
+              ? titleMatch[1].trim()
+              : text.substring(0, 60),
             calendarTime: timeMatch ? timeMatch[0] : "",
-            calendarAction: /\b(list|ce am|agenda|events|arată|show)\b/i.test(text) ? "list" : "create",
+            calendarAction: /\b(list|ce am|agenda|events|arată|show)\b/i.test(
+              text,
+            )
+              ? "list"
+              : "create",
           };
         },
       },
@@ -2260,9 +2700,13 @@ Reply STRICTLY with JSON:
           /\b(f[aă].*raport|make.*report|write.*document)\b/i,
         ],
         extract: (text) => {
-          const titleMatch = text.match(/(?:document|raport|report|plan|memo|propunere|proposal)\s*(?:despre|about|pentru|privind|on)?\s*[:"']?\s*(.+)/i);
+          const titleMatch = text.match(
+            /(?:document|raport|report|plan|memo|propunere|proposal)\s*(?:despre|about|pentru|privind|on)?\s*[:"']?\s*(.+)/i,
+          );
           return {
-            docTitle: titleMatch ? titleMatch[1].trim().substring(0, 80) : "Document",
+            docTitle: titleMatch
+              ? titleMatch[1].trim().substring(0, 80)
+              : "Document",
             docContent: text,
             docFormat: /\b(text|txt)\b/i.test(text) ? "text" : "markdown",
           };
@@ -2278,28 +2722,33 @@ Reply STRICTLY with JSON:
         pattern:
           /\b(trist|deprimat|singur|plang|suparat|nefericit|sad|depressed|lonely|pierdut|dor|melancolie|dezamagit|disappointed)\b/i,
         weight: 0.9,
-        responseHint: "Be empathetic, warm, and supportive. Acknowledge feelings first.",
+        responseHint:
+          "Be empathetic, warm, and supportive. Acknowledge feelings first.",
       },
       happy: {
         pattern:
           /\b(fericit|bucuros|minunat|super|genial|happy|great|awesome|amazing|multumit|satisfied)\b/i,
         weight: 0.7,
-        responseHint: "Match their positive energy. Be enthusiastic and encouraging.",
+        responseHint:
+          "Match their positive energy. Be enthusiastic and encouraging.",
       },
       angry: {
         pattern:
           /\b(nervos|furios|enervat|angry|furious|frustrated|urasc|hate|dezgustat|disgusted)\b/i,
         weight: 0.9,
-        responseHint: "Stay calm and validating. Don't be dismissive. Help solve the problem.",
+        responseHint:
+          "Stay calm and validating. Don't be dismissive. Help solve the problem.",
       },
       anxious: {
         pattern:
           /\b(anxios|stresat|ingrijorat|worried|anxious|stressed|teama|frica|panica|nesigur|uncertain)\b/i,
         weight: 0.9,
-        responseHint: "Provide reassurance with facts. Break things into manageable steps.",
+        responseHint:
+          "Provide reassurance with facts. Break things into manageable steps.",
       },
       confused: {
-        pattern: /\b(nu inteleg|confuz|confused|nu stiu|habar|pierdut|lost|neclar|unclear)\b/i,
+        pattern:
+          /\b(nu inteleg|confuz|confused|nu stiu|habar|pierdut|lost|neclar|unclear)\b/i,
         weight: 0.6,
         responseHint: "Simplify explanations. Use examples and analogies.",
       },
@@ -2319,13 +2768,15 @@ Reply STRICTLY with JSON:
         pattern:
           /\b(urgent|repede|acum|imediat|asap|graba|hurry|quick|now|immediately|rapid|cat mai repede)\b/i,
         weight: 0.85,
-        responseHint: "Be concise and direct. Prioritize the solution. Skip pleasantries.",
+        responseHint:
+          "Be concise and direct. Prioritize the solution. Skip pleasantries.",
       },
       disappointed: {
         pattern:
           /\b(a dezamagit|nu e bun|slab|prost|nasol|lame|bad|terrible|awful|rau|nu functioneaza)\b/i,
         weight: 0.8,
-        responseHint: "Acknowledge the disappointment. Offer concrete improvements.",
+        responseHint:
+          "Acknowledge the disappointment. Offer concrete improvements.",
       },
     };
   }
@@ -2338,32 +2789,88 @@ Reply STRICTLY with JSON:
     if (/[!]{2,}/.test(text)) score += 0.3;
     if (/[?]{2,}/.test(text)) score += 0.2;
     // ALL CAPS words (more than 2)
-    const capsWords = text.split(/\s+/).filter(w => w === w.toUpperCase() && w.length > 2 && /[A-Z]/.test(w));
+    const capsWords = text
+      .split(/\s+/)
+      .filter((w) => w === w.toUpperCase() && w.length > 2 && /[A-Z]/.test(w));
     if (capsWords.length >= 2) score += 0.3;
     // Negative patterns in Romanian
-    if (/\b(nu merge|nu functioneaza|de ce nu|iar nu|tot nu|e stricat|prost|nasol|nicio treaba)\b/i.test(lower)) score += 0.3;
+    if (
+      /\b(nu merge|nu functioneaza|de ce nu|iar nu|tot nu|e stricat|prost|nasol|nicio treaba)\b/i.test(
+        lower,
+      )
+    )
+      score += 0.3;
     // Profanity / strong words
     if (/\b(naiba|drace|dracu|mama|ksm|wtf|ffs)\b/i.test(lower)) score += 0.4;
     // Repeated complaints
-    if (/\b(iar|din nou|again|inca o data|de fiecare data)\b/i.test(lower)) score += 0.2;
+    if (/\b(iar|din nou|again|inca o data|de fiecare data)\b/i.test(lower))
+      score += 0.2;
     return Math.min(1.0, score);
   }
 
   // ── Topic detection patterns ──
   static get TOPIC_PATTERNS() {
     return [
-      { topic: "tech", pattern: /\b(cod|program|software|app|server|bug|api|deploy|git|react|node|python|database|ai|ml|machine learning)\b/i },
-      { topic: "finance", pattern: /\b(bani|pret|cost|investitie|crypto|bitcoin|trading|actiuni|stocks|bursa|profit|pierdere|money|price|cost)\b/i },
-      { topic: "health", pattern: /\b(sanatate|doctor|boala|simptom|durere|medic|health|pain|disease|symptom|diabetic|dieta|fitness)\b/i },
-      { topic: "travel", pattern: /\b(calatorie|zbor|hotel|vacanta|avion|tara|oras|vizita|travel|flight|vacation)\b/i },
-      { topic: "food", pattern: /\b(mancare|reteta|gatit|restaurant|pizza|paste|cooking|recipe|food|meal)\b/i },
-      { topic: "education", pattern: /\b(invat|curs|scoala|universitate|examen|studiu|learn|course|school|university|exam)\b/i },
-      { topic: "entertainment", pattern: /\b(film|muzica|joc|game|serial|anime|movie|music|youtube|spotify|netflix)\b/i },
-      { topic: "weather", pattern: /\b(vreme|meteo|ploaie|soare|temperatura|weather|rain|sun|temperature|forecast)\b/i },
-      { topic: "news", pattern: /\b(stiri|news|ultima ora|breaking|actual|politica|politics|razboi|war)\b/i },
-      { topic: "personal", pattern: /\b(eu|meu|mea|despre mine|viata mea|my|mine|myself|personal)\b/i },
-      { topic: "creative", pattern: /\b(scrie|poem|poveste|articol|write|story|poem|essay|creative|compune|text)\b/i },
-      { topic: "legal", pattern: /\b(lege|contract|drept|avocattribunal|judecata|law|legal|court|attorney)\b/i },
+      {
+        topic: "tech",
+        pattern:
+          /\b(cod|program|software|app|server|bug|api|deploy|git|react|node|python|database|ai|ml|machine learning)\b/i,
+      },
+      {
+        topic: "finance",
+        pattern:
+          /\b(bani|pret|cost|investitie|crypto|bitcoin|trading|actiuni|stocks|bursa|profit|pierdere|money|price|cost)\b/i,
+      },
+      {
+        topic: "health",
+        pattern:
+          /\b(sanatate|doctor|boala|simptom|durere|medic|health|pain|disease|symptom|diabetic|dieta|fitness)\b/i,
+      },
+      {
+        topic: "travel",
+        pattern:
+          /\b(calator|calatorie|calatoresc|zbor|hotel|vacanta|avion|tara|oras|vizita|travel|flight|vacation)\b/i,
+      },
+      {
+        topic: "food",
+        pattern:
+          /\b(mancare|reteta|gatit|restaurant|pizza|paste|cooking|recipe|food|meal)\b/i,
+      },
+      {
+        topic: "education",
+        pattern:
+          /\b(invat|curs|scoala|universitate|examen|studiu|learn|course|school|university|exam)\b/i,
+      },
+      {
+        topic: "entertainment",
+        pattern:
+          /\b(film|muzica|joc|game|serial|anime|movie|music|youtube|spotify|netflix)\b/i,
+      },
+      {
+        topic: "weather",
+        pattern:
+          /\b(vreme|meteo|ploaie|soare|temperatura|weather|rain|sun|temperature|forecast)\b/i,
+      },
+      {
+        topic: "news",
+        pattern:
+          /\b(stiri|news|ultima ora|breaking|actual|politica|politics|razboi|war)\b/i,
+      },
+      {
+        topic: "personal",
+        pattern:
+          /\b(eu|meu|mea|despre mine|viata mea|my|mine|myself|personal)\b/i,
+      },
+      {
+        topic: "creative",
+        pattern:
+          /\b(scrie|poem|poveste|articol|write|story|poem|essay|creative|compune|text)\b/i,
+      },
+      {
+        topic: "legal",
+        pattern:
+          /\b(lege|contract|drept|avocattribunal|judecata|law|legal|court|attorney)\b/i,
+      },
     ];
   }
 
@@ -2454,7 +2961,8 @@ Reply STRICTLY with JSON:
       result.frustrationLevel = frustrationLevel;
       result.isEmotional = true;
       if (frustrationLevel > 0.6) {
-        result.emotionResponseHint = "User is very frustrated. Be extra patient, acknowledge the issue, and provide a clear solution quickly. Do NOT use filler words.";
+        result.emotionResponseHint =
+          "User is very frustrated. Be extra patient, acknowledge the issue, and provide a clear solution quickly. Do NOT use filler words.";
       }
     }
 
@@ -2529,14 +3037,20 @@ Reply STRICTLY with JSON:
         !this.isToolDegraded("imagine")
       ) {
         const imgPrompt = (analysis.imagePrompt || "").trim();
-        const hasStyleDetails = /\b(style|stil|realistic|cartoon|abstract|watercolor|cyberpunk|minimalist|pixel|3d|vector|oil|painting|dark|bright|pastel|neon|retro|vintage|modern|futuristic|portrait|landscape|square|banner|poster|logo|icon|\d{3,4}x\d{3,4}|hd|4k|uhd)\b/i.test(imgPrompt);
+        const hasStyleDetails =
+          /\b(style|stil|realistic|cartoon|abstract|watercolor|cyberpunk|minimalist|pixel|3d|vector|oil|painting|dark|bright|pastel|neon|retro|vintage|modern|futuristic|portrait|landscape|square|banner|poster|logo|icon|\d{3,4}x\d{3,4}|hd|4k|uhd)\b/i.test(
+            imgPrompt,
+          );
         if (imgPrompt.length >= 20 || hasStyleDetails) {
           plan.push({ tool: "imagine", prompt: imgPrompt });
           seen.add("imagine");
         } else {
           // Vague prompt — brain will ask for details instead of generating
           analysis.needsImageClarification = true;
-          logger.info({ component: "Brain", prompt: imgPrompt }, "Image request too vague — will ask for details");
+          logger.info(
+            { component: "Brain", prompt: imgPrompt },
+            "Image request too vague — will ask for details",
+          );
         }
       }
       if (analysis.needsMap && !seen.has("map")) {
@@ -2679,7 +3193,10 @@ Reply STRICTLY with JSON:
       }
       // New P1 tools: translate, summarize, dbQuery, reminder
       if (analysis.needsTranslate && !seen.has("translate")) {
-        plan.push({ tool: "translate", target: analysis.translateTarget || "en" });
+        plan.push({
+          tool: "translate",
+          target: analysis.translateTarget || "en",
+        });
         seen.add("translate");
       }
       if (analysis.needsSummarize && !seen.has("summarize")) {
@@ -2687,16 +3204,30 @@ Reply STRICTLY with JSON:
         seen.add("summarize");
       }
       if (analysis.needsDbQuery && !seen.has("dbQuery")) {
-        plan.push({ tool: "dbQuery", question: analysis.dbQuestion || message });
+        plan.push({
+          tool: "dbQuery",
+          question: analysis.dbQuestion || message,
+        });
         seen.add("dbQuery");
       }
       if (analysis.needsReminder && !seen.has("reminder")) {
-        plan.push({ tool: "reminder", text: analysis.reminderText, time: analysis.reminderTime, userId });
+        plan.push({
+          tool: "reminder",
+          text: analysis.reminderText,
+          time: analysis.reminderTime,
+          userId,
+        });
         seen.add("reminder");
       }
       // P2 tools: email, code exec, RAG, web scrape
       if (analysis.needsEmail && !seen.has("email")) {
-        plan.push({ tool: "email", to: analysis.emailTo, subject: analysis.emailSubject, body: message, userId });
+        plan.push({
+          tool: "email",
+          to: analysis.emailTo,
+          subject: analysis.emailSubject,
+          body: message,
+          userId,
+        });
         seen.add("email");
       }
       if (analysis.needsCodeExec && !seen.has("codeExec")) {
@@ -2704,7 +3235,11 @@ Reply STRICTLY with JSON:
         seen.add("codeExec");
       }
       if (analysis.needsRagSearch && !seen.has("ragSearch")) {
-        plan.push({ tool: "ragSearch", query: analysis.ragQuery || message, userId });
+        plan.push({
+          tool: "ragSearch",
+          query: analysis.ragQuery || message,
+          userId,
+        });
         seen.add("ragSearch");
       }
       if (analysis.needsWebScrape && !seen.has("webScrape")) {
@@ -2712,21 +3247,41 @@ Reply STRICTLY with JSON:
         seen.add("webScrape");
       }
       if (analysis.needsFileOps && !seen.has("fileOps")) {
-        plan.push({ tool: "fileOps", action: analysis.fileAction, fileName: analysis.fileName, content: analysis.fileContent });
+        plan.push({
+          tool: "fileOps",
+          action: analysis.fileAction,
+          fileName: analysis.fileName,
+          content: analysis.fileContent,
+        });
         seen.add("fileOps");
       }
       // P3 tools: calendar, document generation
-      if (analysis.needsCalendar && !seen.has("calendarCreate") && !seen.has("calendarList")) {
+      if (
+        analysis.needsCalendar &&
+        !seen.has("calendarCreate") &&
+        !seen.has("calendarList")
+      ) {
         if (analysis.calendarAction === "list") {
           plan.push({ tool: "calendarList", userId, maxResults: 10 });
           seen.add("calendarList");
         } else {
-          plan.push({ tool: "calendarCreate", title: analysis.calendarTitle, startTime: analysis.calendarTime, userId });
+          plan.push({
+            tool: "calendarCreate",
+            title: analysis.calendarTitle,
+            startTime: analysis.calendarTime,
+            userId,
+          });
           seen.add("calendarCreate");
         }
       }
       if (analysis.needsDocGen && !seen.has("generateDoc")) {
-        plan.push({ tool: "generateDoc", title: analysis.docTitle || "Document", content: analysis.docContent || message, format: analysis.docFormat || "markdown", userId });
+        plan.push({
+          tool: "generateDoc",
+          title: analysis.docTitle || "Document",
+          content: analysis.docContent || message,
+          format: analysis.docFormat || "markdown",
+          userId,
+        });
         seen.add("generateDoc");
       }
     }
@@ -2802,9 +3357,20 @@ Reply STRICTLY with JSON:
 
   async executeTool(step) {
     // Action confirmation check for risky operations
-    const confirmCheck = this._needsConfirmation(step.tool, step, step.userPlan || "free");
+    const confirmCheck = this._needsConfirmation(
+      step.tool,
+      step,
+      step.userPlan || "free",
+    );
     if (confirmCheck) {
-      logger.info({ component: "ActionConfirm", tool: step.tool, risk: confirmCheck.risk }, `⚠️ Blocked risky action: ${step.tool}`);
+      logger.info(
+        {
+          component: "ActionConfirm",
+          tool: step.tool,
+          risk: confirmCheck.risk,
+        },
+        `⚠️ Blocked risky action: ${step.tool}`,
+      );
       // BLOCK the action — return warning instead of executing
       return {
         blocked: true,
@@ -2812,7 +3378,8 @@ Reply STRICTLY with JSON:
         tool: step.tool,
         risk: confirmCheck.risk,
         message: confirmCheck.message,
-        instruction: "Utilizatorul trebuie să confirme explicit această acțiune înainte de execuție.",
+        instruction:
+          "Utilizatorul trebuie să confirme explicit această acțiune înainte de execuție.",
       };
     }
 
@@ -2934,10 +3501,20 @@ Reply STRICTLY with JSON:
       case "dbQuery":
         return this._dbQuery(step.question || "", step.userId);
       case "reminder":
-        return this._scheduleReminder(step.userId, step.text || "", step.time || "", "push");
+        return this._scheduleReminder(
+          step.userId,
+          step.text || "",
+          step.time || "",
+          "push",
+        );
       // P2 tools: email, code exec, RAG, web scrape
       case "email":
-        return this._sendEmail(step.to, step.subject, step.body || "", step.userId);
+        return this._sendEmail(
+          step.to,
+          step.subject,
+          step.body || "",
+          step.userId,
+        );
       case "codeExec":
         return this._execCode(step.code || "");
       case "ragSearch":
@@ -2945,16 +3522,31 @@ Reply STRICTLY with JSON:
       case "webScrape":
         return this._webScrape(step.url || "", true);
       case "fileOps":
-        return this._fileOps(step.action || "list", step.fileName, step.content);
+        return this._fileOps(
+          step.action || "list",
+          step.fileName,
+          step.content,
+        );
       // P3 tools: calendar, document generation
       case "calendarCreate":
-        return this._calendarCreate(step.title || "", step.startTime, step.endTime, step.description, step.userId);
+        return this._calendarCreate(
+          step.title || "",
+          step.startTime,
+          step.endTime,
+          step.description,
+          step.userId,
+        );
       case "calendarList":
         return this._calendarList(step.userId, step.maxResults || 10);
       case "calendarDelete":
         return this._calendarDelete(step.eventId, step.userId);
       case "generateDoc":
-        return this._generateDocument(step.title || "Report", step.content || "", step.format || "markdown", step.userId);
+        return this._generateDocument(
+          step.title || "Report",
+          step.content || "",
+          step.format || "markdown",
+          step.userId,
+        );
       // ═══ P4 tools: IDE-parity (kira-tools) ═══
       case "terminal":
         return this._terminal(step.command || step.cmd || "");
@@ -3051,7 +3643,12 @@ Reply STRICTLY with JSON:
       ctx += `\n[Utilizatorul pare ${analysis.emotionalTone}. Adapteaza tonul empatic.]`;
     }
     if (analysis.frustrationLevel && analysis.frustrationLevel > 0.3) {
-      const level = analysis.frustrationLevel > 0.7 ? "FOARTE FRUSTRAT" : analysis.frustrationLevel > 0.5 ? "frustrat" : "ușor iritat";
+      const level =
+        analysis.frustrationLevel > 0.7
+          ? "FOARTE FRUSTRAT"
+          : analysis.frustrationLevel > 0.5
+            ? "frustrat"
+            : "ușor iritat";
       ctx += `\n[⚠️ ATENȚIE: Utilizatorul este ${level} (nivel: ${(analysis.frustrationLevel * 100).toFixed(0)}%). ${analysis.emotionResponseHint || "Fii empatic, recunoaște problema, oferă soluții concrete rapid. NU folosi cuvinte de umplutură."}]`;
     }
     if (analysis.isEmergency) {
@@ -3225,7 +3822,13 @@ Reply STRICTLY with JSON:
   // 9.1 SELF-REFLECTION — Evaluate response quality before sending
   // Uses fast AI to decide if Brain needs more information
   // ═══════════════════════════════════════════════════════════
-  async _selfReflect(message, currentResponse, toolResults, analysis, language) {
+  async _selfReflect(
+    message,
+    currentResponse,
+    toolResults,
+    analysis,
+    language,
+  ) {
     const aiKey = this.groqKey || this.geminiKey;
     if (!aiKey) return null;
 
@@ -3251,16 +3854,22 @@ Missing tool names must be from: search, weather, imagine, map, memory, vision, 
 
       let txt = null;
       if (this.groqKey) {
-        const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: "Bearer " + this.groqKey },
-          body: JSON.stringify({
-            model: MODELS.GROQ_PRIMARY,
-            max_tokens: 150,
-            messages: [{ role: "user", content: prompt }],
-          }),
-          signal: AbortSignal.timeout(4000),
-        });
+        const r = await fetch(
+          "https://api.groq.com/openai/v1/chat/completions",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: "Bearer " + this.groqKey,
+            },
+            body: JSON.stringify({
+              model: MODELS.GROQ_PRIMARY,
+              max_tokens: 150,
+              messages: [{ role: "user", content: prompt }],
+            }),
+            signal: AbortSignal.timeout(4000),
+          },
+        );
         if (r.ok) {
           const d = await r.json();
           txt = d.choices?.[0]?.message?.content?.trim();
@@ -3268,7 +3877,8 @@ Missing tool names must be from: search, weather, imagine, map, memory, vision, 
       }
 
       if (!txt) {
-        const geminiKey = process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
+        const geminiKey =
+          process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
         if (geminiKey) {
           const r = await fetch(
             `https://generativelanguage.googleapis.com/v1beta/models/${MODELS.GEMINI_CHAT}:generateContent?key=${geminiKey}`,
@@ -3280,7 +3890,7 @@ Missing tool names must be from: search, weather, imagine, map, memory, vision, 
                 generationConfig: { maxOutputTokens: 150 },
               }),
               signal: AbortSignal.timeout(4000),
-            }
+            },
           );
           if (r.ok) {
             const d = await r.json();
@@ -3294,7 +3904,10 @@ Missing tool names must be from: search, weather, imagine, map, memory, vision, 
       try {
         const parsed = JSON.parse(txt.replace(/```json|```/g, "").trim());
         // Only iterate if there are specific missing tools (avoid infinite loops)
-        if (parsed.needsMore && (!parsed.missingTools || parsed.missingTools.length === 0)) {
+        if (
+          parsed.needsMore &&
+          (!parsed.missingTools || parsed.missingTools.length === 0)
+        ) {
           parsed.needsMore = false;
         }
         return parsed;
@@ -3311,7 +3924,12 @@ Missing tool names must be from: search, weather, imagine, map, memory, vision, 
   // 9.2 PLAN FROM REFLECTION — Convert reflection into additional tool plan
   // ═══════════════════════════════════════════════════════════
   _planFromReflection(reflection, userId, mediaData = {}, isAdmin = false) {
-    if (!reflection || !reflection.missingTools || reflection.missingTools.length === 0) return [];
+    if (
+      !reflection ||
+      !reflection.missingTools ||
+      reflection.missingTools.length === 0
+    )
+      return [];
 
     const additionalPlan = [];
     const toolMapping = {
@@ -3336,8 +3954,13 @@ Missing tool names must be from: search, weather, imagine, map, memory, vision, 
       }
     }
 
-    logger.info({ component: "Brain", additionalTools: additionalPlan.map(p => p.tool) },
-      `🔄 Reflection added ${additionalPlan.length} new tools to plan`);
+    logger.info(
+      {
+        component: "Brain",
+        additionalTools: additionalPlan.map((p) => p.tool),
+      },
+      `🔄 Reflection added ${additionalPlan.length} new tools to plan`,
+    );
     return additionalPlan;
   }
 
@@ -3356,7 +3979,10 @@ Missing tool names must be from: search, weather, imagine, map, memory, vision, 
       const recent = managed.slice(-(maxMessages - 2));
       managed = [
         ...first,
-        { role: "system", content: `[... ${history.length - maxMessages} older messages summarized ...]` },
+        {
+          role: "system",
+          content: `[... ${history.length - maxMessages} older messages summarized ...]`,
+        },
         ...recent,
       ];
     }
@@ -3402,19 +4028,28 @@ Missing tool names must be from: search, weather, imagine, map, memory, vision, 
       const prompt = `Sumarizează în maxim ${maxLength} caractere, în limba ${language === "ro" ? "română" : "engleză"}:\n\n${text.substring(0, 2000)}`;
 
       if (this.groqKey) {
-        const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: "Bearer " + this.groqKey },
-          body: JSON.stringify({
-            model: MODELS.GROQ_PRIMARY,
-            max_tokens: Math.ceil(maxLength / 3),
-            messages: [{ role: "user", content: prompt }],
-          }),
-          signal: AbortSignal.timeout(3000),
-        });
+        const r = await fetch(
+          "https://api.groq.com/openai/v1/chat/completions",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: "Bearer " + this.groqKey,
+            },
+            body: JSON.stringify({
+              model: MODELS.GROQ_PRIMARY,
+              max_tokens: Math.ceil(maxLength / 3),
+              messages: [{ role: "user", content: prompt }],
+            }),
+            signal: AbortSignal.timeout(3000),
+          },
+        );
         if (r.ok) {
           const d = await r.json();
-          return d.choices?.[0]?.message?.content?.trim() || text.substring(0, maxLength);
+          return (
+            d.choices?.[0]?.message?.content?.trim() ||
+            text.substring(0, maxLength)
+          );
         }
       }
 
@@ -3430,11 +4065,14 @@ Missing tool names must be from: search, weather, imagine, map, memory, vision, 
               generationConfig: { maxOutputTokens: Math.ceil(maxLength / 3) },
             }),
             signal: AbortSignal.timeout(3000),
-          }
+          },
         );
         if (r.ok) {
           const d = await r.json();
-          return d.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || text.substring(0, maxLength);
+          return (
+            d.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ||
+            text.substring(0, maxLength)
+          );
         }
       }
 
@@ -3454,21 +4092,34 @@ Missing tool names must be from: search, weather, imagine, map, memory, vision, 
     if (!aiKey) return text;
 
     try {
-      const langNames = { ro: "Romanian", en: "English", es: "Spanish", fr: "French", de: "German", it: "Italian" };
+      const langNames = {
+        ro: "Romanian",
+        en: "English",
+        es: "Spanish",
+        fr: "French",
+        de: "German",
+        it: "Italian",
+      };
       const targetName = langNames[targetLang] || targetLang;
       const prompt = `Translate the following text to ${targetName}. Return ONLY the translation, nothing else:\n\n${text.substring(0, 3000)}`;
 
       if (this.groqKey) {
-        const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: "Bearer " + this.groqKey },
-          body: JSON.stringify({
-            model: MODELS.GROQ_PRIMARY,
-            max_tokens: 1000,
-            messages: [{ role: "user", content: prompt }],
-          }),
-          signal: AbortSignal.timeout(5000),
-        });
+        const r = await fetch(
+          "https://api.groq.com/openai/v1/chat/completions",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: "Bearer " + this.groqKey,
+            },
+            body: JSON.stringify({
+              model: MODELS.GROQ_PRIMARY,
+              max_tokens: 1000,
+              messages: [{ role: "user", content: prompt }],
+            }),
+            signal: AbortSignal.timeout(5000),
+          },
+        );
         if (r.ok) {
           const d = await r.json();
           return d.choices?.[0]?.message?.content?.trim() || text;
@@ -3487,7 +4138,7 @@ Missing tool names must be from: search, weather, imagine, map, memory, vision, 
               generationConfig: { maxOutputTokens: 1000 },
             }),
             signal: AbortSignal.timeout(5000),
-          }
+          },
         );
         if (r.ok) {
           const d = await r.json();
@@ -3509,9 +4160,18 @@ Missing tool names must be from: search, weather, imagine, map, memory, vision, 
     if (!this.supabaseAdmin) return { error: "No database connection" };
 
     const SAFE_TABLES = [
-      "profiles", "conversations", "messages", "ai_costs", "page_views",
-      "subscriptions", "trades", "trade_intelligence", "media_history",
-      "learned_facts", "admin_logs", "admin_codes",
+      "profiles",
+      "conversations",
+      "messages",
+      "ai_costs",
+      "page_views",
+      "subscriptions",
+      "trades",
+      "trade_intelligence",
+      "media_history",
+      "learned_facts",
+      "admin_logs",
+      "admin_codes",
     ];
 
     try {
@@ -3532,20 +4192,28 @@ Rules:
       const aiKey = this.groqKey || this.geminiKey;
 
       if (this.groqKey) {
-        const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: "Bearer " + this.groqKey },
-          body: JSON.stringify({
-            model: MODELS.GROQ_PRIMARY,
-            max_tokens: 200,
-            messages: [{ role: "user", content: prompt }],
-          }),
-          signal: AbortSignal.timeout(4000),
-        });
+        const r = await fetch(
+          "https://api.groq.com/openai/v1/chat/completions",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: "Bearer " + this.groqKey,
+            },
+            body: JSON.stringify({
+              model: MODELS.GROQ_PRIMARY,
+              max_tokens: 200,
+              messages: [{ role: "user", content: prompt }],
+            }),
+            signal: AbortSignal.timeout(4000),
+          },
+        );
         if (r.ok) {
           const d = await r.json();
           const txt = d.choices?.[0]?.message?.content?.trim();
-          try { queryPlan = JSON.parse(txt.replace(/```json|```/g, "").trim()); } catch { }
+          try {
+            queryPlan = JSON.parse(txt.replace(/```json|```/g, "").trim());
+          } catch {}
         }
       }
 
@@ -3553,7 +4221,10 @@ Rules:
 
       // Validate table is safe
       if (!SAFE_TABLES.includes(queryPlan.table)) {
-        return { error: `Table ${queryPlan.table} not allowed`, safeTables: SAFE_TABLES };
+        return {
+          error: `Table ${queryPlan.table} not allowed`,
+          safeTables: SAFE_TABLES,
+        };
       }
 
       // Execute query
@@ -3603,22 +4274,28 @@ Rules:
 
     try {
       // Store reminder in Supabase
-      const { data, error } = await this.supabaseAdmin.from("brain_memory").insert({
-        user_id: userId,
-        type: "reminder",
-        content: JSON.stringify({
-          text: reminderText,
-          triggerAt: triggerAt instanceof Date ? triggerAt.toISOString() : triggerAt,
-          channel,
-          status: "pending",
-          createdAt: new Date().toISOString(),
-        }),
-        importance: 9,
-      });
+      const { data, error } = await this.supabaseAdmin
+        .from("brain_memory")
+        .insert({
+          user_id: userId,
+          type: "reminder",
+          content: JSON.stringify({
+            text: reminderText,
+            triggerAt:
+              triggerAt instanceof Date ? triggerAt.toISOString() : triggerAt,
+            channel,
+            status: "pending",
+            createdAt: new Date().toISOString(),
+          }),
+          importance: 9,
+        });
 
       if (error) return { error: error.message };
 
-      logger.info({ component: "Brain", userId, triggerAt }, `⏰ Reminder scheduled: ${reminderText.substring(0, 50)}`);
+      logger.info(
+        { component: "Brain", userId, triggerAt },
+        `⏰ Reminder scheduled: ${reminderText.substring(0, 50)}`,
+      );
       return {
         success: true,
         reminder: reminderText,
@@ -3658,13 +4335,18 @@ Rules:
               .update({ content: JSON.stringify(parsed) })
               .eq("id", rem.id);
 
-            logger.info({ component: "Brain", userId: rem.user_id },
-              `⏰ Reminder fired: ${parsed.text.substring(0, 50)}`);
+            logger.info(
+              { component: "Brain", userId: rem.user_id },
+              `⏰ Reminder fired: ${parsed.text.substring(0, 50)}`,
+            );
           }
-        } catch { }
+        } catch {}
       }
     } catch (e) {
-      logger.warn({ component: "Brain", err: e.message }, "Reminder check failed");
+      logger.warn(
+        { component: "Brain", err: e.message },
+        "Reminder check failed",
+      );
     }
   }
 
@@ -3677,7 +4359,13 @@ Rules:
    * Create a Google Calendar event.
    * Supports natural language time parsing.
    */
-  async _calendarCreate(title, startTime, endTime, description = "", userId = null) {
+  async _calendarCreate(
+    title,
+    startTime,
+    endTime,
+    description = "",
+    userId = null,
+  ) {
     this.toolStats.calendarCreate = (this.toolStats.calendarCreate || 0) + 1;
     const calId = process.env.GOOGLE_CALENDAR_ID || "primary";
 
@@ -3685,42 +4373,75 @@ Rules:
     const token = await this._getCalendarToken();
     if (!token) {
       // Fallback: save as reminder in DB
-      logger.info({ component: "Calendar" }, "No Calendar credentials — saving as reminder");
+      logger.info(
+        { component: "Calendar" },
+        "No Calendar credentials — saving as reminder",
+      );
       await this._scheduleReminder(userId, `📅 ${title}`, startTime, "push");
-      return { saved: true, fallback: "reminder", title, startTime, message: `📅 Am salvat "${title}" ca reminder. Configurează service account pentru Calendar.` };
+      return {
+        saved: true,
+        fallback: "reminder",
+        title,
+        startTime,
+        message: `📅 Am salvat "${title}" ca reminder. Configurează service account pentru Calendar.`,
+      };
     }
 
     try {
       const start = new Date(startTime || Date.now() + 3600000);
-      const end = endTime ? new Date(endTime) : new Date(start.getTime() + 3600000);
+      const end = endTime
+        ? new Date(endTime)
+        : new Date(start.getTime() + 3600000);
 
       if (isNaN(start.getTime())) {
-        return { error: true, message: `Nu am putut interpreta data: "${startTime}". Încearcă format ISO (2025-03-15T14:00:00).` };
+        return {
+          error: true,
+          message: `Nu am putut interpreta data: "${startTime}". Încearcă format ISO (2025-03-15T14:00:00).`,
+        };
       }
 
       const event = {
         summary: title,
-        description: description || `Created by KelionAI for ${userId || "user"}`,
+        description:
+          description || `Created by KelionAI for ${userId || "user"}`,
         start: { dateTime: start.toISOString(), timeZone: "Europe/Bucharest" },
         end: { dateTime: end.toISOString(), timeZone: "Europe/Bucharest" },
       };
 
-      const r = await fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calId)}/events`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify(event),
-        signal: AbortSignal.timeout(8000),
-      });
+      const r = await fetch(
+        `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calId)}/events`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(event),
+          signal: AbortSignal.timeout(8000),
+        },
+      );
 
       if (!r.ok) {
         const errBody = await r.text().catch(() => "");
-        logger.warn({ component: "Calendar", status: r.status, err: errBody }, "Calendar API error");
+        logger.warn(
+          { component: "Calendar", status: r.status, err: errBody },
+          "Calendar API error",
+        );
         await this._scheduleReminder(userId, `📅 ${title}`, startTime, "push");
-        return { saved: true, fallback: "reminder", title, startTime, message: `📅 Calendar API eroare — salvat ca reminder: "${title}" la ${start.toLocaleString("ro-RO")}` };
+        return {
+          saved: true,
+          fallback: "reminder",
+          title,
+          startTime,
+          message: `📅 Calendar API eroare — salvat ca reminder: "${title}" la ${start.toLocaleString("ro-RO")}`,
+        };
       }
 
       const data = await r.json();
-      logger.info({ component: "Calendar", eventId: data.id, title }, `📅 Event created: ${title}`);
+      logger.info(
+        { component: "Calendar", eventId: data.id, title },
+        `📅 Event created: ${title}`,
+      );
 
       return {
         created: true,
@@ -3732,9 +4453,22 @@ Rules:
         message: `📅 Am creat evenimentul "${title}" pe ${start.toLocaleDateString("ro-RO")} la ${start.toLocaleTimeString("ro-RO", { hour: "2-digit", minute: "2-digit" })}.`,
       };
     } catch (e) {
-      logger.warn({ component: "Calendar", err: e.message }, "Calendar create failed");
-      await this._scheduleReminder(userId, `📅 ${title}`, startTime, "push").catch(() => { });
-      return { saved: true, fallback: "reminder", title, message: `📅 Salvat ca reminder: "${title}"` };
+      logger.warn(
+        { component: "Calendar", err: e.message },
+        "Calendar create failed",
+      );
+      await this._scheduleReminder(
+        userId,
+        `📅 ${title}`,
+        startTime,
+        "push",
+      ).catch(() => {});
+      return {
+        saved: true,
+        fallback: "reminder",
+        title,
+        message: `📅 Salvat ca reminder: "${title}"`,
+      };
     }
   }
 
@@ -3748,7 +4482,8 @@ Rules:
     const token = await this._getCalendarToken();
     if (!token) {
       // Fallback: list reminders from DB
-      if (!this.supabaseAdmin) return { events: [], message: "Nu am acces la calendar." };
+      if (!this.supabaseAdmin)
+        return { events: [], message: "Nu am acces la calendar." };
       try {
         const { data } = await this.supabaseAdmin
           .from("brain_memory")
@@ -3757,14 +4492,22 @@ Rules:
           .order("created_at", { ascending: false })
           .limit(maxResults);
 
-        const events = (data || []).map(r => {
-          try {
-            const p = JSON.parse(r.content);
-            return { title: p.text, time: p.triggerAt, status: p.status };
-          } catch { return null; }
-        }).filter(Boolean);
+        const events = (data || [])
+          .map((r) => {
+            try {
+              const p = JSON.parse(r.content);
+              return { title: p.text, time: p.triggerAt, status: p.status };
+            } catch {
+              return null;
+            }
+          })
+          .filter(Boolean);
 
-        return { events, source: "reminders", message: `📋 ${events.length} reminder(e) active.` };
+        return {
+          events,
+          source: "reminders",
+          message: `📋 ${events.length} reminder(e) active.`,
+        };
       } catch (e) {
         return { events: [], error: e.message };
       }
@@ -3781,7 +4524,7 @@ Rules:
       if (!r.ok) throw new Error(`Calendar API ${r.status}`);
 
       const data = await r.json();
-      const events = (data.items || []).map(e => ({
+      const events = (data.items || []).map((e) => ({
         id: e.id,
         title: e.summary,
         start: e.start?.dateTime || e.start?.date,
@@ -3790,10 +4533,20 @@ Rules:
         link: e.htmlLink,
       }));
 
-      logger.info({ component: "Calendar", count: events.length }, `📋 Listed ${events.length} events`);
-      return { events, source: "google", message: `📋 ${events.length} eveniment(e) viitoare.` };
+      logger.info(
+        { component: "Calendar", count: events.length },
+        `📋 Listed ${events.length} events`,
+      );
+      return {
+        events,
+        source: "google",
+        message: `📋 ${events.length} eveniment(e) viitoare.`,
+      };
     } catch (e) {
-      logger.warn({ component: "Calendar", err: e.message }, "Calendar list failed");
+      logger.warn(
+        { component: "Calendar", err: e.message },
+        "Calendar list failed",
+      );
       return { events: [], error: e.message };
     }
   }
@@ -3807,24 +4560,40 @@ Rules:
 
     const token = await this._getCalendarToken();
     if (!token || !eventId) {
-      return { deleted: false, message: "Nu pot șterge — lipsesc credențiale sau event ID." };
+      return {
+        deleted: false,
+        message: "Nu pot șterge — lipsesc credențiale sau event ID.",
+      };
     }
 
     try {
-      const r = await fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calId)}/events/${eventId}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-        signal: AbortSignal.timeout(8000),
-      });
+      const r = await fetch(
+        `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calId)}/events/${eventId}`,
+        {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${token}` },
+          signal: AbortSignal.timeout(8000),
+        },
+      );
 
       if (r.status === 204 || r.ok) {
-        logger.info({ component: "Calendar", eventId }, `🗑️ Event deleted: ${eventId}`);
-        return { deleted: true, eventId, message: `🗑️ Evenimentul a fost șters.` };
+        logger.info(
+          { component: "Calendar", eventId },
+          `🗑️ Event deleted: ${eventId}`,
+        );
+        return {
+          deleted: true,
+          eventId,
+          message: `🗑️ Evenimentul a fost șters.`,
+        };
       }
 
       return { deleted: false, message: `Calendar API a returnat ${r.status}` };
     } catch (e) {
-      logger.warn({ component: "Calendar", err: e.message }, "Calendar delete failed");
+      logger.warn(
+        { component: "Calendar", err: e.message },
+        "Calendar delete failed",
+      );
       return { deleted: false, error: e.message };
     }
   }
@@ -3852,7 +4621,8 @@ Rules:
       // Build JWT header + payload (with domain-wide delegation)
       const header = { alg: "RS256", typ: "JWT" };
       const now = Math.floor(Date.now() / 1000);
-      const calendarOwner = process.env.GOOGLE_CALENDAR_OWNER || "contact@kelionai.app";
+      const calendarOwner =
+        process.env.GOOGLE_CALENDAR_OWNER || "contact@kelionai.app";
       const payload = {
         iss: clientEmail,
         sub: calendarOwner, // Domain-wide delegation: act as this user
@@ -3862,7 +4632,8 @@ Rules:
         exp: now + 3600,
       };
 
-      const b64 = (obj) => Buffer.from(JSON.stringify(obj)).toString("base64url");
+      const b64 = (obj) =>
+        Buffer.from(JSON.stringify(obj)).toString("base64url");
       const unsigned = b64(header) + "." + b64(payload);
 
       // Sign with RSA SHA-256
@@ -3881,17 +4652,26 @@ Rules:
 
       if (!r.ok) {
         const err = await r.text().catch(() => "");
-        logger.warn({ component: "CalendarAuth", status: r.status, err }, "Token exchange failed");
+        logger.warn(
+          { component: "CalendarAuth", status: r.status, err },
+          "Token exchange failed",
+        );
         return null;
       }
 
       const data = await r.json();
       this._calendarTokenCache = data.access_token;
       this._calendarTokenExpiry = Date.now() + 55 * 60 * 1000; // Cache 55 minutes
-      logger.info({ component: "CalendarAuth" }, "🔑 Calendar access token obtained");
+      logger.info(
+        { component: "CalendarAuth" },
+        "🔑 Calendar access token obtained",
+      );
       return data.access_token;
     } catch (e) {
-      logger.warn({ component: "CalendarAuth", err: e.message }, "JWT auth failed");
+      logger.warn(
+        { component: "CalendarAuth", err: e.message },
+        "JWT auth failed",
+      );
       return null;
     }
   }
@@ -3929,50 +4709,74 @@ Generate the complete document now:`;
 
       // Try Gemini first (best for long-form content)
       if (this.geminiKey) {
-        const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${this.geminiKey}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { maxOutputTokens: 4096, temperature: 0.3 },
-          }),
-          signal: AbortSignal.timeout(15000),
-        });
+        const r = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${this.geminiKey}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: { maxOutputTokens: 4096, temperature: 0.3 },
+            }),
+            signal: AbortSignal.timeout(15000),
+          },
+        );
         const d = await r.json();
         docContent = d.candidates?.[0]?.content?.parts?.[0]?.text;
       }
 
       // Fallback to Groq
       if (!docContent && this.groqKey) {
-        const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${this.groqKey}` },
-          body: JSON.stringify({
-            model: "llama-3.3-70b-versatile",
-            messages: [{ role: "user", content: prompt }],
-            max_tokens: 4096,
-            temperature: 0.3,
-          }),
-          signal: AbortSignal.timeout(15000),
-        });
+        const r = await fetch(
+          "https://api.groq.com/openai/v1/chat/completions",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${this.groqKey}`,
+            },
+            body: JSON.stringify({
+              model: "llama-3.3-70b-versatile",
+              messages: [{ role: "user", content: prompt }],
+              max_tokens: 4096,
+              temperature: 0.3,
+            }),
+            signal: AbortSignal.timeout(15000),
+          },
+        );
         const d = await r.json();
         docContent = d.choices?.[0]?.message?.content;
       }
 
       if (!docContent) {
-        return { generated: false, message: "Nu am putut genera documentul — niciun model AI disponibil." };
+        return {
+          generated: false,
+          message:
+            "Nu am putut genera documentul — niciun model AI disponibil.",
+        };
       }
 
       // Save to brain memory for retrieval
       if (this.supabaseAdmin && userId) {
-        await this.supabaseAdmin.from("brain_memory").insert({
-          user_id: userId,
-          type: "document",
-          content: JSON.stringify({ title, format, body: docContent.substring(0, 10000), createdAt: new Date().toISOString() }),
-        }).catch(() => { });
+        await this.supabaseAdmin
+          .from("brain_memory")
+          .insert({
+            user_id: userId,
+            type: "document",
+            content: JSON.stringify({
+              title,
+              format,
+              body: docContent.substring(0, 10000),
+              createdAt: new Date().toISOString(),
+            }),
+          })
+          .catch(() => {});
       }
 
-      logger.info({ component: "DocGen", title, format, length: docContent.length }, `📄 Document generated: ${title} (${docContent.length}c)`);
+      logger.info(
+        { component: "DocGen", title, format, length: docContent.length },
+        `📄 Document generated: ${title} (${docContent.length}c)`,
+      );
 
       return {
         generated: true,
@@ -3983,7 +4787,10 @@ Generate the complete document now:`;
         message: `📄 Document "${title}" generat (${format}, ${docContent.length} caractere).`,
       };
     } catch (e) {
-      logger.warn({ component: "DocGen", err: e.message }, "Document generation failed");
+      logger.warn(
+        { component: "DocGen", err: e.message },
+        "Document generation failed",
+      );
       return { generated: false, error: e.message };
     }
   }
@@ -4005,22 +4812,48 @@ Generate the complete document now:`;
     const sentences = responseText
       .replace(/["""]/g, '"')
       .split(/[.!?]\s+/)
-      .map(s => s.trim())
-      .filter(s => s.length > 15 && s.length < 500);
+      .map((s) => s.trim())
+      .filter((s) => s.length > 15 && s.length < 500);
 
     for (const sentence of sentences) {
       // Detect factual claims
-      const isStatistic = /\b(\d+[\.,]?\d*\s*(%|procent|milioane|miliard|lei|usd|\$|euro|€))/i.test(sentence);
-      const isDate = /\b(in\s+\d{4}|pe\s+\d{1,2}|din\s+(ianuarie|februarie|martie|aprilie|mai|iunie|iulie|august|septembrie|octombrie|noiembrie|decembrie))/i.test(sentence);
-      const isAbsolute = /\b(intotdeauna|niciodata|toți|nimeni|cel mai|always|never|everyone|nobody|every|all|none)\b/i.test(sentence);
-      const isComparison = /\b(mai\s+(bun|mare|mic|rapid|ieftin|scump)|better|worse|faster|cheaper|more\s+than)\b/i.test(sentence);
-      const isCausal = /\b(deoarece|pentru\s+ca|cauza|duce\s+la|because|causes|leads\s+to|results\s+in)\b/i.test(sentence);
-      const isDefinition = /\b(este|sunt|inseamna|represents|means|is\s+a|are\s+the)\b/i.test(sentence);
+      const isStatistic =
+        /\b(\d+[\.,]?\d*\s*(%|procent|milioane|miliard|lei|usd|\$|euro|€))/i.test(
+          sentence,
+        );
+      const isDate =
+        /\b(in\s+\d{4}|pe\s+\d{1,2}|din\s+(ianuarie|februarie|martie|aprilie|mai|iunie|iulie|august|septembrie|octombrie|noiembrie|decembrie))/i.test(
+          sentence,
+        );
+      const isAbsolute =
+        /\b(intotdeauna|niciodata|toți|nimeni|cel mai|always|never|everyone|nobody|every|all|none)\b/i.test(
+          sentence,
+        );
+      const isComparison =
+        /\b(mai\s+(bun|mare|mic|rapid|ieftin|scump)|better|worse|faster|cheaper|more\s+than)\b/i.test(
+          sentence,
+        );
+      const isCausal =
+        /\b(deoarece|pentru\s+ca|cauza|duce\s+la|because|causes|leads\s+to|results\s+in)\b/i.test(
+          sentence,
+        );
+      const isDefinition =
+        /\b(este|sunt|inseamna|represents|means|is\s+a|are\s+the)\b/i.test(
+          sentence,
+        );
 
       if (isStatistic || isDate || isAbsolute || isComparison || isCausal) {
         claims.push({
           claim: sentence.substring(0, 200),
-          type: isStatistic ? "statistic" : isDate ? "temporal" : isAbsolute ? "absolute" : isComparison ? "comparison" : "causal",
+          type: isStatistic
+            ? "statistic"
+            : isDate
+              ? "temporal"
+              : isAbsolute
+                ? "absolute"
+                : isComparison
+                  ? "comparison"
+                  : "causal",
           verifiable: true,
           riskLevel: isAbsolute ? "high" : isStatistic ? "medium" : "low",
         });
@@ -4072,7 +4905,10 @@ Generate the complete document now:`;
       for (const key of toolKeys) {
         const result = toolResults[key];
         if (!result) continue;
-        const text = typeof result === "string" ? result : JSON.stringify(result).substring(0, 3000);
+        const text =
+          typeof result === "string"
+            ? result
+            : JSON.stringify(result).substring(0, 3000);
         evidence[key] = text;
       }
 
@@ -4081,8 +4917,12 @@ Generate the complete document now:`;
       const useGroq = !!this.groqKey;
 
       if (aiKey && claims.length > 0) {
-        const claimTexts = claims.map((c, i) => `${i + 1}. [${c.type}] "${c.claim}"`).join("\n");
-        const evidenceText = toolKeys.map(k => `[${k}]: ${(evidence[k] || "").substring(0, 500)}`).join("\n");
+        const claimTexts = claims
+          .map((c, i) => `${i + 1}. [${c.type}] "${c.claim}"`)
+          .join("\n");
+        const evidenceText = toolKeys
+          .map((k) => `[${k}]: ${(evidence[k] || "").substring(0, 500)}`)
+          .join("\n");
 
         const prompt = `You are a fact-checking system. Check if these claims from an AI response are supported by the provided evidence.
 
@@ -4104,30 +4944,43 @@ Rules:
         try {
           let aiResponse;
           if (useGroq) {
-            const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-              method: "POST",
-              headers: { "Content-Type": "application/json", Authorization: `Bearer ${this.groqKey}` },
-              body: JSON.stringify({
-                model: "llama-3.3-70b-versatile",
-                messages: [{ role: "user", content: prompt }],
-                max_tokens: 500,
-                temperature: 0.1,
-                response_format: { type: "json_object" },
-              }),
-              signal: AbortSignal.timeout(5000),
-            });
+            const r = await fetch(
+              "https://api.groq.com/openai/v1/chat/completions",
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${this.groqKey}`,
+                },
+                body: JSON.stringify({
+                  model: "llama-3.3-70b-versatile",
+                  messages: [{ role: "user", content: prompt }],
+                  max_tokens: 500,
+                  temperature: 0.1,
+                  response_format: { type: "json_object" },
+                }),
+                signal: AbortSignal.timeout(5000),
+              },
+            );
             const d = await r.json();
             aiResponse = d.choices?.[0]?.message?.content;
           } else {
-            const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${this.geminiKey}`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                contents: [{ parts: [{ text: prompt }] }],
-                generationConfig: { maxOutputTokens: 500, temperature: 0.1, responseMimeType: "application/json" },
-              }),
-              signal: AbortSignal.timeout(5000),
-            });
+            const r = await fetch(
+              `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${this.geminiKey}`,
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  contents: [{ parts: [{ text: prompt }] }],
+                  generationConfig: {
+                    maxOutputTokens: 500,
+                    temperature: 0.1,
+                    responseMimeType: "application/json",
+                  },
+                }),
+                signal: AbortSignal.timeout(5000),
+              },
+            );
             const d = await r.json();
             aiResponse = d.candidates?.[0]?.content?.parts?.[0]?.text;
           }
@@ -4139,18 +4992,32 @@ Rules:
             let supported = 0;
             let total = 0;
 
-            for (const r of (Array.isArray(results) ? results : [])) {
+            for (const r of Array.isArray(results) ? results : []) {
               const claim = claims[(r.id || 1) - 1];
               if (!claim) continue;
               total++;
 
               if (r.supported) {
                 supported++;
-                report.verifiedClaims.push({ claim: claim.claim, confidence: r.confidence || 0.8, source: "tool_evidence" });
-                report.evidenceMap[claim.claim.substring(0, 60)] = { verified: true, confidence: r.confidence };
+                report.verifiedClaims.push({
+                  claim: claim.claim,
+                  confidence: r.confidence || 0.8,
+                  source: "tool_evidence",
+                });
+                report.evidenceMap[claim.claim.substring(0, 60)] = {
+                  verified: true,
+                  confidence: r.confidence,
+                };
               } else {
-                report.unsupportedClaims.push({ claim: claim.claim, reason: r.reason || "No evidence", riskLevel: claim.riskLevel });
-                report.evidenceMap[claim.claim.substring(0, 60)] = { verified: false, reason: r.reason };
+                report.unsupportedClaims.push({
+                  claim: claim.claim,
+                  reason: r.reason || "No evidence",
+                  riskLevel: claim.riskLevel,
+                });
+                report.evidenceMap[claim.claim.substring(0, 60)] = {
+                  verified: false,
+                  reason: r.reason,
+                };
               }
             }
 
@@ -4158,7 +5025,10 @@ Rules:
           }
         } catch (e) {
           report.flags.push("AI_CHECK_FAILED");
-          logger.warn({ component: "TruthGuard", err: e.message }, "AI fact-check failed");
+          logger.warn(
+            { component: "TruthGuard", err: e.message },
+            "AI fact-check failed",
+          );
         }
       }
 
@@ -4172,10 +5042,13 @@ Rules:
       if (analysis?.needsDbQuery) requestedTools.push("dbQuery");
 
       const executedTools = toolKeys;
-      const missingTools = requestedTools.filter(t => !executedTools.includes(t));
+      const missingTools = requestedTools.filter(
+        (t) => !executedTools.includes(t),
+      );
       if (missingTools.length > 0) {
         report.flags.push(`MISSING_TOOLS:${missingTools.join(",")}`);
-        report.completenessScore = 1 - (missingTools.length / Math.max(requestedTools.length, 1));
+        report.completenessScore =
+          1 - missingTools.length / Math.max(requestedTools.length, 1);
       }
 
       // 5. Check for "false success" patterns
@@ -4196,14 +5069,19 @@ Rules:
       }
 
       // 6. Detect absolute claims without evidence
-      const absoluteClaims = report.unsupportedClaims.filter(c => c.riskLevel === "high");
+      const absoluteClaims = report.unsupportedClaims.filter(
+        (c) => c.riskLevel === "high",
+      );
       if (absoluteClaims.length > 0) {
         report.flags.push(`HIGH_RISK_CLAIMS:${absoluteClaims.length}`);
         report.factualScore *= 0.7;
       }
 
       // 7. Overall confidence
-      report.confidenceScore = (report.factualScore * 0.5 + report.completenessScore * 0.3 + (toolKeys.length > 0 ? 0.2 : 0));
+      report.confidenceScore =
+        report.factualScore * 0.5 +
+        report.completenessScore * 0.3 +
+        (toolKeys.length > 0 ? 0.2 : 0);
 
       // 8. Final verdict
       if (report.factualScore < 0.3) report.verdict = "FAIL";
@@ -4213,22 +5091,28 @@ Rules:
 
       report.durationMs = Date.now() - startTime;
 
-      logger.info({
-        component: "TruthGuard",
-        factualScore: report.factualScore.toFixed(2),
-        completeness: report.completenessScore.toFixed(2),
-        verified: report.verifiedClaims.length,
-        unsupported: report.unsupportedClaims.length,
-        flags: report.flags,
-        verdict: report.verdict,
-        ms: report.durationMs,
-      }, `🛡️ Truth Guard: ${report.verdict} | factual:${(report.factualScore * 100).toFixed(0)}% | ${report.verifiedClaims.length}✓ ${report.unsupportedClaims.length}✗`);
+      logger.info(
+        {
+          component: "TruthGuard",
+          factualScore: report.factualScore.toFixed(2),
+          completeness: report.completenessScore.toFixed(2),
+          verified: report.verifiedClaims.length,
+          unsupported: report.unsupportedClaims.length,
+          flags: report.flags,
+          verdict: report.verdict,
+          ms: report.durationMs,
+        },
+        `🛡️ Truth Guard: ${report.verdict} | factual:${(report.factualScore * 100).toFixed(0)}% | ${report.verifiedClaims.length}✓ ${report.unsupportedClaims.length}✗`,
+      );
 
       return report;
     } catch (e) {
       report.flags.push("CHECK_ERROR");
       report.durationMs = Date.now() - startTime;
-      logger.warn({ component: "TruthGuard", err: e.message }, "Truth check error");
+      logger.warn(
+        { component: "TruthGuard", err: e.message },
+        "Truth check error",
+      );
       return report;
     }
   }
@@ -4242,11 +5126,36 @@ Rules:
   // Complexity levels (5-tier)
   static get COMPLEXITY_LEVELS() {
     return {
-      simple: { level: 1, model: "fast", maxTokens: 300, description: "Simple Q&A, greetings, status" },
-      medium: { level: 2, model: "fast", maxTokens: 500, description: "Factual questions, lookups" },
-      complex: { level: 3, model: "balanced", maxTokens: 800, description: "Analysis, multi-tool tasks" },
-      critical: { level: 4, model: "premium", maxTokens: 1200, description: "Important decisions, multi-step" },
-      highRisk: { level: 5, model: "premium", maxTokens: 1500, description: "Financial, legal, medical, irreversible" },
+      simple: {
+        level: 1,
+        model: "fast",
+        maxTokens: 300,
+        description: "Simple Q&A, greetings, status",
+      },
+      medium: {
+        level: 2,
+        model: "fast",
+        maxTokens: 500,
+        description: "Factual questions, lookups",
+      },
+      complex: {
+        level: 3,
+        model: "balanced",
+        maxTokens: 800,
+        description: "Analysis, multi-tool tasks",
+      },
+      critical: {
+        level: 4,
+        model: "premium",
+        maxTokens: 1200,
+        description: "Important decisions, multi-step",
+      },
+      highRisk: {
+        level: 5,
+        model: "premium",
+        maxTokens: 1500,
+        description: "Financial, legal, medical, irreversible",
+      },
     };
   }
 
@@ -4259,16 +5168,33 @@ Rules:
     const reasons = [];
 
     // Count active intents
-    const activeIntents = Object.keys(analysis).filter(k => k.startsWith("needs") && analysis[k] === true).length;
-    if (activeIntents >= 4) { score += 2; reasons.push(`${activeIntents} intents`); }
-    else if (activeIntents >= 2) { score += 1; reasons.push(`${activeIntents} intents`); }
+    const activeIntents = Object.keys(analysis).filter(
+      (k) => k.startsWith("needs") && analysis[k] === true,
+    ).length;
+    if (activeIntents >= 4) {
+      score += 2;
+      reasons.push(`${activeIntents} intents`);
+    } else if (activeIntents >= 2) {
+      score += 1;
+      reasons.push(`${activeIntents} intents`);
+    }
 
     // Message length and complexity signals
-    if (message.length > 500) { score += 1; reasons.push("long message"); }
-    if (message.split(/[.!?]/).length > 5) { score += 1; reasons.push("multi-sentence"); }
+    if (message.length > 500) {
+      score += 1;
+      reasons.push("long message");
+    }
+    if (message.split(/[.!?]/).length > 5) {
+      score += 1;
+      reasons.push("multi-sentence");
+    }
 
     // High-risk domains
-    if (/\b(invest|trading|tranzact|bani|money|financ|legal|juridic|medical|sanatate|health|sterge|delete|remove)\b/i.test(message)) {
+    if (
+      /\b(invest|trading|tranzact|bani|money|financ|legal|juridic|medical|sanatate|health|sterge|delete|remove)\b/i.test(
+        message,
+      )
+    ) {
       score += 2;
       reasons.push("high-risk domain");
     }
@@ -4280,7 +5206,11 @@ Rules:
     }
 
     // Analytical requests
-    if (/\b(analiz|compar|evalueaz|decide|recomand|strateg|optimiz|diagnostic)\b/i.test(message)) {
+    if (
+      /\b(analiz|compar|evalueaz|decide|recomand|strateg|optimiz|diagnostic)\b/i.test(
+        message,
+      )
+    ) {
       score += 1;
       reasons.push("analytical");
     }
@@ -4363,20 +5293,34 @@ Rules:
     // Fallback chain: Gemini Flash → Groq → OpenAI
     if (this.geminiKey) {
       return {
-        provider: "gemini", model: "gemini-2.0-flash", apiKey: this.geminiKey,
+        provider: "gemini",
+        model: "gemini-2.0-flash",
+        apiKey: this.geminiKey,
         endpoint: `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent`,
-        reason: "Fallback to Gemini", maxTokens: complexityResult.maxTokens, costPerToken: 0.0000003
+        reason: "Fallback to Gemini",
+        maxTokens: complexityResult.maxTokens,
+        costPerToken: 0.0000003,
       };
     }
     if (this.groqKey) {
       return {
-        provider: "groq", model: "llama-3.3-70b-versatile", apiKey: this.groqKey,
+        provider: "groq",
+        model: "llama-3.3-70b-versatile",
+        apiKey: this.groqKey,
         endpoint: "https://api.groq.com/openai/v1/chat/completions",
-        reason: "Fallback to Groq", maxTokens: complexityResult.maxTokens, costPerToken: 0.00000027
+        reason: "Fallback to Groq",
+        maxTokens: complexityResult.maxTokens,
+        costPerToken: 0.00000027,
       };
     }
 
-    return { provider: "none", model: "none", reason: "No AI provider available", maxTokens: 300, costPerToken: 0 };
+    return {
+      provider: "none",
+      model: "none",
+      reason: "No AI provider available",
+      maxTokens: 300,
+      costPerToken: 0,
+    };
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -4393,15 +5337,23 @@ Rules:
     const issues = [];
 
     // Split into sentences
-    const sentences = responseText.split(/[.!?]\s+/).filter(s => s.length > 10);
+    const sentences = responseText
+      .split(/[.!?]\s+/)
+      .filter((s) => s.length > 10);
     if (sentences.length < 2) return { consistent: true, issues: [] };
 
     // Check for direct contradictions
     const contradictionPairs = [
       [/\b(da|yes)\b/i, /\b(nu|no)\b/i],
       [/\b(poate|can)\b/i, /\b(nu (se )?poate|cannot|can't)\b/i],
-      [/\b(sigur|certainly|definitely)\b/i, /\b(nesigur|uncertain|maybe|poate)\b/i],
-      [/\b(recoman[d]|suggest|advise)\b/i, /\b(nu recoman[d]|do not suggest|avoid)\b/i],
+      [
+        /\b(sigur|certainly|definitely)\b/i,
+        /\b(nesigur|uncertain|maybe|poate)\b/i,
+      ],
+      [
+        /\b(recoman[d]|suggest|advise)\b/i,
+        /\b(nu recoman[d]|do not suggest|avoid)\b/i,
+      ],
       [/\b(crescut|increased|grew)\b/i, /\b(scazut|decreased|dropped)\b/i],
     ];
 
@@ -4413,9 +5365,15 @@ Rules:
             (pattern2.test(sentences[i]) && pattern1.test(sentences[j]))
           ) {
             // Check if they refer to the same topic (share 2+ words)
-            const words_i = sentences[i].toLowerCase().split(/\s+/).filter(w => w.length > 3);
-            const words_j = sentences[j].toLowerCase().split(/\s+/).filter(w => w.length > 3);
-            const shared = words_i.filter(w => words_j.includes(w));
+            const words_i = sentences[i]
+              .toLowerCase()
+              .split(/\s+/)
+              .filter((w) => w.length > 3);
+            const words_j = sentences[j]
+              .toLowerCase()
+              .split(/\s+/)
+              .filter((w) => w.length > 3);
+            const shared = words_i.filter((w) => words_j.includes(w));
             if (shared.length >= 2) {
               issues.push({
                 type: "contradiction",
@@ -4437,23 +5395,48 @@ Rules:
    * Returns: { relevant, score 0-1, reason }
    */
   _checkRelevance(userMessage, responseText) {
-    if (!userMessage || !responseText) return { relevant: true, score: 1.0, reason: "no input" };
+    if (!userMessage || !responseText)
+      return { relevant: true, score: 1.0, reason: "no input" };
 
     // Extract key topics from user message
-    const userWords = userMessage.toLowerCase()
+    const userWords = userMessage
+      .toLowerCase()
       .replace(/[^\w\săîâșț]/g, "")
       .split(/\s+/)
-      .filter(w => w.length > 3 && !["care", "este", "sunt", "asta", "acesta", "aceasta", "pentru", "despre", "this", "that", "what", "from", "with", "have"].includes(w));
+      .filter(
+        (w) =>
+          w.length > 3 &&
+          ![
+            "care",
+            "este",
+            "sunt",
+            "asta",
+            "acesta",
+            "aceasta",
+            "pentru",
+            "despre",
+            "this",
+            "that",
+            "what",
+            "from",
+            "with",
+            "have",
+          ].includes(w),
+      );
 
-    if (userWords.length === 0) return { relevant: true, score: 1.0, reason: "short query" };
+    if (userWords.length === 0)
+      return { relevant: true, score: 1.0, reason: "short query" };
 
     // Check how many user topic words appear in response
     const responseLower = responseText.toLowerCase();
-    const found = userWords.filter(w => responseLower.includes(w));
+    const found = userWords.filter((w) => responseLower.includes(w));
     const score = found.length / userWords.length;
 
     // Question type detection
-    const isQuestion = /\?|ce |cum |cand |unde |cine |de ce |cat |how |what |when |where |who |why /.test(userMessage.toLowerCase());
+    const isQuestion =
+      /\?|ce |cum |cand |unde |cine |de ce |cat |how |what |when |where |who |why /.test(
+        userMessage.toLowerCase(),
+      );
 
     // If it's a question but response looks like a generic filler, flag it
     const genericFillers = [
@@ -4463,16 +5446,25 @@ Rules:
       /in general/i,
       /depinde de/i,
     ];
-    const isGeneric = genericFillers.some(p => p.test(responseText)) && responseText.length < 200;
+    const isGeneric =
+      genericFillers.some((p) => p.test(responseText)) &&
+      responseText.length < 200;
 
     if (isQuestion && isGeneric) {
-      return { relevant: false, score: 0.3, reason: "generic filler to specific question" };
+      return {
+        relevant: false,
+        score: 0.3,
+        reason: "generic filler to specific question",
+      };
     }
 
     return {
       relevant: score >= 0.2,
       score: Math.min(score * 1.5, 1.0), // Boost slightly — partial matches are ok
-      reason: score < 0.2 ? `low topic overlap (${found.length}/${userWords.length})` : "topic match ok",
+      reason:
+        score < 0.2
+          ? `low topic overlap (${found.length}/${userWords.length})`
+          : "topic match ok",
     };
   }
 
@@ -4484,24 +5476,42 @@ Rules:
     const flags = [];
 
     // Financial advice without disclaimers
-    if (/\b(invest|cumpara|vinde|buy|sell|trading)\b/i.test(responseText) &&
-      !/\b(risc|risk|disclaimer|nu constituie sfat|not financial advice|prudenta|careful)\b/i.test(responseText)) {
+    if (
+      /\b(invest|cumpara|vinde|buy|sell|trading)\b/i.test(responseText) &&
+      !/\b(risc|risk|disclaimer|nu constituie sfat|not financial advice|prudenta|careful)\b/i.test(
+        responseText,
+      )
+    ) {
       flags.push({ type: "financial_no_disclaimer", severity: "medium" });
     }
 
     // Medical advice without disclaimers
-    if (/\b(medica[lm]|tratament|pastil|diagnos|boal|symptom|treatment|pill|medicine)\b/i.test(responseText) &&
-      !/\b(doctor|medic|specialist|consulta|profesionist|professional|nu inlocui)\b/i.test(responseText)) {
+    if (
+      /\b(medica[lm]|tratament|pastil|diagnos|boal|symptom|treatment|pill|medicine)\b/i.test(
+        responseText,
+      ) &&
+      !/\b(doctor|medic|specialist|consulta|profesionist|professional|nu inlocui)\b/i.test(
+        responseText,
+      )
+    ) {
       flags.push({ type: "medical_no_disclaimer", severity: "high" });
     }
 
     // Dangerous instructions
-    if (/\b(exploziv|arma|otrav|hack|sparg|bomb|weapon|poison|exploit|vulnerability)\b/i.test(responseText)) {
+    if (
+      /\b(exploziv|arma|otrav|hack|sparg|bomb|weapon|poison|exploit|vulnerability)\b/i.test(
+        responseText,
+      )
+    ) {
       flags.push({ type: "dangerous_content", severity: "critical" });
     }
 
     // Personal data exposure patterns
-    if (/\b(\d{13,16}|\d{3}-\d{2}-\d{4}|[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,})\b/i.test(responseText)) {
+    if (
+      /\b(\d{13,16}|\d{3}-\d{2}-\d{4}|[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,})\b/i.test(
+        responseText,
+      )
+    ) {
       flags.push({ type: "possible_pii", severity: "medium" });
     }
 
@@ -4545,7 +5555,9 @@ Rules:
       // 2. Relevance check
       report.relevance = this._checkRelevance(userMessage, responseText);
       if (!report.relevance.relevant) {
-        report.suggestions.push("⚠️ Răspunsul nu pare să adreseze direct întrebarea");
+        report.suggestions.push(
+          "⚠️ Răspunsul nu pare să adreseze direct întrebarea",
+        );
         report.overallScore *= 0.5;
       } else {
         report.overallScore *= report.relevance.score;
@@ -4558,17 +5570,23 @@ Rules:
           report.suggestions.push("🚫 Conținut potențial periculos detectat");
           report.overallScore *= 0.1;
         } else if (report.safety.severity === "high") {
-          report.suggestions.push("⚠️ Sfat medical/financiar fără disclaimer adecvat");
+          report.suggestions.push(
+            "⚠️ Sfat medical/financiar fără disclaimer adecvat",
+          );
           report.overallScore *= 0.5;
         } else {
-          report.suggestions.push("ℹ️ Verifică conținutul pentru date personale");
+          report.suggestions.push(
+            "ℹ️ Verifică conținutul pentru date personale",
+          );
           report.overallScore *= 0.8;
         }
       }
 
       // 4. Length/quality heuristics
       if (responseText.length < 20 && userMessage.length > 50) {
-        report.suggestions.push("ℹ️ Răspuns prea scurt pentru o întrebare detaliată");
+        report.suggestions.push(
+          "ℹ️ Răspuns prea scurt pentru o întrebare detaliată",
+        );
         report.overallScore *= 0.7;
       }
 
@@ -4589,30 +5607,43 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
           let aiResponse;
 
           if (useGroq) {
-            const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-              method: "POST",
-              headers: { "Content-Type": "application/json", Authorization: `Bearer ${this.groqKey}` },
-              body: JSON.stringify({
-                model: "llama-3.3-70b-versatile",
-                messages: [{ role: "user", content: prompt }],
-                max_tokens: 300,
-                temperature: 0.1,
-                response_format: { type: "json_object" },
-              }),
-              signal: AbortSignal.timeout(4000),
-            });
+            const r = await fetch(
+              "https://api.groq.com/openai/v1/chat/completions",
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${this.groqKey}`,
+                },
+                body: JSON.stringify({
+                  model: "llama-3.3-70b-versatile",
+                  messages: [{ role: "user", content: prompt }],
+                  max_tokens: 300,
+                  temperature: 0.1,
+                  response_format: { type: "json_object" },
+                }),
+                signal: AbortSignal.timeout(4000),
+              },
+            );
             const d = await r.json();
             aiResponse = d.choices?.[0]?.message?.content;
           } else {
-            const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${this.geminiKey}`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                contents: [{ parts: [{ text: prompt }] }],
-                generationConfig: { maxOutputTokens: 300, temperature: 0.1, responseMimeType: "application/json" },
-              }),
-              signal: AbortSignal.timeout(4000),
-            });
+            const r = await fetch(
+              `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${this.geminiKey}`,
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  contents: [{ parts: [{ text: prompt }] }],
+                  generationConfig: {
+                    maxOutputTokens: 300,
+                    temperature: 0.1,
+                    responseMimeType: "application/json",
+                  },
+                }),
+                signal: AbortSignal.timeout(4000),
+              },
+            );
             const d = await r.json();
             aiResponse = d.candidates?.[0]?.content?.parts?.[0]?.text;
           }
@@ -4620,7 +5651,7 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
           if (aiResponse) {
             const critique = JSON.parse(aiResponse);
             const aiScore = (critique.score || 7) / 10;
-            report.overallScore = (report.overallScore * 0.6) + (aiScore * 0.4);
+            report.overallScore = report.overallScore * 0.6 + aiScore * 0.4;
             if (critique.issues && Array.isArray(critique.issues)) {
               for (const issue of critique.issues.slice(0, 3)) {
                 report.suggestions.push("🤖 " + issue);
@@ -4634,7 +5665,10 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
           }
         } catch (e) {
           // AI critique failed — use heuristic score only
-          logger.warn({ component: "CriticAgent", err: e.message }, "AI critique failed");
+          logger.warn(
+            { component: "CriticAgent", err: e.message },
+            "AI critique failed",
+          );
         }
       }
 
@@ -4642,27 +5676,34 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
       if (report.overallScore < 0.2) report.verdict = "REJECTED";
       else if (report.overallScore < 0.4) report.verdict = "NEEDS_REVISION";
       else if (report.overallScore < 0.6) report.verdict = "CAUTION";
-      else if (report.overallScore < 0.8) report.verdict = "APPROVED_WITH_NOTES";
+      else if (report.overallScore < 0.8)
+        report.verdict = "APPROVED_WITH_NOTES";
       else report.verdict = "APPROVED";
 
       report.durationMs = Date.now() - startTime;
 
-      logger.info({
-        component: "CriticAgent",
-        verdict: report.verdict,
-        score: report.overallScore.toFixed(2),
-        consistent: report.consistency?.consistent,
-        relevant: report.relevance?.relevant,
-        safe: report.safety?.safe,
-        suggestions: report.suggestions.length,
-        ms: report.durationMs,
-      }, `🎭 Critic: ${report.verdict} | score:${(report.overallScore * 100).toFixed(0)}% | ${report.suggestions.length} notes | ${report.durationMs}ms`);
+      logger.info(
+        {
+          component: "CriticAgent",
+          verdict: report.verdict,
+          score: report.overallScore.toFixed(2),
+          consistent: report.consistency?.consistent,
+          relevant: report.relevance?.relevant,
+          safe: report.safety?.safe,
+          suggestions: report.suggestions.length,
+          ms: report.durationMs,
+        },
+        `🎭 Critic: ${report.verdict} | score:${(report.overallScore * 100).toFixed(0)}% | ${report.suggestions.length} notes | ${report.durationMs}ms`,
+      );
 
       return report;
     } catch (e) {
       report.durationMs = Date.now() - startTime;
       report.suggestions.push("Critic evaluation error: " + e.message);
-      logger.warn({ component: "CriticAgent", err: e.message }, "Critic evaluation error");
+      logger.warn(
+        { component: "CriticAgent", err: e.message },
+        "Critic evaluation error",
+      );
       return report;
     }
   }
@@ -4689,7 +5730,10 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
       if (error) throw error;
       return data || [];
     } catch (e) {
-      logger.warn({ component: "ProjectMemory", err: e.message }, "Failed to load projects");
+      logger.warn(
+        { component: "ProjectMemory", err: e.message },
+        "Failed to load projects",
+      );
       return [];
     }
   }
@@ -4701,29 +5745,39 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
   async _saveProject(userId, projectData) {
     if (!this.supabaseAdmin || !userId) return null;
     try {
-      const { name, description, tech_stack, status, notes, files_touched } = projectData;
+      const { name, description, tech_stack, status, notes, files_touched } =
+        projectData;
       if (!name) return null;
 
       const { data, error } = await this.supabaseAdmin
         .from("brain_projects")
-        .upsert({
-          user_id: userId,
-          name: name.toLowerCase().trim(),
-          description: description || null,
-          tech_stack: tech_stack || [],
-          status: status || "active",
-          notes: notes || null,
-          files_touched: files_touched || [],
-          last_activity: new Date().toISOString(),
-        }, { onConflict: "user_id,name" })
+        .upsert(
+          {
+            user_id: userId,
+            name: name.toLowerCase().trim(),
+            description: description || null,
+            tech_stack: tech_stack || [],
+            status: status || "active",
+            notes: notes || null,
+            files_touched: files_touched || [],
+            last_activity: new Date().toISOString(),
+          },
+          { onConflict: "user_id,name" },
+        )
         .select()
         .single();
 
       if (error) throw error;
-      logger.info({ component: "ProjectMemory", project: name }, `📁 Project saved: ${name}`);
+      logger.info(
+        { component: "ProjectMemory", project: name },
+        `📁 Project saved: ${name}`,
+      );
       return data;
     } catch (e) {
-      logger.warn({ component: "ProjectMemory", err: e.message }, "Failed to save project");
+      logger.warn(
+        { component: "ProjectMemory", err: e.message },
+        "Failed to save project",
+      );
       return null;
     }
   }
@@ -4754,10 +5808,36 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
       if (!projectName) return;
 
       // Detect tech stack from message
-      const techKeywords = ["node", "react", "vue", "angular", "python", "django", "flask", "java", "spring",
-        "supabase", "firebase", "postgresql", "mongodb", "docker", "railway", "vercel", "next.js",
-        "express", "fastify", "tailwind", "typescript", "javascript", "html", "css", "three.js"];
-      const detectedTech = techKeywords.filter(t => message.toLowerCase().includes(t));
+      const techKeywords = [
+        "node",
+        "react",
+        "vue",
+        "angular",
+        "python",
+        "django",
+        "flask",
+        "java",
+        "spring",
+        "supabase",
+        "firebase",
+        "postgresql",
+        "mongodb",
+        "docker",
+        "railway",
+        "vercel",
+        "next.js",
+        "express",
+        "fastify",
+        "tailwind",
+        "typescript",
+        "javascript",
+        "html",
+        "css",
+        "three.js",
+      ];
+      const detectedTech = techKeywords.filter((t) =>
+        message.toLowerCase().includes(t),
+      );
 
       await this._saveProject(userId, {
         name: projectName,
@@ -4780,9 +5860,19 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
 
     const lines = ["[PROIECTE ACTIVE ALE UTILIZATORULUI]"];
     for (const p of projects.slice(0, 5)) {
-      const tech = Array.isArray(p.tech_stack) && p.tech_stack.length > 0 ? ` (${p.tech_stack.join(", ")})` : "";
-      const age = Math.round((Date.now() - new Date(p.last_activity).getTime()) / 3600000);
-      const ageStr = age < 1 ? "recent" : age < 24 ? `${age}h ago` : `${Math.round(age / 24)}d ago`;
+      const tech =
+        Array.isArray(p.tech_stack) && p.tech_stack.length > 0
+          ? ` (${p.tech_stack.join(", ")})`
+          : "";
+      const age = Math.round(
+        (Date.now() - new Date(p.last_activity).getTime()) / 3600000,
+      );
+      const ageStr =
+        age < 1
+          ? "recent"
+          : age < 24
+            ? `${age}h ago`
+            : `${Math.round(age / 24)}d ago`;
       lines.push(`- ${p.name}${tech} [${p.status}] — last: ${ageStr}`);
       if (p.notes) lines.push(`  nota: ${p.notes.substring(0, 80)}`);
     }
@@ -4797,7 +5887,16 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
   /**
    * Save a procedure (how a task was solved) for future reuse.
    */
-  async _saveProcedure(userId, taskType, taskDescription, solutionSteps, toolsUsed, success, durationMs, complexity) {
+  async _saveProcedure(
+    userId,
+    taskType,
+    taskDescription,
+    solutionSteps,
+    toolsUsed,
+    success,
+    durationMs,
+    complexity,
+  ) {
     if (!this.supabaseAdmin) return null;
     try {
       const { data, error } = await this.supabaseAdmin
@@ -4816,11 +5915,16 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
         .single();
 
       if (error) throw error;
-      logger.info({ component: "ProceduralMemory", type: taskType, success },
-        `📝 Procedure saved: ${taskType} (${success ? "✓" : "✗"})`);
+      logger.info(
+        { component: "ProceduralMemory", type: taskType, success },
+        `📝 Procedure saved: ${taskType} (${success ? "✓" : "✗"})`,
+      );
       return data;
     } catch (e) {
-      logger.warn({ component: "ProceduralMemory", err: e.message }, "Failed to save procedure");
+      logger.warn(
+        { component: "ProceduralMemory", err: e.message },
+        "Failed to save procedure",
+      );
       return null;
     }
   }
@@ -4849,23 +5953,31 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
           .from("brain_procedures")
           .update({ reuse_count: (exactMatches[0].reuse_count || 0) + 1 })
           .eq("id", exactMatches[0].id)
-          .catch(() => { });
+          .catch(() => {});
 
-        return exactMatches.map(p => ({
+        return exactMatches.map((p) => ({
           description: p.task_description,
           steps: p.solution_steps,
           tools: p.tools_used,
           complexity: p.complexity,
           reuseCount: p.reuse_count,
-          age: Math.round((Date.now() - new Date(p.created_at).getTime()) / 86400000),
+          age: Math.round(
+            (Date.now() - new Date(p.created_at).getTime()) / 86400000,
+          ),
         }));
       }
 
       // Fallback: keyword search in task_description
-      const keywords = taskDescription.toLowerCase().split(/\s+/).filter(w => w.length > 3).slice(0, 5);
+      const keywords = taskDescription
+        .toLowerCase()
+        .split(/\s+/)
+        .filter((w) => w.length > 3)
+        .slice(0, 5);
       if (keywords.length === 0) return [];
 
-      const orFilter = keywords.map(k => `task_description.ilike.%${k}%`).join(",");
+      const orFilter = keywords
+        .map((k) => `task_description.ilike.%${k}%`)
+        .join(",");
       const { data: fuzzyMatches } = await this.supabaseAdmin
         .from("brain_procedures")
         .select("*")
@@ -4874,16 +5986,21 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
         .order("created_at", { ascending: false })
         .limit(3);
 
-      return (fuzzyMatches || []).map(p => ({
+      return (fuzzyMatches || []).map((p) => ({
         description: p.task_description,
         steps: p.solution_steps,
         tools: p.tools_used,
         complexity: p.complexity,
         reuseCount: p.reuse_count,
-        age: Math.round((Date.now() - new Date(p.created_at).getTime()) / 86400000),
+        age: Math.round(
+          (Date.now() - new Date(p.created_at).getTime()) / 86400000,
+        ),
       }));
     } catch (e) {
-      logger.warn({ component: "ProceduralMemory", err: e.message }, "Failed to find procedure");
+      logger.warn(
+        { component: "ProceduralMemory", err: e.message },
+        "Failed to find procedure",
+      );
       return [];
     }
   }
@@ -4924,15 +6041,23 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
           .update({ content: JSON.stringify(wsData) })
           .eq("id", existing[0].id);
       } else {
-        await this.supabaseAdmin
-          .from("brain_memory")
-          .insert({ user_id: userId, type: "workspace", content: JSON.stringify(wsData) });
+        await this.supabaseAdmin.from("brain_memory").insert({
+          user_id: userId,
+          type: "workspace",
+          content: JSON.stringify(wsData),
+        });
       }
 
-      logger.info({ component: "Workspace", name: workspaceName, userId }, `📂 Workspace saved: ${workspaceName}`);
+      logger.info(
+        { component: "Workspace", name: workspaceName, userId },
+        `📂 Workspace saved: ${workspaceName}`,
+      );
       return true;
     } catch (e) {
-      logger.warn({ component: "Workspace", err: e.message }, "Workspace save failed");
+      logger.warn(
+        { component: "Workspace", err: e.message },
+        "Workspace save failed",
+      );
       return false;
     }
   }
@@ -4959,13 +6084,22 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
       const { data } = await query;
       if (!data || data.length === 0) return null;
 
-      const workspaces = data.map(w => {
-        try { return JSON.parse(w.content); } catch { return null; }
-      }).filter(Boolean);
+      const workspaces = data
+        .map((w) => {
+          try {
+            return JSON.parse(w.content);
+          } catch {
+            return null;
+          }
+        })
+        .filter(Boolean);
 
       return workspaceName ? workspaces[0] : workspaces;
     } catch (e) {
-      logger.warn({ component: "Workspace", err: e.message }, "Workspace load failed");
+      logger.warn(
+        { component: "Workspace", err: e.message },
+        "Workspace load failed",
+      );
       return null;
     }
   }
@@ -4977,10 +6111,24 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
 
   static get RISKY_ACTIONS() {
     return {
-      email: { risk: "medium", message: "📧 Trimite email către {to}? Subiect: {subject}" },
-      codeExec: { risk: "high", message: "⚠️ Execut cod JavaScript în sandbox? Codul poate accesa date locale." },
-      dbQuery: { risk: "medium", message: "🗄️ Interoghez baza de date? Query-ul ar putea expune date sensibile." },
-      calendarDelete: { risk: "medium", message: "🗑️ Șterg evenimentul din calendar? Acțiunea e ireversibilă." },
+      email: {
+        risk: "medium",
+        message: "📧 Trimite email către {to}? Subiect: {subject}",
+      },
+      codeExec: {
+        risk: "high",
+        message:
+          "⚠️ Execut cod JavaScript în sandbox? Codul poate accesa date locale.",
+      },
+      dbQuery: {
+        risk: "medium",
+        message:
+          "🗄️ Interoghez baza de date? Query-ul ar putea expune date sensibile.",
+      },
+      calendarDelete: {
+        risk: "medium",
+        message: "🗑️ Șterg evenimentul din calendar? Acțiunea e ireversibilă.",
+      },
     };
   }
 
@@ -4997,7 +6145,7 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
 
     // Build the confirmation message with step context
     let msg = risky.message;
-    Object.keys(step).forEach(k => {
+    Object.keys(step).forEach((k) => {
       msg = msg.replace(`{${k}}`, step[k] || "");
     });
 
@@ -5020,23 +6168,31 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
       try {
         const r = await fetch("https://api.resend.com/emails", {
           method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${resendKey}` },
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${resendKey}`,
+          },
           body: JSON.stringify({
-            from: process.env.EMAIL_FROM || `Kelion AI <noreply@${(process.env.APP_URL || '').replace(/^https?:\/\//, '')}>`,
+            from:
+              process.env.EMAIL_FROM ||
+              `Kelion AI <noreply@${(process.env.APP_URL || "").replace(/^https?:\/\//, "")}>`,
             to: [to],
             subject,
             html: `<div style="font-family:Inter,sans-serif;max-width:600px;margin:0 auto;padding:20px">
               <h2 style="color:#6366f1">🧠 KelionAI</h2>
               <div style="line-height:1.6">${body.replace(/\n/g, "<br>")}</div>
               <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0">
-              <p style="font-size:12px;color:#9ca3af">Trimis de Kelion AI — ${process.env.APP_URL || 'kelion'}</p>
+              <p style="font-size:12px;color:#9ca3af">Trimis de Kelion AI — ${process.env.APP_URL || "kelion"}</p>
             </div>`,
           }),
           signal: AbortSignal.timeout(8000),
         });
         const d = await r.json();
         if (d.id) {
-          logger.info({ component: "Brain", to, subject }, "📧 Email sent via Resend");
+          logger.info(
+            { component: "Brain", to, subject },
+            "📧 Email sent via Resend",
+          );
           return { success: true, provider: "Resend", messageId: d.id };
         }
         return { error: d.message || "Resend error", details: d };
@@ -5051,17 +6207,30 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
       try {
         const r = await fetch("https://api.sendgrid.com/v3/mail/send", {
           method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${sgKey}` },
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${sgKey}`,
+          },
           body: JSON.stringify({
             personalizations: [{ to: [{ email: to }] }],
-            from: { email: process.env.EMAIL_FROM || `noreply@${(process.env.APP_URL || '').replace(/^https?:\/\//, '')}`, name: "Kelion AI" },
+            from: {
+              email:
+                process.env.EMAIL_FROM ||
+                `noreply@${(process.env.APP_URL || "").replace(/^https?:\/\//, "")}`,
+              name: "Kelion AI",
+            },
             subject,
-            content: [{ type: "text/html", value: body.replace(/\n/g, "<br>") }],
+            content: [
+              { type: "text/html", value: body.replace(/\n/g, "<br>") },
+            ],
           }),
           signal: AbortSignal.timeout(8000),
         });
         if (r.status === 202) {
-          logger.info({ component: "Brain", to, subject }, "📧 Email sent via SendGrid");
+          logger.info(
+            { component: "Brain", to, subject },
+            "📧 Email sent via SendGrid",
+          );
           return { success: true, provider: "SendGrid" };
         }
         const errText = await r.text();
@@ -5071,7 +6240,10 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
       }
     }
 
-    return { error: "No email provider configured. Set RESEND_API_KEY or SENDGRID_API_KEY in .env" };
+    return {
+      error:
+        "No email provider configured. Set RESEND_API_KEY or SENDGRID_API_KEY in .env",
+    };
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -5085,45 +6257,72 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
       // CSV parsing
       if (ext === "csv" || mimeType === "text/csv") {
         const text = fileBuffer.toString("utf-8");
-        const lines = text.split("\n").filter(l => l.trim());
-        const headers = lines[0]?.split(",").map(h => h.trim()) || [];
-        const rows = lines.slice(1).map(line => {
+        const lines = text.split("\n").filter((l) => l.trim());
+        const headers = lines[0]?.split(",").map((h) => h.trim()) || [];
+        const rows = lines.slice(1).map((line) => {
           const vals = line.split(",");
           const row = {};
-          headers.forEach((h, i) => { row[h] = vals[i]?.trim() || ""; });
+          headers.forEach((h, i) => {
+            row[h] = vals[i]?.trim() || "";
+          });
           return row;
         });
-        return { type: "csv", headers, rowCount: rows.length, preview: rows.slice(0, 10), fullText: text.substring(0, 5000) };
+        return {
+          type: "csv",
+          headers,
+          rowCount: rows.length,
+          preview: rows.slice(0, 10),
+          fullText: text.substring(0, 5000),
+        };
       }
 
       // JSON parsing
       if (ext === "json" || mimeType === "application/json") {
         const text = fileBuffer.toString("utf-8");
         const parsed = JSON.parse(text);
-        return { type: "json", keys: Object.keys(parsed), preview: JSON.stringify(parsed, null, 2).substring(0, 2000) };
+        return {
+          type: "json",
+          keys: Object.keys(parsed),
+          preview: JSON.stringify(parsed, null, 2).substring(0, 2000),
+        };
       }
 
       // TXT/MD parsing
       if (["txt", "md", "log", "env", "cfg", "ini"].includes(ext)) {
         const text = fileBuffer.toString("utf-8");
-        return { type: "text", charCount: text.length, lineCount: text.split("\n").length, content: text.substring(0, 5000) };
+        return {
+          type: "text",
+          charCount: text.length,
+          lineCount: text.split("\n").length,
+          content: text.substring(0, 5000),
+        };
       }
 
       // PDF — basic text extraction (no external dependency)
       if (ext === "pdf" || mimeType === "application/pdf") {
         // Extract readable text from PDF buffer using simple regex
         const text = fileBuffer.toString("latin1");
-        const textMatches = [...text.matchAll(/\(([^)]+)\)/g)].map(m => m[1]).join(" ");
+        const textMatches = [...text.matchAll(/\(([^)]+)\)/g)]
+          .map((m) => m[1])
+          .join(" ");
         const cleanText = textMatches
           .replace(/\\n/g, "\n")
           .replace(/\\r/g, "")
           .replace(/[^\x20-\x7E\u00C0-\u024F\n]/g, " ")
           .replace(/\s+/g, " ")
           .trim();
-        return { type: "pdf", charCount: cleanText.length, content: cleanText.substring(0, 5000), note: "Basic extraction — complex PDFs may need OCR" };
+        return {
+          type: "pdf",
+          charCount: cleanText.length,
+          content: cleanText.substring(0, 5000),
+          note: "Basic extraction — complex PDFs may need OCR",
+        };
       }
 
-      return { error: `Unsupported file type: ${ext}`, supportedTypes: ["csv", "json", "txt", "md", "pdf", "log"] };
+      return {
+        error: `Unsupported file type: ${ext}`,
+        supportedTypes: ["csv", "json", "txt", "md", "pdf", "log"],
+      };
     } catch (e) {
       return { error: e.message, filename };
     }
@@ -5137,7 +6336,8 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
     if (language !== "javascript" && language !== "js") {
       return {
         error: `Only JavaScript is supported in the sandbox. Got: ${language}`,
-        suggestion: "Poți rula cod JavaScript. Pentru alte limbaje, descrie ce vrei să faci și voi ajuta.",
+        suggestion:
+          "Poți rula cod JavaScript. Pentru alte limbaje, descrie ce vrei să faci și voi ajuta.",
       };
     }
 
@@ -5149,7 +6349,14 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
       // Create sandboxed context with safe globals
       const sandbox = {
         console: {
-          log: (...args) => output.push(args.map(a => typeof a === "object" ? JSON.stringify(a) : String(a)).join(" ")),
+          log: (...args) =>
+            output.push(
+              args
+                .map((a) =>
+                  typeof a === "object" ? JSON.stringify(a) : String(a),
+                )
+                .join(" "),
+            ),
           error: (...args) => errors.push(args.join(" ")),
           warn: (...args) => output.push("[WARN] " + args.join(" ")),
         },
@@ -5169,7 +6376,10 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
         Map,
         Set,
         Promise,
-        setTimeout: (fn, ms) => { if (ms > 1000) ms = 1000; return setTimeout(fn, ms); },
+        setTimeout: (fn, ms) => {
+          if (ms > 1000) ms = 1000;
+          return setTimeout(fn, ms);
+        },
         // Block dangerous operations
         require: undefined,
         process: undefined,
@@ -5190,7 +6400,12 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
 
       // Capture return value if any
       if (result !== undefined) {
-        output.push("→ " + (typeof result === "object" ? JSON.stringify(result, null, 2) : String(result)));
+        output.push(
+          "→ " +
+            (typeof result === "object"
+              ? JSON.stringify(result, null, 2)
+              : String(result)),
+        );
       }
 
       return {
@@ -5201,9 +6416,15 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
       };
     } catch (e) {
       if (e.code === "ERR_SCRIPT_EXECUTION_TIMEOUT") {
-        return { error: "Timeout: codul a depășit limita de 3 secunde", code: code.substring(0, 200) };
+        return {
+          error: "Timeout: codul a depășit limita de 3 secunde",
+          code: code.substring(0, 200),
+        };
       }
-      return { error: e.message, line: e.stack?.match(/user-code\.js:(\d+)/)?.[1] || "unknown" };
+      return {
+        error: e.message,
+        line: e.stack?.match(/user-code\.js:(\d+)/)?.[1] || "unknown",
+      };
     }
   }
 
@@ -5216,7 +6437,8 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
         case "write":
         case "create":
         case "save":
-          if (!fileName || !content) return { error: "fileName and content required" };
+          if (!fileName || !content)
+            return { error: "fileName and content required" };
           return kiraTools.writeFile(fileName, content);
         case "read":
         case "open":
@@ -5240,7 +6462,10 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
   // ═══════════════════════════════════════════════════════════
   _execCode(code) {
     try {
-      logger.info({ component: "Brain", codeLen: (code || "").length }, "🔧 Executing code via kiraTools");
+      logger.info(
+        { component: "Brain", codeLen: (code || "").length },
+        "🔧 Executing code via kiraTools",
+      );
       return kiraTools.executeJS(code);
     } catch (e) {
       return { error: e.message };
@@ -5252,7 +6477,10 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
   // ═══════════════════════════════════════════════════════════
   _terminal(command) {
     try {
-      logger.info({ component: "Brain", cmd: (command || "").slice(0, 50) }, "💻 Terminal command");
+      logger.info(
+        { component: "Brain", cmd: (command || "").slice(0, 50) },
+        "💻 Terminal command",
+      );
       return kiraTools.adminTerminal(command);
     } catch (e) {
       return { error: e.message };
@@ -5284,7 +6512,10 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
   // ═══════════════════════════════════════════════════════════
   async _renderPage(url, options) {
     try {
-      logger.info({ component: "Brain", url }, "🖥️ Rendering page with Puppeteer");
+      logger.info(
+        { component: "Brain", url },
+        "🖥️ Rendering page with Puppeteer",
+      );
       return await kiraTools.renderPage(url, options);
     } catch (e) {
       return { error: e.message };
@@ -5297,10 +6528,14 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
   _git(action, n) {
     try {
       switch (action) {
-        case "status": return kiraTools.gitStatus();
-        case "log": return kiraTools.gitLog(n);
-        case "diff": return kiraTools.gitDiff();
-        default: return kiraTools.gitStatus();
+        case "status":
+          return kiraTools.gitStatus();
+        case "log":
+          return kiraTools.gitLog(n);
+        case "diff":
+          return kiraTools.gitDiff();
+        default:
+          return kiraTools.gitStatus();
       }
     } catch (e) {
       return { error: e.message };
@@ -5312,7 +6547,10 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
   // ═══════════════════════════════════════════════════════════
   _codeSearch(query, searchPath) {
     try {
-      logger.info({ component: "Brain", query: (query || "").slice(0, 50) }, "🔍 Code search");
+      logger.info(
+        { component: "Brain", query: (query || "").slice(0, 50) },
+        "🔍 Code search",
+      );
       return kiraTools.projectSearch(query, searchPath);
     } catch (e) {
       return { error: e.message };
@@ -5384,15 +6622,23 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
 
       // Semantic search using pgvector (if match_memories function exists)
       try {
-        const { data: semanticResults, error } = await this.supabaseAdmin.rpc("match_memories", {
-          query_embedding: embedding,
-          match_threshold: 0.7,
-          match_count: topK,
-          p_user_id: userId || null,
-        });
+        const { data: semanticResults, error } = await this.supabaseAdmin.rpc(
+          "match_memories",
+          {
+            query_embedding: embedding,
+            match_threshold: 0.7,
+            match_count: topK,
+            p_user_id: userId || null,
+          },
+        );
 
         if (!error && semanticResults && semanticResults.length > 0) {
-          return { results: semanticResults, method: "semantic", query, similarity: "pgvector" };
+          return {
+            results: semanticResults,
+            method: "semantic",
+            query,
+            similarity: "pgvector",
+          };
         }
       } catch {
         // match_memories function might not exist — fallback
@@ -5431,11 +6677,13 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
         .eq("type", "reminder")
         .limit(5);
 
-      const pendingReminders = (reminders || []).filter(r => {
+      const pendingReminders = (reminders || []).filter((r) => {
         try {
           const p = JSON.parse(r.content);
           return p.status === "pending";
-        } catch { return false; }
+        } catch {
+          return false;
+        }
       });
 
       if (pendingReminders.length > 0) {
@@ -5448,10 +6696,18 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
 
       // Time-based suggestions
       if (hour >= 6 && hour <= 9) {
-        suggestions.push({ type: "morning", text: "Bună dimineața! Vrei un rezumat al știrilor de azi?", action: "news_digest" });
+        suggestions.push({
+          type: "morning",
+          text: "Bună dimineața! Vrei un rezumat al știrilor de azi?",
+          action: "news_digest",
+        });
       }
       if (hour >= 18 && hour <= 21) {
-        suggestions.push({ type: "evening", text: "Vrei să vezi statisticile de trading de azi?", action: "trade_summary" });
+        suggestions.push({
+          type: "evening",
+          text: "Vrei să vezi statisticile de trading de azi?",
+          action: "trade_summary",
+        });
       }
 
       // Check user's recent activity pattern
@@ -5463,16 +6719,26 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
         .limit(5);
 
       if (!recentConvs || recentConvs.length === 0) {
-        suggestions.push({ type: "onboarding", text: "Prima vizită? Încearcă: 'Ce poți face?' sau 'Generează o imagine'", action: "capabilities" });
+        suggestions.push({
+          type: "onboarding",
+          text: "Prima vizită? Încearcă: 'Ce poți face?' sau 'Generează o imagine'",
+          action: "capabilities",
+        });
       }
 
       // Check AI costs
       const { data: costs } = await this.supabaseAdmin
         .from("ai_costs")
         .select("cost_usd")
-        .gte("created_at", new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString());
+        .gte(
+          "created_at",
+          new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString(),
+        );
 
-      const totalCost = (costs || []).reduce((s, c) => s + (parseFloat(c.cost_usd) || 0), 0);
+      const totalCost = (costs || []).reduce(
+        (s, c) => s + (parseFloat(c.cost_usd) || 0),
+        0,
+      );
       if (totalCost > 1) {
         suggestions.push({
           type: "cost_alert",
@@ -5483,7 +6749,10 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
 
       return suggestions.slice(0, 3); // Max 3 suggestions
     } catch (e) {
-      logger.warn({ component: "Brain", err: e.message }, "Proactive suggest failed");
+      logger.warn(
+        { component: "Brain", err: e.message },
+        "Proactive suggest failed",
+      );
       return [];
     }
   }
@@ -5498,31 +6767,36 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
       general: {
         name: "General Assistant",
         icon: "🧠",
-        systemPrompt: "Ești Kelion, un asistent AI general. Răspunde clar, concis și prietenos.",
+        systemPrompt:
+          "Ești Kelion, un asistent AI general. Răspunde clar, concis și prietenos.",
         strengths: ["conversație", "întrebări generale", "recomandări"],
       },
       code: {
         name: "Code Engineer",
         icon: "💻",
-        systemPrompt: "Ești un inginer software expert. Scrie cod curat, explicat pas cu pas. Sugerează best practices, testare, și securitate. Folosește cod blocks cu syntax highlighting.",
+        systemPrompt:
+          "Ești un inginer software expert. Scrie cod curat, explicat pas cu pas. Sugerează best practices, testare, și securitate. Folosește cod blocks cu syntax highlighting.",
         strengths: ["programare", "debugging", "arhitectură", "devops"],
       },
       creative: {
         name: "Creative Director",
         icon: "🎨",
-        systemPrompt: "Ești un director creativ. Generează idei originale, texte inspirate, concepte vizuale. Gândește out-of-the-box.",
+        systemPrompt:
+          "Ești un director creativ. Generează idei originale, texte inspirate, concepte vizuale. Gândește out-of-the-box.",
         strengths: ["copywriting", "branding", "design", "storytelling"],
       },
       research: {
         name: "Research Analyst",
         icon: "🔍",
-        systemPrompt: "Ești un analist de cercetare. Prezintă fapte verificabile cu surse. Compară opțiuni obiectiv. Structurează informația clar.",
+        systemPrompt:
+          "Ești un analist de cercetare. Prezintă fapte verificabile cu surse. Compară opțiuni obiectiv. Structurează informația clar.",
         strengths: ["analiză", "comparații", "rapoarte", "fact-checking"],
       },
       trading: {
         name: "Trading Analyst",
         icon: "📈",
-        systemPrompt: "Ești un analist financiar. Analizează piețe, tendințe, indicatori tehnici. Prezintă riscuri clar. Nu da sfaturi financiare directe.",
+        systemPrompt:
+          "Ești un analist financiar. Analizează piețe, tendințe, indicatori tehnici. Prezintă riscuri clar. Nu da sfaturi financiare directe.",
         strengths: ["crypto", "forex", "acțiuni", "analiză tehnică"],
       },
       tutor: {
@@ -5551,32 +6825,66 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
 
     // Explicit tutor mode triggers
     const tutorTriggers = [
-      "învață-mă", "explică-mi", "cum funcționează", "ce este", "ce înseamnă",
-      "teach me", "explain", "how does", "what is", "tutorial",
-      "pas cu pas", "step by step", "de la zero", "from scratch",
-      "nu înțeleg", "i don't understand", "ajută-mă să înțeleg",
+      "învață-mă",
+      "explică-mi",
+      "cum funcționează",
+      "ce este",
+      "ce înseamnă",
+      "teach me",
+      "explain",
+      "how does",
+      "what is",
+      "tutorial",
+      "pas cu pas",
+      "step by step",
+      "de la zero",
+      "from scratch",
+      "nu înțeleg",
+      "i don't understand",
+      "ajută-mă să înțeleg",
     ];
-    if (tutorTriggers.some(t => msgLower.includes(t))) {
+    if (tutorTriggers.some((t) => msgLower.includes(t))) {
       return { agent: "tutor", ...KelionBrain.AGENTS.tutor };
     }
 
     // Code-related
-    if (analysis.needsCodeExec || /\b(cod|code|functie|function|bug|debug|api|npm|git|deploy|server|database|sql|react|node|python|javascript|css|html)\b/i.test(msgLower)) {
+    if (
+      analysis.needsCodeExec ||
+      /\b(cod|code|functie|function|bug|debug|api|npm|git|deploy|server|database|sql|react|node|python|javascript|css|html)\b/i.test(
+        msgLower,
+      )
+    ) {
       return { agent: "code", ...KelionBrain.AGENTS.code };
     }
 
     // Trading/finance
-    if (analysis.needsMarketData || /\b(bitcoin|btc|eth|crypto|trading|forex|acțiuni|stocks|piață|market|binance|preț|price)\b/i.test(msgLower)) {
+    if (
+      analysis.needsMarketData ||
+      /\b(bitcoin|btc|eth|crypto|trading|forex|acțiuni|stocks|piață|market|binance|preț|price)\b/i.test(
+        msgLower,
+      )
+    ) {
       return { agent: "trading", ...KelionBrain.AGENTS.trading };
     }
 
     // Research
-    if (analysis.needsSearch || analysis.needsRagSearch || /\b(caută|search|compară|compare|analiză|analysis|raport|report|studiu|study)\b/i.test(msgLower)) {
+    if (
+      analysis.needsSearch ||
+      analysis.needsRagSearch ||
+      /\b(caută|search|compară|compare|analiză|analysis|raport|report|studiu|study)\b/i.test(
+        msgLower,
+      )
+    ) {
       return { agent: "research", ...KelionBrain.AGENTS.research };
     }
 
     // Creative
-    if (analysis.needsImagine || /\b(scrie|write|text|articol|blog|slogan|brand|logo|design|creativ|creative|poveste|story)\b/i.test(msgLower)) {
+    if (
+      analysis.needsImagine ||
+      /\b(scrie|write|text|articol|blog|slogan|brand|logo|design|creativ|creative|poveste|story)\b/i.test(
+        msgLower,
+      )
+    ) {
       return { agent: "creative", ...KelionBrain.AGENTS.creative };
     }
 
@@ -5592,7 +6900,7 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
     try {
       const r = await fetch(url, {
         headers: {
-          "User-Agent": `Mozilla/5.0 (compatible; KelionAI/1.0; +${process.env.APP_URL || 'https://kelion'})`,
+          "User-Agent": `Mozilla/5.0 (compatible; KelionAI/1.0; +${process.env.APP_URL || "https://kelion"})`,
           Accept: "text/html,application/xhtml+xml,text/plain",
         },
         signal: AbortSignal.timeout(10000),
@@ -5694,10 +7002,25 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
 
   static get BUDGET_LIMITS() {
     return {
-      free: { dailyUsd: 0.05, monthlyUsd: 1.0, maxToolsPerMsg: 3, label: "Free" },
-      pro: { dailyUsd: 0.50, monthlyUsd: 10.0, maxToolsPerMsg: 8, label: "Pro" },
-      enterprise: { dailyUsd: 5.00, monthlyUsd: 100.0, maxToolsPerMsg: 20, label: "Enterprise" },
-      admin: { dailyUsd: 50.0, monthlyUsd: 500.0, maxToolsPerMsg: 50, label: "Admin" },
+      free: {
+        dailyUsd: 0.05,
+        monthlyUsd: 1.0,
+        maxToolsPerMsg: 3,
+        label: "Free",
+      },
+      pro: { dailyUsd: 0.5, monthlyUsd: 10.0, maxToolsPerMsg: 8, label: "Pro" },
+      enterprise: {
+        dailyUsd: 5.0,
+        monthlyUsd: 100.0,
+        maxToolsPerMsg: 20,
+        label: "Enterprise",
+      },
+      admin: {
+        dailyUsd: 50.0,
+        monthlyUsd: 500.0,
+        maxToolsPerMsg: 50,
+        label: "Admin",
+      },
     };
   }
 
@@ -5718,10 +7041,16 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
         .gte("created_at", todayStart.toISOString());
 
       if (error) throw error;
-      const totalUsd = (data || []).reduce((sum, r) => sum + (r.cost_usd || 0), 0);
+      const totalUsd = (data || []).reduce(
+        (sum, r) => sum + (r.cost_usd || 0),
+        0,
+      );
       return { totalUsd, callCount: (data || []).length };
     } catch (e) {
-      logger.warn({ component: "CostGuardrails", err: e.message }, "getDailyCost failed");
+      logger.warn(
+        { component: "CostGuardrails", err: e.message },
+        "getDailyCost failed",
+      );
       return { totalUsd: 0, callCount: 0 };
     }
   }
@@ -5731,10 +7060,12 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
    * Returns: { allowed, remaining, percentUsed, plan, shouldDowngrade }
    */
   async _checkBudget(userId, plan = "free") {
-    const limits = KelionBrain.BUDGET_LIMITS[plan] || KelionBrain.BUDGET_LIMITS.free;
+    const limits =
+      KelionBrain.BUDGET_LIMITS[plan] || KelionBrain.BUDGET_LIMITS.free;
     const { totalUsd, callCount } = await this._getDailyCost(userId);
     const remaining = Math.max(0, limits.dailyUsd - totalUsd);
-    const percentUsed = limits.dailyUsd > 0 ? (totalUsd / limits.dailyUsd) * 100 : 0;
+    const percentUsed =
+      limits.dailyUsd > 0 ? (totalUsd / limits.dailyUsd) * 100 : 0;
 
     const result = {
       allowed: totalUsd < limits.dailyUsd,
@@ -5749,8 +7080,15 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
     };
 
     if (percentUsed >= 90) {
-      logger.warn({ component: "CostGuardrails", userId, percentUsed: result.percentUsed, totalUsd },
-        `💰 Budget alert: ${result.percentUsed}% used ($${totalUsd.toFixed(4)}/$${limits.dailyUsd})`);
+      logger.warn(
+        {
+          component: "CostGuardrails",
+          userId,
+          percentUsed: result.percentUsed,
+          totalUsd,
+        },
+        `💰 Budget alert: ${result.percentUsed}% used ($${totalUsd.toFixed(4)}/$${limits.dailyUsd})`,
+      );
     }
 
     return result;
@@ -5776,8 +7114,15 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
         costPerToken: 0.00000027,
         downgraded: true,
       };
-      logger.info({ component: "CostGuardrails", from: modelRoute.provider, to: "groq", budget: budgetResult.percentUsed },
-        `💸 Auto-downgrade: ${modelRoute.provider} → groq (budget ${budgetResult.percentUsed}%)`);
+      logger.info(
+        {
+          component: "CostGuardrails",
+          from: modelRoute.provider,
+          to: "groq",
+          budget: budgetResult.percentUsed,
+        },
+        `💸 Auto-downgrade: ${modelRoute.provider} → groq (budget ${budgetResult.percentUsed}%)`,
+      );
       return downgraded;
     }
 
@@ -5792,8 +7137,27 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
   static get POLICY_RULES() {
     return {
       free: {
-        allowedTools: ["search", "weather", "imagine", "map", "translate", "summarize", "reminder", "calendarList", "generateDoc"],
-        blockedTools: ["email", "codeExecute", "ragSearch", "webScrape", "fileParse", "dbQuery", "calendarCreate", "calendarDelete"],
+        allowedTools: [
+          "search",
+          "weather",
+          "imagine",
+          "map",
+          "translate",
+          "summarize",
+          "reminder",
+          "calendarList",
+          "generateDoc",
+        ],
+        blockedTools: [
+          "email",
+          "codeExecute",
+          "ragSearch",
+          "webScrape",
+          "fileParse",
+          "dbQuery",
+          "calendarCreate",
+          "calendarDelete",
+        ],
         maxHistoryLength: 10,
         maxMessageLength: 2000,
       },
@@ -5825,7 +7189,8 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
   _checkPolicy(toolName, plan = "free", isAdmin = false) {
     if (isAdmin) return { allowed: true, reason: "admin", plan: "admin" };
 
-    const rules = KelionBrain.POLICY_RULES[plan] || KelionBrain.POLICY_RULES.free;
+    const rules =
+      KelionBrain.POLICY_RULES[plan] || KelionBrain.POLICY_RULES.free;
 
     // Check blocked tools
     if (rules.blockedTools && rules.blockedTools.includes(toolName)) {
@@ -5838,7 +7203,10 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
     }
 
     // Check allowed tools (if not "all")
-    if (rules.allowedTools !== "all" && !rules.allowedTools.includes(toolName)) {
+    if (
+      rules.allowedTools !== "all" &&
+      !rules.allowedTools.includes(toolName)
+    ) {
       return {
         allowed: false,
         reason: `Tool "${toolName}" not available on ${plan} plan`,
@@ -5856,11 +7224,13 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
    */
   _filterPlanByPolicy(plan, userPlan = "free", isAdmin = false) {
     if (isAdmin) return plan;
-    return plan.filter(step => {
+    return plan.filter((step) => {
       const check = this._checkPolicy(step.tool, userPlan, isAdmin);
       if (!check.allowed) {
-        logger.info({ component: "PolicyEngine", tool: step.tool, plan: userPlan },
-          `🔒 Policy blocked: ${step.tool} (${check.reason})`);
+        logger.info(
+          { component: "PolicyEngine", tool: step.tool, plan: userPlan },
+          `🔒 Policy blocked: ${step.tool} (${check.reason})`,
+        );
       }
       return check.allowed;
     });
@@ -5980,7 +7350,8 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
       /(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/,
     );
     if (ytMatch) {
-      const ytEmbed = this.getToolUrl("youtube_embed") || "https://www.youtube.com/embed";
+      const ytEmbed =
+        this.getToolUrl("youtube_embed") || "https://www.youtube.com/embed";
       const embedUrl = `${ytEmbed}/${ytMatch[1]}?autoplay=1`;
       await this._logMedia("video", embedUrl, query);
       return {
@@ -6010,8 +7381,10 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
     }
 
     // Search YouTube via API or construct search URL
-    const ytSearchBase = this.getToolUrl("youtube_search") || "https://www.youtube.com/results";
-    const ytEmbedBase = this.getToolUrl("youtube_embed") || "https://www.youtube.com/embed";
+    const ytSearchBase =
+      this.getToolUrl("youtube_search") || "https://www.youtube.com/results";
+    const ytEmbedBase =
+      this.getToolUrl("youtube_embed") || "https://www.youtube.com/embed";
     const searchUrl = `${ytSearchBase}?search_query=${encodeURIComponent(query)}`;
     const embedSearch = `${ytEmbedBase}?listType=search&list=${encodeURIComponent(query)}`;
     await this._logMedia("video", searchUrl, query);
@@ -6228,9 +7601,9 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
           summary:
             breaking.length > 0
               ? `🔴 ${breaking.length} știri breaking: ${breaking
-                .slice(0, 3)
-                .map((a) => a.title)
-                .join("; ")}`
+                  .slice(0, 3)
+                  .map((a) => a.title)
+                  .join("; ")}`
               : "Nicio știre breaking momentan. Situația e calmă.",
         };
       } else {
@@ -6248,9 +7621,9 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
           summary:
             latest.length > 0
               ? `📰 ${articles.length} articole. Ultimele: ${latest
-                .slice(0, 3)
-                .map((a) => `${a.title} (${a.source})`)
-                .join("; ")}`
+                  .slice(0, 3)
+                  .map((a) => `${a.title} (${a.source})`)
+                  .join("; ")}`
               : "Nu am știri momentan. Fetch-ul se face automat la ore fixe.",
         };
       }
@@ -6295,8 +7668,7 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
     } else if (action === "privacy") {
       result = {
         action: "privacy",
-        summary:
-          `Politica de confidențialitate: Colectăm email, conversații AI, preferințe. Zero tracking, zero publicitate. Cookie-uri doar pentru autentificare. Date stocate în Supabase (EU). Drepturile tale: acces, rectificare, ștergere, portabilitate. Contact: privacy@${(process.env.APP_URL || '').replace('https://', '')}.`,
+        summary: `Politica de confidențialitate: Colectăm email, conversații AI, preferințe. Zero tracking, zero publicitate. Cookie-uri doar pentru autentificare. Date stocate în Supabase (EU). Drepturile tale: acces, rectificare, ștergere, portabilitate. Contact: privacy@${(process.env.APP_URL || "").replace("https://", "")}.`,
         url: "/api/legal/privacy",
       };
     } else if (action === "exportData") {
@@ -6434,25 +7806,40 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
       results.technicalAnalysis = {};
       for (const asset of assets) {
         try {
-          let prices = [], volumes = [];
+          let prices = [],
+            volumes = [];
           // Try WS-Engine first (real-time)
           try {
-            const candles = wsEngine.getCandles ? wsEngine.getCandles(asset, "1m", 100) : null;
+            const candles = wsEngine.getCandles
+              ? wsEngine.getCandles(asset, "1m", 100)
+              : null;
             if (candles && candles.length >= 20) {
-              prices = candles.map(c => c.close);
-              volumes = candles.map(c => c.volume || 0);
+              prices = candles.map((c) => c.close);
+              volumes = candles.map((c) => c.volume || 0);
             }
-          } catch (_wsErr) { logger.warn({ component: "Brain", err: _wsErr.message }, "WS candles fallback"); }
+          } catch (_wsErr) {
+            logger.warn(
+              { component: "Brain", err: _wsErr.message },
+              "WS candles fallback",
+            );
+          }
           // Fallback: CoinGecko
           if (prices.length < 14) {
             try {
-              const r = await fetch(`https://api.coingecko.com/api/v3/coins/${cgIds[asset]}/market_chart?vs_currency=usd&days=7`);
+              const r = await fetch(
+                `https://api.coingecko.com/api/v3/coins/${cgIds[asset]}/market_chart?vs_currency=usd&days=7`,
+              );
               if (r.ok) {
                 const d = await r.json();
-                prices = (d.prices || []).map(p => p[1]).slice(-100);
-                volumes = (d.total_volumes || []).map(v => v[1]).slice(-100);
+                prices = (d.prices || []).map((p) => p[1]).slice(-100);
+                volumes = (d.total_volumes || []).map((v) => v[1]).slice(-100);
               }
-            } catch (_cgErr) { logger.warn({ component: "Brain", err: _cgErr.message }, "CoinGecko price fallback"); }
+            } catch (_cgErr) {
+              logger.warn(
+                { component: "Brain", err: _cgErr.message },
+                "CoinGecko price fallback",
+              );
+            }
           }
           if (prices.length >= 14) {
             const rsi = this._calcRSI(prices);
@@ -6461,16 +7848,22 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
             // Confluence
             const scoreMap = { BUY: 1, SELL: -1, HOLD: 0 };
             const signals = [rsi.signal, macd.crossSignal].filter(Boolean);
-            const avg = signals.length > 0 ? signals.reduce((s, sig) => s + (scoreMap[sig] || 0), 0) / signals.length : 0;
+            const avg =
+              signals.length > 0
+                ? signals.reduce((s, sig) => s + (scoreMap[sig] || 0), 0) /
+                  signals.length
+                : 0;
             let confluence = "HOLD";
             if (avg >= 0.5) confluence = "BUY";
             else if (avg <= -0.5) confluence = "SELL";
 
             results.technicalAnalysis[asset] = {
               price: Math.round(last * 100) / 100,
-              rsi: rsi.value, rsiSignal: rsi.signal,
+              rsi: rsi.value,
+              rsiSignal: rsi.signal,
               macdSignal: macd.crossSignal,
-              confluence, confidence: Math.round(Math.abs(avg) * 100),
+              confluence,
+              confidence: Math.round(Math.abs(avg) * 100),
             };
           }
         } catch (e) {
@@ -6480,29 +7873,57 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
 
       // 4. MarketLearner adaptive weights
       try {
-        results.learnedWeights = marketLearner.getWeights ? marketLearner.getWeights() : {};
-      } catch (_lwErr) { logger.warn({ component: "Brain", err: _lwErr.message }, "MarketLearner weights error"); }
+        results.learnedWeights = marketLearner.getWeights
+          ? marketLearner.getWeights()
+          : {};
+      } catch (_lwErr) {
+        logger.warn(
+          { component: "Brain", err: _lwErr.message },
+          "MarketLearner weights error",
+        );
+      }
 
       // 5. Forex Session Info
       try {
         results.forex = {
-          currentSession: forexEngine.getCurrentSession ? forexEngine.getCurrentSession() : null,
-          bestPairs: forexEngine.getBestPairsNow ? forexEngine.getBestPairsNow() : null,
+          currentSession: forexEngine.getCurrentSession
+            ? forexEngine.getCurrentSession()
+            : null,
+          bestPairs: forexEngine.getBestPairsNow
+            ? forexEngine.getBestPairsNow()
+            : null,
         };
-      } catch (_fxErr) { logger.warn({ component: "Brain", err: _fxErr.message }, "Forex session error"); }
+      } catch (_fxErr) {
+        logger.warn(
+          { component: "Brain", err: _fxErr.message },
+          "Forex session error",
+        );
+      }
 
       // 6. Performance Stats
       try {
         if (perfTracker.getStats) results.performance = perfTracker.getStats();
-      } catch (_pfErr) { logger.warn({ component: "Brain", err: _pfErr.message }, "PerfTracker stats error"); }
+      } catch (_pfErr) {
+        logger.warn(
+          { component: "Brain", err: _pfErr.message },
+          "PerfTracker stats error",
+        );
+      }
 
       // 7. WS-Engine status
       try {
         results.realTimeStatus = {
           connected: wsEngine.isConnected ? wsEngine.isConnected() : false,
-          assetsTracking: wsEngine.getTrackedAssets ? wsEngine.getTrackedAssets() : [],
+          assetsTracking: wsEngine.getTrackedAssets
+            ? wsEngine.getTrackedAssets()
+            : [],
         };
-      } catch (_wsStatErr) { logger.warn({ component: "Brain", err: _wsStatErr.message }, "WS-Engine status error"); }
+      } catch (_wsStatErr) {
+        logger.warn(
+          { component: "Brain", err: _wsStatErr.message },
+          "WS-Engine status error",
+        );
+      }
 
       const btc = results.technicalAnalysis?.BTC || {};
       const summary = `BTC: $${btc.price || "?"} RSI:${btc.rsi || "?"} (${btc.rsiSignal || "?"}) MACD:${btc.macdSignal || "?"} Confluence:${btc.confluence || "?"} (${btc.confidence || 0}%) | Sentiment:${results.sentiment?.toFixed(2) || "N/A"} | Forex:${results.forex?.currentSession?.name || "?"}`;
@@ -6510,28 +7931,44 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
       if (this.supabaseAdmin) {
         try {
           await this.supabaseAdmin.from("trade_intelligence").insert({
-            asset: "MULTI", analysis_type: "full_brain_scan",
-            result: results, sentiment_score: results.sentiment || 0,
-            confidence: btc.confidence || 50, created_at: new Date().toISOString(),
+            asset: "MULTI",
+            analysis_type: "full_brain_scan",
+            result: results,
+            sentiment_score: results.sentiment || 0,
+            confidence: btc.confidence || 50,
+            created_at: new Date().toISOString(),
           });
-        } catch (_tiDbErr) { logger.warn({ component: "Brain", err: _tiDbErr.message }, "Trade intelligence DB insert error"); }
+        } catch (_tiDbErr) {
+          logger.warn(
+            { component: "Brain", err: _tiDbErr.message },
+            "Trade intelligence DB insert error",
+          );
+        }
       }
 
       return { type: "tradeIntelligence", data: results, summary };
     } catch (e) {
-      return { type: "tradeIntelligence", error: e.message, summary: `Eroare: ${e.message}` };
+      return {
+        type: "tradeIntelligence",
+        error: e.message,
+        summary: `Eroare: ${e.message}`,
+      };
     }
   }
 
   // ── Inline TA helpers (avoid circular dependency with trading.js Router) ──
   _calcRSI(prices, period = 14) {
-    if (!prices || prices.length < period + 1) return { value: 50, signal: "HOLD" };
-    let gains = 0, losses = 0;
+    if (!prices || prices.length < period + 1)
+      return { value: 50, signal: "HOLD" };
+    let gains = 0,
+      losses = 0;
     for (let i = 1; i <= period; i++) {
       const d = prices[i] - prices[i - 1];
-      if (d >= 0) gains += d; else losses += Math.abs(d);
+      if (d >= 0) gains += d;
+      else losses += Math.abs(d);
     }
-    let avgG = gains / period, avgL = losses / period;
+    let avgG = gains / period,
+      avgL = losses / period;
     for (let i = period + 1; i < prices.length; i++) {
       const d = prices[i] - prices[i - 1];
       avgG = (avgG * (period - 1) + (d >= 0 ? d : 0)) / period;
@@ -6539,19 +7976,31 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
     }
     if (avgL === 0) return { value: 100, signal: "SELL" };
     const v = 100 - 100 / (1 + avgG / avgL);
-    return { value: Math.round(v * 100) / 100, signal: v < 30 ? "BUY" : v > 70 ? "SELL" : "HOLD" };
+    return {
+      value: Math.round(v * 100) / 100,
+      signal: v < 30 ? "BUY" : v > 70 ? "SELL" : "HOLD",
+    };
   }
 
   _calcMACD(prices) {
     if (!prices || prices.length < 35) return { crossSignal: "HOLD" };
-    const ema = (p, per) => { const k = 2 / (per + 1); const e = [p[0]]; for (let i = 1; i < p.length; i++) e.push(p[i] * k + e[i - 1] * (1 - k)); return e; };
-    const fast = ema(prices, 12), slow = ema(prices, 26);
+    const ema = (p, per) => {
+      const k = 2 / (per + 1);
+      const e = [p[0]];
+      for (let i = 1; i < p.length; i++) e.push(p[i] * k + e[i - 1] * (1 - k));
+      return e;
+    };
+    const fast = ema(prices, 12),
+      slow = ema(prices, 26);
     const macdLine = fast.map((v, i) => v - slow[i]);
     const sig = ema(macdLine.slice(25), 9);
-    const li = macdLine.length - 1, si = sig.length - 1;
+    const li = macdLine.length - 1,
+      si = sig.length - 1;
     const prev = (macdLine[li - 1] || 0) <= (sig[si - 1] || 0);
     const curr = macdLine[li] > sig[si];
-    return { crossSignal: prev && curr ? "BUY" : !prev && !curr ? "SELL" : "HOLD" };
+    return {
+      crossSignal: prev && curr ? "BUY" : !prev && !curr ? "SELL" : "HOLD",
+    };
   }
 
   // ── COOKIE CONSENT — GDPR Cookie Management ──
@@ -6672,7 +8121,10 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
           enabled: true,
           details: "X-Frame-Options, X-XSS-Protection, HSTS etc.",
         },
-        cors: { enabled: true, details: `Origins: ${process.env.APP_URL || 'configured'}, localhost` },
+        cors: {
+          enabled: true,
+          details: `Origins: ${process.env.APP_URL || "configured"}, localhost`,
+        },
         rateGlobal: { enabled: true, details: "200 requests / 15 min per IP" },
         rateChat: { enabled: true, details: "30 requests / min per IP" },
         rateAuth: { enabled: true, details: "10 requests / 15 min per IP" },
@@ -6813,7 +8265,7 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
         totalEndpoints: endpoints.length,
         totalKeys,
         endpoints,
-        baseUrl: (process.env.APP_URL || '') + "/api/v1",
+        baseUrl: (process.env.APP_URL || "") + "/api/v1",
         authMethod: "Bearer API key",
         summary: `Developer API: ${endpoints.length} endpoints | ${totalKeys} API keys active | Auth: Bearer token | Base: /api/v1`,
       };
@@ -6966,24 +8418,34 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
     const geminiKey = process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
     if (geminiKey) {
       try {
-        const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODELS.GEMINI_VISION}:generateContent?key=${geminiKey}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{
-              role: "user",
-              parts: [
-                { inlineData: { mimeType: "image/jpeg", data: imageBase64 } },
-                { text: "Descrie în detaliu maxim ce vezi în această imagine. Menționează: persoane, obiecte, culori, text vizibil, obstacole, distanțe estimate, pericole potențiale. Răspunde în română cu precizie maximă — informația ajută o persoană cu deficiențe de vedere." },
+        const r = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${MODELS.GEMINI_VISION}:generateContent?key=${geminiKey}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [
+                {
+                  role: "user",
+                  parts: [
+                    {
+                      inlineData: { mimeType: "image/jpeg", data: imageBase64 },
+                    },
+                    {
+                      text: "Descrie în detaliu maxim ce vezi în această imagine. Menționează: persoane, obiecte, culori, text vizibil, obstacole, distanțe estimate, pericole potențiale. Răspunde în română cu precizie maximă — informația ajută o persoană cu deficiențe de vedere.",
+                    },
+                  ],
+                },
               ],
-            }],
-            generationConfig: { maxOutputTokens: 1000 },
-          }),
-        });
+              generationConfig: { maxOutputTokens: 1000 },
+            }),
+          },
+        );
         if (r.ok) {
           const data = await r.json();
           const description =
-            data.candidates?.[0]?.content?.parts?.[0]?.text || "Nu am putut analiza imaginea.";
+            data.candidates?.[0]?.content?.parts?.[0]?.text ||
+            "Nu am putut analiza imaginea.";
           // Supabase usage log
           if (this.supabaseAdmin) {
             try {
@@ -7307,23 +8769,31 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
             ? `Descrie persoana din imagine (vârstă, gen, păr, ochelari, trăsături distinctive). Apoi compară cu aceste persoane cunoscute:\n${knownList}\nRăspunde: MATCH: [nume] sau NO_MATCH dacă nu e nimeni cunoscut.`
             : "Descrie persoana din imagine: vârstă estimată, gen, culoare păr, ochelari da/nu, trăsături distinctive. Răspunde concis în română.";
 
-        const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODELS.GEMINI_VISION}:generateContent?key=${geminiKey}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{
-              role: "user",
-              parts: [
-                { inlineData: { mimeType: "image/jpeg", data: imageBase64 } },
-                { text: prompt },
+        const r = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${MODELS.GEMINI_VISION}:generateContent?key=${geminiKey}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [
+                {
+                  role: "user",
+                  parts: [
+                    {
+                      inlineData: { mimeType: "image/jpeg", data: imageBase64 },
+                    },
+                    { text: prompt },
+                  ],
+                },
               ],
-            }],
-            generationConfig: { maxOutputTokens: 500 },
-          }),
-        });
+              generationConfig: { maxOutputTokens: 500 },
+            }),
+          },
+        );
         if (r.ok) {
           const data = await r.json();
-          const description = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+          const description =
+            data.candidates?.[0]?.content?.parts?.[0]?.text || "";
           const isMatch = description.includes("MATCH:");
           const matchName = isMatch
             ? description.match(/MATCH:\s*(.+)/)?.[1]?.trim()
@@ -7380,20 +8850,29 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
     const geminiKey2 = process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
     if (geminiKey2) {
       try {
-        const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODELS.GEMINI_VISION}:generateContent?key=${geminiKey2}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{
-              role: "user",
-              parts: [
-                { inlineData: { mimeType: "image/jpeg", data: imageBase64 } },
-                { text: 'Descrie fața persoanei pentru recunoaștere viitoare: vârstă estimată, gen, culoare păr, lung/scurt, ochelari da/nu, barbă/mustață, forme faciale distinctive, cicatrici sau semne particulare. Format JSON: {"age":X,"gender":"","hair":"","glasses":false,"facial_hair":"","distinctive":"","description":"text liber"}' },
+        const r = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${MODELS.GEMINI_VISION}:generateContent?key=${geminiKey2}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [
+                {
+                  role: "user",
+                  parts: [
+                    {
+                      inlineData: { mimeType: "image/jpeg", data: imageBase64 },
+                    },
+                    {
+                      text: 'Descrie fața persoanei pentru recunoaștere viitoare: vârstă estimată, gen, culoare păr, lung/scurt, ochelari da/nu, barbă/mustață, forme faciale distinctive, cicatrici sau semne particulare. Format JSON: {"age":X,"gender":"","hair":"","glasses":false,"facial_hair":"","distinctive":"","description":"text liber"}',
+                    },
+                  ],
+                },
               ],
-            }],
-            generationConfig: { maxOutputTokens: 300 },
-          }),
-        });
+              generationConfig: { maxOutputTokens: 300 },
+            }),
+          },
+        );
         if (r.ok) {
           const data = await r.json();
           const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
@@ -7609,7 +9088,9 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
     const fetchT = (url, opts, timeoutMs = 4000) => {
       const ctrl = new AbortController();
       const timer = setTimeout(() => ctrl.abort(), timeoutMs);
-      return fetch(url, { ...opts, signal: ctrl.signal }).finally(() => clearTimeout(timer));
+      return fetch(url, { ...opts, signal: ctrl.signal }).finally(() =>
+        clearTimeout(timer),
+      );
     };
 
     // 1️⃣ PERPLEXITY SONAR — Best: returns synthesized answer + citations
@@ -7678,14 +9159,18 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
     // 3️⃣ SERPER — Fast: raw Google results, very cheap
     if (!result && this.serperKey) {
       try {
-        const r = await fetchT(this.getToolUrl("serper_search") || "https://google.serper.dev/search", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-API-KEY": this.serperKey,
+        const r = await fetchT(
+          this.getToolUrl("serper_search") ||
+            "https://google.serper.dev/search",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-API-KEY": this.serperKey,
+            },
+            body: JSON.stringify({ q: query, num: 5 }),
           },
-          body: JSON.stringify({ q: query, num: 5 }),
-        });
+        );
         if (r.ok) {
           const d = await r.json();
           const answer =
@@ -7712,8 +9197,8 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
       try {
         const r = await fetchT(
           "https://api.duckduckgo.com/?q=" +
-          encodeURIComponent(query) +
-          "&format=json&no_html=1&skip_disambig=1",
+            encodeURIComponent(query) +
+            "&format=json&no_html=1&skip_disambig=1",
         );
         if (r.ok) {
           const d = await r.json();
@@ -7739,7 +9224,9 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
 
   async _weather(city) {
     this.toolStats.weather++;
-    const geoUrl = this.getToolUrl("open_meteo_geo") || "https://geocoding-api.open-meteo.com/v1/search";
+    const geoUrl =
+      this.getToolUrl("open_meteo_geo") ||
+      "https://geocoding-api.open-meteo.com/v1/search";
     const geo = await (
       await fetch(
         `${geoUrl}?name=${encodeURIComponent(city)}&count=1&language=ro`,
@@ -7747,7 +9234,9 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
     ).json();
     if (!geo.results?.[0]) throw new Error("City not found");
     const { latitude, longitude, name, country } = geo.results[0];
-    const forecastUrl = this.getToolUrl("open_meteo_forecast") || "https://api.open-meteo.com/v1/forecast";
+    const forecastUrl =
+      this.getToolUrl("open_meteo_forecast") ||
+      "https://api.open-meteo.com/v1/forecast";
     const wx = await (
       await fetch(
         `${forecastUrl}?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&daily=temperature_2m_max,temperature_2m_min,weather_code&timezone=auto&forecast_days=3`,
@@ -7841,6 +9330,113 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
   // ═══════════════════════════════════════════════════════════
   // 10. AUTO-LEARNING — Extract facts + learn from interaction
   // ═══════════════════════════════════════════════════════════
+
+  // ── Correction patterns (RO + EN) ──
+  static CORRECTION_PATTERNS = [
+    // Romanian
+    /\b(nu|n-am|n-ai)\b.*\b(zis|spus|cerut|vrut)\b/i,
+    /\b(greșit|gresit|incorect|greșeală|greseala)\b/i,
+    /\b(nu e corect|nu-i corect|nu e bine|nu-i bine)\b/i,
+    /\b(nu asta|nu așa|nu asa|altfel|altceva)\b/i,
+    /\b(te-am corectat|te corectez|corectare)\b/i,
+    /\b(din nou|iar greșești|iar gresesti)\b/i,
+    /\b(am zis|ți-am zis|ti-am zis|ți-am spus|ti-am spus)\b.*\b(nu|că|ca)\b/i,
+    /\b(nu mai|oprește|opreste|lasă|lasa|renunță|renunta)\b.*\b(fă|fa|pune|spune|zice)\b/i,
+    // English
+    /\b(wrong|incorrect|not right|not what i)\b/i,
+    /\b(i said|i told you|i asked for|i meant)\b/i,
+    /\b(don'?t|do not|stop)\b.*\b(do that|say that|use|call me)\b/i,
+    /\b(that'?s not|no,? that|no,? i)\b/i,
+    /\b(please don'?t|never|stop doing)\b/i,
+  ];
+
+  detectCorrection(userMessage) {
+    const msg = userMessage.toLowerCase();
+    for (const pattern of this.constructor.CORRECTION_PATTERNS) {
+      if (pattern.test(msg)) return true;
+    }
+    return false;
+  }
+
+  async learnCorrection(userId, userMessage, aiReply) {
+    if (!this.supabaseAdmin || !userId) return;
+    try {
+      // Use LLM to extract WHAT was corrected
+      const extractPrompt = `Userul a corectat AI-ul. Extrage EXACT ce a greșit AI-ul și ce vrea userul.
+User: "${userMessage.substring(0, 500)}"
+AI anterior: "${aiReply.substring(0, 300)}"
+Răspunde STRICT JSON: {"wrong": "ce a greșit AI", "correct": "ce vrea userul", "rule": "regulă scurtă de reținut"}
+Dacă nu poți extrage: {}`;
+
+      let txt = null;
+      if (this.groqKey) {
+        const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + this.groqKey },
+          body: JSON.stringify({ model: MODELS.GROQ_PRIMARY, max_tokens: 150, messages: [{ role: "user", content: extractPrompt }] }),
+        });
+        if (r.ok) { const d = await r.json(); txt = d.choices?.[0]?.message?.content?.trim(); }
+      }
+      if (!txt) {
+        const geminiKey = process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
+        if (geminiKey) {
+          const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODELS.GEMINI_CHAT}:generateContent?key=${geminiKey}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: extractPrompt }] }], generationConfig: { maxOutputTokens: 150 } }),
+          });
+          if (r.ok) { const d = await r.json(); txt = d.candidates?.[0]?.content?.parts?.[0]?.text?.trim(); }
+        }
+      }
+      if (!txt || txt === "{}") return;
+
+      let correction;
+      try { correction = JSON.parse(txt.replace(/```json|```/g, "").trim()); } catch { return; }
+      if (!correction.rule) return;
+
+      // Save correction to Supabase (max 20 corrections per user)
+      const correctionKey = "correction_" + Date.now();
+      await this.supabaseAdmin.from("user_preferences").upsert({
+        user_id: userId,
+        key: correctionKey,
+        value: {
+          wrong: correction.wrong,
+          correct: correction.correct,
+          rule: correction.rule,
+          at: new Date().toISOString(),
+        },
+      }, { onConflict: "user_id,key" });
+
+      // Clean old corrections (keep max 20)
+      const { data: allCorrections } = await this.supabaseAdmin
+        .from("user_preferences")
+        .select("id, key")
+        .eq("user_id", userId)
+        .like("key", "correction_%")
+        .order("key", { ascending: true });
+      if (allCorrections && allCorrections.length > 20) {
+        const toDelete = allCorrections.slice(0, allCorrections.length - 20);
+        for (const old of toDelete) {
+          await this.supabaseAdmin.from("user_preferences").delete().eq("id", old.id);
+        }
+      }
+
+      // Feed into k1-meta-learning
+      if (typeof require === "function") {
+        try {
+          const k1Meta = require("./k1-meta-learning");
+          k1Meta.recordUserInteraction({ domain: "general", wasCorrection: true, correctionNote: correction.rule });
+          const k1Perf = require("./k1-performance");
+          k1Perf.recordCorrection("general", correction.wrong?.substring(0, 50) || "unknown");
+        } catch (e) { /* non-critical */ }
+      }
+
+      logger.info({ component: "Brain", correction: correction.rule }, "🎓 Learned correction: " + correction.rule);
+    } catch (e) {
+      logger.warn({ component: "Brain", err: e.message }, "Correction learning failed (non-critical)");
+    }
+  }
+
   async learnFromConversation(userId, userMessage, aiReply) {
     if (
       !this.supabaseAdmin ||
@@ -7849,6 +9445,13 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
       (!this.groqKey && !this.geminiKey)
     )
       return;
+
+    // ── Check for corrections FIRST (no rate limit for corrections) ──
+    if (this.detectCorrection(userMessage)) {
+      this.learnCorrection(userId, userMessage, aiReply).catch((e) =>
+        logger.warn({ err: e.message }, "learnCorrection failed")
+      );
+    }
 
     // Rate limit: max 1 learning extraction per 5 minutes per user
     const now = Date.now();
@@ -7888,16 +9491,20 @@ Raspunde STRICT JSON. Daca nimic: {}`;
         }
       }
       if (!txt) {
-        const geminiKey = process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
+        const geminiKey =
+          process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
         if (geminiKey) {
-          r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODELS.GEMINI_CHAT}:generateContent?key=${geminiKey}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [{ role: "user", parts: [{ text: learnPrompt }] }],
-              generationConfig: { maxOutputTokens: 150 },
-            }),
-          });
+          r = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${MODELS.GEMINI_CHAT}:generateContent?key=${geminiKey}`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                contents: [{ role: "user", parts: [{ text: learnPrompt }] }],
+                generationConfig: { maxOutputTokens: 150 },
+              }),
+            },
+          );
           if (r.ok) {
             d = await r.json();
             txt = d.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
@@ -8259,7 +9866,9 @@ Raspunde STRICT JSON. Daca nimic: {}`;
         // Recent signals (last 100)
         const { data: signals } = await this.supabaseAdmin
           .from("trading_signals")
-          .select("asset, signal, confidence, entry_price, target_price, stop_loss, created_at")
+          .select(
+            "asset, signal, confidence, entry_price, target_price, stop_loss, created_at",
+          )
           .order("created_at", { ascending: false })
           .limit(100);
         history.signals = signals || [];
@@ -8272,7 +9881,7 @@ Raspunde STRICT JSON. Daca nimic: {}`;
           .limit(500);
         history.trades = trades || [];
 
-        // Strategy performance logs  
+        // Strategy performance logs
         const { data: stratLogs } = await this.supabaseAdmin
           .from("trading_strategy_log")
           .select("strategy, outcome, pnl, confidence, created_at")
@@ -8291,24 +9900,33 @@ Raspunde STRICT JSON. Daca nimic: {}`;
         history.totalAnalyses = history.analyses.length;
         history.totalSignals = history.signals.length;
         history.totalTrades = history.trades.length;
-        history.dataRange = history.analyses.length > 0
-          ? { from: history.analyses[history.analyses.length - 1]?.created_at, to: history.analyses[0]?.created_at }
-          : null;
+        history.dataRange =
+          history.analyses.length > 0
+            ? {
+                from: history.analyses[history.analyses.length - 1]?.created_at,
+                to: history.analyses[0]?.created_at,
+              }
+            : null;
 
         result.supabaseHistory = history;
         result.recentTrades = history.trades.slice(0, 10);
 
         // ═══ 3. BRAIN ANALYZES PERFORMANCE → STRATEGY ADJUSTMENTS ═══
         if (history.trades.length > 0) {
-          const closedTrades = history.trades.filter(t => t.status === "closed" && t.pnl != null);
-          const wins = closedTrades.filter(t => t.pnl > 0);
-          const losses = closedTrades.filter(t => t.pnl <= 0);
+          const closedTrades = history.trades.filter(
+            (t) => t.status === "closed" && t.pnl != null,
+          );
+          const wins = closedTrades.filter((t) => t.pnl > 0);
+          const losses = closedTrades.filter((t) => t.pnl <= 0);
           const totalPnl = closedTrades.reduce((s, t) => s + (t.pnl || 0), 0);
-          const winRate = closedTrades.length > 0 ? Math.round((wins.length / closedTrades.length) * 100) : 0;
+          const winRate =
+            closedTrades.length > 0
+              ? Math.round((wins.length / closedTrades.length) * 100)
+              : 0;
 
           // Best and worst strategies
           const stratPerf = {};
-          closedTrades.forEach(t => {
+          closedTrades.forEach((t) => {
             const s = t.strategy || "unknown";
             if (!stratPerf[s]) stratPerf[s] = { wins: 0, losses: 0, pnl: 0 };
             if (t.pnl > 0) stratPerf[s].wins++;
@@ -8316,10 +9934,12 @@ Raspunde STRICT JSON. Daca nimic: {}`;
             stratPerf[s].pnl += t.pnl || 0;
           });
 
-          const bestStrategy = Object.entries(stratPerf)
-            .sort((a, b) => b[1].pnl - a[1].pnl)[0];
-          const worstStrategy = Object.entries(stratPerf)
-            .sort((a, b) => a[1].pnl - b[1].pnl)[0];
+          const bestStrategy = Object.entries(stratPerf).sort(
+            (a, b) => b[1].pnl - a[1].pnl,
+          )[0];
+          const worstStrategy = Object.entries(stratPerf).sort(
+            (a, b) => a[1].pnl - b[1].pnl,
+          )[0];
 
           result.strategyAnalysis = {
             totalTrades: closedTrades.length,
@@ -8327,8 +9947,12 @@ Raspunde STRICT JSON. Daca nimic: {}`;
             losses: losses.length,
             winRate,
             totalPnl: +totalPnl.toFixed(2),
-            bestStrategy: bestStrategy ? { name: bestStrategy[0], ...bestStrategy[1] } : null,
-            worstStrategy: worstStrategy ? { name: worstStrategy[0], ...worstStrategy[1] } : null,
+            bestStrategy: bestStrategy
+              ? { name: bestStrategy[0], ...bestStrategy[1] }
+              : null,
+            worstStrategy: worstStrategy
+              ? { name: worstStrategy[0], ...worstStrategy[1] }
+              : null,
             strategiesAnalyzed: Object.keys(stratPerf).length,
           };
 
@@ -8341,7 +9965,9 @@ Raspunde STRICT JSON. Daca nimic: {}`;
             // If win rate < 40%, switch to conservative
             if (winRate < 40 && closedTrades.length >= 5) {
               tradeExecutor.setRiskProfile("conservative");
-              adjustments.push("Risk → CONSERVATIVE (win rate " + winRate + "%)");
+              adjustments.push(
+                "Risk → CONSERVATIVE (win rate " + winRate + "%)",
+              );
             }
             // If win rate > 65%, can be more aggressive
             else if (winRate > 65 && closedTrades.length >= 10) {
@@ -8351,10 +9977,11 @@ Raspunde STRICT JSON. Daca nimic: {}`;
 
             // Update indicator weights based on which signals led to wins
             const signalAccuracy = {};
-            closedTrades.forEach(t => {
+            closedTrades.forEach((t) => {
               if (t.raw_data?.indicators) {
                 Object.entries(t.raw_data.indicators).forEach(([ind, sig]) => {
-                  if (!signalAccuracy[ind]) signalAccuracy[ind] = { correct: 0, total: 0 };
+                  if (!signalAccuracy[ind])
+                    signalAccuracy[ind] = { correct: 0, total: 0 };
                   signalAccuracy[ind].total++;
                   if (t.pnl > 0) signalAccuracy[ind].correct++;
                 });
@@ -8365,18 +9992,30 @@ Raspunde STRICT JSON. Daca nimic: {}`;
             Object.entries(signalAccuracy).forEach(([ind, stats]) => {
               if (stats.total >= 3) {
                 const accuracy = stats.correct / stats.total;
-                marketLearner.recordOutcome(ind, accuracy > 0.5 ? "win" : "loss");
-                adjustments.push(`${ind}: accuracy ${Math.round(accuracy * 100)}% → weight updated`);
+                marketLearner.recordOutcome(
+                  ind,
+                  accuracy > 0.5 ? "win" : "loss",
+                );
+                adjustments.push(
+                  `${ind}: accuracy ${Math.round(accuracy * 100)}% → weight updated`,
+                );
               }
             });
 
-            result.botAdjustments = adjustments.length > 0 ? adjustments : ["No adjustments needed yet"];
+            result.botAdjustments =
+              adjustments.length > 0
+                ? adjustments
+                : ["No adjustments needed yet"];
           } catch (e) {
             result.botAdjustments = ["Control loop error: " + e.message];
           }
         } else {
-          result.strategyAnalysis = { note: "No closed trades yet — brain will analyze after first trades" };
-          result.botAdjustments = ["Waiting for trade data to optimize strategy"];
+          result.strategyAnalysis = {
+            note: "No closed trades yet — brain will analyze after first trades",
+          };
+          result.botAdjustments = [
+            "Waiting for trade data to optimize strategy",
+          ];
         }
       }
     } catch (e) {
@@ -8415,8 +10054,8 @@ Raspunde STRICT JSON. Daca nimic: {}`;
         try {
           const r = await fetch(
             "https://newsdata.io/api/1/news?apikey=" +
-            (process.env.NEWSDATA_API_KEY || "") +
-            "&language=ro&category=business,technology&size=10",
+              (process.env.NEWSDATA_API_KEY || "") +
+              "&language=ro&category=business,technology&size=10",
           );
           if (r.ok) {
             const d = await r.json();

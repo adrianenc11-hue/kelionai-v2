@@ -482,7 +482,6 @@ ACȚIUNI CORPORALE(per - braț — opțional, maxim 1 per răspuns):
 Folosește NATURAL: salut → [BODY:wavRight], bravo → [BODY:thumbsUpRight], hmm → [BODY:thinkPose]
 Maxim 1 [BODY:xxx] per răspuns. Doar când contextul o cere.`;
 
-
   // ── CREATOR IDENTITY ─────────────────────────────────────
 
   const CREATOR = `
@@ -644,4 +643,18 @@ Când face ceva banal → adaugi o observație amuzantă scurtă
   return prompt;
 }
 
-module.exports = { buildSystemPrompt, TRUTH_ENGINE };
+/**
+ * NEWBORN BRAIN — Prompt complet gol
+ * Zero instrucțiuni hardcodate. Doar memoria învățată (dacă există).
+ * Scopul: evaluare pură a funcției de învățare, fără bias.
+ */
+function buildNewbornPrompt(memory) {
+  // Dacă are memorie din interacțiuni anterioare — doar asta
+  if (memory && memory.length > 0) {
+    return memory;
+  }
+  // Altfel — string gol. Creierul pornește de la zero absolut.
+  return "";
+}
+
+module.exports = { buildSystemPrompt, TRUTH_ENGINE, buildNewbornPrompt };

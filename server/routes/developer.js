@@ -378,14 +378,16 @@ router.post("/v1/chat", v1Limiter, apiKeyAuth, async (req, res) => {
       null,
     );
 
-    const { buildSystemPrompt } = require("../persona");
-    const systemPrompt = buildSystemPrompt(
-      avatar,
-      language,
-      "",
-      {},
-      thought.chainOfThought,
-    );
+    const { buildSystemPrompt, buildNewbornPrompt } = require("../persona");
+    const systemPrompt = process.env.NEWBORN_MODE === "true"
+      ? buildNewbornPrompt("")
+      : buildSystemPrompt(
+          avatar,
+          language,
+          "",
+          {},
+          thought.chainOfThought,
+        );
     const msgs = (thought.compressedHistory || history).map((h) => ({
       role: h.role === "ai" ? "assistant" : h.role,
       content: h.content,
@@ -398,15 +400,21 @@ router.post("/v1/chat", v1Limiter, apiKeyAuth, async (req, res) => {
     if (!reply && geminiKey) {
       try {
         const geminiModel = MODELS.GEMINI_CHAT || "gemini-3.1-flash";
-        const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiKey}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: msgs.map(m => ({ role: m.role === "assistant" ? "model" : m.role, parts: [{ text: m.content }] })),
-            systemInstruction: { parts: [{ text: systemPrompt }] },
-            generationConfig: { maxOutputTokens: 1024 },
-          }),
-        });
+        const r = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiKey}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: msgs.map((m) => ({
+                role: m.role === "assistant" ? "model" : m.role,
+                parts: [{ text: m.content }],
+              })),
+              systemInstruction: { parts: [{ text: systemPrompt }] },
+              generationConfig: { maxOutputTokens: 1024 },
+            }),
+          },
+        );
         const d = await r.json();
         reply = d.candidates?.[0]?.content?.parts?.[0]?.text;
       } catch (e) {

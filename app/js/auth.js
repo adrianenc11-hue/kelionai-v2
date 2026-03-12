@@ -139,6 +139,8 @@
                     scr.classList.add('hidden'); document.getElementById('app-layout').classList.remove('hidden'); updateUI();
                     if (window.KGuestTimer) KGuestTimer.stop(); // oprește timer-ul guest la login
                     if (window.KApp) KApp.loadConversations();
+                    // Push state so Back goes to auth screen (not away from site)
+                    try { history.pushState({ kelionView: 'app' }, '', '/'); } catch(e) {}
                 }
             } catch (ex) { if (err) { err.style.color = ''; err.textContent = ex.message; } }
             finally { sub.disabled = false; sub.textContent = isReg ? 'Register' : 'Sign In'; }
@@ -170,6 +172,8 @@
             if (window.KAvatar) KAvatar.onResize();
             updateUI();
             if (window.KGuestTimer) KGuestTimer.start();
+            // Push state so Back button doesn't leave the app
+            try { history.pushState({ kelionApp: true }, '', '/'); } catch(e) {}
         }
         if (startBtn) startBtn.addEventListener('click', enterApp);
         // Admin button → navigate to admin panel
@@ -224,6 +228,33 @@
                 if (startBtn2) startBtn2.style.display = 'none';
                 if (form) form.style.display = '';
                 if (guest) guest.style.display = '';
+            }
+        });
+
+        // ── Back-button: natural navigation between views ──
+        // App (logat) → Back → Auth screen (fără logout, sesiune rămâne)
+        // Auth screen → Back → navighează normal (Google, etc.)
+        window.addEventListener('popstate', function (e) {
+            var state = e.state || {};
+            var appLayout = document.getElementById('app-layout');
+            var authScreen = document.getElementById('auth-screen');
+            if (state.kelionView === 'app') {
+                // Forward to app view
+                if (authScreen) authScreen.classList.add('hidden');
+                if (appLayout) appLayout.classList.remove('hidden');
+            } else {
+                // Back from app → show auth screen (but DON'T logout — session stays)
+                var appVisible = appLayout && !appLayout.classList.contains('hidden');
+                if (appVisible) {
+                    if (appLayout) appLayout.classList.add('hidden');
+                    if (authScreen) authScreen.classList.remove('hidden');
+                    // Show START button (not login form) so user can re-enter quickly
+                    var startBtn3 = document.getElementById('start-btn');
+                    if (startBtn3) startBtn3.style.display = '';
+                    var authForm = document.getElementById('auth-form');
+                    if (authForm) authForm.style.display = 'none';
+                }
+                // If auth screen is visible and Back is pressed again → browser navigates away naturally
             }
         });
     }
