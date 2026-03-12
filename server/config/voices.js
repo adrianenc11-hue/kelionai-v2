@@ -16,6 +16,7 @@ const VOICES = {
   ro: {
     kelion: process.env.ELEVENLABS_VOICE_KELION_RO || "am5XuPVtut7uKJQKMja2", // Mike L — Soft, Clear, Charming (7.8K uses)
     kira: process.env.ELEVENLABS_VOICE_KIRA_RO || "3z9q8Y7plHbvhDZehEII", // Antonia — Mellow, Warm, Cute (12.3K uses)
+    k1: process.env.ELEVENLABS_VOICE_K1_RO || "TX3LPaxmHKxFdv7VOQHJ", // Liam — Deep, Direct, Authoritative (used for K1 brain)
   },
   // ─── English ─────────────────────────────────────────────
   en: {

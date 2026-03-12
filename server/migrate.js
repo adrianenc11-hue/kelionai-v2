@@ -608,6 +608,16 @@ CREATE TABLE IF NOT EXISTS tenants (
 CREATE INDEX IF NOT EXISTS idx_tenants_domain ON tenants(domain);
 CREATE INDEX IF NOT EXISTS idx_tenants_active ON tenants(is_active);
 
+-- ═══ K1 BRAIN ADMIN SESSIONS (persistent memory — NEVER deleted) ═══
+CREATE TABLE IF NOT EXISTS brain_admin_sessions (
+    id TEXT PRIMARY KEY,
+    messages JSONB DEFAULT '[]'::jsonb,
+    context JSONB DEFAULT '{}',
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_brain_admin_sessions_updated ON brain_admin_sessions(updated_at DESC);
+
 `;
 
 async function runMigration() {
@@ -666,7 +676,7 @@ async function runMigration() {
             "brain_profiles", "brain_learnings", "brain_metrics",
             "brain_tools", "brain_usage", "brain_projects", "brain_procedures",
             "marketplace_agents", "user_installed_agents", "brain_plugins",
-            "autonomous_tasks", "tenants",
+            "autonomous_tasks", "tenants", "brain_admin_sessions",
         ];
 
         const healthy = [];
