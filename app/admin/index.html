@@ -21,23 +21,24 @@
             </div>
             <div class="header-right">
                 <span id="admin-uptime" class="admin-uptime">—</span>
-                <a href="/admin/brain-chat.html" class="admin-btn" style="background:linear-gradient(135deg,#7c3aed,#a78bfa);color:#fff;text-decoration:none">🧠 K1 Chat</a>
-                <a href="/admin/intelligence.html" class="admin-btn" style="background:linear-gradient(135deg,#06b6d4,#00ffff);color:#000;text-decoration:none;font-weight:600">🔬 Intelligence</a>
-                <a href="/admin/ab-testing.html" class="admin-btn" style="background:linear-gradient(135deg,#f59e0b,#ef4444);color:#fff;text-decoration:none;font-weight:600">🧪 A/B Test</a>
-                <a href="/admin/live-users.html" class="admin-btn" style="background:linear-gradient(135deg,#22c55e,#06b6d4);color:#fff;text-decoration:none;font-weight:600">👥 Live</a>
-                <a href="/admin/errors.html" class="admin-btn" style="background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff;text-decoration:none;font-weight:600">🚨 Errors</a>
-                <button class="admin-btn" onclick="window.open('/api/admin/conversations/export','_blank')" style="background:linear-gradient(135deg,#f59e0b,#fbbf24);color:#000;font-weight:600">📥 Export</button>
-                <div style="position:relative;display:inline-block" id="notif-wrapper">
-                    <button class="admin-btn" onclick="toggleNotifications()" id="notif-bell" style="position:relative;font-size:1.1rem">🔔
-                        <span id="notif-badge" style="display:none;position:absolute;top:-4px;right:-4px;background:#ef4444;color:#fff;font-size:0.6rem;padding:1px 5px;border-radius:10px;font-weight:700">0</span>
+                <a href="/admin/brain-chat.html" class="admin-btn admin-btn-k1">🧠 K1 Chat</a>
+                <a href="/admin/intelligence.html" class="admin-btn admin-btn-intel">🔬 Intelligence</a>
+                <a href="/admin/ab-testing.html" class="admin-btn admin-btn-ab">🧪 A/B Test</a>
+                <a href="/admin/live-users.html" class="admin-btn admin-btn-live">👥 Live</a>
+                <a href="/admin/errors.html" class="admin-btn admin-btn-errors">🚨 Errors</a>
+                <button class="admin-btn admin-btn-export" onclick="window.open('/api/admin/conversations/export','_blank')">📥 Export</button>
+                <div class="notif-wrapper" id="notif-wrapper">
+                    <button class="admin-btn notif-bell" onclick="toggleNotifications()" id="notif-bell">🔔
+                        <span id="notif-badge" class="notif-badge">0</span>
                     </button>
-                    <div id="notif-dropdown" style="display:none;position:absolute;right:0;top:100%;width:360px;max-height:400px;overflow-y:auto;background:#111;border:1px solid rgba(255,255,255,0.1);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.5);z-index:9999;padding:8px">
-                        <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;border-bottom:1px solid rgba(255,255,255,0.06);margin-bottom:4px">
-                            <span style="font-weight:600;font-size:0.85rem;color:#a78bfa">🔔 Notifications</span>
-                            <button onclick="clearNotifications()" style="background:none;border:none;color:#666;cursor:pointer;font-size:0.75rem">Clear all</button>
+                    <div id="notif-dropdown" class="notif-dropdown">
+                        <div class="notif-hdr">
+                            <span class="notif-title">🔔 Notifications</span>
+                            <button onclick="clearNotifications()" class="notif-clear">Clear all</button>
                         </div>
-                        <div id="notif-list" style="font-size:0.8rem"></div>
+                        <div id="notif-list" class="notif-list"></div>
                     </div>
+
                 </div>
                 <button class="admin-btn" onclick="location.reload()">🔄 Refresh</button>
             </div>
