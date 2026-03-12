@@ -22,7 +22,7 @@ const DEFAULT_RULES = {
 };
 
 // In-memory learned rules (restored from DB on startup)
-let learnedRules = {};
+const learnedRules = {};
 let _learnerInterval = null;
 let _lastAnalysis = null;
 
@@ -215,7 +215,7 @@ async function analyzeAndLearn(supabase) {
           },
           { onConflict: "asset" },
         );
-      } catch (e) {
+      } catch (_e) {
         /* table might not exist */
       }
     }
@@ -389,7 +389,7 @@ async function restoreRules(supabase) {
         `[Learner] Restored ${data.length} learned rules from DB`,
       );
     }
-  } catch (e) {
+  } catch (_e) {
     /* table might not exist */
   }
 }
@@ -501,7 +501,7 @@ async function autoBacktest(supabase) {
             results[asset].bestWinRate = winRate;
             results[asset].bestPF = profitFactor;
           }
-        } catch (e) {
+        } catch (_e) {
           /* skip failed strategy */
         }
       }
@@ -529,7 +529,7 @@ async function autoBacktest(supabase) {
             },
             { onConflict: "asset" },
           );
-        } catch (e) {
+        } catch (_e) {
           /* ignore */
         }
       }
@@ -658,7 +658,7 @@ async function analyzeCandlestickPatterns(supabase) {
       let candles;
       try {
         candles = await histLoader.getHistory(asset, 365); // last 365 days
-      } catch (e) {
+      } catch (_e) {
         continue;
       }
       if (!candles || candles.length < 50) {
@@ -706,7 +706,7 @@ async function analyzeCandlestickPatterns(supabase) {
 
     // Calculate averages and save proven patterns
     const provenPatterns = [];
-    for (const [key, s] of Object.entries(patternStats)) {
+    for (const [_key, s] of Object.entries(patternStats)) {
       if (s.occurrences < 5) continue; // need minimum 5 occurrences
 
       s.avgMove1d = s.moves1d.length > 0 ? +(s.moves1d.reduce((a, b) => a + b, 0) / s.moves1d.length).toFixed(3) : 0;
@@ -743,7 +743,7 @@ async function analyzeCandlestickPatterns(supabase) {
             avg_move_5d: p.avgMove5d,
             updated_at: new Date().toISOString(),
           }, { onConflict: "asset,pattern" });
-        } catch (e) { /* table might not exist yet */ }
+        } catch (_e) { /* table might not exist yet */ }
       }
     }
 
@@ -829,7 +829,7 @@ async function trackSignalAccuracy(supabase) {
         verified++;
         if (wasCorrect) correct++;
         else incorrect++;
-      } catch (e) { /* skip */ }
+      } catch (_e) { /* skip */ }
     }
 
     const accuracy = verified > 0 ? +(correct / verified * 100).toFixed(1) : 0;

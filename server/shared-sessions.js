@@ -37,8 +37,10 @@ function createRoom(userId, options = {}) {
 
   rooms.set(roomId, room);
 
-  logger.info({ component: "SharedSession", roomId, ownerId: userId },
-    `🤝 Room created: ${room.name}`);
+  logger.info(
+    { component: "SharedSession", roomId, ownerId: userId },
+    `🤝 Room created: ${room.name}`,
+  );
 
   return {
     roomId,
@@ -74,10 +76,17 @@ function joinRoom(roomId, userId, userName, ws = null) {
     type: "system",
   };
   room.messages.push(joinMsg);
-  broadcastToRoom(roomId, { type: "participant_joined", userId, name: userName, message: joinMsg });
+  broadcastToRoom(roomId, {
+    type: "participant_joined",
+    userId,
+    name: userName,
+    message: joinMsg,
+  });
 
-  logger.info({ component: "SharedSession", roomId, userId },
-    `🤝 User joined: ${userName}`);
+  logger.info(
+    { component: "SharedSession", roomId, userId },
+    `🤝 User joined: ${userName}`,
+  );
 
   return {
     success: true,
@@ -107,16 +116,26 @@ function leaveRoom(roomId, userId) {
     type: "system",
   };
   room.messages.push(leaveMsg);
-  broadcastToRoom(roomId, { type: "participant_left", userId, message: leaveMsg });
+  broadcastToRoom(roomId, {
+    type: "participant_left",
+    userId,
+    message: leaveMsg,
+  });
 
   // Auto-delete empty rooms after 5 minutes
   if (room.participants.size === 0) {
-    setTimeout(() => {
-      if (rooms.has(roomId) && rooms.get(roomId).participants.size === 0) {
-        rooms.delete(roomId);
-        logger.info({ component: "SharedSession", roomId }, "🤝 Room auto-deleted (empty)");
-      }
-    }, 5 * 60 * 1000);
+    setTimeout(
+      () => {
+        if (rooms.has(roomId) && rooms.get(roomId).participants.size === 0) {
+          rooms.delete(roomId);
+          logger.info(
+            { component: "SharedSession", roomId },
+            "🤝 Room auto-deleted (empty)",
+          );
+        }
+      },
+      5 * 60 * 1000,
+    );
   }
 }
 
@@ -130,7 +149,7 @@ function sendMessage(roomId, userId, content, type = "user") {
   const participant = room.participants.get(userId);
   const message = {
     userId,
-    name: type === "ai" ? "Kelion AI" : (participant?.name || userId.slice(0, 6)),
+    name: type === "ai" ? "Kelion AI" : participant?.name || userId.slice(0, 6),
     content,
     timestamp: new Date().toISOString(),
     type, // "user" | "ai" | "system"
@@ -158,8 +177,9 @@ function broadcastToRoom(roomId, data) {
 
   const payload = JSON.stringify(data);
 
-  for (const [userId, participant] of room.participants) {
-    if (participant.ws && participant.ws.readyState === 1) { // WebSocket.OPEN
+  for (const [_userId, participant] of room.participants) {
+    if (participant.ws && participant.ws.readyState === 1) {
+      // WebSocket.OPEN
       try {
         participant.ws.send(payload);
       } catch {
@@ -249,13 +269,13 @@ function buildGroupContext(roomId, limit = 10) {
   if (!room) return "";
 
   const recent = room.messages
-    .filter(m => m.type !== "system")
+    .filter((m) => m.type !== "system")
     .slice(-limit)
-    .map(m => `[${m.name}]: ${m.content}`)
+    .map((m) => `[${m.name}]: ${m.content}`)
     .join("\n");
 
   const participants = getParticipantList(roomId)
-    .map(p => p.name)
+    .map((p) => p.name)
     .join(", ");
 
   return `[SHARED SESSION — Participants: ${participants}]\n${recent}`;

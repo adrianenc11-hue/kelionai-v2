@@ -29,16 +29,84 @@ const PLAN_LIMITS = {
   guest: { chat: 5, search: 3, image: 1, vision: 2, tts: 5, name: "Guest" },
   free: { chat: 10, search: 5, image: 2, vision: 5, tts: 10, name: "Free" },
   pro: { chat: 100, search: 50, image: 20, vision: 50, tts: 100, name: "Pro" },
-  premium: { chat: -1, search: -1, image: -1, vision: -1, tts: -1, name: "Premium" },
-  enterprise: { chat: -1, search: -1, image: -1, vision: -1, tts: -1, name: "Premium" }, // legacy alias
+  premium: {
+    chat: -1,
+    search: -1,
+    image: -1,
+    vision: -1,
+    tts: -1,
+    name: "Premium",
+  },
+  enterprise: {
+    chat: -1,
+    search: -1,
+    image: -1,
+    vision: -1,
+    tts: -1,
+    name: "Premium",
+  }, // legacy alias
   // ── Business Plans ──
-  business_small: { chat: 500, search: 200, image: 50, vision: 100, tts: 500, name: "Business Small", seats: 5, apiAccess: true },
-  business_medium: { chat: 2000, search: 1000, image: 200, vision: 500, tts: 2000, name: "Business Medium", seats: 25, apiAccess: true },
-  business_large: { chat: -1, search: -1, image: -1, vision: -1, tts: -1, name: "Business Large", seats: 100, apiAccess: true },
+  business_small: {
+    chat: 500,
+    search: 200,
+    image: 50,
+    vision: 100,
+    tts: 500,
+    name: "Business Small",
+    seats: 5,
+    apiAccess: true,
+  },
+  business_medium: {
+    chat: 2000,
+    search: 1000,
+    image: 200,
+    vision: 500,
+    tts: 2000,
+    name: "Business Medium",
+    seats: 25,
+    apiAccess: true,
+  },
+  business_large: {
+    chat: -1,
+    search: -1,
+    image: -1,
+    vision: -1,
+    tts: -1,
+    name: "Business Large",
+    seats: 100,
+    apiAccess: true,
+  },
   // ── Developer Plans ──
-  developer_free: { chat: 50, search: 20, image: 5, vision: 10, tts: 20, name: "Developer Free", apiCalls: 1000, rateLimit: 10 },
-  developer_pro: { chat: 500, search: 200, image: 50, vision: 100, tts: 200, name: "Developer Pro", apiCalls: 50000, rateLimit: 100 },
-  developer_enterprise: { chat: -1, search: -1, image: -1, vision: -1, tts: -1, name: "Developer Enterprise", apiCalls: -1, rateLimit: 1000 },
+  developer_free: {
+    chat: 50,
+    search: 20,
+    image: 5,
+    vision: 10,
+    tts: 20,
+    name: "Developer Free",
+    apiCalls: 1000,
+    rateLimit: 10,
+  },
+  developer_pro: {
+    chat: 500,
+    search: 200,
+    image: 50,
+    vision: 100,
+    tts: 200,
+    name: "Developer Pro",
+    apiCalls: 50000,
+    rateLimit: 100,
+  },
+  developer_enterprise: {
+    chat: -1,
+    search: -1,
+    image: -1,
+    vision: -1,
+    tts: -1,
+    name: "Developer Enterprise",
+    apiCalls: -1,
+    rateLimit: 1000,
+  },
 };
 
 // ═══ CHECK USER PLAN & USAGE ═══
@@ -71,7 +139,7 @@ async function getUserPlan(userId, supabaseAdmin) {
 // ═══ CHECK USAGE LIMIT ═══
 // DISABLED — all users have unlimited access for now.
 // Re-enable later by uncommenting the original logic below.
-async function checkUsage(userId, type /*, supabaseAdmin */) {
+async function checkUsage(userId, _type /*, supabaseAdmin */) {
   const plan = userId ? "unlimited" : "guest";
   return { allowed: true, plan, remaining: -1 };
   /*
@@ -165,8 +233,12 @@ router.get("/plans", (req, res) => {
   const allPlans = [
     // ── FREE ──
     {
-      id: "free", name: "Free", price: 0, annualPrice: 0,
-      currency: "EUR", billing: "monthly",
+      id: "free",
+      name: "Free",
+      price: 0,
+      annualPrice: 0,
+      currency: "EUR",
+      billing: "monthly",
       limits: PLAN_LIMITS.free,
       features: [
         "10 AI conversations per day",
@@ -179,8 +251,11 @@ router.get("/plans", (req, res) => {
     },
     // ── PRO Monthly ──
     {
-      id: "pro", name: "Pro", price: 9.99,
-      currency: "EUR", billing: "monthly",
+      id: "pro",
+      name: "Pro",
+      price: 9.99,
+      currency: "EUR",
+      billing: "monthly",
       limits: PLAN_LIMITS.pro,
       features: [
         "100 AI conversations per day",
@@ -196,9 +271,13 @@ router.get("/plans", (req, res) => {
     },
     // ── PRO Annual (save 2 months) ──
     {
-      id: "pro_annual", name: "Pro", price: 99.90,
-      monthlyEquivalent: 8.33, savings: "Save €19.98/year",
-      currency: "EUR", billing: "annual",
+      id: "pro_annual",
+      name: "Pro",
+      price: 99.9,
+      monthlyEquivalent: 8.33,
+      savings: "Save €19.98/year",
+      currency: "EUR",
+      billing: "annual",
       limits: PLAN_LIMITS.pro,
       features: [
         "100 AI conversations per day",
@@ -214,8 +293,11 @@ router.get("/plans", (req, res) => {
     },
     // ── PREMIUM Monthly ──
     {
-      id: "premium", name: "Premium", price: 19.99,
-      currency: "EUR", billing: "monthly",
+      id: "premium",
+      name: "Premium",
+      price: 19.99,
+      currency: "EUR",
+      billing: "monthly",
       limits: PLAN_LIMITS.premium,
       features: [
         "Unlimited AI conversations",
@@ -234,9 +316,13 @@ router.get("/plans", (req, res) => {
     },
     // ── PREMIUM Annual (save 2 months) ──
     {
-      id: "premium_annual", name: "Premium", price: 199.90,
-      monthlyEquivalent: 16.66, savings: "Save €39.98/year",
-      currency: "EUR", billing: "annual",
+      id: "premium_annual",
+      name: "Premium",
+      price: 199.9,
+      monthlyEquivalent: 16.66,
+      savings: "Save €39.98/year",
+      currency: "EUR",
+      billing: "annual",
       limits: PLAN_LIMITS.premium,
       features: [
         "Unlimited AI conversations",
@@ -258,7 +344,12 @@ router.get("/plans", (req, res) => {
     // ═══════════════════════════════════════════════════
     // ── Business Small ──
     {
-      id: "business_small", name: "Business Small", price: 49.99, currency: "EUR", billing: "monthly", category: "business",
+      id: "business_small",
+      name: "Business Small",
+      price: 49.99,
+      currency: "EUR",
+      billing: "monthly",
+      category: "business",
       limits: PLAN_LIMITS.business_small,
       features: [
         "Up to 5 team members",
@@ -272,7 +363,14 @@ router.get("/plans", (req, res) => {
       ],
     },
     {
-      id: "business_small_semi", name: "Business Small", price: 249.94, monthlyEquivalent: 41.66, savings: "Save €49.99 (2 months free)", currency: "EUR", billing: "semiannual", category: "business",
+      id: "business_small_semi",
+      name: "Business Small",
+      price: 249.94,
+      monthlyEquivalent: 41.66,
+      savings: "Save €49.99 (2 months free)",
+      currency: "EUR",
+      billing: "semiannual",
+      category: "business",
       limits: PLAN_LIMITS.business_small,
       features: [
         "Up to 5 team members",
@@ -286,7 +384,14 @@ router.get("/plans", (req, res) => {
       ],
     },
     {
-      id: "business_small_annual", name: "Business Small", price: 499.90, monthlyEquivalent: 41.66, savings: "Save €99.98/year", currency: "EUR", billing: "annual", category: "business",
+      id: "business_small_annual",
+      name: "Business Small",
+      price: 499.9,
+      monthlyEquivalent: 41.66,
+      savings: "Save €99.98/year",
+      currency: "EUR",
+      billing: "annual",
+      category: "business",
       limits: PLAN_LIMITS.business_small,
       features: [
         "Up to 5 team members",
@@ -301,7 +406,12 @@ router.get("/plans", (req, res) => {
     },
     // ── Business Medium ──
     {
-      id: "business_medium", name: "Business Medium", price: 149.99, currency: "EUR", billing: "monthly", category: "business",
+      id: "business_medium",
+      name: "Business Medium",
+      price: 149.99,
+      currency: "EUR",
+      billing: "monthly",
+      category: "business",
       limits: PLAN_LIMITS.business_medium,
       features: [
         "Up to 25 team members",
@@ -317,7 +427,14 @@ router.get("/plans", (req, res) => {
       ],
     },
     {
-      id: "business_medium_semi", name: "Business Medium", price: 749.94, monthlyEquivalent: 124.99, savings: "Save €149.99 (2 months free)", currency: "EUR", billing: "semiannual", category: "business",
+      id: "business_medium_semi",
+      name: "Business Medium",
+      price: 749.94,
+      monthlyEquivalent: 124.99,
+      savings: "Save €149.99 (2 months free)",
+      currency: "EUR",
+      billing: "semiannual",
+      category: "business",
       limits: PLAN_LIMITS.business_medium,
       features: [
         "Up to 25 team members",
@@ -333,7 +450,14 @@ router.get("/plans", (req, res) => {
       ],
     },
     {
-      id: "business_medium_annual", name: "Business Medium", price: 1499.90, monthlyEquivalent: 124.99, savings: "Save €299.98/year", currency: "EUR", billing: "annual", category: "business",
+      id: "business_medium_annual",
+      name: "Business Medium",
+      price: 1499.9,
+      monthlyEquivalent: 124.99,
+      savings: "Save €299.98/year",
+      currency: "EUR",
+      billing: "annual",
+      category: "business",
       limits: PLAN_LIMITS.business_medium,
       features: [
         "Up to 25 team members",
@@ -350,7 +474,12 @@ router.get("/plans", (req, res) => {
     },
     // ── Business Large ──
     {
-      id: "business_large", name: "Business Large", price: 499.99, currency: "EUR", billing: "monthly", category: "business",
+      id: "business_large",
+      name: "Business Large",
+      price: 499.99,
+      currency: "EUR",
+      billing: "monthly",
+      category: "business",
       limits: PLAN_LIMITS.business_large,
       features: [
         "Up to 100 team members",
@@ -368,7 +497,14 @@ router.get("/plans", (req, res) => {
       ],
     },
     {
-      id: "business_large_semi", name: "Business Large", price: 2499.94, monthlyEquivalent: 416.66, savings: "Save €499.99 (2 months free)", currency: "EUR", billing: "semiannual", category: "business",
+      id: "business_large_semi",
+      name: "Business Large",
+      price: 2499.94,
+      monthlyEquivalent: 416.66,
+      savings: "Save €499.99 (2 months free)",
+      currency: "EUR",
+      billing: "semiannual",
+      category: "business",
       limits: PLAN_LIMITS.business_large,
       features: [
         "Up to 100 team members",
@@ -386,7 +522,14 @@ router.get("/plans", (req, res) => {
       ],
     },
     {
-      id: "business_large_annual", name: "Business Large", price: 4999.90, monthlyEquivalent: 416.66, savings: "Save €999.98/year", currency: "EUR", billing: "annual", category: "business",
+      id: "business_large_annual",
+      name: "Business Large",
+      price: 4999.9,
+      monthlyEquivalent: 416.66,
+      savings: "Save €999.98/year",
+      currency: "EUR",
+      billing: "annual",
+      category: "business",
       limits: PLAN_LIMITS.business_large,
       features: [
         "Up to 100 team members",
@@ -407,7 +550,12 @@ router.get("/plans", (req, res) => {
     // DEVELOPER PLANS
     // ═══════════════════════════════════════════════════
     {
-      id: "developer_free", name: "Developer Free", price: 0, currency: "EUR", billing: "monthly", category: "developer",
+      id: "developer_free",
+      name: "Developer Free",
+      price: 0,
+      currency: "EUR",
+      billing: "monthly",
+      category: "developer",
       limits: PLAN_LIMITS.developer_free,
       features: [
         "1,000 API calls per month",
@@ -419,7 +567,12 @@ router.get("/plans", (req, res) => {
       ],
     },
     {
-      id: "developer_pro", name: "Developer Pro", price: 29.99, currency: "EUR", billing: "monthly", category: "developer",
+      id: "developer_pro",
+      name: "Developer Pro",
+      price: 29.99,
+      currency: "EUR",
+      billing: "monthly",
+      category: "developer",
       limits: PLAN_LIMITS.developer_pro,
       features: [
         "50,000 API calls per month",
@@ -433,7 +586,14 @@ router.get("/plans", (req, res) => {
       ],
     },
     {
-      id: "developer_pro_annual", name: "Developer Pro", price: 299.90, monthlyEquivalent: 24.99, savings: "Save €59.98/year", currency: "EUR", billing: "annual", category: "developer",
+      id: "developer_pro_annual",
+      name: "Developer Pro",
+      price: 299.9,
+      monthlyEquivalent: 24.99,
+      savings: "Save €59.98/year",
+      currency: "EUR",
+      billing: "annual",
+      category: "developer",
       limits: PLAN_LIMITS.developer_pro,
       features: [
         "50,000 API calls per month",
@@ -447,7 +607,12 @@ router.get("/plans", (req, res) => {
       ],
     },
     {
-      id: "developer_enterprise", name: "Developer Enterprise", price: 199.99, currency: "EUR", billing: "monthly", category: "developer",
+      id: "developer_enterprise",
+      name: "Developer Enterprise",
+      price: 199.99,
+      currency: "EUR",
+      billing: "monthly",
+      category: "developer",
       limits: PLAN_LIMITS.developer_enterprise,
       features: [
         "Unlimited API calls",
@@ -580,7 +745,8 @@ router.post("/checkout", async (req, res) => {
     } else if (normalizedPlan === "premium" && isAnnual) {
       priceId = process.env.STRIPE_PREMIUM_ANNUAL_PRICE_ID;
     } else {
-      priceId = process.env.STRIPE_PREMIUM_PRICE_ID ||
+      priceId =
+        process.env.STRIPE_PREMIUM_PRICE_ID ||
         process.env.STRIPE_ENTERPRISE_PRICE_ID ||
         process.env.STRIPE_PRICE_PREMIUM;
     }
@@ -604,10 +770,8 @@ router.post("/checkout", async (req, res) => {
       // Supports: Cards, SEPA, Bancontact, iDEAL, Google Pay, Apple Pay, etc.
       payment_method_types: ["card"],
       line_items: [{ price: priceId, quantity: 1 }],
-      success_url:
-        (process.env.APP_URL) + "/?payment=success",
-      cancel_url:
-        (process.env.APP_URL) + "/?payment=cancel",
+      success_url: process.env.APP_URL + "/?payment=success",
+      cancel_url: process.env.APP_URL + "/?payment=cancel",
       metadata: {
         user_id: user.id,
         plan: normalizedPlan,
@@ -629,7 +793,16 @@ router.post("/checkout", async (req, res) => {
     const session = await stripe.checkout.sessions.create(sessionParams);
     res.json({ url: session.url, sessionId: session.id });
   } catch (e) {
-    logger.error({ component: "Payments", err: e.message, stack: e.stack, type: e.type, code: e.code }, "Checkout error");
+    logger.error(
+      {
+        component: "Payments",
+        err: e.message,
+        stack: e.stack,
+        type: e.type,
+        code: e.code,
+      },
+      "Checkout error",
+    );
     res.status(500).json({ error: "Checkout error", detail: e.message });
   }
 });
@@ -658,7 +831,7 @@ router.post("/portal", async (req, res) => {
 
     const session = await stripe.billingPortal.sessions.create({
       customer: data.stripe_customer_id,
-      return_url: (process.env.APP_URL) + "/",
+      return_url: process.env.APP_URL + "/",
     });
 
     res.json({ url: session.url });
@@ -966,8 +1139,10 @@ router.post("/developer/keys", async (req, res) => {
   try {
     const { getUserFromToken, supabaseAdmin } = req.app.locals;
     const user = await getUserFromToken(req);
-    if (!user) return res.status(401).json({ error: "Authentication required" });
-    if (!supabaseAdmin) return res.status(503).json({ error: "Database unavailable" });
+    if (!user)
+      return res.status(401).json({ error: "Authentication required" });
+    if (!supabaseAdmin)
+      return res.status(503).json({ error: "Database unavailable" });
 
     const { name, scopes } = req.body;
     if (!name) return res.status(400).json({ error: "Key name is required" });
@@ -975,7 +1150,12 @@ router.post("/developer/keys", async (req, res) => {
     // Check user's developer plan for key limits
     const planInfo = await getUserPlan(user.id, supabaseAdmin);
     const plan = planInfo.plan || "free";
-    const limits = { free: 1, developer_free: 1, developer_pro: 10, developer_enterprise: -1 };
+    const limits = {
+      free: 1,
+      developer_free: 1,
+      developer_pro: 10,
+      developer_enterprise: -1,
+    };
     const maxKeys = limits[plan] || 1;
 
     // Count existing active keys
@@ -1026,9 +1206,15 @@ router.post("/developer/keys", async (req, res) => {
       warning: "Save this key now. It will not be shown again.",
     });
 
-    logger.info({ component: "Developer", userId: user.id }, `🔑 New API key created: ${name}`);
+    logger.info(
+      { component: "Developer", userId: user.id },
+      `🔑 New API key created: ${name}`,
+    );
   } catch (e) {
-    logger.error({ component: "Developer", err: e.message }, "Key generation error");
+    logger.error(
+      { component: "Developer", err: e.message },
+      "Key generation error",
+    );
     res.status(500).json({ error: "Key generation failed" });
   }
 });
@@ -1038,12 +1224,16 @@ router.get("/developer/keys", async (req, res) => {
   try {
     const { getUserFromToken, supabaseAdmin } = req.app.locals;
     const user = await getUserFromToken(req);
-    if (!user) return res.status(401).json({ error: "Authentication required" });
-    if (!supabaseAdmin) return res.status(503).json({ error: "Database unavailable" });
+    if (!user)
+      return res.status(401).json({ error: "Authentication required" });
+    if (!supabaseAdmin)
+      return res.status(503).json({ error: "Database unavailable" });
 
     const { data: keys } = await supabaseAdmin
       .from("developer_keys")
-      .select("id, name, key_prefix, scopes, status, created_at, last_used_at, usage_count")
+      .select(
+        "id, name, key_prefix, scopes, status, created_at, last_used_at, usage_count",
+      )
       .eq("user_id", user.id)
       .order("created_at", { ascending: false });
 
@@ -1058,8 +1248,10 @@ router.delete("/developer/keys/:id", async (req, res) => {
   try {
     const { getUserFromToken, supabaseAdmin } = req.app.locals;
     const user = await getUserFromToken(req);
-    if (!user) return res.status(401).json({ error: "Authentication required" });
-    if (!supabaseAdmin) return res.status(503).json({ error: "Database unavailable" });
+    if (!user)
+      return res.status(401).json({ error: "Authentication required" });
+    if (!supabaseAdmin)
+      return res.status(503).json({ error: "Database unavailable" });
 
     const { error } = await supabaseAdmin
       .from("developer_keys")
@@ -1069,7 +1261,10 @@ router.delete("/developer/keys/:id", async (req, res) => {
 
     if (error) throw error;
 
-    logger.info({ component: "Developer", userId: user.id }, `🔑 API key revoked: ${req.params.id}`);
+    logger.info(
+      { component: "Developer", userId: user.id },
+      `🔑 API key revoked: ${req.params.id}`,
+    );
     res.json({ success: true, message: "API key revoked successfully" });
   } catch {
     res.status(500).json({ error: "Failed to revoke key" });
@@ -1087,12 +1282,21 @@ router.get("/usage", async (req, res) => {
     const usage = { chat: 0, search: 0, image: 0, vision: 0, tts: 0 };
     if (supabaseAdmin) {
       try {
-        const { data } = await supabaseAdmin.from("usage").select("type, count").eq("user_id", user.id).eq("date", today);
-        if (data) data.forEach((d) => { usage[d.type] = d.count; });
-      } catch { }
+        const { data } = await supabaseAdmin
+          .from("usage")
+          .select("type, count")
+          .eq("user_id", user.id)
+          .eq("date", today);
+        if (data)
+          data.forEach((d) => {
+            usage[d.type] = d.count;
+          });
+      } catch { /* ignored */ }
     }
     res.json({ ...planInfo, usage });
-  } catch { res.status(500).json({ error: "Usage error" }); }
+  } catch {
+    res.status(500).json({ error: "Usage error" });
+  }
 });
 
 module.exports = {

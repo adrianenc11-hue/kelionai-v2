@@ -61,7 +61,8 @@ function setBrain(b) {
 
 // ═══ AI TRANSLATION (Gemini) ═══
 // Detects non-Romanian articles and translates title+summary
-const RO_PATTERN = /[ăîâșțĂÎÂȘȚ]|\b(și|pentru|este|care|sau|din|acest|într-|într|într-un|despre|fără|după|când|unde)\b/i;
+const RO_PATTERN =
+  /[ăîâșțĂÎÂȘȚ]|\b(și|pentru|este|care|sau|din|acest|într-|într|într-un|despre|fără|după|când|unde)\b/i;
 
 function isRomanian(text) {
   if (!text || text.length < 10) return true;
@@ -79,15 +80,18 @@ async function translateToRomanian(title, summary) {
 Title: ${title}
 Summary: ${summary || ""}`;
 
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODELS.GEMINI_CHAT}:generateContent?key=${GEMINI_KEY}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: { maxOutputTokens: 300 },
-      }),
-      timeout: 10000,
-    });
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${MODELS.GEMINI_CHAT}:generateContent?key=${GEMINI_KEY}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          generationConfig: { maxOutputTokens: 300 },
+        }),
+        timeout: 10000,
+      },
+    );
 
     if (!res.ok) return { title, summary };
     const data = await res.json();
@@ -104,7 +108,10 @@ Summary: ${summary || ""}`;
     }
     return { title, summary };
   } catch (e) {
-    logger.warn({ component: "News", err: e.message }, "Translation failed (using original)");
+    logger.warn(
+      { component: "News", err: e.message },
+      "Translation failed (using original)",
+    );
     return { title, summary };
   }
 }
@@ -246,7 +253,10 @@ async function addArticle(raw, source) {
   if (isDuplicate(title)) return;
 
   // Translate non-Romanian articles
-  const translated = await translateToRomanian(title, (raw.summary || raw.description || "").slice(0, 300));
+  const translated = await translateToRomanian(
+    title,
+    (raw.summary || raw.description || "").slice(0, 300),
+  );
 
   const id = makeId(translated.title);
   const { isBreaking, confirmedBy } = checkBreaking(translated.title);
@@ -382,10 +392,10 @@ function parseRSS(xml, _sourceName) {
     const url = linkMatch ? linkMatch[1].trim() : "";
     const description = descMatch
       ? descMatch[1]
-        .replace(/</g, " ")
-        .replace(/>/g, " ")
-        .replace(/\s+/g, " ")
-        .trim()
+          .replace(/</g, " ")
+          .replace(/>/g, " ")
+          .replace(/\s+/g, " ")
+          .trim()
       : "";
     const pubDateStr = pubMatch ? pubMatch[1].trim() : "";
     let publishedAt;
@@ -491,7 +501,9 @@ async function fetchAllSources() {
     if (!Array.isArray(articles)) return;
     // Process in parallel batches of 5 for speed
     for (let i = 0; i < articles.length; i += 5) {
-      await Promise.all(articles.slice(i, i + 5).map(a => addArticle(a, source)));
+      await Promise.all(
+        articles.slice(i, i + 5).map((a) => addArticle(a, source)),
+      );
     }
   };
 
@@ -517,10 +529,22 @@ async function fetchAllSources() {
 
   // ═══ BRAIN INTEGRATION — save headline summary to memory ═══
   if (_brain && articleCache.size > 0) {
-    const topHeadlines = getArticlesArray().slice(0, 5).map(a => a.title).join(" | ");
-    _brain.saveMemory(null, "context", "Știri noi: " + topHeadlines.substring(0, 400), {
-      platform: "news", type: "headlines", count: articleCache.size
-    }).catch(() => { });
+    const topHeadlines = getArticlesArray()
+      .slice(0, 5)
+      .map((a) => a.title)
+      .join(" | ");
+    _brain
+      .saveMemory(
+        null,
+        "context",
+        "Știri noi: " + topHeadlines.substring(0, 400),
+        {
+          platform: "news",
+          type: "headlines",
+          count: articleCache.size,
+        },
+      )
+      .catch(() => {});
   }
 
   // ═══ AUTO-PUBLISH to all media channels (with FULL content) ═══
@@ -542,7 +566,10 @@ async function fetchAllSources() {
               }
             }
           } catch (scrapeErr) {
-            logger.warn({ component: "News", url: article.url, err: scrapeErr.message }, "Article scrape failed (using summary)");
+            logger.warn(
+              { component: "News", url: article.url, err: scrapeErr.message },
+              "Article scrape failed (using summary)",
+            );
           }
         }
       }
@@ -610,7 +637,7 @@ function getNextFetchTimes() {
             0,
             0,
           ) -
-          offsetMin * 60000,
+            offsetMin * 60000,
         );
         const actualHour = parseInt(formatter.format(targetUtc), 10);
         if (actualHour === h && targetUtc > now) {

@@ -21,9 +21,15 @@ let browserInstance = null;
 // Try to load Puppeteer (optional dependency)
 try {
   puppeteer = require("puppeteer");
-  logger.info({ component: "BrowserAgent" }, "🌐 Puppeteer available — full Computer Use enabled");
+  logger.info(
+    { component: "BrowserAgent" },
+    "🌐 Puppeteer available — full Computer Use enabled",
+  );
 } catch {
-  logger.info({ component: "BrowserAgent" }, "🌐 Puppeteer not installed — using fetch-based fallback");
+  logger.info(
+    { component: "BrowserAgent" },
+    "🌐 Puppeteer not installed — using fetch-based fallback",
+  );
 }
 
 const MAX_PAGES = 5; // Max concurrent pages
@@ -53,14 +59,19 @@ async function getBrowser() {
     logger.info({ component: "BrowserAgent" }, "🌐 Browser launched");
     return browserInstance;
   } catch (e) {
-    logger.error({ component: "BrowserAgent", err: e.message }, "Browser launch failed");
+    logger.error(
+      { component: "BrowserAgent", err: e.message },
+      "Browser launch failed",
+    );
     return null;
   }
 }
 
 async function closeBrowser() {
   if (browserInstance) {
-    try { await browserInstance.close(); } catch { }
+    try {
+      await browserInstance.close();
+    } catch { /* ignored */ }
     browserInstance = null;
   }
 }
@@ -83,14 +94,17 @@ async function navigate(url, options = {}) {
     page = await browser.newPage();
     await page.setViewport({ width: 1280, height: 720 });
     await page.setUserAgent(
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
     );
 
     // Block unnecessary resources for speed
     await page.setRequestInterception(true);
     page.on("request", (req) => {
       const type = req.resourceType();
-      if (["image", "stylesheet", "font", "media"].includes(type) && !options.loadMedia) {
+      if (
+        ["image", "stylesheet", "font", "media"].includes(type) &&
+        !options.loadMedia
+      ) {
         req.abort();
       } else {
         req.continue();
@@ -104,7 +118,9 @@ async function navigate(url, options = {}) {
 
     // Wait for dynamic content
     if (options.waitForSelector) {
-      await page.waitForSelector(options.waitForSelector, { timeout: 10000 }).catch(() => { });
+      await page
+        .waitForSelector(options.waitForSelector, { timeout: 10000 })
+        .catch(() => {});
     }
 
     // Extract content
@@ -112,7 +128,9 @@ async function navigate(url, options = {}) {
     const content = await page.evaluate(() => {
       // Get main text content, clean of scripts/styles
       const clone = document.body.cloneNode(true);
-      clone.querySelectorAll("script, style, noscript, iframe").forEach(el => el.remove());
+      clone
+        .querySelectorAll("script, style, noscript, iframe")
+        .forEach((el) => el.remove());
       return clone.innerText.substring(0, 5000);
     });
 
@@ -131,22 +149,29 @@ async function navigate(url, options = {}) {
     const links = await page.evaluate(() => {
       return Array.from(document.querySelectorAll("a[href]"))
         .slice(0, 20)
-        .map(a => ({ text: a.innerText.trim().substring(0, 80), href: a.href }))
-        .filter(l => l.text && l.href.startsWith("http"));
+        .map((a) => ({
+          text: a.innerText.trim().substring(0, 80),
+          href: a.href,
+        }))
+        .filter((l) => l.text && l.href.startsWith("http"));
     });
 
     // Get forms
     const forms = await page.evaluate(() => {
-      return Array.from(document.querySelectorAll("form")).slice(0, 5).map(f => ({
-        action: f.action,
-        method: f.method,
-        inputs: Array.from(f.querySelectorAll("input, select, textarea")).slice(0, 10).map(inp => ({
-          type: inp.type || "text",
-          name: inp.name,
-          placeholder: inp.placeholder,
-          id: inp.id,
-        })),
-      }));
+      return Array.from(document.querySelectorAll("form"))
+        .slice(0, 5)
+        .map((f) => ({
+          action: f.action,
+          method: f.method,
+          inputs: Array.from(f.querySelectorAll("input, select, textarea"))
+            .slice(0, 10)
+            .map((inp) => ({
+              type: inp.type || "text",
+              name: inp.name,
+              placeholder: inp.placeholder,
+              id: inp.id,
+            })),
+        }));
     });
 
     // Store page for follow-up actions
@@ -154,15 +179,24 @@ async function navigate(url, options = {}) {
     if (activePagesMap.size < MAX_PAGES) {
       activePagesMap.set(sessionId, page);
       // Auto-close after 5 minutes
-      setTimeout(() => {
-        const p = activePagesMap.get(sessionId);
-        if (p) { p.close().catch(() => { }); activePagesMap.delete(sessionId); }
-      }, 5 * 60 * 1000);
+      setTimeout(
+        () => {
+          const p = activePagesMap.get(sessionId);
+          if (p) {
+            p.close().catch(() => {});
+            activePagesMap.delete(sessionId);
+          }
+        },
+        5 * 60 * 1000,
+      );
     } else {
       await page.close();
     }
 
-    logger.info({ component: "BrowserAgent", url, title }, `🌐 Navigated: ${title}`);
+    logger.info(
+      { component: "BrowserAgent", url, title },
+      `🌐 Navigated: ${title}`,
+    );
 
     return {
       success: true,
@@ -176,8 +210,11 @@ async function navigate(url, options = {}) {
       engine: "puppeteer",
     };
   } catch (e) {
-    if (page) await page.close().catch(() => { });
-    logger.error({ component: "BrowserAgent", url, err: e.message }, "Navigation failed");
+    if (page) await page.close().catch(() => {});
+    logger.error(
+      { component: "BrowserAgent", url, err: e.message },
+      "Navigation failed",
+    );
     // Fallback to fetch
     return await fetchFallback(url);
   }
@@ -188,21 +225,34 @@ async function navigate(url, options = {}) {
  */
 async function click(sessionId, selector) {
   const page = activePagesMap.get(sessionId);
-  if (!page) return { success: false, error: "Session expired. Navigate again." };
+  if (!page)
+    return { success: false, error: "Session expired. Navigate again." };
 
   try {
     await page.click(selector);
-    await page.waitForNavigation({ waitUntil: "domcontentloaded", timeout: 10000 }).catch(() => { });
+    await page
+      .waitForNavigation({ waitUntil: "domcontentloaded", timeout: 10000 })
+      .catch(() => {});
 
     const title = await page.title();
     const content = await page.evaluate(() => {
       const clone = document.body.cloneNode(true);
-      clone.querySelectorAll("script, style").forEach(el => el.remove());
+      clone.querySelectorAll("script, style").forEach((el) => el.remove());
       return clone.innerText.substring(0, 3000);
     });
-    const screenshot = await page.screenshot({ encoding: "base64", type: "jpeg", quality: 60 });
+    const screenshot = await page.screenshot({
+      encoding: "base64",
+      type: "jpeg",
+      quality: 60,
+    });
 
-    return { success: true, title, content, screenshot: `data:image/jpeg;base64,${screenshot}`, url: page.url() };
+    return {
+      success: true,
+      title,
+      content,
+      screenshot: `data:image/jpeg;base64,${screenshot}`,
+      url: page.url(),
+    };
   } catch (e) {
     return { success: false, error: e.message };
   }
@@ -236,7 +286,9 @@ async function submitForm(sessionId, formSelector, data = {}) {
       try {
         await page.type(`[name="${name}"]`, value, { delay: 30 });
       } catch {
-        try { await page.type(`#${name}`, value, { delay: 30 }); } catch { }
+        try {
+          await page.type(`#${name}`, value, { delay: 30 });
+        } catch { /* ignored */ }
       }
     }
 
@@ -249,13 +301,27 @@ async function submitForm(sessionId, formSelector, data = {}) {
       await page.keyboard.press("Enter");
     }
 
-    await page.waitForNavigation({ waitUntil: "domcontentloaded", timeout: 10000 }).catch(() => { });
+    await page
+      .waitForNavigation({ waitUntil: "domcontentloaded", timeout: 10000 })
+      .catch(() => {});
 
     const title = await page.title();
-    const content = await page.evaluate(() => document.body.innerText.substring(0, 3000));
-    const screenshot = await page.screenshot({ encoding: "base64", type: "jpeg", quality: 60 });
+    const content = await page.evaluate(() =>
+      document.body.innerText.substring(0, 3000),
+    );
+    const screenshot = await page.screenshot({
+      encoding: "base64",
+      type: "jpeg",
+      quality: 60,
+    });
 
-    return { success: true, title, content, url: page.url(), screenshot: `data:image/jpeg;base64,${screenshot}` };
+    return {
+      success: true,
+      title,
+      content,
+      url: page.url(),
+      screenshot: `data:image/jpeg;base64,${screenshot}`,
+    };
   } catch (e) {
     return { success: false, error: e.message };
   }
@@ -269,8 +335,17 @@ async function screenshot(sessionId) {
   if (!page) return { success: false, error: "Session expired" };
 
   try {
-    const img = await page.screenshot({ encoding: "base64", type: "jpeg", quality: 70, fullPage: true });
-    return { success: true, screenshot: `data:image/jpeg;base64,${img}`, url: page.url() };
+    const img = await page.screenshot({
+      encoding: "base64",
+      type: "jpeg",
+      quality: 70,
+      fullPage: true,
+    });
+    return {
+      success: true,
+      screenshot: `data:image/jpeg;base64,${img}`,
+      url: page.url(),
+    };
   } catch (e) {
     return { success: false, error: e.message };
   }
@@ -304,8 +379,9 @@ async function fetchFallback(url) {
   try {
     const response = await fetch(url, {
       headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        "Accept": "text/html,application/xhtml+xml",
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        Accept: "text/html,application/xhtml+xml",
       },
       signal: AbortSignal.timeout(15000),
     });
@@ -331,7 +407,8 @@ async function fetchFallback(url) {
     const links = [];
     let match;
     while ((match = linkRegex.exec(html)) && links.length < 15) {
-      if (match[2].trim()) links.push({ href: match[1], text: match[2].trim().substring(0, 80) });
+      if (match[2].trim())
+        links.push({ href: match[1], text: match[2].trim().substring(0, 80) });
     }
 
     return {
@@ -353,7 +430,7 @@ async function fetchFallback(url) {
 // ═══ CLEANUP ═══
 function cleanup() {
   for (const [id, page] of activePagesMap.entries()) {
-    page.close().catch(() => { });
+    page.close().catch(() => {});
     activePagesMap.delete(id);
   }
   closeBrowser();

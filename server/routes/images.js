@@ -17,7 +17,10 @@ function withTimeout(promise, ms = 10000, label = "operation") {
   return Promise.race([
     promise,
     new Promise((_, reject) =>
-      setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms),
+      setTimeout(
+        () => reject(new Error(`${label} timed out after ${ms}ms`)),
+        ms,
+      ),
     ),
   ]);
 }
@@ -48,22 +51,26 @@ router.post("/", imageLimiter, validate(imagineSchema), async (req, res) => {
         upgrade: true,
       });
 
-    const r = await withTimeout(fetch("https://api.together.xyz/v1/images/generations", {
-      method: "POST",
-      headers: {
-        Authorization: "Bearer " + process.env.TOGETHER_API_KEY,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: MODELS.FLUX,
-        prompt,
-        width: 1024,
-        height: 1024,
-        steps: 4,
-        n: 1,
-        response_format: "b64_json",
+    const r = await withTimeout(
+      fetch("https://api.together.xyz/v1/images/generations", {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer " + process.env.TOGETHER_API_KEY,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: MODELS.FLUX,
+          prompt,
+          width: 1024,
+          height: 1024,
+          steps: 4,
+          n: 1,
+          response_format: "b64_json",
+        }),
       }),
-    }), 30000, "generateImage:FLUX");
+      30000,
+      "generateImage:FLUX",
+    );
     if (!r.ok)
       return res.status(503).json({ error: "Image generation failed" });
     const d = await r.json();
@@ -77,7 +84,14 @@ router.post("/", imageLimiter, validate(imagineSchema), async (req, res) => {
     );
     // ═══ BRAIN INTEGRATION — save what we generated ═══
     if (brain && user?.id) {
-      brain.saveMemory(user.id, "visual", "Am generat imagine: " + prompt.substring(0, 400), { engine: "FLUX" }).catch(() => { });
+      brain
+        .saveMemory(
+          user.id,
+          "visual",
+          "Am generat imagine: " + prompt.substring(0, 400),
+          { engine: "FLUX" },
+        )
+        .catch(() => {});
     }
     res.json({ image: "data:image/png;base64," + b64, prompt, engine: "FLUX" });
   } catch {

@@ -31,7 +31,11 @@ const { supabase, supabaseAdmin } = require("./supabase");
 const { initCache, cacheGet, cacheSet, getCacheStats } = require("./cache");
 const { runMigration } = require("./migrate");
 const { KelionBrain } = require("./brain");
-const { validateEnv, setupGracefulShutdown, smokeTest } = require("./startup-checks");
+const {
+  validateEnv,
+  setupGracefulShutdown,
+  smokeTest,
+} = require("./startup-checks");
 
 const logger = require("./logger");
 const { router: paymentsRouter } = require("./payments");
@@ -43,15 +47,30 @@ const {
   notifySubscribersNews,
   setSupabase: setMessengerSupabase,
 } = require("./messenger");
-const { router: telegramRouter, broadcastNews, setSupabase: setTelegramSupabase } = require("./telegram");
-const { router: whatsappRouter, setSupabase: setWhatsappSupabase } = require("./whatsapp");
+const {
+  router: telegramRouter,
+  broadcastNews,
+  setSupabase: setTelegramSupabase,
+} = require("./telegram");
+const {
+  router: whatsappRouter,
+  setSupabase: setWhatsappSupabase,
+} = require("./whatsapp");
 const fbPage = require("./facebook-page");
 const instagram = require("./instagram");
 const developerRouter = require("./routes/developer");
 const {
-  ipBlacklistMiddleware, compressionMiddleware, staticCacheMiddleware,
-  gracefulDegradationMiddleware, getCircuitStats, getBlacklistStats,
-  getLoadStats, getQueueStats, circuitAllow, circuitSuccess, circuitFailure,
+  ipBlacklistMiddleware,
+  _compressionMiddleware,
+  staticCacheMiddleware,
+  gracefulDegradationMiddleware,
+  getCircuitStats,
+  getBlacklistStats,
+  getLoadStats,
+  getQueueStats,
+  circuitAllow,
+  circuitSuccess,
+  circuitFailure,
   enqueueTask,
 } = require("./scalability");
 
@@ -73,7 +92,7 @@ const messengerBot = require("./messenger");
 const instagramBot = require("./instagram");
 const tradingRouter = require("./trading");
 const { router: marketplaceRouter } = require("./agent-marketplace");
-const { router: pluginRouter, restorePlugins } = require("./plugin-system");
+const { router: pluginRouter, _restorePlugins } = require("./plugin-system");
 const autonomousRunner = require("./autonomous-runner");
 const multimodalRouter = require("./routes/multimodal");
 const browserAgent = require("./browser-agent");
@@ -83,9 +102,9 @@ const app = express();
 app.set("trust proxy", 1);
 
 // ═══ LEVEL 2-4 SCALABILITY MIDDLEWARE ═══
-app.use(ipBlacklistMiddleware);        // Auto-ban abusive IPs (>500 req/min)
+app.use(ipBlacklistMiddleware); // Auto-ban abusive IPs (>500 req/min)
 app.use(gracefulDegradationMiddleware); // 503 when overloaded
-app.use(staticCacheMiddleware);        // Cache-Control headers for static files
+app.use(staticCacheMiddleware); // Cache-Control headers for static files
 
 // ═══ HTTPS FORCE REDIRECT ═══
 app.use((req, res, next) => {
@@ -209,18 +228,43 @@ app.use((req, res, next) => {
       `${req.method} ${req.path} ${res.statusCode} ${duration}ms`,
     );
     // Track page views for admin traffic panel (skip API/static/health/bots)
-    if (req.method === "GET" && !req.path.startsWith("/api/") && !req.path.match(/\.(js|css|png|jpg|svg|ico|woff2?|map|json|webmanifest)$/i) && supabaseAdmin) {
+    if (
+      req.method === "GET" &&
+      !req.path.startsWith("/api/") &&
+      !req.path.match(
+        /\.(js|css|png|jpg|svg|ico|woff2?|map|json|webmanifest)$/i,
+      ) &&
+      supabaseAdmin
+    ) {
       // Skip health checks, service worker, and bot traffic
       const ua = (req.get("user-agent") || "").toLowerCase();
-      const isBot = /bot|crawl|spider|node-fetch|uptimerobot|healthcheck|pingdom|monitoring|curl|wget/i.test(ua);
-      const isHealth = req.path === "/health" || req.path === "/sw.js" || req.path === "/manifest.json" || req.path === "/favicon.svg";
+      const isBot =
+        /bot|crawl|spider|node-fetch|uptimerobot|healthcheck|pingdom|monitoring|curl|wget/i.test(
+          ua,
+        );
+      const isHealth =
+        req.path === "/health" ||
+        req.path === "/sw.js" ||
+        req.path === "/manifest.json" ||
+        req.path === "/favicon.svg";
       if (!isBot && !isHealth) {
-        const realIp = req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || req.ip || "unknown";
+        const realIp =
+          req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
+          req.ip ||
+          "unknown";
         // Skip internal IPs entirely
-        if (realIp === "127.0.0.1" || realIp === "::1" || realIp === "::ffff:127.0.0.1") return;
+        if (
+          realIp === "127.0.0.1" ||
+          realIp === "::1" ||
+          realIp === "::ffff:127.0.0.1"
+        )
+          return;
 
         // Country from CDN headers first, then IP geolocation
-        let country = req.headers["cf-ipcountry"] || req.headers["x-vercel-ip-country"] || null;
+        let country =
+          req.headers["cf-ipcountry"] ||
+          req.headers["x-vercel-ip-country"] ||
+          null;
 
         // Async insert — resolve country via ip-api.com if not from CDN
         const insertView = async () => {
@@ -231,16 +275,26 @@ app.use((req, res, next) => {
               country = global._geoCache[realIp];
             } else {
               try {
-                const geoR = await fetch("http://ip-api.com/json/" + encodeURIComponent(realIp) + "?fields=countryCode", { signal: AbortSignal.timeout(2000) });
+                const geoR = await fetch(
+                  "http://ip-api.com/json/" +
+                    encodeURIComponent(realIp) +
+                    "?fields=countryCode",
+                  { signal: AbortSignal.timeout(2000) },
+                );
                 if (geoR.ok) {
                   const geoD = await geoR.json();
                   country = geoD.countryCode || null;
                   if (country) global._geoCache[realIp] = country;
                   // Keep cache small
                   const keys = Object.keys(global._geoCache);
-                  if (keys.length > 500) { for (let i = 0; i < 200; i++) delete global._geoCache[keys[i]]; }
+                  if (keys.length > 500) {
+                    for (let i = 0; i < 200; i++)
+                      delete global._geoCache[keys[i]];
+                  }
                 }
-              } catch (e) { /* geo lookup failed — ok, insert without */ }
+              } catch (_e) {
+                /* geo lookup failed — ok, insert without */
+              }
             }
           }
           const { error } = await supabaseAdmin.from("page_views").insert({
@@ -248,12 +302,23 @@ app.use((req, res, next) => {
             path: req.path,
             user_agent: (req.get("user-agent") || "").substring(0, 300),
             country: country,
-            referrer: (req.get("referer") || req.get("referrer") || "").substring(0, 500) || null,
+            referrer:
+              (req.get("referer") || req.get("referrer") || "").substring(
+                0,
+                500,
+              ) || null,
           });
-          if (error) logger.warn({ component: "PageViews", err: error.message, code: error.code }, "page_views insert failed");
+          if (error)
+            logger.warn(
+              { component: "PageViews", err: error.message, code: error.code },
+              "page_views insert failed",
+            );
         };
         insertView().catch((e) => {
-          logger.warn({ component: "PageViews", err: e.message }, "page_views insert exception");
+          logger.warn(
+            { component: "PageViews", err: e.message },
+            "page_views insert exception",
+          );
         });
       }
     }
@@ -268,7 +333,8 @@ const globalLimiter = rateLimit({
   message: { error: "Too many requests. Please try again later." },
   standardHeaders: true,
   legacyHeaders: false,
-  skip: (req) => req.path.startsWith("/admin/") || req.path.startsWith("/admin"),
+  skip: (req) =>
+    req.path.startsWith("/admin/") || req.path.startsWith("/admin"),
 });
 
 const asyncHandler = (fn) => (req, res, next) => {
@@ -321,9 +387,9 @@ const _rawHtml = fs.readFileSync(
 );
 const _indexHtml = process.env.SENTRY_DSN
   ? _rawHtml.replace(
-    '<meta name="sentry-dsn" content="">',
-    `<meta name="sentry-dsn" content="${process.env.SENTRY_DSN.replace(/&/g, "&amp;").replace(/"/g, "&quot;")}">`,
-  )
+      '<meta name="sentry-dsn" content="">',
+      `<meta name="sentry-dsn" content="${process.env.SENTRY_DSN.replace(/&/g, "&amp;").replace(/"/g, "&quot;")}">`,
+    )
   : _rawHtml;
 
 // Read 404.html once at startup (for admin stealth)
@@ -346,9 +412,9 @@ const _rawOnboarding = fs.existsSync(
   path.join(__dirname, "..", "app", "onboarding.html"),
 )
   ? fs.readFileSync(
-    path.join(__dirname, "..", "app", "onboarding.html"),
-    "utf8",
-  )
+      path.join(__dirname, "..", "app", "onboarding.html"),
+      "utf8",
+    )
   : null;
 
 // Read reset-password.html once at startup
@@ -356,9 +422,9 @@ const _rawResetPassword = fs.existsSync(
   path.join(__dirname, "..", "app", "reset-password.html"),
 )
   ? fs.readFileSync(
-    path.join(__dirname, "..", "app", "reset-password.html"),
-    "utf8",
-  )
+      path.join(__dirname, "..", "app", "reset-password.html"),
+      "utf8",
+    )
   : null;
 
 // Serve onboarding with CSP nonce injection
@@ -388,33 +454,43 @@ const _adminHtmlPath = path.join(__dirname, "..", "app", "admin", "index.html");
 app.get("/admin", (req, res) => {
   try {
     const html = fs.readFileSync(_adminHtmlPath, "utf8");
-    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
     res.type("html").send(html);
-  } catch (e) { res.status(404).send("Admin page not found"); }
+  } catch (_e) {
+    res.status(404).send("Admin page not found");
+  }
 });
 app.get("/admin/", (req, res) => {
   try {
     const html = fs.readFileSync(_adminHtmlPath, "utf8");
-    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
     res.type("html").send(html);
-  } catch (e) { res.status(404).send("Admin page not found"); }
+  } catch (_e) {
+    res.status(404).send("Admin page not found");
+  }
 });
 // Admin trading page — serve with relaxed CSP (before express.static)
-const _rawTradingHtml = fs.existsSync(path.join(__dirname, "..", "app", "admin", "trading.html"))
-  ? fs.readFileSync(path.join(__dirname, "..", "app", "admin", "trading.html"), "utf8")
+const _rawTradingHtml = fs.existsSync(
+  path.join(__dirname, "..", "app", "admin", "trading.html"),
+)
+  ? fs.readFileSync(
+      path.join(__dirname, "..", "app", "admin", "trading.html"),
+      "utf8",
+    )
   : null;
 app.get("/admin/trading.html", (req, res) => {
   if (!_rawTradingHtml) return res.status(404).send("Trading page not found");
   // Override CSP to allow inline scripts for admin pages
-  res.setHeader("Content-Security-Policy",
+  res.setHeader(
+    "Content-Security-Policy",
     "default-src 'self'; " +
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://*.tradingview.com; " +
-    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://*.tradingview.com; " +
-    "font-src 'self' https://fonts.gstatic.com; " +
-    "img-src 'self' data: blob: https: http:; " +
-    "connect-src 'self' https:; " +
-    "frame-src 'self' https://*.tradingview.com blob:; " +
-    "child-src 'self' https://*.tradingview.com blob:;"
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://*.tradingview.com; " +
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://*.tradingview.com; " +
+      "font-src 'self' https://fonts.gstatic.com; " +
+      "img-src 'self' data: blob: https: http:; " +
+      "connect-src 'self' https:; " +
+      "frame-src 'self' https://*.tradingview.com blob:; " +
+      "child-src 'self' https://*.tradingview.com blob:;",
   );
   res.type("html").send(_rawTradingHtml);
 });
@@ -422,9 +498,9 @@ app.get("/admin/trading.html", (req, res) => {
 // IMPORTANT: must be BEFORE express.static so headers are set
 app.use((req, res, next) => {
   if (req.path.match(/\.(js|css|html)$/)) {
-    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
   }
   next();
 });
@@ -488,7 +564,10 @@ async function saveBrainState() {
     });
     logger.info({ component: "Brain" }, "💾 Brain state saved to Supabase");
   } catch (e) {
-    logger.warn({ component: "Brain", err: e.message }, "Brain state save failed");
+    logger.warn(
+      { component: "Brain", err: e.message },
+      "Brain state save failed",
+    );
   }
 }
 
@@ -517,15 +596,25 @@ async function restoreBrainState() {
         });
       }
       if (s.journal && Array.isArray(s.journal)) {
-        brain.journal = [...(s.journal), ...(brain.journal || [])];
+        brain.journal = [...s.journal, ...(brain.journal || [])];
       }
-      if (s.strategies) brain.strategies = { ...s.strategies, ...(brain.strategies || {}) };
-      logger.info({ component: "Brain", savedAt: s.savedAt }, "🔄 Brain state restored from Supabase");
+      if (s.strategies)
+        brain.strategies = { ...s.strategies, ...(brain.strategies || {}) };
+      logger.info(
+        { component: "Brain", savedAt: s.savedAt },
+        "🔄 Brain state restored from Supabase",
+      );
     } else {
-      logger.info({ component: "Brain" }, "No previous brain state found — fresh start");
+      logger.info(
+        { component: "Brain" },
+        "No previous brain state found — fresh start",
+      );
     }
   } catch (e) {
-    logger.warn({ component: "Brain", err: e.message }, "Brain state restore failed");
+    logger.warn(
+      { component: "Brain", err: e.message },
+      "Brain state restore failed",
+    );
   }
 }
 
@@ -538,12 +627,18 @@ _brainSaveInterval.unref();
 
 // Graceful shutdown — save state before exit
 process.on("SIGTERM", async () => {
-  logger.info({ component: "Server" }, "🛑 SIGTERM received — saving brain state...");
+  logger.info(
+    { component: "Server" },
+    "🛑 SIGTERM received — saving brain state...",
+  );
   await saveBrainState();
   process.exit(0);
 });
 process.on("SIGINT", async () => {
-  logger.info({ component: "Server" }, "🛑 SIGINT received — saving brain state...");
+  logger.info(
+    { component: "Server" },
+    "🛑 SIGINT received — saving brain state...",
+  );
   await saveBrainState();
   process.exit(0);
 });
@@ -606,9 +701,16 @@ app.post("/api/autonomous/start", express.json(), async (req, res) => {
   try {
     const user = await getUserFromToken(req).catch(() => null);
     const userId = user?.id || req.body.userId || "anonymous";
-    const result = await autonomousRunner.startTask(brain, userId, req.body.goal, req.body.options);
+    const result = await autonomousRunner.startTask(
+      brain,
+      userId,
+      req.body.goal,
+      req.body.options,
+    );
     res.json(result);
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 app.get("/api/autonomous/status/:taskId", (req, res) => {
   const status = autonomousRunner.getTaskStatus(req.params.taskId);
@@ -617,7 +719,10 @@ app.get("/api/autonomous/status/:taskId", (req, res) => {
 });
 app.post("/api/autonomous/cancel/:taskId", async (req, res) => {
   const user = await getUserFromToken(req).catch(() => null);
-  const result = autonomousRunner.cancelTask(req.params.taskId, user?.id || "anonymous");
+  const result = autonomousRunner.cancelTask(
+    req.params.taskId,
+    user?.id || "anonymous",
+  );
   res.json(result);
 });
 app.get("/api/autonomous/tasks", async (req, res) => {
@@ -630,18 +735,31 @@ app.post("/api/browser/navigate", express.json(), async (req, res) => {
   try {
     const result = await browserAgent.navigate(req.body.url, req.body.options);
     res.json(result);
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 app.post("/api/browser/click", express.json(), async (req, res) => {
-  const result = await browserAgent.click(req.body.sessionId, req.body.selector);
+  const result = await browserAgent.click(
+    req.body.sessionId,
+    req.body.selector,
+  );
   res.json(result);
 });
 app.post("/api/browser/type", express.json(), async (req, res) => {
-  const result = await browserAgent.type(req.body.sessionId, req.body.selector, req.body.text);
+  const result = await browserAgent.type(
+    req.body.sessionId,
+    req.body.selector,
+    req.body.text,
+  );
   res.json(result);
 });
 app.post("/api/browser/submit", express.json(), async (req, res) => {
-  const result = await browserAgent.submitForm(req.body.sessionId, req.body.formSelector, req.body.data);
+  const result = await browserAgent.submitForm(
+    req.body.sessionId,
+    req.body.formSelector,
+    req.body.data,
+  );
   res.json(result);
 });
 app.get("/api/browser/screenshot/:sessionId", async (req, res) => {
@@ -649,11 +767,17 @@ app.get("/api/browser/screenshot/:sessionId", async (req, res) => {
   res.json(result);
 });
 app.post("/api/browser/extract", express.json(), async (req, res) => {
-  const result = await browserAgent.extract(req.body.sessionId, req.body.selectors);
+  const result = await browserAgent.extract(
+    req.body.sessionId,
+    req.body.selectors,
+  );
   res.json(result);
 });
 app.get("/api/browser/status", (_req, res) => {
-  res.json({ fullMode: browserAgent.isFullMode(), engine: browserAgent.isFullMode() ? "puppeteer" : "fetch-fallback" });
+  res.json({
+    fullMode: browserAgent.isFullMode(),
+    engine: browserAgent.isFullMode() ? "puppeteer" : "fetch-fallback",
+  });
 });
 
 // ═══ SHARED SESSIONS API (Real-time Collaboration) ═══
@@ -664,7 +788,11 @@ app.post("/api/sessions/create", express.json(), async (req, res) => {
 });
 app.post("/api/sessions/join", express.json(), async (req, res) => {
   const user = await getUserFromToken(req).catch(() => null);
-  const result = sharedSessions.joinRoom(req.body.roomId, user?.id || "anonymous", req.body.name || user?.email);
+  const result = sharedSessions.joinRoom(
+    req.body.roomId,
+    user?.id || "anonymous",
+    req.body.name || user?.email,
+  );
   res.json(result);
 });
 app.post("/api/sessions/leave", express.json(), async (req, res) => {
@@ -674,7 +802,12 @@ app.post("/api/sessions/leave", express.json(), async (req, res) => {
 });
 app.post("/api/sessions/message", express.json(), async (req, res) => {
   const user = await getUserFromToken(req).catch(() => null);
-  const result = sharedSessions.sendMessage(req.body.roomId, user?.id || "anonymous", req.body.content, req.body.type || "user");
+  const result = sharedSessions.sendMessage(
+    req.body.roomId,
+    user?.id || "anonymous",
+    req.body.content,
+    req.body.type || "user",
+  );
   res.json(result);
 });
 app.get("/api/sessions/:roomId", (req, res) => {
@@ -703,7 +836,8 @@ app.get("/api/admin/media-history", (req, res) => {
   // Forward to media history route
   const supabaseAdmin = req.app.locals.supabaseAdmin;
   if (!supabaseAdmin) return res.json({ media: [] });
-  supabaseAdmin.from("media_history")
+  supabaseAdmin
+    .from("media_history")
     .select("*")
     .order("created_at", { ascending: false })
     .limit(50)
@@ -711,7 +845,7 @@ app.get("/api/admin/media-history", (req, res) => {
       if (error) return res.status(500).json({ error: error.message });
       res.json({ media: data || [], count: (data || []).length });
     })
-    .catch(e => res.status(500).json({ error: e.message }));
+    .catch((e) => res.status(500).json({ error: e.message }));
 });
 // ═══ #155: FRONTEND ERROR CAPTURE ENDPOINT ═══
 const _frontendErrors = [];
@@ -720,7 +854,15 @@ app.post("/api/brain/errors", express.json(), (req, res) => {
   const { type, message, source, line, url, timestamp } = req.body || {};
   if (!message) return res.status(400).json({ error: "No message" });
 
-  const err = { type, message: String(message).substring(0, 500), source, line, url, timestamp, ip: req.ip };
+  const err = {
+    type,
+    message: String(message).substring(0, 500),
+    source,
+    line,
+    url,
+    timestamp,
+    ip: req.ip,
+  };
   _frontendErrors.push(err);
   if (_frontendErrors.length > 200) _frontendErrors.splice(0, 100); // keep last 100
 
@@ -731,16 +873,23 @@ app.post("/api/brain/errors", express.json(), (req, res) => {
 
   // #154: Self-Healing Brain — log critical patterns
   if (count >= 5) {
-    logger.warn({ component: "SelfHeal", key, count, message }, "🔴 Recurring frontend error detected — needs fix");
+    logger.warn(
+      { component: "SelfHeal", key, count, message },
+      "🔴 Recurring frontend error detected — needs fix",
+    );
     // Store in Supabase for brain analysis
     if (supabaseAdmin) {
-      supabaseAdmin.from("brain_memory").insert({
-        user_id: "00000000-0000-0000-0000-000000000000",
-        memory_type: "error_pattern",
-        content: `RECURRING ERROR (${count}x): ${message} at ${source}:${line}`,
-        context: { source, line, url, count },
-        importance: 9,
-      }).then().catch(() => { });
+      supabaseAdmin
+        .from("brain_memory")
+        .insert({
+          user_id: "00000000-0000-0000-0000-000000000000",
+          memory_type: "error_pattern",
+          content: `RECURRING ERROR (${count}x): ${message} at ${source}:${line}`,
+          context: { source, line, url, count },
+          importance: 9,
+        })
+        .then()
+        .catch(() => {});
     }
   }
 
@@ -951,32 +1100,72 @@ app.get("/api/gdpr/consent-status", async (req, res) => {
     const user = await getUserFromToken(req);
     if (!user) return res.json({ consented: false, categories: {} });
     if (!supabaseAdmin) return res.json({ consented: false, categories: {} });
-    const { data } = await supabaseAdmin.from("user_preferences")
-      .select("value").eq("user_id", user.id).eq("key", "gdpr_consent").maybeSingle();
-    res.json(data?.value || { consented: false, categories: { essential: true, analytics: false, marketing: false } });
-  } catch { res.json({ consented: false, categories: { essential: true } }); }
+    const { data } = await supabaseAdmin
+      .from("user_preferences")
+      .select("value")
+      .eq("user_id", user.id)
+      .eq("key", "gdpr_consent")
+      .maybeSingle();
+    res.json(
+      data?.value || {
+        consented: false,
+        categories: { essential: true, analytics: false, marketing: false },
+      },
+    );
+  } catch {
+    res.json({ consented: false, categories: { essential: true } });
+  }
 });
 app.post("/api/gdpr/export", express.json(), async (req, res) => {
   try {
     const { getUserFromToken, supabaseAdmin } = req.app.locals;
     const user = await getUserFromToken(req);
-    if (!user) return res.status(401).json({ error: "Authentication required" });
-    if (!supabaseAdmin) return res.status(503).json({ error: "Database unavailable" });
-    const { data: prefs } = await supabaseAdmin.from("user_preferences").select("*").eq("user_id", user.id);
-    const { data: convos } = await supabaseAdmin.from("conversations").select("id, created_at").eq("user_id", user.id);
-    res.json({ user: { id: user.id, email: user.email, created_at: user.created_at }, preferences: prefs || [], conversations: convos || [] });
-  } catch { res.status(500).json({ error: "Export error" }); }
+    if (!user)
+      return res.status(401).json({ error: "Authentication required" });
+    if (!supabaseAdmin)
+      return res.status(503).json({ error: "Database unavailable" });
+    const { data: prefs } = await supabaseAdmin
+      .from("user_preferences")
+      .select("*")
+      .eq("user_id", user.id);
+    const { data: convos } = await supabaseAdmin
+      .from("conversations")
+      .select("id, created_at")
+      .eq("user_id", user.id);
+    res.json({
+      user: { id: user.id, email: user.email, created_at: user.created_at },
+      preferences: prefs || [],
+      conversations: convos || [],
+    });
+  } catch {
+    res.status(500).json({ error: "Export error" });
+  }
 });
 app.post("/api/gdpr/delete", express.json(), async (req, res) => {
   try {
     const { getUserFromToken, supabaseAdmin } = req.app.locals;
     const user = await getUserFromToken(req);
-    if (!user) return res.status(401).json({ error: "Authentication required" });
-    if (!supabaseAdmin) return res.status(503).json({ error: "Database unavailable" });
+    if (!user)
+      return res.status(401).json({ error: "Authentication required" });
+    if (!supabaseAdmin)
+      return res.status(503).json({ error: "Database unavailable" });
     // Mark for deletion (actual deletion requires admin approval)
-    await supabaseAdmin.from("user_preferences").upsert({ user_id: user.id, key: "gdpr_delete_requested", value: { requestedAt: new Date().toISOString() } }, { onConflict: "user_id,key" });
-    res.json({ success: true, message: "Deletion request received. Your data will be removed within 30 days as per GDPR." });
-  } catch { res.status(500).json({ error: "Delete request error" }); }
+    await supabaseAdmin.from("user_preferences").upsert(
+      {
+        user_id: user.id,
+        key: "gdpr_delete_requested",
+        value: { requestedAt: new Date().toISOString() },
+      },
+      { onConflict: "user_id,key" },
+    );
+    res.json({
+      success: true,
+      message:
+        "Deletion request received. Your data will be removed within 30 days as per GDPR.",
+    });
+  } catch {
+    res.status(500).json({ error: "Delete request error" });
+  }
 });
 app.use("/api/messenger", messengerRouter);
 app.use("/api/telegram", express.json(), telegramRouter);
@@ -1000,13 +1189,14 @@ app.get("/api/media/instagram/health", (req, res) => {
 // Auto-detect Instagram Business Account ID from Graph API
 app.get("/api/media/instagram/detect-account", async (req, res) => {
   const token = process.env.FB_PAGE_ACCESS_TOKEN;
-  if (!token) return res.status(400).json({ error: "No FB_PAGE_ACCESS_TOKEN set" });
+  if (!token)
+    return res.status(400).json({ error: "No FB_PAGE_ACCESS_TOKEN set" });
   try {
     const results = {};
 
     // Method 1: Direct /me with Page Token → gets page info + IG account
     const meRes = await fetch(
-      `https://graph.facebook.com/v21.0/me?fields=id,name,instagram_business_account&access_token=${token}`
+      `https://graph.facebook.com/v21.0/me?fields=id,name,instagram_business_account&access_token=${token}`,
     );
     const meData = await meRes.json();
     results.method1_me = meData;
@@ -1025,7 +1215,7 @@ app.get("/api/media/instagram/detect-account", async (req, res) => {
     const pageId = process.env.FB_PAGE_ID;
     if (pageId) {
       const pgRes = await fetch(
-        `https://graph.facebook.com/v21.0/${pageId}?fields=instagram_business_account,name&access_token=${token}`
+        `https://graph.facebook.com/v21.0/${pageId}?fields=instagram_business_account,name&access_token=${token}`,
       );
       const pgData = await pgRes.json();
       results.method2_pageId = pgData;
@@ -1043,10 +1233,12 @@ app.get("/api/media/instagram/detect-account", async (req, res) => {
 
     // Method 3: List accounts (works with User Token only)
     const acctRes = await fetch(
-      `https://graph.facebook.com/v21.0/me/accounts?fields=id,name,instagram_business_account&access_token=${token}`
+      `https://graph.facebook.com/v21.0/me/accounts?fields=id,name,instagram_business_account&access_token=${token}`,
     );
     const acctData = await acctRes.json();
-    results.method3_accounts = acctData.error ? { error: acctData.error.message } : acctData;
+    results.method3_accounts = acctData.error
+      ? { error: acctData.error.message }
+      : acctData;
 
     if (acctData.data) {
       for (const page of acctData.data) {
@@ -1064,7 +1256,8 @@ app.get("/api/media/instagram/detect-account", async (req, res) => {
 
     res.json({
       found: false,
-      instruction: "Could not auto-detect. Check that your FB Page is connected to an Instagram Business Account in Meta Business Suite.",
+      instruction:
+        "Could not auto-detect. Check that your FB Page is connected to an Instagram Business Account in Meta Business Suite.",
       debug: results,
     });
   } catch (e) {
@@ -1096,14 +1289,19 @@ app.post("/api/media/publish", adminAuth, async (req, res) => {
   try {
     const { platform, content, imageUrl, caption } = req.body;
     if (!platform || !content) {
-      return res.status(400).json({ error: "platform and content are required" });
+      return res
+        .status(400)
+        .json({ error: "platform and content are required" });
     }
 
     const results = {};
 
     if (platform === "facebook" || platform === "all") {
       try {
-        const fbResult = await fbPage.publish({ message: content, link: imageUrl });
+        const fbResult = await fbPage.publish({
+          message: content,
+          link: imageUrl,
+        });
         results.facebook = { success: true, data: fbResult };
       } catch (e) {
         results.facebook = { success: false, error: e.message };
@@ -1159,13 +1357,27 @@ app.get("/api/voice-clone/list", async (req, res) => {
 app.get("/api/radio/stations", (req, res) => {
   res.json({
     stations: [
-      { name: "RadioZU", url: "https://www.radiozu.ro", country: "RO", genre: "Pop/Dance" },
-      { name: "Kiss FM", url: "https://www.kissfm.ro", country: "RO", genre: "Pop/Hits" },
-      { name: "Spotify", url: "https://open.spotify.com", country: "Global", genre: "All" },
+      {
+        name: "RadioZU",
+        url: "https://www.radiozu.ro",
+        country: "RO",
+        genre: "Pop/Dance",
+      },
+      {
+        name: "Kiss FM",
+        url: "https://www.kissfm.ro",
+        country: "RO",
+        genre: "Pop/Hits",
+      },
+      {
+        name: "Spotify",
+        url: "https://open.spotify.com",
+        country: "Global",
+        genre: "All",
+      },
     ],
   });
 });
-
 
 // ═══ COOKIE CONSENT ENDPOINT ═══
 app.post(
@@ -1334,8 +1546,11 @@ const forexEngine = require("./forex-engine");
 // Initialize with Supabase
 if (app.locals.supabaseAdmin) {
   wsEngine.setSupabase(app.locals.supabaseAdmin);
-  marketLearner.init(app.locals.supabaseAdmin).catch(e =>
-    logger.warn({ err: e.message }, "MarketLearner init warning"));
+  marketLearner
+    .init(app.locals.supabaseAdmin)
+    .catch((e) =>
+      logger.warn({ err: e.message }, "MarketLearner init warning"),
+    );
   const perfTracker = require("./performance-tracker");
   perfTracker.init(app.locals.supabaseAdmin);
 }
@@ -1349,11 +1564,21 @@ app.get("/api/trading/forex/session", adminAuth, (req, res) => {
   res.json(forexEngine.getCurrentSession());
 });
 app.get("/api/trading/forex/pairs", adminAuth, (req, res) => {
-  res.json({ pairs: forexEngine.getAllPairs(), bestNow: forexEngine.getBestPairsNow() });
+  res.json({
+    pairs: forexEngine.getAllPairs(),
+    bestNow: forexEngine.getBestPairsNow(),
+  });
 });
 app.post("/api/trading/forex/lot-size", adminAuth, (req, res) => {
   const { pair, balance, riskPct, slPips } = req.body || {};
-  res.json(forexEngine.calculateLotSize(pair, balance || 10000, riskPct || 1, slPips || 20));
+  res.json(
+    forexEngine.calculateLotSize(
+      pair,
+      balance || 10000,
+      riskPct || 1,
+      slPips || 20,
+    ),
+  );
 });
 app.post("/api/trading/forex/check", adminAuth, (req, res) => {
   const { pair, direction, bid, ask } = req.body || {};
@@ -1371,8 +1596,17 @@ app.get("/api/trading/ws-prices", adminAuth, (req, res) => {
   res.json(wsEngine.getAllPrices());
 });
 app.get("/api/trading/ws-candles/:asset/:tf?", adminAuth, (req, res) => {
-  const candles = wsEngine.getCandles(req.params.asset, req.params.tf || "1m", 100);
-  res.json({ asset: req.params.asset, tf: req.params.tf || "1m", candles, count: candles.length });
+  const candles = wsEngine.getCandles(
+    req.params.asset,
+    req.params.tf || "1m",
+    100,
+  );
+  res.json({
+    asset: req.params.asset,
+    tf: req.params.tf || "1m",
+    candles,
+    count: candles.length,
+  });
 });
 
 // ── Learner routes ──
@@ -1392,7 +1626,8 @@ app.post("/api/trading/learner/save", adminAuth, async (req, res) => {
 // GET /api/media/history — Media history from brain
 app.get("/api/media/history", async (req, res) => {
   const { supabaseAdmin } = req.app.locals;
-  if (!supabaseAdmin) return res.status(503).json({ error: "No database connection" });
+  if (!supabaseAdmin)
+    return res.status(503).json({ error: "No database connection" });
   try {
     const { data, error } = await supabaseAdmin
       .from("media_history")
@@ -1413,7 +1648,6 @@ app.use("/api", (req, res, _next) => {
 
 // (admin panel handlers already registered above, before express.static)
 
-
 // ═══ PUBLIC PAGE REDIRECTS (trailing-slash canonical) ═══
 app.get("/privacy", (req, res) => res.redirect(301, "/privacy/"));
 app.get("/terms", (req, res) => res.redirect(301, "/terms/"));
@@ -1424,7 +1658,13 @@ app.get("/refund-policy", (req, res) => res.redirect(301, "/refund-policy/"));
 
 // ═══ STANDALONE LEGAL PAGES — explicit handlers (not relying on express.static) ═══
 const _legalPages = {};
-for (const page of ["privacy", "terms", "gdpr", "cookie-policy", "refund-policy"]) {
+for (const page of [
+  "privacy",
+  "terms",
+  "gdpr",
+  "cookie-policy",
+  "refund-policy",
+]) {
   const filePath = path.join(__dirname, "..", "app", page, "index.html");
   if (fs.existsSync(filePath)) {
     _legalPages[page] = fs.readFileSync(filePath, "utf8");
@@ -1433,7 +1673,8 @@ for (const page of ["privacy", "terms", "gdpr", "cookie-policy", "refund-policy"
 }
 
 app.get("/privacy/", (req, res) => {
-  if (!_legalPages.privacy) return res.status(404).type("html").send(_raw404Html);
+  if (!_legalPages.privacy)
+    return res.status(404).type("html").send(_raw404Html);
   res.type("html").send(_legalPages.privacy);
 });
 app.get("/terms/", (req, res) => {
@@ -1445,11 +1686,13 @@ app.get("/gdpr/", (req, res) => {
   res.type("html").send(_legalPages.gdpr);
 });
 app.get("/cookie-policy/", (req, res) => {
-  if (!_legalPages["cookie-policy"]) return res.status(404).type("html").send(_raw404Html);
+  if (!_legalPages["cookie-policy"])
+    return res.status(404).type("html").send(_raw404Html);
   res.type("html").send(_legalPages["cookie-policy"]);
 });
 app.get("/refund-policy/", (req, res) => {
-  if (!_legalPages["refund-policy"]) return res.status(404).type("html").send(_raw404Html);
+  if (!_legalPages["refund-policy"])
+    return res.status(404).type("html").send(_raw404Html);
   res.type("html").send(_legalPages["refund-policy"]);
 });
 
@@ -1613,14 +1856,19 @@ if (require.main === module) {
   // ── Attach Voice Stream WebSocket ──
   const { setupVoiceStream } = require("./routes/voice-stream");
   setupVoiceStream(server, app.locals);
-  logger.info({ component: "VoiceStream" }, "WebSocket voice pipeline mounted on /api/voice-stream");
+  logger.info(
+    { component: "VoiceStream" },
+    "WebSocket voice pipeline mounted on /api/voice-stream",
+  );
   setupGracefulShutdown(server);
 
   runMigration()
     .then((migrated) => {
       logConfigHealth();
       // Initialize cache layer (Redis if REDIS_URL set, else in-memory)
-      initCache().catch(e => logger.warn({ err: e.message }, "Cache init warning"));
+      initCache().catch((e) =>
+        logger.warn({ err: e.message }, "Cache init warning"),
+      );
       app.locals.cacheGet = cacheGet;
       app.locals.cacheSet = cacheSet;
       app.locals.getCacheStats = getCacheStats;
@@ -1635,14 +1883,16 @@ if (require.main === module) {
       app.locals.enqueueTask = enqueueTask;
       // Prevent Railway proxy timeouts
       server.keepAliveTimeout = 65000; // 65s (Railway proxy = 60s)
-      server.headersTimeout = 70000;   // 70s > keepAliveTimeout
+      server.headersTimeout = 70000; // 70s > keepAliveTimeout
       server.listen(PORT, "0.0.0.0", () => {
         logger.info(
           {
             component: "Server",
             port: PORT,
             ai: {
-              gemini: !!(process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY),
+              gemini: !!(
+                process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY
+              ),
               gpt4o: !!process.env.OPENAI_API_KEY,
               deepseek: !!process.env.DEEPSEEK_API_KEY,
             },
@@ -1655,12 +1905,15 @@ if (require.main === module) {
           "KelionAI v2.5 started on port " + PORT + " (with voice streaming)",
         );
         // Smoke test internal routes (async, non-blocking)
-        smokeTest(PORT).catch(() => { });
+        smokeTest(PORT).catch(() => {});
         // Self-ping keepalive — prevent Railway idle sleep (every 4 min)
         const APP_URL = process.env.APP_URL || `http://localhost:${PORT}`;
-        setInterval(() => {
-          fetch(`${APP_URL}/api/health`).catch(() => { });
-        }, 4 * 60 * 1000).unref();
+        setInterval(
+          () => {
+            fetch(`${APP_URL}/api/health`).catch(() => {});
+          },
+          4 * 60 * 1000,
+        ).unref();
         // Auto-register Telegram webhook
         if (process.env.TELEGRAM_BOT_TOKEN && process.env.APP_URL) {
           const webhookUrl = `${process.env.APP_URL}/api/telegram/webhook`;

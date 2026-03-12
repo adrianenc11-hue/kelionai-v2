@@ -43,7 +43,8 @@ router.post(
         return res.status(503).json({ error: "Auth service unavailable" });
 
       // Admin bypass: use admin API (no Supabase rate limit)
-      const isAdmin = req.headers["x-admin-secret"] === process.env.ADMIN_SECRET_KEY;
+      const isAdmin =
+        req.headers["x-admin-secret"] === process.env.ADMIN_SECRET_KEY;
       if (isAdmin && supabaseAdmin) {
         const { data, error } = await supabaseAdmin.auth.admin.createUser({
           email,
@@ -53,16 +54,24 @@ router.post(
         });
         if (error) {
           // Already exists = still 200 (security: don't reveal)
-          if (error.message.includes("already") || error.message.includes("exists")) {
+          if (
+            error.message.includes("already") ||
+            error.message.includes("exists")
+          ) {
             return res.json({
               user: { email },
-              message: "If this email is not already in use, a verification email has been sent.",
+              message:
+                "If this email is not already in use, a verification email has been sent.",
             });
           }
           return res.status(400).json({ error: error.message });
         }
         return res.json({
-          user: { id: data.user.id, email: data.user.email, name: data.user.user_metadata?.full_name },
+          user: {
+            id: data.user.id,
+            email: data.user.email,
+            name: data.user.user_metadata?.full_name,
+          },
           message: "Account created (admin bypass).",
         });
       }
@@ -73,7 +82,7 @@ router.post(
         password,
         options: {
           data: { full_name: name || email.split("@")[0] },
-          emailRedirectTo: redirectUrl
+          emailRedirectTo: redirectUrl,
         },
       });
       if (error) {
@@ -118,14 +127,16 @@ router.post("/login", authLimiter, validate(loginSchema), async (req, res) => {
           "Email not verified. Please check your inbox and verify your email before signing in.",
       });
     }
-    const adminEmail = (process.env.ADMIN_EMAIL || "adrianenc11@gmail.com").toLowerCase();
+    const adminEmail = (
+      process.env.ADMIN_EMAIL || "adrianenc11@gmail.com"
+    ).toLowerCase();
     const isAdmin = data.user.email?.toLowerCase() === adminEmail;
     res.json({
       user: {
         id: data.user.id,
         email: data.user.email,
         name: data.user.user_metadata?.full_name,
-        role: isAdmin ? "admin" : (data.user.role || "user"),
+        role: isAdmin ? "admin" : data.user.role || "user",
       },
       session: data.session,
     });
@@ -155,7 +166,12 @@ router.get("/me", async (req, res) => {
     const u = await getUserFromToken(req);
     if (!u) return res.status(401).json({ error: "Not authenticated" });
     res.json({
-      user: { id: u.id, email: u.email, name: u.user_metadata?.full_name, role: u.role || "user" },
+      user: {
+        id: u.id,
+        email: u.email,
+        name: u.user_metadata?.full_name,
+        role: u.role || "user",
+      },
     });
   } catch {
     res.status(500).json({ error: "Auth error" });
@@ -197,9 +213,7 @@ router.post(
       const { email } = req.body;
       if (!supabase)
         return res.status(503).json({ error: "Auth service unavailable" });
-      const redirectTo =
-        (process.env.APP_URL) +
-        "/reset-password.html";
+      const redirectTo = process.env.APP_URL + "/reset-password.html";
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo,
       });

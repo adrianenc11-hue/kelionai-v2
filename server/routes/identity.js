@@ -54,7 +54,14 @@ router.post(
 
       // ═══ BRAIN INTEGRATION — remember face registration ═══
       if (brain) {
-        brain.saveFact(user.id, "User a înregistrat referința facială", "identity", "face-register").catch(() => { });
+        brain
+          .saveFact(
+            user.id,
+            "User a înregistrat referința facială",
+            "identity",
+            "face-register",
+          )
+          .catch(() => {});
       }
 
       logger.info(
@@ -88,19 +95,32 @@ router.post(
 
       // Check role from profiles table (auth.users.role is always 'authenticated')
       let isOwner = false;
-      const adminEmail = (process.env.ADMIN_EMAIL || "adrianenc11@gmail.com").toLowerCase();
+      const adminEmail = (
+        process.env.ADMIN_EMAIL || "adrianenc11@gmail.com"
+      ).toLowerCase();
       if (user && supabaseAdmin) {
         // Auto-create/update admin profile if email matches
         if (user.email?.toLowerCase() === adminEmail) {
-          await supabaseAdmin.from("profiles").upsert({
-            id: user.id,
-            display_name: user.user_metadata?.display_name || user.email.split("@")[0],
-            role: "admin",
-            preferred_language: "ro",
-            updated_at: new Date().toISOString(),
-          }, { onConflict: "id" }).then(() => { }).catch(() => { });
+          await supabaseAdmin
+            .from("profiles")
+            .upsert(
+              {
+                id: user.id,
+                display_name:
+                  user.user_metadata?.display_name || user.email.split("@")[0],
+                role: "admin",
+                preferred_language: "ro",
+                updated_at: new Date().toISOString(),
+              },
+              { onConflict: "id" },
+            )
+            .then(() => {})
+            .catch(() => {});
           isOwner = true;
-          logger.info({ component: "Identity", email: user.email }, "Admin profile auto-ensured");
+          logger.info(
+            { component: "Identity", email: user.email },
+            "Admin profile auto-ensured",
+          );
         } else {
           const { data: userProfile } = await supabaseAdmin
             .from("profiles")
@@ -109,7 +129,10 @@ router.post(
             .single();
           isOwner = userProfile?.role === "admin";
         }
-        logger.info({ component: "Identity", userId: user.id, isOwner }, "Face check: role resolved");
+        logger.info(
+          { component: "Identity", userId: user.id, isOwner },
+          "Face check: role resolved",
+        );
       }
 
       // Check if this is the owner by comparing face with stored reference
@@ -121,23 +144,45 @@ router.post(
           // Get owner profile (admin role)
           const { data: ownerProfile } = await supabaseAdmin
             .from("profiles")
-            .select("id, display_name, face_reference, preferred_language, role")
+            .select(
+              "id, display_name, face_reference, preferred_language, role",
+            )
             .eq("role", "admin")
             .single();
 
           // Auto-update face_reference if too short (was truncated by old bug)
-          if (ownerProfile && isOwner && face.length > 1000 && (!ownerProfile.face_reference || ownerProfile.face_reference.length < 1000)) {
-            await supabaseAdmin.from("profiles").update({
-              face_reference: face.substring(0, 100000),
-              updated_at: new Date().toISOString(),
-            }).eq("id", ownerProfile.id);
-            logger.info({ component: "Identity" }, "Auto-updated face_reference (was truncated)");
+          if (
+            ownerProfile &&
+            isOwner &&
+            face.length > 1000 &&
+            (!ownerProfile.face_reference ||
+              ownerProfile.face_reference.length < 1000)
+          ) {
+            await supabaseAdmin
+              .from("profiles")
+              .update({
+                face_reference: face.substring(0, 100000),
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", ownerProfile.id);
+            logger.info(
+              { component: "Identity" },
+              "Auto-updated face_reference (was truncated)",
+            );
             // Since we're the authenticated admin, grant access directly
             ownerMatch = true;
-            matchedUser = { name: ownerProfile.display_name || "Owner", lang: ownerProfile.preferred_language || "en" };
+            matchedUser = {
+              name: ownerProfile.display_name || "Owner",
+              lang: ownerProfile.preferred_language || "en",
+            };
           }
 
-          if (!ownerMatch && ownerProfile?.face_reference && ownerProfile.face_reference.length > 1000 && process.env.OPENAI_API_KEY) {
+          if (
+            !ownerMatch &&
+            ownerProfile?.face_reference &&
+            ownerProfile.face_reference.length > 1000 &&
+            process.env.OPENAI_API_KEY
+          ) {
             // Use OpenAI Vision to compare faces
             const r = await fetch(
               "https://api.openai.com/v1/chat/completions",
@@ -191,11 +236,19 @@ router.post(
                 lang: ownerProfile.preferred_language || "en",
               };
               // Silent quality upgrade — if new photo is better, update reference quietly
-              if (face.length > (ownerProfile.face_reference?.length || 0) + 500) {
-                supabaseAdmin.from("profiles").update({
-                  face_reference: face.substring(0, 100000),
-                  updated_at: new Date().toISOString(),
-                }).eq("id", ownerProfile.id).then(() => { }).catch(() => { });
+              if (
+                face.length >
+                (ownerProfile.face_reference?.length || 0) + 500
+              ) {
+                supabaseAdmin
+                  .from("profiles")
+                  .update({
+                    face_reference: face.substring(0, 100000),
+                    updated_at: new Date().toISOString(),
+                  })
+                  .eq("id", ownerProfile.id)
+                  .then(() => {})
+                  .catch(() => {});
               }
             }
           }
@@ -209,7 +262,16 @@ router.post(
 
       // ═══ BRAIN INTEGRATION — remember who was recognized ═══
       if (brain && user?.id && (ownerMatch || matchedUser)) {
-        brain.saveMemory(user.id, "context", "Recunoaștere facială: " + (matchedUser?.name || "Owner") + " identificat", { type: "identity" }).catch(() => { });
+        brain
+          .saveMemory(
+            user.id,
+            "context",
+            "Recunoaștere facială: " +
+              (matchedUser?.name || "Owner") +
+              " identificat",
+            { type: "identity" },
+          )
+          .catch(() => {});
       }
 
       const confirmed = ownerMatch || isOwner;
@@ -219,9 +281,9 @@ router.post(
           matchedUser ||
           (user
             ? {
-              name: user.name || user.email,
-              lang: user.preferred_language || "en",
-            }
+                name: user.name || user.email,
+                lang: user.preferred_language || "en",
+              }
             : null),
       };
       // If owner confirmed, include admin token for auto-auth

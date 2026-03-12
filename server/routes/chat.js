@@ -10,7 +10,7 @@ const logger = require("../logger");
 const { validate, chatSchema, memorySchema } = require("../validation");
 const { checkUsage, incrementUsage } = require("../payments");
 const { buildSystemPrompt, buildNewbornPrompt } = require("../persona");
-const { KelionBrain } = require("../brain");
+const { _KelionBrain } = require("../brain");
 const { thinkV4 } = require("../brain-v4");
 const { MODELS } = require("../config/models");
 const { notify } = require("../notifications");
@@ -212,7 +212,7 @@ router.post("/chat", chatLimiter, validate(chatSchema), async (req, res) => {
 
     // V4 returns the final reply directly from Gemini (tool calling + response in one)
     let reply = thought.enrichedMessage;
-    let engine =
+    const engine =
       thought.agent === "v4-gemini-tools" ? "Gemini-V4" : "V3-Fallback";
 
     // ── SANITIZE: Strip leaked system instructions from reply ──
@@ -401,7 +401,7 @@ router.post("/chat", chatLimiter, validate(chatSchema), async (req, res) => {
       else emotion = "happy"; // default to happy, not neutral — feels more alive
     }
     // Parse [GESTURE:xxx] tags from AI reply (brain controls body language)
-    let gestures = [];
+    const gestures = [];
     const gestureMatches = reply.matchAll(/\[GESTURE:\s*(\w+)\]/gi);
     for (const gm of gestureMatches) gestures.push(gm[1].toLowerCase());
     reply = reply.replace(/\[GESTURE:\s*\w+\]/gi, "").trim();
@@ -413,7 +413,7 @@ router.post("/chat", chatLimiter, validate(chatSchema), async (req, res) => {
       reply = reply.replace(/\[POSE:\s*\w+\]/gi, "").trim();
     }
     // Parse [BODY:xxx] tags from AI reply (per-limb body actions)
-    let bodyActions = [];
+    const bodyActions = [];
     const bodyMatches = reply.matchAll(/\[BODY:\s*(\w+)\]/gi);
     for (const bm of bodyMatches) bodyActions.push(bm[1]);
     reply = reply.replace(/\[BODY:\s*\w+\]/gi, "").trim();
@@ -449,7 +449,7 @@ router.post(
   chatLimiter,
   validate(chatSchema),
   async (req, res) => {
-    let heartbeat = null; // Declared outside try so finally can always clear it
+    const heartbeat = null; // Declared outside try so finally can always clear it
     try {
       const { getUserFromToken, supabaseAdmin, brain } = req.app.locals;
       const {
@@ -544,7 +544,7 @@ router.post(
       msgs.push({ role: "user", content: sanitizeReply(thought.enrichedMessage) });
 
       let fullReply = "";
-      const heartbeat = setInterval(() => {
+      const _heartbeat = setInterval(() => {
         try {
           res.write(":heartbeat\n\n");
         } catch {

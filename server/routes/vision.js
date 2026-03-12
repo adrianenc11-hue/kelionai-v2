@@ -17,7 +17,10 @@ function withTimeout(promise, ms = 10000, label = "operation") {
   return Promise.race([
     promise,
     new Promise((_, reject) =>
-      setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms),
+      setTimeout(
+        () => reject(new Error(`${label} timed out after ${ms}ms`)),
+        ms,
+      ),
     ),
   ]);
 }
@@ -35,8 +38,7 @@ router.post("/", apiLimiter, validate(visionSchema), async (req, res) => {
   try {
     const { getUserFromToken, supabaseAdmin, brain } = req.app.locals;
     const { image, avatar = "kelion", language = "ro" } = req.body;
-    if (!image)
-      return res.status(503).json({ error: "Vision unavailable" });
+    if (!image) return res.status(503).json({ error: "Vision unavailable" });
 
     const user = await getUserFromToken(req);
     const usage = await checkUsage(user?.id, "vision", supabaseAdmin);
@@ -68,34 +70,41 @@ Answer in ${LANGS[language] || "English"}, concise but detailed.`;
     // PRIMARY: GPT-5.4 Vision
     if (process.env.OPENAI_API_KEY) {
       try {
-        const r = await withTimeout(fetch("https://api.openai.com/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: "Bearer " + process.env.OPENAI_API_KEY,
-          },
-          body: JSON.stringify({
-            model: MODELS.OPENAI_VISION,
-            max_tokens: 1024,
-            messages: [
-              {
-                role: "user",
-                content: [
-                  {
-                    type: "image_url",
-                    image_url: { url: `data:image/jpeg;base64,${image}` },
-                  },
-                  { type: "text", text: prompt },
-                ],
-              },
-            ],
+        const r = await withTimeout(
+          fetch("https://api.openai.com/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: "Bearer " + process.env.OPENAI_API_KEY,
+            },
+            body: JSON.stringify({
+              model: MODELS.OPENAI_VISION,
+              max_tokens: 1024,
+              messages: [
+                {
+                  role: "user",
+                  content: [
+                    {
+                      type: "image_url",
+                      image_url: { url: `data:image/jpeg;base64,${image}` },
+                    },
+                    { type: "text", text: prompt },
+                  ],
+                },
+              ],
+            }),
           }),
-        }), 25000, "vision:GPT-5.4");
+          25000,
+          "vision:GPT-5.4",
+        );
         const d = await r.json();
         description = d.choices?.[0]?.message?.content;
         if (description) engine = "GPT-5.4";
       } catch (e) {
-        logger.warn({ component: "Vision", err: e.message }, "GPT-5.4 Vision failed");
+        logger.warn(
+          { component: "Vision", err: e.message },
+          "GPT-5.4 Vision failed",
+        );
       }
     }
 
@@ -104,25 +113,37 @@ Answer in ${LANGS[language] || "English"}, concise but detailed.`;
     if (!description && geminiKey) {
       try {
         const geminiModel = MODELS.GEMINI_VISION || "gemini-3.1-flash";
-        const r = await withTimeout(fetch(`https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiKey}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{
-              role: "user",
-              parts: [
-                { inlineData: { mimeType: "image/jpeg", data: image } },
-                { text: prompt },
-              ],
-            }],
-            generationConfig: { maxOutputTokens: 1024 },
-          }),
-        }), 20000, "vision:Gemini");
+        const r = await withTimeout(
+          fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiKey}`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                contents: [
+                  {
+                    role: "user",
+                    parts: [
+                      { inlineData: { mimeType: "image/jpeg", data: image } },
+                      { text: prompt },
+                    ],
+                  },
+                ],
+                generationConfig: { maxOutputTokens: 1024 },
+              }),
+            },
+          ),
+          20000,
+          "vision:Gemini",
+        );
         const d = await r.json();
         description = d.candidates?.[0]?.content?.parts?.[0]?.text;
         if (description) engine = "Gemini";
       } catch (e) {
-        logger.warn({ component: "Vision", err: e.message }, "Gemini Vision fallback failed");
+        logger.warn(
+          { component: "Vision", err: e.message },
+          "Gemini Vision fallback failed",
+        );
       }
     }
 
@@ -138,9 +159,24 @@ Answer in ${LANGS[language] || "English"}, concise but detailed.`;
 
       // Save to brain memory so brain remembers what it saw
       if (brain && user?.id) {
-        brain.saveMemory(user.id, "visual", "Am văzut: " + description.substring(0, 500), {
-          avatar, language, engine, emotion,
-        }).catch((e) => logger.warn({ component: "Vision", err: e.message }, "brain.saveMemory failed"));
+        brain
+          .saveMemory(
+            user.id,
+            "visual",
+            "Am văzut: " + description.substring(0, 500),
+            {
+              avatar,
+              language,
+              engine,
+              emotion,
+            },
+          )
+          .catch((e) =>
+            logger.warn(
+              { component: "Vision", err: e.message },
+              "brain.saveMemory failed",
+            ),
+          );
       }
     }
 
@@ -151,7 +187,10 @@ Answer in ${LANGS[language] || "English"}, concise but detailed.`;
       ),
     );
 
-    logger.info({ component: "Vision", engine, emotion, userId: user?.id }, "Vision analysis complete");
+    logger.info(
+      { component: "Vision", engine, emotion, userId: user?.id },
+      "Vision analysis complete",
+    );
 
     res.json({
       description: description || "Could not analyze.",

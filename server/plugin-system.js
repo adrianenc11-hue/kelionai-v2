@@ -1,6 +1,6 @@
 /**
  * KelionAI — Plugin System
- * 
+ *
  * Standard schema for external tool plugins.
  * Plugins can be installed/uninstalled, have manifests, and execute via brain.
  * Supabase table: brain_plugins
@@ -45,20 +45,25 @@ const BUILTIN_PLUGINS = [
     category: "search",
     builtin: true,
     status: "active",
-    endpoints: [{ method: "POST", path: "/api/brain/search", description: "Web search" }],
+    endpoints: [
+      { method: "POST", path: "/api/brain/search", description: "Web search" },
+    ],
     auth: { type: "api_key", envKey: "TAVILY_API_KEY" },
   },
   {
     id: "tts-elevenlabs",
     name: "ElevenLabs TTS",
     version: "3.0.0",
-    description: "Natural text-to-speech with emotion control and voice cloning",
+    description:
+      "Natural text-to-speech with emotion control and voice cloning",
     author: "KelionAI",
     icon: "🎙️",
     category: "voice",
     builtin: true,
     status: "active",
-    endpoints: [{ method: "POST", path: "/api/voice/tts", description: "Text to speech" }],
+    endpoints: [
+      { method: "POST", path: "/api/voice/tts", description: "Text to speech" },
+    ],
     auth: { type: "api_key", envKey: "ELEVENLABS_API_KEY" },
   },
   {
@@ -71,7 +76,13 @@ const BUILTIN_PLUGINS = [
     category: "vision",
     builtin: true,
     status: "active",
-    endpoints: [{ method: "POST", path: "/api/vision/analyze", description: "Analyze image" }],
+    endpoints: [
+      {
+        method: "POST",
+        path: "/api/vision/analyze",
+        description: "Analyze image",
+      },
+    ],
     auth: { type: "api_key", envKey: "OPENAI_API_KEY" },
   },
   {
@@ -84,28 +95,38 @@ const BUILTIN_PLUGINS = [
     category: "finance",
     builtin: true,
     status: "active",
-    endpoints: [{ method: "GET", path: "/api/trading/analysis", description: "Market analysis" }],
+    endpoints: [
+      {
+        method: "GET",
+        path: "/api/trading/analysis",
+        description: "Market analysis",
+      },
+    ],
     auth: { type: "none" },
   },
 ];
 
 // Load builtins on startup
-BUILTIN_PLUGINS.forEach(p => installedPlugins.set(p.id, p));
+BUILTIN_PLUGINS.forEach((p) => installedPlugins.set(p.id, p));
 
 // ═══ PLUGIN VALIDATION ═══
 function validateManifest(manifest) {
   const errors = [];
-  if (!manifest.id || typeof manifest.id !== "string") errors.push("id required (string)");
-  if (!manifest.name || manifest.name.length < 2) errors.push("name required (min 2 chars)");
+  if (!manifest.id || typeof manifest.id !== "string")
+    errors.push("id required (string)");
+  if (!manifest.name || manifest.name.length < 2)
+    errors.push("name required (min 2 chars)");
   if (!manifest.version) errors.push("version required (semver)");
   if (!manifest.description) errors.push("description required");
-  if (!manifest.endpoints || !Array.isArray(manifest.endpoints)) errors.push("endpoints required (array)");
+  if (!manifest.endpoints || !Array.isArray(manifest.endpoints))
+    errors.push("endpoints required (array)");
   if (manifest.endpoints) {
     for (const ep of manifest.endpoints) {
       if (!ep.method || !ep.path) errors.push(`endpoint missing method/path`);
     }
   }
-  if (manifest.id && !/^[a-z0-9-]+$/.test(manifest.id)) errors.push("id must be lowercase alphanumeric with hyphens");
+  if (manifest.id && !/^[a-z0-9-]+$/.test(manifest.id))
+    errors.push("id must be lowercase alphanumeric with hyphens");
   return errors;
 }
 
@@ -113,7 +134,8 @@ function validateManifest(manifest) {
 async function executePlugin(pluginId, action, params = {}) {
   const plugin = installedPlugins.get(pluginId);
   if (!plugin) return { success: false, error: "Plugin not found" };
-  if (plugin.status !== "active") return { success: false, error: "Plugin is disabled" };
+  if (plugin.status !== "active")
+    return { success: false, error: "Plugin is disabled" };
 
   // Check auth
   if (plugin.auth?.type === "api_key" && plugin.auth.envKey) {
@@ -123,8 +145,10 @@ async function executePlugin(pluginId, action, params = {}) {
   }
 
   // Find matching endpoint
-  const endpoint = plugin.endpoints.find(ep =>
-    ep.path.includes(action) || ep.description?.toLowerCase().includes(action.toLowerCase())
+  const endpoint = plugin.endpoints.find(
+    (ep) =>
+      ep.path.includes(action) ||
+      ep.description?.toLowerCase().includes(action.toLowerCase()),
   );
 
   if (!endpoint) {
@@ -154,7 +178,10 @@ async function executePlugin(pluginId, action, params = {}) {
     const data = await response.json();
     return { success: true, data, plugin: plugin.name };
   } catch (e) {
-    logger.warn({ component: "Plugin", pluginId, err: e.message }, "Plugin execution failed");
+    logger.warn(
+      { component: "Plugin", pluginId, err: e.message },
+      "Plugin execution failed",
+    );
     return { success: false, error: e.message, plugin: plugin.name };
   }
 }
@@ -163,7 +190,7 @@ async function executePlugin(pluginId, action, params = {}) {
 
 // GET /api/plugins — List all installed plugins
 router.get("/", (_req, res) => {
-  const plugins = [...installedPlugins.values()].map(p => ({
+  const plugins = [...installedPlugins.values()].map((p) => ({
     id: p.id,
     name: p.name,
     version: p.version,
@@ -187,30 +214,49 @@ router.post("/install", express.json(), async (req, res) => {
 
     // Validate
     const errors = validateManifest(manifest);
-    if (errors.length > 0) return res.status(400).json({ error: "Invalid manifest", errors });
+    if (errors.length > 0)
+      return res.status(400).json({ error: "Invalid manifest", errors });
 
     // Check for conflicts
     if (installedPlugins.has(manifest.id)) {
-      return res.status(409).json({ error: `Plugin ${manifest.id} already installed. Uninstall first.` });
+      return res.status(409).json({
+        error: `Plugin ${manifest.id} already installed. Uninstall first.`,
+      });
     }
 
     // Install
-    const plugin = { ...manifest, status: "active", installedAt: new Date().toISOString() };
+    const plugin = {
+      ...manifest,
+      status: "active",
+      installedAt: new Date().toISOString(),
+    };
     installedPlugins.set(manifest.id, plugin);
 
     // Persist to Supabase
     const { supabaseAdmin } = req.app.locals;
     if (supabaseAdmin) {
-      await supabaseAdmin.from("brain_plugins").upsert({
-        id: manifest.id,
-        manifest: JSON.stringify(plugin),
-        status: "active",
-        installed_at: new Date().toISOString(),
-      }, { onConflict: "id" }).catch(() => { });
+      await supabaseAdmin
+        .from("brain_plugins")
+        .upsert(
+          {
+            id: manifest.id,
+            manifest: JSON.stringify(plugin),
+            status: "active",
+            installed_at: new Date().toISOString(),
+          },
+          { onConflict: "id" },
+        )
+        .catch(() => {});
     }
 
-    logger.info({ component: "Plugin", pluginId: manifest.id }, `🔌 Plugin installed: ${manifest.name}`);
-    res.json({ success: true, plugin: { id: manifest.id, name: manifest.name } });
+    logger.info(
+      { component: "Plugin", pluginId: manifest.id },
+      `🔌 Plugin installed: ${manifest.name}`,
+    );
+    res.json({
+      success: true,
+      plugin: { id: manifest.id, name: manifest.name },
+    });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -221,16 +267,24 @@ router.delete("/:id", async (req, res) => {
   const pluginId = req.params.id;
   const plugin = installedPlugins.get(pluginId);
   if (!plugin) return res.status(404).json({ error: "Plugin not found" });
-  if (plugin.builtin) return res.status(403).json({ error: "Cannot uninstall builtin plugins" });
+  if (plugin.builtin)
+    return res.status(403).json({ error: "Cannot uninstall builtin plugins" });
 
   installedPlugins.delete(pluginId);
 
   const { supabaseAdmin } = req.app.locals;
   if (supabaseAdmin) {
-    await supabaseAdmin.from("brain_plugins").delete().eq("id", pluginId).catch(() => { });
+    await supabaseAdmin
+      .from("brain_plugins")
+      .delete()
+      .eq("id", pluginId)
+      .catch(() => {});
   }
 
-  logger.info({ component: "Plugin", pluginId }, `🔌 Plugin uninstalled: ${plugin.name}`);
+  logger.info(
+    { component: "Plugin", pluginId },
+    `🔌 Plugin uninstalled: ${plugin.name}`,
+  );
   res.json({ success: true });
 });
 
@@ -247,21 +301,36 @@ router.post("/:id/toggle", async (req, res) => {
 async function restorePlugins(supabase) {
   if (!supabase) return;
   try {
-    const { data } = await supabase.from("brain_plugins").select("manifest, status").eq("status", "active");
+    const { data } = await supabase
+      .from("brain_plugins")
+      .select("manifest, status")
+      .eq("status", "active");
     if (data) {
-      data.forEach(row => {
+      data.forEach((row) => {
         try {
           const manifest = JSON.parse(row.manifest);
           if (manifest.id && !manifest.builtin) {
-            installedPlugins.set(manifest.id, { ...manifest, status: row.status });
+            installedPlugins.set(manifest.id, {
+              ...manifest,
+              status: row.status,
+            });
           }
-        } catch { }
+        } catch { /* ignored */ }
       });
       if (data.length > 0) {
-        logger.info({ component: "Plugin", count: data.length }, `🔌 Restored ${data.length} plugins from DB`);
+        logger.info(
+          { component: "Plugin", count: data.length },
+          `🔌 Restored ${data.length} plugins from DB`,
+        );
       }
     }
-  } catch { }
+  } catch { /* ignored */ }
 }
 
-module.exports = { router, executePlugin, installedPlugins, restorePlugins, validateManifest };
+module.exports = {
+  router,
+  executePlugin,
+  installedPlugins,
+  restorePlugins,
+  validateManifest,
+};

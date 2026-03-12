@@ -12,7 +12,7 @@ const logger = require("./logger");
 const { MODELS } = require("./config/models");
 
 const MAX_STEPS = 20;
-const STEP_TIMEOUT_MS = 30000; // 30s per step
+const _STEP_TIMEOUT_MS = 30000; // 30s per step
 const MAX_CONCURRENT_TASKS = 3;
 
 // In-memory task tracker
@@ -30,9 +30,13 @@ async function startTask(brain, userId, goal, options = {}) {
   if (!brain || !goal) return { error: "Brain and goal required" };
 
   // Check concurrent task limit
-  const userTasks = [...activeTasks.values()].filter(t => t.userId === userId && t.status === "running");
+  const userTasks = [...activeTasks.values()].filter(
+    (t) => t.userId === userId && t.status === "running",
+  );
   if (userTasks.length >= MAX_CONCURRENT_TASKS) {
-    return { error: `Maximum ${MAX_CONCURRENT_TASKS} concurrent tasks. Wait for one to finish.` };
+    return {
+      error: `Maximum ${MAX_CONCURRENT_TASKS} concurrent tasks. Wait for one to finish.`,
+    };
   }
 
   const taskId = `auto_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -58,27 +62,39 @@ async function startTask(brain, userId, goal, options = {}) {
 
   // Save to DB
   if (brain.supabaseAdmin) {
-    brain.supabaseAdmin.from("autonomous_tasks").insert({
-      id: taskId,
-      user_id: userId,
-      goal,
-      status: "running",
-      steps: JSON.stringify([]),
-      started_at: task.startedAt,
-    }).catch(() => { });
+    brain.supabaseAdmin
+      .from("autonomous_tasks")
+      .insert({
+        id: taskId,
+        user_id: userId,
+        goal,
+        status: "running",
+        steps: JSON.stringify([]),
+        started_at: task.startedAt,
+      })
+      .catch(() => {});
   }
 
-  logger.info({ component: "Autonomous", taskId, goal: goal.substring(0, 100) },
-    `🤖 Autonomous task started: ${goal.substring(0, 60)}`);
+  logger.info(
+    { component: "Autonomous", taskId, goal: goal.substring(0, 100) },
+    `🤖 Autonomous task started: ${goal.substring(0, 60)}`,
+  );
 
   // Run task asynchronously (non-blocking)
-  runTaskLoop(brain, task).catch(e => {
+  runTaskLoop(brain, task).catch((e) => {
     task.status = "failed";
     task.error = e.message;
-    logger.error({ component: "Autonomous", taskId, err: e.message }, "Autonomous task failed");
+    logger.error(
+      { component: "Autonomous", taskId, err: e.message },
+      "Autonomous task failed",
+    );
   });
 
-  return { taskId, status: "running", message: "Task started. I'll work on it autonomously." };
+  return {
+    taskId,
+    status: "running",
+    message: "Task started. I'll work on it autonomously.",
+  };
 }
 
 /**
@@ -89,7 +105,11 @@ async function runTaskLoop(brain, task) {
     // ═══ STEP 1: PLAN ═══
     const plan = await createPlan(brain, task.goal);
     task.plan = plan;
-    task.steps.push({ type: "plan", content: plan, timestamp: new Date().toISOString() });
+    task.steps.push({
+      type: "plan",
+      content: plan,
+      timestamp: new Date().toISOString(),
+    });
 
     if (!plan || !plan.steps || plan.steps.length === 0) {
       task.status = "failed";
@@ -105,8 +125,15 @@ async function runTaskLoop(brain, task) {
       task.currentStep = i + 1;
       const planStep = plan.steps[i];
 
-      logger.info({ component: "Autonomous", taskId: task.taskId, step: i + 1, total: plan.steps.length },
-        `🔄 Step ${i + 1}/${plan.steps.length}: ${planStep.action}`);
+      logger.info(
+        {
+          component: "Autonomous",
+          taskId: task.taskId,
+          step: i + 1,
+          total: plan.steps.length,
+        },
+        `🔄 Step ${i + 1}/${plan.steps.length}: ${planStep.action}`,
+      );
 
       // Execute step
       const stepResult = await executeStep(brain, task, planStep);
@@ -130,8 +157,10 @@ async function runTaskLoop(brain, task) {
 
       // If verification fails, try to recover once
       if (!verification.passed && i < task.maxSteps - 1) {
-        logger.warn({ component: "Autonomous", taskId: task.taskId, step: i + 1 },
-          "⚠️ Step verification failed — attempting recovery");
+        logger.warn(
+          { component: "Autonomous", taskId: task.taskId, step: i + 1 },
+          "⚠️ Step verification failed — attempting recovery",
+        );
         const recovery = await executeStep(brain, task, {
           action: `Fix: ${verification.feedback}`,
           tool: planStep.tool,
@@ -154,28 +183,43 @@ async function runTaskLoop(brain, task) {
     task.status = "completed";
     task.completedAt = new Date().toISOString();
 
-    logger.info({ component: "Autonomous", taskId: task.taskId, steps: task.steps.length },
-      `✅ Autonomous task completed: ${task.goal.substring(0, 60)}`);
+    logger.info(
+      {
+        component: "Autonomous",
+        taskId: task.taskId,
+        steps: task.steps.length,
+      },
+      `✅ Autonomous task completed: ${task.goal.substring(0, 60)}`,
+    );
 
     // Save final result to brain memory
     if (brain.supabaseAdmin && task.userId) {
-      brain.saveMemory(task.userId, "autonomous_result",
-        `Autonomous task completed: ${task.goal}\n\nResult: ${task.result?.summary || "Done"}`,
-        { taskId: task.taskId, steps: task.steps.length }, 8
-      ).catch(() => { });
+      brain
+        .saveMemory(
+          task.userId,
+          "autonomous_result",
+          `Autonomous task completed: ${task.goal}\n\nResult: ${task.result?.summary || "Done"}`,
+          { taskId: task.taskId, steps: task.steps.length },
+          8,
+        )
+        .catch(() => {});
     }
 
     // Notify user
     if (task.notifyOnComplete) {
       // Could trigger push notification, email, or in-app notification
-      logger.info({ component: "Autonomous", taskId: task.taskId, userId: task.userId },
-        "📬 Task complete — user notified");
+      logger.info(
+        { component: "Autonomous", taskId: task.taskId, userId: task.userId },
+        "📬 Task complete — user notified",
+      );
     }
-
   } catch (e) {
     task.status = "failed";
     task.error = e.message;
-    logger.error({ component: "Autonomous", taskId: task.taskId, err: e.message }, "Autonomous loop failed");
+    logger.error(
+      { component: "Autonomous", taskId: task.taskId, err: e.message },
+      "Autonomous loop failed",
+    );
   }
 
   await updateTaskInDB(brain, task);
@@ -186,7 +230,10 @@ async function runTaskLoop(brain, task) {
  */
 async function createPlan(brain, goal) {
   const geminiKey = process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
-  if (!geminiKey) return { steps: [{ action: goal, tool: "search", params: { query: goal } }] };
+  if (!geminiKey)
+    return {
+      steps: [{ action: goal, tool: "search", params: { query: goal } }],
+    };
 
   try {
     const prompt = `You are an AI task planner. Break down this goal into specific executable steps.
@@ -209,17 +256,23 @@ Rules:
 - Be specific in action descriptions
 - Return ONLY the JSON array`;
 
-    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODELS.GEMINI_CHAT}:generateContent?key=${geminiKey}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.3, maxOutputTokens: 1000 },
-      }),
-      signal: AbortSignal.timeout(15000),
-    });
+    const r = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${MODELS.GEMINI_CHAT}:generateContent?key=${geminiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.3, maxOutputTokens: 1000 },
+        }),
+        signal: AbortSignal.timeout(15000),
+      },
+    );
 
-    if (!r.ok) return { steps: [{ action: goal, tool: "search", params: { query: goal } }] };
+    if (!r.ok)
+      return {
+        steps: [{ action: goal, tool: "search", params: { query: goal } }],
+      };
     const data = await r.json();
     const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
 
@@ -229,7 +282,10 @@ Rules:
       return { steps: steps.slice(0, 10) };
     }
   } catch (e) {
-    logger.warn({ component: "Autonomous", err: e.message }, "Plan creation failed — using simple plan");
+    logger.warn(
+      { component: "Autonomous", err: e.message },
+      "Plan creation failed — using simple plan",
+    );
   }
 
   return { steps: [{ action: goal, tool: "search", params: { query: goal } }] };
@@ -267,7 +323,11 @@ async function executeStep(brain, task, step) {
         return { success: false, error: "No database", tool };
       }
       case "document_gen": {
-        return { success: true, data: { type: params.type, topic: params.topic, generated: true }, tool };
+        return {
+          success: true,
+          data: { type: params.type, topic: params.topic, generated: true },
+          tool,
+        };
       }
       case "trade_intelligence": {
         try {
@@ -275,11 +335,19 @@ async function executeStep(brain, task, step) {
           const analysis = investSim.getPortfolioSummary();
           return { success: true, data: analysis, tool };
         } catch {
-          return { success: false, error: "Trading module not available", tool };
+          return {
+            success: false,
+            error: "Trading module not available",
+            tool,
+          };
         }
       }
       default:
-        return { success: true, data: { action: step.action, note: "Executed via default handler" }, tool };
+        return {
+          success: true,
+          data: { action: step.action, note: "Executed via default handler" },
+          tool,
+        };
     }
   } catch (e) {
     return { success: false, error: e.message, tool };
@@ -295,7 +363,10 @@ async function verifyStep(brain, task, planStep, stepResult) {
   }
 
   // Simple verification — check if result has data
-  if (stepResult.data && (typeof stepResult.data === "object" || typeof stepResult.data === "string")) {
+  if (
+    stepResult.data &&
+    (typeof stepResult.data === "object" || typeof stepResult.data === "string")
+  ) {
     return { passed: true, feedback: "Step completed successfully" };
   }
 
@@ -306,10 +377,15 @@ async function verifyStep(brain, task, planStep, stepResult) {
  * Synthesize final result from all steps
  */
 async function synthesizeResult(brain, task) {
-  const successfulSteps = task.steps.filter(s => s.type === "execute" && s.result?.success);
-  const summary = successfulSteps.map(s =>
-    `Step ${s.step}: ${s.action} → ${typeof s.result.data === "string" ? s.result.data.substring(0, 200) : "OK"}`
-  ).join("\n");
+  const successfulSteps = task.steps.filter(
+    (s) => s.type === "execute" && s.result?.success,
+  );
+  const summary = successfulSteps
+    .map(
+      (s) =>
+        `Step ${s.step}: ${s.action} → ${typeof s.result.data === "string" ? s.result.data.substring(0, 200) : "OK"}`,
+    )
+    .join("\n");
 
   return {
     summary: summary || "Task completed but no data collected",
@@ -327,19 +403,22 @@ async function synthesizeResult(brain, task) {
 async function updateTaskInDB(brain, task) {
   if (!brain.supabaseAdmin) return;
   try {
-    await brain.supabaseAdmin.from("autonomous_tasks").upsert({
-      id: task.taskId,
-      user_id: task.userId,
-      goal: task.goal,
-      status: task.status,
-      current_step: task.currentStep,
-      steps: JSON.stringify(task.steps.slice(-20)), // Keep last 20 steps
-      result: task.result ? JSON.stringify(task.result) : null,
-      error: task.error,
-      started_at: task.startedAt,
-      completed_at: task.completedAt,
-    }, { onConflict: "id" });
-  } catch { }
+    await brain.supabaseAdmin.from("autonomous_tasks").upsert(
+      {
+        id: task.taskId,
+        user_id: task.userId,
+        goal: task.goal,
+        status: task.status,
+        current_step: task.currentStep,
+        steps: JSON.stringify(task.steps.slice(-20)), // Keep last 20 steps
+        result: task.result ? JSON.stringify(task.result) : null,
+        error: task.error,
+        started_at: task.startedAt,
+        completed_at: task.completedAt,
+      },
+      { onConflict: "id" },
+    );
+  } catch { /* ignored */ }
 }
 
 /**
@@ -368,7 +447,7 @@ function getTaskStatus(taskId) {
     status: task.status,
     currentStep: task.currentStep,
     totalSteps: task.plan?.steps?.length || 0,
-    stepsCompleted: task.steps.filter(s => s.type === "execute").length,
+    stepsCompleted: task.steps.filter((s) => s.type === "execute").length,
     result: task.result,
     error: task.error,
     startedAt: task.startedAt,
@@ -381,8 +460,8 @@ function getTaskStatus(taskId) {
  */
 function getUserTasks(userId) {
   return [...activeTasks.values()]
-    .filter(t => t.userId === userId)
-    .map(t => getTaskStatus(t.taskId))
+    .filter((t) => t.userId === userId)
+    .map((t) => getTaskStatus(t.taskId))
     .sort((a, b) => new Date(b.startedAt) - new Date(a.startedAt));
 }
 

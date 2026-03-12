@@ -592,7 +592,7 @@ function calculateStochastic(highs, lows, closes, kPeriod = 14, dPeriod = 3) {
   for (let i = dPeriod - 1; i < kValues.length; i++) {
     dValues.push(
       kValues.slice(i - dPeriod + 1, i + 1).reduce((a, b) => a + b, 0) /
-      dPeriod,
+        dPeriod,
     );
   }
   const d = dValues[dValues.length - 1] || k;
@@ -917,8 +917,8 @@ function calculateROC(closes, period = 12) {
   const value =
     closes[closes.length - 1 - period] !== 0
       ? ((closes[closes.length - 1] - closes[closes.length - 1 - period]) /
-        closes[closes.length - 1 - period]) *
-      100
+          closes[closes.length - 1 - period]) *
+        100
       : 0;
   let signal = "HOLD";
   if (value > 5) signal = "BUY";

@@ -1,63 +1,61 @@
 {
   "version": "1.0",
-  "commit": "ed53137cc652b40597d38ef8333c9d0603c7a615",
+  "commit": "8853db78fd3a45fe23753d2ad30dc0bb7771d23d",
   "branch": "master",
-  "preview_url": "https://kelionai.app",
-  "timestamp": "2026-03-05T11:12:58.632Z",
+  "preview_url": null,
+  "timestamp": "2026-03-12T18:45:30.721Z",
   "node_version": "v20.11.0",
-  "overall": "FAIL",
+  "overall": "PASS",
   "gates": [
     {
       "name": "Prettier (format check)",
       "status": "pass",
-      "duration": 2289,
+      "duration": 3563,
       "output": "Checking formatting...\nAll matched files use Prettier code style!"
     },
     {
       "name": "Lint (ESLint)",
       "status": "pass",
-      "duration": 1430,
-      "output": ""
+      "duration": 2204,
+      "output": "                                           no-unused-vars\n  386:18  warning  'e' is defined but never used                                               no-unused-vars\n  445:18  warning  'asset' is defined but never used. Allowed unused args must match /^_/u     no-unused-vars\n  445:25  warning  'candle1m' is defined but never used. Allowed unused args must match /^_/u  no-unused-vars\n\n✖ 179 problems (0 errors, 179 warnings)\n  0 errors and 21 warnings potentially fixable with the `--fix` option."
     },
     {
       "name": "Typecheck",
       "status": "pass",
-      "duration": 693,
+      "duration": 714,
       "output": "typecheck: N/A (JS-only project)"
     },
     {
       "name": "Unit Tests (Jest)",
       "status": "pass",
-      "duration": 5284,
-      "output": "-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------\n\n=============================== Coverage summary ===============================\nStatements   : 18.42% ( 1221/6626 )\nBranches     : 11.62% ( 577/4962 )\nFunctions    : 16.23% ( 112/690 )\nLines        : 19% ( 1168/6146 )\n================================================================================"
+      "duration": 16983,
+      "output": "--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------\n\n=============================== Coverage summary ===============================\nStatements   : 13.01% ( 2195/16866 )\nBranches     : 6.44% ( 838/13007 )\nFunctions    : 8.18% ( 175/2138 )\nLines        : 13.71% ( 2136/15572 )\n================================================================================"
     },
     {
       "name": "Build Validation",
       "status": "pass",
-      "duration": 689,
+      "duration": 831,
       "output": "Build OK: static assets validated"
     },
     {
       "name": "Security (npm audit)",
       "status": "pass",
-      "duration": 1100,
+      "duration": 1281,
       "output": "found 0 vulnerabilities"
     },
     {
       "name": "Smoke Probe",
-      "status": "pass",
-      "duration": 1041,
-      "output": "🔍 Smoke Probe — https://kelionai.app\n\n✅ /api/payments/plans → 200 [132ms]\n✅ /api/news/public → 200 [256ms]\n✅ /health → 200 [314ms]\n\n3/3 probes passed."
+      "status": "skipped",
+      "reason": "No BASE_URL set"
     },
     {
       "name": "E2E (Playwright)",
-      "status": "fail",
-      "duration": 1500010,
-      "exitCode": null,
-      "output": "ll.spec.js:1013:3 › Deep — API Data Quality › developer v1/status returns real data (51ms)\n  ✓  172 [chromium] › tests\\e2e-full.spec.js:1221:3 › API — Trading › GET /api/trading/status (96ms)\n  ✓  173 [chromium] › tests\\e2e-full.spec.js:1227:3 › API — Trading › GET /api/trading/analysis (30ms)\n  ✓  174 [chromium] › tests\\e2e-full.spec.js:1233:3 › API — Trading › GET /api/trading/signals (55ms)\n  ✓  175 [chromium] › tests\\e2e-full.spec.js:1239:3 › API — Trading › GET /api/trading/portfolio (68ms)"
+      "status": "skipped",
+      "reason": "No BASE_URL set — E2E requires real preview URL"
     }
   ],
   "limitations": [
+    "Smoke + E2E skipped — no BASE_URL (local run only)",
     "Typecheck: N/A (JS-only project)",
     "Lighthouse: not run in CI (no headless Chrome)"
   ]

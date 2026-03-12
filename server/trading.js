@@ -71,13 +71,13 @@ async function updateFearGreedCache() {
         ts: Date.now(),
       };
     }
-  } catch {}
+  } catch { /* ignored */ }
 }
 // Update Fear&Greed every 30 min
 setInterval(updateFearGreedCache, 30 * 60 * 1000);
 setTimeout(updateFearGreedCache, 5000); // first update 5s after boot
 
-function calculateSmartConfluence(prices, volumes) {
+function calculateSmartConfluence(prices, _volumes) {
   const rsi = calculateRSI(prices);
   const macd = calculateMACD(prices);
   const bollinger = calculateBollingerBands(prices);
@@ -696,7 +696,7 @@ function detectSmartMoney(prices, volumes) {
   const len = Math.min(prices.length, volumes.length);
   const p = prices.slice(-len);
   const v = volumes.slice(-len);
-  const last = p[p.length - 1];
+  const _last = p[p.length - 1];
 
   // ── Volume Divergence ──
   const priceTrend =
@@ -832,18 +832,18 @@ async function analyzeMultiTimeframe(asset) {
   for (const tf of timeframes) {
     try {
       // Try ws-engine first (real-time)
-      let candles = wsEngine.getCandles(asset, tf, 100);
+      const candles = wsEngine.getCandles(asset, tf, 100);
       let prices = [],
-        volumes = [];
+        _volumes = [];
 
       if (candles && candles.length >= 20) {
         prices = candles.map((c) => c.close);
-        volumes = candles.map((c) => c.volume || 0);
+        _volumes = candles.map((c) => c.volume || 0);
       } else {
         // Fallback: use fetchRealPrices for this asset
         const data = await fetchRealPrices(asset, 100);
         prices = data.prices;
-        volumes = data.volumes;
+        _volumes = data.volumes;
       }
 
       if (prices.length < 14) continue;
@@ -1535,7 +1535,7 @@ async function analyzeAsset(asset) {
         sentimentText = newsHeadlines.join(" ");
       }
     }
-  } catch (e) {
+  } catch (_e) {
     /* trade-intelligence not available */
   }
   const sentiment = analyzeSentiment(sentimentText);
@@ -2497,7 +2497,7 @@ router.post("/paper/off", (req, res) => {
         )
         .catch(() => {});
     }
-  } catch {}
+  } catch { /* ignored */ }
   res.json(result);
 });
 
@@ -3305,7 +3305,7 @@ router.get("/ai-score/:asset", async (req, res) => {
     let mta = null;
     try {
       mta = await analyzeMultiTimeframe(realAsset);
-    } catch (e) {
+    } catch (_e) {
       /* optional */
     }
 
@@ -3402,7 +3402,7 @@ router.get("/alert-check", async (req, res) => {
           priority: smAgrees ? "HIGH" : "MEDIUM",
           timestamp: new Date().toISOString(),
         });
-      } catch (e) {
+      } catch (_e) {
         // Skip failed assets
       }
     }
@@ -3912,7 +3912,7 @@ setTimeout(async () => {
     const { supabaseAdmin: sb } = require("./supabase");
     await k1Persist.loadState(sb);
     logger.info("[K1] State loaded from Supabase");
-  } catch {}
+  } catch { /* ignored */ }
 }, 5000);
 
 // Start scheduled jobs (forgetting@6h, self-test@12h)
@@ -3920,7 +3920,7 @@ setTimeout(() => {
   try {
     const { supabaseAdmin: sb } = require("./supabase");
     k1Meta.startScheduledJobs(sb);
-  } catch {}
+  } catch { /* ignored */ }
 }, 15000); // 15s after boot
 
 router.get("/k1/evolution", (req, res) => {
@@ -3993,7 +3993,7 @@ async function k1MarketDataFeed() {
               signal,
             };
           }
-        } catch {}
+        } catch { /* ignored */ }
       }),
     );
 
@@ -4030,7 +4030,7 @@ async function k1MarketDataFeed() {
               marketData[k] = { price, change24h, signal };
             }
           }
-        } catch {}
+        } catch { /* ignored */ }
       }),
     );
 
@@ -4049,7 +4049,7 @@ async function k1MarketDataFeed() {
           };
         }
       }
-    } catch {}
+    } catch { /* ignored */ }
 
     // Update K1 World State with real market data
     if (Object.keys(marketData).length > 0) {
@@ -4077,7 +4077,7 @@ async function k1MarketDataFeed() {
           "meta-learning",
         ],
       });
-    } catch {}
+    } catch { /* ignored */ }
   } catch (err) {
     logger.warn({ err: err.message }, "[K1-Feed] Market data feed error");
   }
@@ -4107,7 +4107,7 @@ setInterval(
           );
         }
       }
-    } catch {}
+    } catch { /* ignored */ }
   },
   5 * 60 * 1000,
 );
@@ -4118,7 +4118,7 @@ setInterval(
     try {
       const { supabaseAdmin: sb } = require("./supabase");
       await k1Persist.saveState(sb);
-    } catch {}
+    } catch { /* ignored */ }
   },
   5 * 60 * 1000,
 );

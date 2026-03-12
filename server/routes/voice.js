@@ -32,14 +32,38 @@ const apiLimiter = rateLimit({
 // GET /api/voices — list all available TTS voices
 router.get("/voices", (req, res) => {
   const LANG_NAMES = {
-    ro: "Romanian", en: "English", es: "Spanish", fr: "French",
-    de: "German", it: "Italian", pt: "Portuguese", ru: "Russian",
-    ja: "Japanese", zh: "Chinese", ko: "Korean", ar: "Arabic",
-    hi: "Hindi", tr: "Turkish", pl: "Polish", nl: "Dutch",
-    sv: "Swedish", no: "Norwegian", da: "Danish", fi: "Finnish",
-    cs: "Czech", sk: "Slovak", hu: "Hungarian", hr: "Croatian",
-    bg: "Bulgarian", el: "Greek", he: "Hebrew", uk: "Ukrainian",
-    vi: "Vietnamese", th: "Thai", id: "Indonesian", ms: "Malay",
+    ro: "Romanian",
+    en: "English",
+    es: "Spanish",
+    fr: "French",
+    de: "German",
+    it: "Italian",
+    pt: "Portuguese",
+    ru: "Russian",
+    ja: "Japanese",
+    zh: "Chinese",
+    ko: "Korean",
+    ar: "Arabic",
+    hi: "Hindi",
+    tr: "Turkish",
+    pl: "Polish",
+    nl: "Dutch",
+    sv: "Swedish",
+    no: "Norwegian",
+    da: "Danish",
+    fi: "Finnish",
+    cs: "Czech",
+    sk: "Slovak",
+    hu: "Hungarian",
+    hr: "Croatian",
+    bg: "Bulgarian",
+    el: "Greek",
+    he: "Hebrew",
+    uk: "Ukrainian",
+    vi: "Vietnamese",
+    th: "Thai",
+    id: "Indonesian",
+    ms: "Malay",
     sw: "Swahili",
   };
   const voices = [];
@@ -80,7 +104,8 @@ router.post("/speak", ttsLimiter, validate(speakSchema), async (req, res) => {
         upgrade: true,
       });
 
-    const selectedVoiceSettings = VOICE_EMOTIONS[mood] || VOICE_EMOTIONS.neutral;
+    const selectedVoiceSettings =
+      VOICE_EMOTIONS[mood] || VOICE_EMOTIONS.neutral;
 
     // Check if user has a cloned voice — overrides default
     let vid = null;
@@ -117,7 +142,9 @@ router.post("/speak", ttsLimiter, validate(speakSchema), async (req, res) => {
     if (process.env.ELEVENLABS_API_KEY) {
       try {
         const r = await fetch(
-          "https://api.elevenlabs.io/v1/text-to-speech/" + vid + "/with-timestamps",
+          "https://api.elevenlabs.io/v1/text-to-speech/" +
+            vid +
+            "/with-timestamps",
           {
             method: "POST",
             headers: {
@@ -138,19 +165,32 @@ router.post("/speak", ttsLimiter, validate(speakSchema), async (req, res) => {
             buf = Buffer.from(data.audio_base64, "base64");
             alignment = data.alignment || null;
             logger.info(
-              { component: "Speak", alignmentChars: alignment?.characters?.length || 0 },
-              "ElevenLabs alignment received: " + (alignment?.characters?.length || 0) + " chars",
+              {
+                component: "Speak",
+                alignmentChars: alignment?.characters?.length || 0,
+              },
+              "ElevenLabs alignment received: " +
+                (alignment?.characters?.length || 0) +
+                " chars",
             );
           }
         } else {
           const errBody = await r.text().catch(() => "");
           logger.warn(
-            { component: "Speak", status: r.status, voiceId: vid, error: errBody.substring(0, 200) },
+            {
+              component: "Speak",
+              status: r.status,
+              voiceId: vid,
+              error: errBody.substring(0, 200),
+            },
             "ElevenLabs TTS failed: " + r.status + " — trying OpenAI fallback",
           );
         }
       } catch (e) {
-        logger.warn({ component: "Speak", err: e.message }, "ElevenLabs TTS error — trying OpenAI fallback");
+        logger.warn(
+          { component: "Speak", err: e.message },
+          "ElevenLabs TTS error — trying OpenAI fallback",
+        );
       }
     }
 
@@ -177,7 +217,10 @@ router.post("/speak", ttsLimiter, validate(speakSchema), async (req, res) => {
           ttsEngine = "OpenAI";
           alignment = null; // OpenAI has no alignment data
         } else {
-          openaiErr = r2.status + ": " + (await r2.text().catch(() => "")).substring(0, 200);
+          openaiErr =
+            r2.status +
+            ": " +
+            (await r2.text().catch(() => "")).substring(0, 200);
           logger.error(
             { component: "Speak", status: r2.status, error: openaiErr },
             "OpenAI TTS also failed: " + r2.status,
@@ -185,15 +228,33 @@ router.post("/speak", ttsLimiter, validate(speakSchema), async (req, res) => {
         }
       } catch (e) {
         openaiErr = e.message;
-        logger.error({ component: "Speak", err: e.message }, "OpenAI TTS error");
+        logger.error(
+          { component: "Speak", err: e.message },
+          "OpenAI TTS error",
+        );
       }
     }
 
-    if (!buf) return res.status(503).json({ error: "TTS unavailable", openai: openaiErr });
+    if (!buf)
+      return res
+        .status(503)
+        .json({ error: "TTS unavailable", openai: openaiErr });
 
     logger.info(
-      { component: "Speak", bytes: buf.length, avatar, mood, engine: ttsEngine, hasAlignment: !!alignment },
-      ttsEngine + " | " + buf.length + " bytes | " + avatar + (alignment ? " | ALIGNED" : ""),
+      {
+        component: "Speak",
+        bytes: buf.length,
+        avatar,
+        mood,
+        engine: ttsEngine,
+        hasAlignment: !!alignment,
+      },
+      ttsEngine +
+        " | " +
+        buf.length +
+        " bytes | " +
+        avatar +
+        (alignment ? " | ALIGNED" : ""),
     );
     incrementUsage(user?.id, "tts", supabaseAdmin).catch((e) =>
       logger.warn(
@@ -239,7 +300,10 @@ router.post("/listen", apiLimiter, validate(listenSchema), async (req, res) => {
       });
       form.append("model", MODELS.WHISPER);
       form.append("language", "ro");
-      form.append("prompt", "Aceasta este o conversație în limba română cu KelionAI.");
+      form.append(
+        "prompt",
+        "Aceasta este o conversație în limba română cu KelionAI.",
+      );
       const r = await fetch(
         "https://api.groq.com/openai/v1/audio/transcriptions",
         {
@@ -253,9 +317,16 @@ router.post("/listen", apiLimiter, validate(listenSchema), async (req, res) => {
 
       // ═══ BRAIN INTEGRATION — save what we heard ═══
       if (brain && user?.id && transcript.length > 2) {
-        brain.saveMemory(user.id, "audio", "User a spus prin voce: " + transcript.substring(0, 500), {
-          engine: "Groq-Whisper",
-        }).catch(() => { });
+        brain
+          .saveMemory(
+            user.id,
+            "audio",
+            "User a spus prin voce: " + transcript.substring(0, 500),
+            {
+              engine: "Groq-Whisper",
+            },
+          )
+          .catch(() => {});
       }
 
       incrementUsage(user?.id, "stt", supabaseAdmin).catch((e) =>
@@ -287,7 +358,10 @@ router.post("/lipsync", ttsLimiter, async (req, res) => {
     }
 
     // ── Strategy 1: NVIDIA Audio2Face API (if configured) ──
-    if ((engine === "nvidia" || engine === "auto") && process.env.NVIDIA_A2F_API_KEY) {
+    if (
+      (engine === "nvidia" || engine === "auto") &&
+      process.env.NVIDIA_A2F_API_KEY
+    ) {
       try {
         const a2fResult = await _nvidiaAudio2Face(audioBase64);
         if (a2fResult.success) {
@@ -298,7 +372,10 @@ router.post("/lipsync", ttsLimiter, async (req, res) => {
           });
         }
       } catch (e) {
-        logger.warn({ component: "LipSync", err: e.message }, "NVIDIA A2F failed, falling back");
+        logger.warn(
+          { component: "LipSync", err: e.message },
+          "NVIDIA A2F failed, falling back",
+        );
       }
     }
 
@@ -319,7 +396,10 @@ router.post("/lipsync", ttsLimiter, async (req, res) => {
           return res.json({ visemes, engine: "rhubarb" });
         }
       } catch (e) {
-        logger.warn({ component: "LipSync", err: e.message }, "Rhubarb engine failed, using text fallback");
+        logger.warn(
+          { component: "LipSync", err: e.message },
+          "Rhubarb engine failed, using text fallback",
+        );
       }
     }
 
@@ -339,14 +419,16 @@ router.post("/lipsync", ttsLimiter, async (req, res) => {
 // ── NVIDIA Audio2Face API integration ──
 async function _nvidiaAudio2Face(audioBase64) {
   const apiKey = process.env.NVIDIA_A2F_API_KEY;
-  const endpoint = process.env.NVIDIA_A2F_ENDPOINT || "https://grpc.nvcf.nvidia.com/nvidia/audio2face";
+  const endpoint =
+    process.env.NVIDIA_A2F_ENDPOINT ||
+    "https://grpc.nvcf.nvidia.com/nvidia/audio2face";
 
   const res = await fetch(endpoint, {
     method: "POST",
     headers: {
-      "Authorization": `Bearer ${apiKey}`,
+      Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
-      "Accept": "application/json",
+      Accept: "application/json",
     },
     body: JSON.stringify({
       audio: audioBase64,
@@ -372,15 +454,15 @@ async function _nvidiaAudio2Face(audioBase64) {
 // ── Rhubarb shape → Oculus viseme mapping ──
 function _rhubarbToOculus(shape) {
   const map = {
-    A: "viseme_PP",   // MBP
-    B: "viseme_kk",   // ETC  
-    C: "viseme_I",    // E
-    D: "viseme_aa",   // AI
-    E: "viseme_O",    // O
-    F: "viseme_U",    // WQ
-    G: "viseme_FF",   // FV
-    H: "viseme_TH",   // L
-    X: "viseme_sil",  // Silence
+    A: "viseme_PP", // MBP
+    B: "viseme_kk", // ETC
+    C: "viseme_I", // E
+    D: "viseme_aa", // AI
+    E: "viseme_O", // O
+    F: "viseme_U", // WQ
+    G: "viseme_FF", // FV
+    H: "viseme_TH", // L
+    X: "viseme_sil", // Silence
   };
   return map[shape] || "viseme_sil";
 }
@@ -388,17 +470,32 @@ function _rhubarbToOculus(shape) {
 // ── Text → phoneme estimation (simple fallback) ──
 function _textToVisemes(text) {
   const VOWEL_MAP = {
-    a: "viseme_aa", e: "viseme_E", i: "viseme_I",
-    o: "viseme_O", u: "viseme_U",
-    ă: "viseme_E", â: "viseme_I", î: "viseme_I",
+    a: "viseme_aa",
+    e: "viseme_E",
+    i: "viseme_I",
+    o: "viseme_O",
+    u: "viseme_U",
+    ă: "viseme_E",
+    â: "viseme_I",
+    î: "viseme_I",
   };
   const CONSONANT_MAP = {
-    m: "viseme_PP", b: "viseme_PP", p: "viseme_PP",
-    f: "viseme_FF", v: "viseme_FF",
-    t: "viseme_TH", d: "viseme_DD", n: "viseme_nn",
-    s: "viseme_SS", z: "viseme_SS", ș: "viseme_SS",
-    c: "viseme_kk", k: "viseme_kk", g: "viseme_kk",
-    r: "viseme_RR", l: "viseme_TH",
+    m: "viseme_PP",
+    b: "viseme_PP",
+    p: "viseme_PP",
+    f: "viseme_FF",
+    v: "viseme_FF",
+    t: "viseme_TH",
+    d: "viseme_DD",
+    n: "viseme_nn",
+    s: "viseme_SS",
+    z: "viseme_SS",
+    ș: "viseme_SS",
+    c: "viseme_kk",
+    k: "viseme_kk",
+    g: "viseme_kk",
+    r: "viseme_RR",
+    l: "viseme_TH",
   };
   const AVG_CHAR_DURATION = 0.07; // ~70ms per character
   const visemes = [];

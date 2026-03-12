@@ -73,11 +73,12 @@ async function requireAdmin(req, res, next) {
 
 // ── POST /verify-code — validate admin access/exit code (pre-auth) ──
 router.post("/verify-code", express.json(), (req, res) => {
-  const { code } = req.body || {};
+  const { code: rawCode } = req.body || {};
+  const code = (rawCode || "").trim();
   const accessCode =
-    process.env.ADMIN_ACCESS_CODE || process.env.ADMIN_EXIT_CODE;
-  const exitCode = process.env.ADMIN_EXIT_CODE || process.env.ADMIN_ACCESS_CODE;
-  const secret = process.env.ADMIN_SECRET_KEY;
+    (process.env.ADMIN_ACCESS_CODE || process.env.ADMIN_EXIT_CODE || "").trim();
+  const exitCode = (process.env.ADMIN_EXIT_CODE || process.env.ADMIN_ACCESS_CODE || "").trim();
+  const secret = (process.env.ADMIN_SECRET_KEY || "").trim();
 
   if (!code) return res.status(400).json({ error: "Code required" });
 
@@ -289,7 +290,7 @@ router.get("/costs", async (req, res) => {
 
     // By user this month (top 10)
     const byUser = {};
-    (providerData || []).forEach((r) => {
+    (providerData || []).forEach((_r) => {
       // We need user_id — refetch with user_id
     });
 
@@ -1243,7 +1244,7 @@ router.get("/test-tables", async (req, res) => {
 
   for (const table of TABLES) {
     try {
-      const { data, error, count } = await supabaseAdmin
+      const { _data, error, count } = await supabaseAdmin
         .from(table)
         .select("*", { count: "exact", head: true });
 

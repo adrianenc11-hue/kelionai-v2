@@ -222,7 +222,9 @@ async function sendInviteEmail({ to, senderName, code, expiresAt }) {
   }
 
   const from =
-    process.env.EMAIL_FROM || process.env.SMTP_USER || `noreply@${(process.env.APP_URL || '').replace('https://', '')}`;
+    process.env.EMAIL_FROM ||
+    process.env.SMTP_USER ||
+    `noreply@${(process.env.APP_URL || "").replace("https://", "")}`;
 
   try {
     const info = await transport.sendMail({ from, to, subject, html });
@@ -311,11 +313,16 @@ async function applyReferralBonus(code, recipientUserId, supabaseAdmin) {
 
       // ── Send confirmation email to the inviter ──
       try {
-        const { data: senderUser } = await supabaseAdmin.auth.admin.getUserById(refCode.sender_id);
+        const { data: senderUser } = await supabaseAdmin.auth.admin.getUserById(
+          refCode.sender_id,
+        );
         if (senderUser && senderUser.email) {
           const transport = getMailTransport();
           if (transport) {
-            const from = process.env.EMAIL_FROM || process.env.SMTP_USER || `noreply@${(process.env.APP_URL || '').replace('https://', '')}`;
+            const from =
+              process.env.EMAIL_FROM ||
+              process.env.SMTP_USER ||
+              `noreply@${(process.env.APP_URL || "").replace("https://", "")}`;
             await transport.sendMail({
               from,
               to: senderUser.email,
@@ -336,13 +343,19 @@ async function applyReferralBonus(code, recipientUserId, supabaseAdmin) {
     <a href="${appUrl}" style="display:inline-block;background:linear-gradient(135deg,#6366F1,#06B6D4);color:#fff;font-weight:bold;padding:12px 28px;border-radius:10px;text-decoration:none">Open KelionAI</a>
   </div>
 </div>
-</body></html>`
+</body></html>`,
             });
-            logger.info({ component: "Referral", to: senderUser.email }, "Sender bonus confirmation email sent");
+            logger.info(
+              { component: "Referral", to: senderUser.email },
+              "Sender bonus confirmation email sent",
+            );
           }
         }
       } catch (emailErr) {
-        logger.warn({ component: "Referral", err: emailErr.message }, "Failed to send sender bonus email (non-fatal)");
+        logger.warn(
+          { component: "Referral", err: emailErr.message },
+          "Failed to send sender bonus email (non-fatal)",
+        );
       }
     }
   } catch (e) {
@@ -901,16 +914,30 @@ router.get("/stats", async (req, res) => {
   try {
     const { getUserFromToken, supabaseAdmin } = req.app.locals;
     const user = await getUserFromToken(req);
-    if (!user) return res.status(401).json({ error: "Authentication required" });
-    if (!supabaseAdmin) return res.status(503).json({ error: "Database unavailable" });
-    const { data: codes } = await supabaseAdmin.from("referral_codes")
+    if (!user)
+      return res.status(401).json({ error: "Authentication required" });
+    if (!supabaseAdmin)
+      return res.status(503).json({ error: "Database unavailable" });
+    const { data: codes } = await supabaseAdmin
+      .from("referral_codes")
       .select("id, status, sender_bonus_applied, sender_bonus_days")
       .eq("sender_id", user.id);
     const totalCodes = (codes || []).length;
-    const redeemed = (codes || []).filter(c => c.status === "redeemed").length;
-    const bonusDays = (codes || []).filter(c => c.sender_bonus_applied).reduce((s, c) => s + (c.sender_bonus_days || 0), 0);
-    res.json({ totalCodes, redeemed, active: totalCodes - redeemed, bonusDaysEarned: bonusDays });
-  } catch { res.status(500).json({ error: "Stats error" }); }
+    const redeemed = (codes || []).filter(
+      (c) => c.status === "redeemed",
+    ).length;
+    const bonusDays = (codes || [])
+      .filter((c) => c.sender_bonus_applied)
+      .reduce((s, c) => s + (c.sender_bonus_days || 0), 0);
+    res.json({
+      totalCodes,
+      redeemed,
+      active: totalCodes - redeemed,
+      bonusDaysEarned: bonusDays,
+    });
+  } catch {
+    res.status(500).json({ error: "Stats error" });
+  }
 });
 
 // GET /api/referral/code — get or generate user's referral code
@@ -918,43 +945,65 @@ router.get("/code", async (req, res) => {
   try {
     const { getUserFromToken, supabaseAdmin } = req.app.locals;
     const user = await getUserFromToken(req);
-    if (!user) return res.status(401).json({ error: "Authentication required" });
-    if (!supabaseAdmin) return res.status(503).json({ error: "Database unavailable" });
-    const { data } = await supabaseAdmin.from("referral_codes")
+    if (!user)
+      return res.status(401).json({ error: "Authentication required" });
+    if (!supabaseAdmin)
+      return res.status(503).json({ error: "Database unavailable" });
+    const { data } = await supabaseAdmin
+      .from("referral_codes")
       .select("code, expires_at, status")
       .eq("sender_id", user.id)
       .eq("status", "active")
       .order("created_at", { ascending: false })
       .limit(1);
-    if (data && data.length > 0) return res.json({ code: data[0].code, expiresAt: data[0].expires_at });
+    if (data && data.length > 0)
+      return res.json({ code: data[0].code, expiresAt: data[0].expires_at });
     // Auto-generate one
     const code = generateSecureReferralCode(user.id);
-    const expiresAt = new Date(Date.now() + CODE_EXPIRY_DAYS * 24 * 60 * 60 * 1000).toISOString();
+    const expiresAt = new Date(
+      Date.now() + CODE_EXPIRY_DAYS * 24 * 60 * 60 * 1000,
+    ).toISOString();
     await supabaseAdmin.from("referral_codes").insert({
-      sender_id: user.id, code, code_hash: hashCode(code), status: "active",
-      expires_at: expiresAt, sender_bonus_days: SENDER_BONUS_DAYS, receiver_bonus_days: RECEIVER_BONUS_DAYS,
+      sender_id: user.id,
+      code,
+      code_hash: hashCode(code),
+      status: "active",
+      expires_at: expiresAt,
+      sender_bonus_days: SENDER_BONUS_DAYS,
+      receiver_bonus_days: RECEIVER_BONUS_DAYS,
     });
     res.json({ code, expiresAt, generated: true });
-  } catch { res.status(500).json({ error: "Code error" }); }
+  } catch {
+    res.status(500).json({ error: "Code error" });
+  }
 });
 
 // GET /api/referral/leaderboard — top referrers
 router.get("/leaderboard", async (req, res) => {
   try {
     const { supabaseAdmin } = req.app.locals;
-    if (!supabaseAdmin) return res.status(503).json({ error: "Database unavailable" });
-    const { data } = await supabaseAdmin.from("referral_codes")
+    if (!supabaseAdmin)
+      return res.status(503).json({ error: "Database unavailable" });
+    const { data } = await supabaseAdmin
+      .from("referral_codes")
       .select("sender_id, status")
       .eq("status", "redeemed");
     // Aggregate by sender
     const counts = {};
-    (data || []).forEach(r => { counts[r.sender_id] = (counts[r.sender_id] || 0) + 1; });
+    (data || []).forEach((r) => {
+      counts[r.sender_id] = (counts[r.sender_id] || 0) + 1;
+    });
     const leaderboard = Object.entries(counts)
-      .map(([userId, count]) => ({ userId: userId.substring(0, 8) + "...", referrals: count }))
+      .map(([userId, count]) => ({
+        userId: userId.substring(0, 8) + "...",
+        referrals: count,
+      }))
       .sort((a, b) => b.referrals - a.referrals)
       .slice(0, 10);
     res.json({ leaderboard });
-  } catch { res.status(500).json({ error: "Leaderboard error" }); }
+  } catch {
+    res.status(500).json({ error: "Leaderboard error" });
+  }
 });
 
 module.exports = {

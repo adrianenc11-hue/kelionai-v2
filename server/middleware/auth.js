@@ -31,7 +31,7 @@ function adminAuth(req, res, next) {
   // Method 2: Supabase JWT — verify admin email
   const authHeader = req.headers["authorization"];
   if (authHeader && authHeader.startsWith("Bearer ")) {
-    const token = authHeader.slice(7);
+    const _token = authHeader.slice(7);
     try {
       const { getUserFromToken } = req.app.locals;
       if (getUserFromToken) {

@@ -117,7 +117,7 @@ function scoreTools(toolName, category, score) {
 function adjustRisk(tradeResult) {
   if (!tradeResult) return;
 
-  const { pnlPct, reason, holdHours } = tradeResult;
+  const { pnlPct, reason, _holdHours } = tradeResult;
 
   // Ajustare stop-loss: dacă se declanșează prea des, mărește-l
   if (reason && reason.includes("STOP-LOSS")) {
@@ -419,7 +419,7 @@ function startScheduledJobs(supabaseGetter) {
       try {
         const k1Truth = require("./k1-truth");
         k1Truth.runSelfTest("trading");
-      } catch {}
+      } catch { /* ignored */ }
     },
     2 * 60 * 1000,
   );
@@ -646,7 +646,7 @@ function getProactiveSuggestion() {
     .sort(([, a], [, b]) => b - a)
     .slice(0, 2)
     .map(([d]) => d);
-  const isWeekend = currentDay === "Saturday" || currentDay === "Sunday";
+  const _isWeekend = currentDay === "Saturday" || currentDay === "Sunday";
   if (topDays.length > 0 && !topDays.includes(currentDay) && m.totalInteractions > 30) {
     // User is active on an unusual day
     suggestions.push(`De obicei ești mai activ ${topDays.join(" și ")} — astăzi e o zi bonus! 😊`);

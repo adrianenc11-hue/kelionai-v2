@@ -67,17 +67,37 @@ router.get("/", (req, res) => {
 // GET /api/health/test-tables — Test all 28 Supabase tables (read-only)
 router.get("/test-tables", async (req, res) => {
   const { supabaseAdmin } = req.app.locals;
-  if (!supabaseAdmin) return res.status(503).json({ error: "No Supabase connection" });
+  if (!supabaseAdmin)
+    return res.status(503).json({ error: "No Supabase connection" });
 
   const TABLES = [
-    "conversations", "messages", "user_preferences", "api_keys",
-    "admin_logs", "trades", "profiles", "media_history",
-    "telegram_users", "whatsapp_users", "whatsapp_messages",
-    "trade_intelligence", "cookie_consents", "metrics_snapshots",
-    "ai_costs", "page_views", "subscriptions", "referrals",
-    "admin_codes", "brain_memory", "learned_facts",
-    "messenger_users", "messenger_messages", "messenger_subscribers",
-    "telegram_messages", "market_candles", "market_learnings",
+    "conversations",
+    "messages",
+    "user_preferences",
+    "api_keys",
+    "admin_logs",
+    "trades",
+    "profiles",
+    "media_history",
+    "telegram_users",
+    "whatsapp_users",
+    "whatsapp_messages",
+    "trade_intelligence",
+    "cookie_consents",
+    "metrics_snapshots",
+    "ai_costs",
+    "page_views",
+    "subscriptions",
+    "referrals",
+    "admin_codes",
+    "brain_memory",
+    "learned_facts",
+    "messenger_users",
+    "messenger_messages",
+    "messenger_subscribers",
+    "telegram_messages",
+    "market_candles",
+    "market_learnings",
     "market_patterns",
   ];
 
@@ -93,7 +113,13 @@ router.get("/test-tables", async (req, res) => {
 
       if (error) {
         failed++;
-        results.push({ table, status: "ERROR", error: error.message, code: error.code, hint: error.hint || null });
+        results.push({
+          table,
+          status: "ERROR",
+          error: error.message,
+          code: error.code,
+          hint: error.hint || null,
+        });
       } else {
         passed++;
         results.push({ table, status: "OK", rowCount: count || 0 });
@@ -105,9 +131,15 @@ router.get("/test-tables", async (req, res) => {
   }
 
   res.json({
-    summary: { total: TABLES.length, passed, failed, allOk: failed === 0, testedAt: new Date().toISOString() },
+    summary: {
+      total: TABLES.length,
+      passed,
+      failed,
+      allOk: failed === 0,
+      testedAt: new Date().toISOString(),
+    },
     results,
-    errors: results.filter(r => r.status !== "OK"),
+    errors: results.filter((r) => r.status !== "OK"),
   });
 });
 

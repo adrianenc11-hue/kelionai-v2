@@ -34,7 +34,10 @@ router.get("/webhook", (req, res) => {
   const token = req.query["hub.verify_token"];
   const challenge = req.query["hub.challenge"];
   if (!VERIFY_TOKEN) {
-    logger.warn({ component: "Instagram" }, "Webhook verify attempt but FB_VERIFY_TOKEN not set");
+    logger.warn(
+      { component: "Instagram" },
+      "Webhook verify attempt but FB_VERIFY_TOKEN not set",
+    );
     return res.sendStatus(403);
   }
   if (mode === "subscribe" && token === VERIFY_TOKEN) {
@@ -120,9 +123,22 @@ async function handleIncomingDM(msg) {
 
   // ═══ BRAIN INTEGRATION — save DM memory ═══
   if (brain) {
-    brain.saveMemory(null, "text", "Instagram DM " + senderId + ": " + text.substring(0, 200) + " | Reply: " + reply.substring(0, 300), {
-      platform: "instagram", type: "dm"
-    }).catch(() => { });
+    brain
+      .saveMemory(
+        null,
+        "text",
+        "Instagram DM " +
+          senderId +
+          ": " +
+          text.substring(0, 200) +
+          " | Reply: " +
+          reply.substring(0, 300),
+        {
+          platform: "instagram",
+          type: "dm",
+        },
+      )
+      .catch(() => {});
   }
 
   // Log to Supabase
@@ -272,7 +288,7 @@ async function postNews(article, imageUrl) {
   const caption = formatCaption(article);
 
   // Default image if none provided
-  const img = imageUrl || (process.env.APP_URL + "/img/kelionai-share.png");
+  const img = imageUrl || process.env.APP_URL + "/img/kelionai-share.png";
 
   const containerId = await createMediaContainer(img, caption);
   if (!containerId) return null;

@@ -28,7 +28,9 @@
         "health": "bash scripts/health-check.sh",
         "railway:setup": "node scripts/railway-setup.js",
         "railway:vars": "bash scripts/railway-env.sh",
-        "setup:secrets": "bash scripts/setup-secrets.sh"
+        "setup:secrets": "bash scripts/setup-secrets.sh",
+        "check:deploy": "node scripts/check-deploy-readiness.js",
+        "deploy:all": "node scripts/deploy-all.js"
     },
     "jest": {
         "testEnvironment": "node",
@@ -58,7 +60,7 @@
         "dotenv": "^17.3.1",
         "exceljs": "^4.4.0",
         "express": "^4.22.1",
-        "express-rate-limit": "^8.2.1",
+        "express-rate-limit": "^8.3.1",
         "form-data": "^4.0.5",
         "franc-min": "^6.2.0",
         "helmet": "^8.1.0",

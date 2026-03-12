@@ -18,7 +18,10 @@ function withTimeout(promise, ms = 10000, label = "operation") {
   return Promise.race([
     promise,
     new Promise((_, reject) =>
-      setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms),
+      setTimeout(
+        () => reject(new Error(`${label} timed out after ${ms}ms`)),
+        ms,
+      ),
     ),
   ]);
 }
@@ -28,18 +31,31 @@ if (process.env.FB_PAGE_ACCESS_TOKEN) {
   setTimeout(async () => {
     try {
       const res = await withTimeout(
-        fetch("https://graph.facebook.com/v21.0/me?access_token=" + process.env.FB_PAGE_ACCESS_TOKEN),
-        5000, "fb:tokenHealthCheck"
+        fetch(
+          "https://graph.facebook.com/v21.0/me?access_token=" +
+            process.env.FB_PAGE_ACCESS_TOKEN,
+        ),
+        5000,
+        "fb:tokenHealthCheck",
       );
       if (res.ok) {
         const data = await res.json();
-        logger.info({ component: "Messenger", pageId: data.id, name: data.name }, "✅ Token VALID — Messenger ready");
+        logger.info(
+          { component: "Messenger", pageId: data.id, name: data.name },
+          "✅ Token VALID — Messenger ready",
+        );
       } else {
         const err = await res.text().catch(() => "(no body)");
-        logger.error({ component: "Messenger", status: res.status, body: err }, "❌ Token INVALID or EXPIRED — Messenger will NOT work");
+        logger.error(
+          { component: "Messenger", status: res.status, body: err },
+          "❌ Token INVALID or EXPIRED — Messenger will NOT work",
+        );
       }
     } catch (e) {
-      logger.error({ component: "Messenger", err: e.message }, "❌ Token health check FAILED");
+      logger.error(
+        { component: "Messenger", err: e.message },
+        "❌ Token health check FAILED",
+      );
     }
   }, 4000);
 }
@@ -59,7 +75,10 @@ async function addToHistory(senderId, from, text) {
         content: (text || "").slice(0, 2000),
       });
     } catch (e) {
-      logger.warn({ component: "Messenger", err: e.message }, "DB history write failed");
+      logger.warn(
+        { component: "Messenger", err: e.message },
+        "DB history write failed",
+      );
     }
   }
 }
@@ -74,9 +93,15 @@ async function getContextSummary(senderId) {
       .order("created_at", { ascending: false })
       .limit(MAX_CONTEXT_MESSAGES);
     if (!data || data.length === 0) return "";
-    return data.reverse().map((h) => h.role + ": " + h.content).join("\n");
+    return data
+      .reverse()
+      .map((h) => h.role + ": " + h.content)
+      .join("\n");
   } catch (e) {
-    logger.warn({ component: "Messenger", err: e.message }, "DB history read failed");
+    logger.warn(
+      { component: "Messenger", err: e.message },
+      "DB history read failed",
+    );
     return "";
   }
 }
@@ -158,7 +183,10 @@ async function getKnownUser(senderId, supabase) {
         return user;
       }
     } catch (e) {
-      logger.warn({ component: "Messenger", err: e.message }, "table may not exist");
+      logger.warn(
+        { component: "Messenger", err: e.message },
+        "table may not exist",
+      );
     }
   }
   return null;
@@ -168,7 +196,12 @@ async function saveKnownUser(senderId, lang, name, supabase) {
   const db = supabase || _supabase;
   // Update cache
   const cached = _userCache.get(senderId) || {};
-  const user = { ...cached, lang, name, firstSeen: cached.firstSeen || new Date().toISOString() };
+  const user = {
+    ...cached,
+    lang,
+    name,
+    firstSeen: cached.firstSeen || new Date().toISOString(),
+  };
   if (_userCache.size >= _USER_CACHE_MAX) {
     const oldest = _userCache.keys().next().value;
     _userCache.delete(oldest);
@@ -187,7 +220,10 @@ async function saveKnownUser(senderId, lang, name, supabase) {
         { onConflict: "sender_id" },
       );
     } catch (e) {
-      logger.warn({ component: "Messenger", err: e.message }, "DB write failed");
+      logger.warn(
+        { component: "Messenger", err: e.message },
+        "DB write failed",
+      );
     }
   }
 }
@@ -204,17 +240,21 @@ async function setChatCharacter(senderId, character) {
   if (cached) cached.character = character;
   if (_supabase) {
     try {
-      await _supabase.from("messenger_users")
+      await _supabase
+        .from("messenger_users")
         .update({ character })
         .eq("sender_id", senderId);
     } catch (e) {
-      logger.warn({ component: "Messenger", err: e.message }, "character update failed");
+      logger.warn(
+        { component: "Messenger", err: e.message },
+        "character update failed",
+      );
     }
   }
 }
 
 // Message count — stored in Supabase
-async function getUserMessageCount(senderId) {
+async function _getUserMessageCount(senderId) {
   const user = await getKnownUser(senderId, _supabase);
   return (user && user.messageCount) || 0;
 }
@@ -224,14 +264,20 @@ async function incrementUserMessageCount(senderId) {
   if (cached) cached.messageCount = (cached.messageCount || 0) + 1;
   if (_supabase) {
     try {
-      await _supabase.rpc("increment_messenger_message_count", { p_sender_id: senderId }).catch(() => {
-        // Fallback if RPC not available
-        _supabase.from("messenger_users")
-          .update({ message_count: (cached && cached.messageCount) || 1 })
-          .eq("sender_id", senderId);
-      });
+      await _supabase
+        .rpc("increment_messenger_message_count", { p_sender_id: senderId })
+        .catch(() => {
+          // Fallback if RPC not available
+          _supabase
+            .from("messenger_users")
+            .update({ message_count: (cached && cached.messageCount) || 1 })
+            .eq("sender_id", senderId);
+        });
     } catch (e) {
-      logger.warn({ component: "Messenger", err: e.message }, "message count update failed");
+      logger.warn(
+        { component: "Messenger", err: e.message },
+        "message count update failed",
+      );
     }
   }
 }
@@ -303,7 +349,10 @@ function isRateLimited(senderId) {
         if (senderRateLimits.size < _RATE_LIMIT_MAX_ENTRIES) break;
       }
     }
-    senderRateLimits.set(senderId, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    senderRateLimits.set(senderId, {
+      count: 1,
+      resetAt: now + RATE_LIMIT_WINDOW_MS,
+    });
     return false;
   }
   if (entry.count >= RATE_LIMIT_MAX) return true;
@@ -374,12 +423,16 @@ async function getSenderProfile(senderId) {
   const token = process.env.FB_PAGE_ACCESS_TOKEN;
   if (!token) return null;
   try {
-    const res = await withTimeout(fetch(
-      "https://graph.facebook.com/v21.0/" +
-      senderId +
-      "?fields=first_name,last_name&access_token=" +
-      token,
-    ), 5000, "getSenderProfile");
+    const res = await withTimeout(
+      fetch(
+        "https://graph.facebook.com/v21.0/" +
+          senderId +
+          "?fields=first_name,last_name&access_token=" +
+          token,
+      ),
+      5000,
+      "getSenderProfile",
+    );
     if (res.ok) {
       const data = await res.json();
       return data.first_name
@@ -400,7 +453,11 @@ async function downloadMediaFromUrl(url) {
   try {
     const res = await withTimeout(fetch(url), 10000, "downloadMediaFromUrl");
     if (res.ok) {
-      const ab = await withTimeout(res.arrayBuffer(), 10000, "downloadMediaFromUrl:readBody");
+      const ab = await withTimeout(
+        res.arrayBuffer(),
+        10000,
+        "downloadMediaFromUrl:readBody",
+      );
       return Buffer.from(ab);
     }
   } catch (e) {
@@ -424,37 +481,41 @@ async function analyzeImage(imageBuffer, caption, mimeType) {
   const mediaType = mimeType || "image/jpeg";
   const userPrompt = caption
     ? 'Utilizatorul a trimis aceasta imagine cu textul: "' +
-    caption +
-    '". Descrie ce vezi, identifica persoane, obiecte, locuri, texte.'
+      caption +
+      '". Descrie ce vezi, identifica persoane, obiecte, locuri, texte.'
     : "Descrie in detaliu ce vezi in aceasta imagine. Identifica persoane, obiecte, locuri, texte vizibile, culori, actiuni.";
 
   try {
-    const res = await withTimeout(fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: "Bearer " + apiKey,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: MODELS.OPENAI_VISION,
-        messages: [
-          {
-            role: "user",
-            content: [
-              { type: "text", text: userPrompt },
-              {
-                type: "image_url",
-                image_url: {
-                  url: "data:" + mediaType + ";base64," + base64Image,
-                  detail: "high",
+    const res = await withTimeout(
+      fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer " + apiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: MODELS.OPENAI_VISION,
+          messages: [
+            {
+              role: "user",
+              content: [
+                { type: "text", text: userPrompt },
+                {
+                  type: "image_url",
+                  image_url: {
+                    url: "data:" + mediaType + ";base64," + base64Image,
+                    detail: "high",
+                  },
                 },
-              },
-            ],
-          },
-        ],
-        max_tokens: 1000,
+              ],
+            },
+          ],
+          max_tokens: 1000,
+        }),
       }),
-    }), 25000, "analyzeImage");
+      25000,
+      "analyzeImage",
+    );
     if (res.ok) {
       const data = await res.json();
       return (
@@ -489,14 +550,18 @@ async function transcribeAudio(audioBuffer, mimeType) {
     process.env.GROQ_API_KEY ? MODELS.WHISPER : MODELS.OPENAI_WHISPER,
   );
   try {
-    const res = await withTimeout(fetch(baseUrl + "/audio/transcriptions", {
-      method: "POST",
-      headers: Object.assign(
-        { Authorization: "Bearer " + apiKey },
-        form.getHeaders(),
-      ),
-      body: form,
-    }), 20000, "transcribeAudio");
+    const res = await withTimeout(
+      fetch(baseUrl + "/audio/transcriptions", {
+        method: "POST",
+        headers: Object.assign(
+          { Authorization: "Bearer " + apiKey },
+          form.getHeaders(),
+        ),
+        body: form,
+      }),
+      20000,
+      "transcribeAudio",
+    );
     if (res.ok) {
       const data = await res.json();
       return data.text || "";
@@ -517,7 +582,7 @@ async function extractDocumentText(buffer, mimeType, filename) {
     }
     if (
       mimeType ===
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
       ext === "docx"
     ) {
       const result = await mammoth.extractRawText({ buffer: buffer });
@@ -557,17 +622,21 @@ async function sendMessage(recipientId, text, quickReplies) {
       })
       .slice(0, 13);
   }
-  const res = await withTimeout(fetch(
-    "https://graph.facebook.com/v21.0/me/messages?access_token=" + token,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        recipient: { id: recipientId },
-        message: message,
-      }),
-    },
-  ), 10000, "sendMessage");
+  const res = await withTimeout(
+    fetch(
+      "https://graph.facebook.com/v21.0/me/messages?access_token=" + token,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          recipient: { id: recipientId },
+          message: message,
+        }),
+      },
+    ),
+    10000,
+    "sendMessage",
+  );
   if (!res.ok) {
     const body = await res.text();
     logger.error(
@@ -582,17 +651,21 @@ async function sendTypingOn(recipientId) {
   const token = process.env.FB_PAGE_ACCESS_TOKEN;
   if (!token) return;
   try {
-    await withTimeout(fetch(
-      "https://graph.facebook.com/v21.0/me/messages?access_token=" + token,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          recipient: { id: recipientId },
-          sender_action: "typing_on",
-        }),
-      },
-    ), 5000, "sendTypingOn");
+    await withTimeout(
+      fetch(
+        "https://graph.facebook.com/v21.0/me/messages?access_token=" + token,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            recipient: { id: recipientId },
+            sender_action: "typing_on",
+          }),
+        },
+      ),
+      5000,
+      "sendTypingOn",
+    );
   } catch (e) {
     logger.warn(
       { component: "Messenger", err: e.message },
@@ -606,22 +679,26 @@ async function sendAudioMessage(recipientId, audioUrl) {
   const token = process.env.FB_PAGE_ACCESS_TOKEN;
   if (!token) return;
   try {
-    const res = await withTimeout(fetch(
-      "https://graph.facebook.com/v21.0/me/messages?access_token=" + token,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          recipient: { id: recipientId },
-          message: {
-            attachment: {
-              type: "audio",
-              payload: { url: audioUrl, is_reusable: true },
+    const res = await withTimeout(
+      fetch(
+        "https://graph.facebook.com/v21.0/me/messages?access_token=" + token,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            recipient: { id: recipientId },
+            message: {
+              attachment: {
+                type: "audio",
+                payload: { url: audioUrl, is_reusable: true },
+              },
             },
-          },
-        }),
-      },
-    ), 10000, "sendAudioMessage");
+          }),
+        },
+      ),
+      10000,
+      "sendAudioMessage",
+    );
     if (!res.ok) {
       const body = await res.text();
       logger.error(
@@ -644,9 +721,8 @@ async function generateAndSendVoice(recipientId, text, character) {
   const appUrl = process.env.APP_URL;
   try {
     const voiceId = getVoiceId(character);
-    const res = await withTimeout(fetch(
-      "https://api.elevenlabs.io/v1/text-to-speech/" + voiceId,
-      {
+    const res = await withTimeout(
+      fetch("https://api.elevenlabs.io/v1/text-to-speech/" + voiceId, {
         method: "POST",
         headers: { "Content-Type": "application/json", "xi-api-key": apiKey },
         body: JSON.stringify({
@@ -654,10 +730,14 @@ async function generateAndSendVoice(recipientId, text, character) {
           model_id: MODELS.ELEVENLABS_MODEL,
           voice_settings: { stability: 0.5, similarity_boost: 0.75 },
         }),
-      },
-    ), 12000, "generateVoice:elevenlabs");
+      }),
+      12000,
+      "generateVoice:elevenlabs",
+    );
     if (!res.ok) return;
-    const audioBuffer = Buffer.from(await withTimeout(res.arrayBuffer(), 10000, "generateVoice:readBody"));
+    const audioBuffer = Buffer.from(
+      await withTimeout(res.arrayBuffer(), 10000, "generateVoice:readBody"),
+    );
     const audioId = crypto.randomBytes(16).toString("hex");
     mediaBuffers.set(audioId, {
       buffer: audioBuffer,
@@ -683,22 +763,26 @@ async function sendImageMessage(recipientId, imageUrl) {
   const token = process.env.FB_PAGE_ACCESS_TOKEN;
   if (!token) return;
   try {
-    const res = await withTimeout(fetch(
-      "https://graph.facebook.com/v21.0/me/messages?access_token=" + token,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          recipient: { id: recipientId },
-          message: {
-            attachment: {
-              type: "image",
-              payload: { url: imageUrl, is_reusable: true },
+    const res = await withTimeout(
+      fetch(
+        "https://graph.facebook.com/v21.0/me/messages?access_token=" + token,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            recipient: { id: recipientId },
+            message: {
+              attachment: {
+                type: "image",
+                payload: { url: imageUrl, is_reusable: true },
+              },
             },
-          },
-        }),
-      },
-    ), 10000, "sendImageMessage");
+          }),
+        },
+      ),
+      10000,
+      "sendImageMessage",
+    );
     if (!res.ok) {
       const body = await res.text();
       logger.error(
@@ -719,25 +803,29 @@ async function sendGenericTemplate(recipientId, elements) {
   const token = process.env.FB_PAGE_ACCESS_TOKEN;
   if (!token) return;
   try {
-    const res = await withTimeout(fetch(
-      "https://graph.facebook.com/v21.0/me/messages?access_token=" + token,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          recipient: { id: recipientId },
-          message: {
-            attachment: {
-              type: "template",
-              payload: {
-                template_type: "generic",
-                elements: elements.slice(0, 10),
+    const res = await withTimeout(
+      fetch(
+        "https://graph.facebook.com/v21.0/me/messages?access_token=" + token,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            recipient: { id: recipientId },
+            message: {
+              attachment: {
+                type: "template",
+                payload: {
+                  template_type: "generic",
+                  elements: elements.slice(0, 10),
+                },
               },
             },
-          },
-        }),
-      },
-    ), 10000, "sendGenericTemplate");
+          }),
+        },
+      ),
+      10000,
+      "sendGenericTemplate",
+    );
     if (!res.ok) {
       const body = await res.text();
       logger.error(
@@ -758,26 +846,30 @@ async function _sendButtonTemplate(recipientId, text, buttons) {
   const token = process.env.FB_PAGE_ACCESS_TOKEN;
   if (!token) return;
   try {
-    const res = await withTimeout(fetch(
-      "https://graph.facebook.com/v21.0/me/messages?access_token=" + token,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          recipient: { id: recipientId },
-          message: {
-            attachment: {
-              type: "template",
-              payload: {
-                template_type: "button",
-                text: text.slice(0, 640),
-                buttons: buttons.slice(0, 3),
+    const res = await withTimeout(
+      fetch(
+        "https://graph.facebook.com/v21.0/me/messages?access_token=" + token,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            recipient: { id: recipientId },
+            message: {
+              attachment: {
+                type: "template",
+                payload: {
+                  template_type: "button",
+                  text: text.slice(0, 640),
+                  buttons: buttons.slice(0, 3),
+                },
               },
             },
-          },
-        }),
-      },
-    ), 10000, "sendButtonTemplate");
+          }),
+        },
+      ),
+      10000,
+      "sendButtonTemplate",
+    );
     if (!res.ok) {
       const body = await res.text();
       logger.error(
@@ -798,37 +890,45 @@ async function setupPersistentMenu() {
   const token = process.env.FB_PAGE_ACCESS_TOKEN;
   if (!token) return { error: "No page token configured" };
   try {
-    const res = await withTimeout(fetch(
-      "https://graph.facebook.com/v21.0/me/messenger_profile?access_token=" +
-      token,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          persistent_menu: [
-            {
-              locale: "default",
-              composer_input_disabled: false,
-              call_to_actions: [
-                {
-                  type: "postback",
-                  title: "🤖 Kelion",
-                  payload: "SWITCH_KELION",
-                },
-                { type: "postback", title: "👩‍💻 Kira", payload: "SWITCH_KIRA" },
-                {
-                  type: "web_url",
-                  title: "🌐 KelionAI",
-                  url: process.env.APP_URL,
-                },
-                { type: "postback", title: "📰 Știri", payload: "GET_NEWS" },
-                { type: "postback", title: "❓ Ajutor", payload: "GET_HELP" },
-              ],
-            },
-          ],
-        }),
-      },
-    ), 10000, "setupPersistentMenu");
+    const res = await withTimeout(
+      fetch(
+        "https://graph.facebook.com/v21.0/me/messenger_profile?access_token=" +
+          token,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            persistent_menu: [
+              {
+                locale: "default",
+                composer_input_disabled: false,
+                call_to_actions: [
+                  {
+                    type: "postback",
+                    title: "🤖 Kelion",
+                    payload: "SWITCH_KELION",
+                  },
+                  {
+                    type: "postback",
+                    title: "👩‍💻 Kira",
+                    payload: "SWITCH_KIRA",
+                  },
+                  {
+                    type: "web_url",
+                    title: "🌐 KelionAI",
+                    url: process.env.APP_URL,
+                  },
+                  { type: "postback", title: "📰 Știri", payload: "GET_NEWS" },
+                  { type: "postback", title: "❓ Ajutor", payload: "GET_HELP" },
+                ],
+              },
+            ],
+          }),
+        },
+      ),
+      10000,
+      "setupPersistentMenu",
+    );
     const data = await res.json();
     logger.info(
       { component: "Messenger", result: data },
@@ -880,14 +980,14 @@ async function handlePostback(senderId, payload, appLocals) {
       await sendMessage(
         senderId,
         "❓ Cum te pot ajuta:\n\n" +
-        "📝 Trimite text — raspund intrebarii tale\n" +
-        "🖼️ Trimite imagine — analizez poza\n" +
-        "🎤 Trimite mesaj vocal — transcriu si raspund\n" +
-        "📄 Trimite document — extrag si analizez textul\n" +
-        '📰 Scrie "stiri" — iti trimit ultimele stiri\n' +
-        '🤖 Scrie "kelion" sau "kira" — schimba asistentul\n' +
-        '🔔 Scrie "aboneaza-ma" — notificari stiri\n\n' +
-        `🌐 Mai multe pe ${process.env.APP_URL}`,
+          "📝 Trimite text — raspund intrebarii tale\n" +
+          "🖼️ Trimite imagine — analizez poza\n" +
+          "🎤 Trimite mesaj vocal — transcriu si raspund\n" +
+          "📄 Trimite document — extrag si analizez textul\n" +
+          '📰 Scrie "stiri" — iti trimit ultimele stiri\n' +
+          '🤖 Scrie "kelion" sau "kira" — schimba asistentul\n' +
+          '🔔 Scrie "aboneaza-ma" — notificari stiri\n\n' +
+          `🌐 Mai multe pe ${process.env.APP_URL}`,
         ["💬 Chat", "📰 Știri", "🌐 Site"],
       );
     }
@@ -910,7 +1010,7 @@ function buildNewsElements(articles) {
     return {
       title: (a.title || "Știre").slice(0, 80),
       subtitle: (a.description || a.summary || "").slice(0, 80),
-      image_url: a.image || a.imageUrl || (process.env.APP_URL + "/og-image.jpg"),
+      image_url: a.image || a.imageUrl || process.env.APP_URL + "/og-image.jpg",
       default_action: {
         type: "web_url",
         url: a.url || a.link || process.env.APP_URL,
@@ -980,20 +1080,24 @@ async function generateImage(prompt) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return null;
   try {
-    const res = await withTimeout(fetch("https://api.openai.com/v1/images/generations", {
-      method: "POST",
-      headers: {
-        Authorization: "Bearer " + apiKey,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: MODELS.DALL_E,
-        prompt: prompt,
-        n: 1,
-        size: "1024x1024",
-        response_format: "url",
+    const res = await withTimeout(
+      fetch("https://api.openai.com/v1/images/generations", {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer " + apiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: MODELS.DALL_E,
+          prompt: prompt,
+          n: 1,
+          size: "1024x1024",
+          response_format: "url",
+        }),
       }),
-    }), 30000, "generateImage:DALL-E");
+      30000,
+      "generateImage:DALL-E",
+    );
     if (res.ok) {
       const data = await res.json();
       return data.data && data.data[0] && data.data[0].url;
@@ -1038,15 +1142,16 @@ router.get("/subscribe", async function (req, res) {
   if (!token)
     return res.status(500).json({ error: "FB_PAGE_ACCESS_TOKEN not set" });
   try {
-    const meRes = await withTimeout(fetch(
-      "https://graph.facebook.com/v21.0/me?access_token=" + token,
-    ), 10000, "subscribe:getPageId");
+    const meRes = await withTimeout(
+      fetch("https://graph.facebook.com/v21.0/me?access_token=" + token),
+      10000,
+      "subscribe:getPageId",
+    );
     const me = await meRes.json();
     if (!me.id)
       return res.status(500).json({ error: "Cannot get page ID", details: me });
-    const subRes = await withTimeout(fetch(
-      "https://graph.facebook.com/v21.0/" + me.id + "/subscribed_apps",
-      {
+    const subRes = await withTimeout(
+      fetch("https://graph.facebook.com/v21.0/" + me.id + "/subscribed_apps", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1054,8 +1159,10 @@ router.get("/subscribe", async function (req, res) {
             "messages,messaging_postbacks,message_deliveries,message_reads",
           access_token: token,
         }),
-      },
-    ), 10000, "subscribe:subscribeApps");
+      }),
+      10000,
+      "subscribe:subscribeApps",
+    );
     const result = await subRes.json();
     logger.info(
       { component: "Messenger", pageId: me.id, result: result },
@@ -1272,8 +1379,8 @@ router.post("/webhook", async function (req, res) {
           await sendMessage(
             senderId,
             (charName === "kelion" ? "🤖 " : "👩‍💻 ") +
-            displayName +
-            " este acum asistentul tau. Cu ce te pot ajuta?",
+              displayName +
+              " este acum asistentul tau. Cu ce te pot ajuta?",
             ["💬 Chat", "📰 Știri", "🌤️ Meteo"],
           );
           stats.repliesSent++;
@@ -1388,7 +1495,7 @@ router.post("/webhook", async function (req, res) {
             userName: senderName || senderId,
             supabase: req.app.locals.supabaseAdmin || req.app.locals.supabase,
           });
-        } catch { }
+        } catch { /* ignored */ }
 
         // AI RESPONSE
         let reply;
@@ -1398,7 +1505,9 @@ router.post("/webhook", async function (req, res) {
         } else {
           const brain = req.app.locals.brain;
           const context = await getContextSummary(senderId);
-          const k1SystemCtx = k1Context ? k1Bridge.getK1SystemContext(k1Context) : "";
+          const k1SystemCtx = k1Context
+            ? k1Bridge.getK1SystemContext(k1Context)
+            : "";
           const prompt = context
             ? "[Context:\n" + context + "]\nUser: " + userText + k1SystemCtx
             : userText + k1SystemCtx;
@@ -1442,7 +1551,7 @@ router.post("/webhook", async function (req, res) {
             domain: k1Context?.k1?.domain || "general",
             supabase: req.app.locals.supabaseAdmin || req.app.locals.supabase,
           });
-        } catch { }
+        } catch { /* ignored */ }
 
         // DETERMINE QUICK REPLIES FOR RESPONSE
         const msgCount = await incrementUserMessageCount(senderId);
@@ -1458,9 +1567,22 @@ router.post("/webhook", async function (req, res) {
         // ═══ BRAIN INTEGRATION — save chat memory ═══
         const brainRef = req.app.locals.brain;
         if (brainRef) {
-          brainRef.saveMemory(null, "text", "Messenger " + (senderName || senderId) + ": " + (userText || "").substring(0, 200) + " | Reply: " + reply.substring(0, 300), {
-            platform: "messenger", character
-          }).catch(() => { });
+          brainRef
+            .saveMemory(
+              null,
+              "text",
+              "Messenger " +
+                (senderName || senderId) +
+                ": " +
+                (userText || "").substring(0, 200) +
+                " | Reply: " +
+                reply.substring(0, 300),
+              {
+                platform: "messenger",
+                character,
+              },
+            )
+            .catch(() => {});
         }
 
         // FEATURE 2: VOICE REPLY when user sent audio
@@ -1480,8 +1602,8 @@ router.post("/webhook", async function (req, res) {
               await sendMessage(
                 senderId,
                 "👋 Bun venit! Sunt " +
-                (character === "kira" ? "Kira" : "Kelion") +
-                ", asistentul tau AI.\n\nCe doresti sa faci?",
+                  (character === "kira" ? "Kira" : "Kelion") +
+                  ", asistentul tau AI.\n\nCe doresti sa faci?",
                 ["🤖 Kelion", "👩‍💻 Kira", "📰 Știri", "❓ Ajutor"],
               );
             } catch (ex) {
@@ -1526,11 +1648,11 @@ router.post("/webhook", async function (req, res) {
               await sendMessage(
                 senderId,
                 "Ai folosit " +
-                FREE_MESSAGES_LIMIT +
-                " mesaje gratuite!\n\n" +
-                `Continua cu functii premium pe ${process.env.APP_URL}:\n` +
-                "Chat nelimitat cu AI\nAvatare 3D\nVoce naturala\n\n" +
-                `Aboneaza-te: ${process.env.APP_URL}/pricing`,
+                  FREE_MESSAGES_LIMIT +
+                  " mesaje gratuite!\n\n" +
+                  `Continua cu functii premium pe ${process.env.APP_URL}:\n` +
+                  "Chat nelimitat cu AI\nAvatare 3D\nVoce naturala\n\n" +
+                  `Aboneaza-te: ${process.env.APP_URL}/pricing`,
                 ["💎 Upgrade", "🌐 Site"],
               );
             } catch (ex) {
@@ -1586,15 +1708,15 @@ router.get("/health", function (req, res) {
         : "misconfigured",
     hasPageToken: !!process.env.FB_PAGE_ACCESS_TOKEN,
     hasAppSecret: !!process.env.FB_APP_SECRET,
-    hasVerifyToken: !!(process.env.FB_VERIFY_TOKEN || process.env.MESSENGER_VERIFY_TOKEN),
+    hasVerifyToken: !!(
+      process.env.FB_VERIFY_TOKEN || process.env.MESSENGER_VERIFY_TOKEN
+    ),
     graphApiVersion: "v21.0",
     visionEnabled: !!process.env.OPENAI_API_KEY,
     sttEnabled: !!(process.env.GROQ_API_KEY || process.env.OPENAI_API_KEY),
     ttsEnabled: !!process.env.ELEVENLABS_API_KEY,
     stats: getStats(),
-    webhookUrl:
-      (process.env.APP_URL) +
-      "/api/messenger/webhook",
+    webhookUrl: process.env.APP_URL + "/api/messenger/webhook",
   });
 });
 

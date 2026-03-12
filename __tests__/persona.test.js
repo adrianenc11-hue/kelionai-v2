@@ -81,7 +81,7 @@ describe("TRUTH_ENGINE", () => {
   test("TRUTH_ENGINE appears first in prompt before persona text", () => {
     const prompt = buildSystemPrompt("kelion", "ro", "", null, false);
     const truthIndex = prompt.indexOf("MOTORUL ADEVĂRULUI");
-    const kelionIndex = prompt.indexOf("Ești Kelion");
+    const kelionIndex = prompt.toUpperCase().indexOf("EȘTI KELION");
     expect(truthIndex).toBeGreaterThanOrEqual(0);
     expect(kelionIndex).toBeGreaterThanOrEqual(0);
     expect(truthIndex).toBeLessThan(kelionIndex);
@@ -90,7 +90,7 @@ describe("TRUTH_ENGINE", () => {
   test("TRUTH_ENGINE appears first in kira prompt before persona text", () => {
     const prompt = buildSystemPrompt("kira", "ro", "", null, false);
     const truthIndex = prompt.indexOf("MOTORUL ADEVĂRULUI");
-    const kiraIndex = prompt.indexOf("Ești Kira");
+    const kiraIndex = prompt.toUpperCase().indexOf("EȘTI KIRA");
     expect(truthIndex).toBeGreaterThanOrEqual(0);
     expect(kiraIndex).toBeGreaterThanOrEqual(0);
     expect(truthIndex).toBeLessThan(kiraIndex);

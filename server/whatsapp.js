@@ -33,7 +33,10 @@ function withTimeout(promise, ms = 10000, label = "operation") {
   return Promise.race([
     promise,
     new Promise((_, reject) =>
-      setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms),
+      setTimeout(
+        () => reject(new Error(`${label} timed out after ${ms}ms`)),
+        ms,
+      ),
     ),
   ]);
 }
@@ -67,17 +70,31 @@ if (WA_TOKEN && PHONE_NUMBER_ID) {
     try {
       const res = await withTimeout(
         fetch(`${GRAPH_API}/${PHONE_NUMBER_ID}?access_token=${WA_TOKEN}`),
-        5000, "wa:tokenHealthCheck"
+        5000,
+        "wa:tokenHealthCheck",
       );
       if (res.ok) {
         const data = await res.json();
-        logger.info({ component: "WhatsApp", phoneId: data.id, name: data.display_phone_number || data.verified_name }, "✅ Token VALID — WhatsApp ready");
+        logger.info(
+          {
+            component: "WhatsApp",
+            phoneId: data.id,
+            name: data.display_phone_number || data.verified_name,
+          },
+          "✅ Token VALID — WhatsApp ready",
+        );
       } else {
         const err = await res.text().catch(() => "(no body)");
-        logger.error({ component: "WhatsApp", status: res.status, body: err }, "❌ Token INVALID or EXPIRED — WhatsApp will NOT work");
+        logger.error(
+          { component: "WhatsApp", status: res.status, body: err },
+          "❌ Token INVALID or EXPIRED — WhatsApp will NOT work",
+        );
       }
     } catch (e) {
-      logger.error({ component: "WhatsApp", err: e.message }, "❌ Token health check FAILED");
+      logger.error(
+        { component: "WhatsApp", err: e.message },
+        "❌ Token health check FAILED",
+      );
     }
   }, 3000);
 }
@@ -101,7 +118,10 @@ router.post("/send", express.json(), async (req, res) => {
     await sendTextMessage(to, text);
     res.json({ success: true, to, text });
   } catch (e) {
-    logger.error({ component: "WhatsApp", err: e.message }, "Manual send error");
+    logger.error(
+      { component: "WhatsApp", err: e.message },
+      "Manual send error",
+    );
     res.status(500).json({ error: "Send failed", details: e.message });
   }
 });
@@ -112,7 +132,9 @@ router.post("/send", express.json(), async (req, res) => {
 const MAX_CONTEXT_MESSAGES = 50;
 let _supabase = null;
 
-function setSupabase(client) { _supabase = client; }
+function setSupabase(client) {
+  _supabase = client;
+}
 
 async function addToHistory(chatId, from, text) {
   if (_supabase) {
@@ -123,7 +145,10 @@ async function addToHistory(chatId, from, text) {
         content: (text || "").slice(0, 2000),
       });
     } catch (e) {
-      logger.warn({ component: "WhatsApp", err: e.message }, "DB history write failed");
+      logger.warn(
+        { component: "WhatsApp", err: e.message },
+        "DB history write failed",
+      );
     }
   }
 }
@@ -138,9 +163,15 @@ async function getContextSummary(chatId) {
       .order("created_at", { ascending: false })
       .limit(MAX_CONTEXT_MESSAGES);
     if (!data || data.length === 0) return "";
-    return data.reverse().map((h) => h.role + ": " + h.content).join("\n");
+    return data
+      .reverse()
+      .map((h) => h.role + ": " + h.content)
+      .join("\n");
   } catch (e) {
-    logger.warn({ component: "WhatsApp", err: e.message }, "DB history read failed");
+    logger.warn(
+      { component: "WhatsApp", err: e.message },
+      "DB history read failed",
+    );
     return "";
   }
 }
@@ -169,7 +200,7 @@ const _USER_CACHE_MAX = 50;
 const FREE_MESSAGES_LIMIT = 15;
 
 // ═══ KNOWN USERS — backed by Supabase whatsapp_users ═══
-const knownUsers = null; // REMOVED — use _userCache + Supabase
+const _knownUsers = null; // REMOVED — use _userCache + Supabase
 
 async function getKnownUser(phoneNumber, supabase) {
   if (_userCache.has(phoneNumber)) return _userCache.get(phoneNumber);
@@ -197,7 +228,10 @@ async function getKnownUser(phoneNumber, supabase) {
         return user;
       }
     } catch (e) {
-      logger.warn({ component: "WhatsApp", err: e.message }, "table may not exist");
+      logger.warn(
+        { component: "WhatsApp", err: e.message },
+        "table may not exist",
+      );
     }
   }
   return null;
@@ -206,7 +240,12 @@ async function getKnownUser(phoneNumber, supabase) {
 async function saveKnownUser(phoneNumber, lang, name, supabase) {
   const db = supabase || _supabase;
   const cached = _userCache.get(phoneNumber) || {};
-  const user = { ...cached, lang, name, firstSeen: cached.firstSeen || new Date().toISOString() };
+  const user = {
+    ...cached,
+    lang,
+    name,
+    firstSeen: cached.firstSeen || new Date().toISOString(),
+  };
   if (_userCache.size >= _USER_CACHE_MAX) {
     const oldest = _userCache.keys().next().value;
     _userCache.delete(oldest);
@@ -290,7 +329,10 @@ function isRateLimited(phone) {
         if (userRateLimits.size < _RATE_LIMIT_MAX_ENTRIES) break;
       }
     }
-    userRateLimits.set(phone, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    userRateLimits.set(phone, {
+      count: 1,
+      resetAt: now + RATE_LIMIT_WINDOW_MS,
+    });
     return false;
   }
   if (entry.count >= RATE_LIMIT_MAX) return true;
@@ -369,19 +411,23 @@ async function sendTextMessage(to, text) {
     );
     return;
   }
-  const res = await withTimeout(fetch(`${GRAPH_API}/${PHONE_NUMBER_ID}/messages`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${WA_TOKEN}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      messaging_product: "whatsapp",
-      to,
-      type: "text",
-      text: { body: text.slice(0, 4096) },
+  const res = await withTimeout(
+    fetch(`${GRAPH_API}/${PHONE_NUMBER_ID}/messages`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${WA_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        to,
+        type: "text",
+        text: { body: text.slice(0, 4096) },
+      }),
     }),
-  }), 10000, "sendTextMessage");
+    10000,
+    "sendTextMessage",
+  );
   if (res.ok) {
     logger.info({ component: "WhatsApp", to }, "Text message sent");
   } else {
@@ -396,19 +442,23 @@ async function sendTextMessage(to, text) {
 // ═══ SEND WHATSAPP AUDIO MESSAGE ═══
 async function sendAudioMessage(to, mediaId) {
   if (!WA_TOKEN || !PHONE_NUMBER_ID) return;
-  const res = await withTimeout(fetch(`${GRAPH_API}/${PHONE_NUMBER_ID}/messages`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${WA_TOKEN}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      messaging_product: "whatsapp",
-      to,
-      type: "audio",
-      audio: { id: mediaId },
+  const res = await withTimeout(
+    fetch(`${GRAPH_API}/${PHONE_NUMBER_ID}/messages`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${WA_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        to,
+        type: "audio",
+        audio: { id: mediaId },
+      }),
     }),
-  }), 10000, "sendAudioMessage");
+    10000,
+    "sendAudioMessage",
+  );
   if (res.ok) {
     logger.info({ component: "WhatsApp", to }, "Audio message sent");
   } else {
@@ -456,7 +506,11 @@ async function downloadMedia(mediaId) {
       );
       return null;
     }
-    const ab = await withTimeout(dataRes.arrayBuffer(), 15000, "downloadMedia:readBody");
+    const ab = await withTimeout(
+      dataRes.arrayBuffer(),
+      15000,
+      "downloadMedia:readBody",
+    );
     return Buffer.from(ab);
   } catch (e) {
     logger.error(
@@ -507,7 +561,10 @@ async function uploadMedia(buffer, mimeType) {
 async function transcribeAudio(audioBuffer, mimeType) {
   const apiKey = process.env.GROQ_API_KEY || process.env.OPENAI_API_KEY;
   if (!apiKey) {
-    logger.error({ component: "WhatsApp" }, "No STT API key configured (GROQ_API_KEY or OPENAI_API_KEY)");
+    logger.error(
+      { component: "WhatsApp" },
+      "No STT API key configured (GROQ_API_KEY or OPENAI_API_KEY)",
+    );
     return null;
   }
   const baseUrl = process.env.GROQ_API_KEY
@@ -539,10 +596,16 @@ async function transcribeAudio(audioBuffer, mimeType) {
       return data.text || "";
     }
     const errBody = await res.text().catch(() => "(no body)");
-    logger.error({ component: "WhatsApp", status: res.status, body: errBody }, "STT failed");
+    logger.error(
+      { component: "WhatsApp", status: res.status, body: errBody },
+      "STT failed",
+    );
     return null;
   } catch (e) {
-    logger.error({ component: "WhatsApp", err: e.message }, "transcribeAudio error");
+    logger.error(
+      { component: "WhatsApp", err: e.message },
+      "transcribeAudio error",
+    );
     return null;
   }
 }
@@ -555,29 +618,36 @@ async function generateSpeech(text, lang, character) {
 
   try {
     const res = await withTimeout(
-      fetch(
-        `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
-        {
-          method: "POST",
-          headers: { "xi-api-key": apiKey, "Content-Type": "application/json" },
-          body: JSON.stringify({
-            text: text.slice(0, 1000),
-            model_id: MODELS.ELEVENLABS_MODEL,
-            voice_settings: { stability: 0.5, similarity_boost: 0.75 },
-          }),
-        },
-      ),
+      fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+        method: "POST",
+        headers: { "xi-api-key": apiKey, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: text.slice(0, 1000),
+          model_id: MODELS.ELEVENLABS_MODEL,
+          voice_settings: { stability: 0.5, similarity_boost: 0.75 },
+        }),
+      }),
       12000,
       "generateSpeech",
     );
     if (res.ok) {
-      const ab = await withTimeout(res.arrayBuffer(), 10000, "generateSpeech:readBody");
+      const ab = await withTimeout(
+        res.arrayBuffer(),
+        10000,
+        "generateSpeech:readBody",
+      );
       return Buffer.from(ab);
     }
-    logger.error({ component: "WhatsApp", status: res.status }, "TTS API failed");
+    logger.error(
+      { component: "WhatsApp", status: res.status },
+      "TTS API failed",
+    );
     return null;
   } catch (e) {
-    logger.error({ component: "WhatsApp", err: e.message }, "generateSpeech error");
+    logger.error(
+      { component: "WhatsApp", err: e.message },
+      "generateSpeech error",
+    );
     return null;
   }
 }
@@ -591,7 +661,8 @@ async function extractDocumentText(buffer, mimeType, filename) {
       return (data.text || "").slice(0, 3000);
     }
     if (
-      mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+      mimeType ===
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
       ext === "docx"
     ) {
       const result = await mammoth.extractRawText({ buffer: buffer });
@@ -735,38 +806,35 @@ router.post("/webhook", async (req, res) => {
                 const openaiKey = process.env.OPENAI_API_KEY;
                 if (openaiKey) {
                   const visionRes = await withTimeout(
-                    fetch(
-                      "https://api.openai.com/v1/chat/completions",
-                      {
-                        method: "POST",
-                        headers: {
-                          Authorization: `Bearer ${openaiKey}`,
-                          "Content-Type": "application/json",
-                        },
-                        body: JSON.stringify({
-                          model: MODELS.OPENAI_VISION,
-                          messages: [
-                            {
-                              role: "user",
-                              content: [
-                                {
-                                  type: "image_url",
-                                  image_url: {
-                                    url: `data:${mimeType};base64,${b64}`,
-                                  },
-                                },
-                                {
-                                  type: "text",
-                                  text:
-                                    caption || "Describe this image in detail.",
-                                },
-                              ],
-                            },
-                          ],
-                          max_tokens: 500,
-                        }),
+                    fetch("https://api.openai.com/v1/chat/completions", {
+                      method: "POST",
+                      headers: {
+                        Authorization: `Bearer ${openaiKey}`,
+                        "Content-Type": "application/json",
                       },
-                    ),
+                      body: JSON.stringify({
+                        model: MODELS.OPENAI_VISION,
+                        messages: [
+                          {
+                            role: "user",
+                            content: [
+                              {
+                                type: "image_url",
+                                image_url: {
+                                  url: `data:${mimeType};base64,${b64}`,
+                                },
+                              },
+                              {
+                                type: "text",
+                                text:
+                                  caption || "Describe this image in detail.",
+                              },
+                            ],
+                          },
+                        ],
+                        max_tokens: 500,
+                      }),
+                    }),
                     15000,
                     "imageVision",
                   );
@@ -812,13 +880,23 @@ router.post("/webhook", async (req, res) => {
                     },
                     body: JSON.stringify({
                       model: MODELS.OPENAI_VISION,
-                      messages: [{
-                        role: "user",
-                        content: [
-                          { type: "image_url", image_url: { url: `data:${mimeType};base64,${b64}` } },
-                          { type: "text", text: "This is a WhatsApp sticker. Briefly describe what it shows (emotion, character, action)." },
-                        ],
-                      }],
+                      messages: [
+                        {
+                          role: "user",
+                          content: [
+                            {
+                              type: "image_url",
+                              image_url: {
+                                url: `data:${mimeType};base64,${b64}`,
+                              },
+                            },
+                            {
+                              type: "text",
+                              text: "This is a WhatsApp sticker. Briefly describe what it shows (emotion, character, action).",
+                            },
+                          ],
+                        },
+                      ],
                       max_tokens: 150,
                     }),
                   }),
@@ -827,7 +905,8 @@ router.post("/webhook", async (req, res) => {
                 );
                 if (visionRes.ok) {
                   const visionData = await visionRes.json();
-                  const desc = visionData.choices?.[0]?.message?.content || "a sticker";
+                  const desc =
+                    visionData.choices?.[0]?.message?.content || "a sticker";
                   userText = `[User sent a sticker: ${desc}]`;
                 } else {
                   userText = "[User sent a sticker]";
@@ -836,7 +915,10 @@ router.post("/webhook", async (req, res) => {
                 userText = "[User sent a sticker]";
               }
             } catch (e) {
-              logger.warn({ component: "WhatsApp", err: e.message }, "Sticker analysis failed");
+              logger.warn(
+                { component: "WhatsApp", err: e.message },
+                "Sticker analysis failed",
+              );
               userText = "[User sent a sticker]";
             }
           } else if (msgType === "document") {
@@ -847,7 +929,11 @@ router.post("/webhook", async (req, res) => {
               const mimeType = msg.document.mime_type || "";
               const caption = msg.document.caption || "";
               if (docBuffer) {
-                const docText = await extractDocumentText(docBuffer, mimeType, filename);
+                const docText = await extractDocumentText(
+                  docBuffer,
+                  mimeType,
+                  filename,
+                );
                 if (docText) {
                   userText = caption
                     ? `${caption}\n[Document "${filename}" content:\n${docText}]`
@@ -861,7 +947,10 @@ router.post("/webhook", async (req, res) => {
                 userText = `[User sent a document: ${filename} — could not download]`;
               }
             } catch (e) {
-              logger.error({ component: "WhatsApp", err: e.message }, "Document processing failed");
+              logger.error(
+                { component: "WhatsApp", err: e.message },
+                "Document processing failed",
+              );
               userText = "[User sent a document — processing error]";
             }
           } else if (msgType === "location") {
@@ -877,11 +966,14 @@ router.post("/webhook", async (req, res) => {
           } else if (msgType === "contacts") {
             // Contacts → acknowledge and describe
             const contacts = msg.contacts || [];
-            const names = contacts.map(c => {
-              const fn = c.name?.formatted_name || c.name?.first_name || "Unknown";
-              const phone = c.phones?.[0]?.phone || "";
-              return phone ? `${fn} (${phone})` : fn;
-            }).join(", ");
+            const names = contacts
+              .map((c) => {
+                const fn =
+                  c.name?.formatted_name || c.name?.first_name || "Unknown";
+                const phone = c.phones?.[0]?.phone || "";
+                return phone ? `${fn} (${phone})` : fn;
+              })
+              .join(", ");
             userText = `[User shared contact(s): ${names}]`;
           } else if (msgType === "reaction") {
             // Reactions → silently acknowledge (don't generate a full AI response)
@@ -913,12 +1005,15 @@ router.post("/webhook", async (req, res) => {
             // Save character to DB
             if (_supabase) {
               try {
-                await _supabase.from("whatsapp_users")
+                await _supabase
+                  .from("whatsapp_users")
                   .update({ character: char })
                   .eq("phone", phone);
                 const cached = _userCache.get(phone);
                 if (cached) cached.character = char;
-              } catch (e) { /* ignore */ }
+              } catch (_e) {
+                /* ignore */
+              }
             }
             const name = char === "kelion" ? "Kelion" : "Kira";
             await sendTextMessage(
@@ -940,10 +1035,15 @@ router.post("/webhook", async (req, res) => {
             if (addressed) {
               if (_supabase) {
                 try {
-                  await _supabase.from("whatsapp_users").update({ character: addressed }).eq("phone", phone);
+                  await _supabase
+                    .from("whatsapp_users")
+                    .update({ character: addressed })
+                    .eq("phone", phone);
                   const cached = _userCache.get(phone);
                   if (cached) cached.character = addressed;
-                } catch (e) { /* ignore */ }
+                } catch (_e) {
+                  /* ignore */
+                }
               }
             }
             // Mark intervention time
@@ -968,7 +1068,7 @@ router.post("/webhook", async (req, res) => {
               userName: contactName || phone,
               supabase: req.app.locals.supabaseAdmin || req.app.locals.supabase,
             });
-          } catch { }
+          } catch { /* ignored */ }
 
           // ═══ AI RESPONSE (with conversation context) ═══
           let reply;
@@ -976,7 +1076,9 @@ router.post("/webhook", async (req, res) => {
           const context = await getContextSummary(chatId);
           const detectedLangForPrompt = detectLanguage(userText);
           // Enrich prompt with K1 context
-          const k1SystemCtx = k1Context ? k1Bridge.getK1SystemContext(k1Context) : "";
+          const k1SystemCtx = k1Context
+            ? k1Bridge.getK1SystemContext(k1Context)
+            : "";
           const prompt = context
             ? `[Conversation context:\n${context}]\n\nUser: ${userText}${k1SystemCtx}`
             : userText + k1SystemCtx;
@@ -1006,8 +1108,7 @@ router.post("/webhook", async (req, res) => {
               reply = "Momentan sunt ocupat. Încearcă din nou.";
             }
           } else {
-            reply =
-              `Sunt KelionAI! Pentru experiența completă vizitează ${process.env.APP_URL}`;
+            reply = `Sunt KelionAI! Pentru experiența completă vizitează ${process.env.APP_URL}`;
           }
 
           // ═══ K1 POST-PROCESS — Confidence + Memory save ═══
@@ -1018,7 +1119,7 @@ router.post("/webhook", async (req, res) => {
               domain: k1Context?.k1?.domain || "general",
               supabase: req.app.locals.supabaseAdmin || req.app.locals.supabase,
             });
-          } catch { }
+          } catch { /* ignored */ }
 
           // Prefix polite intervention phrase for unsolicited group responses
           if (isGroup && !getAddressedCharacter(userText)) {
@@ -1032,9 +1133,22 @@ router.post("/webhook", async (req, res) => {
 
           // ═══ BRAIN INTEGRATION — save chat memory ═══
           if (brain) {
-            brain.saveMemory(null, "text", "WhatsApp " + phone + ": " + userText.substring(0, 200) + " | Reply: " + reply.substring(0, 300), {
-              platform: "whatsapp", character
-            }).catch(() => { });
+            brain
+              .saveMemory(
+                null,
+                "text",
+                "WhatsApp " +
+                  phone +
+                  ": " +
+                  userText.substring(0, 200) +
+                  " | Reply: " +
+                  reply.substring(0, 300),
+                {
+                  platform: "whatsapp",
+                  character,
+                },
+              )
+              .catch(() => {});
           }
 
           // If voice message → also send audio response
@@ -1071,11 +1185,15 @@ router.post("/webhook", async (req, res) => {
           // Update message count in DB
           if (supabase) {
             try {
-              await supabase.from("whatsapp_users")
+              await supabase
+                .from("whatsapp_users")
                 .update({ message_count: msgCount })
                 .eq("phone", phone);
-              if (_userCache.has(phone)) _userCache.get(phone).messageCount = msgCount;
-            } catch (e) { /* ignore */ }
+              if (_userCache.has(phone))
+                _userCache.get(phone).messageCount = msgCount;
+            } catch (_e) {
+              /* ignore */
+            }
           }
 
           if (!known) {
@@ -1121,11 +1239,11 @@ router.post("/webhook", async (req, res) => {
               await sendTextMessage(
                 phone,
                 `⭐ Ai folosit ${FREE_MESSAGES_LIMIT} mesaje gratuite!\n\n` +
-                `Continuă cu funcții premium pe ${process.env.APP_URL}:\n` +
-                `• 💬 Chat nelimitat cu AI\n` +
-                `• 🎭 Avatare 3D\n` +
-                `• 🔊 Voce naturală\n\n` +
-                `🌐 Abonează-te: ${process.env.APP_URL}/pricing`,
+                  `Continuă cu funcții premium pe ${process.env.APP_URL}:\n` +
+                  `• 💬 Chat nelimitat cu AI\n` +
+                  `• 🎭 Avatare 3D\n` +
+                  `• 🔊 Voce naturală\n\n` +
+                  `🌐 Abonează-te: ${process.env.APP_URL}/pricing`,
               );
             }, 3000);
           }
@@ -1163,10 +1281,15 @@ router.post("/send", async (req, res) => {
   try {
     const { to, message } = req.body;
     if (!to || !message) {
-      return res.status(400).json({ error: "to (phone number) and message are required" });
+      return res
+        .status(400)
+        .json({ error: "to (phone number) and message are required" });
     }
     if (!WA_TOKEN || !PHONE_NUMBER_ID) {
-      return res.status(503).json({ error: "WhatsApp not configured (missing WA_ACCESS_TOKEN or WA_PHONE_NUMBER_ID)" });
+      return res.status(503).json({
+        error:
+          "WhatsApp not configured (missing WA_ACCESS_TOKEN or WA_PHONE_NUMBER_ID)",
+      });
     }
     await sendTextMessage(to, message);
     stats.repliesSent++;
@@ -1188,8 +1311,7 @@ router.get("/health", (req, res) => {
       repliesSent: stats.repliesSent,
       activeUsers: stats.uniqueUsers,
     },
-    webhookUrl:
-      (process.env.APP_URL) + "/api/whatsapp/webhook",
+    webhookUrl: process.env.APP_URL + "/api/whatsapp/webhook",
   });
 });
 

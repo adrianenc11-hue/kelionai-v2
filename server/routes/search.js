@@ -40,18 +40,22 @@ router.post("/", searchLimiter, validate(searchSchema), async (req, res) => {
     // 1. Perplexity Sonar
     if (process.env.PERPLEXITY_API_KEY) {
       try {
-        const r = await fetch(brain?.getToolUrl("perplexity_search") || "https://api.perplexity.ai/chat/completions", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: "Bearer " + process.env.PERPLEXITY_API_KEY,
+        const r = await fetch(
+          brain?.getToolUrl("perplexity_search") ||
+            "https://api.perplexity.ai/chat/completions",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: "Bearer " + process.env.PERPLEXITY_API_KEY,
+            },
+            body: JSON.stringify({
+              model: MODELS.PERPLEXITY,
+              messages: [{ role: "user", content: query }],
+              max_tokens: 500,
+            }),
           },
-          body: JSON.stringify({
-            model: MODELS.PERPLEXITY,
-            messages: [{ role: "user", content: query }],
-            max_tokens: 500,
-          }),
-        });
+        );
         if (r.ok) {
           const d = await r.json();
           const answer = d.choices?.[0]?.message?.content || "";
@@ -69,7 +73,15 @@ router.post("/", searchLimiter, validate(searchSchema), async (req, res) => {
               "incrementUsage failed",
             ),
           );
-          if (brain && user?.id) brain.saveMemory(user.id, "search", "User a căutat: " + query + " → " + answer.substring(0, 300), { engine: "Perplexity" }).catch(() => { });
+          if (brain && user?.id)
+            brain
+              .saveMemory(
+                user.id,
+                "search",
+                "User a căutat: " + query + " → " + answer.substring(0, 300),
+                { engine: "Perplexity" },
+              )
+              .catch(() => {});
           return res.json({ results, answer, engine: "Perplexity" });
         }
       } catch (e) {
@@ -83,17 +95,20 @@ router.post("/", searchLimiter, validate(searchSchema), async (req, res) => {
     // 2. Tavily
     if (process.env.TAVILY_API_KEY) {
       try {
-        const tr = await fetch(brain?.getToolUrl("tavily_search") || "https://api.tavily.com/search", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            api_key: process.env.TAVILY_API_KEY,
-            query,
-            search_depth: "basic",
-            max_results: 5,
-            include_answer: true,
-          }),
-        });
+        const tr = await fetch(
+          brain?.getToolUrl("tavily_search") || "https://api.tavily.com/search",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              api_key: process.env.TAVILY_API_KEY,
+              query,
+              search_depth: "basic",
+              max_results: 5,
+              include_answer: true,
+            }),
+          },
+        );
         if (tr.ok) {
           const td = await tr.json();
           logger.info(
@@ -111,7 +126,18 @@ router.post("/", searchLimiter, validate(searchSchema), async (req, res) => {
             ),
           );
           const tavilyAnswer = td.answer || "";
-          if (brain && user?.id) brain.saveMemory(user.id, "search", "User a căutat: " + query + " → " + tavilyAnswer.substring(0, 300), { engine: "Tavily" }).catch(() => { });
+          if (brain && user?.id)
+            brain
+              .saveMemory(
+                user.id,
+                "search",
+                "User a căutat: " +
+                  query +
+                  " → " +
+                  tavilyAnswer.substring(0, 300),
+                { engine: "Tavily" },
+              )
+              .catch(() => {});
           return res.json({
             results: (td.results || []).map((x) => ({
               title: x.title,
@@ -133,14 +159,18 @@ router.post("/", searchLimiter, validate(searchSchema), async (req, res) => {
     // 3. Serper
     if (process.env.SERPER_API_KEY) {
       try {
-        const sr = await fetch(brain?.getToolUrl("serper_search") || "https://google.serper.dev/search", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-API-KEY": process.env.SERPER_API_KEY,
+        const sr = await fetch(
+          brain?.getToolUrl("serper_search") ||
+            "https://google.serper.dev/search",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-API-KEY": process.env.SERPER_API_KEY,
+            },
+            body: JSON.stringify({ q: query, num: 5 }),
           },
-          body: JSON.stringify({ q: query, num: 5 }),
-        });
+        );
         if (sr.ok) {
           const sd = await sr.json();
           const answer =
@@ -161,7 +191,15 @@ router.post("/", searchLimiter, validate(searchSchema), async (req, res) => {
               "incrementUsage failed",
             ),
           );
-          if (brain && user?.id) brain.saveMemory(user.id, "search", "User a căutat: " + query + " → " + answer.substring(0, 300), { engine: "Serper" }).catch(() => { });
+          if (brain && user?.id)
+            brain
+              .saveMemory(
+                user.id,
+                "search",
+                "User a căutat: " + query + " → " + answer.substring(0, 300),
+                { engine: "Serper" },
+              )
+              .catch(() => {});
           return res.json({ results, answer, engine: "Serper" });
         }
       } catch (e) {
@@ -175,8 +213,8 @@ router.post("/", searchLimiter, validate(searchSchema), async (req, res) => {
     // 4. DuckDuckGo (free fallback)
     const r = await fetch(
       "https://api.duckduckgo.com/?q=" +
-      encodeURIComponent(query) +
-      "&format=json&no_html=1&skip_disambig=1",
+        encodeURIComponent(query) +
+        "&format=json&no_html=1&skip_disambig=1",
     );
     const d = await r.json();
     const results = [];
@@ -200,7 +238,18 @@ router.post("/", searchLimiter, validate(searchSchema), async (req, res) => {
         "incrementUsage failed",
       ),
     );
-    if (brain && user?.id) brain.saveMemory(user.id, "search", "User a căutat: " + query + " → " + (d.Abstract || "").substring(0, 300), { engine: "DuckDuckGo" }).catch(() => { });
+    if (brain && user?.id)
+      brain
+        .saveMemory(
+          user.id,
+          "search",
+          "User a căutat: " +
+            query +
+            " → " +
+            (d.Abstract || "").substring(0, 300),
+          { engine: "DuckDuckGo" },
+        )
+        .catch(() => {});
     res.json({ results, answer: d.Abstract || "", engine: "DuckDuckGo" });
   } catch {
     res.status(500).json({ error: "Search error" });
@@ -214,26 +263,41 @@ router.get("/", searchLimiter, async (req, res) => {
   req.body = { query: q };
   // Reuse POST handler by calling next route
   try {
-    const { getUserFromToken, supabaseAdmin, brain } = req.app.locals;
+    const { getUserFromToken, supabaseAdmin, _brain } = req.app.locals;
     const user = await getUserFromToken(req);
-    const { checkUsage, incrementUsage } = require("../payments");
+    const { checkUsage, _incrementUsage } = require("../payments");
     const usage = await checkUsage(user?.id, "search", supabaseAdmin);
     if (!usage.allowed)
-      return res.status(429).json({ error: "Search limit reached.", plan: usage.plan });
+      return res
+        .status(429)
+        .json({ error: "Search limit reached.", plan: usage.plan });
 
     // DuckDuckGo fallback (simplest for GET alias)
     const r = await fetch(
-      "https://api.duckduckgo.com/?q=" + encodeURIComponent(q) + "&format=json&no_html=1&skip_disambig=1"
+      "https://api.duckduckgo.com/?q=" +
+        encodeURIComponent(q) +
+        "&format=json&no_html=1&skip_disambig=1",
     );
     const d = await r.json();
     const results = [];
     if (d.Abstract)
-      results.push({ title: d.Heading || q, content: d.Abstract, url: d.AbstractURL });
+      results.push({
+        title: d.Heading || q,
+        content: d.Abstract,
+        url: d.AbstractURL,
+      });
     if (d.RelatedTopics)
       for (const t of d.RelatedTopics.slice(0, 5))
-        if (t.Text) results.push({ title: t.Text.substring(0, 80), content: t.Text, url: t.FirstURL });
+        if (t.Text)
+          results.push({
+            title: t.Text.substring(0, 80),
+            content: t.Text,
+            url: t.FirstURL,
+          });
     res.json({ results, answer: d.Abstract || "", engine: "DuckDuckGo" });
-  } catch { res.status(500).json({ error: "Search error" }); }
+  } catch {
+    res.status(500).json({ error: "Search error" });
+  }
 });
 
 module.exports = router;

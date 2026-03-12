@@ -2422,7 +2422,7 @@ async function executeTool(brain, toolName, toolInput, userId) {
       }
       case "flashcards": {
         if (!brain.supabaseAdmin) return { error: "Database not connected" };
-        const fcKey = `flashcards:${(toolInput.set_name || toolInput.topic || "default").replace(/\s+/g, "_").toLowerCase()}`;
+        const _fcKey = `flashcards:${(toolInput.set_name || toolInput.topic || "default").replace(/\s+/g, "_").toLowerCase()}`;
         if (toolInput.action === "create") {
           return {
             action: "create",
@@ -2662,7 +2662,7 @@ async function executeTool(brain, toolName, toolInput, userId) {
                 gain_muscle: (tdee + 300).toFixed(0),
               };
             }
-          } catch (e) {
+          } catch (_e) {
             return { error: "Invalid parameters" };
           }
         }
@@ -2933,8 +2933,8 @@ async function thinkV4(
 
     // ── 6. CALL GEMINI WITH TOOLS ──
     // First call: Gemini decides what tools to use
-    let toolsUsed = [];
-    let toolResults = [];
+    const toolsUsed = [];
+    const toolResults = [];
     let finalResponse = "";
     let totalTokens = 0;
     const MAX_TOOL_ROUNDS = 3; // Prevent infinite loops
@@ -3260,7 +3260,10 @@ async function thinkV4(
       }).catch(() => {});
       // #endregion
       return {
-        enrichedMessage: message,
+        enrichedMessage:
+          (language === "ro"
+            ? "Îmi pare rău, am întâmpinat o problemă tehnică și nu pot răspunde acum. Te rog să încerci din nou. 🔧"
+            : "I'm sorry, I encountered a technical issue and can't respond right now. Please try again. 🔧"),
         toolsUsed: [],
         monitor: { content: null, type: null },
         analysis: {
@@ -3273,7 +3276,9 @@ async function thinkV4(
         compressedHistory: history || [],
         failedTools: [],
         thinkTime,
-        confidence: 0.3,
+        confidence: 0,
+        agent: "error-fallback",
+        error: `V4: ${e.message} | V3: ${e2.message}`,
       };
     }
   }

@@ -247,7 +247,7 @@ class KelionBrain {
             .from("brain_memory")
             .update({ content: JSON.stringify(parsed) })
             .eq("id", task.id);
-        } catch {}
+        } catch { /* ignored */ }
       }
     } catch (e) {
       logger.warn(
@@ -478,7 +478,7 @@ class KelionBrain {
         .eq("status", "active")
         .single();
       if (sub?.plan) plan = sub.plan;
-    } catch {}
+    } catch { /* ignored */ }
 
     const limit = this.PLAN_LIMITS[plan] || 50;
 
@@ -669,7 +669,7 @@ When asked "what can you do?" list these real capabilities. Use them proactively
       if (!r.ok) return null;
       const d = await r.json();
       return d.data?.[0]?.embedding || null;
-    } catch (e) {
+    } catch (_e) {
       return null;
     }
   }
@@ -701,7 +701,7 @@ When asked "what can you do?" list these real capabilities. Use them proactively
               return vectorResults;
             }
           }
-        } catch (vecE) {
+        } catch (_vecE) {
           // pgvector not available or function doesn't exist yet — fallback silently
         }
       }
@@ -784,7 +784,7 @@ When asked "what can you do?" list these real capabilities. Use them proactively
         .limit(limit);
       if (error) return [];
       return data || [];
-    } catch (e) {
+    } catch (_e) {
       return [];
     }
   }
@@ -816,7 +816,7 @@ When asked "what can you do?" list these real capabilities. Use them proactively
     }
   }
 
-  async extractAndSaveFacts(userId, message, reply) {
+  async extractAndSaveFacts(userId, message, _reply) {
     if (!userId || !this.supabaseAdmin) return;
     // Rate limit: max once per 30 seconds per user
     const lastTime = this.lastLearnTime.get(userId) || 0;
@@ -824,7 +824,7 @@ When asked "what can you do?" list these real capabilities. Use them proactively
     this.lastLearnTime.set(userId, Date.now());
     try {
       // Use simple heuristics to extract facts (no extra AI call needed)
-      const lower = message.toLowerCase();
+      const _lower = message.toLowerCase();
       // Personal preferences
       if (
         /\b(prefer|vreau|imi place|mi-ar placea|I like|I prefer)\b/i.test(
@@ -918,7 +918,7 @@ When asked "what can you do?" list these real capabilities. Use them proactively
         if (oldest) this._profileCache.delete(oldest[0]);
       }
       return profile;
-    } catch (e) {
+    } catch (_e) {
       return null;
     }
   }
@@ -932,7 +932,7 @@ When asked "what can you do?" list these real capabilities. Use them proactively
     let bestAgent = null;
     let bestScore = 0;
 
-    for (const [key, agent] of Object.entries(this.agents)) {
+    for (const [_key, agent] of Object.entries(this.agents)) {
       let score = 0;
       for (const topic of topics) {
         for (const trigger of agent.triggerTopics) {
@@ -1154,7 +1154,7 @@ When asked "what can you do?" list these real capabilities. Use them proactively
           });
           return config;
         }
-      } catch {}
+      } catch { /* ignored */ }
     }
 
     return this._defaultTenantConfig();
@@ -1539,7 +1539,7 @@ When asked "what can you do?" list these real capabilities. Use them proactively
       // ═══ AGENTIC LOOP — Multi-turn tool chaining ═══
       // Brain can iterate: execute → reflect → re-plan → execute again
       const MAX_ITERATIONS = 3;
-      let allResults = {};
+      const allResults = {};
       let chainOfThought = null;
       let enriched = "";
       let confidence = 0;
@@ -3827,7 +3827,7 @@ Reply STRICTLY with JSON:
     currentResponse,
     toolResults,
     analysis,
-    language,
+    _language,
   ) {
     const aiKey = this.groqKey || this.geminiKey;
     if (!aiKey) return null;
@@ -3923,7 +3923,7 @@ Missing tool names must be from: search, weather, imagine, map, memory, vision, 
   // ═══════════════════════════════════════════════════════════
   // 9.2 PLAN FROM REFLECTION — Convert reflection into additional tool plan
   // ═══════════════════════════════════════════════════════════
-  _planFromReflection(reflection, userId, mediaData = {}, isAdmin = false) {
+  _planFromReflection(reflection, userId, _mediaData = {}, _isAdmin = false) {
     if (
       !reflection ||
       !reflection.missingTools ||
@@ -4085,7 +4085,7 @@ Missing tool names must be from: search, weather, imagine, map, memory, vision, 
   // ═══════════════════════════════════════════════════════════
   // 9.5 TRANSLATE — Dedicated translation service
   // ═══════════════════════════════════════════════════════════
-  async _translate(text, targetLang = "ro", sourceLang = "auto") {
+  async _translate(text, targetLang = "ro", _sourceLang = "auto") {
     if (!text || text.length === 0) return text;
 
     const aiKey = this.groqKey || this.geminiKey;
@@ -4156,7 +4156,7 @@ Missing tool names must be from: search, weather, imagine, map, memory, vision, 
   // 9.6 DB QUERY TOOL — Brain can query Supabase directly
   // Read-only, safe tables only, with query generation
   // ═══════════════════════════════════════════════════════════
-  async _dbQuery(question, userId) {
+  async _dbQuery(question, _userId) {
     if (!this.supabaseAdmin) return { error: "No database connection" };
 
     const SAFE_TABLES = [
@@ -4189,7 +4189,7 @@ Rules:
 - If question is about counting, use aggregate:"count"`;
 
       let queryPlan = null;
-      const aiKey = this.groqKey || this.geminiKey;
+      const _aiKey = this.groqKey || this.geminiKey;
 
       if (this.groqKey) {
         const r = await fetch(
@@ -4213,7 +4213,7 @@ Rules:
           const txt = d.choices?.[0]?.message?.content?.trim();
           try {
             queryPlan = JSON.parse(txt.replace(/```json|```/g, "").trim());
-          } catch {}
+          } catch { /* ignored */ }
         }
       }
 
@@ -4274,7 +4274,7 @@ Rules:
 
     try {
       // Store reminder in Supabase
-      const { data, error } = await this.supabaseAdmin
+      const { _data, error } = await this.supabaseAdmin
         .from("brain_memory")
         .insert({
           user_id: userId,
@@ -4340,7 +4340,7 @@ Rules:
               `⏰ Reminder fired: ${parsed.text.substring(0, 50)}`,
             );
           }
-        } catch {}
+        } catch { /* ignored */ }
       }
     } catch (e) {
       logger.warn(
@@ -4475,7 +4475,7 @@ Rules:
   /**
    * List upcoming Google Calendar events.
    */
-  async _calendarList(userId = null, maxResults = 10) {
+  async _calendarList(_userId = null, maxResults = 10) {
     this.toolStats.calendarList = (this.toolStats.calendarList || 0) + 1;
     const calId = process.env.GOOGLE_CALENDAR_ID || "primary";
 
@@ -4554,7 +4554,7 @@ Rules:
   /**
    * Delete a Google Calendar event by ID.
    */
-  async _calendarDelete(eventId, userId = null) {
+  async _calendarDelete(eventId, _userId = null) {
     this.toolStats.calendarDelete = (this.toolStats.calendarDelete || 0) + 1;
     const calId = process.env.GOOGLE_CALENDAR_ID || "primary";
 
@@ -4875,7 +4875,7 @@ Generate the complete document now:`;
    * Returns: { factualScore, completenessScore, confidenceScore,
    *            verifiedClaims, unsupportedClaims, evidenceMap, flags, verdict }
    */
-  async _truthCheck(responseText, toolResults, analysis, sources = []) {
+  async _truthCheck(responseText, toolResults, analysis, _sources = []) {
     const startTime = Date.now();
     const report = {
       factualScore: 1.0,
@@ -5531,7 +5531,7 @@ Rules:
    * Full Critic Agent evaluation — runs all checks and produces a verdict.
    * Returns: { verdict, overallScore, consistency, relevance, safety, suggestions[], durationMs }
    */
-  async criticEvaluate(userMessage, responseText, analysis, toolsUsed = []) {
+  async criticEvaluate(userMessage, responseText, analysis, _toolsUsed = []) {
     const startTime = Date.now();
 
     const report = {
@@ -5786,7 +5786,7 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
    * Auto-detect project from conversation and update memory.
    * Runs after each conversation to keep project memory fresh.
    */
-  async _autoDetectProject(userId, message, analysis, toolsUsed) {
+  async _autoDetectProject(userId, message, _analysis, _toolsUsed) {
     if (!this.supabaseAdmin || !userId) return;
     try {
       // Detect project-related keywords
@@ -5845,7 +5845,7 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
         notes: `Last mentioned: ${message.substring(0, 100)}...`,
         files_touched: [],
       });
-    } catch (e) {
+    } catch (_e) {
       // Non-blocking
     }
   }
@@ -6161,7 +6161,7 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
   // 9.8 EMAIL — Send emails via environment-configured provider
   // Supports: Resend, SendGrid, or SMTP fallback
   // ═══════════════════════════════════════════════════════════
-  async _sendEmail(to, subject, body, userId) {
+  async _sendEmail(to, subject, body, _userId) {
     // Try Resend first (simplest API)
     const resendKey = process.env.RESEND_API_KEY;
     if (resendKey) {
@@ -6661,7 +6661,7 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
   // 9.12 PROACTIVE SUGGESTIONS — Context-aware suggestions
   // Analyzes user patterns and offers relevant actions
   // ═══════════════════════════════════════════════════════════
-  async _proactiveSuggest(userId, context = {}) {
+  async _proactiveSuggest(userId, _context = {}) {
     if (!this.supabaseAdmin || !userId) return [];
 
     try {
@@ -7807,7 +7807,7 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
       for (const asset of assets) {
         try {
           let prices = [],
-            volumes = [];
+            _volumes = [];
           // Try WS-Engine first (real-time)
           try {
             const candles = wsEngine.getCandles
@@ -7815,7 +7815,7 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
               : null;
             if (candles && candles.length >= 20) {
               prices = candles.map((c) => c.close);
-              volumes = candles.map((c) => c.volume || 0);
+              _volumes = candles.map((c) => c.volume || 0);
             }
           } catch (_wsErr) {
             logger.warn(
@@ -7832,7 +7832,7 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
               if (r.ok) {
                 const d = await r.json();
                 prices = (d.prices || []).map((p) => p[1]).slice(-100);
-                volumes = (d.total_volumes || []).map((v) => v[1]).slice(-100);
+                _volumes = (d.total_volumes || []).map((v) => v[1]).slice(-100);
               }
             } catch (_cgErr) {
               logger.warn(
@@ -9428,7 +9428,7 @@ Dacă nu poți extrage: {}`;
           k1Meta.recordUserInteraction({ domain: "general", wasCorrection: true, correctionNote: correction.rule });
           const k1Perf = require("./k1-performance");
           k1Perf.recordCorrection("general", correction.wrong?.substring(0, 50) || "unknown");
-        } catch (e) { /* non-critical */ }
+        } catch (_e) { /* non-critical */ }
       }
 
       logger.info({ component: "Brain", correction: correction.rule }, "🎓 Learned correction: " + correction.rule);
@@ -9914,7 +9914,7 @@ Raspunde STRICT JSON. Daca nimic: {}`;
         // ═══ 3. BRAIN ANALYZES PERFORMANCE → STRATEGY ADJUSTMENTS ═══
         if (history.trades.length > 0) {
           const closedTrades = history.trades.filter(
-            (t) => t.status === "closed" && t.pnl != null,
+            (t) => t.status === "closed" && t.pnl !== null,
           );
           const wins = closedTrades.filter((t) => t.pnl > 0);
           const losses = closedTrades.filter((t) => t.pnl <= 0);
@@ -9979,7 +9979,7 @@ Raspunde STRICT JSON. Daca nimic: {}`;
             const signalAccuracy = {};
             closedTrades.forEach((t) => {
               if (t.raw_data?.indicators) {
-                Object.entries(t.raw_data.indicators).forEach(([ind, sig]) => {
+                Object.entries(t.raw_data.indicators).forEach(([ind, _sig]) => {
                   if (!signalAccuracy[ind])
                     signalAccuracy[ind] = { correct: 0, total: 0 };
                   signalAccuracy[ind].total++;

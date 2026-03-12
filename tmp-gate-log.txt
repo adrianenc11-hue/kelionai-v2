@@ -1,0 +1,161 @@
+[2026-03-12T17:26:48.307Z] ÔòÉÔòÉÔòÉ TRUTH GUARD ÔÇö GATE RUNNER ÔòÉÔòÉÔòÉ
+[2026-03-12T17:26:48.313Z] Commit: local
+[2026-03-12T17:26:48.313Z] Node: v20.11.0
+[2026-03-12T17:26:48.313Z] CWD: C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2
+[2026-03-12T17:26:48.313Z] 
+ÔòÉÔòÉÔòÉÔòÉ GATE: Prettier (format check) ÔòÉÔòÉÔòÉÔòÉ
+[2026-03-12T17:26:48.313Z] Command: npx prettier --check "server/**/*.js"
+[2026-03-12T17:26:51.862Z] y.js
+[[33mwarn[39m] server/k1-messenger-bridge.js
+[[33mwarn[39m] server/k1-meta-learning.js
+[[33mwarn[39m] server/k1-performance.js
+[[33mwarn[39m] server/k1-persistence.js
+[[33mwarn[39m] server/k1-truth.js
+[[33mwarn[39m] server/k1-world-state.js
+[[33mwarn[39m] server/kira-tools.js
+[[33mwarn[39m] server/legal.js
+[[33mwarn[39m] server/market-data.js
+[[33mwarn[39m] server/market-learner.js
+[[33mwarn[39m] server/messenger.js
+[[33mwarn[39m] server/middleware/apiKeyAuth.js
+[[33mwarn[39m] server/migrate.js
+[[33mwarn[39m] server/model-watcher.js
+[[33mwarn[39m] server/news.js
+[[33mwarn[39m] server/paper-trading.js
+[[33mwarn[39m] server/payments.js
+[[33mwarn[39m] server/performance-tracker.js
+[[33mwarn[39m] server/persona.js
+[[33mwarn[39m] server/plugin-system.js
+[[33mwarn[39m] server/referral.js
+[[33mwarn[39m] server/routes/admin.js
+[[33mwarn[39m] server/routes/auth.js
+[[33mwarn[39m] server/routes/brain-chat.js
+[[33mwarn[39m] server/routes/chat.js
+[[33mwarn[39m] server/routes/developer.js
+[[33mwarn[39m] server/routes/export.js
+[[33mwarn[39m] server/routes/health.js
+[[33mwarn[39m] server/routes/identity.js
+[[33mwarn[39m] server/routes/images.js
+[[33mwarn[39m] server/routes/multimodal.js
+[[33mwarn[39m] server/routes/search.js
+[[33mwarn[39m] server/routes/vision.js
+[[33mwarn[39m] server/routes/voice-clone.js
+[[33mwarn[39m] server/routes/voice-stream.js
+[[33mwarn[39m] server/routes/voice.js
+[[33mwarn[39m] server/routes/weather.js
+[[33mwarn[39m] server/scalability.js
+[[33mwarn[39m] server/shared-sessions.js
+[[33mwarn[39m] server/startup-checks.js
+[[33mwarn[39m] server/telegram.js
+[[33mwarn[39m] server/trade-executor.js
+[[33mwarn[39m] server/trade-persistence.js
+[[33mwarn[39m] server/trading-learner.js
+[[33mwarn[39m] server/trading.js
+[[33mwarn[39m] server/whatsapp.js
+[[33mwarn[39m] server/ws-engine.js
+[[33mwarn[39m] Code style issues found in 66 files. Run Prettier with --write to fix.
+[2026-03-12T17:26:51.862Z] ÔØî Prettier (format check) FAILED (3549ms, exit 1)
+[2026-03-12T17:26:51.863Z] 
+ÔòÉÔòÉÔòÉÔòÉ GATE: Lint (ESLint) ÔòÉÔòÉÔòÉÔòÉ
+[2026-03-12T17:26:51.863Z] Command: npx eslint server/
+[2026-03-12T17:26:53.820Z]       no-empty
+  3355:13  warning  Empty block statement                                                               no-empty
+  3372:13  warning  Empty block statement                                                               no-empty
+  3399:11  warning  Empty block statement                                                               no-empty
+  3407:11  warning  Empty block statement                                                               no-empty
+
+C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2\server\whatsapp.js
+   172:7   warning  'knownUsers' is assigned a value but never used. Allowed unused vars must match /^_/u  no-unused-vars
+   921:24  warning  'e' is defined but never used                                                          no-unused-vars
+   946:26  warning  'e' is defined but never used                                                          no-unused-vars
+   971:19  warning  Empty block statement                                                                  no-empty
+  1021:19  warning  Empty block statement                                                                  no-empty
+  1078:22  warning  'e' is defined but never used                                                          no-unused-vars
+
+C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2\server\ws-engine.js
+  141:22  warning  'err' is defined but never used                                             no-unused-vars
+  253:30  warning  'e' is defined but never used                                               no-unused-vars
+  317:26  warning  'e' is defined but never used                                               no-unused-vars
+  369:20  warning  'asset' is defined but never used. Allowed unused args must match /^_/u     no-unused-vars
+  369:27  warning  'candle1m' is defined but never used. Allowed unused args must match /^_/u  no-unused-vars
+
+Ô£û 178 problems (0 errors, 178 warnings)
+  0 errors and 21 warnings potentially fixable with the `--fix` option.
+[2026-03-12T17:26:53.821Z] Ô£à Lint (ESLint) PASSED (1957ms)
+[2026-03-12T17:26:53.821Z] 
+ÔòÉÔòÉÔòÉÔòÉ GATE: Typecheck ÔòÉÔòÉÔòÉÔòÉ
+[2026-03-12T17:26:53.821Z] Command: npm run typecheck --silent
+[2026-03-12T17:26:54.491Z] typecheck: N/A (JS-only project)
+[2026-03-12T17:26:54.491Z] Ô£à Typecheck PASSED (670ms)
+[2026-03-12T17:26:54.491Z] 
+ÔòÉÔòÉÔòÉÔòÉ GATE: Unit Tests (Jest) ÔòÉÔòÉÔòÉÔòÉ
+[2026-03-12T17:26:54.491Z] Command: npx jest --forceExit --silent
+[2026-03-12T17:27:09.279Z]  (C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2\node_modules\jest-util\build\index.js:504:62)
+    at Object.set [as version] (C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2\node_modules\jest-util\build\index.js:514:14)
+    at Reflect.set (<anonymous>)
+    at originalSetter (C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2\node_modules\jest-util\build\index.js:504:62)
+    at Object.set [as version] (C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2\node_modules\jest-util\build\index.js:514:14)
+    at Reflect.set (<anonymous>)
+    at originalSetter (C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2\node_modules\jest-util\build\index.js:504:62)
+    at Object.set [as version] (C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2\node_modules\jest-util\build\index.js:514:14)
+    at Reflect.set (<anonymous>)
+    at originalSetter (C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2\node_modules\jest-util\build\index.js:504:62)
+    at Object.set [as version] (C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2\node_modules\jest-util\build\index.js:514:14)
+    at Reflect.set (<anonymous>)
+    at originalSetter (C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2\node_modules\jest-util\build\index.js:504:62)
+    at Object.set [as version] (C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2\node_modules\jest-util\build\index.js:514:14)
+    at Reflect.set (<anonymous>)
+
+Node.js v20.11.0
+A worker process has failed to exit gracefully and has been force exited. This is likely caused by tests leaking due to improper teardown. Try running with --detectOpenHandles to find leaks. Active timers can also cause this, ensure that .unref() was called on them.
+Test Suites: 5 failed, 6 passed, 11 total
+Tests:       12 failed, 226 passed, 238 total
+Snapshots:   0 total
+Time:        12.662 s
+Force exiting Jest: Have you considered using `--detectOpenHandles` to detect async operations that kept running after all tests finished?
+[2026-03-12T17:27:09.279Z] ÔØî Unit Tests (Jest) FAILED (14788ms, exit 1)
+[2026-03-12T17:27:09.280Z] 
+ÔòÉÔòÉÔòÉÔòÉ GATE: Build Validation ÔòÉÔòÉÔòÉÔòÉ
+[2026-03-12T17:27:09.280Z] Command: npm run build --silent
+[2026-03-12T17:27:10.000Z] Build OK: static assets validated
+[2026-03-12T17:27:10.000Z] Ô£à Build Validation PASSED (720ms)
+[2026-03-12T17:27:10.000Z] 
+ÔòÉÔòÉÔòÉÔòÉ GATE: Security (npm audit) ÔòÉÔòÉÔòÉÔòÉ
+[2026-03-12T17:27:10.000Z] Command: npm audit --audit-level=high
+[2026-03-12T17:27:11.287Z] # npm audit report
+
+express-rate-limit  8.2.0 - 8.2.1
+Severity: high
+express-rate-limit: IPv4-mapped IPv6 addresses bypass per-client rate limiting on servers with dual-stack network - https://github.com/advisories/GHSA-46wh-pxpv-q5gq
+fix available via `npm audit fix`
+node_modules/express-rate-limit
+
+1 high severity vulnerability
+
+To address all issues, run:
+  npm audit fix
+[2026-03-12T17:27:11.287Z] ÔØî Security (npm audit) FAILED (1287ms, exit 1)
+[2026-03-12T17:27:11.287Z] 
+ÔòÉÔòÉÔòÉÔòÉ GATE: Smoke Probe ÔòÉÔòÉÔòÉÔòÉ
+[2026-03-12T17:27:11.287Z] ÔÅ¡´©Å  SKIPPED ÔÇö no BASE_URL or API_BASE_URL set (local run)
+[2026-03-12T17:27:11.287Z] 
+ÔòÉÔòÉÔòÉÔòÉ GATE: E2E (Playwright) ÔòÉÔòÉÔòÉÔòÉ
+[2026-03-12T17:27:11.287Z] ÔÅ¡´©Å  SKIPPED ÔÇö no BASE_URL set (requires Railway preview URL per Truth Guard rules)
+[2026-03-12T17:27:11.287Z] 
+ÔòÉÔòÉÔòÉÔòÉ GENERATING ARTIFACTS ÔòÉÔòÉÔòÉÔòÉ
+[2026-03-12T17:27:11.419Z] Ô£à gate_report.json written
+[2026-03-12T17:27:11.419Z] Ô£à file_err.txt written
+[2026-03-12T17:27:11.419Z] 
+ÔòÉÔòÉÔòÉ GATE SUMMARY ÔòÉÔòÉÔòÉ
+[2026-03-12T17:27:11.420Z]   ÔØî Prettier (format check): FAIL (3549ms)
+[2026-03-12T17:27:11.420Z]   Ô£à Lint (ESLint): PASS (1957ms)
+[2026-03-12T17:27:11.420Z]   Ô£à Typecheck: PASS (670ms)
+[2026-03-12T17:27:11.420Z]   ÔØî Unit Tests (Jest): FAIL (14788ms)
+[2026-03-12T17:27:11.420Z]   Ô£à Build Validation: PASS (720ms)
+[2026-03-12T17:27:11.420Z]   ÔØî Security (npm audit): FAIL (1287ms)
+[2026-03-12T17:27:11.420Z]   ÔÅ¡´©Å Smoke Probe: SKIPPED
+[2026-03-12T17:27:11.420Z]   ÔÅ¡´©Å E2E (Playwright): SKIPPED
+[2026-03-12T17:27:11.420Z] 
+  Overall: FAIL
+[2026-03-12T17:27:11.420Z] 
+­ƒÜ½ DEPLOY FORBIDDEN ÔÇö gates did not pass.

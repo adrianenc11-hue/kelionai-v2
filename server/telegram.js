@@ -12,35 +12,41 @@ const logger = require("./logger");
 const { MODELS } = require("./config/models");
 
 const router = express.Router();
-const APP_URL = process.env.APP_URL || '';
+const APP_URL = process.env.APP_URL || "";
 
 // ═══ TIMEOUT HELPER — prevents hanging on slow/dead APIs ═══
 function withTimeout(promise, ms = 10000, label = "operation") {
   return Promise.race([
     promise,
     new Promise((_, reject) =>
-      setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms),
+      setTimeout(
+        () => reject(new Error(`${label} timed out after ${ms}ms`)),
+        ms,
+      ),
     ),
   ]);
 }
 
 // ═══ AUTO-REGISTER WEBHOOK ON STARTUP ═══
 if (process.env.TELEGRAM_BOT_TOKEN) {
-  const webhookUrl =
-    (process.env.APP_URL) + "/api/telegram/webhook";
+  const webhookUrl = process.env.APP_URL + "/api/telegram/webhook";
   setTimeout(async () => {
     try {
-      const res = await withTimeout(fetch(
-        `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/setWebhook`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            url: webhookUrl,
-            allowed_updates: ["message", "callback_query"],
-          }),
-        },
-      ), 10000, "telegram:autoRegisterWebhook");
+      const res = await withTimeout(
+        fetch(
+          `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/setWebhook`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              url: webhookUrl,
+              allowed_updates: ["message", "callback_query"],
+            }),
+          },
+        ),
+        10000,
+        "telegram:autoRegisterWebhook",
+      );
       const data = await res.json();
       logger.info(
         { component: "Telegram", success: data.ok, webhookUrl },
@@ -79,7 +85,9 @@ const _userCache = new Map();
 const _USER_CACHE_MAX = 50;
 let _supabase = null;
 
-function setSupabase(client) { _supabase = client; }
+function setSupabase(client) {
+  _supabase = client;
+}
 
 async function getKnownUser(userId, supabase) {
   if (_userCache.has(userId)) return _userCache.get(userId);
@@ -106,7 +114,10 @@ async function getKnownUser(userId, supabase) {
         return user;
       }
     } catch (e) {
-      logger.warn({ component: "Telegram", err: e.message }, "table may not exist");
+      logger.warn(
+        { component: "Telegram", err: e.message },
+        "table may not exist",
+      );
     }
   }
   return null;
@@ -115,7 +126,12 @@ async function getKnownUser(userId, supabase) {
 async function saveKnownUser(userId, lang, name, supabase) {
   const db = supabase || _supabase;
   const cached = _userCache.get(userId) || {};
-  const user = { ...cached, lang, name, firstSeen: cached.firstSeen || new Date().toISOString() };
+  const user = {
+    ...cached,
+    lang,
+    name,
+    firstSeen: cached.firstSeen || new Date().toISOString(),
+  };
   if (_userCache.size >= _USER_CACHE_MAX) {
     const oldest = _userCache.keys().next().value;
     _userCache.delete(oldest);
@@ -149,7 +165,10 @@ function isRateLimited(userId) {
         if (userRateLimits.size < _RATE_LIMIT_MAX_ENTRIES) break;
       }
     }
-    userRateLimits.set(userId, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    userRateLimits.set(userId, {
+      count: 1,
+      resetAt: now + RATE_LIMIT_WINDOW_MS,
+    });
     return false;
   }
   if (entry.count >= RATE_LIMIT_MAX) return true;
@@ -167,7 +186,10 @@ async function addToHistory(chatId, from, text) {
         content: (text || "").slice(0, 2000),
       });
     } catch (e) {
-      logger.warn({ component: "Telegram", err: e.message }, "DB history write failed");
+      logger.warn(
+        { component: "Telegram", err: e.message },
+        "DB history write failed",
+      );
     }
   }
 }
@@ -240,14 +262,15 @@ async function sendMessage(chatId, text, options = {}) {
     if (options.replyMarkup)
       body.reply_markup = JSON.stringify(options.replyMarkup);
 
-    const res = await withTimeout(fetch(
-      `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
-      {
+    const res = await withTimeout(
+      fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
-      },
-    ), 10000, "telegram:sendMessage");
+      }),
+      10000,
+      "telegram:sendMessage",
+    );
     if (res.ok) {
       stats.repliesSent++;
       logger.info({ component: "Telegram", chatId }, "Message sent");
@@ -361,7 +384,7 @@ const COMMANDS = {
       `• Știri în timp real\n` +
       `• Meteo, sport, trading\n\n` +
       `🌐 <b>Website:</b> ${APP_URL}\n` +
-      `📧 <b>Contact:</b> ${APP_URL.replace('https://', 'support@')}`;
+      `📧 <b>Contact:</b> ${APP_URL.replace("https://", "support@")}`;
     await sendMessage(chatId, msg);
   },
 
@@ -454,7 +477,7 @@ function faqReply(text) {
     return `💰 <b>Planuri KelionAI:</b>\n\n• <b>Free</b> — gratuit, 10 chat-uri/zi\n• <b>Pro</b> — €9.99/lună, 100 chat-uri/zi\n• <b>Premium</b> — €19.99/lună, nelimitat\n\n🌐 Detalii: ${APP_URL}/pricing/`;
   }
   if (/contact|support|ajutor|problema/.test(t)) {
-    return `📧 Contactează-ne: ${APP_URL.replace('https://', 'support@')}\nSuntem disponibili luni-vineri.`;
+    return `📧 Contactează-ne: ${APP_URL.replace("https://", "support@")}\nSuntem disponibili luni-vineri.`;
   }
   if (/ce e[șs]ti|cine e[șs]ti/.test(t)) {
     return `🤖 Sunt <b>KelionAI</b> — asistentul tău AI personal cu avatar 3D, suport vocal și multilingv!\n\n🌐 Încearcă: ${APP_URL}`;
@@ -471,19 +494,32 @@ async function downloadTelegramFile(fileId) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ file_id: fileId }),
-      }), 10000, "telegram:getFile"
+      }),
+      10000,
+      "telegram:getFile",
     );
     if (!metaRes.ok) return null;
     const meta = await metaRes.json();
     if (!meta.ok || !meta.result?.file_path) return null;
 
     const fileUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${meta.result.file_path}`;
-    const dataRes = await withTimeout(fetch(fileUrl), 15000, "telegram:downloadFile");
+    const dataRes = await withTimeout(
+      fetch(fileUrl),
+      15000,
+      "telegram:downloadFile",
+    );
     if (!dataRes.ok) return null;
-    const ab = await withTimeout(dataRes.arrayBuffer(), 10000, "telegram:readFileBody");
+    const ab = await withTimeout(
+      dataRes.arrayBuffer(),
+      10000,
+      "telegram:readFileBody",
+    );
     return Buffer.from(ab);
   } catch (e) {
-    logger.error({ component: "Telegram", fileId, err: e.message }, "downloadFile error");
+    logger.error(
+      { component: "Telegram", fileId, err: e.message },
+      "downloadFile error",
+    );
     return null;
   }
 }
@@ -501,12 +537,22 @@ async function transcribeAudio(audioBuffer, mimeType) {
       filename: "audio.ogg",
       contentType: mimeType || "audio/ogg",
     });
-    form.append("model", process.env.GROQ_API_KEY ? MODELS.WHISPER : MODELS.OPENAI_WHISPER);
-    const res = await withTimeout(fetch(baseUrl + "/audio/transcriptions", {
-      method: "POST",
-      headers: Object.assign({ Authorization: "Bearer " + apiKey }, form.getHeaders()),
-      body: form,
-    }), 20000, "telegram:transcribeAudio");
+    form.append(
+      "model",
+      process.env.GROQ_API_KEY ? MODELS.WHISPER : MODELS.OPENAI_WHISPER,
+    );
+    const res = await withTimeout(
+      fetch(baseUrl + "/audio/transcriptions", {
+        method: "POST",
+        headers: Object.assign(
+          { Authorization: "Bearer " + apiKey },
+          form.getHeaders(),
+        ),
+        body: form,
+      }),
+      20000,
+      "telegram:transcribeAudio",
+    );
     if (res.ok) {
       const data = await res.json();
       return data.text || "";
@@ -520,30 +566,48 @@ async function transcribeAudio(audioBuffer, mimeType) {
 // ═══ ANALYZE IMAGE (GPT Vision) ═══
 async function analyzeImage(imageBuffer, caption) {
   const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) return caption || "Am primit o imagine dar Vision API nu e configurat.";
+  if (!apiKey)
+    return caption || "Am primit o imagine dar Vision API nu e configurat.";
   const base64 = imageBuffer.toString("base64");
   const userPrompt = caption
     ? `Utilizatorul a trimis această imagine cu textul: "${caption}". Descrie ce vezi.`
     : "Descrie în detaliu ce vezi în această imagine. Identifică persoane, obiecte, locuri, texte vizibile.";
   try {
-    const res = await withTimeout(fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: "Bearer " + apiKey, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: MODELS.OPENAI_VISION,
-        messages: [{
-          role: "user",
-          content: [
-            { type: "text", text: userPrompt },
-            { type: "image_url", image_url: { url: "data:image/jpeg;base64," + base64, detail: "high" } },
+    const res = await withTimeout(
+      fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer " + apiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: MODELS.OPENAI_VISION,
+          messages: [
+            {
+              role: "user",
+              content: [
+                { type: "text", text: userPrompt },
+                {
+                  type: "image_url",
+                  image_url: {
+                    url: "data:image/jpeg;base64," + base64,
+                    detail: "high",
+                  },
+                },
+              ],
+            },
           ],
-        }],
-        max_tokens: 1000,
+          max_tokens: 1000,
+        }),
       }),
-    }), 25000, "telegram:analyzeImage");
+      25000,
+      "telegram:analyzeImage",
+    );
     if (res.ok) {
       const data = await res.json();
-      return data.choices?.[0]?.message?.content || "Nu am putut analiza imaginea.";
+      return (
+        data.choices?.[0]?.message?.content || "Nu am putut analiza imaginea."
+      );
     }
   } catch (e) {
     logger.error({ component: "Telegram", err: e.message }, "Vision failed");
@@ -570,16 +634,20 @@ router.post("/webhook", async (req, res) => {
       }
       // Answer callback to remove loading state
       if (BOT_TOKEN) {
-        await withTimeout(fetch(
-          `https://api.telegram.org/bot${BOT_TOKEN}/answerCallbackQuery`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              callback_query_id: update.callback_query.id,
-            }),
-          },
-        ), 5000, "telegram:answerCallback");
+        await withTimeout(
+          fetch(
+            `https://api.telegram.org/bot${BOT_TOKEN}/answerCallbackQuery`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                callback_query_id: update.callback_query.id,
+              }),
+            },
+          ),
+          5000,
+          "telegram:answerCallback",
+        );
       }
       return;
     }
@@ -619,7 +687,10 @@ router.post("/webhook", async (req, res) => {
     if (message.audio) {
       const buffer = await downloadTelegramFile(message.audio.file_id);
       if (buffer) {
-        const transcript = await transcribeAudio(buffer, message.audio.mime_type || "audio/mpeg");
+        const transcript = await transcribeAudio(
+          buffer,
+          message.audio.mime_type || "audio/mpeg",
+        );
         if (transcript) {
           text = transcript;
         } else {
@@ -632,7 +703,8 @@ router.post("/webhook", async (req, res) => {
       const mime = message.document.mime_type || "";
       if (mime.startsWith("image/")) {
         const buffer = await downloadTelegramFile(message.document.file_id);
-        if (buffer) mediaContext = await analyzeImage(buffer, message.caption || null);
+        if (buffer)
+          mediaContext = await analyzeImage(buffer, message.caption || null);
         text = message.caption || "Am trimis o imagine";
       } else {
         text = message.caption || "Am trimis un document";
@@ -669,18 +741,25 @@ router.post("/webhook", async (req, res) => {
     }
 
     // ═══ USER ENGAGEMENT TRACKING — from Supabase ═══
-    const known = await getKnownUser(userId, req.app.locals.supabaseAdmin || req.app.locals.supabase);
+    const known = await getKnownUser(
+      userId,
+      req.app.locals.supabaseAdmin || req.app.locals.supabase,
+    );
     const msgCount = known ? (known.messageCount || 0) + 1 : 1;
     // Update message count in DB
     const _db = req.app.locals.supabaseAdmin || req.app.locals.supabase;
     if (_db) {
       try {
-        await _db.from("telegram_users")
+        await _db
+          .from("telegram_users")
           .update({ message_count: msgCount })
           .eq("user_id", String(userId));
         // Update cache
-        if (_userCache.has(userId)) _userCache.get(userId).messageCount = msgCount;
-      } catch (e) { /* ignore */ }
+        if (_userCache.has(userId))
+          _userCache.get(userId).messageCount = msgCount;
+      } catch (_e) {
+        /* ignore */
+      }
     }
     // ═══ K1 COGNITIVE BRIDGE — Pre-process prin reasoning loop ═══
     const k1Bridge = require("./k1-messenger-bridge");
@@ -692,7 +771,7 @@ router.post("/webhook", async (req, res) => {
         userName,
         supabase: req.app.locals.supabaseAdmin || req.app.locals.supabase,
       });
-    } catch { }
+    } catch { /* ignored */ }
 
     // Use Brain AI
     const detectedLangTg = detectLanguage(text);
@@ -709,7 +788,9 @@ router.post("/webhook", async (req, res) => {
             setTimeout(() => reject(new Error("Brain timeout")), 15000),
           );
           // Enrich context with K1 data
-          const k1SystemCtx = k1Context ? k1Bridge.getK1SystemContext(k1Context) : "";
+          const k1SystemCtx = k1Context
+            ? k1Bridge.getK1SystemContext(k1Context)
+            : "";
           const enrichedText = k1SystemCtx ? text + k1SystemCtx : text;
           const result = await Promise.race([
             brain.think(enrichedText, "kelion", [], detectedLangTg || "auto"),
@@ -723,12 +804,10 @@ router.post("/webhook", async (req, res) => {
             { component: "Telegram", err: e.message },
             "Brain unavailable",
           );
-          reply =
-            `🤖 Momentan sunt ocupat. Încearcă din nou sau vizitează ${APP_URL}`;
+          reply = `🤖 Momentan sunt ocupat. Încearcă din nou sau vizitează ${APP_URL}`;
         }
       } else {
-        reply =
-          `🤖 Sunt KelionAI! Pentru experiența completă vizitează ${APP_URL}`;
+        reply = `🤖 Sunt KelionAI! Pentru experiența completă vizitează ${APP_URL}`;
       }
     }
 
@@ -740,16 +819,29 @@ router.post("/webhook", async (req, res) => {
         domain: k1Context?.k1?.domain || "general",
         supabase: req.app.locals.supabaseAdmin || req.app.locals.supabase,
       });
-    } catch { }
+    } catch { /* ignored */ }
 
     await sendMessage(chatId, escapeHtml(reply), { parseMode: undefined });
 
     // ═══ BRAIN INTEGRATION — save chat memory ═══
     const brainRef = req.app.locals.brain;
     if (brainRef) {
-      brainRef.saveMemory(null, "text", "Telegram " + userName + ": " + text.substring(0, 200) + " | Reply: " + reply.substring(0, 300), {
-        platform: "telegram", userId: String(userId)
-      }).catch(() => { });
+      brainRef
+        .saveMemory(
+          null,
+          "text",
+          "Telegram " +
+            userName +
+            ": " +
+            text.substring(0, 200) +
+            " | Reply: " +
+            reply.substring(0, 300),
+          {
+            platform: "telegram",
+            userId: String(userId),
+          },
+        )
+        .catch(() => {});
     }
 
     // ═══ SAVE MESSAGE TO DB ═══
@@ -798,12 +890,12 @@ router.post("/webhook", async (req, res) => {
         await sendMessage(
           chatId,
           `⭐ <b>Ai folosit ${FREE_MESSAGES_LIMIT} mesaje gratuite azi!</b>\n\n` +
-          `Continuă cu funcții premium pe ${APP_URL}:\n` +
-          `• 💬 Chat nelimitat cu AI\n` +
-          `• 🎭 Avatare 3D — Kelion & Kira\n` +
-          `• 🔊 Voce naturală\n` +
-          `• 🖼️ Generare imagini\n\n` +
-          `🌐 Abonează-te: ${APP_URL}/pricing`,
+            `Continuă cu funcții premium pe ${APP_URL}:\n` +
+            `• 💬 Chat nelimitat cu AI\n` +
+            `• 🎭 Avatare 3D — Kelion & Kira\n` +
+            `• 🔊 Voce naturală\n` +
+            `• 🖼️ Generare imagini\n\n` +
+            `🌐 Abonează-te: ${APP_URL}/pricing`,
           {
             replyMarkup: {
               inline_keyboard: [
@@ -832,20 +924,20 @@ router.get("/setup", async (req, res) => {
   if (!BOT_TOKEN) {
     return res.json({ error: "TELEGRAM_BOT_TOKEN not set" });
   }
-  const webhookUrl =
-    (process.env.APP_URL) + "/api/telegram/webhook";
+  const webhookUrl = process.env.APP_URL + "/api/telegram/webhook";
   try {
-    const response = await withTimeout(fetch(
-      `https://api.telegram.org/bot${BOT_TOKEN}/setWebhook`,
-      {
+    const response = await withTimeout(
+      fetch(`https://api.telegram.org/bot${BOT_TOKEN}/setWebhook`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           url: webhookUrl,
           allowed_updates: ["message", "callback_query"],
         }),
-      },
-    ), 10000, "telegram:setupWebhook");
+      }),
+      10000,
+      "telegram:setupWebhook",
+    );
     const data = await response.json();
     res.json({ success: data.ok, webhookUrl, result: data });
   } catch (e) {
@@ -864,8 +956,7 @@ router.get("/health", (req, res) => {
       repliesSent: stats.repliesSent,
       activeUsers: stats.uniqueUsers,
     },
-    webhookUrl:
-      (process.env.APP_URL) + "/api/telegram/webhook",
+    webhookUrl: process.env.APP_URL + "/api/telegram/webhook",
   });
 });
 
@@ -883,4 +974,10 @@ async function broadcastNews(articles) {
   await broadcastToChannel(msg);
 }
 
-module.exports = { router, broadcastNews, setSupabase, sendMessage, CHANNEL_ID };
+module.exports = {
+  router,
+  broadcastNews,
+  setSupabase,
+  sendMessage,
+  CHANNEL_ID,
+};
