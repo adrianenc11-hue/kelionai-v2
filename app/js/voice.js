@@ -215,7 +215,7 @@
             // Chunk the text and play each chunk sequentially
             var chunks = _chunkText(ttsText);
             console.log('[Voice] TTS chunked into', chunks.length, 'parts');
-            showSubtitle(ttsText);
+            // showSubtitle disabled — text already visible in chat overlay (prevents duplicate display)
 
             for (var ci = 0; ci < chunks.length; ci++) {
                 if (thisId !== _speakId) { console.log('[Voice] Stale, aborting chunk', ci); return; }
