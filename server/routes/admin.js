@@ -10,6 +10,7 @@ const { notify, sseHandler, getRecent } = require("../notifications");
 const abTest = require("../ab-testing");
 const sprint2 = require("../sprint2");
 const qw = require("../quick-wins");
+const cot = require("../chain-of-thought");
 const router = express.Router();
 
 // ── Config from environment variables ──
@@ -2861,6 +2862,10 @@ router.get("/errors", (_req, res) => res.json(sprint2.getErrorStats()));
 router.post("/errors", (req, res) => { sprint2.trackError(req.body); res.json({ ok: true }); });
 
 // ══════════════════════════════════════════════════════════
+// CHAIN OF THOUGHT
+router.get("/cot", (_req, res) => res.json({ enabled: cot.isEnabled() }));
+router.post("/cot/toggle", (req, res) => res.json({ enabled: cot.toggle(req.body.enabled) }));
+
 // QUICK WINS ENDPOINTS
 // ══════════════════════════════════════════════════════════
 router.post("/templates", (req, res) => res.json(qw.createTemplate(req.body)));
