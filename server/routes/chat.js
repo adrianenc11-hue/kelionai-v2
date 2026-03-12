@@ -195,6 +195,22 @@ router.post("/chat", chatLimiter, validate(chatSchema), async (req, res) => {
     let reply = thought.enrichedMessage;
     let engine =
       thought.agent === "v4-gemini-tools" ? "Gemini-V4" : "V3-Fallback";
+
+    // ── SANITIZE: Strip leaked system instructions from reply ──
+    if (reply) {
+      // Remove [SYSTEM INSTRUCTION...] blocks
+      reply = reply.replace(/\[SYSTEM INSTRUCTION[^\]]*\][\s\S]*?\[END SYSTEM INSTRUCTION\]\s*/gi, "");
+      // Remove other internal prompt markers
+      reply = reply.replace(/\[LEARNED PATTERNS\][\s\S]*?\[\/LEARNED PATTERNS\]\s*/gi, "");
+      reply = reply.replace(/\[SELF-EVAL HINTS\][\s\S]*?\[\/SELF-EVAL HINTS\]\s*/gi, "");
+      reply = reply.replace(/\[CONTEXT SWITCH\][^\n]*\n?/gi, "");
+      reply = reply.replace(/\[PROACTIVE\][\s\S]*?\[\/PROACTIVE\]\s*/gi, "");
+      reply = reply.replace(/\[EMOTIONAL CONTEXT\][^\n]*\n?/gi, "");
+      reply = reply.replace(/\[CURRENT DATE & TIME\][^\n]*\n?/gi, "");
+      reply = reply.replace(/\[USER LOCATION\][^\n]*\n?/gi, "");
+      reply = reply.replace(/\[REZULTATE CAUTARE WEB REALE\][\s\S]*?Citeaza sursele\.\s*/gi, "");
+      reply = reply.trim();
+    }
     // #region agent log
     fetch("http://127.0.0.1:7257/ingest/9ae34db2-4176-48c4-a1ff-ca0fe87de92a", {
       method: "POST",
