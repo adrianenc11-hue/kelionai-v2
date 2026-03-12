@@ -337,7 +337,7 @@
     </div>
 
     <script>
-        const H = { 'x-admin-secret': 'kAI-adm1n-s3cr3t-2026-pr0d', 'Content-Type': 'application/json' };
+        const H = { 'x-admin-secret': sessionStorage.getItem('kelion_admin_secret') || '', 'Content-Type': 'application/json' };
         const API = '/api/trading';
 
         async function loadDashboard() {

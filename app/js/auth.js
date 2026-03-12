@@ -50,32 +50,20 @@
         if (!adminBtn) return;
         var isLoggedIn = !!currentUser;
         var isAdminRole = isLoggedIn && currentUser.role === 'admin';
-        var faceConfirmed = !!sessionStorage.getItem('kelion_admin_secret');
-        var unlocked = isAdminRole && faceConfirmed;
-        // Only show for admin users
+        // Auto-unlock for admin users — no password needed
         if (!isAdminRole) {
             adminBtn.style.display = 'none';
             return;
         }
         adminBtn.style.display = '';
-        adminBtn.dataset.locked = unlocked ? 'false' : 'true';
-        if (unlocked) {
-            adminBtn.style.background = 'rgba(16,185,129,0.15)';
-            adminBtn.style.borderColor = 'rgba(16,185,129,0.4)';
-            adminBtn.style.color = '#6ee7b7';
-            adminBtn.style.cursor = 'pointer';
-            adminBtn.style.opacity = '1';
-            adminBtn.innerHTML = '🛡️ Admin';
-            adminBtn.title = 'Admin Panel — Acces activat';
-        } else {
-            adminBtn.style.background = 'rgba(239,68,68,0.12)';
-            adminBtn.style.borderColor = 'rgba(239,68,68,0.3)';
-            adminBtn.style.color = '#fca5a5';
-            adminBtn.style.cursor = 'not-allowed';
-            adminBtn.style.opacity = '0.7';
-            adminBtn.innerHTML = '🔒 Admin';
-            adminBtn.title = 'Admin Panel — Introdu cod admin în chat';
-        }
+        adminBtn.dataset.locked = 'false';
+        adminBtn.style.background = 'rgba(16,185,129,0.15)';
+        adminBtn.style.borderColor = 'rgba(16,185,129,0.4)';
+        adminBtn.style.color = '#6ee7b7';
+        adminBtn.style.cursor = 'pointer';
+        adminBtn.style.opacity = '1';
+        adminBtn.innerHTML = '🛡️ Admin';
+        adminBtn.title = 'Admin Panel';
     }
 
     function updateUI() {
@@ -179,24 +167,9 @@
         // Admin button → navigate to admin panel
         var adminBtn = document.getElementById('btn-admin');
         if (adminBtn) adminBtn.addEventListener('click', function () {
+            // Admin auto-unlocked — direct navigate
             if (adminBtn.dataset.locked === 'false') {
                 window.location.href = '/admin';
-            } else if (currentUser) {
-                // Logged in but face not recognized — password fallback
-                var secret = prompt('🔐 Recunoașterea facială nu a funcționat.\nIntrodu parola Admin:');
-                if (!secret || !secret.trim()) return;
-                // Verify against API
-                fetch('/api/admin/ai-status', { headers: { 'x-admin-secret': secret.trim() } })
-                    .then(function (r) {
-                        if (r.ok) {
-                            sessionStorage.setItem('kelion_admin_secret', secret.trim());
-                            updateAdminButtonState();
-                            window.location.href = '/admin';
-                        } else {
-                            alert('❌ Parolă incorectă.');
-                        }
-                    })
-                    .catch(function () { alert('❌ Eroare conexiune.'); });
             }
         });
         // Auto-enter when both avatars are 100% loaded (or 10s max)
