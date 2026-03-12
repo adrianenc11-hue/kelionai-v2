@@ -185,8 +185,8 @@
         renderer.setSize(w, h);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 3)); // CINEMATIC: up to 3x for 4K/retina
 
-        camera = new THREE.PerspectiveCamera(22, w / h, 0.1, 100);
-        camera.position.set(0, 0.05, 0.95); // Tight face framing — head + neck, no shoulders/hands
+        camera = new THREE.PerspectiveCamera(24, w / h, 0.1, 100);
+        camera.position.set(0, -0.02, 1.05); // Portrait framing — full face + neck + upper chest
         renderer.outputColorSpace = THREE.SRGBColorSpace;
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
         renderer.toneMappingExposure = 1.2;
@@ -262,7 +262,7 @@
                 if (maxDim > 0) currentModel.scale.setScalar(1.2 / maxDim);
 
                 // Shift model down for head+torso framing
-                currentModel.position.y -= 0.25; // Face centered — head + neck only
+                currentModel.position.y -= 0.15; // Portrait centered — full face visible
 
                 currentModel.traverse((child) => {
                     if (child.isMesh) {
