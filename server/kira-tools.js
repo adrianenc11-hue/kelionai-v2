@@ -598,8 +598,9 @@ function gitDiff() {
 function projectSearch(query, searchPath) {
   if (!query) return { success: false, error: "No query provided" };
   const safePath = (searchPath || ".").replace(/[;&|`$]/g, "");
-  const safeQuery = query.replace(/[;&|`$"]/g, "").slice(0, 200);
-  return adminTerminal(`grep -rn --include="*.js" --include="*.html" --include="*.css" --include="*.json" --include="*.md" "${safeQuery}" ${safePath} | head -30`);
+  const safeQuery = query.replace(/[;&`$"]/g, "").slice(0, 200);
+  // Pipe | is allowed for grep OR patterns (ex: TODO|FIXME|BUG)
+  return adminTerminal(`grep -rn -E --include="*.js" --include="*.html" --include="*.css" --include="*.json" --include="*.md" "${safeQuery}" ${safePath} | head -30`);
 }
 
 function projectTree(dirPath, depth) {
@@ -613,7 +614,7 @@ function projectTree(dirPath, depth) {
 // ═══════════════════════════════════════════════════════════════
 
 const PROJECT_READ_MAX = 100000; // 100KB max
-const BLOCKED_FILE_PATTERNS = [/\.env/i, /node_modules/i, /\.git\//i, /password/i, /secret/i];
+const BLOCKED_FILE_PATTERNS = []; // K1 has TOTAL access per Adrian's orders
 
 function readProjectFile(filePath) {
   if (!filePath) return { success: false, error: "No filePath provided" };

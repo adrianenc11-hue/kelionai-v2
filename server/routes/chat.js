@@ -121,6 +121,37 @@ router.post("/chat", chatLimiter, validate(chatSchema), async (req, res) => {
       geo,
     } = req.body;
     if (!message) return res.status(400).json({ error: "Message is required" });
+    
+    // ═══ K1 MODE INTERCEPT — admin says "K1" to talk to brain directly ═══
+    const isK1Admin = req.headers["x-admin-secret"] === process.env.ADMIN_SECRET_KEY;
+    const isK1 = isK1Admin && /^k1[\s:,]/i.test(message.trim());
+    if (isK1) {
+      try {
+        const brainChat = require("./brain-chat");
+        const k1Message = message.replace(/^k1[\s:,]*/i, "").trim();
+        // Forward to brain-chat internally
+        const fakeReq = { body: { message: k1Message, sessionId: "k1_chat_" + Date.now() }, app: req.app };
+        const fakeRes = {
+          json: (data) => {
+            // Return as K1 response with different voice marker
+            res.json({
+              reply: data.reply,
+              emotion: "neutral",
+              k1Mode: true,
+              k1Voice: "alloy", // Different from Kelion/Kira voice
+              pendingApproval: data.pendingApproval || null,
+            });
+          },
+          status: (code) => ({ json: (d) => res.status(code).json(d) }),
+        };
+        await brainChat.handle(fakeReq, fakeRes);
+        return;
+      } catch (e) {
+        // K1 not available, fall through to normal chat
+        logger.warn({ component: "Chat", err: e.message }, "K1 intercept failed, using normal chat");
+      }
+    }
+
     const user = await getUserFromToken(req);
 
     // Admin tool execution is gated in brain.buildPlan() via isAdmin parameter.
@@ -394,6 +425,9 @@ router.post(
       msgs.push({ role: "user", content: thought.enrichedMessage });
 
       let fullReply = "";
+      const heartbeat = setInterval(() => {
+        try { res.write(":heartbeat\n\n"); } catch { /* connection closed */ }
+      }, 15000);
 
       // AI Chain: Gemini (streaming nativ) → GPT-5.4 fallback → DeepSeek (backup)
       // NOTĂ: Chain-ul pe /chat/stream diferă INTENȚIONAT de /chat.

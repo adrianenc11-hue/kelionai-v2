@@ -1323,6 +1323,9 @@ app.locals._getNewsArticles = newsModule.getArticlesArray;
 // ═══ TRADING BOT (admin only) ═══
 app.use("/api/trading", adminAuth, require("./trading"));
 
+// ═══ K1 BRAIN CHAT (admin only — direct brain access) ═══
+app.use("/api/admin/brain-chat", adminAuth, require("./routes/brain-chat"));
+
 // ═══ REAL-TIME ENGINE + MARKET LEARNER + FOREX ═══
 const wsEngine = require("./ws-engine");
 const marketLearner = require("./market-learner");

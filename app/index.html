@@ -240,40 +240,75 @@
 
         /* ─── #65 Hourglass Premium Animation ─── */
         @keyframes hourglassFlip {
-            0%   { transform: rotate(0deg); }
-            25%  { transform: rotate(180deg); }
-            50%  { transform: rotate(180deg); }
-            75%  { transform: rotate(360deg); }
-            100% { transform: rotate(360deg); }
+            0% {
+                transform: rotate(0deg);
+            }
+
+            25% {
+                transform: rotate(180deg);
+            }
+
+            50% {
+                transform: rotate(180deg);
+            }
+
+            75% {
+                transform: rotate(360deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
         }
-        #loading-icon { animation: hourglassFlip 2s ease-in-out infinite !important; }
+
+        #loading-icon {
+            animation: hourglassFlip 2s ease-in-out infinite !important;
+        }
 
         /* ─── #64 Showcase Features ─── */
         .showcase-grid {
-            display: none; /* Hidden — AI brain controls visibility */
+            display: none;
+            /* Hidden — AI brain controls visibility */
             grid-template-columns: 1fr 1fr;
             gap: 8px;
             padding: 12px;
             max-height: 220px;
             overflow-y: auto;
         }
+
         .showcase-card {
-            background: rgba(99,102,241,0.06);
-            border: 1px solid rgba(99,102,241,0.12);
+            background: rgba(99, 102, 241, 0.06);
+            border: 1px solid rgba(99, 102, 241, 0.12);
             border-radius: 12px;
             padding: 12px 10px;
             text-align: center;
             transition: all 0.25s;
             cursor: default;
         }
+
         .showcase-card:hover {
-            background: rgba(99,102,241,0.12);
-            border-color: rgba(99,102,241,0.25);
+            background: rgba(99, 102, 241, 0.12);
+            border-color: rgba(99, 102, 241, 0.25);
             transform: translateY(-2px);
         }
-        .showcase-card .sc-icon { font-size: 1.4rem; display: block; margin-bottom: 4px; }
-        .showcase-card .sc-label { font-size: 0.7rem; color: #a5b4fc; font-weight: 600; }
-        .showcase-card .sc-desc { font-size: 0.6rem; color: #555577; margin-top: 2px; }
+
+        .showcase-card .sc-icon {
+            font-size: 1.4rem;
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .showcase-card .sc-label {
+            font-size: 0.7rem;
+            color: #a5b4fc;
+            font-weight: 600;
+        }
+
+        .showcase-card .sc-desc {
+            font-size: 0.6rem;
+            color: #555577;
+            margin-top: 2px;
+        }
 
         /* ─── #53 Brain-map Tab ─── */
         .brain-map-panel {
@@ -284,16 +319,21 @@
             height: 100%;
             overflow-y: auto;
         }
-        .brain-map-panel.active { display: flex; }
+
+        .brain-map-panel.active {
+            display: flex;
+        }
+
         .brain-node {
-            background: rgba(99,102,241,0.08);
-            border: 1px solid rgba(99,102,241,0.15);
+            background: rgba(99, 102, 241, 0.08);
+            border: 1px solid rgba(99, 102, 241, 0.15);
             border-radius: 10px;
             padding: 10px 14px;
             font-size: 0.8rem;
             color: #c4b5fd;
             animation: brainFadeIn 0.3s ease;
         }
+
         .brain-node .bn-label {
             font-size: 0.65rem;
             color: #6366f1;
@@ -302,15 +342,25 @@
             letter-spacing: 1px;
             margin-bottom: 4px;
         }
+
         @keyframes brainFadeIn {
-            from { opacity: 0; transform: translateY(8px); }
-            to   { opacity: 1; transform: translateY(0); }
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
+
         .display-tabs {
             display: flex;
             gap: 0;
             margin-left: 12px;
         }
+
         .display-tab {
             padding: 6px 14px;
             font-size: 0.75rem;
@@ -323,8 +373,15 @@
             transition: all 0.2s;
             font-family: var(--kelion-font);
         }
-        .display-tab:hover { color: #a5b4fc; }
-        .display-tab.active { color: #a5b4fc; border-bottom-color: #6366f1; }
+
+        .display-tab:hover {
+            color: #a5b4fc;
+        }
+
+        .display-tab.active {
+            color: #a5b4fc;
+            border-bottom-color: #6366f1;
+        }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
@@ -526,27 +583,39 @@
 
             <!-- #64 SHOWCASE — hidden by default, AI brain shows when relevant -->
             <div id="showcase-panel" class="showcase-grid">
-                <div class="showcase-card"><span class="sc-icon">🧠</span><span class="sc-label">AI Brain</span><span class="sc-desc">Multi-model intelligence</span></div>
-                <div class="showcase-card"><span class="sc-icon">🎙️</span><span class="sc-label">Voice</span><span class="sc-desc">Real-time conversation</span></div>
-                <div class="showcase-card"><span class="sc-icon">👁️</span><span class="sc-label">Vision</span><span class="sc-desc">Image understanding</span></div>
-                <div class="showcase-card"><span class="sc-icon">🔍</span><span class="sc-label">Search</span><span class="sc-desc">Live web results</span></div>
-                <div class="showcase-card"><span class="sc-icon">🖼️</span><span class="sc-label">Create</span><span class="sc-desc">AI image generation</span></div>
-                <div class="showcase-card"><span class="sc-icon">📊</span><span class="sc-label">Trading</span><span class="sc-desc">Market analysis</span></div>
-                <div class="showcase-card"><span class="sc-icon">🌐</span><span class="sc-label">i18n</span><span class="sc-desc">6 languages</span></div>
-                <div class="showcase-card"><span class="sc-icon">🔐</span><span class="sc-label">Security</span><span class="sc-desc">GDPR compliant</span></div>
+                <div class="showcase-card"><span class="sc-icon">🧠</span><span class="sc-label">AI Brain</span><span
+                        class="sc-desc">Multi-model intelligence</span></div>
+                <div class="showcase-card"><span class="sc-icon">🎙️</span><span class="sc-label">Voice</span><span
+                        class="sc-desc">Real-time conversation</span></div>
+                <div class="showcase-card"><span class="sc-icon">👁️</span><span class="sc-label">Vision</span><span
+                        class="sc-desc">Image understanding</span></div>
+                <div class="showcase-card"><span class="sc-icon">🔍</span><span class="sc-label">Search</span><span
+                        class="sc-desc">Live web results</span></div>
+                <div class="showcase-card"><span class="sc-icon">🖼️</span><span class="sc-label">Create</span><span
+                        class="sc-desc">AI image generation</span></div>
+                <div class="showcase-card"><span class="sc-icon">📊</span><span class="sc-label">Trading</span><span
+                        class="sc-desc">Market analysis</span></div>
+                <div class="showcase-card"><span class="sc-icon">🌐</span><span class="sc-label">i18n</span><span
+                        class="sc-desc">6 languages</span></div>
+                <div class="showcase-card"><span class="sc-icon">🔐</span><span class="sc-label">Security</span><span
+                        class="sc-desc">GDPR compliant</span></div>
             </div>
             <div id="display-panel">
                 <div id="display-header">
                     <span id="display-title" data-i18n="monitor.title">Monitor</span>
                     <!-- #53 BRAIN-MAP TAB -->
                     <div class="display-tabs">
-                        <button class="display-tab active" data-tab="chat" onclick="switchDisplayTab('chat')">💬 Chat</button>
-                        <button class="display-tab" data-tab="brain" onclick="switchDisplayTab('brain')">🧠 Brain</button>
+                        <button class="display-tab active" data-tab="chat" onclick="switchDisplayTab('chat')">💬
+                            Chat</button>
+                        <button class="display-tab" data-tab="brain" onclick="switchDisplayTab('brain')">🧠
+                            Brain</button>
                     </div>
                 </div>
                 <!-- #53 BRAIN-MAP PANEL -->
                 <div id="brain-map" class="brain-map-panel">
-                    <div class="brain-node"><div class="bn-label">Status</div>Waiting for conversation...</div>
+                    <div class="brain-node">
+                        <div class="bn-label">Status</div>Waiting for conversation...
+                    </div>
                 </div>
                 <!-- Chat messages (main zone) -->
                 <div id="chat-overlay"></div>
@@ -691,7 +760,7 @@
     <script>
         // ─── #53 Brain-map tab switching ───
         function switchDisplayTab(tab) {
-            document.querySelectorAll('.display-tab').forEach(function(t) {
+            document.querySelectorAll('.display-tab').forEach(function (t) {
                 t.classList.toggle('active', t.dataset.tab === tab);
             });
             var brainMap = document.getElementById('brain-map');
