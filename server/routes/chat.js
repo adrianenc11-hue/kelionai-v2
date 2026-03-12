@@ -16,6 +16,24 @@ const { MODELS } = require("../config/models");
 
 const router = express.Router();
 
+// ── Sanitize internal markers from AI replies ──
+function sanitizeReply(text) {
+  if (!text) return text;
+  let r = text;
+  r = r.replace(/\[SYSTEM INSTRUCTION[^\]]*\][\s\S]*?\[END SYSTEM INSTRUCTION\]\s*/gi, "");
+  r = r.replace(/\[LEARNED PATTERNS\][\s\S]*?\[\/LEARNED PATTERNS\]\s*/gi, "");
+  r = r.replace(/\[SELF-EVAL HINTS\][\s\S]*?\[\/SELF-EVAL HINTS\]\s*/gi, "");
+  r = r.replace(/\[CONTEXT SWITCH\][^\n]*\n?/gi, "");
+  r = r.replace(/\[PROACTIVE\][\s\S]*?\[\/PROACTIVE\]\s*/gi, "");
+  r = r.replace(/\[EMOTIONAL CONTEXT\][^\n]*\n?/gi, "");
+  r = r.replace(/\[CURRENT DATE & TIME\][^\n]*\n?/gi, "");
+  r = r.replace(/\[USER LOCATION\][^\n]*\n?/gi, "");
+  r = r.replace(/\[REZULTATE CAUTARE WEB REALE\][\s\S]*?Citeaza sursele\.\s*/gi, "");
+  r = r.replace(/\[DATE METEO REALE\][^\n]*\n?/gi, "");
+  r = r.replace(/\[CONTEXT DIN MEMORIE\][^\n]*\n?/gi, "");
+  return r.trim();
+}
+
 // Emotion is decided by the brain via [EMOTION:xxx] tag in the AI reply
 
 const chatLimiter = rateLimit({
@@ -198,18 +216,7 @@ router.post("/chat", chatLimiter, validate(chatSchema), async (req, res) => {
 
     // ── SANITIZE: Strip leaked system instructions from reply ──
     if (reply) {
-      // Remove [SYSTEM INSTRUCTION...] blocks
-      reply = reply.replace(/\[SYSTEM INSTRUCTION[^\]]*\][\s\S]*?\[END SYSTEM INSTRUCTION\]\s*/gi, "");
-      // Remove other internal prompt markers
-      reply = reply.replace(/\[LEARNED PATTERNS\][\s\S]*?\[\/LEARNED PATTERNS\]\s*/gi, "");
-      reply = reply.replace(/\[SELF-EVAL HINTS\][\s\S]*?\[\/SELF-EVAL HINTS\]\s*/gi, "");
-      reply = reply.replace(/\[CONTEXT SWITCH\][^\n]*\n?/gi, "");
-      reply = reply.replace(/\[PROACTIVE\][\s\S]*?\[\/PROACTIVE\]\s*/gi, "");
-      reply = reply.replace(/\[EMOTIONAL CONTEXT\][^\n]*\n?/gi, "");
-      reply = reply.replace(/\[CURRENT DATE & TIME\][^\n]*\n?/gi, "");
-      reply = reply.replace(/\[USER LOCATION\][^\n]*\n?/gi, "");
-      reply = reply.replace(/\[REZULTATE CAUTARE WEB REALE\][\s\S]*?Citeaza sursele\.\s*/gi, "");
-      reply = reply.trim();
+      reply = sanitizeReply(reply);
     }
     // #region agent log
     fetch("http://127.0.0.1:7257/ingest/9ae34db2-4176-48c4-a1ff-ca0fe87de92a", {
@@ -526,7 +533,7 @@ router.post(
         role: h.role === "ai" ? "assistant" : h.role,
         content: h.content,
       }));
-      msgs.push({ role: "user", content: thought.enrichedMessage });
+      msgs.push({ role: "user", content: sanitizeReply(thought.enrichedMessage) });
 
       let fullReply = "";
       const heartbeat = setInterval(() => {
@@ -754,8 +761,9 @@ router.post(
         }
       }
 
+      const cleanReply = sanitizeReply(fullReply);
       res.write(
-        `data: ${JSON.stringify({ type: "done", reply: fullReply, thinkTime: thought.thinkTime, conversationId: savedConvId })}\n\n`,
+        `data: ${JSON.stringify({ type: "done", reply: cleanReply, thinkTime: thought.thinkTime, conversationId: savedConvId })}\n\n`,
       );
       res.end();
 
