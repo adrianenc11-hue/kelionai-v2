@@ -15,6 +15,9 @@ CYAN='\033[0;36m'
 BOLD='\033[1m'
 NC='\033[0m'
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
 # ─── Guard: avertizare deploy.sh DEPRECAT din root ────────────
 ROOT_DEPLOY="$PROJECT_DIR/deploy.sh"
 if [ -f "$ROOT_DEPLOY" ]; then
@@ -39,8 +42,6 @@ warn() { echo -e "${YELLOW}⚠️  $1${NC}"; }
 info() { echo -e "${CYAN}ℹ️  $1${NC}"; }
 step() { echo -e "\n${BOLD}${BLUE}▶ $1${NC}"; }
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$PROJECT_DIR"
 
 echo ""

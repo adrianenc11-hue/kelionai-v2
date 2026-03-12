@@ -20,7 +20,7 @@ const refreshSchema = z.object({
 });
 
 const chatSchema = z.object({
-  message: z.string().max(10000).default(""),
+  message: z.string().min(1).max(10000),
   avatar: z.enum(["kelion", "kira"]).optional(),
   history: z
     .array(
@@ -82,11 +82,15 @@ const searchSchema = z.object({
   query: z.string().min(1).max(500),
 });
 
-const weatherSchema = z.object({
-  city: z.string().min(1).max(200).optional(),
-  lat: z.number().min(-90).max(90).optional(),
-  lng: z.number().min(-180).max(180).optional(),
-});
+const weatherSchema = z
+  .object({
+    city: z.string().min(1).max(200).optional(),
+    lat: z.number().min(-90).max(90).optional(),
+    lng: z.number().min(-180).max(180).optional(),
+  })
+  .refine((data) => !!data.city || (typeof data.lat === "number" && typeof data.lng === "number"), {
+    message: "city or lat/lng required",
+  });
 
 const imagineSchema = z.object({
   prompt: z.string().min(1).max(1000),
