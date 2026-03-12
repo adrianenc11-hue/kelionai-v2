@@ -2716,4 +2716,80 @@ router.get("/intelligence", (req, res) => {
   }
 });
 
+// ══════════════════════════════════════════════════════════
+// GET /api/admin/conversations — List all conversations
+// ══════════════════════════════════════════════════════════
+router.get("/conversations", async (req, res) => {
+  try {
+    const { supabaseAdmin } = req.app.locals;
+    if (!supabaseAdmin) return res.json({ conversations: [] });
+
+    const { data } = await supabaseAdmin
+      .from("conversations")
+      .select("id, user_id, created_at, messages_text")
+      .order("created_at", { ascending: false })
+      .limit(200);
+
+    res.json({ conversations: data || [], total: (data || []).length });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ══════════════════════════════════════════════════════════
+// GET /api/admin/conversations/export — Export ALL as JSON
+// ══════════════════════════════════════════════════════════
+router.get("/conversations/export", async (req, res) => {
+  try {
+    const { supabaseAdmin } = req.app.locals;
+    if (!supabaseAdmin) return res.status(500).json({ error: "No DB" });
+
+    // Get all conversations
+    const { data: convs } = await supabaseAdmin
+      .from("conversations")
+      .select("id, user_id, created_at, messages_text")
+      .order("created_at", { ascending: false })
+      .limit(500);
+
+    // Get all messages
+    const { data: msgs } = await supabaseAdmin
+      .from("messages")
+      .select("id, conversation_id, role, content, created_at")
+      .order("created_at", { ascending: true })
+      .limit(10000);
+
+    // Group messages by conversation
+    const msgMap = {};
+    (msgs || []).forEach(m => {
+      if (!msgMap[m.conversation_id]) msgMap[m.conversation_id] = [];
+      msgMap[m.conversation_id].push({
+        role: m.role,
+        content: m.content,
+        created_at: m.created_at
+      });
+    });
+
+    const exported = (convs || []).map(c => ({
+      id: c.id,
+      user_id: c.user_id,
+      created_at: c.created_at,
+      messages_text: c.messages_text,
+      messages: msgMap[c.id] || []
+    }));
+
+    const filename = `kelionai_conversations_${new Date().toISOString().split('T')[0]}.json`;
+    res.setHeader("Content-Type", "application/json");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.json({
+      exported_at: new Date().toISOString(),
+      total_conversations: exported.length,
+      total_messages: (msgs || []).length,
+      conversations: exported
+    });
+  } catch (e) {
+    logger.error({ component: "Admin", err: e.message }, "Conversation export failed");
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;
