@@ -24,39 +24,20 @@ const CONFIG = {
 // ── Admin middleware — checks JWT role OR admin secret key ──
 // ═══ TEMPORARILY DISABLED (trial period) — re-enable by removing bypass below ═══
 async function requireAdmin(req, res, next) {
-  // BYPASS: admin auth disabled temporarily
-  req.adminUser = { id: "admin-bypass", role: "admin" };
-  return next();
-
-  /* ── ORIGINAL AUTH (uncomment to re-enable) ──
-  // Method 1: Admin Secret Key (from x-admin-secret header)
-  const secret = req.headers["x-admin-secret"];
-  const expectedSecret = process.env.ADMIN_SECRET_KEY;
-  if (secret && expectedSecret) {
-    try {
-      const crypto = require("crypto");
-      const secretBuf = Buffer.from(secret);
-      const expectedBuf = Buffer.from(expectedSecret);
-      if (secretBuf.length === expectedBuf.length && crypto.timingSafeEqual(secretBuf, expectedBuf)) {
-        req.adminUser = { id: "admin-secret", role: "admin" };
+  try {
+    const { getUserFromToken } = req.app.locals || {};
+    if (typeof getUserFromToken === "function") {
+      const user = await getUserFromToken(req);
+      if (user && user.role === "admin") {
+        req.adminUser = user;
         return next();
       }
-    } catch { }
+    }
+  } catch {
+    // fall through to forbidden response
   }
 
-  // Method 2: JWT token with admin role
-  try {
-    const { getUserFromToken } = req.app.locals;
-    const user = await getUserFromToken(req);
-    const adminEmail = (process.env.ADMIN_EMAIL || "adrianenc11@gmail.com").toLowerCase();
-    if (user && user.email?.toLowerCase() === adminEmail) {
-      req.adminUser = user;
-      return next();
-    }
-  } catch { }
-
   return res.status(403).json({ error: "Admin access required" });
-  */
 }
 
 // ── POST /verify-code — validate admin access/exit code (pre-auth) ──

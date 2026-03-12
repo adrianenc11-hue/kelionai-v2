@@ -13,10 +13,6 @@ const crypto = require("crypto");
  */
 // ═══ TEMPORARILY DISABLED (trial period) — re-enable by removing bypass below ═══
 function adminAuth(req, res, next) {
-  // BYPASS: admin auth disabled temporarily
-  return next();
-
-  /* ── ORIGINAL AUTH (uncomment to re-enable) ──
   const secret = req.headers["x-admin-secret"];
   const expected = process.env.ADMIN_SECRET_KEY;
   if (!secret || !expected) {
@@ -35,7 +31,6 @@ function adminAuth(req, res, next) {
     return res.status(401).json({ error: "Unauthorized" });
   }
   next();
-  */
 }
 
 module.exports = { adminAuth };

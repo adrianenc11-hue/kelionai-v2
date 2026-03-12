@@ -2355,7 +2355,7 @@ Reply STRICTLY with JSON:
       { topic: "tech", pattern: /\b(cod|program|software|app|server|bug|api|deploy|git|react|node|python|database|ai|ml|machine learning)\b/i },
       { topic: "finance", pattern: /\b(bani|pret|cost|investitie|crypto|bitcoin|trading|actiuni|stocks|bursa|profit|pierdere|money|price|cost)\b/i },
       { topic: "health", pattern: /\b(sanatate|doctor|boala|simptom|durere|medic|health|pain|disease|symptom|diabetic|dieta|fitness)\b/i },
-      { topic: "travel", pattern: /\b(calatorie|zbor|hotel|vacanta|avion|tara|oras|vizita|travel|flight|vacation)\b/i },
+      { topic: "travel", pattern: /\b(calatorie|calator|calatoresc|calatorim|zbor|hotel|vacanta|avion|tara|oras|vizita|travel|flight|vacation)\b/i },
       { topic: "food", pattern: /\b(mancare|reteta|gatit|restaurant|pizza|paste|cooking|recipe|food|meal)\b/i },
       { topic: "education", pattern: /\b(invat|curs|scoala|universitate|examen|studiu|learn|course|school|university|exam)\b/i },
       { topic: "entertainment", pattern: /\b(film|muzica|joc|game|serial|anime|movie|music|youtube|spotify|netflix)\b/i },
