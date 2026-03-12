@@ -7,6 +7,7 @@
 const express = require("express");
 const logger = require("../logger");
 const { notify, sseHandler, getRecent } = require("../notifications");
+const abTest = require("../ab-testing");
 const router = express.Router();
 
 // ── Config from environment variables ──
@@ -2795,6 +2796,36 @@ router.get("/conversations/export", async (req, res) => {
     logger.error({ component: "Admin", err: e.message }, "Conversation export failed");
     res.status(500).json({ error: e.message });
   }
+});
+
+// ══════════════════════════════════════════════════════════
+// A/B TESTING ENDPOINTS
+// ══════════════════════════════════════════════════════════
+router.get("/ab-tests", (_req, res) => {
+  res.json({ experiments: abTest.getAllExperiments() });
+});
+
+router.post("/ab-tests", (req, res) => {
+  try {
+    const exp = abTest.createExperiment(req.body);
+    notify("system", `🧪 New A/B test: ${exp.name}`);
+    res.json({ experiment: exp });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
+router.post("/ab-tests/:id/winner", (req, res) => {
+  const result = abTest.declareWinner(req.params.id, req.body.variant);
+  if (!result) return res.status(404).json({ error: "Experiment not found" });
+  notify("success", `🏆 A/B test winner: ${result.name} → ${req.body.variant}`);
+  res.json({ experiment: result });
+});
+
+router.delete("/ab-tests/:id", (req, res) => {
+  const ok = abTest.deleteExperiment(req.params.id);
+  if (!ok) return res.status(404).json({ error: "Not found" });
+  res.json({ deleted: true });
 });
 
 module.exports = router;
