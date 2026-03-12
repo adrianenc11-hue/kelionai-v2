@@ -256,6 +256,105 @@ function recordUserInteraction(data) {
   if (topHour) {
     userModel.peakHour = parseInt(topHour[0]);
   }
+
+  // Analizează stilul de comunicare din mesaj
+  if (data.userMessage) {
+    analyzeUserStyle(data.userMessage);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// STYLE ANALYSIS — Learns communication preferences from messages
+// ═══════════════════════════════════════════════════════════════
+
+// Counters for style detection (not hardcoded rules)
+const styleCounters = {
+  messageLengths: [],     // track message lengths
+  technicalWords: 0,      // count of technical terms used
+  simpleWords: 0,         // count of simple/casual terms
+  formalPhrases: 0,       // formal language indicators
+  informalPhrases: 0,     // informal language indicators
+  emojiCount: 0,          // emoji usage
+  totalAnalyzed: 0,       // total messages analyzed
+};
+
+/**
+ * Analyze a user message to learn communication style.
+ * Only updates preferences after 10+ messages (real data).
+ */
+function analyzeUserStyle(message) {
+  if (!message || typeof message !== "string") return;
+  const m = message.trim();
+  if (m.length < 2) return;
+
+  styleCounters.totalAnalyzed++;
+  styleCounters.messageLengths.push(m.length);
+  if (styleCounters.messageLengths.length > 50) styleCounters.messageLengths.shift();
+
+  // Technical vocabulary detection (RO + EN)
+  const techTerms = /\b(API|backend|frontend|deploy|server|database|function|variabil[aă]|algoritm|framework|debug|commit|merge|branch|endpoint|token|hash|crypto|blockchain|RSI|MACD|fibonacci|bollinger|volatilitat|portofoliu|hedging|leverage|margin)\b/gi;
+  const techMatches = m.match(techTerms);
+  if (techMatches) styleCounters.technicalWords += techMatches.length;
+
+  // Simple/casual vocabulary
+  const simpleTerms = /\b(ok|da|nu|bine|mersi|ms|hai|super|tare|misto|fain|wow|cool|nice|perfect|bravo|salut|hey|yo)\b/gi;
+  const simpleMatches = m.match(simpleTerms);
+  if (simpleMatches) styleCounters.simpleWords += simpleMatches.length;
+
+  // Formal indicators
+  const formalPattern = /\b(vă rog|mulțumesc|dumneavoastră|domnul|doamna|aș dori|permiteți|referitor la|conform|please|thank you|regards|kindly)\b/gi;
+  if (formalPattern.test(m)) styleCounters.formalPhrases++;
+
+  // Informal indicators
+  const informalPattern = /\b(yo|hey|bro|frate|boss|sefu|nush|stii|zic|zici|mna|bre|ba|:D|:P|XD|lol|haha)\b/gi;
+  if (informalPattern.test(m)) styleCounters.informalPhrases++;
+
+  // Emoji detection
+  const emojiPattern = /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2702}-\u{27B0}\u{24C2}-\u{1F251}]/gu;
+  const emojis = m.match(emojiPattern);
+  if (emojis) styleCounters.emojiCount += emojis.length;
+
+  // ── Update userModel only after 10+ messages (real observed data) ──
+  if (styleCounters.totalAnalyzed >= 10) {
+    const avgLen = styleCounters.messageLengths.reduce((a, b) => a + b, 0) / styleCounters.messageLengths.length;
+
+    // Message length → style preference
+    if (avgLen < 30) {
+      userModel.communication.preferredStyle = "foarte_concis";
+    } else if (avgLen < 80) {
+      userModel.communication.preferredStyle = "concis";
+    } else if (avgLen < 200) {
+      userModel.communication.preferredStyle = "normal";
+    } else {
+      userModel.communication.preferredStyle = "detaliat";
+    }
+
+    // Technical level from vocabulary
+    const techRatio = styleCounters.technicalWords / Math.max(1, styleCounters.technicalWords + styleCounters.simpleWords);
+    if (techRatio > 0.6) {
+      userModel.communication.technicalLevel = "avansat";
+    } else if (techRatio > 0.3) {
+      userModel.communication.technicalLevel = "intermediar";
+    } else {
+      userModel.communication.technicalLevel = "începător";
+    }
+
+    // Formality level
+    if (styleCounters.formalPhrases > styleCounters.informalPhrases * 2) {
+      userModel.communication.formality = "formal";
+    } else if (styleCounters.informalPhrases > styleCounters.formalPhrases * 2) {
+      userModel.communication.formality = "informal";
+    } else {
+      userModel.communication.formality = "normal";
+    }
+
+    // Emoji preference
+    userModel.communication.usesEmoji = styleCounters.emojiCount > styleCounters.totalAnalyzed * 0.3;
+
+    // Mark as observed (not default)
+    userModel.communication._observed = true;
+    userModel.communication._analyzedMessages = styleCounters.totalAnalyzed;
+  }
 }
 
 function getUserModel() {
@@ -472,9 +571,29 @@ function synthesizePatterns() {
     }
   }
 
-  // 5. NU emitem preferredStyle / technicalLevel / riskProfile
-  //    Acestea sunt default-uri hardcodate, NU date reale observate.
-  //    Vor fi emise doar când implementăm detectarea automată din conversații.
+  // 5. Communication style — DOAR dacă a fost observat din date reale
+  if (m.communication._observed) {
+    const styleMap = {
+      foarte_concis: "Userul preferă mesaje foarte scurte. Răspunde concis, fără explicații inutile.",
+      concis: "Userul preferă răspunsuri scurte și la obiect.",
+      normal: "Userul preferă răspunsuri de lungime medie.",
+      detaliat: "Userul preferă răspunsuri detaliate cu explicații complete.",
+    };
+    if (styleMap[m.communication.preferredStyle]) {
+      rules.push(styleMap[m.communication.preferredStyle]);
+    }
+    if (m.communication.technicalLevel) {
+      rules.push(`Nivel tehnic observat: ${m.communication.technicalLevel}.`);
+    }
+    if (m.communication.formality === "informal") {
+      rules.push("Userul comunică informal. Folosește ton casual, prietenesc.");
+    } else if (m.communication.formality === "formal") {
+      rules.push("Userul comunică formal. Menține un ton profesional.");
+    }
+    if (m.communication.usesEmoji) {
+      rules.push("Userul folosește emoji frecvent. Poți răspunde cu emoji.");
+    }
+  }
 
   return rules;
 }

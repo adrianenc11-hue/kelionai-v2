@@ -8,7 +8,7 @@
 const logger = require("./logger");
 const { MODELS } = require("./config/models");
 const { buildSystemPrompt, buildNewbornPrompt } = require("./persona");
-const { getPatternsText } = require("./k1-meta-learning");
+const { getPatternsText, recordUserInteraction } = require("./k1-meta-learning");
 const { selfEvaluate, getQualityHints } = require("./k1-performance");
 const vm = require("vm");
 
@@ -3149,6 +3149,7 @@ async function thinkV4(
         : toolsUsed.includes("code_execute") ? "coding"
         : "general";
       selfEvaluate(message, finalResponse, evalDomain);
+      recordUserInteraction({ domain: evalDomain, userMessage: message });
     } catch (_) { /* non-blocking */ }
 
     return {
