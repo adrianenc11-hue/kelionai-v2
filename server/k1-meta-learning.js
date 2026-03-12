@@ -607,6 +607,62 @@ function getPatternsText() {
   return "\n[LEARNED PATTERNS]\n" + rules.join("\n") + "\n[/LEARNED PATTERNS]";
 }
 
+// ═══════════════════════════════════════════════════════════════
+// PROACTIVE SUGGESTIONS — Pattern-based contextual hints
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Generate proactive suggestion based on observed patterns.
+ * Returns a hint string or "" if no suggestion.
+ * Only activates after 20+ interactions (sufficient data).
+ */
+function getProactiveSuggestion() {
+  const m = userModel;
+  if (m.totalInteractions < 20) return ""; // need enough data
+
+  const now = new Date();
+  const currentHour = now.getUTCHours().toString();
+  const currentDay = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][now.getUTCDay()];
+
+  const suggestions = [];
+
+  // 1. Peak hour + preferred domain → contextual suggestion
+  if (m.peakHour !== undefined && Math.abs(parseInt(currentHour) - m.peakHour) <= 1) {
+    const topDomain = m.preferredDomain;
+    const domainSuggestions = {
+      trading: "E ora ta de trading — vrei o analiză rapidă a pieței?",
+      coding: "E ora ta de coding — ai ceva la care lucrezi?",
+      research: "E momentul tău obișnuit de research — ce investigăm azi?",
+      news: "E ora ta de știri — vrei un rezumat al zilei?",
+    };
+    if (topDomain && domainSuggestions[topDomain]) {
+      suggestions.push(domainSuggestions[topDomain]);
+    }
+  }
+
+  // 2. Active day pattern — weekend vs weekday behavior
+  const topDays = Object.entries(m.temporal.activeDays)
+    .filter(([, v]) => v >= 3)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 2)
+    .map(([d]) => d);
+  const isWeekend = currentDay === "Saturday" || currentDay === "Sunday";
+  if (topDays.length > 0 && !topDays.includes(currentDay) && m.totalInteractions > 30) {
+    // User is active on an unusual day
+    suggestions.push(`De obicei ești mai activ ${topDays.join(" și ")} — astăzi e o zi bonus! 😊`);
+  }
+
+  // 3. High correction rate warning (proactive self-improvement)
+  if (m.correctionRate > 20 && m.totalInteractions > 15) {
+    suggestions.push("Atenție sporită la acuratețe — rata de corecții e ridicată recent.");
+  }
+
+  // Return first suggestion (keep it subtle, one at a time)
+  return suggestions.length > 0
+    ? "\n[PROACTIVE] " + suggestions[0] + " [/PROACTIVE]"
+    : "";
+}
+
 module.exports = {
   useTemplate,
   scoreTools,
@@ -620,4 +676,5 @@ module.exports = {
   resetAll,
   synthesizePatterns,
   getPatternsText,
+  getProactiveSuggestion,
 };

@@ -8,7 +8,7 @@
 const logger = require("./logger");
 const { MODELS } = require("./config/models");
 const { buildSystemPrompt, buildNewbornPrompt } = require("./persona");
-const { getPatternsText, recordUserInteraction } = require("./k1-meta-learning");
+const { getPatternsText, recordUserInteraction, getProactiveSuggestion } = require("./k1-meta-learning");
 const { selfEvaluate, getQualityHints } = require("./k1-performance");
 const vm = require("vm");
 
@@ -2889,12 +2889,13 @@ async function thinkV4(
     const dateTimeBlock = `\n[CURRENT DATE & TIME] ${now.toLocaleDateString("ro-RO", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}, ora ${now.toLocaleTimeString("ro-RO", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Bucharest" })} (Romania). Folosește MEREU aceste date când userul întreabă de zi, dată sau oră.`;
     const patternsBlock = getPatternsText();
     const qualityHints = getQualityHints();
+    const proactiveHint = getProactiveSuggestion();
     const systemPrompt = process.env.NEWBORN_MODE === "true"
-      ? buildNewbornPrompt(memoryBlock + patternsBlock + qualityHints + contextSwitchHint)
+      ? buildNewbornPrompt(memoryBlock + patternsBlock + qualityHints + contextSwitchHint + proactiveHint)
       : buildSystemPrompt(
           avatar,
           language,
-          memoryBlock + emotionBlock + geoBlock + dateTimeBlock + patternsBlock + qualityHints + contextSwitchHint,
+          memoryBlock + emotionBlock + geoBlock + dateTimeBlock + patternsBlock + qualityHints + contextSwitchHint + proactiveHint,
           "",
           null,
         );
