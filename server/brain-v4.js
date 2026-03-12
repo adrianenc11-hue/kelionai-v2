@@ -2854,6 +2854,27 @@ async function thinkV4(
         "User is very frustrated. Be patient, acknowledge the issue, provide solutions quickly.";
     }
 
+    // ── 3b. Context switch detection ──
+    const topicKeywords = {
+      trading: /\b(trade|trading|buy|sell|BTC|ETH|crypto|piață|preț|analiză|signal|RSI|MACD|invest|portofoliu|acțiuni|bursă|forex)\b/i,
+      coding: /\b(code|coding|bug|error|function|deploy|API|server|git|commit|script|database|program)\b/i,
+      news: /\b(news|știri|știre|politic|război|eveniment|actual|azi|ieri|breaking)\b/i,
+      weather: /\b(vreme|meteo|weather|ploaie|soare|temperatură|grad|frig|cald)\b/i,
+      music: /\b(muzică|music|song|cântec|artist|album|concert|playlist)\b/i,
+      personal: /\b(eu|mine|viața|familie|sănătate|hobby|plan|sentiment|gândesc|simt)\b/i,
+    };
+    let currentTopic = "general";
+    for (const [topic, pattern] of Object.entries(topicKeywords)) {
+      if (pattern.test(message)) { currentTopic = topic; break; }
+    }
+    // Static var to track previous topic across calls
+    if (!brain._lastTopic) brain._lastTopic = "general";
+    let contextSwitchHint = "";
+    if (brain._lastTopic !== currentTopic && brain._lastTopic !== "general" && currentTopic !== "general") {
+      contextSwitchHint = `\n[CONTEXT SWITCH] Userul a trecut de la ${brain._lastTopic} la ${currentTopic}. Ajustează-ți tonul și cunoștințele.`;
+    }
+    brain._lastTopic = currentTopic;
+
     // ── 4. Build system prompt with FULL context ──
     const geoBlock = mediaData.geo
       ? `\n[USER LOCATION] Lat: ${mediaData.geo.lat}, Lng: ${mediaData.geo.lng}${mediaData.geo.accuracy ? ` (accuracy: ${Math.round(mediaData.geo.accuracy)}m)` : ""}. Use this for weather, nearby places, and location-aware responses.`
@@ -2869,11 +2890,11 @@ async function thinkV4(
     const patternsBlock = getPatternsText();
     const qualityHints = getQualityHints();
     const systemPrompt = process.env.NEWBORN_MODE === "true"
-      ? buildNewbornPrompt(memoryBlock + patternsBlock + qualityHints)
+      ? buildNewbornPrompt(memoryBlock + patternsBlock + qualityHints + contextSwitchHint)
       : buildSystemPrompt(
           avatar,
           language,
-          memoryBlock + emotionBlock + geoBlock + dateTimeBlock + patternsBlock + qualityHints,
+          memoryBlock + emotionBlock + geoBlock + dateTimeBlock + patternsBlock + qualityHints + contextSwitchHint,
           "",
           null,
         );
