@@ -373,10 +373,21 @@ router.post("/", async (req, res) => {
         : response.text;
 
     // === #13 TRUTH CHECK ===
-    const fileRefs = brainMessage.match(/[\w\-./]+\.(?:js|ts|html|css|json|md)/gi) || [];
+    // Regex stricter: doar referințe valide de fișiere (fără prefixe false ca "n./")
+    const fileRefs = brainMessage.match(/(?:^|[\s"'(,])([a-zA-Z][\w\-./]*\.(?:js|ts|html|css|json|md))\b/gi) || [];
     const tw = [];
-    for (const f of [...new Set(fileRefs)].slice(0, 5)) {
-      const c = [path.resolve(f), path.resolve('server', f), path.resolve('app', f), path.resolve('app/js', f)];
+    const cwd = process.cwd();
+    for (const raw of [...new Set(fileRefs)].slice(0, 5)) {
+      const f = raw.replace(/^[\s"'(,]+/, ''); // curăță prefix
+      if (f.length < 3 || f.startsWith('n.') || f.startsWith('..' )) continue; // skip invalid
+      const c = [
+        path.resolve(cwd, f),
+        path.resolve(cwd, 'server', f),
+        path.resolve(cwd, 'app', f),
+        path.resolve(cwd, 'app/js', f),
+        path.resolve(cwd, 'server/routes', f),
+        path.resolve(cwd, 'server/config', f),
+      ];
       if (!c.some(p => fs.existsSync(p))) tw.push('TRUTH: "' + f + '" NU EXISTA pe disc.');
     }
     if (tw.length > 0) brainMessage += '\n\n---\n' + tw.join('\n');
