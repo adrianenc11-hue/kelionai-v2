@@ -8,6 +8,7 @@ const express = require("express");
 const logger = require("../logger");
 const { notify, sseHandler, getRecent } = require("../notifications");
 const abTest = require("../ab-testing");
+const sprint2 = require("../sprint2");
 const router = express.Router();
 
 // ── Config from environment variables ──
@@ -96,6 +97,19 @@ router.post("/verify-code", express.json(), (req, res) => {
 
   // Not a valid admin code — return 404 so frontend falls through to normal chat
   return res.status(404).json({ error: "Invalid code" });
+});
+
+// ── Public: User Feedback (no admin required) ──
+router.post("/feedback", (req, res) => {
+  const entry = sprint2.recordFeedback({ userId: req.body.userId, messageId: req.body.messageId, type: req.body.type, comment: req.body.comment, avatar: req.body.avatar });
+  abTest.recordFeedback(req.body.userId, req.body.type === "up" ? "thumbsUp" : "thumbsDown");
+  res.json({ ok: true, feedback: entry });
+});
+
+// ── Public: Session heartbeat (no admin required) ──
+router.post("/heartbeat", (req, res) => {
+  sprint2.trackSession(req.body.userId || "anon", { email: req.body.email, avatar: req.body.avatar, page: req.body.page, ip: req.ip, userAgent: req.headers["user-agent"] });
+  res.json({ ok: true });
 });
 
 router.use(requireAdmin);
@@ -2827,5 +2841,13 @@ router.delete("/ab-tests/:id", (req, res) => {
   if (!ok) return res.status(404).json({ error: "Not found" });
   res.json({ deleted: true });
 });
+
+// ══════════════════════════════════════════════════════════
+// SPRINT #2 ENDPOINTS
+// ══════════════════════════════════════════════════════════
+router.get("/feedback-stats", (_req, res) => res.json(sprint2.getFeedbackStats()));
+router.get("/live-users", (_req, res) => res.json(sprint2.getLiveSessions()));
+router.get("/errors", (_req, res) => res.json(sprint2.getErrorStats()));
+router.post("/errors", (req, res) => { sprint2.trackError(req.body); res.json({ ok: true }); });
 
 module.exports = router;
