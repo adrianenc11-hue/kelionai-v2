@@ -1,6 +1,7 @@
 # Secrets — NEVER include in Docker images
 .env
 .env.*
+!.env.example
 .env.backup*
 .env.local
 .env.production
