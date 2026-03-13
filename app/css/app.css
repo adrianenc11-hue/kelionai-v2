@@ -46,8 +46,8 @@ body {
     background: var(--kelion-bg);
     color: var(--kelion-text);
     overflow: hidden;
-    user-select: none;
     -webkit-user-select: none;
+    user-select: none;
 }
 
 /* ─── Main Layout ───────────────────────────────── */
@@ -77,8 +77,8 @@ body {
     flex-direction: column;
     border-left: 1px solid rgba(99, 102, 241, 0.12);
     background: rgba(8, 8, 24, 0.7);
-    backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(16px);
     order: 2;
     /* Push to right */
 }
@@ -119,8 +119,8 @@ body {
     opacity: 0;
     transition: opacity 0.3s ease;
     z-index: 10;
-    backdrop-filter: blur(4px);
     -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
     font-family: inherit;
     letter-spacing: 0.01em;
 }
@@ -195,6 +195,7 @@ body {
     border-radius: 999px;
     border: 1px solid rgba(99, 102, 241, 0.15);
     background: rgba(5, 5, 16, 0.6);
+    -webkit-backdrop-filter: blur(8px);
     backdrop-filter: blur(8px);
     color: var(--kelion-text-secondary);
     font-size: 0.75rem;
@@ -240,8 +241,8 @@ body {
     gap: 16px;
     scrollbar-width: thin;
     scrollbar-color: rgba(99, 102, 241, 0.2) transparent;
-    user-select: text;
     -webkit-user-select: text;
+    user-select: text;
     position: relative;
 }
 
@@ -265,8 +266,8 @@ body {
     font-size: 0.9rem;
     line-height: 1.6;
     animation: msgFadeIn 0.35s cubic-bezier(0.4, 0, 0.2, 1);
-    user-select: text;
     -webkit-user-select: text;
+    user-select: text;
     cursor: text;
 }
 
@@ -287,8 +288,8 @@ body {
     cursor: pointer;
     color: var(--kelion-text-secondary);
     transition: all 0.2s ease;
-    user-select: none;
     -webkit-user-select: none;
+    user-select: none;
 }
 
 .msg-action-btn:hover {
@@ -313,8 +314,8 @@ body {
     background: rgba(10, 10, 30, 0.6);
     border: 1px solid rgba(255, 255, 255, 0.06);
     border-bottom-left-radius: 4px;
-    backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
     max-width: 85%;
 }
@@ -382,6 +383,7 @@ body {
     font-size: 0.72rem;
     color: var(--kelion-text-secondary);
     transition: all 0.25s ease;
+    -webkit-user-select: none;
     user-select: none;
 }
 
@@ -493,8 +495,8 @@ body {
     gap: 8px;
     padding: 12px 14px;
     background: rgba(8, 8, 24, 0.75);
-    backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
+    backdrop-filter: blur(20px);
     border-top: 1px solid rgba(99, 102, 241, 0.1);
     margin-bottom: 0;
     position: relative;
@@ -599,8 +601,8 @@ body {
     outline: none;
     min-width: 0;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
 }
 
 #text-input::placeholder {
@@ -907,6 +909,7 @@ body {
 
 .weather-card {
     background: var(--kelion-glass);
+    -webkit-backdrop-filter: var(--kelion-glass-blur);
     backdrop-filter: var(--kelion-glass-blur);
     border: 1px solid var(--kelion-glass-border);
     border-radius: var(--kelion-radius-xl);
@@ -971,6 +974,7 @@ body {
     position: fixed;
     inset: 0;
     background: rgba(99, 102, 241, 0.06);
+    -webkit-backdrop-filter: blur(6px);
     backdrop-filter: blur(6px);
     display: flex;
     align-items: center;
@@ -988,6 +992,7 @@ body {
     border: 2px dashed var(--kelion-primary);
     border-radius: var(--kelion-radius-xl);
     background: var(--kelion-glass);
+    -webkit-backdrop-filter: var(--kelion-glass-blur);
     backdrop-filter: var(--kelion-glass-blur);
 }
 
@@ -1071,6 +1076,7 @@ body {
         z-index: 60;
         margin-bottom: 0;
         background: rgba(5, 5, 16, 0.95);
+        -webkit-backdrop-filter: blur(12px);
         backdrop-filter: blur(12px);
         padding: 8px 12px;
     }
@@ -1108,6 +1114,7 @@ body {
     padding: 44px 32px;
     text-align: center;
     background: var(--kelion-glass);
+    -webkit-backdrop-filter: var(--kelion-glass-blur);
     backdrop-filter: var(--kelion-glass-blur);
     border: 1px solid var(--kelion-glass-border);
     border-radius: var(--kelion-radius-xl);
@@ -1291,6 +1298,7 @@ body {
     bottom: 0;
     width: 300px;
     background: rgba(5, 5, 16, 0.95);
+    -webkit-backdrop-filter: blur(24px);
     backdrop-filter: blur(24px);
     border-right: 1px solid var(--kelion-border);
     z-index: 1000;
@@ -1410,6 +1418,7 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
+    -webkit-backdrop-filter: blur(8px);
     backdrop-filter: blur(8px);
 }
 
@@ -1661,6 +1670,7 @@ body {
     right: 0;
     height: 34px;
     background: rgba(5, 5, 16, 0.9);
+    -webkit-backdrop-filter: blur(12px);
     backdrop-filter: blur(12px);
     border-top: 1px solid rgba(99, 102, 241, 0.08);
     display: flex;

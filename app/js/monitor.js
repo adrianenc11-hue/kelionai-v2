@@ -2,26 +2,26 @@
 // KelionAI — Monitor Manager
 // Controls the right-side display panel content
 // ═══════════════════════════════════════════════════════════════
-var MonitorManager = (function () {
+const _MonitorManager = (function () {
     'use strict';
 
-    var PANELS = ['monitor-image', 'monitor-map', 'monitor-text', 'monitor-search', 'monitor-weather', 'monitor-iframe', 'monitor-audio', 'monitor-video', 'monitor-default'];
-    var _lastContentHash = ''; // Dedup: prevent same content showing twice
+    const PANELS = ['monitor-image', 'monitor-map', 'monitor-text', 'monitor-search', 'monitor-weather', 'monitor-iframe', 'monitor-audio', 'monitor-video', 'monitor-default'];
+    let _lastContentHash = ''; // Dedup: prevent same content showing twice
 
     function showPanel(id) {
         PANELS.forEach(function (pid) {
-            var el = document.getElementById(pid);
+            const el = document.getElementById(pid);
             if (el) el.style.display = 'none';
         });
-        var el = document.getElementById(id);
+        const el = document.getElementById(id);
         if (el) el.style.display = '';
     }
 
     function showImage(url, caption) {
-        var el = document.getElementById('monitor-image');
+        const el = document.getElementById('monitor-image');
         if (!el) return;
-        var safeUrl = String(url).replace(/"/g, '&quot;');
-        var safeCaption = caption ? String(caption).replace(/</g, '&lt;').replace(/>/g, '&gt;') : '';
+        const safeUrl = String(url).replace(/"/g, '&quot;');
+        const safeCaption = caption ? String(caption).replace(/</g, '&lt;').replace(/>/g, '&gt;') : '';
         el.innerHTML = '<img src="' + safeUrl + '" alt="' + safeCaption + '">' +
             (safeCaption ? '<p class="monitor-caption">' + safeCaption + '</p>' : '');
         showPanel('monitor-image');
@@ -29,11 +29,11 @@ var MonitorManager = (function () {
     }
 
     function showMap(lat, lng, label) {
-        var el = document.getElementById('monitor-map');
+        const el = document.getElementById('monitor-map');
         if (!el) return;
-        var safeLabel = label ? String(label).replace(/"/g, '&quot;') : 'Map';
-        var bbox = (lng - 0.05) + '%2C' + (lat - 0.05) + '%2C' + (lng + 0.05) + '%2C' + (lat + 0.05);
-        var url = 'https://www.openstreetmap.org/export/embed.html?bbox=' + bbox +
+        const safeLabel = label ? String(label).replace(/"/g, '&quot;') : 'Map';
+        const bbox = (lng - 0.05) + '%2C' + (lat - 0.05) + '%2C' + (lng + 0.05) + '%2C' + (lat + 0.05);
+        const url = 'https://www.openstreetmap.org/export/embed.html?bbox=' + bbox +
             '&layer=mapnik&marker=' + lat + '%2C' + lng;
         el.innerHTML = '<iframe src="' + url + '" title="' + safeLabel + '"></iframe>' +
             (label ? '<p class="monitor-caption">📍 ' + String(label).replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</p>' : '');
@@ -42,9 +42,9 @@ var MonitorManager = (function () {
     }
 
     function showWebContent(url) {
-        var el = document.getElementById('monitor-map');
+        const el = document.getElementById('monitor-map');
         if (!el) return;
-        var safeUrl = String(url).replace(/"/g, '&quot;');
+        const safeUrl = String(url).replace(/"/g, '&quot;');
         el.innerHTML = '<div class="monitor-browser">' +
             '<div class="browser-bar">' +
             '<input type="text" id="browser-url" value="' + safeUrl + '" placeholder="Enter URL..." style="flex:1;background:#1a1a2e;color:#e0e0ff;border:1px solid #333;border-radius:6px;padding:5px 10px;font-size:0.75rem;">' +
@@ -65,12 +65,12 @@ var MonitorManager = (function () {
         if (window.KAvatar) KAvatar.setPresenting(true);
         // Wire up browser controls
         setTimeout(function () {
-            var goBtn = document.getElementById('browser-go');
-            var urlInput = document.getElementById('browser-url');
-            var closeBtn = document.getElementById('browser-close');
+            const goBtn = document.getElementById('browser-go');
+            const urlInput = document.getElementById('browser-url');
+            const closeBtn = document.getElementById('browser-close');
             if (goBtn && urlInput) {
                 goBtn.addEventListener('click', function () {
-                    var u = urlInput.value.trim();
+                    let u = urlInput.value.trim();
                     if (u && !u.startsWith('http')) u = 'https://' + u;
                     if (u) showWebContent(u);
                 });
@@ -87,9 +87,9 @@ var MonitorManager = (function () {
     }
 
     function showMarkdown(text) {
-        var el = document.getElementById('monitor-text');
+        const el = document.getElementById('monitor-text');
         if (!el) return;
-        var html = String(text)
+        const html = String(text)
             .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
             .replace(/^### (.+)$/gm, '<h3>$1</h3>')
             .replace(/^## (.+)$/gm, '<h2>$1</h2>')
@@ -104,15 +104,15 @@ var MonitorManager = (function () {
     }
 
     function showSearchResults(results) {
-        var el = document.getElementById('monitor-search');
+        const el = document.getElementById('monitor-search');
         if (!el) return;
         if (!results || !results.length) { clear(); return; }
-        var html = '<div class="monitor-search-list">';
-        for (var i = 0; i < results.length; i++) {
-            var r = results[i];
-            var title = String(r.title || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-            var url = String(r.url || r.link || '#').replace(/"/g, '&quot;');
-            var snippet = String(r.snippet || r.description || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        let html = '<div class="monitor-search-list">';
+        for (let i = 0; i < results.length; i++) {
+            const r = results[i];
+            const title = String(r.title || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const url = String(r.url || r.link || '#').replace(/"/g, '&quot;');
+            const snippet = String(r.snippet || r.description || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
             html += '<div class="monitor-search-item">' +
                 '<a href="' + url + '" target="_blank" rel="noopener">' +
                 '<div class="search-title">' + title + '</div>' +
@@ -127,13 +127,13 @@ var MonitorManager = (function () {
     }
 
     function showWeather(data) {
-        var el = document.getElementById('monitor-weather');
+        const el = document.getElementById('monitor-weather');
         if (!el) return;
-        var icon = data.icon || '🌤️';
-        var city = String(data.city || data.location || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        var temp = data.temperature !== undefined ? data.temperature : (data.temp !== undefined ? data.temp : '');
-        var desc = String(data.description || data.condition || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        var html = '<div class="weather-card">' +
+        const icon = data.icon || '🌤️';
+        const city = String(data.city || data.location || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const temp = data.temperature !== undefined ? data.temperature : (data.temp !== undefined ? data.temp : '');
+        const desc = String(data.description || data.condition || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const html = '<div class="weather-card">' +
             '<div class="weather-city">' + city + '</div>' +
             '<div class="weather-main">' +
             '<span class="weather-icon">' + icon + '</span>' +
@@ -152,21 +152,21 @@ var MonitorManager = (function () {
 
     function show(content, type) {
         // Dedup: skip if same content already displayed
-        var hash = String(content).substring(0, 200) + '|' + (type || '');
+        const hash = String(content).substring(0, 200) + '|' + (type || '');
         if (hash === _lastContentHash) return;
         _lastContentHash = hash;
 
         if (type === 'image') {
             showImage(content);
         } else if (type === 'map') {
-            var el = document.getElementById('monitor-map');
+            const el = document.getElementById('monitor-map');
             if (!el) return;
-            var safeUrl = String(content).replace(/"/g, '&quot;');
+            const safeUrl = String(content).replace(/"/g, '&quot;');
             el.innerHTML = '<iframe src="' + safeUrl + '" title="Map"></iframe>';
             showPanel('monitor-map');
             if (window.KAvatar) KAvatar.setPresenting(true);
         } else if (type === 'html') {
-            var el = document.getElementById('monitor-text');
+            const el = document.getElementById('monitor-text');
             if (!el) return;
             el.innerHTML = content;
             showPanel('monitor-text');
@@ -188,10 +188,10 @@ var MonitorManager = (function () {
 
     // ── IFRAME (URL/Web Navigation) ──
     function showIframe(url, title) {
-        var iframe = document.getElementById('monitor-iframe-src');
+        const iframe = document.getElementById('monitor-iframe-src');
         if (!iframe) return;
         iframe.src = String(url);
-        var titleEl = document.getElementById('display-title');
+        const titleEl = document.getElementById('display-title');
         if (titleEl && title) titleEl.textContent = title;
         showPanel('monitor-iframe');
         if (window.KAvatar) KAvatar.setPresenting(true);
@@ -199,15 +199,15 @@ var MonitorManager = (function () {
 
     // ── RADIO LIVE ──
     function showRadio(streamUrl, stationName, logo) {
-        var player = document.getElementById('radio-player');
-        var nameEl = document.getElementById('radio-name');
-        var logoEl = document.getElementById('radio-logo');
+        const player = document.getElementById('radio-player');
+        const nameEl = document.getElementById('radio-name');
+        const logoEl = document.getElementById('radio-logo');
         if (!player) return;
         player.src = String(streamUrl);
         if (nameEl) nameEl.textContent = stationName || 'Radio';
         if (logoEl) logoEl.textContent = logo || '📻';
         player.play().catch(function () { });
-        var titleEl = document.getElementById('display-title');
+        const titleEl = document.getElementById('display-title');
         if (titleEl) titleEl.textContent = '🎵 ' + (stationName || 'Radio');
         showPanel('monitor-audio');
         if (window.KAvatar) KAvatar.setPresenting(true);
@@ -215,10 +215,10 @@ var MonitorManager = (function () {
 
     // ── VIDEO (YouTube / Netflix / Embed) ──
     function showVideo(embedUrl, title) {
-        var iframe = document.getElementById('monitor-video-src');
+        const iframe = document.getElementById('monitor-video-src');
         if (!iframe) return;
         iframe.src = String(embedUrl);
-        var titleEl = document.getElementById('display-title');
+        const titleEl = document.getElementById('display-title');
         if (titleEl) titleEl.textContent = '🎬 ' + (title || 'Video');
         showPanel('monitor-video');
         if (window.KAvatar) KAvatar.setPresenting(true);
@@ -230,33 +230,33 @@ var MonitorManager = (function () {
     }
 
     function downloadContent() {
-        var imgEl = document.getElementById('monitor-image');
-        var mapEl = document.getElementById('monitor-map');
-        var textEl = document.getElementById('monitor-text');
-        var img = imgEl && imgEl.style.display !== 'none' ? imgEl.querySelector('img') : null;
-        var iframe = mapEl && mapEl.style.display !== 'none' ? mapEl.querySelector('iframe') : null;
-        var text = textEl && textEl.style.display !== 'none' ? textEl : null;
+        const imgEl = document.getElementById('monitor-image');
+        const mapEl = document.getElementById('monitor-map');
+        const textEl = document.getElementById('monitor-text');
+        const img = imgEl && imgEl.style.display !== 'none' ? imgEl.querySelector('img') : null;
+        const iframe = mapEl && mapEl.style.display !== 'none' ? mapEl.querySelector('iframe') : null;
+        const text = textEl && textEl.style.display !== 'none' ? textEl : null;
 
         if (img && img.src) {
             fetch(img.src).then(function (r) { return r.blob(); }).then(function (blob) {
-                var url = URL.createObjectURL(blob);
-                var a = document.createElement('a');
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
                 a.href = url; a.download = 'monitor-image.png'; a.click();
                 setTimeout(function () { URL.revokeObjectURL(url); }, 100);
             }).catch(function () {
-                var a = document.createElement('a');
+                const a = document.createElement('a');
                 a.href = img.src; a.download = 'monitor-image.png'; a.target = '_blank'; a.click();
             });
         } else if (iframe && iframe.src) {
-            var a = document.createElement('a');
-            var blob = new Blob([iframe.src], { type: 'text/plain' });
-            var iframeUrl = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            const blob = new Blob([iframe.src], { type: 'text/plain' });
+            const iframeUrl = URL.createObjectURL(blob);
             a.href = iframeUrl; a.download = 'monitor-url.txt'; a.click();
             setTimeout(function () { URL.revokeObjectURL(iframeUrl); }, 100);
         } else if (text) {
-            var blob2 = new Blob([text.innerHTML], { type: 'text/html' });
-            var textUrl = URL.createObjectURL(blob2);
-            var a2 = document.createElement('a');
+            const blob2 = new Blob([text.innerHTML], { type: 'text/html' });
+            const textUrl = URL.createObjectURL(blob2);
+            const a2 = document.createElement('a');
             a2.href = textUrl; a2.download = 'monitor-content.html'; a2.click();
             setTimeout(function () { URL.revokeObjectURL(textUrl); }, 100);
         }
@@ -266,20 +266,20 @@ var MonitorManager = (function () {
     // Falls back to downloadContent() if JSZip is unavailable.
     function downloadAsZip() {
         if (window.JSZip) {
-            var zip = new JSZip();
-            var imgEl = document.getElementById('monitor-image');
-            var textEl = document.getElementById('monitor-text');
-            var img = imgEl && imgEl.style.display !== 'none' ? imgEl.querySelector('img') : null;
-            var text = textEl && textEl.style.display !== 'none' ? textEl : null;
-            var tasks = [];
+            const zip = new JSZip();
+            const imgEl = document.getElementById('monitor-image');
+            const textEl = document.getElementById('monitor-text');
+            const img = imgEl && imgEl.style.display !== 'none' ? imgEl.querySelector('img') : null;
+            const text = textEl && textEl.style.display !== 'none' ? textEl : null;
+            const tasks = [];
             if (img && img.src) {
                 tasks.push(fetch(img.src).then(function (r) { return r.blob(); }).then(function (b) { zip.file('image.png', b); }).catch(function () { }));
             }
             if (text) { zip.file('content.html', text.innerHTML); }
             Promise.all(tasks).then(function () {
                 zip.generateAsync({ type: 'blob' }).then(function (blob) {
-                    var zipUrl = URL.createObjectURL(blob);
-                    var a = document.createElement('a');
+                    const zipUrl = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
                     a.href = zipUrl; a.download = 'monitor-export.zip'; a.click();
                     setTimeout(function () { URL.revokeObjectURL(zipUrl); }, 100);
                 });
@@ -290,9 +290,9 @@ var MonitorManager = (function () {
     }
 
     document.addEventListener('DOMContentLoaded', function () {
-        var dlBtn = document.getElementById('btn-monitor-download');
-        var zipBtn = document.getElementById('btn-monitor-zip');
-        var webBtn = document.getElementById('btn-monitor-web');
+        const dlBtn = document.getElementById('btn-monitor-download');
+        const zipBtn = document.getElementById('btn-monitor-zip');
+        const webBtn = document.getElementById('btn-monitor-web');
         if (dlBtn) dlBtn.addEventListener('click', downloadContent);
         if (zipBtn) zipBtn.addEventListener('click', downloadAsZip);
         if (webBtn) webBtn.addEventListener('click', function () { showWebContent('about:blank'); });

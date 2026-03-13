@@ -8,27 +8,27 @@
     let recognition = null, isListeningForWake = false, isProcessing = false;
 
     // ─── Subtitle overlay ───────────────────────────────────
-    var _subtitleEl = null;
-    var _subtitleTimer = null;
+    let _subtitleEl = null;
+    let _subtitleTimer = null;
     function _ensureSubtitleEl() {
         if (_subtitleEl && document.body.contains(_subtitleEl)) return _subtitleEl;
         _subtitleEl = document.createElement('div');
         _subtitleEl.id = 'speech-subtitle';
         _subtitleEl.setAttribute('aria-live', 'polite');
-        var parent = document.getElementById('avatar-area') || document.querySelector('.left-panel') || document.body;
+        const parent = document.getElementById('avatar-area') || document.querySelector('.left-panel') || document.body;
         parent.style.position = parent.style.position || 'relative';
         parent.appendChild(_subtitleEl);
         return _subtitleEl;
     }
-    function showSubtitle(text) {
+    function _showSubtitle(text) {
         if (!text) return;
         // Strip any leaked system instructions
         text = (text || '').replace(/\[SYSTEM INSTRUCTION[^\]]*\][\s\S]*?\[END SYSTEM INSTRUCTION\]\s*/gi, '').replace(/\[AGENT ACTIV[^\]]*\]\s*/gi, '').trim();
         if (!text) return;
         if (_subtitleTimer) { clearTimeout(_subtitleTimer); _subtitleTimer = null; }
-        var el = _ensureSubtitleEl();
+        const el = _ensureSubtitleEl();
         // Truncate to ~120 chars for single line
-        var display = text.length > 120 ? text.substring(0, 117) + '...' : text;
+        const display = text.length > 120 ? text.substring(0, 117) + '...' : text;
         el.textContent = display;
         el.classList.add('visible');
     }
@@ -47,10 +47,10 @@
     function ensureAudioUnlocked() {
         const ctx = getAudioContext();
         if (ctx.state === 'suspended') ctx.resume();
-        try { const b = ctx.createBuffer(1, 1, 22050), s = ctx.createBufferSource(); s.buffer = b; s.connect(ctx.destination); s.start(0); } catch (e) { }
+        try { const b = ctx.createBuffer(1, 1, 22050), s = ctx.createBufferSource(); s.buffer = b; s.connect(ctx.destination); s.start(0); } catch (_e) { /* ignored */ }
         // Replay pending audio if context was suspended and is now running
         if (ctx.state === 'running' && pendingAudioBuffer) {
-            const buf = pendingAudioBuffer, av = pendingAudioAvatar, txt = pendingAudioText;
+            const buf = pendingAudioBuffer, _av = pendingAudioAvatar, txt = pendingAudioText;
             pendingAudioBuffer = null; pendingAudioAvatar = null; pendingAudioText = null;
             const btn = document.getElementById('audio-unlock-btn'); if (btn) btn.remove();
             isSpeaking = true;
@@ -60,16 +60,16 @@
 
     // ─── AUTO-UNLOCK: browser requires user gesture for AudioContext ──
     // This fires on the FIRST click/key/touch and unlocks audio permanently
-    var _audioUnlocked = false;
+    let _audioUnlocked = false;
     function _autoUnlockAudio() {
         if (_audioUnlocked) return;
-        var ctx = getAudioContext();
+        const ctx = getAudioContext();
         if (ctx.state === 'suspended') {
             ctx.resume().then(function () {
                 console.log('[Voice] AudioContext unlocked via user gesture');
             });
         }
-        try { var b = ctx.createBuffer(1, 1, 22050), s = ctx.createBufferSource(); s.buffer = b; s.connect(ctx.destination); s.start(0); } catch (e) { }
+        try { const b = ctx.createBuffer(1, 1, 22050), s = ctx.createBufferSource(); s.buffer = b; s.connect(ctx.destination); s.start(0); } catch (_e) { /* ignored */ }
         if (ctx.state === 'running') {
             _audioUnlocked = true;
             console.log('[Voice] Audio permanently unlocked');
@@ -115,36 +115,36 @@
                     if (window.KAvatar && targetAvatar !== window.KAvatar.getCurrentAvatar()) {
                         window.KAvatar.loadAvatar(targetAvatar);
                         document.querySelectorAll('.avatar-pill').forEach(b => b.classList.toggle('active', b.dataset.avatar === targetAvatar));
-                        var displayName = targetAvatar.charAt(0).toUpperCase() + targetAvatar.slice(1);
-                        var navName = document.getElementById('navbar-avatar-name');
+                        const displayName = targetAvatar.charAt(0).toUpperCase() + targetAvatar.slice(1);
+                        const navName = document.getElementById('navbar-avatar-name');
                         if (navName) navName.textContent = displayName;
-                        var avatarName = document.getElementById('avatar-name');
+                        const avatarName = document.getElementById('avatar-name');
                         if (avatarName) avatarName.textContent = displayName;
                         document.title = displayName + 'AI';
                     }
                 }
             }
         };
-        recognition.onend = () => { if (isListeningForWake && !isProcessing) try { recognition.start(); } catch (e) { } };
-        recognition.onerror = (e) => { if (e.error !== 'not-allowed' && isListeningForWake) setTimeout(() => { try { recognition.start(); } catch (e) { } }, 1000); };
-        try { recognition.start(); isListeningForWake = true; console.log('[Voice] Wake word active'); } catch (e) { }
+        recognition.onend = () => { if (isListeningForWake && !isProcessing) try { recognition.start(); } catch (_e) { /* ignored */ } };
+        recognition.onerror = (e) => { if (e.error !== 'not-allowed' && isListeningForWake) setTimeout(() => { try { recognition.start(); } catch (_e) { /* ignored */ } }, 1000); };
+        try { recognition.start(); isListeningForWake = true; console.log('[Voice] Wake word active'); } catch (_e) { /* ignored */ }
         // Start mic level monitor (standalone function, no duplicate)
         startMicMonitor();
     }
 
     function resumeWakeDetection() {
         isProcessing = false; window.KAvatar.setAttentive(false);
-        if (isListeningForWake && recognition) try { recognition.start(); } catch (e) { }
+        if (isListeningForWake && recognition) try { recognition.start(); } catch (_e) { /* ignored */ }
     }
 
     function stopWakeWordDetection() {
         isListeningForWake = false;
         isProcessing = false;
-        if (recognition) try { recognition.stop(); } catch (e) { }
+        if (recognition) try { recognition.stop(); } catch (_e) { /* ignored */ }
         console.log('[Voice] Wake word stopped');
     }
 
-    function detectLanguage(text) {
+    function detectLanguage(_text) {
         // Language detection disabled for voice switching —
         // Voice language is controlled by AI response (KVoice.setLanguage from app.js)
         // The naive keyword matching was causing voice switching mid-conversation (B3 bug)
@@ -166,18 +166,18 @@
             .trim();
     }
 
-    var speakSafetyTimer = null;
-    var _speakId = 0; // atomic counter — prevents race condition overlap
-    var CHUNK_MAX = 450; // max chars per TTS chunk — ElevenLabs truncates at ~5000
+    let speakSafetyTimer = null;
+    let _speakId = 0; // atomic counter — prevents race condition overlap
+    const CHUNK_MAX = 450; // max chars per TTS chunk — ElevenLabs truncates at ~5000
 
     // Split text into sentence chunks of ~CHUNK_MAX chars
     function _chunkText(text) {
         if (text.length <= CHUNK_MAX) return [text];
-        var chunks = [];
+        const chunks = [];
         // Split on sentence boundaries
-        var sentences = text.split(/(?<=[.!?])\s+/);
-        var current = '';
-        for (var i = 0; i < sentences.length; i++) {
+        const sentences = text.split(/(?<=[.!?])\s+/);
+        let current = '';
+        for (let i = 0; i < sentences.length; i++) {
             if (current.length + sentences[i].length > CHUNK_MAX && current.length > 0) {
                 chunks.push(current.trim());
                 current = sentences[i];
@@ -192,7 +192,7 @@
     async function speak(text, avatar) {
         if (isSpeaking) stopSpeaking();
         if (!text || !text.trim()) return;
-        var thisId = ++_speakId; // capture generation
+        const thisId = ++_speakId; // capture generation
         isSpeaking = true;
         if (speakSafetyTimer) clearTimeout(speakSafetyTimer);
         speakSafetyTimer = setTimeout(function () {
@@ -204,24 +204,24 @@
             if (!ttsText) { isSpeaking = false; resumeWakeDetection(); return; }
 
             // FORCE AudioContext running before fetching
-            var ctx = getAudioContext();
-            try { await ctx.resume(); } catch (e) { }
+            let ctx = getAudioContext();
+            try { await ctx.resume(); } catch (_e) { /* ignored */ }
             if (ctx.state !== 'running') {
                 sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
                 ctx = sharedAudioCtx;
-                try { await ctx.resume(); } catch (e) { }
+                try { await ctx.resume(); } catch (_e) { /* ignored */ }
             }
 
             // Chunk the text and play each chunk sequentially
-            var chunks = _chunkText(ttsText);
+            const chunks = _chunkText(ttsText);
             console.log('[Voice] TTS chunked into', chunks.length, 'parts');
             // showSubtitle disabled — text already visible in chat overlay (prevents duplicate display)
 
-            for (var ci = 0; ci < chunks.length; ci++) {
+            for (let ci = 0; ci < chunks.length; ci++) {
                 if (thisId !== _speakId) { console.log('[Voice] Stale, aborting chunk', ci); return; }
 
                 console.log('[Voice] Fetching chunk', ci + 1, '/', chunks.length, ':', chunks[ci].substring(0, 40) + '...');
-                var resp = await fetch(API_BASE + '/api/speak', {
+                const resp = await fetch(API_BASE + '/api/speak', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', ...(window.KAuth ? KAuth.getAuthHeaders() : {}) },
                     body: JSON.stringify({ text: chunks[ci], avatar: avatar || KAvatar.getCurrentAvatar(), language: detectedLanguage })
@@ -231,17 +231,17 @@
                 if (!resp.ok) { console.warn('[Voice] TTS chunk', ci, 'failed:', resp.status); continue; }
 
                 // Parse JSON response (audio base64 + alignment)
-                var data = await resp.json();
+                const data = await resp.json();
                 if (thisId !== _speakId) return;
                 if (!data.audio) { console.warn('[Voice] TTS chunk', ci, 'has no audio'); continue; }
 
                 // Decode base64 audio to ArrayBuffer
-                var binaryStr = atob(data.audio);
-                var arrayBuf = new ArrayBuffer(binaryStr.length);
-                var bytes = new Uint8Array(arrayBuf);
-                for (var bi = 0; bi < binaryStr.length; bi++) bytes[bi] = binaryStr.charCodeAt(bi);
+                const binaryStr = atob(data.audio);
+                const arrayBuf = new ArrayBuffer(binaryStr.length);
+                const bytes = new Uint8Array(arrayBuf);
+                for (let bi = 0; bi < binaryStr.length; bi++) bytes[bi] = binaryStr.charCodeAt(bi);
 
-                var chunkAlignment = data.alignment || null;
+                const chunkAlignment = data.alignment || null;
                 console.log('[Voice] Chunk', ci + 1, 'received:', arrayBuf.byteLength, 'bytes',
                     chunkAlignment ? '+ alignment (' + (chunkAlignment.characters ? chunkAlignment.characters.length : 0) + ' chars)' : '(no alignment)');
 
@@ -255,13 +255,13 @@
 
     // Play a single audio chunk — calls onDone when finished
     function playAudioChunk(arrayBuf, chunkText, isLast, onDone, alignment) {
-        var ctx = getAudioContext();
+        const ctx = getAudioContext();
         ctx.decodeAudioData(arrayBuf.slice(0), function (audioBuf) {
             currentSourceNode = ctx.createBufferSource();
             currentSourceNode.buffer = audioBuf;
 
             // ── Professional lip sync with alignment (ElevenLabs) ──
-            var usingAlignment = false;
+            let usingAlignment = false;
             if (alignment && window.AlignmentLipSync) {
                 try {
                     AlignmentLipSync.setMorphMeshes(KAvatar.getMorphMeshes());
@@ -278,13 +278,13 @@
 
             // ── Fallback: FFT-based lip sync ──
             if (!usingAlignment) {
-                var ls = KAvatar.getLipSync();
-                var fftOk = false;
+                const ls = KAvatar.getLipSync();
+                let fftOk = false;
                 if (ls && ls.connectToContext) {
                     try {
-                        var an = ls.connectToContext(ctx);
+                        const an = ls.connectToContext(ctx);
                         if (an) { currentSourceNode.connect(an); an.connect(ctx.destination); fftOk = true; ls.start(); }
-                    } catch (e) { }
+                    } catch (_e) { /* ignored */ }
                 }
                 if (!fftOk) { currentSourceNode.connect(ctx.destination); fallbackTextLipSync(chunkText); }
             }
@@ -294,7 +294,7 @@
 
             currentSourceNode.onended = function () {
                 if (usingAlignment && window.AlignmentLipSync) {
-                    try { AlignmentLipSync.stop(); } catch (e) { }
+                    try { AlignmentLipSync.stop(); } catch (_e) { /* ignored */ }
                 }
                 if (isLast) {
                     stopAllLipSync(); hideSubtitle(); isSpeaking = false;
@@ -311,7 +311,7 @@
             }
             window.dispatchEvent(new CustomEvent('audio-start', { detail: { duration: audioBuf.duration, isChunked: true } }));
             console.log('[Voice] ✅ Chunk playing (' + arrayBuf.byteLength + 'B, ' + Math.round(audioBuf.duration) + 's' + (usingAlignment ? ', ALIGNED' : '') + ')');
-        }, function (err) {
+        }, function (_err) {
             console.warn('[Voice] Chunk decode failed');
             if (isLast) { stopAllLipSync(); hideSubtitle(); isSpeaking = false; KAvatar.setExpression('neutral'); KAvatar.setPresenting(false); resumeWakeDetection(); }
             onDone();
@@ -322,7 +322,7 @@
         const ctx = getAudioContext();
         let audioBuf;
         try { audioBuf = await ctx.decodeAudioData(arrayBuf.slice(0)); }
-        catch (e) { console.warn('[Voice] Audio decode failed'); fallbackTextLipSync(fallbackText || ''); isSpeaking = false; resumeWakeDetection(); return; }
+        catch (_e) { console.warn('[Voice] Audio decode failed'); fallbackTextLipSync(fallbackText || ''); isSpeaking = false; resumeWakeDetection(); return; }
 
         currentSourceNode = ctx.createBufferSource();
         currentSourceNode.buffer = audioBuf;
@@ -334,7 +334,7 @@
             try {
                 const an = ls.connectToContext(ctx);
                 if (an) { currentSourceNode.connect(an); an.connect(ctx.destination); fftOk = true; ls.start(); }
-            } catch (e) { }
+            } catch (_e) { /* ignored */ }
         }
         if (!fftOk) { currentSourceNode.connect(ctx.destination); fallbackTextLipSync(fallbackText || ''); }
 
@@ -343,7 +343,7 @@
 
         // Auto-gestures during speech
         if (fallbackText) {
-            var gt = fallbackText.toLowerCase();
+            const gt = fallbackText.toLowerCase();
             setTimeout(function () { if (window.KAvatar) KAvatar.playGesture('nod'); }, 500);
             if (gt.includes('?')) setTimeout(function () { if (window.KAvatar) KAvatar.playGesture('tilt'); }, 2000);
             if (gt.includes('!')) setTimeout(function () { if (window.KAvatar) KAvatar.playGesture('nod'); }, 1500);
@@ -361,12 +361,12 @@
         // Dispatch event for synchronized text reveal
         window.dispatchEvent(new CustomEvent('audio-start', { detail: { duration: audioBuf.duration } }));
         // Safety timeout: stop lip sync even if onended doesn't fire
-        var audioDurationMs = Math.ceil(audioBuf.duration * 1000) + 500;
+        const audioDurationMs = Math.ceil(audioBuf.duration * 1000) + 500;
         setTimeout(function () { if (isSpeaking) { stopAllLipSync(); hideSubtitle(); isSpeaking = false; currentSourceNode = null; KAvatar.setExpression('neutral'); KAvatar.setPresenting(false); resumeWakeDetection(); } }, audioDurationMs);
         console.log('[Voice] ✅ Audio playing (' + arrayBuf.byteLength + 'B, ' + Math.round(audioBuf.duration) + 's)');
     }
 
-    function showAudioUnlockPrompt(arrayBuf, avatar, text) {
+    function _showAudioUnlockPrompt(arrayBuf, avatar, text) {
         pendingAudioBuffer = arrayBuf;
         pendingAudioAvatar = avatar;
         pendingAudioText = text || '';
@@ -378,12 +378,12 @@
         btn.style.cssText = 'position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#1a73e8;color:#fff;border:none;border-radius:24px;padding:12px 24px;cursor:pointer;z-index:9999;font-size:14px;font-weight:600;box-shadow:0 4px 16px rgba(0,0,0,0.4)';
         btn.onclick = async function () {
             btn.remove();
-            const buf = pendingAudioBuffer, av = pendingAudioAvatar, txt = pendingAudioText;
+            const buf = pendingAudioBuffer, _av = pendingAudioAvatar, txt = pendingAudioText;
             pendingAudioBuffer = null; pendingAudioAvatar = null; pendingAudioText = null;
             if (!buf) return;
             isSpeaking = true;
             const ctx = getAudioContext();
-            try { await ctx.resume(); } catch (e) { }
+            try { await ctx.resume(); } catch (_e) { /* ignored */ }
             await playAudioBuffer(buf, txt);
         };
         document.body.appendChild(btn);
@@ -391,10 +391,10 @@
     }
 
     function stopAllLipSync() {
-        var ls = KAvatar.getLipSync(), ts = KAvatar.getTextLipSync();
-        if (ls) try { ls.stop(); } catch (e) { }
-        if (ts) try { ts.stop(); } catch (e) { }
-        if (window.AlignmentLipSync) try { AlignmentLipSync.stop(); } catch (e) { }
+        const ls = KAvatar.getLipSync(), ts = KAvatar.getTextLipSync();
+        if (ls) try { ls.stop(); } catch (_e) { /* ignored */ }
+        if (ts) try { ts.stop(); } catch (_e) { /* ignored */ }
+        if (window.AlignmentLipSync) try { AlignmentLipSync.stop(); } catch (_e) { /* ignored */ }
         KAvatar.setMorph('Smile', 0);
     }
 
@@ -404,7 +404,7 @@
     }
 
     function stopSpeaking() {
-        if (currentSourceNode) try { currentSourceNode.stop(); } catch (e) { } currentSourceNode = null;
+        if (currentSourceNode) try { currentSourceNode.stop(); } catch (_e) { /* ignored */ } currentSourceNode = null;
         stopAllLipSync(); hideSubtitle(); isSpeaking = false; KAvatar.setExpression('neutral'); KAvatar.setPresenting(false);
     }
 
@@ -421,7 +421,7 @@
     // ─── Manual record ───────────────────────────────────────
     async function startListening() {
         if (isRecording) return;
-        if (recognition) try { recognition.stop(); } catch (e) { }
+        if (recognition) try { recognition.stop(); } catch (_e) { /* ignored */ }
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 } });
             audioChunks = [];
@@ -429,7 +429,7 @@
             mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunks.push(e.data); };
             mediaRecorder.start(100); isRecording = true; KAvatar.setExpression('thinking', 0.4);
             return true;
-        } catch (e) { resumeWakeDetection(); return false; }
+        } catch (_e) { resumeWakeDetection(); return false; }
     }
 
     function stopListening() {
@@ -445,7 +445,7 @@
                     try {
                         const r = await fetch(API_BASE + '/api/listen', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ audio: b64 }) });
                         const d = await r.json(); if (d.text) detectLanguage(d.text); resolve(d.text || null);
-                    } catch (e) { resolve(null); }
+                    } catch (_e) { resolve(null); }
                 };
                 reader.readAsDataURL(blob);
             };
@@ -473,42 +473,42 @@
     }
 
     // Auto-start mic monitor on first user interaction
-    var micMonitorStarted = false;
+    let micMonitorStarted = false;
     function startMicMonitor() {
         if (micMonitorStarted) return;
         micMonitorStarted = true;
         try {
             navigator.mediaDevices.getUserMedia({ audio: { noiseSuppression: true, echoCancellation: true } }).then(function (stream) {
-                var micCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const micCtx = new (window.AudioContext || window.webkitAudioContext)();
                 micCtx.resume();
-                var micSrc = micCtx.createMediaStreamSource(stream);
-                var micAn = micCtx.createAnalyser();
+                const micSrc = micCtx.createMediaStreamSource(stream);
+                const micAn = micCtx.createAnalyser();
                 micAn.fftSize = 256;
                 micSrc.connect(micAn);
-                var micData = new Uint8Array(micAn.frequencyBinCount);
-                var micEl = document.getElementById('mic-level');
+                const micData = new Uint8Array(micAn.frequencyBinCount);
+                const micEl = document.getElementById('mic-level');
                 if (!micEl) return;
-                var bars = micEl.querySelectorAll('span');
+                const bars = micEl.querySelectorAll('span');
                 function updateMicLevel() {
                     micAn.getByteFrequencyData(micData);
-                    var sum = 0; for (var j = 0; j < 32; j++) sum += micData[j];
-                    var vol = sum / 32 / 255;
+                    let sum = 0; for (let j = 0; j < 32; j++) sum += micData[j];
+                    const vol = sum / 32 / 255;
                     if (vol > 0.05) {
                         micEl.classList.add('active');
-                        for (var k = 0; k < bars.length; k++) {
-                            var h = Math.max(4, Math.min(22, vol * 22 * (1 + Math.random() * 0.3)));
+                        for (let k = 0; k < bars.length; k++) {
+                            const h = Math.max(4, Math.min(22, vol * 22 * (1 + Math.random() * 0.3)));
                             bars[k].style.height = h + 'px';
                         }
                     } else {
                         micEl.classList.remove('active');
-                        for (var k = 0; k < bars.length; k++) bars[k].style.height = '4px';
+                        for (let k = 0; k < bars.length; k++) bars[k].style.height = '4px';
                     }
                     requestAnimationFrame(updateMicLevel);
                 }
                 updateMicLevel();
                 console.log('[Voice] Mic monitor started');
             }).catch(function (e) { console.warn('[Voice] Mic monitor failed:', e.message || e); });
-        } catch (e) { }
+        } catch (_e) { /* ignored */ }
     }
 
     // Auto-start mic monitor on first click

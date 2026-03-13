@@ -4,11 +4,11 @@
     let currentUser = null;
 
     function saveSession(s, u) { if (s) { sessionStorage.setItem('kelion_token', s.access_token); if (s.refresh_token) sessionStorage.setItem('kelion_refresh_token', s.refresh_token); if (s.expires_at) sessionStorage.setItem('kelion_token_expires', s.expires_at); } if (u) sessionStorage.setItem('kelion_user', JSON.stringify(u)); }
-    function loadSession() { const t = sessionStorage.getItem('kelion_token'), u = sessionStorage.getItem('kelion_user'); if (t && u) { try { currentUser = JSON.parse(u); } catch (e) { } } return { token: t, user: currentUser }; }
+    function loadSession() { const t = sessionStorage.getItem('kelion_token'), u = sessionStorage.getItem('kelion_user'); if (t && u) { try { currentUser = JSON.parse(u); } catch (_e) { /* ignored */ } } return { token: t, user: currentUser }; }
     function clearSession() { sessionStorage.removeItem('kelion_token'); sessionStorage.removeItem('kelion_refresh_token'); sessionStorage.removeItem('kelion_token_expires'); sessionStorage.removeItem('kelion_user'); currentUser = null; }
     function getAuthHeaders() { const t = sessionStorage.getItem('kelion_token'); return t ? { 'Authorization': 'Bearer ' + t } : {}; }
     function isTokenExpired() { const exp = sessionStorage.getItem('kelion_token_expires'); if (!exp) return false; return (parseInt(exp) - 60) < (Date.now() / 1000); }
-    async function refreshToken() { const rt = sessionStorage.getItem('kelion_refresh_token'); if (!rt) { clearSession(); return false; } try { const r = await fetch(API + '/api/auth/refresh', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ refresh_token: rt }) }); if (!r.ok) { clearSession(); return false; } const d = await r.json(); currentUser = d.user; saveSession(d.session, d.user); return true; } catch (e) { return false; } }
+    async function refreshToken() { const rt = sessionStorage.getItem('kelion_refresh_token'); if (!rt) { clearSession(); return false; } try { const r = await fetch(API + '/api/auth/refresh', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ refresh_token: rt }) }); if (!r.ok) { clearSession(); return false; } const d = await r.json(); currentUser = d.user; saveSession(d.session, d.user); return true; } catch (_e) { return false; } }
 
     async function register(email, pw, name) {
         const r = await fetch(API + '/api/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password: pw, name }) });
@@ -21,7 +21,7 @@
         const d = await r.json(); if (!r.ok) throw new Error(d.error); currentUser = d.user; saveSession(d.session, d.user); return d;
     }
 
-    async function logout() { try { await fetch(API + '/api/auth/logout', { method: 'POST', headers: getAuthHeaders() }); } catch (e) { } clearSession(); }
+    async function logout() { try { await fetch(API + '/api/auth/logout', { method: 'POST', headers: getAuthHeaders() }); } catch (_e) { /* ignored */ } clearSession(); }
 
     async function forgotPassword(email) {
         const r = await fetch(API + '/api/auth/forgot-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) });
@@ -42,14 +42,14 @@
         const { token, user } = loadSession(); if (!token) return null;
         if (isTokenExpired()) { const ok = await refreshToken(); if (!ok) return null; }
         try { const r = await fetch(API + '/api/auth/me', { headers: getAuthHeaders() }); if (r.ok) { const d = await r.json(); currentUser = d.user; return d.user; } clearSession(); return null; }
-        catch (e) { return user; }
+        catch (_e) { return user; }
     }
 
     function updateAdminButtonState() {
-        var adminBtn = document.getElementById('btn-admin');
+        const adminBtn = document.getElementById('btn-admin');
         if (!adminBtn) return;
-        var isLoggedIn = !!currentUser;
-        var isAdminRole = isLoggedIn && currentUser.role === 'admin';
+        const isLoggedIn = !!currentUser;
+        const isAdminRole = isLoggedIn && currentUser.role === 'admin';
         // Auto-unlock for admin users — no password needed
         if (!isAdminRole) {
             adminBtn.style.display = 'none';
@@ -122,13 +122,13 @@
                             const rr = await fetch(API + '/api/referral/redeem', { method: 'POST', headers: { 'Content-Type': 'application/json', ...getAuthHeaders() }, body: JSON.stringify({ code: storedCode }) });
                             const rd = await rr.json();
                             if (rd.success) localStorage.removeItem('kelion_referral_code');
-                        } catch (_e) { }
+                        } catch (_e) { /* ignored */ }
                     }
                     scr.classList.add('hidden'); document.getElementById('app-layout').classList.remove('hidden'); updateUI();
                     if (window.KGuestTimer) KGuestTimer.stop(); // oprește timer-ul guest la login
                     if (window.KApp) KApp.loadConversations();
                     // Push state so Back goes to auth screen (not away from site)
-                    try { history.pushState({ kelionView: 'app' }, '', '/'); } catch(e) {}
+                    try { history.pushState({ kelionView: 'app' }, '', '/'); } catch(_e) { /* ignored */ }
                 }
             } catch (ex) { if (err) { err.style.color = ''; err.textContent = ex.message; } }
             finally { sub.disabled = false; sub.textContent = isReg ? 'Register' : 'Sign In'; }
@@ -146,14 +146,14 @@
         const startBtn = scr.querySelector('#start-btn');
         function enterApp() {
             try {
-                var c = new (window.AudioContext || window.webkitAudioContext)();
-                var b = c.createBuffer(1, 1, 22050);
-                var s = c.createBufferSource();
+                const c = new (window.AudioContext || window.webkitAudioContext)();
+                const b = c.createBuffer(1, 1, 22050);
+                const s = c.createBufferSource();
                 s.buffer = b; s.connect(c.destination); s.start(0); c.resume();
-            } catch (e) { }
+            } catch (_e) { /* ignored */ }
             if (window.KVoice) { KVoice.ensureAudioUnlocked(); }
             document.getElementById('auth-screen').classList.add('hidden');
-            var appLayout = document.getElementById('app-layout');
+            const appLayout = document.getElementById('app-layout');
             appLayout.classList.remove('hidden');
             appLayout.style.visibility = '';
             appLayout.style.pointerEvents = '';
@@ -161,11 +161,11 @@
             updateUI();
             if (window.KGuestTimer) KGuestTimer.start();
             // Push state so Back button doesn't leave the app
-            try { history.pushState({ kelionApp: true }, '', '/'); } catch(e) {}
+            try { history.pushState({ kelionApp: true }, '', '/'); } catch(_e) { /* ignored */ }
         }
         if (startBtn) startBtn.addEventListener('click', enterApp);
         // Admin button → navigate to admin panel
-        var adminBtn = document.getElementById('btn-admin');
+        const adminBtn = document.getElementById('btn-admin');
         if (adminBtn) adminBtn.addEventListener('click', function () {
             // Admin auto-unlocked — direct navigate
             if (adminBtn.dataset.locked === 'false') {
@@ -176,7 +176,7 @@
         window.addEventListener('avatars-ready', function () {
             console.log('[Auth] Avatars ready — auto-entering app');
             if (startBtn) {
-                var loadIcon = document.getElementById('loading-icon');
+                const loadIcon = document.getElementById('loading-icon');
                 if (loadIcon) loadIcon.style.animation = 'none';
                 startBtn.innerHTML = '▶ START';
             }
@@ -197,7 +197,7 @@
                 scr.classList.remove('hidden');
                 document.getElementById('app-layout').classList.add('hidden');
                 // Show auth form directly, hide START button
-                var startBtn2 = scr.querySelector('#start-btn');
+                const startBtn2 = scr.querySelector('#start-btn');
                 if (startBtn2) startBtn2.style.display = 'none';
                 if (form) form.style.display = '';
                 if (guest) guest.style.display = '';
@@ -208,23 +208,23 @@
         // App (logat) → Back → Auth screen (fără logout, sesiune rămâne)
         // Auth screen → Back → navighează normal (Google, etc.)
         window.addEventListener('popstate', function (e) {
-            var state = e.state || {};
-            var appLayout = document.getElementById('app-layout');
-            var authScreen = document.getElementById('auth-screen');
+            const state = e.state || {};
+            const appLayout = document.getElementById('app-layout');
+            const authScreen = document.getElementById('auth-screen');
             if (state.kelionView === 'app') {
                 // Forward to app view
                 if (authScreen) authScreen.classList.add('hidden');
                 if (appLayout) appLayout.classList.remove('hidden');
             } else {
                 // Back from app → show auth screen (but DON'T logout — session stays)
-                var appVisible = appLayout && !appLayout.classList.contains('hidden');
+                const appVisible = appLayout && !appLayout.classList.contains('hidden');
                 if (appVisible) {
                     if (appLayout) appLayout.classList.add('hidden');
                     if (authScreen) authScreen.classList.remove('hidden');
                     // Show START button (not login form) so user can re-enter quickly
-                    var startBtn3 = document.getElementById('start-btn');
+                    const startBtn3 = document.getElementById('start-btn');
                     if (startBtn3) startBtn3.style.display = '';
-                    var authForm = document.getElementById('auth-form');
+                    const authForm = document.getElementById('auth-form');
                     if (authForm) authForm.style.display = 'none';
                 }
                 // If auth screen is visible and Back is pressed again → browser navigates away naturally
@@ -237,19 +237,19 @@
 
         // ── Handle Supabase email confirmation callback ──
         // When user clicks email link, Supabase redirects to: https://kelionai.app/#access_token=...&refresh_token=...&type=signup
-        var hash = window.location.hash;
+        const hash = window.location.hash;
         if (hash && hash.includes('access_token=')) {
             try {
-                var hashParams = new URLSearchParams(hash.substring(1));
-                var accessToken = hashParams.get('access_token');
-                var refreshTokenVal = hashParams.get('refresh_token');
-                var expiresAt = hashParams.get('expires_at');
-                var tokenType = hashParams.get('type'); // 'signup', 'recovery', etc.
+                const hashParams = new URLSearchParams(hash.substring(1));
+                const accessToken = hashParams.get('access_token');
+                const refreshTokenVal = hashParams.get('refresh_token');
+                const expiresAt = hashParams.get('expires_at');
+                const tokenType = hashParams.get('type'); // 'signup', 'recovery', etc.
 
                 if (accessToken) {
                     console.log('[Auth] Email callback detected, type:', tokenType);
                     // Save tokens to session
-                    var session = {
+                    const session = {
                         access_token: accessToken,
                         refresh_token: refreshTokenVal || '',
                         expires_at: expiresAt || ''
@@ -258,11 +258,11 @@
 
                     // Fetch user info with the new token
                     try {
-                        var r = await fetch(API + '/api/auth/me', {
+                        const r = await fetch(API + '/api/auth/me', {
                             headers: { 'Authorization': 'Bearer ' + accessToken }
                         });
                         if (r.ok) {
-                            var d = await r.json();
+                            const d = await r.json();
                             currentUser = d.user;
                             saveSession(session, d.user);
                             console.log('[Auth] ✅ Email confirmed, user:', d.user.email);
@@ -310,14 +310,14 @@
     // Timer removed — guests are limited by server-side daily message quotas instead.
     // Stub to prevent errors from existing code that references KGuestTimer.
     function openSubscriptions() {
-        var modal = document.getElementById('pricing-modal');
+        const modal = document.getElementById('pricing-modal');
         if (modal) {
             modal.classList.remove('hidden');
             if (window.KPayments) KPayments.renderPricing();
         }
     }
     function initStub() {
-        var subBtn = document.getElementById('btn-subscriptions');
+        const subBtn = document.getElementById('btn-subscriptions');
         if (subBtn) subBtn.addEventListener('click', openSubscriptions);
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initStub);

@@ -6,12 +6,14 @@
 (function () {
     'use strict';
     const API_BASE = window.location.origin;
-    let chatHistory = [], storedFiles = [], audioUnlocked = false;
-    let currentConversationId = null, useStreaming = true, historyOpen = false;
+    let chatHistory = [], audioUnlocked = false;
+    const storedFiles = [];
+    let currentConversationId = null, historyOpen = false;
+    const _useStreaming = true;
     let adminSecret = null; // stored when admin mode is active
 
     // ── #155: FRONTEND ERROR CAPTURE → Brain ──
-    var _errCount = 0, _errResetTimer = null;
+    let _errCount = 0, _errResetTimer = null;
     function reportError(type, message, source, line, col) {
         if (_errCount >= 5) return; // max 5 per minute
         _errCount++;
@@ -22,12 +24,12 @@
                 source: source || '', line: line || 0, col: col || 0,
                 url: location.pathname, timestamp: new Date().toISOString(), ua: navigator.userAgent.substring(0, 100)
             }));
-        } catch (e) { /* silent */ }
+        } catch (_e) { /* silent */ }
     }
     window.onerror = function (msg, src, line, col) { reportError('uncaught', msg, src, line, col); };
     window.addEventListener('unhandledrejection', function (e) { reportError('promise', e.reason?.message || String(e.reason), '', 0, 0); });
 
-    function adminHeaders() { return { ...authHeaders(), 'x-admin-secret': adminSecret || '' }; }
+    function _adminHeaders() { return { ...authHeaders(), 'x-admin-secret': adminSecret || '' }; }
 
     function authHeaders() { return { 'Content-Type': 'application/json', ...(window.KAuth ? KAuth.getAuthHeaders() : {}) }; }
 
@@ -37,7 +39,7 @@
     function unlockAudio() {
         if (!audioUnlocked) {
             audioUnlocked = true;
-            try { const c = new (window.AudioContext || window.webkitAudioContext)(), b = c.createBuffer(1, 1, 22050), s = c.createBufferSource(); s.buffer = b; s.connect(c.destination); s.start(0); c.resume(); } catch (e) { }
+            try { const c = new (window.AudioContext || window.webkitAudioContext)(), b = c.createBuffer(1, 1, 22050), s = c.createBufferSource(); s.buffer = b; s.connect(c.destination); s.start(0); c.resume(); } catch (_e) { /* ignored */ }
         }
         if (window.KVoice) KVoice.ensureAudioUnlocked();
     }
@@ -52,7 +54,7 @@
     function isVisionRequest(t) { const l = t.toLowerCase(); return VISION_TRIGGERS.some(v => l.includes(v)); }
 
     // ─── Web commands — open sites via chat ──────────────────
-    var WEB_SITES = {
+    const WEB_SITES = {
         'youtube': 'https://www.youtube.com', 'netflix': 'https://www.netflix.com',
         'radiozu': 'https://www.radiozu.ro', 'radio zu': 'https://www.radiozu.ro',
         'kissfm': 'https://www.kissfm.ro', 'kiss fm': 'https://www.kissfm.ro',
@@ -64,15 +66,15 @@
         'hbo': 'https://www.max.com', 'disney': 'https://www.disneyplus.com',
         'prime video': 'https://www.primevideo.com', 'amazon': 'https://www.amazon.com'
     };
-    var WEB_CMDS = /\b(deschide|pune|open|play|start|go to|du-te pe|arata|arată|mergi pe|porneste|pornește|navighează|navigheaza)\b/i;
+    const WEB_CMDS = /\b(deschide|pune|open|play|start|go to|du-te pe|arata|arată|mergi pe|porneste|pornește|navighează|navigheaza)\b/i;
     function tryWebCommand(text) {
-        var lower = text.toLowerCase();
+        const lower = text.toLowerCase();
         if (!WEB_CMDS.test(lower)) return null;
         // Check for direct URL in message
-        var urlMatch = lower.match(/https?:\/\/[^\s]+/);
+        const urlMatch = lower.match(/https?:\/\/[^\s]+/);
         if (urlMatch) return urlMatch[0];
         // Check for known sites
-        for (var name in WEB_SITES) {
+        for (const name in WEB_SITES) {
             if (lower.includes(name)) return WEB_SITES[name];
         }
         return null;
@@ -98,16 +100,16 @@
                     method: 'POST', headers: authHeaders(),
                     body: JSON.stringify({ action: 'save', key: 'last_vision_' + Date.now(), value: desc })
                 }).catch(function (e) { console.warn('[Vision] Memory save failed:', e.message); });
-            } catch (e) { /* non-blocking */ }
+            } catch (_e) { /* non-blocking */ }
 
             // Send vision context to brain for enriched follow-up
             try {
                 await sendToAI_Regular('[VISION_CONTEXT: ' + desc + '] Tocmai am văzut prin cameră. Oferă un comentariu scurt și natural despre ce am observat.', 'ro');
-            } catch (e) { /* fallback: just speak the raw description */ }
+            } catch (_e) { /* fallback: just speak the raw description */ }
 
             try { KAvatar.setExpression('happy', 0.3); } catch (e) { console.warn('[App] Expression change failed:', e.message); }
             if (window.KVoice) await KVoice.speak(desc);
-        } catch (e) {
+        } catch (_e) {
             addMessage('assistant', 'Camera not available. Please allow camera access in your browser settings.');
         }
     }
@@ -116,7 +118,7 @@
     // MEDIA UPLOAD SYSTEM — Images, Files, Paste, Drag & Drop
     // Sends imageBase64 to /api/chat → brain-v4 → Gemini Vision
     // ═══════════════════════════════════════════════════════════
-    var pendingMedia = null; // { base64, mimeType, name, size, previewUrl }
+    let pendingMedia = null; // { base64, mimeType, name, size, previewUrl }
 
     function handleFileAttach(file) {
         if (!file) return;
@@ -125,11 +127,11 @@
             addMessage('assistant', '⚠️ Fișierul e prea mare (max 20MB). Încearcă un fișier mai mic.');
             return;
         }
-        var reader = new FileReader();
+        const reader = new FileReader();
         reader.onload = function (e) {
-            var dataUrl = e.target.result;
-            var base64 = dataUrl.split(',')[1];
-            var mimeType = file.type || 'application/octet-stream';
+            const dataUrl = e.target.result;
+            const base64 = dataUrl.split(',')[1];
+            const mimeType = file.type || 'application/octet-stream';
             pendingMedia = {
                 base64: base64,
                 mimeType: mimeType,
@@ -145,41 +147,41 @@
     function showMediaPreview() {
         removeMediaPreview(); // clean previous
         if (!pendingMedia) return;
-        var preview = document.createElement('div');
+        const preview = document.createElement('div');
         preview.id = 'media-preview';
         preview.style.cssText = 'display:flex;align-items:center;gap:8px;padding:6px 12px;margin:0 16px 4px;background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.2);border-radius:10px;font-size:0.8rem;color:#a5b4fc;';
-        var content = '';
+        let content = '';
         if (pendingMedia.previewUrl) {
             content += '<img src="' + pendingMedia.previewUrl + '" style="width:40px;height:40px;object-fit:cover;border-radius:6px">';
         } else {
             content += '<span style="font-size:1.4rem">📎</span>';
         }
-        var sizeStr = pendingMedia.size > 1024 * 1024
+        const sizeStr = pendingMedia.size > 1024 * 1024
             ? (pendingMedia.size / (1024 * 1024)).toFixed(1) + ' MB'
             : (pendingMedia.size / 1024).toFixed(0) + ' KB';
         content += '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + pendingMedia.name + ' (' + sizeStr + ')</span>';
         content += '<button onclick="window._clearPendingMedia()" style="background:none;border:none;color:#f87171;cursor:pointer;font-size:1rem;padding:2px 6px" title="Elimină">✕</button>';
         preview.innerHTML = content;
-        var inputRow = document.getElementById('input-row');
+        const inputRow = document.getElementById('input-row');
         if (inputRow) inputRow.parentNode.insertBefore(preview, inputRow);
     }
 
     function removeMediaPreview() {
-        var el = document.getElementById('media-preview');
+        const el = document.getElementById('media-preview');
         if (el) el.remove();
     }
 
     window._clearPendingMedia = function () {
         pendingMedia = null;
         removeMediaPreview();
-        var fi = document.getElementById('file-input-hidden');
+        const fi = document.getElementById('file-input-hidden');
         if (fi) fi.value = '';
     };
 
     // Wire btn-plus → file picker
     (function () {
-        var btnPlus = document.getElementById('btn-plus');
-        var fileInput = document.getElementById('file-input-hidden');
+        const btnPlus = document.getElementById('btn-plus');
+        const fileInput = document.getElementById('file-input-hidden');
         if (btnPlus && fileInput) {
             btnPlus.title = 'Atașează fișier (imagine, PDF, audio, arhivă)';
             btnPlus.textContent = '📎';
@@ -198,11 +200,11 @@
     // Paste handler — paste images from clipboard
     document.addEventListener('paste', function (e) {
         if (!e.clipboardData || !e.clipboardData.items) return;
-        for (var i = 0; i < e.clipboardData.items.length; i++) {
-            var item = e.clipboardData.items[i];
+        for (let i = 0; i < e.clipboardData.items.length; i++) {
+            const item = e.clipboardData.items[i];
             if (item.type.indexOf('image') !== -1) {
                 e.preventDefault();
-                var blob = item.getAsFile();
+                const blob = item.getAsFile();
                 if (blob) {
                     blob.name = blob.name || 'clipboard-image.png';
                     handleFileAttach(blob);
@@ -214,9 +216,9 @@
 
     // Drag & drop handler — connected to existing drop-zone
     (function () {
-        var dropZone = document.getElementById('drop-zone');
-        var body = document.body;
-        var dragCounter = 0;
+        const dropZone = document.getElementById('drop-zone');
+        const body = document.body;
+        let dragCounter = 0;
 
         body.addEventListener('dragenter', function (e) {
             e.preventDefault();
@@ -250,7 +252,7 @@
     // SYNCED CHAT — Voice + Text synchronized
     // Flow: get AI reply → create empty div → speak() → on audio-start → reveal text char-by-char
     // ═══════════════════════════════════════════════════════════
-    var _speakGeneration = 0; // atomic counter to prevent voice overlap
+    let _speakGeneration = 0; // atomic counter to prevent voice overlap
 
     async function sendToAI_Regular(message, language) {
         showThinking(true);
@@ -259,7 +261,7 @@
         KAvatar.setExpression('thinking', 0.5);
 
         // Capture pending media before clearing
-        var mediaToSend = pendingMedia;
+        const mediaToSend = pendingMedia;
         if (mediaToSend) {
             window._clearPendingMedia();
             // If no text message, add default
@@ -275,7 +277,7 @@
         }
 
         try {
-            var payload = {
+            const payload = {
                 message,
                 avatar: KAvatar.getCurrentAvatar(),
                 history: chatHistory.slice(-50),
@@ -308,7 +310,7 @@
             }
 
             const data = await resp.json();
-            let fullReply = (data.reply || '').replace(/\[SYSTEM INSTRUCTION[^\]]*\][\s\S]*?\[END SYSTEM INSTRUCTION\]\s*/gi, '').replace(/\[AGENT ACTIV[^\]]*\]\s*/gi, '').trim();
+            const fullReply = (data.reply || '').replace(/\[SYSTEM INSTRUCTION[^\]]*\][\s\S]*?\[END SYSTEM INSTRUCTION\]\s*/gi, '').replace(/\[AGENT ACTIV[^\]]*\]\s*/gi, '').trim();
             if (data.conversationId) persistConvId(data.conversationId);
 
             if (!fullReply) {
@@ -345,7 +347,7 @@
             overlay.innerHTML = ''; // Clear previous — max 1 phrase on screen
 
             // ── COPY + SAVE BUTTONS (top-right of monitor) ──
-            var actionBar = document.createElement('div');
+            const actionBar = document.createElement('div');
             actionBar.className = 'msg-actions';
             actionBar.innerHTML = '<button class="msg-action-btn" id="btn-copy-msg" title="Copiază text">📋</button>' +
                 '<button class="msg-action-btn" id="btn-save-msg" title="Salvează ca fișier">💾</button>';
@@ -357,15 +359,15 @@
                     setTimeout(function () { actionBar.querySelector('#btn-copy-msg').textContent = '📋'; }, 1500);
                 }).catch(function () {
                     // Fallback: textarea copy
-                    var ta = document.createElement('textarea'); ta.value = fullReply; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+                    const ta = document.createElement('textarea'); ta.value = fullReply; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
                     actionBar.querySelector('#btn-copy-msg').textContent = '✅';
                     setTimeout(function () { actionBar.querySelector('#btn-copy-msg').textContent = '📋'; }, 1500);
                 });
             };
             // Wire save button
             actionBar.querySelector('#btn-save-msg').onclick = function () {
-                var blob = new Blob([fullReply], { type: 'text/plain;charset=utf-8' });
-                var a = document.createElement('a');
+                const blob = new Blob([fullReply], { type: 'text/plain;charset=utf-8' });
+                const a = document.createElement('a');
                 a.href = URL.createObjectURL(blob);
                 a.download = 'kelion-response-' + new Date().toISOString().slice(0, 19).replace(/:/g, '-') + '.txt';
                 a.click();
@@ -381,7 +383,7 @@
 
             // ── BRAIN-DIRECTED AVATAR CONTROL ──
             // Emotion from brain (replaces hardcoded 'happy')
-            var brainEmotion = data.emotion || 'happy';
+            const brainEmotion = data.emotion || 'happy';
             KAvatar.setExpression(brainEmotion, 0.5);
 
             // Gestures from brain (nod, shake, wave, tilt, etc.)
@@ -405,7 +407,7 @@
 
             // ── #53 BRAIN-MAP: Populate brain thinking panel ──
             if (typeof addBrainNode === 'function') {
-                var now = new Date().toLocaleTimeString();
+                const now = new Date().toLocaleTimeString();
                 addBrainNode('Response · ' + now, fullReply.substring(0, 80) + (fullReply.length > 80 ? '…' : ''));
                 if (brainEmotion && brainEmotion !== 'happy') addBrainNode('Emotion', '🎭 ' + brainEmotion);
                 if (data.gestures && data.gestures.length) addBrainNode('Gestures', '👋 ' + data.gestures.join(', '));
@@ -414,19 +416,19 @@
             }
 
             // Increment generation counter to prevent overlap
-            var thisGen = ++_speakGeneration;
-            var _textRevealed = false; // guard: only ONE source writes text
+            const thisGen = ++_speakGeneration;
+            let _textRevealed = false; // guard: only ONE source writes text
 
             // Listen for audio-start event to sync text reveal
-            var revealHandler = function (e) {
+            const revealHandler = function (e) {
                 window.removeEventListener('audio-start', revealHandler);
                 if (thisGen !== _speakGeneration) return; // stale, skip
                 if (_textRevealed) return; // already shown by fallback
                 _textRevealed = true;
-                var duration = e.detail.duration;
-                var msPerChar = (duration * 1000) / fullReply.length;
-                var charIdx = 0;
-                var timer = setInterval(function () {
+                const duration = e.detail.duration;
+                const msPerChar = (duration * 1000) / fullReply.length;
+                let charIdx = 0;
+                const timer = setInterval(function () {
                     if (thisGen !== _speakGeneration) { clearInterval(timer); return; }
                     charIdx++;
                     if (charIdx >= fullReply.length) {
@@ -465,7 +467,7 @@
 
 
 
-        } catch (e) {
+        } catch (_e) {
             showThinking(false);
             addMessage('assistant', 'Connection error.');
             if (window.KVoice) KVoice.resumeWakeDetection();
@@ -519,7 +521,7 @@
                 item.addEventListener('click', () => resumeConversation(c.id, c.avatar));
                 list.appendChild(item);
             }
-        } catch (e) {
+        } catch (_e) {
             list.innerHTML = '<div class="history-empty">Unable to load history.<br>Check authentication.</div>';
         }
     }
@@ -546,7 +548,7 @@
 
             document.querySelectorAll('.history-item').forEach(function (el) { el.classList.remove('active'); });
             if (window.innerWidth < 768) toggleHistory(false);
-        } catch (e) {
+        } catch (_e) {
             addMessage('assistant', 'Failed to load conversation.');
         }
     }
@@ -554,14 +556,14 @@
     function startNewChat() {
         persistConvId(null);
         chatHistory = [];
-        var overlay = document.getElementById('chat-overlay');
+        const overlay = document.getElementById('chat-overlay');
         if (overlay) overlay.innerHTML = '';
         document.querySelectorAll('.history-item').forEach(function (el) { el.classList.remove('active'); });
         if (window.innerWidth < 768) toggleHistory(false);
     }
 
     function toggleHistory(forceState) {
-        var sidebar = document.getElementById('history-sidebar');
+        const sidebar = document.getElementById('history-sidebar');
         if (!sidebar) return;
         historyOpen = forceState !== undefined ? forceState : !historyOpen;
         sidebar.classList.toggle('hidden', !historyOpen);
@@ -569,23 +571,23 @@
     }
 
     function formatTimeAgo(date) {
-        var now = new Date(), diff = now - date;
-        var mins = Math.floor(diff / 60000);
+        const now = new Date(), diff = now - date;
+        const mins = Math.floor(diff / 60000);
         if (mins < 1) return 'just now';
         if (mins < 60) return mins + ' min';
-        var hours = Math.floor(mins / 60);
+        const hours = Math.floor(mins / 60);
         if (hours < 24) return hours + 'h';
-        var days = Math.floor(hours / 24);
+        const days = Math.floor(hours / 24);
         if (days < 7) return days + 'd';
         return date.toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
     }
 
-    function escapeHtml(t) { var d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+    function escapeHtml(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
 
     // ─── Markdown parser for chat messages ─────────────────────
     function parseMarkdown(text) {
         if (!text) return '';
-        var html = escapeHtml(text);
+        let html = escapeHtml(text);
         // Bold: **text** or __text__
         html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
         html = html.replace(/__(.+?)__/g, '<strong>$1</strong>');
@@ -609,9 +611,9 @@
         // Strip any leaked system instructions from display
         text = (text || '').replace(/\[SYSTEM INSTRUCTION[^\]]*\][\s\S]*?\[END SYSTEM INSTRUCTION\]\s*/gi, '').replace(/\[AGENT ACTIV[^\]]*\]\s*/gi, '').trim();
         if (!text) return; // Don't show empty messages
-        var o = document.getElementById('chat-overlay');
+        const o = document.getElementById('chat-overlay');
         o.innerHTML = ''; // Clear previous — max 1 phrase on screen at a time
-        var m = document.createElement('div');
+        const m = document.createElement('div');
         m.className = 'msg ' + type;
         if (type === 'assistant') {
             m.innerHTML = parseMarkdown(text);
@@ -623,20 +625,20 @@
         // Auto-clear text after 5 seconds
         setTimeout(function () { if (o.contains(m)) o.removeChild(m); }, 5000);
     }
-    function updateSubtitle(/* type, text */) {
+    function _updateSubtitle(/* type, text */) {
         // Disabled — messages already visible in chat overlay, subtitle caused duplicate display
         return;
     }
     function showThinking(v) { document.getElementById('thinking').classList.toggle('active', v); }
-    function hideWelcome() { var w = document.getElementById('welcome'); if (w) w.classList.add('hidden'); }
+    function hideWelcome() { const w = document.getElementById('welcome'); if (w) w.classList.add('hidden'); }
 
     function switchAvatar(name) {
         if (window.KVoice) KVoice.stopSpeaking();
         try { KAvatar.loadAvatar(name); } catch (e) { console.warn('[App] Avatar load failed:', e.message); }
         document.querySelectorAll('.avatar-pill').forEach(function (b) { b.classList.toggle('active', b.dataset.avatar === name); });
-        var displayName = name.charAt(0).toUpperCase() + name.slice(1);
-        var n = document.getElementById('avatar-name'); if (n) n.textContent = displayName;
-        var navName = document.getElementById('navbar-avatar-name'); if (navName) navName.textContent = displayName;
+        const displayName = name.charAt(0).toUpperCase() + name.slice(1);
+        const n = document.getElementById('avatar-name'); if (n) n.textContent = displayName;
+        const navName = document.getElementById('navbar-avatar-name'); if (navName) navName.textContent = displayName;
         document.title = displayName + 'AI';
         // DO NOT clear chat history or chat overlay when switching avatars
         // chatHistory = []; persistConvId(null);
@@ -646,34 +648,34 @@
     // ─── Upgrade voice command detection ─────────────────────
     // Matches: "Kelion/Chelion, upgrade/abonament", "vreau pro/premium", "upgrade plan"
     function isUpgradeRequest(t) {
-        var l = t.toLowerCase();
+        const l = t.toLowerCase();
         return /(kelion|chelion)[,.\s]+(upgrade|abonament)|vreau\s+(pro|premium)|upgrade\s+plan/.test(l);
     }
 
     // ─── Input handlers ──────────────────────────────────────
     async function onSendText() {
-        var inp = document.getElementById('text-input'); var text = inp.value.trim(); if (!text) return; inp.value = '';
-        var l = text.toLowerCase();
+        const inp = document.getElementById('text-input'); let text = inp.value.trim(); if (!text) return; inp.value = '';
+        const l = text.toLowerCase();
         if (/^(kira|chira)[,.\s]/i.test(l)) { switchAvatar('kira'); text = text.replace(/^(kira|chira)[,.\s]*/i, '').trim(); }
         else if (/^(kelion|chelion)[,.\s]/i.test(l)) { switchAvatar('kelion'); text = text.replace(/^(kelion|chelion)[,.\s]*/i, '').trim(); }
         if (!text) return;
         if (isUpgradeRequest(text)) { if (window.KPayments) KPayments.showUpgradePrompt(); return; }
         // ─── Admin code detection (only for short code-like messages) ─────
-        var looksLikeCode = text.length < 40 && !/\b(ce|cum|de|la|si|sau|nu|da|eu|tu|el|ea|am|ai|are|sunt|esti|este|vreau|vrei|fa|pune|arata|spune|caut|deschide|salut|buna|hey|hi|hello|what|how|when|where)\b/i.test(text);
+        const looksLikeCode = text.length < 40 && !/\b(ce|cum|de|la|si|sau|nu|da|eu|tu|el|ea|am|ai|are|sunt|esti|este|vreau|vrei|fa|pune|arata|spune|caut|deschide|salut|buna|hey|hi|hello|what|how|when|where)\b/i.test(text);
         if (looksLikeCode) {
             try {
-                var codeResp = await fetch(API_BASE + '/api/admin/verify-code', {
+                const codeResp = await fetch(API_BASE + '/api/admin/verify-code', {
                     method: 'POST', headers: authHeaders(),
                     body: JSON.stringify({ code: text })
                 });
                 if (codeResp.ok) {
-                    var codeData = await codeResp.json();
+                    const codeData = await codeResp.json();
                     hideWelcome(); addMessage('user', '🔑 •••••');
                     if (codeData.action === 'enter') {
                         adminSecret = codeData.secret;
                         sessionStorage.setItem('kelion_admin_secret', codeData.secret);
                         // Unlock admin button
-                        var ab = document.getElementById('btn-admin');
+                        const ab = document.getElementById('btn-admin');
                         if (ab) {
                             ab.dataset.locked = 'false';
                             ab.style.cssText = 'padding:8px 14px;font-size:0.85rem;background:rgba(16,185,129,0.2);border:1px solid rgba(16,185,129,0.5);border-radius:8px;color:#34d399;cursor:pointer;font-family:var(--kelion-font);transition:all 0.4s;opacity:1;';
@@ -685,7 +687,7 @@
                         adminSecret = null;
                         sessionStorage.removeItem('kelion_admin_secret');
                         // Re-lock admin button
-                        var ab2 = document.getElementById('btn-admin');
+                        const ab2 = document.getElementById('btn-admin');
                         if (ab2) {
                             ab2.dataset.locked = 'true';
                             ab2.style.cssText = 'padding:8px 14px;font-size:0.85rem;background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);border-radius:8px;color:#fca5a5;cursor:not-allowed;font-family:var(--kelion-font);transition:all 0.4s;opacity:0.7;';
@@ -696,10 +698,10 @@
                     }
                     return;
                 }
-            } catch (e) { /* continue normally */ }
+            } catch (_e) { /* continue normally */ }
         }
         // Web command — show on monitor + open in new tab backup
-        var webUrl = tryWebCommand(text);
+        const webUrl = tryWebCommand(text);
         if (webUrl) {
             hideWelcome(); addMessage('user', text);
             // Show on monitor
@@ -726,7 +728,7 @@
 
     // ─── Drag & Drop ─────────────────────────────────────────
     function setupDragDrop() {
-        var dp = document.getElementById('display-panel'), dz = document.getElementById('drop-zone'); if (!dp || !dz) return;
+        const dp = document.getElementById('display-panel'), dz = document.getElementById('drop-zone'); if (!dp || !dz) return;
         dp.addEventListener('dragover', function (e) { e.preventDefault(); dz.classList.remove('hidden'); });
         dp.addEventListener('dragleave', function (e) { if (!dp.contains(e.relatedTarget)) dz.classList.add('hidden'); });
         dp.addEventListener('drop', function (e) { e.preventDefault(); dz.classList.add('hidden'); handleFiles(e.dataTransfer.files); });
@@ -735,19 +737,19 @@
     async function handleFiles(fileList) {
         hideWelcome();
         for (let i = 0; i < fileList.length; i++) {
-            let file = fileList[i];
-            var reader = new FileReader();
+            const file = fileList[i];
+            const reader = new FileReader();
             reader.onload = async function () {
                 storedFiles.push({ name: file.name, size: file.size, type: file.type, data: reader.result });
                 addMessage('user', '📎 ' + file.name + ' (' + Math.round(file.size / 1024) + ' KB)');
                 if (file.type.startsWith('image/')) {
-                    var b64 = reader.result.split(',')[1];
+                    const b64 = reader.result.split(',')[1];
                     KAvatar.setExpression('thinking', 0.5); showThinking(true);
                     try {
-                        var r = await fetch(API_BASE + '/api/vision', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ image: b64, avatar: KAvatar.getCurrentAvatar(), language: window.KVoice ? KVoice.getLanguage() : 'en' }) });
-                        var d = await r.json(); showThinking(false); addMessage('assistant', d.description || 'Could not analyze.');
+                        const r = await fetch(API_BASE + '/api/vision', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ image: b64, avatar: KAvatar.getCurrentAvatar(), language: window.KVoice ? KVoice.getLanguage() : 'en' }) });
+                        const d = await r.json(); showThinking(false); addMessage('assistant', d.description || 'Could not analyze.');
                         KAvatar.setExpression('happy', 0.3); if (window.KVoice) await KVoice.speak(d.description);
-                    } catch (e) { showThinking(false); addMessage('assistant', 'Analysis error.'); }
+                    } catch (_e) { showThinking(false); addMessage('assistant', 'Analysis error.'); }
                 } else { addMessage('assistant', 'I received ' + file.name + '. What should I do with it?'); }
             };
             if (file.type.startsWith('text/') || file.name.match(/\.(txt|md|json|csv)$/)) reader.readAsText(file);
@@ -758,18 +760,18 @@
     // ─── Health check ────────────────────────────────────────
     async function checkHealth() {
         try {
-            var r = await fetch(API_BASE + '/api/health');
-            var d = await r.json();
+            const r = await fetch(API_BASE + '/api/health');
+            const d = await r.json();
             if (d.status === 'ok' || d.status === 'online') {
-                var statusText = document.getElementById('status-text');
-                var statusDot = document.getElementById('status-dot');
+                const statusText = document.getElementById('status-text');
+                const statusDot = document.getElementById('status-dot');
                 if (statusText) statusText.textContent = 'Online' + (d.brain !== 'healthy' ? ' ⚠️' : '');
                 if (statusDot) statusDot.style.background = d.brain === 'healthy' ? '#00ff88' : '#ffaa00';
                 if (d.services && !d.services.ai_gemini) useStreaming = false;
             }
-        } catch (e) {
-            var statusText = document.getElementById('status-text');
-            var statusDot = document.getElementById('status-dot');
+        } catch (_e) {
+            const statusText = document.getElementById('status-text');
+            const statusDot = document.getElementById('status-dot');
             if (statusText) statusText.textContent = 'Offline';
             if (statusDot) statusDot.style.background = '#ff4444';
             useStreaming = false;
@@ -781,7 +783,7 @@
         // ─── Splash: loading animation, auto-dismissed after 3s ──
         // NOTE: This is just the loading overlay. Auth-screen (with START button) stays visible
         // until user clicks START — that click is the user gesture needed for AudioContext
-        var splashEl = document.getElementById('splash-screen');
+        const splashEl = document.getElementById('splash-screen');
         function dismissSplash() {
             if (splashEl && splashEl.parentNode) {
                 splashEl.style.opacity = '0';
@@ -789,7 +791,7 @@
                 setTimeout(function () { if (splashEl && splashEl.parentNode) splashEl.parentNode.removeChild(splashEl); }, 600);
             }
         }
-        var splashTimer = setTimeout(dismissSplash, 3000);
+        const splashTimer = setTimeout(dismissSplash, 3000);
         // NO auth safety auto-show — START button is the only gate
 
         if (window.KAuth) KAuth.init();
@@ -797,38 +799,38 @@
             KAvatar.init();
         } catch (e) {
             console.error('[App] Avatar init failed:', e.message);
-            var canvas = document.getElementById('avatar-canvas');
+            const canvas = document.getElementById('avatar-canvas');
             if (canvas) canvas.style.display = 'none';
         }
 
         ['click', 'touchstart', 'keydown'].forEach(function (e) { document.addEventListener(e, unlockAudio, { once: true, passive: true }); });
 
-        var sendBtn = document.getElementById('btn-send');
+        const sendBtn = document.getElementById('btn-send');
         if (sendBtn) sendBtn.addEventListener('click', onSendText);
         document.getElementById('text-input').addEventListener('keydown', function (e) { if (e.key === 'Enter') onSendText(); });
 
         // ─── Clipboard paste — Ctrl+V images into chat ──────────
         document.addEventListener('paste', function (e) {
-            var items = (e.clipboardData || e.originalEvent.clipboardData).items;
+            const items = (e.clipboardData || e.originalEvent.clipboardData).items;
             if (!items) return;
-            for (var i = 0; i < items.length; i++) {
+            for (let i = 0; i < items.length; i++) {
                 if (items[i].type.indexOf('image') !== -1) {
                     e.preventDefault();
-                    var blob = items[i].getAsFile();
-                    var reader = new FileReader();
+                    const blob = items[i].getAsFile();
+                    const reader = new FileReader();
                     reader.onload = function (ev) {
-                        var b64 = ev.target.result;
+                        const b64 = ev.target.result;
                         // Show preview in chat
                         addMessage('user', '📷 [Screenshot pasted]');
-                        var overlay = document.getElementById('chat-overlay');
-                        var imgEl = document.createElement('div');
+                        const overlay = document.getElementById('chat-overlay');
+                        const imgEl = document.createElement('div');
                         imgEl.className = 'msg user';
                         imgEl.innerHTML = '<img src="' + b64 + '" style="max-width:200px;border-radius:8px;margin:4px 0;">';
                         overlay.appendChild(imgEl);
                         overlay.scrollTop = overlay.scrollHeight;
                         // Send to vision API for analysis
                         showThinking(true);
-                        var rawB64 = b64.replace(/^data:image\/[a-z+]+;base64,/, '');
+                        const rawB64 = b64.replace(/^data:image\/[a-z+]+;base64,/, '');
                         fetch(API_BASE + '/api/vision', {
                             method: 'POST',
                             headers: authHeaders(),
@@ -841,7 +843,7 @@
                             .then(function (r) { return r.json(); })
                             .then(function (data) {
                                 showThinking(false);
-                                var desc = data.description || data.reply || 'Nu am putut analiza imaginea.';
+                                const desc = data.description || data.reply || 'Nu am putut analiza imaginea.';
                                 addMessage('assistant', desc);
                                 chatHistory.push({ role: 'user', content: '[User pasted a screenshot]' });
                                 chatHistory.push({ role: 'assistant', content: desc });
@@ -861,10 +863,10 @@
         document.querySelectorAll('.avatar-pill').forEach(function (b) { b.addEventListener('click', function () { switchAvatar(b.dataset.avatar); }); });
 
         // Mic toggle button — explicit permission request
-        var micToggle = document.getElementById('btn-mic-toggle');
-        var micOn = false;
-        var _micRetryCount = 0;
-        var _micNoSpeechTimer = null;
+        const micToggle = document.getElementById('btn-mic-toggle');
+        let micOn = false;
+        let _micRetryCount = 0;
+        let _micNoSpeechTimer = null;
         if (micToggle) {
             micToggle.addEventListener('click', async function () {
                 if (!micOn) {
@@ -872,21 +874,21 @@
                     micToggle.style.color = '#ffaa00';
                     micToggle.title = 'Requesting mic permission...';
                     try {
-                        var stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                         stream.getTracks().forEach(function (t) { t.stop(); });
                         micOn = true;
                         _micRetryCount = 0;
                         if (window.KVoice) { KVoice.ensureAudioUnlocked(); if (KVoice.stopWakeWordDetection) KVoice.stopWakeWordDetection(); }
                         // Start DIRECT speech recognition — no wake word needed
-                        var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+                        const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
                         if (SR) {
                             window._directSpeech = new SR();
                             window._directSpeech.continuous = true;
                             window._directSpeech.interimResults = true;
                             // DEFAULT: Romanian (ro-RO) — primary user language
                             // Falls back to i18n language if explicitly set to something else
-                            var i18nLang = (window.i18n && i18n.getLanguage && i18n.getLanguage()) || null;
-                            var micLang = 'ro-RO'; // DEFAULT Romanian
+                            const i18nLang = (window.i18n && i18n.getLanguage && i18n.getLanguage()) || null;
+                            let micLang = 'ro-RO'; // DEFAULT Romanian
                             if (i18nLang && i18nLang !== 'en') {
                                 // Only override if user explicitly chose a non-English language
                                 micLang = i18nLang;
@@ -903,15 +905,15 @@
                                 _micRetryCount = 0; // reset on successful result
                                 // Clear no-speech warning timer
                                 if (_micNoSpeechTimer) { clearTimeout(_micNoSpeechTimer); _micNoSpeechTimer = null; }
-                                for (var i = ev.resultIndex; i < ev.results.length; i++) {
+                                for (let i = ev.resultIndex; i < ev.results.length; i++) {
                                     if (ev.results[i].isFinal) {
-                                        var text = ev.results[i][0].transcript.trim();
-                                        var confidence = ev.results[i][0].confidence;
+                                        const text = ev.results[i][0].transcript.trim();
+                                        const confidence = ev.results[i][0].confidence;
                                         console.log('[Mic] ✅ Final result:', text, 'confidence:', confidence.toFixed(2));
                                         if (text && text.length > 1) {
                                             // Auto-detect language from transcript
                                             if (window.KVoice && KVoice.setLanguage) {
-                                                var detLang = /[ăîâșț]/i.test(text) ? 'ro' : 'en';
+                                                const detLang = /[ăîâșț]/i.test(text) ? 'ro' : 'en';
                                                 KVoice.setLanguage(detLang);
                                             }
                                             hideWelcome(); addMessage('user', '🎙️ ' + text); showThinking(true);
@@ -920,7 +922,7 @@
                                         }
                                     } else {
                                         // Interim result — show user that mic is hearing
-                                        var interim = ev.results[i][0].transcript.trim();
+                                        const interim = ev.results[i][0].transcript.trim();
                                         if (interim.length > 2) {
                                             console.log('[Mic] 🔄 Hearing:', interim);
                                         }
@@ -946,7 +948,7 @@
                                     // Don't restart while AI is speaking — wait for it to finish
                                     if (window.KVoice && KVoice.isSpeaking && KVoice.isSpeaking()) {
                                         console.log('[Mic] ⏸️ AI is speaking, waiting to restart...');
-                                        var waitForSpeech = setInterval(function () {
+                                        const waitForSpeech = setInterval(function () {
                                             if (!KVoice.isSpeaking()) {
                                                 clearInterval(waitForSpeech);
                                                 if (micOn) {
@@ -981,7 +983,7 @@
                                 }
                                 if (micOn && _micRetryCount < 50) {
                                     _micRetryCount++;
-                                    setTimeout(function () { try { window._directSpeech.start(); } catch (e) { } }, 1000);
+                                    setTimeout(function () { try { window._directSpeech.start(); } catch (_e) { /* ignored */ } }, 1000);
                                 }
                             };
                             window._directSpeech.start();
@@ -1002,7 +1004,7 @@
                         // Start mic monitor for visual feedback
                         if (window.KVoice && KVoice.startMicMonitor) KVoice.startMicMonitor();
                         // Show bargraph indicator
-                        var micLevelEl = document.getElementById('mic-level');
+                        const micLevelEl = document.getElementById('mic-level');
                         if (micLevelEl) micLevelEl.style.display = 'flex';
                     } catch (e) {
                         micToggle.style.borderColor = '#ff4444';
@@ -1014,14 +1016,14 @@
                 } else {
                     micOn = false;
                     if (_micNoSpeechTimer) { clearTimeout(_micNoSpeechTimer); _micNoSpeechTimer = null; }
-                    if (window._directSpeech) { try { window._directSpeech.stop(); } catch (e) { } window._directSpeech = null; }
+                    if (window._directSpeech) { try { window._directSpeech.stop(); } catch (_e) { /* ignored */ } window._directSpeech = null; }
                     if (window.KVoice && KVoice.startWakeWordDetection) KVoice.startWakeWordDetection();
                     micToggle.style.borderColor = '#555';
                     micToggle.style.color = '#888';
                     micToggle.style.boxShadow = 'none';
                     micToggle.title = 'Microphone OFF — click to turn on';
                     // Hide bargraph indicator
-                    var micLevelEl = document.getElementById('mic-level');
+                    const micLevelEl = document.getElementById('mic-level');
                     if (micLevelEl) micLevelEl.style.display = 'none';
                     console.log('[App] Mic OFF');
                 }
@@ -1029,26 +1031,26 @@
         }
 
         // History buttons
-        var histBtn = document.getElementById('btn-history');
+        const histBtn = document.getElementById('btn-history');
         if (histBtn) histBtn.addEventListener('click', function () { toggleHistory(); });
-        var closeHist = document.getElementById('btn-close-history');
+        const closeHist = document.getElementById('btn-close-history');
         if (closeHist) closeHist.addEventListener('click', function () { toggleHistory(false); });
-        var newChat = document.getElementById('btn-new-chat');
+        const newChat = document.getElementById('btn-new-chat');
         if (newChat) newChat.addEventListener('click', startNewChat);
 
         // Pricing close
-        var pricingClose = document.getElementById('pricing-close');
-        if (pricingClose) pricingClose.addEventListener('click', function () { var m = document.getElementById('pricing-modal'); if (m) m.classList.add('hidden'); });
+        const pricingClose = document.getElementById('pricing-close');
+        if (pricingClose) pricingClose.addEventListener('click', function () { const m = document.getElementById('pricing-modal'); if (m) m.classList.add('hidden'); });
 
         // ➕ button — popup with IN (import) / OUT (export ZIP)
-        var plusBtn = document.getElementById('btn-plus');
-        var fileInput = document.getElementById('file-input-hidden');
+        const plusBtn = document.getElementById('btn-plus');
+        const fileInput = document.getElementById('file-input-hidden');
         if (plusBtn) {
             plusBtn.addEventListener('click', function () {
                 // Remove existing popup if any
-                var old = document.getElementById('plus-popup');
+                const old = document.getElementById('plus-popup');
                 if (old) { old.remove(); return; }
-                var popup = document.createElement('div');
+                const popup = document.createElement('div');
                 popup.id = 'plus-popup';
                 popup.style.cssText = 'position:absolute;bottom:44px;right:0;background:#1a1a2e;border:1px solid #333;border-radius:8px;padding:6px;z-index:100;display:flex;gap:6px;box-shadow:0 4px 16px rgba(0,0,0,0.5);';
                 popup.innerHTML = '<button id="plus-import" style="background:#2a2a4a;color:#a5b4fc;border:1px solid #444;border-radius:6px;padding:8px 16px;cursor:pointer;font-size:0.85rem;">📂 Adaugă fișier</button>' +
@@ -1066,9 +1068,9 @@
                 });
                 document.getElementById('plus-export-chat').addEventListener('click', function () {
                     popup.remove();
-                    var blob = new Blob([JSON.stringify(chatHistory, null, 2)], { type: 'application/json' });
-                    var url = URL.createObjectURL(blob);
-                    var a = document.createElement('a');
+                    const blob = new Blob([JSON.stringify(chatHistory, null, 2)], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
                     a.href = url; a.download = 'kelion-chat-' + new Date().toISOString().slice(0, 10) + '.json'; a.click();
                     setTimeout(function () { URL.revokeObjectURL(url); }, 100);
                 });
@@ -1091,7 +1093,7 @@
         }
 
         window.addEventListener('wake-message', function (e) {
-            var detail = e.detail; hideWelcome(); addMessage('user', detail.text); showThinking(true);
+            const detail = e.detail; hideWelcome(); addMessage('user', detail.text); showThinking(true);
             if (isVisionRequest(detail.text)) triggerVision(); else sendToAI(detail.text, detail.language);
         });
 
@@ -1104,21 +1106,21 @@
 
         // ─── Session exit: cleanup on tab/window close ────────────────
         window.addEventListener('beforeunload', function () {
-            var token = sessionStorage.getItem('kelion_token');
+            const token = sessionStorage.getItem('kelion_token');
             if (token) {
-                try { navigator.sendBeacon('/api/auth/logout', JSON.stringify({ token: token })); } catch (e) { }
+                try { navigator.sendBeacon('/api/auth/logout', JSON.stringify({ token: token })); } catch (_e) { /* ignored */ }
             }
             sessionStorage.clear();
             if (window.KVoice) {
-                try { KVoice.stopSpeaking(); } catch (e) { }
-                try { KVoice.stopListening(); } catch (e) { }
-                try { KVoice.mute(); } catch (e) { }
+                try { KVoice.stopSpeaking(); } catch (_e) { /* ignored */ }
+                try { KVoice.stopListening(); } catch (_e) { /* ignored */ }
+                try { KVoice.mute(); } catch (_e) { /* ignored */ }
             }
-            if (window.i18n) { try { i18n.setLanguage('en'); } catch (e) { } }
+            if (window.i18n) { try { i18n.setLanguage('en'); } catch (_e) { /* ignored */ } }
         });
 
         // ─── Idle detection: logout after 30 min of inactivity ───────
-        var idleTimer = null;
+        let idleTimer = null;
         function resetIdleTimer() {
             clearTimeout(idleTimer);
             if (sessionStorage.getItem('kelion_token')) {
@@ -1126,9 +1128,9 @@
                     if (window.KAuth && KAuth.isLoggedIn()) {
                         KAuth.logout().then(function () {
                             sessionStorage.clear();
-                            if (window.KVoice) try { KVoice.stopSpeaking(); } catch (e) { }
-                            var authScr = document.getElementById('auth-screen');
-                            var appLayout = document.getElementById('app-layout');
+                            if (window.KVoice) try { KVoice.stopSpeaking(); } catch (_e) { /* ignored */ }
+                            const authScr = document.getElementById('auth-screen');
+                            const appLayout = document.getElementById('app-layout');
                             if (authScr) authScr.classList.remove('hidden');
                             if (appLayout) appLayout.classList.add('hidden');
                         });
@@ -1142,8 +1144,8 @@
                     if (window.KAuth && KAuth.isLoggedIn()) {
                         KAuth.logout().then(function () {
                             sessionStorage.clear();
-                            var authScr = document.getElementById('auth-screen');
-                            var appLayout = document.getElementById('app-layout');
+                            const authScr = document.getElementById('auth-screen');
+                            const appLayout = document.getElementById('app-layout');
                             if (authScr) authScr.classList.remove('hidden');
                             if (appLayout) appLayout.classList.add('hidden');
                         });
@@ -1159,21 +1161,21 @@
         resetIdleTimer();
 
         // Restore last conversation from localStorage
-        var savedConvId = restoreConvId();
+        const savedConvId = restoreConvId();
         if (savedConvId) {
             currentConversationId = savedConvId;
             fetch(API_BASE + '/api/conversations/' + savedConvId + '/messages', { headers: authHeaders() })
                 .then(function (r) { return r.ok ? r.json() : null; })
                 .then(function (data) {
                     if (!data) return;
-                    var msgs = data.messages || data || [];
+                    const msgs = data.messages || data || [];
                     if (msgs.length === 0) return;
                     hideWelcome();
-                    var overlay = document.getElementById('chat-overlay');
+                    const overlay = document.getElementById('chat-overlay');
                     overlay.innerHTML = '';
                     chatHistory = [];
-                    for (var i = 0; i < msgs.length; i++) {
-                        var role = msgs[i].role === 'assistant' ? 'assistant' : 'user';
+                    for (let i = 0; i < msgs.length; i++) {
+                        const role = msgs[i].role === 'assistant' ? 'assistant' : 'user';
                         addMessage(role, msgs[i].content);
                         chatHistory.push({ role: role, content: msgs[i].content });
                     }

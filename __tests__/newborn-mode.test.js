@@ -1,6 +1,6 @@
 "use strict";
 
-const { buildNewbornPrompt, buildSystemPrompt, TRUTH_ENGINE } = require("../server/persona");
+const { buildNewbornPrompt, buildSystemPrompt, _TRUTH_ENGINE } = require("../server/persona");
 
 describe("buildNewbornPrompt", () => {
   test("returns empty string when no memory", () => {

@@ -23,11 +23,11 @@
     const MAX_INIT_RETRIES = 50; // up to 5s total
 
     // Per-avatar background textures (IIFE scope — accessible from init + loadAvatar)
-    var bgTextures = { kelion: '/models/avatar-bg.png', kira: '/models/avatar-bg-kira.png' };
-    var bgLoader = null;
+    const bgTextures = { kelion: '/models/avatar-bg.png', kira: '/models/avatar-bg-kira.png' };
+    let bgLoader = null;
     function _loadAvatarBg(name) {
         if (!bgLoader || !scene) return;
-        var src = bgTextures[name] || bgTextures.kelion;
+        const src = bgTextures[name] || bgTextures.kelion;
         bgLoader.load(src, function (tex) {
             tex.colorSpace = THREE.SRGBColorSpace;
             scene.background = tex;
@@ -40,7 +40,8 @@
     let blinkTimer = 0, nextBlink = 2 + Math.random() * 4, blinkPhase = 0, blinkValue = 0;
 
     // Expression
-    let targetExpression = {}, currentExpression = {};
+    let targetExpression = {};
+    const currentExpression = {};
     let currentExpressionName = 'neutral';
 
     // Mouth morph cache — populated at loadAvatar, used in animate for force-close
@@ -50,7 +51,7 @@
         morphMeshes.forEach(function (m) {
             if (!m.morphTargetDictionary || !m.morphTargetInfluences) return;
             Object.keys(m.morphTargetDictionary).forEach(function (k) {
-                var kl = k.toLowerCase();
+                const kl = k.toLowerCase();
                 if (kl.indexOf('mouth') >= 0 || kl.indexOf('jaw') >= 0 || kl.indexOf('viseme') >= 0 || kl.indexOf('lip') >= 0 || kl === 'smile') {
                     _mouthMorphCache.push({ mesh: m, idx: m.morphTargetDictionary[k] });
                 }
@@ -64,15 +65,15 @@
 
     // Presenting state — rotates 8° towards monitor
     let isPresenting = false;
-    var PRESENT_ANGLE = 8 * Math.PI / 180; // 8 degrees right
+    const PRESENT_ANGLE = 8 * Math.PI / 180; // 8 degrees right
 
     // ══ INNOVATIVE: Eye Tracking (mouse follow) ══════════════
-    var _mouseX = 0, _mouseY = 0;
-    var _eyeBones = { left: null, right: null };
-    var _headBone = null;
-    var _spineBone = null;
-    var _neckBone = null;
-    var _fingerBones = { left: {}, right: {} };
+    let _mouseX = 0, _mouseY = 0;
+    let _eyeBones = { left: null, right: null };
+    let _headBone = null;
+    let _spineBone = null;
+    let _neckBone = null;
+    const _fingerBones = { left: {}, right: {} };
     document.addEventListener('mousemove', function (e) {
         if (_faceTrackingActive) return; // Camera overrides mouse
         _mouseX = (e.clientX / window.innerWidth) * 2 - 1;
@@ -80,13 +81,13 @@
     });
 
     // ══ Face Tracking via Camera ═══════════════════════════════
-    var _faceTrackingActive = false;
+    let _faceTrackingActive = false;
     window.addEventListener('vision-detection', function (e) {
         if (!e.detail || !e.detail.predictions) return;
-        var preds = e.detail.predictions;
+        const preds = e.detail.predictions;
         // Find 'person' detection (coco-ssd class)
-        var person = null;
-        for (var i = 0; i < preds.length; i++) {
+        let person = null;
+        for (let i = 0; i < preds.length; i++) {
             if (preds[i].class === 'person' && preds[i].score > 0.4) {
                 person = preds[i];
                 break;
@@ -96,11 +97,11 @@
             _faceTrackingActive = true;
             // bbox = [x, y, width, height]
             // Face is at top-center of person bbox
-            var video = document.querySelector('video');
-            var vw = video ? video.videoWidth || 640 : 640;
-            var vh = video ? video.videoHeight || 480 : 480;
-            var faceCenterX = person.bbox[0] + person.bbox[2] / 2;
-            var faceCenterY = person.bbox[1] + person.bbox[3] * 0.2; // top 20% = face
+            const video = document.querySelector('video');
+            const vw = video ? video.videoWidth || 640 : 640;
+            const vh = video ? video.videoHeight || 480 : 480;
+            const faceCenterX = person.bbox[0] + person.bbox[2] / 2;
+            const faceCenterY = person.bbox[1] + person.bbox[3] * 0.2; // top 20% = face
             // Normalize to -1..1 (MIRRORED on X because front camera is mirrored)
             _mouseX = -((faceCenterX / vw) * 2 - 1);
             _mouseY = -((faceCenterY / vh) * 2 - 1);
@@ -110,14 +111,14 @@
     // (not auto-start; camera turns on only via RealtimeVision.start())
 
     // ══ INNOVATIVE: Micro-expressions ═════════════════════════
-    var _microTimer = 0;
-    var _nextMicro = 3 + Math.random() * 5; // 3-8s between twitches
-    var _microActive = false;
-    var _microMorph = '';
-    var _microValue = 0;
-    var _microDuration = 0;
-    var _microElapsed = 0;
-    var MICRO_EXPRESSIONS = [
+    let _microTimer = 0;
+    let _nextMicro = 3 + Math.random() * 5; // 3-8s between twitches
+    let _microActive = false;
+    let _microMorph = '';
+    let _microValue = 0;
+    let _microDuration = 0;
+    let _microElapsed = 0;
+    const MICRO_EXPRESSIONS = [
         { morph: 'browInnerUp', max: 0.15, duration: 0.3 },
         { morph: 'browOuterUpLeft', max: 0.12, duration: 0.25 },
         { morph: 'browOuterUpRight', max: 0.12, duration: 0.25 },
@@ -136,18 +137,18 @@
     ];
 
     // ══ INNOVATIVE: Eye Saccades ══════════════════════════════
-    var _saccadeTimer = 0;
-    var _nextSaccade = 0.5 + Math.random() * 2; // 0.5-2.5s
-    var _saccadeTargetX = 0, _saccadeTargetY = 0;
-    var _saccadeCurrentX = 0, _saccadeCurrentY = 0;
+    let _saccadeTimer = 0;
+    let _nextSaccade = 0.5 + Math.random() * 2; // 0.5-2.5s
+    let _saccadeTargetX = 0, _saccadeTargetY = 0;
+    let _saccadeCurrentX = 0, _saccadeCurrentY = 0;
 
     // ══ INNOVATIVE: Breathing ═════════════════════════════════
-    var _breathPhase = 0;
-    var BREATH_SPEED = 0.8; // ~4s per full cycle
-    var BREATH_AMOUNT = 0.015; // Visible chest movement
+    let _breathPhase = 0;
+    const BREATH_SPEED = 0.8; // ~4s per full cycle
+    const BREATH_AMOUNT = 0.015; // Visible chest movement
 
     // Expression intensity table (smarter than fixed 0.5)
-    var EXPRESSION_INTENSITY = {
+    const EXPRESSION_INTENSITY = {
         happy: 0.5, thinking: 0.35, concerned: 0.4, neutral: 0,
         laughing: 0.7, surprised: 0.6, playful: 0.5,
         sad: 0.45, determined: 0.4, loving: 0.5, sleepy: 0.3,
@@ -221,7 +222,7 @@
         loadAvatar('kelion').then(function () {
             console.log('[Avatar] Kelion loaded');
             // Preload Kira model silently into browser cache
-            var preloader = new THREE.GLTFLoader();
+            const preloader = new THREE.GLTFLoader();
             preloader.load(MODELS.kira, function () {
                 console.log('[Avatar] Kira model preloaded into cache');
                 console.log('[Avatar] ✅ Both avatars ready!');
@@ -280,11 +281,11 @@
                         _cacheMouthMorphs();
 
                         // Z-fighting fix for eyebrows/lashes (from v1)
-                        var nm = (child.name || '').toLowerCase();
-                        var matNm = (child.material && child.material.name) ? child.material.name.toLowerCase() : '';
-                        var isHead = (nm.indexOf('head') !== -1 && nm.indexOf('eye') === -1) || matNm === 'head';
-                        var isBrow = nm.indexOf('brow') !== -1 || matNm.indexOf('brow') !== -1;
-                        var isLash = nm.indexOf('lash') !== -1 || matNm.indexOf('lash') !== -1;
+                        const nm = (child.name || '').toLowerCase();
+                        const matNm = (child.material && child.material.name) ? child.material.name.toLowerCase() : '';
+                        const isHead = (nm.indexOf('head') !== -1 && nm.indexOf('eye') === -1) || matNm === 'head';
+                        const isBrow = nm.indexOf('brow') !== -1 || matNm.indexOf('brow') !== -1;
+                        const isLash = nm.indexOf('lash') !== -1 || matNm.indexOf('lash') !== -1;
 
                         if (isHead && child.material) {
                             child.renderOrder = 0;
@@ -306,39 +307,39 @@
                 // MIRROR FIX for k-female.glb — Blender mirror modifier not applied
                 // Brows and lashes only have geometry on one side, clone + flip X
                 if (name === 'kira') {
-                    var meshesToMirror = [];
+                    const meshesToMirror = [];
                     currentModel.traverse(function (child) {
                         if (!child.isMesh) return;
-                        var nmLow = (child.name || '').toLowerCase();
+                        const nmLow = (child.name || '').toLowerCase();
                         if (nmLow.indexOf('brow') !== -1 || nmLow.indexOf('lash') !== -1) {
                             meshesToMirror.push(child);
                         }
                     });
                     meshesToMirror.forEach(function (origMesh) {
-                        var mirrorGeo = origMesh.geometry.clone();
-                        var pos = mirrorGeo.attributes.position;
-                        var nrm = mirrorGeo.attributes.normal;
-                        for (var vi = 0; vi < pos.count; vi++) {
+                        const mirrorGeo = origMesh.geometry.clone();
+                        const pos = mirrorGeo.attributes.position;
+                        const nrm = mirrorGeo.attributes.normal;
+                        for (let vi = 0; vi < pos.count; vi++) {
                             pos.setX(vi, -pos.getX(vi));
                             if (nrm) nrm.setX(vi, -nrm.getX(vi));
                         }
                         pos.needsUpdate = true;
                         if (nrm) nrm.needsUpdate = true;
-                        var idx = mirrorGeo.index;
+                        const idx = mirrorGeo.index;
                         if (idx) {
-                            var arr = idx.array;
-                            for (var ti = 0; ti < arr.length; ti += 3) {
-                                var tmp = arr[ti]; arr[ti] = arr[ti + 2]; arr[ti + 2] = tmp;
+                            const arr = idx.array;
+                            for (let ti = 0; ti < arr.length; ti += 3) {
+                                const tmp = arr[ti]; arr[ti] = arr[ti + 2]; arr[ti + 2] = tmp;
                             }
                             idx.needsUpdate = true;
                         }
-                        var mirrorMat = origMesh.material.clone();
+                        const mirrorMat = origMesh.material.clone();
                         mirrorMat.side = THREE.DoubleSide;
                         mirrorMat.depthTest = false;
                         mirrorMat.depthWrite = false;
                         mirrorMat.transparent = true;
                         mirrorMat.opacity = 1.0;
-                        var mirrorMesh;
+                        let mirrorMesh;
                         if (origMesh.isSkinnedMesh && origMesh.skeleton) {
                             mirrorMesh = new THREE.SkinnedMesh(mirrorGeo, mirrorMat);
                             mirrorMesh.bind(origMesh.skeleton, origMesh.bindMatrix);
@@ -430,7 +431,7 @@
         if (intensity === undefined || intensity === null) {
             intensity = EXPRESSION_INTENSITY[name] || 0.5;
         }
-        var expressions = {
+        const expressions = {
             happy: { 'cheekSquintLeft': 0.3, 'cheekSquintRight': 0.3, 'mouthSmileLeft': 0.2, 'mouthSmileRight': 0.2, 'mouthDimpleLeft': 0.1, 'mouthDimpleRight': 0.1 },
             thinking: { 'browInnerUp': 0.3, 'eyeSquintLeft': 0.15, 'eyeSquintRight': 0.15, 'cheekPuff': 0.08, 'mouthPressLeft': 0.1, 'mouthPressRight': 0.1 },
             concerned: { 'browInnerUp': 0.4, 'mouthFrownLeft': 0.2, 'mouthFrownRight': 0.2, 'mouthStretchLeft': 0.08, 'mouthStretchRight': 0.08 },
@@ -448,17 +449,17 @@
         };
         currentExpressionName = name;
         targetExpression = {};
-        var expr = expressions[name] || {};
-        for (var key in expr) targetExpression[key] = expr[key] * intensity;
+        const expr = expressions[name] || {};
+        for (const key in expr) targetExpression[key] = expr[key] * intensity;
         setMoodLighting(name);
     }
 
     // Mood lighting target
-    var targetBgColor = new THREE.Color(0x060614);
+    const targetBgColor = new THREE.Color(0x060614);
 
     function setMoodLighting(mood) {
         if (!scene) return;
-        var colors = {
+        const colors = {
             happy: 0x0a0a1e,
             laughing: 0x0e0a1e,
             sad: 0x060618,
@@ -476,18 +477,18 @@
     function updateMoodLighting() {
         if (!scene || !scene.background) return;
         // Manual lerp — THREE.Color may not have .lerp() in all versions
-        var bg = scene.background;
+        const bg = scene.background;
         bg.r += (targetBgColor.r - bg.r) * 0.05;
         bg.g += (targetBgColor.g - bg.g) * 0.05;
         bg.b += (targetBgColor.b - bg.b) * 0.05;
     }
 
     // ── Gesture system ───────────────────────────────────────
-    var gestureQueue = [];
-    var gestureActive = false;
-    var gestureTimer = 0;
-    var gestureDuration = 0;
-    var gestureData = null;
+    const gestureQueue = [];
+    let gestureActive = false;
+    let gestureTimer = 0;
+    let gestureDuration = 0;
+    let gestureData = null;
 
     function playGesture(type) {
         gestureQueue.push(type);
@@ -497,7 +498,7 @@
         if (!currentModel) return;
         if (gestureActive) {
             gestureTimer += dt;
-            var t = gestureTimer / gestureDuration;
+            const t = gestureTimer / gestureDuration;
             if (t >= 1) {
                 gestureActive = false;
                 gestureTimer = 0;
@@ -507,7 +508,7 @@
                 currentModel.rotation.y += (-currentModel.rotation.y) * 0.1;
                 return;
             }
-            var angle = Math.sin(t * Math.PI);
+            const angle = Math.sin(t * Math.PI);
             // DAMPENED: reduced amplitudes ~60% + slower lerp to avoid bouncy puppet effect
             if (gestureData === 'nod') {
                 currentModel.rotation.x += (angle * 0.025 - currentModel.rotation.x) * 0.08;
@@ -537,8 +538,8 @@
     }
 
     // ── Pose system (body posture) ────────────────────────────
-    var currentPose = 'relaxed';
-    var armBones = {
+    let currentPose = 'relaxed';
+    let armBones = {
         leftShoulder: null, rightShoulder: null,
         leftArm: null, rightArm: null,
         leftForeArm: null, rightForeArm: null,
@@ -554,7 +555,7 @@
             leftHand: null, rightHand: null
         };
         // Flexible bone matching for MetaPerson / Mixamo / generic models
-        var allBones = [];
+        const allBones = [];
         currentModel.traverse(function (bone) {
             if (!bone.isBone) return;
             allBones.push(bone);
@@ -562,15 +563,15 @@
         console.log('[Avatar] All bones:', allBones.map(function (b) { return b.name; }).join(', '));
 
         function findBone(patterns) {
-            for (var pi = 0; pi < patterns.length; pi++) {
-                for (var bi = 0; bi < allBones.length; bi++) {
+            for (let pi = 0; pi < patterns.length; pi++) {
+                for (let bi = 0; bi < allBones.length; bi++) {
                     if (allBones[bi].name === patterns[pi]) return allBones[bi];
                 }
             }
             // Fuzzy fallback: case-insensitive contains
-            var lowerPatterns = patterns.map(function (p) { return p.toLowerCase(); });
-            for (var pi2 = 0; pi2 < lowerPatterns.length; pi2++) {
-                for (var bi2 = 0; bi2 < allBones.length; bi2++) {
+            const lowerPatterns = patterns.map(function (p) { return p.toLowerCase(); });
+            for (let pi2 = 0; pi2 < lowerPatterns.length; pi2++) {
+                for (let bi2 = 0; bi2 < allBones.length; bi2++) {
                     if (allBones[bi2].name.toLowerCase() === lowerPatterns[pi2]) return allBones[bi2];
                 }
             }
@@ -604,7 +605,7 @@
         _neckBone = null;
         currentModel.traverse(function (bone) {
             if (!bone.isBone) return;
-            var nm = bone.name;
+            const nm = bone.name;
             if (nm === 'LeftEye' || nm === 'Eye_L' || nm === 'leftEye') _eyeBones.left = bone;
             if (nm === 'RightEye' || nm === 'Eye_R' || nm === 'rightEye') _eyeBones.right = bone;
             if (nm === 'Head' || nm === 'head') _headBone = bone;
@@ -618,7 +619,7 @@
     // ══ Compute arms-down quaternions dynamically from A-pose rest ══
     // MetaPerson models come in A-pose. We rotate shoulders ~55° downward
     // around their local Z axis to bring arms to a natural hanging position.
-    var _computedArmDown = null;
+    let _computedArmDown = null;
 
     function _computeArmDownQuaternions() {
         // DISABLED: arm rotation was deforming the mesh.
@@ -630,7 +631,7 @@
 
     // MetaPerson bone quaternions for arm poses
     // These are now computed dynamically in _computeArmDownQuaternions()
-    var ARM_POSES = {
+    const ARM_POSES = {
         relaxed: {
             ls: null, rs: null,  // will be set by _computeArmDownQuaternions
             la: [0.0, 0.0, 0.0, 1.0],
@@ -656,7 +657,7 @@
         console.log('[Avatar] Pose set:', currentPose);
     }
 
-    var _mixerArmsStopped = false;
+    let _mixerArmsStopped = false;
     function _enforcePose() {
         if (typeof THREE === 'undefined') return;
 
@@ -664,17 +665,17 @@
         if (!_mixerArmsStopped && mixer && mixer._actions) {
             mixer._actions.forEach(function (action) {
                 if (!action || !action._clip) return;
-                var clip = action._clip;
-                var tracksToRemove = [];
+                const clip = action._clip;
+                const tracksToRemove = [];
                 clip.tracks.forEach(function (track, idx) {
-                    var tn = track.name.toLowerCase();
+                    const tn = track.name.toLowerCase();
                     if (tn.indexOf('shoulder') !== -1 || tn.indexOf('leftarm') !== -1 || tn.indexOf('rightarm') !== -1 ||
                         tn.indexOf('left_arm') !== -1 || tn.indexOf('right_arm') !== -1 ||
                         tn.indexOf('forearm') !== -1 || tn.indexOf('hand') !== -1) {
                         tracksToRemove.push(idx);
                     }
                 });
-                for (var i = tracksToRemove.length - 1; i >= 0; i--) {
+                for (let i = tracksToRemove.length - 1; i >= 0; i--) {
                     clip.tracks.splice(tracksToRemove[i], 1);
                 }
             });
@@ -699,29 +700,29 @@
         }
 
         // Apply upper arm quaternions from static pose table
-        var p = ARM_POSES[currentPose] || ARM_POSES.relaxed;
+        const p = ARM_POSES[currentPose] || ARM_POSES.relaxed;
         if (armBones.leftArm && p.la) armBones.leftArm.quaternion.set(p.la[0], p.la[1], p.la[2], p.la[3]);
         if (armBones.rightArm && p.ra) armBones.rightArm.quaternion.set(p.ra[0], p.ra[1], p.ra[2], p.ra[3]);
     }
 
     function updateExpression(dt) {
-        var speed = 3 * dt;
-        var allKeys = {};
-        var k;
+        const speed = 3 * dt;
+        const allKeys = {};
+        let k;
         for (k in targetExpression) allKeys[k] = true;
         for (k in currentExpression) allKeys[k] = true;
         for (k in allKeys) {
-            var target = targetExpression[k] || 0;
-            var current = currentExpression[k] || 0;
-            var next = current + (target - current) * speed;
+            const target = targetExpression[k] || 0;
+            const current = currentExpression[k] || 0;
+            const next = current + (target - current) * speed;
             if (Math.abs(next) < 0.001 && target === 0) delete currentExpression[k];
             else { currentExpression[k] = next; setMorph(k, next); }
         }
     }
 
     // ══ Body Action system — stub for brain-triggered actions ══
-    var _bodyActionActive = false;
-    var _bodyActionTimer = 0;
+    let _bodyActionActive = false;
+    let _bodyActionTimer = 0;
     function updateBodyAction(dt) {
         // Body actions are triggered by [BODY:xxx] tags from AI responses
         // They work through the gesture/pose system already implemented
@@ -733,7 +734,7 @@
     function animate() {
         requestAnimationFrame(animate);
         if (!renderer || !scene || !camera) return; // Guard against init race
-        var dt = clock.getDelta();
+        const dt = clock.getDelta();
         try {
             // Mixer provides base idle animation from GLB model
             // Brain controls changes via [GESTURE:xxx] [POSE:xxx] [EMOTION:xxx] tags
@@ -759,15 +760,15 @@
             // ══ Breathing (Spine bone gentle movement) ═══════════════
             _breathPhase += dt * BREATH_SPEED;
             if (_spineBone) {
-                var breathVal = Math.sin(_breathPhase * Math.PI * 2) * BREATH_AMOUNT;
+                const breathVal = Math.sin(_breathPhase * Math.PI * 2) * BREATH_AMOUNT;
                 _spineBone.rotation.x += (breathVal - (_spineBone.rotation.x - (_spineBone._baseRotX || 0))) * 0.1;
                 if (!_spineBone._baseRotX) _spineBone._baseRotX = _spineBone.rotation.x;
             }
 
             // ══ Head Tracking (head follows mouse subtly) ═════════════
             if (_headBone) {
-                var headYaw = _mouseX * 0.15;   // was 0.25 — subtler head turn
-                var headPitch = _mouseY * 0.08; // was 0.12 — subtler pitch
+                const headYaw = _mouseX * 0.15;   // was 0.25 — subtler head turn
+                const headPitch = _mouseY * 0.08; // was 0.12 — subtler pitch
                 _headBone.rotation.y += (headYaw - _headBone.rotation.y) * 0.04; // was 0.08 — smoother
                 _headBone.rotation.x += (headPitch - _headBone.rotation.x) * 0.04;
             }
@@ -778,7 +779,7 @@
                 _microActive = true;
                 _microTimer = 0;
                 _microElapsed = 0;
-                var me = MICRO_EXPRESSIONS[Math.floor(Math.random() * MICRO_EXPRESSIONS.length)];
+                const me = MICRO_EXPRESSIONS[Math.floor(Math.random() * MICRO_EXPRESSIONS.length)];
                 _microMorph = me.morph;
                 _microValue = me.max;
                 _microDuration = me.duration;
@@ -786,7 +787,7 @@
             }
             if (_microActive) {
                 _microElapsed += dt;
-                var mt = _microElapsed / _microDuration;
+                const mt = _microElapsed / _microDuration;
                 if (mt >= 1) {
                     _microActive = false;
                     setMorph(_microMorph, 0);
@@ -811,8 +812,8 @@
 
             // ══ Eye Tracking (mouse follow + saccades) ═══════════════
             if (_eyeBones.left || _eyeBones.right) {
-                var eyeYaw = _mouseX * 0.35 + _saccadeCurrentX;
-                var eyePitch = _mouseY * 0.2 + _saccadeCurrentY;
+                const eyeYaw = _mouseX * 0.35 + _saccadeCurrentX;
+                const eyePitch = _mouseY * 0.2 + _saccadeCurrentY;
                 if (_eyeBones.left) {
                     _eyeBones.left.rotation.y += (eyeYaw - _eyeBones.left.rotation.y) * 0.1;
                     _eyeBones.left.rotation.x += (eyePitch - _eyeBones.left.rotation.x) * 0.1;
@@ -846,10 +847,10 @@
                 currentModel.rotation.y += (_mouseX * 0.02 - currentModel.rotation.y) * 0.03; // was 0.04/0.05
             }
             // SMOOTH mouth close — exponential decay instead of instant zero
-            var _lipRan = (window.AlignmentLipSync && AlignmentLipSync.isActive()) || (lipSync && window.KVoice && KVoice.isSpeaking());
+            const _lipRan = (window.AlignmentLipSync && AlignmentLipSync.isActive()) || (lipSync && window.KVoice && KVoice.isSpeaking());
             if (!_lipRan) {
-                for (var ci = 0; ci < _mouthMorphCache.length; ci++) {
-                    var curr = _mouthMorphCache[ci].mesh.morphTargetInfluences[_mouthMorphCache[ci].idx];
+                for (let ci = 0; ci < _mouthMorphCache.length; ci++) {
+                    const curr = _mouthMorphCache[ci].mesh.morphTargetInfluences[_mouthMorphCache[ci].idx];
                     _mouthMorphCache[ci].mesh.morphTargetInfluences[_mouthMorphCache[ci].idx] = curr * 0.70; // TEST-A: faster mouth close
                 }
             }
@@ -861,11 +862,11 @@
     }
 
     function onResize() {
-        var canvas = document.getElementById('avatar-canvas');
+        const canvas = document.getElementById('avatar-canvas');
         if (!canvas || !renderer) return;
-        var container = canvas.parentElement;
-        var w = container.clientWidth;
-        var h = container.clientHeight;
+        const container = canvas.parentElement;
+        const w = container.clientWidth;
+        const h = container.clientHeight;
         if (w === 0 || h === 0) return;
         camera.aspect = w / h;
         camera.updateProjectionMatrix();
@@ -874,7 +875,7 @@
 
     // ── Finger Pose System ─────────────────────────────────────
     // Each finger has 4 joints (1=base, 4=tip). Rotation is on X axis (curl).
-    var FINGER_POSES = {
+    const FINGER_POSES = {
         relaxed: { curl: 0.15 },   // slightly curled, natural
         fist: { curl: 1.4 },    // fully closed
         open: { curl: 0 },      // flat, spread
@@ -883,27 +884,27 @@
     };
 
     function setFingerPose(hand, pose) {
-        var bones = (hand === 'left') ? _fingerBones.left : _fingerBones.right;
+        const bones = (hand === 'left') ? _fingerBones.left : _fingerBones.right;
         if (!bones || Object.keys(bones).length === 0) return;
-        var p = FINGER_POSES[pose] || FINGER_POSES.relaxed;
-        var fingerNames = ['Thumb', 'Index', 'Middle', 'Ring', 'Pinky'];
-        for (var i = 0; i < fingerNames.length; i++) {
-            var fn = fingerNames[i];
-            var joints = bones[fn];
+        const p = FINGER_POSES[pose] || FINGER_POSES.relaxed;
+        const fingerNames = ['Thumb', 'Index', 'Middle', 'Ring', 'Pinky'];
+        for (let i = 0; i < fingerNames.length; i++) {
+            const fn = fingerNames[i];
+            const joints = bones[fn];
             if (!joints) continue;
-            var curl = p.curl !== undefined ? p.curl : 0;
+            let curl = p.curl !== undefined ? p.curl : 0;
             // Special per-finger overrides (for point/thumbsup)
             if (fn === 'Index' && p.index !== undefined) curl = p.index;
             else if (fn === 'Thumb' && p.thumb !== undefined) curl = p.thumb;
             else if (fn !== 'Index' && fn !== 'Thumb' && p.others !== undefined) curl = p.others;
-            for (var j = 0; j < joints.length; j++) {
+            for (let j = 0; j < joints.length; j++) {
                 joints[j].rotation.x += (curl - joints[j].rotation.x) * 0.15;
             }
         }
     }
 
     // Default finger pose — apply every frame for consistency
-    var _currentFingerPose = 'relaxed';
+    let _currentFingerPose = 'relaxed';
     function _enforceFingerPose() {
         setFingerPose('left', _currentFingerPose);
         setFingerPose('right', _currentFingerPose);
@@ -912,16 +913,16 @@
     // ── IK Body Action System ────────────────────────────────────
     // Per-limb bone control with quaternion slerp interpolation
     // Brain emits [BODY:xxx] tags → parsed → queued here
-    var _bodyQueue = [];
-    var _bodyActive = false;
-    var _bodyTimer = 0;
-    var _bodyDuration = 0;
-    var _bodyAction = null;
-    var _bodyPhase = 'in'; // 'in' = animate to target, 'hold' = hold, 'out' = return
-    var _bodyStartQ = {}; // snapshot of bone quaternions at start
+    const _bodyQueue = [];
+    let _bodyActive = false;
+    let _bodyTimer = 0;
+    const _bodyDuration = 0;
+    let _bodyAction = null;
+    let _bodyPhase = 'in'; // 'in' = animate to target, 'hold' = hold, 'out' = return
+    let _bodyStartQ = {}; // snapshot of bone quaternions at start
 
     // Relaxed quaternions (arms down) — used as return target
-    var _RELAXED_Q = {
+    const _RELAXED_Q = {
         ls: [0.6963, 0.1228, -0.6963, 0.1228],
         rs: [0.6963, -0.1228, 0.6963, 0.1228],
         la: [0.0, 0.0, 0.0, 1.0],
@@ -936,7 +937,7 @@
     // Keys: ls=LeftShoulder, rs=RightShoulder, la=LeftArm, ra=RightArm,
     //       lfa=LeftForeArm, rfa=RightForeArm, lh=LeftHand, rh=RightHand
     // fingerL/fingerR = finger pose for that hand
-    var BODY_ACTIONS = {
+    const BODY_ACTIONS = {
         resetArms: {
             dur: 0.6, hold: 0.2,
             ls: _RELAXED_Q.ls, rs: _RELAXED_Q.rs,
@@ -1048,16 +1049,16 @@
     };
 
     function _snapshotBones() {
-        var snap = {};
-        var map = {
+        const snap = {};
+        const map = {
             ls: armBones.leftShoulder, rs: armBones.rightShoulder,
             la: armBones.leftArm, ra: armBones.rightArm,
             lfa: armBones.leftForeArm, rfa: armBones.rightForeArm,
             lh: armBones.leftHand, rh: armBones.rightHand
         };
-        for (var key in map) {
+        for (const key in map) {
             if (map[key]) {
-                var q = map[key].quaternion;
+                const q = map[key].quaternion;
                 snap[key] = [q.x, q.y, q.z, q.w];
             }
         }
@@ -1069,15 +1070,15 @@
 
     function _applyBoneQ(boneKey, qArr, t) {
         if (typeof THREE === 'undefined') return;
-        var map = {
+        const map = {
             ls: armBones.leftShoulder, rs: armBones.rightShoulder,
             la: armBones.leftArm, ra: armBones.rightArm,
             lfa: armBones.leftForeArm, rfa: armBones.rightForeArm,
             lh: armBones.leftHand, rh: armBones.rightHand
         };
-        var bone = map[boneKey];
+        const bone = map[boneKey];
         if (!bone || !qArr) return;
-        var target = new THREE.Quaternion(qArr[0], qArr[1], qArr[2], qArr[3]);
+        const target = new THREE.Quaternion(qArr[0], qArr[1], qArr[2], qArr[3]);
         bone.quaternion.slerp(target, t);
     }
 
@@ -1095,13 +1096,13 @@
 
         if (_bodyActive) {
             _bodyTimer += dt;
-            var action = BODY_ACTIONS[_bodyAction];
+            const action = BODY_ACTIONS[_bodyAction];
             if (!action) { _bodyActive = false; return; }
 
-            var inDur = action.dur || 0.7;
-            var holdDur = action.hold || 1.0;
-            var outDur = action.dur || 0.7;
-            var totalDur = inDur + holdDur + outDur;
+            const inDur = action.dur || 0.7;
+            const holdDur = action.hold || 1.0;
+            const outDur = action.dur || 0.7;
+            const totalDur = inDur + holdDur + outDur;
 
             if (_bodyTimer >= totalDur) {
                 // Done — return to relaxed
@@ -1114,15 +1115,15 @@
                 return;
             }
 
-            var boneKeys = ['ls', 'rs', 'la', 'ra', 'lfa', 'rfa', 'lh', 'rh'];
+            const boneKeys = ['ls', 'rs', 'la', 'ra', 'lfa', 'rfa', 'lh', 'rh'];
 
             if (_bodyTimer < inDur) {
                 // Phase: animate IN (slerp from start to target)
                 _bodyPhase = 'in';
-                var t = Math.min(_bodyTimer / inDur, 1.0);
+                let t = Math.min(_bodyTimer / inDur, 1.0);
                 t = t * t * (3 - 2 * t); // smoothstep easing
-                for (var i = 0; i < boneKeys.length; i++) {
-                    var k = boneKeys[i];
+                for (let i = 0; i < boneKeys.length; i++) {
+                    const k = boneKeys[i];
                     if (action[k]) _applyBoneQ(k, action[k], t * 0.15);
                 }
                 // Spine for bow
@@ -1132,23 +1133,23 @@
             } else if (_bodyTimer < inDur + holdDur) {
                 // Phase: HOLD (maintain target + optional oscillate)
                 _bodyPhase = 'hold';
-                for (var i2 = 0; i2 < boneKeys.length; i2++) {
-                    var k2 = boneKeys[i2];
+                for (let i2 = 0; i2 < boneKeys.length; i2++) {
+                    const k2 = boneKeys[i2];
                     if (action[k2]) _applyBoneQ(k2, action[k2], 0.15);
                 }
                 // Oscillation for wave/clap/pump
                 if (action.oscillate) {
-                    var oscT = Math.sin((_bodyTimer - inDur) * 6) * 0.15;
+                    const oscT = Math.sin((_bodyTimer - inDur) * 6) * 0.15;
                     if (action.oscillate === 'both') {
                         if (armBones.leftForeArm) armBones.leftForeArm.rotation.y += oscT;
                         if (armBones.rightForeArm) armBones.rightForeArm.rotation.y -= oscT;
                     } else {
-                        var oscMap = {
+                        const oscMap = {
                             lfa: armBones.leftForeArm, rfa: armBones.rightForeArm,
                             la: armBones.leftArm, ra: armBones.rightArm,
                             lh: armBones.leftHand, rh: armBones.rightHand
                         };
-                        var oscBone = oscMap[action.oscillate];
+                        const oscBone = oscMap[action.oscillate];
                         if (oscBone) oscBone.rotation.z += oscT;
                     }
                 }
@@ -1159,11 +1160,11 @@
             } else {
                 // Phase: animate OUT (slerp back to relaxed)
                 _bodyPhase = 'out';
-                var tOut = Math.min((_bodyTimer - inDur - holdDur) / outDur, 1.0);
+                let tOut = Math.min((_bodyTimer - inDur - holdDur) / outDur, 1.0);
                 tOut = tOut * tOut * (3 - 2 * tOut);
-                for (var i3 = 0; i3 < boneKeys.length; i3++) {
-                    var k3 = boneKeys[i3];
-                    var relaxQ = _RELAXED_Q[k3] || [0, 0, 0, 1];
+                for (let i3 = 0; i3 < boneKeys.length; i3++) {
+                    const k3 = boneKeys[i3];
+                    const relaxQ = _RELAXED_Q[k3] || [0, 0, 0, 1];
                     _applyBoneQ(k3, relaxQ, tOut * 0.12);
                 }
                 // Spine return

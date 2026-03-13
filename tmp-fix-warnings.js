@@ -27,7 +27,7 @@ for (const file of results) {
 let totalFixed = 0;
 
 for (const [filePath, messages] of Object.entries(fileWarnings)) {
-  let lines = fs.readFileSync(filePath, "utf8").split("\n");
+  const lines = fs.readFileSync(filePath, "utf8").split("\n");
   // Process from bottom to top to preserve line numbers
   const sorted = [...messages].sort((a, b) => b.line - a.line || b.column - a.column);
 

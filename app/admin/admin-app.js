@@ -4,43 +4,43 @@
    ═══════════════════════════════════════════════════════════════ */
 "use strict";
 
-var adminSecret = (document.querySelector('meta[name="admin-secret"]') || {}).content || sessionStorage.getItem('kelion_admin_secret') || '';
+const adminSecret = (document.querySelector('meta[name="admin-secret"]') || {}).content || sessionStorage.getItem('kelion_admin_secret') || '';
 function hdrs() {
-    var h = { 'Content-Type': 'application/json' };
+    const h = { 'Content-Type': 'application/json' };
     if (adminSecret) h['x-admin-secret'] = adminSecret;
     try {
         // Try all known Supabase token storage keys
-        var keys = Object.keys(localStorage).filter(function (k) { return k.startsWith('sb-') && k.endsWith('-auth-token'); });
-        var t = null;
-        for (var i = 0; i < keys.length; i++) {
+        const keys = Object.keys(localStorage).filter(function (k) { return k.startsWith('sb-') && k.endsWith('-auth-token'); });
+        let t = null;
+        for (let i = 0; i < keys.length; i++) {
             try {
-                var raw = localStorage.getItem(keys[i]);
+                const raw = localStorage.getItem(keys[i]);
                 if (raw) {
-                    var parsed = JSON.parse(raw);
+                    const parsed = JSON.parse(raw);
                     if (parsed && parsed.access_token) { t = parsed.access_token; break; }
                 }
-            } catch (e2) { }
+            } catch (_e2) { /* ignored */ }
         }
         // Fallback: direct token
         if (!t) t = localStorage.getItem('sb-access-token');
         if (t) h['Authorization'] = 'Bearer ' + t;
-    } catch (e) { }
+    } catch (_e) { /* ignored */ }
     return h;
 }
-function esc(s) { var d = document.createElement('div'); d.textContent = s || '—'; return d.innerHTML; }
+function esc(s) { const d = document.createElement('div'); d.textContent = s || '—'; return d.innerHTML; }
 function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
 
 // ── AI STATUS ── (auto-monitoring, no manual buttons)
 async function loadAiStatus() {
     try {
-        var r = await fetch('/api/admin/ai-status', { headers: hdrs() });
-        var d = await r.json();
-        var grid = document.getElementById('ai-status-grid');
+        const r = await fetch('/api/admin/ai-status', { headers: hdrs() });
+        const d = await r.json();
+        const grid = document.getElementById('ai-status-grid');
         grid.innerHTML = '';
 
         // Month progress header
         if (d.month) {
-            var mh = document.createElement('div');
+            const mh = document.createElement('div');
             mh.className = 'month-header';
             mh.innerHTML = '📅 Luna: <strong>' + (d.month.current || '') + '</strong> — Ziua ' + 
                 (d.month.dayOfMonth || 0) + '/' + (d.month.daysInMonth || 30) + 
@@ -52,17 +52,17 @@ async function loadAiStatus() {
         }
 
         (d.providers || []).forEach(function (p) {
-            var card = document.createElement('div');
-            var borderColor = p.alertLevel === 'red' ? '#ef4444' : p.alertLevel === 'yellow' ? '#f59e0b' : '#10b981';
+            const card = document.createElement('div');
+            const borderColor = p.alertLevel === 'red' ? '#ef4444' : p.alertLevel === 'yellow' ? '#f59e0b' : '#10b981';
             card.className = 'ai-card ' + (p.live ? 'live' : 'off');
             card.style.borderColor = borderColor;
             card.style.cursor = 'pointer';
 
-            var tierLabel = p.tier === 'free' ? '🆓 Free' : '💳 Pay';
-            var costStr = '$' + (p.costMonth || 0).toFixed(4);
-            var reqStr = (p.requests || 0) + ' req';
-            var projStr = p.projectedMonth > 0 ? '~$' + p.projectedMonth.toFixed(2) + '/mo' : '';
-            var alertDot = p.alertLevel === 'red' ? '🔴' : p.alertLevel === 'yellow' ? '🟡' : '🟢';
+            const tierLabel = p.tier === 'free' ? '🆓 Free' : '💳 Pay';
+            const costStr = '$' + (p.costMonth || 0).toFixed(4);
+            const reqStr = (p.requests || 0) + ' req';
+            const projStr = p.projectedMonth > 0 ? '~$' + p.projectedMonth.toFixed(2) + '/mo' : '';
+            const alertDot = p.alertLevel === 'red' ? '🔴' : p.alertLevel === 'yellow' ? '🟡' : '🟢';
 
             card.innerHTML = '<div class="ai-status-dot ' + (p.live ? 'dot-live' : 'dot-off') + '"></div>' +
                 '<div class="ai-name">' + p.name + '</div>' +
@@ -72,14 +72,14 @@ async function loadAiStatus() {
 
             // Click to show details inline
             card.addEventListener('click', function() {
-                var existing = card.querySelector('.ai-detail-panel');
+                const existing = card.querySelector('.ai-detail-panel');
                 if (existing) { existing.remove(); return; }
                 // Close other panels
                 document.querySelectorAll('.ai-detail-panel').forEach(function(el) { el.remove(); });
-                var panel = document.createElement('div');
+                const panel = document.createElement('div');
                 panel.className = 'ai-detail-panel';
                 panel.style.cssText = 'margin-top:8px;padding:8px;background:rgba(0,0,0,0.3);border-radius:8px;font-size:0.72rem;line-height:1.5;text-align:left';
-                var details = '<div style="color:' + borderColor + ';font-weight:600">' + (p.alertMessage || '') + '</div>';
+                let details = '<div style="color:' + borderColor + ';font-weight:600">' + (p.alertMessage || '') + '</div>';
                 details += '<div>📊 Consum luna: <strong>' + costStr + '</strong> (' + reqStr + ')</div>';
                 if (p.projectedMonth > 0) details += '<div>📈 Proiecție: ~$' + p.projectedMonth.toFixed(4) + '/lună</div>';
                 if (p.freeQuota > 0) details += '<div>🎁 Cotă gratuită: ' + p.freeQuota.toLocaleString() + ' ' + (p.unit || '') + '</div>';
@@ -91,7 +91,7 @@ async function loadAiStatus() {
 
             grid.appendChild(card);
         });
-    } catch (e) { document.getElementById('ai-status-grid').innerHTML = '<div class="ai-card off"><div class="ai-name">Error</div></div>'; }
+    } catch (_e) { document.getElementById('ai-status-grid').innerHTML = '<div class="ai-card off"><div class="ai-name">Error</div></div>'; }
 }
 
 // ── TRAFFIC ──
@@ -110,7 +110,7 @@ function parseDevice(ua) {
     if (ua.includes('iPad') || ua.includes('Tablet')) return '📱 Tablet';
     return '💻 Desktop';
 }
-async function deleteVisit(id) {
+async function _deleteVisit(id) {
     if (!confirm('Ștergi această vizită?')) return;
     try {
         await fetch('/api/admin/traffic/' + id, { method: 'DELETE', headers: hdrs() });
@@ -119,48 +119,48 @@ async function deleteVisit(id) {
 }
 async function loadTraffic() {
     try {
-        var r = await fetch('/api/admin/traffic', { headers: hdrs() });
-        var d = await r.json();
+        const r = await fetch('/api/admin/traffic', { headers: hdrs() });
+        const d = await r.json();
         document.getElementById('traffic-unique').textContent = d.uniqueToday || 0;
         document.getElementById('traffic-total').textContent = d.totalToday || 0;
         document.getElementById('traffic-active').textContent = d.activeConnections || 0;
         // Show all-time total in stats bar (real count from DB, excluding internal IPs)
         document.getElementById('val-views-today').textContent = d.totalAllTime || d.totalToday || 0;
-        var chart = document.getElementById('traffic-chart');
+        const chart = document.getElementById('traffic-chart');
         if (d.daily && d.daily.length > 0) {
-            var max = Math.max.apply(null, d.daily.map(function (x) { return x.count; })) || 1;
+            const max = Math.max.apply(null, d.daily.map(function (x) { return x.count; })) || 1;
             chart.innerHTML = d.daily.map(function (day) {
-                var pct = Math.round((day.count / max) * 100);
+                const pct = Math.round((day.count / max) * 100);
                 return '<div class="bar-col"><div class="bar-value">' + day.count + '</div>' +
                     '<div class="bar" style="height:' + pct + '%"></div>' +
                     '<div class="bar-label">' + day.date.slice(5) + '</div></div>';
             }).join('');
         }
-        var tbody = document.querySelector('#visits-table tbody');
+        const tbody = document.querySelector('#visits-table tbody');
         if (d.recent && d.recent.length > 0) {
             tbody.innerHTML = d.recent.slice(0, 30).map(function (v) {
-                var time = new Date(v.created_at).toLocaleTimeString('ro-RO');
-                var browser = parseBrowser(v.user_agent);
-                var device = parseDevice(v.user_agent);
+                const time = new Date(v.created_at).toLocaleTimeString('ro-RO');
+                const browser = parseBrowser(v.user_agent);
+                const device = parseDevice(v.user_agent);
                 return '<tr><td>' + time + '</td><td>' + esc(v.path) + '</td><td>' + esc(v.ip) + '</td>' +
                     '<td>' + esc(v.country || '—') + '</td><td>' + browser + '</td><td>' + device + '</td>' +
                     '<td><button class="btn-sm btn-danger" onclick="deleteVisit(\'' + v.id + '\')" title="Șterge">🗑️</button></td></tr>';
             }).join('');
         }
-    } catch (e) { }
+    } catch (_e) { /* ignored */ }
 }
 
 // ── CREDIT ──
 async function loadCredit() {
     try {
-        var r = await fetch('/api/admin/costs', { headers: hdrs() });
-        var d = await r.json();
+        const r = await fetch('/api/admin/costs', { headers: hdrs() });
+        const d = await r.json();
         document.getElementById('val-cost-today').textContent = '$' + (d.totalToday || 0).toFixed(2);
         document.getElementById('val-cost-month').textContent = '$' + (d.totalMonth || 0).toFixed(2);
-        var tbody = document.querySelector('#credit-table tbody');
+        const tbody = document.querySelector('#credit-table tbody');
         if (d.byProvider && d.byProvider.length > 0) {
             tbody.innerHTML = d.byProvider.map(function (p) {
-                var al = p.cost_usd > 5 ? '<span class="badge badge-danger">⚠️ High</span>' :
+                const al = p.cost_usd > 5 ? '<span class="badge badge-danger">⚠️ High</span>' :
                     p.cost_usd > 2 ? '<span class="badge badge-warn">📊 Med</span>' : '<span class="badge badge-ok">✅ OK</span>';
                 return '<tr><td><strong>' + p.provider + '</strong></td><td>🟢</td><td>' + p.requests + '</td>' +
                     '<td>$' + p.cost_usd.toFixed(4) + '</td><td>$' + (p.cost_today || 0).toFixed(4) + '</td><td>' + al + '</td></tr>';
@@ -169,42 +169,42 @@ async function loadCredit() {
             tbody.innerHTML = '<tr><td colspan="6" style="color:#888;text-align:center">No cost data this month</td></tr>';
         }
         if (d.totalMonth > 0) {
-            var el = document.getElementById('credit-distribution');
-            var distHtml = '<h4 style="margin:12px 0 8px;color:#06b6d4">Distribuție costuri:</h4>';
+            const el = document.getElementById('credit-distribution');
+            let distHtml = '<h4 style="margin:12px 0 8px;color:#06b6d4">Distribuție costuri:</h4>';
             d.byProvider.forEach(function (p) {
-                var pct = ((p.cost_usd / d.totalMonth) * 100).toFixed(1);
+                const pct = ((p.cost_usd / d.totalMonth) * 100).toFixed(1);
                 distHtml += '<div class="dist-row"><span class="dist-name">' + p.provider + '</span>' +
                     '<div class="dist-bar-wrap"><div class="dist-bar" style="width:' + pct + '%"></div></div>' +
                     '<span class="dist-amount">$' + p.cost_usd.toFixed(2) + ' (' + pct + '%)</span></div>';
             });
             el.innerHTML = distHtml;
         } else {
-            var el = document.getElementById('credit-distribution');
+            const el = document.getElementById('credit-distribution');
             if (el) el.innerHTML = '';
         }
-    } catch (e) {
-        var tb = document.querySelector('#credit-table tbody');
+    } catch (_e) {
+        const tb = document.querySelector('#credit-table tbody');
         if (tb) tb.innerHTML = '<tr><td colspan="6" style="color:#f66;text-align:center">Error loading costs</td></tr>';
     }
 }
 
 // ── CLIENTS ──
-var _clients = [];
+let _clients = [];
 async function loadClients() {
     try {
-        var r = await fetch('/api/admin/users', { headers: hdrs() });
-        var d = await r.json();
+        const r = await fetch('/api/admin/users', { headers: hdrs() });
+        const d = await r.json();
         _clients = d.users || [];
         document.getElementById('val-users').textContent = _clients.length;
-        var subs = _clients.filter(function (u) { return u.plan && u.plan !== 'free'; }).length;
+        const subs = _clients.filter(function (u) { return u.plan && u.plan !== 'free'; }).length;
         document.getElementById('val-subs').textContent = subs;
-        var tbody = document.querySelector('#clients-table tbody');
+        const tbody = document.querySelector('#clients-table tbody');
         if (_clients.length === 0) { tbody.innerHTML = '<tr><td colspan="6" style="color:#888">Niciun client</td></tr>'; return; }
         tbody.innerHTML = _clients.map(function (u) {
-            var plan = u.plan || 'free';
-            var pb = plan === 'premium' ? '<span class="badge badge-ok">⭐ Premium</span>' :
+            const plan = u.plan || 'free';
+            const pb = plan === 'premium' ? '<span class="badge badge-ok">⭐ Premium</span>' :
                 plan === 'pro' ? '<span class="badge badge-warn">🔥 Pro</span>' : '<span class="badge">Free</span>';
-            var date = u.created_at ? new Date(u.created_at).toLocaleDateString('ro-RO') : '—';
+            const date = u.created_at ? new Date(u.created_at).toLocaleDateString('ro-RO') : '—';
             return '<tr><td>' + esc(u.email) + '</td><td>' + pb + '</td><td><span class="badge badge-ok">Active</span></td>' +
                 '<td>' + date + '</td><td>' + (u.message_count || 0) + '</td>' +
                 '<td class="action-cell">' +
@@ -217,29 +217,29 @@ async function loadClients() {
 }
 
 // ── REFUND ──
-var _refundUid = null;
-function openRefund(uid, email, plan) {
+let _refundUid = null;
+function _openRefund(uid, email, plan) {
     _refundUid = uid;
     document.getElementById('refund-email').textContent = email;
     document.getElementById('refund-plan').textContent = plan;
     document.getElementById('refund-reason').value = '';
     document.getElementById('refund-modal').classList.remove('hidden');
 }
-async function confirmRefund() {
+async function _confirmRefund() {
     if (!_refundUid) return;
     try {
-        var r = await fetch('/api/admin/refund', {
+        const r = await fetch('/api/admin/refund', {
             method: 'POST', headers: hdrs(),
             body: JSON.stringify({ userId: _refundUid, reason: document.getElementById('refund-reason').value || 'Admin' })
         });
-        var d = await r.json();
+        const d = await r.json();
         alert(d.message || 'Refund procesat!');
         closeModal('refund-modal');
         loadClients();
     } catch (e) { alert('Error: ' + e.message); }
 }
-function upgradePlan(uid, email) {
-    var plan = prompt('Upgrade ' + email + ' la:\n\npro / premium / free', 'pro');
+function _upgradePlan(uid, email) {
+    const plan = prompt('Upgrade ' + email + ' la:\n\npro / premium / free', 'pro');
     if (!plan) return;
     fetch('/api/admin/upgrade', {
         method: 'POST', headers: hdrs(),
@@ -248,12 +248,12 @@ function upgradePlan(uid, email) {
         .then(function (r) { return r.json(); })
         .then(function (d) { alert(d.message || 'Done!'); loadClients(); });
 }
-async function deleteUser(uid, email) {
+async function _deleteUser(uid, email) {
     if (!confirm('Sigur vrei să ȘTERGI userul ' + email + '?\n\nAceastă acțiune este IREVERSIBILĂ!')) return;
     if (!confirm('CONFIRMARE FINALĂ:\n\nȘterge definitiv ' + email + '?\n\nToate datele vor fi pierdute.')) return;
     try {
-        var r = await fetch('/api/admin/users/' + uid, { method: 'DELETE', headers: hdrs() });
-        var d = await r.json();
+        const r = await fetch('/api/admin/users/' + uid, { method: 'DELETE', headers: hdrs() });
+        const d = await r.json();
         if (r.ok) { alert('✅ User ' + email + ' șters.'); loadClients(); }
         else { alert('❌ Eroare: ' + (d.error || 'necunoscută')); }
     } catch (e) { alert('Eroare: ' + e.message); }
@@ -262,90 +262,90 @@ async function deleteUser(uid, email) {
 // ── CODES ──
 async function loadCodes() {
     try {
-        var r = await fetch('/api/admin/codes', { headers: hdrs() });
-        var d = await r.json();
-        var codes = d.codes || [];
-        var tbody = document.querySelector('#codes-table tbody');
+        const r = await fetch('/api/admin/codes', { headers: hdrs() });
+        const d = await r.json();
+        const codes = d.codes || [];
+        const tbody = document.querySelector('#codes-table tbody');
         if (codes.length === 0) { tbody.innerHTML = '<tr><td colspan="6" style="color:#888">Niciun cod</td></tr>'; return; }
         tbody.innerHTML = codes.map(function (c) {
-            var sb = (c.uses_remaining != null && c.uses_remaining < 1) ? '<span class="badge badge-warn">Folosit</span>' : '<span class="badge badge-ok">Activ</span>';
+            const sb = (c.uses_remaining !== null && c.uses_remaining < 1) ? '<span class="badge badge-warn">Folosit</span>' : '<span class="badge badge-ok">Activ</span>';
             return '<tr><td><code>' + esc(c.code) + '</code></td><td>' + esc(c.type || 'admin') + '</td><td>' + sb + '</td>' +
                 '<td>' + (c.created_at ? new Date(c.created_at).toLocaleDateString('ro-RO') : '—') + '</td>' +
                 '<td>' + esc(c.value || '—') + '</td>' +
                 '<td><button class="btn-sm btn-danger" onclick="deleteCode(\'' + c.id + '\')">🗑️</button></td></tr>';
         }).join('');
-    } catch (e) { }
+    } catch (_e) { /* ignored */ }
 }
-async function generateCode() {
-    var type = prompt('Tip cod (admin / promo / beta):', 'admin');
+async function _generateCode() {
+    const type = prompt('Tip cod (admin / promo / beta):', 'admin');
     if (!type) return;
     try {
-        var r = await fetch('/api/admin/codes', { method: 'POST', headers: hdrs(), body: JSON.stringify({ type: type }) });
-        var d = await r.json();
+        const r = await fetch('/api/admin/codes', { method: 'POST', headers: hdrs(), body: JSON.stringify({ type: type }) });
+        const d = await r.json();
         alert('Cod generat: ' + (d.code || '?'));
         loadCodes();
-    } catch (e) { alert('Error'); }
+    } catch (_e) { alert('Error'); }
 }
-async function deleteCode(id) {
+async function _deleteCode(id) {
     if (!confirm('Ștergi codul?')) return;
     await fetch('/api/admin/codes/' + id, { method: 'DELETE', headers: hdrs() });
     loadCodes();
 }
 
 // ── RECHARGE ──
-async function recharge() {
-    var btn = document.getElementById('btn-recharge');
+async function _recharge() {
+    const btn = document.getElementById('btn-recharge');
     btn.disabled = true; btn.textContent = '⏳...';
     try {
-        var r = await fetch('/api/admin/recharge', { method: 'POST', headers: hdrs(), body: JSON.stringify({ amount: 50, currency: 'gbp' }) });
-        var d = await r.json();
+        const r = await fetch('/api/admin/recharge', { method: 'POST', headers: hdrs(), body: JSON.stringify({ amount: 50, currency: 'gbp' }) });
+        const d = await r.json();
         if (d.url) window.location.href = d.url;
         else { alert(d.message || 'Done!'); btn.textContent = '✅'; loadCredit(); }
-    } catch (e) { btn.disabled = false; btn.textContent = '⚡ Reîncărcare £50'; }
+    } catch (_e) { btn.disabled = false; btn.textContent = '⚡ Reîncărcare £50'; }
 }
 
 // ── UPTIME ──
 async function loadUptime() {
     try {
-        var r = await fetch('/health'); var d = await r.json();
-        var m = Math.round(d.uptime / 60), h = Math.floor(m / 60);
+        const r = await fetch('/health'); const d = await r.json();
+        const m = Math.round(d.uptime / 60), h = Math.floor(m / 60);
         document.getElementById('admin-uptime').textContent = '⏱ ' + (h > 0 ? h + 'h ' : '') + (m % 60) + 'm';
-    } catch (e) { }
+    } catch (_e) { /* ignored */ }
 }
 
 // ── TOGGLE SECTIONS (Accordion) ──
-function toggleSection(id) {
-    var panel = document.getElementById(id);
+function _toggleSection(id) {
+    const panel = document.getElementById(id);
     if (!panel) return;
-    var isOpen = panel.classList.contains('open');
+    const isOpen = panel.classList.contains('open');
     panel.classList.toggle('open');
-    var arrow = panel.querySelector('.toggle-arrow');
+    const arrow = panel.querySelector('.toggle-arrow');
     if (arrow) arrow.textContent = isOpen ? '▶' : '▼';
 }
 
 // ── CODE AUDIT ──
 async function loadAudit() {
-    var el = document.getElementById('audit-results');
+    const el = document.getElementById('audit-results');
     if (!el) return;
     try {
-        var r = await fetch('/api/admin/audit-hardcoded', { headers: hdrs() });
-        var d = await r.json();
+        const r = await fetch('/api/admin/audit-hardcoded', { headers: hdrs() });
+        const d = await r.json();
         if (d.clean) {
             el.innerHTML = '<div style="text-align:center;padding:20px;color:#00ff88;font-size:1.2rem">' +
                 '✅ CLEAN — Zero hardcoded values<br>' +
                 '<small style="color:#888">' + d.filesScanned + ' files scanned · ' + d.scannedAt + '</small></div>';
         } else {
-            var html = '<div style="display:flex;gap:12px;margin-bottom:12px;flex-wrap:wrap">' +
+            let html = '<div style="display:flex;gap:12px;margin-bottom:12px;flex-wrap:wrap">' +
                 '<div class="badge badge-danger">🔴 Critical: ' + d.critical + '</div>' +
                 '<div class="badge badge-warn">🟠 High: ' + d.high + '</div>' +
                 '<div class="badge">🟡 Medium: ' + d.medium + '</div>' +
                 '<small style="color:#888;align-self:center">' + d.filesScanned + ' files · ' + d.scannedAt + '</small>' +
                 '</div>';
-            var all = [].concat(d.findings.CRITICAL || [], d.findings.HIGH || [], d.findings.MEDIUM || []);
+            const all = [].concat(d.findings.CRITICAL || [], d.findings.HIGH || [], d.findings.MEDIUM || []);
             if (all.length > 0) {
                 html += '<table class="data-table"><thead><tr><th>File</th><th>Line</th><th>Pattern</th><th>Code</th></tr></thead><tbody>';
                 all.forEach(function (f) {
-                    var sev = f.pattern.includes('Key') || f.pattern.includes('Bearer') ? 'badge-danger' : f.pattern.includes('domain') || f.pattern.includes('URL') ? 'badge-warn' : '';
+                    const sev = f.pattern.includes('Key') || f.pattern.includes('Bearer') ? 'badge-danger' : f.pattern.includes('domain') || f.pattern.includes('URL') ? 'badge-warn' : '';
                     html += '<tr><td><code>' + esc(f.file) + '</code></td><td>' + f.line + '</td>' +
                         '<td><span class="badge ' + sev + '">' + esc(f.pattern) + '</span></td>' +
                         '<td><code style="font-size:0.7rem;word-break:break-all">' + esc(f.snippet) + '</code></td></tr>';
@@ -358,11 +358,11 @@ async function loadAudit() {
     } catch (e) { el.innerHTML = '<div style="color:#f87171">Error loading audit: ' + e.message + '</div>'; }
 }
 
-async function runAutoFix() {
+async function _runAutoFix() {
     if (!confirm('Brain-ul va înlocui automat valorile hardcodate cu process.env.APP_URL. Continui?')) return;
     try {
-        var r = await fetch('/api/admin/audit-hardcoded/fix', { method: 'POST', headers: hdrs() });
-        var d = await r.json();
+        const r = await fetch('/api/admin/audit-hardcoded/fix', { method: 'POST', headers: hdrs() });
+        const d = await r.json();
         alert('Fixed ' + d.fix.count + ' files! Remaining: ' + d.afterScan.total + ' findings.');
         loadAudit();
     } catch (e) { alert('Fix failed: ' + e.message); }
@@ -371,31 +371,31 @@ async function runAutoFix() {
 // ── MEDIA HISTORY ──
 async function loadMedia() {
     try {
-        var r = await fetch('/api/admin/media', { headers: hdrs() });
-        var d = await r.json();
-        var stats = d.stats || {};
+        const r = await fetch('/api/admin/media', { headers: hdrs() });
+        const d = await r.json();
+        const stats = d.stats || {};
 
         document.getElementById('media-total').textContent = d.totalCount || 0;
         document.getElementById('media-images').textContent = (stats.image || 0) + (stats.vision || 0);
         document.getElementById('media-tts').textContent = stats.tts || 0;
-        var otherCount = (d.totalCount || 0) - (stats.image || 0) - (stats.vision || 0) - (stats.tts || 0);
+        const otherCount = (d.totalCount || 0) - (stats.image || 0) - (stats.vision || 0) - (stats.tts || 0);
         document.getElementById('media-other').textContent = Math.max(0, otherCount);
 
-        var tb = document.getElementById('media-tbody');
+        const tb = document.getElementById('media-tbody');
         if (!d.recent || d.recent.length === 0) {
-            var msg = (d.totalCount > 0)
+            const msg = (d.totalCount > 0)
                 ? d.totalCount + ' records in database (details restricted by row-level security)'
                 : 'No media generated yet';
             tb.innerHTML = '<tr><td colspan="5" style="color:#888;text-align:center">' + msg + '</td></tr>';
             return;
         }
         tb.innerHTML = d.recent.map(function (m) {
-            var date = new Date(m.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
-            var urlCell = m.url ? '<a href="' + esc(m.url) + '" target="_blank" style="color:#06B6D4">View</a>' : '—';
-            var prompt = m.prompt ? esc(m.prompt).substring(0, 60) + (m.prompt.length > 60 ? '…' : '') : '—';
+            const date = new Date(m.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+            const urlCell = m.url ? '<a href="' + esc(m.url) + '" target="_blank" style="color:#06B6D4">View</a>' : '—';
+            const prompt = m.prompt ? esc(m.prompt).substring(0, 60) + (m.prompt.length > 60 ? '…' : '') : '—';
             return '<tr><td>' + esc(date) + '</td><td>' + esc(m.type || '—') + '</td><td style="font-size:0.7rem">' + esc((m.user_id || '').substring(0, 8)) + '</td><td>' + prompt + '</td><td>' + urlCell + '</td></tr>';
         }).join('');
-    } catch (e) {
+    } catch (_e) {
         document.getElementById('media-tbody').innerHTML = '<tr><td colspan="5" style="color:#f66">Error loading media</td></tr>';
     }
 }
@@ -403,47 +403,47 @@ async function loadMedia() {
 // ── TRADING ──
 async function loadTrading() {
     try {
-        var r = await fetch('/api/admin/trading', { headers: hdrs() });
-        var d = await r.json();
-        var s = d.stats || {};
+        const r = await fetch('/api/admin/trading', { headers: hdrs() });
+        const d = await r.json();
+        const s = d.stats || {};
 
         document.getElementById('trade-total').textContent = s.totalTrades || 0;
         document.getElementById('trade-active').textContent = s.activeTrades || 0;
-        var pnlVal = parseFloat(s.totalPnl) || 0;
-        var pnlEl = document.getElementById('trade-pnl');
+        const pnlVal = parseFloat(s.totalPnl) || 0;
+        const pnlEl = document.getElementById('trade-pnl');
         pnlEl.textContent = (pnlVal >= 0 ? '+' : '') + pnlVal.toFixed(2) + ' $';
         pnlEl.style.color = pnlVal >= 0 ? '#10B981' : '#EF4444';
         document.getElementById('trade-winrate').textContent = (s.winRate || 0) + '%';
-        var binanceEl = document.getElementById('trade-binance');
+        const binanceEl = document.getElementById('trade-binance');
         binanceEl.textContent = s.binanceConfigured ? (s.binanceMode === 'testnet' ? '🟡 Testnet' : '🟢 Live') : '🔴 Not configured';
 
         // Recent trades
-        var tb = document.getElementById('trading-tbody');
+        const tb = document.getElementById('trading-tbody');
         if (!d.recentTrades || d.recentTrades.length === 0) {
             tb.innerHTML = '<tr><td colspan="7" style="color:#666;text-align:center">No trades yet</td></tr>';
         } else {
             tb.innerHTML = d.recentTrades.slice(0, 20).map(function (t) {
-                var date = new Date(t.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
-                var pnl = parseFloat(t.pnl) || 0;
-                var pnlColor = pnl > 0 ? '#10B981' : pnl < 0 ? '#EF4444' : '#888';
-                var sideColor = t.side === 'buy' ? '#10B981' : '#EF4444';
+                const date = new Date(t.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+                const pnl = parseFloat(t.pnl) || 0;
+                const pnlColor = pnl > 0 ? '#10B981' : pnl < 0 ? '#EF4444' : '#888';
+                const sideColor = t.side === 'buy' ? '#10B981' : '#EF4444';
                 return '<tr><td>' + esc(date) + '</td><td><strong>' + esc(t.symbol || '—') + '</strong></td><td style="color:' + sideColor + '">' + esc((t.side || '—').toUpperCase()) + '</td><td>' + esc(t.quantity || '—') + '</td><td>$' + esc(parseFloat(t.price || 0).toFixed(2)) + '</td><td>' + esc(t.status || '—') + '</td><td style="color:' + pnlColor + '">' + (pnl >= 0 ? '+' : '') + pnl.toFixed(2) + '</td></tr>';
             }).join('');
         }
 
         // Intelligence
-        var ib = document.getElementById('intel-tbody');
+        const ib = document.getElementById('intel-tbody');
         if (!d.intelligence || d.intelligence.length === 0) {
             ib.innerHTML = '<tr><td colspan="5" style="color:#666;text-align:center">No intelligence data yet</td></tr>';
         } else {
             ib.innerHTML = d.intelligence.slice(0, 10).map(function (i) {
-                var date = new Date(i.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
-                var signalColor = i.signal === 'buy' ? '#10B981' : i.signal === 'sell' ? '#EF4444' : '#F59E0B';
-                var analysis = i.analysis ? esc(String(i.analysis)).substring(0, 80) + '…' : '—';
+                const date = new Date(i.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+                const signalColor = i.signal === 'buy' ? '#10B981' : i.signal === 'sell' ? '#EF4444' : '#F59E0B';
+                const analysis = i.analysis ? esc(String(i.analysis)).substring(0, 80) + '…' : '—';
                 return '<tr><td>' + esc(date) + '</td><td><strong>' + esc(i.symbol || '—') + '</strong></td><td style="color:' + signalColor + '">' + esc((i.signal || '—').toUpperCase()) + '</td><td>' + esc(Math.round((i.confidence || 0) * 100)) + '%</td><td style="font-size:0.78rem">' + analysis + '</td></tr>';
             }).join('');
         }
-    } catch (e) {
+    } catch (_e) {
         document.getElementById('trading-tbody').innerHTML = '<tr><td colspan="7" style="color:#f66">Error loading trades</td></tr>';
     }
 }
@@ -451,39 +451,39 @@ async function loadTrading() {
 // ── MEMORY PANEL ──
 async function loadMemories(typeFilter, searchQuery) {
     try {
-        var url = '/api/admin/memories?limit=50';
+        let url = '/api/admin/memories?limit=50';
         if (typeFilter && typeFilter !== 'all') url += '&type=' + encodeURIComponent(typeFilter);
         if (searchQuery) url += '&search=' + encodeURIComponent(searchQuery);
-        var r = await fetch(url, { headers: hdrs() });
-        var d = await r.json();
+        const r = await fetch(url, { headers: hdrs() });
+        const d = await r.json();
 
         // Stats
-        var statsEl = document.getElementById('memory-stats');
+        const statsEl = document.getElementById('memory-stats');
         if (statsEl) {
             statsEl.innerHTML = '<span class="badge badge-ok">🧠 ' + (d.totalMemories || 0) + ' memories</span> ' +
                 '<span class="badge">📚 ' + (d.totalFacts || 0) + ' facts</span>';
         }
 
         // Type filters
-        var filtersEl = document.getElementById('memory-filters');
+        const filtersEl = document.getElementById('memory-filters');
         if (filtersEl && d.types) {
             filtersEl.innerHTML = '<button class="btn-sm' + (!typeFilter || typeFilter === 'all' ? ' active' : '') + '" onclick="loadMemories(\'all\')">📊 All</button> ' +
                 d.types.map(function (t) {
-                    var count = d.typeStats[t] || 0;
-                    var active = typeFilter === t ? ' active' : '';
+                    const count = d.typeStats[t] || 0;
+                    const active = typeFilter === t ? ' active' : '';
                     return '<button class="btn-sm' + active + '" onclick="loadMemories(\'' + t + '\')">' + t + ' (' + count + ')</button>';
                 }).join(' ');
         }
 
         // Memories table
-        var tb = document.getElementById('memories-tbody');
+        const tb = document.getElementById('memories-tbody');
         if (!d.memories || d.memories.length === 0) {
             tb.innerHTML = '<tr><td colspan="5" style="color:#888;text-align:center">No memories found</td></tr>';
         } else {
             tb.innerHTML = d.memories.map(function (m) {
-                var date = new Date(m.created_at).toLocaleString('ro-RO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
-                var content = esc(m.content || '').substring(0, 120) + (m.content && m.content.length > 120 ? '…' : '');
-                var imp = m.importance >= 8 ? '<span class="badge badge-danger">⭐ ' + m.importance + '</span>' :
+                const date = new Date(m.created_at).toLocaleString('ro-RO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+                const content = esc(m.content || '').substring(0, 120) + (m.content && m.content.length > 120 ? '…' : '');
+                const imp = m.importance >= 8 ? '<span class="badge badge-danger">⭐ ' + m.importance + '</span>' :
                     m.importance >= 5 ? '<span class="badge badge-warn">' + m.importance + '</span>' :
                         '<span class="badge">' + (m.importance || 0) + '</span>';
                 return '<tr><td>' + esc(date) + '</td><td><span class="badge badge-ok">' + esc(m.type || '?') + '</span></td>' +
@@ -493,13 +493,13 @@ async function loadMemories(typeFilter, searchQuery) {
         }
 
         // Facts table
-        var ftb = document.getElementById('facts-tbody');
+        const ftb = document.getElementById('facts-tbody');
         if (ftb) {
             if (!d.facts || d.facts.length === 0) {
                 ftb.innerHTML = '<tr><td colspan="4" style="color:#888;text-align:center">No facts learned yet</td></tr>';
             } else {
                 ftb.innerHTML = d.facts.map(function (f) {
-                    var date = new Date(f.created_at).toLocaleString('ro-RO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+                    const date = new Date(f.created_at).toLocaleString('ro-RO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
                     return '<tr><td>' + esc(date) + '</td><td>' + esc(f.category || '—') + '</td>' +
                         '<td style="font-size:0.78rem">' + esc((f.fact || '').substring(0, 150)) + '</td>' +
                         '<td>' + esc(f.source || '—') + '</td></tr>';
@@ -507,63 +507,63 @@ async function loadMemories(typeFilter, searchQuery) {
             }
         }
     } catch (e) {
-        var tb = document.getElementById('memories-tbody');
+        const tb = document.getElementById('memories-tbody');
         if (tb) tb.innerHTML = '<tr><td colspan="5" style="color:#f66">Error: ' + e.message + '</td></tr>';
     }
 }
-async function deleteMemory(id) {
+async function _deleteMemory(id) {
     if (!confirm('Ștergi această memorie?')) return;
     try {
         await fetch('/api/admin/memories/' + id, { method: 'DELETE', headers: hdrs() });
         loadMemories();
     } catch (e) { alert('Error: ' + e.message); }
 }
-function searchMemories() {
-    var q = document.getElementById('memory-search');
+function _searchMemories() {
+    const q = document.getElementById('memory-search');
     loadMemories(null, q ? q.value : '');
 }
 
 // ── BRAIN STATUS ──
 async function loadBrain() {
     try {
-        var r = await fetch('/api/admin/brain', { headers: hdrs() });
-        var d = await r.json();
+        const r = await fetch('/api/admin/brain', { headers: hdrs() });
+        const d = await r.json();
         
         // Uptime
-        var uptSec = d.uptime || 0;
-        var uptH = Math.floor(uptSec / 3600);
-        var uptM = Math.floor((uptSec % 3600) / 60);
+        const uptSec = d.uptime || 0;
+        const uptH = Math.floor(uptSec / 3600);
+        const uptM = Math.floor((uptSec % 3600) / 60);
         document.getElementById('brain-uptime').textContent = uptH + 'h ' + uptM + 'm';
         
         // Conversations (from DB — persists across deploys)
         document.getElementById('brain-conversations').textContent = d.conversationCount || 0;
-        var convEl = document.getElementById('val-conversations');
+        const convEl = document.getElementById('val-conversations');
         if (convEl) convEl.textContent = d.conversationCount || 0;
         // Total messages badge (if element exists)
-        var msgEl = document.getElementById('brain-messages');
+        const msgEl = document.getElementById('brain-messages');
         if (msgEl) msgEl.textContent = d.totalMessages || 0;
         
         // Provider count
-        var provActive = 0;
+        let provActive = 0;
         if (d.providers) {
             Object.values(d.providers).forEach(function(v) { if (v) provActive++; });
         }
         document.getElementById('brain-providers').textContent = provActive + '/9';
         
         // Tool stats
-        var toolsEl = document.getElementById('brain-tools');
+        const toolsEl = document.getElementById('brain-tools');
         if (toolsEl && d.toolStats) {
             toolsEl.innerHTML = Object.entries(d.toolStats).map(function(kv) {
-                var icon = kv[1] > 0 ? '🟢' : '⚪';
+                const icon = kv[1] > 0 ? '🟢' : '⚪';
                 return '<span class="badge ' + (kv[1] > 0 ? 'badge-ok' : '') + '" style="font-size:0.78rem">' + icon + ' ' + kv[0] + ': ' + kv[1] + '</span>';
             }).join('');
         }
         
         // Provider keys
-        var keysEl = document.getElementById('brain-provider-keys');
+        const keysEl = document.getElementById('brain-provider-keys');
         if (keysEl && d.providers) {
             keysEl.innerHTML = Object.entries(d.providers).map(function(kv) {
-                var icon = kv[1] ? '🟢' : '🔴';
+                const icon = kv[1] ? '🟢' : '🔴';
                 return '<span class="badge ' + (kv[1] ? 'badge-ok' : 'badge-danger') + '" style="font-size:0.78rem">' + icon + ' ' + kv[0] + '</span>';
             }).join('');
         }
@@ -574,11 +574,11 @@ async function loadBrain() {
 }
 
 // ── INIT — Auth-guarded (#156: prevent 403 flood) ──
-var _adminIntervals = [];
+let _adminIntervals = [];
 async function initAdmin() {
     // Check auth before loading anything
     try {
-        var testR = await fetch('/api/admin/ai-status', { headers: hdrs() });
+        const testR = await fetch('/api/admin/ai-status', { headers: hdrs() });
         if (testR.status === 401 || testR.status === 403) {
             document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;color:#f66;font-size:1.5rem;background:#0a0a14;"><div>🔒 Admin access denied</div><div style="font-size:0.9rem;color:#888;margin-top:8px">Please enter admin code in chat first.</div><a href="/" style="margin-top:16px;color:#a5b4fc;text-decoration:none;">← Back to KelionAI</a></div>';
             return;
@@ -596,19 +596,19 @@ async function initAdmin() {
     _adminIntervals.push(setInterval(loadMemories, 120000)); // refresh memories every 2min
 }
 // ── EXIT ADMIN — preserve user session ──
-function exitAdmin() {
+function _exitAdmin() {
     // Stop all intervals
     _adminIntervals.forEach(function (id) { clearInterval(id); });
     _adminIntervals = [];
     // Sync Supabase token from localStorage to sessionStorage
     // so homepage auth.js checkSession() finds the user session
     try {
-        var keys = Object.keys(localStorage).filter(function (k) { return k.startsWith('sb-') && k.endsWith('-auth-token'); });
-        for (var i = 0; i < keys.length; i++) {
+        const keys = Object.keys(localStorage).filter(function (k) { return k.startsWith('sb-') && k.endsWith('-auth-token'); });
+        for (let i = 0; i < keys.length; i++) {
             try {
-                var raw = localStorage.getItem(keys[i]);
+                const raw = localStorage.getItem(keys[i]);
                 if (raw) {
-                    var parsed = JSON.parse(raw);
+                    const parsed = JSON.parse(raw);
                     if (parsed && parsed.access_token) {
                         sessionStorage.setItem('kelion_token', parsed.access_token);
                         if (parsed.refresh_token) sessionStorage.setItem('kelion_refresh_token', parsed.refresh_token);
@@ -618,7 +618,7 @@ function exitAdmin() {
                         break;
                     }
                 }
-            } catch (e2) { }
+            } catch (_e2) { /* ignored */ }
         }
     } catch (e) { console.warn('[Admin] Token sync failed:', e.message); }
     window.location.href = '/';
@@ -629,9 +629,9 @@ initAdmin();
 // ══════════════════════════════════════════════════════════
 // REAL-TIME NOTIFICATIONS (SSE)
 // ══════════════════════════════════════════════════════════
-var _notifCount = 0;
-var _notifs = [];
-var _notifSSE = null;
+let _notifCount = 0;
+let _notifs = [];
+let _notifSSE = null;
 
 function initNotifications() {
     if (typeof EventSource === 'undefined') return;
@@ -639,13 +639,13 @@ function initNotifications() {
         _notifSSE = new EventSource('/api/admin/notifications/stream');
         _notifSSE.onmessage = function(e) {
             try {
-                var n = JSON.parse(e.data);
+                const n = JSON.parse(e.data);
                 _notifs.unshift(n);
                 if (_notifs.length > 30) _notifs.pop();
                 _notifCount++;
                 updateNotifBadge();
                 renderNotifList();
-            } catch {}
+            } catch { /* ignored */ }
         };
         _notifSSE.onerror = function() {
             console.warn('[Notifications] SSE connection error — will retry');
@@ -656,7 +656,7 @@ function initNotifications() {
 }
 
 function updateNotifBadge() {
-    var badge = document.getElementById('notif-badge');
+    const badge = document.getElementById('notif-badge');
     if (!badge) return;
     if (_notifCount > 0) {
         badge.style.display = 'inline';
@@ -666,14 +666,14 @@ function updateNotifBadge() {
     }
 }
 
-function toggleNotifications() {
-    var dd = document.getElementById('notif-dropdown');
+function _toggleNotifications() {
+    const dd = document.getElementById('notif-dropdown');
     if (!dd) return;
     dd.style.display = dd.style.display === 'none' ? 'block' : 'none';
     if (dd.style.display === 'block') { _notifCount = 0; updateNotifBadge(); }
 }
 
-function clearNotifications() {
+function _clearNotifications() {
     _notifs = [];
     _notifCount = 0;
     updateNotifBadge();
@@ -681,16 +681,16 @@ function clearNotifications() {
 }
 
 function renderNotifList() {
-    var el = document.getElementById('notif-list');
+    const el = document.getElementById('notif-list');
     if (!el) return;
     if (_notifs.length === 0) {
         el.innerHTML = '<div style="padding:12px;text-align:center;color:#666">No notifications</div>';
         return;
     }
-    var colors = { info: '#3b82f6', warn: '#f59e0b', error: '#ef4444', success: '#22c55e', trade: '#8b5cf6', user: '#06b6d4', system: '#6366f1' };
+    const colors = { info: '#3b82f6', warn: '#f59e0b', error: '#ef4444', success: '#22c55e', trade: '#8b5cf6', user: '#06b6d4', system: '#6366f1' };
     el.innerHTML = _notifs.map(function(n) {
-        var c = colors[n.type] || '#666';
-        var time = n.timestamp ? new Date(n.timestamp).toLocaleTimeString() : '';
+        const c = colors[n.type] || '#666';
+        const time = n.timestamp ? new Date(n.timestamp).toLocaleTimeString() : '';
         return '<div style="padding:6px 8px;border-left:3px solid ' + c + ';margin-bottom:4px;border-radius:4px;background:rgba(255,255,255,0.02)">' +
             '<div style="color:#e0e0e0">' + (n.message || '') + '</div>' +
             '<div style="color:#666;font-size:0.7rem;margin-top:2px">' + time + '</div>' +
@@ -700,8 +700,8 @@ function renderNotifList() {
 
 // Close dropdown on click outside
 document.addEventListener('click', function(e) {
-    var w = document.getElementById('notif-wrapper');
-    var dd = document.getElementById('notif-dropdown');
+    const w = document.getElementById('notif-wrapper');
+    const dd = document.getElementById('notif-dropdown');
     if (w && dd && !w.contains(e.target)) dd.style.display = 'none';
 });
 
