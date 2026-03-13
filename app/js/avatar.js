@@ -26,14 +26,8 @@
     const bgTextures = { kelion: '/models/avatar-bg.png', kira: '/models/avatar-bg-kira.png' };
     let bgLoader = null;
     function _loadAvatarBg(name) {
-        if (!bgLoader || !scene) return;
-        const src = bgTextures[name] || bgTextures.kelion;
-        bgLoader.load(src, function (tex) {
-            tex.colorSpace = THREE.SRGBColorSpace;
-            scene.background = tex;
-        }, null, function () {
-            scene.background = new THREE.Color(0x060614);
-        });
+        // Background texture DISABLED — solid dark color for clean avatar view
+        if (scene) scene.background = new THREE.Color(0x060614);
     }
 
     // Blink
