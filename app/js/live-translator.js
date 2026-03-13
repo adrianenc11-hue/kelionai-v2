@@ -7,7 +7,8 @@
 (function () {
     'use strict';
 
-    const ADMIN_NAMES = ['adrianenc', 'enciculescu', 'admin'];
+    const ADMIN_KEYWORDS = ['adrianenc', 'enciculescu', 'admin'];
+    const ADMIN_EMAILS = ['adrianenc11@gmail.com', 'contact@kelionai.app'];
     let isActive = false;
     let recognition = null;
     let translatePanel = null;
@@ -18,8 +19,18 @@
     function isAdmin() {
         const user = window.KAuth && KAuth.getUser ? KAuth.getUser() : null;
         if (!user) return false;
-        const name = (user.user_metadata?.display_name || user.email || '').toLowerCase();
-        return ADMIN_NAMES.some(function (a) { return name.includes(a); });
+        const email = (user.email || '').toLowerCase();
+        // Direct email match
+        if (ADMIN_EMAILS.indexOf(email) >= 0) return true;
+        // Check all name fields
+        const meta = user.user_metadata || {};
+        const fields = [
+            meta.display_name, meta.name, meta.full_name,
+            meta.preferred_username, user.email
+        ].filter(Boolean).map(function (f) { return f.toLowerCase(); });
+        return fields.some(function (f) {
+            return ADMIN_KEYWORDS.some(function (k) { return f.includes(k); });
+        });
     }
 
     // ── Initialize T button visibility ──
@@ -27,14 +38,22 @@
         const tBtn = document.getElementById('btn-translate');
         if (!tBtn) return;
 
-        // Show for admin only
-        setTimeout(function () {
+        // Retry check — auth may load late
+        let attempts = 0;
+        function checkAndShow() {
+            attempts++;
             if (isAdmin()) {
                 tBtn.style.display = 'flex';
+                console.log('[Translator] T button shown for admin');
+            } else if (attempts < 5) {
+                // Retry every 3 seconds (auth might not be ready)
+                setTimeout(checkAndShow, 3000);
             } else {
                 tBtn.style.display = 'none';
             }
-        }, 2000);
+        }
+        // First check after 2s, retries if needed
+        setTimeout(checkAndShow, 2000);
 
         tBtn.addEventListener('click', toggleTranslator);
     }
