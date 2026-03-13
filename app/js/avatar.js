@@ -192,7 +192,7 @@
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 3)); // CINEMATIC: up to 3x for 4K/retina
 
         camera = new THREE.PerspectiveCamera(24, w / h, 0.1, 100);
-        camera.position.set(0, -0.02, 2.00); // Zoomed out — full upper body view
+        camera.position.set(0, 0.35, 2.00); // Moved up — avatar centered in viewport
         renderer.outputColorSpace = THREE.SRGBColorSpace;
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
         renderer.toneMappingExposure = 1.2;
