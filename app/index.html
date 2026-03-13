@@ -657,10 +657,23 @@
                 </div>
             </div>
         </div><!-- /#main-content -->
+        <!-- Translate output panel — live transcription/translation overlay -->
+        <div id="translate-output" style="display:none;padding:8px 16px;border-top:1px solid rgba(16,185,129,0.2);background:rgba(16,185,129,0.05);max-height:200px;overflow-y:auto;font-size:0.85rem;color:#e0e0ff;position:relative;">
+            <div id="translate-text" style="white-space:pre-wrap;line-height:1.5;"></div>
+            <div style="position:absolute;top:6px;right:8px;display:flex;gap:4px;">
+                <button id="btn-translate-save" title="Save transcript" style="background:rgba(16,185,129,0.2);border:1px solid rgba(16,185,129,0.3);border-radius:6px;color:#6ee7b7;cursor:pointer;font-size:0.7rem;padding:3px 8px;font-family:var(--kelion-font);">💾 Save</button>
+                <button id="btn-translate-copy" title="Copy transcript" style="background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.3);border-radius:6px;color:#a5b4fc;cursor:pointer;font-size:0.7rem;padding:3px 8px;font-family:var(--kelion-font);">📋 Copy</button>
+                <button id="btn-translate-clear" title="Clear" style="background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);border-radius:6px;color:#fca5a5;cursor:pointer;font-size:0.7rem;padding:3px 8px;font-family:var(--kelion-font);">✕</button>
+            </div>
+        </div>
         <!-- Input row — FULL WIDTH at page bottom -->
         <div id="input-row" style="padding:8px 16px;border-top:1px solid rgba(99,102,241,0.1);">
             <button id="btn-mic-toggle" title="Microphone ON/OFF" aria-label="Toggle microphone"
                 style="background:none;border:2px solid #555;border-radius:50%;width:36px;height:36px;cursor:pointer;font-size:1.1rem;color:#888;transition:all 0.3s;">🎙️</button>
+            <button id="btn-camera-inline" title="Camera ON/OFF" aria-label="Toggle camera"
+                style="background:none;border:2px solid #555;border-radius:50%;width:36px;height:36px;cursor:pointer;font-size:1.1rem;color:#888;transition:all 0.3s;">📷</button>
+            <button id="btn-translate" title="Live Translator (Admin)" aria-label="Live translation"
+                style="display:none;background:none;border:2px solid #555;border-radius:50%;width:36px;height:36px;cursor:pointer;font-size:0.9rem;font-weight:900;color:#888;transition:all 0.3s;font-family:var(--kelion-font);">T</button>
             <div id="mic-level" title="Mic level" style="display:none">
                 <span></span><span></span><span></span><span></span><span></span>
             </div>
@@ -762,7 +775,8 @@
     <script src="/js/geolocation.js"></script>
     <script src="/js/voice-stream-client.js"></script>
     <script src="/js/auto-camera.js"></script>
-    <script src="/js/app.js?v=20260313a"></script>
+    <script src="/js/live-translator.js"></script>
+    <script src="/js/app.js?v=20260313b"></script>
     <script src="/js/navbar.js"></script>
     <script src="/js/referral-ui.js"></script>
 
@@ -854,55 +868,29 @@
     <button class="theme-toggle" id="theme-toggle" style="display:none!important" title="Toggle dark/light theme" aria-hidden="true">
         <span id="theme-icon">☀️</span>
     </button>
-    <!-- Camera Toggle — replaces dark mode button position -->
-    <button class="theme-toggle" id="camera-toggle"
-        title="Activează camera — Kelion te vede"
-        aria-label="Activează camera pentru ca Kelion să te vadă. Apasă pentru a porni sau opri camera."
-        role="button"
-        aria-pressed="false">
-        <span id="camera-icon" aria-hidden="true">👁️</span>
-    </button>
+    <!-- Camera Toggle — now inline in input row (btn-camera-inline) -->
     <script>
         (function() {
-            // Theme toggle (keep working in background)
-            var html = document.documentElement;
-            // Camera toggle
-            var camBtn = document.getElementById('camera-toggle');
-            var camIcon = document.getElementById('camera-icon');
+            var camBtn = document.getElementById('btn-camera-inline');
             var camActive = false;
-
-            function announce(msg) {
-                // Screen reader announcement
-                var live = document.getElementById('sr-announce');
-                if (!live) {
-                    live = document.createElement('div');
-                    live.id = 'sr-announce';
-                    live.setAttribute('role', 'status');
-                    live.setAttribute('aria-live', 'polite');
-                    live.style.cssText = 'position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);';
-                    document.body.appendChild(live);
-                }
-                live.textContent = '';
-                setTimeout(function() { live.textContent = msg; }, 100);
-            }
+            if (!camBtn) return;
 
             camBtn.addEventListener('click', async function() {
-                if (!window.KAutoCamera) { announce('Camera nu este disponibilă.'); return; }
+                if (!window.KAutoCamera) return;
                 var active = await KAutoCamera.toggle();
                 camActive = active;
-                camBtn.setAttribute('aria-pressed', active ? 'true' : 'false');
                 if (active) {
-                    camIcon.textContent = '👁️‍🗨️';
-                    camBtn.title = 'Camera ACTIVĂ — Kelion te vede! Click pentru a opri.';
-                    camBtn.setAttribute('aria-label', 'Camera activă. Kelion te vede. Apasă pentru a opri camera.');
-                    camBtn.style.boxShadow = '0 0 12px rgba(0,255,100,0.5)';
-                    announce('Camera pornită. Kelion te poate vedea acum.');
+                    camBtn.textContent = '📷';
+                    camBtn.style.borderColor = '#10B981';
+                    camBtn.style.color = '#10B981';
+                    camBtn.style.boxShadow = '0 0 10px rgba(16,185,129,0.4)';
+                    camBtn.title = 'Camera ACTIVĂ — Click pentru a opri';
                 } else {
-                    camIcon.textContent = '👁️';
-                    camBtn.title = 'Activează camera — Kelion te vede';
-                    camBtn.setAttribute('aria-label', 'Activează camera pentru ca Kelion să te vadă. Apasă pentru a porni camera.');
+                    camBtn.textContent = '📷';
+                    camBtn.style.borderColor = '#555';
+                    camBtn.style.color = '#888';
                     camBtn.style.boxShadow = '';
-                    announce('Camera oprită.');
+                    camBtn.title = 'Camera ON/OFF';
                 }
             });
         })();
