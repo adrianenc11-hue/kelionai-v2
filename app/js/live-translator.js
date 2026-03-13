@@ -1,258 +1,331 @@
-// ═══════════════════════════════════════════════════════════════
-// KelionAI — Live Translator (Admin-only)
-// Uses Web Speech API for continuous listening + optional translation
-// ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
+// KelionAI – Live Translator + Accessibility Module
+// Pure speech-to-text translator (NO brain, NO AI chat)
+// For deaf/hard-of-hearing users + real-time translation
+// Bidirectional: any language → RO | RO → detected language
+// ═══════════════════════════════════════════════════════════
 (function () {
     'use strict';
 
-    let _recognition = null;
-    let _active = false;
-    let _transcript = '';
-    let _interimText = '';
+    const ADMIN_NAMES = ['adrianenc', 'enciculescu', 'admin'];
+    let isActive = false;
+    let recognition = null;
+    let translatePanel = null;
+    let transcriptArea = null;
+    let savedMicState = null;
 
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-        console.warn('[Translator] Web Speech API not supported');
-        return;
+    // ── Check admin access ──
+    function isAdmin() {
+        const user = window.KAuth && KAuth.getUser ? KAuth.getUser() : null;
+        if (!user) return false;
+        const name = (user.user_metadata?.display_name || user.email || '').toLowerCase();
+        return ADMIN_NAMES.some(function (a) { return name.includes(a); });
     }
 
-    function getElements() {
-        return {
-            btn: document.getElementById('btn-translate'),
-            output: document.getElementById('translate-output'),
-            textEl: document.getElementById('translate-text'),
-            saveBtn: document.getElementById('btn-translate-save'),
-            copyBtn: document.getElementById('btn-translate-copy'),
-            clearBtn: document.getElementById('btn-translate-clear'),
-            micBtn: document.getElementById('btn-mic-toggle'),
-        };
+    // ── Initialize T button visibility ──
+    function initTranslator() {
+        const tBtn = document.getElementById('btn-translate');
+        if (!tBtn) return;
+
+        // Show for admin only
+        setTimeout(function () {
+            if (isAdmin()) {
+                tBtn.style.display = 'flex';
+            } else {
+                tBtn.style.display = 'none';
+            }
+        }, 2000);
+
+        tBtn.addEventListener('click', toggleTranslator);
     }
 
-    function start() {
-        if (_active) return;
-        _active = true;
+    // ── Toggle translator ON/OFF ──
+    function toggleTranslator() {
+        if (isActive) {
+            stopTranslator();
+        } else {
+            startTranslator();
+        }
+    }
 
-        const els = getElements();
+    // ── Start listening + translating ──
+    function startTranslator() {
+        const tBtn = document.getElementById('btn-translate');
+        const micBtn = document.getElementById('btn-mic');
 
-        // Show output panel
-        if (els.output) els.output.style.display = '';
-        if (els.textEl) els.textEl.textContent = '🎤 Listening...';
+        // Check browser support
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+            alert('Browser-ul nu suportă recunoaștere vocală. Folosește Chrome.');
+            return;
+        }
 
-        // Style T button as active
-        if (els.btn) {
-            els.btn.style.borderColor = '#10B981';
-            els.btn.style.color = '#10B981';
-            els.btn.style.boxShadow = '0 0 12px rgba(16,185,129,0.5)';
-            els.btn.title = 'Translator ACTIV — Click to stop';
+        isActive = true;
+
+        // Visual feedback
+        if (tBtn) {
+            tBtn.classList.add('active');
+            tBtn.textContent = 'T';
+            tBtn.title = 'Translator ACTIV — click pentru oprire';
         }
 
         // Disable normal mic
-        if (els.micBtn) {
-            els.micBtn.style.opacity = '0.3';
-            els.micBtn.style.pointerEvents = 'none';
-            els.micBtn.title = 'Mic disabled — Translator active';
+        if (micBtn) {
+            savedMicState = micBtn.disabled;
+            micBtn.disabled = true;
+            micBtn.style.opacity = '0.3';
         }
 
-        // Stop KVoice wake detection if available
-        if (window.KVoice && KVoice.pauseWakeDetection) {
-            try { KVoice.pauseWakeDetection(); } catch (e) { }
+        // Stop KVoice recognition if active
+        if (window.KVoice && KVoice.stopListening) {
+            try { KVoice.stopListening(); } catch (_e) { /* ok */ }
         }
 
-        // Create recognition
-        _recognition = new SpeechRecognition();
-        _recognition.continuous = true;
-        _recognition.interimResults = true;
-        _recognition.maxAlternatives = 1;
-        // Accept any language — browser auto-detects
-        _recognition.lang = ''; // empty = auto-detect
+        // Show translate panel
+        showPanel();
 
-        _recognition.onresult = function (event) {
-            let interim = '';
+        // Start recognition
+        recognition = new SpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.maxAlternatives = 1;
+        // Auto-detect language (don't set recognition.lang — let browser decide)
+
+        let lastFinalTranscript = '';
+
+        recognition.onresult = function (event) {
+            let interimTranscript = '';
+            let finalTranscript = '';
+
             for (let i = event.resultIndex; i < event.results.length; i++) {
-                const result = event.results[i];
-                if (result.isFinal) {
-                    const text = result[0].transcript.trim();
-                    if (text) {
-                        const timestamp = new Date().toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-                        _transcript += '[' + timestamp + '] ' + text + '\n';
-                    }
+                const transcript = event.results[i][0].transcript;
+                if (event.results[i].isFinal) {
+                    finalTranscript += transcript;
                 } else {
-                    interim = result[0].transcript;
+                    interimTranscript += transcript;
                 }
             }
-            _interimText = interim;
-            updateDisplay();
-        };
 
-        _recognition.onerror = function (event) {
-            console.warn('[Translator] Error:', event.error);
-            if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
-                stop();
-                return;
+            // Show interim (gray) text
+            if (interimTranscript) {
+                showInterim(interimTranscript);
             }
-            // Auto-restart on other errors
-            if (_active) {
-                setTimeout(function () {
-                    if (_active) {
-                        try { _recognition.start(); } catch (e) { }
-                    }
-                }, 500);
+
+            // Process final text
+            if (finalTranscript && finalTranscript !== lastFinalTranscript) {
+                lastFinalTranscript = finalTranscript;
+                processTranscript(finalTranscript.trim());
             }
         };
 
-        _recognition.onend = function () {
-            // Auto-restart if still active (continuous mode sometimes stops)
-            if (_active) {
-                setTimeout(function () {
-                    if (_active && _recognition) {
-                        try { _recognition.start(); } catch (e) { }
-                    }
-                }, 200);
+        recognition.onerror = function (event) {
+            if (event.error === 'no-speech' || event.error === 'aborted') return;
+            console.warn('[Translator] Recognition error:', event.error);
+            addLine('⚠️ Eroare: ' + event.error, 'error');
+        };
+
+        recognition.onend = function () {
+            // Auto-restart if still active
+            if (isActive) {
+                try { recognition.start(); } catch (_e) { /* ok */ }
             }
         };
 
         try {
-            _recognition.start();
-        } catch (e) {
-            console.error('[Translator] Start failed:', e);
-            stop();
+            recognition.start();
+            addLine('🎤 Translator pornit — vorbește în orice limbă...', 'system');
+        } catch (_e) {
+            addLine('⚠️ Nu am putut porni microfonul', 'error');
         }
     }
 
-    function stop() {
-        _active = false;
-        const els = getElements();
+    // ── Stop translator ──
+    function stopTranslator() {
+        isActive = false;
+        const tBtn = document.getElementById('btn-translate');
+        const micBtn = document.getElementById('btn-mic');
 
-        if (_recognition) {
-            try { _recognition.stop(); } catch (e) { }
-            _recognition = null;
+        if (recognition) {
+            try { recognition.stop(); } catch (_e) { /* ok */ }
+            recognition = null;
         }
 
-        // Style T button as inactive
-        if (els.btn) {
-            els.btn.style.borderColor = '#555';
-            els.btn.style.color = '#888';
-            els.btn.style.boxShadow = '';
-            els.btn.title = 'Live Translator (Admin)';
+        // Visual reset
+        if (tBtn) {
+            tBtn.classList.remove('active');
+            tBtn.title = 'Live Translator (admin)';
         }
 
-        // Re-enable normal mic
-        if (els.micBtn) {
-            els.micBtn.style.opacity = '';
-            els.micBtn.style.pointerEvents = '';
-            els.micBtn.title = 'Microphone ON/OFF';
+        // Restore mic
+        if (micBtn) {
+            micBtn.disabled = savedMicState || false;
+            micBtn.style.opacity = '1';
         }
 
-        // Resume wake detection
+        // Resume KVoice if available
         if (window.KVoice && KVoice.resumeWakeDetection) {
-            try { KVoice.resumeWakeDetection(); } catch (e) { }
+            try { KVoice.resumeWakeDetection(); } catch (_e) { /* ok */ }
         }
 
-        _interimText = '';
-        updateDisplay();
+        addLine('⏹️ Translator oprit.', 'system');
     }
 
-    function toggle() {
-        if (_active) {
-            stop();
-        } else {
-            start();
-        }
-        return _active;
-    }
+    // ── Process a final transcript — translate it ──
+    async function processTranscript(text) {
+        if (!text) return;
 
-    function updateDisplay() {
-        const els = getElements();
-        if (!els.textEl) return;
+        const time = new Date().toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
-        let display = _transcript;
-        if (_interimText) {
-            display += '💬 ' + _interimText + '...';
-        }
-        if (!display) {
-            display = _active ? '🎤 Listening...' : '(no transcript yet)';
-        }
-        els.textEl.textContent = display;
+        // Show original text immediately
+        addLine('[' + time + '] 🎙️ ' + text, 'original');
 
-        // Auto-scroll
-        if (els.output) {
-            els.output.scrollTop = els.output.scrollHeight;
-        }
-    }
-
-    function saveTranscript() {
-        if (!_transcript.trim()) return;
-        const blob = new Blob([_transcript], { type: 'text/plain;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        const date = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
-        a.href = url;
-        a.download = 'kelion-transcript-' + date + '.txt';
-        a.click();
-        setTimeout(function () { URL.revokeObjectURL(url); }, 100);
-    }
-
-    function copyTranscript() {
-        if (!_transcript.trim()) return;
-        navigator.clipboard.writeText(_transcript).then(function () {
-            const els = getElements();
-            if (els.copyBtn) {
-                els.copyBtn.textContent = '✅ Copied!';
-                setTimeout(function () { els.copyBtn.textContent = '📋 Copy'; }, 2000);
-            }
-        }).catch(function () { });
-    }
-
-    function clearTranscript() {
-        _transcript = '';
-        _interimText = '';
-        updateDisplay();
-    }
-
-    // Wire up buttons on DOMContentLoaded
-    document.addEventListener('DOMContentLoaded', function () {
-        const els = getElements();
-
-        // Show T button only for admin users
-        // Check periodically since auth loads async
-        function checkAdmin() {
-            var userEl = document.getElementById('user-name');
-            var userName = (userEl && userEl.textContent) || '';
-            var isAdmin = /adrianenc|ENCICULESCU|admin/i.test(userName) && !/guest/i.test(userName);
-            if (isAdmin && els.btn) {
-                els.btn.style.display = '';
-            }
-        }
-        checkAdmin();
-        // Re-check after auth loads (2s, 5s)
-        setTimeout(checkAdmin, 2000);
-        setTimeout(checkAdmin, 5000);
-
-        if (els.btn) {
-            els.btn.addEventListener('click', toggle);
-        }
-        if (els.saveBtn) {
-            els.saveBtn.addEventListener('click', saveTranscript);
-        }
-        if (els.copyBtn) {
-            els.copyBtn.addEventListener('click', copyTranscript);
-        }
-        if (els.clearBtn) {
-            els.clearBtn.addEventListener('click', function () {
-                clearTranscript();
-                if (!_active && els.output) {
-                    els.output.style.display = 'none';
-                }
+        // Translate via backend (lightweight, no brain)
+        try {
+            const API_BASE = window.API_BASE || '';
+            const resp = await fetch(API_BASE + '/api/translate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: text, targetLang: 'ro' })
             });
+
+            if (resp.ok) {
+                const data = await resp.json();
+                const lang = data.detectedLang || '??';
+                const translated = data.translated || text;
+
+                if (lang.toLowerCase() === 'ro' || translated.toLowerCase() === text.toLowerCase()) {
+                    // Already Romanian or same text — just show transcription
+                    addLine('[' + time + '] 📝 ' + text, 'translated');
+                } else {
+                    // Show translation with detected lang flag
+                    addLine('[' + time + '] 🌐 [' + lang.toUpperCase() + '→RO] ' + translated, 'translated');
+                }
+            } else {
+                // Fallback — show original
+                addLine('[' + time + '] 📝 ' + text, 'translated');
+            }
+        } catch (_e) {
+            // Offline fallback — just show text
+            addLine('[' + time + '] 📝 ' + text, 'translated');
         }
-    });
+    }
+
+    // ── Show interim (in-progress) text ──
+    function showInterim(text) {
+        if (!transcriptArea) return;
+        let interimEl = transcriptArea.querySelector('.translate-interim');
+        if (!interimEl) {
+            interimEl = document.createElement('div');
+            interimEl.className = 'translate-interim';
+            transcriptArea.appendChild(interimEl);
+        }
+        interimEl.textContent = '... ' + text;
+        transcriptArea.scrollTop = transcriptArea.scrollHeight;
+    }
+
+    // ── Add a line to the transcript ──
+    function addLine(text, type) {
+        if (!transcriptArea) return;
+
+        // Remove interim
+        const interim = transcriptArea.querySelector('.translate-interim');
+        if (interim) interim.remove();
+
+        const line = document.createElement('div');
+        line.className = 'translate-line translate-' + (type || 'original');
+        line.textContent = text;
+        transcriptArea.appendChild(line);
+        transcriptArea.scrollTop = transcriptArea.scrollHeight;
+    }
+
+    // ── Show/create the translate panel ──
+    function showPanel() {
+        translatePanel = document.getElementById('translate-output');
+        if (!translatePanel) return;
+
+        translatePanel.style.display = 'flex';
+        translatePanel.innerHTML = '';
+
+        // Header with controls
+        const header = document.createElement('div');
+        header.className = 'translate-header';
+        header.innerHTML =
+            '<span>🌐 Live Translator — Accesibilitate</span>' +
+            '<div class="translate-actions">' +
+            '<button id="tr-save" title="Salvează transcript">💾 Save</button>' +
+            '<button id="tr-copy" title="Copiază text">📋 Copy</button>' +
+            '<button id="tr-clear" title="Șterge tot">🗑️ Clear</button>' +
+            '</div>';
+        translatePanel.appendChild(header);
+
+        // Transcript area
+        transcriptArea = document.createElement('div');
+        transcriptArea.className = 'translate-transcript';
+        translatePanel.appendChild(transcriptArea);
+
+        // Wire buttons
+        header.querySelector('#tr-save').onclick = saveTranscript;
+        header.querySelector('#tr-copy').onclick = copyTranscript;
+        header.querySelector('#tr-clear').onclick = clearTranscript;
+    }
+
+    // ── Get full transcript text ──
+    function getFullText() {
+        if (!transcriptArea) return '';
+        const lines = transcriptArea.querySelectorAll('.translate-line');
+        return Array.from(lines).map(function (l) { return l.textContent; }).join('\n');
+    }
+
+    // ── Save transcript as .txt ──
+    function saveTranscript() {
+        const text = getFullText();
+        if (!text) return;
+        const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'kelion-translate-' + new Date().toISOString().slice(0, 19).replace(/:/g, '-') + '.txt';
+        a.click();
+        URL.revokeObjectURL(a.href);
+    }
+
+    // ── Copy transcript to clipboard ──
+    function copyTranscript() {
+        const text = getFullText();
+        if (!text) return;
+        navigator.clipboard.writeText(text).then(function () {
+            const btn = document.getElementById('tr-copy');
+            if (btn) { btn.textContent = '✅ Copied!'; setTimeout(function () { btn.textContent = '📋 Copy'; }, 2000); }
+        }).catch(function () {
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+        });
+    }
+
+    // ── Clear transcript ──
+    function clearTranscript() {
+        if (transcriptArea) transcriptArea.innerHTML = '';
+        if (!isActive) {
+            const panel = document.getElementById('translate-output');
+            if (panel) panel.style.display = 'none';
+        }
+    }
+
+    // ── Auto-init ──
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initTranslator);
+    } else {
+        setTimeout(initTranslator, 500);
+    }
 
     // Export for external use
-    window.KTranslator = {
-        start: start,
-        stop: stop,
-        toggle: toggle,
-        isActive: function () { return _active; },
-        getTranscript: function () { return _transcript; },
+    window.LiveTranslator = {
+        start: startTranslator,
+        stop: stopTranslator,
+        toggle: toggleTranslator,
+        isActive: function () { return isActive; }
     };
 })();

@@ -318,7 +318,7 @@
             overlay.appendChild(msgEl);
 
             let fullReply = '';
-            let streamEngine = 'Gemini';
+            let _streamEngine = 'Gemini';
             let streamSuccess = false;
 
             // Try SSE streaming first (if no media — stream doesn't support images)
@@ -516,7 +516,7 @@
             }
 
             // Speak the reply
-            const thisGen = ++_speakGeneration;
+            const _thisGen = ++_speakGeneration;
             if (window.KVoice) {
                 KVoice.speak(fullReply, KAvatar.getCurrentAvatar());
             }
