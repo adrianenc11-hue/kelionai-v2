@@ -580,10 +580,20 @@ async function loadBrain() {
 // ── INIT — Auth-guarded (#156: prevent 403 flood) ──
 let _adminIntervals = [];
 async function initAdmin() {
-    // Check auth before loading anything
-    try {
+    // Check auth before loading anything (with retry for cold-start)
+    async function checkAdminAuth() {
         const testR = await fetch('/api/admin/ai-status', { headers: hdrs() });
-        if (testR.status === 401 || testR.status === 403) {
+        return testR.status !== 401 && testR.status !== 403;
+    }
+    try {
+        let ok = await checkAdminAuth();
+        if (!ok) {
+            // Retry once after delay (cold-start / token propagation)
+            console.warn('[Admin] First auth check failed, retrying in 1.5s...');
+            await new Promise(r => setTimeout(r, 1500));
+            ok = await checkAdminAuth();
+        }
+        if (!ok) {
             document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;color:#f66;font-size:1.5rem;background:#0a0a14;"><div>🔒 Admin access denied</div><div style="font-size:0.9rem;color:#888;margin-top:8px">Please enter admin code in chat first.</div><a href="/" style="margin-top:16px;color:#a5b4fc;text-decoration:none;">← Back to KelionAI</a></div>';
             return;
         }
