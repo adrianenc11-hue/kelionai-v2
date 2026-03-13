@@ -104,7 +104,7 @@
 
             // Send vision context to brain for enriched follow-up
             try {
-                await sendToAI_Regular('[VISION_CONTEXT: ' + desc + '] Tocmai am văzut prin cameră. Oferă un comentariu scurt și natural despre ce am observat.', 'ro');
+                await sendToAI_Regular('[VISION_CONTEXT: ' + desc + '] Am văzut prin cameră. Confirmă scurt ce am văzut și întreabă dacă vrea detalii despre ceva anume. NU descrie din nou tot.', 'ro');
             } catch (_e) { /* fallback: just speak the raw description */ }
 
             try { KAvatar.setExpression('happy', 0.3); } catch (e) { console.warn('[App] Expression change failed:', e.message); }
@@ -296,6 +296,7 @@
                 if (frame) {
                     payload.imageBase64 = frame.base64;
                     payload.imageMimeType = frame.mimeType;
+                    payload.isAutoCamera = true; // flag for concise vision responses
                 }
             }
 

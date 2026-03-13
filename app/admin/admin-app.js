@@ -9,19 +9,23 @@ function hdrs() {
     const h = { 'Content-Type': 'application/json' };
     if (adminSecret) h['x-admin-secret'] = adminSecret;
     try {
-        // Try all known Supabase token storage keys
-        const keys = Object.keys(localStorage).filter(function (k) { return k.startsWith('sb-') && k.endsWith('-auth-token'); });
         let t = null;
-        for (let i = 0; i < keys.length; i++) {
-            try {
-                const raw = localStorage.getItem(keys[i]);
-                if (raw) {
-                    const parsed = JSON.parse(raw);
-                    if (parsed && parsed.access_token) { t = parsed.access_token; break; }
-                }
-            } catch (_e2) { /* ignored */ }
+        // Priority 1: sessionStorage kelion_token (set by auth.js on login)
+        t = sessionStorage.getItem('kelion_token');
+        // Priority 2: Supabase token keys in localStorage
+        if (!t) {
+            const keys = Object.keys(localStorage).filter(function (k) { return k.startsWith('sb-') && k.endsWith('-auth-token'); });
+            for (let i = 0; i < keys.length; i++) {
+                try {
+                    const raw = localStorage.getItem(keys[i]);
+                    if (raw) {
+                        const parsed = JSON.parse(raw);
+                        if (parsed && parsed.access_token) { t = parsed.access_token; break; }
+                    }
+                } catch (_e2) { /* ignored */ }
+            }
         }
-        // Fallback: direct token
+        // Priority 3: direct token fallback
         if (!t) t = localStorage.getItem('sb-access-token');
         if (t) h['Authorization'] = 'Bearer ' + t;
     } catch (_e) { /* ignored */ }

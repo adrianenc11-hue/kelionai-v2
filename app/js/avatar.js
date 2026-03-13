@@ -67,7 +67,7 @@
     let isPresenting = false;
     const PRESENT_ANGLE = 8 * Math.PI / 180; // 8 degrees right
 
-    // ══ INNOVATIVE: Eye Tracking (mouse follow) ══════════════
+    // ══ INNOVATIVE: Eye Tracking (mouse follow + face tracking) ══════════════
     let _mouseX = 0, _mouseY = 0;
     let _eyeBones = { left: null, right: null };
     let _headBone = null;
@@ -82,10 +82,12 @@
 
     // ══ Face Tracking via Camera ═══════════════════════════════
     let _faceTrackingActive = false;
+    let _faceTrackingTimeout = null;
+
+    // Listen for vision-detection events (from RealtimeVision COCO-SSD)
     window.addEventListener('vision-detection', function (e) {
         if (!e.detail || !e.detail.predictions) return;
         const preds = e.detail.predictions;
-        // Find 'person' detection (coco-ssd class)
         let person = null;
         for (let i = 0; i < preds.length; i++) {
             if (preds[i].class === 'person' && preds[i].score > 0.4) {
@@ -95,20 +97,29 @@
         }
         if (person) {
             _faceTrackingActive = true;
-            // bbox = [x, y, width, height]
-            // Face is at top-center of person bbox
             const video = document.querySelector('video');
             const vw = video ? video.videoWidth || 640 : 640;
             const vh = video ? video.videoHeight || 480 : 480;
             const faceCenterX = person.bbox[0] + person.bbox[2] / 2;
-            const faceCenterY = person.bbox[1] + person.bbox[3] * 0.2; // top 20% = face
-            // Normalize to -1..1 (MIRRORED on X because front camera is mirrored)
+            const faceCenterY = person.bbox[1] + person.bbox[3] * 0.2;
             _mouseX = -((faceCenterX / vw) * 2 - 1);
             _mouseY = -((faceCenterY / vh) * 2 - 1);
+            // Auto-expire face tracking if no new detection for 3s
+            clearTimeout(_faceTrackingTimeout);
+            _faceTrackingTimeout = setTimeout(function () { _faceTrackingActive = false; }, 3000);
         }
     });
-    // Face tracking — starts ONLY when user explicitly requests it
-    // (not auto-start; camera turns on only via RealtimeVision.start())
+
+    // Listen for face-position events (from KAutoCamera lightweight face detection)
+    window.addEventListener('face-position', function (e) {
+        if (!e.detail) return;
+        _faceTrackingActive = true;
+        // e.detail.x, e.detail.y are normalized -1..1 (already mirrored)
+        _mouseX = e.detail.x;
+        _mouseY = e.detail.y;
+        clearTimeout(_faceTrackingTimeout);
+        _faceTrackingTimeout = setTimeout(function () { _faceTrackingActive = false; }, 3000);
+    });
 
     // ══ INNOVATIVE: Micro-expressions ═════════════════════════
     let _microTimer = 0;
@@ -622,11 +633,38 @@
     let _computedArmDown = null;
 
     function _computeArmDownQuaternions() {
-        // DISABLED: arm rotation was deforming the mesh.
-        // Arms will stay in the GLB model's original rest pose (T-pose or A-pose).
-        // Proper fix requires a model with built-in idle animation or correct bone orientation.
-        _computedArmDown = null;
-        console.log('[Avatar] Arm rotation DISABLED — using model rest pose');
+        // Bring arms from A-pose to relaxed hanging position
+        // Strategy: apply moderate rotation (~35°) to UpperArm bones ONLY
+        // Shoulders and forearms stay in rest pose to avoid mesh deformation
+        if (typeof THREE === 'undefined') return;
+
+        const angle = 35 * Math.PI / 180; // 35° — enough to look natural, not enough to deform
+
+        // Left arm: rotate around local Z axis by -angle (bring down)
+        if (armBones.leftArm) {
+            const delta = new THREE.Quaternion().setFromAxisAngle(
+                new THREE.Vector3(0, 0, 1), -angle
+            );
+            const rest = armBones.leftArm.quaternion.clone();
+            _computedArmDown = _computedArmDown || {};
+            _computedArmDown.la = rest.multiply(delta);
+        }
+
+        // Right arm: rotate around local Z axis by +angle (bring down, mirrored)
+        if (armBones.rightArm) {
+            const delta = new THREE.Quaternion().setFromAxisAngle(
+                new THREE.Vector3(0, 0, 1), angle
+            );
+            const rest = armBones.rightArm.quaternion.clone();
+            _computedArmDown = _computedArmDown || {};
+            _computedArmDown.ra = rest.multiply(delta);
+        }
+
+        if (_computedArmDown) {
+            console.log('[Avatar] ✅ Arm-down quaternions computed (35° rotation)');
+        } else {
+            console.log('[Avatar] ⚠️ No arm bones found for arm-down computation');
+        }
     }
 
     // MetaPerson bone quaternions for arm poses
@@ -691,18 +729,24 @@
             if (armBones.rightShoulder && _computedArmDown.rs) {
                 armBones.rightShoulder.quaternion.copy(_computedArmDown.rs);
             }
+            if (armBones.leftArm && _computedArmDown.la) {
+                armBones.leftArm.quaternion.copy(_computedArmDown.la);
+            }
+            if (armBones.rightArm && _computedArmDown.ra) {
+                armBones.rightArm.quaternion.copy(_computedArmDown.ra);
+            }
             if (armBones.leftForeArm && _computedArmDown.lfa) {
                 armBones.leftForeArm.quaternion.copy(_computedArmDown.lfa);
             }
             if (armBones.rightForeArm && _computedArmDown.rfa) {
                 armBones.rightForeArm.quaternion.copy(_computedArmDown.rfa);
             }
+        } else {
+            // Fallback: Apply upper arm quaternions from static pose table
+            const p = ARM_POSES[currentPose] || ARM_POSES.relaxed;
+            if (armBones.leftArm && p.la) armBones.leftArm.quaternion.set(p.la[0], p.la[1], p.la[2], p.la[3]);
+            if (armBones.rightArm && p.ra) armBones.rightArm.quaternion.set(p.ra[0], p.ra[1], p.ra[2], p.ra[3]);
         }
-
-        // Apply upper arm quaternions from static pose table
-        const p = ARM_POSES[currentPose] || ARM_POSES.relaxed;
-        if (armBones.leftArm && p.la) armBones.leftArm.quaternion.set(p.la[0], p.la[1], p.la[2], p.la[3]);
-        if (armBones.rightArm && p.ra) armBones.rightArm.quaternion.set(p.ra[0], p.ra[1], p.ra[2], p.ra[3]);
     }
 
     function updateExpression(dt) {
@@ -804,34 +848,44 @@
             if (_saccadeTimer >= _nextSaccade) {
                 _saccadeTimer = 0;
                 _nextSaccade = 0.5 + Math.random() * 2;
-                _saccadeTargetX = (Math.random() - 0.5) * 0.04;
-                _saccadeTargetY = (Math.random() - 0.5) * 0.02;
+                _saccadeTargetX = (Math.random() - 0.5) * 0.03;
+                _saccadeTargetY = (Math.random() - 0.5) * 0.015;
             }
-            _saccadeCurrentX += (_saccadeTargetX - _saccadeCurrentX) * 0.3;
-            _saccadeCurrentY += (_saccadeTargetY - _saccadeCurrentY) * 0.3;
+            _saccadeCurrentX += (_saccadeTargetX - _saccadeCurrentX) * 0.25;
+            _saccadeCurrentY += (_saccadeTargetY - _saccadeCurrentY) * 0.25;
 
-            // ══ Eye Tracking (mouse follow + saccades) ═══════════════
-            if (_eyeBones.left || _eyeBones.right) {
-                const eyeYaw = _mouseX * 0.35 + _saccadeCurrentX;
-                const eyePitch = _mouseY * 0.2 + _saccadeCurrentY;
-                if (_eyeBones.left) {
-                    _eyeBones.left.rotation.y += (eyeYaw - _eyeBones.left.rotation.y) * 0.1;
-                    _eyeBones.left.rotation.x += (eyePitch - _eyeBones.left.rotation.x) * 0.1;
-                }
-                if (_eyeBones.right) {
-                    _eyeBones.right.rotation.y += (eyeYaw - _eyeBones.right.rotation.y) * 0.1;
-                    _eyeBones.right.rotation.x += (eyePitch - _eyeBones.right.rotation.x) * 0.1;
-                }
-            } else {
-                // Fallback: morph-based eye direction
-                setMorph('eyeLookOutLeft', Math.max(0, _mouseX * 0.3));
-                setMorph('eyeLookInLeft', Math.max(0, -_mouseX * 0.3));
-                setMorph('eyeLookOutRight', Math.max(0, -_mouseX * 0.3));
-                setMorph('eyeLookInRight', Math.max(0, _mouseX * 0.3));
-                setMorph('eyeLookUpLeft', Math.max(0, _mouseY * 0.2));
-                setMorph('eyeLookUpRight', Math.max(0, _mouseY * 0.2));
-                setMorph('eyeLookDownLeft', Math.max(0, -_mouseY * 0.2));
-                setMorph('eyeLookDownRight', Math.max(0, -_mouseY * 0.2));
+            // ══ Eye Tracking — MORPH-BASED PRIMARY (parallel gaze, no cross-eye) ══
+            // Morph targets handle left/right correctly by design:
+            //   eyeLookOutLeft  = left eye looks LEFT  (away from nose)
+            //   eyeLookInLeft   = left eye looks RIGHT (toward nose)
+            //   eyeLookOutRight = right eye looks RIGHT (away from nose)
+            //   eyeLookInRight  = right eye looks LEFT  (toward nose)
+            // When _mouseX > 0 (looking RIGHT): LookInLeft + LookOutRight → both eyes right ✓
+            // When _mouseX < 0 (looking LEFT):  LookOutLeft + LookInRight → both eyes left ✓
+            const gazeX = _mouseX * 0.35 + _saccadeCurrentX;
+            const gazeY = _mouseY * 0.25 + _saccadeCurrentY;
+
+            // Horizontal gaze (parallel — both eyes look the same direction)
+            setMorph('eyeLookInLeft',    Math.max(0,  gazeX * 0.6));  // left eye → right
+            setMorph('eyeLookOutLeft',   Math.max(0, -gazeX * 0.6));  // left eye → left
+            setMorph('eyeLookOutRight',  Math.max(0,  gazeX * 0.6));  // right eye → right
+            setMorph('eyeLookInRight',   Math.max(0, -gazeX * 0.6));  // right eye → left
+            // Vertical gaze
+            setMorph('eyeLookUpLeft',    Math.max(0,  gazeY * 0.4));
+            setMorph('eyeLookUpRight',   Math.max(0,  gazeY * 0.4));
+            setMorph('eyeLookDownLeft',  Math.max(0, -gazeY * 0.4));
+            setMorph('eyeLookDownRight', Math.max(0, -gazeY * 0.4));
+
+            // ══ Bone-based eye rotation — SUBTLE SUPPLEMENT ONLY ══
+            // Very gentle embellishment (10x less than before), with mirror correction
+            if (_eyeBones.left) {
+                _eyeBones.left.rotation.y += (gazeX * 0.04 - _eyeBones.left.rotation.y) * 0.06;
+                _eyeBones.left.rotation.x += (gazeY * 0.03 - _eyeBones.left.rotation.x) * 0.06;
+            }
+            if (_eyeBones.right) {
+                // MIRROR CORRECTION: negate Y for right eye bone (mirrored skeleton)
+                _eyeBones.right.rotation.y += (-gazeX * 0.04 - _eyeBones.right.rotation.y) * 0.06;
+                _eyeBones.right.rotation.x += (gazeY * 0.03 - _eyeBones.right.rotation.x) * 0.06;
             }
 
             // Body stays STILL — only brain-triggered gestures move the model

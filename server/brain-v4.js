@@ -2923,6 +2923,15 @@ async function thinkV4(
           data: mediaData.imageBase64,
         },
       });
+      // Auto-camera: add accessibility hint for concise descriptions
+      if (mediaData.isAutoCamera) {
+        userParts.push({
+          text: "[AUTO-CAMERA] Aceasta e imagine automată de la camera utilizatorului. " +
+                "Regulă: NU descrie toată camera/scena. Fii SCURT (1-2 propoziții). " +
+                "Menționează DOAR: persoane (culori exacte de haine), pericole, text vizibil. " +
+                "Dacă nu e nimic nou de spus, nu comenta imaginea deloc — răspunde normal la mesaj.",
+        });
+      }
     }
     userParts.push({ text: message });
 
