@@ -414,6 +414,13 @@
                 });
             }
 
+            // Eye gaze from brain (center, left, right, up, down, up-left, etc.)
+            if (data.gaze && KAvatar.setEyeGaze) {
+                KAvatar.setEyeGaze(data.gaze);
+                // Return to natural idle after 3 seconds
+                setTimeout(function () { try { KAvatar.startEyeIdle(); } catch (_e) { /* ok */ } }, 3000);
+            }
+
             // ── AUTO-DISPLAY: Show reply on monitor if it has structured content ──
             if (window.MonitorManager && fullReply) {
                 const hasStructure = /^[\-\*\d]\s|^#{1,3}\s|\*\*|```|\n\n/m.test(fullReply);
@@ -815,6 +822,8 @@
         if (window.KAuth) KAuth.init();
         try {
             KAvatar.init();
+            // Auto-start natural eye movement
+            setTimeout(function () { try { KAvatar.startEyeIdle(); } catch (_e) { /* ok */ } }, 3000);
         } catch (e) {
             console.error('[App] Avatar init failed:', e.message);
             const canvas = document.getElementById('avatar-canvas');

@@ -618,20 +618,35 @@ GESTURI EXPRESIVE:
 - facepalm = facepalm (eroare amuzantă, "uff")
 - salute = salut militar (disciplină, respect)
 
+### OCHI (privire) — [GAZE:xxx]
+Controlezi direcția ochilor:
+- center = privește spre utilizator (default)
+- left = privește stânga
+- right = privește dreapta
+- up = privește sus (gândire, visare)
+- down = privește jos (rușine, timiditate)
+- up-left = privește sus-stânga (amintire)
+- up-right = privește sus-dreapta (imaginare)
+- down-left = privește jos-stânga (introspecție)
+- down-right = privește jos-dreapta (emoție)
+Exemplu: [GAZE:up] Hmm, lasă-mă să mă gândesc...
+
 ### REGULI DE UTILIZARE:
 1. Folosește MINIM un tag [EMOTION:xxx] la fiecare răspuns
 2. Folosește [BODY:xxx] când situația cere vizual (salut, acord, entuziasm)
-3. Nu supraîncărca — max 1-2 body actions per răspuns
-4. Alege gestul potrivit emoției: bucurie→thumbsUpRight, salut→wavRight, gândire→thinkPose
-5. Tag-urile se pun ORIUNDE în text — sistemul le extrage automat
-6. Textul care rămâne (fără tag-uri) e ce vede userul pe ecran
+3. Folosește [GAZE:xxx] pentru a face privirea naturală — privește sus când gândești, la utilizator când vorbești
+4. Nu supraîncărca — max 1-2 body actions + 1 gaze per răspuns
+5. Alege gestul potrivit emoției: bucurie→thumbsUpRight, salut→wavRight, gândire→thinkPose
+6. Tag-urile se pun ORIUNDE în text — sistemul le extrage automat
+7. Textul care rămâne (fără tag-uri) e ce vede userul pe ecran
 
 ### EXEMPLE NATURALE:
-"Bună! [EMOTION:happy] [GESTURE:wave] [BODY:wavRight] Ce mai faci?"
-"Hmm, lasă-mă să mă gândesc... [EMOTION:thinking] [BODY:thinkPose]"
-"Bravo! Ai reușit! [EMOTION:excited] [BODY:clap]"
-"Nu sunt sigur... [EMOTION:confused] [BODY:headScratch]"
-"Gata, rezolvat! [EMOTION:happy] [BODY:thumbsUpRight]"
+"Bună! [EMOTION:happy] [GESTURE:wave] [BODY:wavRight] [GAZE:center] Ce mai faci?"
+"Hmm, lasă-mă să mă gândesc... [EMOTION:thinking] [BODY:thinkPose] [GAZE:up]"
+"Bravo! Ai reușit! [EMOTION:excited] [BODY:clap] [GAZE:center]"
+"Nu sunt sigur... [EMOTION:confused] [BODY:headScratch] [GAZE:up-left]"
+"Gata, rezolvat! [EMOTION:happy] [BODY:thumbsUpRight] [GAZE:center]"
+"Îmi pare rău... [EMOTION:sad] [GAZE:down]"
 `;
 
   // ── ASSEMBLY ─────────────────────────────────────────────

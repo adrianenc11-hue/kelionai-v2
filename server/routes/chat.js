@@ -417,6 +417,13 @@ router.post("/chat", chatLimiter, validate(chatSchema), async (req, res) => {
     const bodyMatches = reply.matchAll(/\[BODY:\s*(\w+)\]/gi);
     for (const bm of bodyMatches) bodyActions.push(bm[1]);
     reply = reply.replace(/\[BODY:\s*\w+\]/gi, "").trim();
+    // Parse [GAZE:xxx] tag from AI reply (eye direction: center, left, right, up, down, up-left, etc.)
+    let gaze = null;
+    const gazeMatch = reply.match(/\[GAZE:\s*([\w-]+)\]/i);
+    if (gazeMatch) {
+      gaze = gazeMatch[1].toLowerCase();
+      reply = reply.replace(/\[GAZE:\s*[\w-]+\]/gi, "").trim();
+    }
 
     const response = {
       reply,
@@ -430,6 +437,7 @@ router.post("/chat", chatLimiter, validate(chatSchema), async (req, res) => {
       gestures,
       pose,
       bodyActions,
+      gaze,
     };
     if (monitorFromReply) {
       response.monitor = monitorFromReply;

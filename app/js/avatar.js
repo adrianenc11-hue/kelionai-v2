@@ -1066,6 +1066,52 @@
                 if (camera) camera.position.z = z;
             });
         },
+        setEyeGaze: function (direction, intensity) {
+            intensity = intensity || 0.4;
+            const target = { up: 0, down: 0, left: 0, right: 0 };
+            const gazeMap = {
+                'center':     {},
+                'left':       { left: intensity },
+                'right':      { right: intensity },
+                'up':         { up: intensity },
+                'down':       { down: intensity },
+                'up-left':    { up: intensity * 0.7, left: intensity * 0.7 },
+                'up-right':   { up: intensity * 0.7, right: intensity * 0.7 },
+                'down-left':  { down: intensity * 0.7, left: intensity * 0.7 },
+                'down-right': { down: intensity * 0.7, right: intensity * 0.7 },
+            };
+            const g = gazeMap[direction] || {};
+            Object.assign(target, g);
+            // Apply directly using setMorph — smooth enough via RPM blendshapes
+            setMorph('eyeLookUpLeft',    target.up);
+            setMorph('eyeLookUpRight',   target.up);
+            setMorph('eyeLookDownLeft',  target.down);
+            setMorph('eyeLookDownRight', target.down);
+            // Left gaze: left-eye Out, right-eye In
+            setMorph('eyeLookOutLeft',   target.left);
+            setMorph('eyeLookInRight',   target.left);
+            // Right gaze: left-eye In, right-eye Out
+            setMorph('eyeLookInLeft',    target.right);
+            setMorph('eyeLookOutRight',  target.right);
+        },
+        startEyeIdle: function () {
+            if (this._eyeIdleTimer) return;
+            const self = this;
+            const directions = ['center', 'center', 'center', 'left', 'right', 'up', 'up-left', 'up-right', 'down'];
+            function nextGaze() {
+                const dir = directions[Math.floor(Math.random() * directions.length)];
+                const intensity = 0.1 + Math.random() * 0.25;
+                self.setEyeGaze(dir, intensity);
+                const delay = 1500 + Math.random() * 3000;
+                self._eyeIdleTimer = setTimeout(nextGaze, delay);
+            }
+            nextGaze();
+        },
+        stopEyeIdle: function () {
+            if (this._eyeIdleTimer) { clearTimeout(this._eyeIdleTimer); this._eyeIdleTimer = null; }
+            this.setEyeGaze('center');
+        },
+        _eyeIdleTimer: null,
         getLipSync: function () { return lipSync; },
         getTextLipSync: function () { return textLipSync; },
         getMorphMeshes: function () { return morphMeshes; },
