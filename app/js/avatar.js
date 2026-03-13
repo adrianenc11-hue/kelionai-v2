@@ -632,39 +632,63 @@
     // around their local Z axis to bring arms to a natural hanging position.
     let _computedArmDown = null;
 
-    function _computeArmDownQuaternions() {
-        // Bring arms from A-pose to relaxed hanging position
-        // Strategy: apply moderate rotation (~35°) to UpperArm bones ONLY
-        // Shoulders and forearms stay in rest pose to avoid mesh deformation
+    // Store rest-pose quaternions (captured ONCE when model loads)
+    let _armRestLeft = null;
+    let _armRestRight = null;
+    let _currentArmAngle = 15; // DEFAULT: 15° — gentle, preserves shoulders
+
+    function _computeArmDownQuaternions(angleDeg) {
         if (typeof THREE === 'undefined') return;
+        if (angleDeg !== undefined) _currentArmAngle = angleDeg;
+        const angle = _currentArmAngle * Math.PI / 180;
 
-        const angle = 35 * Math.PI / 180; // 35° — enough to look natural, not enough to deform
+        // Capture rest-pose quaternions ONCE
+        if (!_armRestLeft && armBones.leftArm) _armRestLeft = armBones.leftArm.quaternion.clone();
+        if (!_armRestRight && armBones.rightArm) _armRestRight = armBones.rightArm.quaternion.clone();
 
-        // Left arm: rotate around local Z axis by -angle (bring down)
-        if (armBones.leftArm) {
-            const delta = new THREE.Quaternion().setFromAxisAngle(
-                new THREE.Vector3(0, 0, 1), -angle
-            );
-            const rest = armBones.leftArm.quaternion.clone();
-            _computedArmDown = _computedArmDown || {};
-            _computedArmDown.la = rest.multiply(delta);
+        _computedArmDown = {};
+
+        // Left arm: rotate around local Z axis by -angle
+        if (armBones.leftArm && _armRestLeft) {
+            const delta = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -angle);
+            _computedArmDown.la = _armRestLeft.clone().multiply(delta);
+        }
+        // Right arm: rotate around local Z axis by +angle (mirrored)
+        if (armBones.rightArm && _armRestRight) {
+            const delta = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), angle);
+            _computedArmDown.ra = _armRestRight.clone().multiply(delta);
         }
 
-        // Right arm: rotate around local Z axis by +angle (bring down, mirrored)
-        if (armBones.rightArm) {
-            const delta = new THREE.Quaternion().setFromAxisAngle(
-                new THREE.Vector3(0, 0, 1), angle
-            );
-            const rest = armBones.rightArm.quaternion.clone();
-            _computedArmDown = _computedArmDown || {};
-            _computedArmDown.ra = rest.multiply(delta);
-        }
+        console.log('[Avatar] Arm-down:', _currentArmAngle + '°');
+    }
 
-        if (_computedArmDown) {
-            console.log('[Avatar] ✅ Arm-down quaternions computed (35° rotation)');
-        } else {
-            console.log('[Avatar] ⚠️ No arm bones found for arm-down computation');
-        }
+    // ── CALIBRATION SLIDER UI ──────────────────────────────
+    function showArmCalibrator() {
+        if (document.getElementById('arm-calibrator')) return;
+        const panel = document.createElement('div');
+        panel.id = 'arm-calibrator';
+        panel.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);z-index:9999;background:rgba(0,0,0,0.9);border:1px solid #6366f1;border-radius:12px;padding:16px 24px;display:flex;flex-direction:column;align-items:center;gap:8px;font-family:var(--kelion-font);color:#fff;';
+        panel.innerHTML = '<div style="font-size:0.9rem;font-weight:600;">🔧 Calibrare brațe</div>' +
+            '<div style="display:flex;align-items:center;gap:12px;">' +
+            '<span style="font-size:0.75rem;color:#888;">0°</span>' +
+            '<input type="range" id="arm-angle-slider" min="0" max="60" value="' + _currentArmAngle + '" style="width:250px;accent-color:#6366f1;">' +
+            '<span style="font-size:0.75rem;color:#888;">60°</span>' +
+            '</div>' +
+            '<div id="arm-angle-value" style="font-size:1.2rem;font-weight:700;color:#6366f1;">' + _currentArmAngle + '°</div>' +
+            '<div style="font-size:0.7rem;color:#888;">Spune-mi numărul când arată bine!</div>' +
+            '<button id="arm-cal-close" style="margin-top:4px;padding:4px 16px;background:#6366f1;border:none;border-radius:8px;color:#fff;cursor:pointer;font-size:0.8rem;">Închide</button>';
+        document.body.appendChild(panel);
+
+        var slider = document.getElementById('arm-angle-slider');
+        var label = document.getElementById('arm-angle-value');
+        slider.addEventListener('input', function () {
+            var val = parseInt(slider.value);
+            label.textContent = val + '°';
+            _computeArmDownQuaternions(val);
+        });
+        document.getElementById('arm-cal-close').addEventListener('click', function () {
+            panel.remove();
+        });
     }
 
     // MetaPerson bone quaternions for arm poses
@@ -1262,6 +1286,8 @@
             setFingerPose(hand, pose);
         },
         findArmBones: findArmBones,
+        showArmCalibrator: showArmCalibrator,
+        setArmAngle: function (deg) { _computeArmDownQuaternions(deg); },
         getLipSync: function () { return lipSync; },
         getTextLipSync: function () { return textLipSync; },
         getMorphMeshes: function () { return morphMeshes; },
