@@ -11,8 +11,8 @@ const MODELS = {
   OPENAI_CHAT: "gpt-5.4",
   OPENAI_FALLBACK: "gpt-4o",
   OPENAI_VISION: "gpt-5.4",
-  GEMINI_CHAT: "gemini-3.1-flash",
-  GEMINI_VISION: "gemini-3.1-flash",
+  GEMINI_CHAT: "gemini-2.5-flash",
+  GEMINI_VISION: "gemini-2.5-flash",
   DEEPSEEK: "deepseek-chat",
 
   // ── STT ──
