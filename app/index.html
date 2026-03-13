@@ -646,58 +646,7 @@
                     <div id="monitor-video" style="display:none"><iframe id="monitor-video-src" src=""
                             allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen
                             style="width:100%;height:100%;border:none;border-radius:8px"></iframe></div>
-                    <div id="monitor-default" class="monitor-dashboard">
-                        <div class="dash-header">
-                            <div class="dash-greeting">
-                                <span class="dash-wave">👋</span>
-                                <span class="dash-hello" id="dash-greeting-text">Bună!</span>
-                            </div>
-                            <div class="dash-clock" id="dash-clock">--:--</div>
-                        </div>
-                        <p class="dash-subtitle">Ce pot face pentru tine?</p>
-                        <div class="dash-grid">
-                            <button class="dash-btn" onclick="document.getElementById('text-input').value='caută pe internet ';document.getElementById('text-input').focus();">
-                                <span class="dash-icon">🔍</span><span class="dash-label">Search</span>
-                            </button>
-                            <button class="dash-btn" onclick="document.getElementById('text-input').value='cum e vremea? ';document.getElementById('text-input').focus();">
-                                <span class="dash-icon">🌤️</span><span class="dash-label">Weather</span>
-                            </button>
-                            <button class="dash-btn" onclick="document.getElementById('text-input').value='pune radio Kiss FM ';document.getElementById('text-input').focus();">
-                                <span class="dash-icon">📻</span><span class="dash-label">Radio</span>
-                            </button>
-                            <button class="dash-btn" onclick="document.getElementById('text-input').value='generează o imagine cu ';document.getElementById('text-input').focus();">
-                                <span class="dash-icon">🖼️</span><span class="dash-label">Images</span>
-                            </button>
-                            <button class="dash-btn" onclick="document.getElementById('text-input').value='arată-mi harta ';document.getElementById('text-input').focus();">
-                                <span class="dash-icon">📍</span><span class="dash-label">Map</span>
-                            </button>
-                            <button class="dash-btn" onclick="document.getElementById('text-input').value='cum stă Bitcoin azi? ';document.getElementById('text-input').focus();">
-                                <span class="dash-icon">📊</span><span class="dash-label">Trading</span>
-                            </button>
-                            <button class="dash-btn" onclick="document.getElementById('text-input').value='sfaturi de sănătate ';document.getElementById('text-input').focus();">
-                                <span class="dash-icon">🏥</span><span class="dash-label">Health</span>
-                            </button>
-                            <button class="dash-btn" onclick="document.getElementById('text-input').value='informații juridice despre ';document.getElementById('text-input').focus();">
-                                <span class="dash-icon">⚖️</span><span class="dash-label">Legal</span>
-                            </button>
-                            <button class="dash-btn" onclick="document.getElementById('text-input').value='dă-mi o rețetă de ';document.getElementById('text-input').focus();">
-                                <span class="dash-icon">🍳</span><span class="dash-label">Recipes</span>
-                            </button>
-                            <button class="dash-btn" onclick="document.getElementById('text-input').value='diagnostic auto: ';document.getElementById('text-input').focus();">
-                                <span class="dash-icon">🚗</span><span class="dash-label">Car</span>
-                            </button>
-                            <button class="dash-btn" onclick="document.getElementById('text-input').value='quiz de ';document.getElementById('text-input').focus();">
-                                <span class="dash-icon">🎓</span><span class="dash-label">Quiz</span>
-                            </button>
-                            <button class="dash-btn" onclick="document.getElementById('text-input').value='analizează schema ';document.getElementById('text-input').focus();">
-                                <span class="dash-icon">🔬</span><span class="dash-label">Engineering</span>
-                            </button>
-                        </div>
-                        <div class="dash-prompt">
-                            <span class="dash-pulse"></span>
-                            <span>Scrie orice sau apasă un buton...</span>
-                        </div>
-                    </div>
+                    <div id="monitor-default" style="display:none"></div>
                 </div>
                 <!-- Thinking indicator -->
                 <div id="thinking" style="display:none;padding:8px 16px;">
@@ -933,27 +882,6 @@
                     camBtn.title = 'Camera ON/OFF';
                 }
             });
-        })();
-    </script>
-    <script>
-        /* Dashboard Clock & Greeting */
-        (function(){
-            function updateDashClock(){
-                var el=document.getElementById('dash-clock');
-                var gr=document.getElementById('dash-greeting-text');
-                if(!el) return;
-                var now=new Date();
-                var h=now.getHours(), m=now.getMinutes();
-                el.textContent=(h<10?'0':'')+h+':'+(m<10?'0':'')+m;
-                if(gr){
-                    if(h<6) gr.textContent='Noapte bună!';
-                    else if(h<12) gr.textContent='Bună dimineața!';
-                    else if(h<18) gr.textContent='Bună ziua!';
-                    else gr.textContent='Bună seara!';
-                }
-            }
-            updateDashClock();
-            setInterval(updateDashClock,30000);
         })();
     </script>
 </body>
