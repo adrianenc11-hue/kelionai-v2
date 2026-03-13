@@ -762,15 +762,64 @@
         }
     }
 
-    // ══ Body Action system — stub for brain-triggered actions ══
+    // ══ Body Action system — Euler-based arm bone animations ══
     let _bodyActionActive = false;
     let _bodyActionTimer = 0;
+    let _bodyActionDuration = 2.0;
+    let _bodyActionType = null;
+    const _armDefaultL = { x: 27, y: -9, z: -4 };
+    const _armDefaultR = { x: 27, y: -9, z: -4 };
+    const _BODY_EULER = {
+        raiseLeftHand:   { lx: -40, ly: 0, lz: 0, rx: null, ry: null, rz: null, dur: 2.5 },
+        raiseRightHand:  { lx: null, ly: null, lz: null, rx: -40, ry: 0, rz: 0, dur: 2.5 },
+        wavLeft:         { lx: -50, ly: 0, lz: 15, rx: null, ry: null, rz: null, dur: 2.0 },
+        wavRight:        { lx: null, ly: null, lz: null, rx: -50, ry: 0, rz: -15, dur: 2.0 },
+        pointLeft:       { lx: -20, ly: 0, lz: 30, rx: null, ry: null, rz: null, dur: 2.0 },
+        pointRight:      { lx: null, ly: null, lz: null, rx: -20, ry: 0, rz: -30, dur: 2.0 },
+        thinkPose:       { lx: null, ly: null, lz: null, rx: -55, ry: 20, rz: -15, dur: 3.0 },
+        crossArms:       { lx: -10, ly: 30, lz: -20, rx: -10, ry: -30, rz: 20, dur: 2.5 },
+        handsOnHips:     { lx: 10, ly: 20, lz: -15, rx: 10, ry: -20, rz: 15, dur: 2.5 },
+        clap:            { lx: -30, ly: 15, lz: -10, rx: -30, ry: -15, rz: 10, dur: 1.5 },
+        thumbsUpLeft:    { lx: -45, ly: 0, lz: 0, rx: null, ry: null, rz: null, dur: 2.0 },
+        thumbsUpRight:   { lx: null, ly: null, lz: null, rx: -45, ry: 0, rz: 0, dur: 2.0 },
+        fistPumpLeft:    { lx: -60, ly: 0, lz: 0, rx: null, ry: null, rz: null, dur: 2.0 },
+        fistPumpRight:   { lx: null, ly: null, lz: null, rx: -60, ry: 0, rz: 0, dur: 2.0 },
+        shakeHands:      { lx: null, ly: null, lz: null, rx: -20, ry: 0, rz: -25, dur: 2.5 },
+        headScratch:     { lx: null, ly: null, lz: null, rx: -65, ry: 15, rz: 0, dur: 2.5 },
+        facepalm:        { lx: null, ly: null, lz: null, rx: -60, ry: 15, rz: -10, dur: 2.0 },
+        salute:          { lx: null, ly: null, lz: null, rx: -55, ry: 10, rz: 0, dur: 2.0 },
+        bow:             { lx: 10, ly: 0, lz: 0, rx: 10, ry: 0, rz: 0, dur: 2.5 },
+    };
+
+    function playBodyAction(type) {
+        const action = _BODY_EULER[type];
+        if (!action) { console.warn('[Avatar] Unknown body action:', type); return; }
+        _bodyActionType = type;
+        _bodyActionActive = true;
+        _bodyActionTimer = 0;
+        _bodyActionDuration = action.dur || 2.0;
+        console.log('[Avatar] Body action:', type, '(' + _bodyActionDuration + 's)');
+    }
+
     function updateBodyAction(dt) {
-        // Body actions are triggered by [BODY:xxx] tags from AI responses
-        // They work through the gesture/pose system already implemented
-        if (!_bodyActionActive) return;
+        if (!_bodyActionActive || !_bodyActionType) return;
         _bodyActionTimer += dt;
-        if (_bodyActionTimer > 2.0) { _bodyActionActive = false; _bodyActionTimer = 0; }
+        const action = _BODY_EULER[_bodyActionType];
+        if (!action) { _bodyActionActive = false; return; }
+        const t = _bodyActionTimer / _bodyActionDuration;
+        const blend = Math.sin(Math.min(t, 1.0) * Math.PI);
+        if (t >= 1.0) {
+            _armL.x = _armDefaultL.x; _armL.y = _armDefaultL.y; _armL.z = _armDefaultL.z;
+            _armR.x = _armDefaultR.x; _armR.y = _armDefaultR.y; _armR.z = _armDefaultR.z;
+            _bodyActionActive = false; _bodyActionTimer = 0; _bodyActionType = null;
+            return;
+        }
+        if (action.lx !== null) _armL.x = _armDefaultL.x + (action.lx - _armDefaultL.x) * blend;
+        if (action.ly !== null) _armL.y = _armDefaultL.y + (action.ly - _armDefaultL.y) * blend;
+        if (action.lz !== null) _armL.z = _armDefaultL.z + (action.lz - _armDefaultL.z) * blend;
+        if (action.rx !== null) _armR.x = _armDefaultR.x + (action.rx - _armDefaultR.x) * blend;
+        if (action.ry !== null) _armR.y = _armDefaultR.y + (action.ry - _armDefaultR.y) * blend;
+        if (action.rz !== null) _armR.z = _armDefaultR.z + (action.rz - _armDefaultR.z) * blend;
     }
 
     function animate() {
@@ -960,284 +1009,6 @@
     function _enforceFingerPose() {
         setFingerPose('left', _currentFingerPose);
         setFingerPose('right', _currentFingerPose);
-    }
-
-    // ── IK Body Action System ────────────────────────────────────
-    // Per-limb bone control with quaternion slerp interpolation
-    // Brain emits [BODY:xxx] tags → parsed → queued here
-    const _bodyQueue = [];
-    let _bodyActive = false;
-    let _bodyTimer = 0;
-    const _bodyDuration = 0;
-    let _bodyAction = null;
-    let _bodyPhase = 'in'; // 'in' = animate to target, 'hold' = hold, 'out' = return
-    let _bodyStartQ = {}; // snapshot of bone quaternions at start
-
-    // Relaxed quaternions (arms down) — used as return target
-    const _RELAXED_Q = {
-        ls: [0.6963, 0.1228, -0.6963, 0.1228],
-        rs: [0.6963, -0.1228, 0.6963, 0.1228],
-        la: [0.0, 0.0, 0.0, 1.0],
-        ra: [0.0, 0.0, 0.0, 1.0],
-        lfa: [0.0, 0.0, 0.0, 1.0],
-        rfa: [0.0, 0.0, 0.0, 1.0],
-        lh: [0.0, 0.0, 0.0, 1.0],
-        rh: [0.0, 0.0, 0.0, 1.0]
-    };
-
-    // Body action presets — quaternion targets per bone
-    // Keys: ls=LeftShoulder, rs=RightShoulder, la=LeftArm, ra=RightArm,
-    //       lfa=LeftForeArm, rfa=RightForeArm, lh=LeftHand, rh=RightHand
-    // fingerL/fingerR = finger pose for that hand
-    const BODY_ACTIONS = {
-        resetArms: {
-            dur: 0.6, hold: 0.2,
-            ls: _RELAXED_Q.ls, rs: _RELAXED_Q.rs,
-            la: _RELAXED_Q.la, ra: _RELAXED_Q.ra,
-            lfa: _RELAXED_Q.lfa, rfa: _RELAXED_Q.rfa,
-            lh: _RELAXED_Q.lh, rh: _RELAXED_Q.rh,
-            fingerL: 'relaxed', fingerR: 'relaxed'
-        },
-        raiseLeftHand: {
-            dur: 1.0, hold: 1.0,
-            ls: [0.5, 0.5, -0.5, 0.5], la: [0.0, 0.0, -0.3, 0.95],
-            lfa: [0.0, 0.0, 0.0, 1.0], fingerL: 'open'
-        },
-        raiseRightHand: {
-            dur: 1.0, hold: 1.0,
-            rs: [0.5, -0.5, 0.5, 0.5], ra: [0.0, 0.0, 0.3, 0.95],
-            rfa: [0.0, 0.0, 0.0, 1.0], fingerR: 'open'
-        },
-        wavLeft: {
-            dur: 0.6, hold: 1.5, oscillate: 'lfa',
-            ls: [0.5, 0.5, -0.5, 0.5], la: [0.0, 0.0, -0.3, 0.95],
-            lfa: [0.0, -0.3, 0.0, 0.95], fingerL: 'open'
-        },
-        wavRight: {
-            dur: 0.6, hold: 1.5, oscillate: 'rfa',
-            rs: [0.5, -0.5, 0.5, 0.5], ra: [0.0, 0.0, 0.3, 0.95],
-            rfa: [0.0, 0.3, 0.0, 0.95], fingerR: 'open'
-        },
-        pointLeft: {
-            dur: 0.7, hold: 1.5,
-            ls: [0.6, 0.35, -0.6, 0.35], la: [0.0, 0.15, -0.15, 0.97],
-            lfa: [0.0, 0.0, 0.0, 1.0], fingerL: 'point'
-        },
-        pointRight: {
-            dur: 0.7, hold: 1.5,
-            rs: [0.6, -0.35, 0.6, 0.35], ra: [0.0, -0.15, 0.15, 0.97],
-            rfa: [0.0, 0.0, 0.0, 1.0], fingerR: 'point'
-        },
-        thinkPose: {
-            dur: 0.8, hold: 2.0,
-            rs: [0.6, -0.3, 0.55, 0.45], ra: [0.35, -0.1, 0.2, 0.9],
-            rfa: [-0.55, 0.0, 0.0, 0.83], fingerR: 'relaxed'
-        },
-        crossArms: {
-            dur: 0.8, hold: 2.0,
-            ls: [0.6, 0.35, -0.55, 0.45], rs: [0.6, -0.35, 0.55, 0.45],
-            la: [0.25, 0.15, -0.1, 0.95], ra: [0.25, -0.15, 0.1, 0.95],
-            lfa: [-0.4, 0.2, 0.0, 0.89], rfa: [-0.4, -0.2, 0.0, 0.89],
-            fingerL: 'relaxed', fingerR: 'relaxed'
-        },
-        handsOnHips: {
-            dur: 0.7, hold: 2.0,
-            ls: [0.65, 0.25, -0.65, 0.25], rs: [0.65, -0.25, 0.65, 0.25],
-            la: [0.15, 0.3, -0.2, 0.92], ra: [0.15, -0.3, 0.2, 0.92],
-            lfa: [-0.35, 0.25, 0.0, 0.9], rfa: [-0.35, -0.25, 0.0, 0.9],
-            fingerL: 'relaxed', fingerR: 'relaxed'
-        },
-        clap: {
-            dur: 0.4, hold: 1.5, oscillate: 'both',
-            ls: [0.6, 0.35, -0.55, 0.45], rs: [0.6, -0.35, 0.55, 0.45],
-            la: [0.2, 0.1, -0.1, 0.97], ra: [0.2, -0.1, 0.1, 0.97],
-            lfa: [-0.3, 0.15, 0.0, 0.94], rfa: [-0.3, -0.15, 0.0, 0.94],
-            fingerL: 'open', fingerR: 'open'
-        },
-        thumbsUpLeft: {
-            dur: 0.7, hold: 1.5,
-            ls: [0.5, 0.5, -0.5, 0.5], la: [0.0, 0.0, -0.2, 0.98],
-            lfa: [-0.3, 0.0, 0.0, 0.95], fingerL: 'thumbsup'
-        },
-        thumbsUpRight: {
-            dur: 0.7, hold: 1.5,
-            rs: [0.5, -0.5, 0.5, 0.5], ra: [0.0, 0.0, 0.2, 0.98],
-            rfa: [-0.3, 0.0, 0.0, 0.95], fingerR: 'thumbsup'
-        },
-        fistPumpLeft: {
-            dur: 0.5, hold: 1.0, oscillate: 'la',
-            ls: [0.45, 0.55, -0.45, 0.55], la: [0.0, 0.0, -0.35, 0.94],
-            lfa: [-0.3, 0.0, 0.0, 0.95], fingerL: 'fist'
-        },
-        fistPumpRight: {
-            dur: 0.5, hold: 1.0, oscillate: 'ra',
-            rs: [0.45, -0.55, 0.45, 0.55], ra: [0.0, 0.0, 0.35, 0.94],
-            rfa: [-0.3, 0.0, 0.0, 0.95], fingerR: 'fist'
-        },
-        shakeHands: {
-            dur: 0.8, hold: 1.5, oscillate: 'rfa',
-            rs: [0.6, -0.35, 0.55, 0.4], ra: [0.15, -0.1, 0.15, 0.97],
-            rfa: [-0.15, 0.0, 0.0, 0.99], fingerR: 'relaxed'
-        },
-        headScratch: {
-            dur: 0.8, hold: 1.5, oscillate: 'rh',
-            rs: [0.4, -0.55, 0.4, 0.6], ra: [0.35, -0.1, 0.2, 0.9],
-            rfa: [-0.6, 0.0, 0.0, 0.8], fingerR: 'relaxed'
-        },
-        facepalm: {
-            dur: 0.6, hold: 1.5,
-            rs: [0.5, -0.45, 0.5, 0.55], ra: [0.3, -0.1, 0.15, 0.94],
-            rfa: [-0.55, 0.0, 0.0, 0.83], fingerR: 'open'
-        },
-        salute: {
-            dur: 0.6, hold: 1.5,
-            rs: [0.45, -0.55, 0.45, 0.55], ra: [0.3, -0.1, 0.25, 0.91],
-            rfa: [-0.55, 0.0, 0.0, 0.83], fingerR: 'open'
-        },
-        bow: {
-            dur: 1.0, hold: 1.5, spineAngle: 0.3,
-            fingerL: 'relaxed', fingerR: 'relaxed'
-        }
-    };
-
-    function _snapshotBones() {
-        const snap = {};
-        const map = {
-            ls: armBones.leftShoulder, rs: armBones.rightShoulder,
-            la: armBones.leftArm, ra: armBones.rightArm,
-            lfa: armBones.leftForeArm, rfa: armBones.rightForeArm,
-            lh: armBones.leftHand, rh: armBones.rightHand
-        };
-        for (const key in map) {
-            if (map[key]) {
-                const q = map[key].quaternion;
-                snap[key] = [q.x, q.y, q.z, q.w];
-            }
-        }
-        if (_spineBone) {
-            snap.spineX = _spineBone.rotation.x;
-        }
-        return snap;
-    }
-
-    function _applyBoneQ(boneKey, qArr, t) {
-        if (typeof THREE === 'undefined') return;
-        const map = {
-            ls: armBones.leftShoulder, rs: armBones.rightShoulder,
-            la: armBones.leftArm, ra: armBones.rightArm,
-            lfa: armBones.leftForeArm, rfa: armBones.rightForeArm,
-            lh: armBones.leftHand, rh: armBones.rightHand
-        };
-        const bone = map[boneKey];
-        if (!bone || !qArr) return;
-        const target = new THREE.Quaternion(qArr[0], qArr[1], qArr[2], qArr[3]);
-        bone.quaternion.slerp(target, t);
-    }
-
-    function playBodyAction(name) {
-        if (!BODY_ACTIONS[name]) {
-            console.warn('[Avatar] Unknown body action:', name);
-            return;
-        }
-        _bodyQueue.push(name);
-    }
-
-    function updateBodyAction(dt) {
-        if (!currentModel) return;
-        if (!armBones.leftShoulder) findArmBones();
-
-        if (_bodyActive) {
-            _bodyTimer += dt;
-            const action = BODY_ACTIONS[_bodyAction];
-            if (!action) { _bodyActive = false; return; }
-
-            const inDur = action.dur || 0.7;
-            const holdDur = action.hold || 1.0;
-            const outDur = action.dur || 0.7;
-            const totalDur = inDur + holdDur + outDur;
-
-            if (_bodyTimer >= totalDur) {
-                // Done — return to relaxed
-                _bodyActive = false;
-                _bodyTimer = 0;
-                _bodyAction = null;
-                _bodyPhase = 'in';
-                // Reset finger poses
-                _currentFingerPose = 'relaxed';
-                return;
-            }
-
-            const boneKeys = ['ls', 'rs', 'la', 'ra', 'lfa', 'rfa', 'lh', 'rh'];
-
-            if (_bodyTimer < inDur) {
-                // Phase: animate IN (slerp from start to target)
-                _bodyPhase = 'in';
-                let t = Math.min(_bodyTimer / inDur, 1.0);
-                t = t * t * (3 - 2 * t); // smoothstep easing
-                for (let i = 0; i < boneKeys.length; i++) {
-                    const k = boneKeys[i];
-                    if (action[k]) _applyBoneQ(k, action[k], t * 0.15);
-                }
-                // Spine for bow
-                if (action.spineAngle && _spineBone) {
-                    _spineBone.rotation.x += (action.spineAngle - _spineBone.rotation.x) * t * 0.1;
-                }
-            } else if (_bodyTimer < inDur + holdDur) {
-                // Phase: HOLD (maintain target + optional oscillate)
-                _bodyPhase = 'hold';
-                for (let i2 = 0; i2 < boneKeys.length; i2++) {
-                    const k2 = boneKeys[i2];
-                    if (action[k2]) _applyBoneQ(k2, action[k2], 0.15);
-                }
-                // Oscillation for wave/clap/pump
-                if (action.oscillate) {
-                    const oscT = Math.sin((_bodyTimer - inDur) * 6) * 0.15;
-                    if (action.oscillate === 'both') {
-                        if (armBones.leftForeArm) armBones.leftForeArm.rotation.y += oscT;
-                        if (armBones.rightForeArm) armBones.rightForeArm.rotation.y -= oscT;
-                    } else {
-                        const oscMap = {
-                            lfa: armBones.leftForeArm, rfa: armBones.rightForeArm,
-                            la: armBones.leftArm, ra: armBones.rightArm,
-                            lh: armBones.leftHand, rh: armBones.rightHand
-                        };
-                        const oscBone = oscMap[action.oscillate];
-                        if (oscBone) oscBone.rotation.z += oscT;
-                    }
-                }
-                // Spine hold
-                if (action.spineAngle && _spineBone) {
-                    _spineBone.rotation.x += (action.spineAngle - _spineBone.rotation.x) * 0.1;
-                }
-            } else {
-                // Phase: animate OUT (slerp back to relaxed)
-                _bodyPhase = 'out';
-                let tOut = Math.min((_bodyTimer - inDur - holdDur) / outDur, 1.0);
-                tOut = tOut * tOut * (3 - 2 * tOut);
-                for (let i3 = 0; i3 < boneKeys.length; i3++) {
-                    const k3 = boneKeys[i3];
-                    const relaxQ = _RELAXED_Q[k3] || [0, 0, 0, 1];
-                    _applyBoneQ(k3, relaxQ, tOut * 0.12);
-                }
-                // Spine return
-                if (action.spineAngle && _spineBone) {
-                    _spineBone.rotation.x += (0 - _spineBone.rotation.x) * tOut * 0.1;
-                }
-            }
-
-            // Apply finger poses during action
-            if (action.fingerL) setFingerPose('left', action.fingerL);
-            if (action.fingerR) setFingerPose('right', action.fingerR);
-
-        } else if (_bodyQueue.length > 0) {
-            // Start next action from queue
-            _bodyAction = _bodyQueue.shift();
-            _bodyActive = true;
-            _bodyTimer = 0;
-            _bodyPhase = 'in';
-            _bodyStartQ = _snapshotBones();
-            console.log('[Avatar] Body action started:', _bodyAction);
-        }
     }
 
     window.KAvatar = {
