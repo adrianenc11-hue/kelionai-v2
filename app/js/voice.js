@@ -215,39 +215,47 @@
             // Chunk the text and play each chunk sequentially
             const chunks = _chunkText(ttsText);
             console.log('[Voice] TTS chunked into', chunks.length, 'parts');
-            // showSubtitle disabled — text already visible in chat overlay (prevents duplicate display)
 
-            for (let ci = 0; ci < chunks.length; ci++) {
-                if (thisId !== _speakId) { console.log('[Voice] Stale, aborting chunk', ci); return; }
-
-                console.log('[Voice] Fetching chunk', ci + 1, '/', chunks.length, ':', chunks[ci].substring(0, 40) + '...');
+            // ═══ PREFETCH PATTERN: fetch next chunk while current plays ═══
+            // This eliminates the pause between chunks
+            async function fetchChunkAudio(chunkText, avatar) {
                 const resp = await fetch(API_BASE + '/api/speak', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', ...(window.KAuth ? KAuth.getAuthHeaders() : {}) },
-                    body: JSON.stringify({ text: chunks[ci], avatar: avatar || KAvatar.getCurrentAvatar(), language: detectedLanguage })
+                    body: JSON.stringify({ text: chunkText, avatar: avatar || KAvatar.getCurrentAvatar(), language: detectedLanguage })
                 });
-
-                if (thisId !== _speakId) return;
-                if (!resp.ok) { console.warn('[Voice] TTS chunk', ci, 'failed:', resp.status); continue; }
-
-                // Parse JSON response (audio base64 + alignment)
+                if (!resp.ok) return null;
                 const data = await resp.json();
-                if (thisId !== _speakId) return;
-                if (!data.audio) { console.warn('[Voice] TTS chunk', ci, 'has no audio'); continue; }
-
-                // Decode base64 audio to ArrayBuffer
+                if (!data.audio) return null;
                 const binaryStr = atob(data.audio);
                 const arrayBuf = new ArrayBuffer(binaryStr.length);
                 const bytes = new Uint8Array(arrayBuf);
                 for (let bi = 0; bi < binaryStr.length; bi++) bytes[bi] = binaryStr.charCodeAt(bi);
+                return { arrayBuf, alignment: data.alignment || null };
+            }
 
-                const chunkAlignment = data.alignment || null;
-                console.log('[Voice] Chunk', ci + 1, 'received:', arrayBuf.byteLength, 'bytes',
-                    chunkAlignment ? '+ alignment (' + (chunkAlignment.characters ? chunkAlignment.characters.length : 0) + ' chars)' : '(no alignment)');
+            // Start prefetching first chunk immediately
+            let prefetchPromise = fetchChunkAudio(chunks[0], avatar);
+
+            for (let ci = 0; ci < chunks.length; ci++) {
+                if (thisId !== _speakId) { console.log('[Voice] Stale, aborting chunk', ci); return; }
+
+                // Wait for current chunk's audio (already prefetched)
+                const chunkData = await prefetchPromise;
+                if (thisId !== _speakId) return;
+
+                // Start prefetching NEXT chunk immediately (while current plays)
+                if (ci + 1 < chunks.length) {
+                    prefetchPromise = fetchChunkAudio(chunks[ci + 1], avatar);
+                }
+
+                if (!chunkData) { console.warn('[Voice] TTS chunk', ci, 'failed'); continue; }
+
+                console.log('[Voice] Playing chunk', ci + 1, '/', chunks.length);
 
                 // Play this chunk and wait for it to finish before next
                 await new Promise(function (resolve) {
-                    playAudioChunk(arrayBuf, chunks[ci], ci === chunks.length - 1, resolve, chunkAlignment);
+                    playAudioChunk(chunkData.arrayBuf, chunks[ci], ci === chunks.length - 1, resolve, chunkData.alignment);
                 });
             }
         } catch (e) { console.error('[Voice]', e); stopAllLipSync(); hideSubtitle(); isSpeaking = false; resumeWakeDetection(); }

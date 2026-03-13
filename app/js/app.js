@@ -318,7 +318,7 @@
             overlay.appendChild(msgEl);
 
             let fullReply = '';
-            let _streamEngine = 'Gemini';
+            const _streamEngine = 'Gemini';
             let streamSuccess = false;
 
             // Try SSE streaming first (if no media — stream doesn't support images)
@@ -1166,6 +1166,35 @@
             if (token) {
                 try { navigator.sendBeacon('/api/auth/logout', JSON.stringify({ token: token })); } catch (_e) { /* ignored */ }
             }
+
+            // ── FREE TIER: Clear memory on exit (paid users keep everything) ──
+            let userPlan = 'free';
+            try {
+                const u = window.KAuth && KAuth.getUser ? KAuth.getUser() : null;
+                if (u && u.user_metadata && u.user_metadata.plan) userPlan = u.user_metadata.plan;
+                // Also check localStorage for plan
+                const storedPlan = localStorage.getItem('kelion_plan');
+                if (storedPlan && storedPlan !== 'free') userPlan = storedPlan;
+            } catch (_e) { /* ignored */ }
+
+            if (userPlan === 'free' || userPlan === 'guest') {
+                // Clear chat history in memory
+                chatHistory.length = 0;
+                // Clear conversation ID so next session starts fresh
+                currentConversationId = null;
+                // Clear localStorage conversation data
+                try { localStorage.removeItem('kelion_conv_id'); } catch (_e) { /* ignored */ }
+                try { localStorage.removeItem('kelion_chat_history'); } catch (_e) { /* ignored */ }
+                // Clear server-side user preferences for free users (beacon)
+                if (token) {
+                    try {
+                        navigator.sendBeacon('/api/memory/clear-session',
+                            JSON.stringify({ token: token, plan: 'free' }));
+                    } catch (_e) { /* ignored */ }
+                }
+                console.log('[App] Free tier: memory cleared on exit');
+            }
+
             sessionStorage.clear();
             if (window.KVoice) {
                 try { KVoice.stopSpeaking(); } catch (_e) { /* ignored */ }
