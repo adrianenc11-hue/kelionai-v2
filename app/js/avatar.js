@@ -722,35 +722,14 @@
     let _mixerArmsStopped = false;
     function _enforcePose() {
         if (typeof THREE === 'undefined') return;
-        // ARM OVERRIDE DISABLED — model's idle animation handles arms correctly.
-        // Our bone rotation was deforming mesh and making shoulders disappear.
-        // Calibration slider remains available via KAvatar.showArmCalibrator() for future models.
-
-        // Apply computed arms-down quaternions (dynamic, model-agnostic)
-        if (_computedArmDown) {
-            if (armBones.leftShoulder && _computedArmDown.ls) {
-                armBones.leftShoulder.quaternion.copy(_computedArmDown.ls);
-            }
-            if (armBones.rightShoulder && _computedArmDown.rs) {
-                armBones.rightShoulder.quaternion.copy(_computedArmDown.rs);
-            }
-            if (armBones.leftArm && _computedArmDown.la) {
-                armBones.leftArm.quaternion.copy(_computedArmDown.la);
-            }
-            if (armBones.rightArm && _computedArmDown.ra) {
-                armBones.rightArm.quaternion.copy(_computedArmDown.ra);
-            }
-            if (armBones.leftForeArm && _computedArmDown.lfa) {
-                armBones.leftForeArm.quaternion.copy(_computedArmDown.lfa);
-            }
-            if (armBones.rightForeArm && _computedArmDown.rfa) {
-                armBones.rightForeArm.quaternion.copy(_computedArmDown.rfa);
-            }
-        } else {
-            // Fallback: Apply upper arm quaternions from static pose table
-            const p = ARM_POSES[currentPose] || ARM_POSES.relaxed;
-            if (armBones.leftArm && p.la) armBones.leftArm.quaternion.set(p.la[0], p.la[1], p.la[2], p.la[3]);
-            if (armBones.rightArm && p.ra) armBones.rightArm.quaternion.set(p.ra[0], p.ra[1], p.ra[2], p.ra[3]);
+        // ADDITIVE BLEND: mixer sets base pose each frame, we multiply arm-down delta ON TOP.
+        // This preserves shoulder deformation and natural idle animation.
+        if (_currentArmAngle > 0 && armBones.leftArm && armBones.rightArm) {
+            const angle = _currentArmAngle * Math.PI / 180;
+            const deltaL = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -angle);
+            const deltaR = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), angle);
+            armBones.leftArm.quaternion.multiply(deltaL);
+            armBones.rightArm.quaternion.multiply(deltaR);
         }
     }
 
