@@ -296,31 +296,166 @@
                 if (frame) {
                     payload.imageBase64 = frame.base64;
                     payload.imageMimeType = frame.mimeType;
-                    payload.isAutoCamera = true; // flag for concise vision responses
+                    payload.isAutoCamera = true;
                 }
             }
 
-            const resp = await fetch(API_BASE + '/api/chat', {
-                method: 'POST', headers: authHeaders(),
-                body: JSON.stringify(payload)
-            });
+            // ═══════════════════════════════════════════════════════
+            // SSE STREAMING — word-by-word display (FAST!)
+            // ═══════════════════════════════════════════════════════
+            // Prepare UI for streaming
+            const overlay = document.getElementById('chat-overlay');
+            overlay.innerHTML = '';
+            const actionBar = document.createElement('div');
+            actionBar.className = 'msg-actions';
+            actionBar.innerHTML = '<button class="msg-action-btn" id="btn-copy-msg" title="Copiază text">📋</button>' +
+                '<button class="msg-action-btn" id="btn-save-msg" title="Salvează ca fișier">💾</button>';
+            overlay.appendChild(actionBar);
+            const msgEl = document.createElement('div');
+            msgEl.className = 'msg assistant';
+            msgEl.style.userSelect = 'text';
+            msgEl.innerHTML = '<span style="color:#6366f1;opacity:0.6">⏳</span>';
+            overlay.appendChild(msgEl);
 
-            showThinking(false);
-            if (!resp.ok) {
-                const e = await resp.json().catch(() => ({}));
-                if (resp.status === 429 && e.upgrade) {
-                    const planName = e.plan ? (e.plan.charAt(0).toUpperCase() + e.plan.slice(1)) : 'Free';
-                    addMessage('assistant', 'You have reached the daily limit for the ' + planName + ' plan. Say \'Kelion, upgrade\' or click ⭐ Plans to see options.');
-                } else if (resp.status === 429) {
-                    addMessage('assistant', '⏳ Too many messages. Please wait a moment.');
-                } else addMessage('assistant', e.error || 'Error.');
-                if (window.KVoice) KVoice.resumeWakeDetection();
-                return;
+            let fullReply = '';
+            let streamEngine = 'Gemini';
+            let streamSuccess = false;
+
+            // Try SSE streaming first (if no media — stream doesn't support images)
+            if (!mediaToSend && !payload.imageBase64) {
+                try {
+                    const hdrs = authHeaders();
+                    hdrs['Content-Type'] = 'application/json';
+                    const resp = await fetch(API_BASE + '/api/chat/stream', {
+                        method: 'POST',
+                        headers: hdrs,
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (resp.ok && resp.body) {
+                        showThinking(false);
+                        const reader = resp.body.getReader();
+                        const decoder = new TextDecoder();
+                        let buffer = '';
+
+                        while (true) {
+                            const { done, value } = await reader.read();
+                            if (done) break;
+
+                            buffer += decoder.decode(value, { stream: true });
+                            const lines = buffer.split('\n');
+                            buffer = lines.pop() || '';
+
+                            for (const line of lines) {
+                                if (!line.startsWith('data: ')) continue;
+                                const jsonStr = line.slice(6).trim();
+                                if (!jsonStr || jsonStr === '[DONE]') continue;
+                                try {
+                                    const evt = JSON.parse(jsonStr);
+                                    if (evt.type === 'chunk' && evt.text) {
+                                        fullReply += evt.text;
+                                        // Progressive display — show text as it arrives
+                                        msgEl.innerHTML = parseMarkdown(fullReply);
+                                        overlay.scrollTop = overlay.scrollHeight;
+                                    } else if (evt.type === 'start') {
+                                        streamEngine = evt.engine || 'Gemini';
+                                    } else if (evt.type === 'monitor' && evt.content) {
+                                        showOnMonitor(evt.content, evt.monitorType || 'html');
+                                    } else if (evt.type === 'thinking') {
+                                        msgEl.innerHTML = '<span style="color:#6366f1;opacity:0.6">🧠 Thinking...</span>';
+                                    } else if (evt.type === 'done') {
+                                        if (evt.conversationId) persistConvId(evt.conversationId);
+                                        if (evt.emotion) KAvatar.setExpression(evt.emotion, 0.5);
+                                    }
+                                } catch (_pe) { /* skip bad JSON */ }
+                            }
+                        }
+                        streamSuccess = fullReply.length > 0;
+                    }
+                } catch (_streamErr) {
+                    console.warn('[App] Stream failed, falling back to regular:', _streamErr.message);
+                }
             }
 
-            const data = await resp.json();
-            const fullReply = (data.reply || '').replace(/\[SYSTEM INSTRUCTION[^\]]*\][\s\S]*?\[END SYSTEM INSTRUCTION\]\s*/gi, '').replace(/\[AGENT ACTIV[^\]]*\]\s*/gi, '').trim();
-            if (data.conversationId) persistConvId(data.conversationId);
+            // ═══════════════════════════════════════════════════════
+            // FALLBACK: Regular fetch (for media uploads or stream failure)
+            // ═══════════════════════════════════════════════════════
+            if (!streamSuccess) {
+                const resp = await fetch(API_BASE + '/api/chat', {
+                    method: 'POST', headers: authHeaders(),
+                    body: JSON.stringify(payload)
+                });
+
+                showThinking(false);
+                if (!resp.ok) {
+                    const e = await resp.json().catch(() => ({}));
+                    if (resp.status === 429 && e.upgrade) {
+                        const planName = e.plan ? (e.plan.charAt(0).toUpperCase() + e.plan.slice(1)) : 'Free';
+                        addMessage('assistant', 'You have reached the daily limit for the ' + planName + ' plan. Say \'Kelion, upgrade\' or click ⭐ Plans to see options.');
+                    } else if (resp.status === 429) {
+                        addMessage('assistant', '⏳ Too many messages. Please wait a moment.');
+                    } else addMessage('assistant', e.error || 'Error.');
+                    if (window.KVoice) KVoice.resumeWakeDetection();
+                    return;
+                }
+
+                const data = await resp.json();
+                fullReply = (data.reply || '').replace(/\[SYSTEM INSTRUCTION[^\]]*\][\s\S]*?\[END SYSTEM INSTRUCTION\]\s*/gi, '').replace(/\[AGENT ACTIV[^\]]*\]\s*/gi, '').trim();
+                if (data.conversationId) persistConvId(data.conversationId);
+                streamEngine = data.engine || 'Gemini';
+
+                // Avatar control from tags
+                const brainEmotion = data.emotion || 'happy';
+                KAvatar.setExpression(brainEmotion, 0.5);
+                if (data.gestures && data.gestures.length > 0) {
+                    data.gestures.forEach(function (g, i) { setTimeout(function () { KAvatar.playGesture(g); }, i * 800); });
+                }
+                if (data.pose && KAvatar.setPose) KAvatar.setPose(data.pose);
+                if (data.bodyActions && data.bodyActions.length > 0 && KAvatar.playBodyAction) {
+                    data.bodyActions.forEach(function (ba, i) { setTimeout(function () { KAvatar.playBodyAction(ba); }, i * 1500); });
+                }
+                if (data.gaze && KAvatar.setEyeGaze) {
+                    KAvatar.setEyeGaze(data.gaze);
+                    setTimeout(function () { try { KAvatar.startEyeIdle(); } catch (_e) { /* ok */ } }, 3000);
+                }
+
+                // Monitor content
+                if (data.monitor && data.monitor.content) {
+                    showOnMonitor(data.monitor.content, data.monitor.type);
+                } else if (data.monitor && data.monitor.search_results) {
+                    if (window.MonitorManager) MonitorManager.showSearchResults(data.monitor.search_results);
+                } else if (data.monitor && data.monitor.weather) {
+                    if (window.MonitorManager) MonitorManager.showWeather(data.monitor.weather);
+                }
+            }
+
+            // ═══════════════════════════════════════════════════════
+            // POST-STREAM: Extract tags from streamed text, final display
+            // ═══════════════════════════════════════════════════════
+            // Clean system instruction leaks
+            fullReply = fullReply.replace(/\[SYSTEM INSTRUCTION[^\]]*\][\s\S]*?\[END SYSTEM INSTRUCTION\]\s*/gi, '').replace(/\[AGENT ACTIV[^\]]*\]\s*/gi, '').trim();
+
+            // Extract avatar tags from streamed text (if streaming was used)
+            if (streamSuccess) {
+                // Emotion
+                const emotionMatch = fullReply.match(/\[EMOTION:\s*(\w+)\]/i);
+                if (emotionMatch) KAvatar.setExpression(emotionMatch[1].toLowerCase(), 0.5);
+                else KAvatar.setExpression('happy', 0.5);
+                // Gestures
+                const gestureMatches = [...fullReply.matchAll(/\[GESTURE:\s*(\w+)\]/gi)];
+                gestureMatches.forEach(function (gm, i) { setTimeout(function () { KAvatar.playGesture(gm[1].toLowerCase()); }, i * 800); });
+                // Body
+                const bodyMatches = [...fullReply.matchAll(/\[BODY:\s*(\w+)\]/gi)];
+                bodyMatches.forEach(function (bm, i) { setTimeout(function () { if (KAvatar.playBodyAction) KAvatar.playBodyAction(bm[1]); }, i * 1500); });
+                // Gaze
+                const gazeMatch = fullReply.match(/\[GAZE:\s*([\w-]+)\]/i);
+                if (gazeMatch && KAvatar.setEyeGaze) {
+                    KAvatar.setEyeGaze(gazeMatch[1].toLowerCase());
+                    setTimeout(function () { try { KAvatar.startEyeIdle(); } catch (_e) { /* ok */ } }, 3000);
+                }
+                // Strip all tags from display
+                fullReply = fullReply.replace(/\[EMOTION:\s*\w+\]/gi, '').replace(/\[GESTURE:\s*\w+\]/gi, '').replace(/\[BODY:\s*\w+\]/gi, '').replace(/\[GAZE:\s*[\w-]+\]/gi, '').replace(/\[POSE:\s*\w+\]/gi, '').replace(/\[MONITOR\][\s\S]*?\[\/MONITOR\]/gi, '').trim();
+            }
 
             if (!fullReply) {
                 addMessage('assistant', '...');
@@ -331,50 +466,24 @@
             chatHistory.push({ role: 'user', content: message });
             chatHistory.push({ role: 'assistant', content: fullReply });
 
-            // Monitor content
-            if (data.monitor && data.monitor.content) {
-                showOnMonitor(data.monitor.content, data.monitor.type);
-            } else if (data.monitor && data.monitor.search_results) {
-                if (window.MonitorManager) MonitorManager.showSearchResults(data.monitor.search_results);
-            } else if (data.monitor && data.monitor.weather) {
-                if (window.MonitorManager) MonitorManager.showWeather(data.monitor.weather);
-            }
+            // Final display (clean text without tags)
+            msgEl.innerHTML = parseMarkdown(fullReply);
+            overlay.scrollTop = overlay.scrollHeight;
 
-            const imgMatch = fullReply.match(/https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp)/i);
-            if (imgMatch && !data.monitor?.content) showOnMonitor(imgMatch[0], 'image');
-
-            const coordMatch2 = fullReply.match(/(-?\d+\.?\d*)[°\s,]+([NS])?\s*,?\s*(-?\d+\.?\d*)[°\s,]+([EW])?/i);
-            if (!imgMatch && !data.monitor?.content && coordMatch2) {
-                const lat2 = parseFloat(coordMatch2[1]);
-                const lng2 = parseFloat(coordMatch2[3]);
-                if (!isNaN(lat2) && !isNaN(lng2) && window.MonitorManager) MonitorManager.showMap(lat2, lng2);
-            }
-
-            // ── SYNCED VOICE + TEXT ──
-            // Create empty message — text will be revealed with voice
-            const overlay = document.getElementById('chat-overlay');
-            overlay.innerHTML = ''; // Clear previous — max 1 phrase on screen
-
-            // ── COPY + SAVE BUTTONS (top-right of monitor) ──
-            const actionBar = document.createElement('div');
-            actionBar.className = 'msg-actions';
-            actionBar.innerHTML = '<button class="msg-action-btn" id="btn-copy-msg" title="Copiază text">📋</button>' +
-                '<button class="msg-action-btn" id="btn-save-msg" title="Salvează ca fișier">💾</button>';
-            overlay.appendChild(actionBar);
-            // Wire copy button
-            actionBar.querySelector('#btn-copy-msg').onclick = function () {
+            // Wire copy/save buttons
+            const copyBtn = actionBar.querySelector('#btn-copy-msg');
+            const saveBtn = actionBar.querySelector('#btn-save-msg');
+            if (copyBtn) copyBtn.onclick = function () {
                 navigator.clipboard.writeText(fullReply).then(function () {
-                    actionBar.querySelector('#btn-copy-msg').textContent = '✅';
-                    setTimeout(function () { actionBar.querySelector('#btn-copy-msg').textContent = '📋'; }, 1500);
+                    copyBtn.textContent = '✅';
+                    setTimeout(function () { copyBtn.textContent = '📋'; }, 1500);
                 }).catch(function () {
-                    // Fallback: textarea copy
                     const ta = document.createElement('textarea'); ta.value = fullReply; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
-                    actionBar.querySelector('#btn-copy-msg').textContent = '✅';
-                    setTimeout(function () { actionBar.querySelector('#btn-copy-msg').textContent = '📋'; }, 1500);
+                    copyBtn.textContent = '✅';
+                    setTimeout(function () { copyBtn.textContent = '📋'; }, 1500);
                 });
             };
-            // Wire save button
-            actionBar.querySelector('#btn-save-msg').onclick = function () {
+            if (saveBtn) saveBtn.onclick = function () {
                 const blob = new Blob([fullReply], { type: 'text/plain;charset=utf-8' });
                 const a = document.createElement('a');
                 a.href = URL.createObjectURL(blob);
@@ -383,114 +492,34 @@
                 URL.revokeObjectURL(a.href);
             };
 
-            const msgEl = document.createElement('div');
-            msgEl.className = 'msg assistant';
-            msgEl.style.userSelect = 'text';
-            msgEl.innerHTML = '';
-            overlay.appendChild(msgEl);
-            overlay.scrollTop = overlay.scrollHeight;
-
-            // ── BRAIN-DIRECTED AVATAR CONTROL ──
-            // Emotion from brain (replaces hardcoded 'happy')
-            const brainEmotion = data.emotion || 'happy';
-            KAvatar.setExpression(brainEmotion, 0.5);
-
-            // Gestures from brain (nod, shake, wave, tilt, etc.)
-            if (data.gestures && data.gestures.length > 0) {
-                data.gestures.forEach(function (g, i) {
-                    setTimeout(function () { KAvatar.playGesture(g); }, i * 800);
-                });
-            }
-
-            // Pose from brain (relaxed, presenting, crossed, open)
-            if (data.pose && KAvatar.setPose) {
-                KAvatar.setPose(data.pose);
-            }
-
-            // Body actions from brain (per-limb IK: raiseLeftHand, wavRight, etc.)
-            if (data.bodyActions && data.bodyActions.length > 0 && KAvatar.playBodyAction) {
-                data.bodyActions.forEach(function (ba, i) {
-                    setTimeout(function () { KAvatar.playBodyAction(ba); }, i * 1500);
-                });
-            }
-
-            // Eye gaze from brain (center, left, right, up, down, up-left, etc.)
-            if (data.gaze && KAvatar.setEyeGaze) {
-                KAvatar.setEyeGaze(data.gaze);
-                // Return to natural idle after 3 seconds
-                setTimeout(function () { try { KAvatar.startEyeIdle(); } catch (_e) { /* ok */ } }, 3000);
-            }
-
-            // ── AUTO-DISPLAY: Show reply on monitor if it has structured content ──
+            // Auto-display on monitor if structured
             if (window.MonitorManager && fullReply) {
                 const hasStructure = /^[\-\*\d]\s|^#{1,3}\s|\*\*|```|\n\n/m.test(fullReply);
                 const isLong = fullReply.length > 80;
-                if (hasStructure || isLong) {
-                    MonitorManager.showMarkdown(fullReply);
-                }
+                if (hasStructure || isLong) MonitorManager.showMarkdown(fullReply);
             }
 
-            // ── #53 BRAIN-MAP: Populate brain thinking panel ──
+            // Image/map detection
+            const imgMatch = fullReply.match(/https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp)/i);
+            if (imgMatch) showOnMonitor(imgMatch[0], 'image');
+            const coordMatch2 = fullReply.match(/(-?\d+\.?\d*)[°\s,]+([NS])?\s*,?\s*(-?\d+\.?\d*)[°\s,]+([EW])?/i);
+            if (!imgMatch && coordMatch2) {
+                const lat2 = parseFloat(coordMatch2[1]);
+                const lng2 = parseFloat(coordMatch2[3]);
+                if (!isNaN(lat2) && !isNaN(lng2) && window.MonitorManager) MonitorManager.showMap(lat2, lng2);
+            }
+
+            // Brain map
             if (typeof addBrainNode === 'function') {
                 const now = new Date().toLocaleTimeString();
                 addBrainNode('Response · ' + now, fullReply.substring(0, 80) + (fullReply.length > 80 ? '…' : ''));
-                if (brainEmotion && brainEmotion !== 'happy') addBrainNode('Emotion', '🎭 ' + brainEmotion);
-                if (data.gestures && data.gestures.length) addBrainNode('Gestures', '👋 ' + data.gestures.join(', '));
-                if (data.bodyActions && data.bodyActions.length) addBrainNode('Body', '🏃 ' + data.bodyActions.join(', '));
-                if (data.tools_used && data.tools_used.length) addBrainNode('Tools', '🔧 ' + data.tools_used.join(', '));
             }
 
-            // Increment generation counter to prevent overlap
+            // Speak the reply
             const thisGen = ++_speakGeneration;
-            let _textRevealed = false; // guard: only ONE source writes text
-
-            // Listen for audio-start event to sync text reveal
-            const revealHandler = function (e) {
-                window.removeEventListener('audio-start', revealHandler);
-                if (thisGen !== _speakGeneration) return; // stale, skip
-                if (_textRevealed) return; // already shown by fallback
-                _textRevealed = true;
-                const duration = e.detail.duration;
-                const msPerChar = (duration * 1000) / fullReply.length;
-                let charIdx = 0;
-                const timer = setInterval(function () {
-                    if (thisGen !== _speakGeneration) { clearInterval(timer); return; }
-                    charIdx++;
-                    if (charIdx >= fullReply.length) {
-                        clearInterval(timer);
-                        msgEl.innerHTML = parseMarkdown(fullReply);
-                        overlay.scrollTop = overlay.scrollHeight;
-                        return;
-                    }
-                    msgEl.innerHTML = parseMarkdown(fullReply.substring(0, charIdx));
-                    overlay.scrollTop = overlay.scrollHeight;
-                }, msPerChar);
-            };
-            window.addEventListener('audio-start', revealHandler);
-
-            // Speak — triggers 'audio-start' event when audio actually starts
             if (window.KVoice) {
-                // Auto-switch TTS voice to match AI response language
-                if (data.language && KVoice.setLanguage) {
-                    KVoice.setLanguage(data.language);
-                }
-                KVoice.speak(fullReply, data.avatar || KAvatar.getCurrentAvatar());
+                KVoice.speak(fullReply, KAvatar.getCurrentAvatar());
             }
-
-            // Fallback: if audio doesn't start in 15s, show text anyway
-            // (increased from 4s because TTS fetch for long texts can take 5-10s)
-            setTimeout(function () {
-                window.removeEventListener('audio-start', revealHandler);
-                if (_textRevealed) return; // audio handler already revealed
-                _textRevealed = true;
-                if (!msgEl.innerHTML || msgEl.innerHTML === '') {
-                    msgEl.innerHTML = parseMarkdown(fullReply);
-                    overlay.scrollTop = overlay.scrollHeight;
-                }
-            }, 15000);
-
-
-
 
         } catch (_e) {
             showThinking(false);
