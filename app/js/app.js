@@ -285,10 +285,18 @@
                 conversationId: currentConversationId,
                 geo: window.KGeo ? KGeo.getCached() : null
             };
-            // Attach media if present
+            // Attach media if present (manual upload)
             if (mediaToSend) {
                 payload.imageBase64 = mediaToSend.base64;
                 payload.imageMimeType = mediaToSend.mimeType;
+            }
+            // Auto-camera: if active and no manual image, snap a frame
+            else if (window.KAutoCamera && KAutoCamera.isActive()) {
+                const frame = KAutoCamera.captureFrame();
+                if (frame) {
+                    payload.imageBase64 = frame.base64;
+                    payload.imageMimeType = frame.mimeType;
+                }
             }
 
             const resp = await fetch(API_BASE + '/api/chat', {
