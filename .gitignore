@@ -1,15 +1,26 @@
 node_modules/
+
+# ═══ SECRETS — NEVER COMMIT ═══
 .env
+.env.*
 .env.local
 .env.production
+.env.backup*
+.env.railway*
+*.railway.json
+.env.railway.json
+
+# Test artifacts
 test-results/
 playwright-report/
 blob-report/
-*.webp
 coverage/
+
+# Build / temp
+*.webp
 logs/
 conflicts/
 reports/*.json
 reports/*.md
 auto-merge-report.md
-
+tmp-*
