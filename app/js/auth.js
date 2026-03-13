@@ -18,8 +18,20 @@
     }
 
     async function login(email, pw) {
-        const r = await fetch(API + '/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password: pw }) });
-        const d = await r.json(); if (!r.ok) throw new Error(d.error); currentUser = d.user; saveSession(d.session, d.user); return d;
+        async function _doLogin() {
+            const r = await fetch(API + '/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password: pw }) });
+            const d = await r.json(); if (!r.ok) throw new Error(d.error); currentUser = d.user; saveSession(d.session, d.user); return d;
+        }
+        try {
+            return await _doLogin();
+        } catch (firstErr) {
+            // Auto-retry once on network/cold-start failures (not wrong password)
+            const isAuthError = firstErr.message && (firstErr.message.includes('Invalid') || firstErr.message.includes('password') || firstErr.message.includes('Email not verified'));
+            if (isAuthError) throw firstErr;
+            console.warn('[Auth] First login attempt failed, retrying...', firstErr.message);
+            await new Promise(r => setTimeout(r, 800));
+            return await _doLogin();
+        }
     }
 
     async function logout() { try { await fetch(API + '/api/auth/logout', { method: 'POST', headers: getAuthHeaders() }); } catch (_e) { /* ignored */ } clearSession(); }

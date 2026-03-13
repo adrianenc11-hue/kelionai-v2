@@ -166,6 +166,9 @@ app.use((req, res, next) => {
           "https://www.kaggle.com",
           "https://*.sentry.io",
           "https://*.ingest.sentry.io",
+          "https://fonts.googleapis.com",
+          "https://fonts.gstatic.com",
+          "https://*.supabase.co",
         ],
         frameSrc: [
           "'self'",
