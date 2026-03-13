@@ -654,11 +654,14 @@ process.on("SIGINT", async () => {
 // ═══ AUTH HELPER ═══
 async function getUserFromToken(req) {
   const h = req.headers.authorization;
-  if (!h || !h.startsWith("Bearer ") || !supabase) return null;
+  if (!h || !h.startsWith("Bearer ")) return null;
+  // Use supabaseAdmin (service_role) for token verification — anon key cannot verify other users' tokens
+  const client = supabaseAdmin || supabase;
+  if (!client) return null;
   try {
     const {
       data: { user },
-    } = await supabase.auth.getUser(h.split(" ")[1]);
+    } = await client.auth.getUser(h.split(" ")[1]);
     return user;
   } catch {
     return null;

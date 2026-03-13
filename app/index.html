@@ -525,8 +525,6 @@
                 <button class="btn-secondary" id="btn-admin" title="Admin Panel — Locked" data-locked="true"
                     style="display:none;padding:8px 14px;font-size:0.85rem;background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);border-radius:8px;color:#fca5a5;cursor:not-allowed;font-family:var(--kelion-font);transition:all 0.4s;opacity:0.7;">🔒
                     Admin</button>
-                <button class="btn-secondary" id="btn-translate" title="Live Translator (Admin)" aria-label="Live translation"
-                    style="display:none;padding:8px 14px;font-size:0.85rem;background:rgba(234,179,8,0.12);border:1px solid rgba(234,179,8,0.3);border-radius:8px;color:#fbbf24;cursor:pointer;font-family:var(--kelion-font);transition:all 0.2s;font-weight:700;">🌐 T</button>
                 <button class="btn-secondary" id="btn-subscriptions" title="Plans"
                     style="padding:8px 14px;font-size:0.85rem;background:rgba(99,102,241,0.12);border:1px solid rgba(99,102,241,0.3);border-radius:8px;color:#a5b4fc;cursor:pointer;font-family:var(--kelion-font);transition:all 0.2s;">⭐
                     Plans</button>
@@ -657,15 +655,7 @@
                 </div>
             </div>
         </div><!-- /#main-content -->
-        <!-- Translate output panel — live transcription/translation overlay -->
-        <div id="translate-output" style="display:none;padding:8px 16px;border-top:1px solid rgba(16,185,129,0.2);background:rgba(16,185,129,0.05);max-height:200px;overflow-y:auto;font-size:0.85rem;color:#e0e0ff;position:relative;">
-            <div id="translate-text" style="white-space:pre-wrap;line-height:1.5;"></div>
-            <div style="position:absolute;top:6px;right:8px;display:flex;gap:4px;">
-                <button id="btn-translate-save" title="Save transcript" style="background:rgba(16,185,129,0.2);border:1px solid rgba(16,185,129,0.3);border-radius:6px;color:#6ee7b7;cursor:pointer;font-size:0.7rem;padding:3px 8px;font-family:var(--kelion-font);">💾 Save</button>
-                <button id="btn-translate-copy" title="Copy transcript" style="background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.3);border-radius:6px;color:#a5b4fc;cursor:pointer;font-size:0.7rem;padding:3px 8px;font-family:var(--kelion-font);">📋 Copy</button>
-                <button id="btn-translate-clear" title="Clear" style="background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);border-radius:6px;color:#fca5a5;cursor:pointer;font-size:0.7rem;padding:3px 8px;font-family:var(--kelion-font);">✕</button>
-            </div>
-        </div>
+
         <!-- Input row — FULL WIDTH at page bottom -->
         <div id="input-row" style="padding:8px 16px;border-top:1px solid rgba(99,102,241,0.1);">
             <button id="btn-mic-toggle" title="Microphone ON/OFF" aria-label="Toggle microphone"
@@ -774,7 +764,7 @@
     <script src="/js/geolocation.js"></script>
     <script src="/js/voice-stream-client.js"></script>
     <script src="/js/auto-camera.js"></script>
-    <script src="/js/live-translator.js"></script>
+
     <script src="/js/app.js?v=20260313b"></script>
     <script src="/js/navbar.js"></script>
     <script src="/js/referral-ui.js"></script>
