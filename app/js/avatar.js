@@ -719,17 +719,22 @@
         console.log('[Avatar] Pose set:', currentPose);
     }
 
-    let _mixerArmsStopped = false;
+    const _mixerArmsStopped = false;
+    // Snapshot: arm quaternions right after mixer.update(), before our modification
+    let _armSnapshot = { left: null, right: null };
+    function _captureArmSnapshot() {
+        if (armBones.leftArm) _armSnapshot.left = armBones.leftArm.quaternion.clone();
+        if (armBones.rightArm) _armSnapshot.right = armBones.rightArm.quaternion.clone();
+    }
     function _enforcePose() {
         if (typeof THREE === 'undefined') return;
-        // ADDITIVE BLEND: mixer sets base pose each frame, we multiply arm-down delta ON TOP.
-        // This preserves shoulder deformation and natural idle animation.
-        if (_currentArmAngle > 0 && armBones.leftArm && armBones.rightArm) {
+        // Apply arm-down delta from SNAPSHOT (not accumulated multiply)
+        if (_currentArmAngle > 0 && _armSnapshot.left && _armSnapshot.right) {
             const angle = _currentArmAngle * Math.PI / 180;
             const deltaL = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -angle);
             const deltaR = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), angle);
-            armBones.leftArm.quaternion.multiply(deltaL);
-            armBones.rightArm.quaternion.multiply(deltaR);
+            armBones.leftArm.quaternion.copy(_armSnapshot.left).multiply(deltaL);
+            armBones.rightArm.quaternion.copy(_armSnapshot.right).multiply(deltaR);
         }
     }
 
@@ -767,6 +772,7 @@
             // Mixer provides base idle animation from GLB model
             // Brain controls changes via [GESTURE:xxx] [POSE:xxx] [EMOTION:xxx] tags
             if (mixer) mixer.update(dt);
+            _captureArmSnapshot(); // Save mixer arm output BEFORE our override
             _enforcePose();
 
             updateBlink(dt);
