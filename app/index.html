@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 
 <head>
     <meta charset="UTF-8">
@@ -32,6 +32,14 @@
         } catch (e) {
             if (e.message === 'redirect') throw e;
         }
+    </script>
+    <script>
+        // ─── Theme: apply before paint (anti-flash) ──────────────
+        try {
+            var savedTheme = localStorage.getItem('kelion_theme') || 'dark';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+            if (savedTheme === 'light') document.querySelector('meta[name="theme-color"]').content = '#F8F9FC';
+        } catch(e) {}
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -840,6 +848,31 @@
                 try { localStorage.setItem('pwa_dismissed', Date.now()); } catch (e) { }
             });
         }
+    </script>
+    <!-- Theme Toggle -->
+    <button class="theme-toggle" id="theme-toggle" title="Toggle dark/light theme" aria-label="Toggle theme">
+        <span id="theme-icon">☀️</span>
+    </button>
+    <script>
+        (function() {
+            var toggle = document.getElementById('theme-toggle');
+            var icon = document.getElementById('theme-icon');
+            var html = document.documentElement;
+            function updateIcon() {
+                var current = html.getAttribute('data-theme') || 'dark';
+                icon.textContent = current === 'dark' ? '☀️' : '🌙';
+            }
+            updateIcon();
+            toggle.addEventListener('click', function() {
+                var current = html.getAttribute('data-theme') || 'dark';
+                var next = current === 'dark' ? 'light' : 'dark';
+                html.setAttribute('data-theme', next);
+                try { localStorage.setItem('kelion_theme', next); } catch(e) {}
+                var meta = document.querySelector('meta[name="theme-color"]');
+                if (meta) meta.content = next === 'dark' ? '#050510' : '#F8F9FC';
+                updateIcon();
+            });
+        })();
     </script>
 </body>
 
