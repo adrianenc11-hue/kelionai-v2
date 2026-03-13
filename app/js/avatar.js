@@ -635,7 +635,7 @@
     // Store rest-pose quaternions (captured ONCE when model loads)
     let _armRestLeft = null;
     let _armRestRight = null;
-    let _currentArmAngle = 15; // DEFAULT: 15° — gentle, preserves shoulders
+    let _currentArmAngle = 35; // DEFAULT: 35° — relaxed arms alongside body
 
     function _computeArmDownQuaternions(angleDeg) {
         if (typeof THREE === 'undefined') return;
