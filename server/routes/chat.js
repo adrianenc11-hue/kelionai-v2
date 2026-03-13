@@ -457,7 +457,7 @@ router.post(
   chatLimiter,
   validate(chatSchema),
   async (req, res) => {
-    const heartbeat = null; // Declared outside try so finally can always clear it
+    let heartbeat = null; // Must be let — reassigned in try block
     try {
       const { getUserFromToken, supabaseAdmin, brain } = req.app.locals;
       const {
