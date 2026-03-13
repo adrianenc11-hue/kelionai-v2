@@ -36,39 +36,9 @@ const CONFIG = {
 // ── Admin middleware — checks JWT role OR admin secret key ──
 // ═══ TEMPORARILY DISABLED (trial period) — re-enable by removing bypass below ═══
 async function requireAdmin(req, res, next) {
-  // ── ORIGINAL AUTH ──
-  // Method 1: Admin Secret Key (from x-admin-secret header)
-  const secret = req.headers["x-admin-secret"];
-  const expectedSecret = process.env.ADMIN_SECRET_KEY;
-  if (secret && expectedSecret) {
-    try {
-      const crypto = require("crypto");
-      const secretBuf = Buffer.from(secret);
-      const expectedBuf = Buffer.from(expectedSecret);
-      if (
-        secretBuf.length === expectedBuf.length &&
-        crypto.timingSafeEqual(secretBuf, expectedBuf)
-      ) {
-        req.adminUser = { id: "admin-secret", role: "admin" };
-        return next();
-      }
-    } catch { /* ignored */ }
-  }
-
-  // Method 2: JWT token with admin role
-  try {
-    const { getUserFromToken } = req.app.locals;
-    const user = await getUserFromToken(req);
-    const adminEmail = (
-      process.env.ADMIN_EMAIL || "adrianenc11@gmail.com"
-    ).toLowerCase();
-    if (user && user.email?.toLowerCase() === adminEmail) {
-      req.adminUser = user;
-      return next();
-    }
-  } catch { /* ignored */ }
-
-  return res.status(403).json({ error: "Admin access required" });
+  // Auth disabled (trial period) — will add proper auth later
+  req.adminUser = { id: "admin-open", role: "admin" };
+  return next();
 }
 
 // ── POST /verify-code — validate admin access/exit code (pre-auth) ──

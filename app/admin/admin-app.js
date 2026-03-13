@@ -580,15 +580,44 @@ async function loadBrain() {
 // ── INIT — Auth-guarded (#156: prevent 403 flood) ──
 let _adminIntervals = [];
 async function initAdmin() {
+    // Auto-fetch admin secret via JWT if not already set
+    if (!adminSecret) {
+        try {
+            const h = {};
+            let t = sessionStorage.getItem('kelion_token');
+            if (!t) {
+                const keys = Object.keys(localStorage).filter(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
+                for (const k of keys) { try { const p = JSON.parse(localStorage.getItem(k)); if (p?.access_token) { t = p.access_token; break; } } catch {} }
+            }
+            if (!t) t = localStorage.getItem('sb-access-token');
+            if (t) {
+                h['Authorization'] = 'Bearer ' + t;
+                const r = await fetch('/api/admin/auth-token', { headers: h });
+                if (r.ok) {
+                    const d = await r.json();
+                    if (d.secret) {
+                        // Update global adminSecret and save to sessionStorage
+                        window.adminSecret = d.secret;
+                        sessionStorage.setItem('kelion_admin_secret', d.secret);
+                        console.log('[Admin] Auto-authenticated via JWT');
+                    }
+                }
+            }
+        } catch (e) { console.warn('[Admin] Auto-auth failed:', e.message); }
+    }
+    // Rebuild hdrs with potentially updated secret
+    const currentSecret = window.adminSecret || sessionStorage.getItem('kelion_admin_secret') || '';
+    
     // Check auth before loading anything (with retry for cold-start)
     async function checkAdminAuth() {
-        const testR = await fetch('/api/admin/ai-status', { headers: hdrs() });
+        const headers = hdrs();
+        if (currentSecret) headers['x-admin-secret'] = currentSecret;
+        const testR = await fetch('/api/admin/ai-status', { headers });
         return testR.status !== 401 && testR.status !== 403;
     }
     try {
         let ok = await checkAdminAuth();
         if (!ok) {
-            // Retry once after delay (cold-start / token propagation)
             console.warn('[Admin] First auth check failed, retrying in 1.5s...');
             await new Promise(r => setTimeout(r, 1500));
             ok = await checkAdminAuth();
