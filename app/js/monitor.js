@@ -97,6 +97,9 @@ const _MonitorManager = (function () {
             .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
             .replace(/\*(.+?)\*/g, '<em>$1</em>')
             .replace(/`(.+?)`/g, '<code>$1</code>')
+            .replace(/^[\-\*] (.+)$/gm, '<li>$1</li>')
+            .replace(/^\d+\.\s(.+)$/gm, '<li>$1</li>')
+            .replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>')
             .replace(/\n/g, '<br>');
         el.innerHTML = html;
         showPanel('monitor-text');

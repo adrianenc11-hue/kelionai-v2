@@ -414,6 +414,15 @@
                 });
             }
 
+            // ── AUTO-DISPLAY: Show reply on monitor if it has structured content ──
+            if (window.MonitorManager && fullReply) {
+                const hasStructure = /^[\-\*\d]\s|^#{1,3}\s|\*\*|```|\n\n/m.test(fullReply);
+                const isLong = fullReply.length > 80;
+                if (hasStructure || isLong) {
+                    MonitorManager.showMarkdown(fullReply);
+                }
+            }
+
             // ── #53 BRAIN-MAP: Populate brain thinking panel ──
             if (typeof addBrainNode === 'function') {
                 const now = new Date().toLocaleTimeString();
