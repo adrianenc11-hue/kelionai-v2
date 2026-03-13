@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="ro">
+
+<head>
+    <meta charset="UTF-8">
+    <title>TestComplet AI — KelionAI v2.5</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: #0a0a1a;
+            color: #e0e0e0;
+            padding: 12px
+        }
+
+        h1 {
+            text-align: center;
+            color: #00ffff;
+            font-size: 1.4rem;
+            margin: 8px 0 2px
+        }
+
+        .sub {
+            text-align: center;
+            color: #888;
+            font-size: .78rem;
+            margin-bottom: 6px
+        }
+
+        .pbar-wrap {
+            background: #111;
+            border: 2px solid #00ff88;
+            border-radius: 14px;
+            height: 56px;
+            margin: 8px auto;
+            max-width: 98%;
+            position: sticky;
+            top: 6px;
+            z-index: 99;
+            overflow: hidden;
+            box-shadow: 0 0 30px #00ff8830
+        }
+
+        .pbar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00ff88, #00cc66);
+            border-radius: 12px;
+            transition: width .5s;
+            min-width: 0
+        }
+
+        .pbar-segs {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: flex;
+            pointer-events: none
+        }
+
+        .pbar-seg {
+            flex: 1;
+            border-right: 1px solid #0a0a1a40
+        }
+
+        .pbar-label {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-weight: 900;
+            color: #fff;
+            text-shadow: 0 0 10px #000, 0 0 20px #000;
+            pointer-events: none;
+            letter-spacing: 2px
+        }
+
+        .stats-row {
+            display: flex;
+            justify-content: center;
+            gap: 24px;
+            margin: 6px 0 10px;
+            font-size: .85rem
+        }
+
+        .sp {
+            color: #00ff88;
+            font-weight: bold
+        }
+
+        .sf {
+            color: #ff4444;
+            font-weight: bold
+        }
+
+        .sw {
+            color: #666
+        }
+
+        .sc {
+            color: #ffaa00;
+            font-weight: bold
+        }
+
+        .wrap {
+            overflow-x: auto;
+            border-radius: 10px;
+            border: 1px solid #1a1a3a
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: .76rem
+        }
+
+        th {
+            background: #12122a;
+            color: #00ffff;
+            padding: 7px 5px;
+            border: 1px solid #1a1a3a;
+            position: sticky;
+            top: 74px;
+            z-index: 9;
+            white-space: nowrap;
+            font-size: .68rem;
+            text-transform: uppercase;
+            letter-spacing: .4px
+        }
+
+        td {
+            padding: 5px;
+            border: 1px solid #1a1a3a;
+            text-align: center;
+            white-space: nowrap
+        }
+
+        tr:nth-child(even) {
+            background: #0d0d20
+        }
+
+        tr:nth-child(odd) {
+            background: #09091a
+        }
+
+        tr:hover {
+            background: #1a1a40
+        }
+
+        .cat {
+            background: #15153a !important;
+            color: #00ffff;
+            font-weight: bold;
+            font-size: .82rem;
+            text-align: left;
+            letter-spacing: 1px
+        }
+
+        .cat td {
+            border-bottom: 2px solid #00ffff40;
+            padding: 9px 8px
+        }
+
+        .fn {
+            text-align: left;
+            color: #ddd;
+            max-width: 170px;
+            overflow: hidden;
+            text-overflow: ellipsis
+        }
+
+        .ep {
+            text-align: left;
+            color: #888;
+            font-family: 'Cascadia Code', monospace;
+            font-size: .68rem;
+            max-width: 220px
+        }
+
+        .c-pass {
+            color: #00ff88;
+            font-weight: bold
+        }
+
+        .c-fail {
+            color: #ff4444
+        }
+
+        .c-na {
+            color: #333
+        }
+
+        .c-test {
+            color: #ffaa00;
+            animation: pulse 1s infinite
+        }
+
+        td.clickable {
+            cursor: pointer;
+            transition: background .2s
+        }
+
+        td.clickable:hover {
+            background: #1a1a4a !important
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1
+            }
+
+            50% {
+                opacity: .3
+            }
+        }
+
+        /* POPUP MODAL for 26 sub-tests */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, .85);
+            z-index: 999;
+            align-items: center;
+            justify-content: center
+        }
+
+        .modal-overlay.active {
+            display: flex
+        }
+
+        .modal {
+            background: #12122a;
+            border: 2px solid #00ffff;
+            border-radius: 16px;
+            padding: 20px;
+            max-width: 520px;
+            width: 92%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 0 60px #00ffff30
+        }
+
+        .modal h2 {
+            color: #00ffff;
+            font-size: 1.1rem;
+            margin-bottom: 4px
+        }
+
+        .modal .mfn {
+            color: #888;
+            font-size: .8rem;
+            margin-bottom: 12px
+        }
+
+        .modal-close {
+            float: right;
+            background: none;
+            border: none;
+            color: #ff4444;
+            font-size: 1.5rem;
+            cursor: pointer;
+            margin: -10px -5px 0 0
+        }
+
+        .sub-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: .75rem
+        }
+
+        .sub-table th {
+            background: #1a1a3a;
+            color: #00ffff;
+            padding: 6px 8px;
+            text-align: left;
+            font-size: .7rem
+        }
+
+        .sub-table td {
+            padding: 5px 8px;
+            border-bottom: 1px solid #1a1a3a
+        }
+
+        .sub-table tr:hover {
+            background: #1a1a40
+        }
+
+        .st-pass {
+            color: #00ff88;
+            font-weight: bold
+        }
+
+        .st-fail {
+            color: #ff4444;
+            font-weight: bold
+        }
+
+        .st-pending {
+            color: #555
+        }
+    </style>
+</head>
+
+<body>
+    <h1>🧪 TestComplet AI — KelionAI v2.5</h1>
+    <p class="sub">148 funcții reale din cod sursă | Click pe celulă → 26 sub-teste | Auto-refresh 500ms</p>
+    <div class="pbar-wrap">
+        <div class="pbar-fill" id="bar" style="width:0%"></div>
+        <div class="pbar-segs" id="segs"></div>
+        <div class="pbar-label" id="lbl">0 / 148 — 0%</div>
+    </div>
+    <div class="stats-row">
+        <span>✅ <span class="sp" id="sp">0</span> PASS</span>
+        <span>❌ <span class="sf" id="sf">0</span> FAIL</span>
+        <span>⏳ <span class="sw" id="sw2">148</span> Pending</span>
+        <span>🔄 <span class="sc" id="sc">—</span></span>
+    </div>
+    <div class="wrap">
+        <table id="t">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Funcție</th>
+                    <th>Endpoint / Modul</th>
+                    <th>V.Fizic</th>
+                    <th>Supa</th>
+                    <th>Brain</th>
+                    <th>Chat</th>
+                    <th>Media</th>
+                    <th>Mess FB</th>
+                    <th>WhatsApp</th>
+                    <th>Trading</th>
+                    <th>Admin</th>
+                    <th>Abon</th>
+                    <th>Notă</th>
+                </tr>
+            </thead>
+            <tbody id="tb"></tbody>
+        </table>
+    </div>
+
+    <!-- MODAL: 26 sub-teste -->
+    <div class="modal-overlay" id="modal">
+        <div class="modal">
+            <button class="modal-close" id="modalClose">✕</button>
+            <h2 id="modalTitle">#1 Register</h2>
+            <div class="mfn" id="modalEp">POST /api/auth/register</div>
+            <table class="sub-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Tip Test</th>
+                        <th>Status</th>
+                        <th>Notă</th>
+                    </tr>
+                </thead>
+                <tbody id="modalBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const TEST_TYPES = [
+            "Unit", "Integration", "Contract (CDC)", "Component", "System",
+            "E2E", "UAT", "Smoke", "Regression", "UI Functional",
+            "Visual Regression", "Accessibility (a11y)", "Performance", "Load", "Stress",
+            "Soak / Endurance", "SAST", "DAST", "SCA", "Pentest",
+            "Chaos", "Failover", "DR", "Data Migration", "Backup & Restore",
+            "Upgrade / Rollback"
+        ];
+
+        const D = [
+            ["AUTH", ""],
+            [1, "Register", "POST /api/auth/register", "", "", "—", "—", "—", "—", "—", "—", "—", "—", ""],
+            [2, "Login", "POST /api/auth/login", "", "", "—", "—", "—", "—", "—", "—", "—", "—", ""],
+            [3, "Logout", "POST /api/auth/logout", "", "", "—", "—", "—", "—", "—", "—", "—", "—", ""],
+            [4, "User Profile /me", "GET /api/auth/me", "", "", "—", "—", "—", "—", "—", "—", "—", "—", ""],
+            [5, "Refresh Token", "POST /api/auth/refresh", "", "", "—", "—", "—", "—", "—", "—", "—", "—", ""],
+            [6, "Forgot Password", "POST /api/auth/forgot-password", "", "", "—", "—", "—", "—", "—", "—", "—", "—", ""],
+            [7, "Reset Password", "POST /api/auth/reset-password", "", "", "—", "—", "—", "—", "—", "—", "—", "—", ""],
+            [8, "Change Password", "POST /api/auth/change-password", "", "", "—", "—", "—", "—", "—", "—", "—", "—", ""],
+            [9, "Change Email", "POST /api/auth/change-email", "", "", "—", "—", "—", "—", "—", "—", "—", "—", ""],
+            ["CHAT & BRAIN", ""],
+            [10, "Chat Text → AI", "POST /api/chat", "", "", "", "", "—", "—", "—", "—", "—", "", ""],
+            [11, "Chat Streaming SSE", "POST /api/chat/stream", "", "", "", "", "—", "—", "—", "—", "—", "", ""],
+            ["VOCE", ""],
+            [12, "TTS Speak", "POST /api/speak", "", "", "—", "", "", "—", "—", "—", "—", "", ""],
+            [13, "STT Listen", "POST /api/listen", "", "", "—", "", "", "—", "—", "—", "—", "", ""],
+            [14, "Voice Clone Create", "POST /api/voice/clone", "", "", "—", "—", "", "—", "—", "—", "—", "—", ""],
+            [15, "Voice Clone Delete", "DELETE /api/voice/clone", "", "", "—", "—", "", "—", "—", "—", "—", "—", ""],
+            [16, "Voice Clone Status", "GET /api/voice/clone", "", "", "—", "—", "—", "—", "—", "—", "—", "—", ""],
+            ["VIZIUNE", ""],
+            [17, "Vision Analysis", "POST /api/vision", "", "", "", "", "", "—", "—", "—", "—", "", ""],
+            ["IMAGINI", ""],
+            [18, "Image Gen FLUX", "POST /api/imagine", "", "", "—", "", "", "—", "—", "—", "—", "", ""],
+            ["CĂUTARE", ""],
+            [19, "Web Search", "POST /api/search", "", "", "—", "", "—", "—", "—", "—", "—", "", ""],
+            ["METEO", ""],
+            [20, "Weather", "POST /api/weather", "—", "—", "—", "", "—", "—", "—", "—", "—", "—", ""],
+            ["IDENTITATE", ""],
+            [21, "Register Face", "POST /api/identity/register-face", "", "", "—", "—", "", "—", "—", "—", "—", "—", ""],
+            [22, "Face Check", "POST /api/identity/check", "", "", "", "—", "", "—", "—", "—", "—", "—", ""],
+            ["PLĂȚI & ABONAMENTE", ""],
+            [23, "Plans List", "GET /api/payments/plans", "—", "—", "—", "—", "—", "—", "—", "—", "—", "", ""],
+            [24, "Plan Status", "GET /api/payments/status", "", "", "—", "—", "—", "—", "—", "—", "—", "", ""],
+            [25, "Checkout Pro €9.99", "POST /api/payments/checkout", "", "", "—", "—", "—", "—", "—", "—", "—", "", ""],
+            [26, "Checkout Premium €19.99", "POST /api/payments/checkout", "", "", "—", "—", "—", "—", "—", "—", "—", "", ""],
+            [27, "Billing Portal", "POST /api/payments/portal", "", "", "—", "—", "—", "—", "—", "—", "—", "", ""],
+            [28, "Stripe Webhook", "POST /api/payments/webhook", "", "", "—", "—", "—", "—", "—", "—", "—", "", ""],
+            [29, "Usage Check", "Funcție internă", "", "", "—", "—", "—", "—", "—", "—", "—", "", ""],
+            [30, "Usage Increment", "Funcție internă", "", "", "—", "—", "—", "—", "—", "—", "—", "", ""],
+            ["REFERRAL", ""],
+            [31, "Generate Code HMAC", "POST /api/referral/generate", "", "", "—", "—", "—", "—", "—", "—", "—", "", ""],
+            [32, "Send Invite Email", "POST /api/referral/send-invite", "", "", "—", "—", "—", "—", "—", "—", "—", "—", ""],
+            [33, "Verify Code", "POST /api/referral/verify", "", "", "—", "—", "—", "—", "—", "—", "—", "—", ""],
+            [34, "Redeem Code", "POST /api/referral/redeem", "", "", "—", "—", "—", "—", "—", "—", "—", "", ""],
+            [35, "My Codes", "GET /api/referral/my-codes", "", "", "—", "—", "—", "—", "—", "—", "—", "—", ""],
+            [36, "My Bonuses", "GET /api/referral/my-bonuses", "", "", "—", "—", "—", "—", "—", "—", "—", "—", ""],
+            [37, "Revoke Code", "DELETE /api/referral/revoke/:id", "", "", "—", "—", "—", "—", "—", "—", "—", "—", ""],
+            [38, "Apply Bonus", "Funcție internă", "", "", "—", "—", "—", "—", "—", "—", "—", "", ""],
+            ["TRADING", ""],
+            [39, "Trading Status", "GET /api/trading/status", "—", "—", "—", "—", "—", "—", "—", "", "", "—", ""],
+            [40, "Full Analysis", "GET /api/trading/analysis", "—", "—", "—", "—", "—", "—", "—", "", "", "—", ""],
+            [41, "Trading Signals", "GET /api/trading/signals", "—", "—", "—", "—", "—", "—", "—", "", "", "—", ""],
+            [42, "Portfolio", "GET /api/trading/portfolio", "—", "—", "—", "—", "—", "—", "—", "", "", "—", ""],
+            [43, "Backtest", "POST /api/trading/backtest", "—", "—", "—", "—", "—", "—", "—", "", "", "—", ""],
+            [44, "Alerts", "GET /api/trading/alerts", "—", "—", "—", "—", "—", "—", "—", "", "", "—", ""],
+            [45, "Correlation", "GET /api/trading/correlation", "—", "—", "—", "—", "—", "—", "—", "", "", "—", ""],
+            [46, "Risk Analysis", "GET /api/trading/risk", "—", "—", "—", "—", "—", "—", "—", "", "", "—", ""],
+            [47, "History", "GET /api/trading/history", "—", "—", "—", "—", "—", "—", "—", "", "", "—", ""],
+            [48, "Execute Trade", "POST /api/trading/execute", "—", "", "", "", "—", "—", "—", "", "", "—", ""],
+            [49, "RSI Calc", "Funcție internă", "—", "—", "—", "—", "—", "—", "—", "", "—", "—", ""],
+            [50, "MACD Calc", "Funcție internă", "—", "—", "—", "—", "—", "—", "—", "", "—", "—", ""],
+            [51, "Bollinger Bands", "Funcție internă", "—", "—", "—", "—", "—", "—", "—", "", "—", "—", ""],
+            [52, "EMA Crossover", "Funcție internă", "—", "—", "—", "—", "—", "—", "—", "", "—", "—", ""],
+            [53, "Fibonacci", "Funcție internă", "—", "—", "—", "—", "—", "—", "—", "", "—", "—", ""],
+            [54, "Volume/VWAP", "Funcție internă", "—", "—", "—", "—", "—", "—", "—", "", "—", "—", ""],
+            [55, "Sentiment", "Funcție internă", "—", "—", "—", "—", "—", "—", "—", "", "—", "—", ""],
+            [56, "Confluence Score", "Funcție internă", "—", "—", "—", "—", "—", "—", "—", "", "—", "—", ""],
+            [57, "Real Price Fetch", "Funcție internă", "—", "—", "—", "—", "—", "—", "—", "", "—", "—", ""],
+            ["MESSENGER FB", ""],
+            [58, "Webhook Verify", "GET /api/messenger/webhook", "—", "—", "—", "—", "—", "", "—", "—", "—", "—", ""],
+            [59, "Webhook Handler", "POST /api/messenger/webhook", "", "", "", "—", "—", "", "—", "—", "—", "—", ""],
+            [60, "Send Text", "Funcție internă", "—", "—", "—", "—", "—", "", "—", "—", "—", "—", ""],
+            [61, "Send Audio", "Funcție internă", "—", "—", "—", "—", "", "", "—", "—", "—", "—", ""],
+            [62, "Send Image", "Funcție internă", "—", "—", "—", "—", "", "", "—", "—", "—", "—", ""],
+            [63, "Generic Template", "Funcție internă", "—", "—", "—", "—", "—", "", "—", "—", "—", "—", ""],
+            [64, "Voice Reply TTS", "Funcție internă", "—", "—", "—", "—", "", "", "—", "—", "—", "—", ""],
+            [65, "Image Analysis", "Funcție internă", "—", "", "", "—", "", "", "—", "—", "—", "—", ""],
+            [66, "Audio Transcribe", "Funcție internă", "—", "—", "—", "—", "", "", "—", "—", "—", "—", ""],
+            [67, "Document Extract", "Funcție internă", "—", "—", "—", "—", "", "", "—", "—", "—", "—", ""],
+            [68, "Persistent Menu", "Funcție internă", "—", "—", "—", "—", "—", "", "—", "—", "—", "—", ""],
+            [69, "Postback Handler", "Funcție internă", "—", "—", "—", "—", "—", "", "—", "—", "—", "—", ""],
+            [70, "Broadcast News", "Funcție internă", "—", "—", "—", "—", "—", "", "—", "—", "—", "—", ""],
+            [71, "Messenger Stats", "GET /api/messenger/stats", "—", "—", "—", "—", "—", "", "—", "—", "", "—", ""],
+            [72, "Context/History", "Funcție internă", "", "—", "—", "—", "—", "", "—", "—", "—", "—", ""],
+            [73, "Language Detection", "Funcție internă", "—", "—", "—", "—", "—", "", "—", "—", "—", "—", ""],
+            [74, "Rate Limiting", "Funcție internă", "—", "—", "—", "—", "—", "", "—", "—", "—", "—", ""],
+            [75, "Known User Track", "Funcție internă", "", "—", "—", "—", "—", "", "—", "—", "—", "—", ""],
+            ["WHATSAPP", ""],
+            [76, "Webhook Verify", "GET /api/whatsapp/webhook", "—", "—", "—", "—", "—", "—", "", "—", "—", "—", ""],
+            [77, "Webhook Handler", "POST /api/whatsapp/webhook", "", "", "", "—", "—", "—", "", "—", "—", "—", ""],
+            [78, "Send Text", "Funcție internă", "—", "—", "—", "—", "—", "—", "", "—", "—", "—", ""],
+            [79, "Send Audio", "Funcție internă", "—", "—", "—", "—", "", "—", "", "—", "—", "—", ""],
+            [80, "Download Media", "Funcție internă", "—", "—", "—", "—", "", "—", "", "—", "—", "—", ""],
+            [81, "Upload Media", "Funcție internă", "—", "—", "—", "—", "", "—", "", "—", "—", "—", ""],
+            [82, "Transcribe Audio", "Funcție internă", "—", "—", "—", "—", "", "—", "", "—", "—", "—", ""],
+            [83, "Generate Speech", "Funcție internă", "—", "—", "—", "—", "", "—", "", "—", "—", "—", ""],
+            [84, "Group Intervention", "Funcție internă", "—", "—", "—", "—", "—", "—", "", "—", "—", "—", ""],
+            [85, "Context/History", "Funcție internă", "", "—", "—", "—", "—", "—", "", "—", "—", "—", ""],
+            [86, "Known User Track", "Funcție internă", "", "—", "—", "—", "—", "—", "", "—", "—", "—", ""],
+            [87, "Language Detection", "Funcție internă", "—", "—", "—", "—", "—", "—", "", "—", "—", "—", ""],
+            [88, "Rate Limiting", "Funcție internă", "—", "—", "—", "—", "—", "—", "", "—", "—", "—", ""],
+            ["TELEGRAM", ""],
+            [89, "Webhook Handler", "POST /api/telegram/webhook", "", "", "", "—", "—", "—", "—", "—", "—", "—", ""],
+            [90, "/start Command", "Funcție internă", "—", "—", "—", "—", "—", "—", "—", "—", "—", "—", ""],
+            [91, "/help Command", "Funcție internă", "—", "—", "—", "—", "—", "—", "—", "—", "—", "—", ""],
+            [92, "/banc Command", "Funcție internă", "—", "—", "—", "—", "—", "—", "—", "—", "—", "—", ""],
+            [93, "/stiri Command", "Funcție internă", "—", "—", "—", "—", "", "—", "—", "—", "—", "—", ""],
+            [94, "/breaking Command", "Funcție internă", "—", "—", "—", "—", "", "—", "—", "—", "—", "—", ""],
+            [95, "Broadcast Channel", "Funcție internă", "—", "—", "—", "—", "—", "—", "—", "—", "—", "—", ""],
+            [96, "FAQ Fallback", "Funcție internă", "—", "—", "—", "—", "—", "—", "—", "—", "—", "—", ""],
+            [97, "Known User Track", "Funcție internă", "", "—", "—", "—", "—", "—", "—", "—", "—", "—", ""],
+            ["INSTAGRAM", ""],
+            [98, "Webhook Verify", "GET /api/instagram/webhook", "—", "—", "—", "—", "—", "—", "—", "—", "—", "—", ""],
+            [99, "Webhook DM", "POST /api/instagram/webhook", "", "", "", "—", "—", "—", "—", "—", "—", "—", ""],
+            [100, "Handle DM", "Funcție internă", "—", "", "—", "—", "—", "—", "—", "—", "—", "—", ""],
+            [101, "Send DM", "Funcție internă", "—", "—", "—", "—", "—", "—", "—", "—", "—", "—", ""],
+            [102, "Create Container", "Funcție internă", "—", "—", "—", "—", "", "—", "—", "—", "—", "—", ""],
+            [103, "Publish Media", "Funcție internă", "—", "—", "—", "—", "", "—", "—", "—", "—", "—", ""],
+            [104, "Post News", "Funcție internă", "—", "—", "—", "—", "", "—", "—", "—", "—", "—", ""],
+            [105, "Publish Batch", "Funcție internă", "—", "—", "—", "—", "", "—", "—", "—", "", "—", ""],
+            ["NEWS / MEDIA", ""],
+            [106, "News Latest", "GET /api/news/latest", "—", "—", "—", "—", "", "—", "—", "—", "", "—", ""],
+            [107, "News Status", "GET /api/news/status", "—", "—", "—", "—", "", "—", "—", "—", "", "—", ""],
+            [108, "News Fetch", "GET /api/news/fetch", "", "—", "—", "—", "", "—", "—", "—", "", "—", ""],
+            [109, "News Public", "GET /api/news/public", "—", "—", "—", "—", "", "—", "—", "—", "—", "—", ""],
+            [110, "Scheduler", "Funcție internă", "", "—", "—", "—", "", "—", "—", "—", "—", "—", ""],
+            [111, "RSS Fetch 8 surse", "Funcție internă", "—", "—", "—", "—", "", "—", "—", "—", "—", "—", ""],
+            [112, "Anti-Fake Filter", "Funcție internă", "—", "—", "—", "—", "", "—", "—", "—", "—", "—", ""],
+            [113, "Breaking Detection", "Funcție internă", "—", "—", "—", "—", "", "—", "—", "—", "—", "—", ""],
+            [114, "FB Page Publish", "Funcție internă", "—", "—", "—", "—", "", "—", "—", "—", "", "—", ""],
+            [115, "Media Auto-Publish", "POST /api/news/publish", "—", "—", "—", "—", "", "", "—", "—", "", "—", ""],
+            [116, "Media Status", "GET /api/media/status", "—", "—", "—", "—", "", "—", "—", "—", "", "—", ""],
+            ["DEVELOPER API", ""],
+            [117, "List API Keys", "GET /api/developer/keys", "", "—", "—", "—", "—", "—", "—", "—", "—", "—", ""],
+            [118, "Create API Key", "POST /api/developer/keys", "", "—", "—", "—", "—", "—", "—", "—", "—", "—", ""],
+            [119, "Revoke API Key", "DELETE /api/developer/keys/:id", "", "—", "—", "—", "—", "—", "—", "—", "—", "—", ""],
+            [120, "Dev Stats", "GET /api/developer/stats", "", "—", "—", "—", "—", "—", "—", "—", "—", "—", ""],
+            [121, "Save Webhook", "POST /api/developer/webhooks", "", "—", "—", "—", "—", "—", "—", "—", "—", "—", ""],
+            [122, "Get Webhook", "GET /api/developer/webhooks", "", "—", "—", "—", "—", "—", "—", "—", "—", "—", ""],
+            [123, "v1 Status", "GET /api/v1/status", "—", "—", "—", "—", "—", "—", "—", "—", "—", "—", ""],
+            [124, "v1 Models", "GET /api/v1/models", "—", "—", "—", "—", "—", "—", "—", "—", "—", "—", ""],
+            [125, "v1 User Profile", "GET /api/v1/user/profile", "", "—", "—", "—", "—", "—", "—", "—", "—", "—", ""],
+            [126, "v1 Chat", "POST /api/v1/chat", "—", "", "", "", "—", "—", "—", "—", "—", "—", ""],
+            ["ADMIN", ""],
+            [127, "Verify Admin Code", "POST /api/admin/verify-code", "—", "—", "—", "—", "—", "—", "—", "—", "", "—", ""],
+            [128, "Brain Diagnostics", "GET /api/brain", "—", "", "", "—", "—", "—", "—", "—", "", "—", ""],
+            [129, "Brain Reset", "POST /api/brain/reset", "—", "", "", "—", "—", "—", "—", "—", "", "—", ""],
+            [130, "Health Check Full", "GET /api/admin/health-check", "", "", "", "—", "—", "—", "—", "—", "", "", ""],
+            [131, "Payment Stats", "GET /api/payments/admin/stats", "", "—", "—", "—", "—", "—", "—", "—", "", "", ""],
+            ["HEALTH & INFRA", ""],
+            [132, "Health Endpoint", "GET /api/health", "", "", "", "—", "—", "—", "—", "—", "—", "—", ""],
+            [133, "Cookie Consent", "POST /api/cookie-consent", "", "—", "—", "—", "—", "—", "—", "—", "—", "—", ""],
+            [134, "Ticker Disable", "POST /api/ticker/disable", "", "—", "—", "—", "—", "—", "—", "—", "—", "", ""],
+            [135, "Legal Pages", "GET /api/legal/*", "—", "—", "—", "—", "—", "—", "—", "—", "—", "—", ""],
+            [136, "HTTPS Redirect", "Middleware", "—", "—", "—", "—", "—", "—", "—", "—", "—", "—", ""],
+            [137, "CSP Nonce", "Middleware", "—", "—", "—", "—", "—", "—", "—", "—", "—", "—", ""],
+            [138, "Rate Limit Global", "Middleware", "—", "—", "—", "—", "—", "—", "—", "—", "—", "—", ""],
+            [139, "SPA Whitelist", "Middleware", "—", "—", "—", "—", "—", "—", "—", "—", "—", "—", ""],
+            [140, "Supabase RLS", "DB Config", "", "—", "—", "—", "—", "—", "—", "—", "—", "—", ""],
+            [141, "Metrics", "Middleware", "—", "—", "—", "—", "—", "—", "—", "—", "—", "—", ""],
+            ["BRAIN INTERN", ""],
+            [142, "Brain.think()", "brain.js", "", "", "", "", "—", "—", "—", "—", "—", "—", ""],
+            [143, "Brain.getDiagnostics()", "brain.js", "—", "", "", "—", "—", "—", "—", "—", "", "—", ""],
+            [144, "Brain.learn()", "brain.js", "", "", "", "", "—", "—", "—", "—", "—", "—", ""],
+            [145, "Brain.resetTool()", "brain.js", "—", "", "", "—", "—", "—", "—", "—", "", "—", ""],
+            [146, "Brain.resetAll()", "brain.js", "—", "", "", "—", "—", "—", "—", "—", "", "—", ""],
+            [147, "buildSystemPrompt()", "persona.js", "—", "", "", "", "—", "—", "—", "—", "—", "—", ""],
+            [148, "Multi-Engine Cascade", "brain.js", "—", "", "", "", "—", "—", "—", "—", "—", "—", ""]
+        ];
+
+        // Sub-test storage: { funcId: { "Smoke": {status,note}, ... } }
+        let subTests = {};
+        for (let i = 1; i <= 148; i++) {
+            subTests[i] = {};
+            TEST_TYPES.forEach(t => { subTests[i][t] = { status: "—", note: "" }; });
+        }
+
+        const tb = document.getElementById("tb");
+        const sg = document.getElementById("segs");
+        for (let i = 0; i < 148; i++) { const d = document.createElement("div"); d.className = "pbar-seg"; sg.appendChild(d); }
+
+        D.forEach(r => {
+            if (typeof r[0] === "string" && r.length === 2) {
+                const tr = document.createElement("tr"); tr.className = "cat";
+                tr.innerHTML = `<td colspan="14">▸ ${r[0]}</td>`; tb.appendChild(tr);
+            } else {
+                const tr = document.createElement("tr"); tr.id = "r" + r[0];
+                let h = `<td>${r[0]}</td><td class="fn">${r[1]}</td><td class="ep">${r[2]}</td>`;
+                for (let i = 3; i < 13; i++) {
+                    const v = r[i];
+                    if (v === "—") {
+                        h += `<td class="c-na">—</td>`;
+                    } else {
+                        h += `<td class="clickable" id="c${r[0]}_${i}" onclick="openModal(${r[0]})"></td>`;
+                    }
+                }
+                h += `<td class="fn" style="color:#666;font-size:.6rem" id="n${r[0]}"></td>`;
+                tr.innerHTML = h; tb.appendChild(tr);
+            }
+        });
+
+        // MODAL
+        const modal = document.getElementById("modal");
+        document.getElementById("modalClose").onclick = () => modal.classList.remove("active");
+        modal.onclick = e => { if (e.target === modal) modal.classList.remove("active"); };
+        document.addEventListener("keydown", e => { if (e.key === "Escape") modal.classList.remove("active"); });
+
+        function openModal(id) {
+            const row = D.find(r => r[0] === id);
+            if (!row) return;
+            document.getElementById("modalTitle").textContent = `#${id} ${row[1]}`;
+            document.getElementById("modalEp").textContent = row[2];
+            const body = document.getElementById("modalBody");
+            body.innerHTML = "";
+            let passCount = 0, totalDone = 0;
+            TEST_TYPES.forEach((t, i) => {
+                const st = subTests[id]?.[t] || { status: "—", note: "" };
+                const cls = st.status === "PASS" ? "st-pass" : st.status === "FAIL" ? "st-fail" : "st-pending";
+                const icon = st.status === "PASS" ? "✅" : st.status === "FAIL" ? "❌" : "⏳";
+                if (st.status !== "—") totalDone++;
+                if (st.status === "PASS") passCount++;
+                const tr = document.createElement("tr");
+                tr.innerHTML = `<td>${i + 1}</td><td>${t}</td><td class="${cls}">${icon} ${st.status}</td><td style="color:#666;font-size:.65rem">${st.note}</td>`;
+                body.appendChild(tr);
+            });
+            document.getElementById("modalTitle").textContent = `#${id} ${row[1]} — ${passCount}/${TEST_TYPES.length}`;
+            modal.classList.add("active");
+        }
+
+        let lastTest = '';
+        async function refresh() {
+            try {
+                const r = await fetch('/results.json?t=' + Date.now());
+                const d = await r.json();
+                const pct = d.total > 0 ? Math.round(d.passed / d.total * 100) : 0;
+                document.getElementById("bar").style.width = pct + "%";
+                const cur = d.inProgress || lastTest;
+                if (d.inProgress) lastTest = d.inProgress;
+                document.getElementById("lbl").textContent = `${d.passed} / ${d.total} — ${pct}%` + (cur ? `  ▸ ${cur}` : '');
+                document.getElementById("sp").textContent = d.passed;
+                document.getElementById("sf").textContent = d.failed;
+                document.getElementById("sw2").textContent = d.total - d.tested;
+                document.getElementById("sc").textContent = cur || "—";
+                (d.results || []).forEach(res => {
+                    // Store sub-test result
+                    const type = res.type || "Smoke";
+                    if (subTests[res.id]) {
+                        subTests[res.id][type] = { status: res.status, note: res.note || "" };
+                    }
+                });
+                // Update cells based on COMPLETED sub-test count per function
+                for (let fid = 1; fid <= 148; fid++) {
+                    const cell = document.getElementById("c" + fid + "_3");
+                    if (!cell) continue;
+                    const st = subTests[fid];
+                    if (!st) continue;
+                    let done = 0, pass = 0, fail = 0;
+                    TEST_TYPES.forEach(t => {
+                        if (st[t] && st[t].status !== "—") { done++; if (st[t].status === "PASS") pass++; if (st[t].status === "FAIL") fail++; }
+                    });
+                    if (done === 0) { cell.className = "clickable"; cell.textContent = ""; }
+                    else if (fail > 0) { cell.className = "clickable c-fail"; cell.textContent = `❌ ${pass}/${done}`; }
+                    else if (done < 26) { cell.className = "clickable c-test"; cell.textContent = `🔄 ${done}/26`; }
+                    else { cell.className = "clickable c-pass"; cell.textContent = "✅ 26/26"; }
+                }
+            } catch { }
+        }
+        setInterval(refresh, 500);
+        refresh();
+    </script>
+</body>
+
+</html>

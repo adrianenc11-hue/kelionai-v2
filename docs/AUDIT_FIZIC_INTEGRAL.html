@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="ro">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>AUDIT FIZIC INTEGRAL — KelionAI v2.5</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: #0a0a1a;
+            color: #e0e0e0;
+            padding: 20px
+        }
+
+        h1 {
+            text-align: center;
+            color: #00ffff;
+            margin: 20px 0 5px;
+            font-size: 1.6rem
+        }
+
+        .sub {
+            text-align: center;
+            color: #888;
+            margin-bottom: 20px;
+            font-size: .85rem
+        }
+
+        .legend {
+            display: flex;
+            gap: 16px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+            font-size: .8rem
+        }
+
+        .legend span {
+            padding: 3px 10px;
+            border-radius: 4px
+        }
+
+        .l-pass {
+            background: #00ff8820;
+            color: #00ff88;
+            border: 1px solid #00ff88
+        }
+
+        .l-fail {
+            background: #ff444420;
+            color: #ff4444;
+            border: 1px solid #ff4444
+        }
+
+        .l-na {
+            background: #33333380;
+            color: #666;
+            border: 1px solid #444
+        }
+
+        .l-warn {
+            background: #ffaa0020;
+            color: #ffaa00;
+            border: 1px solid #ffaa00
+        }
+
+        .stats {
+            text-align: center;
+            margin: 10px 0 20px;
+            font-size: .9rem;
+            color: #00ffff
+        }
+
+        .wrap {
+            overflow-x: auto;
+            border-radius: 12px;
+            border: 1px solid #1a1a3a
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: .78rem
+        }
+
+        th {
+            background: #12122a;
+            color: #00ffff;
+            padding: 8px 6px;
+            border: 1px solid #1a1a3a;
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            white-space: nowrap;
+            text-transform: uppercase;
+            font-size: .7rem;
+            letter-spacing: .5px
+        }
+
+        td {
+            padding: 6px;
+            border: 1px solid #1a1a3a;
+            text-align: center;
+            white-space: nowrap
+        }
+
+        tr:nth-child(even) {
+            background: #0d0d20
+        }
+
+        tr:nth-child(odd) {
+            background: #09091a
+        }
+
+        tr:hover {
+            background: #1a1a40
+        }
+
+        .cat {
+            background: #15153a !important;
+            color: #00ffff;
+            font-weight: bold;
+            font-size: .85rem;
+            text-align: left;
+            letter-spacing: 1px
+        }
+
+        .cat td {
+            border-bottom: 2px solid #00ffff40;
+            padding: 10px 8px
+        }
+
+        .fn {
+            text-align: left;
+            color: #ddd;
+            max-width: 180px;
+            overflow: hidden;
+            text-overflow: ellipsis
+        }
+
+        .ep {
+            text-align: left;
+            color: #888;
+            font-family: 'Cascadia Code', monospace;
+            font-size: .7rem;
+            max-width: 230px
+        }
+
+        .c-pass {
+            color: #00ff88;
+            font-weight: bold
+        }
+
+        .c-fail {
+            color: #ff4444
+        }
+
+        .c-na {
+            color: #333
+        }
+
+        .c-warn {
+            color: #ffaa00
+        }
+
+        .miss {
+            background: #ff444410
+        }
+
+        .miss td {
+            color: #ff6666
+        }
+
+        #filter {
+            background: #12122a;
+            color: #e0e0e0;
+            border: 1px solid #1a1a3a;
+            padding: 6px 14px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            width: 300px;
+            display: block;
+            margin: 0 auto 12px
+        }
+    </style>
+</head>
+
+<body>
+    <h1>📋 AUDIT FIZIC INTEGRAL — KelionAI v2.5</h1>
+    <p class="sub">148 funcții reale din cod sursă | Data: 2026-03-05 | ❌ = Neverificat | ✅ = Testat fizic LIVE</p>
+    <div class="legend">
+        <span class="l-fail">❌ Neverificat</span>
+        <span class="l-pass">✅ PASS</span>
+        <span class="l-na">— Nu se aplică</span>
+        <span class="l-warn">⚠️ Problemă</span>
+    </div>
+    <input id="filter" placeholder="🔍 Caută funcție sau endpoint..." oninput="filterTable()">
+    <div class="stats" id="stats"></div>
+    <div class="wrap">
+        <table id="t">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Funcție</th>
+                    <th>Endpoint / Modul</th>
+                    <th>V.Fizic</th>
+                    <th>Supa</th>
+                    <th>Brain</th>
+                    <th>Chat</th>
+                    <th>Media</th>
+                    <th>Mess FB</th>
+                    <th>WhatsApp</th>
+                    <th>Trading</th>
+                    <th>Admin</th>
+                    <th>Abon</th>
+                    <th>Notă</th>
+                </tr>
+            </thead>
+            <tbody id="tb"></tbody>
+        </table>
+    </div>
+    <div style="margin-top:20px;text-align:center;color:#666;font-size:.75rem">
+        ⚠️ FUNCȚII LIPSĂ DIN COD: Annual Plans, Family Promotion, Enterprise (alias Premium), WhatsApp Send standalone,
+        sw.js, GPS Brain integration
+    </div>
+    <script>
+        const D = [
+            ["AUTH", ""],
+            [1, "Register", "POST /api/auth/register", "❌", "❌", "-", "-", "-", "-", "-", "-", "-", "-", ""],
+            [2, "Login", "POST /api/auth/login", "❌", "❌", "-", "-", "-", "-", "-", "-", "-", "-", ""],
+            [3, "Logout", "POST /api/auth/logout", "❌", "❌", "-", "-", "-", "-", "-", "-", "-", "-", ""],
+            [4, "User Profile /me", "GET /api/auth/me", "❌", "❌", "-", "-", "-", "-", "-", "-", "-", "-", ""],
+            [5, "Refresh Token", "POST /api/auth/refresh", "❌", "❌", "-", "-", "-", "-", "-", "-", "-", "-", ""],
+            [6, "Forgot Password", "POST /api/auth/forgot-password", "❌", "❌", "-", "-", "-", "-", "-", "-", "-", "-", ""],
+            [7, "Reset Password", "POST /api/auth/reset-password", "❌", "❌", "-", "-", "-", "-", "-", "-", "-", "-", ""],
+            [8, "Change Password", "POST /api/auth/change-password", "❌", "❌", "-", "-", "-", "-", "-", "-", "-", "-", ""],
+            [9, "Change Email", "POST /api/auth/change-email", "❌", "❌", "-", "-", "-", "-", "-", "-", "-", "-", ""],
+            ["CHAT & BRAIN", ""],
+            [10, "Chat Text → AI", "POST /api/chat", "❌", "❌", "❌", "❌", "-", "-", "-", "-", "-", "❌", "Multi-engine cascade"],
+            [11, "Chat Streaming SSE", "POST /api/chat/stream", "❌", "❌", "❌", "❌", "-", "-", "-", "-", "-", "❌", "SSE word-by-word"],
+            ["VOCE", ""],
+            [12, "TTS Speak", "POST /api/speak", "❌", "❌", "-", "❌", "❌", "-", "-", "-", "-", "❌", "ElevenLabs"],
+            [13, "STT Listen", "POST /api/listen", "❌", "❌", "-", "❌", "❌", "-", "-", "-", "-", "❌", "Groq Whisper"],
+            [14, "Voice Clone Create", "POST /api/voice/clone", "❌", "❌", "-", "-", "❌", "-", "-", "-", "-", "-", ""],
+            [15, "Voice Clone Delete", "DELETE /api/voice/clone", "❌", "❌", "-", "-", "❌", "-", "-", "-", "-", "-", ""],
+            [16, "Voice Clone Status", "GET /api/voice/clone", "❌", "❌", "-", "-", "-", "-", "-", "-", "-", "-", ""],
+            ["VIZIUNE", ""],
+            [17, "Vision Analysis", "POST /api/vision", "❌", "❌", "❌", "❌", "❌", "-", "-", "-", "-", "❌", "Claude Vision"],
+            ["IMAGINI", ""],
+            [18, "Image Gen FLUX", "POST /api/imagine", "❌", "❌", "-", "❌", "❌", "-", "-", "-", "-", "❌", "Together AI"],
+            ["CĂUTARE WEB", ""],
+            [19, "Web Search", "POST /api/search", "❌", "❌", "-", "❌", "-", "-", "-", "-", "-", "❌", "4-engine cascade"],
+            ["METEO", ""],
+            [20, "Weather", "POST /api/weather", "❌", "-", "-", "❌", "-", "-", "-", "-", "-", "-", "Open-Meteo"],
+            ["IDENTITATE", ""],
+            [21, "Register Face", "POST /api/identity/register-face", "❌", "❌", "-", "-", "❌", "-", "-", "-", "-", "-", ""],
+            [22, "Face Check", "POST /api/identity/check", "❌", "❌", "❌", "-", "❌", "-", "-", "-", "-", "-", "OpenAI Vision"],
+            ["PLĂȚI & ABONAMENTE", ""],
+            [23, "Plans List", "GET /api/payments/plans", "❌", "-", "-", "-", "-", "-", "-", "-", "-", "❌", ""],
+            [24, "Plan Status", "GET /api/payments/status", "❌", "❌", "-", "-", "-", "-", "-", "-", "-", "❌", ""],
+            [25, "Checkout Pro", "POST /api/payments/checkout", "❌", "❌", "-", "-", "-", "-", "-", "-", "-", "❌", "€9.99/mo"],
+            [26, "Checkout Premium", "POST /api/payments/checkout", "❌", "❌", "-", "-", "-", "-", "-", "-", "-", "❌", "€19.99/mo"],
+            [27, "Billing Portal", "POST /api/payments/portal", "❌", "❌", "-", "-", "-", "-", "-", "-", "-", "❌", "Stripe Portal"],
+            [28, "Stripe Webhook", "POST /api/payments/webhook", "❌", "❌", "-", "-", "-", "-", "-", "-", "-", "❌", ""],
+            [29, "Usage Check", "Funcție internă", "❌", "❌", "-", "-", "-", "-", "-", "-", "-", "❌", "checkUsage()"],
+            [30, "Usage Increment", "Funcție internă", "❌", "❌", "-", "-", "-", "-", "-", "-", "-", "❌", "incrementUsage()"],
+            ["REFERRAL", ""],
+            [31, "Generate Code HMAC", "POST /api/referral/generate", "❌", "❌", "-", "-", "-", "-", "-", "-", "-", "❌", ""],
+            [32, "Send Invite Email", "POST /api/referral/send-invite", "❌", "❌", "-", "-", "-", "-", "-", "-", "-", "-", "Nodemailer"],
+            [33, "Verify Code", "POST /api/referral/verify", "❌", "❌", "-", "-", "-", "-", "-", "-", "-", "-", ""],
+            [34, "Redeem Code", "POST /api/referral/redeem", "❌", "❌", "-", "-", "-", "-", "-", "-", "-", "❌", ""],
+            [35, "My Codes", "GET /api/referral/my-codes", "❌", "❌", "-", "-", "-", "-", "-", "-", "-", "-", ""],
+            [36, "My Bonuses", "GET /api/referral/my-bonuses", "❌", "❌", "-", "-", "-", "-", "-", "-", "-", "-", ""],
+            [37, "Revoke Code", "DELETE /api/referral/revoke/:id", "❌", "❌", "-", "-", "-", "-", "-", "-", "-", "-", ""],
+            [38, "Apply Bonus", "Funcție internă", "❌", "❌", "-", "-", "-", "-", "-", "-", "-", "❌", "applyReferralBonus()"],
+            ["TRADING", ""],
+            [39, "Trading Status", "GET /api/trading/status", "❌", "-", "-", "-", "-", "-", "-", "❌", "❌", "-", ""],
+            [40, "Full Analysis", "GET /api/trading/analysis", "❌", "-", "-", "-", "-", "-", "-", "❌", "❌", "-", "CoinGecko real data"],
+            [41, "Trading Signals", "GET /api/trading/signals", "❌", "-", "-", "-", "-", "-", "-", "❌", "❌", "-", ""],
+            [42, "Portfolio", "GET /api/trading/portfolio", "❌", "-", "-", "-", "-", "-", "-", "❌", "❌", "-", ""],
+            [43, "Backtest", "POST /api/trading/backtest", "❌", "-", "-", "-", "-", "-", "-", "❌", "❌", "-", ""],
+            [44, "Alerts", "GET /api/trading/alerts", "❌", "-", "-", "-", "-", "-", "-", "❌", "❌", "-", ""],
+            [45, "Correlation", "GET /api/trading/correlation", "❌", "-", "-", "-", "-", "-", "-", "❌", "❌", "-", ""],
+            [46, "Risk Analysis", "GET /api/trading/risk", "❌", "-", "-", "-", "-", "-", "-", "❌", "❌", "-", ""],
+            [47, "History", "GET /api/trading/history", "❌", "-", "-", "-", "-", "-", "-", "❌", "❌", "-", ""],
+            [48, "Execute Trade", "POST /api/trading/execute", "❌", "-", "❌", "❌", "-", "-", "-", "❌", "❌", "-", "Paper only"],
+            [49, "RSI Calc", "Funcție internă", "❌", "-", "-", "-", "-", "-", "-", "❌", "-", "-", ""],
+            [50, "MACD Calc", "Funcție internă", "❌", "-", "-", "-", "-", "-", "-", "❌", "-", "-", ""],
+            [51, "Bollinger Bands", "Funcție internă", "❌", "-", "-", "-", "-", "-", "-", "❌", "-", "-", ""],
+            [52, "EMA Crossover", "Funcție internă", "❌", "-", "-", "-", "-", "-", "-", "❌", "-", "-", ""],
+            [53, "Fibonacci", "Funcție internă", "❌", "-", "-", "-", "-", "-", "-", "❌", "-", "-", ""],
+            [54, "Volume/VWAP", "Funcție internă", "❌", "-", "-", "-", "-", "-", "-", "❌", "-", "-", ""],
+            [55, "Sentiment", "Funcție internă", "❌", "-", "-", "-", "-", "-", "-", "❌", "-", "-", ""],
+            [56, "Confluence Score", "Funcție internă", "❌", "-", "-", "-", "-", "-", "-", "❌", "-", "-", ""],
+            [57, "Real Price Fetch", "Funcție internă", "❌", "-", "-", "-", "-", "-", "-", "❌", "-", "-", "CoinGecko API"],
+            ["MESSENGER FACEBOOK", ""],
+            [58, "Webhook Verify", "GET /api/messenger/webhook", "❌", "-", "-", "-", "-", "❌", "-", "-", "-", "-", ""],
+            [59, "Webhook Handler", "POST /api/messenger/webhook", "❌", "❌", "❌", "-", "-", "❌", "-", "-", "-", "-", "Full AI"],
+            [60, "Send Text", "Funcție internă", "❌", "-", "-", "-", "-", "❌", "-", "-", "-", "-", ""],
+            [61, "Send Audio", "Funcție internă", "❌", "-", "-", "-", "❌", "❌", "-", "-", "-", "-", ""],
+            [62, "Send Image", "Funcție internă", "❌", "-", "-", "-", "❌", "❌", "-", "-", "-", "-", ""],
+            [63, "Generic Template", "Funcție internă", "❌", "-", "-", "-", "-", "❌", "-", "-", "-", "-", "Carousel"],
+            [64, "Voice Reply TTS", "Funcție internă", "❌", "-", "-", "-", "❌", "❌", "-", "-", "-", "-", ""],
+            [65, "Image Analysis", "Funcție internă", "❌", "-", "❌", "-", "❌", "❌", "-", "-", "-", "-", "GPT-4o Vision"],
+            [66, "Audio Transcribe", "Funcție internă", "❌", "-", "-", "-", "❌", "❌", "-", "-", "-", "-", "Whisper"],
+            [67, "Document Extract", "Funcție internă", "❌", "-", "-", "-", "❌", "❌", "-", "-", "-", "-", "PDF/DOCX"],
+            [68, "Persistent Menu", "Funcție internă", "❌", "-", "-", "-", "-", "❌", "-", "-", "-", "-", ""],
+            [69, "Postback Handler", "Funcție internă", "❌", "-", "-", "-", "-", "❌", "-", "-", "-", "-", ""],
+            [70, "Broadcast News", "Funcție internă", "❌", "-", "-", "-", "-", "❌", "-", "-", "-", "-", ""],
+            [71, "Messenger Stats", "GET /api/messenger/stats", "❌", "-", "-", "-", "-", "❌", "-", "-", "❌", "-", ""],
+            [72, "Context/History", "Funcție internă", "❌", "❌", "-", "-", "-", "❌", "-", "-", "-", "-", "Supabase backed"],
+            [73, "Language Detection", "Funcție internă", "❌", "-", "-", "-", "-", "❌", "-", "-", "-", "-", ""],
+            [74, "Rate Limiting", "Funcție internă", "❌", "-", "-", "-", "-", "❌", "-", "-", "-", "-", ""],
+            [75, "Known User Track", "Funcție internă", "❌", "❌", "-", "-", "-", "❌", "-", "-", "-", "-", ""],
+            ["WHATSAPP", ""],
+            [76, "Webhook Verify", "GET /api/whatsapp/webhook", "❌", "-", "-", "-", "-", "-", "❌", "-", "-", "-", ""],
+            [77, "Webhook Handler", "POST /api/whatsapp/webhook", "❌", "❌", "❌", "-", "-", "-", "❌", "-", "-", "-", "Full AI"],
+            [78, "Send Text", "Funcție internă", "❌", "-", "-", "-", "-", "-", "❌", "-", "-", "-", ""],
+            [79, "Send Audio", "Funcție internă", "❌", "-", "-", "-", "❌", "-", "❌", "-", "-", "-", ""],
+            [80, "Download Media", "Funcție internă", "❌", "-", "-", "-", "❌", "-", "❌", "-", "-", "-", ""],
+            [81, "Upload Media", "Funcție internă", "❌", "-", "-", "-", "❌", "-", "❌", "-", "-", "-", ""],
+            [82, "Transcribe Audio", "Funcție internă", "❌", "-", "-", "-", "❌", "-", "❌", "-", "-", "-", "Whisper"],
+            [83, "Generate Speech", "Funcție internă", "❌", "-", "-", "-", "❌", "-", "❌", "-", "-", "-", "ElevenLabs"],
+            [84, "Group Intervention", "Funcție internă", "❌", "-", "-", "-", "-", "-", "❌", "-", "-", "-", "Smart pause"],
+            [85, "Context/History", "Funcție internă", "❌", "❌", "-", "-", "-", "-", "❌", "-", "-", "-", ""],
+            [86, "Known User Track", "Funcție internă", "❌", "❌", "-", "-", "-", "-", "❌", "-", "-", "-", ""],
+            [87, "Language Detection", "Funcție internă", "❌", "-", "-", "-", "-", "-", "❌", "-", "-", "-", ""],
+            [88, "Rate Limiting", "Funcție internă", "❌", "-", "-", "-", "-", "-", "❌", "-", "-", "-", ""],
+            ["TELEGRAM", ""],
+            [89, "Webhook Handler", "POST /api/telegram/webhook", "❌", "❌", "❌", "-", "-", "-", "-", "-", "-", "-", ""],
+            [90, "/start Command", "Funcție internă", "❌", "-", "-", "-", "-", "-", "-", "-", "-", "-", ""],
+            [91, "/help Command", "Funcție internă", "❌", "-", "-", "-", "-", "-", "-", "-", "-", "-", ""],
+            [92, "/banc Command", "Funcție internă", "❌", "-", "-", "-", "-", "-", "-", "-", "-", "-", ""],
+            [93, "/stiri Command", "Funcție internă", "❌", "-", "-", "-", "❌", "-", "-", "-", "-", "-", ""],
+            [94, "/breaking Command", "Funcție internă", "❌", "-", "-", "-", "❌", "-", "-", "-", "-", "-", ""],
+            [95, "Broadcast Channel", "Funcție internă", "❌", "-", "-", "-", "-", "-", "-", "-", "-", "-", ""],
+            [96, "FAQ Fallback", "Funcție internă", "❌", "-", "-", "-", "-", "-", "-", "-", "-", "-", ""],
+            [97, "Known User Track", "Funcție internă", "❌", "❌", "-", "-", "-", "-", "-", "-", "-", "-", ""],
+            ["INSTAGRAM", ""],
+            [98, "Webhook Verify", "GET /api/instagram/webhook", "❌", "-", "-", "-", "-", "-", "-", "-", "-", "-", ""],
+            [99, "Webhook DM", "POST /api/instagram/webhook", "❌", "❌", "❌", "-", "-", "-", "-", "-", "-", "-", ""],
+            [100, "Handle DM", "Funcție internă", "❌", "-", "❌", "-", "-", "-", "-", "-", "-", "-", ""],
+            [101, "Send DM", "Funcție internă", "❌", "-", "-", "-", "-", "-", "-", "-", "-", "-", "Graph API"],
+            [102, "Create Media Container", "Funcție internă", "❌", "-", "-", "-", "❌", "-", "-", "-", "-", "-", ""],
+            [103, "Publish Media", "Funcție internă", "❌", "-", "-", "-", "❌", "-", "-", "-", "-", "-", ""],
+            [104, "Post News", "Funcție internă", "❌", "-", "-", "-", "❌", "-", "-", "-", "-", "-", ""],
+            [105, "Publish Batch", "Funcție internă", "❌", "-", "-", "-", "❌", "-", "-", "-", "❌", "-", "⚠️ Needs ENV"],
+            ["NEWS / MEDIA", ""],
+            [106, "News Latest", "GET /api/news/latest", "❌", "-", "-", "-", "❌", "-", "-", "-", "❌", "-", ""],
+            [107, "News Status", "GET /api/news/status", "❌", "-", "-", "-", "❌", "-", "-", "-", "❌", "-", ""],
+            [108, "News Fetch", "GET /api/news/fetch", "❌", "❌", "-", "-", "❌", "-", "-", "-", "❌", "-", "Rate limited"],
+            [109, "News Public", "GET /api/news/public", "❌", "-", "-", "-", "❌", "-", "-", "-", "-", "-", ""],
+            [110, "Scheduler", "Funcție internă", "❌", "❌", "-", "-", "❌", "-", "-", "-", "-", "-", "3x/zi"],
+            [111, "RSS Fetch 8 surse", "Funcție internă", "❌", "-", "-", "-", "❌", "-", "-", "-", "-", "-", ""],
+            [112, "Anti-Fake Filter", "Funcție internă", "❌", "-", "-", "-", "❌", "-", "-", "-", "-", "-", ""],
+            [113, "Breaking Detection", "Funcție internă", "❌", "-", "-", "-", "❌", "-", "-", "-", "-", "-", ""],
+            [114, "FB Page Publish", "Funcție internă", "❌", "-", "-", "-", "❌", "-", "-", "-", "❌", "-", ""],
+            [115, "Media Auto-Publish", "POST /api/news/publish", "❌", "-", "-", "-", "❌", "❌", "-", "-", "❌", "-", ""],
+            [116, "Media Status", "GET /api/media/status", "❌", "-", "-", "-", "❌", "-", "-", "-", "❌", "-", ""],
+            ["DEVELOPER API", ""],
+            [117, "List API Keys", "GET /api/developer/keys", "❌", "❌", "-", "-", "-", "-", "-", "-", "-", "-", ""],
+            [118, "Create API Key", "POST /api/developer/keys", "❌", "❌", "-", "-", "-", "-", "-", "-", "-", "-", ""],
+            [119, "Revoke API Key", "DELETE /api/developer/keys/:id", "❌", "❌", "-", "-", "-", "-", "-", "-", "-", "-", ""],
+            [120, "Dev Stats", "GET /api/developer/stats", "❌", "❌", "-", "-", "-", "-", "-", "-", "-", "-", ""],
+            [121, "Save Webhook", "POST /api/developer/webhooks", "❌", "❌", "-", "-", "-", "-", "-", "-", "-", "-", ""],
+            [122, "Get Webhook", "GET /api/developer/webhooks", "❌", "❌", "-", "-", "-", "-", "-", "-", "-", "-", ""],
+            [123, "v1 Status", "GET /api/v1/status", "❌", "-", "-", "-", "-", "-", "-", "-", "-", "-", "Public"],
+            [124, "v1 Models", "GET /api/v1/models", "❌", "-", "-", "-", "-", "-", "-", "-", "-", "-", "API Key"],
+            [125, "v1 User Profile", "GET /api/v1/user/profile", "❌", "❌", "-", "-", "-", "-", "-", "-", "-", "-", ""],
+            [126, "v1 Chat", "POST /api/v1/chat", "❌", "-", "❌", "❌", "-", "-", "-", "-", "-", "-", "API Key"],
+            ["ADMIN", ""],
+            [127, "Verify Admin Code", "POST /api/admin/verify-code", "❌", "-", "-", "-", "-", "-", "-", "-", "❌", "-", ""],
+            [128, "Brain Diagnostics", "GET /api/brain", "❌", "-", "❌", "-", "-", "-", "-", "-", "❌", "-", ""],
+            [129, "Brain Reset", "POST /api/brain/reset", "❌", "-", "❌", "-", "-", "-", "-", "-", "❌", "-", ""],
+            [130, "Health Check Full", "GET /api/admin/health-check", "❌", "❌", "❌", "-", "-", "-", "-", "-", "❌", "❌", ""],
+            [131, "Payment Stats", "GET /api/payments/admin/stats", "❌", "❌", "-", "-", "-", "-", "-", "-", "❌", "❌", ""],
+            ["HEALTH & INFRA", ""],
+            [132, "Health Endpoint", "GET /api/health", "❌", "❌", "❌", "-", "-", "-", "-", "-", "-", "-", ""],
+            [133, "Cookie Consent", "POST /api/cookie-consent", "❌", "❌", "-", "-", "-", "-", "-", "-", "-", "-", ""],
+            [134, "Ticker Disable", "POST /api/ticker/disable", "❌", "❌", "-", "-", "-", "-", "-", "-", "-", "❌", "Premium"],
+            [135, "Legal Pages", "GET /api/legal/*", "❌", "-", "-", "-", "-", "-", "-", "-", "-", "-", ""],
+            [136, "HTTPS Redirect", "Middleware", "❌", "-", "-", "-", "-", "-", "-", "-", "-", "-", ""],
+            [137, "CSP Nonce", "Middleware", "❌", "-", "-", "-", "-", "-", "-", "-", "-", "-", ""],
+            [138, "Rate Limit Global", "Middleware", "❌", "-", "-", "-", "-", "-", "-", "-", "-", "-", "200/15min"],
+            [139, "SPA Whitelist", "Middleware", "❌", "-", "-", "-", "-", "-", "-", "-", "-", "-", ""],
+            [140, "Supabase RLS", "DB Config", "❌", "❌", "-", "-", "-", "-", "-", "-", "-", "-", ""],
+            [141, "Metrics Middleware", "Middleware", "❌", "-", "-", "-", "-", "-", "-", "-", "-", "-", ""],
+            ["BRAIN INTERN", ""],
+            [142, "Brain.think()", "brain.js", "❌", "❌", "❌", "❌", "-", "-", "-", "-", "-", "-", "Chain-of-Thought"],
+            [143, "Brain.getDiagnostics()", "brain.js", "❌", "-", "❌", "-", "-", "-", "-", "-", "❌", "-", ""],
+            [144, "Brain.learn()", "brain.js", "❌", "❌", "❌", "❌", "-", "-", "-", "-", "-", "-", "Auto-learn"],
+            [145, "Brain.resetTool()", "brain.js", "❌", "-", "❌", "-", "-", "-", "-", "-", "❌", "-", ""],
+            [146, "Brain.resetAll()", "brain.js", "❌", "-", "❌", "-", "-", "-", "-", "-", "❌", "-", ""],
+            [147, "buildSystemPrompt()", "persona.js", "❌", "-", "❌", "❌", "-", "-", "-", "-", "-", "-", "Multi-language"],
+            [148, "Multi-Engine Cascade", "brain.js", "❌", "-", "❌", "❌", "-", "-", "-", "-", "-", "-", "Groq→GPT→Claude→DS"]
+        ];
+        const tb = document.getElementById("tb");
+        let total = 0, cats = 0;
+        D.forEach(r => {
+            if (typeof r[0] === "string" && r.length === 2) {
+                const tr = document.createElement("tr"); tr.className = "cat";
+                tr.innerHTML = `<td colspan="14">▸ ${r[0]}</td>`; tb.appendChild(tr); cats++;
+            } else {
+                total++;
+                const tr = document.createElement("tr"); tr.dataset.search = (r[1] + " " + r[2]).toLowerCase();
+                let h = `<td>${r[0]}</td><td class="fn">${r[1]}</td><td class="ep">${r[2]}</td>`;
+                for (let i = 3; i < 13; i++) {
+                    const v = r[i], c = v === "✅" ? "c-pass" : v === "❌" ? "c-fail" : v === "⚠️" ? "c-warn" : "c-na";
+                    h += `<td class="${c}">${v}</td>`;
+                }
+                h += `<td class="fn" style="color:#666;font-size:.65rem">${r[13] || ""}</td>`;
+                tr.innerHTML = h; tb.appendChild(tr);
+            }
+        });
+        document.getElementById("stats").textContent = `Total: ${total} funcții reale | ${cats} categorii | 0/${total} verificate`;
+        function filterTable() {
+            const q = document.getElementById("filter").value.toLowerCase();
+            document.querySelectorAll("#tb tr").forEach(tr => {
+                if (tr.className === "cat") { tr.style.display = ""; return; }
+                tr.style.display = (!q || tr.dataset.search?.includes(q)) ? "" : "none";
+            });
+        }
+    </script>
+</body>
+
+</html>

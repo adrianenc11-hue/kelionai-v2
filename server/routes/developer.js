@@ -99,7 +99,7 @@ router.post("/keys", mgmtLimiter, async (req, res) => {
         name,
         key,
         key_preview: keyPreview,
-        rate_limit: 100,
+        rate_limit: 0,
         request_count: 0,
       })
       .select("id, name, key, key_preview, created_at, rate_limit")

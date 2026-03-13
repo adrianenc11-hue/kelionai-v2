@@ -58,8 +58,9 @@ function apiKeyAuth(req, res, next) {
         return res.status(401).json({ error: "API key has been revoked" });
       }
 
-      const limit = data.rate_limit || 100;
-      if (isKeyRateLimited(data.id, limit)) {
+      const limit = data.rate_limit;
+      // rate_limit = 0 or null means unlimited — skip rate check
+      if (limit && limit > 0 && isKeyRateLimited(data.id, limit)) {
         return res.status(429).json({
           error: "Rate limit exceeded. Max " + limit + " requests/hour.",
         });
@@ -72,7 +73,7 @@ function apiKeyAuth(req, res, next) {
       // Uses rpc to atomically increment request_count at DB level
       supabaseAdmin
         .rpc("increment_api_key_count", { key_id: data.id })
-        .then(() => {})
+        .then(() => { })
         .catch((rpcErr) => {
           // Fallback: plain update if rpc not available
           logger.warn(
@@ -83,7 +84,7 @@ function apiKeyAuth(req, res, next) {
             .from("api_keys")
             .update({ last_used_at: new Date().toISOString() })
             .eq("id", data.id)
-            .then(() => {})
+            .then(() => { })
             .catch((e) =>
               logger.warn(
                 { component: "ApiKeyAuth", err: e.message },

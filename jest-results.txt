@@ -1,0 +1,501 @@
+  console.log
+    [dotenv@17.3.1] injecting env (0) from .env -- tip: ÔÜÖ´©Å  enable debug logging with { debug: true }
+
+      at _log (node_modules/dotenv/lib/main.js:139:11)
+
+  console.log
+    [dotenv@17.3.1] injecting env (0) from .env -- tip: ­ƒöÉ prevent committing .env to code: https://dotenvx.com/precommit
+
+      at _log (node_modules/dotenv/lib/main.js:139:11)
+
+{"level":40,"time":1772722775548,"pid":4968,"hostname":"AE","component":"WhatsApp","msg":"WhatsApp token not set. Set WA_ACCESS_TOKEN (or WHATSAPP_TOKEN) ÔÇö bot will not send messages"}
+{"level":40,"time":1772722775548,"pid":4968,"hostname":"AE","component":"WhatsApp","msg":"WhatsApp Phone Number ID not set. Set WA_PHONE_NUMBER_ID ÔÇö bot will not send messages"}
+{"level":40,"time":1772722775548,"pid":4968,"hostname":"AE","component":"WhatsApp","msg":"WA_VERIFY_TOKEN not set ÔÇö webhook verification is DISABLED. Set WA_VERIFY_TOKEN env var to enable it."}
+{"level":30,"time":1772722775731,"pid":4968,"hostname":"AE","component":"Brain","msg":"­ƒºá Engine initialized"}
+{"level":30,"time":1772722775755,"pid":4968,"hostname":"AE","component":"News","msg":"­ƒô░ News scheduler started (checks every 15min)"}
+{"level":30,"time":1772722776138,"pid":4968,"hostname":"AE","component":"TradeExecutor","msg":"­ƒôØ No Binance API keys ÔÇö PAPER MODE"}
+{"level":40,"time":1772722775558,"pid":11928,"hostname":"AE","component":"WhatsApp","msg":"WhatsApp token not set. Set WA_ACCESS_TOKEN (or WHATSAPP_TOKEN) ÔÇö bot will not send messages"}
+{"level":40,"time":1772722775559,"pid":11928,"hostname":"AE","component":"WhatsApp","msg":"WhatsApp Phone Number ID not set. Set WA_PHONE_NUMBER_ID ÔÇö bot will not send messages"}
+{"level":40,"time":1772722775559,"pid":11928,"hostname":"AE","component":"WhatsApp","msg":"WA_VERIFY_TOKEN not set ÔÇö webhook verification is DISABLED. Set WA_VERIFY_TOKEN env var to enable it."}
+{"level":30,"time":1772722775742,"pid":11928,"hostname":"AE","component":"Brain","msg":"­ƒºá Engine initialized"}
+{"level":30,"time":1772722775764,"pid":11928,"hostname":"AE","component":"News","msg":"­ƒô░ News scheduler started (checks every 15min)"}
+{"level":30,"time":1772722776145,"pid":11928,"hostname":"AE","component":"TradeExecutor","msg":"­ƒôØ No Binance API keys ÔÇö PAPER MODE"}
+{"level":30,"time":1772722776170,"pid":11928,"hostname":"AE","component":"HTTP","method":"GET","path":"/health","statusCode":200,"duration":2,"msg":"GET /health 200 2ms"}
+{"level":30,"time":1772722776172,"pid":4968,"hostname":"AE","component":"HTTP","method":"GET","path":"/webhook","statusCode":403,"duration":7,"msg":"GET /webhook 403 7ms"}
+{"level":30,"time":1772722776179,"pid":4968,"hostname":"AE","component":"HTTP","method":"GET","path":"/webhook","statusCode":403,"duration":1,"msg":"GET /webhook 403 1ms"}
+{"level":30,"time":1772722776183,"pid":4968,"hostname":"AE","component":"Messenger","msg":"Webhook verified"}
+{"level":30,"time":1772722776184,"pid":4968,"hostname":"AE","component":"HTTP","method":"GET","path":"/webhook","statusCode":200,"duration":0,"msg":"GET /webhook 200 0ms"}
+{"level":30,"time":1772722776184,"pid":11928,"hostname":"AE","component":"HTTP","method":"GET","path":"/","statusCode":200,"duration":7,"msg":"GET / 200 7ms"}
+{"level":30,"time":1772722776189,"pid":11928,"hostname":"AE","component":"HTTP","method":"GET","path":"/","statusCode":200,"duration":1,"msg":"GET / 200 1ms"}
+{"level":30,"time":1772722776189,"pid":4968,"hostname":"AE","component":"HTTP","method":"POST","path":"/webhook","statusCode":200,"duration":1,"msg":"POST /webhook 200 1ms"}
+{"level":30,"time":1772722776193,"pid":11928,"hostname":"AE","component":"HTTP","method":"GET","path":"/some/unknown/path","statusCode":404,"duration":1,"msg":"GET /some/unknown/path 404 1ms"}
+{"level":30,"time":1772722776194,"pid":4968,"hostname":"AE","component":"HTTP","method":"GET","path":"/health","statusCode":200,"duration":1,"msg":"GET /health 200 1ms"}
+{"level":30,"time":1772722776197,"pid":11928,"hostname":"AE","component":"HTTP","method":"GET","path":"/health","statusCode":200,"duration":1,"msg":"GET /health 200 1ms"}
+{"level":30,"time":1772722776212,"pid":11928,"hostname":"AE","component":"HTTP","method":"POST","path":"/speak","statusCode":400,"duration":2,"msg":"POST /speak 400 2ms"}
+{"level":30,"time":1772722776218,"pid":11928,"hostname":"AE","component":"HTTP","method":"POST","path":"/speak","statusCode":400,"duration":1,"msg":"POST /speak 400 1ms"}
+{"level":30,"time":1772722776222,"pid":11928,"hostname":"AE","component":"HTTP","method":"POST","path":"/speak","statusCode":503,"duration":1,"msg":"POST /speak 503 1ms"}
+{"level":30,"time":1772722776226,"pid":11928,"hostname":"AE","component":"HTTP","method":"POST","path":"/chat","statusCode":400,"duration":1,"msg":"POST /chat 400 1ms"}
+{"level":30,"time":1772722776231,"pid":11928,"hostname":"AE","component":"HTTP","method":"POST","path":"/chat","statusCode":400,"duration":1,"msg":"POST /chat 400 1ms"}
+{"level":30,"time":1772722776236,"pid":11928,"hostname":"AE","component":"HTTP","method":"POST","path":"/","statusCode":400,"duration":1,"msg":"POST / 400 1ms"}
+{"level":30,"time":1772722776240,"pid":11928,"hostname":"AE","component":"HTTP","method":"POST","path":"/","statusCode":400,"duration":1,"msg":"POST / 400 1ms"}
+{"level":30,"time":1772722776243,"pid":11928,"hostname":"AE","component":"HTTP","method":"POST","path":"/","statusCode":400,"duration":0,"msg":"POST / 400 0ms"}
+{"level":30,"time":1772722776247,"pid":11928,"hostname":"AE","component":"HTTP","method":"POST","path":"/speak","statusCode":400,"duration":1,"msg":"POST /speak 400 1ms"}
+{"level":30,"time":1772722776253,"pid":11928,"hostname":"AE","component":"HTTP","method":"GET","path":"/admin/health-check","statusCode":401,"duration":2,"msg":"GET /admin/health-check 401 2ms"}
+{"level":30,"time":1772722776258,"pid":11928,"hostname":"AE","component":"Admin","msg":"­ƒÅÑ Health check performed"}
+{"level":30,"time":1772722776259,"pid":11928,"hostname":"AE","component":"HTTP","method":"GET","path":"/admin/health-check","statusCode":200,"duration":2,"msg":"GET /admin/health-check 200 2ms"}
+{"level":30,"time":1772722776263,"pid":11928,"hostname":"AE","component":"Admin","msg":"­ƒÅÑ Health check performed"}
+{"level":30,"time":1772722776264,"pid":11928,"hostname":"AE","component":"HTTP","method":"GET","path":"/admin/health-check","statusCode":200,"duration":1,"msg":"GET /admin/health-check 200 1ms"}
+{"level":30,"time":1772722776267,"pid":11928,"hostname":"AE","component":"Admin","msg":"­ƒÅÑ Health check performed"}
+{"level":30,"time":1772722776268,"pid":11928,"hostname":"AE","component":"HTTP","method":"GET","path":"/admin/health-check","statusCode":200,"duration":1,"msg":"GET /admin/health-check 200 1ms"}
+{"level":30,"time":1772722776272,"pid":11928,"hostname":"AE","component":"HTTP","method":"GET","path":"/metrics","statusCode":200,"duration":2,"msg":"GET /metrics 200 2ms"}
+{"level":30,"time":1772722776277,"pid":11928,"hostname":"AE","component":"HTTP","method":"GET","path":"/nonexistent","statusCode":404,"duration":1,"msg":"GET /nonexistent 404 1ms"}
+{"level":50,"time":1772722776282,"pid":11928,"hostname":"AE","component":"Error","method":"GET","path":"/test","msg":"Test internal error"}
+{"level":30,"time":1772722776289,"pid":11928,"hostname":"AE","component":"HTTP","method":"GET","path":"/plans","statusCode":200,"duration":2,"msg":"GET /plans 200 2ms"}
+{"level":30,"time":1772722776292,"pid":11928,"hostname":"AE","component":"HTTP","method":"GET","path":"/plans","statusCode":200,"duration":1,"msg":"GET /plans 200 1ms"}
+{"level":30,"time":1772722776295,"pid":11928,"hostname":"AE","component":"HTTP","method":"GET","path":"/status","statusCode":200,"duration":1,"msg":"GET /status 200 1ms"}
+{"level":30,"time":1772722776298,"pid":11928,"hostname":"AE","component":"HTTP","method":"POST","path":"/checkout","statusCode":503,"duration":1,"msg":"POST /checkout 503 1ms"}
+PASS __tests__/messenger.test.js
+  getStats()
+    ÔêÜ returns an object with numeric messagesReceived and repliesSent (3 ms)
+    ÔêÜ initial counts start at 0 (3 ms)
+  GET /api/messenger/webhook (verification)
+    ÔêÜ returns 403 when verify token is missing (25 ms)
+    ÔêÜ returns 403 when verify token does not match (5 ms)
+    ÔêÜ returns 200 with challenge when verify token matches (4 ms)
+  POST /api/messenger/webhook
+    ÔêÜ always returns 200 (Facebook requirement) (7 ms)
+  GET /api/messenger/health
+    ÔêÜ returns health status object (5 ms)
+
+PASS __tests__/server.test.js
+  GET /health
+    ÔêÜ returns 200 with status ok (24 ms)
+  GET /api/health
+    ÔêÜ returns 200 with status ok (12 ms)
+  GET / (smoke test)
+    ÔêÜ serves index.html with 200 (4 ms)
+  GET /nonexistent-route
+    ÔêÜ unknown path returns 404 (SPA whitelist) (4 ms)
+  Security Headers
+    ÔêÜ responses include helmet security headers (4 ms)
+  Input Validation
+    ÔêÜ POST /api/speak with empty body returns 400 (15 ms)
+    ÔêÜ POST /api/speak with oversized text returns 400 (5 ms)
+    ÔêÜ POST /api/speak with valid text does not return 400 for validation (3 ms)
+    ÔêÜ POST /api/chat with empty body returns 400 (4 ms)
+    ÔêÜ POST /api/chat with oversized message returns 400 (5 ms)
+    ÔêÜ POST /api/search with empty query returns 400 (5 ms)
+    ÔêÜ POST /api/weather with empty city returns 400 (4 ms)
+    ÔêÜ POST /api/imagine with empty body returns 400 (3 ms)
+    ÔêÜ validation error response includes details array (5 ms)
+  GET /api/admin/health-check
+    ÔêÜ returns 401 without admin secret (5 ms)
+    ÔêÜ returns 200 with valid admin secret (6 ms)
+    ÔêÜ server section has expected fields (5 ms)
+    ÔêÜ security section reflects CSP enabled (3 ms)
+  Metrics Endpoint
+    ÔêÜ GET /metrics returns Prometheus format (5 ms)
+  Error Handling
+    ÔêÜ 404 for unknown API routes returns JSON error (4 ms)
+    ÔêÜ error responses do not contain stack traces in production mode (3 ms)
+    ÔêÜ 500 errors hide stack trace and return generic message in production (1 ms)
+  Coverage Configuration
+    ÔêÜ jest config includes coverage settings (1 ms)
+  Payments API
+    ÔêÜ GET /api/payments/plans returns plan list (6 ms)
+    ÔêÜ GET /api/payments/plans includes price and limits (3 ms)
+    ÔêÜ GET /api/payments/status returns guest plan for unauthenticated user (3 ms)
+    ÔêÜ POST /api/payments/checkout requires authentication (4 ms)
+
+  console.log
+    [dotenv@17.3.1] injecting env (0) from .env -- tip: ÔÜÖ´©Å  load multiple .env files with { path: ['.env.local', '.env'] }
+
+      at _log (node_modules/dotenv/lib/main.js:139:11)
+
+  console.log
+    [dotenv@17.3.1] injecting env (0) from .env -- tip: ­ƒøí´©Å auth for agents: https://vestauth.com
+
+      at _log (node_modules/dotenv/lib/main.js:139:11)
+
+{"level":40,"time":1772722776927,"pid":4968,"hostname":"AE","component":"WhatsApp","msg":"WhatsApp token not set. Set WA_ACCESS_TOKEN (or WHATSAPP_TOKEN) ÔÇö bot will not send messages"}
+{"level":40,"time":1772722776928,"pid":4968,"hostname":"AE","component":"WhatsApp","msg":"WhatsApp Phone Number ID not set. Set WA_PHONE_NUMBER_ID ÔÇö bot will not send messages"}
+{"level":40,"time":1772722776928,"pid":4968,"hostname":"AE","component":"WhatsApp","msg":"WA_VERIFY_TOKEN not set ÔÇö webhook verification is DISABLED. Set WA_VERIFY_TOKEN env var to enable it."}
+{"level":30,"time":1772722777053,"pid":4968,"hostname":"AE","component":"Brain","msg":"­ƒºá Engine initialized"}
+{"level":30,"time":1772722777071,"pid":4968,"hostname":"AE","component":"News","msg":"­ƒô░ News scheduler started (checks every 15min)"}
+{"level":30,"time":1772722777400,"pid":4968,"hostname":"AE","component":"TradeExecutor","msg":"­ƒôØ No Binance API keys ÔÇö PAPER MODE"}
+{"level":30,"time":1772722777422,"pid":4968,"hostname":"AE","component":"HTTP","method":"GET","path":"/latest","statusCode":401,"duration":6,"msg":"GET /latest 401 6ms"}
+{"level":30,"time":1772722777429,"pid":4968,"hostname":"AE","component":"HTTP","method":"GET","path":"/latest","statusCode":200,"duration":1,"msg":"GET /latest 200 1ms"}
+{"level":30,"time":1772722777435,"pid":4968,"hostname":"AE","component":"HTTP","method":"GET","path":"/latest","statusCode":200,"duration":1,"msg":"GET /latest 200 1ms"}
+{"level":30,"time":1772722777440,"pid":4968,"hostname":"AE","component":"HTTP","method":"GET","path":"/breaking","statusCode":401,"duration":1,"msg":"GET /breaking 401 1ms"}
+{"level":30,"time":1772722777443,"pid":4968,"hostname":"AE","component":"HTTP","method":"GET","path":"/breaking","statusCode":200,"duration":1,"msg":"GET /breaking 200 1ms"}
+{"level":30,"time":1772722777447,"pid":4968,"hostname":"AE","component":"HTTP","method":"GET","path":"/schedule","statusCode":401,"duration":1,"msg":"GET /schedule 401 1ms"}
+{"level":30,"time":1772722777461,"pid":4968,"hostname":"AE","component":"HTTP","method":"GET","path":"/schedule","statusCode":200,"duration":11,"msg":"GET /schedule 200 11ms"}
+{"level":30,"time":1772722777467,"pid":4968,"hostname":"AE","component":"HTTP","method":"GET","path":"/schedule","statusCode":200,"duration":2,"msg":"GET /schedule 200 2ms"}
+{"level":30,"time":1772722777477,"pid":4968,"hostname":"AE","component":"HTTP","method":"POST","path":"/config","statusCode":401,"duration":1,"msg":"POST /config 401 1ms"}
+{"level":30,"time":1772722777481,"pid":4968,"hostname":"AE","component":"HTTP","method":"POST","path":"/config","statusCode":200,"duration":0,"msg":"POST /config 200 0ms"}
+{"level":40,"time":1772722777042,"pid":11928,"hostname":"AE","component":"WhatsApp","msg":"WhatsApp token not set. Set WA_ACCESS_TOKEN (or WHATSAPP_TOKEN) ÔÇö bot will not send messages"}
+{"level":40,"time":1772722777042,"pid":11928,"hostname":"AE","component":"WhatsApp","msg":"WhatsApp Phone Number ID not set. Set WA_PHONE_NUMBER_ID ÔÇö bot will not send messages"}
+{"level":40,"time":1772722777042,"pid":11928,"hostname":"AE","component":"WhatsApp","msg":"WA_VERIFY_TOKEN not set ÔÇö webhook verification is DISABLED. Set WA_VERIFY_TOKEN env var to enable it."}
+{"level":30,"time":1772722777175,"pid":11928,"hostname":"AE","component":"Brain","msg":"­ƒºá Engine initialized"}
+{"level":30,"time":1772722777196,"pid":11928,"hostname":"AE","component":"News","msg":"­ƒô░ News scheduler started (checks every 15min)"}
+{"level":30,"time":1772722777554,"pid":11928,"hostname":"AE","component":"TradeExecutor","msg":"­ƒôØ No Binance API keys ÔÇö PAPER MODE"}
+{"level":30,"time":1772722777572,"pid":11928,"hostname":"AE","component":"HTTP","method":"GET","path":"/terms","statusCode":200,"duration":4,"msg":"GET /terms 200 4ms"}
+{"level":30,"time":1772722777578,"pid":11928,"hostname":"AE","component":"HTTP","method":"GET","path":"/terms","statusCode":200,"duration":0,"msg":"GET /terms 200 0ms"}
+{"level":30,"time":1772722777583,"pid":11928,"hostname":"AE","component":"HTTP","method":"GET","path":"/privacy","statusCode":200,"duration":1,"msg":"GET /privacy 200 1ms"}
+{"level":30,"time":1772722777590,"pid":11928,"hostname":"AE","component":"HTTP","method":"GET","path":"/privacy","statusCode":200,"duration":0,"msg":"GET /privacy 200 0ms"}
+PASS __tests__/news.test.js
+  GET /api/news/latest (admin only)
+    ÔêÜ returns 401 without admin auth (20 ms)
+    ÔêÜ returns 200 with articles array when authenticated (6 ms)
+    ÔêÜ accepts category query parameter (5 ms)
+  GET /api/news/breaking (admin only)
+    ÔêÜ returns 401 without admin auth (4 ms)
+    ÔêÜ returns 200 with breaking articles when authenticated (3 ms)
+  GET /api/news/schedule (admin only)
+    ÔêÜ returns 401 without admin auth (4 ms)
+    ÔêÜ returns 200 with schedule info when authenticated (15 ms)
+    ÔêÜ schedule contains all 3 expected hours (5 ms)
+  POST /api/news/config (admin only)
+    ÔêÜ returns 401 without admin auth (10 ms)
+    ÔêÜ returns 200 with success when authenticated (5 ms)
+
+{"level":30,"time":1772722777594,"pid":11928,"hostname":"AE","component":"HTTP","method":"GET","path":"/gdpr/export","statusCode":401,"duration":1,"msg":"GET /gdpr/export 401 1ms"}
+{"level":30,"time":1772722777597,"pid":11928,"hostname":"AE","component":"HTTP","method":"DELETE","path":"/gdpr/delete","statusCode":401,"duration":0,"msg":"DELETE /gdpr/delete 401 0ms"}
+{"level":30,"time":1772722777606,"pid":11928,"hostname":"AE","component":"HTTP","method":"POST","path":"/gdpr/consent","statusCode":401,"duration":1,"msg":"POST /gdpr/consent 401 1ms"}
+PASS __tests__/legal.test.js
+  GET /api/legal/terms
+    ÔêÜ returns 200 with terms of service JSON (14 ms)
+    ÔêÜ each section has title and content fields (5 ms)
+  GET /api/legal/privacy
+    ÔêÜ returns 200 with privacy policy JSON (4 ms)
+    ÔêÜ includes effectiveDate field (6 ms)
+  GDPR endpoints require authentication
+    ÔêÜ GET /api/legal/gdpr/export returns 401 without auth (4 ms)
+    ÔêÜ DELETE /api/legal/gdpr/delete returns 401 without auth (3 ms)
+    ÔêÜ POST /api/legal/gdpr/consent returns 401 without auth (9 ms)
+
+{"level":30,"time":1772722778186,"pid":11928,"hostname":"AE","component":"TradeExecutor","msg":"­ƒôØ No Binance API keys ÔÇö PAPER MODE"}
+PASS __tests__/trading.test.js
+  calculateEMA
+    ÔêÜ returns array of same length as input (1 ms)
+    ÔêÜ EMA of constant price array returns all same values (1 ms)
+    ÔêÜ returns empty array when prices shorter than period
+  calculateRSI
+    ÔêÜ returns value between 0 and 100 with known inputs (1 ms)
+    ÔêÜ all gains ÔåÆ RSI should be ~100
+    ÔêÜ all losses ÔåÆ RSI should be ~0 (1 ms)
+    ÔêÜ mixed prices ÔåÆ returns numeric between 0 and 100
+  calculateMACD
+    ÔêÜ returns object with macd, signal, histogram properties (1 ms)
+    ÔêÜ histogram is a number with enough prices (1 ms)
+  calculateBollingerBands
+    ÔêÜ returns { middle, upper, lower, signal }
+    ÔêÜ upper > middle > lower for varying prices
+    ÔêÜ constant price array ÔåÆ bands equal the price
+  calculateFibonacci
+    ÔêÜ returns { levels } with keys '23.6', '38.2', '50', '61.8', '78.6' (1 ms)
+    ÔêÜ high=100, low=0: 50% level equals 50
+    ÔêÜ high=100, low=0: 38.2% level Ôëê 61.8
+  analyzeSentiment
+    ÔêÜ bullish text ÔåÆ score > 0 (1 ms)
+    ÔêÜ bearish text ÔåÆ score < 0
+    ÔêÜ empty string ÔåÆ score 0 (neutral)
+  calculateConfluence
+    ÔêÜ returns { signal, confidence } (1 ms)
+    ÔêÜ confidence is between 0 and 100
+    ÔêÜ all BUY signals ÔåÆ signal is BUY or STRONG BUY
+    ÔêÜ all SELL signals ÔåÆ signal is SELL or STRONG SELL
+  Trading API ÔÇö 401 without admin secret
+    ÔêÜ GET /api/trading/status returns 401 (7 ms)
+    ÔêÜ GET /api/trading/analysis returns 401 (2 ms)
+    ÔêÜ GET /api/trading/signals returns 401 (2 ms)
+    ÔêÜ GET /api/trading/portfolio returns 401 (1 ms)
+    ÔêÜ GET /api/trading/risk returns 401 (1 ms)
+    ÔêÜ GET /api/trading/correlation returns 401 (2 ms)
+    ÔêÜ GET /api/trading/alerts returns 401 (2 ms)
+  GET /api/trading/status (admin only)
+    ÔêÜ returns 200 with active, version, disclaimer when authenticated (4 ms)
+
+{"level":40,"time":1772722778456,"pid":11928,"hostname":"AE","component":"Referral","msg":"ÔÜá´©Å  No REFERRAL_SECRET or SESSION_SECRET set ÔÇö referral codes use insecure fallback. Set one of these env vars in production."}
+{"level":40,"time":1772722778457,"pid":11928,"hostname":"AE","component":"Referral","msg":"ÔÜá´©Å  No REFERRAL_SECRET or SESSION_SECRET set ÔÇö referral codes use insecure fallback. Set one of these env vars in production."}
+{"level":40,"time":1772722778458,"pid":11928,"hostname":"AE","component":"Referral","msg":"ÔÜá´©Å  No REFERRAL_SECRET or SESSION_SECRET set ÔÇö referral codes use insecure fallback. Set one of these env vars in production."}
+{"level":40,"time":1772722778458,"pid":11928,"hostname":"AE","component":"Referral","msg":"ÔÜá´©Å  No REFERRAL_SECRET or SESSION_SECRET set ÔÇö referral codes use insecure fallback. Set one of these env vars in production."}
+{"level":40,"time":1772722778458,"pid":11928,"hostname":"AE","component":"Referral","msg":"ÔÜá´©Å  No REFERRAL_SECRET or SESSION_SECRET set ÔÇö referral codes use insecure fallback. Set one of these env vars in production."}
+{"level":40,"time":1772722778459,"pid":11928,"hostname":"AE","component":"Referral","msg":"ÔÜá´©Å  No REFERRAL_SECRET or SESSION_SECRET set ÔÇö referral codes use insecure fallback. Set one of these env vars in production."}
+{"level":40,"time":1772722778459,"pid":11928,"hostname":"AE","component":"Referral","msg":"ÔÜá´©Å  No REFERRAL_SECRET or SESSION_SECRET set ÔÇö referral codes use insecure fallback. Set one of these env vars in production."}
+{"level":40,"time":1772722778459,"pid":11928,"hostname":"AE","component":"Referral","msg":"ÔÜá´©Å  No REFERRAL_SECRET or SESSION_SECRET set ÔÇö referral codes use insecure fallback. Set one of these env vars in production."}
+{"level":40,"time":1772722778460,"pid":11928,"hostname":"AE","component":"Referral","msg":"ÔÜá´©Å  No REFERRAL_SECRET or SESSION_SECRET set ÔÇö referral codes use insecure fallback. Set one of these env vars in production."}
+{"level":40,"time":1772722778461,"pid":11928,"hostname":"AE","component":"Referral","msg":"ÔÜá´©Å  No REFERRAL_SECRET or SESSION_SECRET set ÔÇö referral codes use insecure fallback. Set one of these env vars in production."}
+{"level":40,"time":1772722778461,"pid":11928,"hostname":"AE","component":"Referral","msg":"ÔÜá´©Å  No REFERRAL_SECRET or SESSION_SECRET set ÔÇö referral codes use insecure fallback. Set one of these env vars in production."}
+{"level":30,"time":1772722778464,"pid":11928,"hostname":"AE","component":"Referral","userId":"user-1","days":5,"msg":"Ô£à Receiver bonus applied"}
+{"level":30,"time":1772722778464,"pid":11928,"hostname":"AE","component":"Referral","userId":"sender-1","days":10,"msg":"Ô£à Sender bonus applied"}
+PASS __tests__/referral.test.js
+  generateSecureReferralCode
+    ÔêÜ generates a code in correct format KEL-xxxx-xxxxxx-XXXXXXXXXX (2 ms)
+    ÔêÜ generates unique codes for same user at different times
+    ÔêÜ has 4 dash-separated parts (1 ms)
+    ÔêÜ starts with KEL prefix
+  verifyReferralCode
+    ÔêÜ accepts a freshly generated valid code (1 ms)
+    ÔêÜ rejects tampered HMAC (wrong last segment)
+    ÔêÜ rejects code with wrong prefix
+    ÔêÜ rejects null / undefined / empty input
+    ÔêÜ rejects code with too few parts
+    ÔêÜ detects expired code (timestamp > CODE_EXPIRY_DAYS old) (1 ms)
+    ÔêÜ does not flag fresh code as expired
+  hashCode
+    ÔêÜ returns a hex string of length 64 (SHA-256)
+    ÔêÜ same input produces same hash (1 ms)
+    ÔêÜ different inputs produce different hashes
+  applyReferralBonus
+    ÔêÜ does nothing if code is null
+    ÔêÜ does nothing if supabaseAdmin is null (1 ms)
+    ÔêÜ does nothing if code not found in DB
+    ÔêÜ does nothing if code status is not redeemed
+    ÔêÜ does nothing if both bonuses already applied
+    ÔêÜ applies bonuses when code is redeemed and bonuses not yet applied (1 ms)
+  Constants
+    ÔêÜ CODE_EXPIRY_DAYS is a positive integer
+    ÔêÜ MAX_ACTIVE_CODES_PER_MONTH is 5
+    ÔêÜ SENDER_BONUS_DAYS is 10 (5 ms)
+    ÔêÜ RECEIVER_BONUS_DAYS is 5
+
+PASS __tests__/brain.test.js
+  KelionBrain
+    ÔêÜ instantiates with default state (1 ms)
+    ÔêÜ getDiagnostics returns complete report
+    ÔêÜ getDiagnostics status is a valid value (1 ms)
+    ÔêÜ getDiagnostics memory values are strings with MB suffix
+    ÔêÜ analyzeIntent detects language (9 ms)
+    ÔêÜ resetAll clears tool errors
+    refineSearchQuery
+      ÔêÜ removes filler words from queries (1 ms)
+      ÔêÜ returns original query when all words are filler
+      ÔêÜ truncates very long queries
+  analyzeIntent ÔÇö Romanian search
+    ÔêÜ detecteaz─â c─âutare: "caut─â informa╚øii despre Node.js" (3 ms)
+    ÔêÜ detecteaz─â c─âutare: "ce este inteligen╚øa artificial─â?"
+    ÔêÜ detecteaz─â c─âutare: "c├ót cost─â un iPhone 16?" (1 ms)
+  analyzeIntent ÔÇö Weather
+    ÔêÜ detecteaz─â meteo cu ora╚Ö explicit: "cum e vremea ├«n Bucure╚Öti?" (1 ms)
+    ÔêÜ detecteaz─â meteo f─âr─â ora╚Ö ÔåÆ default Bucharest
+  analyzeIntent ÔÇö Image generation
+    ÔêÜ detecteaz─â imagine: "genereaz─â o imagine cu un dragon" (1 ms)
+    ÔêÜ NU declan╚Öeaz─â imagine pentru text f─âr─â cuv├ónt trigger (1 ms)
+  analyzeIntent ÔÇö Emotion detection
+    ÔêÜ detecteaz─â triste╚øe (3 ms)
+    ÔêÜ detecteaz─â furie (1 ms)
+    ÔêÜ detecteaz─â recuno╚Ötin╚ø─â
+  analyzeIntent ÔÇö Emergency
+    ÔêÜ detecteaz─â urgen╚ø─â: "ajutor! pericol!" (1 ms)
+    ÔêÜ detecteaz─â urgen╚ø─â: "sun─â la 112"
+  analyzeIntent ÔÇö False positives
+    ÔêÜ salut simplu NU declan╚Öeaz─â search
+    ÔêÜ "ok" NU declan╚Öeaz─â nimic
+  analyzeIntent ÔÇö Complexity
+    ÔêÜ "salut" ÔåÆ simple
+    ÔêÜ request multi-tool ÔåÆ complex
+  analyzeIntent ÔÇö Topics
+    ÔêÜ detecteaz─â topic tech (1 ms)
+    ÔêÜ detecteaz─â topic travel
+  compressHistory
+    ÔêÜ returneaz─â array gol pentru history gol (1 ms)
+    ÔêÜ returneaz─â history neschimbat dac─â <= 20 mesaje
+    ÔêÜ comprim─â history lung > 20 mesaje
+  buildPlan
+    ÔêÜ plan gol pentru mesaj simplu (1 ms)
+    ÔêÜ plan cu search pentru query de c─âutare
+    ÔêÜ plan cu weather pentru query meteo (1 ms)
+  refineSearchQuery
+    ÔêÜ elimin─â filler words din query
+    ÔêÜ trunchiaz─â query lung la 8 cuvinte
+    ÔêÜ returneaz─â originalul dac─â devine gol dup─â cleanup (1 ms)
+  journalEntry
+    ÔêÜ adaug─â intrare ├«n journal
+  recordError ╚Öi isToolDegraded
+    ÔêÜ ├«nregistreaz─â erori ╚Öi marcheaz─â tool ca degraded dup─â 5
+    ÔêÜ resetTool cur─â╚ø─â erorile
+  decomposeTask
+    ÔêÜ descompune request cu "╚Öi" ├«n 2+ subtask-uri (1 ms)
+    ÔêÜ mesaj simplu r─âm├óne 1 task (1 ms)
+
+PASS __tests__/validation.test.js
+  registerSchema
+    ÔêÜ accepts valid email, password, and optional name (2 ms)
+    ÔêÜ rejects invalid email (1 ms)
+    ÔêÜ rejects password shorter than 6 characters
+    ÔêÜ rejects missing email (1 ms)
+  loginSchema
+    ÔêÜ accepts valid email and password
+    ÔêÜ rejects missing password
+  refreshSchema
+    ÔêÜ accepts a refresh_token string (1 ms)
+    ÔêÜ rejects empty refresh_token
+    ÔêÜ rejects missing refresh_token
+  chatSchema
+    ÔêÜ accepts message with defaults (1 ms)
+    ÔêÜ accepts all optional fields
+    ÔêÜ rejects empty message (1 ms)
+    ÔêÜ rejects message over 10000 characters
+    ÔêÜ rejects invalid avatar value
+  speakSchema
+    ÔêÜ accepts text with default avatar (1 ms)
+    ÔêÜ accepts text with avatar kira
+    ÔêÜ rejects empty text
+    ÔêÜ rejects missing text (1 ms)
+    ÔêÜ rejects text over 10000 characters
+  listenSchema
+    ÔêÜ accepts body with text field (WebSpeech passthrough)
+    ÔêÜ accepts body with audio field
+    ÔêÜ rejects empty body (neither text nor audio) (1 ms)
+  visionSchema
+    ÔêÜ accepts image string
+    ÔêÜ accepts image with optional fields
+    ÔêÜ rejects missing image (1 ms)
+  searchSchema
+    ÔêÜ accepts a query string
+    ÔêÜ rejects empty query
+    ÔêÜ rejects missing query
+    ÔêÜ rejects query over 500 characters
+  weatherSchema
+    ÔêÜ accepts a city string
+    ÔêÜ rejects empty city
+    ÔêÜ rejects missing city
+  imagineSchema
+    ÔêÜ accepts a prompt string (1 ms)
+    ÔêÜ rejects empty prompt
+    ÔêÜ rejects prompt over 1000 characters
+  memorySchema
+    ÔêÜ accepts save action with key and value (1 ms)
+    ÔêÜ accepts load action
+    ÔêÜ accepts list action without key
+    ÔêÜ rejects invalid action (1 ms)
+    ÔêÜ rejects missing action
+  validate middleware factory
+    ÔêÜ calls next() when validation passes
+    ÔêÜ returns 400 with error details when validation fails (1 ms)
+    ÔêÜ sanitizes req.body to only parsed fields (1 ms)
+
+PASS __tests__/cache.test.js
+  cacheSet / cacheGet
+    ÔêÜ stores and retrieves a string value (1 ms)
+    ÔêÜ stores and retrieves an object value (1 ms)
+    ÔêÜ stores and retrieves a number value
+    ÔêÜ returns null for a key that was never set (1 ms)
+    ÔêÜ overwrites a previously set value
+    ÔêÜ returns null for an expired entry (1102 ms)
+  cacheDel
+    ÔêÜ deletes a previously set key (1 ms)
+    ÔêÜ deleting a non-existent key does not throw
+  getCacheStats
+    ÔêÜ returns an object with backend, memStoreSize and redisConnected (1 ms)
+    ÔêÜ backend is "memory" when no Redis is configured
+    ÔêÜ redisConnected is false when no Redis is configured
+    ÔêÜ memStoreSize is a non-negative number
+    ÔêÜ memStoreSize increases after setting a new key
+
+PASS __tests__/payments.test.js
+  PLAN_LIMITS
+    ÔêÜ has all required plans defined (2 ms)
+    ÔêÜ each plan has chat, search, image, vision, tts fields (1 ms)
+    ÔêÜ guest limits are smaller than free limits
+    ÔêÜ free chat limit is 10 (1 ms)
+    ÔêÜ pro chat limit is 100
+    ÔêÜ premium limits are -1 (unlimited)
+  checkUsage
+    ÔêÜ returns allowed:true when supabaseAdmin is null (graceful degradation)
+    ÔêÜ returns allowed:true for guest with no supabaseAdmin
+    ÔêÜ returns plan:guest (not free) for null userId (1 ms)
+    ÔêÜ returns allowed:true for premium plan (unlimited)
+    ÔêÜ returns allowed:false when count >= limit (1 ms)
+    ÔêÜ returns allowed:true when count < limit
+  incrementUsage
+    ÔêÜ does nothing when supabaseAdmin is null
+    ÔêÜ inserts new record when no existing entry (1 ms)
+    ÔêÜ updates count when existing entry found (2 ms)
+
+PASS __tests__/persona.test.js
+  buildSystemPrompt
+    ÔêÜ returns a non-empty string (2 ms)
+    ÔêÜ includes avatar name for kelion
+    ÔêÜ includes avatar name for kira (1 ms)
+    ÔêÜ supports multiple languages (3 ms)
+    ÔêÜ handles unknown language gracefully
+    ÔêÜ includes memory context when provided
+    ÔêÜ includes HUMOR_IQ section (1 ms)
+    ÔêÜ includes TEMPORAL_AWARENESS section
+    ÔêÜ includes CURIOSITY section (1 ms)
+    ÔêÜ injects current time context
+    ÔêÜ Kelion persona has catchphrases
+    ÔêÜ Kira persona has catchphrases (1 ms)
+    ÔêÜ includes variability rules
+  TRUTH_ENGINE
+    ÔêÜ TRUTH_ENGINE appears first in prompt before persona text
+    ÔêÜ TRUTH_ENGINE appears first in kira prompt before persona text
+    ÔêÜ contains NENEGOCIABIL (1 ms)
+    ÔêÜ contains EXCLUDEREA MINCIUNII (1 ms)
+    ÔêÜ contains EXCLUDEREA RAPORT─éRII FALSE
+    ÔêÜ contains ADEV─éR 100%
+    ÔêÜ contains ETICHETARE OBLIGATORIE
+    ÔêÜ contains REGULA SUPREM─é (1 ms)
+    ÔêÜ TRUTH_ENGINE constant contains expected sections (2 ms)
+
+------------------------|---------|----------|---------|---------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+File                    | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s                                                                                                                                                                                                                                                                                                                                                                                             
+------------------------|---------|----------|---------|---------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+All files               |   18.23 |    11.37 |   16.33 |   18.82 |                                                                                                                                                                                                                                                                                                                                                                                                               
+ server                 |   18.15 |     9.14 |   18.07 |   18.71 |                                                                                                                                                                                                                                                                                                                                                                                                               
+  brain.js              |    15.2 |    14.34 |   22.04 |   15.26 | 85-312,343,499-574,623-756,921-922,929-930,1041-1042,1045-1046,1049-1050,1054-1059,1062-1063,1066-1067,1070-1071,1074-1079,1082-1087,1091-1092,1095-1096,1099-1100,1103-1104,1108-1129,1134-1139,1142-1143,1146-1147,1150-1151,1154-1155,1158-1159,1162-1163,1166-1167,1171-1172,1175-1176,1179-1180,1190-1192,1206-1465,1482,1497-1501,1512-1513,1523-1564,1587-3680,3693-3700,3719,3723-3724,3728,3751-3980 
+  cache.js              |   37.03 |    37.93 |   44.44 |   36.53 | 17-19,29-65,77-81,103-107,120-124                                                                                                                                                                                                                                                                                                                                                                             
+  facebook-page.js      |    8.69 |        0 |       0 |      10 | 14-98                                                                                                                                                                                                                                                                                                                                                                                                         
+  index.js              |      55 |    21.09 |   36.73 |   56.25 | 9,15,126,133-143,197,276-282,287-293,304-309,337-343,371,559,564,567,570,599-619,630-640,648-664,672-674,692-731,753-765,769-781,803-808,827-912,921-993                                                                                                                                                                                                                                                      
+  instagram.js          |    11.3 |     2.81 |   15.38 |   12.26 | 33-40,45-289                                                                                                                                                                                                                                                                                                                                                                                                  
+  legal.js              |   29.67 |     6.52 |   55.55 |   28.91 | 111-175,185-250,256-275,285-307                                                                                                                                                                                                                                                                                                                                                                               
+  logger.js             |     100 |    83.33 |     100 |     100 | 8                                                                                                                                                                                                                                                                                                                                                                                                             
+  messenger.js          |    8.73 |     3.01 |    9.43 |    9.41 | 22-48,66-82,95-254,264-279,292-972,977-981,998-1031,1037-1038,1051-1060,1066-1079,1086-1504                                                                                                                                                                                                                                                                                                                   
+  metrics.js            |      75 |       70 |   66.66 |   74.28 | 16-44                                                                                                                                                                                                                                                                                                                                                                                                         
+  migrate.js            |   14.28 |        0 |       0 |   14.28 | 209-265                                                                                                                                                                                                                                                                                                                                                                                                       
+  news.js               |   20.91 |     6.85 |   21.81 |   22.67 | 72-153,161-215,223-511,562-564,575-586,607,619,631,647-665,681-693,702-724                                                                                                                                                                                                                                                                                                                                    
+  payments.js           |   22.64 |    19.01 |   46.15 |   22.58 | 10-11,18-21,73,113,144-154,214-240,250-336,342-369,378-561,568-589,595-661                                                                                                                                                                                                                                                                                                                                    
+  persona.js            |   92.15 |    59.25 |     100 |   92.15 | 455,460-461,503                                                                                                                                                                                                                                                                                                                                                                                               
+  referral.js           |   26.28 |    18.77 |      24 |   25.34 | 53,128-130,138-242,313,343-347,357-364,393-460,470-530,537-598,604-702,708-751,757-815,821-858                                                                                                                                                                                                                                                                                                                
+  supabase.js           |   63.63 |       50 |     100 |   63.63 | 7-11,14-21                                                                                                                                                                                                                                                                                                                                                                                                    
+  telegram.js           |    8.04 |     0.45 |     3.7 |    8.77 | 17-37,72-207,216-259,266-449,454-632,641-661,667-692                                                                                                                                                                                                                                                                                                                                                          
+  trade-executor.js     |    3.79 |     0.29 |    1.56 |    4.33 | 130-161,181-1112,1146-1457,1490-1496                                                                                                                                                                                                                                                                                                                                                                          
+  trade-intelligence.js |    1.55 |        0 |       0 |    1.69 | 20-327,338-919                                                                                                                                                                                                                                                                                                                                                                                                
+  trading.js            |   22.93 |    18.66 |   15.29 |   22.03 | 84,125,160-161,192-209,243-268,389,414-657,694-751,757-812,818-909,915-1078,1084-1108,1114-1159,1165-1207,1213,1230-1438,1444-1509,1515,1519,1528-1536,1540-1541,1545,1555,1559-1570,1574-1597                                                                                                                                                                                                                
+  validation.js         |     100 |      100 |     100 |     100 |                                                                                                                                                                                                                                                                                                                                                                                                               
+  whatsapp.js           |    9.84 |     3.14 |    3.44 |   10.89 | 60-99,117-240,253-492,497-512,517-882,901-904,909-925                                                                                                                                                                                                                                                                                                                                                         
+ server/config          |      30 |    91.89 |       0 |      30 |                                                                                                                                                                                                                                                                                                                                                                                                               
+  voices.js             |      30 |    91.89 |       0 |      30 | 196-210                                                                                                                                                                                                                                                                                                                                                                                                       
+ server/middleware      |   22.22 |    18.42 |    8.33 |   23.18 |                                                                                                                                                                                                                                                                                                                                                                                                               
+  apiKeyAuth.js         |   12.19 |        0 |       0 |   12.82 | 13-21,27-29,37-98                                                                                                                                                                                                                                                                                                                                                                                             
+  auth.js               |   84.61 |     87.5 |     100 |   84.61 | 27-30                                                                                                                                                                                                                                                                                                                                                                                                         
+  checkSubscription.js  |       0 |        0 |       0 |       0 | 9-47                                                                                                                                                                                                                                                                                                                                                                                                          
+ server/routes          |   18.29 |     7.16 |    4.87 |   18.93 |                                                                                                                                                                                                                                                                                                                                                                                                               
+  admin.js              |    45.8 |    33.33 |    12.5 |    45.9 | 15-46,51-52,57-61,150-171,183-184,196,218-225,247,265,294,300-367                                                                                                                                                                                                                                                                                                                                             
+  auth.js               |   13.79 |        0 |       0 |   15.09 | 34-65,72-99,105-114,119-127,133-151,161-178,189-206,217-228,239-252                                                                                                                                                                                                                                                                                                                                           
+  chat.js               |    5.83 |        0 |       0 |    6.22 | 48-97,104-347,357-650,657-674,680-705,715-779                                                                                                                                                                                                                                                                                                                                                                 
+  developer.js          |   12.04 |        0 |       0 |   12.65 | 35,44-64,70-120,126-158,164-192,198-226,232-249,259,294-323,328-350,356-444                                                                                                                                                                                                                                                                                                                                   
+  health.js             |     100 |    63.63 |     100 |     100 | 13,58-59                                                                                                                                                                                                                                                                                                                                                                                                      
+  identity.js           |   17.02 |        0 |       0 |   18.18 | 28-64,76-173                                                                                                                                                                                                                                                                                                                                                                                                  
+  images.js             |   28.57 |        0 |       0 |   29.62 | 23-68                                                                                                                                                                                                                                                                                                                                                                                                         
+  search.js             |   13.04 |        0 |       0 |   13.23 | 24-200                                                                                                                                                                                                                                                                                                                                                                                                        
+  vision.js             |   33.33 |        0 |       0 |   33.33 | 24-89                                                                                                                                                                                                                                                                                                                                                                                                         
+  voice-clone.js        |   11.39 |        0 |       0 |   11.84 | 18-30,37-150,156-212,218-242                                                                                                                                                                                                                                                                                                                                                                                  
+  voice.js              |   28.35 |    21.87 |      25 |   29.68 | 40-117,123-166                                                                                                                                                                                                                                                                                                                                                                                                
+  weather.js            |   33.33 |        0 |       0 |      35 | 22-80                                                                                                                                                                                                                                                                                                                                                                                                         
+------------------------|---------|----------|---------|---------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+=============================== Coverage summary ===============================
+Statements   : 18.23% ( 1227/6729 )
+Branches     : 11.37% ( 578/5083 )
+Functions    : 16.33% ( 114/698 )
+Lines        : 18.82% ( 1174/6238 )
+================================================================================
+Test Suites: 11 passed, 11 total
+Tests:       239 passed, 239 total
+Snapshots:   0 total
+Time:        5.192 s
+Ran all test suites.
+Force exiting Jest: Have you considered using `--detectOpenHandles` to detect async operations that kept running after all tests finished?

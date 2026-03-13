@@ -1,0 +1,364 @@
+
+Running 154 tests using 5 workers
+
+  Ô£ô    1 [chromium] ÔÇ║ tests\e2e-full.spec.js:1439:3 ÔÇ║ API ÔÇö Legal & GDPR ÔÇ║ DELETE /api/gdpr/delete ÔåÆ needs auth (185ms)
+  Ô£ô    2 [chromium] ÔÇ║ tests\e2e-full.spec.js:1251:3 ÔÇ║ API ÔÇö Trading ÔÇ║ POST /api/trading/backtest (189ms)
+  Ô£ô    4 [chromium] ÔÇ║ tests\e2e-full.spec.js:646:3 ÔÇ║ API Health ÔÇ║ static assets return 200 (no 5xx) (300ms)
+  Ô£ô    6 [chromium] ÔÇ║ tests\e2e-full.spec.js:1445:3 ÔÇ║ API ÔÇö Legal & GDPR ÔÇ║ GET /api/gdpr/consent (177ms)
+  Ô£ô    9 [chromium] ÔÇ║ tests\e2e-full.spec.js:1449:3 ÔÇ║ API ÔÇö Legal & GDPR ÔÇ║ POST /api/gdpr/consent (26ms)
+  Ô£ô    8 [chromium] ÔÇ║ tests\e2e-full.spec.js:654:3 ÔÇ║ API Health ÔÇ║ unknown API endpoint returns 404 (not 5xx) (176ms)
+  Ô£ô    7 [chromium] ÔÇ║ tests\e2e-full.spec.js:1261:3 ÔÇ║ API ÔÇö Trading ÔÇ║ GET /api/trading/alerts (247ms)
+  Ô£ô   12 [chromium] ÔÇ║ tests\e2e-full.spec.js:1267:3 ÔÇ║ API ÔÇö Trading ÔÇ║ GET /api/trading/correlation (31ms)
+  Ô£ô   13 [chromium] ÔÇ║ tests\e2e-full.spec.js:1273:3 ÔÇ║ API ÔÇö Trading ÔÇ║ GET /api/trading/risk (28ms)
+  Ô£ô   14 [chromium] ÔÇ║ tests\e2e-full.spec.js:1277:3 ÔÇ║ API ÔÇö Trading ÔÇ║ GET /api/trading/history (23ms)
+  Ô£ô   15 [chromium] ÔÇ║ tests\e2e-full.spec.js:1283:3 ÔÇ║ API ÔÇö Trading ÔÇ║ POST /api/trading/execute ÔåÆ needs auth (24ms)
+  Ô£ô   16 [chromium] ÔÇ║ tests\e2e-full.spec.js:1293:3 ÔÇ║ API ÔÇö Trading ÔÇ║ GET /api/trading/full-analysis (31ms)
+  Ô£ô   17 [chromium] ÔÇ║ tests\e2e-full.spec.js:1299:3 ÔÇ║ API ÔÇö Trading ÔÇ║ GET /api/trading/calendar (29ms)
+  Ô£ô   18 [chromium] ÔÇ║ tests\e2e-full.spec.js:1305:3 ÔÇ║ API ÔÇö Trading ÔÇ║ GET /api/trading/positions (27ms)
+  Ô£ô   19 [chromium] ÔÇ║ tests\e2e-full.spec.js:1311:3 ÔÇ║ API ÔÇö Trading ÔÇ║ POST /api/trading/close (34ms)
+  Ô£ô   20 [chromium] ÔÇ║ tests\e2e-full.spec.js:1317:3 ÔÇ║ API ÔÇö Trading ÔÇ║ POST /api/trading/kill-switch (172ms)
+  Ô£ô   21 [chromium] ÔÇ║ tests\e2e-full.spec.js:1323:3 ÔÇ║ API ÔÇö Trading ÔÇ║ GET /api/trading/paper-balance (49ms)
+  Ô£ô   22 [chromium] ÔÇ║ tests\e2e-full.spec.js:1329:3 ÔÇ║ API ÔÇö Trading ÔÇ║ GET /api/trading/risk-profile (25ms)
+  Ô£ô   23 [chromium] ÔÇ║ tests\e2e-full.spec.js:1335:3 ÔÇ║ API ÔÇö Trading ÔÇ║ POST /api/trading/risk-profile (28ms)
+  Ô£ô   24 [chromium] ÔÇ║ tests\e2e-full.spec.js:1345:3 ÔÇ║ API ÔÇö Trading ÔÇ║ GET /api/trading/projections (27ms)
+  Ô£ô   25 [chromium] ÔÇ║ tests\e2e-full.spec.js:1353:3 ÔÇ║ API ÔÇö Developer ÔÇ║ GET /api/developer/keys (23ms)
+  Ô£ô   26 [chromium] ÔÇ║ tests\e2e-full.spec.js:1359:3 ÔÇ║ API ÔÇö Developer ÔÇ║ POST /api/developer/keys (32ms)
+  Ô£ô   27 [chromium] ÔÇ║ tests\e2e-full.spec.js:1367:3 ÔÇ║ API ÔÇö Developer ÔÇ║ GET /api/developer/stats (24ms)
+  Ô£ô   28 [chromium] ÔÇ║ tests\e2e-full.spec.js:1373:3 ÔÇ║ API ÔÇö Developer ÔÇ║ GET /api/developer/webhooks (23ms)
+  Ô£ô   29 [chromium] ÔÇ║ tests\e2e-full.spec.js:1379:3 ÔÇ║ API ÔÇö Developer ÔÇ║ POST /api/developer/webhooks (30ms)
+  Ô£ÿ    5 [chromium] ÔÇ║ tests\e2e-full.spec.js:1036:3 ÔÇ║ Real User ÔÇö Full Auth Flow ÔÇ║ register new account (1.3s)
+  -   31 [chromium] ÔÇ║ tests\e2e-full.spec.js:1043:3 ÔÇ║ Real User ÔÇö Full Auth Flow ÔÇ║ login with new account
+  -   32 [chromium] ÔÇ║ tests\e2e-full.spec.js:1053:3 ÔÇ║ Real User ÔÇö Full Auth Flow ÔÇ║ GET /api/auth/me returns user profile
+  -   33 [chromium] ÔÇ║ tests\e2e-full.spec.js:1062:3 ÔÇ║ Real User ÔÇö Full Auth Flow ÔÇ║ chat as authenticated user
+  -   34 [chromium] ÔÇ║ tests\e2e-full.spec.js:1072:3 ÔÇ║ Real User ÔÇö Full Auth Flow ÔÇ║ conversations list as auth user
+  -   35 [chromium] ÔÇ║ tests\e2e-full.spec.js:1082:3 ÔÇ║ Real User ÔÇö Full Auth Flow ÔÇ║ memory as auth user
+  -   36 [chromium] ÔÇ║ tests\e2e-full.spec.js:1092:3 ÔÇ║ Real User ÔÇö Full Auth Flow ÔÇ║ trading status as auth user
+  -   37 [chromium] ÔÇ║ tests\e2e-full.spec.js:1102:3 ÔÇ║ Real User ÔÇö Full Auth Flow ÔÇ║ trading portfolio as auth user
+  -   38 [chromium] ÔÇ║ tests\e2e-full.spec.js:1112:3 ÔÇ║ Real User ÔÇö Full Auth Flow ÔÇ║ trading signals as auth user
+  -   39 [chromium] ÔÇ║ tests\e2e-full.spec.js:1122:3 ÔÇ║ Real User ÔÇö Full Auth Flow ÔÇ║ search as auth user
+  -   40 [chromium] ÔÇ║ tests\e2e-full.spec.js:1133:3 ÔÇ║ Real User ÔÇö Full Auth Flow ÔÇ║ referral code as auth user
+  -   41 [chromium] ÔÇ║ tests\e2e-full.spec.js:1143:3 ÔÇ║ Real User ÔÇö Full Auth Flow ÔÇ║ payments plans as auth user
+  -   42 [chromium] ÔÇ║ tests\e2e-full.spec.js:1153:3 ÔÇ║ Real User ÔÇö Full Auth Flow ÔÇ║ GDPR export as auth user
+  -   43 [chromium] ÔÇ║ tests\e2e-full.spec.js:1163:3 ÔÇ║ Real User ÔÇö Full Auth Flow ÔÇ║ developer keys as auth user
+  -   44 [chromium] ÔÇ║ tests\e2e-full.spec.js:1173:3 ÔÇ║ Real User ÔÇö Full Auth Flow ÔÇ║ change-password requires correct old password
+  -   45 [chromium] ÔÇ║ tests\e2e-full.spec.js:1184:3 ÔÇ║ Real User ÔÇö Full Auth Flow ÔÇ║ login in browser and chat as real user
+  -   46 [chromium] ÔÇ║ tests\e2e-full.spec.js:1211:3 ÔÇ║ Real User ÔÇö Full Auth Flow ÔÇ║ logout works
+  Ô£ô   30 [chromium] ÔÇ║ tests\e2e-full.spec.js:1389:3 ÔÇ║ API ÔÇö Developer ÔÇ║ GET /api/developer/v1/status (33ms)
+  Ô£ô   47 [chromium] ÔÇ║ tests\e2e-full.spec.js:1395:3 ÔÇ║ API ÔÇö Developer ÔÇ║ GET /api/developer/v1/models (26ms)
+  Ô£ô   48 [chromium] ÔÇ║ tests\e2e-full.spec.js:1401:3 ÔÇ║ API ÔÇö Developer ÔÇ║ GET /api/developer/v1/user/profile (26ms)
+  Ô£ô   49 [chromium] ÔÇ║ tests\e2e-full.spec.js:1407:3 ÔÇ║ API ÔÇö Developer ÔÇ║ POST /api/developer/v1/chat (31ms)
+  Ô£ô   50 [chromium] ÔÇ║ tests\e2e-full.spec.js:1417:3 ÔÇ║ API ÔÇö Developer ÔÇ║ DELETE /api/developer/keys/test (28ms)
+  Ô£ô   51 [chromium] ÔÇ║ tests\e2e-full.spec.js:1425:3 ÔÇ║ API ÔÇö Legal & GDPR ÔÇ║ GET /api/legal/terms (31ms)
+  Ô£ô   52 [chromium] ÔÇ║ tests\e2e-full.spec.js:1429:3 ÔÇ║ API ÔÇö Legal & GDPR ÔÇ║ GET /api/legal/privacy (23ms)
+  Ô£ô   53 [chromium] ÔÇ║ tests\e2e-full.spec.js:1433:3 ÔÇ║ API ÔÇö Legal & GDPR ÔÇ║ POST /api/gdpr/export ÔåÆ needs auth (27ms)
+  Ô£ô   54 [chromium] ÔÇ║ tests\e2e-full.spec.js:1641:3 ÔÇ║ API ÔÇö Admin ÔÇ║ GET /api/admin/health-check ÔåÆ needs admin (26ms)
+  Ô£ô   55 [chromium] ÔÇ║ tests\e2e-full.spec.js:1649:3 ÔÇ║ API ÔÇö Ticker & Metrics ÔÇ║ POST /api/ticker/disable (23ms)
+  Ô£ô   56 [chromium] ÔÇ║ tests\e2e-full.spec.js:1655:3 ÔÇ║ API ÔÇö Ticker & Metrics ÔÇ║ GET /api/metrics ÔåÆ needs admin (24ms)
+  Ô£ô   57 [chromium] ÔÇ║ tests\e2e-full.spec.js:1663:3 ÔÇ║ API ÔÇö Referral ÔÇ║ GET /api/referral/code (27ms)
+  Ô£ô   58 [chromium] ÔÇ║ tests\e2e-full.spec.js:1671:3 ÔÇ║ API ÔÇö Auth Complete ÔÇ║ POST /api/auth/login bad ÔåÆ 401 (75ms)
+  Ô£ô   59 [chromium] ÔÇ║ tests\e2e-full.spec.js:1681:3 ÔÇ║ API ÔÇö Auth Complete ÔÇ║ GET /api/auth/me no token ÔåÆ 401 (35ms)
+  Ô£ô   60 [chromium] ÔÇ║ tests\e2e-full.spec.js:1687:3 ÔÇ║ API ÔÇö Auth Complete ÔÇ║ POST /api/auth/refresh no token (27ms)
+  Ô£ô   61 [chromium] ÔÇ║ tests\e2e-full.spec.js:1693:3 ÔÇ║ API ÔÇö Auth Complete ÔÇ║ POST /api/auth/forgot-password no email (26ms)
+  Ô£ô   62 [chromium] ÔÇ║ tests\e2e-full.spec.js:1699:3 ÔÇ║ API ÔÇö Auth Complete ÔÇ║ POST /api/auth/change-email no auth (25ms)
+  Ô£ô   63 [chromium] ÔÇ║ tests\e2e-full.spec.js:1711:3 ÔÇ║ API ÔÇö Brain & Chat ÔÇ║ POST /api/chat empty message (33ms)
+  Ô£ô   64 [chromium] ÔÇ║ tests\e2e-full.spec.js:1721:3 ÔÇ║ API ÔÇö Brain & Chat ÔÇ║ GET /api/chat/stream SSE (25ms)
+  Ô£ô   65 [chromium] ÔÇ║ tests\e2e-full.spec.js:1725:3 ÔÇ║ API ÔÇö Brain & Chat ÔÇ║ GET /api/conversations (25ms)
+  Ô£ô   66 [chromium] ÔÇ║ tests\e2e-full.spec.js:1731:3 ÔÇ║ API ÔÇö Brain & Chat ÔÇ║ GET /api/memory (27ms)
+  Ô£ô   67 [chromium] ÔÇ║ tests\e2e-full.spec.js:1735:3 ÔÇ║ API ÔÇö Brain & Chat ÔÇ║ GET /api/admin/payments/stats ÔåÆ admin (27ms)
+  Ô£ô   68 [chromium] ÔÇ║ tests\e2e-full.spec.js:1743:3 ÔÇ║ API ÔÇö Messenger Stats ÔÇ║ GET /api/messenger/stats ÔåÆ admin (23ms)
+  Ô£ÿ   70 [chromium] ÔÇ║ tests\e2e-full.spec.js:1036:3 ÔÇ║ Real User ÔÇö Full Auth Flow ÔÇ║ register new account (retry #1) (503ms)
+  -   71 [chromium] ÔÇ║ tests\e2e-full.spec.js:1043:3 ÔÇ║ Real User ÔÇö Full Auth Flow ÔÇ║ login with new account (retry #1)
+  -   72 [chromium] ÔÇ║ tests\e2e-full.spec.js:1053:3 ÔÇ║ Real User ÔÇö Full Auth Flow ÔÇ║ GET /api/auth/me returns user profile (retry #1)
+  -   73 [chromium] ÔÇ║ tests\e2e-full.spec.js:1062:3 ÔÇ║ Real User ÔÇö Full Auth Flow ÔÇ║ chat as authenticated user (retry #1)
+  -   74 [chromium] ÔÇ║ tests\e2e-full.spec.js:1072:3 ÔÇ║ Real User ÔÇö Full Auth Flow ÔÇ║ conversations list as auth user (retry #1)
+  -   75 [chromium] ÔÇ║ tests\e2e-full.spec.js:1082:3 ÔÇ║ Real User ÔÇö Full Auth Flow ÔÇ║ memory as auth user (retry #1)
+  -   76 [chromium] ÔÇ║ tests\e2e-full.spec.js:1092:3 ÔÇ║ Real User ÔÇö Full Auth Flow ÔÇ║ trading status as auth user (retry #1)
+  -   77 [chromium] ÔÇ║ tests\e2e-full.spec.js:1102:3 ÔÇ║ Real User ÔÇö Full Auth Flow ÔÇ║ trading portfolio as auth user (retry #1)
+  -   78 [chromium] ÔÇ║ tests\e2e-full.spec.js:1112:3 ÔÇ║ Real User ÔÇö Full Auth Flow ÔÇ║ trading signals as auth user (retry #1)
+  -   79 [chromium] ÔÇ║ tests\e2e-full.spec.js:1122:3 ÔÇ║ Real User ÔÇö Full Auth Flow ÔÇ║ search as auth user (retry #1)
+  -   80 [chromium] ÔÇ║ tests\e2e-full.spec.js:1133:3 ÔÇ║ Real User ÔÇö Full Auth Flow ÔÇ║ referral code as auth user (retry #1)
+  -   81 [chromium] ÔÇ║ tests\e2e-full.spec.js:1143:3 ÔÇ║ Real User ÔÇö Full Auth Flow ÔÇ║ payments plans as auth user (retry #1)
+  -   82 [chromium] ÔÇ║ tests\e2e-full.spec.js:1153:3 ÔÇ║ Real User ÔÇö Full Auth Flow ÔÇ║ GDPR export as auth user (retry #1)
+  -   83 [chromium] ÔÇ║ tests\e2e-full.spec.js:1163:3 ÔÇ║ Real User ÔÇö Full Auth Flow ÔÇ║ developer keys as auth user (retry #1)
+  -   84 [chromium] ÔÇ║ tests\e2e-full.spec.js:1173:3 ÔÇ║ Real User ÔÇö Full Auth Flow ÔÇ║ change-password requires correct old password (retry #1)
+  -   85 [chromium] ÔÇ║ tests\e2e-full.spec.js:1184:3 ÔÇ║ Real User ÔÇö Full Auth Flow ÔÇ║ login in browser and chat as real user (retry #1)
+  -   86 [chromium] ÔÇ║ tests\e2e-full.spec.js:1211:3 ÔÇ║ Real User ÔÇö Full Auth Flow ÔÇ║ logout works (retry #1)
+  Ô£ô    3 [chromium] ÔÇ║ tests\e2e-full.spec.js:26:3 ÔÇ║ Onboarding Flow ÔÇ║ / redirects to /onboarding.html on first visit (3.9s)
+  Ô£ô   87 [chromium] ÔÇ║ tests\e2e-full.spec.js:40:3 ÔÇ║ Onboarding Flow ÔÇ║ onboarding page loads with title and content (1.3s)
+  Ô£ô   69 [chromium] ÔÇ║ tests\e2e-full.spec.js:1755:3 ÔÇ║ Security ÔÇ║ XSS in chat message is sanitized (4.5s)
+  Ô£ô   89 [chromium] ÔÇ║ tests\e2e-full.spec.js:1763:3 ÔÇ║ Security ÔÇ║ SQL injection in login is blocked (37ms)
+  Ô£ô   90 [chromium] ÔÇ║ tests\e2e-full.spec.js:1770:3 ÔÇ║ Security ÔÇ║ path traversal blocked (66ms)
+  Ô£ô   88 [chromium] ÔÇ║ tests\e2e-full.spec.js:57:3 ÔÇ║ Onboarding Flow ÔÇ║ onboarding step 1 ÔåÆ step 2 via "Get Started" button (917ms)
+  Ô£ô   91 [chromium] ÔÇ║ tests\e2e-full.spec.js:1776:3 ÔÇ║ Security ÔÇ║ HTTPS enforced (51ms)
+  Ô£ô   93 [chromium] ÔÇ║ tests\e2e-full.spec.js:1781:3 ÔÇ║ Security ÔÇ║ auth endpoints reject invalid tokens (120ms)
+  Ô£ô   94 [chromium] ÔÇ║ tests\e2e-full.spec.js:1788:3 ÔÇ║ Security ÔÇ║ admin routes blocked without admin token (78ms)
+  Ô£ô   10 [chromium] ÔÇ║ tests\e2e-full.spec.js:1459:3 ÔÇ║ API ÔÇö AI Services ÔÇ║ POST /api/search (6.7s)
+  Ô£ô   96 [chromium] ÔÇ║ tests\e2e-full.spec.js:1465:3 ÔÇ║ API ÔÇö AI Services ÔÇ║ GET /api/weather (55ms)
+  Ô£ô   97 [chromium] ÔÇ║ tests\e2e-full.spec.js:1471:3 ÔÇ║ API ÔÇö AI Services ÔÇ║ POST /api/vision (45ms)
+  Ô£ô   98 [chromium] ÔÇ║ tests\e2e-full.spec.js:1481:3 ÔÇ║ API ÔÇö AI Services ÔÇ║ POST /api/voice/speak (55ms)
+  Ô£ô   99 [chromium] ÔÇ║ tests\e2e-full.spec.js:1489:3 ÔÇ║ API ÔÇö AI Services ÔÇ║ POST /api/voice/listen (44ms)
+  Ô£ô   92 [chromium] ÔÇ║ tests\e2e-full.spec.js:82:3 ÔÇ║ Onboarding Flow ÔÇ║ onboarding step 2 has plan selection (893ms)
+  Ô£ô  101 [chromium] ÔÇ║ tests\e2e-full.spec.js:121:3 ÔÇ║ Onboarding Flow ÔÇ║ onboarding navigate prev (back) from step 2 to step 1 (815ms)
+  Ô£ô  100 [chromium] ÔÇ║ tests\e2e-full.spec.js:1495:3 ÔÇ║ API ÔÇö AI Services ÔÇ║ POST /api/imagine (1.6s)
+  Ô£ô  103 [chromium] ÔÇ║ tests\e2e-full.spec.js:1505:3 ÔÇ║ API ÔÇö Identity ÔÇ║ POST /api/identity/register-face (26ms)
+  Ô£ô  104 [chromium] ÔÇ║ tests\e2e-full.spec.js:1511:3 ÔÇ║ API ÔÇö Identity ÔÇ║ POST /api/identity/check (56ms)
+  Ô£ô  105 [chromium] ÔÇ║ tests\e2e-full.spec.js:1519:3 ÔÇ║ API ÔÇö Payments ÔÇ║ GET /api/payments/plans (36ms)
+  Ô£ô  106 [chromium] ÔÇ║ tests\e2e-full.spec.js:1525:3 ÔÇ║ API ÔÇö Payments ÔÇ║ POST /api/payments/checkout ÔåÆ needs auth (66ms)
+  Ô£ô  107 [chromium] ÔÇ║ tests\e2e-full.spec.js:1535:3 ÔÇ║ API ÔÇö News ÔÇ║ GET /api/news (104ms)
+  Ô£ô  108 [chromium] ÔÇ║ tests\e2e-full.spec.js:1539:3 ÔÇ║ API ÔÇö News ÔÇ║ POST /api/news ÔåÆ needs admin (73ms)
+  Ô£ô  109 [chromium] ÔÇ║ tests\e2e-full.spec.js:1547:3 ÔÇ║ API ÔÇö Media ÔÇ║ GET /api/media/facebook/health (42ms)
+  Ô£ô  110 [chromium] ÔÇ║ tests\e2e-full.spec.js:1553:3 ÔÇ║ API ÔÇö Media ÔÇ║ GET /api/media/instagram/health (33ms)
+  Ô£ô  111 [chromium] ÔÇ║ tests\e2e-full.spec.js:1559:3 ÔÇ║ API ÔÇö Media ÔÇ║ GET /api/media/status ÔåÆ needs admin (33ms)
+  Ô£ô  112 [chromium] ÔÇ║ tests\e2e-full.spec.js:1565:3 ÔÇ║ API ÔÇö Media ÔÇ║ POST /api/media/publish ÔåÆ needs admin (42ms)
+  Ô£ô  113 [chromium] ÔÇ║ tests\e2e-full.spec.js:1573:3 ÔÇ║ API ÔÇö Messaging ÔÇ║ GET /api/messenger/webhook (54ms)
+  Ô£ô  114 [chromium] ÔÇ║ tests\e2e-full.spec.js:1583:3 ÔÇ║ API ÔÇö Messaging ÔÇ║ POST /api/telegram/webhook (26ms)
+  Ô£ô  115 [chromium] ÔÇ║ tests\e2e-full.spec.js:1589:3 ÔÇ║ API ÔÇö Messaging ÔÇ║ GET /api/telegram/health (45ms)
+  Ô£ô  116 [chromium] ÔÇ║ tests\e2e-full.spec.js:1595:3 ÔÇ║ API ÔÇö Messaging ÔÇ║ GET /api/whatsapp/webhook (46ms)
+  Ô£ô  117 [chromium] ÔÇ║ tests\e2e-full.spec.js:1605:3 ÔÇ║ API ÔÇö Messaging ÔÇ║ POST /api/whatsapp/webhook (75ms)
+  Ô£ô  102 [chromium] ÔÇ║ tests\e2e-full.spec.js:153:3 ÔÇ║ Onboarding Flow ÔÇ║ "Finish" finishes onboarding and redirects to / (1.4s)
+  Ô£ô  118 [chromium] ÔÇ║ tests\e2e-full.spec.js:1611:3 ÔÇ║ API ÔÇö Messaging ÔÇ║ POST /api/whatsapp/send (joke) (56ms)
+  Ô£ô  120 [chromium] ÔÇ║ tests\e2e-full.spec.js:1621:3 ÔÇ║ API ÔÇö Messaging ÔÇ║ GET /api/whatsapp/health (49ms)
+  Ô£ô  121 [chromium] ÔÇ║ tests\e2e-full.spec.js:1629:3 ÔÇ║ API ÔÇö Admin ÔÇ║ GET /api/admin/brain ÔåÆ needs admin (30ms)
+  Ô£ô  122 [chromium] ÔÇ║ tests\e2e-full.spec.js:1635:3 ÔÇ║ API ÔÇö Admin ÔÇ║ POST /api/admin/brain/reset ÔåÆ needs admin (35ms)
+  Ô£ô   95 [chromium] ÔÇ║ tests\e2e-full.spec.js:1795:3 ÔÇ║ Security ÔÇ║ XSS in search query is sanitized (3.1s)
+  Ô£ô  123 [chromium] ÔÇ║ tests\e2e-full.spec.js:1808:3 ÔÇ║ Security ÔÇ║ oversized payload rejected (7.8s)
+  Ô£ô  124 [chromium] ÔÇ║ tests\e2e-full.spec.js:1816:3 ÔÇ║ Security ÔÇ║ no server version header exposed (45ms)
+  Ô£ô  125 [chromium] ÔÇ║ tests\e2e-full.spec.js:1822:3 ÔÇ║ Security ÔÇ║ CORS headers present (36ms)
+  Ô£ô  119 [chromium] ÔÇ║ tests\e2e-full.spec.js:184:3 ÔÇ║ Onboarding Flow ÔÇ║ after onboarding, / does NOT redirect to onboarding (9.2s)
+  Ô£ô   11 [chromium] ÔÇ║ tests\e2e-full.spec.js:705:3 ÔÇ║ Error Handling ÔÇ║ unknown page returns app (not crash) (40.8s)
+  Ô£ô  127 [chromium] ÔÇ║ tests\e2e-full.spec.js:716:3 ÔÇ║ Error Handling ÔÇ║ error.html page loads correctly (52.3s)
+  Ô£ô  126 [chromium] ÔÇ║ tests\e2e-full.spec.js:243:3 ÔÇ║ Main Pages Navigation ÔÇ║ homepage / loads with visible content (1.3m)
+  Ô£ô  129 [chromium] ÔÇ║ tests\e2e-full.spec.js:258:3 ÔÇ║ Main Pages Navigation ÔÇ║ /pricing/ page loads (17.3s)
+  Ô£ô  128 [chromium] ÔÇ║ tests\e2e-full.spec.js:731:3 ÔÇ║ Error Handling ÔÇ║ no uncaught JS errors on homepage (45.3s)
+  -  130 [chromium] ÔÇ║ tests\e2e-full.spec.js:272:3 ÔÇ║ Main Pages Navigation ÔÇ║ pricing link from navbar has correct href
+  Ô£ô  131 [chromium] ÔÇ║ tests\e2e-full.spec.js:754:3 ÔÇ║ Error Handling ÔÇ║ no uncaught JS errors on pricing page (1.2m)
+  Ô£ô  133 [chromium] ÔÇ║ tests\e2e-full.spec.js:786:3 ÔÇ║ PWA ÔÇ║ manifest.json is present and valid (62ms)
+  Ô£ô  132 [chromium] ÔÇ║ tests\e2e-full.spec.js:298:3 ÔÇ║ Main Pages Navigation ÔÇ║ /settings page loads (1.2m)
+  Ô£ô  135 [chromium] ÔÇ║ tests\e2e-full.spec.js:306:3 ÔÇ║ Main Pages Navigation ÔÇ║ /developer page loads (1.2m)
+  Ô£ÿ  134 [chromium] ÔÇ║ tests\e2e-full.spec.js:800:3 ÔÇ║ PWA ÔÇ║ service worker registration attempted (1.3m)
+  Ô£ô  137 [chromium] ÔÇ║ tests\e2e-full.spec.js:800:3 ÔÇ║ PWA ÔÇ║ service worker registration attempted (retry #1) (25.0s)
+  Ô£ô  136 [chromium] ÔÇ║ tests\e2e-full.spec.js:314:3 ÔÇ║ Main Pages Navigation ÔÇ║ navigate back to homepage from developer page (42.3s)
+  Ô£ô  138 [chromium] ÔÇ║ tests\e2e-full.spec.js:826:3 ÔÇ║ Quality ÔÇö JS Errors ÔÇ║ no critical JS errors on page (37.5s)
+  Ô£ô  139 [chromium] ÔÇ║ tests\e2e-full.spec.js:331:3 ÔÇ║ Main Pages Navigation ÔÇ║ static assets load (CSS/JS) (29.5s)
+  Ô£ô  140 [chromium] ÔÇ║ tests\e2e-full.spec.js:857:3 ÔÇ║ Deep ÔÇö Chat Quality ÔÇ║ AI reply contains actual words (2.6s)
+  Ô£ô  142 [chromium] ÔÇ║ tests\e2e-full.spec.js:865:3 ÔÇ║ Deep ÔÇö Chat Quality ÔÇ║ AI reply to math is correct (3.2s)
+  Ô£ô  143 [chromium] ÔÇ║ tests\e2e-full.spec.js:877:3 ÔÇ║ Deep ÔÇö Chat Quality ÔÇ║ Kira replies in Romanian (3.7s)
+  Ô£ô  144 [chromium] ÔÇ║ tests\e2e-full.spec.js:932:3 ÔÇ║ Deep ÔÇö UI Interactions ÔÇ║ pricing modal opens and has grid (23.4s)
+  Ô£ÿ  145 [chromium] ÔÇ║ tests\e2e-full.spec.js:939:3 ÔÇ║ Deep ÔÇö UI Interactions ÔÇ║ pricing modal closes (41.3s)
+  Ô£ô  146 [chromium] ÔÇ║ tests\e2e-full.spec.js:939:3 ÔÇ║ Deep ÔÇö UI Interactions ÔÇ║ pricing modal closes (retry #1) (27.9s)
+  Ô£ÿ  141 [chromium] ÔÇ║ tests\e2e-full.spec.js:382:3 ÔÇ║ Buttons and Links ÔÇ║ navbar links are all reachable (no 404) (1.7m)
+  Ô£ô  147 [chromium] ÔÇ║ tests\e2e-full.spec.js:948:3 ÔÇ║ Deep ÔÇö UI Interactions ÔÇ║ conversation history sidebar opens (50.6s)
+  Ô£ô  148 [chromium] ÔÇ║ tests\e2e-full.spec.js:382:3 ÔÇ║ Buttons and Links ÔÇ║ navbar links are all reachable (no 404) (retry #1) (48.7s)
+  Ô£ÿ  149 [chromium] ÔÇ║ tests\e2e-full.spec.js:955:3 ÔÇ║ Deep ÔÇö UI Interactions ÔÇ║ microphone button visible (5.0m)
+ÔÜá´©Å kelionai.app is DOWN ÔÇö skipping all E2E tests
+  Ô£ÿ  150 [chromium] ÔÇ║ tests\e2e-full.spec.js:409:3 ÔÇ║ Buttons and Links ÔÇ║ send button is visible and enabled (55.8m)
+  Ô£ÿ  151 [chromium] ÔÇ║ tests\e2e-full.spec.js:955:3 ÔÇ║ Deep ÔÇö UI Interactions ÔÇ║ microphone button visible (retry #1) (3ms)
+ÔÜá´©Å kelionai.app is DOWN ÔÇö skipping all E2E tests
+ÔÜá´©Å kelionai.app is DOWN ÔÇö skipping all E2E tests
+  -  152 [chromium] ÔÇ║ tests\e2e-full.spec.js:961:3 ÔÇ║ Deep ÔÇö UI Interactions ÔÇ║ monitor panel default state
+  -  154 [chromium] ÔÇ║ tests\e2e-full.spec.js:967:3 ÔÇ║ Deep ÔÇö UI Interactions ÔÇ║ navbar shows avatar name Kelion
+  -  153 [chromium] ÔÇ║ tests\e2e-full.spec.js:409:3 ÔÇ║ Buttons and Links ÔÇ║ send button is visible and enabled (retry #1)
+  -  155 [chromium] ÔÇ║ tests\e2e-full.spec.js:972:3 ÔÇ║ Deep ÔÇö UI Interactions ÔÇ║ user badge shows Guest
+  -  156 [chromium] ÔÇ║ tests\e2e-full.spec.js:431:3 ÔÇ║ Buttons and Links ÔÇ║ mic button is visible
+  -  157 [chromium] ÔÇ║ tests\e2e-full.spec.js:978:3 ÔÇ║ Deep ÔÇö UI Interactions ÔÇ║ full chat: send + AI replies
+  -  159 [chromium] ÔÇ║ tests\e2e-full.spec.js:997:3 ÔÇ║ Deep ÔÇö API Data Quality ÔÇ║ search returns real data
+  -  160 [chromium] ÔÇ║ tests\e2e-full.spec.js:1007:3 ÔÇ║ Deep ÔÇö API Data Quality ÔÇ║ legal terms has real content
+  -  161 [chromium] ÔÇ║ tests\e2e-full.spec.js:1013:3 ÔÇ║ Deep ÔÇö API Data Quality ÔÇ║ privacy policy has real content
+  -  162 [chromium] ÔÇ║ tests\e2e-full.spec.js:1019:3 ÔÇ║ Deep ÔÇö API Data Quality ÔÇ║ developer v1/status returns real data
+  -  158 [chromium] ÔÇ║ tests\e2e-full.spec.js:447:3 ÔÇ║ Buttons and Links ÔÇ║ avatar switcher buttons are clickable
+  -  163 [chromium] ÔÇ║ tests\e2e-full.spec.js:1227:3 ÔÇ║ API ÔÇö Trading ÔÇ║ GET /api/trading/status
+  -  165 [chromium] ÔÇ║ tests\e2e-full.spec.js:1233:3 ÔÇ║ API ÔÇö Trading ÔÇ║ GET /api/trading/analysis
+  -  166 [chromium] ÔÇ║ tests\e2e-full.spec.js:1239:3 ÔÇ║ API ÔÇö Trading ÔÇ║ GET /api/trading/signals
+  -  167 [chromium] ÔÇ║ tests\e2e-full.spec.js:1245:3 ÔÇ║ API ÔÇö Trading ÔÇ║ GET /api/trading/portfolio
+  -  164 [chromium] ÔÇ║ tests\e2e-full.spec.js:457:3 ÔÇ║ Buttons and Links ÔÇ║ Get Started button is visible on homepage
+  -  168 [chromium] ÔÇ║ tests\e2e-full.spec.js:466:3 ÔÇ║ Buttons and Links ÔÇ║ pricing modal button is visible and present
+  -  169 [chromium] ÔÇ║ tests\e2e-full.spec.js:526:3 ÔÇ║ Responsive Mobile (375├ù812) ÔÇ║ homepage loads on mobile viewport
+  -  170 [chromium] ÔÇ║ tests\e2e-full.spec.js:538:3 ÔÇ║ Responsive Mobile (375├ù812) ÔÇ║ hamburger menu is visible on mobile
+  -  171 [chromium] ÔÇ║ tests\e2e-full.spec.js:548:3 ÔÇ║ Responsive Mobile (375├ù812) ÔÇ║ hamburger menu opens mobile nav
+  -  172 [chromium] ÔÇ║ tests\e2e-full.spec.js:585:3 ÔÇ║ Responsive Mobile (375├ù812) ÔÇ║ send button is accessible on mobile
+  -  173 [chromium] ÔÇ║ tests\e2e-full.spec.js:598:3 ÔÇ║ Responsive Mobile (375├ù812) ÔÇ║ onboarding page is usable on mobile
+  -  174 [chromium] ÔÇ║ tests\e2e-full.spec.js:624:3 ÔÇ║ API Health ÔÇ║ GET /api/health returns 200
+  -  175 [chromium] ÔÇ║ tests\e2e-full.spec.js:632:3 ÔÇ║ API Health ÔÇ║ GET / returns 200
+  -  176 [chromium] ÔÇ║ tests\e2e-full.spec.js:639:3 ÔÇ║ API Health ÔÇ║ GET /health returns 200 (catch-all serves app)
+
+
+  1) [chromium] ÔÇ║ tests\e2e-full.spec.js:955:3 ÔÇ║ Deep ÔÇö UI Interactions ÔÇ║ microphone button visible 
+
+    [31mTearing down "context" exceeded the test timeout of 180000ms.[39m
+
+    attachment #1: screenshot (image/png) ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+    test-results\e2e-full-Deep-ÔÇö-UI-Interactions-microphone-button-visible-chromium\test-finished-1.png
+    ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+
+    Retry #1 ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+
+    TimeoutError: browserType.launch: Timeout 180000ms exceeded.
+    Call log:
+    [2m  - <launching> C:\Users\adria\AppData\Local\ms-playwright\chromium_headless_shell-1208\chrome-headless-shell-win64\chrome-headless-shell.exe --disable-field-trial-config --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-back-forward-cache --disable-breakpad --disable-client-side-phishing-detection --disable-component-extensions-with-background-pages --disable-component-update --no-default-browser-check --disable-default-apps --disable-dev-shm-usage --disable-extensions --disable-features=AvoidUnnecessaryBeforeUnloadCheckSync,BoundaryEventDispatchTracksNodeRemoval,DestroyProfileOnBrowserClose,DialMediaRouteProvider,GlobalMediaControls,HttpsUpgrades,LensOverlay,MediaRouter,PaintHolding,ThirdPartyStoragePartitioning,Translate,AutoDeElevate,RenderDocument,OptimizationHints --enable-features=CDPScreenshotNewSurface --allow-pre-commit-input --disable-hang-monitor --disable-ipc-flooding-protection --disable-popup-blocking --disable-prompt-on-repost --disable-renderer-backgrounding --force-color-profile=srgb --metrics-recording-only --no-first-run --password-store=basic --use-mock-keychain --no-service-autorun --export-tagged-pdf --disable-search-engine-choice-screen --unsafely-disable-devtools-self-xss-warnings --edge-skip-compat-layer-relaunch --enable-automation --disable-infobars --disable-search-engine-choice-screen --disable-sync --enable-unsafe-swiftshader --headless --hide-scrollbars --mute-audio --blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4 --no-sandbox --use-gl=swiftshader --enable-webgl --ignore-gpu-blocklist --user-data-dir=C:\Users\adria\AppData\Local\Temp\playwright_chromiumdev_profile-g4N9xG --remote-debugging-pipe --no-startup-window[22m
+    [2m  - <launched> pid=22120[22m
+
+
+    attachment #1: trace (application/zip) ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+    test-results\e2e-full-Deep-ÔÇö-UI-Interactions-microphone-button-visible-chromium-retry1\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\e2e-full-Deep-ÔÇö-UI-Interactions-microphone-button-visible-chromium-retry1\trace.zip
+
+    ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+
+  2) [chromium] ÔÇ║ tests\e2e-full.spec.js:1036:3 ÔÇ║ Real User ÔÇö Full Auth Flow ÔÇ║ register new account 
+
+    Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoContain[2m([22m[32mexpected[39m[2m) // indexOf[22m
+
+    Expected value: [32m400[39m
+    Received array: [31m[200, 201, 409][39m
+
+      1039 |       data: { email: TEST_EMAIL, password: TEST_PASS, name: TEST_NAME },
+      1040 |     });
+    > 1041 |     expect([200, 201, 409]).toContain(r.status());
+           |                             ^
+      1042 |   });
+      1043 |   test("login with new account", async ({ request }) => {
+      1044 |     test.skip(!siteIsUp);
+        at C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2\tests\e2e-full.spec.js:1041:29
+
+    Retry #1 ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+
+    Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoContain[2m([22m[32mexpected[39m[2m) // indexOf[22m
+
+    Expected value: [32m400[39m
+    Received array: [31m[200, 201, 409][39m
+
+      1039 |       data: { email: TEST_EMAIL, password: TEST_PASS, name: TEST_NAME },
+      1040 |     });
+    > 1041 |     expect([200, 201, 409]).toContain(r.status());
+           |                             ^
+      1042 |   });
+      1043 |   test("login with new account", async ({ request }) => {
+      1044 |     test.skip(!siteIsUp);
+        at C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2\tests\e2e-full.spec.js:1041:29
+
+    attachment #1: trace (application/zip) ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+    test-results\e2e-full-Real-User-ÔÇö-Full-Auth-Flow-register-new-account-chromium-retry1\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\e2e-full-Real-User-ÔÇö-Full-Auth-Flow-register-new-account-chromium-retry1\trace.zip
+
+    ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+
+  3) [chromium] ÔÇ║ tests\e2e-full.spec.js:382:3 ÔÇ║ Buttons and Links ÔÇ║ navbar links are all reachable (no 404) 
+
+    TimeoutError: page.waitForSelector: Timeout 10000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('nav a[href]') to be visible[22m
+
+
+      385 |       .waitForLoadState("networkidle", { timeout: 10000 })
+      386 |       .catch(() => {});
+    > 387 |     await page.waitForSelector("nav a[href]", {
+          |                ^
+      388 |       state: "visible",
+      389 |       timeout: 10000,
+      390 |     });
+        at C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2\tests\e2e-full.spec.js:387:16
+
+    attachment #1: video (video/webm) ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+    test-results\e2e-full-Buttons-and-Links-3d28f-s-are-all-reachable-no-404--chromium\video.webm
+    ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+
+  4) [chromium] ÔÇ║ tests\e2e-full.spec.js:409:3 ÔÇ║ Buttons and Links ÔÇ║ send button is visible and enabled 
+
+    [31mTest timeout of 180000ms exceeded.[39m
+
+    Error: page.screenshot: Test timeout of 180000ms exceeded.
+    Call log:
+    [2m  - taking page screenshot[22m
+    [2m  - waiting for fonts to load...[22m
+    [2m  - fonts loaded[22m
+
+
+      421 |       return;
+      422 |     }
+    > 423 |     await page.screenshot({ path: "test-results/send-btn-before.png" });
+          |                ^
+      424 |
+      425 |     const btnSend = page.locator("#btn-send");
+      426 |     await expect(btnSend).toBeVisible();
+        at C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2\tests\e2e-full.spec.js:423:16
+
+    [31mTearing down "context" exceeded the test timeout of 180000ms.[39m
+
+    attachment #1: screenshot (image/png) ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+    test-results\e2e-full-Buttons-and-Links-1e96c-tton-is-visible-and-enabled-chromium\test-failed-1.png
+    ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+
+    Error Context: test-results\e2e-full-Buttons-and-Links-1e96c-tton-is-visible-and-enabled-chromium\error-context.md
+
+  5) [chromium] ÔÇ║ tests\e2e-full.spec.js:800:3 ÔÇ║ PWA ÔÇ║ service worker registration attempted ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+
+    TimeoutError: page.waitForSelector: Timeout 60000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('#avatar-canvas') to be visible[22m
+    [2m    22 ├ù locator resolved to hidden <canvas width="319" height="328" id="avatar-canvas" data-engine="three.js r160"></canvas>[22m
+
+
+      803 |     });
+      804 |     await page.goto("/");
+    > 805 |     await page.waitForSelector("#avatar-canvas", {
+          |                ^
+      806 |       state: "visible",
+      807 |       timeout: 60000,
+      808 |     });
+        at C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2\tests\e2e-full.spec.js:805:16
+
+    attachment #1: video (video/webm) ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+    test-results\e2e-full-PWA-service-worker-registration-attempted-chromium\video.webm
+    ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+
+    Error Context: test-results\e2e-full-PWA-service-worker-registration-attempted-chromium\error-context.md
+
+  6) [chromium] ÔÇ║ tests\e2e-full.spec.js:939:3 ÔÇ║ Deep ÔÇö UI Interactions ÔÇ║ pricing modal closes ÔöÇÔöÇÔöÇÔöÇÔöÇ
+
+    TimeoutError: page.click: Timeout 20000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('#btn-subscriptions')[22m
+    [2m    - locator resolved to <button title="Abonamente" class="btn-secondary" id="btn-subscriptions">Ô¡ÉÔåÁ                    Abonamente</button>[22m
+    [2m  - attempting click action[22m
+    [2m    - waiting for element to be visible, enabled and stable[22m
+
+
+      939 |   test("pricing modal closes", async ({ page }) => {
+      940 |     test.skip(!siteIsUp);
+    > 941 |     await page.click("#btn-subscriptions");
+          |                ^
+      942 |     await expect(page.locator("#pricing-modal")).toBeVisible({
+      943 |       timeout: 10000,
+      944 |     });
+        at C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2\tests\e2e-full.spec.js:941:16
+
+    attachment #1: screenshot (image/png) ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+    test-results\e2e-full-Deep-ÔÇö-UI-Interactions-pricing-modal-closes-chromium\test-failed-1.png
+    ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+
+    attachment #2: video (video/webm) ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+    test-results\e2e-full-Deep-ÔÇö-UI-Interactions-pricing-modal-closes-chromium\video.webm
+    ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+
+    Error Context: test-results\e2e-full-Deep-ÔÇö-UI-Interactions-pricing-modal-closes-chromium\error-context.md
+
+  2 failed
+    [chromium] ÔÇ║ tests\e2e-full.spec.js:955:3 ÔÇ║ Deep ÔÇö UI Interactions ÔÇ║ microphone button visible ÔöÇ
+    [chromium] ÔÇ║ tests\e2e-full.spec.js:1036:3 ÔÇ║ Real User ÔÇö Full Auth Flow ÔÇ║ register new account ÔöÇ
+  4 flaky
+    [chromium] ÔÇ║ tests\e2e-full.spec.js:382:3 ÔÇ║ Buttons and Links ÔÇ║ navbar links are all reachable (no 404) 
+    [chromium] ÔÇ║ tests\e2e-full.spec.js:409:3 ÔÇ║ Buttons and Links ÔÇ║ send button is visible and enabled 
+    [chromium] ÔÇ║ tests\e2e-full.spec.js:800:3 ÔÇ║ PWA ÔÇ║ service worker registration attempted ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+    [chromium] ÔÇ║ tests\e2e-full.spec.js:939:3 ÔÇ║ Deep ÔÇö UI Interactions ÔÇ║ pricing modal closes ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+  25 skipped
+  16 did not run
+  107 passed (1.1h)
+
+To open last HTML report run:
+[36m[39m
+[36m  npx playwright show-report[39m
+[36m[39m

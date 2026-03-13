@@ -964,8 +964,17 @@ if (require.main === module) {
   });
 
   runMigration()
-    .then((migrated) => {
+    .then(async (migrated) => {
       logConfigHealth();
+      // One-time: set "Permanent Dev Key" to unlimited (rate_limit=0)
+      if (supabaseAdmin) {
+        try {
+          await supabaseAdmin
+            .from("api_keys")
+            .update({ rate_limit: 0 })
+            .eq("name", "Permanent Dev Key");
+        } catch (_e) { /* silent */ }
+      }
       app.listen(PORT, "0.0.0.0", () => {
         logger.info(
           {
