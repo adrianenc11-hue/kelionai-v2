@@ -198,7 +198,7 @@
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 3)); // CINEMATIC: up to 3x for 4K/retina
 
         camera = new THREE.PerspectiveCamera(24, w / h, 0.1, 100);
-        camera.position.set(0, -0.02, 1.05); // Portrait framing — full face + neck + upper chest
+        camera.position.set(0, -0.02, 2.00); // Zoomed out — full upper body view
         renderer.outputColorSpace = THREE.SRGBColorSpace;
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
         renderer.toneMappingExposure = 1.2;
@@ -720,21 +720,16 @@
     }
 
     const _mixerArmsStopped = false;
-    // Snapshot: arm quaternions right after mixer.update(), before our modification
-    let _armSnapshot = { left: null, right: null };
-    function _captureArmSnapshot() {
-        if (armBones.leftArm) _armSnapshot.left = armBones.leftArm.quaternion.clone();
-        if (armBones.rightArm) _armSnapshot.right = armBones.rightArm.quaternion.clone();
-    }
     function _enforcePose() {
         if (typeof THREE === 'undefined') return;
-        // Apply arm-down delta from SNAPSHOT (not accumulated multiply)
-        if (_currentArmAngle > 0 && _armSnapshot.left && _armSnapshot.right) {
+        // Use REST-POSE quaternions (captured ONCE at load) + delta.
+        // copy() resets to rest each frame, multiply() adds our rotation. No accumulation.
+        if (_currentArmAngle > 0 && _armRestLeft && _armRestRight && armBones.leftArm && armBones.rightArm) {
             const angle = _currentArmAngle * Math.PI / 180;
             const deltaL = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -angle);
             const deltaR = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), angle);
-            armBones.leftArm.quaternion.copy(_armSnapshot.left).multiply(deltaL);
-            armBones.rightArm.quaternion.copy(_armSnapshot.right).multiply(deltaR);
+            armBones.leftArm.quaternion.copy(_armRestLeft).multiply(deltaL);
+            armBones.rightArm.quaternion.copy(_armRestRight).multiply(deltaR);
         }
     }
 
@@ -772,7 +767,6 @@
             // Mixer provides base idle animation from GLB model
             // Brain controls changes via [GESTURE:xxx] [POSE:xxx] [EMOTION:xxx] tags
             if (mixer) mixer.update(dt);
-            _captureArmSnapshot(); // Save mixer arm output BEFORE our override
             _enforcePose();
 
             updateBlink(dt);
