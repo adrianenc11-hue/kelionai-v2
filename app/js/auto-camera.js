@@ -1,7 +1,8 @@
 // ═══════════════════════════════════════════════════════════════
 // KelionAI — Auto-Camera Vision
 // Captures camera frame automatically with each chat message
-// So Kelion can always "see" the user
+// So Kelion can always "see" the user (especially for blind users!)
+// Button is in index.html — this module handles the camera logic
 // ═══════════════════════════════════════════════════════════════
 (function () {
     'use strict';
@@ -12,16 +13,15 @@
     let _enabled = false;
     let _permissionGranted = false;
 
-    const CAPTURE_WIDTH = 640;   // Resolution - enough for Gemini, not too heavy
+    const CAPTURE_WIDTH = 640;
     const CAPTURE_HEIGHT = 480;
-    const JPEG_QUALITY = 0.6;     // Lower quality = smaller payload = faster
+    const JPEG_QUALITY = 0.6;
 
     /**
-     * Initialize the auto-camera system
-     * Creates hidden video + canvas elements
+     * Initialize hidden video + canvas elements
      */
     function init() {
-        if (_video) return; // Already initialized
+        if (_video) return;
 
         _video = document.createElement('video');
         _video.setAttribute('autoplay', '');
@@ -36,12 +36,11 @@
         _canvas.style.display = 'none';
         document.body.appendChild(_canvas);
 
-        console.log('[AutoCamera] Initialized (hidden video + canvas)');
+        console.log('[AutoCamera] Initialized');
     }
 
     /**
      * Request camera permission and start stream
-     * Returns true if permission granted
      */
     async function requestPermission() {
         if (_permissionGranted && _stream) return true;
@@ -60,7 +59,7 @@
             await _video.play();
             _permissionGranted = true;
             _enabled = true;
-            console.log('[AutoCamera] ✅ Permission granted — auto-vision active');
+            console.log('[AutoCamera] ✅ Camera active');
             return true;
         } catch (e) {
             console.warn('[AutoCamera] ❌ Permission denied:', e.message);
@@ -71,23 +70,18 @@
     }
 
     /**
-     * Capture a single frame from the camera
-     * Returns { base64, mimeType } or null if not available
+     * Capture a single frame (photo)
      */
     function captureFrame() {
         if (!_enabled || !_stream || !_video || !_canvas) return null;
-        if (_video.readyState < 2) return null; // Not ready
+        if (_video.readyState < 2) return null;
 
         try {
             const ctx = _canvas.getContext('2d');
             ctx.drawImage(_video, 0, 0, CAPTURE_WIDTH, CAPTURE_HEIGHT);
             const dataUrl = _canvas.toDataURL('image/jpeg', JPEG_QUALITY);
-            // Extract pure base64 (remove "data:image/jpeg;base64," prefix)
             const base64 = dataUrl.split(',')[1];
-            return {
-                base64: base64,
-                mimeType: 'image/jpeg'
-            };
+            return { base64, mimeType: 'image/jpeg' };
         } catch (e) {
             console.warn('[AutoCamera] Capture failed:', e.message);
             return null;
@@ -114,8 +108,7 @@
             stop();
             return false;
         } else {
-            const ok = await requestPermission();
-            return ok;
+            return await requestPermission();
         }
     }
 
@@ -126,7 +119,7 @@
         return _enabled && _permissionGranted && !!_stream;
     }
 
-    // Auto-init on load (but don't request permission yet — user must opt-in)
+    // Auto-init on load (just hidden elements, button is in HTML)
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);
     } else {

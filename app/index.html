@@ -850,28 +850,60 @@
             });
         }
     </script>
-    <!-- Theme Toggle -->
-    <button class="theme-toggle" id="theme-toggle" title="Toggle dark/light theme" aria-label="Toggle theme">
+    <!-- Theme Toggle (hidden — replaced by camera) -->
+    <button class="theme-toggle" id="theme-toggle" style="display:none!important" title="Toggle dark/light theme" aria-hidden="true">
         <span id="theme-icon">☀️</span>
+    </button>
+    <!-- Camera Toggle — replaces dark mode button position -->
+    <button class="theme-toggle" id="camera-toggle"
+        title="Activează camera — Kelion te vede"
+        aria-label="Activează camera pentru ca Kelion să te vadă. Apasă pentru a porni sau opri camera."
+        role="button"
+        aria-pressed="false">
+        <span id="camera-icon" aria-hidden="true">👁️</span>
     </button>
     <script>
         (function() {
-            var toggle = document.getElementById('theme-toggle');
-            var icon = document.getElementById('theme-icon');
+            // Theme toggle (keep working in background)
             var html = document.documentElement;
-            function updateIcon() {
-                var current = html.getAttribute('data-theme') || 'dark';
-                icon.textContent = current === 'dark' ? '☀️' : '🌙';
+            // Camera toggle
+            var camBtn = document.getElementById('camera-toggle');
+            var camIcon = document.getElementById('camera-icon');
+            var camActive = false;
+
+            function announce(msg) {
+                // Screen reader announcement
+                var live = document.getElementById('sr-announce');
+                if (!live) {
+                    live = document.createElement('div');
+                    live.id = 'sr-announce';
+                    live.setAttribute('role', 'status');
+                    live.setAttribute('aria-live', 'polite');
+                    live.style.cssText = 'position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);';
+                    document.body.appendChild(live);
+                }
+                live.textContent = '';
+                setTimeout(function() { live.textContent = msg; }, 100);
             }
-            updateIcon();
-            toggle.addEventListener('click', function() {
-                var current = html.getAttribute('data-theme') || 'dark';
-                var next = current === 'dark' ? 'light' : 'dark';
-                html.setAttribute('data-theme', next);
-                try { localStorage.setItem('kelion_theme', next); } catch(e) {}
-                var meta = document.querySelector('meta[name="theme-color"]');
-                if (meta) meta.content = next === 'dark' ? '#050510' : '#F8F9FC';
-                updateIcon();
+
+            camBtn.addEventListener('click', async function() {
+                if (!window.KAutoCamera) { announce('Camera nu este disponibilă.'); return; }
+                var active = await KAutoCamera.toggle();
+                camActive = active;
+                camBtn.setAttribute('aria-pressed', active ? 'true' : 'false');
+                if (active) {
+                    camIcon.textContent = '👁️‍🗨️';
+                    camBtn.title = 'Camera ACTIVĂ — Kelion te vede! Click pentru a opri.';
+                    camBtn.setAttribute('aria-label', 'Camera activă. Kelion te vede. Apasă pentru a opri camera.');
+                    camBtn.style.boxShadow = '0 0 12px rgba(0,255,100,0.5)';
+                    announce('Camera pornită. Kelion te poate vedea acum.');
+                } else {
+                    camIcon.textContent = '👁️';
+                    camBtn.title = 'Activează camera — Kelion te vede';
+                    camBtn.setAttribute('aria-label', 'Activează camera pentru ca Kelion să te vadă. Apasă pentru a porni camera.');
+                    camBtn.style.boxShadow = '';
+                    announce('Camera oprită.');
+                }
             });
         })();
     </script>
