@@ -661,33 +661,35 @@
         if (document.getElementById('arm-calibrator')) { document.getElementById('arm-calibrator').remove(); }
         const panel = document.createElement('div');
         panel.id = 'arm-calibrator';
-        panel.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);z-index:9999;background:rgba(0,0,0,0.95);border:1px solid #6366f1;border-radius:12px;padding:16px 24px;display:flex;flex-direction:column;align-items:center;gap:6px;font-family:var(--kelion-font);color:#fff;min-width:320px;';
-        function makeSlider(label, id, val, color) {
-            return '<div style="display:flex;align-items:center;gap:8px;width:100%;">' +
-                '<span style="font-size:0.85rem;font-weight:700;color:' + color + ';width:20px;">' + label + '</span>' +
-                '<span style="font-size:0.7rem;color:#666;">-90</span>' +
-                '<input type="range" id="' + id + '" min="-90" max="90" value="' + val + '" style="flex:1;accent-color:' + color + ';">' +
-                '<span style="font-size:0.7rem;color:#666;">90</span>' +
-                '<span id="' + id + '-val" style="font-size:0.9rem;font-weight:700;color:' + color + ';width:45px;text-align:right;">' + val + '°</span>' +
-                '</div>';
+        panel.style.cssText = 'position:fixed;bottom:60px;left:50%;transform:translateX(-50%);z-index:9999;background:rgba(0,0,0,0.95);border:1px solid #6366f1;border-radius:12px;padding:12px 20px;display:flex;flex-direction:column;align-items:center;gap:4px;font-family:var(--kelion-font);color:#fff;min-width:340px;';
+        function row(label, id, val, color) {
+            return '<div style="display:flex;align-items:center;gap:6px;width:100%;"><span style="font-size:0.75rem;font-weight:700;color:' + color + ';width:18px;">' + label + '</span><input type="range" id="' + id + '" min="-90" max="90" value="' + val + '" style="flex:1;accent-color:' + color + ';height:16px;"><span id="' + id + '-v" style="font-size:0.8rem;font-weight:700;color:' + color + ';width:40px;text-align:right;">' + val + '°</span></div>';
         }
-        panel.innerHTML = '<div style="font-size:0.9rem;font-weight:600;">🔧 Calibrare brațe (3 axe)</div>' +
-            makeSlider('X', 'arm-x', _armRotX, '#ef4444') +
-            makeSlider('Y', 'arm-y', _armRotY, '#22c55e') +
-            makeSlider('Z', 'arm-z', _armRotZ, '#3b82f6') +
-            '<div style="font-size:0.7rem;color:#888;">X=sus/jos  Y=twist  Z=față/spate</div>' +
-            '<button id="arm-cal-close" style="margin-top:4px;padding:4px 16px;background:#6366f1;border:none;border-radius:8px;color:#fff;cursor:pointer;font-size:0.8rem;">Închide</button>';
+        panel.innerHTML = '<div style="font-size:0.85rem;font-weight:600;">🔧 Brațe L / R</div>' +
+            '<div style="font-size:0.7rem;color:#f97316;">── Stânga ──</div>' +
+            row('X', 'lx', _armL.x, '#ef4444') + row('Y', 'ly', _armL.y, '#22c55e') + row('Z', 'lz', _armL.z, '#3b82f6') +
+            '<div style="font-size:0.7rem;color:#f97316;">── Dreapta ──</div>' +
+            row('X', 'rx', _armR.x, '#ef4444') + row('Y', 'ry', _armR.y, '#22c55e') + row('Z', 'rz', _armR.z, '#3b82f6') +
+            '<div style="font-size:0.6rem;color:#555;">X=sus/jos Y=twist Z=față/spate</div>' +
+            '<button id="arm-cal-close" style="padding:3px 14px;background:#6366f1;border:none;border-radius:8px;color:#fff;cursor:pointer;font-size:0.75rem;">Închide</button>';
         document.body.appendChild(panel);
-        ['arm-x', 'arm-y', 'arm-z'].forEach(function (id) {
-            document.getElementById(id).addEventListener('input', function () {
+        const lmap = {lx:'x',ly:'y',lz:'z'};
+        ['lx','ly','lz'].forEach(function(id) {
+            document.getElementById(id).addEventListener('input', function() {
                 const v = parseInt(this.value);
-                document.getElementById(id + '-val').textContent = v + '°';
-                if (id === 'arm-x') _armRotX = v;
-                if (id === 'arm-y') _armRotY = v;
-                if (id === 'arm-z') _armRotZ = v;
+                document.getElementById(id + '-v').textContent = v + '°';
+                _armL[lmap[id]] = v;
             });
         });
-        document.getElementById('arm-cal-close').addEventListener('click', function () { panel.remove(); });
+        const rmap = {rx:'x',ry:'y',rz:'z'};
+        ['rx','ry','rz'].forEach(function(id) {
+            document.getElementById(id).addEventListener('input', function() {
+                const v = parseInt(this.value);
+                document.getElementById(id + '-v').textContent = v + '°';
+                _armR[rmap[id]] = v;
+            });
+        });
+        document.getElementById('arm-cal-close').addEventListener('click', function() { panel.remove(); });
     }
 
     // MetaPerson bone quaternions for arm poses
@@ -719,25 +721,30 @@
     }
 
     const _mixerArmsStopped = false;
-    // 3-axis arm rotation (Euler degrees)
-    let _armRotX = 0, _armRotY = 0, _armRotZ = 0;
+    // Independent L/R arm rotation (Euler degrees)
+    const _armL = { x: 27, y: -9, z: -4 }; // LEFT arm defaults (user-calibrated)
+    const _armR = { x: 27, y: -9, z: -4 }; // RIGHT arm defaults (user-calibrated)
 
     function _enforcePose() {
         if (typeof THREE === 'undefined') return;
         if (!_armRestLeft || !_armRestRight || !armBones.leftArm || !armBones.rightArm) return;
-        if (_armRotX === 0 && _armRotY === 0 && _armRotZ === 0) return;
 
-        const rx = _armRotX * Math.PI / 180;
-        const ry = _armRotY * Math.PI / 180;
-        const rz = _armRotZ * Math.PI / 180;
-
-        // Left arm delta (mirrored on Z and Y)
-        const deltaL = new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, -ry, -rz, 'XYZ'));
-        // Right arm delta
-        const deltaR = new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, ry, rz, 'XYZ'));
-
-        armBones.leftArm.quaternion.copy(_armRestLeft).multiply(deltaL);
-        armBones.rightArm.quaternion.copy(_armRestRight).multiply(deltaR);
+        // Left arm
+        if (_armL.x !== 0 || _armL.y !== 0 || _armL.z !== 0) {
+            const rx = _armL.x * Math.PI / 180;
+            const ry = _armL.y * Math.PI / 180;
+            const rz = _armL.z * Math.PI / 180;
+            const deltaL = new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, -ry, -rz, 'XYZ'));
+            armBones.leftArm.quaternion.copy(_armRestLeft).multiply(deltaL);
+        }
+        // Right arm
+        if (_armR.x !== 0 || _armR.y !== 0 || _armR.z !== 0) {
+            const rx = _armR.x * Math.PI / 180;
+            const ry = _armR.y * Math.PI / 180;
+            const rz = _armR.z * Math.PI / 180;
+            const deltaR = new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, ry, rz, 'XYZ'));
+            armBones.rightArm.quaternion.copy(_armRestRight).multiply(deltaR);
+        }
     }
 
     function updateExpression(dt) {
