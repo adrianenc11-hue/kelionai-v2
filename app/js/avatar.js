@@ -658,31 +658,36 @@
 
     // ── CALIBRATION SLIDER UI ──────────────────────────────
     function showArmCalibrator() {
-        if (document.getElementById('arm-calibrator')) return;
+        if (document.getElementById('arm-calibrator')) { document.getElementById('arm-calibrator').remove(); }
         const panel = document.createElement('div');
         panel.id = 'arm-calibrator';
-        panel.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);z-index:9999;background:rgba(0,0,0,0.9);border:1px solid #6366f1;border-radius:12px;padding:16px 24px;display:flex;flex-direction:column;align-items:center;gap:8px;font-family:var(--kelion-font);color:#fff;';
-        panel.innerHTML = '<div style="font-size:0.9rem;font-weight:600;">🔧 Calibrare brațe</div>' +
-            '<div style="display:flex;align-items:center;gap:12px;">' +
-            '<span style="font-size:0.75rem;color:#888;">0°</span>' +
-            '<input type="range" id="arm-angle-slider" min="0" max="60" value="' + _currentArmAngle + '" style="width:250px;accent-color:#6366f1;">' +
-            '<span style="font-size:0.75rem;color:#888;">60°</span>' +
-            '</div>' +
-            '<div id="arm-angle-value" style="font-size:1.2rem;font-weight:700;color:#6366f1;">' + _currentArmAngle + '°</div>' +
-            '<div style="font-size:0.7rem;color:#888;">Spune-mi numărul când arată bine!</div>' +
+        panel.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);z-index:9999;background:rgba(0,0,0,0.95);border:1px solid #6366f1;border-radius:12px;padding:16px 24px;display:flex;flex-direction:column;align-items:center;gap:6px;font-family:var(--kelion-font);color:#fff;min-width:320px;';
+        function makeSlider(label, id, val, color) {
+            return '<div style="display:flex;align-items:center;gap:8px;width:100%;">' +
+                '<span style="font-size:0.85rem;font-weight:700;color:' + color + ';width:20px;">' + label + '</span>' +
+                '<span style="font-size:0.7rem;color:#666;">-90</span>' +
+                '<input type="range" id="' + id + '" min="-90" max="90" value="' + val + '" style="flex:1;accent-color:' + color + ';">' +
+                '<span style="font-size:0.7rem;color:#666;">90</span>' +
+                '<span id="' + id + '-val" style="font-size:0.9rem;font-weight:700;color:' + color + ';width:45px;text-align:right;">' + val + '°</span>' +
+                '</div>';
+        }
+        panel.innerHTML = '<div style="font-size:0.9rem;font-weight:600;">🔧 Calibrare brațe (3 axe)</div>' +
+            makeSlider('X', 'arm-x', _armRotX, '#ef4444') +
+            makeSlider('Y', 'arm-y', _armRotY, '#22c55e') +
+            makeSlider('Z', 'arm-z', _armRotZ, '#3b82f6') +
+            '<div style="font-size:0.7rem;color:#888;">X=sus/jos  Y=twist  Z=față/spate</div>' +
             '<button id="arm-cal-close" style="margin-top:4px;padding:4px 16px;background:#6366f1;border:none;border-radius:8px;color:#fff;cursor:pointer;font-size:0.8rem;">Închide</button>';
         document.body.appendChild(panel);
-
-        var slider = document.getElementById('arm-angle-slider');
-        var label = document.getElementById('arm-angle-value');
-        slider.addEventListener('input', function () {
-            var val = parseInt(slider.value);
-            label.textContent = val + '°';
-            _computeArmDownQuaternions(val);
+        ['arm-x', 'arm-y', 'arm-z'].forEach(function (id) {
+            document.getElementById(id).addEventListener('input', function () {
+                const v = parseInt(this.value);
+                document.getElementById(id + '-val').textContent = v + '°';
+                if (id === 'arm-x') _armRotX = v;
+                if (id === 'arm-y') _armRotY = v;
+                if (id === 'arm-z') _armRotZ = v;
+            });
         });
-        document.getElementById('arm-cal-close').addEventListener('click', function () {
-            panel.remove();
-        });
+        document.getElementById('arm-cal-close').addEventListener('click', function () { panel.remove(); });
     }
 
     // MetaPerson bone quaternions for arm poses
@@ -714,17 +719,25 @@
     }
 
     const _mixerArmsStopped = false;
+    // 3-axis arm rotation (Euler degrees)
+    let _armRotX = 0, _armRotY = 0, _armRotZ = 0;
+
     function _enforcePose() {
         if (typeof THREE === 'undefined') return;
-        // Use REST-POSE quaternions (captured ONCE at load) + delta.
-        // copy() resets to rest each frame, multiply() adds our rotation. No accumulation.
-        if (_currentArmAngle > 0 && _armRestLeft && _armRestRight && armBones.leftArm && armBones.rightArm) {
-            const angle = _currentArmAngle * Math.PI / 180;
-            const deltaL = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -angle);
-            const deltaR = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), angle);
-            armBones.leftArm.quaternion.copy(_armRestLeft).multiply(deltaL);
-            armBones.rightArm.quaternion.copy(_armRestRight).multiply(deltaR);
-        }
+        if (!_armRestLeft || !_armRestRight || !armBones.leftArm || !armBones.rightArm) return;
+        if (_armRotX === 0 && _armRotY === 0 && _armRotZ === 0) return;
+
+        const rx = _armRotX * Math.PI / 180;
+        const ry = _armRotY * Math.PI / 180;
+        const rz = _armRotZ * Math.PI / 180;
+
+        // Left arm delta (mirrored on Z and Y)
+        const deltaL = new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, -ry, -rz, 'XYZ'));
+        // Right arm delta
+        const deltaR = new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, ry, rz, 'XYZ'));
+
+        armBones.leftArm.quaternion.copy(_armRestLeft).multiply(deltaL);
+        armBones.rightArm.quaternion.copy(_armRestRight).multiply(deltaR);
     }
 
     function updateExpression(dt) {
