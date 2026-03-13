@@ -92,8 +92,10 @@ const messengerBot = require("./messenger");
 const instagramBot = require("./instagram");
 const tradingRouter = require("./trading");
 const { router: marketplaceRouter } = require("./agent-marketplace");
-const { router: pluginRouter, _restorePlugins } = require("./plugin-system");
+const { router: pluginRouter, restorePlugins: _restorePlugins } = require("./plugin-system");
 const autonomousRunner = require("./autonomous-runner");
+const ollama = require("./ai-providers/ollama");
+const { tenantMiddleware } = require("./middleware/tenant");
 const multimodalRouter = require("./routes/multimodal");
 const browserAgent = require("./browser-agent");
 const sharedSessions = require("./shared-sessions");
@@ -695,6 +697,39 @@ app.use("/api/trading", tradingRouter);
 app.use("/api/marketplace", marketplaceRouter);
 app.use("/api/plugins", pluginRouter);
 app.use("/api/multimodal", multimodalRouter);
+
+// ═══ v3.3 TENANT MIDDLEWARE ═══
+app.use(tenantMiddleware);
+
+// ═══ v3.4 OLLAMA / LOCAL AI ROUTES ═══
+app.get("/api/admin/models", adminAuth, async (_req, res) => {
+  const available = await ollama.checkStatus();
+  const models = available ? await ollama.listModels() : { models: [] };
+  res.json({ available, ...models });
+});
+app.post("/api/admin/models/pull", adminAuth, express.json(), async (req, res) => {
+  const result = await ollama.pullModel(req.body.model);
+  res.json(result);
+});
+app.post("/api/admin/models/delete", adminAuth, express.json(), async (req, res) => {
+  const result = await ollama.deleteModel(req.body.model);
+  res.json(result);
+});
+app.post("/api/admin/models/test", adminAuth, express.json(), async (req, res) => {
+  const result = await ollama.chat(req.body.prompt || "Hello", { model: req.body.model });
+  res.json(result);
+});
+app.get("/api/ai/status", async (_req, res) => {
+  const localAvailable = await ollama.checkStatus();
+  res.json({
+    local: { available: localAvailable, provider: "ollama", model: ollama.defaultModel },
+    cloud: { available: true, providers: ["openai", "gemini", "groq"].filter(p => {
+      const keys = { openai: "OPENAI_API_KEY", gemini: "GOOGLE_AI_KEY", groq: "GROQ_API_KEY" };
+      return !!process.env[keys[p]];
+    })},
+    mode: localAvailable ? "hybrid" : "cloud",
+  });
+});
 
 // ═══ AUTONOMOUS TASKS API ═══
 app.post("/api/autonomous/start", express.json(), async (req, res) => {
@@ -1860,6 +1895,11 @@ if (require.main === module) {
     { component: "VoiceStream" },
     "WebSocket voice pipeline mounted on /api/voice-stream",
   );
+
+  // ── Attach Collaboration WebSocket ──
+  const { setupCollaboration } = require("./collaboration");
+  setupCollaboration(server);
+
   setupGracefulShutdown(server);
 
   runMigration()
