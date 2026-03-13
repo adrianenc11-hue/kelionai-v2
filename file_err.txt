@@ -1,0 +1,255 @@
+[2026-03-12T14:23:53.967Z] ═══ TRUTH GUARD — GATE RUNNER ═══
+[2026-03-12T14:23:53.971Z] Commit: local
+[2026-03-12T14:23:53.971Z] Node: v20.11.0
+[2026-03-12T14:23:53.971Z] CWD: C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2
+[2026-03-12T14:23:53.971Z] 
+════ GATE: Prettier (format check) ════
+[2026-03-12T14:23:53.971Z] Command: npx prettier --check "server/**/*.js"
+[2026-03-12T14:23:57.168Z] y.js
+[[33mwarn[39m] server/k1-messenger-bridge.js
+[[33mwarn[39m] server/k1-meta-learning.js
+[[33mwarn[39m] server/k1-performance.js
+[[33mwarn[39m] server/k1-persistence.js
+[[33mwarn[39m] server/k1-truth.js
+[[33mwarn[39m] server/k1-world-state.js
+[[33mwarn[39m] server/kira-tools.js
+[[33mwarn[39m] server/legal.js
+[[33mwarn[39m] server/market-data.js
+[[33mwarn[39m] server/market-learner.js
+[[33mwarn[39m] server/messenger.js
+[[33mwarn[39m] server/middleware/apiKeyAuth.js
+[[33mwarn[39m] server/migrate.js
+[[33mwarn[39m] server/model-watcher.js
+[[33mwarn[39m] server/news.js
+[[33mwarn[39m] server/paper-trading.js
+[[33mwarn[39m] server/payments.js
+[[33mwarn[39m] server/performance-tracker.js
+[[33mwarn[39m] server/persona.js
+[[33mwarn[39m] server/plugin-system.js
+[[33mwarn[39m] server/referral.js
+[[33mwarn[39m] server/routes/admin.js
+[[33mwarn[39m] server/routes/auth.js
+[[33mwarn[39m] server/routes/brain-chat.js
+[[33mwarn[39m] server/routes/chat.js
+[[33mwarn[39m] server/routes/developer.js
+[[33mwarn[39m] server/routes/export.js
+[[33mwarn[39m] server/routes/health.js
+[[33mwarn[39m] server/routes/identity.js
+[[33mwarn[39m] server/routes/images.js
+[[33mwarn[39m] server/routes/multimodal.js
+[[33mwarn[39m] server/routes/search.js
+[[33mwarn[39m] server/routes/vision.js
+[[33mwarn[39m] server/routes/voice-clone.js
+[[33mwarn[39m] server/routes/voice-stream.js
+[[33mwarn[39m] server/routes/voice.js
+[[33mwarn[39m] server/routes/weather.js
+[[33mwarn[39m] server/scalability.js
+[[33mwarn[39m] server/shared-sessions.js
+[[33mwarn[39m] server/startup-checks.js
+[[33mwarn[39m] server/telegram.js
+[[33mwarn[39m] server/trade-executor.js
+[[33mwarn[39m] server/trade-persistence.js
+[[33mwarn[39m] server/trading-learner.js
+[[33mwarn[39m] server/trading.js
+[[33mwarn[39m] server/whatsapp.js
+[[33mwarn[39m] server/ws-engine.js
+[[33mwarn[39m] Code style issues found in 66 files. Run Prettier with --write to fix.
+y.js
+[[33mwarn[39m] server/k1-messenger-bridge.js
+[[33mwarn[39m] server/k1-meta-learning.js
+[[33mwarn[39m] server/k1-performance.js
+[[33mwarn[39m] server/k1-persistence.js
+[[33mwarn[39m] server/k1-truth.js
+[[33mwarn[39m] server/k1-world-state.js
+[[33mwarn[39m] server/kira-tools.js
+[[33mwarn[39m] server/legal.js
+[[33mwarn[39m] server/market-data.js
+[[33mwarn[39m] server/market-learner.js
+[[33mwarn[39m] server/messenger.js
+[[33mwarn[39m] server/middleware/apiKeyAuth.js
+[[33mwarn[39m] server/migrate.js
+[[33mwarn[39m] server/model-watcher.js
+[[33mwarn[39m] server/news.js
+[[33mwarn[39m] server/paper-trading.js
+[[33mwarn[39m] server/payments.js
+[[33mwarn[39m] server/performance-tracker.js
+[[33mwarn[39m] server/persona.js
+[[33mwarn[39m] server/plugin-system.js
+[[33mwarn[39m] server/referral.js
+[[33mwarn[39m] server/routes/admin.js
+[[33mwarn[39m] server/routes/auth.js
+[[33mwarn[39m] server/routes/brain-chat.js
+[[33mwarn[39m] server/routes/chat.js
+[[33mwarn[39m] server/routes/developer.js
+[[33mwarn[39m] server/routes/export.js
+[[33mwarn[39m] server/routes/health.js
+[[33mwarn[39m] server/routes/identity.js
+[[33mwarn[39m] server/routes/images.js
+[[33mwarn[39m] server/routes/multimodal.js
+[[33mwarn[39m] server/routes/search.js
+[[33mwarn[39m] server/routes/vision.js
+[[33mwarn[39m] server/routes/voice-clone.js
+[[33mwarn[39m] server/routes/voice-stream.js
+[[33mwarn[39m] server/routes/voice.js
+[[33mwarn[39m] server/routes/weather.js
+[[33mwarn[39m] server/scalability.js
+[[33mwarn[39m] server/shared-sessions.js
+[[33mwarn[39m] server/startup-checks.js
+[[33mwarn[39m] server/telegram.js
+[[33mwarn[39m] server/trade-executor.js
+[[33mwarn[39m] server/trade-persistence.js
+[[33mwarn[39m] server/trading-learner.js
+[[33mwarn[39m] server/trading.js
+[[33mwarn[39m] server/whatsapp.js
+[[33mwarn[39m] server/ws-engine.js
+[[33mwarn[39m] Code style issues found in 66 files. Run Prettier with --write to fix.
+[2026-03-12T14:23:57.170Z] ❌ Prettier (format check) FAILED (3197ms, exit 1)
+[2026-03-12T14:23:57.171Z] 
+════ GATE: Lint (ESLint) ════
+[2026-03-12T14:23:57.171Z] Command: npx eslint server/
+[2026-03-12T14:23:59.973Z]       no-empty
+  3355:13  warning  Empty block statement                                                               no-empty
+  3372:13  warning  Empty block statement                                                               no-empty
+  3399:11  warning  Empty block statement                                                               no-empty
+  3407:11  warning  Empty block statement                                                               no-empty
+
+C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2\server\whatsapp.js
+   172:7   warning  'knownUsers' is assigned a value but never used. Allowed unused vars must match /^_/u  no-unused-vars
+   921:24  warning  'e' is defined but never used                                                          no-unused-vars
+   946:26  warning  'e' is defined but never used                                                          no-unused-vars
+   971:19  warning  Empty block statement                                                                  no-empty
+  1021:19  warning  Empty block statement                                                                  no-empty
+  1078:22  warning  'e' is defined but never used                                                          no-unused-vars
+
+C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2\server\ws-engine.js
+  141:22  warning  'err' is defined but never used                                             no-unused-vars
+  253:30  warning  'e' is defined but never used                                               no-unused-vars
+  317:26  warning  'e' is defined but never used                                               no-unused-vars
+  369:20  warning  'asset' is defined but never used. Allowed unused args must match /^_/u     no-unused-vars
+  369:27  warning  'candle1m' is defined but never used. Allowed unused args must match /^_/u  no-unused-vars
+
+✖ 178 problems (0 errors, 178 warnings)
+  0 errors and 21 warnings potentially fixable with the `--fix` option.
+      no-empty
+  3355:13  warning  Empty block statement                                                               no-empty
+  3372:13  warning  Empty block statement                                                               no-empty
+  3399:11  warning  Empty block statement                                                               no-empty
+  3407:11  warning  Empty block statement                                                               no-empty
+
+C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2\server\whatsapp.js
+   172:7   warning  'knownUsers' is assigned a value but never used. Allowed unused vars must match /^_/u  no-unused-vars
+   921:24  warning  'e' is defined but never used                                                          no-unused-vars
+   946:26  warning  'e' is defined but never used                                                          no-unused-vars
+   971:19  warning  Empty block statement                                                                  no-empty
+  1021:19  warning  Empty block statement                                                                  no-empty
+  1078:22  warning  'e' is defined but never used                                                          no-unused-vars
+
+C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2\server\ws-engine.js
+  141:22  warning  'err' is defined but never used                                             no-unused-vars
+  253:30  warning  'e' is defined but never used                                               no-unused-vars
+  317:26  warning  'e' is defined but never used                                               no-unused-vars
+  369:20  warning  'asset' is defined but never used. Allowed unused args must match /^_/u     no-unused-vars
+  369:27  warning  'candle1m' is defined but never used. Allowed unused args must match /^_/u  no-unused-vars
+
+✖ 178 problems (0 errors, 178 warnings)
+  0 errors and 21 warnings potentially fixable with the `--fix` option.
+[2026-03-12T14:23:59.974Z] ✅ Lint (ESLint) PASSED (2802ms)
+[2026-03-12T14:23:59.977Z] 
+════ GATE: Typecheck ════
+[2026-03-12T14:23:59.978Z] Command: npm run typecheck --silent
+[2026-03-12T14:24:00.776Z] typecheck: N/A (JS-only project)
+typecheck: N/A (JS-only project)
+[2026-03-12T14:24:00.776Z] ✅ Typecheck PASSED (797ms)
+[2026-03-12T14:24:00.776Z] 
+════ GATE: Unit Tests (Jest) ════
+[2026-03-12T14:24:00.777Z] Command: npx jest --forceExit --silent
+[2026-03-12T14:24:44.302Z]  (C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2\node_modules\jest-util\build\index.js:504:62)
+    at Object.set [as version] (C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2\node_modules\jest-util\build\index.js:514:14)
+    at Reflect.set (<anonymous>)
+    at originalSetter (C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2\node_modules\jest-util\build\index.js:504:62)
+    at Object.set [as version] (C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2\node_modules\jest-util\build\index.js:514:14)
+    at Reflect.set (<anonymous>)
+    at originalSetter (C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2\node_modules\jest-util\build\index.js:504:62)
+    at Object.set [as version] (C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2\node_modules\jest-util\build\index.js:514:14)
+    at Reflect.set (<anonymous>)
+    at originalSetter (C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2\node_modules\jest-util\build\index.js:504:62)
+    at Object.set [as version] (C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2\node_modules\jest-util\build\index.js:514:14)
+    at Reflect.set (<anonymous>)
+    at originalSetter (C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2\node_modules\jest-util\build\index.js:504:62)
+    at Object.set [as version] (C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2\node_modules\jest-util\build\index.js:514:14)
+    at Reflect.set (<anonymous>)
+
+Node.js v20.11.0
+A worker process has failed to exit gracefully and has been force exited. This is likely caused by tests leaking due to improper teardown. Try running with --detectOpenHandles to find leaks. Active timers can also cause this, ensure that .unref() was called on them.
+Test Suites: 5 failed, 6 passed, 11 total
+Tests:       12 failed, 226 passed, 238 total
+Snapshots:   0 total
+Time:        41.965 s
+Force exiting Jest: Have you considered using `--detectOpenHandles` to detect async operations that kept running after all tests finished?
+ (C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2\node_modules\jest-util\build\index.js:504:62)
+    at Object.set [as version] (C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2\node_modules\jest-util\build\index.js:514:14)
+    at Reflect.set (<anonymous>)
+    at originalSetter (C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2\node_modules\jest-util\build\index.js:504:62)
+    at Object.set [as version] (C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2\node_modules\jest-util\build\index.js:514:14)
+    at Reflect.set (<anonymous>)
+    at originalSetter (C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2\node_modules\jest-util\build\index.js:504:62)
+    at Object.set [as version] (C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2\node_modules\jest-util\build\index.js:514:14)
+    at Reflect.set (<anonymous>)
+    at originalSetter (C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2\node_modules\jest-util\build\index.js:504:62)
+    at Object.set [as version] (C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2\node_modules\jest-util\build\index.js:514:14)
+    at Reflect.set (<anonymous>)
+    at originalSetter (C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2\node_modules\jest-util\build\index.js:504:62)
+    at Object.set [as version] (C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2\node_modules\jest-util\build\index.js:514:14)
+    at Reflect.set (<anonymous>)
+
+Node.js v20.11.0
+A worker process has failed to exit gracefully and has been force exited. This is likely caused by tests leaking due to improper teardown. Try running with --detectOpenHandles to find leaks. Active timers can also cause this, ensure that .unref() was called on them.
+Test Suites: 5 failed, 6 passed, 11 total
+Tests:       12 failed, 226 passed, 238 total
+Snapshots:   0 total
+Time:        41.965 s
+Force exiting Jest: Have you considered using `--detectOpenHandles` to detect async operations that kept running after all tests finished?
+[2026-03-12T14:24:44.302Z] ❌ Unit Tests (Jest) FAILED (43525ms, exit 1)
+[2026-03-12T14:24:44.302Z] 
+════ GATE: Build Validation ════
+[2026-03-12T14:24:44.302Z] Command: npm run build --silent
+[2026-03-12T14:24:45.065Z] Build OK: static assets validated
+Build OK: static assets validated
+[2026-03-12T14:24:45.066Z] ✅ Build Validation PASSED (762ms)
+[2026-03-12T14:24:45.066Z] 
+════ GATE: Security (npm audit) ════
+[2026-03-12T14:24:45.066Z] Command: npm audit --audit-level=high
+[2026-03-12T14:24:46.534Z] # npm audit report
+
+express-rate-limit  8.2.0 - 8.2.1
+Severity: high
+express-rate-limit: IPv4-mapped IPv6 addresses bypass per-client rate limiting on servers with dual-stack network - https://github.com/advisories/GHSA-46wh-pxpv-q5gq
+fix available via `npm audit fix`
+node_modules/express-rate-limit
+
+1 high severity vulnerability
+
+To address all issues, run:
+  npm audit fix
+# npm audit report
+
+express-rate-limit  8.2.0 - 8.2.1
+Severity: high
+express-rate-limit: IPv4-mapped IPv6 addresses bypass per-client rate limiting on servers with dual-stack network - https://github.com/advisories/GHSA-46wh-pxpv-q5gq
+fix available via `npm audit fix`
+node_modules/express-rate-limit
+
+1 high severity vulnerability
+
+To address all issues, run:
+  npm audit fix
+[2026-03-12T14:24:46.535Z] ❌ Security (npm audit) FAILED (1468ms, exit 1)
+[2026-03-12T14:24:46.535Z] 
+════ GATE: Smoke Probe ════
+[2026-03-12T14:24:46.535Z] ⏭️  SKIPPED — no BASE_URL or API_BASE_URL set (local run)
+[2026-03-12T14:24:46.536Z] 
+════ GATE: E2E (Playwright) ════
+[2026-03-12T14:24:46.536Z] ⏭️  SKIPPED — no BASE_URL set (requires Railway preview URL per Truth Guard rules)
+[2026-03-12T14:24:46.536Z] 
+════ GENERATING ARTIFACTS ════
+[2026-03-12T14:24:46.626Z] ✅ gate_report.json written

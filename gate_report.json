@@ -1,63 +1,64 @@
 {
   "version": "1.0",
-  "commit": "ed53137cc652b40597d38ef8333c9d0603c7a615",
+  "commit": "8853db78fd3a45fe23753d2ad30dc0bb7771d23d",
   "branch": "master",
-  "preview_url": "https://kelionai.app",
-  "timestamp": "2026-03-05T11:12:58.632Z",
+  "preview_url": null,
+  "timestamp": "2026-03-12T14:24:46.625Z",
   "node_version": "v20.11.0",
   "overall": "FAIL",
   "gates": [
     {
       "name": "Prettier (format check)",
-      "status": "pass",
-      "duration": 2289,
-      "output": "Checking formatting...\nAll matched files use Prettier code style!"
+      "status": "fail",
+      "duration": 3197,
+      "exitCode": 1,
+      "output": "tes/weather.js\n[\u001b[33mwarn\u001b[39m] server/scalability.js\n[\u001b[33mwarn\u001b[39m] server/shared-sessions.js\n[\u001b[33mwarn\u001b[39m] server/startup-checks.js\n[\u001b[33mwarn\u001b[39m] server/telegram.js\n[\u001b[33mwarn\u001b[39m] server/trade-executor.js\n[\u001b[33mwarn\u001b[39m] server/trade-persistence.js\n[\u001b[33mwarn\u001b[39m] server/trading-learner.js\n[\u001b[33mwarn\u001b[39m] server/trading.js\n[\u001b[33mwarn\u001b[39m] server/whatsapp.js\n[\u001b[33mwarn\u001b[39m] server/ws-engine.js\n[\u001b[33mwarn\u001b[39m] Code style issues found in 66 files. Run Prettier with --write to fix."
     },
     {
       "name": "Lint (ESLint)",
       "status": "pass",
-      "duration": 1430,
-      "output": ""
+      "duration": 2802,
+      "output": "                                           no-unused-vars\n  317:26  warning  'e' is defined but never used                                               no-unused-vars\n  369:20  warning  'asset' is defined but never used. Allowed unused args must match /^_/u     no-unused-vars\n  369:27  warning  'candle1m' is defined but never used. Allowed unused args must match /^_/u  no-unused-vars\n\n✖ 178 problems (0 errors, 178 warnings)\n  0 errors and 21 warnings potentially fixable with the `--fix` option."
     },
     {
       "name": "Typecheck",
       "status": "pass",
-      "duration": 693,
+      "duration": 797,
       "output": "typecheck: N/A (JS-only project)"
     },
     {
       "name": "Unit Tests (Jest)",
-      "status": "pass",
-      "duration": 5284,
-      "output": "-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------\n\n=============================== Coverage summary ===============================\nStatements   : 18.42% ( 1221/6626 )\nBranches     : 11.62% ( 577/4962 )\nFunctions    : 16.23% ( 112/690 )\nLines        : 19% ( 1168/6146 )\n================================================================================"
+      "status": "fail",
+      "duration": 43525,
+      "exitCode": 1,
+      "output": "gracefully and has been force exited. This is likely caused by tests leaking due to improper teardown. Try running with --detectOpenHandles to find leaks. Active timers can also cause this, ensure that .unref() was called on them.\nTest Suites: 5 failed, 6 passed, 11 total\nTests:       12 failed, 226 passed, 238 total\nSnapshots:   0 total\nTime:        41.965 s\nForce exiting Jest: Have you considered using `--detectOpenHandles` to detect async operations that kept running after all tests finished?"
     },
     {
       "name": "Build Validation",
       "status": "pass",
-      "duration": 689,
+      "duration": 762,
       "output": "Build OK: static assets validated"
     },
     {
       "name": "Security (npm audit)",
-      "status": "pass",
-      "duration": 1100,
-      "output": "found 0 vulnerabilities"
+      "status": "fail",
+      "duration": 1468,
+      "exitCode": 1,
+      "output": "# npm audit report\n\nexpress-rate-limit  8.2.0 - 8.2.1\nSeverity: high\nexpress-rate-limit: IPv4-mapped IPv6 addresses bypass per-client rate limiting on servers with dual-stack network - https://github.com/advisories/GHSA-46wh-pxpv-q5gq\nfix available via `npm audit fix`\nnode_modules/express-rate-limit\n\n1 high severity vulnerability\n\nTo address all issues, run:\n  npm audit fix"
     },
     {
       "name": "Smoke Probe",
-      "status": "pass",
-      "duration": 1041,
-      "output": "🔍 Smoke Probe — https://kelionai.app\n\n✅ /api/payments/plans → 200 [132ms]\n✅ /api/news/public → 200 [256ms]\n✅ /health → 200 [314ms]\n\n3/3 probes passed."
+      "status": "skipped",
+      "reason": "No BASE_URL set"
     },
     {
       "name": "E2E (Playwright)",
-      "status": "fail",
-      "duration": 1500010,
-      "exitCode": null,
-      "output": "ll.spec.js:1013:3 › Deep — API Data Quality › developer v1/status returns real data (51ms)\n  ✓  172 [chromium] › tests\\e2e-full.spec.js:1221:3 › API — Trading › GET /api/trading/status (96ms)\n  ✓  173 [chromium] › tests\\e2e-full.spec.js:1227:3 › API — Trading › GET /api/trading/analysis (30ms)\n  ✓  174 [chromium] › tests\\e2e-full.spec.js:1233:3 › API — Trading › GET /api/trading/signals (55ms)\n  ✓  175 [chromium] › tests\\e2e-full.spec.js:1239:3 › API — Trading › GET /api/trading/portfolio (68ms)"
+      "status": "skipped",
+      "reason": "No BASE_URL set — E2E requires real preview URL"
     }
   ],
   "limitations": [
+    "Smoke + E2E skipped — no BASE_URL (local run only)",
     "Typecheck: N/A (JS-only project)",
     "Lighthouse: not run in CI (no headless Chrome)"
   ]
