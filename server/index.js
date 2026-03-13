@@ -98,6 +98,7 @@ const ollama = require("./ai-providers/ollama");
 const { tenantMiddleware } = require("./middleware/tenant");
 const multimodalRouter = require("./routes/multimodal");
 const browserAgent = require("./browser-agent");
+const quickWins = require("./quick-wins");
 const sharedSessions = require("./shared-sessions");
 
 const app = express();
@@ -730,6 +731,43 @@ app.get("/api/ai/status", async (_req, res) => {
     mode: localAvailable ? "hybrid" : "cloud",
   });
 });
+
+// ═══ QUICK WINS API (Bookmarks, Templates, Webhooks, Rate Limits) ═══
+app.get("/api/bookmarks", async (req, res) => {
+  const user = await getUserFromToken(req).catch(() => null);
+  res.json(quickWins.getBookmarks(user?.id || "anonymous"));
+});
+app.post("/api/bookmarks", express.json(), async (req, res) => {
+  const user = await getUserFromToken(req).catch(() => null);
+  res.json(quickWins.addBookmark(user?.id || "anonymous", req.body));
+});
+app.delete("/api/bookmarks/:id", async (req, res) => {
+  const user = await getUserFromToken(req).catch(() => null);
+  const ok = quickWins.deleteBookmark(user?.id || "anonymous", req.params.id);
+  res.json({ ok });
+});
+
+app.get("/api/templates", (_req, res) => res.json(quickWins.getTemplates()));
+app.get("/api/templates/:id", (req, res) => {
+  const t = quickWins.getTemplate(req.params.id);
+  t ? res.json(t) : res.status(404).json({ error: "Template not found" });
+});
+app.post("/api/templates", adminAuth, express.json(), (req, res) => {
+  res.json(quickWins.createTemplate(req.body));
+});
+app.delete("/api/templates/:id", adminAuth, (req, res) => {
+  res.json({ ok: quickWins.deleteTemplate(req.params.id) });
+});
+
+app.get("/api/webhooks", adminAuth, (_req, res) => res.json(quickWins.getWebhooks()));
+app.post("/api/webhooks", adminAuth, express.json(), (req, res) => {
+  res.json(quickWins.registerWebhook(req.body));
+});
+app.delete("/api/webhooks/:id", adminAuth, (req, res) => {
+  res.json({ ok: quickWins.deleteWebhook(req.params.id) });
+});
+
+app.get("/api/rate-limits", adminAuth, (_req, res) => res.json(quickWins.getRateLimitStats()));
 
 // ═══ AUTONOMOUS TASKS API ═══
 app.post("/api/autonomous/start", express.json(), async (req, res) => {
