@@ -722,28 +722,9 @@
     let _mixerArmsStopped = false;
     function _enforcePose() {
         if (typeof THREE === 'undefined') return;
-
-        // Stop mixer from animating arm/shoulder bones (one-time)
-        if (!_mixerArmsStopped && mixer && mixer._actions) {
-            mixer._actions.forEach(function (action) {
-                if (!action || !action._clip) return;
-                const clip = action._clip;
-                const tracksToRemove = [];
-                clip.tracks.forEach(function (track, idx) {
-                    const tn = track.name.toLowerCase();
-                    if (tn.indexOf('shoulder') !== -1 || tn.indexOf('leftarm') !== -1 || tn.indexOf('rightarm') !== -1 ||
-                        tn.indexOf('left_arm') !== -1 || tn.indexOf('right_arm') !== -1 ||
-                        tn.indexOf('forearm') !== -1 || tn.indexOf('hand') !== -1) {
-                        tracksToRemove.push(idx);
-                    }
-                });
-                for (let i = tracksToRemove.length - 1; i >= 0; i--) {
-                    clip.tracks.splice(tracksToRemove[i], 1);
-                }
-            });
-            _mixerArmsStopped = true;
-            console.log('[Avatar] Stopped mixer arm/shoulder tracks');
-        }
+        // ARM OVERRIDE DISABLED — model's idle animation handles arms correctly.
+        // Our bone rotation was deforming mesh and making shoulders disappear.
+        // Calibration slider remains available via KAvatar.showArmCalibrator() for future models.
 
         // Apply computed arms-down quaternions (dynamic, model-agnostic)
         if (_computedArmDown) {
@@ -1298,6 +1279,28 @@
                 scene.background = scene._savedBg;
                 console.log('[Avatar] Background ON (texture)');
             }
+        },
+        setZoom: function (z) {
+            if (!camera) return;
+            camera.position.z = z;
+            console.log('[Avatar] Zoom:', z);
+        },
+        showZoomCalibrator: function () {
+            if (document.getElementById('zoom-calibrator')) return;
+            const p = document.createElement('div');
+            p.id = 'zoom-calibrator';
+            p.style.cssText = 'position:fixed;top:80px;right:20px;z-index:9999;background:rgba(0,0,0,0.9);border:1px solid #6366f1;border-radius:12px;padding:16px 20px;display:flex;flex-direction:column;align-items:center;gap:8px;font-family:var(--kelion-font);color:#fff;';
+            const curZ = camera ? camera.position.z : 1.05;
+            p.innerHTML = '<div style="font-size:0.9rem;font-weight:600;">🔍 Zoom cameră</div>' +
+                '<input type="range" id="zoom-slider" min="50" max="200" value="' + Math.round(curZ * 100) + '" style="width:200px;accent-color:#6366f1;">' +
+                '<div id="zoom-value" style="font-size:1.2rem;font-weight:700;color:#6366f1;">' + curZ.toFixed(2) + '</div>' +
+                '<button onclick="this.parentElement.remove()" style="padding:4px 16px;background:#6366f1;border:none;border-radius:8px;color:#fff;cursor:pointer;font-size:0.8rem;">Închide</button>';
+            document.body.appendChild(p);
+            document.getElementById('zoom-slider').addEventListener('input', function () {
+                const z = parseInt(this.value) / 100;
+                document.getElementById('zoom-value').textContent = z.toFixed(2);
+                if (camera) camera.position.z = z;
+            });
         },
         getLipSync: function () { return lipSync; },
         getTextLipSync: function () { return textLipSync; },
