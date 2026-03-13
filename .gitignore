@@ -3,12 +3,12 @@ node_modules/
 # ═══ SECRETS — NEVER COMMIT ═══
 .env
 .env.*
+!.env.example
 .env.local
 .env.production
 .env.backup*
 .env.railway*
 *.railway.json
-.env.railway.json
 
 # Test artifacts
 test-results/
