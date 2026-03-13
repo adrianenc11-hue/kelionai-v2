@@ -2,6 +2,7 @@
     'use strict';
     const API = window.location.origin;
     let currentUser = null;
+    let _sessionChecked = false; // gate auto-enter until checkSession completes
 
     function saveSession(s, u) { if (s) { sessionStorage.setItem('kelion_token', s.access_token); if (s.refresh_token) sessionStorage.setItem('kelion_refresh_token', s.refresh_token); if (s.expires_at) sessionStorage.setItem('kelion_token_expires', s.expires_at); } if (u) sessionStorage.setItem('kelion_user', JSON.stringify(u)); }
     function loadSession() { const t = sessionStorage.getItem('kelion_token'), u = sessionStorage.getItem('kelion_user'); if (t && u) { try { currentUser = JSON.parse(u); } catch (_e) { /* ignored */ } } return { token: t, user: currentUser }; }
@@ -173,19 +174,24 @@
             }
         });
         // Auto-enter when both avatars are 100% loaded (or 10s max)
+        // GATE: only auto-enter AFTER checkSession has resolved, to prevent bounce
         window.addEventListener('avatars-ready', function () {
-            console.log('[Auth] Avatars ready — auto-entering app');
+            console.log('[Auth] Avatars ready');
             if (startBtn) {
                 const loadIcon = document.getElementById('loading-icon');
                 if (loadIcon) loadIcon.style.animation = 'none';
                 startBtn.innerHTML = '▶ START';
             }
-            if (!scr.classList.contains('hidden')) enterApp();
+            // Only auto-enter if session check is done AND no logged-in user (guest mode)
+            // If user is logged in, init() already handled the transition
+            if (_sessionChecked && !currentUser && !scr.classList.contains('hidden')) {
+                enterApp();
+            }
         });
         // Fallback: enter after 10s max even if avatars not loaded
         setTimeout(function () {
-            if (!scr.classList.contains('hidden')) {
-                console.log('[Auth] 10s timeout — entering app');
+            if (_sessionChecked && !currentUser && !scr.classList.contains('hidden')) {
+                console.log('[Auth] 10s timeout — entering app as guest');
                 enterApp();
             }
         }, 10000);
@@ -276,8 +282,17 @@
         }
 
         const u = await checkSession();
-        if (u) { document.getElementById('auth-screen')?.classList.add('hidden'); document.getElementById('app-layout')?.classList.remove('hidden'); updateUI(); }
-        else { document.getElementById('auth-screen')?.classList.remove('hidden'); document.getElementById('app-layout')?.classList.add('hidden'); updateUI(); }
+        _sessionChecked = true; // signal to auto-enter handlers that session is resolved
+        if (u) {
+            document.getElementById('auth-screen')?.classList.add('hidden');
+            document.getElementById('app-layout')?.classList.remove('hidden');
+            updateUI();
+            if (window.KApp) KApp.loadConversations();
+        } else {
+            document.getElementById('auth-screen')?.classList.remove('hidden');
+            document.getElementById('app-layout')?.classList.add('hidden');
+            updateUI();
+        }
         const params = new URLSearchParams(window.location.search);
         const inviteCode = params.get('invite');
         if (inviteCode && /^KEL-[0-9a-fA-F]{4}-[0-9a-fA-F]{6}-[A-Z0-9]{10}$/i.test(inviteCode)) {
