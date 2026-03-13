@@ -2902,7 +2902,7 @@ async function thinkV4(
 
     // ── 5. Prepare messages for Gemini ──
     // Compress history to last 20 messages max
-    const recentHistory = (history || []).slice(-50).map((h) => ({
+    const recentHistory = (history || []).slice(-20).map((h) => ({
       role: h.role === "user" ? "user" : "model",
       parts: [
         {
