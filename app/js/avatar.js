@@ -1288,6 +1288,17 @@
         findArmBones: findArmBones,
         showArmCalibrator: showArmCalibrator,
         setArmAngle: function (deg) { _computeArmDownQuaternions(deg); },
+        toggleBackground: function () {
+            if (!scene) return;
+            if (scene.background && scene.background.isTexture) {
+                scene._savedBg = scene.background;
+                scene.background = new THREE.Color(0x111111);
+                console.log('[Avatar] Background OFF (solid dark)');
+            } else if (scene._savedBg) {
+                scene.background = scene._savedBg;
+                console.log('[Avatar] Background ON (texture)');
+            }
+        },
         getLipSync: function () { return lipSync; },
         getTextLipSync: function () { return textLipSync; },
         getMorphMeshes: function () { return morphMeshes; },
