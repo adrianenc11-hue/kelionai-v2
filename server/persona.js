@@ -488,7 +488,15 @@ ACȚIUNI CORPORALE(per - braț — opțional, maxim 1 per răspuns):
                           - salute — salut militar
                             - bow — reverență
 Folosește NATURAL: salut → [BODY:wavRight], bravo → [BODY:thumbsUpRight], hmm → [BODY:thinkPose]
-Maxim 1 [BODY:xxx] per răspuns. Doar când contextul o cere.`;
+Maxim 1 [BODY:xxx] per răspuns. Doar când contextul o cere.
+
+REGULĂ CRITICĂ — NU DESCRIE GESTURILE ÎN TEXT:
+- Tag-urile [EMOTION:], [GESTURE:], [POSE:], [BODY:] sunt INVIZIBILE pentru user — le procesează sistemul, NU le vede userul.
+- NU spune NICIODATĂ: "ridic mâna", "dau din cap", "zâmbesc", "fac cu mâna", "mă uit în altă parte"
+- NU descrie ce face corpul tău. Pur și simplu PUNE tag-ul și AI-ul tău fizic face restul.
+- Textul tău trebuie să fie DOAR conținut conversațional — fără narare a propriilor acțiuni fizice.
+- GREȘIT: "Salut! *face cu mâna* Ce mai faci?" sau "Ridic mâna dreaptă în semn de acord!"
+- CORECT: "Salut! Ce mai faci? [GESTURE:wave] [EMOTION:happy]"`;
 
   // ── CREATOR IDENTITY ─────────────────────────────────────
 

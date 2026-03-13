@@ -68,9 +68,9 @@ body {
 
 /* ─── RIGHT PANEL: Avatar (35%) ── */
 #left-panel {
-    width: 35%;
+    width: 45%;
     min-width: 280px;
-    max-width: 420px;
+    max-width: 560px;
     flex-shrink: 0;
     height: 100%;
     display: flex;
