@@ -177,11 +177,18 @@
             try { history.pushState({ kelionApp: true }, '', '/'); } catch(_e) { /* ignored */ }
         }
         if (startBtn) startBtn.addEventListener('click', enterApp);
-        // Admin button → navigate to admin panel
+        // Admin button → fetch admin secret via JWT, then navigate to admin panel
         const adminBtn = document.getElementById('btn-admin');
-        if (adminBtn) adminBtn.addEventListener('click', function () {
-            // Admin auto-unlocked — direct navigate
+        if (adminBtn) adminBtn.addEventListener('click', async function () {
+            // Admin auto-unlocked — fetch secret via JWT before navigating
             if (adminBtn.dataset.locked === 'false') {
+                try {
+                    const r = await fetch(API + '/api/admin/auth-token', { headers: getAuthHeaders() });
+                    if (r.ok) {
+                        const d = await r.json();
+                        if (d.secret) sessionStorage.setItem('kelion_admin_secret', d.secret);
+                    }
+                } catch (_e) { /* navigate anyway, admin-app.js has fallback */ }
                 window.location.href = '/admin';
             }
         });

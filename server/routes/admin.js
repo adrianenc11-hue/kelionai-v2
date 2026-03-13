@@ -102,6 +102,26 @@ router.post("/verify-code", express.json(), (req, res) => {
   return res.status(404).json({ error: "Invalid code" });
 });
 
+// ── GET /api/admin/auth-token — issue admin secret for JWT-authenticated admin ──
+router.get("/auth-token", async (req, res) => {
+  try {
+    const { getUserFromToken } = req.app.locals;
+    const user = await getUserFromToken(req);
+    if (!user) return res.status(401).json({ error: "Not authenticated" });
+    const adminEmail = (process.env.ADMIN_EMAIL || "adrianenc11@gmail.com").toLowerCase();
+    if (user.email?.toLowerCase() !== adminEmail) {
+      return res.status(403).json({ error: "Not admin" });
+    }
+    const secret = (process.env.ADMIN_SECRET_KEY || "").trim();
+    if (!secret) return res.status(500).json({ error: "Admin secret not configured" });
+    logger.info({ component: "Admin" }, "Admin secret issued via JWT for " + user.email);
+    return res.json({ secret });
+  } catch (e) {
+    logger.warn({ component: "Admin", err: e.message }, "auth-token error");
+    return res.status(500).json({ error: "Auth error" });
+  }
+});
+
 // ── Public: User Feedback (no admin required) ──
 router.post("/feedback", (req, res) => {
   const entry = sprint2.recordFeedback({ userId: req.body.userId, messageId: req.body.messageId, type: req.body.type, comment: req.body.comment, avatar: req.body.avatar });
