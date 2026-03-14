@@ -149,6 +149,7 @@ async function scrapeUrl(url) {
       process.env.HOST_IP ||
       process.env.HOST_IP ||
       process.env.HOST_IP ||
+      process.env.HOST_IP ||
       '127.0.0.1' ||
       host.startsWith('192.168.') ||
       host.startsWith('10.') ||
@@ -428,6 +429,7 @@ async function deepBrowse(url, options = {}) {
       [
         'localhost',
         process.env.HOST_IP ||
+          process.env.HOST_IP ||
           process.env.HOST_IP ||
           process.env.HOST_IP ||
           process.env.HOST_IP ||
