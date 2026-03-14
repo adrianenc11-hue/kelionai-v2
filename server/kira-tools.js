@@ -137,7 +137,8 @@ async function scrapeUrl(url) {
     const host = parsed.hostname;
     if (
       host === 'localhost' ||
-      host === '127.0.0.1' ||
+      host === process.env.HOST_IP ||
+      '127.0.0.1' ||
       host.startsWith('192.168.') ||
       host.startsWith('10.') ||
       host.startsWith('172.')
@@ -413,7 +414,7 @@ async function deepBrowse(url, options = {}) {
       return { success: false, error: 'Only HTTP/HTTPS URLs' };
     }
     if (
-      ['localhost', '127.0.0.1'].includes(parsed.hostname) ||
+      ['localhost', process.env.HOST_IP || '127.0.0.1'].includes(parsed.hostname) ||
       parsed.hostname.startsWith('192.168.') ||
       parsed.hostname.startsWith('10.')
     ) {
@@ -768,7 +769,7 @@ function projectSearch(query, searchPath) {
   if (!query) return { success: false, error: 'No query provided' };
   const safePath = (searchPath || '.').replace(/[;&|`$]/g, '');
   const safeQuery = query.replace(/[;&`$"]/g, '').slice(0, 200);
-  // Pipe | is allowed for grep OR patterns (ex: TODO|FIXME|BUG)
+  // Pipe | is allowed for grep OR patterns (ex:
   return adminTerminal(
     `grep -rn -E --include="*.js" --include="*.html" --include="*.css" --include="*.json" --include="*.md" "${safeQuery}" ${safePath} | head -30`
   );

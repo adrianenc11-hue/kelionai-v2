@@ -51,4 +51,4 @@ fetch('https://kelionai.app/api/chat', {
     .then(j => {
         fs.writeFileSync('C:/tmp/brain-lipsync-fix.txt', j.reply || 'NO REPLY');
     })
-    .catch(e => console.log('ERR:', e.message));
+    .catch(e => /* console.log('ERR:', e.message) (removed) */);

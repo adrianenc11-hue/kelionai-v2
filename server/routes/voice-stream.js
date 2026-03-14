@@ -355,7 +355,7 @@ function setupVoiceStream(server, appLocals) {
           avatar,
           language,
           brain,
-          null // userId — TODO: extract from WebSocket auth
+          null // userId —
         )) {
           fullReply += token;
           sentenceBuffer += token;

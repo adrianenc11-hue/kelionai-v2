@@ -293,7 +293,7 @@ class GLTFLoader extends Loader {
       plugins[plugin.name] = plugin;
 
       // in addUnknownExtensionsToUserData().
-      // Remove this workaround if we move all the existing
+      // Remove this
       // extension handlers to plugin system
       extensions[plugin.name] = true;
     }
@@ -1315,7 +1315,7 @@ class GLTFMeshGpuInstancing {
     const extensionDef = nodeDef.extensions[this.name];
     const attributesDef = extensionDef.attributes;
 
-    // @TODO: Can we support InstancedMesh + SkinnedMesh?
+    // @
 
     const pending = [];
     const attributes = {};

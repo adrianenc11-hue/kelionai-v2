@@ -1,6 +1,6 @@
 {
   "config": {
-    "configFile": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\playwright.config.js",
+    "configFile": process.env.STORAGE_PATH || "/tmp",
     "rootDir": "C:/Users/adria/.gemini/antigravity/scratch/kelionai-v2/tests",
     "forbidOnly": false,
     "fullyParallel": true,
@@ -86,12 +86,12 @@
                         {
                           "name": "screenshot",
                           "contentType": "image/png",
-                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-New-Pages-13--89f50-ssword-html-loads-with-form-chromium\\test-finished-1.png"
+                          "path": process.env.STORAGE_PATH || "/tmp"
                         },
                         {
                           "name": "video",
                           "contentType": "video/webm",
-                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-New-Pages-13--89f50-ssword-html-loads-with-form-chromium\\video.webm"
+                          "path": process.env.STORAGE_PATH || "/tmp"
                         }
                       ]
                     }
@@ -131,12 +131,12 @@
                         {
                           "name": "screenshot",
                           "contentType": "image/png",
-                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-New-Pages-14-direct-404-html-loads-chromium\\test-finished-1.png"
+                          "path": process.env.STORAGE_PATH || "/tmp"
                         },
                         {
                           "name": "video",
                           "contentType": "video/webm",
-                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-New-Pages-14-direct-404-html-loads-chromium\\video.webm"
+                          "path": process.env.STORAGE_PATH || "/tmp"
                         }
                       ]
                     }
@@ -176,12 +176,12 @@
                         {
                           "name": "screenshot",
                           "contentType": "image/png",
-                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-New-Pages-15-error-html-loads-chromium\\test-finished-1.png"
+                          "path": process.env.STORAGE_PATH || "/tmp"
                         },
                         {
                           "name": "video",
                           "contentType": "video/webm",
-                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-New-Pages-15-error-html-loads-chromium\\video.webm"
+                          "path": process.env.STORAGE_PATH || "/tmp"
                         }
                       ]
                     }
@@ -221,12 +221,12 @@
                         {
                           "name": "screenshot",
                           "contentType": "image/png",
-                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-New-Pages-16-dashboard-billing-html-loads-chromium\\test-finished-1.png"
+                          "path": process.env.STORAGE_PATH || "/tmp"
                         },
                         {
                           "name": "video",
                           "contentType": "video/webm",
-                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-New-Pages-16-dashboard-billing-html-loads-chromium\\video.webm"
+                          "path": process.env.STORAGE_PATH || "/tmp"
                         }
                       ]
                     }
@@ -266,12 +266,12 @@
                         {
                           "name": "screenshot",
                           "contentType": "image/png",
-                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-New-Pages-17-dashboard-trading-html-loads-chromium\\test-finished-1.png"
+                          "path": process.env.STORAGE_PATH || "/tmp"
                         },
                         {
                           "name": "video",
                           "contentType": "video/webm",
-                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-New-Pages-17-dashboard-trading-html-loads-chromium\\video.webm"
+                          "path": process.env.STORAGE_PATH || "/tmp"
                         }
                       ]
                     }
@@ -311,12 +311,12 @@
                         {
                           "name": "screenshot",
                           "contentType": "image/png",
-                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-New-Pages-18-dashboard-news-html-loads-chromium\\test-finished-1.png"
+                          "path": process.env.STORAGE_PATH || "/tmp"
                         },
                         {
                           "name": "video",
                           "contentType": "video/webm",
-                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-New-Pages-18-dashboard-news-html-loads-chromium\\video.webm"
+                          "path": process.env.STORAGE_PATH || "/tmp"
                         }
                       ]
                     }
@@ -356,12 +356,12 @@
                         {
                           "name": "screenshot",
                           "contentType": "image/png",
-                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-New-Pages-19-dashboard-sports-html-loads-chromium\\test-finished-1.png"
+                          "path": process.env.STORAGE_PATH || "/tmp"
                         },
                         {
                           "name": "video",
                           "contentType": "video/webm",
-                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-New-Pages-19-dashboard-sports-html-loads-chromium\\video.webm"
+                          "path": process.env.STORAGE_PATH || "/tmp"
                         }
                       ]
                     }
@@ -401,12 +401,12 @@
                         {
                           "name": "screenshot",
                           "contentType": "image/png",
-                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-New-Pages-20-dashboard-health-html-loads-chromium\\test-finished-1.png"
+                          "path": process.env.STORAGE_PATH || "/tmp"
                         },
                         {
                           "name": "video",
                           "contentType": "video/webm",
-                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-New-Pages-20-dashboard-health-html-loads-chromium\\video.webm"
+                          "path": process.env.STORAGE_PATH || "/tmp"
                         }
                       ]
                     }
@@ -488,12 +488,12 @@
                         {
                           "name": "screenshot",
                           "contentType": "image/png",
-                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-Buttons-Extended-27-back-buttons-work-chromium\\test-finished-1.png"
+                          "path": process.env.STORAGE_PATH || "/tmp"
                         },
                         {
                           "name": "video",
                           "contentType": "video/webm",
-                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-Buttons-Extended-27-back-buttons-work-chromium\\video.webm"
+                          "path": process.env.STORAGE_PATH || "/tmp"
                         }
                       ]
                     }
@@ -517,7 +517,7 @@
                     {
                       "type": "skip",
                       "location": {
-                        "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                        "file": process.env.STORAGE_PATH || "/tmp",
                         "line": 122,
                         "column": 23
                       }
@@ -541,7 +541,7 @@
                         {
                           "type": "skip",
                           "location": {
-                            "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                            "file": process.env.STORAGE_PATH || "/tmp",
                             "line": 122,
                             "column": 23
                           }
@@ -551,12 +551,12 @@
                         {
                           "name": "screenshot",
                           "contentType": "image/png",
-                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-Buttons-Extended-28-subscription-modal-opens-chromium\\test-finished-1.png"
+                          "path": process.env.STORAGE_PATH || "/tmp"
                         },
                         {
                           "name": "video",
                           "contentType": "video/webm",
-                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-Buttons-Extended-28-subscription-modal-opens-chromium\\video.webm"
+                          "path": process.env.STORAGE_PATH || "/tmp"
                         }
                       ]
                     }
@@ -756,12 +756,12 @@
                         {
                           "name": "screenshot",
                           "contentType": "image/png",
-                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-Avatar-Kira-52-Kira-avatar-loads-chromium\\test-finished-1.png"
+                          "path": process.env.STORAGE_PATH || "/tmp"
                         },
                         {
                           "name": "video",
                           "contentType": "video/webm",
-                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-Avatar-Kira-52-Kira-avatar-loads-chromium\\video.webm"
+                          "path": process.env.STORAGE_PATH || "/tmp"
                         }
                       ]
                     }
@@ -801,12 +801,12 @@
                         {
                           "name": "screenshot",
                           "contentType": "image/png",
-                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-Avatar-Kira-55-Kira-TTS-has-different-voice-chromium\\test-finished-1.png"
+                          "path": process.env.STORAGE_PATH || "/tmp"
                         },
                         {
                           "name": "video",
                           "contentType": "video/webm",
-                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-Avatar-Kira-55-Kira-TTS-has-different-voice-chromium\\video.webm"
+                          "path": process.env.STORAGE_PATH || "/tmp"
                         }
                       ]
                     }
@@ -846,12 +846,12 @@
                         {
                           "name": "screenshot",
                           "contentType": "image/png",
-                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-Avatar-Kira-5-0e5ff-t-has-different-personality-chromium\\test-finished-1.png"
+                          "path": process.env.STORAGE_PATH || "/tmp"
                         },
                         {
                           "name": "video",
                           "contentType": "video/webm",
-                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-Avatar-Kira-5-0e5ff-t-has-different-personality-chromium\\video.webm"
+                          "path": process.env.STORAGE_PATH || "/tmp"
                         }
                       ]
                     }
@@ -1037,7 +1037,7 @@
                         "message": "TimeoutError: page.waitForSelector: Timeout 60000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('#btn-mic') to be visible\u001b[22m\n",
                         "stack": "TimeoutError: page.waitForSelector: Timeout 60000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('#btn-mic') to be visible\u001b[22m\n\n    at C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js:274:20",
                         "location": {
-                          "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                          "file": process.env.STORAGE_PATH || "/tmp",
                           "column": 20,
                           "line": 274
                         },
@@ -1046,7 +1046,7 @@
                       "errors": [
                         {
                           "location": {
-                            "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                            "file": process.env.STORAGE_PATH || "/tmp",
                             "column": 20,
                             "line": 274
                           },
@@ -1062,21 +1062,21 @@
                         {
                           "name": "screenshot",
                           "contentType": "image/png",
-                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-Microphone-Ca-9cbb5-button-toggles-recording-UI-chromium\\test-failed-1.png"
+                          "path": process.env.STORAGE_PATH || "/tmp"
                         },
                         {
                           "name": "video",
                           "contentType": "video/webm",
-                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-Microphone-Ca-9cbb5-button-toggles-recording-UI-chromium\\video.webm"
+                          "path": process.env.STORAGE_PATH || "/tmp"
                         },
                         {
                           "name": "error-context",
                           "contentType": "text/markdown",
-                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-Microphone-Ca-9cbb5-button-toggles-recording-UI-chromium\\error-context.md"
+                          "path": process.env.STORAGE_PATH || "/tmp"
                         }
                       ],
                       "errorLocation": {
-                        "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                        "file": process.env.STORAGE_PATH || "/tmp",
                         "column": 20,
                         "line": 274
                       }
@@ -1090,7 +1090,7 @@
                         "message": "TimeoutError: page.waitForSelector: Timeout 60000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('#btn-mic') to be visible\u001b[22m\n",
                         "stack": "TimeoutError: page.waitForSelector: Timeout 60000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('#btn-mic') to be visible\u001b[22m\n\n    at C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js:274:20",
                         "location": {
-                          "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                          "file": process.env.STORAGE_PATH || "/tmp",
                           "column": 20,
                           "line": 274
                         },
@@ -1099,7 +1099,7 @@
                       "errors": [
                         {
                           "location": {
-                            "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                            "file": process.env.STORAGE_PATH || "/tmp",
                             "column": 20,
                             "line": 274
                           },
@@ -1115,26 +1115,26 @@
                         {
                           "name": "screenshot",
                           "contentType": "image/png",
-                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-Microphone-Ca-9cbb5-button-toggles-recording-UI-chromium-retry1\\test-failed-1.png"
+                          "path": process.env.STORAGE_PATH || "/tmp"
                         },
                         {
                           "name": "video",
                           "contentType": "video/webm",
-                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-Microphone-Ca-9cbb5-button-toggles-recording-UI-chromium-retry1\\video.webm"
+                          "path": process.env.STORAGE_PATH || "/tmp"
                         },
                         {
                           "name": "error-context",
                           "contentType": "text/markdown",
-                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-Microphone-Ca-9cbb5-button-toggles-recording-UI-chromium-retry1\\error-context.md"
+                          "path": process.env.STORAGE_PATH || "/tmp"
                         },
                         {
                           "name": "trace",
                           "contentType": "application/zip",
-                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-Microphone-Ca-9cbb5-button-toggles-recording-UI-chromium-retry1\\trace.zip"
+                          "path": process.env.STORAGE_PATH || "/tmp"
                         }
                       ],
                       "errorLocation": {
-                        "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                        "file": process.env.STORAGE_PATH || "/tmp",
                         "column": 20,
                         "line": 274
                       }
@@ -1337,7 +1337,7 @@
                     {
                       "type": "skip",
                       "location": {
-                        "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                        "file": process.env.STORAGE_PATH || "/tmp",
                         "line": 338,
                         "column": 23
                       }
@@ -1361,7 +1361,7 @@
                         {
                           "type": "skip",
                           "location": {
-                            "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                            "file": process.env.STORAGE_PATH || "/tmp",
                             "line": 338,
                             "column": 23
                           }
@@ -1599,12 +1599,12 @@
                         {
                           "name": "screenshot",
                           "contentType": "image/png",
-                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-Geolocation-1-d0736-ission-requested-at-startup-chromium\\test-finished-1.png"
+                          "path": process.env.STORAGE_PATH || "/tmp"
                         },
                         {
                           "name": "video",
                           "contentType": "video/webm",
-                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-Geolocation-1-d0736-ission-requested-at-startup-chromium\\video.webm"
+                          "path": process.env.STORAGE_PATH || "/tmp"
                         }
                       ]
                     }
@@ -1798,7 +1798,7 @@
                         "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m404\u001b[39m\nReceived: \u001b[31m401\u001b[39m",
                         "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m404\u001b[39m\nReceived: \u001b[31m401\u001b[39m\n    at C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js:464:28",
                         "location": {
-                          "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                          "file": process.env.STORAGE_PATH || "/tmp",
                           "column": 28,
                           "line": 464
                         },
@@ -1807,7 +1807,7 @@
                       "errors": [
                         {
                           "location": {
-                            "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                            "file": process.env.STORAGE_PATH || "/tmp",
                             "column": 28,
                             "line": 464
                           },
@@ -1821,7 +1821,7 @@
                       "annotations": [],
                       "attachments": [],
                       "errorLocation": {
-                        "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                        "file": process.env.STORAGE_PATH || "/tmp",
                         "column": 28,
                         "line": 464
                       }
@@ -1835,7 +1835,7 @@
                         "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m404\u001b[39m\nReceived: \u001b[31m401\u001b[39m",
                         "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m404\u001b[39m\nReceived: \u001b[31m401\u001b[39m\n    at C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js:464:28",
                         "location": {
-                          "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                          "file": process.env.STORAGE_PATH || "/tmp",
                           "column": 28,
                           "line": 464
                         },
@@ -1844,7 +1844,7 @@
                       "errors": [
                         {
                           "location": {
-                            "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                            "file": process.env.STORAGE_PATH || "/tmp",
                             "column": 28,
                             "line": 464
                           },
@@ -1860,11 +1860,11 @@
                         {
                           "name": "trace",
                           "contentType": "application/zip",
-                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-Admin-Extende-4766b-ut-admin-secret-returns-404-chromium-retry1\\trace.zip"
+                          "path": process.env.STORAGE_PATH || "/tmp"
                         }
                       ],
                       "errorLocation": {
-                        "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                        "file": process.env.STORAGE_PATH || "/tmp",
                         "column": 28,
                         "line": 464
                       }
@@ -1955,12 +1955,12 @@
                         {
                           "name": "screenshot",
                           "contentType": "image/png",
-                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-i18n-161-language-switch-EN-updates-UI-chromium\\test-finished-1.png"
+                          "path": process.env.STORAGE_PATH || "/tmp"
                         },
                         {
                           "name": "video",
                           "contentType": "video/webm",
-                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-i18n-161-language-switch-EN-updates-UI-chromium\\video.webm"
+                          "path": process.env.STORAGE_PATH || "/tmp"
                         }
                       ]
                     }
@@ -2000,12 +2000,12 @@
                         {
                           "name": "screenshot",
                           "contentType": "image/png",
-                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-i18n-162-language-switch-RO-updates-UI-chromium\\test-finished-1.png"
+                          "path": process.env.STORAGE_PATH || "/tmp"
                         },
                         {
                           "name": "video",
                           "contentType": "video/webm",
-                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-i18n-162-language-switch-RO-updates-UI-chromium\\video.webm"
+                          "path": process.env.STORAGE_PATH || "/tmp"
                         }
                       ]
                     }
@@ -2079,12 +2079,12 @@
                         {
                           "name": "screenshot",
                           "contentType": "image/png",
-                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-i18n-164-language-persists-after-reload-chromium\\test-finished-1.png"
+                          "path": process.env.STORAGE_PATH || "/tmp"
                         },
                         {
                           "name": "video",
                           "contentType": "video/webm",
-                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-i18n-164-language-persists-after-reload-chromium\\video.webm"
+                          "path": process.env.STORAGE_PATH || "/tmp"
                         }
                       ]
                     }
@@ -2132,12 +2132,12 @@
                         {
                           "name": "screenshot",
                           "contentType": "image/png",
-                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-Conversation--a1e4d--appears-in-history-sidebar-chromium\\test-finished-1.png"
+                          "path": process.env.STORAGE_PATH || "/tmp"
                         },
                         {
                           "name": "video",
                           "contentType": "video/webm",
-                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-Conversation--a1e4d--appears-in-history-sidebar-chromium\\video.webm"
+                          "path": process.env.STORAGE_PATH || "/tmp"
                         }
                       ]
                     }
@@ -2169,7 +2169,7 @@
                     {
                       "type": "skip",
                       "location": {
-                        "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                        "file": process.env.STORAGE_PATH || "/tmp",
                         "line": 569,
                         "column": 45
                       }
@@ -2193,7 +2193,7 @@
                         {
                           "type": "skip",
                           "location": {
-                            "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                            "file": process.env.STORAGE_PATH || "/tmp",
                             "line": 569,
                             "column": 45
                           }
@@ -2279,12 +2279,12 @@
                         {
                           "name": "screenshot",
                           "contentType": "image/png",
-                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-UI-Layout-170-chat-area-has-minimum-height-chromium\\test-finished-1.png"
+                          "path": process.env.STORAGE_PATH || "/tmp"
                         },
                         {
                           "name": "video",
                           "contentType": "video/webm",
-                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-UI-Layout-170-chat-area-has-minimum-height-chromium\\video.webm"
+                          "path": process.env.STORAGE_PATH || "/tmp"
                         }
                       ]
                     }
@@ -2350,7 +2350,7 @@
                     {
                       "type": "skip",
                       "location": {
-                        "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                        "file": process.env.STORAGE_PATH || "/tmp",
                         "line": 619,
                         "column": 45
                       }
@@ -2374,7 +2374,7 @@
                         {
                           "type": "skip",
                           "location": {
-                            "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                            "file": process.env.STORAGE_PATH || "/tmp",
                             "line": 619,
                             "column": 45
                           }
@@ -2396,7 +2396,7 @@
                         {
                           "type": "skip",
                           "location": {
-                            "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                            "file": process.env.STORAGE_PATH || "/tmp",
                             "line": 619,
                             "column": 45
                           }
@@ -2406,7 +2406,7 @@
                         {
                           "name": "trace",
                           "contentType": "application/zip",
-                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-E2E-Flows-173-badb8-ter-ÔåÆ-login-ÔåÆ-chat-ÔåÆ-logout-chromium-retry1\\trace.zip"
+                          "path": process.env.STORAGE_PATH || "/tmp"
                         }
                       ]
                     }
@@ -2459,7 +2459,7 @@
                         {
                           "name": "trace",
                           "contentType": "application/zip",
-                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-E2E-Flows-174-9579f-ound-trip-TTS-returns-audio-chromium-retry1\\trace.zip"
+                          "path": process.env.STORAGE_PATH || "/tmp"
                         }
                       ]
                     }
@@ -2493,7 +2493,7 @@
                         "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: < \u001b[32m500\u001b[39m\nReceived:   \u001b[31m503\u001b[39m",
                         "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: < \u001b[32m500\u001b[39m\nReceived:   \u001b[31m503\u001b[39m\n    at C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js:656:32",
                         "location": {
-                          "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                          "file": process.env.STORAGE_PATH || "/tmp",
                           "column": 32,
                           "line": 656
                         },
@@ -2502,7 +2502,7 @@
                       "errors": [
                         {
                           "location": {
-                            "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                            "file": process.env.STORAGE_PATH || "/tmp",
                             "column": 32,
                             "line": 656
                           },
@@ -2516,7 +2516,7 @@
                       "annotations": [],
                       "attachments": [],
                       "errorLocation": {
-                        "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                        "file": process.env.STORAGE_PATH || "/tmp",
                         "column": 32,
                         "line": 656
                       }
@@ -2536,7 +2536,7 @@
                         {
                           "name": "trace",
                           "contentType": "application/zip",
-                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-E2E-Flows-175-search-chat-follow-up-chromium-retry1\\trace.zip"
+                          "path": process.env.STORAGE_PATH || "/tmp"
                         }
                       ]
                     }
@@ -2612,7 +2612,7 @@
                         "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: < \u001b[32m500\u001b[39m\nReceived:   \u001b[31m503\u001b[39m",
                         "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: < \u001b[32m500\u001b[39m\nReceived:   \u001b[31m503\u001b[39m\n    at C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js:685:28",
                         "location": {
-                          "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                          "file": process.env.STORAGE_PATH || "/tmp",
                           "column": 28,
                           "line": 685
                         },
@@ -2621,7 +2621,7 @@
                       "errors": [
                         {
                           "location": {
-                            "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                            "file": process.env.STORAGE_PATH || "/tmp",
                             "column": 28,
                             "line": 685
                           },
@@ -2635,7 +2635,7 @@
                       "annotations": [],
                       "attachments": [],
                       "errorLocation": {
-                        "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                        "file": process.env.STORAGE_PATH || "/tmp",
                         "column": 28,
                         "line": 685
                       }
@@ -2655,7 +2655,7 @@
                         {
                           "name": "trace",
                           "contentType": "application/zip",
-                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-AI-Simulation-41e65-senter-presentation-outline-chromium-retry1\\trace.zip"
+                          "path": process.env.STORAGE_PATH || "/tmp"
                         }
                       ]
                     }
@@ -2723,7 +2723,7 @@
                         "message": "TimeoutError: apiRequestContext.post: Timeout 20000ms exceeded.\nCall log:\n\u001b[2m  - ÔåÆ POST https://kelionai.app/api/chat\u001b[22m\n\u001b[2m    - user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.7632.6 Safari/537.36\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 107\u001b[22m\n",
                         "stack": "TimeoutError: apiRequestContext.post: Timeout 20000ms exceeded.\nCall log:\n\u001b[2m  - ÔåÆ POST https://kelionai.app/api/chat\u001b[22m\n\u001b[2m    - user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.7632.6 Safari/537.36\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 107\u001b[22m\n\n    at C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js:706:33",
                         "location": {
-                          "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                          "file": process.env.STORAGE_PATH || "/tmp",
                           "column": 33,
                           "line": 706
                         },
@@ -2732,7 +2732,7 @@
                       "errors": [
                         {
                           "location": {
-                            "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                            "file": process.env.STORAGE_PATH || "/tmp",
                             "column": 33,
                             "line": 706
                           },
@@ -2746,7 +2746,7 @@
                       "annotations": [],
                       "attachments": [],
                       "errorLocation": {
-                        "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                        "file": process.env.STORAGE_PATH || "/tmp",
                         "column": 33,
                         "line": 706
                       }
@@ -2766,7 +2766,7 @@
                         {
                           "name": "trace",
                           "contentType": "application/zip",
-                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-AI-Simulation-fca8f-ant-business-plan-structure-chromium-retry1\\trace.zip"
+                          "path": process.env.STORAGE_PATH || "/tmp"
                         }
                       ]
                     }
@@ -2800,7 +2800,7 @@
                         "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: < \u001b[32m500\u001b[39m\nReceived:   \u001b[31m503\u001b[39m",
                         "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: < \u001b[32m500\u001b[39m\nReceived:   \u001b[31m503\u001b[39m\n    at C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js:721:28",
                         "location": {
-                          "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                          "file": process.env.STORAGE_PATH || "/tmp",
                           "column": 28,
                           "line": 721
                         },
@@ -2809,7 +2809,7 @@
                       "errors": [
                         {
                           "location": {
-                            "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                            "file": process.env.STORAGE_PATH || "/tmp",
                             "column": 28,
                             "line": 721
                           },
@@ -2823,7 +2823,7 @@
                       "annotations": [],
                       "attachments": [],
                       "errorLocation": {
-                        "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                        "file": process.env.STORAGE_PATH || "/tmp",
                         "column": 28,
                         "line": 721
                       }
@@ -2843,7 +2843,7 @@
                         {
                           "name": "trace",
                           "contentType": "application/zip",
-                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-AI-Simulation-2a811-80-Researcher-cites-sources-chromium-retry1\\trace.zip"
+                          "path": process.env.STORAGE_PATH || "/tmp"
                         }
                       ]
                     }
@@ -2911,7 +2911,7 @@
                         "message": "TimeoutError: apiRequestContext.post: Timeout 20000ms exceeded.\nCall log:\n\u001b[2m  - ÔåÆ POST https://kelionai.app/api/chat\u001b[22m\n\u001b[2m    - user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.7632.6 Safari/537.36\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 108\u001b[22m\n",
                         "stack": "TimeoutError: apiRequestContext.post: Timeout 20000ms exceeded.\nCall log:\n\u001b[2m  - ÔåÆ POST https://kelionai.app/api/chat\u001b[22m\n\u001b[2m    - user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.7632.6 Safari/537.36\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 108\u001b[22m\n\n    at C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js:742:33",
                         "location": {
-                          "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                          "file": process.env.STORAGE_PATH || "/tmp",
                           "column": 33,
                           "line": 742
                         },
@@ -2920,7 +2920,7 @@
                       "errors": [
                         {
                           "location": {
-                            "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                            "file": process.env.STORAGE_PATH || "/tmp",
                             "column": 33,
                             "line": 742
                           },
@@ -2934,7 +2934,7 @@
                       "annotations": [],
                       "attachments": [],
                       "errorLocation": {
-                        "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                        "file": process.env.STORAGE_PATH || "/tmp",
                         "column": 33,
                         "line": 742
                       }
@@ -2954,7 +2954,7 @@
                         {
                           "name": "trace",
                           "contentType": "application/zip",
-                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-AI-Simulation-c00f4-thinkTime-0-on-role-request-chromium-retry1\\trace.zip"
+                          "path": process.env.STORAGE_PATH || "/tmp"
                         }
                       ]
                     }
@@ -2996,7 +2996,7 @@
                         "message": "TimeoutError: apiRequestContext.post: Timeout 20000ms exceeded.\nCall log:\n\u001b[2m  - ÔåÆ POST https://kelionai.app/api/chat\u001b[22m\n\u001b[2m    - user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.7632.6 Safari/537.36\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 115\u001b[22m\n",
                         "stack": "TimeoutError: apiRequestContext.post: Timeout 20000ms exceeded.\nCall log:\n\u001b[2m  - ÔåÆ POST https://kelionai.app/api/chat\u001b[22m\n\u001b[2m    - user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.7632.6 Safari/537.36\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 115\u001b[22m\n\n    at C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js:763:33",
                         "location": {
-                          "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                          "file": process.env.STORAGE_PATH || "/tmp",
                           "column": 33,
                           "line": 763
                         },
@@ -3005,7 +3005,7 @@
                       "errors": [
                         {
                           "location": {
-                            "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                            "file": process.env.STORAGE_PATH || "/tmp",
                             "column": 33,
                             "line": 763
                           },
@@ -3019,7 +3019,7 @@
                       "annotations": [],
                       "attachments": [],
                       "errorLocation": {
-                        "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                        "file": process.env.STORAGE_PATH || "/tmp",
                         "column": 33,
                         "line": 763
                       }
@@ -3033,7 +3033,7 @@
                         "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: < \u001b[32m500\u001b[39m\nReceived:   \u001b[31m503\u001b[39m",
                         "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: < \u001b[32m500\u001b[39m\nReceived:   \u001b[31m503\u001b[39m\n    at C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js:766:28",
                         "location": {
-                          "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                          "file": process.env.STORAGE_PATH || "/tmp",
                           "column": 28,
                           "line": 766
                         },
@@ -3042,7 +3042,7 @@
                       "errors": [
                         {
                           "location": {
-                            "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                            "file": process.env.STORAGE_PATH || "/tmp",
                             "column": 28,
                             "line": 766
                           },
@@ -3058,11 +3058,11 @@
                         {
                           "name": "trace",
                           "contentType": "application/zip",
-                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-Brain-Intelli-c8163-hinkTime-on-complex-request-chromium-retry1\\trace.zip"
+                          "path": process.env.STORAGE_PATH || "/tmp"
                         }
                       ],
                       "errorLocation": {
-                        "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                        "file": process.env.STORAGE_PATH || "/tmp",
                         "column": 28,
                         "line": 766
                       }
@@ -3207,7 +3207,7 @@
                         "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: < \u001b[32m500\u001b[39m\nReceived:   \u001b[31m503\u001b[39m",
                         "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: < \u001b[32m500\u001b[39m\nReceived:   \u001b[31m503\u001b[39m\n    at C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js:816:28",
                         "location": {
-                          "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                          "file": process.env.STORAGE_PATH || "/tmp",
                           "column": 28,
                           "line": 816
                         },
@@ -3216,7 +3216,7 @@
                       "errors": [
                         {
                           "location": {
-                            "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                            "file": process.env.STORAGE_PATH || "/tmp",
                             "column": 28,
                             "line": 816
                           },
@@ -3230,7 +3230,7 @@
                       "annotations": [],
                       "attachments": [],
                       "errorLocation": {
-                        "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                        "file": process.env.STORAGE_PATH || "/tmp",
                         "column": 28,
                         "line": 816
                       }
@@ -3250,7 +3250,7 @@
                         {
                           "name": "trace",
                           "contentType": "application/zip",
-                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-Persona-Emoti-3d7ba-adness-emotional-validation-chromium-retry1\\trace.zip"
+                          "path": process.env.STORAGE_PATH || "/tmp"
                         }
                       ]
                     }
@@ -3318,7 +3318,7 @@
                         "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: < \u001b[32m500\u001b[39m\nReceived:   \u001b[31m503\u001b[39m",
                         "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: < \u001b[32m500\u001b[39m\nReceived:   \u001b[31m503\u001b[39m\n    at C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js:841:28",
                         "location": {
-                          "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                          "file": process.env.STORAGE_PATH || "/tmp",
                           "column": 28,
                           "line": 841
                         },
@@ -3327,7 +3327,7 @@
                       "errors": [
                         {
                           "location": {
-                            "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                            "file": process.env.STORAGE_PATH || "/tmp",
                             "column": 28,
                             "line": 841
                           },
@@ -3341,7 +3341,7 @@
                       "annotations": [],
                       "attachments": [],
                       "errorLocation": {
-                        "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                        "file": process.env.STORAGE_PATH || "/tmp",
                         "column": 28,
                         "line": 841
                       }
@@ -3361,7 +3361,7 @@
                         {
                           "name": "trace",
                           "contentType": "application/zip",
-                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-Persona-Emoti-7dc07-triggers-weather-suggestion-chromium-retry1\\trace.zip"
+                          "path": process.env.STORAGE_PATH || "/tmp"
                         }
                       ]
                     }
@@ -3471,7 +3471,7 @@
                         "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: < \u001b[32m500\u001b[39m\nReceived:   \u001b[31m503\u001b[39m",
                         "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: < \u001b[32m500\u001b[39m\nReceived:   \u001b[31m503\u001b[39m\n    at C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js:885:28",
                         "location": {
-                          "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                          "file": process.env.STORAGE_PATH || "/tmp",
                           "column": 28,
                           "line": 885
                         },
@@ -3480,7 +3480,7 @@
                       "errors": [
                         {
                           "location": {
-                            "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                            "file": process.env.STORAGE_PATH || "/tmp",
                             "column": 28,
                             "line": 885
                           },
@@ -3494,7 +3494,7 @@
                       "annotations": [],
                       "attachments": [],
                       "errorLocation": {
-                        "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                        "file": process.env.STORAGE_PATH || "/tmp",
                         "column": 28,
                         "line": 885
                       }
@@ -3514,7 +3514,7 @@
                         {
                           "name": "trace",
                           "contentType": "application/zip",
-                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-Persistent-Me-5343e--no-auth-user-has-no-memory-chromium-retry1\\trace.zip"
+                          "path": process.env.STORAGE_PATH || "/tmp"
                         }
                       ]
                     }

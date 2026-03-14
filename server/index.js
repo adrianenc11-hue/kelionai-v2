@@ -227,7 +227,7 @@ app.use((req, res, next) => {
       if (!isBot && !isHealth) {
         const realIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || 'unknown';
         // Skip internal IPs entirely
-        if (realIp === '127.0.0.1' || realIp === '::1' || realIp === '::ffff:127.0.0.1') return;
+        if (realIp === process.env.HOST_IP || '127.0.0.1' || realIp === '::1' || realIp === '::ffff:127.0.0.1') return;
 
         // Country from CDN headers first, then IP geolocation
         let country = req.headers['cf-ipcountry'] || req.headers['x-vercel-ip-country'] || null;
@@ -1806,7 +1806,7 @@ if (require.main === module) {
       // Prevent Railway proxy timeouts
       server.keepAliveTimeout = 65000; // 65s (Railway proxy = 60s)
       server.headersTimeout = 70000; // 70s > keepAliveTimeout
-      server.listen(PORT, '0.0.0.0', () => {
+      server.listen(PORT, process.env.HOST_IP || '127.0.0.1', () => {
         logger.info(
           {
             component: 'Server',
@@ -1858,7 +1858,7 @@ if (require.main === module) {
     })
     .catch(() => {
       logger.error({ component: 'Server' }, 'Migration error');
-      server.listen(PORT, '0.0.0.0', () =>
+      server.listen(PORT, process.env.HOST_IP || '127.0.0.1', () =>
         logger.info({ component: 'Server', port: PORT }, 'KelionAI v2.5 on port ' + PORT + ' (migration failed)')
       );
     });

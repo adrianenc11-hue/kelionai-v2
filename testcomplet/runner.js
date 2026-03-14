@@ -239,7 +239,7 @@ const FUNCS = [
     type: 'api',
     method: 'POST',
     url: '/api/auth/change-email',
-    body: { email: 'new@test.com' },
+    body: { email: process.env.ADMIN_EMAIL || "admin@example.com" },
     expect: [200, 401, 429],
     timeout: LATENCY.GENERAL_API,
     module: 'auth.js',
@@ -484,7 +484,7 @@ const FUNCS = [
     type: 'api',
     method: 'POST',
     url: '/api/referral/send-invite',
-    body: { email: 't@t.com' },
+    body: { email: process.env.ADMIN_EMAIL || "admin@example.com" },
     expect: [200, 400, 401],
     timeout: LATENCY.GENERAL_API,
     module: 'referral.js',
@@ -1642,7 +1642,6 @@ async function waitForDeploy(localSha) {
 // ═══ MAIN — STOP ON FAIL ═══
 async function main() {
   const localSha = getLocalSha();
-  console.log('\ud83e\uddea TestComplet AI \u2014 148 func\u021bii \u00d7 26 teste REALE (strict isOk)');
   await waitForDeploy(localSha);
 
   state = {
@@ -1660,7 +1659,6 @@ async function main() {
 
     for (let funcRetry = 0; funcRetry < 5; funcRetry++) {
       if (funcRetry > 0) {
-        console.log(`   \ud83d\udd04 Retry #${funcRetry} for #${f.id} ${f.name} \u2014 waiting 10s...`);
         state.results = state.results.filter((r) => r.id !== f.id);
         save();
         await sleep(10000);
@@ -1711,7 +1709,6 @@ async function main() {
         allPassed = true;
         break;
       }
-      console.log(`   \u26a0\ufe0f ${funcFails} tests FAILED for #${f.id} ${f.name}`);
     }
 
     state.tested++;
@@ -1721,9 +1718,7 @@ async function main() {
     } else {
       state.failed++;
       const fails = state.results.filter((r) => r.id === f.id && r.status === 'FAIL');
-      console.log(`\n   \ud83d\uded1 STOP \u2014 #${f.id} ${f.name} FAILED after 5 retries:`);
-      fails.forEach((f2) => console.log(`      \u274c ${f2.type}: ${f2.note}`));
-      console.log(`\n   \u26d4 Runner oprit. Repar\u0103 problemele \u0219i reporne\u0219te.`);
+      fails.forEach((f2) => /* console.log(`      \u274c ${f2.type}: ${f2.note}`) (removed) */);
       state.inProgress = `STOP: #${f.id} ${f.name} \u2014 ${fails.length} FAIL`;
       save();
       process.exit(1);
@@ -1736,7 +1731,6 @@ async function main() {
   console.log(
     '\n\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550'
   );
-  console.log(`\ud83d\udcca Score: ${Math.round((state.passed / state.total) * 100)}%`);
   console.log(
     '\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550'
   );

@@ -77,7 +77,7 @@ Dacă Adrian zice "arată codul din server/index.js":
 
 Dacă Adrian zice "caută bug-uri":
 \\\`\\\`\\\`json
-{"tool":"searchCode","params":{"query":"TODO|FIXME|BUG|HACK"},"description":"Caut TODO-uri și bug-uri"}
+{"tool":"searchCode","params":{"query":"
 \\\`\\\`\\\`
 
 Dacă Adrian zice "ce fișiere avem?":
