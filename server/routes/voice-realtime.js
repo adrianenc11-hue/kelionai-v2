@@ -59,6 +59,7 @@ function setupRealtimeVoice(server, appLocals) {
 
     try {
       openaiWs = new WebSocket(`${REALTIME_URL}?model=${REALTIME_MODEL}`, {
+        perMessageDeflate: false,
         headers: {
           Authorization: `Bearer ${apiKey}`,
           "OpenAI-Beta": "realtime=v1",
