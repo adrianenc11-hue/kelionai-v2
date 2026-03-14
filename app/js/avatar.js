@@ -192,7 +192,7 @@
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 3)); // CINEMATIC: up to 3x for 4K/retina
 
         camera = new THREE.PerspectiveCamera(24, w / h, 0.1, 100);
-        camera.position.set(0, 0.35, 2.00); // Moved up — avatar centered in viewport
+        camera.position.set(0, 0.55, 1.60); // Raised up + closer — full bust centered in viewport
         renderer.outputColorSpace = THREE.SRGBColorSpace;
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
         renderer.toneMappingExposure = 1.2;
@@ -268,7 +268,7 @@
                 if (maxDim > 0) currentModel.scale.setScalar(1.2 / maxDim);
 
                 // Shift model down for head+torso framing
-                currentModel.position.y -= 0.15; // Portrait centered — full face visible
+                currentModel.position.y -= 0.05; // Slight shift — head+shoulders centered
 
                 currentModel.traverse((child) => {
                     if (child.isMesh) {
