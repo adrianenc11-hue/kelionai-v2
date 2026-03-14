@@ -36,7 +36,7 @@ function setupCollaboration(httpServer) {
     logger.info({ component: 'Collab', userId }, `🤝 WebSocket connected: ${userName}`);
 
     // ── Message handler ──
-    ws.on('message', (raw) => {
+    const messageHandler = (raw) => {
       try {
         const msg = JSON.parse(raw.toString());
 
@@ -160,13 +160,16 @@ function setupCollaboration(httpServer) {
       } catch (e) {
         ws.send(JSON.stringify({ type: 'error', error: `Parse error: ${e.message}` }));
       }
-    });
+    };
+
+    ws.on('message', messageHandler);
 
     // ── Disconnect handler ──
     ws.on('close', () => {
       if (currentRoom) {
         sharedSessions.leaveRoom(currentRoom, userId);
       }
+      ws.removeListener('message', messageHandler);
       logger.info({ component: 'Collab', userId }, `🤝 WebSocket disconnected: ${userName}`);
     });
 

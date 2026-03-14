@@ -355,10 +355,14 @@ function fetchRSS(url) {
     };
     const req = https.get(options, (res) => {
       let body = '';
-      res.on('data', (chunk) => {
+      const dataListener = (chunk) => {
         body += chunk;
+      };
+      res.on('data', dataListener);
+      res.on('end', () => {
+        res.removeListener('data', dataListener);
+        resolve(body);
       });
-      res.on('end', () => resolve(body));
     });
     req.on('error', () => resolve(''));
     req.on('timeout', () => {
