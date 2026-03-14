@@ -17,7 +17,7 @@ const REALTIME_MODEL = MODELS.GPT_REALTIME || "gpt-4o-realtime-preview";
  * Client connects to /api/voice-realtime → proxied to OpenAI Realtime API.
  */
 function setupRealtimeVoice(server, appLocals) {
-  const wss = new WebSocket.Server({ noServer: true });
+  const wss = new WebSocket.Server({ noServer: true, perMessageDeflate: false });
   const brain = appLocals?.brain || null;
 
   // Handle upgrade requests for /api/voice-realtime

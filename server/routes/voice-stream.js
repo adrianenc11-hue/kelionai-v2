@@ -276,7 +276,7 @@ function createElevenLabsTTS(onAudio, voiceId) {
 // MAIN: Setup WebSocket voice pipeline on the HTTP server
 // ═══════════════════════════════════════════════════════════════
 function setupVoiceStream(server, appLocals) {
-  const wss = new WebSocket.Server({ noServer: true });
+  const wss = new WebSocket.Server({ noServer: true, perMessageDeflate: false });
   const brain = appLocals?.brain || null;
 
   // Handle upgrade requests for /api/voice-stream
