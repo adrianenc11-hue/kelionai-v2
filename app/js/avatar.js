@@ -23,11 +23,20 @@
     const MAX_INIT_RETRIES = 50; // up to 5s total
 
     // Per-avatar background textures (IIFE scope — accessible from init + loadAvatar)
-    const bgTextures = { kelion: '/models/avatar-bg.png', kira: '/models/avatar-bg-kira.png' };
-    let bgLoader = null;
-    function _loadAvatarBg(name) {
-        // Background texture DISABLED — solid dark color for clean avatar view
-        if (scene) scene.background = new THREE.Color(0x060614);
+    const _bgTextures = { kelion: '/models/avatar-bg.png', kira: '/models/avatar-bg-kira.png' };
+    let _bgLoader = null;
+    function _loadAvatarBg(_name) {
+        if (!scene) return;
+        if (!_bgLoader) _bgLoader = new THREE.TextureLoader();
+        const path = _bgTextures[_name] || _bgTextures.kelion;
+        _bgLoader.load(path, function (tex) {
+            tex.colorSpace = THREE.SRGBColorSpace;
+            scene.background = tex;
+            console.log('[Avatar] Background loaded:', path);
+        }, null, function () {
+            // Fallback to solid color if texture fails
+            scene.background = new THREE.Color(0x060614);
+        });
     }
 
     // Blink
@@ -192,7 +201,7 @@
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 3)); // CINEMATIC: up to 3x for 4K/retina
 
         camera = new THREE.PerspectiveCamera(24, w / h, 0.1, 100);
-        camera.position.set(0, 0.45, 1.90); // Centered bust — safe zoom for FOV 24°
+        camera.position.set(0, 0.00, 2.80); // User-calibrated: full body centered
         renderer.outputColorSpace = THREE.SRGBColorSpace;
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
         renderer.toneMappingExposure = 1.2;
@@ -268,7 +277,7 @@
                 if (maxDim > 0) currentModel.scale.setScalar(1.2 / maxDim);
 
                 // Shift model down for head+torso framing
-                currentModel.position.y -= 0.08; // Head+shoulders centered, not too low
+                currentModel.position.y -= 0.60; // User-calibrated: full body framing
 
                 currentModel.traverse((child) => {
                     if (child.isMesh) {
