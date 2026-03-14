@@ -283,6 +283,8 @@ function setupVoiceStream(server, appLocals) {
   server.on("upgrade", (request, socket, head) => {
     const url = new URL(request.url, `http://${request.headers.host}`);
     if (url.pathname === "/api/voice-stream") {
+      // Strip compression extensions — Railway proxy may add compression
+      delete request.headers["sec-websocket-extensions"];
       wss.handleUpgrade(request, socket, head, (ws) => {
         wss.emit("connection", ws, request);
       });
