@@ -128,11 +128,10 @@ tradePersist.ensureTables().catch(() => {});
 try {
   const { createClient } = require("@supabase/supabase-js");
   const SUPABASE_URL =
-    process.env.SUPABASE_URL || "https://nqlobybfwmtkmsqadqqr.supabase.co";
+    process.env.SUPABASE_URL;
   const SUPABASE_KEY =
     process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.SUPABASE_SERVICE_KEY ||
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5xbG9ieWJmd210a21zcWFkcXFyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTg3MzAyMiwiZXhwIjoyMDg3NDQ5MDIyfQ.AngYdhgIOXas4UssEP1ENLiZCW9CYPgecvYej3PvLOQ";
+    process.env.SUPABASE_SERVICE_KEY;
   if (SUPABASE_URL && SUPABASE_KEY) {
     const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
     histLoader.init(sb);
@@ -2469,11 +2468,10 @@ router.get("/history/progress", (req, res) => {
 router.post("/paper/on", (req, res) => {
   const { createClient } = require("@supabase/supabase-js");
   const sbUrl =
-    process.env.SUPABASE_URL || "https://nqlobybfwmtkmsqadqqr.supabase.co";
+    process.env.SUPABASE_URL;
   const sbKey =
     process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.SUPABASE_SERVICE_KEY ||
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5xbG9ieWJmd210a21zcWFkcXFyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTg3MzAyMiwiZXhwIjoyMDg3NDQ5MDIyfQ.AngYdhgIOXas4UssEP1ENLiZCW9CYPgecvYej3PvLOQ";
+    process.env.SUPABASE_SERVICE_KEY;
   const sb = createClient(sbUrl, sbKey);
   const result = paperTrading.turnOn(sb);
   res.json(result);
@@ -2507,7 +2505,7 @@ setTimeout(async () => {
   try {
     const { createClient } = require("@supabase/supabase-js");
     const sbUrl =
-      process.env.SUPABASE_URL || "https://nqlobybfwmtkmsqadqqr.supabase.co";
+      process.env.SUPABASE_URL;
     const sbKey =
       process.env.SUPABASE_SERVICE_ROLE_KEY ||
       process.env.SUPABASE_SERVICE_KEY ||
@@ -2558,11 +2556,10 @@ router.get("/paper/history", async (req, res) => {
 router.post("/paper/reset", (req, res) => {
   const { createClient } = require("@supabase/supabase-js");
   const sbUrl =
-    process.env.SUPABASE_URL || "https://nqlobybfwmtkmsqadqqr.supabase.co";
+    process.env.SUPABASE_URL;
   const sbKey =
     process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.SUPABASE_SERVICE_KEY ||
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5xbG9ieWJmd210a21zcWFkcXFyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTg3MzAyMiwiZXhwIjoyMDg3NDQ5MDIyfQ.AngYdhgIOXas4UssEP1ENLiZCW9CYPgecvYej3PvLOQ";
+    process.env.SUPABASE_SERVICE_KEY;
   const sb = createClient(sbUrl, sbKey);
   res.json(paperTrading.reset(sb));
 });
@@ -2570,11 +2567,10 @@ router.post("/paper/reset", (req, res) => {
 router.post("/paper/switch", (req, res) => {
   const { createClient } = require("@supabase/supabase-js");
   const sbUrl =
-    process.env.SUPABASE_URL || "https://nqlobybfwmtkmsqadqqr.supabase.co";
+    process.env.SUPABASE_URL;
   const sbKey =
     process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.SUPABASE_SERVICE_KEY ||
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5xbG9ieWJmd210a21zcWFkcXFyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTg3MzAyMiwiZXhwIjoyMDg3NDQ5MDIyfQ.AngYdhgIOXas4UssEP1ENLiZCW9CYPgecvYej3PvLOQ";
+    process.env.SUPABASE_SERVICE_KEY;
   const sb = createClient(sbUrl, sbKey);
   const mode = req.body?.mode || req.query?.mode || "PAPER";
   res.json(paperTrading.switchMode(mode, sb));
@@ -2599,7 +2595,7 @@ router.get("/simulate", async (req, res) => {
   try {
     const { createClient } = require("@supabase/supabase-js");
     const sbUrl =
-      process.env.SUPABASE_URL || "https://nqlobybfwmtkmsqadqqr.supabase.co";
+      process.env.SUPABASE_URL;
     const sbKey =
       process.env.SUPABASE_SERVICE_ROLE_KEY ||
       process.env.SUPABASE_SERVICE_KEY ||
@@ -2618,7 +2614,7 @@ router.get("/brain-rules", async (req, res) => {
   try {
     const { createClient } = require("@supabase/supabase-js");
     const sbUrl =
-      process.env.SUPABASE_URL || "https://nqlobybfwmtkmsqadqqr.supabase.co";
+      process.env.SUPABASE_URL;
     const sbKey =
       process.env.SUPABASE_SERVICE_ROLE_KEY ||
       process.env.SUPABASE_SERVICE_KEY ||

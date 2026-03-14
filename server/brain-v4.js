@@ -1865,7 +1865,7 @@ async function executeTool(brain, toolName, toolInput, userId) {
         }
         try {
           const emailBody = {
-            from: process.env.EMAIL_FROM || "KelionAI <noreply@kelionai.app>",
+            from: process.env.EMAIL_FROM || process.env.ADMIN_EMAIL || "",
             to: toolInput.to.split(",").map((e) => e.trim()),
             subject: toolInput.subject,
             html: toolInput.body,

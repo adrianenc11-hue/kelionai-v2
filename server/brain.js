@@ -4622,7 +4622,7 @@ Rules:
       const header = { alg: "RS256", typ: "JWT" };
       const now = Math.floor(Date.now() / 1000);
       const calendarOwner =
-        process.env.GOOGLE_CALENDAR_OWNER || "contact@kelionai.app";
+        process.env.GOOGLE_CALENDAR_OWNER || process.env.ADMIN_EMAIL || "";
       const payload = {
         iss: clientEmail,
         sub: calendarOwner, // Domain-wide delegation: act as this user

@@ -170,7 +170,7 @@ async function scrapeUrl(url) {
 
     const res = await fetch(url, {
       headers: {
-        "User-Agent": "KelionAI/2.5 (Web Scraper; +https://kelionai.app)",
+        "User-Agent": `KelionAI/2.5 (Web Scraper; +${process.env.APP_URL || "https://kelionai.app"})`,
         Accept: "text/html,application/xhtml+xml,text/plain,application/json",
       },
       signal: controller.signal,
@@ -981,7 +981,7 @@ async function scrapeFullArticle(url) {
     const res = await fetch(url, {
       headers: {
         "User-Agent":
-          "Mozilla/5.0 (compatible; KelionAI/2.5; +https://kelionai.app)",
+          `Mozilla/5.0 (compatible; KelionAI/2.5; +${process.env.APP_URL || "https://kelionai.app"})`,
         Accept: "text/html",
       },
       signal: controller.signal,
