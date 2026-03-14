@@ -11,7 +11,7 @@ const { validate, chatSchema, memorySchema } = require("../validation");
 const { checkUsage, incrementUsage } = require("../payments");
 const { buildSystemPrompt, buildNewbornPrompt } = require("../persona");
 const { _KelionBrain } = require("../brain");
-const { thinkV4 } = require("../brain-v4");
+const { thinkV5 } = require("../brain-v5");
 const { MODELS } = require("../config/models");
 const { notify } = require("../notifications");
 
@@ -197,8 +197,8 @@ router.post("/chat", chatLimiter, validate(chatSchema), async (req, res) => {
         upgrade: true,
       });
 
-    // ═══ BRAIN V4: Gemini Tool Calling — one call does everything ═══
-    const thought = await thinkV4(
+    // ═══ BRAIN V5: GPT-5.4 + Gemini hybrid with Quality Gate ═══
+    const thought = await thinkV5(
       brain,
       message,
       avatar,
@@ -210,10 +210,9 @@ router.post("/chat", chatLimiter, validate(chatSchema), async (req, res) => {
       isAdmin,
     );
 
-    // V4 returns the final reply directly from Gemini (tool calling + response in one)
+    // V5 returns the final reply from GPT-5.4 or Gemini Flash
     let reply = thought.enrichedMessage;
-    const engine =
-      thought.agent === "v4-gemini-tools" ? "Gemini-V4" : "V3-Fallback";
+    const engine = thought.agent || "V5";
 
     // ── SANITIZE: Strip leaked system instructions from reply ──
     if (reply) {

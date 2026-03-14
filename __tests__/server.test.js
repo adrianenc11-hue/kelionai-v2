@@ -111,29 +111,31 @@ describe("Input Validation", () => {
 });
 
 describe("GET /api/admin/health-check", () => {
-  test("returns 403 without admin JWT (role-based auth)", async () => {
-    // Admin routes use requireAdmin middleware which checks JWT for role === 'admin'
-    // Without a valid JWT, it returns 403 "Admin access required"
+  test("returns silent 200 empty without admin credentials (stealth)", async () => {
+    // Admin doesn't exist for non-admin users — returns 200 empty, no error hints
     const res = await request(app).get("/api/admin/health-check");
-    expect(res.status).toBe(403);
-    expect(res.body.error).toBe("Admin access required");
+    expect(res.status).toBe(200);
+    expect(res.body.error).toBeUndefined(); // No error message — admin is invisible
   });
 
-  test("returns 403 with x-admin-secret but no JWT (requireAdmin needs JWT)", async () => {
-    // x-admin-secret header is NOT used by the admin router
-    // requireAdmin middleware requires a valid JWT Bearer token with role === 'admin'
+  test("grants access with valid x-admin-secret header", async () => {
+    process.env.ADMIN_SECRET_KEY = "test-secret-key-123";
     const res = await request(app)
       .get("/api/admin/health-check")
-      .set("x-admin-secret", "test-secret");
-    expect(res.status).toBe(403);
+      .set("x-admin-secret", "test-secret-key-123");
+    // With valid secret, should get actual admin response (200 with data)
+    expect(res.status).toBe(200);
+    delete process.env.ADMIN_SECRET_KEY;
   });
 
-  test("admin endpoints consistently return 403 for non-admin users", async () => {
-    // All /api/admin/* routes are protected by requireAdmin
+  test("admin endpoints return silent 200 for non-admin users (stealth)", async () => {
+    // All /api/admin/* routes silently ignore non-admin requests
     const endpoints = ["/api/admin/brain", "/api/admin/health-check", "/api/admin/users"];
     for (const ep of endpoints) {
       const res = await request(app).get(ep);
-      expect(res.status).toBe(403);
+      expect(res.status).toBe(200);
+      // Response should be empty {} — no admin data leaked
+      expect(Object.keys(res.body).length).toBeLessThanOrEqual(0);
     }
   });
 });

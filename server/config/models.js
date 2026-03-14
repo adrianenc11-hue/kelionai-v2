@@ -14,6 +14,9 @@ const MODELS = {
   GEMINI_CHAT: "gemini-2.5-flash",
   GEMINI_VISION: "gemini-2.5-flash",
   DEEPSEEK: "deepseek-chat",
+  OPENAI_TOOLS: "gpt-5.4",      // V5: primary tool calling model
+  GEMINI_QA: "gemini-2.5-flash", // V5: Quality Gate verifier (free)
+  GPT_REALTIME: "gpt-4o-realtime-preview", // Voice-First: audio→audio
 
   // ── STT ──
   WHISPER: "whisper-large-v3-turbo",

@@ -1943,6 +1943,14 @@ if (require.main === module) {
     "WebSocket voice pipeline mounted on /api/voice-stream",
   );
 
+  // ── Attach Voice-First (OpenAI Realtime) WebSocket ──
+  const { setupRealtimeVoice } = require("./routes/voice-realtime");
+  setupRealtimeVoice(server, app.locals);
+  logger.info(
+    { component: "VoiceRealtime" },
+    "WebSocket voice-first mounted on /api/voice-realtime",
+  );
+
   // ── Attach Collaboration WebSocket ──
   const { setupCollaboration } = require("./collaboration");
   setupCollaboration(server);

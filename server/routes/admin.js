@@ -33,12 +33,39 @@ const CONFIG = {
   adminEmail: process.env.ADMIN_EMAIL || "",
 };
 
-// ── Admin middleware — checks JWT role OR admin secret key ──
-// ═══ TEMPORARILY DISABLED (trial period) — re-enable by removing bypass below ═══
+// ── Admin middleware — stealth: non-admins get silent 200 empty (admin doesn't exist) ──
 async function requireAdmin(req, res, next) {
-  // Auth disabled (trial period) — will add proper auth later
-  req.adminUser = { id: "admin-open", role: "admin" };
-  return next();
+  // Non-admin requests are silently ignored — 200 empty, no error, no hints
+  const silentIgnore = () => res.status(200).json({});
+
+  try {
+    // Method 1: x-admin-secret header (admin panel sends this after verify-code)
+    const secret = (process.env.ADMIN_SECRET_KEY || "").trim();
+    const headerSecret = (req.headers["x-admin-secret"] || "").trim();
+    if (secret && headerSecret === secret) {
+      req.adminUser = { id: "admin-secret", role: "admin" };
+      return next();
+    }
+
+    // Method 2: JWT Bearer token with admin email
+    const authHeader = req.headers.authorization || "";
+    const { getUserFromToken } = req.app.locals || {};
+    if (getUserFromToken && authHeader.startsWith("Bearer ")) {
+      const user = await getUserFromToken(req).catch(() => null);
+      if (user) {
+        const adminEmail = (process.env.ADMIN_EMAIL || "").toLowerCase().trim();
+        if (adminEmail && user.email?.toLowerCase().trim() === adminEmail) {
+          req.adminUser = { id: user.id, role: "admin", email: user.email };
+          return next();
+        }
+      }
+    }
+
+    // Not admin — silent ignore (admin doesn't exist for you)
+    return silentIgnore();
+  } catch (_e) {
+    return silentIgnore();
+  }
 }
 
 // ── POST /verify-code — validate admin access/exit code (pre-auth) ──

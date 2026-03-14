@@ -3293,4 +3293,4 @@ async function thinkV4(
   }
 }
 
-module.exports = { thinkV4, TOOL_DEFINITIONS };
+module.exports = { thinkV4, TOOL_DEFINITIONS, executeTool };

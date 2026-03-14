@@ -662,6 +662,10 @@
                 style="background:none;border:2px solid #555;border-radius:50%;width:36px;height:36px;cursor:pointer;font-size:1.1rem;color:#888;transition:all 0.3s;">🎙️</button>
             <button id="btn-camera-inline" title="Camera ON/OFF" aria-label="Toggle camera"
                 style="background:none;border:2px solid #555;border-radius:50%;width:36px;height:36px;cursor:pointer;font-size:1.1rem;color:#888;transition:all 0.3s;">📷</button>
+            <button id="btn-voicefirst" title="Voice-First Mode" aria-label="Toggle Voice-First mode"
+                style="background:none;border:2px solid #555;border-radius:50%;width:36px;height:36px;cursor:pointer;font-size:1.1rem;color:#888;transition:all 0.3s;">🗣️</button>
+            <button id="btn-cc-toggle" title="CC Subtitles" aria-label="Toggle CC subtitles"
+                style="display:none;background:none;border:2px solid #555;border-radius:50%;width:36px;height:36px;cursor:pointer;font-size:0.75rem;font-weight:700;color:#888;transition:all 0.3s;font-family:var(--kelion-font);">CC</button>
 
             <div id="mic-level" title="Mic level" style="display:none">
                 <span></span><span></span><span></span><span></span><span></span>
@@ -753,6 +757,7 @@
     <script src="/js/alignment-lipsync.js?v=20260308"></script>
     <script src="/js/avatar.js?v=20260310e"></script>
     <script src="/js/voice.js"></script>
+    <script src="/js/voice-realtime-client.js"></script>
     <script src="/js/realtime-vision.js?v=20260310e"></script>
     <script src="/js/auth.js"></script>
     <script src="/js/identity.js"></script>
@@ -882,6 +887,85 @@
                     camBtn.title = 'Camera ON/OFF';
                 }
             });
+        })();
+    </script>
+    <!-- Voice-First Mode Toggle + CC Subtitle -->
+    <style>
+        .voice-cc-subtitle {
+            position: absolute;
+            bottom: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            max-width: 90%;
+            background: rgba(0,0,0,0.75);
+            -webkit-backdrop-filter: blur(8px);
+            backdrop-filter: blur(8px);
+            color: #fff;
+            font-size: 0.85rem;
+            padding: 6px 16px;
+            border-radius: 8px;
+            text-align: center;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            z-index: 50;
+        }
+        .voice-cc-subtitle.visible { opacity: 1; }
+    </style>
+    <script>
+        (function() {
+            var vfBtn = document.getElementById('btn-voicefirst');
+            var ccBtn = document.getElementById('btn-cc-toggle');
+            var vfActive = false;
+            if (!vfBtn) return;
+
+            vfBtn.addEventListener('click', function() {
+                if (!window.KVoiceFirst) return;
+
+                if (!vfActive) {
+                    // Activate Voice-First
+                    var avatar = (window.KAvatar && KAvatar.getCurrentAvatar) ? KAvatar.getCurrentAvatar() : 'kelion';
+                    var lang = (window.KVoice && KVoice.getLanguage) ? KVoice.getLanguage() : 'ro';
+                    KVoiceFirst.connect(avatar, lang);
+                    vfActive = true;
+                    vfBtn.style.borderColor = '#10B981';
+                    vfBtn.style.color = '#10B981';
+                    vfBtn.style.boxShadow = '0 0 10px rgba(16,185,129,0.4)';
+                    vfBtn.title = 'Voice-First ACTIV — Click pentru a opri';
+                    // Show CC toggle
+                    if (ccBtn) ccBtn.style.display = '';
+                } else {
+                    // Deactivate Voice-First
+                    KVoiceFirst.disconnect();
+                    vfActive = false;
+                    vfBtn.style.borderColor = '#555';
+                    vfBtn.style.color = '#888';
+                    vfBtn.style.boxShadow = '';
+                    vfBtn.title = 'Voice-First Mode';
+                    // Hide CC toggle
+                    if (ccBtn) ccBtn.style.display = 'none';
+                }
+            });
+
+            // CC toggle
+            if (ccBtn) {
+                ccBtn.addEventListener('click', function() {
+                    if (!window.KVoiceFirst) return;
+                    var enabled = !KVoiceFirst.isCCEnabled();
+                    KVoiceFirst.setCCEnabled(enabled);
+                    if (enabled) {
+                        ccBtn.style.borderColor = '#06B6D4';
+                        ccBtn.style.color = '#06B6D4';
+                        ccBtn.style.boxShadow = '0 0 10px rgba(6,182,212,0.4)';
+                        ccBtn.title = 'CC Subtitles ON';
+                    } else {
+                        ccBtn.style.borderColor = '#555';
+                        ccBtn.style.color = '#888';
+                        ccBtn.style.boxShadow = '';
+                        ccBtn.title = 'CC Subtitles OFF';
+                    }
+                });
+            }
         })();
     </script>
 </body>
