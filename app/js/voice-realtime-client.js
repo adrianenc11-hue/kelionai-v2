@@ -122,7 +122,8 @@
                 avatar: _lastAvatar,
                 language: _lastLanguage
             },
-            transports: ['websocket', 'polling'],
+            transports: ['polling', 'websocket'],  // polling first — Railway proxy breaks raw WS
+            upgrade: true,                          // try WS upgrade after polling connects
             reconnection: true,
             reconnectionAttempts: 3,
             reconnectionDelay: 2000,
