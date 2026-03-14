@@ -271,13 +271,13 @@
                 const center = box.getCenter(new THREE.Vector3());
                 const size = box.getSize(new THREE.Vector3());
 
-                // Center model at world origin
+                // Center model at world origin (X, Z only — Y is user-calibrated)
                 currentModel.position.sub(center);
                 const maxDim = Math.max(size.x, size.y, size.z);
                 if (maxDim > 0) currentModel.scale.setScalar(1.2 / maxDim);
 
-                // Shift model down for head+torso framing
-                currentModel.position.y -= 0.60; // User-calibrated: full body framing
+                // Override Y with user-calibrated absolute value (SET, not subtract)
+                currentModel.position.y = -0.60;
 
                 currentModel.traverse((child) => {
                     if (child.isMesh) {
