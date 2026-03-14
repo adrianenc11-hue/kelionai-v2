@@ -183,7 +183,7 @@ const TOOL_DEFINITIONS = [
       properties: {
         code: {
           type: 'string',
-          description: 'JavaScript code to execute. Must return a value or use /* /* /* /* /* /* /* /* /* /* /* /* /* /* console.log() (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */.',
+          description: 'JavaScript code to execute. Must return a value or use /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* console.log() (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */.',
         },
       },
       required: ['code'],
