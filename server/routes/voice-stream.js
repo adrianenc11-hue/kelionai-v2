@@ -335,8 +335,12 @@ function setupVoiceStream(server, appLocals) {
         // Wait for TTS WebSocket to be ready
         await new Promise((resolve) => {
           if (ttsHandler.ws.readyState === WebSocket.OPEN) return resolve();
-          ttsHandler.ws.on('open', resolve);
-          setTimeout(resolve, 3000); // timeout
+          const openHandler = () => resolve();
+          ttsHandler.ws.on('open', openHandler);
+          setTimeout(() => {
+            ttsHandler.ws.off('open', openHandler);
+            resolve();
+          }, 3000); // timeout
         });
 
         clientWs.send(
@@ -451,7 +455,7 @@ function setupVoiceStream(server, appLocals) {
     }
 
     // Handle incoming messages from client
-    clientWs.on('message', (data) => {
+    const handleClientMessage = (data) => {
       try {
         // Binary data = audio chunk from microphone
         if (Buffer.isBuffer(data) || data instanceof ArrayBuffer) {
@@ -480,10 +484,13 @@ function setupVoiceStream(server, appLocals) {
       } catch (e) {
         logger.warn({ component: 'VoiceStream', err: e.message }, 'Message parse');
       }
-    });
+    };
+
+    clientWs.on('message', handleClientMessage);
 
     clientWs.on('close', () => {
       logger.info({ component: 'VoiceStream', duration: Date.now() - startTime }, 'Client disconnected');
+      clientWs.off('message', handleClientMessage);
       if (sttHandler) sttHandler.close();
       if (ttsHandler) ttsHandler.close();
     });

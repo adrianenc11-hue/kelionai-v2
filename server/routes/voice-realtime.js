@@ -97,7 +97,7 @@ function setupRealtimeVoice(io, appLocals) {
     });
 
     // ── Relay OpenAI events to client ──
-    openaiWs.on('message', (raw) => {
+    const handleOpenAiMessage = (raw) => {
       try {
         const event = JSON.parse(raw.toString());
 
@@ -227,7 +227,8 @@ function setupRealtimeVoice(io, appLocals) {
       } catch (e) {
         logger.warn({ component: 'VoiceRealtime', err: e.message }, 'Event parse error');
       }
-    });
+    };
+    openaiWs.on('message', handleOpenAiMessage);
 
     openaiWs.on('error', (e) => {
       logger.error({ component: 'VoiceRealtime', err: e.message }, 'OpenAI WS error');
