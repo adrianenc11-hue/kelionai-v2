@@ -1727,9 +1727,7 @@ app.get("/api/media/history", async (req, res) => {
 app.get("/api/voice-stream", (req, res) => {
   res.status(426).json({ error: "Upgrade to WebSocket required" });
 });
-app.get("/api/voice-realtime", (req, res) => {
-  res.status(426).json({ error: "Upgrade to WebSocket required" });
-});
+// Note: /api/voice-realtime removed — now handled by Socket.io (/voice-realtime namespace)
 
 // 404 for unknown API routes — must come before the catch-all
 app.use("/api", (req, res, _next) => {
@@ -1943,7 +1941,16 @@ if (require.main === module) {
   // ── Create HTTP server for WebSocket support ──
   const server = http.createServer(app);
 
-  // ── Attach Voice Stream WebSocket ──
+  // ── Create Socket.io server (used by voice-first) ──
+  const { Server: SocketIOServer } = require("socket.io");
+  const io = new SocketIOServer(server, {
+    cors: { origin: "*" },
+    transports: ["websocket", "polling"],
+    pingTimeout: 60000,
+    pingInterval: 25000,
+  });
+
+  // ── Attach Voice Stream WebSocket (classic pipeline — stays raw WS) ──
   const { setupVoiceStream } = require("./routes/voice-stream");
   setupVoiceStream(server, app.locals);
   logger.info(
@@ -1951,12 +1958,12 @@ if (require.main === module) {
     "WebSocket voice pipeline mounted on /api/voice-stream",
   );
 
-  // ── Attach Voice-First (OpenAI Realtime) WebSocket ──
+  // ── Attach Voice-First (OpenAI Realtime) via Socket.io ──
   const { setupRealtimeVoice } = require("./routes/voice-realtime");
-  setupRealtimeVoice(server, app.locals);
+  setupRealtimeVoice(io, app.locals);
   logger.info(
     { component: "VoiceRealtime" },
-    "WebSocket voice-first mounted on /api/voice-realtime",
+    "Socket.io voice-first mounted on /voice-realtime namespace",
   );
 
   // ── Attach Collaboration WebSocket ──

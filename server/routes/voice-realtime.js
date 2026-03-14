@@ -1,6 +1,7 @@
 // ═══════════════════════════════════════════════════════════════
-// KelionAI — Voice-First Mode: OpenAI Realtime API Proxy
-// Single WebSocket: Audio → GPT Realtime → Audio + Transcript
+// KelionAI — Voice-First Mode: OpenAI Realtime API via Socket.io
+// Socket.io namespace: /voice-realtime
+// Replaces raw WebSocket proxy to fix Railway proxy compression
 // ═══════════════════════════════════════════════════════════════
 "use strict";
 
@@ -13,44 +14,28 @@ const REALTIME_URL = "wss://api.openai.com/v1/realtime";
 const REALTIME_MODEL = MODELS.GPT_REALTIME || "gpt-4o-realtime-preview";
 
 /**
- * Setup the Voice-First WebSocket on the HTTP server.
- * Client connects to /api/voice-realtime → proxied to OpenAI Realtime API.
+ * Attach Voice-First Socket.io namespace to the io server.
+ * @param {import('socket.io').Server} io  — Socket.io server instance
+ * @param {object} appLocals              — Express app.locals (contains brain)
  */
-function setupRealtimeVoice(server, appLocals) {
-  const wss = new WebSocket.Server({ noServer: true, perMessageDeflate: true });
+function setupRealtimeVoice(io, appLocals) {
   const brain = appLocals?.brain || null;
+  const ns = io.of("/voice-realtime");
 
-  // Handle upgrade requests for /api/voice-realtime
-  server.on("upgrade", (request, socket, head) => {
-    const url = new URL(request.url, `http://${request.headers.host}`);
-    if (url.pathname === "/api/voice-realtime") {
-      // Allow compression negotiation for Railway proxy compatibility
-      wss.handleUpgrade(request, socket, head, (ws) => {
-        wss.emit("connection", ws, request);
-      });
-    }
-  });
-
-  wss.on("connection", (clientWs, req) => {
-    const url = new URL(req.url, `http://${req.headers.host}`);
-    const avatar = url.searchParams.get("avatar") || "kelion";
-    const language = url.searchParams.get("language") || "ro";
+  ns.on("connection", (socket) => {
+    const avatar = socket.handshake.query.avatar || "kelion";
+    const language = socket.handshake.query.language || "ro";
     const startTime = Date.now();
 
     logger.info(
-      { component: "VoiceRealtime", avatar, language },
-      "Client connected to voice-realtime",
+      { component: "VoiceRealtime", avatar, language, id: socket.id },
+      "Client connected to voice-realtime (Socket.io)",
     );
 
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
-      clientWs.send(
-        JSON.stringify({
-          type: "error",
-          error: "OPENAI_API_KEY not configured",
-        }),
-      );
-      clientWs.close();
+      socket.emit("error_msg", { error: "OPENAI_API_KEY not configured" });
+      socket.disconnect(true);
       return;
     }
 
@@ -60,7 +45,6 @@ function setupRealtimeVoice(server, appLocals) {
 
     try {
       openaiWs = new WebSocket(`${REALTIME_URL}?model=${REALTIME_MODEL}`, {
-        perMessageDeflate: false,
         headers: {
           Authorization: `Bearer ${apiKey}`,
           "OpenAI-Beta": "realtime=v1",
@@ -71,10 +55,8 @@ function setupRealtimeVoice(server, appLocals) {
         { component: "VoiceRealtime", err: e.message },
         "Failed to create OpenAI WS",
       );
-      clientWs.send(
-        JSON.stringify({ type: "error", error: "Realtime API unavailable" }),
-      );
-      clientWs.close();
+      socket.emit("error_msg", { error: "Realtime API unavailable" });
+      socket.disconnect(true);
       return;
     }
 
@@ -112,15 +94,12 @@ function setupRealtimeVoice(server, appLocals) {
       );
 
       // Signal client that we're ready
-      clientWs.send(
-        JSON.stringify({
-          type: "ready",
-          engine: "openai-realtime",
-          model: REALTIME_MODEL,
-          avatar,
-          language,
-        }),
-      );
+      socket.emit("ready", {
+        engine: "openai-realtime",
+        model: REALTIME_MODEL,
+        avatar,
+        language,
+      });
     });
 
     // ── Relay OpenAI events to client ──
@@ -129,50 +108,38 @@ function setupRealtimeVoice(server, appLocals) {
         const event = JSON.parse(raw.toString());
 
         switch (event.type) {
-          // ── Audio response chunks → relay to client as binary ──
+          // ── Audio response chunks ──
           case "response.audio.delta": {
             const audioB64 = event.delta;
-            if (audioB64 && clientWs.readyState === WebSocket.OPEN) {
-              // Send as JSON — client decodes base64
-              clientWs.send(
-                JSON.stringify({
-                  type: "audio_chunk",
-                  audio: audioB64,
-                }),
-              );
+            if (audioB64 && socket.connected) {
+              socket.emit("audio_chunk", { audio: audioB64 });
             }
             break;
           }
 
           // ── Audio response complete ──
           case "response.audio.done": {
-            clientWs.send(JSON.stringify({ type: "audio_end" }));
+            socket.emit("audio_end");
             break;
           }
 
           // ── Transcript of AI response (for CC subtitles) ──
           case "response.audio_transcript.delta": {
             if (event.delta) {
-              clientWs.send(
-                JSON.stringify({
-                  type: "transcript",
-                  text: event.delta,
-                  role: "assistant",
-                }),
-              );
+              socket.emit("transcript", {
+                text: event.delta,
+                role: "assistant",
+              });
             }
             break;
           }
 
           case "response.audio_transcript.done": {
             if (event.transcript) {
-              clientWs.send(
-                JSON.stringify({
-                  type: "transcript_done",
-                  text: event.transcript,
-                  role: "assistant",
-                }),
-              );
+              socket.emit("transcript_done", {
+                text: event.transcript,
+                role: "assistant",
+              });
 
               // Save to brain memory
               if (brain) {
@@ -190,18 +157,14 @@ function setupRealtimeVoice(server, appLocals) {
             break;
           }
 
-          // ── Transcript of user's speech (input transcription) ──
+          // ── Transcript of user's speech ──
           case "conversation.item.input_audio_transcription.completed": {
             if (event.transcript) {
-              clientWs.send(
-                JSON.stringify({
-                  type: "transcript",
-                  text: event.transcript,
-                  role: "user",
-                }),
-              );
+              socket.emit("transcript", {
+                text: event.transcript,
+                role: "user",
+              });
 
-              // Save user speech to brain memory
               if (brain) {
                 brain
                   .saveMemory(
@@ -217,27 +180,21 @@ function setupRealtimeVoice(server, appLocals) {
             break;
           }
 
-          // ── Speech started (user is talking) ──
+          // ── Speech started/stopped ──
           case "input_audio_buffer.speech_started": {
-            clientWs.send(JSON.stringify({ type: "speech_started" }));
+            socket.emit("speech_started");
             break;
           }
 
-          // ── Speech stopped (user stopped talking) ──
           case "input_audio_buffer.speech_stopped": {
-            clientWs.send(JSON.stringify({ type: "speech_stopped" }));
+            socket.emit("speech_stopped");
             break;
           }
 
           // ── Turn complete ──
           case "response.done": {
             const usage = event.response?.usage;
-            clientWs.send(
-              JSON.stringify({
-                type: "turn_complete",
-                usage: usage || null,
-              }),
-            );
+            socket.emit("turn_complete", { usage: usage || null });
 
             if (usage) {
               logger.info(
@@ -258,18 +215,14 @@ function setupRealtimeVoice(server, appLocals) {
               { component: "VoiceRealtime", error: event.error },
               "OpenAI Realtime error",
             );
-            clientWs.send(
-              JSON.stringify({
-                type: "error",
-                error: event.error?.message || "Unknown error",
-              }),
-            );
+            socket.emit("error_msg", {
+              error: event.error?.message || "Unknown error",
+            });
             break;
           }
 
           // ── Rate limits ──
           case "rate_limits.updated": {
-            // Log but don't relay to client
             logger.debug(
               { component: "VoiceRealtime", limits: event.rate_limits },
               "Rate limits updated",
@@ -278,7 +231,6 @@ function setupRealtimeVoice(server, appLocals) {
           }
 
           default:
-            // Log unknown events for debugging
             if (event.type && !event.type.startsWith("session.")) {
               logger.debug(
                 { component: "VoiceRealtime", eventType: event.type },
@@ -300,12 +252,7 @@ function setupRealtimeVoice(server, appLocals) {
         { component: "VoiceRealtime", err: e.message },
         "OpenAI WS error",
       );
-      clientWs.send(
-        JSON.stringify({
-          type: "error",
-          error: "Realtime connection error",
-        }),
-      );
+      socket.emit("error_msg", { error: "Realtime connection error" });
     });
 
     openaiWs.on("close", (code, reason) => {
@@ -313,82 +260,68 @@ function setupRealtimeVoice(server, appLocals) {
         { component: "VoiceRealtime", code, reason: reason?.toString() },
         "OpenAI WS closed",
       );
-      if (clientWs.readyState === WebSocket.OPEN) {
-        clientWs.send(JSON.stringify({ type: "disconnected" }));
-        clientWs.close();
+      if (socket.connected) {
+        socket.emit("disconnected");
+        socket.disconnect(true);
       }
     });
 
-    // ── Handle client messages ──
-    clientWs.on("message", (data) => {
+    // ── Handle client events ──
+
+    // Binary audio from microphone (PCM 24kHz 16-bit mono)
+    socket.on("audio", (data) => {
       if (!connected || openaiWs.readyState !== WebSocket.OPEN) return;
 
-      try {
-        // Binary = raw audio from microphone (PCM 24kHz 16-bit mono)
-        if (Buffer.isBuffer(data) || data instanceof ArrayBuffer) {
-          const b64Audio = Buffer.isBuffer(data)
-            ? data.toString("base64")
-            : Buffer.from(data).toString("base64");
+      const buf = Buffer.isBuffer(data) ? data : Buffer.from(data);
+      const b64Audio = buf.toString("base64");
 
-          openaiWs.send(
-            JSON.stringify({
-              type: "input_audio_buffer.append",
-              audio: b64Audio,
-            }),
-          );
-          return;
-        }
+      openaiWs.send(
+        JSON.stringify({
+          type: "input_audio_buffer.append",
+          audio: b64Audio,
+        }),
+      );
+    });
 
-        // Text = control messages
-        const msg = JSON.parse(data.toString());
+    // Client signals end of speech (manual mode)
+    socket.on("commit", () => {
+      if (!connected || openaiWs.readyState !== WebSocket.OPEN) return;
+      openaiWs.send(JSON.stringify({ type: "input_audio_buffer.commit" }));
+      openaiWs.send(JSON.stringify({ type: "response.create" }));
+    });
 
-        if (msg.type === "commit") {
-          // Client signals end of speech (manual mode)
-          openaiWs.send(
-            JSON.stringify({ type: "input_audio_buffer.commit" }),
-          );
-          openaiWs.send(
-            JSON.stringify({ type: "response.create" }),
-          );
-        }
+    // Cancel current response
+    socket.on("cancel", () => {
+      if (!connected || openaiWs.readyState !== WebSocket.OPEN) return;
+      openaiWs.send(JSON.stringify({ type: "response.cancel" }));
+    });
 
-        if (msg.type === "cancel") {
-          // Cancel current response
-          openaiWs.send(JSON.stringify({ type: "response.cancel" }));
-        }
-
-        if (msg.type === "text_input") {
-          // Text fallback — user typed instead of spoke
-          openaiWs.send(
-            JSON.stringify({
-              type: "conversation.item.create",
-              item: {
-                type: "message",
-                role: "user",
-                content: [
-                  {
-                    type: "input_text",
-                    text: msg.text,
-                  },
-                ],
+    // Text fallback — user typed instead of spoke
+    socket.on("text_input", (msg) => {
+      if (!connected || openaiWs.readyState !== WebSocket.OPEN) return;
+      openaiWs.send(
+        JSON.stringify({
+          type: "conversation.item.create",
+          item: {
+            type: "message",
+            role: "user",
+            content: [
+              {
+                type: "input_text",
+                text: msg.text,
               },
-            }),
-          );
-          openaiWs.send(JSON.stringify({ type: "response.create" }));
-        }
-      } catch (e) {
-        logger.warn(
-          { component: "VoiceRealtime", err: e.message },
-          "Client message error",
-        );
-      }
+            ],
+          },
+        }),
+      );
+      openaiWs.send(JSON.stringify({ type: "response.create" }));
     });
 
     // ── Client disconnected ──
-    clientWs.on("close", () => {
+    socket.on("disconnect", () => {
       const duration = Date.now() - startTime;
       logger.info(
-        { component: "VoiceRealtime", duration },
+        { component: "VoiceRealtime", duration, id: socket.id },
         `Client disconnected (${Math.round(duration / 1000)}s session)`,
       );
       if (openaiWs && openaiWs.readyState === WebSocket.OPEN) {
@@ -397,7 +330,12 @@ function setupRealtimeVoice(server, appLocals) {
     });
   });
 
-  return wss;
+  logger.info(
+    { component: "VoiceRealtime", namespace: "/voice-realtime" },
+    "Socket.io voice-first namespace ready",
+  );
+
+  return ns;
 }
 
 module.exports = { setupRealtimeVoice };
