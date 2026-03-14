@@ -73,46 +73,36 @@
         isConnected = false;
         stopMic();
 
-        console.warn('[VoiceFirst] ⚠️ Falling back to classic pipeline:', reason);
+        console.warn('[VoiceFirst] ⚠️ Realtime API unavailable:', reason);
 
         // Alert admin via custom event (admin panel picks this up)
         window.dispatchEvent(new CustomEvent('admin-alert', {
             detail: {
                 type: 'voice-fallback',
                 severity: 'warning',
-                message: 'Voice-First Realtime API down → classic pipeline active. Reason: ' + reason,
+                message: 'Voice-First Realtime API down. Reason: ' + reason,
                 timestamp: new Date().toISOString()
             }
         }));
 
-        // Show mic button as fallback + activate classic voice
-        const micBtn = document.getElementById('btn-mic-toggle');
-        if (micBtn) {
-            micBtn.style.display = '';
-            micBtn.style.borderColor = '#f59e0b';
-            micBtn.style.color = '#f59e0b';
-            micBtn.title = '⚠️ Voice-First indisponibil — mod clasic activ';
-        }
-
-        // Update 🗣️ button to show fallback state
+        // 🗣️ button → amber to signal issue (mic stays hidden per design)
         const vfBtn = document.getElementById('btn-voicefirst');
         if (vfBtn) {
             vfBtn.style.borderColor = '#f59e0b';
             vfBtn.style.color = '#f59e0b';
             vfBtn.style.boxShadow = '0 0 10px rgba(245,158,11,0.4)';
-            vfBtn.title = '⚠️ Realtime indisponibil — fallback activ';
+            vfBtn.title = '⚠️ Realtime indisponibil';
         }
 
-        // Try to log to server (admin notification)
-        fetch('/api/health', { method: 'GET' }).catch(function () { });
+        // Hide CC toggle (VF not active)
+        const ccBtn = document.getElementById('btn-cc-toggle');
+        if (ccBtn) ccBtn.style.display = 'none';
 
         window.dispatchEvent(new CustomEvent('voicefirst-fallback', { detail: { reason: reason } }));
     }
 
     function _clearFallback() {
         _fallbackActive = false;
-        const micBtn = document.getElementById('btn-mic-toggle');
-        if (micBtn) micBtn.style.display = 'none';
     }
 
     // ── Connect to Voice-First server proxy ──
