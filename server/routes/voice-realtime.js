@@ -17,15 +17,14 @@ const REALTIME_MODEL = MODELS.GPT_REALTIME || "gpt-4o-realtime-preview";
  * Client connects to /api/voice-realtime → proxied to OpenAI Realtime API.
  */
 function setupRealtimeVoice(server, appLocals) {
-  const wss = new WebSocket.Server({ noServer: true, perMessageDeflate: false });
+  const wss = new WebSocket.Server({ noServer: true, perMessageDeflate: true });
   const brain = appLocals?.brain || null;
 
   // Handle upgrade requests for /api/voice-realtime
   server.on("upgrade", (request, socket, head) => {
     const url = new URL(request.url, `http://${request.headers.host}`);
     if (url.pathname === "/api/voice-realtime") {
-      // Strip compression extensions — Railway proxy adds compression otherwise
-      delete request.headers["sec-websocket-extensions"];
+      // Allow compression negotiation for Railway proxy compatibility
       wss.handleUpgrade(request, socket, head, (ws) => {
         wss.emit("connection", ws, request);
       });
