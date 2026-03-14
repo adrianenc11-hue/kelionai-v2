@@ -1049,23 +1049,56 @@
             camera.position.z = z;
             console.log('[Avatar] Zoom:', z);
         },
-        showZoomCalibrator: function () {
-            if (document.getElementById('zoom-calibrator')) return;
+        showCameraCalibrator: function () {
+            if (document.getElementById('camera-calibrator')) { document.getElementById('camera-calibrator').remove(); }
             const p = document.createElement('div');
-            p.id = 'zoom-calibrator';
-            p.style.cssText = 'position:fixed;top:80px;right:20px;z-index:9999;background:rgba(0,0,0,0.9);border:1px solid #6366f1;border-radius:12px;padding:16px 20px;display:flex;flex-direction:column;align-items:center;gap:8px;font-family:var(--kelion-font);color:#fff;';
-            const curZ = camera ? camera.position.z : 1.05;
-            p.innerHTML = '<div style="font-size:0.9rem;font-weight:600;">🔍 Zoom cameră</div>' +
-                '<input type="range" id="zoom-slider" min="50" max="200" value="' + Math.round(curZ * 100) + '" style="width:200px;accent-color:#6366f1;">' +
-                '<div id="zoom-value" style="font-size:1.2rem;font-weight:700;color:#6366f1;">' + curZ.toFixed(2) + '</div>' +
-                '<button onclick="this.parentElement.remove()" style="padding:4px 16px;background:#6366f1;border:none;border-radius:8px;color:#fff;cursor:pointer;font-size:0.8rem;">Închide</button>';
+            p.id = 'camera-calibrator';
+            p.style.cssText = 'position:fixed;top:80px;right:20px;z-index:9999;background:rgba(0,0,0,0.95);border:1px solid #6366f1;border-radius:12px;padding:16px 20px;display:flex;flex-direction:column;align-items:center;gap:6px;font-family:var(--kelion-font);color:#fff;min-width:280px;';
+            const curY = camera ? Math.round(camera.position.y * 100) : 45;
+            const curZ = camera ? Math.round(camera.position.z * 100) : 190;
+            const curMY = currentModel ? Math.round(currentModel.position.y * 100) : -8;
+            function row(label, id, min, max, val, color) {
+                return '<div style="display:flex;align-items:center;gap:6px;width:100%;">' +
+                    '<span style="font-size:0.75rem;font-weight:700;color:' + color + ';width:60px;">' + label + '</span>' +
+                    '<input type="range" id="' + id + '" min="' + min + '" max="' + max + '" value="' + val + '" style="flex:1;accent-color:' + color + ';height:16px;">' +
+                    '<span id="' + id + '-v" style="font-size:0.85rem;font-weight:700;color:' + color + ';width:50px;text-align:right;">' + (val / 100).toFixed(2) + '</span></div>';
+            }
+            p.innerHTML = '<div style="font-size:0.9rem;font-weight:600;">📐 Camera Calibrator</div>' +
+                row('Cam Y ↕', 'cam-y', 0, 100, curY, '#22c55e') +
+                row('Zoom Z', 'cam-z', 100, 300, curZ, '#3b82f6') +
+                row('Model Y', 'mod-y', -50, 50, curMY, '#f59e0b') +
+                '<div id="cam-values" style="font-size:0.7rem;color:#888;margin-top:4px;">cam(0, ' + (curY / 100).toFixed(2) + ', ' + (curZ / 100).toFixed(2) + ') model.y=' + (curMY / 100).toFixed(2) + '</div>' +
+                '<button id="cam-cal-close" style="padding:4px 16px;background:#6366f1;border:none;border-radius:8px;color:#fff;cursor:pointer;font-size:0.8rem;margin-top:4px;">Închide</button>';
             document.body.appendChild(p);
-            document.getElementById('zoom-slider').addEventListener('input', function () {
-                const z = parseInt(this.value) / 100;
-                document.getElementById('zoom-value').textContent = z.toFixed(2);
-                if (camera) camera.position.z = z;
+            function updateValues() {
+                const y = parseInt(document.getElementById('cam-y').value);
+                const z = parseInt(document.getElementById('cam-z').value);
+                const my = parseInt(document.getElementById('mod-y').value);
+                document.getElementById('cam-values').textContent =
+                    'cam(0, ' + (y / 100).toFixed(2) + ', ' + (z / 100).toFixed(2) + ') model.y=' + (my / 100).toFixed(2);
+            }
+            document.getElementById('cam-y').addEventListener('input', function () {
+                const v = parseInt(this.value) / 100;
+                document.getElementById('cam-y-v').textContent = v.toFixed(2);
+                if (camera) camera.position.y = v;
+                updateValues();
             });
+            document.getElementById('cam-z').addEventListener('input', function () {
+                const v = parseInt(this.value) / 100;
+                document.getElementById('cam-z-v').textContent = v.toFixed(2);
+                if (camera) camera.position.z = v;
+                updateValues();
+            });
+            document.getElementById('mod-y').addEventListener('input', function () {
+                const v = parseInt(this.value) / 100;
+                document.getElementById('mod-y-v').textContent = v.toFixed(2);
+                if (currentModel) currentModel.position.y = v;
+                updateValues();
+            });
+            document.getElementById('cam-cal-close').addEventListener('click', function () { p.remove(); });
         },
+        // Legacy alias
+        showZoomCalibrator: function () { window.KAvatar.showCameraCalibrator(); },
         setEyeGaze: function (direction, intensity) {
             intensity = intensity || 0.4;
             const target = { up: 0, down: 0, left: 0, right: 0 };
