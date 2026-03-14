@@ -7,9 +7,19 @@
 const express = require('express');
 const PDFDocument = require('pdfkit');
 const ExcelJS = require('exceljs');
+const rateLimit = require('express-rate-limit');
 const logger = require('../logger');
 
 const router = express.Router();
+
+// Rate limiting for public export routes
+const exportLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  message: { error: 'Too many export requests, please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // GET /api/export/pdf?key=doc:my_document
 router.get('/pdf', async (req, res) => {

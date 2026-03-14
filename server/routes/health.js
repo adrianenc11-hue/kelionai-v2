@@ -6,6 +6,7 @@
 const express = require('express');
 const router = express.Router();
 const { version } = require('../../package.json');
+const rateLimit = require('express-rate-limit');
 
 // GET /api/health
 router.get('/', (req, res) => {

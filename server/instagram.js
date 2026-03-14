@@ -41,7 +41,7 @@ const apiLimiter = rateLimit({
   max: 100, // Limit each IP to 100 requests per windowMs
   standardHeaders: true,
   legacyHeaders: false,
-  message: 'Too many requests from this IP, please try again later.'
+  message: 'Too many requests from this IP, please try again later.',
 });
 
 // Apply rate limiting to public-facing routes

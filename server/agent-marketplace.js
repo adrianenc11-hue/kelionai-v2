@@ -19,7 +19,7 @@ const publicApiLimiter = rateLimit({
   max: 100, // Limit each IP to 100 requests per windowMs
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: 'Too many requests, please try again later.' }
+  message: { error: 'Too many requests, please try again later.' },
 });
 
 // ═══ DEFAULT AGENT TEMPLATES ═══
