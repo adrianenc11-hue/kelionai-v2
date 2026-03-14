@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="en">
   <head>
+  <meta name="description" content="Page description">
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>KelionAI — Webhooks & Rate Limits</title>
@@ -11,7 +12,7 @@
         box-sizing: border-box;
       }
       body {
-        font-family: "Inter", "Segoe UI", sans-serif;
+        font-family: 'Inter', 'Segoe UI', sans-serif;
         background: #060614;
         color: #e0e0e0;
         min-height: 100vh;
@@ -182,12 +183,8 @@
         <h3>🔗 Webhooks</h3>
         <div class="form">
           <input id="w-url" placeholder="https://your-endpoint.com/webhook" />
-          <input
-            id="w-secret"
-            placeholder="Secret (optional)"
-            style="max-width: 180px"
-          />
-          <button onclick="addHook()">+ Add Webhook</button>
+          <input id="w-secret" placeholder="Secret (optional)" style="max-width: 180px" />
+          <button type="button" onclick="addHook()">+ Add Webhook</button>
         </div>
         <div id="hooks-list"></div>
       </div>
@@ -198,58 +195,54 @@
       <div class="refresh">Auto-refreshes every 10s</div>
     </div>
     <script>
-      const T = localStorage.getItem("supabase_token") || "";
+      const T = localStorage.getItem('supabase_token') || '';
       const H = {
-        "Content-Type": "application/json",
-        Authorization: "Bearer " + T,
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer ' + T,
       };
       async function load() {
         try {
           const [hr, rr] = await Promise.all([
-            fetch("/api/admin/webhooks", { headers: H }),
-            fetch("/api/admin/rate-limits", { headers: H }),
+            fetch('/api/admin/webhooks', { headers: H }),
+            fetch('/api/admin/rate-limits', { headers: H }),
           ]);
           const hooks = await hr.json(),
             rl = await rr.json();
-          document.getElementById("s-hooks").textContent = hooks.length || 0;
-          document.getElementById("s-tracked").textContent =
-            rl.totalTracked || 0;
-          document.getElementById("s-blocked").textContent =
-            rl.currentlyBlocked || 0;
-          document.getElementById("hooks-list").innerHTML =
+          document.getElementById('s-hooks').textContent = hooks.length || 0;
+          document.getElementById('s-tracked').textContent = rl.totalTracked || 0;
+          document.getElementById('s-blocked').textContent = rl.currentlyBlocked || 0;
+          document.getElementById('hooks-list').innerHTML =
             (hooks || [])
               .map(
                 (h) =>
-                  `<div class="hook-row"><div><span class="hook-url">${h.url}</span><div class="hook-meta">Events: ${h.events.join(", ")} · ${h.deliveries} deliveries${h.lastError ? " · ⚠️ " + h.lastError : ""}</div></div><button class="btn-del" onclick="delHook('${h.id}')">Delete</button></div>`,
+                  `<div class="hook-row"><div><span class="hook-url">${h.url}</span><div class="hook-meta">Events: ${h.events.join(', ')} · ${h.deliveries} deliveries${h.lastError ? ' · ⚠️ ' + h.lastError : ''}</div></div><button type="button" class="btn-del" onclick="delHook('${h.id}')">Delete</button></div>`
               )
-              .join("") ||
-            '<div style="text-align:center;color:#666;padding:12px">No webhooks configured</div>';
-          document.getElementById("rl-list").innerHTML =
+              .join('') || '<div style="text-align:center;color:#666;padding:12px">No webhooks configured</div>';
+          document.getElementById('rl-list').innerHTML =
             (rl.topUsers || [])
               .map(
                 (u) =>
-                  `<div class="rl-row"><span class="rl-key">${u.key}</span><span>${u.count} reqs${u.blocked ? ' · <span class="rl-blocked">BLOCKED (' + u.totalBlocks + "x)</span>" : ""}</span></div>`,
+                  `<div class="rl-row"><span class="rl-key">${u.key}</span><span>${u.count} reqs${u.blocked ? ' · <span class="rl-blocked">BLOCKED (' + u.totalBlocks + 'x)</span>' : ''}</span></div>`
               )
-              .join("") ||
-            '<div style="text-align:center;color:#666;padding:12px">No rate limit data</div>';
+              .join('') || '<div style="text-align:center;color:#666;padding:12px">No rate limit data</div>';
         } catch (e) {
           console.error(e);
         }
       }
       async function addHook() {
-        await fetch("/api/admin/webhooks", {
-          method: "POST",
+        await fetch('/api/admin/webhooks', {
+          method: 'POST',
           headers: H,
           body: JSON.stringify({
-            url: document.getElementById("w-url").value,
-            secret: document.getElementById("w-secret").value,
+            url: document.getElementById('w-url').value,
+            secret: document.getElementById('w-secret').value,
           }),
         });
         load();
       }
       async function delHook(id) {
-        await fetch("/api/admin/webhooks/" + id, {
-          method: "DELETE",
+        await fetch('/api/admin/webhooks/' + id, {
+          method: 'DELETE',
           headers: H,
         });
         load();

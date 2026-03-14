@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="en">
   <head>
+  <meta name="description" content="Page description">
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>KelionAI — Session Management</title>
@@ -11,7 +12,7 @@
         box-sizing: border-box;
       }
       body {
-        font-family: "Inter", "Segoe UI", sans-serif;
+        font-family: 'Inter', 'Segoe UI', sans-serif;
         background: #060614;
         color: #e0e0e0;
         min-height: 100vh;
@@ -169,59 +170,51 @@
       </div>
       <div class="section">
         <h3>📋 Active Sessions</h3>
-        <button class="btn-revoke-all" onclick="revokeAll()">
-          ⚠️ Revoke All Sessions
-        </button>
+        <button type="button" class="btn-revoke-all" onclick="revokeAll()">⚠️ Revoke All Sessions</button>
         <div id="sessions-list"></div>
       </div>
       <div class="refresh">Auto-refreshes every 10s</div>
     </div>
     <script>
-      const T = localStorage.getItem("supabase_token") || "";
+      const T = localStorage.getItem('supabase_token') || '';
       const H = {
-        "Content-Type": "application/json",
-        Authorization: "Bearer " + T,
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer ' + T,
       };
       async function load() {
         try {
-          const r = await fetch("/api/admin/live-users", { headers: H });
+          const r = await fetch('/api/admin/live-users', { headers: H });
           const d = await r.json();
           const s = d.sessions || [];
-          document.getElementById("s-active").textContent = d.online || 0;
-          document.getElementById("s-total").textContent = s.length;
-          document.getElementById("s-idle").textContent = s.filter(
-            (x) => x.idle > 30,
-          ).length;
-          document.getElementById("sessions-list").innerHTML = s.length
+          document.getElementById('s-active').textContent = d.online || 0;
+          document.getElementById('s-total').textContent = s.length;
+          document.getElementById('s-idle').textContent = s.filter((x) => x.idle > 30).length;
+          document.getElementById('sessions-list').innerHTML = s.length
             ? s
                 .map((x) => {
-                  const status =
-                    x.idle < 30 ? "active" : x.idle < 120 ? "idle" : "expired";
-                  const dur =
-                    x.duration > 60
-                      ? Math.round(x.duration / 60) + "m"
-                      : x.duration + "s";
+                  const status = x.idle < 30 ? 'active' : x.idle < 120 ? 'idle' : 'expired';
+                  const dur = x.duration > 60 ? Math.round(x.duration / 60) + 'm' : x.duration + 's';
                   return `<div class="sess-row">
                         <span class="sess-email">${x.email}</span>
-                        <span class="sess-meta">${x.avatar} · ${dur} · ${x.userAgent ? x.userAgent.slice(0, 30) + "…" : "-"}</span>
+                        <span class="sess-meta">${x.avatar} · ${dur} · ${x.userAgent ? x.userAgent.slice(0, 30) + '…' : '-'}</span>
                         <span class="badge ${status}">${status}</span>
-                        <button class="btn-revoke" onclick="revoke('${x.userId}')">Revoke</button>
+                        <button type="button" class="btn-revoke" onclick="revoke('${x.userId}')">Revoke</button>
                     </div>`;
                 })
-                .join("")
+                .join('')
             : '<div style="text-align:center;color:#666;padding:20px">No active sessions</div>';
         } catch (e) {
           console.error(e);
         }
       }
       async function revoke(uid) {
-        if (!confirm("Revoke session for " + uid + "?")) return;
-        alert("Session revoked (server-side cleanup needed)");
+        if (!confirm('Revoke session for ' + uid + '?')) return;
+        alert('Session revoked (server-side cleanup needed)');
         load();
       }
       async function revokeAll() {
-        if (!confirm("Revoke ALL sessions?")) return;
-        alert("All sessions revoked");
+        if (!confirm('Revoke ALL sessions?')) return;
+        alert('All sessions revoked');
       }
       load();
       setInterval(load, 10000);

@@ -10,9 +10,9 @@
  * - AI responds to group context
  * - Participant presence tracking
  */
-"use strict";
+'use strict';
 
-const logger = require("./logger");
+const logger = require('./logger');
 
 // ═══ IN-MEMORY ROOM STORAGE ═══
 const rooms = new Map(); // roomId → { participants, messages, createdAt, ownerId }
@@ -37,10 +37,7 @@ function createRoom(userId, options = {}) {
 
   rooms.set(roomId, room);
 
-  logger.info(
-    { component: "SharedSession", roomId, ownerId: userId },
-    `🤝 Room created: ${room.name}`,
-  );
+  logger.info({ component: 'SharedSession', roomId, ownerId: userId }, `🤝 Room created: ${room.name}`);
 
   return {
     roomId,
@@ -54,10 +51,10 @@ function createRoom(userId, options = {}) {
  */
 function joinRoom(roomId, userId, userName, ws = null) {
   const room = rooms.get(roomId);
-  if (!room) return { error: "Room not found" };
+  if (!room) return { error: 'Room not found' };
 
   if (room.participants.size >= room.maxParticipants) {
-    return { error: "Room is full" };
+    return { error: 'Room is full' };
   }
 
   room.participants.set(userId, {
@@ -69,24 +66,21 @@ function joinRoom(roomId, userId, userName, ws = null) {
 
   // Notify others
   const joinMsg = {
-    userId: "system",
-    name: "System",
+    userId: 'system',
+    name: 'System',
     content: `${userName || userId.slice(0, 6)} joined the session`,
     timestamp: new Date().toISOString(),
-    type: "system",
+    type: 'system',
   };
   room.messages.push(joinMsg);
   broadcastToRoom(roomId, {
-    type: "participant_joined",
+    type: 'participant_joined',
     userId,
     name: userName,
     message: joinMsg,
   });
 
-  logger.info(
-    { component: "SharedSession", roomId, userId },
-    `🤝 User joined: ${userName}`,
-  );
+  logger.info({ component: 'SharedSession', roomId, userId }, `🤝 User joined: ${userName}`);
 
   return {
     success: true,
@@ -109,15 +103,15 @@ function leaveRoom(roomId, userId) {
 
   // Notify others
   const leaveMsg = {
-    userId: "system",
-    name: "System",
+    userId: 'system',
+    name: 'System',
     content: `${participant?.name || userId.slice(0, 6)} left the session`,
     timestamp: new Date().toISOString(),
-    type: "system",
+    type: 'system',
   };
   room.messages.push(leaveMsg);
   broadcastToRoom(roomId, {
-    type: "participant_left",
+    type: 'participant_left',
     userId,
     message: leaveMsg,
   });
@@ -128,13 +122,10 @@ function leaveRoom(roomId, userId) {
       () => {
         if (rooms.has(roomId) && rooms.get(roomId).participants.size === 0) {
           rooms.delete(roomId);
-          logger.info(
-            { component: "SharedSession", roomId },
-            "🤝 Room auto-deleted (empty)",
-          );
+          logger.info({ component: 'SharedSession', roomId }, '🤝 Room auto-deleted (empty)');
         }
       },
-      5 * 60 * 1000,
+      5 * 60 * 1000
     );
   }
 }
@@ -142,14 +133,14 @@ function leaveRoom(roomId, userId) {
 /**
  * Send message to room (from user or AI)
  */
-function sendMessage(roomId, userId, content, type = "user") {
+function sendMessage(roomId, userId, content, type = 'user') {
   const room = rooms.get(roomId);
-  if (!room) return { error: "Room not found" };
+  if (!room) return { error: 'Room not found' };
 
   const participant = room.participants.get(userId);
   const message = {
     userId,
-    name: type === "ai" ? "Kelion AI" : participant?.name || userId.slice(0, 6),
+    name: type === 'ai' ? 'Kelion AI' : participant?.name || userId.slice(0, 6),
     content,
     timestamp: new Date().toISOString(),
     type, // "user" | "ai" | "system"
@@ -163,7 +154,7 @@ function sendMessage(roomId, userId, content, type = "user") {
   }
 
   // Broadcast to all participants
-  broadcastToRoom(roomId, { type: "new_message", message });
+  broadcastToRoom(roomId, { type: 'new_message', message });
 
   return { success: true, message };
 }
@@ -266,17 +257,17 @@ function getUserRooms(userId) {
  */
 function buildGroupContext(roomId, limit = 10) {
   const room = rooms.get(roomId);
-  if (!room) return "";
+  if (!room) return '';
 
   const recent = room.messages
-    .filter((m) => m.type !== "system")
+    .filter((m) => m.type !== 'system')
     .slice(-limit)
     .map((m) => `[${m.name}]: ${m.content}`)
-    .join("\n");
+    .join('\n');
 
   const participants = getParticipantList(roomId)
     .map((p) => p.name)
-    .join(", ");
+    .join(', ');
 
   return `[SHARED SESSION — Participants: ${participants}]\n${recent}`;
 }
@@ -294,6 +285,10 @@ function updateParticipantWs(roomId, userId, ws) {
   }
 }
 
+/**
+ * undefined
+ * @returns {*}
+ */
 module.exports = {
   createRoom,
   joinRoom,

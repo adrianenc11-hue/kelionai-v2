@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="en">
   <head>
+  <meta name="description" content="Page description">
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>KelionAI — Error Tracking</title>
@@ -11,7 +12,7 @@
         box-sizing: border-box;
       }
       body {
-        font-family: "Inter", "Segoe UI", sans-serif;
+        font-family: 'Inter', 'Segoe UI', sans-serif;
         background: #060614;
         color: #e0e0e0;
         min-height: 100vh;
@@ -165,44 +166,36 @@
       <div class="refresh">Auto-refreshes every 15s</div>
     </div>
     <script>
-      const T = localStorage.getItem("supabase_token") || "";
+      const T = localStorage.getItem('supabase_token') || '';
       const H = {
-        "Content-Type": "application/json",
-        Authorization: "Bearer " + T,
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer ' + T,
       };
       async function load() {
         try {
-          const r = await fetch("/api/admin/errors", { headers: H });
+          const r = await fetch('/api/admin/errors', { headers: H });
           const d = await r.json();
-          document.getElementById("s-total").textContent = d.total || 0;
-          document.getElementById("s-1h").textContent = d.last1h || 0;
-          document.getElementById("s-24h").textContent = d.last24h || 0;
-          if (d.total === 0)
-            document.getElementById("s-total").classList.add("ok");
-          document.getElementById("top-list").innerHTML =
+          document.getElementById('s-total').textContent = d.total || 0;
+          document.getElementById('s-1h').textContent = d.last1h || 0;
+          document.getElementById('s-24h').textContent = d.last24h || 0;
+          if (d.total === 0) document.getElementById('s-total').classList.add('ok');
+          document.getElementById('top-list').innerHTML =
             (d.topErrors || [])
-              .map(
-                (e) =>
-                  `<div class="top-err"><span>${e.message}</span><span class="cnt">×${e.count}</span></div>`,
-              )
-              .join("") ||
-            '<div style="text-align:center;color:#666;padding:12px">No errors 🎉</div>';
+              .map((e) => `<div class="top-err"><span>${e.message}</span><span class="cnt">×${e.count}</span></div>`)
+              .join('') || '<div style="text-align:center;color:#666;padding:12px">No errors 🎉</div>';
           const src = d.bySource || {};
-          document.getElementById("source-list").innerHTML =
+          document.getElementById('source-list').innerHTML =
             Object.entries(src)
-              .map(
-                ([k, v]) =>
-                  `<span class="source-tag">${k}: <strong>${v}</strong></span>`,
-              )
-              .join("") || "None";
-          document.getElementById("err-list").innerHTML =
+              .map(([k, v]) => `<span class="source-tag">${k}: <strong>${v}</strong></span>`)
+              .join('') || 'None';
+          document.getElementById('err-list').innerHTML =
             (d.recent || [])
               .slice(0, 20)
               .map(
                 (e) =>
-                  `<div class="err-row"><div class="msg">${e.message}</div><div class="meta">${e.source} · ${e.route || "-"} · ${new Date(e.timestamp).toLocaleTimeString()}</div>${e.stack ? `<pre style="color:#666;font-size:.7rem;margin-top:4px;white-space:pre-wrap;max-height:60px;overflow:hidden">${e.stack.slice(0, 200)}</pre>` : ""}</div>`,
+                  `<div class="err-row"><div class="msg">${e.message}</div><div class="meta">${e.source} · ${e.route || '-'} · ${new Date(e.timestamp).toLocaleTimeString()}</div>${e.stack ? `<pre style="color:#666;font-size:.7rem;margin-top:4px;white-space:pre-wrap;max-height:60px;overflow:hidden">${e.stack.slice(0, 200)}</pre>` : ''}</div>`
               )
-              .join("") ||
+              .join('') ||
             '<div style="text-align:center;color:#22c55e;padding:20px">No errors! System healthy 🎉</div>';
         } catch (e) {
           console.error(e);

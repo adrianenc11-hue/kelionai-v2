@@ -5,14 +5,9 @@
 
 /* ── Message bubbles ── */
 .message-user {
-  background: linear-gradient(
-    135deg,
-    var(--kelion-primary, #6c63ff),
-    var(--kelion-primary-hover, #5a52e0)
-  );
+  background: linear-gradient(135deg, var(--kelion-primary, #6c63ff), var(--kelion-primary-hover, #5a52e0));
   color: #fff;
-  border-radius: var(--kelion-radius, 12px) var(--kelion-radius, 12px) 4px
-    var(--kelion-radius, 12px);
+  border-radius: var(--kelion-radius, 12px) var(--kelion-radius, 12px) 4px var(--kelion-radius, 12px);
   padding: 12px 16px;
   max-width: 70%;
   align-self: flex-end;
@@ -23,8 +18,7 @@
   background: var(--kelion-surface, rgba(15, 15, 45, 0.85));
   border: 1px solid var(--kelion-border, rgba(255, 255, 255, 0.08));
   color: var(--kelion-text, #e8e8f0);
-  border-radius: var(--kelion-radius, 12px) var(--kelion-radius, 12px)
-    var(--kelion-radius, 12px) 4px;
+  border-radius: var(--kelion-radius, 12px) var(--kelion-radius, 12px) var(--kelion-radius, 12px) 4px;
   padding: 12px 16px;
   max-width: 70%;
   align-self: flex-start;
@@ -36,11 +30,7 @@
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: linear-gradient(
-    135deg,
-    var(--kelion-primary, #6c63ff),
-    var(--kelion-secondary, #00ccff)
-  );
+  background: linear-gradient(135deg, var(--kelion-primary, #6c63ff), var(--kelion-secondary, #00ccff));
   box-shadow: var(--kelion-glow, 0 0 30px rgba(108, 99, 255, 0.3));
   display: flex;
   align-items: center;
@@ -73,7 +63,7 @@
   border: 1px solid var(--kelion-border, rgba(255, 255, 255, 0.08));
   border-radius: 100px;
   color: var(--kelion-text, #e8e8f0);
-  font-family: var(--kelion-font, "Inter", sans-serif);
+  font-family: var(--kelion-font, 'Inter', sans-serif);
   padding: 14px 60px 14px 20px;
   width: 100%;
   font-size: 15px;
@@ -95,11 +85,7 @@
   width: 44px;
   height: 44px;
   border-radius: 50%;
-  background: linear-gradient(
-    135deg,
-    var(--kelion-primary, #6c63ff),
-    var(--kelion-secondary, #00ccff)
-  );
+  background: linear-gradient(135deg, var(--kelion-primary, #6c63ff), var(--kelion-secondary, #00ccff));
   border: none;
   cursor: pointer;
   display: flex;

@@ -4,7 +4,7 @@
 // Replaces old FFT-only approach with proper multi-morph viseme mapping
 // ═══════════════════════════════════════════════════════════════
 (function () {
-  "use strict";
+  'use strict';
 
   var morphMeshes = [];
   var audioCtx = null;
@@ -16,37 +16,37 @@
 
   // ── Viseme morph targets (Oculus standard) ──
   var VISEME_MORPHS = [
-    "viseme_sil",
-    "viseme_PP",
-    "viseme_FF",
-    "viseme_TH",
-    "viseme_DD",
-    "viseme_kk",
-    "viseme_CH",
-    "viseme_SS",
-    "viseme_nn",
-    "viseme_RR",
-    "viseme_aa",
-    "viseme_E",
-    "viseme_I",
-    "viseme_O",
-    "viseme_U",
+    'viseme_sil',
+    'viseme_PP',
+    'viseme_FF',
+    'viseme_TH',
+    'viseme_DD',
+    'viseme_kk',
+    'viseme_CH',
+    'viseme_SS',
+    'viseme_nn',
+    'viseme_RR',
+    'viseme_aa',
+    'viseme_E',
+    'viseme_I',
+    'viseme_O',
+    'viseme_U',
   ];
 
   // ── ARKit mouth morphs (supplementary) ──
   var ARKIT_MOUTH = [
-    "jawOpen",
-    "mouthOpen",
-    "mouthSmile",
-    "mouthFunnel",
-    "mouthPucker",
-    "mouthClose",
-    "mouthSmileLeft",
-    "mouthSmileRight",
+    'jawOpen',
+    'mouthOpen',
+    'mouthSmile',
+    'mouthFunnel',
+    'mouthPucker',
+    'mouthClose',
+    'mouthSmileLeft',
+    'mouthSmileRight',
   ];
 
   // ── Legacy morphs (backward compat with older models) ──
-  var LEGACY_MOUTH = ["Smile", "jawOpen", "mouthOpen", "JawOpen", "mouth_open"];
+  var LEGACY_MOUTH = ['Smile', 'jawOpen', 'mouthOpen', 'JawOpen', 'mouth_open'];
 
   // ── Frequency band → viseme mapping ──
   // Low (100-500Hz) = jaw movement, vowels
@@ -70,6 +70,10 @@
   var _prevVisemes = {};
   var COARTIC_BLEND = 0.1; // 10% — less blend = more distinct shapes
 
+  /**
+   * SimpleLipSync
+   * @returns {*}
+   */
   function SimpleLipSync() {}
 
   SimpleLipSync.prototype.setMorphMeshes = function (meshes) {
@@ -80,24 +84,22 @@
   SimpleLipSync.prototype.connectToContext = function (ctx) {
     try {
       audioCtx = ctx;
-      if (audioCtx.state === "suspended") audioCtx.resume();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
       analyser = audioCtx.createAnalyser();
       analyser.fftSize = 512; // CINEMATIC: doubled for better frequency resolution
       analyser.smoothingTimeConstant = 0.35; // slightly less smoothing for snappier response
       dataArray = new Uint8Array(analyser.frequencyBinCount);
-      console.log("[LipSync] Viseme engine connected, fftSize=256");
       return analyser;
     } catch (e) {
-      console.error("[LipSync] connectToContext error:", e);
+      console.error('[LipSync] connectToContext error:', e);
       return null;
     }
   };
 
   SimpleLipSync.prototype.connectToElement = function (audioEl) {
     try {
-      if (!audioCtx)
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      if (audioCtx.state === "suspended") audioCtx.resume();
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
       if (connectedElements.has(audioEl)) return true;
       try {
         var sourceNode = audioCtx.createMediaElementSource(audioEl);
@@ -110,11 +112,11 @@
         connectedElements.add(audioEl);
         return true;
       } catch (e) {
-        console.warn("[LipSync] MediaElementSource failed");
+        console.warn('[LipSync] MediaElementSource failed');
         return false;
       }
     } catch (e) {
-      console.error("[LipSync] Connect error:", e);
+      console.error('[LipSync] Connect error:', e);
       return false;
     }
   };
@@ -240,8 +242,7 @@
         var smoothed = prev + (target - prev) * factor;
 
         // CINEMATIC: add subtle asymmetry for realism (left side slightly ahead)
-        var asymOffset =
-          name.indexOf("Left") !== -1 || name.indexOf("left") !== -1 ? 0.02 : 0;
+        var asymOffset = name.indexOf('Left') !== -1 || name.indexOf('left') !== -1 ? 0.02 : 0;
         smoothed = Math.min(smoothed + asymOffset, 1);
 
         mesh.morphTargetInfluences[idx] = smoothed;
@@ -252,6 +253,12 @@
     for (var k in visemes) _prevVisemes[k] = visemes[k];
   };
 
+  /**
+   * _bandAvg
+   * @param {*} start
+   * @param {*} end
+   * @returns {*}
+   */
   function _bandAvg(start, end) {
     if (!dataArray) return 0;
     var sum = 0;
@@ -270,13 +277,14 @@
     if (analyser) {
       try {
         analyser.disconnect();
-      } catch (e) {}
+      } catch (e) {
+        console.error(e);
+      }
       analyser = null;
       dataArray = null;
     }
     this._resetMouth();
     prevValues = {};
-    console.log("[LipSync] STOPPED — mouth closed");
   };
 
   SimpleLipSync.prototype._resetMouth = function () {
@@ -311,8 +319,7 @@
         var idx = mesh.morphTargetDictionary[LEGACY_MOUTH[i]];
         if (idx !== undefined) {
           var current = mesh.morphTargetInfluences[idx];
-          mesh.morphTargetInfluences[idx] =
-            current + (value - current) * SMOOTH_FACTOR;
+          mesh.morphTargetInfluences[idx] = current + (value - current) * SMOOTH_FACTOR;
         }
       }
     }
@@ -323,7 +330,7 @@
     this.msPerChar = (opts && opts.msPerChar) || 50;
     this.timer = null;
     this.charIndex = 0;
-    this.text = "";
+    this.text = '';
   }
 
   TextLipSync.prototype.setMorphMeshes = function (meshes) {
@@ -359,11 +366,11 @@
     h: { jawOpen: 0.08 },
     j: { viseme_CH: 0.08 },
     k: { viseme_kk: 0.1 },
-    " ": { viseme_sil: 0.05 },
-    ".": {},
-    ",": { viseme_sil: 0.02 },
-    "!": {},
-    "?": {},
+    ' ': { viseme_sil: 0.05 },
+    '.': {},
+    ',': { viseme_sil: 0.02 },
+    '!': {},
+    '?': {},
   };
 
   TextLipSync.prototype.speak = function (text) {
@@ -372,6 +379,10 @@
     this.charIndex = 0;
     var self = this;
 
+    /**
+     * tick
+     * @returns {*}
+     */
     function tick() {
       if (self.charIndex >= self.text.length) {
         self.stop();
@@ -381,22 +392,14 @@
       var ch = self.text[self.charIndex].toLowerCase();
       var visemes = PHONEME_VISEME[ch];
       if (!visemes) {
-        visemes =
-          ch >= "a" && ch <= "z" ? { jawOpen: 0.15, viseme_aa: 0.1 } : {};
+        visemes = ch >= 'a' && ch <= 'z' ? { jawOpen: 0.15, viseme_aa: 0.1 } : {};
       }
 
-      var isPause =
-        ch === "." ||
-        ch === "!" ||
-        ch === "?" ||
-        ch === "," ||
-        ch === " " ||
-        ch === "\n";
+      var isPause = ch === '.' || ch === '!' || ch === '?' || ch === ',' || ch === ' ' || ch === '\n';
 
       for (var m = 0; m < morphMeshes.length; m++) {
         var mesh = morphMeshes[m];
-        if (!mesh.morphTargetDictionary || !mesh.morphTargetInfluences)
-          continue;
+        if (!mesh.morphTargetDictionary || !mesh.morphTargetInfluences) continue;
 
         // First, decay all visemes
         for (var vi = 0; vi < VISEME_MORPHS.length; vi++) {
@@ -419,8 +422,7 @@
             var idx = mesh.morphTargetDictionary[name];
             if (idx !== undefined) {
               var current = mesh.morphTargetInfluences[idx];
-              mesh.morphTargetInfluences[idx] =
-                current + (visemes[name] - current) * 0.4;
+              mesh.morphTargetInfluences[idx] = current + (visemes[name] - current) * 0.4;
             }
           }
         }
@@ -429,9 +431,9 @@
       self.charIndex++;
 
       var delay = self.msPerChar;
-      if (ch === "." || ch === "!" || ch === "?") delay = 300;
-      else if (ch === ",") delay = 150;
-      else if (ch === " ") delay = 20;
+      if (ch === '.' || ch === '!' || ch === '?') delay = 300;
+      else if (ch === ',') delay = 150;
+      else if (ch === ' ') delay = 20;
 
       self.timer = setTimeout(tick, delay);
     }

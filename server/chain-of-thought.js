@@ -2,15 +2,24 @@
 // KelionAI — Chain-of-Thought (CoT) Module
 // Shows AI reasoning steps when enabled
 // ═══════════════════════════════════════════════════════════════
-"use strict";
+'use strict';
 
 let cotEnabled = false;
 
+/**
+ * isEnabled
+ * @returns {*}
+ */
 function isEnabled() {
   return cotEnabled;
 }
+/**
+ * toggle
+ * @param {*} val
+ * @returns {*}
+ */
 function toggle(val) {
-  cotEnabled = typeof val === "boolean" ? val : !cotEnabled;
+  cotEnabled = typeof val === 'boolean' ? val : !cotEnabled;
   return cotEnabled;
 }
 
@@ -51,7 +60,11 @@ This helps the user understand HOW you reached your conclusion.`
 function cleanResponse(response) {
   if (cotEnabled) return response; // Keep CoT visible
   // Strip <details> blocks if they leaked through
-  return response.replace(/<details>[\s\S]*?<\/details>/gi, "").trim();
+  return response.replace(/<details>[\s\S]*?<\/details>/gi, '').trim();
 }
 
+/**
+ * undefined
+ * @returns {*}
+ */
 module.exports = { isEnabled, toggle, enhancePrompt, cleanResponse };

@@ -1,6 +1,6 @@
 # 📊 Raport Onest — KelionAI v2.5 — Stare Reală
 
-> **Data:** 11 Martie 2026  
+> **Data:** 11 Martie 2026
 > **Legendă:** 🟢 Funcționează 100% | 🔴 Nu funcționează / Stricat | 🔵 Trebuia implementat dar NU este
 
 ---

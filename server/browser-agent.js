@@ -11,25 +11,19 @@
  * Uses Puppeteer (or falls back to fetch-based scraping)
  * Sandboxed: no access to local filesystem, limited to web navigation
  */
-"use strict";
+'use strict';
 
-const logger = require("./logger");
+const logger = require('./logger');
 
 let puppeteer = null;
 let browserInstance = null;
 
 // Try to load Puppeteer (optional dependency)
 try {
-  puppeteer = require("puppeteer");
-  logger.info(
-    { component: "BrowserAgent" },
-    "🌐 Puppeteer available — full Computer Use enabled",
-  );
+  puppeteer = require('puppeteer');
+  logger.info({ component: 'BrowserAgent' }, '🌐 Puppeteer available — full Computer Use enabled');
 } catch {
-  logger.info(
-    { component: "BrowserAgent" },
-    "🌐 Puppeteer not installed — using fetch-based fallback",
-  );
+  logger.info({ component: 'BrowserAgent' }, '🌐 Puppeteer not installed — using fetch-based fallback');
 }
 
 const MAX_PAGES = 5; // Max concurrent pages
@@ -38,35 +32,40 @@ const activePagesMap = new Map(); // sessionId → page
 
 // ═══ BROWSER LIFECYCLE ═══
 
+/**
+ * getBrowser
+ * @returns {*}
+ */
 async function getBrowser() {
   if (!puppeteer) return null;
   if (browserInstance && browserInstance.isConnected()) return browserInstance;
 
   try {
     browserInstance = await puppeteer.launch({
-      headless: "new",
+      headless: 'new',
       args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-gpu",
-        "--no-first-run",
-        "--no-zygote",
-        "--single-process",
-        "--disable-extensions",
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--no-first-run',
+        '--no-zygote',
+        '--single-process',
+        '--disable-extensions',
       ],
     });
-    logger.info({ component: "BrowserAgent" }, "🌐 Browser launched");
+    logger.info({ component: 'BrowserAgent' }, '🌐 Browser launched');
     return browserInstance;
   } catch (e) {
-    logger.error(
-      { component: "BrowserAgent", err: e.message },
-      "Browser launch failed",
-    );
+    logger.error({ component: 'BrowserAgent', err: e.message }, 'Browser launch failed');
     return null;
   }
 }
 
+/**
+ * closeBrowser
+ * @returns {*}
+ */
 async function closeBrowser() {
   if (browserInstance) {
     try {
@@ -96,17 +95,14 @@ async function navigate(url, options = {}) {
     page = await browser.newPage();
     await page.setViewport({ width: 1280, height: 720 });
     await page.setUserAgent(
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
     );
 
     // Block unnecessary resources for speed
     await page.setRequestInterception(true);
-    page.on("request", (req) => {
+    page.on('request', (req) => {
       const type = req.resourceType();
-      if (
-        ["image", "stylesheet", "font", "media"].includes(type) &&
-        !options.loadMedia
-      ) {
+      if (['image', 'stylesheet', 'font', 'media'].includes(type) && !options.loadMedia) {
         req.abort();
       } else {
         req.continue();
@@ -114,15 +110,15 @@ async function navigate(url, options = {}) {
     });
 
     await page.goto(url, {
-      waitUntil: options.waitUntil || "domcontentloaded",
+      waitUntil: options.waitUntil || 'domcontentloaded',
       timeout: PAGE_TIMEOUT,
     });
 
     // Wait for dynamic content
     if (options.waitForSelector) {
-      await page
-        .waitForSelector(options.waitForSelector, { timeout: 10000 })
-        .catch(() => {});
+      await page.waitForSelector(options.waitForSelector, { timeout: 10000 }).catch((err) => {
+        console.error(err);
+      });
     }
 
     // Extract content
@@ -130,9 +126,7 @@ async function navigate(url, options = {}) {
     const content = await page.evaluate(() => {
       // Get main text content, clean of scripts/styles
       const clone = document.body.cloneNode(true);
-      clone
-        .querySelectorAll("script, style, noscript, iframe")
-        .forEach((el) => el.remove());
+      clone.querySelectorAll('script, style, noscript, iframe').forEach((el) => el.remove());
       return clone.innerText.substring(0, 5000);
     });
 
@@ -140,8 +134,8 @@ async function navigate(url, options = {}) {
     let screenshot = null;
     if (options.screenshot !== false) {
       screenshot = await page.screenshot({
-        encoding: "base64",
-        type: "jpeg",
+        encoding: 'base64',
+        type: 'jpeg',
         quality: 60,
         fullPage: false,
       });
@@ -149,26 +143,26 @@ async function navigate(url, options = {}) {
 
     // Get links
     const links = await page.evaluate(() => {
-      return Array.from(document.querySelectorAll("a[href]"))
+      return Array.from(document.querySelectorAll('a[href]'))
         .slice(0, 20)
         .map((a) => ({
           text: a.innerText.trim().substring(0, 80),
           href: a.href,
         }))
-        .filter((l) => l.text && l.href.startsWith("http"));
+        .filter((l) => l.text && l.href.startsWith('http'));
     });
 
     // Get forms
     const forms = await page.evaluate(() => {
-      return Array.from(document.querySelectorAll("form"))
+      return Array.from(document.querySelectorAll('form'))
         .slice(0, 5)
         .map((f) => ({
           action: f.action,
           method: f.method,
-          inputs: Array.from(f.querySelectorAll("input, select, textarea"))
+          inputs: Array.from(f.querySelectorAll('input, select, textarea'))
             .slice(0, 10)
             .map((inp) => ({
-              type: inp.type || "text",
+              type: inp.type || 'text',
               name: inp.name,
               placeholder: inp.placeholder,
               id: inp.id,
@@ -185,20 +179,19 @@ async function navigate(url, options = {}) {
         () => {
           const p = activePagesMap.get(sessionId);
           if (p) {
-            p.close().catch(() => {});
+            p.close().catch((err) => {
+              console.error(err);
+            });
             activePagesMap.delete(sessionId);
           }
         },
-        5 * 60 * 1000,
+        5 * 60 * 1000
       );
     } else {
       await page.close();
     }
 
-    logger.info(
-      { component: "BrowserAgent", url, title },
-      `🌐 Navigated: ${title}`,
-    );
+    logger.info({ component: 'BrowserAgent', url, title }, `🌐 Navigated: ${title}`);
 
     return {
       success: true,
@@ -209,14 +202,14 @@ async function navigate(url, options = {}) {
       screenshot: screenshot ? `data:image/jpeg;base64,${screenshot}` : null,
       links,
       forms,
-      engine: "puppeteer",
+      engine: 'puppeteer',
     };
   } catch (e) {
-    if (page) await page.close().catch(() => {});
-    logger.error(
-      { component: "BrowserAgent", url, err: e.message },
-      "Navigation failed",
-    );
+    if (page)
+      await page.close().catch((err) => {
+        console.error(err);
+      });
+    logger.error({ component: 'BrowserAgent', url, err: e.message }, 'Navigation failed');
     // Fallback to fetch
     return await fetchFallback(url);
   }
@@ -227,24 +220,23 @@ async function navigate(url, options = {}) {
  */
 async function click(sessionId, selector) {
   const page = activePagesMap.get(sessionId);
-  if (!page)
-    return { success: false, error: "Session expired. Navigate again." };
+  if (!page) return { success: false, error: 'Session expired. Navigate again.' };
 
   try {
     await page.click(selector);
-    await page
-      .waitForNavigation({ waitUntil: "domcontentloaded", timeout: 10000 })
-      .catch(() => {});
+    await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 10000 }).catch((err) => {
+      console.error(err);
+    });
 
     const title = await page.title();
     const content = await page.evaluate(() => {
       const clone = document.body.cloneNode(true);
-      clone.querySelectorAll("script, style").forEach((el) => el.remove());
+      clone.querySelectorAll('script, style').forEach((el) => el.remove());
       return clone.innerText.substring(0, 3000);
     });
     const screenshot = await page.screenshot({
-      encoding: "base64",
-      type: "jpeg",
+      encoding: 'base64',
+      type: 'jpeg',
       quality: 60,
     });
 
@@ -265,7 +257,7 @@ async function click(sessionId, selector) {
  */
 async function type(sessionId, selector, text) {
   const page = activePagesMap.get(sessionId);
-  if (!page) return { success: false, error: "Session expired" };
+  if (!page) return { success: false, error: 'Session expired' };
 
   try {
     await page.type(selector, text, { delay: 50 });
@@ -280,7 +272,7 @@ async function type(sessionId, selector, text) {
  */
 async function submitForm(sessionId, formSelector, data = {}) {
   const page = activePagesMap.get(sessionId);
-  if (!page) return { success: false, error: "Session expired" };
+  if (!page) return { success: false, error: 'Session expired' };
 
   try {
     // Fill fields
@@ -299,23 +291,21 @@ async function submitForm(sessionId, formSelector, data = {}) {
     // Submit
     if (formSelector) {
       await page.click(`${formSelector} [type="submit"]`).catch(async () => {
-        await page.keyboard.press("Enter");
+        await page.keyboard.press('Enter');
       });
     } else {
-      await page.keyboard.press("Enter");
+      await page.keyboard.press('Enter');
     }
 
-    await page
-      .waitForNavigation({ waitUntil: "domcontentloaded", timeout: 10000 })
-      .catch(() => {});
+    await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 10000 }).catch((err) => {
+      console.error(err);
+    });
 
     const title = await page.title();
-    const content = await page.evaluate(() =>
-      document.body.innerText.substring(0, 3000),
-    );
+    const content = await page.evaluate(() => document.body.innerText.substring(0, 3000));
     const screenshot = await page.screenshot({
-      encoding: "base64",
-      type: "jpeg",
+      encoding: 'base64',
+      type: 'jpeg',
       quality: 60,
     });
 
@@ -336,12 +326,12 @@ async function submitForm(sessionId, formSelector, data = {}) {
  */
 async function screenshot(sessionId) {
   const page = activePagesMap.get(sessionId);
-  if (!page) return { success: false, error: "Session expired" };
+  if (!page) return { success: false, error: 'Session expired' };
 
   try {
     const img = await page.screenshot({
-      encoding: "base64",
-      type: "jpeg",
+      encoding: 'base64',
+      type: 'jpeg',
       quality: 70,
       fullPage: true,
     });
@@ -360,7 +350,7 @@ async function screenshot(sessionId) {
  */
 async function extract(sessionId, selectors = {}) {
   const page = activePagesMap.get(sessionId);
-  if (!page) return { success: false, error: "Session expired" };
+  if (!page) return { success: false, error: 'Session expired' };
 
   try {
     const data = await page.evaluate((sels) => {
@@ -383,9 +373,8 @@ async function fetchFallback(url) {
   try {
     const response = await fetch(url, {
       headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        Accept: "text/html,application/xhtml+xml",
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        Accept: 'text/html,application/xhtml+xml',
       },
       signal: AbortSignal.timeout(15000),
     });
@@ -395,10 +384,10 @@ async function fetchFallback(url) {
 
     // Basic HTML to text extraction
     const textContent = html
-      .replace(/<script[\s\S]*?<\/script>/gi, "")
-      .replace(/<style[\s\S]*?<\/style>/gi, "")
-      .replace(/<[^>]+>/g, " ")
-      .replace(/\s+/g, " ")
+      .replace(/<script[\s\S]*?<\/script>/gi, '')
+      .replace(/<style[\s\S]*?<\/style>/gi, '')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ')
       .trim()
       .substring(0, 3000);
 
@@ -411,8 +400,7 @@ async function fetchFallback(url) {
     const links = [];
     let match;
     while ((match = linkRegex.exec(html)) && links.length < 15) {
-      if (match[2].trim())
-        links.push({ href: match[1], text: match[2].trim().substring(0, 80) });
+      if (match[2].trim()) links.push({ href: match[1], text: match[2].trim().substring(0, 80) });
     }
 
     return {
@@ -424,22 +412,28 @@ async function fetchFallback(url) {
       screenshot: null,
       links,
       forms: [],
-      engine: "fetch-fallback",
+      engine: 'fetch-fallback',
     };
   } catch (e) {
-    return { success: false, error: e.message, engine: "fetch-fallback" };
+    return { success: false, error: e.message, engine: 'fetch-fallback' };
   }
 }
 
 // ═══ CLEANUP ═══
 function cleanup() {
   for (const [id, page] of activePagesMap.entries()) {
-    page.close().catch(() => {});
+    page.close().catch((err) => {
+      console.error(err);
+    });
     activePagesMap.delete(id);
   }
   closeBrowser();
 }
 
+/**
+ * undefined
+ * @returns {*}
+ */
 module.exports = {
   navigate,
   click,

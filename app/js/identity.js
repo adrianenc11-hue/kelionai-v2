@@ -1,7 +1,7 @@
 // KelionAI — Identity Module (Face Capture + Recognition)
 // Feature 5: Face capture at registration, passive recognition, greeting by name
 (function () {
-  "use strict";
+  'use strict';
 
   const API_BASE = window.location.origin;
   let passiveCheckInterval = null;
@@ -13,11 +13,11 @@
     let stream = null;
     try {
       stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user", width: 320, height: 240 },
+        video: { facingMode: 'user', width: 320, height: 240 },
       });
-      const video = document.createElement("video");
+      const video = document.createElement('video');
       video.srcObject = stream;
-      video.setAttribute("playsinline", "");
+      video.setAttribute('playsinline', '');
       await video.play();
       await new Promise((r) => setTimeout(r, 800));
 
@@ -26,10 +26,10 @@
       let bestScore = 0;
       for (let i = 0; i < 3; i++) {
         if (i > 0) await new Promise((r) => setTimeout(r, 300));
-        const canvas = document.createElement("canvas");
+        const canvas = document.createElement('canvas');
         canvas.width = 320;
         canvas.height = 240;
-        const ctx2d = canvas.getContext("2d");
+        const ctx2d = canvas.getContext('2d');
         ctx2d.drawImage(video, 0, 0, 320, 240);
         // Calculate image quality score (pixel variance = sharpness)
         const imgData = ctx2d.getImageData(0, 0, 320, 240).data;
@@ -43,7 +43,7 @@
         }
         const mean = sum / count;
         const variance = sumSq / count - mean * mean;
-        const photo = canvas.toDataURL("image/jpeg", 0.8).split(",")[1];
+        const photo = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
         if (variance > bestScore) {
           bestScore = variance;
           bestPhoto = photo;
@@ -51,7 +51,7 @@
       }
       return bestPhoto;
     } catch (e) {
-      console.warn("[Identity] Camera access error:", e.message);
+      console.warn('[Identity] Camera access error:', e.message);
       return null;
     } finally {
       if (stream) stream.getTracks().forEach((t) => t.stop());
@@ -65,18 +65,17 @@
       if (!photo) return false;
 
       const authHeaders = window.KAuth ? KAuth.getAuthHeaders() : {};
-      const r = await fetch(API_BASE + "/api/identity/register-face", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeaders },
+      const r = await fetch(API_BASE + '/api/identity/register-face', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
         body: JSON.stringify({ face: photo, userId }),
       });
       const d = await r.json();
       if (d.success) {
-        console.log("[Identity] Face registered successfully");
         return true;
       }
     } catch (e) {
-      console.warn("[Identity] Face registration failed:", e.message);
+      console.warn('[Identity] Face registration failed:', e.message);
     }
     return false;
   }
@@ -90,16 +89,16 @@
       if (!photo) return null;
 
       const authHeaders = window.KAuth ? KAuth.getAuthHeaders() : {};
-      const r = await fetch(API_BASE + "/api/identity/check", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeaders },
+      const r = await fetch(API_BASE + '/api/identity/check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
         body: JSON.stringify({ face: photo }),
       });
       if (!r.ok) return null;
       const d = await r.json();
       return d;
     } catch (e) {
-      console.warn("[Identity] Face check failed:", e.message);
+      console.warn('[Identity] Face check failed:', e.message);
       return null;
     } finally {
       isCheckingFace = false;
@@ -111,46 +110,46 @@
     const hour = new Date().getHours();
     const greetings = {
       en: {
-        morning: "Good morning",
-        afternoon: "Good afternoon",
-        evening: "Good evening",
-        returning: "Welcome back",
+        morning: 'Good morning',
+        afternoon: 'Good afternoon',
+        evening: 'Good evening',
+        returning: 'Welcome back',
       },
       ro: {
-        morning: "Bună dimineața",
-        afternoon: "Bună ziua",
-        evening: "Bună seara",
-        returning: "Bine ai revenit",
+        morning: 'Bună dimineața',
+        afternoon: 'Bună ziua',
+        evening: 'Bună seara',
+        returning: 'Bine ai revenit',
       },
       fr: {
-        morning: "Bonjour",
-        afternoon: "Bon après-midi",
-        evening: "Bonsoir",
-        returning: "Bon retour",
+        morning: 'Bonjour',
+        afternoon: 'Bon après-midi',
+        evening: 'Bonsoir',
+        returning: 'Bon retour',
       },
       de: {
-        morning: "Guten Morgen",
-        afternoon: "Guten Tag",
-        evening: "Guten Abend",
-        returning: "Willkommen zurück",
+        morning: 'Guten Morgen',
+        afternoon: 'Guten Tag',
+        evening: 'Guten Abend',
+        returning: 'Willkommen zurück',
       },
       es: {
-        morning: "Buenos días",
-        afternoon: "Buenas tardes",
-        evening: "Buenas noches",
-        returning: "Bienvenido de nuevo",
+        morning: 'Buenos días',
+        afternoon: 'Buenas tardes',
+        evening: 'Buenas noches',
+        returning: 'Bienvenido de nuevo',
       },
       it: {
-        morning: "Buongiorno",
-        afternoon: "Buon pomeriggio",
-        evening: "Buona sera",
-        returning: "Bentornato",
+        morning: 'Buongiorno',
+        afternoon: 'Buon pomeriggio',
+        evening: 'Buona sera',
+        returning: 'Bentornato',
       },
       pt: {
-        morning: "Bom dia",
-        afternoon: "Boa tarde",
-        evening: "Boa noite",
-        returning: "Bem-vindo de volta",
+        morning: 'Bom dia',
+        afternoon: 'Boa tarde',
+        evening: 'Boa noite',
+        returning: 'Bem-vindo de volta',
       },
     };
     const g = greetings[lang] || greetings.en;
@@ -166,6 +165,10 @@
   let _ownerRecognized = false;
   let _greetingDone = false;
 
+  /**
+   * runPassiveFaceCheck
+   * @returns {*}
+   */
   async function runPassiveFaceCheck() {
     // Stop checking once owner is confirmed — no more API calls
     if (_ownerRecognized) return;
@@ -177,32 +180,23 @@
       _ownerRecognized = true;
       // Auto-store admin token from face recognition (no password needed)
       if (result.adminToken) {
-        sessionStorage.setItem("kelion_admin_secret", result.adminToken);
-        console.log("[Identity] Admin auto-authenticated via face recognition");
+        sessionStorage.setItem('kelion_admin_secret', result.adminToken);
         // Update button visual state (red→green if also logged in)
-        if (window.KAuth && KAuth.updateAdminButtonState)
-          KAuth.updateAdminButtonState();
+        if (window.KAuth && KAuth.updateAdminButtonState) KAuth.updateAdminButtonState();
       }
       // Stop the interval — no more face checks needed
       stopPassiveCheck();
-      console.log("[Identity] Owner recognized — face check stopped");
     }
 
     // Greeting — fire only once per session
-    if (
-      result.user &&
-      result.user.name &&
-      !_greetingDone &&
-      !window.KAuth?.isLoggedIn()
-    ) {
+    if (result.user && result.user.name && !_greetingDone && !window.KAuth?.isLoggedIn()) {
       _greetingDone = true;
-      const lang = window.i18n ? i18n.getLanguage() : "en";
+      const lang = window.i18n ? i18n.getLanguage() : 'en';
       const greeting = buildGreeting(result.user.name, lang);
-      console.log("[Identity] Greeting:", greeting);
       window.dispatchEvent(
-        new CustomEvent("identity-recognized", {
+        new CustomEvent('identity-recognized', {
           detail: { user: result.user, greeting },
-        }),
+        })
       );
     }
   }
@@ -214,9 +208,12 @@
     setTimeout(runPassiveFaceCheck, 3000);
     // Then every 10 seconds until owner is recognized
     passiveCheckInterval = setInterval(runPassiveFaceCheck, 10000);
-    console.log("[Identity] Passive face check started");
   }
 
+  /**
+   * stopPassiveCheck
+   * @returns {*}
+   */
   function stopPassiveCheck() {
     if (passiveCheckInterval) {
       clearInterval(passiveCheckInterval);

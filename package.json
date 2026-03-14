@@ -30,7 +30,8 @@
     "railway:vars": "bash scripts/railway-env.sh",
     "setup:secrets": "bash scripts/setup-secrets.sh",
     "check:deploy": "node scripts/check-deploy-readiness.js",
-    "deploy:all": "node scripts/deploy-all.js"
+    "deploy:all": "node scripts/deploy-all.js",
+    "format": "prettier --write ."
   },
   "jest": {
     "testEnvironment": "node",
@@ -73,7 +74,7 @@
     "pg": "^8.18.0",
     "pino": "^10.3.1",
     "prom-client": "^15.1.3",
-    "puppeteer": "^19.8.0",
+    "puppeteer": "24.39.1",
     "redis": "^5.11.0",
     "socket.io": "^4.8.3",
     "stripe": "^20.4.0",
@@ -88,5 +89,7 @@
     "@playwright/test": "^1.58.2",
     "jest": "^30.2.0",
     "supertest": "^7.2.2"
-  }
+  },
+  "license": "MIT",
+  "author": ""
 }

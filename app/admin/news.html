@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="en">
   <head>
+  <meta name="description" content="Page description">
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>KelionAI — News Bot Admin</title>
@@ -352,6 +353,7 @@
 
   <body>
     <nav
+      role="navigation"
       style="
         display: flex;
         align-items: center;
@@ -362,33 +364,19 @@
         font-size: 0.82rem;
       "
     >
-      <a
-        href="/"
-        style="color: #00ffff; text-decoration: none; font-weight: bold"
-        >← KelionAI</a
-      >
+      <a href="/" style="color: #00ffff; text-decoration: none; font-weight: bold">← KelionAI</a>
       <span style="color: #333">|</span>
-      <a href="/admin/health.html" style="color: #888; text-decoration: none"
-        >Health</a
-      >
-      <a href="/admin/news.html" style="color: #00ffff; text-decoration: none"
-        >News</a
-      >
-      <a href="/admin/trading.html" style="color: #888; text-decoration: none"
-        >Trading</a
-      >
-      <a href="/admin/sports.html" style="color: #888; text-decoration: none"
-        >Sports</a
-      >
+      <a href="/admin/health.html" style="color: #888; text-decoration: none">Health</a>
+      <a href="/admin/news.html" style="color: #00ffff; text-decoration: none">News</a>
+      <a href="/admin/trading.html" style="color: #888; text-decoration: none">Trading</a>
+      <a href="/admin/sports.html" style="color: #888; text-decoration: none">Sports</a>
     </nav>
     <h1>📰 KelionAI — News Bot</h1>
     <p class="subtitle">News management panel</p>
 
     <div class="toolbar">
-      <button class="btn" id="btn-fetch" onclick="triggerFetch()">
-        ⚡ Fetch Now
-      </button>
-      <button class="btn secondary" onclick="loadLatest()">🔄 Reload</button>
+      <button type="button" class="btn" id="btn-fetch" onclick="triggerFetch()">⚡ Fetch Now</button>
+      <button type="button" class="btn secondary" onclick="loadLatest()">🔄 Reload</button>
       <span class="status-bar" id="status-bar">—</span>
     </div>
 
@@ -422,64 +410,54 @@
     </div>
 
     <div id="detail-view">
-      <button class="detail-back" onclick="closeDetail()">
-        ← Back to news list
-      </button>
+      <button type="button" class="detail-back" onclick="closeDetail()">← Back to news list</button>
       <div class="detail-card" id="detail-content"></div>
     </div>
 
     <script>
-      "use strict";
+      'use strict';
 
       let allArticles = [];
-      let currentCategory = "";
-      let adminSecret = "kAI-adm1n-s3cr3t-2026-pr0d";
+      let currentCategory = '';
+      let adminSecret = 'kAI-adm1n-s3cr3t-2026-pr0d';
 
       function getHeaders() {
-        return { "x-admin-secret": adminSecret };
+        return { 'x-admin-secret': adminSecret };
       }
 
       function setStatus(msg, isError) {
-        const el = document.getElementById("status-bar");
+        const el = document.getElementById('status-bar');
         const safe = escHtml(msg);
-        el.innerHTML = isError
-          ? `<span class="error-msg">${safe}</span>`
-          : `<span>${safe}</span>`;
+        el.innerHTML = isError ? `<span class="error-msg">${safe}</span>` : `<span>${safe}</span>`;
       }
 
       function formatDate(iso) {
         try {
-          return new Date(iso).toLocaleString("en-US", {
-            day: "2-digit",
-            month: "short",
-            hour: "2-digit",
-            minute: "2-digit",
+          return new Date(iso).toLocaleString('en-US', {
+            day: '2-digit',
+            month: 'short',
+            hour: '2-digit',
+            minute: '2-digit',
           });
         } catch (e) {
-          return iso || "";
+          return iso || '';
         }
       }
 
       // ═══ CATEGORY TABS ═══
-      document
-        .getElementById("category-tabs")
-        .addEventListener("click", (e) => {
-          const tab = e.target.closest(".tab");
-          if (!tab) return;
-          document
-            .querySelectorAll(".tab")
-            .forEach((t) => t.classList.remove("active"));
-          tab.classList.add("active");
-          currentCategory = tab.dataset.cat;
-          renderArticles();
-        });
+      document.getElementById('category-tabs').addEventListener('click', (e) => {
+        const tab = e.target.closest('.tab');
+        if (!tab) return;
+        document.querySelectorAll('.tab').forEach((t) => t.classList.remove('active'));
+        tab.classList.add('active');
+        currentCategory = tab.dataset.cat;
+        renderArticles();
+      });
 
       // ═══ RENDER ARTICLES ═══
       function renderArticles() {
-        const list = document.getElementById("articles-list");
-        const filtered = currentCategory
-          ? allArticles.filter((a) => a.category === currentCategory)
-          : allArticles;
+        const list = document.getElementById('articles-list');
+        const filtered = currentCategory ? allArticles.filter((a) => a.category === currentCategory) : allArticles;
 
         if (!filtered.length) {
           list.innerHTML =
@@ -496,35 +474,33 @@
                         <span>📡 ${escHtml(a.source)}</span>
                         <span>🕐 ${formatDate(a.publishedAt)}</span>
                         <span class="badge category">${escHtml(a.category)}</span>
-                        ${a.isBreaking ? '<span class="badge breaking">🔴 BREAKING</span>' : ""}
-                        ${a.confirmedBy > 1 ? `<span class="badge sources">✓ ${a.confirmedBy} sources</span>` : ""}
+                        ${a.isBreaking ? '<span class="badge breaking">🔴 BREAKING</span>' : ''}
+                        ${a.confirmedBy > 1 ? `<span class="badge sources">✓ ${a.confirmedBy} sources</span>` : ''}
                     </div>
                 </div>
-            `,
+            `
           )
-          .join("");
+          .join('');
       }
 
       function escHtml(str) {
-        return String(str || "")
-          .replace(/&/g, "&amp;")
-          .replace(/</g, "&lt;")
-          .replace(/>/g, "&gt;")
-          .replace(/"/g, "&quot;");
+        return String(str || '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
       }
 
       // ═══ BREAKING NEWS ═══
       function renderBreaking(articles) {
-        const breaking = articles.filter(
-          (a) => a.isBreaking || a.confirmedBy >= 2,
-        );
-        const section = document.getElementById("breaking-section");
+        const breaking = articles.filter((a) => a.isBreaking || a.confirmedBy >= 2);
+        const section = document.getElementById('breaking-section');
         if (!breaking.length) {
-          section.style.display = "none";
+          section.style.display = 'none';
           return;
         }
-        section.style.display = "block";
-        document.getElementById("breaking-list").innerHTML = breaking
+        section.style.display = 'block';
+        document.getElementById('breaking-list').innerHTML = breaking
           .map(
             (a) => `
                 <div class="breaking-article" onclick="openDetail('${escHtml(a.id)}')">
@@ -533,9 +509,9 @@
                         ${escHtml(a.source)} · ${formatDate(a.publishedAt)} · ✓ ${a.confirmedBy} sources
                     </div>
                 </div>
-            `,
+            `
           )
-          .join("");
+          .join('');
       }
 
       // ═══ ARTICLE DETAIL ═══
@@ -543,64 +519,61 @@
         const article = allArticles.find((a) => a.id === id);
         if (!article) return;
 
-        document.getElementById("detail-content").innerHTML = `
+        document.getElementById('detail-content').innerHTML = `
                 <h2>${escHtml(article.title)}</h2>
                 <div class="detail-meta">
                     <span>📡 ${escHtml(article.source)}</span>
                     <span>🕐 ${formatDate(article.publishedAt)}</span>
                     <span class="badge category">${escHtml(article.category)}</span>
-                    ${article.isBreaking ? '<span class="badge breaking">🔴 BREAKING</span>' : ""}
-                    ${article.confirmedBy > 1 ? `<span class="badge sources">✓ ${article.confirmedBy} confirmed sources</span>` : ""}
+                    ${article.isBreaking ? '<span class="badge breaking">🔴 BREAKING</span>' : ''}
+                    ${article.confirmedBy > 1 ? `<span class="badge sources">✓ ${article.confirmedBy} confirmed sources</span>` : ''}
                 </div>
-                <p class="detail-summary">${escHtml(article.summary || "No summary available.")}</p>
-                ${article.url ? `<a class="detail-link" href="${escHtml(article.url)}" target="_blank" rel="noopener noreferrer">→ Read full article</a>` : ""}
+                <p class="detail-summary">${escHtml(article.summary || 'No summary available.')}</p>
+                ${article.url ? `<a class="detail-link" href="${escHtml(article.url)}" target="_blank" rel="noopener noreferrer">→ Read full article</a>` : ''}
             `;
 
-        document.getElementById("list-view").style.display = "none";
-        document.getElementById("detail-view").style.display = "block";
+        document.getElementById('list-view').style.display = 'none';
+        document.getElementById('detail-view').style.display = 'block';
         window.scrollTo(0, 0);
       }
 
       function closeDetail() {
-        document.getElementById("list-view").style.display = "block";
-        document.getElementById("detail-view").style.display = "none";
+        document.getElementById('list-view').style.display = 'block';
+        document.getElementById('detail-view').style.display = 'none';
       }
 
       // ═══ LOAD LATEST ═══
       async function loadLatest() {
         const cat = currentCategory;
-        const url = `/api/news/latest${cat ? `?category=${encodeURIComponent(cat)}` : ""}`;
+        const url = `/api/news/latest${cat ? `?category=${encodeURIComponent(cat)}` : ''}`;
         try {
           const res = await fetch(url, { headers: getHeaders() });
           if (res.status === 401) {
-            setStatus("Unauthorized — check admin secret.", true);
+            setStatus('Unauthorized — check admin secret.', true);
             return;
           }
           const data = await res.json();
           allArticles = data.articles || [];
           renderArticles();
           renderBreaking(allArticles);
-          const last = data.lastFetchAt
-            ? `Last: ${formatDate(data.lastFetchAt)}`
-            : "No fetch performed";
+          const last = data.lastFetchAt ? `Last: ${formatDate(data.lastFetchAt)}` : 'No fetch performed';
           setStatus(`${allArticles.length} articles · ${last}`);
         } catch (e) {
-          setStatus("Error loading news: " + e.message, true);
+          setStatus('Error loading news: ' + e.message, true);
         }
       }
 
       // ═══ LOAD SCHEDULE ═══
       async function loadSchedule() {
         try {
-          const res = await fetch("/api/news/schedule", {
+          const res = await fetch('/api/news/schedule', {
             headers: getHeaders(),
           });
           if (!res.ok) return;
           const data = await res.json();
-          const scheduleList = document.getElementById("schedule-list");
+          const scheduleList = document.getElementById('schedule-list');
           if (!data.schedule || !data.schedule.length) {
-            scheduleList.innerHTML =
-              '<div style="color:#555;font-size:0.82rem;">N/A</div>';
+            scheduleList.innerHTML = '<div style="color:#555;font-size:0.82rem;">N/A</div>';
             return;
           }
           scheduleList.innerHTML =
@@ -611,9 +584,9 @@
                         <span class="schedule-label">${s.label}</span>
                         <span class="schedule-time">${formatDate(s.nextAt)}</span>
                     </div>
-                `,
+                `
               )
-              .join("") +
+              .join('') +
             `<div class="schedule-row"><span class="schedule-label">Cached articles</span><span class="schedule-time">${data.cacheSize}</span></div>`;
         } catch (e) {
           /* ignore */
@@ -622,32 +595,28 @@
 
       // ═══ TRIGGER FETCH ═══
       async function triggerFetch() {
-        const btn = document.getElementById("btn-fetch");
+        const btn = document.getElementById('btn-fetch');
         btn.disabled = true;
-        setStatus("Fetching news...");
+        setStatus('Fetching news...');
         try {
-          const res = await fetch("/api/news/fetch", { headers: getHeaders() });
+          const res = await fetch('/api/news/fetch', { headers: getHeaders() });
           if (res.status === 401) {
-            setStatus("Unauthorized — check admin secret.", true);
+            setStatus('Unauthorized — check admin secret.', true);
             btn.disabled = false;
             return;
           }
           if (res.status === 429) {
             const d = await res.json();
-            setStatus(d.error || "Too early.", true);
+            setStatus(d.error || 'Too early.', true);
             btn.disabled = false;
             return;
           }
           const data = await res.json();
-          setStatus(
-            data.success
-              ? `✓ Fetch OK — ${data.articles} articles`
-              : `Partial fetch: ${data.error || ""}`,
-          );
+          setStatus(data.success ? `✓ Fetch OK — ${data.articles} articles` : `Partial fetch: ${data.error || ''}`);
           await loadLatest();
           await loadSchedule();
         } catch (e) {
-          setStatus("Fetch error: " + e.message, true);
+          setStatus('Fetch error: ' + e.message, true);
         }
         btn.disabled = false;
       }

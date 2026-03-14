@@ -20,7 +20,7 @@
       body {
         background: var(--kelion-bg, #050510);
         color: var(--kelion-text, #f0f0ff);
-        font-family: "Inter", system-ui, sans-serif;
+        font-family: 'Inter', system-ui, sans-serif;
         margin: 0;
         min-height: 100vh;
       }
@@ -188,7 +188,7 @@
   <body>
     <header class="legal-header">
       <a href="/" class="legal-logo">Kelion<span>AI</span></a>
-      <nav class="legal-nav">
+      <nav role="navigation" class="legal-nav">
         <a href="/">Home</a>
         <a href="/pricing/">Pricing</a>
         <a href="/terms/">Terms</a>
@@ -199,39 +199,30 @@
     <main class="legal-main">
       <h1>GDPR — Your Data Rights</h1>
       <p class="legal-meta">
-        KelionAI is committed to protecting your personal data in compliance
-        with the EU General Data Protection Regulation (GDPR).
+        KelionAI is committed to protecting your personal data in compliance with the EU General Data Protection
+        Regulation (GDPR).
       </p>
 
       <div class="legal-section">
         <h2>Your Rights Under GDPR</h2>
-        <p>
-          As a user of KelionAI, you have the following rights regarding your
-          personal data:
-        </p>
+        <p>As a user of KelionAI, you have the following rights regarding your personal data:</p>
       </div>
 
       <div class="rights-grid">
         <div class="right-card">
           <div class="icon">📋</div>
           <h3>Right of Access</h3>
-          <p>
-            Request a copy of all personal data we hold about you at any time.
-          </p>
+          <p>Request a copy of all personal data we hold about you at any time.</p>
         </div>
         <div class="right-card">
           <div class="icon">✏️</div>
           <h3>Right to Rectification</h3>
-          <p>
-            Request correction of any inaccurate or incomplete personal data.
-          </p>
+          <p>Request correction of any inaccurate or incomplete personal data.</p>
         </div>
         <div class="right-card">
           <div class="icon">🗑️</div>
           <h3>Right to Erasure</h3>
-          <p>
-            Request deletion of your personal data ("right to be forgotten").
-          </p>
+          <p>Request deletion of your personal data ("right to be forgotten").</p>
         </div>
         <div class="right-card">
           <div class="icon">📦</div>
@@ -246,66 +237,53 @@
         <div class="right-card">
           <div class="icon">✋</div>
           <h3>Right to Object</h3>
-          <p>
-            Object to the processing of your personal data for certain purposes.
-          </p>
+          <p>Object to the processing of your personal data for certain purposes.</p>
         </div>
       </div>
 
       <div class="legal-section">
         <h2>How to Exercise Your Rights</h2>
-        <p>
-          KelionAI provides built-in tools to exercise your GDPR rights directly
-          from the application:
-        </p>
+        <p>KelionAI provides built-in tools to exercise your GDPR rights directly from the application:</p>
       </div>
 
       <div class="legal-section">
         <h2>Data Export</h2>
         <p>
-          You can export all your personal data (conversations, preferences,
-          subscription info, usage data, and referrals) at any time by making an
-          authenticated request to the GDPR export endpoint. The data is
-          provided in JSON format.
+          You can export all your personal data (conversations, preferences, subscription info, usage data, and
+          referrals) at any time by making an authenticated request to the GDPR export endpoint. The data is provided in
+          JSON format.
         </p>
       </div>
 
       <div class="legal-section">
         <h2>Data Deletion</h2>
         <p>
-          You can request complete deletion of all your personal data. This
-          action is irreversible and includes cancellation of any active
-          subscriptions, deletion of all conversations and messages, removal of
-          preferences and usage data, and deletion of referral codes. To confirm
-          deletion, you must explicitly send a confirmation request.
+          You can request complete deletion of all your personal data. This action is irreversible and includes
+          cancellation of any active subscriptions, deletion of all conversations and messages, removal of preferences
+          and usage data, and deletion of referral codes. To confirm deletion, you must explicitly send a confirmation
+          request.
         </p>
       </div>
 
       <div class="legal-section">
         <h2>Consent Management</h2>
         <p>
-          You can manage your consent preferences for memory (AI learning),
-          analytics, and marketing at any time. KelionAI only uses essential
-          cookies for authentication — no tracking or advertising cookies are
-          used.
+          You can manage your consent preferences for memory (AI learning), analytics, and marketing at any time.
+          KelionAI only uses essential cookies for authentication — no tracking or advertising cookies are used.
         </p>
       </div>
 
       <div class="legal-section">
         <h2>Data Controller</h2>
         <p>
-          KelionAI acts as the data controller for your personal information.
-          Data is stored on Supabase (EU servers) and Railway infrastructure.
-          All data is encrypted in transit (TLS) and at rest. Payment processing
-          is handled exclusively by Stripe — we never store your payment card
-          details.
+          KelionAI acts as the data controller for your personal information. Data is stored on Supabase (EU servers)
+          and Railway infrastructure. All data is encrypted in transit (TLS) and at rest. Payment processing is handled
+          exclusively by Stripe — we never store your payment card details.
         </p>
       </div>
 
       <div class="gdpr-contact">
-        <p style="color: #f0f0ff; font-weight: 600; margin-bottom: 8px">
-          Have a GDPR question or request?
-        </p>
+        <p style="color: #f0f0ff; font-weight: 600; margin-bottom: 8px">Have a GDPR question or request?</p>
         <p style="color: #8888aa; font-size: 0.9rem">
           Contact our Data Protection team at
           <a href="mailto:privacy@kelionai.app">privacy@kelionai.app</a>
@@ -315,8 +293,8 @@
 
     <footer class="legal-footer">
       <p>
-        © 2026 KelionAI. <a href="/terms/">Terms of Service</a> ·
-        <a href="/privacy/">Privacy Policy</a> · <a href="/gdpr/">GDPR</a>
+        © 2026 KelionAI. <a href="/terms/">Terms of Service</a> · <a href="/privacy/">Privacy Policy</a> ·
+        <a href="/gdpr/">GDPR</a>
       </p>
     </footer>
     <a href="/" id="home-btn-fixed" class="home-btn-fixed" title="Home">🏠</a>

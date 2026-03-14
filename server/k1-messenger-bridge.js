@@ -1,4 +1,4 @@
-"use strict";
+'use strict';
 
 /**
  * K1 MESSENGER BRIDGE — Conectează K1 Cognitive la Telegram/WhatsApp/Messenger
@@ -12,12 +12,12 @@
  * - World State awareness (piețe, alerts)
  */
 
-const k1Cognitive = require("./k1-cognitive");
-const k1Memory = require("./k1-memory");
-const k1World = require("./k1-world-state");
-const k1Meta = require("./k1-meta-learning");
-const k1Perf = require("./k1-performance");
-const logger = require("pino")({ name: "k1-bridge" });
+const k1Cognitive = require('./k1-cognitive');
+const k1Memory = require('./k1-memory');
+const k1World = require('./k1-world-state');
+const k1Meta = require('./k1-meta-learning');
+const k1Perf = require('./k1-performance');
+const logger = require('pino')({ name: 'k1-bridge' });
 
 // ═══════════════════════════════════════════════════════════════
 // PRE-PROCESS — Înainte de a trimite la LLM
@@ -29,9 +29,9 @@ const logger = require("pino")({ name: "k1-bridge" });
  */
 async function preProcess(message, options = {}) {
   const {
-    platform = "unknown", // telegram, whatsapp, messenger
-    userId = "unknown",
-    userName = "User",
+    platform = 'unknown', // telegram, whatsapp, messenger
+    userId = 'unknown',
+    userName = 'User',
     supabase = null,
   } = options;
 
@@ -64,7 +64,7 @@ async function preProcess(message, options = {}) {
   // 5. Save input to memory
   k1Memory.addToHot({
     content: `[${platform}/${userName}] ${message.slice(0, 300)}`,
-    type: "message",
+    type: 'message',
     domain: reasoning.reasoning.domain,
     importance: 5,
     source: platform,
@@ -103,7 +103,7 @@ async function preProcess(message, options = {}) {
       domain: reasoning.reasoning.domain,
       confidence: reasoning.confidence.score,
     },
-    "[K1-Bridge] Pre-processed",
+    '[K1-Bridge] Pre-processed'
   );
 
   return context;
@@ -119,9 +119,9 @@ async function preProcess(message, options = {}) {
  */
 async function postProcess(response, options = {}) {
   const {
-    platform = "unknown",
-    _userId = "unknown",
-    domain = "general",
+    platform = 'unknown',
+    _userId = 'unknown',
+    domain = 'general',
     supabase = null,
     addBadge = false, // Adaugă emoji de confidence la răspuns
   } = options;
@@ -131,19 +131,19 @@ async function postProcess(response, options = {}) {
 
   // 2. Save response to memory
   k1Memory.addToHot({
-    content: `[K1→${platform}] ${(typeof response === "string" ? response : "").slice(0, 300)}`,
-    type: "response",
+    content: `[K1→${platform}] ${(typeof response === 'string' ? response : '').slice(0, 300)}`,
+    type: 'response',
     domain,
     importance: 4,
-    source: "k1",
+    source: 'k1',
   });
 
   // Save to warm (persistent)
   if (supabase) {
     try {
       await k1Memory.saveToWarm(supabase, {
-        content: `[${platform}] ${(typeof response === "string" ? response : "").slice(0, 500)}`,
-        type: "response",
+        content: `[${platform}] ${(typeof response === 'string' ? response : '').slice(0, 500)}`,
+        type: 'response',
         domain,
         importance: 4,
         tags: [platform],
@@ -156,21 +156,21 @@ async function postProcess(response, options = {}) {
   // 3. Calculate confidence on response
   const confidence = k1Cognitive.calculateConfidence({
     domain,
-    hasSources: /sursa|link|conform|potrivit/i.test(response || ""),
-    isFactual: /\$[\d,]+|[\d.]+%|RSI|MACD/i.test(response || ""),
+    hasSources: /sursa|link|conform|potrivit/i.test(response || ''),
+    isFactual: /\$[\d,]+|[\d.]+%|RSI|MACD/i.test(response || ''),
   });
 
   // 4. Meta-learning: score template + tool usage
   try {
     k1Meta.useTemplate(`${domain}_analysis`, confidence.score > 70);
-    k1Meta.scoreTools("llm_response", domain, confidence.score);
+    k1Meta.scoreTools('llm_response', domain, confidence.score);
   } catch {
     /* ignored */
   }
 
   // 5. Optional: add confidence badge
   let enhancedResponse = response;
-  if (addBadge && typeof response === "string" && confidence.score < 60) {
+  if (addBadge && typeof response === 'string' && confidence.score < 60) {
     enhancedResponse = `${response}\n\n${confidence.emoji} _Confidence: ${confidence.score}%_`;
   }
 
@@ -189,35 +189,31 @@ async function postProcess(response, options = {}) {
  * Generează contextul K1 care se adaugă la system prompt
  */
 function getK1SystemContext(context) {
-  if (!context || !context.k1) return "";
+  if (!context || !context.k1) return '';
 
   const parts = [];
 
   // World awareness
   if (context.world?.btc) {
     parts.push(
-      `[Market] BTC: $${context.world.btc}, ETH: $${context.world.eth || "?"}, Fear&Greed: ${context.world.fearGreed || "?"}`,
+      `[Market] BTC: $${context.world.btc}, ETH: $${context.world.eth || '?'}, Fear&Greed: ${context.world.fearGreed || '?'}`
     );
   }
 
   // Relevant memories
   if (context.memories && context.memories.length > 0) {
-    parts.push(`[Memory] ${context.memories.join(" | ").slice(0, 200)}`);
+    parts.push(`[Memory] ${context.memories.join(' | ').slice(0, 200)}`);
   }
 
   // Active alerts
   if (context.alerts && context.alerts.length > 0) {
-    parts.push(`[Alerts] ${context.alerts.join("; ").slice(0, 150)}`);
+    parts.push(`[Alerts] ${context.alerts.join('; ').slice(0, 150)}`);
   }
 
   // Cognitive state
-  parts.push(
-    `[K1] Domain: ${context.k1.domain}, Confidence: ${context.k1.confidence?.score || "?"}%`,
-  );
+  parts.push(`[K1] Domain: ${context.k1.domain}, Confidence: ${context.k1.confidence?.score || '?'}%`);
 
-  return parts.length > 0
-    ? `\n--- K1 Context ---\n${parts.join("\n")}\n---\n`
-    : "";
+  return parts.length > 0 ? `\n--- K1 Context ---\n${parts.join('\n')}\n---\n` : '';
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -233,7 +229,7 @@ function getProactiveMessages() {
   if (alerts.length === 0) return [];
 
   const messages = alerts
-    .filter((a) => a.type === "warning" || a.type === "opportunity")
+    .filter((a) => a.type === 'warning' || a.type === 'opportunity')
     .slice(0, 2)
     .map((a) => ({
       text: `🔔 *K1 Alert*\n${a.message}`,
@@ -249,6 +245,10 @@ function getProactiveMessages() {
   return messages;
 }
 
+/**
+ * undefined
+ * @returns {*}
+ */
 module.exports = {
   preProcess,
   postProcess,

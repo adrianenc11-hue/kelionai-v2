@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="ro">
   <head>
+  <meta name="description" content="Page description">
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>K1 — Brain Direct Chat</title>
@@ -17,7 +18,7 @@
       }
 
       body {
-        font-family: "Inter", sans-serif;
+        font-family: 'Inter', sans-serif;
         background: #0a0a0f;
         color: #e0e0e0;
         height: 100vh;
@@ -100,7 +101,7 @@
         background: rgba(139, 92, 246, 0.08);
         border: 1px solid rgba(139, 92, 246, 0.2);
         border-bottom-left-radius: 4px;
-        font-family: "JetBrains Mono", monospace;
+        font-family: 'JetBrains Mono', monospace;
         font-size: 0.85rem;
       }
 
@@ -166,7 +167,7 @@
         border-radius: 8px;
         padding: 12px;
         margin-top: 8px;
-        font-family: "JetBrains Mono", monospace;
+        font-family: 'JetBrains Mono', monospace;
         font-size: 0.78rem;
         max-height: 300px;
         overflow-y: auto;
@@ -189,7 +190,7 @@
         border: 1px solid rgba(139, 92, 246, 0.3);
         background: rgba(255, 255, 255, 0.04);
         color: #e0e0e0;
-        font-family: "Inter", sans-serif;
+        font-family: 'Inter', sans-serif;
         font-size: 0.92rem;
         resize: none;
         outline: none;
@@ -326,45 +327,36 @@
           }
         "
       ></textarea>
-      <button id="btn-send" onclick="sendMessage()">Trimite</button>
+      <button type="button" id="btn-send" onclick="sendMessage()">Trimite</button>
     </div>
 
     <script>
       // ═══ CONFIG ═══
-      const ADMIN_SECRET = sessionStorage.getItem("kelion_admin_secret") || "";
-      let currentSessionId =
-        localStorage.getItem("k1_session_id") || "session_" + Date.now();
-      localStorage.setItem("k1_session_id", currentSessionId);
+      const ADMIN_SECRET = sessionStorage.getItem('kelion_admin_secret') || '';
+      let currentSessionId = localStorage.getItem('k1_session_id') || 'session_' + Date.now();
+      localStorage.setItem('k1_session_id', currentSessionId);
 
-      const chatContainer = document.getElementById("chat-container");
-      const inputEl = document.getElementById("input");
-      const btnSend = document.getElementById("btn-send");
-      const thinkingEl = document.getElementById("thinking");
+      const chatContainer = document.getElementById('chat-container');
+      const inputEl = document.getElementById('input');
+      const btnSend = document.getElementById('btn-send');
+      const thinkingEl = document.getElementById('thinking');
 
       // ═══ LOAD PREVIOUS SESSION ═══
       async function loadSession() {
         try {
-          const res = await fetch(
-            `/api/admin/brain-chat/session/${currentSessionId}`,
-            {
-              headers: { "x-admin-secret": ADMIN_SECRET },
-            },
-          );
+          const res = await fetch(`/api/admin/brain-chat/session/${currentSessionId}`, {
+            headers: { 'x-admin-secret': ADMIN_SECRET },
+          });
           if (!res.ok) return;
           const data = await res.json();
           if (data.messages && data.messages.length > 0) {
             data.messages.forEach((m) => {
-              addMessage(
-                m.role === "user" ? "user" : "brain",
-                m.content,
-                null,
-                false,
-              );
+              addMessage(m.role === 'user' ? 'user' : 'brain', m.content, null, false);
             });
             scrollToBottom();
           }
         } catch (e) {
-          console.error("Load session failed:", e);
+          console.error('Load session failed:', e);
         }
       }
 
@@ -373,64 +365,59 @@
         const msg = inputEl.value.trim();
         if (!msg) return;
 
-        inputEl.value = "";
-        inputEl.style.height = "auto";
-        addMessage("user", msg);
+        inputEl.value = '';
+        inputEl.style.height = 'auto';
+        addMessage('user', msg);
         btnSend.disabled = true;
-        thinkingEl.classList.add("active");
+        thinkingEl.classList.add('active');
 
         try {
-          const res = await fetch("/api/admin/brain-chat", {
-            method: "POST",
+          const res = await fetch('/api/admin/brain-chat', {
+            method: 'POST',
             headers: {
-              "Content-Type": "application/json",
-              "x-admin-secret": ADMIN_SECRET,
+              'Content-Type': 'application/json',
+              'x-admin-secret': ADMIN_SECRET,
             },
             body: JSON.stringify({ message: msg, sessionId: currentSessionId }),
           });
 
           if (!res.ok) {
-            const err = await res
-              .json()
-              .catch(() => ({ error: "Eroare server" }));
-            addMessage("system", `❌ Eroare: ${err.error || res.status}`);
+            const err = await res.json().catch(() => ({ error: 'Eroare server' }));
+            addMessage('system', `❌ Eroare: ${err.error || res.status}`);
             return;
           }
 
           const data = await res.json();
 
           // Add brain response
-          addMessage("brain", data.reply, data.provider);
+          addMessage('brain', data.reply, data.provider);
 
           // Handle pending approval
           if (data.pendingApproval) {
-            addApprovalButtons(
-              data.pendingApproval.opId,
-              data.pendingApproval.preview,
-            );
+            addApprovalButtons(data.pendingApproval.opId, data.pendingApproval.preview);
           }
         } catch (e) {
-          addMessage("system", `❌ Eroare: ${e.message}`);
+          addMessage('system', `❌ Eroare: ${e.message}`);
         } finally {
           btnSend.disabled = false;
-          thinkingEl.classList.remove("active");
+          thinkingEl.classList.remove('active');
           scrollToBottom();
         }
       }
 
       // ═══ ADD MESSAGE TO CHAT ═══
       function addMessage(role, content, provider, scroll = true) {
-        const div = document.createElement("div");
+        const div = document.createElement('div');
         div.className = `msg ${role}`;
 
-        if (role === "brain" && provider) {
-          const tag = document.createElement("div");
-          tag.className = "provider-tag";
+        if (role === 'brain' && provider) {
+          const tag = document.createElement('div');
+          tag.className = 'provider-tag';
           tag.textContent = provider.toUpperCase();
           div.appendChild(tag);
         }
 
-        const text = document.createElement("div");
+        const text = document.createElement('div');
         text.textContent = content;
         div.appendChild(text);
 
@@ -440,18 +427,18 @@
 
       // ═══ APPROVAL BUTTONS ═══
       function addApprovalButtons(opId, preview) {
-        const bar = document.createElement("div");
-        bar.className = "approval-bar";
+        const bar = document.createElement('div');
+        bar.className = 'approval-bar';
         bar.id = `approval-${opId}`;
 
-        const approveBtn = document.createElement("button");
-        approveBtn.className = "btn-approve yes";
-        approveBtn.textContent = "✅ APPROVE";
+        const approveBtn = document.createElement('button');
+        approveBtn.className = 'btn-approve yes';
+        approveBtn.textContent = '✅ APPROVE';
         approveBtn.onclick = () => handleApproval(opId, true);
 
-        const rejectBtn = document.createElement("button");
-        rejectBtn.className = "btn-approve no";
-        rejectBtn.textContent = "❌ REJECT";
+        const rejectBtn = document.createElement('button');
+        rejectBtn.className = 'btn-approve no';
+        rejectBtn.textContent = '❌ REJECT';
         rejectBtn.onclick = () => handleApproval(opId, false);
 
         bar.appendChild(approveBtn);
@@ -459,8 +446,8 @@
 
         // Show preview if available
         if (preview) {
-          const diffDiv = document.createElement("div");
-          diffDiv.className = "diff-preview";
+          const diffDiv = document.createElement('div');
+          diffDiv.className = 'diff-preview';
           diffDiv.textContent = JSON.stringify(preview, null, 2);
           chatContainer.appendChild(diffDiv);
         }
@@ -471,16 +458,14 @@
 
       // ═══ HANDLE APPROVAL ═══
       async function handleApproval(opId, approved) {
-        const endpoint = approved
-          ? "/api/admin/brain-chat/approve"
-          : "/api/admin/brain-chat/reject";
+        const endpoint = approved ? '/api/admin/brain-chat/approve' : '/api/admin/brain-chat/reject';
 
         try {
           const res = await fetch(endpoint, {
-            method: "POST",
+            method: 'POST',
             headers: {
-              "Content-Type": "application/json",
-              "x-admin-secret": ADMIN_SECRET,
+              'Content-Type': 'application/json',
+              'x-admin-secret': ADMIN_SECRET,
             },
             body: JSON.stringify({ opId }),
           });
@@ -493,14 +478,14 @@
 
           if (approved) {
             addMessage(
-              "system",
-              `✅ Operație aprobată: ${data.type}\n${JSON.stringify(data.result, null, 2).slice(0, 2000)}`,
+              'system',
+              `✅ Operație aprobată: ${data.type}\n${JSON.stringify(data.result, null, 2).slice(0, 2000)}`
             );
           } else {
-            addMessage("system", `❌ Operație refuzată: ${data.type}`);
+            addMessage('system', `❌ Operație refuzată: ${data.type}`);
           }
         } catch (e) {
-          addMessage("system", `❌ Eroare: ${e.message}`);
+          addMessage('system', `❌ Eroare: ${e.message}`);
         }
       }
 
@@ -512,36 +497,33 @@
       }
 
       // Auto-resize textarea
-      inputEl.addEventListener("input", () => {
-        inputEl.style.height = "auto";
-        inputEl.style.height = Math.min(inputEl.scrollHeight, 120) + "px";
+      inputEl.addEventListener('input', () => {
+        inputEl.style.height = 'auto';
+        inputEl.style.height = Math.min(inputEl.scrollHeight, 120) + 'px';
       });
 
       // ═══ PROGRESS BAR ═══
-      const progressBar = document.getElementById("progress-bar");
-      const progressFill = document.getElementById("progress-fill");
-      const progressTask = document.getElementById("progress-task");
-      const progressPct = document.getElementById("progress-pct");
+      const progressBar = document.getElementById('progress-bar');
+      const progressFill = document.getElementById('progress-fill');
+      const progressTask = document.getElementById('progress-task');
+      const progressPct = document.getElementById('progress-pct');
 
       function setProgress(pct, task) {
-        progressBar.classList.add("active");
-        progressFill.style.width = pct + "%";
-        progressPct.textContent = pct + "%";
+        progressBar.classList.add('active');
+        progressFill.style.width = pct + '%';
+        progressPct.textContent = pct + '%';
         if (task) progressTask.textContent = task;
-        localStorage.setItem(
-          "k1_progress",
-          JSON.stringify({ pct, task, time: Date.now() }),
-        );
+        localStorage.setItem('k1_progress', JSON.stringify({ pct, task, time: Date.now() }));
       }
 
       function hideProgress() {
-        progressBar.classList.remove("active");
-        localStorage.removeItem("k1_progress");
+        progressBar.classList.remove('active');
+        localStorage.removeItem('k1_progress');
       }
 
       // Restore progress on reload
       try {
-        const saved = JSON.parse(localStorage.getItem("k1_progress") || "null");
+        const saved = JSON.parse(localStorage.getItem('k1_progress') || 'null');
         if (saved && Date.now() - saved.time < 30000) {
           setProgress(saved.pct, saved.task);
         }
@@ -549,8 +531,8 @@
 
       // ═══ NEW SESSION ═══
       function newSession() {
-        currentSessionId = "session_" + Date.now();
-        localStorage.setItem("k1_session_id", currentSessionId);
+        currentSessionId = 'session_' + Date.now();
+        localStorage.setItem('k1_session_id', currentSessionId);
         chatContainer.innerHTML =
           '<div class="msg system">Sesiune nouă K1. Memoria persistă din sesiunile anterioare.</div>';
       }
@@ -558,8 +540,8 @@
       // ═══ INIT ═══
       if (!ADMIN_SECRET) {
         addMessage(
-          "system",
-          '⚠️ Nu ai setat parola de admin.\nDeschide Console → sessionStorage.setItem("kelion_admin_secret", "PAROLA_TA")',
+          'system',
+          '⚠️ Nu ai setat parola de admin.\nDeschide Console → sessionStorage.setItem("kelion_admin_secret", "PAROLA_TA")'
         );
       } else {
         loadSession();

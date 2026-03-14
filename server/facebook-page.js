@@ -2,9 +2,9 @@
 // KelionAI v2 — FACEBOOK PAGE AUTO-POST
 // Auto-publishes news to the Facebook Page
 // ═══════════════════════════════════════════════════════════════
-"use strict";
+'use strict';
 
-const logger = require("./logger");
+const logger = require('./logger');
 
 const PAGE_TOKEN = process.env.FB_PAGE_ACCESS_TOKEN;
 const PAGE_ID = process.env.FB_PAGE_ID;
@@ -12,48 +12,36 @@ const PAGE_ID = process.env.FB_PAGE_ID;
 // ═══ POST TO FACEBOOK PAGE ═══
 async function postToPage(message, link) {
   if (!PAGE_TOKEN || !PAGE_ID) {
-    logger.warn(
-      { component: "FacebookPage" },
-      "FB_PAGE_ACCESS_TOKEN or FB_PAGE_ID not set",
-    );
+    logger.warn({ component: 'FacebookPage' }, 'FB_PAGE_ACCESS_TOKEN or FB_PAGE_ID not set');
     return null;
   }
   try {
     const body = { message, access_token: PAGE_TOKEN };
     if (link) body.link = link;
 
-    const res = await fetch(
-      `https://graph.facebook.com/v21.0/${PAGE_ID}/feed`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      },
-    );
+    const res = await fetch(`https://graph.facebook.com/v21.0/${PAGE_ID}/feed`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
     const data = await res.json();
     if (data.id) {
-      logger.info(
-        { component: "FacebookPage", postId: data.id },
-        "Posted to Facebook Page",
-      );
+      logger.info({ component: 'FacebookPage', postId: data.id }, 'Posted to Facebook Page');
       return data.id;
     } else {
-      logger.error(
-        { component: "FacebookPage", error: data.error },
-        "Failed to post",
-      );
+      logger.error({ component: 'FacebookPage', error: data.error }, 'Failed to post');
       return null;
     }
   } catch (e) {
-    logger.error({ component: "FacebookPage", err: e.message }, "Post error");
+    logger.error({ component: 'FacebookPage', err: e.message }, 'Post error');
     return null;
   }
 }
 
 // ═══ FORMAT NEWS FOR FACEBOOK (FULL ARTICLE) ═══
 function formatNewsPost(article) {
-  const emoji = article.isBreaking ? "🔴 BREAKING" : "📰";
-  const category = article.category ? ` #${article.category}` : "";
+  const emoji = article.isBreaking ? '🔴 BREAKING' : '📰';
+  const category = article.category ? ` #${article.category}` : '';
 
   let post = `${emoji} ${article.title}\n\n`;
 
@@ -68,7 +56,7 @@ function formatNewsPost(article) {
   if (article.source) post += `📌 Sursă: ${article.source}\n`;
   if (article.url) post += `🔗 Original: ${article.url}\n`;
   post += `\n🤖 KelionAI — Asistentul tău AI personal\n`;
-  post += `🌐 ${process.env.APP_URL || "https://kelionai.app"}${category}`;
+  post += `🌐 ${process.env.APP_URL || 'https://kelionai.app'}${category}`;
 
   return { message: post, link: article.url || null };
 }
@@ -90,10 +78,7 @@ async function publishNewsBatch(articles, maxPosts = 3) {
     }
   }
 
-  logger.info(
-    { component: "FacebookPage", count: posted.length },
-    "News batch posted",
-  );
+  logger.info({ component: 'FacebookPage', count: posted.length }, 'News batch posted');
   return posted;
 }
 
@@ -105,13 +90,17 @@ async function postCustom(text) {
 // ═══ HEALTH ═══
 function getHealth() {
   return {
-    status: PAGE_TOKEN && PAGE_ID ? "configured" : "misconfigured",
+    status: PAGE_TOKEN && PAGE_ID ? 'configured' : 'misconfigured',
     hasPageToken: !!PAGE_TOKEN,
     hasPageId: !!PAGE_ID,
-    graphApiVersion: "v21.0",
+    graphApiVersion: 'v21.0',
   };
 }
 
+/**
+ * undefined
+ * @returns {*}
+ */
 module.exports = {
   postToPage,
   publishNewsBatch,

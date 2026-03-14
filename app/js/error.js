@@ -1,9 +1,9 @@
 // KelionAI — Error page script
 (function () {
-  "use strict";
-  var retryBtn = document.getElementById("btn-retry");
+  'use strict';
+  var retryBtn = document.getElementById('btn-retry');
   if (retryBtn) {
-    retryBtn.addEventListener("click", function () {
+    retryBtn.addEventListener('click', function () {
       window.location.reload();
     });
   }

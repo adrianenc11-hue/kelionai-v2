@@ -1,4 +1,4 @@
-"use strict";
+'use strict';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // KelionAI — Forex Engine (OANDA v20)
@@ -7,7 +7,7 @@
 // "Intrăm în forex cu tancul."
 // ═══════════════════════════════════════════════════════════════════════════
 
-const logger = require("./logger");
+const logger = require('./logger');
 
 // ── Forex pair metadata ──
 const PAIRS = {
@@ -15,104 +15,102 @@ const PAIRS = {
     pipSize: 0.0001,
     pipValue: 10,
     avgSpread: 0.00012,
-    baseCcy: "EUR",
-    quoteCcy: "USD",
+    baseCcy: 'EUR',
+    quoteCcy: 'USD',
   },
   GBP_USD: {
     pipSize: 0.0001,
     pipValue: 10,
     avgSpread: 0.00015,
-    baseCcy: "GBP",
-    quoteCcy: "USD",
+    baseCcy: 'GBP',
+    quoteCcy: 'USD',
   },
   USD_JPY: {
     pipSize: 0.01,
     pipValue: 6.7,
     avgSpread: 0.012,
-    baseCcy: "USD",
-    quoteCcy: "JPY",
+    baseCcy: 'USD',
+    quoteCcy: 'JPY',
   },
   GBP_JPY: {
     pipSize: 0.01,
     pipValue: 6.7,
     avgSpread: 0.025,
-    baseCcy: "GBP",
-    quoteCcy: "JPY",
+    baseCcy: 'GBP',
+    quoteCcy: 'JPY',
   },
   EUR_GBP: {
     pipSize: 0.0001,
     pipValue: 12.5,
     avgSpread: 0.00015,
-    baseCcy: "EUR",
-    quoteCcy: "GBP",
+    baseCcy: 'EUR',
+    quoteCcy: 'GBP',
   },
   AUD_USD: {
     pipSize: 0.0001,
     pipValue: 10,
     avgSpread: 0.00015,
-    baseCcy: "AUD",
-    quoteCcy: "USD",
+    baseCcy: 'AUD',
+    quoteCcy: 'USD',
   },
   USD_CHF: {
     pipSize: 0.0001,
     pipValue: 10,
     avgSpread: 0.00015,
-    baseCcy: "USD",
-    quoteCcy: "CHF",
+    baseCcy: 'USD',
+    quoteCcy: 'CHF',
   },
   USD_CAD: {
     pipSize: 0.0001,
     pipValue: 7.5,
     avgSpread: 0.00018,
-    baseCcy: "USD",
-    quoteCcy: "CAD",
+    baseCcy: 'USD',
+    quoteCcy: 'CAD',
   },
   NZD_USD: {
     pipSize: 0.0001,
     pipValue: 10,
     avgSpread: 0.00018,
-    baseCcy: "NZD",
-    quoteCcy: "USD",
+    baseCcy: 'NZD',
+    quoteCcy: 'USD',
   },
   EUR_JPY: {
     pipSize: 0.01,
     pipValue: 6.7,
     avgSpread: 0.02,
-    baseCcy: "EUR",
-    quoteCcy: "JPY",
+    baseCcy: 'EUR',
+    quoteCcy: 'JPY',
   },
 };
 
 // ── Trading sessions (UTC) ──
 const SESSIONS = {
-  tokyo: { open: 0, close: 9, name: "Tokyo", emoji: "🇯🇵", quality: "medium" },
-  london: { open: 7, close: 16, name: "London", emoji: "🇬🇧", quality: "high" },
+  tokyo: { open: 0, close: 9, name: 'Tokyo', emoji: '🇯🇵', quality: 'medium' },
+  london: { open: 7, close: 16, name: 'London', emoji: '🇬🇧', quality: 'high' },
   newYork: {
     open: 13,
     close: 22,
-    name: "New York",
-    emoji: "🇺🇸",
-    quality: "high",
+    name: 'New York',
+    emoji: '🇺🇸',
+    quality: 'high',
   },
-  sydney: { open: 22, close: 7, name: "Sydney", emoji: "🇦🇺", quality: "low" },
+  sydney: { open: 22, close: 7, name: 'Sydney', emoji: '🇦🇺', quality: 'low' },
 };
 
 // Session overlaps — BEST trading times
 const OVERLAPS = [
-  { name: "London-NY", start: 13, end: 16, quality: "premium", emoji: "🔥" },
-  { name: "Tokyo-London", start: 7, end: 9, quality: "good", emoji: "⚡" },
+  { name: 'London-NY', start: 13, end: 16, quality: 'premium', emoji: '🔥' },
+  { name: 'Tokyo-London', start: 7, end: 9, quality: 'good', emoji: '⚡' },
 ];
 
 class ForexEngine {
   constructor() {
-    this.oandaKey = process.env.OANDA_API_KEY || "";
-    this.oandaAcct = process.env.OANDA_ACCOUNT_ID || "";
+    this.oandaKey = process.env.OANDA_API_KEY || '';
+    this.oandaAcct = process.env.OANDA_ACCOUNT_ID || '';
     this.oandaHost =
-      (process.env.OANDA_ENV || "practice") === "live"
-        ? "api-fxtrade.oanda.com"
-        : "api-fxpractice.oanda.com";
-    this.maxSpreadPips = parseFloat(process.env.FOREX_MAX_SPREAD_PIPS || "3");
-    this.defaultLeverage = parseInt(process.env.FOREX_LEVERAGE || "100", 10);
+      (process.env.OANDA_ENV || 'practice') === 'live' ? 'api-fxtrade.oanda.com' : 'api-fxpractice.oanda.com';
+    this.maxSpreadPips = parseFloat(process.env.FOREX_MAX_SPREAD_PIPS || '3');
+    this.defaultLeverage = parseInt(process.env.FOREX_LEVERAGE || '100', 10);
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -151,8 +149,7 @@ class ForexEngine {
   // Calculate lot size based on risk percentage and SL distance
   calculateLotSize(pair, accountBalance, riskPct, stopLossPips) {
     const info = PAIRS[pair];
-    if (!info || stopLossPips <= 0)
-      return { lots: 0, units: 0, error: "Invalid params" };
+    if (!info || stopLossPips <= 0) return { lots: 0, units: 0, error: 'Invalid params' };
 
     const riskAmount = accountBalance * (riskPct / 100);
     const pipVal = info.pipValue; // per standard lot
@@ -188,23 +185,19 @@ class ForexEngine {
     const activeSessions = [];
     for (const [key, ses] of Object.entries(SESSIONS)) {
       if (ses.open < ses.close) {
-        if (decimal >= ses.open && decimal < ses.close)
-          activeSessions.push({ ...ses, key });
+        if (decimal >= ses.open && decimal < ses.close) activeSessions.push({ ...ses, key });
       } else {
         // Overnight (Sydney)
-        if (decimal >= ses.open || decimal < ses.close)
-          activeSessions.push({ ...ses, key });
+        if (decimal >= ses.open || decimal < ses.close) activeSessions.push({ ...ses, key });
       }
     }
 
     // Check overlaps
-    const activeOverlaps = OVERLAPS.filter(
-      (o) => decimal >= o.start && decimal < o.end,
-    );
+    const activeOverlaps = OVERLAPS.filter((o) => decimal >= o.start && decimal < o.end);
 
     const isWeekend = now.getUTCDay() === 0 || now.getUTCDay() === 6;
     const bestTime = activeOverlaps.length > 0;
-    const goodTime = activeSessions.some((s) => s.quality === "high");
+    const goodTime = activeSessions.some((s) => s.quality === 'high');
 
     return {
       utcHour: hour,
@@ -212,20 +205,14 @@ class ForexEngine {
       overlaps: activeOverlaps,
       isWeekend,
       marketOpen: !isWeekend,
-      tradingQuality: isWeekend
-        ? "closed"
-        : bestTime
-          ? "premium"
-          : goodTime
-            ? "high"
-            : "medium",
+      tradingQuality: isWeekend ? 'closed' : bestTime ? 'premium' : goodTime ? 'high' : 'medium',
       recommendation: isWeekend
-        ? "⛔ Market closed (weekend)"
+        ? '⛔ Market closed (weekend)'
         : bestTime
-          ? "🔥 BEST TIME — London-NY overlap"
+          ? '🔥 BEST TIME — London-NY overlap'
           : goodTime
-            ? "✅ Good — major session active"
-            : "⚠️ Low volatility — careful",
+            ? '✅ Good — major session active'
+            : '⚠️ Low volatility — careful',
     };
   }
 
@@ -234,19 +221,19 @@ class ForexEngine {
     const session = this.getCurrentSession();
     if (!session.marketOpen) return [];
 
-    const isLondon = session.sessions.some((s) => s.key === "london");
-    const isNY = session.sessions.some((s) => s.key === "newYork");
-    const isTokyo = session.sessions.some((s) => s.key === "tokyo");
+    const isLondon = session.sessions.some((s) => s.key === 'london');
+    const isNY = session.sessions.some((s) => s.key === 'newYork');
+    const isTokyo = session.sessions.some((s) => s.key === 'tokyo');
 
     const pairs = [];
     if (isLondon || isNY) {
-      pairs.push("EUR_USD", "GBP_USD", "USD_CHF", "EUR_GBP");
+      pairs.push('EUR_USD', 'GBP_USD', 'USD_CHF', 'EUR_GBP');
     }
     if (isNY) {
-      pairs.push("USD_CAD", "USD_JPY");
+      pairs.push('USD_CAD', 'USD_JPY');
     }
     if (isTokyo) {
-      pairs.push("USD_JPY", "EUR_JPY", "GBP_JPY", "AUD_USD", "NZD_USD");
+      pairs.push('USD_JPY', 'EUR_JPY', 'GBP_JPY', 'AUD_USD', 'NZD_USD');
     }
 
     return [...new Set(pairs)];
@@ -258,7 +245,7 @@ class ForexEngine {
 
   checkSpread(pair, currentBid, currentAsk) {
     const info = PAIRS[pair];
-    if (!info) return { ok: false, reason: "Unknown pair" };
+    if (!info) return { ok: false, reason: 'Unknown pair' };
 
     const spreadRaw = currentAsk - currentBid;
     const spreadPips = spreadRaw / info.pipSize;
@@ -272,10 +259,8 @@ class ForexEngine {
       spreadPips: +spreadPips.toFixed(1),
       avgSpreadPips: +avgSpreadPips.toFixed(1),
       spreadRatio: +spreadRatio.toFixed(2),
-      status: ok ? "✅ Normal" : "🚫 Too wide",
-      reason: ok
-        ? null
-        : `Spread ${spreadPips.toFixed(1)} pips > max ${this.maxSpreadPips} pips`,
+      status: ok ? '✅ Normal' : '🚫 Too wide',
+      reason: ok ? null : `Spread ${spreadPips.toFixed(1)} pips > max ${this.maxSpreadPips} pips`,
     };
   }
 
@@ -290,7 +275,7 @@ class ForexEngine {
     const slDistance = slPips * info.pipSize;
     const tpDistance = tpPips * info.pipSize;
 
-    if (direction === "BUY") {
+    if (direction === 'BUY') {
       return {
         entry: entryPrice,
         stopLoss: +(entryPrice - slDistance).toFixed(5),
@@ -329,7 +314,7 @@ class ForexEngine {
 
   shouldAvoidOvernight(pair, direction) {
     const swap = this.getSwapInfo(pair);
-    const cost = direction === "BUY" ? swap.long : swap.short;
+    const cost = direction === 'BUY' ? swap.long : swap.short;
     return { avoidOvernight: cost < -0.5, swapCostPips: cost };
   }
 
@@ -337,17 +322,11 @@ class ForexEngine {
   // OANDA API — place real/paper orders
   // ═══════════════════════════════════════════════════════════════
 
-  async placeOrder(
-    pair,
-    units,
-    type = "MARKET",
-    slPrice = null,
-    tpPrice = null,
-  ) {
+  async placeOrder(pair, units, type = 'MARKET', slPrice = null, tpPrice = null) {
     if (!this.oandaKey || !this.oandaAcct) {
       return {
         success: false,
-        error: "OANDA not configured (set OANDA_API_KEY + OANDA_ACCOUNT_ID)",
+        error: 'OANDA not configured (set OANDA_API_KEY + OANDA_ACCOUNT_ID)',
       };
     }
 
@@ -356,7 +335,7 @@ class ForexEngine {
         type: type,
         instrument: pair,
         units: String(units), // positive=buy, negative=sell
-        timeInForce: "FOK", // Fill or Kill
+        timeInForce: 'FOK', // Fill or Kill
       },
     };
 
@@ -366,27 +345,21 @@ class ForexEngine {
     try {
       const url = `https://${this.oandaHost}/v3/accounts/${this.oandaAcct}/orders`;
       const r = await fetch(url, {
-        method: "POST",
+        method: 'POST',
         headers: {
           Authorization: `Bearer ${this.oandaKey}`,
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify(orderBody),
       });
       const data = await r.json();
 
       if (r.ok) {
-        logger.info(
-          { component: "Forex", pair, units, type },
-          "✅ Order placed via OANDA",
-        );
+        logger.info({ component: 'Forex', pair, units, type }, '✅ Order placed via OANDA');
         return { success: true, data };
       } else {
-        logger.error(
-          { component: "Forex", err: JSON.stringify(data) },
-          "OANDA order failed",
-        );
-        return { success: false, error: data.errorMessage || "Order rejected" };
+        logger.error({ component: 'Forex', err: JSON.stringify(data) }, 'OANDA order failed');
+        return { success: false, error: data.errorMessage || 'Order rejected' };
       }
     } catch (e) {
       return { success: false, error: e.message };
@@ -399,7 +372,7 @@ class ForexEngine {
 
   async getAccountSummary() {
     if (!this.oandaKey || !this.oandaAcct) {
-      return { connected: false, error: "OANDA not configured" };
+      return { connected: false, error: 'OANDA not configured' };
     }
     try {
       const url = `https://${this.oandaHost}/v3/accounts/${this.oandaAcct}/summary`;
@@ -421,7 +394,7 @@ class ForexEngine {
           currency: acct.currency,
         };
       }
-      return { connected: false, error: "API error" };
+      return { connected: false, error: 'API error' };
     } catch (e) {
       return { connected: false, error: e.message };
     }
@@ -437,17 +410,15 @@ class ForexEngine {
     // 1. Session check
     const session = this.getCurrentSession();
     checks.push({
-      name: "Session",
-      passed:
-        session.tradingQuality !== "closed" &&
-        session.tradingQuality !== "medium",
+      name: 'Session',
+      passed: session.tradingQuality !== 'closed' && session.tradingQuality !== 'medium',
       detail: session.recommendation,
     });
 
     // 2. Spread check
     const spread = this.checkSpread(pair, currentBid, currentAsk);
     checks.push({
-      name: "Spread",
+      name: 'Spread',
       passed: spread.ok,
       detail: `${spread.spreadPips} pips (max: ${this.maxSpreadPips})`,
     });
@@ -455,32 +426,26 @@ class ForexEngine {
     // 3. Best pairs check
     const bestPairs = this.getBestPairsNow();
     checks.push({
-      name: "Pair Quality",
+      name: 'Pair Quality',
       passed: bestPairs.includes(pair),
-      detail: bestPairs.includes(pair)
-        ? "✅ Good for this session"
-        : "⚠️ Not ideal for current session",
+      detail: bestPairs.includes(pair) ? '✅ Good for this session' : '⚠️ Not ideal for current session',
     });
 
     // 4. Overnight risk
     const swap = this.shouldAvoidOvernight(pair, direction);
     checks.push({
-      name: "Swap Risk",
+      name: 'Swap Risk',
       passed: !swap.avoidOvernight,
       detail: `Swap: ${swap.swapCostPips} pips/day`,
     });
 
     const allPassed = checks.every((c) => c.passed);
-    const criticalFails = checks.filter(
-      (c) => !c.passed && (c.name === "Session" || c.name === "Spread"),
-    );
+    const criticalFails = checks.filter((c) => !c.passed && (c.name === 'Session' || c.name === 'Spread'));
 
     return {
       approved: allPassed || criticalFails.length === 0,
       checks,
-      summary: allPassed
-        ? "✅ All checks passed"
-        : `⚠️ ${checks.filter((c) => !c.passed).length} issues`,
+      summary: allPassed ? '✅ All checks passed' : `⚠️ ${checks.filter((c) => !c.passed).length} issues`,
     };
   }
 
@@ -499,6 +464,10 @@ class ForexEngine {
 
 const forexEngine = new ForexEngine();
 
+/**
+ * undefined
+ * @returns {*}
+ */
 module.exports = forexEngine;
 module.exports.ForexEngine = ForexEngine;
 module.exports.PAIRS = PAIRS;

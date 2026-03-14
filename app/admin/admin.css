@@ -13,7 +13,7 @@
   --admin-danger: #ef4444;
   --admin-success: #10b981;
   --admin-warning: #f59e0b;
-  --admin-font: "Inter", -apple-system, sans-serif;
+  --admin-font: 'Inter', -apple-system, sans-serif;
 }
 
 /* LIGHT THEME */
@@ -261,11 +261,7 @@ body {
 
 /* BUTTONS */
 .admin-btn {
-  background: linear-gradient(
-    135deg,
-    var(--admin-accent),
-    var(--admin-accent2)
-  );
+  background: linear-gradient(135deg, var(--admin-accent), var(--admin-accent2));
   color: #fff;
   border: none;
   padding: 10px 20px;
@@ -423,11 +419,7 @@ body {
 .bar {
   width: 100%;
   max-width: 40px;
-  background: linear-gradient(
-    180deg,
-    var(--admin-accent),
-    var(--admin-accent2)
-  );
+  background: linear-gradient(180deg, var(--admin-accent), var(--admin-accent2));
   border-radius: 4px 4px 0 0;
   min-height: 2px;
   transition: height 0.5s ease;
@@ -671,11 +663,7 @@ body {
   display: inline-block;
   padding: 4px 14px;
   margin: -4px 20px 4px auto;
-  background: linear-gradient(
-    135deg,
-    var(--admin-accent),
-    var(--admin-accent2)
-  );
+  background: linear-gradient(135deg, var(--admin-accent), var(--admin-accent2));
   color: #fff;
   text-decoration: none;
   font-size: 0.75rem;

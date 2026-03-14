@@ -3,7 +3,7 @@
 // Connects to /api/voice-stream for sub-1s voice-to-voice
 // ═══════════════════════════════════════════════════════════════
 (function () {
-  "use strict";
+  'use strict';
 
   var ws = null;
   var audioCtx = null;
@@ -15,10 +15,7 @@
   var isPlaying = false;
 
   var API_BASE = window.location.origin;
-  var WS_BASE = API_BASE.replace("https://", "wss://").replace(
-    "http://",
-    "ws://",
-  );
+  var WS_BASE = API_BASE.replace('https://', 'wss://').replace('http://', 'ws://');
 
   // ── PCM Player (plays raw PCM16 24kHz from server) ──────────
   function getAudioContext() {
@@ -27,10 +24,15 @@
         sampleRate: 24000,
       });
     }
-    if (audioCtx.state === "suspended") audioCtx.resume();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
     return audioCtx;
   }
 
+  /**
+   * playPCMChunk
+   * @param {*} pcmData
+   * @returns {*}
+   */
   function playPCMChunk(pcmData) {
     var ctx = getAudioContext();
     // PCM16 little-endian → Float32
@@ -47,6 +49,10 @@
     if (!isPlaying) drainQueue();
   }
 
+  /**
+   * drainQueue
+   * @returns {*}
+   */
   function drainQueue() {
     if (pcmQueue.length === 0) {
       isPlaying = false;
@@ -93,13 +99,16 @@
       source.connect(processor);
       processor.connect(ctx.destination); // needed for ScriptProcessor to work
       isListening = true;
-      console.log("[VoiceStream] 🎤 Mic capture started");
     } catch (e) {
-      console.error("[VoiceStream] Mic error:", e.message);
+      console.error('[VoiceStream] Mic error:', e.message);
       throw e;
     }
   }
 
+  /**
+   * stopMicCapture
+   * @returns {*}
+   */
   function stopMicCapture() {
     isListening = false;
     if (mediaStream) {
@@ -108,26 +117,21 @@
       });
       mediaStream = null;
     }
-    console.log("[VoiceStream] 🔇 Mic capture stopped");
   }
 
   // ── WebSocket connection ───────────────────────────────────
   function connect(opts) {
     opts = opts || {};
-    var avatar =
-      opts.avatar || (window.KAvatar ? KAvatar.getCurrentAvatar() : "kelion");
-    var language = opts.language || "ro";
+    var avatar = opts.avatar || (window.KAvatar ? KAvatar.getCurrentAvatar() : 'kelion');
+    var language = opts.language || 'ro';
 
-    var url =
-      WS_BASE + "/api/voice-stream?avatar=" + avatar + "&language=" + language;
-    console.log("[VoiceStream] Connecting to", url);
+    var url = WS_BASE + '/api/voice-stream?avatar=' + avatar + '&language=' + language;
 
     ws = new WebSocket(url);
-    ws.binaryType = "arraybuffer";
+    ws.binaryType = 'arraybuffer';
 
     ws.onopen = function () {
       isConnected = true;
-      console.log("[VoiceStream] ✅ Connected");
     };
 
     ws.onmessage = function (event) {
@@ -142,94 +146,86 @@
         var msg = JSON.parse(event.data);
         handleMessage(msg);
       } catch (e) {
-        console.warn("[VoiceStream] Parse error:", e.message);
+        console.warn('[VoiceStream] Parse error:', e.message);
       }
     };
 
     ws.onclose = function () {
       isConnected = false;
-      console.log("[VoiceStream] Disconnected");
     };
 
     ws.onerror = function (e) {
-      console.error("[VoiceStream] WS error");
+      console.error('[VoiceStream] WS error');
       isConnected = false;
     };
   }
 
+  /**
+   * handleMessage
+   * @param {*} msg
+   * @returns {*}
+   */
   function handleMessage(msg) {
     switch (msg.type) {
-      case "ready":
-        console.log(
-          "[VoiceStream] Pipeline ready:",
-          msg.stt,
-          "→",
-          msg.llm,
-          "→",
-          msg.tts,
-        );
-        window.dispatchEvent(
-          new CustomEvent("voice-stream-ready", { detail: msg }),
-        );
+      case 'ready':
+        console.log('[VoiceStream] Pipeline ready:', msg.stt, '→', msg.llm, '→', msg.tts);
+        window.dispatchEvent(new CustomEvent('voice-stream-ready', { detail: msg }));
         break;
 
-      case "transcript":
+      case 'transcript':
         // Show interim/final transcript in chat
         if (!msg.interim) {
-          var overlay = document.getElementById("chat-overlay");
+          var overlay = document.getElementById('chat-overlay');
           if (overlay) {
             // Remove any interim display
-            var interimEl = document.getElementById("vs-interim");
+            var interimEl = document.getElementById('vs-interim');
             if (interimEl) interimEl.remove();
             // Add final user message
-            var userMsg = document.createElement("div");
-            userMsg.className = "msg user";
-            userMsg.textContent = "🎙️ " + msg.text;
+            var userMsg = document.createElement('div');
+            userMsg.className = 'msg user';
+            userMsg.textContent = '🎙️ ' + msg.text;
             overlay.appendChild(userMsg);
             overlay.scrollTop = overlay.scrollHeight;
           }
           // Show thinking indicator
-          var thinking = document.getElementById("thinking");
-          if (thinking) thinking.classList.add("active");
+          var thinking = document.getElementById('thinking');
+          if (thinking) thinking.classList.add('active');
         } else {
           // Show interim text as ghost text
-          var overlay = document.getElementById("chat-overlay");
+          var overlay = document.getElementById('chat-overlay');
           if (overlay) {
-            var interimEl = document.getElementById("vs-interim");
+            var interimEl = document.getElementById('vs-interim');
             if (!interimEl) {
-              interimEl = document.createElement("div");
-              interimEl.id = "vs-interim";
-              interimEl.className = "msg user";
-              interimEl.style.opacity = "0.5";
+              interimEl = document.createElement('div');
+              interimEl.id = 'vs-interim';
+              interimEl.className = 'msg user';
+              interimEl.style.opacity = '0.5';
               overlay.appendChild(interimEl);
             }
-            interimEl.textContent = "🎙️ " + msg.text + "...";
+            interimEl.textContent = '🎙️ ' + msg.text + '...';
             overlay.scrollTop = overlay.scrollHeight;
           }
         }
         break;
 
-      case "llm_start":
-        console.log("[VoiceStream] LLM TTFT:", msg.ttft, "ms");
+      case 'llm_start':
         // Fire audio-start event for avatar lip sync
-        window.dispatchEvent(
-          new CustomEvent("audio-start", { detail: { duration: 5 } }),
-        );
+        window.dispatchEvent(new CustomEvent('audio-start', { detail: { duration: 5 } }));
         break;
 
-      case "token":
+      case 'token':
         // Streaming text — append to current assistant message
-        var overlay = document.getElementById("chat-overlay");
+        var overlay = document.getElementById('chat-overlay');
         if (overlay) {
-          var assistEl = document.getElementById("vs-reply");
+          var assistEl = document.getElementById('vs-reply');
           if (!assistEl) {
             // Hide thinking
-            var thinking = document.getElementById("thinking");
-            if (thinking) thinking.classList.remove("active");
+            var thinking = document.getElementById('thinking');
+            if (thinking) thinking.classList.remove('active');
             // Create assistant message element
-            assistEl = document.createElement("div");
-            assistEl.id = "vs-reply";
-            assistEl.className = "msg assistant";
+            assistEl = document.createElement('div');
+            assistEl.id = 'vs-reply';
+            assistEl.className = 'msg assistant';
             overlay.appendChild(assistEl);
           }
           assistEl.textContent += msg.text;
@@ -237,25 +233,21 @@
         }
         break;
 
-      case "audio_end":
-        console.log("[VoiceStream] Audio stream ended");
+      case 'audio_end':
         break;
 
-      case "turn_complete":
-        console.log("[VoiceStream] Turn complete:", msg.totalTime, "ms");
+      case 'turn_complete':
         // Reset the reply element ID so next turn creates a new one
-        var replyEl = document.getElementById("vs-reply");
-        if (replyEl) replyEl.removeAttribute("id");
+        var replyEl = document.getElementById('vs-reply');
+        if (replyEl) replyEl.removeAttribute('id');
 
-        window.dispatchEvent(
-          new CustomEvent("voice-stream-turn", { detail: msg }),
-        );
+        window.dispatchEvent(new CustomEvent('voice-stream-turn', { detail: msg }));
         break;
 
-      case "error":
-        console.error("[VoiceStream] Server error:", msg.error);
-        var thinking = document.getElementById("thinking");
-        if (thinking) thinking.classList.remove("active");
+      case 'error':
+        console.error('[VoiceStream] Server error:', msg.error);
+        var thinking = document.getElementById('thinking');
+        if (thinking) thinking.classList.remove('active');
         break;
     }
   }
@@ -263,10 +255,10 @@
   // ── Send text directly (fallback when no Deepgram STT) ─────
   function sendText(text) {
     if (!ws || ws.readyState !== WebSocket.OPEN) {
-      console.warn("[VoiceStream] Not connected");
+      console.warn('[VoiceStream] Not connected');
       return false;
     }
-    ws.send(JSON.stringify({ type: "text_input", text: text }));
+    ws.send(JSON.stringify({ type: 'text_input', text: text }));
     return true;
   }
 
@@ -289,6 +281,4 @@
       return isListening;
     },
   };
-
-  console.log("[VoiceStream] 🔌 Client module loaded");
 })();

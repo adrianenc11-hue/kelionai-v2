@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="en">
   <head>
+  <meta name="description" content="Page description">
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>KelionAI — Cost Analytics</title>
@@ -11,7 +12,7 @@
         box-sizing: border-box;
       }
       body {
-        font-family: "Inter", "Segoe UI", sans-serif;
+        font-family: 'Inter', 'Segoe UI', sans-serif;
         background: #060614;
         color: #e0e0e0;
         min-height: 100vh;
@@ -239,39 +240,34 @@
         <h3>⚙️ Budget Alert Threshold</h3>
         <div class="budget-form">
           <input type="number" id="budget" placeholder="$ limit" value="50" />
-          <button onclick="setBudget()">Set Alert</button>
-          <span
-            id="budget-status"
-            style="color: #888; font-size: 0.82rem"
-          ></span>
+          <button type="button" onclick="setBudget()">Set Alert</button>
+          <span id="budget-status" style="color: #888; font-size: 0.82rem"></span>
         </div>
       </div>
       <div class="section">
         <h3>📋 Request Distribution</h3>
         <div id="req-dist"></div>
       </div>
-      <div class="refresh">
-        Auto-refreshes every 30s · Data from admin/stats endpoint
-      </div>
+      <div class="refresh">Auto-refreshes every 30s · Data from admin/stats endpoint</div>
     </div>
     <script>
-      const T = localStorage.getItem("supabase_token") || "";
+      const T = localStorage.getItem('supabase_token') || '';
       const H = {
-        "Content-Type": "application/json",
-        Authorization: "Bearer " + T,
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer ' + T,
       };
-      let budgetLimit = parseFloat(localStorage.getItem("budgetLimit")) || 50;
-      document.getElementById("budget").value = budgetLimit;
+      let budgetLimit = parseFloat(localStorage.getItem('budgetLimit')) || 50;
+      document.getElementById('budget').value = budgetLimit;
 
       const COLORS = {
-        openai: "bar-openai",
-        google: "bar-google",
-        anthropic: "bar-anthropic",
+        openai: 'bar-openai',
+        google: 'bar-google',
+        anthropic: 'bar-anthropic',
       };
 
       async function load() {
         try {
-          const r = await fetch("/api/admin/stats", { headers: H });
+          const r = await fetch('/api/admin/stats', { headers: H });
           const d = await r.json();
           const credits = d.credits || {};
           let totalSpent = 0,
@@ -287,54 +283,49 @@
             totalCredit += remaining;
             providers.push({ name, spent, remaining, reqs });
           }
-          document.getElementById("s-total").textContent =
-            "$" + totalSpent.toFixed(2);
-          document.getElementById("s-reqs").textContent = totalReqs;
-          document.getElementById("s-avg").textContent =
-            totalReqs > 0 ? "$" + (totalSpent / totalReqs).toFixed(4) : "$0";
-          document.getElementById("s-credit").textContent =
-            "$" + totalCredit.toFixed(2);
+          document.getElementById('s-total').textContent = '$' + totalSpent.toFixed(2);
+          document.getElementById('s-reqs').textContent = totalReqs;
+          document.getElementById('s-avg').textContent =
+            totalReqs > 0 ? '$' + (totalSpent / totalReqs).toFixed(4) : '$0';
+          document.getElementById('s-credit').textContent = '$' + totalCredit.toFixed(2);
 
           // Budget alert
           if (totalSpent > budgetLimit) {
-            document.getElementById("alert").classList.add("show");
-            document.getElementById("alert-msg").textContent =
+            document.getElementById('alert').classList.add('show');
+            document.getElementById('alert-msg').textContent =
               `Spending ($${totalSpent.toFixed(2)}) exceeds budget limit ($${budgetLimit})!`;
           } else {
-            document.getElementById("alert").classList.remove("show");
+            document.getElementById('alert').classList.remove('show');
           }
 
           // Provider bars
           const maxSpent = Math.max(...providers.map((p) => p.spent), 1);
-          document.getElementById("providers").innerHTML =
+          document.getElementById('providers').innerHTML =
             providers
               .map((p) => {
                 const pct = Math.max((p.spent / maxSpent) * 100, 2);
-                const cls = COLORS[p.name.toLowerCase()] || "bar-other";
+                const cls = COLORS[p.name.toLowerCase()] || 'bar-other';
                 return `<div class="provider-row"><span class="provider-name">${p.name}</span><div class="bar-wrap"><div class="bar-fill ${cls}" style="width:${pct}%">$${p.spent.toFixed(2)}</div></div><span class="cost-amount">${p.reqs} reqs</span></div>`;
               })
-              .join("") ||
-            '<div style="text-align:center;color:#666;padding:20px">No cost data available</div>';
+              .join('') || '<div style="text-align:center;color:#666;padding:20px">No cost data available</div>';
 
           // Request distribution
-          document.getElementById("req-dist").innerHTML =
+          document.getElementById('req-dist').innerHTML =
             providers
               .map((p) => {
-                const pct =
-                  totalReqs > 0 ? ((p.reqs / totalReqs) * 100).toFixed(1) : 0;
+                const pct = totalReqs > 0 ? ((p.reqs / totalReqs) * 100).toFixed(1) : 0;
                 return `<div class="log-row"><span class="prov">${p.name}</span><span>${p.reqs} requests (${pct}%)</span><span class="amt">$${p.spent.toFixed(4)}/req avg</span></div>`;
               })
-              .join("") || "No data";
+              .join('') || 'No data';
         } catch (e) {
           console.error(e);
         }
       }
 
       function setBudget() {
-        budgetLimit = parseFloat(document.getElementById("budget").value) || 50;
-        localStorage.setItem("budgetLimit", budgetLimit);
-        document.getElementById("budget-status").textContent =
-          "✅ Alert set at $" + budgetLimit;
+        budgetLimit = parseFloat(document.getElementById('budget').value) || 50;
+        localStorage.setItem('budgetLimit', budgetLimit);
+        document.getElementById('budget-status').textContent = '✅ Alert set at $' + budgetLimit;
         load();
       }
 

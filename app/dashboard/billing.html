@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="en">
   <head>
+  <meta name="description" content="Page description">
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Billing — KelionAI</title>
@@ -37,7 +38,7 @@
         --text-muted: #555577;
         --radius: 12px;
         --radius-lg: 20px;
-        --font: "Inter", -apple-system, sans-serif;
+        --font: 'Inter', -apple-system, sans-serif;
         --transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         --glass: rgba(10, 10, 30, 0.6);
         --glass-blur: blur(20px);
@@ -325,7 +326,7 @@
   <body>
     <header class="billing-header">
       <a href="/" class="billing-logo">Kelion<span>AI</span></a>
-      <nav class="billing-nav">
+      <nav role="navigation" class="billing-nav">
         <a href="/" class="nav-link">Home</a>
         <a href="/pricing/" class="nav-link">Pricing</a>
       </nav>
@@ -340,9 +341,7 @@
       <div id="billing-message"></div>
 
       <div id="billing-content">
-        <div class="plan-loading">
-          Loading account data...<span class="spinner"></span>
-        </div>
+        <div class="plan-loading">Loading account data...<span class="spinner"></span></div>
       </div>
     </main>
 
@@ -356,17 +355,17 @@
     <script src="/js/shared.js"></script>
     <script>
       (function () {
-        "use strict";
+        'use strict';
         var API = window.location.origin;
 
         function showMsg(text, type) {
-          var el = document.getElementById("billing-message");
+          var el = document.getElementById('billing-message');
           el.textContent = text;
           el.className = type;
-          el.style.display = "block";
-          if (type === "success")
+          el.style.display = 'block';
+          if (type === 'success')
             setTimeout(function () {
-              el.style.display = "none";
+              el.style.display = 'none';
             }, 5000);
         }
 
@@ -375,20 +374,20 @@
             return (
               '<div class="usage-bar-wrap"><div class="usage-label"><span>' +
               label +
-              "</span><span>∞</span></div>" +
+              '</span><span>∞</span></div>' +
               '<div class="usage-track"><div class="usage-fill" style="width:10%"></div></div></div>'
             );
           }
           var pct = limit > 0 ? Math.min(100, (used / limit) * 100) : 0;
-          var cls = pct >= 100 ? "exceeded" : pct >= 80 ? "warn" : "";
+          var cls = pct >= 100 ? 'exceeded' : pct >= 80 ? 'warn' : '';
           return (
             '<div class="usage-bar-wrap"><div class="usage-label"><span>' +
             label +
-            "</span><span>" +
+            '</span><span>' +
             used +
-            " / " +
+            ' / ' +
             limit +
-            "</span></div>" +
+            '</span></div>' +
             '<div class="usage-track"><div class="usage-fill ' +
             cls +
             '" style="width:' +
@@ -399,22 +398,22 @@
 
         async function openPortal() {
           try {
-            var r = await fetch(API + "/api/payments/portal", {
-              method: "POST",
+            var r = await fetch(API + '/api/payments/portal', {
+              method: 'POST',
               headers: KShared.authHeaders(),
             });
             var d = await r.json();
             if (d.url) window.location.href = d.url;
-            else showMsg(d.error || "Portal error.", "error");
+            else showMsg(d.error || 'Portal error.', 'error');
           } catch (e) {
-            showMsg("Error opening portal.", "error");
+            showMsg('Error opening portal.', 'error');
           }
         }
 
         async function init() {
           var token = KShared.getToken();
           if (!token) {
-            document.getElementById("billing-content").innerHTML =
+            document.getElementById('billing-content').innerHTML =
               '<div class="billing-section"><p class="no-sub">You need to be signed in to view billing data. ' +
               '<a href="/">Go to the app</a> and sign in.</p></div>';
             return;
@@ -422,94 +421,91 @@
 
           var status;
           try {
-            var r = await fetch(API + "/api/payments/status", {
+            var r = await fetch(API + '/api/payments/status', {
               headers: KShared.authHeaders(),
             });
-            if (!r.ok) throw new Error("HTTP " + r.status);
+            if (!r.ok) throw new Error('HTTP ' + r.status);
             status = await r.json();
           } catch (e) {
-            document.getElementById("billing-content").innerHTML =
+            document.getElementById('billing-content').innerHTML =
               '<div class="billing-section"><p class="no-sub">Could not load data. Please try again.</p></div>';
             return;
           }
 
-          var plan = status.plan || "free";
+          var plan = status.plan || 'free';
           var sub = status.subscription;
           var limits = status.limits || {};
           var usage = status.usage || {};
 
-          var statusText = sub ? sub.status : "free";
+          var statusText = sub ? sub.status : 'free';
           var statusClass =
-            statusText === "active"
-              ? "active"
-              : statusText === "cancelled"
-                ? "cancelled"
-                : statusText === "past_due"
-                  ? "past_due"
-                  : "";
+            statusText === 'active'
+              ? 'active'
+              : statusText === 'cancelled'
+                ? 'cancelled'
+                : statusText === 'past_due'
+                  ? 'past_due'
+                  : '';
 
-          var renewHtml = "";
+          var renewHtml = '';
           if (sub && sub.current_period_end) {
             var d = new Date(sub.current_period_end);
             renewHtml =
               '<div class="billing-row"><span class="label">Renews</span><span class="value">' +
-              d.toLocaleDateString("en-US", {
-                day: "2-digit",
-                month: "long",
-                year: "numeric",
+              d.toLocaleDateString('en-US', {
+                day: '2-digit',
+                month: 'long',
+                year: 'numeric',
               }) +
-              "</span></div>";
+              '</span></div>';
           }
 
           var planHtml =
             '<div class="billing-section">' +
-            "<h2>Current Plan</h2>" +
+            '<h2>Current Plan</h2>' +
             '<div class="billing-row"><span class="label">Plan</span><span class="value">' +
             plan.toUpperCase() +
-            "</span></div>" +
+            '</span></div>' +
             (sub
               ? '<div class="billing-row"><span class="label">Status</span><span class="value ' +
                 statusClass +
                 '">' +
                 statusText +
-                "</span></div>"
-              : "") +
+                '</span></div>'
+              : '') +
             renewHtml +
             '<div class="billing-actions" style="margin-top:16px">';
 
-          if (plan === "free" || plan === "guest") {
+          if (plan === 'free' || plan === 'guest') {
             planHtml +=
-              '<button class="btn btn-primary" onclick="window.location.href=\'/pricing/\'">Upgrade plan</button>';
+              '<button type="button" class="btn btn-primary" onclick="window.location.href=\'/pricing/\'">Upgrade plan</button>';
           } else {
-            planHtml +=
-              '<button class="btn btn-secondary" id="btn-portal">Manage subscription</button>';
-            planHtml +=
-              '<button class="btn btn-danger" id="btn-cancel">Cancel subscription</button>';
+            planHtml += '<button type="button" class="btn btn-secondary" id="btn-portal">Manage subscription</button>';
+            planHtml += '<button type="button" class="btn btn-danger" id="btn-cancel">Cancel subscription</button>';
           }
 
-          planHtml += "</div></div>";
+          planHtml += '</div></div>';
 
           var usageHtml =
             '<div class="billing-section"><h2>Usage Today</h2>' +
-            usageBar(usage.chat || 0, limits.chat, "💬 Chat") +
-            usageBar(usage.search || 0, limits.search, "🔍 Search") +
-            usageBar(usage.image || 0, limits.image, "🖼 Images") +
-            usageBar(usage.vision || 0, limits.vision, "👁 Vision") +
-            usageBar(usage.tts || 0, limits.tts, "🔊 TTS") +
-            "</div>";
+            usageBar(usage.chat || 0, limits.chat, '💬 Chat') +
+            usageBar(usage.search || 0, limits.search, '🔍 Search') +
+            usageBar(usage.image || 0, limits.image, '🖼 Images') +
+            usageBar(usage.vision || 0, limits.vision, '👁 Vision') +
+            usageBar(usage.tts || 0, limits.tts, '🔊 TTS') +
+            '</div>';
 
-          document.getElementById("billing-content").innerHTML =
-            planHtml + usageHtml;
+          document.getElementById('billing-content').innerHTML = planHtml + usageHtml;
 
-          var portalBtn = document.getElementById("btn-portal");
-          if (portalBtn) portalBtn.addEventListener("click", openPortal);
+          var portalBtn = document.getElementById('btn-portal');
+          if (portalBtn) portalBtn.addEventListener('click', openPortal);
 
-          var cancelBtn = document.getElementById("btn-cancel");
+          var cancelBtn = document.getElementById('btn-cancel');
           if (cancelBtn) {
-            cancelBtn.addEventListener("click", function () {
+            cancelBtn.addEventListener('click', function () {
               if (
                 confirm(
-                  "Are you sure you want to cancel your subscription? You will lose access to premium features at the end of the current period.",
+                  'Are you sure you want to cancel your subscription? You will lose access to premium features at the end of the current period.'
                 )
               ) {
                 openPortal();
@@ -518,20 +514,16 @@
           }
 
           var params = new URLSearchParams(window.location.search);
-          if (params.get("payment") === "success") {
-            showMsg(
-              "✅ Payment processed successfully! Your plan has been activated.",
-              "success",
-            );
-            window.history.replaceState({}, "", window.location.pathname);
-          } else if (params.get("payment") === "cancel") {
-            showMsg("Payment was cancelled.", "error");
-            window.history.replaceState({}, "", window.location.pathname);
+          if (params.get('payment') === 'success') {
+            showMsg('✅ Payment processed successfully! Your plan has been activated.', 'success');
+            window.history.replaceState({}, '', window.location.pathname);
+          } else if (params.get('payment') === 'cancel') {
+            showMsg('Payment was cancelled.', 'error');
+            window.history.replaceState({}, '', window.location.pathname);
           }
         }
 
-        if (document.readyState === "loading")
-          document.addEventListener("DOMContentLoaded", init);
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
         else init();
       })();
     </script>

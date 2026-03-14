@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="en">
   <head>
+  <meta name="description" content="Page description">
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>KelionAI — Live Users & Feedback</title>
@@ -11,7 +12,7 @@
         box-sizing: border-box;
       }
       body {
-        font-family: "Inter", "Segoe UI", sans-serif;
+        font-family: 'Inter', 'Segoe UI', sans-serif;
         background: #060614;
         color: #e0e0e0;
         min-height: 100vh;
@@ -178,43 +179,42 @@
       <div class="refresh">Auto-refreshes every 10s</div>
     </div>
     <script>
-      const T = localStorage.getItem("supabase_token") || "";
+      const T = localStorage.getItem('supabase_token') || '';
       const H = {
-        "Content-Type": "application/json",
-        Authorization: "Bearer " + T,
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer ' + T,
       };
       async function load() {
         try {
           const [lr, fr] = await Promise.all([
-            fetch("/api/admin/live-users", { headers: H }),
-            fetch("/api/admin/feedback-stats", { headers: H }),
+            fetch('/api/admin/live-users', { headers: H }),
+            fetch('/api/admin/feedback-stats', { headers: H }),
           ]);
           const l = await lr.json(),
             f = await fr.json();
-          document.getElementById("s-online").textContent = l.online || 0;
-          document.getElementById("s-total").textContent = f.total || 0;
-          document.getElementById("s-up").textContent = f.up || 0;
-          document.getElementById("s-down").textContent = f.down || 0;
-          document.getElementById("s-rate").textContent =
-            f.satisfactionRate || "-";
-          const el = document.getElementById("live-list");
+          document.getElementById('s-online').textContent = l.online || 0;
+          document.getElementById('s-total').textContent = f.total || 0;
+          document.getElementById('s-up').textContent = f.up || 0;
+          document.getElementById('s-down').textContent = f.down || 0;
+          document.getElementById('s-rate').textContent = f.satisfactionRate || '-';
+          const el = document.getElementById('live-list');
           el.innerHTML = (l.sessions || []).length
             ? l.sessions
                 .map(
                   (s) =>
-                    `<div class="user-row"><span class="email">${s.email}</span><span class="meta">${s.avatar} · ${Math.round(s.duration / 60)}min · <span class="badge ${s.idle < 30 ? "online" : "idle"}">${s.idle < 30 ? "active" : "idle " + s.idle + "s"}</span></span></div>`,
+                    `<div class="user-row"><span class="email">${s.email}</span><span class="meta">${s.avatar} · ${Math.round(s.duration / 60)}min · <span class="badge ${s.idle < 30 ? 'online' : 'idle'}">${s.idle < 30 ? 'active' : 'idle ' + s.idle + 's'}</span></span></div>`
                 )
-                .join("")
+                .join('')
             : '<div style="text-align:center;color:#666;padding:20px">No users online</div>';
-          const fl = document.getElementById("fb-list");
+          const fl = document.getElementById('fb-list');
           fl.innerHTML = (f.recent || []).length
             ? f.recent
                 .slice(0, 20)
                 .map(
                   (r) =>
-                    `<div class="fb-item"><span class="${r.type === "up" ? "fb-up" : "fb-down"}">${r.type === "up" ? "👍" : "👎"}</span><span>${r.userId}</span><span class="meta">${r.comment || ""}</span><span class="meta">${new Date(r.timestamp).toLocaleTimeString()}</span></div>`,
+                    `<div class="fb-item"><span class="${r.type === 'up' ? 'fb-up' : 'fb-down'}">${r.type === 'up' ? '👍' : '👎'}</span><span>${r.userId}</span><span class="meta">${r.comment || ''}</span><span class="meta">${new Date(r.timestamp).toLocaleTimeString()}</span></div>`
                 )
-                .join("")
+                .join('')
             : '<div style="text-align:center;color:#666;padding:20px">No feedback yet</div>';
         } catch (e) {
           console.error(e);

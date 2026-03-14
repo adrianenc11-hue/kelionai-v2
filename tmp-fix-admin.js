@@ -13,7 +13,7 @@ f = f.replace(
   '(process.env.ADMIN_ACCESS_CODE || process.env.ADMIN_EXIT_CODE || "").trim();'
 );
 
-// Fix 3: trim exitCode 
+// Fix 3: trim exitCode
 f = f.replace(
   'const exitCode = process.env.ADMIN_EXIT_CODE || process.env.ADMIN_ACCESS_CODE;',
   'const exitCode = (process.env.ADMIN_EXIT_CODE || process.env.ADMIN_ACCESS_CODE || "").trim();'
@@ -26,4 +26,3 @@ f = f.replace(
 );
 
 fs.writeFileSync('server/routes/admin.js', f);
-console.log('Admin verify-code .trim() fix applied!');

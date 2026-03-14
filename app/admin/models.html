@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="ro">
   <head>
+  <meta name="description" content="Page description">
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>KelionAI — Model Manager</title>
@@ -184,56 +185,50 @@
           <span class="admin-badge">v3.4</span>
         </div>
         <div class="header-right">
-          <span id="ollama-status" class="status-badge status-offline"
-            >⏳ Checking...</span
-          >
-          <button class="admin-btn" onclick="loadAll()">🔄 Refresh</button>
+          <span id="ollama-status" class="status-badge status-offline">⏳ Checking...</span>
+          <button type="button" class="admin-btn" onclick="loadAll()">🔄 Refresh</button>
         </div>
       </header>
 
       <!-- MODELS -->
-      <h2 style="color: #e0e0e0; font-size: 1.1rem; margin: 20px 0 0">
-        📦 Installed Models
-      </h2>
+      <h2 style="color: #e0e0e0; font-size: 1.1rem; margin: 20px 0 0">📦 Installed Models</h2>
       <div class="model-grid" id="model-grid">
-        <div style="color: #888; text-align: center; padding: 40px">
-          Checking Ollama...
-        </div>
+        <div style="color: #888; text-align: center; padding: 40px">Checking Ollama...</div>
       </div>
 
       <!-- DOWNLOAD SECTION -->
       <div class="download-section">
         <h3>📥 Download New Model</h3>
         <div class="download-grid">
-          <button class="download-btn" onclick="pullModel('llama3.2')">
+          <button type="button" class="download-btn" onclick="pullModel('llama3.2')">
             <span class="dl-name">Llama 3.2</span>
             <span class="dl-size">3B · 2.0 GB</span>
           </button>
-          <button class="download-btn" onclick="pullModel('llama3.1')">
+          <button type="button" class="download-btn" onclick="pullModel('llama3.1')">
             <span class="dl-name">Llama 3.1</span>
             <span class="dl-size">8B · 4.7 GB</span>
           </button>
-          <button class="download-btn" onclick="pullModel('mistral')">
+          <button type="button" class="download-btn" onclick="pullModel('mistral')">
             <span class="dl-name">Mistral</span>
             <span class="dl-size">7B · 4.1 GB</span>
           </button>
-          <button class="download-btn" onclick="pullModel('phi3')">
+          <button type="button" class="download-btn" onclick="pullModel('phi3')">
             <span class="dl-name">Phi-3</span>
             <span class="dl-size">3.8B · 2.3 GB</span>
           </button>
-          <button class="download-btn" onclick="pullModel('gemma2')">
+          <button type="button" class="download-btn" onclick="pullModel('gemma2')">
             <span class="dl-name">Gemma 2</span>
             <span class="dl-size">9B · 5.4 GB</span>
           </button>
-          <button class="download-btn" onclick="pullModel('qwen2.5')">
+          <button type="button" class="download-btn" onclick="pullModel('qwen2.5')">
             <span class="dl-name">Qwen 2.5</span>
             <span class="dl-size">7B · 4.4 GB</span>
           </button>
-          <button class="download-btn" onclick="pullModel('codellama')">
+          <button type="button" class="download-btn" onclick="pullModel('codellama')">
             <span class="dl-name">CodeLlama</span>
             <span class="dl-size">7B · 3.8 GB</span>
           </button>
-          <button class="download-btn" onclick="pullModel('deepseek-coder-v2')">
+          <button type="button" class="download-btn" onclick="pullModel('deepseek-coder-v2')">
             <span class="dl-name">DeepSeek Coder v2</span>
             <span class="dl-size">16B · 8.9 GB</span>
           </button>
@@ -241,14 +236,7 @@
         <div id="pull-status"></div>
 
         <!-- Custom pull -->
-        <div
-          style="
-            margin-top: 16px;
-            display: flex;
-            gap: 10px;
-            align-items: center;
-          "
-        >
+        <div style="margin-top: 16px; display: flex; gap: 10px; align-items: center">
           <input
             type="text"
             id="custom-model"
@@ -263,11 +251,7 @@
               font-size: 0.85rem;
             "
           />
-          <button
-            class="download-btn"
-            onclick="pullCustom()"
-            style="white-space: nowrap"
-          >
+          <button type="button" class="download-btn" onclick="pullCustom()" style="white-space: nowrap">
             <span class="dl-name">📥 Pull Custom</span>
           </button>
         </div>
@@ -277,21 +261,21 @@
     <script>
       async function loadAll() {
         try {
-          const res = await fetch("/api/admin/models");
+          const res = await fetch('/api/admin/models');
           const data = await res.json();
 
           // Status badge
-          const badge = document.getElementById("ollama-status");
+          const badge = document.getElementById('ollama-status');
           if (data.available) {
-            badge.className = "status-badge status-online";
-            badge.textContent = "🟢 Ollama Online";
+            badge.className = 'status-badge status-online';
+            badge.textContent = '🟢 Ollama Online';
           } else {
-            badge.className = "status-badge status-offline";
-            badge.textContent = "🔴 Ollama Offline";
+            badge.className = 'status-badge status-offline';
+            badge.textContent = '🔴 Ollama Offline';
           }
 
           // Render models
-          const grid = document.getElementById("model-grid");
+          const grid = document.getElementById('model-grid');
           const models = data.models || [];
           if (!models.length) {
             grid.innerHTML = data.available
@@ -309,105 +293,104 @@
                         <span class="model-tag tag-size">${esc(m.sizeHuman)}</span>
                         <span class="model-tag tag-family">${esc(m.family)}</span>
                         <span class="model-tag">${esc(m.parameters)}</span>
-                        ${m.quantization !== "unknown" ? `<span class="model-tag">${esc(m.quantization)}</span>` : ""}
+                        ${m.quantization !== 'unknown' ? `<span class="model-tag">${esc(m.quantization)}</span>` : ''}
                     </div>
-                    <div style="font-size:0.75rem;color:#666">Digest: ${esc(m.digest || "—")}</div>
+                    <div style="font-size:0.75rem;color:#666">Digest: ${esc(m.digest || '—')}</div>
                     <div class="model-actions">
-                        <button onclick="testModel('${esc(m.name)}')">🧪 Test</button>
-                        <button class="btn-danger" onclick="deleteModel('${esc(m.name)}')">🗑️ Delete</button>
+                        <button type="button" onclick="testModel('${esc(m.name)}')">🧪 Test</button>
+                        <button type="button" class="btn-danger" onclick="deleteModel('${esc(m.name)}')">🗑️ Delete</button>
                     </div>
                 </div>
-            `,
+            `
             )
-            .join("");
+            .join('');
         } catch (e) {
-          document.getElementById("ollama-status").className =
-            "status-badge status-offline";
-          document.getElementById("ollama-status").textContent = "🔴 Error";
-          document.getElementById("model-grid").innerHTML =
+          document.getElementById('ollama-status').className = 'status-badge status-offline';
+          document.getElementById('ollama-status').textContent = '🔴 Error';
+          document.getElementById('model-grid').innerHTML =
             `<div style="color:#f87171;padding:20px">Error: ${e.message}</div>`;
         }
       }
 
       async function pullModel(name) {
-        const status = document.getElementById("pull-status");
+        const status = document.getElementById('pull-status');
         status.innerHTML = `⏳ Downloading <strong>${esc(name)}</strong>... (this may take a few minutes)`;
-        status.style.color = "#a5b4fc";
+        status.style.color = '#a5b4fc';
 
         try {
-          const res = await fetch("/api/admin/models/pull", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
+          const res = await fetch('/api/admin/models/pull', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ model: name }),
           });
           const data = await res.json();
           if (data.success) {
             status.innerHTML = `✅ <strong>${esc(name)}</strong> downloaded!`;
-            status.style.color = "#34d399";
+            status.style.color = '#34d399';
             loadAll();
           } else {
-            status.innerHTML = `❌ Failed: ${esc(data.error || "Unknown")}`;
-            status.style.color = "#f87171";
+            status.innerHTML = `❌ Failed: ${esc(data.error || 'Unknown')}`;
+            status.style.color = '#f87171';
           }
         } catch (e) {
           status.innerHTML = `❌ Error: ${esc(e.message)}`;
-          status.style.color = "#f87171";
+          status.style.color = '#f87171';
         }
       }
 
       function pullCustom() {
-        const name = document.getElementById("custom-model").value.trim();
-        if (!name) return alert("Enter model name");
+        const name = document.getElementById('custom-model').value.trim();
+        if (!name) return alert('Enter model name');
         pullModel(name);
       }
 
       async function deleteModel(name) {
         if (!confirm(`Delete model "${name}"?`)) return;
         try {
-          const res = await fetch("/api/admin/models/delete", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
+          const res = await fetch('/api/admin/models/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ model: name }),
           });
           const data = await res.json();
           if (data.success) loadAll();
-          else alert("Error: " + (data.error || "Failed"));
+          else alert('Error: ' + (data.error || 'Failed'));
         } catch (e) {
-          alert("Error: " + e.message);
+          alert('Error: ' + e.message);
         }
       }
 
       async function testModel(name) {
-        const status = document.getElementById("pull-status");
+        const status = document.getElementById('pull-status');
         status.innerHTML = `🧪 Testing <strong>${esc(name)}</strong>...`;
-        status.style.color = "#a5b4fc";
+        status.style.color = '#a5b4fc';
 
         try {
-          const res = await fetch("/api/admin/models/test", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
+          const res = await fetch('/api/admin/models/test', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               model: name,
-              prompt: "Say hello in one sentence.",
+              prompt: 'Say hello in one sentence.',
             }),
           });
           const data = await res.json();
           if (data.success) {
             status.innerHTML = `✅ <strong>${esc(name)}</strong>: "${esc(data.response?.substring(0, 200))}" (${data.durationMs || 0}ms)`;
-            status.style.color = "#34d399";
+            status.style.color = '#34d399';
           } else {
-            status.innerHTML = `❌ Test failed: ${esc(data.error || "Unknown")}`;
-            status.style.color = "#f87171";
+            status.innerHTML = `❌ Test failed: ${esc(data.error || 'Unknown')}`;
+            status.style.color = '#f87171';
           }
         } catch (e) {
           status.innerHTML = `❌ Error: ${esc(e.message)}`;
-          status.style.color = "#f87171";
+          status.style.color = '#f87171';
         }
       }
 
       function esc(str) {
-        const d = document.createElement("div");
-        d.textContent = str || "";
+        const d = document.createElement('div');
+        d.textContent = str || '';
         return d.innerHTML;
       }
 

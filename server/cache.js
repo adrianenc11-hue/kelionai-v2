@@ -3,9 +3,9 @@
 // Redis (via REDIS_URL env) with graceful fallback to in-memory TTL
 // Used for: session tokens, usage counters, weather cache
 // ═══════════════════════════════════════════════════════════════
-"use strict";
+'use strict';
 
-const logger = require("./logger");
+const logger = require('./logger');
 
 // ── In-memory fallback store ─────────────────────────────────
 const _memStore = new Map();
@@ -27,15 +27,12 @@ _cleanupInterval.unref();
  */
 async function initCache() {
   if (!process.env.REDIS_URL) {
-    logger.info(
-      { component: "Cache" },
-      "📦 Cache: in-memory mode (no REDIS_URL)",
-    );
+    logger.info({ component: 'Cache' }, '📦 Cache: in-memory mode (no REDIS_URL)');
     return;
   }
   try {
     // Dynamic import — redis is optional
-    const { createClient } = require("redis");
+    const { createClient } = require('redis');
     _redisClient = createClient({
       url: process.env.REDIS_URL,
       socket: {
@@ -43,24 +40,18 @@ async function initCache() {
         reconnectStrategy: (retries) => (retries > 3 ? false : retries * 500),
       },
     });
-    _redisClient.on("error", (err) => {
+    _redisClient.on('error', (err) => {
       if (_redisAvailable)
-        logger.warn(
-          { component: "Cache", err: err.message },
-          "⚠️ Redis error — falling back to memory",
-        );
+        logger.warn({ component: 'Cache', err: err.message }, '⚠️ Redis error — falling back to memory');
       _redisAvailable = false;
     });
-    _redisClient.on("ready", () => {
+    _redisClient.on('ready', () => {
       _redisAvailable = true;
-      logger.info({ component: "Cache" }, "✅ Cache: Redis connected");
+      logger.info({ component: 'Cache' }, '✅ Cache: Redis connected');
     });
     await _redisClient.connect();
   } catch (e) {
-    logger.warn(
-      { component: "Cache", err: e.message },
-      "⚠️ Redis unavailable — using in-memory cache",
-    );
+    logger.warn({ component: 'Cache', err: e.message }, '⚠️ Redis unavailable — using in-memory cache');
     _redisClient = null;
     _redisAvailable = false;
   }
@@ -132,12 +123,16 @@ async function cacheDel(key) {
  */
 function getCacheStats() {
   return {
-    backend: _redisAvailable ? "redis" : "memory",
+    backend: _redisAvailable ? 'redis' : 'memory',
     memStoreSize: _memStore.size,
     redisConnected: _redisAvailable,
   };
 }
 
+/**
+ * undefined
+ * @returns {*}
+ */
 module.exports = {
   initCache,
   cacheGet,

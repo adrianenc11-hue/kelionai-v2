@@ -12,10 +12,10 @@
  * - Execution timeout: 5 seconds
  * - Memory limit via context isolation
  */
-"use strict";
+'use strict';
 
-const vm = require("vm");
-const logger = require("./logger");
+const vm = require('vm');
+const logger = require('./logger');
 
 const EXECUTION_TIMEOUT_MS = 5000;
 
@@ -28,21 +28,9 @@ function buildSandboxContext(api = {}) {
   return {
     // ── Safe globals ──
     console: {
-      log: (...args) =>
-        logger.info(
-          { component: "PluginSandbox" },
-          `[plugin] ${args.map(String).join(" ")}`,
-        ),
-      warn: (...args) =>
-        logger.warn(
-          { component: "PluginSandbox" },
-          `[plugin] ${args.map(String).join(" ")}`,
-        ),
-      error: (...args) =>
-        logger.error(
-          { component: "PluginSandbox" },
-          `[plugin] ${args.map(String).join(" ")}`,
-        ),
+      log: (...args) => logger.info({ component: 'PluginSandbox' }, `[plugin] ${args.map(String).join(' ')}`),
+      warn: (...args) => logger.warn({ component: 'PluginSandbox' }, `[plugin] ${args.map(String).join(' ')}`),
+      error: (...args) => logger.error({ component: 'PluginSandbox' }, `[plugin] ${args.map(String).join(' ')}`),
     },
     JSON,
     Math,
@@ -69,7 +57,7 @@ function buildSandboxContext(api = {}) {
     // ── Plugin API (safe subset) ──
     kelion: {
       // Chat: send a message as the plugin
-      chat: api.chat || (async () => ({ error: "chat not available" })),
+      chat: api.chat || (async () => ({ error: 'chat not available' })),
 
       // Memory: read/write plugin-scoped memory
       memory: {
@@ -79,7 +67,7 @@ function buildSandboxContext(api = {}) {
       },
 
       // HTTP: fetch with domain whitelist
-      fetch: api.fetch || (async () => ({ error: "fetch not available" })),
+      fetch: api.fetch || (async () => ({ error: 'fetch not available' })),
 
       // Config: read plugin config (read-only)
       config: api.config || {},
@@ -92,12 +80,9 @@ function buildSandboxContext(api = {}) {
         slugify: (str) =>
           String(str)
             .toLowerCase()
-            .replace(/[^a-z0-9]+/g, "-")
-            .replace(/^-|-$/g, ""),
-        truncate: (str, len = 200) =>
-          String(str).length > len
-            ? String(str).substring(0, len) + "..."
-            : String(str),
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-|-$/g, ''),
+        truncate: (str, len = 200) => (String(str).length > len ? String(str).substring(0, len) + '...' : String(str)),
         formatDate: (date) => new Date(date || Date.now()).toISOString(),
       },
     },
@@ -125,7 +110,7 @@ async function executeSandboxed(code, api = {}) {
     `;
 
     const script = new vm.Script(wrappedCode, {
-      filename: "plugin.js",
+      filename: 'plugin.js',
       timeout: EXECUTION_TIMEOUT_MS,
     });
 
@@ -136,27 +121,16 @@ async function executeSandboxed(code, api = {}) {
     // Wait for async result with timeout
     const result = await Promise.race([
       resultPromise,
-      new Promise((_, reject) =>
-        setTimeout(
-          () => reject(new Error("Plugin execution timeout")),
-          EXECUTION_TIMEOUT_MS,
-        ),
-      ),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Plugin execution timeout')), EXECUTION_TIMEOUT_MS)),
     ]);
 
     const duration = Date.now() - start;
-    logger.info(
-      { component: "PluginSandbox", duration },
-      `Plugin executed in ${duration}ms`,
-    );
+    logger.info({ component: 'PluginSandbox', duration }, `Plugin executed in ${duration}ms`);
 
     return { success: true, result, duration };
   } catch (e) {
     const duration = Date.now() - start;
-    logger.warn(
-      { component: "PluginSandbox", err: e.message, duration },
-      "Plugin execution failed",
-    );
+    logger.warn({ component: 'PluginSandbox', err: e.message, duration }, 'Plugin execution failed');
     return { success: false, error: e.message, duration };
   }
 }
@@ -169,23 +143,23 @@ async function executeSandboxed(code, api = {}) {
 function validateCode(code) {
   const violations = [];
   const dangerous = [
-    { pattern: /require\s*\(/g, reason: "require() is not allowed" },
-    { pattern: /process\./g, reason: "process access is not allowed" },
-    { pattern: /child_process/g, reason: "child_process is not allowed" },
-    { pattern: /fs\./g, reason: "filesystem access is not allowed" },
-    { pattern: /eval\s*\(/g, reason: "eval() is not allowed" },
+    { pattern: /require\s*\(/g, reason: 'require() is not allowed' },
+    { pattern: /process\./g, reason: 'process access is not allowed' },
+    { pattern: /child_process/g, reason: 'child_process is not allowed' },
+    { pattern: /fs\./g, reason: 'filesystem access is not allowed' },
+    { pattern: /eval\s*\(/g, reason: 'eval() is not allowed' },
     {
       pattern: /Function\s*\(/g,
-      reason: "Function() constructor is not allowed",
+      reason: 'Function() constructor is not allowed',
     },
-    { pattern: /__proto__/g, reason: "__proto__ access is not allowed" },
+    { pattern: /__proto__/g, reason: '__proto__ access is not allowed' },
     {
       pattern: /constructor\s*\[/g,
-      reason: "constructor access is not allowed",
+      reason: 'constructor access is not allowed',
     },
     {
       pattern: /globalThis\s*\./g,
-      reason: "globalThis access is not allowed",
+      reason: 'globalThis access is not allowed',
     },
   ];
 
@@ -197,12 +171,16 @@ function validateCode(code) {
 
   // Size limit: 50KB
   if (code.length > 50000) {
-    violations.push("Code exceeds 50KB limit");
+    violations.push('Code exceeds 50KB limit');
   }
 
   return violations;
 }
 
+/**
+ * undefined
+ * @returns {*}
+ */
 module.exports = {
   executeSandboxed,
   validateCode,

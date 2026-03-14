@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="ro">
   <head>
+  <meta name="description" content="Page description">
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AI Software Audit Error Tracker</title>
@@ -244,9 +245,8 @@
         <div>
           <h1>AI Software Audit Error Tracker</h1>
           <p>
-            O pagină unică în care generezi promptul de audit pentru AI, apoi
-            lipești răspunsul și aplicația îți extrage un tabel cu erori,
-            severitate, rută, test și status.
+            O pagină unică în care generezi promptul de audit pentru AI, apoi lipești răspunsul și aplicația îți extrage
+            un tabel cu erori, severitate, rută, test și status.
           </p>
         </div>
         <div class="small">Single-file HTML • fără backend • export CSV</div>
@@ -305,28 +305,19 @@ Provide screenshots, commands, and exact files changed.</textarea
             >
           </div>
           <div class="actions">
-            <button id="generatePromptBtn">Generează prompt de audit</button>
-            <button class="secondary" id="copyPromptBtn">
-              Copiază promptul
-            </button>
-            <button class="secondary" id="loadDemoBtn">
-              Încarcă demo report
-            </button>
+            <button type="button" id="generatePromptBtn">Generează prompt de audit</button>
+            <button type="button" class="secondary" id="copyPromptBtn">Copiază promptul</button>
+            <button type="button" class="secondary" id="loadDemoBtn">Încarcă demo report</button>
           </div>
           <div class="hint small">
-            Sugestie: dă promptul generat oricărui AI agent. Cere-i să răspundă
-            în formatul structurat de mai jos ca parserul să construiască
-            tabelul automat.
+            Sugestie: dă promptul generat oricărui AI agent. Cere-i să răspundă în formatul structurat de mai jos ca
+            parserul să construiască tabelul automat.
           </div>
         </section>
 
         <section class="panel">
           <h2>2) Prompt gata de trimis AI-ului</h2>
-          <textarea
-            id="auditPrompt"
-            class="big"
-            placeholder="Aici apare promptul complet..."
-          ></textarea>
+          <textarea id="auditPrompt" class="big" placeholder="Aici apare promptul complet..."></textarea>
         </section>
       </div>
 
@@ -335,20 +326,15 @@ Provide screenshots, commands, and exact files changed.</textarea
         <p>
           Parserul recunoaște cel mai bine linii de forma:<br />
           <span class="small"
-            >ISSUE | severity=critical | area=routing | route=/privacy |
-            test=E2E | status=fail | title=Direct route returns 404 |
-            evidence=Direct open shows 404 | fix=Add route</span
+            >ISSUE | severity=critical | area=routing | route=/privacy | test=E2E | status=fail | title=Direct route
+            returns 404 | evidence=Direct open shows 404 | fix=Add route</span
           >
         </p>
-        <textarea
-          id="reportInput"
-          class="big"
-          placeholder="Lipește răspunsul AI aici..."
-        ></textarea>
+        <textarea id="reportInput" class="big" placeholder="Lipește răspunsul AI aici..."></textarea>
         <div class="actions">
-          <button id="parseBtn">Extrage erorile în tabel</button>
-          <button class="secondary" id="clearBtn">Curăță</button>
-          <button class="secondary" id="exportCsvBtn">Exportă CSV</button>
+          <button type="button" id="parseBtn">Extrage erorile în tabel</button>
+          <button type="button" class="secondary" id="clearBtn">Curăță</button>
+          <button type="button" class="secondary" id="exportCsvBtn">Exportă CSV</button>
         </div>
         <div class="stats">
           <div class="stat">
@@ -373,9 +359,7 @@ Provide screenshots, commands, and exact files changed.</textarea
       <section class="panel" style="margin-top: 20px">
         <div class="toolbar">
           <h2>4) Tabel erori găsite</h2>
-          <div class="small">
-            Poți sorta ulterior în Excel după CSV-ul exportat.
-          </div>
+          <div class="small">Poți sorta ulterior în Excel după CSV-ul exportat.</div>
         </div>
         <div style="overflow: auto">
           <table id="issuesTable">
@@ -403,17 +387,17 @@ Provide screenshots, commands, and exact files changed.</textarea
       const state = { issues: [] };
 
       function buildPrompt() {
-        const projectName = $("projectName").value.trim();
-        const prodUrl = $("prodUrl").value.trim();
-        const routes = $("routes")
+        const projectName = $('projectName').value.trim();
+        const prodUrl = $('prodUrl').value.trim();
+        const routes = $('routes')
           .value.split(/\n+/)
           .map((s) => s.trim())
           .filter(Boolean);
-        const suites = $("suites")
+        const suites = $('suites')
           .value.split(/\n+/)
           .map((s) => s.trim())
           .filter(Boolean);
-        const requirements = $("requirements")
+        const requirements = $('requirements')
           .value.split(/\n+/)
           .map((s) => s.trim())
           .filter(Boolean);
@@ -424,13 +408,13 @@ Target production URL:
 ${prodUrl}
 
 Public routes that must be verified one by one:
-${routes.map((r) => `- ${r}`).join("\n")}
+${routes.map((r) => `- ${r}`).join('\n')}
 
 Mandatory requirements:
-${requirements.map((r) => `- ${r}`).join("\n")}
+${requirements.map((r) => `- ${r}`).join('\n')}
 
 Test suites to run or verify where possible:
-${suites.map((s) => `- ${s}`).join("\n")}
+${suites.map((s) => `- ${s}`).join('\n')}
 
 Rules:
 - Do not say fixed, done, resolved, passed, or verified without proof.
@@ -447,35 +431,35 @@ COMMANDS_RUN | <semicolon separated commands>
 
 Be honest. If a suite cannot be truly executed without repo or internal access, mark it blocked and say why.`;
 
-        $("auditPrompt").value = prompt;
+        $('auditPrompt').value = prompt;
       }
 
       function normalizeSeverity(value) {
-        const v = (value || "").toLowerCase();
-        if (["critical", "crit", "p0", "p1"].includes(v)) return "critical";
-        if (["high", "major", "p2"].includes(v)) return "high";
-        if (["medium", "med", "p3"].includes(v)) return "medium";
-        return "low";
+        const v = (value || '').toLowerCase();
+        if (['critical', 'crit', 'p0', 'p1'].includes(v)) return 'critical';
+        if (['high', 'major', 'p2'].includes(v)) return 'high';
+        if (['medium', 'med', 'p3'].includes(v)) return 'medium';
+        return 'low';
       }
 
       function parseIssueLine(line) {
-        if (!line.trim().startsWith("ISSUE |")) return null;
+        if (!line.trim().startsWith('ISSUE |')) return null;
         const obj = {
-          severity: "low",
-          area: "other",
-          route: "",
-          test: "",
-          status: "warning",
-          title: "",
-          evidence: "",
-          fix: "",
+          severity: 'low',
+          area: 'other',
+          route: '',
+          test: '',
+          status: 'warning',
+          title: '',
+          evidence: '',
+          fix: '',
         };
         const parts = line
-          .split("|")
+          .split('|')
           .map((p) => p.trim())
           .slice(1);
         for (const part of parts) {
-          const idx = part.indexOf("=");
+          const idx = part.indexOf('=');
           if (idx === -1) continue;
           const key = part.slice(0, idx).trim().toLowerCase();
           const value = part.slice(idx + 1).trim();
@@ -494,38 +478,38 @@ Be honest. If a suite cannot be truly executed without repo or internal access, 
         const patterns = [
           {
             regex: /(404|not found)/i,
-            severity: "critical",
-            area: "routing",
-            status: "fail",
-            title: "Route returns 404",
+            severity: 'critical',
+            area: 'routing',
+            status: 'fail',
+            title: 'Route returns 404',
           },
           {
             regex: /(romanian|rom[aâ]n|Abonamente|Se încarcă|Invită|Trimite)/i,
-            severity: "high",
-            area: "localization",
-            status: "fail",
-            title: "Romanian text found in public UI",
+            severity: 'high',
+            area: 'localization',
+            status: 'fail',
+            title: 'Romanian text found in public UI',
           },
           {
             regex: /(csp|helmet|blocked script)/i,
-            severity: "high",
-            area: "security",
-            status: "warning",
-            title: "CSP or script blocking issue",
+            severity: 'high',
+            area: 'security',
+            status: 'warning',
+            title: 'CSP or script blocking issue',
           },
           {
             regex: /(accessibility|a11y|aria|contrast)/i,
-            severity: "medium",
-            area: "accessibility",
-            status: "warning",
-            title: "Accessibility issue mentioned",
+            severity: 'medium',
+            area: 'accessibility',
+            status: 'warning',
+            title: 'Accessibility issue mentioned',
           },
           {
             regex: /(performance|slow|lighthouse|load time)/i,
-            severity: "medium",
-            area: "performance",
-            status: "warning",
-            title: "Performance issue mentioned",
+            severity: 'medium',
+            area: 'performance',
+            status: 'warning',
+            title: 'Performance issue mentioned',
           },
         ];
 
@@ -540,7 +524,7 @@ Be honest. If a suite cannot be truly executed without repo or internal access, 
                 status: p.status,
                 title: p.title,
                 evidence: line,
-                fix: "",
+                fix: '',
               });
               break;
             }
@@ -551,31 +535,19 @@ Be honest. If a suite cannot be truly executed without repo or internal access, 
 
       function extractRoute(text) {
         const m = text.match(/\/(?:[a-zA-Z0-9._-]+(?:\/[a-zA-Z0-9._-]+)*)?/);
-        return m ? m[0] : "";
+        return m ? m[0] : '';
       }
 
       function extractTest(text) {
-        const known = [
-          "E2E",
-          "Smoke",
-          "Accessibility",
-          "a11y",
-          "Performance",
-          "UI",
-          "SAST",
-          "DAST",
-          "SCA",
-        ];
-        const found = known.find((k) => new RegExp(k, "i").test(text));
-        return found || "";
+        const known = ['E2E', 'Smoke', 'Accessibility', 'a11y', 'Performance', 'UI', 'SAST', 'DAST', 'SCA'];
+        const found = known.find((k) => new RegExp(k, 'i').test(text));
+        return found || '';
       }
 
       function dedupeIssues(items) {
         const seen = new Set();
         return items.filter((it) => {
-          const key = [it.severity, it.area, it.route, it.test, it.title].join(
-            "||",
-          );
+          const key = [it.severity, it.area, it.route, it.test, it.title].join('||');
           if (seen.has(key)) return false;
           seen.add(key);
           return true;
@@ -583,30 +555,28 @@ Be honest. If a suite cannot be truly executed without repo or internal access, 
       }
 
       function parseReport() {
-        const raw = $("reportInput").value;
+        const raw = $('reportInput').value;
         const issueLines = raw.split(/\n+/).map(parseIssueLine).filter(Boolean);
-        state.issues = issueLines.length
-          ? dedupeIssues(issueLines)
-          : fallbackParse(raw);
+        state.issues = issueLines.length ? dedupeIssues(issueLines) : fallbackParse(raw);
         renderTable();
         updateStats();
       }
 
       function renderTable() {
-        const tbody = $("issuesTable").querySelector("tbody");
-        tbody.innerHTML = "";
+        const tbody = $('issuesTable').querySelector('tbody');
+        tbody.innerHTML = '';
         state.issues.forEach((issue, i) => {
-          const tr = document.createElement("tr");
+          const tr = document.createElement('tr');
           tr.innerHTML = `
           <td>${i + 1}</td>
           <td><span class="chip sev-${issue.severity}">${issue.severity}</span></td>
-          <td>${escapeHtml(issue.area || "")}</td>
-          <td>${escapeHtml(issue.route || "")}</td>
-          <td>${escapeHtml(issue.test || "")}</td>
-          <td>${escapeHtml(issue.status || "")}</td>
-          <td>${escapeHtml(issue.title || "")}</td>
-          <td>${escapeHtml(issue.evidence || "")}</td>
-          <td>${escapeHtml(issue.fix || "")}</td>
+          <td>${escapeHtml(issue.area || '')}</td>
+          <td>${escapeHtml(issue.route || '')}</td>
+          <td>${escapeHtml(issue.test || '')}</td>
+          <td>${escapeHtml(issue.status || '')}</td>
+          <td>${escapeHtml(issue.title || '')}</td>
+          <td>${escapeHtml(issue.evidence || '')}</td>
+          <td>${escapeHtml(issue.fix || '')}</td>
         `;
           tbody.appendChild(tr);
         });
@@ -614,42 +584,25 @@ Be honest. If a suite cannot be truly executed without repo or internal access, 
 
       function updateStats() {
         const total = state.issues.length;
-        const critical = state.issues.filter(
-          (i) => i.severity === "critical" || i.severity === "high",
-        ).length;
-        const routeCount = new Set(
-          state.issues.map((i) => i.route).filter(Boolean),
-        ).size;
-        const testCount = new Set(
-          state.issues.map((i) => i.test).filter(Boolean),
-        ).size;
-        $("totalCount").textContent = String(total);
-        $("criticalCount").textContent = String(critical);
-        $("routeCount").textContent = String(routeCount);
-        $("testCount").textContent = String(testCount);
+        const critical = state.issues.filter((i) => i.severity === 'critical' || i.severity === 'high').length;
+        const routeCount = new Set(state.issues.map((i) => i.route).filter(Boolean)).size;
+        const testCount = new Set(state.issues.map((i) => i.test).filter(Boolean)).size;
+        $('totalCount').textContent = String(total);
+        $('criticalCount').textContent = String(critical);
+        $('routeCount').textContent = String(routeCount);
+        $('testCount').textContent = String(testCount);
       }
 
       function exportCsv() {
         if (!state.issues.length) return;
-        const header = [
-          "severity",
-          "area",
-          "route",
-          "test",
-          "status",
-          "title",
-          "evidence",
-          "fix",
-        ];
-        const rows = state.issues.map((i) =>
-          header.map((h) => csvEscape(i[h] || "")).join(","),
-        );
-        const csv = [header.join(","), ...rows].join("\n");
-        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+        const header = ['severity', 'area', 'route', 'test', 'status', 'title', 'evidence', 'fix'];
+        const rows = state.issues.map((i) => header.map((h) => csvEscape(i[h] || '')).join(','));
+        const csv = [header.join(','), ...rows].join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
+        const a = document.createElement('a');
         a.href = url;
-        a.download = "audit_issues.csv";
+        a.download = 'audit_issues.csv';
         a.click();
         URL.revokeObjectURL(url);
       }
@@ -661,27 +614,27 @@ Be honest. If a suite cannot be truly executed without repo or internal access, 
 
       function escapeHtml(str) {
         return String(str)
-          .replace(/&/g, "&amp;")
-          .replace(/</g, "&lt;")
-          .replace(/>/g, "&gt;")
-          .replace(/"/g, "&quot;")
-          .replace(/'/g, "&#039;");
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#039;');
       }
 
       function copyPrompt() {
-        $("auditPrompt").select();
-        document.execCommand("copy");
+        $('auditPrompt').select();
+        document.execCommand('copy');
       }
 
       function clearAll() {
-        $("reportInput").value = "";
+        $('reportInput').value = '';
         state.issues = [];
         renderTable();
         updateStats();
       }
 
       function loadDemo() {
-        $("reportInput").value =
+        $('reportInput').value =
           `ISSUE | severity=critical | area=routing | route=/privacy | test=E2E | status=fail | title=Direct route returns 404 | evidence=Opening /privacy directly shows Page not found | fix=Add server route or SPA rewrite for /privacy
 ISSUE | severity=high | area=localization | route=/ | test=UI Functional Tests | status=fail | title=Romanian text visible on homepage | evidence=Homepage still shows 'Abonamente' and 'Invită prieteni' | fix=Replace runtime strings and verify production bundle
 ISSUE | severity=medium | area=accessibility | route=/premium | test=Accessibility Tests (a11y) | status=warning | title=Icon-only controls may lack clear labels | evidence=Found minimal controls without obvious textual labels | fix=Add aria-label and visible accessible names
@@ -691,12 +644,12 @@ COMMANDS_RUN | npm run test:e2e; npm audit; rg -n "Abonamente|Invită" .`;
         parseReport();
       }
 
-      $("generatePromptBtn").addEventListener("click", buildPrompt);
-      $("copyPromptBtn").addEventListener("click", copyPrompt);
-      $("parseBtn").addEventListener("click", parseReport);
-      $("clearBtn").addEventListener("click", clearAll);
-      $("exportCsvBtn").addEventListener("click", exportCsv);
-      $("loadDemoBtn").addEventListener("click", loadDemo);
+      $('generatePromptBtn').addEventListener('click', buildPrompt);
+      $('copyPromptBtn').addEventListener('click', copyPrompt);
+      $('parseBtn').addEventListener('click', parseReport);
+      $('clearBtn').addEventListener('click', clearAll);
+      $('exportCsvBtn').addEventListener('click', exportCsv);
+      $('loadDemoBtn').addEventListener('click', loadDemo);
 
       buildPrompt();
     </script>

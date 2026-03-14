@@ -17,7 +17,7 @@
   --radius: 16px;
   --radius-sm: 10px;
   --radius-lg: 24px;
-  --font: "Inter", -apple-system, sans-serif;
+  --font: 'Inter', -apple-system, sans-serif;
   --transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   --glass: rgba(10, 10, 30, 0.6);
   --glass-blur: blur(20px);
@@ -527,7 +527,7 @@ a:hover {
 }
 
 .pricing-card .plan-features li::before {
-  content: "✓";
+  content: '✓';
   color: var(--accent-purple);
   font-weight: 700;
   flex-shrink: 0;

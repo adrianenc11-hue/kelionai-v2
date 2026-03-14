@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="en">
   <head>
+  <meta name="description" content="Page description">
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>KelionAI — K1 Brain Dashboard</title>
@@ -264,11 +265,7 @@
     <p class="subtitle">Cognitive AI Engine — Live status</p>
 
     <div class="status-bar" id="statusBar">
-      <span
-        class="status-pill pulse"
-        style="background: rgba(0, 255, 255, 0.15); color: #00ffff"
-        >⏳ Loading...</span
-      >
+      <span class="status-pill pulse" style="background: rgba(0, 255, 255, 0.15); color: #00ffff">⏳ Loading...</span>
     </div>
 
     <div id="loading">Loading K1 state...</div>
@@ -328,14 +325,10 @@
 
       <!-- Actions -->
       <div class="section" style="display: flex; gap: 8px; flex-wrap: wrap">
-        <button class="btn" onclick="loadDashboard()">🔄 Refresh</button>
-        <button class="btn secondary" onclick="runSelfTest()">
-          🧪 Self-Test
-        </button>
-        <button class="btn secondary" onclick="triggerForget()">
-          🧹 Forgetting
-        </button>
-        <button class="btn secondary" onclick="spawnDebate()">💬 Debate</button>
+        <button type="button" class="btn" onclick="loadDashboard()">🔄 Refresh</button>
+        <button type="button" class="btn secondary" onclick="runSelfTest()">🧪 Self-Test</button>
+        <button type="button" class="btn secondary" onclick="triggerForget()">🧹 Forgetting</button>
+        <button type="button" class="btn secondary" onclick="spawnDebate()">💬 Debate</button>
       </div>
 
       <p class="mini" id="lastUpdate">Last update: —</p>
@@ -343,70 +336,55 @@
 
     <script>
       const H = {
-        "x-admin-secret": sessionStorage.getItem("kelion_admin_secret") || "",
-        "Content-Type": "application/json",
+        'x-admin-secret': sessionStorage.getItem('kelion_admin_secret') || '',
+        'Content-Type': 'application/json',
       };
-      const API = "/api/trading";
+      const API = '/api/trading';
 
       async function loadDashboard() {
         try {
           const r = await fetch(`${API}/k1/dashboard`, { headers: H });
           if (!r.ok) throw new Error(`HTTP ${r.status}`);
           const d = await r.json();
-          document.getElementById("loading").style.display = "none";
-          document.getElementById("dashboard").style.display = "block";
+          document.getElementById('loading').style.display = 'none';
+          document.getElementById('dashboard').style.display = 'block';
           renderDashboard(d);
-          document.getElementById("lastUpdate").textContent =
-            `Last update: ${new Date().toLocaleTimeString()}`;
+          document.getElementById('lastUpdate').textContent = `Last update: ${new Date().toLocaleTimeString()}`;
         } catch (e) {
-          document.getElementById("loading").innerHTML =
-            `<span class="red">❌ Error: ${e.message}</span>`;
+          document.getElementById('loading').innerHTML = `<span class="red">❌ Error: ${e.message}</span>`;
         }
       }
 
       function renderDashboard(d) {
         // Status bar
         const pills = [];
-        pills.push(pill("🧠 Cognitive", "cyan"));
-        pills.push(pill(`💾 Memory: ${d.memory?.hotCount || 0} hot`, "green"));
-        pills.push(
-          pill(
-            `🤖 Agents: ${d.agents?.active || 0} active`,
-            d.agents?.active > 0 ? "pink" : "dim",
-          ),
-        );
-        pills.push(
-          pill(
-            `📊 Tasks: ${d.performance?.overall?.totalTasks || 0}`,
-            "yellow",
-          ),
-        );
-        document.getElementById("statusBar").innerHTML = pills.join("");
+        pills.push(pill('🧠 Cognitive', 'cyan'));
+        pills.push(pill(`💾 Memory: ${d.memory?.hotCount || 0} hot`, 'green'));
+        pills.push(pill(`🤖 Agents: ${d.agents?.active || 0} active`, d.agents?.active > 0 ? 'pink' : 'dim'));
+        pills.push(pill(`📊 Tasks: ${d.performance?.overall?.totalTasks || 0}`, 'yellow'));
+        document.getElementById('statusBar').innerHTML = pills.join('');
 
         // Overview cards
         const ov = d.performance?.overall || {};
         const cog = d.cognitive || {};
-        document.getElementById("overviewGrid").innerHTML = `
-            ${oCard("🧠 Reasoning Loop", cog.monologue?.length || 0, "thoughts logged", "cyan")}
-            ${oCard("📊 Accuracy", ov.accuracy !== null ? ov.accuracy + "%" : "—", ov.status || "no data", ov.accuracy >= 80 ? "green" : ov.accuracy >= 60 ? "yellow" : "red")}
-            ${oCard("🤖 Agents", `${d.agents?.active || 0}/${d.agents?.total || 0}`, `${d.agents?.promoted || 0} promoted`, "pink")}
-            ${oCard("💾 Memory", d.memory?.hotCount || 0, "in hot cache", "cyan")}
+        document.getElementById('overviewGrid').innerHTML = `
+            ${oCard('🧠 Reasoning Loop', cog.monologue?.length || 0, 'thoughts logged', 'cyan')}
+            ${oCard('📊 Accuracy', ov.accuracy !== null ? ov.accuracy + '%' : '—', ov.status || 'no data', ov.accuracy >= 80 ? 'green' : ov.accuracy >= 60 ? 'yellow' : 'red')}
+            ${oCard('🤖 Agents', `${d.agents?.active || 0}/${d.agents?.total || 0}`, `${d.agents?.promoted || 0} promoted`, 'pink')}
+            ${oCard('💾 Memory', d.memory?.hotCount || 0, 'in hot cache', 'cyan')}
         `;
 
         // Monologue
         const thoughts =
-          (cog.monologue || [])
-            .map(
-              (t) => `${t.phase || "?"} | ${t.thought || t.content || "..."}`,
-            )
-            .join("\n") || "No thoughts yet...";
-        document.getElementById("monologue").textContent = thoughts;
+          (cog.monologue || []).map((t) => `${t.phase || '?'} | ${t.thought || t.content || '...'}`).join('\n') ||
+          'No thoughts yet...';
+        document.getElementById('monologue').textContent = thoughts;
 
         // Performance
         const perf = d.performance || {};
         const domains = (perf.domains || []).filter((dm) => dm.tasks > 0);
         if (domains.length > 0) {
-          document.getElementById("perfContent").innerHTML = `
+          document.getElementById('perfContent').innerHTML = `
                 <table>
                     <tr><th>Domain</th><th>Tasks</th><th>Accuracy</th><th>Trend</th></tr>
                     ${domains
@@ -414,22 +392,22 @@
                         (dm) => `<tr>
                         <td>${dm.domain}</td>
                         <td>${dm.tasks}</td>
-                        <td><span class="${dm.accuracy >= 80 ? "green" : dm.accuracy >= 60 ? "yellow" : "red"}">${dm.accuracy ?? "—"}%</span></td>
-                        <td>${dm.trendEmoji || "➡️"}</td>
-                    </tr>`,
+                        <td><span class="${dm.accuracy >= 80 ? 'green' : dm.accuracy >= 60 ? 'yellow' : 'red'}">${dm.accuracy ?? '—'}%</span></td>
+                        <td>${dm.trendEmoji || '➡️'}</td>
+                    </tr>`
                       )
-                      .join("")}
+                      .join('')}
                 </table>
-                ${perf.weakAreas?.length ? `<p class="mini red" style="margin-top:6px">⚠️ Weak: ${perf.weakAreas.join(", ")}</p>` : ""}
+                ${perf.weakAreas?.length ? `<p class="mini red" style="margin-top:6px">⚠️ Weak: ${perf.weakAreas.join(', ')}</p>` : ''}
             `;
         } else {
-          document.getElementById("perfContent").innerHTML =
+          document.getElementById('perfContent').innerHTML =
             '<p class="mini">No performance data yet. Send messages to track.</p>';
         }
 
         // Agents
         const ag = d.agents || {};
-        document.getElementById("agentsContent").innerHTML = `
+        document.getElementById('agentsContent').innerHTML = `
             <div><span class="big cyan">${ag.active || 0}</span> <span class="mini">active</span></div>
             <div class="mini" style="margin-top:4px">
                 ${ag.completed || 0} completed · ${ag.promoted || 0} promoted · ${ag.killed || 0} killed
@@ -441,63 +419,55 @@
         const truthTests = d.truth || [];
         if (truthTests.length > 0) {
           const last = truthTests[truthTests.length - 1];
-          document.getElementById("truthContent").innerHTML = `
-                <div><span class="big ${last.score >= 80 ? "green" : last.score >= 50 ? "yellow" : "red"}">${last.score}%</span>
+          document.getElementById('truthContent').innerHTML = `
+                <div><span class="big ${last.score >= 80 ? 'green' : last.score >= 50 ? 'yellow' : 'red'}">${last.score}%</span>
                 <span class="mini">last self-test</span></div>
-                <div class="mini" style="margin-top:4px">${last.tests?.filter((t) => t.passed).length || 0}/${last.tests?.length || 0} passed · ${last.domain || "trading"}</div>
-                <div class="progress-bar" style="margin-top:6px"><div class="progress-fill" style="width:${last.score}%;background:${last.score >= 80 ? "#00ff88" : last.score >= 50 ? "#ffcc00" : "#ff4444"}"></div></div>
+                <div class="mini" style="margin-top:4px">${last.tests?.filter((t) => t.passed).length || 0}/${last.tests?.length || 0} passed · ${last.domain || 'trading'}</div>
+                <div class="progress-bar" style="margin-top:6px"><div class="progress-fill" style="width:${last.score}%;background:${last.score >= 80 ? '#00ff88' : last.score >= 50 ? '#ffcc00' : '#ff4444'}"></div></div>
             `;
         } else {
-          document.getElementById("truthContent").innerHTML =
-            '<p class="mini">No self-tests run yet.</p>';
+          document.getElementById('truthContent').innerHTML = '<p class="mini">No self-tests run yet.</p>';
         }
 
         // World State
         const world = d.world || {};
         const mkts = world.markets || {};
         const marketRows = Object.entries(mkts)
-          .filter(([k]) => k !== "fearGreed")
+          .filter(([k]) => k !== 'fearGreed')
           .map(([k, v]) => {
-            if (typeof v === "object" && v !== null) {
+            if (typeof v === 'object' && v !== null) {
               const rawPrice = v.price !== undefined ? v.price : null;
               const price =
                 rawPrice !== null
-                  ? Number(rawPrice).toLocaleString("en-US", {
+                  ? Number(rawPrice).toLocaleString('en-US', {
                       minimumFractionDigits: 0,
                       maximumFractionDigits: 2,
                     })
-                  : "—";
-              const chg = v.change24h
-                ? ` (${v.change24h > 0 ? "+" : ""}${Number(v.change24h).toFixed(2)}%)`
-                : "";
+                  : '—';
+              const chg = v.change24h ? ` (${v.change24h > 0 ? '+' : ''}${Number(v.change24h).toFixed(2)}%)` : '';
               const sig =
-                v.signal && v.signal !== "HOLD"
-                  ? ` <span style="color:${v.signal === "BUY" ? "#00ff88" : "#ff4444"}">${v.signal}</span>`
-                  : "";
+                v.signal && v.signal !== 'HOLD'
+                  ? ` <span style="color:${v.signal === 'BUY' ? '#00ff88' : '#ff4444'}">${v.signal}</span>`
+                  : '';
               return `<tr><td>${k.toUpperCase()}</td><td>$${price}${chg}${sig}</td></tr>`;
             }
-            return `<tr><td>${k.toUpperCase()}</td><td>$${v || "—"}</td></tr>`;
+            return `<tr><td>${k.toUpperCase()}</td><td>$${v || '—'}</td></tr>`;
           })
-          .join("");
-        document.getElementById("worldContent").innerHTML = `
+          .join('');
+        document.getElementById('worldContent').innerHTML = `
             <table>
                 <tr><th>Asset</th><th>Price</th></tr>
                 ${marketRows}
             </table>
             ${(() => {
               const fg = mkts.fearGreed || world.fearGreed;
-              if (!fg) return "";
-              const fgColor =
-                fg.value <= 25
-                  ? "#ff4444"
-                  : fg.value >= 75
-                    ? "#00ff88"
-                    : "#ffcc00";
+              if (!fg) return '';
+              const fgColor = fg.value <= 25 ? '#ff4444' : fg.value >= 75 ? '#00ff88' : '#ffcc00';
               return `<div style="margin-top:8px;padding:8px;background:rgba(255,255,255,0.03);border-radius:6px">
                     <div class="mini">😱 Fear & Greed Index</div>
                     <div style="display:flex;align-items:center;gap:8px;margin-top:4px">
                         <span class="big" style="color:${fgColor}">${fg.value}</span>
-                        <span class="mini">${fg.label || ""}</span>
+                        <span class="mini">${fg.label || ''}</span>
                     </div>
                     <div class="progress-bar" style="margin-top:4px"><div class="progress-fill" style="width:${fg.value}%;background:${fgColor}"></div></div>
                 </div>`;
@@ -507,120 +477,110 @@
         // Alerts
         const alerts = d.alerts || [];
         if (alerts.length > 0) {
-          document.getElementById("alertsContent").innerHTML = alerts
+          document.getElementById('alertsContent').innerHTML = alerts
             .slice(0, 5)
-            .map(
-              (a) =>
-                `<div class="alert-item">${a.message || a.text || JSON.stringify(a)}</div>`,
-            )
-            .join("");
+            .map((a) => `<div class="alert-item">${a.message || a.text || JSON.stringify(a)}</div>`)
+            .join('');
         } else {
-          document.getElementById("alertsContent").innerHTML =
-            '<p class="mini green">✅ No active alerts</p>';
+          document.getElementById('alertsContent').innerHTML = '<p class="mini green">✅ No active alerts</p>';
         }
 
         // Memory
         const mem = d.memory || {};
-        document.getElementById("memoryContent").innerHTML = `
+        document.getElementById('memoryContent').innerHTML = `
             <div><span class="big cyan">${mem.hotCount || 0}</span> <span class="mini">hot entries</span></div>
-            <div class="mini" style="margin-top:4px">Warm: ${mem.warmCount || "?"} · Cold: ${mem.coldCount || "?"}</div>
+            <div class="mini" style="margin-top:4px">Warm: ${mem.warmCount || '?'} · Cold: ${mem.coldCount || '?'}</div>
         `;
 
         // Evolution
         const evo = d.evolution || {};
         const strats = evo.strategies || {};
         const rp = strats.riskParams || [];
-        document.getElementById("evolutionContent").innerHTML = `
+        document.getElementById('evolutionContent').innerHTML = `
             <div class="mini" style="margin-bottom:6px"><strong class="pink">Meta-Learning</strong></div>
-            ${rp.map((p) => `<div class="mini">${p.name}: <strong>${p.current}</strong> <span style="color:#555">(${p.range})</span></div>`).join("")}
+            ${rp.map((p) => `<div class="mini">${p.name}: <strong>${p.current}</strong> <span style="color:#555">(${p.range})</span></div>`).join('')}
             <div class="mini" style="margin-top:6px">Templates: ${strats.promptTemplates?.length || 0} · Tools: ${Object.keys(strats.toolPreferences || {}).length}</div>
         `;
 
         // User model
         const um = evo.userModel || {};
-        document.getElementById("userContent").innerHTML = `
+        document.getElementById('userContent').innerHTML = `
             <div class="mini">Interactions: <strong>${um.totalInteractions || 0}</strong></div>
             <div class="mini">Corrections: <strong>${um.totalCorrections || 0}</strong> (${um.correctionRate || 0}%)</div>
-            <div class="mini">Top domain: <strong class="cyan">${um.preferredDomain || "—"}</strong></div>
-            <div class="mini">Peak hour: <strong>${um.peakHour !== undefined ? um.peakHour + ":00 UTC" : "—"}</strong></div>
-            <div class="mini">Style: ${um.communication?.preferredStyle || "—"} · Lang: ${um.communication?.preferredLanguage || "—"}</div>
+            <div class="mini">Top domain: <strong class="cyan">${um.preferredDomain || '—'}</strong></div>
+            <div class="mini">Peak hour: <strong>${um.peakHour !== undefined ? um.peakHour + ':00 UTC' : '—'}</strong></div>
+            <div class="mini">Style: ${um.communication?.preferredStyle || '—'} · Lang: ${um.communication?.preferredLanguage || '—'}</div>
         `;
       }
 
       function pill(text, color) {
         const colors = {
-          cyan: "#00ffff",
-          green: "#00ff88",
-          pink: "#ff6bff",
-          yellow: "#ffcc00",
-          red: "#ff4444",
-          dim: "#666",
+          cyan: '#00ffff',
+          green: '#00ff88',
+          pink: '#ff6bff',
+          yellow: '#ffcc00',
+          red: '#ff4444',
+          dim: '#666',
         };
-        const c = colors[color] || "#888";
+        const c = colors[color] || '#888';
         return `<span class="status-pill" style="background:${c}22;color:${c}">${text}</span>`;
       }
 
       function oCard(title, value, sub, color) {
         const colors = {
-          cyan: "#00ffff",
-          green: "#00ff88",
-          pink: "#ff6bff",
-          yellow: "#ffcc00",
-          red: "#ff4444",
+          cyan: '#00ffff',
+          green: '#00ff88',
+          pink: '#ff6bff',
+          yellow: '#ffcc00',
+          red: '#ff4444',
         };
-        return `<div class="card"><h3>${title}</h3><div class="big" style="color:${colors[color] || "#fff"}">${value}</div><div class="mini">${sub}</div></div>`;
+        return `<div class="card"><h3>${title}</h3><div class="big" style="color:${colors[color] || '#fff'}">${value}</div><div class="mini">${sub}</div></div>`;
       }
 
       async function runSelfTest() {
         try {
           const r = await fetch(`${API}/k1/truth/self-test`, {
-            method: "POST",
+            method: 'POST',
             headers: H,
-            body: JSON.stringify({ domain: "trading" }),
+            body: JSON.stringify({ domain: 'trading' }),
           });
           const d = await r.json();
-          alert(
-            `Self-test: ${d.score}% (${d.tests?.filter((t) => t.passed).length}/${d.tests?.length} passed)`,
-          );
+          alert(`Self-test: ${d.score}% (${d.tests?.filter((t) => t.passed).length}/${d.tests?.length} passed)`);
           loadDashboard();
         } catch (e) {
-          alert("Error: " + e.message);
+          alert('Error: ' + e.message);
         }
       }
 
       async function triggerForget() {
         try {
           const r = await fetch(`${API}/k1/memory/forget`, {
-            method: "POST",
+            method: 'POST',
             headers: H,
-            body: "{}",
+            body: '{}',
           });
           const d = await r.json();
-          alert(
-            `Forgetting: ${d.deleted || 0} deleted, ${d.compressed || 0} compressed`,
-          );
+          alert(`Forgetting: ${d.deleted || 0} deleted, ${d.compressed || 0} compressed`);
           loadDashboard();
         } catch (e) {
-          alert("Error: " + e.message);
+          alert('Error: ' + e.message);
         }
       }
 
       async function spawnDebate() {
-        const task = prompt("Debate topic:");
+        const task = prompt('Debate topic:');
         if (!task) return;
         try {
           const r = await fetch(`${API}/k1/agents/debate`, {
-            method: "POST",
+            method: 'POST',
             headers: H,
             body: JSON.stringify({ task }),
           });
           const d = await r.json();
-          alert(
-            `Debate set up! PRO=#${d.proAgent?.id}, CON=#${d.conAgent?.id}, Judge=#${d.judgeAgent?.id}`,
-          );
+          alert(`Debate set up! PRO=#${d.proAgent?.id}, CON=#${d.conAgent?.id}, Judge=#${d.judgeAgent?.id}`);
           loadDashboard();
         } catch (e) {
-          alert("Error: " + e.message);
+          alert('Error: ' + e.message);
         }
       }
 

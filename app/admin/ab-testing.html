@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="en">
   <head>
+  <meta name="description" content="Page description">
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>KelionAI — A/B Testing</title>
@@ -11,7 +12,7 @@
         box-sizing: border-box;
       }
       body {
-        font-family: "Inter", "Segoe UI", sans-serif;
+        font-family: 'Inter', 'Segoe UI', sans-serif;
         background: #060614;
         color: #e0e0e0;
         min-height: 100vh;
@@ -234,14 +235,9 @@
             max="100"
             style="max-width: 100px"
           />
-          <textarea
-            id="exp-variants"
-            placeholder='Variants JSON: {"A":"concise","B":"detailed"}'
-          ></textarea>
+          <textarea id="exp-variants" placeholder='Variants JSON: {"A":"concise","B":"detailed"}'></textarea>
         </div>
-        <button class="btn-create" onclick="createExperiment()">
-          Create Experiment
-        </button>
+        <button type="button" class="btn-create" onclick="createExperiment()">Create Experiment</button>
       </div>
 
       <!-- Experiments List -->
@@ -250,30 +246,26 @@
     </div>
 
     <script>
-      const TOKEN =
-        localStorage.getItem("supabase_token") ||
-        localStorage.getItem("admin_token") ||
-        "";
+      const TOKEN = localStorage.getItem('supabase_token') || localStorage.getItem('admin_token') || '';
       const HEADERS = {
-        "Content-Type": "application/json",
-        Authorization: "Bearer " + TOKEN,
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer ' + TOKEN,
       };
 
       async function loadExperiments() {
         try {
-          const r = await fetch("/api/admin/ab-tests", { headers: HEADERS });
+          const r = await fetch('/api/admin/ab-tests', { headers: HEADERS });
           const d = await r.json();
           renderExperiments(d.experiments || []);
         } catch (e) {
-          console.error("Load failed:", e);
+          console.error('Load failed:', e);
         }
       }
 
       function renderExperiments(list) {
-        const el = document.getElementById("experiments-list");
+        const el = document.getElementById('experiments-list');
         if (!list.length) {
-          el.innerHTML =
-            '<div style="text-align:center;color:#666;padding:40px">No experiments yet</div>';
+          el.innerHTML = '<div style="text-align:center;color:#666;padding:40px">No experiments yet</div>';
           return;
         }
         el.innerHTML = list
@@ -281,59 +273,58 @@
             const variants = Object.entries(exp.variants || {})
               .map(([name, data]) => {
                 const isWinner = exp.winner === name;
-                return `<div class="variant-card ${isWinner ? "winner" : ""}">
-                        <div class="variant-name">${isWinner ? "🏆 " : ""}${name}</div>
+                return `<div class="variant-card ${isWinner ? 'winner' : ''}">
+                        <div class="variant-name">${isWinner ? '🏆 ' : ''}${name}</div>
                         <div class="variant-stat"><span class="label">Impressions</span><span class="value">${data.impressions || 0}</span></div>
                         <div class="variant-stat"><span class="label">👍 Thumbs Up</span><span class="value">${data.thumbsUp || 0}</span></div>
                         <div class="variant-stat"><span class="label">👎 Thumbs Down</span><span class="value">${data.thumbsDown || 0}</span></div>
-                        <div class="variant-stat"><span class="label">Satisfaction</span><span class="value">${data.satisfactionRate || "N/A"}</span></div>
-                        <div class="variant-stat"><span class="label">Corrections</span><span class="value">${data.correctionRate || "N/A"}</span></div>
-                        ${exp.status === "active" ? `<div class="actions"><button class="btn btn-winner" onclick="declareWinner('${exp.id}','${name}')">🏆 Winner</button></div>` : ""}
+                        <div class="variant-stat"><span class="label">Satisfaction</span><span class="value">${data.satisfactionRate || 'N/A'}</span></div>
+                        <div class="variant-stat"><span class="label">Corrections</span><span class="value">${data.correctionRate || 'N/A'}</span></div>
+                        ${exp.status === 'active' ? `<div class="actions"><button type="button" class="btn btn-winner" onclick="declareWinner('${exp.id}','${name}')">🏆 Winner</button></div>` : ''}
                     </div>`;
               })
-              .join("");
+              .join('');
             return `<div class="experiment">
                     <div class="exp-header">
                         <span class="exp-name">${exp.name || exp.id}</span>
                         <span class="exp-status ${exp.status}">${exp.status}</span>
                     </div>
-                    <div class="exp-desc">${exp.description || ""}</div>
+                    <div class="exp-desc">${exp.description || ''}</div>
                     <div class="exp-meta">
                         <span>Target: ${exp.target}</span>
                         <span>Traffic: ${exp.trafficPercent}%</span>
                         <span>Created: ${new Date(exp.createdAt).toLocaleDateString()}</span>
-                        ${exp.winner ? `<span>Winner: 🏆 ${exp.winner}</span>` : ""}
+                        ${exp.winner ? `<span>Winner: 🏆 ${exp.winner}</span>` : ''}
                     </div>
                     <div class="variants-grid">${variants}</div>
                     <div class="actions" style="margin-top:12px">
-                        <button class="btn btn-delete" onclick="deleteExperiment('${exp.id}')">🗑 Delete</button>
+                        <button type="button" class="btn btn-delete" onclick="deleteExperiment('${exp.id}')">🗑 Delete</button>
                     </div>
                 </div>`;
           })
-          .join("");
+          .join('');
       }
 
       async function createExperiment() {
-        const id = document.getElementById("exp-id").value.trim();
-        const name = document.getElementById("exp-name").value.trim();
-        const desc = document.getElementById("exp-desc").value.trim();
-        const target = document.getElementById("exp-target").value;
-        const traffic =
-          parseInt(document.getElementById("exp-traffic").value) || 50;
+        const id = document.getElementById('exp-id').value.trim();
+        const name = document.getElementById('exp-name').value.trim();
+        const desc = document.getElementById('exp-desc').value.trim();
+        const target = document.getElementById('exp-target').value;
+        const traffic = parseInt(document.getElementById('exp-traffic').value) || 50;
         let variants;
         try {
-          variants = JSON.parse(document.getElementById("exp-variants").value);
+          variants = JSON.parse(document.getElementById('exp-variants').value);
         } catch {
-          alert("Invalid JSON for variants");
+          alert('Invalid JSON for variants');
           return;
         }
         if (!id || !variants) {
-          alert("ID and Variants required");
+          alert('ID and Variants required');
           return;
         }
         try {
-          await fetch("/api/admin/ab-tests", {
-            method: "POST",
+          await fetch('/api/admin/ab-tests', {
+            method: 'POST',
             headers: HEADERS,
             body: JSON.stringify({
               id,
@@ -345,20 +336,19 @@
             }),
           });
           loadExperiments();
-          document.getElementById("exp-id").value = "";
-          document.getElementById("exp-name").value = "";
-          document.getElementById("exp-desc").value = "";
-          document.getElementById("exp-variants").value = "";
+          document.getElementById('exp-id').value = '';
+          document.getElementById('exp-name').value = '';
+          document.getElementById('exp-desc').value = '';
+          document.getElementById('exp-variants').value = '';
         } catch (e) {
-          alert("Error: " + e.message);
+          alert('Error: ' + e.message);
         }
       }
 
       async function declareWinner(expId, variant) {
-        if (!confirm("Declare " + variant + " as winner for " + expId + "?"))
-          return;
-        await fetch("/api/admin/ab-tests/" + expId + "/winner", {
-          method: "POST",
+        if (!confirm('Declare ' + variant + ' as winner for ' + expId + '?')) return;
+        await fetch('/api/admin/ab-tests/' + expId + '/winner', {
+          method: 'POST',
           headers: HEADERS,
           body: JSON.stringify({ variant }),
         });
@@ -366,9 +356,9 @@
       }
 
       async function deleteExperiment(expId) {
-        if (!confirm("Delete experiment " + expId + "?")) return;
-        await fetch("/api/admin/ab-tests/" + expId, {
-          method: "DELETE",
+        if (!confirm('Delete experiment ' + expId + '?')) return;
+        await fetch('/api/admin/ab-tests/' + expId, {
+          method: 'DELETE',
           headers: HEADERS,
         });
         loadExperiments();

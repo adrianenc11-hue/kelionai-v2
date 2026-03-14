@@ -6,7 +6,7 @@
 // Button is in index.html — this module handles the camera logic
 // ═══════════════════════════════════════════════════════════════
 (function () {
-  "use strict";
+  'use strict';
 
   let _stream = null;
   let _video = null;
@@ -32,39 +32,36 @@
   function init() {
     if (_video) return;
 
-    _video = document.createElement("video");
-    _video.setAttribute("autoplay", "");
-    _video.setAttribute("playsinline", "");
-    _video.setAttribute("muted", "");
-    _video.style.display = "none";
+    _video = document.createElement('video');
+    _video.setAttribute('autoplay', '');
+    _video.setAttribute('playsinline', '');
+    _video.setAttribute('muted', '');
+    _video.style.display = 'none';
     document.body.appendChild(_video);
 
-    _canvas = document.createElement("canvas");
+    _canvas = document.createElement('canvas');
     _canvas.width = CAPTURE_WIDTH;
     _canvas.height = CAPTURE_HEIGHT;
-    _canvas.style.display = "none";
+    _canvas.style.display = 'none';
     document.body.appendChild(_canvas);
 
     // Tracking canvas (smaller for performance)
-    _trackCanvas = document.createElement("canvas");
+    _trackCanvas = document.createElement('canvas');
     _trackCanvas.width = 160;
     _trackCanvas.height = 120;
-    _trackCtx = _trackCanvas.getContext("2d", { willReadFrequently: true });
+    _trackCtx = _trackCanvas.getContext('2d', { willReadFrequently: true });
 
     // Try browser FaceDetector API (Chrome)
     try {
-      if (typeof FaceDetector !== "undefined") {
+      if (typeof FaceDetector !== 'undefined') {
         _faceDetector = new FaceDetector({
           fastMode: true,
           maxDetectedFaces: 1,
         });
-        console.log("[AutoCamera] ✅ Browser FaceDetector available");
       }
     } catch (_e) {
       /* not available */
     }
-
-    console.log("[AutoCamera] Initialized");
   }
 
   /**
@@ -79,7 +76,7 @@
         video: {
           width: { ideal: CAPTURE_WIDTH },
           height: { ideal: CAPTURE_HEIGHT },
-          facingMode: "user",
+          facingMode: 'user',
         },
         audio: false,
       });
@@ -87,14 +84,13 @@
       await _video.play();
       _permissionGranted = true;
       _enabled = true;
-      console.log("[AutoCamera] ✅ Camera active");
 
       // Start face tracking loop
       startFaceTracking();
 
       return true;
     } catch (e) {
-      console.warn("[AutoCamera] ❌ Permission denied:", e.message);
+      console.warn('[AutoCamera] ❌ Permission denied:', e.message);
       _permissionGranted = false;
       _enabled = false;
       return false;
@@ -107,9 +103,12 @@
   function startFaceTracking() {
     if (_faceTrackInterval) return;
     _faceTrackInterval = setInterval(trackFace, FACE_TRACK_MS);
-    console.log("[AutoCamera] 👁️ Face tracking started");
   }
 
+  /**
+   * stopFaceTracking
+   * @returns {*}
+   */
   function stopFaceTracking() {
     if (_faceTrackInterval) {
       clearInterval(_faceTrackInterval);
@@ -143,9 +142,7 @@
       } catch (_e) {
         // FaceDetector failed, fall through to motion tracking
         _faceDetector = null;
-        console.log(
-          "[AutoCamera] FaceDetector unavailable, using motion fallback",
-        );
+        console.log('[AutoCamera] FaceDetector unavailable, using motion fallback');
       }
     }
 
@@ -168,9 +165,7 @@
           for (let x = 0; x < tw; x += 2) {
             const i = (y * tw + x) * 4;
             const diff =
-              Math.abs(curr[i] - prev[i]) +
-              Math.abs(curr[i + 1] - prev[i + 1]) +
-              Math.abs(curr[i + 2] - prev[i + 2]);
+              Math.abs(curr[i] - prev[i]) + Math.abs(curr[i + 1] - prev[i + 1]) + Math.abs(curr[i + 2] - prev[i + 2]);
             if (diff > 60) {
               // motion threshold
               // Weight by luminance (faces are usually brighter)
@@ -203,9 +198,9 @@
    */
   function dispatchFacePosition(x, y) {
     window.dispatchEvent(
-      new CustomEvent("face-position", {
+      new CustomEvent('face-position', {
         detail: { x: x, y: y },
-      }),
+      })
     );
   }
 
@@ -217,13 +212,13 @@
     if (_video.readyState < 2) return null;
 
     try {
-      const ctx = _canvas.getContext("2d");
+      const ctx = _canvas.getContext('2d');
       ctx.drawImage(_video, 0, 0, CAPTURE_WIDTH, CAPTURE_HEIGHT);
-      const dataUrl = _canvas.toDataURL("image/jpeg", JPEG_QUALITY);
-      const base64 = dataUrl.split(",")[1];
-      return { base64, mimeType: "image/jpeg" };
+      const dataUrl = _canvas.toDataURL('image/jpeg', JPEG_QUALITY);
+      const base64 = dataUrl.split(',')[1];
+      return { base64, mimeType: 'image/jpeg' };
     } catch (e) {
-      console.warn("[AutoCamera] Capture failed:", e.message);
+      console.warn('[AutoCamera] Capture failed:', e.message);
       return null;
     }
   }
@@ -238,7 +233,6 @@
       _stream = null;
     }
     _enabled = false;
-    console.log("[AutoCamera] Camera stopped");
   }
 
   /**
@@ -261,8 +255,8 @@
   }
 
   // Auto-init on load (just hidden elements, button is in HTML)
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", init);
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
   } else {
     init();
   }

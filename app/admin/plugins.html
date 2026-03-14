@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="ro">
   <head>
+  <meta name="description" content="Page description">
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>KelionAI — Plugin Manager</title>
@@ -206,7 +207,7 @@
         border-radius: 8px;
         padding: 12px;
         color: #e0e0e0;
-        font-family: "Fira Code", monospace;
+        font-family: 'Fira Code', monospace;
         font-size: 0.82rem;
         resize: vertical;
       }
@@ -262,10 +263,8 @@
           <span class="admin-badge">v3.2</span>
         </div>
         <div class="header-right">
-          <button class="admin-btn" onclick="loadPlugins()">🔄 Refresh</button>
-          <button class="admin-btn" id="theme-toggle" onclick="toggleTheme()">
-            🌙
-          </button>
+          <button type="button" class="admin-btn" onclick="loadPlugins()">🔄 Refresh</button>
+          <button type="button" class="admin-btn" id="theme-toggle" onclick="toggleTheme()">🌙</button>
         </div>
       </header>
 
@@ -299,42 +298,24 @@
 
       <!-- FILTERS -->
       <div class="filter-bar" id="filter-bar">
-        <button class="filter-btn active" onclick="filterPlugins('all')">
-          All
-        </button>
-        <button class="filter-btn" onclick="filterPlugins('active')">
-          ✅ Active
-        </button>
-        <button class="filter-btn" onclick="filterPlugins('disabled')">
-          ⏸️ Disabled
-        </button>
-        <button class="filter-btn" onclick="filterPlugins('builtin')">
-          🏗️ Built-in
-        </button>
-        <button class="filter-btn" onclick="filterPlugins('local')">
-          📂 Local
-        </button>
-        <button class="filter-btn" onclick="filterPlugins('command')">
-          ⌨️ Command
-        </button>
-        <button class="filter-btn" onclick="filterPlugins('middleware')">
-          🔗 Middleware
-        </button>
+        <button type="button" class="filter-btn active" onclick="filterPlugins('all')">All</button>
+        <button type="button" class="filter-btn" onclick="filterPlugins('active')">✅ Active</button>
+        <button type="button" class="filter-btn" onclick="filterPlugins('disabled')">⏸️ Disabled</button>
+        <button type="button" class="filter-btn" onclick="filterPlugins('builtin')">🏗️ Built-in</button>
+        <button type="button" class="filter-btn" onclick="filterPlugins('local')">📂 Local</button>
+        <button type="button" class="filter-btn" onclick="filterPlugins('command')">⌨️ Command</button>
+        <button type="button" class="filter-btn" onclick="filterPlugins('middleware')">🔗 Middleware</button>
       </div>
 
       <!-- PLUGIN GRID -->
       <div class="plugin-grid" id="plugin-grid">
-        <div style="color: #888; text-align: center; padding: 40px">
-          Loading plugins...
-        </div>
+        <div style="color: #888; text-align: center; padding: 40px">Loading plugins...</div>
       </div>
 
       <!-- INSTALL SECTION -->
       <div class="install-section">
         <h3>➕ Install Custom Plugin</h3>
-        <p style="font-size: 0.8rem; color: #888; margin-bottom: 10px">
-          Paste a plugin manifest (JSON) to install:
-        </p>
+        <p style="font-size: 0.8rem; color: #888; margin-bottom: 10px">Paste a plugin manifest (JSON) to install:</p>
         <textarea
           class="install-textarea"
           id="install-manifest"
@@ -350,136 +331,119 @@
   "endpoints": []
 }'
         ></textarea>
-        <button class="install-btn" onclick="installPlugin()">
-          🔌 Install Plugin
-        </button>
-        <span
-          id="install-status"
-          style="margin-left: 12px; font-size: 0.82rem; color: #888"
-        ></span>
+        <button type="button" class="install-btn" onclick="installPlugin()">🔌 Install Plugin</button>
+        <span id="install-status" style="margin-left: 12px; font-size: 0.82rem; color: #888"></span>
       </div>
     </div>
 
     <script>
       function toggleTheme() {
-        document.body.classList.toggle("light-theme");
-        const isLight = document.body.classList.contains("light-theme");
-        localStorage.setItem("admin-theme", isLight ? "light" : "dark");
-        document.getElementById("theme-toggle").textContent = isLight
-          ? "☀️"
-          : "🌙";
+        document.body.classList.toggle('light-theme');
+        const isLight = document.body.classList.contains('light-theme');
+        localStorage.setItem('admin-theme', isLight ? 'light' : 'dark');
+        document.getElementById('theme-toggle').textContent = isLight ? '☀️' : '🌙';
       }
-      if (localStorage.getItem("admin-theme") === "light") {
-        document.body.classList.add("light-theme");
-        document.addEventListener("DOMContentLoaded", () => {
-          const t = document.getElementById("theme-toggle");
-          if (t) t.textContent = "☀️";
+      if (localStorage.getItem('admin-theme') === 'light') {
+        document.body.classList.add('light-theme');
+        document.addEventListener('DOMContentLoaded', () => {
+          const t = document.getElementById('theme-toggle');
+          if (t) t.textContent = '☀️';
         });
       }
 
       let allPlugins = [];
-      let currentFilter = "all";
+      let currentFilter = 'all';
 
       async function loadPlugins() {
         try {
-          const [pluginsRes, statsRes] = await Promise.all([
-            fetch("/api/plugins"),
-            fetch("/api/plugins/stats"),
-          ]);
+          const [pluginsRes, statsRes] = await Promise.all([fetch('/api/plugins'), fetch('/api/plugins/stats')]);
           const pluginsData = await pluginsRes.json();
           const statsData = await statsRes.json();
 
           allPlugins = pluginsData.plugins || [];
 
           // Update stats
-          document.getElementById("s-total").textContent = statsData.total || 0;
-          document.getElementById("s-active").textContent =
-            statsData.active || 0;
-          document.getElementById("s-disabled").textContent =
-            statsData.disabled || 0;
-          document.getElementById("s-builtin").textContent =
-            statsData.builtin || 0;
-          document.getElementById("s-local").textContent = statsData.local || 0;
-          document.getElementById("s-custom").textContent =
-            statsData.custom || 0;
+          document.getElementById('s-total').textContent = statsData.total || 0;
+          document.getElementById('s-active').textContent = statsData.active || 0;
+          document.getElementById('s-disabled').textContent = statsData.disabled || 0;
+          document.getElementById('s-builtin').textContent = statsData.builtin || 0;
+          document.getElementById('s-local').textContent = statsData.local || 0;
+          document.getElementById('s-custom').textContent = statsData.custom || 0;
 
           renderPlugins(allPlugins);
         } catch (e) {
-          document.getElementById("plugin-grid").innerHTML =
+          document.getElementById('plugin-grid').innerHTML =
             `<div style="color:#f87171;padding:20px">Error loading plugins: ${e.message}</div>`;
         }
       }
 
       function renderPlugins(plugins) {
-        const grid = document.getElementById("plugin-grid");
+        const grid = document.getElementById('plugin-grid');
         if (!plugins.length) {
-          grid.innerHTML =
-            '<div style="color:#888;text-align:center;padding:40px">No plugins found</div>';
+          grid.innerHTML = '<div style="color:#888;text-align:center;padding:40px">No plugins found</div>';
           return;
         }
 
         grid.innerHTML = plugins
           .map(
             (p) => `
-            <div class="plugin-card ${p.status === "disabled" ? "disabled" : ""}" data-id="${p.id}">
+            <div class="plugin-card ${p.status === 'disabled' ? 'disabled' : ''}" data-id="${p.id}">
                 <div class="plugin-header">
-                    <div class="plugin-icon">${p.icon || "🔌"}</div>
+                    <div class="plugin-icon">${p.icon || '🔌'}</div>
                     <div class="plugin-info">
                         <h3>${esc(p.name)}</h3>
-                        <span class="version">v${esc(p.version)} · ${esc(p.author || "Unknown")}</span>
+                        <span class="version">v${esc(p.version)} · ${esc(p.author || 'Unknown')}</span>
                     </div>
                 </div>
-                <div class="plugin-desc">${esc(p.description || "")}</div>
+                <div class="plugin-desc">${esc(p.description || '')}</div>
                 <div class="plugin-meta">
-                    <span class="plugin-tag ${p.builtin ? "tag-builtin" : p.local ? "tag-local" : "tag-custom"}">
-                        ${p.builtin ? "🏗️ Built-in" : p.local ? "📂 Local" : "📦 Custom"}
+                    <span class="plugin-tag ${p.builtin ? 'tag-builtin' : p.local ? 'tag-local' : 'tag-custom'}">
+                        ${p.builtin ? '🏗️ Built-in' : p.local ? '📂 Local' : '📦 Custom'}
                     </span>
-                    <span class="plugin-tag ${p.status === "active" ? "tag-active" : "tag-disabled"}">
-                        ${p.status === "active" ? "✅ Active" : "⏸️ Disabled"}
+                    <span class="plugin-tag ${p.status === 'active' ? 'tag-active' : 'tag-disabled'}">
+                        ${p.status === 'active' ? '✅ Active' : '⏸️ Disabled'}
                     </span>
-                    <span class="plugin-tag tag-category">${esc(p.category || "general")}</span>
-                    ${p.type && p.type !== "builtin" ? `<span class="plugin-tag tag-category">${esc(p.type)}</span>` : ""}
-                    ${p.hasAuth ? '<span class="plugin-tag tag-active">🔑 Auth OK</span>' : ""}
-                    ${p.commands?.length ? `<span class="plugin-tag tag-category">${p.commands.join(", ")}</span>` : ""}
+                    <span class="plugin-tag tag-category">${esc(p.category || 'general')}</span>
+                    ${p.type && p.type !== 'builtin' ? `<span class="plugin-tag tag-category">${esc(p.type)}</span>` : ''}
+                    ${p.hasAuth ? '<span class="plugin-tag tag-active">🔑 Auth OK</span>' : ''}
+                    ${p.commands?.length ? `<span class="plugin-tag tag-category">${p.commands.join(', ')}</span>` : ''}
                 </div>
                 <div class="plugin-actions">
-                    <button class="btn-toggle" onclick="togglePlugin('${p.id}')">
-                        ${p.status === "active" ? "⏸️ Disable" : "▶️ Enable"}
+                    <button type="button" class="btn-toggle" onclick="togglePlugin('${p.id}')">
+                        ${p.status === 'active' ? '⏸️ Disable' : '▶️ Enable'}
                     </button>
-                    ${!p.builtin && !p.local ? `<button class="btn-delete" onclick="uninstallPlugin('${p.id}')">🗑️ Uninstall</button>` : ""}
+                    ${!p.builtin && !p.local ? `<button type="button" class="btn-delete" onclick="uninstallPlugin('${p.id}')">🗑️ Uninstall</button>` : ''}
                 </div>
             </div>
-        `,
+        `
           )
-          .join("");
+          .join('');
       }
 
       function filterPlugins(filter) {
         currentFilter = filter;
-        document
-          .querySelectorAll(".filter-btn")
-          .forEach((b) => b.classList.remove("active"));
-        event.target.classList.add("active");
+        document.querySelectorAll('.filter-btn').forEach((b) => b.classList.remove('active'));
+        event.target.classList.add('active');
 
         let filtered = allPlugins;
         switch (filter) {
-          case "active":
-            filtered = allPlugins.filter((p) => p.status === "active");
+          case 'active':
+            filtered = allPlugins.filter((p) => p.status === 'active');
             break;
-          case "disabled":
-            filtered = allPlugins.filter((p) => p.status === "disabled");
+          case 'disabled':
+            filtered = allPlugins.filter((p) => p.status === 'disabled');
             break;
-          case "builtin":
+          case 'builtin':
             filtered = allPlugins.filter((p) => p.builtin);
             break;
-          case "local":
+          case 'local':
             filtered = allPlugins.filter((p) => p.local);
             break;
-          case "command":
-            filtered = allPlugins.filter((p) => p.type === "command");
+          case 'command':
+            filtered = allPlugins.filter((p) => p.type === 'command');
             break;
-          case "middleware":
-            filtered = allPlugins.filter((p) => p.type === "middleware");
+          case 'middleware':
+            filtered = allPlugins.filter((p) => p.type === 'middleware');
             break;
         }
         renderPlugins(filtered);
@@ -488,60 +452,60 @@
       async function togglePlugin(id) {
         try {
           const res = await fetch(`/api/plugins/${id}/toggle`, {
-            method: "POST",
+            method: 'POST',
           });
           const data = await res.json();
           if (data.success) loadPlugins();
         } catch (e) {
-          alert("Toggle failed: " + e.message);
+          alert('Toggle failed: ' + e.message);
         }
       }
 
       async function uninstallPlugin(id) {
         if (!confirm(`Uninstall plugin "${id}"?`)) return;
         try {
-          const res = await fetch(`/api/plugins/${id}`, { method: "DELETE" });
+          const res = await fetch(`/api/plugins/${id}`, { method: 'DELETE' });
           const data = await res.json();
           if (data.success) loadPlugins();
-          else alert("Error: " + (data.error || "Unknown"));
+          else alert('Error: ' + (data.error || 'Unknown'));
         } catch (e) {
-          alert("Uninstall failed: " + e.message);
+          alert('Uninstall failed: ' + e.message);
         }
       }
 
       async function installPlugin() {
-        const textarea = document.getElementById("install-manifest");
-        const status = document.getElementById("install-status");
+        const textarea = document.getElementById('install-manifest');
+        const status = document.getElementById('install-status');
         try {
           const manifest = JSON.parse(textarea.value);
-          status.textContent = "Installing...";
-          status.style.color = "#a5b4fc";
+          status.textContent = 'Installing...';
+          status.style.color = '#a5b4fc';
 
-          const res = await fetch("/api/plugins/install", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
+          const res = await fetch('/api/plugins/install', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ manifest }),
           });
           const data = await res.json();
 
           if (data.success) {
             status.textContent = `✅ Installed: ${data.plugin.name}`;
-            status.style.color = "#34d399";
-            textarea.value = "";
+            status.style.color = '#34d399';
+            textarea.value = '';
             loadPlugins();
           } else {
-            status.textContent = `❌ ${data.error || "Failed"}`;
-            status.style.color = "#f87171";
+            status.textContent = `❌ ${data.error || 'Failed'}`;
+            status.style.color = '#f87171';
           }
         } catch (e) {
           status.textContent = `❌ Invalid JSON: ${e.message}`;
-          status.style.color = "#f87171";
+          status.style.color = '#f87171';
         }
       }
 
       function esc(str) {
-        const d = document.createElement("div");
-        d.textContent = str || "";
+        const d = document.createElement('div');
+        d.textContent = str || '';
         return d.innerHTML;
       }
 

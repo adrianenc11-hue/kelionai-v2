@@ -4,7 +4,7 @@
 // Supports 15 Oculus visemes + ARKit blend shapes
 // ═══════════════════════════════════════════════════════════════
 (function () {
-  "use strict";
+  'use strict';
 
   var morphMeshes = [];
   var _active = false;
@@ -29,60 +29,60 @@
   //         C_DENTAL, C_ALVEOLAR, C_PALATAL, C_VELAR, C_SIBILANT, C_NASAL, SILENCE
   var CHAR_PHONEME = {
     // Romanian vowels
-    a: "V_OPEN",
-    ă: "V_MID",
-    â: "V_MID",
-    î: "V_CLOSE",
-    e: "V_MID",
-    i: "V_CLOSE",
-    o: "V_ROUND",
-    u: "V_TIGHT",
+    a: 'V_OPEN',
+    ă: 'V_MID',
+    â: 'V_MID',
+    î: 'V_CLOSE',
+    e: 'V_MID',
+    i: 'V_CLOSE',
+    o: 'V_ROUND',
+    u: 'V_TIGHT',
     // English vowels (additional)
-    y: "V_CLOSE",
+    y: 'V_CLOSE',
     // Bilabial: lips together
-    b: "C_BILABIAL",
-    p: "C_BILABIAL",
-    m: "C_NASAL",
+    b: 'C_BILABIAL',
+    p: 'C_BILABIAL',
+    m: 'C_NASAL',
     // Labiodental: lip + teeth
-    f: "C_LABIO",
-    v: "C_LABIO",
+    f: 'C_LABIO',
+    v: 'C_LABIO',
     // Dental/Alveolar
-    t: "C_DENTAL",
-    d: "C_DENTAL",
-    n: "C_NASAL",
-    l: "C_ALVEOLAR",
-    r: "C_ALVEOLAR",
+    t: 'C_DENTAL',
+    d: 'C_DENTAL',
+    n: 'C_NASAL',
+    l: 'C_ALVEOLAR',
+    r: 'C_ALVEOLAR',
     // Sibilants
-    s: "C_SIBILANT",
-    z: "C_SIBILANT",
-    ș: "C_PALATAL",
-    ț: "C_SIBILANT",
+    s: 'C_SIBILANT',
+    z: 'C_SIBILANT',
+    ș: 'C_PALATAL',
+    ț: 'C_SIBILANT',
     // Palatal/Postalveolar
-    c: "C_VELAR",
-    g: "C_VELAR",
-    k: "C_VELAR",
-    h: "C_VELAR",
-    j: "C_PALATAL",
-    ş: "C_PALATAL",
-    ţ: "C_SIBILANT",
-    q: "C_VELAR",
-    w: "V_TIGHT",
-    x: "C_SIBILANT",
+    c: 'C_VELAR',
+    g: 'C_VELAR',
+    k: 'C_VELAR',
+    h: 'C_VELAR',
+    j: 'C_PALATAL',
+    ş: 'C_PALATAL',
+    ţ: 'C_SIBILANT',
+    q: 'C_VELAR',
+    w: 'V_TIGHT',
+    x: 'C_SIBILANT',
     // Silence
-    " ": "SILENCE",
-    ".": "SILENCE",
-    ",": "SILENCE",
-    "!": "SILENCE",
-    "?": "SILENCE",
-    "-": "SILENCE",
-    ":": "SILENCE",
-    ";": "SILENCE",
-    '"': "SILENCE",
-    "'": "SILENCE",
-    "\n": "SILENCE",
-    "\r": "SILENCE",
-    "(": "SILENCE",
-    ")": "SILENCE",
+    ' ': 'SILENCE',
+    '.': 'SILENCE',
+    ',': 'SILENCE',
+    '!': 'SILENCE',
+    '?': 'SILENCE',
+    '-': 'SILENCE',
+    ':': 'SILENCE',
+    ';': 'SILENCE',
+    '"': 'SILENCE',
+    "'": 'SILENCE',
+    '\n': 'SILENCE',
+    '\r': 'SILENCE',
+    '(': 'SILENCE',
+    ')': 'SILENCE',
   };
 
   // ── Phoneme class → Viseme weight map ──
@@ -199,9 +199,9 @@
     var ends = alignment.character_end_times_seconds;
 
     for (var i = 0; i < chars.length; i++) {
-      var ch = (chars[i] || "").toLowerCase();
-      var phonemeClass = CHAR_PHONEME[ch] || "SILENCE";
-      var visemes = PHONEME_VISEMES[phonemeClass] || PHONEME_VISEMES["SILENCE"];
+      var ch = (chars[i] || '').toLowerCase();
+      var phonemeClass = CHAR_PHONEME[ch] || 'SILENCE';
+      var visemes = PHONEME_VISEMES[phonemeClass] || PHONEME_VISEMES['SILENCE'];
 
       _timeline.push({
         startTime: starts[i] || 0,
@@ -212,13 +212,11 @@
       });
     }
     console.log(
-      "[AlignmentLipSync] Timeline built:",
+      '[AlignmentLipSync] Timeline built:',
       _timeline.length,
-      "entries,",
-      "duration:",
-      _timeline.length > 0
-        ? _timeline[_timeline.length - 1].endTime.toFixed(2) + "s"
-        : "0s",
+      'entries,',
+      'duration:',
+      _timeline.length > 0 ? _timeline[_timeline.length - 1].endTime.toFixed(2) + 's' : '0s'
     );
   }
 
@@ -238,10 +236,7 @@
     // Find active timeline entry
     var activeIdx = -1;
     for (var i = 0; i < _timeline.length; i++) {
-      if (
-        currentTime >= _timeline[i].startTime &&
-        currentTime < _timeline[i].endTime
-      ) {
+      if (currentTime >= _timeline[i].startTime && currentTime < _timeline[i].endTime) {
         activeIdx = i;
         break;
       }
@@ -250,16 +245,15 @@
     // If past all entries, return silence
     if (activeIdx === -1) {
       if (currentTime >= _timeline[_timeline.length - 1].endTime) {
-        return PHONEME_VISEMES["SILENCE"];
+        return PHONEME_VISEMES['SILENCE'];
       }
       // Before first entry
-      return PHONEME_VISEMES["SILENCE"];
+      return PHONEME_VISEMES['SILENCE'];
     }
 
     var entry = _timeline[activeIdx];
     var duration = entry.endTime - entry.startTime;
-    var progress =
-      duration > 0 ? (currentTime - entry.startTime) / duration : 0;
+    var progress = duration > 0 ? (currentTime - entry.startTime) / duration : 0;
 
     // Apply cubic easing for natural in/out within each phoneme
     var eased = _cubicEase(progress);
@@ -305,91 +299,112 @@
 
   // ── All mouth morph names for reset ──
   var ALL_MOUTH_MORPHS = [
-    "viseme_sil",
-    "viseme_PP",
-    "viseme_FF",
-    "viseme_TH",
-    "viseme_DD",
-    "viseme_kk",
-    "viseme_CH",
-    "viseme_SS",
-    "viseme_nn",
-    "viseme_RR",
-    "viseme_aa",
-    "viseme_E",
-    "viseme_I",
-    "viseme_O",
-    "viseme_U",
-    "sil",
-    "PP",
-    "FF",
-    "TH",
-    "DD",
-    "kk",
-    "CH",
-    "SS",
-    "nn",
-    "RR",
-    "aa",
-    "E",
-    "ih",
-    "oh",
-    "ou",
-    "jawOpen",
-    "mouthOpen",
-    "mouthSmile",
-    "mouthFunnel",
-    "mouthPucker",
-    "mouthClose",
-    "mouthSmileLeft",
-    "mouthSmileRight",
-    "mouthPressLeft",
-    "mouthPressRight",
-    "mouthRollLower",
-    "mouthRollUpper",
-    "mouthShrugLower",
-    "mouthShrugUpper",
-    "mouthStretchLeft",
-    "mouthStretchRight",
-    "mouthLowerDownLeft",
-    "mouthLowerDownRight",
-    "mouthUpperUpLeft",
-    "mouthUpperUpRight",
-    "mouthDimpleLeft",
-    "mouthDimpleRight",
-    "jawLeft",
-    "jawRight",
+    'viseme_sil',
+    'viseme_PP',
+    'viseme_FF',
+    'viseme_TH',
+    'viseme_DD',
+    'viseme_kk',
+    'viseme_CH',
+    'viseme_SS',
+    'viseme_nn',
+    'viseme_RR',
+    'viseme_aa',
+    'viseme_E',
+    'viseme_I',
+    'viseme_O',
+    'viseme_U',
+    'sil',
+    'PP',
+    'FF',
+    'TH',
+    'DD',
+    'kk',
+    'CH',
+    'SS',
+    'nn',
+    'RR',
+    'aa',
+    'E',
+    'ih',
+    'oh',
+    'ou',
+    'jawOpen',
+    'mouthOpen',
+    'mouthSmile',
+    'mouthFunnel',
+    'mouthPucker',
+    'mouthClose',
+    'mouthSmileLeft',
+    'mouthSmileRight',
+    'mouthPressLeft',
+    'mouthPressRight',
+    'mouthRollLower',
+    'mouthRollUpper',
+    'mouthShrugLower',
+    'mouthShrugUpper',
+    'mouthStretchLeft',
+    'mouthStretchRight',
+    'mouthLowerDownLeft',
+    'mouthLowerDownRight',
+    'mouthUpperUpLeft',
+    'mouthUpperUpRight',
+    'mouthDimpleLeft',
+    'mouthDimpleRight',
+    'jawLeft',
+    'jawRight',
   ];
 
   // ══════════════════════════════════════════════════════
   // PUBLIC API
   // ══════════════════════════════════════════════════════
 
+  /**
+   * setMorphMeshes
+   * @param {*} meshes
+   * @returns {*}
+   */
   function setMorphMeshes(meshes) {
     morphMeshes = meshes || [];
     _prevValues = {};
   }
 
+  /**
+   * setAudioContext
+   * @param {*} ctx
+   * @returns {*}
+   */
   function setAudioContext(ctx) {
     _audioCtx = ctx;
   }
 
+  /**
+   * load
+   * @param {*} alignment
+   * @returns {*}
+   */
   function load(alignment) {
     _alignment = alignment;
     _buildTimeline(alignment);
     _prevValues = {};
   }
 
+  /**
+   * start
+   * @param {*} audioStartTime
+   * @returns {*}
+   */
   function start(audioStartTime) {
     _audioStartTime = audioStartTime || 0;
     _active = true;
     _prevValues = {};
-    console.log(
-      "[AlignmentLipSync] ▶ Started at audioCtx.currentTime =",
-      audioStartTime.toFixed(3),
-    );
+    console.log('[AlignmentLipSync] ▶ Started at audioCtx.currentTime =', audioStartTime.toFixed(3));
   }
 
+  /**
+   * update
+   * @returns {*}
+   */
   function update() {
     if (!_active || !_audioCtx || _timeline.length === 0) return;
 
@@ -416,12 +431,12 @@
 
         // Apply clamps based on morph type
         var maxVal = MAX_VISEME;
-        if (name === "jawOpen" || name === "mouthOpen") maxVal = MAX_JAW;
-        if (name.indexOf("viseme_aa") >= 0 || name === "aa") maxVal = MAX_VOWEL;
+        if (name === 'jawOpen' || name === 'mouthOpen') maxVal = MAX_JAW;
+        if (name.indexOf('viseme_aa') >= 0 || name === 'aa') maxVal = MAX_VOWEL;
         target = _clamp(target, maxVal);
 
         // Asymmetry: left side slightly ahead
-        if (name.indexOf("Left") >= 0 || name.indexOf("left") >= 0) {
+        if (name.indexOf('Left') >= 0 || name.indexOf('left') >= 0) {
           target = _clamp(target + ASYMMETRY_OFFSET, maxVal);
         }
 
@@ -449,6 +464,10 @@
     }
   }
 
+  /**
+   * stop
+   * @returns {*}
+   */
   function stop() {
     _active = false;
     // Smooth close — decay all mouth morphs
@@ -464,13 +483,20 @@
     }
     _prevValues = {};
     _timeline = [];
-    console.log("[AlignmentLipSync] ⏹ Stopped");
   }
 
+  /**
+   * isActive
+   * @returns {*}
+   */
   function isActive() {
     return _active;
   }
 
+  /**
+   * dispose
+   * @returns {*}
+   */
   function dispose() {
     stop();
     morphMeshes = [];
@@ -489,6 +515,4 @@
     isActive: isActive,
     dispose: dispose,
   };
-
-  console.log("[AlignmentLipSync] ✅ Professional lip sync engine loaded");
 })();

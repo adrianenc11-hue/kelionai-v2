@@ -2,35 +2,29 @@
 // KelionAI — Admin API Routes (admin-only, role-gated)
 // Zero hardcoded values — all from env vars
 // ═══════════════════════════════════════════════════════════════
-"use strict";
+'use strict';
 
-const express = require("express");
-const logger = require("../logger");
-const { notify, sseHandler, getRecent } = require("../notifications");
-const abTest = require("../ab-testing");
-const sprint2 = require("../sprint2");
-const qw = require("../quick-wins");
-const cot = require("../chain-of-thought");
+const express = require('express');
+const logger = require('../logger');
+const { notify, sseHandler, getRecent } = require('../notifications');
+const abTest = require('../ab-testing');
+const sprint2 = require('../sprint2');
+const qw = require('../quick-wins');
+const cot = require('../chain-of-thought');
 const router = express.Router();
 
 // ── Config from environment variables ──
 const CONFIG = {
   planPrices: {
-    pro: parseFloat(process.env.PLAN_PRO_PRICE || "9.99"),
-    premium: parseFloat(process.env.PLAN_PREMIUM_PRICE || "29.99"),
+    pro: parseFloat(process.env.PLAN_PRO_PRICE || '9.99'),
+    premium: parseFloat(process.env.PLAN_PREMIUM_PRICE || '29.99'),
   },
-  rechargeAmountPence: parseInt(
-    process.env.RECHARGE_AMOUNT_PENCE || "5000",
-    10,
-  ),
-  creditLowThreshold: parseFloat(process.env.CREDIT_LOW_THRESHOLD || "5"),
-  creditMedThreshold: parseFloat(process.env.CREDIT_MED_THRESHOLD || "2"),
+  rechargeAmountPence: parseInt(process.env.RECHARGE_AMOUNT_PENCE || '5000', 10),
+  creditLowThreshold: parseFloat(process.env.CREDIT_LOW_THRESHOLD || '5'),
+  creditMedThreshold: parseFloat(process.env.CREDIT_MED_THRESHOLD || '2'),
   appUrl:
-    process.env.APP_URL ||
-    (process.env.RAILWAY_PUBLIC_DOMAIN
-      ? "https://" + process.env.RAILWAY_PUBLIC_DOMAIN
-      : ""),
-  adminEmail: process.env.ADMIN_EMAIL || "",
+    process.env.APP_URL || (process.env.RAILWAY_PUBLIC_DOMAIN ? 'https://' + process.env.RAILWAY_PUBLIC_DOMAIN : ''),
+  adminEmail: process.env.ADMIN_EMAIL || '',
 };
 
 // ── Admin middleware — stealth: non-admins get silent 200 empty (admin doesn't exist) ──
@@ -40,22 +34,22 @@ async function requireAdmin(req, res, next) {
 
   try {
     // Method 1: x-admin-secret header (admin panel sends this after verify-code)
-    const secret = (process.env.ADMIN_SECRET_KEY || "").trim();
-    const headerSecret = (req.headers["x-admin-secret"] || "").trim();
+    const secret = (process.env.ADMIN_SECRET_KEY || '').trim();
+    const headerSecret = (req.headers['x-admin-secret'] || '').trim();
     if (secret && headerSecret === secret) {
-      req.adminUser = { id: "admin-secret", role: "admin" };
+      req.adminUser = { id: 'admin-secret', role: 'admin' };
       return next();
     }
 
     // Method 2: JWT Bearer token with admin email
-    const authHeader = req.headers.authorization || "";
+    const authHeader = req.headers.authorization || '';
     const { getUserFromToken } = req.app.locals || {};
-    if (getUserFromToken && authHeader.startsWith("Bearer ")) {
+    if (getUserFromToken && authHeader.startsWith('Bearer ')) {
       const user = await getUserFromToken(req).catch(() => null);
       if (user) {
-        const adminEmail = (process.env.ADMIN_EMAIL || "").toLowerCase().trim();
+        const adminEmail = (process.env.ADMIN_EMAIL || '').toLowerCase().trim();
         if (adminEmail && user.email?.toLowerCase().trim() === adminEmail) {
-          req.adminUser = { id: user.id, role: "admin", email: user.email };
+          req.adminUser = { id: user.id, role: 'admin', email: user.email };
           return next();
         }
       }
@@ -69,71 +63,57 @@ async function requireAdmin(req, res, next) {
 }
 
 // ── POST /verify-code — validate admin access/exit code (pre-auth) ──
-router.post("/verify-code", express.json(), (req, res) => {
+router.post('/verify-code', express.json(), (req, res) => {
   const { code: rawCode } = req.body || {};
-  const code = (rawCode || "").trim();
-  const accessCode = (
-    process.env.ADMIN_ACCESS_CODE ||
-    process.env.ADMIN_EXIT_CODE ||
-    ""
-  ).trim();
-  const exitCode = (
-    process.env.ADMIN_EXIT_CODE ||
-    process.env.ADMIN_ACCESS_CODE ||
-    ""
-  ).trim();
-  const secret = (process.env.ADMIN_SECRET_KEY || "").trim();
+  const code = (rawCode || '').trim();
+  const accessCode = (process.env.ADMIN_ACCESS_CODE || process.env.ADMIN_EXIT_CODE || '').trim();
+  const exitCode = (process.env.ADMIN_EXIT_CODE || process.env.ADMIN_ACCESS_CODE || '').trim();
+  const secret = (process.env.ADMIN_SECRET_KEY || '').trim();
 
-  if (!code) return res.status(400).json({ error: "Code required" });
+  if (!code) return res.status(400).json({ error: 'Code required' });
 
   if (code === accessCode && secret) {
-    logger.info({ component: "Admin" }, "Admin access granted via code");
+    logger.info({ component: 'Admin' }, 'Admin access granted via code');
     return res.json({
-      action: "enter",
+      action: 'enter',
       secret,
-      message: "Admin mode activat!",
+      message: 'Admin mode activat!',
     });
   }
   if (code === exitCode) {
-    logger.info({ component: "Admin" }, "Admin access revoked via exit code");
+    logger.info({ component: 'Admin' }, 'Admin access revoked via exit code');
     return res.json({
-      action: "exit",
-      message: "Admin mode dezactivat.",
+      action: 'exit',
+      message: 'Admin mode dezactivat.',
     });
   }
 
   // Not a valid admin code — return 404 so frontend falls through to normal chat
-  return res.status(404).json({ error: "Invalid code" });
+  return res.status(404).json({ error: 'Invalid code' });
 });
 
 // ── GET /api/admin/auth-token — issue admin secret for JWT-authenticated admin ──
-router.get("/auth-token", async (req, res) => {
+router.get('/auth-token', async (req, res) => {
   try {
     const { getUserFromToken } = req.app.locals;
     const user = await getUserFromToken(req);
-    if (!user) return res.status(401).json({ error: "Not authenticated" });
-    const adminEmail = (
-      process.env.ADMIN_EMAIL || "adrianenc11@gmail.com"
-    ).toLowerCase();
+    if (!user) return res.status(401).json({ error: 'Not authenticated' });
+    const adminEmail = (process.env.ADMIN_EMAIL || 'adrianenc11@gmail.com').toLowerCase();
     if (user.email?.toLowerCase() !== adminEmail) {
-      return res.status(403).json({ error: "Not admin" });
+      return res.status(403).json({ error: 'Not admin' });
     }
-    const secret = (process.env.ADMIN_SECRET_KEY || "").trim();
-    if (!secret)
-      return res.status(500).json({ error: "Admin secret not configured" });
-    logger.info(
-      { component: "Admin" },
-      "Admin secret issued via JWT for " + user.email,
-    );
+    const secret = (process.env.ADMIN_SECRET_KEY || '').trim();
+    if (!secret) return res.status(500).json({ error: 'Admin secret not configured' });
+    logger.info({ component: 'Admin' }, 'Admin secret issued via JWT for ' + user.email);
     return res.json({ secret });
   } catch (e) {
-    logger.warn({ component: "Admin", err: e.message }, "auth-token error");
-    return res.status(500).json({ error: "Auth error" });
+    logger.warn({ component: 'Admin', err: e.message }, 'auth-token error');
+    return res.status(500).json({ error: 'Auth error' });
   }
 });
 
 // ── Public: User Feedback (no admin required) ──
-router.post("/feedback", (req, res) => {
+router.post('/feedback', (req, res) => {
   const entry = sprint2.recordFeedback({
     userId: req.body.userId,
     messageId: req.body.messageId,
@@ -141,63 +121,54 @@ router.post("/feedback", (req, res) => {
     comment: req.body.comment,
     avatar: req.body.avatar,
   });
-  abTest.recordFeedback(
-    req.body.userId,
-    req.body.type === "up" ? "thumbsUp" : "thumbsDown",
-  );
+  abTest.recordFeedback(req.body.userId, req.body.type === 'up' ? 'thumbsUp' : 'thumbsDown');
   res.json({ ok: true, feedback: entry });
 });
 
 // ── Public: Session heartbeat (no admin required) ──
-router.post("/heartbeat", (req, res) => {
-  sprint2.trackSession(req.body.userId || "anon", {
+router.post('/heartbeat', (req, res) => {
+  sprint2.trackSession(req.body.userId || 'anon', {
     email: req.body.email,
     avatar: req.body.avatar,
     page: req.body.page,
     ip: req.ip,
-    userAgent: req.headers["user-agent"],
+    userAgent: req.headers['user-agent'],
   });
   res.json({ ok: true });
 });
 
 // ── Public: Bookmarks (no admin required) ──
-router.post("/bookmarks", (req, res) =>
-  res.json(qw.addBookmark(req.body.userId || "anon", req.body)),
-);
-router.get("/bookmarks/:userId", (req, res) =>
-  res.json(qw.getBookmarks(req.params.userId)),
-);
-router.delete("/bookmarks/:userId/:id", (req, res) => {
+router.post('/bookmarks', (req, res) => res.json(qw.addBookmark(req.body.userId || 'anon', req.body)));
+router.get('/bookmarks/:userId', (req, res) => res.json(qw.getBookmarks(req.params.userId)));
+router.delete('/bookmarks/:userId/:id', (req, res) => {
   qw.deleteBookmark(req.params.userId, req.params.id);
   res.json({ ok: true });
 });
 
 // ── Public: Templates (no admin required) ──
-router.get("/templates", (_req, res) => res.json(qw.getTemplates()));
-router.get("/templates/:id", (req, res) => {
+router.get('/templates', (_req, res) => res.json(qw.getTemplates()));
+router.get('/templates/:id', (req, res) => {
   const t = qw.getTemplate(req.params.id);
-  t ? res.json(t) : res.status(404).json({ error: "Not found" });
+  t ? res.json(t) : res.status(404).json({ error: 'Not found' });
 });
 
 router.use(requireAdmin);
 
 // ── SSE Notifications Stream (must be BEFORE JSON middleware) ──
-router.get("/notifications/stream", sseHandler);
-router.get("/notifications", (req, res) =>
-  res.json({ notifications: getRecent(30) }),
-);
+router.get('/notifications/stream', sseHandler);
+router.get('/notifications', (req, res) => res.json({ notifications: getRecent(30) }));
 
 // ── Log ALL admin actions to Supabase ──
 router.use(async (req, res, next) => {
-  if (["POST", "PUT", "DELETE", "PATCH"].includes(req.method)) {
+  if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(req.method)) {
     const { supabaseAdmin } = req.app.locals;
     if (supabaseAdmin) {
       try {
-        await supabaseAdmin.from("admin_logs").insert({
-          action: req.method + " " + req.path,
+        await supabaseAdmin.from('admin_logs').insert({
+          action: req.method + ' ' + req.path,
           details: JSON.stringify({ body: req.body, params: req.params }),
-          admin_id: req.adminUser?.id || "admin",
-          source: "admin_panel",
+          admin_id: req.adminUser?.id || 'admin',
+          source: 'admin_panel',
           created_at: new Date().toISOString(),
         });
       } catch {
@@ -211,11 +182,10 @@ router.use(async (req, res, next) => {
 // ══════════════════════════════════════════════════════════
 // GET /api/admin/brain — Brain diagnostic
 // ══════════════════════════════════════════════════════════
-router.get("/brain", async (req, res) => {
+router.get('/brain', async (req, res) => {
   try {
     const { brain, supabaseAdmin } = req.app.locals;
-    if (!brain)
-      return res.json({ toolStats: {}, toolErrors: {}, providers: {} });
+    if (!brain) return res.json({ toolStats: {}, toolErrors: {}, providers: {} });
 
     // Get REAL conversation count from DB (not RAM which resets on deploy)
     let conversationCount = brain.conversationCount || 0;
@@ -223,13 +193,11 @@ router.get("/brain", async (req, res) => {
     if (supabaseAdmin) {
       try {
         const { count: convCount } = await supabaseAdmin
-          .from("conversations")
-          .select("id", { count: "exact", head: true });
+          .from('conversations')
+          .select('id', { count: 'exact', head: true });
         conversationCount = convCount || 0;
 
-        const { count: msgCount } = await supabaseAdmin
-          .from("messages")
-          .select("id", { count: "exact", head: true });
+        const { count: msgCount } = await supabaseAdmin.from('messages').select('id', { count: 'exact', head: true });
         totalMessages = msgCount || 0;
       } catch {
         /* tables might not exist */
@@ -257,10 +225,7 @@ router.get("/brain", async (req, res) => {
       strategies: brain.strategies || {},
     });
   } catch {
-    logger.error(
-      { component: "Admin", err: e.message },
-      "Brain diagnostic failed",
-    );
+    logger.error({ component: 'Admin', err: e.message }, 'Brain diagnostic failed');
     res.status(500).json({ error: e.message });
   }
 });
@@ -268,12 +233,12 @@ router.get("/brain", async (req, res) => {
 // ══════════════════════════════════════════════════════════
 // POST /api/admin/reset — Reset brain tools
 // ══════════════════════════════════════════════════════════
-router.post("/reset", (req, res) => {
+router.post('/reset', (req, res) => {
   const { brain } = req.app.locals;
   const { tool } = req.body;
-  if (!brain) return res.json({ success: false, error: "No brain instance" });
+  if (!brain) return res.json({ success: false, error: 'No brain instance' });
 
-  if (tool === "all" || !tool) {
+  if (tool === 'all' || !tool) {
     brain.toolStats = {
       search: 0,
       weather: 0,
@@ -298,13 +263,13 @@ router.post("/reset", (req, res) => {
     brain.toolStats[tool] = 0;
     if (brain.toolErrors[tool] !== undefined) brain.toolErrors[tool] = 0;
   }
-  res.json({ success: true, tool: tool || "all" });
+  res.json({ success: true, tool: tool || 'all' });
 });
 
 // ══════════════════════════════════════════════════════════
 // GET /api/admin/costs — AI cost reports
 // ══════════════════════════════════════════════════════════
-router.get("/costs", async (req, res) => {
+router.get('/costs', async (req, res) => {
   try {
     const { supabaseAdmin } = req.app.locals;
     if (!supabaseAdmin)
@@ -316,14 +281,14 @@ router.get("/costs", async (req, res) => {
         totalMonth: 0,
       });
 
-    const today = new Date().toISOString().split("T")[0];
-    const monthStart = today.substring(0, 7) + "-01";
+    const today = new Date().toISOString().split('T')[0];
+    const monthStart = today.substring(0, 7) + '-01';
 
     // By provider this month
     const { data: providerData } = await supabaseAdmin
-      .from("ai_costs")
-      .select("provider, tokens_in, tokens_out, cost_usd, created_at")
-      .gte("created_at", monthStart + "T00:00:00Z");
+      .from('ai_costs')
+      .select('provider, tokens_in, tokens_out, cost_usd, created_at')
+      .gte('created_at', monthStart + 'T00:00:00Z');
 
     const byProvider = {};
     (providerData || []).forEach((r) => {
@@ -352,9 +317,9 @@ router.get("/costs", async (req, res) => {
     });
 
     const { data: userData } = await supabaseAdmin
-      .from("ai_costs")
-      .select("user_id, provider, cost_usd")
-      .gte("created_at", monthStart + "T00:00:00Z");
+      .from('ai_costs')
+      .select('user_id, provider, cost_usd')
+      .gte('created_at', monthStart + 'T00:00:00Z');
 
     (userData || []).forEach((r) => {
       if (!byUser[r.user_id])
@@ -366,8 +331,7 @@ router.get("/costs", async (req, res) => {
         };
       byUser[r.user_id].requests++;
       byUser[r.user_id].cost_usd += parseFloat(r.cost_usd) || 0;
-      byUser[r.user_id].providers[r.provider] =
-        (byUser[r.user_id].providers[r.provider] || 0) + 1;
+      byUser[r.user_id].providers[r.provider] = (byUser[r.user_id].providers[r.provider] || 0) + 1;
     });
 
     const sortedUsers = Object.values(byUser)
@@ -377,23 +341,19 @@ router.get("/costs", async (req, res) => {
         user_id: u.user_id,
         requests: u.requests,
         cost_usd: u.cost_usd,
-        top_provider:
-          Object.entries(u.providers).sort((a, b) => b[1] - a[1])[0]?.[0] ||
-          "—",
+        top_provider: Object.entries(u.providers).sort((a, b) => b[1] - a[1])[0]?.[0] || '—',
       }));
 
     // Daily costs (last 7 days)
-    const weekAgo = new Date(Date.now() - 7 * 86400000)
-      .toISOString()
-      .split("T")[0];
+    const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0];
     const { data: dailyData } = await supabaseAdmin
-      .from("ai_costs")
-      .select("cost_usd, created_at")
-      .gte("created_at", weekAgo + "T00:00:00Z");
+      .from('ai_costs')
+      .select('cost_usd, created_at')
+      .gte('created_at', weekAgo + 'T00:00:00Z');
 
     const daily = {};
     (dailyData || []).forEach((r) => {
-      const day = r.created_at.split("T")[0];
+      const day = r.created_at.split('T')[0];
       daily[day] = (daily[day] || 0) + (parseFloat(r.cost_usd) || 0);
     });
     const dailyArr = Object.entries(daily)
@@ -404,10 +364,7 @@ router.get("/costs", async (req, res) => {
     const totalToday = (dailyData || [])
       .filter((r) => r.created_at.startsWith(today))
       .reduce((s, r) => s + (parseFloat(r.cost_usd) || 0), 0);
-    const totalMonth = Object.values(byProvider).reduce(
-      (s, p) => s + p.cost_usd,
-      0,
-    );
+    const totalMonth = Object.values(byProvider).reduce((s, p) => s + p.cost_usd, 0);
 
     res.json({
       byProvider: Object.values(byProvider),
@@ -417,7 +374,7 @@ router.get("/costs", async (req, res) => {
       totalMonth,
     });
   } catch {
-    logger.error({ component: "Admin", err: e.message }, "Costs query failed");
+    logger.error({ component: 'Admin', err: e.message }, 'Costs query failed');
     res.json({
       byProvider: [],
       byUser: [],
@@ -431,7 +388,7 @@ router.get("/costs", async (req, res) => {
 // ══════════════════════════════════════════════════════════
 // GET /api/admin/traffic — Page views
 // ══════════════════════════════════════════════════════════
-router.get("/traffic", async (req, res) => {
+router.get('/traffic', async (req, res) => {
   try {
     const { supabaseAdmin } = req.app.locals;
     if (!supabaseAdmin)
@@ -443,43 +400,41 @@ router.get("/traffic", async (req, res) => {
         daily: [],
       });
 
-    const today = new Date().toISOString().split("T")[0];
+    const today = new Date().toISOString().split('T')[0];
     // Internal IPs/paths to exclude from real traffic
-    const INTERNAL_IPS = ["127.0.0.1", "::1", "::ffff:127.0.0.1"];
-    const _INTERNAL_PATHS = ["/health", "/metrics"];
+    const INTERNAL_IPS = ['127.0.0.1', '::1', '::ffff:127.0.0.1'];
+    const _INTERNAL_PATHS = ['/health', '/metrics'];
 
     // Recent 50 REAL visits (exclude internal)
     const { data: recent } = await supabaseAdmin
-      .from("page_views")
-      .select("*")
-      .not("ip", "in", "(" + INTERNAL_IPS.join(",") + ")")
-      .order("created_at", { ascending: false })
+      .from('page_views')
+      .select('*')
+      .not('ip', 'in', '(' + INTERNAL_IPS.join(',') + ')')
+      .order('created_at', { ascending: false })
       .limit(50);
 
     // Today stats — REAL visitors only
     const { data: todayData, count: todayCount } = await supabaseAdmin
-      .from("page_views")
-      .select("ip", { count: "exact", head: false })
-      .gte("created_at", today + "T00:00:00Z")
-      .not("ip", "in", "(" + INTERNAL_IPS.join(",") + ")")
+      .from('page_views')
+      .select('ip', { count: 'exact', head: false })
+      .gte('created_at', today + 'T00:00:00Z')
+      .not('ip', 'in', '(' + INTERNAL_IPS.join(',') + ')')
       .limit(10000);
 
     const uniqueIps = new Set((todayData || []).map((d) => d.ip));
 
     // Daily traffic (last 7 days) — exclude internal
-    const weekAgo = new Date(Date.now() - 7 * 86400000)
-      .toISOString()
-      .split("T")[0];
+    const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0];
     const { data: weekData } = await supabaseAdmin
-      .from("page_views")
-      .select("created_at, ip")
-      .gte("created_at", weekAgo + "T00:00:00Z")
-      .not("ip", "in", "(" + INTERNAL_IPS.join(",") + ")")
+      .from('page_views')
+      .select('created_at, ip')
+      .gte('created_at', weekAgo + 'T00:00:00Z')
+      .not('ip', 'in', '(' + INTERNAL_IPS.join(',') + ')')
       .limit(10000);
 
     const dailyCounts = {};
     (weekData || []).forEach((r) => {
-      const day = r.created_at.split("T")[0];
+      const day = r.created_at.split('T')[0];
       dailyCounts[day] = (dailyCounts[day] || 0) + 1;
     });
     const daily = Object.entries(dailyCounts)
@@ -489,7 +444,7 @@ router.get("/traffic", async (req, res) => {
     // Active connections
     let activeConnections = 0;
     try {
-      const { activeConnections: ac } = require("../metrics");
+      const { activeConnections: ac } = require('../metrics');
       activeConnections = (await ac.get()).values[0]?.value || 0;
     } catch {
       /* metrics not available */
@@ -499,9 +454,9 @@ router.get("/traffic", async (req, res) => {
     let totalAllTime = 0;
     try {
       const { count: allCount } = await supabaseAdmin
-        .from("page_views")
-        .select("id", { count: "exact", head: true })
-        .not("ip", "in", "(" + INTERNAL_IPS.join(",") + ")");
+        .from('page_views')
+        .select('id', { count: 'exact', head: true })
+        .not('ip', 'in', '(' + INTERNAL_IPS.join(',') + ')');
       totalAllTime = allCount || 0;
     } catch {
       /* ok */
@@ -516,10 +471,7 @@ router.get("/traffic", async (req, res) => {
       daily,
     });
   } catch {
-    logger.error(
-      { component: "Admin", err: e.message },
-      "Traffic query failed",
-    );
+    logger.error({ component: 'Admin', err: e.message }, 'Traffic query failed');
     res.json({
       recent: [],
       uniqueToday: 0,
@@ -534,14 +486,11 @@ router.get("/traffic", async (req, res) => {
 // ══════════════════════════════════════════════════════════
 // DELETE /api/admin/traffic/:id — Delete a page view
 // ══════════════════════════════════════════════════════════
-router.delete("/traffic/:id", async (req, res) => {
+router.delete('/traffic/:id', async (req, res) => {
   try {
     const { supabaseAdmin } = req.app.locals;
-    if (!supabaseAdmin) return res.status(500).json({ error: "No DB" });
-    const { error } = await supabaseAdmin
-      .from("page_views")
-      .delete()
-      .eq("id", req.params.id);
+    if (!supabaseAdmin) return res.status(500).json({ error: 'No DB' });
+    const { error } = await supabaseAdmin.from('page_views').delete().eq('id', req.params.id);
     if (error) return res.status(500).json({ error: error.message });
     res.json({ ok: true });
   } catch {
@@ -552,7 +501,7 @@ router.delete("/traffic/:id", async (req, res) => {
 // ══════════════════════════════════════════════════════════
 // GET /api/admin/users — User list
 // ══════════════════════════════════════════════════════════
-router.get("/users", async (req, res) => {
+router.get('/users', async (req, res) => {
   try {
     const { supabaseAdmin } = req.app.locals;
     if (!supabaseAdmin) return res.json({ users: [] });
@@ -566,8 +515,8 @@ router.get("/users", async (req, res) => {
     const users = (data?.users || []).map((u) => ({
       id: u.id,
       email: u.email,
-      name: u.user_metadata?.full_name || "—",
-      plan: u.user_metadata?.plan || "free",
+      name: u.user_metadata?.full_name || '—',
+      plan: u.user_metadata?.plan || 'free',
       role: u.role,
       created_at: u.created_at,
       last_sign_in_at: u.last_sign_in_at,
@@ -575,10 +524,7 @@ router.get("/users", async (req, res) => {
 
     // Get message counts
     try {
-      const { data: usage } = await supabaseAdmin
-        .from("usage")
-        .select("user_id, count")
-        .eq("type", "chat");
+      const { data: usage } = await supabaseAdmin.from('usage').select('user_id, count').eq('type', 'chat');
 
       const counts = {};
       (usage || []).forEach((u) => {
@@ -593,7 +539,7 @@ router.get("/users", async (req, res) => {
 
     res.json({ users });
   } catch {
-    logger.error({ component: "Admin", err: e.message }, "Users query failed");
+    logger.error({ component: 'Admin', err: e.message }, 'Users query failed');
     res.json({ users: [] });
   }
 });
@@ -601,26 +547,25 @@ router.get("/users", async (req, res) => {
 // ══════════════════════════════════════════════════════════
 // DELETE /api/admin/users/:id — Delete user completely
 // ══════════════════════════════════════════════════════════
-router.delete("/users/:id", async (req, res) => {
+router.delete('/users/:id', async (req, res) => {
   try {
     const { supabaseAdmin } = req.app.locals;
-    if (!supabaseAdmin) return res.status(500).json({ error: "No database" });
+    if (!supabaseAdmin) return res.status(500).json({ error: 'No database' });
 
     const userId = req.params.id;
-    if (!userId) return res.status(400).json({ error: "User ID required" });
+    if (!userId) return res.status(400).json({ error: 'User ID required' });
 
     // Get user info before deletion (for logging)
-    const { data: userData } =
-      await supabaseAdmin.auth.admin.getUserById(userId);
-    const email = userData?.user?.email || "unknown";
+    const { data: userData } = await supabaseAdmin.auth.admin.getUserById(userId);
+    const email = userData?.user?.email || 'unknown';
 
     // Clean up related data (ignore errors — tables may not exist)
     const tables = [
-      { table: "conversations", column: "user_id" },
-      { table: "user_preferences", column: "user_id" },
-      { table: "subscriptions", column: "user_id" },
-      { table: "referrals", column: "user_id" },
-      { table: "brain_profiles", column: "user_id" },
+      { table: 'conversations', column: 'user_id' },
+      { table: 'user_preferences', column: 'user_id' },
+      { table: 'subscriptions', column: 'user_id' },
+      { table: 'referrals', column: 'user_id' },
+      { table: 'brain_profiles', column: 'user_id' },
     ];
     for (const t of tables) {
       try {
@@ -636,22 +581,19 @@ router.delete("/users/:id", async (req, res) => {
 
     // Log the action
     try {
-      await supabaseAdmin.from("admin_logs").insert({
-        action: "delete_user",
+      await supabaseAdmin.from('admin_logs').insert({
+        action: 'delete_user',
         details: { userId, email },
-        admin_id: req.adminUser?.id || "admin",
+        admin_id: req.adminUser?.id || 'admin',
       });
     } catch {
       /* ignored */
     }
 
-    logger.info(
-      { component: "Admin", userId, email },
-      `🗑️ User ${email} deleted`,
-    );
+    logger.info({ component: 'Admin', userId, email }, `🗑️ User ${email} deleted`);
     res.json({ success: true, deleted: email });
   } catch {
-    logger.error({ component: "Admin", err: e.message }, "Delete user failed");
+    logger.error({ component: 'Admin', err: e.message }, 'Delete user failed');
     res.status(500).json({ error: e.message });
   }
 });
@@ -659,7 +601,7 @@ router.delete("/users/:id", async (req, res) => {
 // ══════════════════════════════════════════════════════════
 // GET /api/admin/revenue — Revenue stats
 // ══════════════════════════════════════════════════════════
-router.get("/revenue", async (req, res) => {
+router.get('/revenue', async (req, res) => {
   try {
     const { supabaseAdmin } = req.app.locals;
     if (!supabaseAdmin)
@@ -671,20 +613,17 @@ router.get("/revenue", async (req, res) => {
       });
 
     const { data: subs } = await supabaseAdmin
-      .from("subscriptions")
-      .select("user_id, plan, status, amount, created_at")
-      .eq("status", "active");
+      .from('subscriptions')
+      .select('user_id, plan, status, amount, created_at')
+      .eq('status', 'active');
 
     const subscribers = (subs || []).length;
-    const mrr = (subs || []).reduce(
-      (s, sub) => s + (parseFloat(sub.amount) || 0),
-      0,
-    );
+    const mrr = (subs || []).reduce((s, sub) => s + (parseFloat(sub.amount) || 0), 0);
 
     const { data: payments } = await supabaseAdmin
-      .from("payments")
-      .select("user_id, amount, plan, created_at")
-      .order("created_at", { ascending: false })
+      .from('payments')
+      .select('user_id, amount, plan, created_at')
+      .order('created_at', { ascending: false })
       .limit(20);
 
     res.json({
@@ -694,10 +633,7 @@ router.get("/revenue", async (req, res) => {
       recentPayments: payments || [],
     });
   } catch {
-    logger.error(
-      { component: "Admin", err: e.message },
-      "Revenue query failed",
-    );
+    logger.error({ component: 'Admin', err: e.message }, 'Revenue query failed');
     res.json({ subscribers: 0, mrr: 0, churnRate: 0, recentPayments: [] });
   }
 });
@@ -706,7 +642,7 @@ router.get("/revenue", async (req, res) => {
 // GET /api/admin/ai-status — Live status of all AI providers
 // Connected to Brain + Supabase ai_costs
 // ══════════════════════════════════════════════════════════
-router.get("/ai-status", async (req, res) => {
+router.get('/ai-status', async (req, res) => {
   try {
     const { brain, supabaseAdmin } = req.app.locals;
 
@@ -714,78 +650,73 @@ router.get("/ai-status", async (req, res) => {
     const providerPlans = {
       OpenAI: {
         key: !!brain?.openaiKey,
-        tier: "pay-as-you-go",
+        tier: 'pay-as-you-go',
         freeQuota: 0,
-        unit: "tokens",
-        pricingUrl:
-          "https://platform.openai.com/settings/organization/billing/overview",
+        unit: 'tokens',
+        pricingUrl: 'https://platform.openai.com/settings/organization/billing/overview',
       },
       Google: {
         key: !!(process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY),
-        tier: "free",
+        tier: 'free',
         freeQuota: 1500,
-        unit: "req/zi",
-        pricingUrl: "https://aistudio.google.com/apikey",
+        unit: 'req/zi',
+        pricingUrl: 'https://aistudio.google.com/apikey',
       },
       Groq: {
         key: !!brain?.groqKey,
-        tier: "free",
+        tier: 'free',
         freeQuota: 14400,
-        unit: "req/zi",
-        pricingUrl: "https://console.groq.com/settings/usage",
+        unit: 'req/zi',
+        pricingUrl: 'https://console.groq.com/settings/usage',
       },
       Perplexity: {
         key: !!brain?.perplexityKey,
-        tier: "pay-as-you-go",
+        tier: 'pay-as-you-go',
         freeQuota: 0,
-        unit: "requests",
-        pricingUrl: "https://www.perplexity.ai/settings/api",
+        unit: 'requests',
+        pricingUrl: 'https://www.perplexity.ai/settings/api',
       },
       Together: {
         key: !!brain?.togetherKey,
-        tier: "pay-as-you-go",
+        tier: 'pay-as-you-go',
         freeQuota: 0,
-        unit: "tokens",
-        pricingUrl: "https://api.together.ai/settings/billing",
+        unit: 'tokens',
+        pricingUrl: 'https://api.together.ai/settings/billing',
       },
       ElevenLabs: {
         key: !!process.env.ELEVENLABS_API_KEY,
-        tier: "free",
+        tier: 'free',
         freeQuota: 10000,
-        unit: "caractere/lună",
-        pricingUrl: "https://elevenlabs.io/subscription",
+        unit: 'caractere/lună',
+        pricingUrl: 'https://elevenlabs.io/subscription',
       },
       DeepSeek: {
         key: !!process.env.DEEPSEEK_API_KEY,
-        tier: "pay-as-you-go",
+        tier: 'pay-as-you-go',
         freeQuota: 0,
-        unit: "tokens",
-        pricingUrl: "https://platform.deepseek.com/usage",
+        unit: 'tokens',
+        pricingUrl: 'https://platform.deepseek.com/usage',
       },
       Tavily: {
         key: !!brain?.tavilyKey,
-        tier: "free",
+        tier: 'free',
         freeQuota: 1000,
-        unit: "căutări/lună",
-        pricingUrl: "https://tavily.com/#pricing",
+        unit: 'căutări/lună',
+        pricingUrl: 'https://tavily.com/#pricing',
       },
       Serper: {
         key: !!brain?.serperKey,
-        tier: "free",
+        tier: 'free',
         freeQuota: 2500,
-        unit: "căutări/lună",
-        pricingUrl: "https://serper.dev/dashboard",
+        unit: 'căutări/lună',
+        pricingUrl: 'https://serper.dev/dashboard',
       },
     };
 
     // Month tracking
     const now = new Date();
-    const monthStart = now.toISOString().substring(0, 7) + "-01";
-    const daysInMonth = new Date(
-      now.getFullYear(),
-      now.getMonth() + 1,
-      0,
-    ).getDate();
+    const monthStart = now.toISOString().substring(0, 7) + '-01';
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
     const dayOfMonth = now.getDate();
     const daysLeft = daysInMonth - dayOfMonth;
 
@@ -795,9 +726,9 @@ router.get("/ai-status", async (req, res) => {
     if (supabaseAdmin) {
       try {
         const { data } = await supabaseAdmin
-          .from("ai_costs")
-          .select("provider, cost_usd")
-          .gte("created_at", monthStart + "T00:00:00Z");
+          .from('ai_costs')
+          .select('provider, cost_usd')
+          .gte('created_at', monthStart + 'T00:00:00Z');
         (data || []).forEach((r) => {
           const pName = r.provider;
           if (!costByProvider[pName]) costByProvider[pName] = 0;
@@ -814,9 +745,7 @@ router.get("/ai-status", async (req, res) => {
     const creditByProvider = {};
     if (supabaseAdmin) {
       try {
-        const { data: credits } = await supabaseAdmin
-          .from("provider_credits")
-          .select("provider, credit_usd");
+        const { data: credits } = await supabaseAdmin.from('provider_credits').select('provider, credit_usd');
         (credits || []).forEach((c) => {
           creditByProvider[c.provider] = parseFloat(c.credit_usd) || 0;
         });
@@ -826,37 +755,31 @@ router.get("/ai-status", async (req, res) => {
     }
 
     const providers = Object.entries(providerPlans).map(([name, plan]) => {
-      const costMonth =
-        costByProvider[name.toLowerCase()] || costByProvider[name] || 0;
-      const requests =
-        requestsByProvider[name.toLowerCase()] || requestsByProvider[name] || 0;
+      const costMonth = costByProvider[name.toLowerCase()] || costByProvider[name] || 0;
+      const requests = requestsByProvider[name.toLowerCase()] || requestsByProvider[name] || 0;
       const creditLimit = creditByProvider[name] || 0;
       const remaining = Math.max(0, creditLimit - costMonth);
 
       // Alert level
-      let alertLevel = "green";
-      let alertMessage = "";
+      let alertLevel = 'green';
+      let alertMessage = '';
       if (creditLimit > 0) {
         const usedPct = (costMonth / creditLimit) * 100;
         if (usedPct >= 90) {
-          alertLevel = "red";
-          alertMessage = "⚠️ Credit aproape epuizat! Reîncarcă urgent.";
+          alertLevel = 'red';
+          alertMessage = '⚠️ Credit aproape epuizat! Reîncarcă urgent.';
         } else if (usedPct >= 70) {
-          alertLevel = "yellow";
-          alertMessage = "⚡ Consum ridicat — monitorizează.";
+          alertLevel = 'yellow';
+          alertMessage = '⚡ Consum ridicat — monitorizează.';
         } else {
-          alertMessage = "✅ Credit suficient.";
+          alertMessage = '✅ Credit suficient.';
         }
-      } else if (plan.tier === "free") {
-        alertMessage =
-          "🆓 Free tier — " + plan.freeQuota.toLocaleString() + " " + plan.unit;
+      } else if (plan.tier === 'free') {
+        alertMessage = '🆓 Free tier — ' + plan.freeQuota.toLocaleString() + ' ' + plan.unit;
       } else {
-        alertLevel = costMonth > 1 ? "yellow" : "green";
+        alertLevel = costMonth > 1 ? 'yellow' : 'green';
         alertMessage =
-          "💳 Pay-as-you-go — " +
-          (costMonth > 0
-            ? "$" + costMonth.toFixed(4) + " consumat"
-            : "fără consum");
+          '💳 Pay-as-you-go — ' + (costMonth > 0 ? '$' + costMonth.toFixed(4) + ' consumat' : 'fără consum');
       }
 
       // Projected monthly cost
@@ -891,7 +814,7 @@ router.get("/ai-status", async (req, res) => {
       },
     });
   } catch {
-    logger.error({ component: "Admin", err: e.message }, "AI status failed");
+    logger.error({ component: 'Admin', err: e.message }, 'AI status failed');
     res.json({ providers: [], month: {} });
   }
 });
@@ -899,27 +822,25 @@ router.get("/ai-status", async (req, res) => {
 // ══════════════════════════════════════════════════════════
 // POST /api/admin/provider-credit — Update credit for a provider
 // ══════════════════════════════════════════════════════════
-router.post("/provider-credit", async (req, res) => {
+router.post('/provider-credit', async (req, res) => {
   try {
     const { supabaseAdmin } = req.app.locals;
-    if (!supabaseAdmin) return res.status(500).json({ error: "No DB" });
+    if (!supabaseAdmin) return res.status(500).json({ error: 'No DB' });
     const { provider, amount } = req.body;
-    if (!provider || amount === null)
-      return res.status(400).json({ error: "provider and amount required" });
+    if (!provider || amount === null) return res.status(400).json({ error: 'provider and amount required' });
 
     const credit = parseFloat(amount);
-    if (isNaN(credit) || credit < 0)
-      return res.status(400).json({ error: "Invalid amount" });
+    if (isNaN(credit) || credit < 0) return res.status(400).json({ error: 'Invalid amount' });
 
     // Upsert into provider_credits
-    const { error } = await supabaseAdmin.from("provider_credits").upsert(
+    const { error } = await supabaseAdmin.from('provider_credits').upsert(
       {
         provider,
         credit_usd: credit,
         updated_at: new Date().toISOString(),
-        updated_by: "admin",
+        updated_by: 'admin',
       },
-      { onConflict: "provider" },
+      { onConflict: 'provider' }
     );
 
     if (error) return res.status(500).json({ error: error.message });
@@ -933,15 +854,15 @@ router.post("/provider-credit", async (req, res) => {
 // CRUD /api/admin/codes — Admin codes management
 // Connected to Supabase admin_codes table
 // ══════════════════════════════════════════════════════════
-router.get("/codes", async (req, res) => {
+router.get('/codes', async (req, res) => {
   try {
     const { supabaseAdmin } = req.app.locals;
     if (!supabaseAdmin) return res.json({ codes: [] });
 
     const { data } = await supabaseAdmin
-      .from("admin_codes")
-      .select("*")
-      .order("created_at", { ascending: false })
+      .from('admin_codes')
+      .select('*')
+      .order('created_at', { ascending: false })
       .limit(50);
 
     res.json({ codes: data || [] });
@@ -950,36 +871,36 @@ router.get("/codes", async (req, res) => {
   }
 });
 
-router.post("/codes", async (req, res) => {
+router.post('/codes', async (req, res) => {
   try {
     const { supabaseAdmin } = req.app.locals;
-    if (!supabaseAdmin) return res.status(500).json({ error: "No DB" });
+    if (!supabaseAdmin) return res.status(500).json({ error: 'No DB' });
 
     const { type } = req.body;
-    const crypto = require("crypto");
-    const code = crypto.randomBytes(4).toString("hex").toUpperCase();
+    const crypto = require('crypto');
+    const code = crypto.randomBytes(4).toString('hex').toUpperCase();
 
-    const { error } = await supabaseAdmin.from("admin_codes").insert({
+    const { error } = await supabaseAdmin.from('admin_codes').insert({
       code,
-      type: type || "admin",
+      type: type || 'admin',
       uses_remaining: 1,
       created_at: new Date().toISOString(),
     });
 
     if (error) return res.status(500).json({ error: error.message });
-    logger.info({ component: "Admin", code, type }, "Admin code generated");
+    logger.info({ component: 'Admin', code, type }, 'Admin code generated');
     res.json({ code, type });
   } catch {
     res.status(500).json({ error: e.message });
   }
 });
 
-router.delete("/codes/:id", async (req, res) => {
+router.delete('/codes/:id', async (req, res) => {
   try {
     const { supabaseAdmin } = req.app.locals;
-    if (!supabaseAdmin) return res.status(500).json({ error: "No DB" });
+    if (!supabaseAdmin) return res.status(500).json({ error: 'No DB' });
 
-    await supabaseAdmin.from("admin_codes").delete().eq("id", req.params.id);
+    await supabaseAdmin.from('admin_codes').delete().eq('id', req.params.id);
     res.json({ success: true });
   } catch {
     res.status(500).json({ error: e.message });
@@ -990,51 +911,47 @@ router.delete("/codes/:id", async (req, res) => {
 // POST /api/admin/refund — Refund user subscription
 // Cancels subscription in Supabase + logs reason
 // ══════════════════════════════════════════════════════════
-router.post("/refund", async (req, res) => {
+router.post('/refund', async (req, res) => {
   try {
     const { supabaseAdmin } = req.app.locals;
-    if (!supabaseAdmin) return res.status(500).json({ error: "No DB" });
+    if (!supabaseAdmin) return res.status(500).json({ error: 'No DB' });
 
     const { userId, reason } = req.body;
-    if (!userId) return res.status(400).json({ error: "userId required" });
+    if (!userId) return res.status(400).json({ error: 'userId required' });
 
     // Get subscription details
     const { data: sub } = await supabaseAdmin
-      .from("subscriptions")
-      .select("*")
-      .eq("user_id", userId)
-      .eq("status", "active")
+      .from('subscriptions')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('status', 'active')
       .single();
 
-    if (!sub)
-      return res
-        .status(404)
-        .json({ error: "Nicio subscripție activă găsită." });
+    if (!sub) return res.status(404).json({ error: 'Nicio subscripție activă găsită.' });
 
-    const maxRefundDays = parseInt(process.env.REFUND_MAX_DAYS || "15", 10);
-    const billingType =
-      sub.billing_type || (sub.plan_interval === "year" ? "annual" : "monthly");
+    const maxRefundDays = parseInt(process.env.REFUND_MAX_DAYS || '15', 10);
+    const billingType = sub.billing_type || (sub.plan_interval === 'year' ? 'annual' : 'monthly');
     const subStartDate = new Date(sub.created_at);
     const now = new Date();
     const daysSinceStart = Math.floor((now - subStartDate) / 86400000);
 
     let refundAmount = 0;
-    let message = "";
+    let message = '';
 
-    if (billingType === "monthly") {
+    if (billingType === 'monthly') {
       // ── LUNAR: no refund, just cancel ──
       refundAmount = 0;
-      message = "Abonament lunar anulat. Fără rambursare (conform politicii).";
+      message = 'Abonament lunar anulat. Fără rambursare (conform politicii).';
     } else {
       // ── ANUAL: refund diferența lunilor rămase ──
       if (daysSinceStart > maxRefundDays) {
         return res.status(400).json({
           error:
-            "Perioada de refund a expirat! Maxim " +
+            'Perioada de refund a expirat! Maxim ' +
             maxRefundDays +
-            " zile de la activare. Au trecut " +
+            ' zile de la activare. Au trecut ' +
             daysSinceStart +
-            " zile.",
+            ' zile.',
         });
       }
 
@@ -1046,64 +963,54 @@ router.post("/refund", async (req, res) => {
       refundAmount = parseFloat((monthsRemaining * monthlyRate).toFixed(2));
 
       message =
-        "Abonament anual oprit. Luni folosite: " +
+        'Abonament anual oprit. Luni folosite: ' +
         monthsUsed +
-        ". Luni rămase: " +
+        '. Luni rămase: ' +
         monthsRemaining +
-        ". Refund: £" +
+        '. Refund: £' +
         refundAmount.toFixed(2) +
-        " din £" +
+        ' din £' +
         totalAmount.toFixed(2) +
-        ".";
+        '.';
     }
 
     // Cancel subscription
     await supabaseAdmin
-      .from("subscriptions")
+      .from('subscriptions')
       .update({
-        status: "refunded",
+        status: 'refunded',
         cancelled_at: now.toISOString(),
         refund_amount: refundAmount,
-        refund_reason: reason || "Admin refund",
+        refund_reason: reason || 'Admin refund',
       })
-      .eq("user_id", userId);
+      .eq('user_id', userId);
 
     // Update user plan to free
     await supabaseAdmin.auth.admin.updateUserById(userId, {
-      user_metadata: { plan: "free" },
+      user_metadata: { plan: 'free' },
     });
 
     // Process Stripe refund if applicable
-    if (
-      refundAmount > 0 &&
-      process.env.STRIPE_SECRET_KEY &&
-      sub.stripe_subscription_id
-    ) {
+    if (refundAmount > 0 && process.env.STRIPE_SECRET_KEY && sub.stripe_subscription_id) {
       try {
-        const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+        const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
         await stripe.refunds.create({
           payment_intent: sub.stripe_payment_intent,
           amount: Math.round(refundAmount * 100), // pence
-          reason: "requested_by_customer",
+          reason: 'requested_by_customer',
         });
-        message += " (Stripe refund procesat)";
+        message += ' (Stripe refund procesat)';
       } catch (stripeErr) {
-        message +=
-          " (Stripe refund EȘUAT: " +
-          stripeErr.message +
-          " — procesează manual)";
-        logger.error(
-          { component: "Admin", err: stripeErr.message },
-          "Stripe refund failed",
-        );
+        message += ' (Stripe refund EȘUAT: ' + stripeErr.message + ' — procesează manual)';
+        logger.error({ component: 'Admin', err: stripeErr.message }, 'Stripe refund failed');
       }
     }
 
     // Log refund
     await supabaseAdmin
-      .from("admin_logs")
+      .from('admin_logs')
       .insert({
-        action: "refund",
+        action: 'refund',
         user_id: userId,
         details: JSON.stringify({
           reason,
@@ -1115,15 +1022,14 @@ router.post("/refund", async (req, res) => {
         admin_id: req.adminUser?.id,
         created_at: now.toISOString(),
       })
-      .catch(() => {});
+      .catch((err) => {
+        console.error(err);
+      });
 
-    logger.info(
-      { component: "Admin", userId, billingType, refundAmount },
-      "Refund processed",
-    );
+    logger.info({ component: 'Admin', userId, billingType, refundAmount }, 'Refund processed');
     res.json({ success: true, refundAmount, billingType, message });
   } catch {
-    logger.error({ component: "Admin", err: e.message }, "Refund failed");
+    logger.error({ component: 'Admin', err: e.message }, 'Refund failed');
     res.status(500).json({ error: e.message });
   }
 });
@@ -1132,14 +1038,13 @@ router.post("/refund", async (req, res) => {
 // POST /api/admin/upgrade — Upgrade/downgrade user plan
 // Updates Supabase Auth metadata + subscriptions table
 // ══════════════════════════════════════════════════════════
-router.post("/upgrade", async (req, res) => {
+router.post('/upgrade', async (req, res) => {
   try {
     const { supabaseAdmin } = req.app.locals;
-    if (!supabaseAdmin) return res.status(500).json({ error: "No DB" });
+    if (!supabaseAdmin) return res.status(500).json({ error: 'No DB' });
 
     const { userId, plan } = req.body;
-    if (!userId || !plan)
-      return res.status(400).json({ error: "userId and plan required" });
+    if (!userId || !plan) return res.status(400).json({ error: 'userId and plan required' });
 
     // Update user metadata
     const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
@@ -1148,43 +1053,47 @@ router.post("/upgrade", async (req, res) => {
     if (error) return res.status(500).json({ error: error.message });
 
     // Upsert subscription
-    if (plan !== "free") {
+    if (plan !== 'free') {
       await supabaseAdmin
-        .from("subscriptions")
+        .from('subscriptions')
         .upsert(
           {
             user_id: userId,
             plan,
-            status: "active",
-            amount: plan === "premium" ? 29.99 : plan === "pro" ? 9.99 : 0,
+            status: 'active',
+            amount: plan === 'premium' ? 29.99 : plan === 'pro' ? 9.99 : 0,
             created_at: new Date().toISOString(),
           },
-          { onConflict: "user_id" },
+          { onConflict: 'user_id' }
         )
-        .catch(() => {});
+        .catch((err) => {
+          console.error(err);
+        });
     } else {
       await supabaseAdmin
-        .from("subscriptions")
-        .update({ status: "cancelled", cancelled_at: new Date().toISOString() })
-        .eq("user_id", userId)
-        .catch(() => {});
+        .from('subscriptions')
+        .update({ status: 'cancelled', cancelled_at: new Date().toISOString() })
+        .eq('user_id', userId)
+        .catch((err) => {
+          console.error(err);
+        });
     }
 
     // Log upgrade to Supabase
     try {
-      await supabaseAdmin.from("admin_logs").insert({
-        action: "upgrade",
+      await supabaseAdmin.from('admin_logs').insert({
+        action: 'upgrade',
         user_id: userId,
-        details: JSON.stringify({ plan, previous: "unknown" }),
-        admin_id: req.adminUser?.id || "admin",
+        details: JSON.stringify({ plan, previous: 'unknown' }),
+        admin_id: req.adminUser?.id || 'admin',
         created_at: new Date().toISOString(),
       });
     } catch {
       /* ignored */
     }
 
-    logger.info({ component: "Admin", userId, plan }, "User plan updated");
-    res.json({ success: true, message: "Plan actualizat la " + plan + "!" });
+    logger.info({ component: 'Admin', userId, plan }, 'User plan updated');
+    res.json({ success: true, message: 'Plan actualizat la ' + plan + '!' });
   } catch {
     res.status(500).json({ error: e.message });
   }
@@ -1194,42 +1103,36 @@ router.post("/upgrade", async (req, res) => {
 // POST /api/admin/recharge — Recharge AI credits (Stripe)
 // Creates Stripe Checkout Session for £50, logs distribution
 // ══════════════════════════════════════════════════════════
-router.post("/recharge", async (req, res) => {
+router.post('/recharge', async (req, res) => {
   try {
-    const stripe = process.env.STRIPE_SECRET_KEY
-      ? require("stripe")(process.env.STRIPE_SECRET_KEY)
-      : null;
+    const stripe = process.env.STRIPE_SECRET_KEY ? require('stripe')(process.env.STRIPE_SECRET_KEY) : null;
 
     if (stripe) {
       const session = await stripe.checkout.sessions.create({
-        payment_method_types: ["card"],
+        payment_method_types: ['card'],
         line_items: [
           {
             price_data: {
-              currency: "gbp",
+              currency: 'gbp',
               product_data: {
-                name: "KelionAI — AI Credit Recharge",
-                description:
-                  "Top-up for AI API credits (proportional distribution)",
+                name: 'KelionAI — AI Credit Recharge',
+                description: 'Top-up for AI API credits (proportional distribution)',
               },
               unit_amount: CONFIG.rechargeAmountPence,
             },
             quantity: 1,
           },
         ],
-        mode: "payment",
-        success_url: CONFIG.appUrl + "/admin?recharge=success",
-        cancel_url: CONFIG.appUrl + "/admin?recharge=cancelled",
+        mode: 'payment',
+        success_url: CONFIG.appUrl + '/admin?recharge=success',
+        cancel_url: CONFIG.appUrl + '/admin?recharge=cancelled',
         metadata: {
-          type: "ai_recharge",
-          admin_id: req.adminUser?.id || "unknown",
+          type: 'ai_recharge',
+          admin_id: req.adminUser?.id || 'unknown',
         },
       });
 
-      logger.info(
-        { component: "Admin", sessionId: session.id },
-        "Recharge checkout created",
-      );
+      logger.info({ component: 'Admin', sessionId: session.id }, 'Recharge checkout created');
       return res.json({ url: session.url });
     }
 
@@ -1237,24 +1140,25 @@ router.post("/recharge", async (req, res) => {
     const { supabaseAdmin } = req.app.locals;
     if (supabaseAdmin) {
       await supabaseAdmin
-        .from("admin_logs")
+        .from('admin_logs')
         .insert({
-          action: "recharge",
-          details: "£50 AI credit recharge (manual)",
+          action: 'recharge',
+          details: '£50 AI credit recharge (manual)',
           admin_id: req.adminUser?.id,
           created_at: new Date().toISOString(),
         })
-        .catch(() => {});
+        .catch((err) => {
+          console.error(err);
+        });
     }
 
-    logger.info({ component: "Admin" }, "Recharge recorded (no Stripe)");
+    logger.info({ component: 'Admin' }, 'Recharge recorded (no Stripe)');
     res.json({
       success: true,
-      message:
-        "Recharge £50 înregistrată! (fără Stripe — adaugă manual credit pe API providers)",
+      message: 'Recharge £50 înregistrată! (fără Stripe — adaugă manual credit pe API providers)',
     });
   } catch {
-    logger.error({ component: "Admin", err: e.message }, "Recharge failed");
+    logger.error({ component: 'Admin', err: e.message }, 'Recharge failed');
     res.status(500).json({ error: e.message });
   }
 });
@@ -1263,42 +1167,41 @@ router.post("/recharge", async (req, res) => {
 // GET /api/admin/test-tables — Test ALL Supabase tables
 // Runs SELECT on each table, collects errors per table
 // ══════════════════════════════════════════════════════════
-router.get("/test-tables", async (req, res) => {
+router.get('/test-tables', async (req, res) => {
   const { supabaseAdmin } = req.app.locals;
-  if (!supabaseAdmin)
-    return res.status(503).json({ error: "No Supabase connection" });
+  if (!supabaseAdmin) return res.status(503).json({ error: 'No Supabase connection' });
 
   const TABLES = [
     // Etapa 1 — Core (migrate.js existing)
-    "conversations",
-    "messages",
-    "user_preferences",
-    "api_keys",
-    "admin_logs",
-    "trades",
-    "profiles",
-    "media_history",
-    "telegram_users",
-    "whatsapp_users",
-    "whatsapp_messages",
-    "trade_intelligence",
-    "cookie_consents",
-    "metrics_snapshots",
-    "ai_costs",
-    "page_views",
+    'conversations',
+    'messages',
+    'user_preferences',
+    'api_keys',
+    'admin_logs',
+    'trades',
+    'profiles',
+    'media_history',
+    'telegram_users',
+    'whatsapp_users',
+    'whatsapp_messages',
+    'trade_intelligence',
+    'cookie_consents',
+    'metrics_snapshots',
+    'ai_costs',
+    'page_views',
     // Etapa 2 — Newly added to migrate.js
-    "subscriptions",
-    "referrals",
-    "admin_codes",
-    "brain_memory",
-    "learned_facts",
-    "messenger_users",
-    "messenger_messages",
-    "messenger_subscribers",
-    "telegram_messages",
-    "market_candles",
-    "market_learnings",
-    "market_patterns",
+    'subscriptions',
+    'referrals',
+    'admin_codes',
+    'brain_memory',
+    'learned_facts',
+    'messenger_users',
+    'messenger_messages',
+    'messenger_subscribers',
+    'telegram_messages',
+    'market_candles',
+    'market_learnings',
+    'market_patterns',
   ];
 
   const results = [];
@@ -1307,15 +1210,13 @@ router.get("/test-tables", async (req, res) => {
 
   for (const table of TABLES) {
     try {
-      const { _data, error, count } = await supabaseAdmin
-        .from(table)
-        .select("*", { count: "exact", head: true });
+      const { _data, error, count } = await supabaseAdmin.from(table).select('*', { count: 'exact', head: true });
 
       if (error) {
         failed++;
         results.push({
           table,
-          status: "❌ ERROR",
+          status: '❌ ERROR',
           error: error.message,
           code: error.code,
           hint: error.hint || null,
@@ -1324,7 +1225,7 @@ router.get("/test-tables", async (req, res) => {
         passed++;
         results.push({
           table,
-          status: "✅ OK",
+          status: '✅ OK',
           rowCount: count || 0,
         });
       }
@@ -1332,7 +1233,7 @@ router.get("/test-tables", async (req, res) => {
       failed++;
       results.push({
         table,
-        status: "💥 CRASH",
+        status: '💥 CRASH',
         error: e.message,
       });
     }
@@ -1347,7 +1248,7 @@ router.get("/test-tables", async (req, res) => {
       testedAt: new Date().toISOString(),
     },
     results,
-    errors: results.filter((r) => r.status !== "✅ OK"),
+    errors: results.filter((r) => r.status !== '✅ OK'),
   });
 });
 
@@ -1355,126 +1256,101 @@ router.get("/test-tables", async (req, res) => {
 // POST /api/admin/update-social-photos — Set Kelion avatar on social platforms
 // Uses Telegram Bot API + Facebook Graph API
 // ══════════════════════════════════════════════════════════
-router.post("/update-social-photos", async (req, res) => {
-  const fs = require("fs");
-  const path = require("path");
+router.post('/update-social-photos', async (req, res) => {
+  const fs = require('fs');
+  const path = require('path');
   const results = {};
 
   // Load Kelion photo from disk
-  const photoPath = path.join(
-    __dirname,
-    "..",
-    "..",
-    "app",
-    "models",
-    "kelion-reference.png",
-  );
+  const photoPath = path.join(__dirname, '..', '..', 'app', 'models', 'kelion-reference.png');
   if (!fs.existsSync(photoPath)) {
-    return res.status(404).json({ error: "kelion-reference.png not found" });
+    return res.status(404).json({ error: 'kelion-reference.png not found' });
   }
   const photoData = fs.readFileSync(photoPath);
-  logger.info(
-    { component: "Admin", size: photoData.length },
-    "Kelion photo loaded for social update",
-  );
+  logger.info({ component: 'Admin', size: photoData.length }, 'Kelion photo loaded for social update');
 
   // ── 1. Telegram Bot ──
   const telegramToken = process.env.TELEGRAM_BOT_TOKEN;
   if (telegramToken) {
     try {
-      const boundary = "----KelionPhoto" + Date.now();
+      const boundary = '----KelionPhoto' + Date.now();
       const bodyParts = [
         Buffer.from(
-          "--" +
+          '--' +
             boundary +
-            '\r\nContent-Disposition: form-data; name="photo"; filename="kelion.png"\r\nContent-Type: image/png\r\n\r\n',
+            '\r\nContent-Disposition: form-data; name="photo"; filename="kelion.png"\r\nContent-Type: image/png\r\n\r\n'
         ),
         photoData,
-        Buffer.from("\r\n--" + boundary + "--\r\n"),
+        Buffer.from('\r\n--' + boundary + '--\r\n'),
       ];
       const body = Buffer.concat(bodyParts);
 
       // Delete existing photo first (Telegram requires this)
       try {
-        await fetch(
-          "https://api.telegram.org/bot" + telegramToken + "/deleteMyCommands",
-        );
+        await fetch('https://api.telegram.org/bot' + telegramToken + '/deleteMyCommands');
       } catch {
         /* ok */
       }
 
-      const r = await fetch(
-        "https://api.telegram.org/bot" + telegramToken + "/setMyPhoto",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "multipart/form-data; boundary=" + boundary,
-          },
-          body,
+      const r = await fetch('https://api.telegram.org/bot' + telegramToken + '/setMyPhoto', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'multipart/form-data; boundary=' + boundary,
         },
-      );
+        body,
+      });
       const d = await r.json();
-      results.telegram = d.ok
-        ? "✅ Photo updated"
-        : "❌ " + (d.description || JSON.stringify(d));
+      results.telegram = d.ok ? '✅ Photo updated' : '❌ ' + (d.description || JSON.stringify(d));
     } catch {
-      results.telegram = "❌ " + e.message;
+      results.telegram = '❌ ' + e.message;
     }
   } else {
-    results.telegram = "⚠️ No TELEGRAM_BOT_TOKEN";
+    results.telegram = '⚠️ No TELEGRAM_BOT_TOKEN';
   }
 
   // ── 2. Facebook Page ──
-  const fbToken =
-    process.env.FACEBOOK_PAGE_TOKEN || process.env.FB_PAGE_ACCESS_TOKEN;
+  const fbToken = process.env.FACEBOOK_PAGE_TOKEN || process.env.FB_PAGE_ACCESS_TOKEN;
   const fbPageId = process.env.FB_PAGE_ID;
   if (fbToken && fbPageId) {
     try {
-      const boundary = "----KelionPhoto" + Date.now();
+      const boundary = '----KelionPhoto' + Date.now();
       const bodyParts = [
         Buffer.from(
-          "--" +
+          '--' +
             boundary +
-            '\r\nContent-Disposition: form-data; name="source"; filename="kelion.png"\r\nContent-Type: image/png\r\n\r\n',
+            '\r\nContent-Disposition: form-data; name="source"; filename="kelion.png"\r\nContent-Type: image/png\r\n\r\n'
         ),
         photoData,
-        Buffer.from("\r\n--" + boundary + "--\r\n"),
+        Buffer.from('\r\n--' + boundary + '--\r\n'),
       ];
       const body = Buffer.concat(bodyParts);
 
-      const r = await fetch(
-        "https://graph.facebook.com/v21.0/" + fbPageId + "/picture",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "multipart/form-data; boundary=" + boundary,
-            Authorization: "Bearer " + fbToken,
-          },
-          body,
+      const r = await fetch('https://graph.facebook.com/v21.0/' + fbPageId + '/picture', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'multipart/form-data; boundary=' + boundary,
+          Authorization: 'Bearer ' + fbToken,
         },
-      );
+        body,
+      });
       const d = await r.json();
-      results.facebook =
-        d.success || d.id
-          ? "✅ Photo updated"
-          : "❌ " + JSON.stringify(d).substring(0, 200);
+      results.facebook = d.success || d.id ? '✅ Photo updated' : '❌ ' + JSON.stringify(d).substring(0, 200);
     } catch {
-      results.facebook = "❌ " + e.message;
+      results.facebook = '❌ ' + e.message;
     }
   } else {
-    results.facebook = "⚠️ No FB_PAGE_ACCESS_TOKEN or FB_PAGE_ID";
+    results.facebook = '⚠️ No FB_PAGE_ACCESS_TOKEN or FB_PAGE_ID';
   }
 
   // ── 3. Messenger — uses Facebook Page photo automatically ──
-  results.messenger = results.facebook?.startsWith("✅")
-    ? "✅ Uses Facebook Page photo"
-    : "⚠️ Depends on Facebook Page update";
+  results.messenger = results.facebook?.startsWith('✅')
+    ? '✅ Uses Facebook Page photo'
+    : '⚠️ Depends on Facebook Page update';
 
   // ── 4. Instagram — API doesn't support profile photo updates ──
-  results.instagram =
-    "⚠️ Instagram API doesn't support profile photo changes — must be done manually in the app";
+  results.instagram = "⚠️ Instagram API doesn't support profile photo changes — must be done manually in the app";
 
-  logger.info({ component: "Admin", results }, "Social photo update completed");
+  logger.info({ component: 'Admin', results }, 'Social photo update completed');
   res.json({ results });
 });
 
@@ -1484,36 +1360,35 @@ router.post("/update-social-photos", async (req, res) => {
 // GET  /api/admin/audit-hardcoded     → view results
 // POST /api/admin/audit-hardcoded/fix → auto-replace known patterns
 // ══════════════════════════════════════════════════════════════
-const fs = require("fs");
-const auditPath = require("path");
+const fs = require('fs');
+const auditPath = require('path');
 
 const AUDIT_PATTERNS = [
   {
-    name: "Hardcoded URL",
-    regex:
-      /["'`]https?:\/\/(?!(?:api\.|graph\.|cdn\.))[a-z0-9][a-z0-9.-]*\.(app|com|io|net|org|dev|co)[^\s"'`]*/gi,
-    severity: "HIGH",
+    name: 'Hardcoded URL',
+    regex: /["'`]https?:\/\/(?!(?:api\.|graph\.|cdn\.))[a-z0-9][a-z0-9.-]*\.(app|com|io|net|org|dev|co)[^\s"'`]*/gi,
+    severity: 'HIGH',
   },
   {
-    name: "API Key (sk-/sk_)",
+    name: 'API Key (sk-/sk_)',
     regex: /["'`](sk[-_][a-zA-Z0-9_-]{20,})["'`]/g,
-    severity: "CRITICAL",
+    severity: 'CRITICAL',
   },
   {
-    name: "Bearer token literal",
+    name: 'Bearer token literal',
     regex: /["'`]Bearer\s+[a-zA-Z0-9._-]{20,}["'`]/g,
-    severity: "CRITICAL",
+    severity: 'CRITICAL',
   },
-  { name: "Hardcoded domain", regex: /kelionai\.app/gi, severity: "HIGH" },
+  { name: 'Hardcoded domain', regex: /kelionai\.app/gi, severity: 'HIGH' },
   {
-    name: "localhost reference",
+    name: 'localhost reference',
     regex: /["'`](?:https?:\/\/)?localhost[:\d]*["'`]/gi,
-    severity: "MEDIUM",
+    severity: 'MEDIUM',
   },
   {
-    name: "Hardcoded IP",
+    name: 'Hardcoded IP',
     regex: /["'`]\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}["'`]/g,
-    severity: "MEDIUM",
+    severity: 'MEDIUM',
   },
 ];
 
@@ -1582,9 +1457,13 @@ const AUDIT_WHITELIST = [
 
 let _lastAudit = null;
 
+/**
+ * scanHardcoded
+ * @returns {*}
+ */
 function scanHardcoded() {
-  const root = auditPath.join(__dirname, "..", "..");
-  const dirs = ["server", "app/js", "app/admin"];
+  const root = auditPath.join(__dirname, '..', '..');
+  const dirs = ['server', 'app/js', 'app/admin'];
   const findings = { CRITICAL: [], HIGH: [], MEDIUM: [], LOW: [] };
   let total = 0,
     filesScanned = 0;
@@ -1595,14 +1474,14 @@ function scanHardcoded() {
     const walk = (d) => {
       for (const e of fs.readdirSync(d, { withFileTypes: true })) {
         const fp = auditPath.join(d, e.name);
-        if (fp.includes("node_modules")) continue;
+        if (fp.includes('node_modules')) continue;
         if (e.isDirectory()) {
           walk(fp);
           continue;
         }
-        if (!e.name.endsWith(".js")) continue;
+        if (!e.name.endsWith('.js')) continue;
         filesScanned++;
-        const lines = fs.readFileSync(fp, "utf8").split("\n");
+        const lines = fs.readFileSync(fp, 'utf8').split('\n');
         for (let i = 0; i < lines.length; i++) {
           const line = lines[i];
           if (AUDIT_WHITELIST.some((re) => re.test(line))) continue;
@@ -1610,7 +1489,7 @@ function scanHardcoded() {
             p.regex.lastIndex = 0;
             if (p.regex.test(line)) {
               findings[p.severity].push({
-                file: auditPath.relative(root, fp).replace(/\\/g, "/"),
+                file: auditPath.relative(root, fp).replace(/\\/g, '/'),
                 line: i + 1,
                 pattern: p.name,
                 snippet: line.trim().substring(0, 120),
@@ -1638,9 +1517,13 @@ function scanHardcoded() {
   return _lastAudit;
 }
 
+/**
+ * fixHardcoded
+ * @returns {*}
+ */
 function fixHardcoded() {
-  const root = auditPath.join(__dirname, "..", "..");
-  const dirs = ["server", "app/js", "app/admin"];
+  const root = auditPath.join(__dirname, '..', '..');
+  const dirs = ['server', 'app/js', 'app/admin'];
   const fixes = [];
   const backups = [];
 
@@ -1650,68 +1533,51 @@ function fixHardcoded() {
     const walk = (d) => {
       for (const e of fs.readdirSync(d, { withFileTypes: true })) {
         const fp = auditPath.join(d, e.name);
-        if (fp.includes("node_modules")) continue;
+        if (fp.includes('node_modules')) continue;
         if (e.isDirectory()) {
           walk(fp);
           continue;
         }
-        if (!e.name.endsWith(".js")) continue;
-        let content = fs.readFileSync(fp, "utf8");
+        if (!e.name.endsWith('.js')) continue;
+        let content = fs.readFileSync(fp, 'utf8');
         const original = content;
         // Replace known hardcoded patterns line by line
         content = content
-          .split("\n")
+          .split('\n')
           .map((line) => {
             if (AUDIT_WHITELIST.some((re) => re.test(line))) return line;
             // "https://kelionai.app/path" → process.env.APP_URL + "/path"
-            line = line.replace(
-              /"https:\/\/kelionai\.app(\/[^"]*)"/g,
-              (m, path) =>
-                path
-                  ? `(process.env.APP_URL + "${path}")`
-                  : `process.env.APP_URL`,
+            line = line.replace(/"https:\/\/kelionai\.app(\/[^"]*)"/g, (m, path) =>
+              path ? `(process.env.APP_URL + "${path}")` : `process.env.APP_URL`
             );
             // 'https://kelionai.app/path' → process.env.APP_URL + '/path'
-            line = line.replace(
-              /'https:\/\/kelionai\.app(\/[^']*)'/g,
-              (m, path) =>
-                path
-                  ? `(process.env.APP_URL + '${path}')`
-                  : `process.env.APP_URL`,
+            line = line.replace(/'https:\/\/kelionai\.app(\/[^']*)'/g, (m, path) =>
+              path ? `(process.env.APP_URL + '${path}')` : `process.env.APP_URL`
             );
             // Inside template literals: https://kelionai.app → ${process.env.APP_URL}
-            if (line.includes("`")) {
-              line = line.replace(
-                /https:\/\/kelionai\.app/g,
-                "${process.env.APP_URL}",
-              );
-              line = line.replace(
-                /(?<!@)(?<!\.)kelionai\.app(?!["'])/g,
-                "${process.env.APP_URL}",
-              );
+            if (line.includes('`')) {
+              line = line.replace(/https:\/\/kelionai\.app/g, '${process.env.APP_URL}');
+              line = line.replace(/(?<!@)(?<!\.)kelionai\.app(?!["'])/g, '${process.env.APP_URL}');
             }
             return line;
           })
-          .join("\n");
+          .join('\n');
 
         if (content !== original) {
           // Create backup before modifying
-          const bakPath = fp + ".bak";
+          const bakPath = fp + '.bak';
           try {
-            fs.writeFileSync(bakPath, original, "utf8");
-            backups.push(auditPath.relative(root, bakPath).replace(/\\/g, "/"));
+            fs.writeFileSync(bakPath, original, 'utf8');
+            backups.push(auditPath.relative(root, bakPath).replace(/\\/g, '/'));
           } catch (bakErr) {
-            logger.warn(
-              { component: "Audit", file: fp, err: bakErr.message },
-              "Backup failed — skipping file",
-            );
+            logger.warn({ component: 'Audit', file: fp, err: bakErr.message }, 'Backup failed — skipping file');
             continue;
           }
-          fs.writeFileSync(fp, content, "utf8");
-          fixes.push(auditPath.relative(root, fp).replace(/\\/g, "/"));
+          fs.writeFileSync(fp, content, 'utf8');
+          fixes.push(auditPath.relative(root, fp).replace(/\\/g, '/'));
           logger.info(
-            { component: "Audit", file: fixes[fixes.length - 1] },
-            "Auto-fixed hardcoded values (backup created)",
+            { component: 'Audit', file: fixes[fixes.length - 1] },
+            'Auto-fixed hardcoded values (backup created)'
           );
         }
       }
@@ -1732,21 +1598,18 @@ try {
   if (r.total > 0) {
     logger.warn(
       {
-        component: "Audit",
+        component: 'Audit',
         total: r.total,
         critical: r.critical,
         high: r.high,
       },
-      `⚠️ Hardcoded audit: ${r.total} findings (${r.critical} critical, ${r.high} high)`,
+      `⚠️ Hardcoded audit: ${r.total} findings (${r.critical} critical, ${r.high} high)`
     );
   } else {
-    logger.info(
-      { component: "Audit" },
-      "✅ Hardcoded audit: CLEAN — zero findings",
-    );
+    logger.info({ component: 'Audit' }, '✅ Hardcoded audit: CLEAN — zero findings');
   }
 } catch {
-  logger.warn({ component: "Audit", err: e.message }, "Startup audit failed");
+  logger.warn({ component: 'Audit', err: e.message }, 'Startup audit failed');
 }
 
 // ── Periodic scan every 6 hours ──
@@ -1756,24 +1619,21 @@ setInterval(
       const r = scanHardcoded();
       if (r.total > 0) {
         logger.warn(
-          { component: "Audit", total: r.total, critical: r.critical },
-          `⚠️ Periodic audit: ${r.total} hardcoded findings`,
+          { component: 'Audit', total: r.total, critical: r.critical },
+          `⚠️ Periodic audit: ${r.total} hardcoded findings`
         );
       } else {
-        logger.info({ component: "Audit" }, "✅ Periodic audit: CLEAN");
+        logger.info({ component: 'Audit' }, '✅ Periodic audit: CLEAN');
       }
     } catch {
-      logger.warn(
-        { component: "Audit", err: e.message },
-        "Periodic audit failed",
-      );
+      logger.warn({ component: 'Audit', err: e.message }, 'Periodic audit failed');
     }
   },
-  6 * 60 * 60 * 1000,
+  6 * 60 * 60 * 1000
 );
 
 // ── Endpoints ──
-router.get("/audit-hardcoded", (req, res) => {
+router.get('/audit-hardcoded', (req, res) => {
   try {
     res.json(_lastAudit || scanHardcoded());
   } catch {
@@ -1781,29 +1641,29 @@ router.get("/audit-hardcoded", (req, res) => {
   }
 });
 
-router.post("/audit-hardcoded/fix", (req, res) => {
+router.post('/audit-hardcoded/fix', (req, res) => {
   try {
     const fix = fixHardcoded();
     const after = scanHardcoded();
     logger.info(
-      { component: "Audit", fixed: fix.count, remaining: after.total },
-      `Auto-fix: ${fix.count} files fixed, ${after.total} remaining`,
+      { component: 'Audit', fixed: fix.count, remaining: after.total },
+      `Auto-fix: ${fix.count} files fixed, ${after.total} remaining`
     );
     res.json({ fix, afterScan: after });
   } catch {
-    logger.error({ component: "Audit", err: e.message }, "Auto-fix failed");
+    logger.error({ component: 'Audit', err: e.message }, 'Auto-fix failed');
     res.status(500).json({ error: e.message });
   }
 });
 
 // ── GET: Brain health and intelligence status ──
-router.get("/brain-health", (req, res) => {
+router.get('/brain-health', (req, res) => {
   try {
     const brain = req.app?.locals?.brain;
     if (!brain) {
       return res.json({
-        status: "unavailable",
-        message: "Brain instance nu este inițializat",
+        status: 'unavailable',
+        message: 'Brain instance nu este inițializat',
         uptime: 0,
         conversations: 0,
         toolStats: {},
@@ -1818,9 +1678,7 @@ router.get("/brain-health", (req, res) => {
 
     // Safe access with fallbacks for all optional properties
     const hasMonitor = !!brain.autonomousMonitor?.getStatus;
-    const monitorStatus = hasMonitor
-      ? brain.autonomousMonitor.getStatus()
-      : { status: "not-available" };
+    const monitorStatus = hasMonitor ? brain.autonomousMonitor.getStatus() : { status: 'not-available' };
 
     const hasLearningStore = !!brain.learningStore?.circuitBreakers;
     const circuitBreakers = hasLearningStore
@@ -1830,10 +1688,8 @@ router.get("/brain-health", (req, res) => {
       : [];
 
     res.json({
-      status: brain.recentErrors > 5 ? "degraded" : "healthy",
-      uptime: brain.startTime
-        ? Math.round((Date.now() - brain.startTime) / 1000)
-        : Math.round(process.uptime()),
+      status: brain.recentErrors > 5 ? 'degraded' : 'healthy',
+      uptime: brain.startTime ? Math.round((Date.now() - brain.startTime) / 1000) : Math.round(process.uptime()),
       conversations: brain.conversationCount || brain.conversations?.size || 0,
       learningsExtracted: brain.learningsExtracted || 0,
       toolStats: brain.toolStats || {},
@@ -1855,35 +1711,32 @@ router.get("/brain-health", (req, res) => {
 // ══════════════════════════════════════════════════════════
 // GET /api/admin/media — Media history & stats
 // ══════════════════════════════════════════════════════════
-router.get("/media", async (req, res) => {
+router.get('/media', async (req, res) => {
   try {
     const { supabaseAdmin } = req.app.locals;
-    if (!supabaseAdmin)
-      return res.json({ recent: [], stats: {}, totalCount: 0 });
+    if (!supabaseAdmin) return res.json({ recent: [], stats: {}, totalCount: 0 });
 
     // Total count first (this works even with RLS)
-    const { count } = await supabaseAdmin
-      .from("media_history")
-      .select("id", { count: "exact", head: true });
+    const { count } = await supabaseAdmin.from('media_history').select('id', { count: 'exact', head: true });
 
     // Recent media — select columns that actually exist in the table
     // brain._logMedia inserts: user_id, type, url, title, created_at
     const { data: recent, error: selErr } = await supabaseAdmin
-      .from("media_history")
-      .select("id, user_id, type, url, title, created_at")
-      .order("created_at", { ascending: false })
+      .from('media_history')
+      .select('id, user_id, type, url, title, created_at')
+      .order('created_at', { ascending: false })
       .limit(50);
 
     if (selErr) {
       logger.warn(
-        { component: "Admin", err: selErr.message, code: selErr.code },
-        "Media select failed — trying minimal query",
+        { component: 'Admin', err: selErr.message, code: selErr.code },
+        'Media select failed — trying minimal query'
       );
       // Fallback: select only basic columns
       const { data: fallbackRecent } = await supabaseAdmin
-        .from("media_history")
-        .select("id, type, created_at")
-        .order("created_at", { ascending: false })
+        .from('media_history')
+        .select('id, type, created_at')
+        .order('created_at', { ascending: false })
         .limit(50);
       const stats = {};
       (fallbackRecent || []).forEach((m) => {
@@ -1892,7 +1745,7 @@ router.get("/media", async (req, res) => {
       return res.json({
         recent: (fallbackRecent || []).map((m) => ({
           ...m,
-          prompt: m.title || "—",
+          prompt: m.title || '—',
           url: null,
         })),
         stats,
@@ -1909,12 +1762,12 @@ router.get("/media", async (req, res) => {
     // Map title -> prompt for frontend compatibility
     const mapped = (recent || []).map((m) => ({
       ...m,
-      prompt: m.title || "—",
+      prompt: m.title || '—',
     }));
 
     res.json({ recent: mapped, stats, totalCount: count || 0 });
   } catch {
-    logger.error({ component: "Admin", err: e.message }, "Media query failed");
+    logger.error({ component: 'Admin', err: e.message }, 'Media query failed');
     res.json({ recent: [], stats: {}, totalCount: 0 });
   }
 });
@@ -1922,48 +1775,35 @@ router.get("/media", async (req, res) => {
 // ══════════════════════════════════════════════════════════
 // GET /api/admin/trading — Trading stats & recent trades
 // ══════════════════════════════════════════════════════════
-router.get("/trading", async (req, res) => {
+router.get('/trading', async (req, res) => {
   try {
     const { supabaseAdmin } = req.app.locals;
-    if (!supabaseAdmin)
-      return res.json({ recentTrades: [], stats: {}, intelligence: [] });
+    if (!supabaseAdmin) return res.json({ recentTrades: [], stats: {}, intelligence: [] });
 
     // Recent trades
     const { data: trades } = await supabaseAdmin
-      .from("trades")
-      .select(
-        "id, user_id, symbol, side, quantity, price, status, pnl, created_at",
-      )
-      .order("created_at", { ascending: false })
+      .from('trades')
+      .select('id, user_id, symbol, side, quantity, price, status, pnl, created_at')
+      .order('created_at', { ascending: false })
       .limit(50);
 
     // Trade intelligence (recent analyses)
     const { data: intel } = await supabaseAdmin
-      .from("trade_intelligence")
-      .select("id, symbol, signal, confidence, analysis, created_at")
-      .order("created_at", { ascending: false })
+      .from('trade_intelligence')
+      .select('id, symbol, signal, confidence, analysis, created_at')
+      .order('created_at', { ascending: false })
       .limit(20);
 
     // Compute stats
     const totalTrades = (trades || []).length;
-    const totalPnl = (trades || []).reduce(
-      (s, t) => s + (parseFloat(t.pnl) || 0),
-      0,
-    );
-    const winTrades = (trades || []).filter(
-      (t) => (parseFloat(t.pnl) || 0) > 0,
-    ).length;
-    const lossTrades = (trades || []).filter(
-      (t) => (parseFloat(t.pnl) || 0) < 0,
-    ).length;
-    const activeTrades = (trades || []).filter(
-      (t) => t.status === "open" || t.status === "active",
-    ).length;
+    const totalPnl = (trades || []).reduce((s, t) => s + (parseFloat(t.pnl) || 0), 0);
+    const winTrades = (trades || []).filter((t) => (parseFloat(t.pnl) || 0) > 0).length;
+    const lossTrades = (trades || []).filter((t) => (parseFloat(t.pnl) || 0) < 0).length;
+    const activeTrades = (trades || []).filter((t) => t.status === 'open' || t.status === 'active').length;
 
     // Binance config status
     const binanceConfigured = !!process.env.BINANCE_API_KEY;
-    const binanceMode =
-      process.env.BINANCE_TESTNET === "true" ? "testnet" : "live";
+    const binanceMode = process.env.BINANCE_TESTNET === 'true' ? 'testnet' : 'live';
 
     res.json({
       recentTrades: trades || [],
@@ -1971,8 +1811,7 @@ router.get("/trading", async (req, res) => {
       stats: {
         totalTrades,
         totalPnl: totalPnl.toFixed(2),
-        winRate:
-          totalTrades > 0 ? ((winTrades / totalTrades) * 100).toFixed(1) : "0",
+        winRate: totalTrades > 0 ? ((winTrades / totalTrades) * 100).toFixed(1) : '0',
         winTrades,
         lossTrades,
         activeTrades,
@@ -1981,10 +1820,7 @@ router.get("/trading", async (req, res) => {
       },
     });
   } catch {
-    logger.error(
-      { component: "Admin", err: e.message },
-      "Trading query failed",
-    );
+    logger.error({ component: 'Admin', err: e.message }, 'Trading query failed');
     res.json({ recentTrades: [], stats: {}, intelligence: [] });
   }
 });
@@ -1992,7 +1828,7 @@ router.get("/trading", async (req, res) => {
 // ══════════════════════════════════════════════════════════
 // GET /api/admin/health-check — Full system health check
 // ══════════════════════════════════════════════════════════
-router.get("/health-check", async (req, res) => {
+router.get('/health-check', async (req, res) => {
   try {
     const { brain, supabaseAdmin } = req.app.locals;
     let score = 100;
@@ -2001,30 +1837,26 @@ router.get("/health-check", async (req, res) => {
     // Server info
     const uptime = process.uptime();
     const mem = process.memoryUsage();
-    const fmtMB = (bytes) => (bytes / 1024 / 1024).toFixed(1) + " MB";
+    const fmtMB = (bytes) => (bytes / 1024 / 1024).toFixed(1) + ' MB';
 
     // Database check
     let dbConnected = false;
     const tables = {};
     const tableNames = [
-      "profiles",
-      "conversations",
-      "messages",
-      "ai_costs",
-      "page_views",
-      "subscriptions",
-      "admin_codes",
+      'profiles',
+      'conversations',
+      'messages',
+      'ai_costs',
+      'page_views',
+      'subscriptions',
+      'admin_codes',
     ];
     if (supabaseAdmin) {
       try {
         for (const t of tableNames) {
           try {
-            const { count, error } = await supabaseAdmin
-              .from(t)
-              .select("*", { count: "exact", head: true });
-            tables[t] = error
-              ? { ok: false, error: error.message }
-              : { ok: true, count: count || 0 };
+            const { count, error } = await supabaseAdmin.from(t).select('*', { count: 'exact', head: true });
+            tables[t] = error ? { ok: false, error: error.message } : { ok: true, count: count || 0 };
           } catch {
             tables[t] = { ok: false, error: e.message };
           }
@@ -2036,22 +1868,18 @@ router.get("/health-check", async (req, res) => {
     }
     if (!dbConnected) {
       score -= 30;
-      recommendations.push("Database not connected");
+      recommendations.push('Database not connected');
     }
 
     // Brain
-    const brainStatus = brain
-      ? brain.recentErrors > 5
-        ? "degraded"
-        : "healthy"
-      : "unavailable";
-    if (brainStatus === "degraded") {
+    const brainStatus = brain ? (brain.recentErrors > 5 ? 'degraded' : 'healthy') : 'unavailable';
+    if (brainStatus === 'degraded') {
       score -= 15;
-      recommendations.push("Brain has recent errors");
+      recommendations.push('Brain has recent errors');
     }
-    if (brainStatus === "unavailable") {
+    if (brainStatus === 'unavailable') {
       score -= 20;
-      recommendations.push("Brain not available");
+      recommendations.push('Brain not available');
     }
 
     // Services
@@ -2067,7 +1895,7 @@ router.get("/health-check", async (req, res) => {
         label: k.charAt(0).toUpperCase() + k.slice(1),
         active: v,
       };
-      if (!v && k !== "stripe") {
+      if (!v && k !== 'stripe') {
         score -= 5;
         recommendations.push(`${k} not configured`);
       }
@@ -2082,13 +1910,11 @@ router.get("/health-check", async (req, res) => {
       cspEnabled: true,
       httpsRedirect: !!process.env.RAILWAY_PUBLIC_DOMAIN,
       corsConfigured: true,
-      adminSecretConfigured: !!(
-        process.env.ADMIN_SECRET_KEY || process.env.ADMIN_SECRET
-      ),
+      adminSecretConfigured: !!(process.env.ADMIN_SECRET_KEY || process.env.ADMIN_SECRET),
     };
     if (!security.adminSecretConfigured) {
       score -= 5;
-      recommendations.push("No ADMIN_SECRET set");
+      recommendations.push('No ADMIN_SECRET set');
     }
 
     // Payments
@@ -2102,15 +1928,12 @@ router.get("/health-check", async (req, res) => {
     if (supabaseAdmin) {
       try {
         const { count } = await supabaseAdmin
-          .from("subscriptions")
-          .select("*", { count: "exact", head: true })
-          .eq("status", "active");
+          .from('subscriptions')
+          .select('*', { count: 'exact', head: true })
+          .eq('status', 'active');
         payments.activeSubscribers = count || 0;
       } catch {
-        logger.warn(
-          { component: "Admin", err: e.message },
-          "Subscription count query failed",
-        );
+        logger.warn({ component: 'Admin', err: e.message }, 'Subscription count query failed');
       }
     }
 
@@ -2119,44 +1942,38 @@ router.get("/health-check", async (req, res) => {
       global: {
         max: 200,
         windowMs: 15 * 60 * 1000,
-        windowLabel: "15 minute",
-        note: "Singurul rate limiter general din index.js",
+        windowLabel: '15 minute',
+        note: 'Singurul rate limiter general din index.js',
       },
       newsFetch: {
         max: 1,
         windowMs: 14 * 60 * 1000,
-        windowLabel: "14 minute",
-        note: "Configurat în news.js fetchLimiter",
+        windowLabel: '14 minute',
+        note: 'Configurat în news.js fetchLimiter',
       },
     };
 
     // Brain-driven recommendations
-    if (brain && typeof brain.think === "function") {
+    if (brain && typeof brain.think === 'function') {
       try {
         const diagnosticPrompt = `Ești sistemul de monitorizare KelionAI. Analizează rapid:
 - Uptime: ${Math.floor(uptime)}s, Memorie RSS: ${fmtMB(mem.rss)}, Heap: ${fmtMB(mem.heapUsed)}/${fmtMB(mem.heapTotal)}
 - DB conectat: ${dbConnected}, Tabele ok: ${Object.values(tables).filter((t) => t.ok).length}/${Object.keys(tables).length}
 - Brain status: ${brainStatus}, Erori recente: ${brain.recentErrors || 0}
 - Servicii: ${Object.entries(svcChecks)
-          .map(([k, v]) => k + ":" + (v ? "OK" : "LIPSĂ"))
-          .join(", ")}
+          .map(([k, v]) => k + ':' + (v ? 'OK' : 'LIPSĂ'))
+          .join(', ')}
 Răspunde în maxim 3 recomandări scurte, fiecare pe un rând. Doar probleme reale, nu generalități.`;
         const brainResult = await Promise.race([
-          brain.think(diagnosticPrompt, "kelion", [], "ro"),
-          new Promise((_, rej) =>
-            setTimeout(() => rej(new Error("timeout")), 5000),
-          ),
+          brain.think(diagnosticPrompt, 'kelion', [], 'ro'),
+          new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 5000)),
         ]);
         if (brainResult?.enrichedMessage) {
           const brainRecs = brainResult.enrichedMessage
-            .split("\n")
+            .split('\n')
             .filter((l) => l.trim())
             .slice(0, 3);
-          recommendations.push(
-            ...brainRecs.map(
-              (r) => "🧠 " + r.replace(/^[-•*\d.)\s]+/, "").trim(),
-            ),
-          );
+          recommendations.push(...brainRecs.map((r) => '🧠 ' + r.replace(/^[-•*\d.)\s]+/, '').trim()));
         }
       } catch {
         /* Brain diagnostic timeout — non-blocking */
@@ -2170,22 +1987,13 @@ Răspunde în maxim 3 recomandări scurte, fiecare pe un rând. Doar probleme re
     };
     if (errors.recentCount > 0) score -= Math.min(10, errors.recentCount);
 
-    const grade =
-      score >= 90
-        ? "A"
-        : score >= 75
-          ? "B"
-          : score >= 60
-            ? "C"
-            : score >= 40
-              ? "D"
-              : "F";
+    const grade = score >= 90 ? 'A' : score >= 75 ? 'B' : score >= 60 ? 'C' : score >= 40 ? 'D' : 'F';
 
     res.json({
       score: Math.max(0, score),
       grade,
       server: {
-        version: require("../../package.json").version || "1.0.0",
+        version: require('../../package.json').version || '1.0.0',
         uptime: `${Math.floor(uptime / 3600)}h ${Math.floor((uptime % 3600) / 60)}m`,
         nodeVersion: process.version,
         memory: {
@@ -2212,8 +2020,8 @@ Răspunde în maxim 3 recomandări scurte, fiecare pe un rând. Doar probleme re
       recommendations,
     });
   } catch {
-    logger.error({ component: "Admin", err: e.message }, "Health check failed");
-    res.status(500).json({ error: e.message, score: 0, grade: "F" });
+    logger.error({ component: 'Admin', err: e.message }, 'Health check failed');
+    res.status(500).json({ error: e.message, score: 0, grade: 'F' });
   }
 });
 
@@ -2226,6 +2034,12 @@ Răspunde în maxim 3 recomandări scurte, fiecare pe un rând. Doar probleme re
 const _monitorHistory = []; // in-memory ring buffer (last 48 entries = 24h)
 const MONITOR_MAX = 48;
 
+/**
+ * collectMonitorSnapshot
+ * @param {*} supabaseAdmin
+ * @param {*} brain
+ * @returns {*}
+ */
 async function collectMonitorSnapshot(supabaseAdmin, brain) {
   try {
     // 1. Collect health data
@@ -2244,11 +2058,7 @@ async function collectMonitorSnapshot(supabaseAdmin, brain) {
     let tradingState = null;
     if (supabaseAdmin) {
       try {
-        const { data } = await supabaseAdmin
-          .from("trading_state")
-          .select("*")
-          .eq("id", "paper_bot")
-          .single();
+        const { data } = await supabaseAdmin.from('trading_state').select('*').eq('id', 'paper_bot').single();
         tradingState = data;
       } catch {
         /* table may not exist */
@@ -2259,9 +2069,7 @@ async function collectMonitorSnapshot(supabaseAdmin, brain) {
     let candleCount = 0;
     if (supabaseAdmin) {
       try {
-        const { count } = await supabaseAdmin
-          .from("market_candles")
-          .select("*", { count: "exact", head: true });
+        const { count } = await supabaseAdmin.from('market_candles').select('*', { count: 'exact', head: true });
         candleCount = count || 0;
       } catch {
         /* table may not exist */
@@ -2301,7 +2109,7 @@ async function collectMonitorSnapshot(supabaseAdmin, brain) {
     // 6. Save to Supabase
     if (supabaseAdmin) {
       try {
-        await supabaseAdmin.from("system_monitor").insert({
+        await supabaseAdmin.from('system_monitor').insert({
           snapshot: JSON.stringify(snapshot),
           health_score: snapshot.health.score,
           trading_pnl: snapshot.trading?.total_pnl || 0,
@@ -2311,22 +2119,20 @@ async function collectMonitorSnapshot(supabaseAdmin, brain) {
         });
 
         // Keep only last 200 entries in DB
-        const { count } = await supabaseAdmin
-          .from("system_monitor")
-          .select("*", { count: "exact", head: true });
+        const { count } = await supabaseAdmin.from('system_monitor').select('*', { count: 'exact', head: true });
         if (count && count > 200) {
           const { data: old } = await supabaseAdmin
-            .from("system_monitor")
-            .select("id")
-            .order("created_at", { ascending: true })
+            .from('system_monitor')
+            .select('id')
+            .order('created_at', { ascending: true })
             .limit(count - 200);
           if (old && old.length > 0) {
             await supabaseAdmin
-              .from("system_monitor")
+              .from('system_monitor')
               .delete()
               .in(
-                "id",
-                old.map((r) => r.id),
+                'id',
+                old.map((r) => r.id)
               );
           }
         }
@@ -2337,20 +2143,17 @@ async function collectMonitorSnapshot(supabaseAdmin, brain) {
 
     logger.info(
       {
-        component: "Monitor",
+        component: 'Monitor',
         score: snapshot.health.score,
         pnl: snapshot.trading?.total_pnl,
         candles: snapshot.data.candles,
       },
-      "📊 Auto-monitor snapshot saved",
+      '📊 Auto-monitor snapshot saved'
     );
 
     return snapshot;
   } catch {
-    logger.warn(
-      { component: "Monitor", err: e.message },
-      "Monitor snapshot failed",
-    );
+    logger.warn({ component: 'Monitor', err: e.message }, 'Monitor snapshot failed');
     return null;
   }
 }
@@ -2359,13 +2162,20 @@ async function collectMonitorSnapshot(supabaseAdmin, brain) {
 let _monitorInterval = null;
 let _monitorStarted = false;
 
+/**
+ * ensureMonitorStarted
+ * @param {*} req
+ * @returns {*}
+ */
 function ensureMonitorStarted(req) {
   if (_monitorStarted) return;
   _monitorStarted = true;
   const { supabaseAdmin, brain } = req.app.locals;
 
   // Initial snapshot
-  collectMonitorSnapshot(supabaseAdmin, brain).catch(() => {});
+  collectMonitorSnapshot(supabaseAdmin, brain).catch((err) => {
+    console.error(err);
+  });
 
   // Every 30 minutes
   _monitorInterval = setInterval(
@@ -2376,13 +2186,10 @@ function ensureMonitorStarted(req) {
         /* ok */
       }
     },
-    30 * 60 * 1000,
+    30 * 60 * 1000
   );
 
-  logger.info(
-    { component: "Monitor" },
-    "📊 Auto-monitor started — snapshots every 30 min",
-  );
+  logger.info({ component: 'Monitor' }, '📊 Auto-monitor started — snapshots every 30 min');
 }
 
 // Middleware to start monitor on first admin request
@@ -2392,7 +2199,7 @@ router.use((req, res, next) => {
 });
 
 // ── GET /api/admin/monitor — Brain-analyzed current status ──
-router.get("/monitor", async (req, res) => {
+router.get('/monitor', async (req, res) => {
   try {
     const { supabaseAdmin, brain } = req.app.locals;
 
@@ -2404,9 +2211,9 @@ router.get("/monitor", async (req, res) => {
     if (supabaseAdmin) {
       try {
         const { data } = await supabaseAdmin
-          .from("system_monitor")
-          .select("*")
-          .order("created_at", { ascending: false })
+          .from('system_monitor')
+          .select('*')
+          .order('created_at', { ascending: false })
           .limit(48);
         history = (data || []).map((r) => {
           try {
@@ -2424,22 +2231,22 @@ router.get("/monitor", async (req, res) => {
 
     // ═══ BRAIN ANALYSIS ═══
     let brainAnalysis = null;
-    if (brain && typeof brain.think === "function") {
+    if (brain && typeof brain.think === 'function') {
       try {
         const tradingInfo = current?.trading
           ? `Cash: €${current.trading.cash}, Portfolio: €${current.trading.portfolio_value}, P&L: €${current.trading.total_pnl}, Trades: ${current.trading.total_trades}, Wins: ${current.trading.win_count}, Losses: ${current.trading.loss_count}`
-          : "Trading bot nu este activ";
+          : 'Trading bot nu este activ';
 
         const historyTrend =
           history.length > 1
             ? `Ultimele ${history.length} snapshot-uri: score-uri health = [${history
                 .slice(0, 5)
                 .map((h) => h.health?.score)
-                .join(", ")}], P&L trend = [${history
+                .join(', ')}], P&L trend = [${history
                 .slice(0, 5)
                 .map((h) => h.trading?.total_pnl || 0)
-                .join(", ")}]`
-            : "Fără istoric suficient";
+                .join(', ')}]`
+            : 'Fără istoric suficient';
 
         const analysisPrompt = `Ești sistemul de monitorizare KelionAI. Analizează REAL și ONEST:
 
@@ -2466,10 +2273,8 @@ Răspunde STRICT în format JSON:
 IMPORTANT: Nu minți, nu ascunzi probleme. Dacă trading-ul pierde bani, spune clar.`;
 
         const brainResult = await Promise.race([
-          brain.think(analysisPrompt, "kelion-monitor", [], "ro"),
-          new Promise((_, rej) =>
-            setTimeout(() => rej(new Error("timeout")), 8000),
-          ),
+          brain.think(analysisPrompt, 'kelion-monitor', [], 'ro'),
+          new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 8000)),
         ]);
 
         if (brainResult?.enrichedMessage) {
@@ -2485,10 +2290,10 @@ IMPORTANT: Nu minți, nu ascunzi probleme. Dacă trading-ul pierde bani, spune c
           }
         }
       } catch {
-        brainAnalysis = { error: e.message, status: "ANALYSIS_FAILED" };
+        brainAnalysis = { error: e.message, status: 'ANALYSIS_FAILED' };
       }
     } else {
-      brainAnalysis = { error: "Brain not available", status: "NO_BRAIN" };
+      brainAnalysis = { error: 'Brain not available', status: 'NO_BRAIN' };
     }
 
     res.json({
@@ -2498,42 +2303,38 @@ IMPORTANT: Nu minți, nu ascunzi probleme. Dacă trading-ul pierde bani, spune c
       recentHistory: history.slice(0, 10),
       autoMonitor: {
         enabled: true,
-        interval: "30 minutes",
-        nextRun: _monitorInterval ? "Active" : "Not started",
+        interval: '30 minutes',
+        nextRun: _monitorInterval ? 'Active' : 'Not started',
       },
     });
   } catch {
-    logger.error(
-      { component: "Monitor", err: e.message },
-      "Monitor route failed",
-    );
+    logger.error({ component: 'Monitor', err: e.message }, 'Monitor route failed');
     res.status(500).json({ error: e.message });
   }
 });
 
 // ── GET /api/admin/monitor/history — Full monitoring history ──
-router.get("/monitor/history", async (req, res) => {
+router.get('/monitor/history', async (req, res) => {
   try {
     const { supabaseAdmin } = req.app.locals;
-    if (!supabaseAdmin)
-      return res.json({ history: _monitorHistory, source: "memory" });
+    if (!supabaseAdmin) return res.json({ history: _monitorHistory, source: 'memory' });
 
     const { data, error } = await supabaseAdmin
-      .from("system_monitor")
-      .select("*")
-      .order("created_at", { ascending: false })
+      .from('system_monitor')
+      .select('*')
+      .order('created_at', { ascending: false })
       .limit(200);
 
     if (error)
       return res.json({
         history: _monitorHistory,
-        source: "memory",
+        source: 'memory',
         dbError: error.message,
       });
 
     res.json({
       history: data || [],
-      source: "database",
+      source: 'database',
       totalEntries: (data || []).length,
     });
   } catch {
@@ -2545,7 +2346,7 @@ router.get("/monitor/history", async (req, res) => {
 // GET /api/admin/memories — Brain Memory Panel
 // Browse, search, and filter brain memories
 // ══════════════════════════════════════════════════════════
-router.get("/memories", async (req, res) => {
+router.get('/memories', async (req, res) => {
   try {
     const { supabaseAdmin } = req.app.locals;
     if (!supabaseAdmin)
@@ -2560,50 +2361,37 @@ router.get("/memories", async (req, res) => {
 
     // Query brain_memory table
     let memQuery = supabaseAdmin
-      .from("brain_memory")
-      .select("id, user_id, type, content, importance, created_at, tags", {
-        count: "exact",
+      .from('brain_memory')
+      .select('id, user_id, type, content, importance, created_at, tags', {
+        count: 'exact',
       })
-      .order("created_at", { ascending: false })
-      .range(parseInt(offset), parseInt(offset) + parseInt(limit) - 1);
+      .order('created_at', { ascending: false })
+      .range(parseInt(offset), parseInt(offset, 10) + parseInt(limit, 10) - 1);
 
-    if (type && type !== "all") memQuery = memQuery.eq("type", type);
-    if (search) memQuery = memQuery.ilike("content", `%${search}%`);
+    if (type && type !== 'all') memQuery = memQuery.eq('type', type);
+    if (search) memQuery = memQuery.ilike('content', `%${search}%`);
 
-    const {
-      data: memories,
-      count: totalMemories,
-      error: memErr,
-    } = await memQuery;
-    if (memErr)
-      logger.warn(
-        { component: "Admin", err: memErr.message },
-        "Memory query error",
-      );
+    const { data: memories, count: totalMemories, error: memErr } = await memQuery;
+    if (memErr) logger.warn({ component: 'Admin', err: memErr.message }, 'Memory query error');
 
     // Query learned_facts table
     let factQuery = supabaseAdmin
-      .from("learned_facts")
-      .select("id, fact, category, source, confidence, created_at", {
-        count: "exact",
+      .from('learned_facts')
+      .select('id, fact, category, source, confidence, created_at', {
+        count: 'exact',
       })
-      .order("created_at", { ascending: false })
-      .limit(parseInt(limit));
+      .order('created_at', { ascending: false })
+      .limit(parseInt(limit, 10));
 
-    if (search) factQuery = factQuery.ilike("fact", `%${search}%`);
+    if (search) factQuery = factQuery.ilike('fact', `%${search}%`);
 
     const { data: facts, count: totalFacts, error: factErr } = await factQuery;
-    if (factErr)
-      logger.warn(
-        { component: "Admin", err: factErr.message },
-        "Facts query error",
-      );
+    if (factErr) logger.warn({ component: 'Admin', err: factErr.message }, 'Facts query error');
 
     // Stats by type
     const typeStats = {};
     (memories || []).forEach((m) => {
-      typeStats[m.type || "unknown"] =
-        (typeStats[m.type || "unknown"] || 0) + 1;
+      typeStats[m.type || 'unknown'] = (typeStats[m.type || 'unknown'] || 0) + 1;
     });
 
     res.json({
@@ -2612,22 +2400,10 @@ router.get("/memories", async (req, res) => {
       totalMemories: totalMemories || 0,
       totalFacts: totalFacts || 0,
       typeStats,
-      types: [
-        "text",
-        "visual",
-        "code",
-        "procedure",
-        "preference",
-        "fact",
-        "emotion",
-        "context",
-      ],
+      types: ['text', 'visual', 'code', 'procedure', 'preference', 'fact', 'emotion', 'context'],
     });
   } catch {
-    logger.error(
-      { component: "Admin", err: e.message },
-      "Memory panel query failed",
-    );
+    logger.error({ component: 'Admin', err: e.message }, 'Memory panel query failed');
     res.json({
       memories: [],
       facts: [],
@@ -2639,22 +2415,16 @@ router.get("/memories", async (req, res) => {
 });
 
 // DELETE /api/admin/memories/:id — Remove a specific memory
-router.delete("/memories/:id", async (req, res) => {
+router.delete('/memories/:id', async (req, res) => {
   try {
     const { supabaseAdmin } = req.app.locals;
-    if (!supabaseAdmin) return res.status(503).json({ error: "No DB" });
+    if (!supabaseAdmin) return res.status(503).json({ error: 'No DB' });
 
-    const { error } = await supabaseAdmin
-      .from("brain_memory")
-      .delete()
-      .eq("id", req.params.id);
+    const { error } = await supabaseAdmin.from('brain_memory').delete().eq('id', req.params.id);
 
     if (error) return res.status(500).json({ error: error.message });
 
-    logger.info(
-      { component: "Admin", memoryId: req.params.id },
-      "Memory deleted",
-    );
+    logger.info({ component: 'Admin', memoryId: req.params.id }, 'Memory deleted');
     res.json({ success: true });
   } catch {
     res.status(500).json({ error: e.message });
@@ -2665,42 +2435,42 @@ router.delete("/memories/:id", async (req, res) => {
 // GET /api/admin/intelligence — K1 Intelligence Dashboard data
 // Aggregates performance, meta-learning, patterns, user model
 // ══════════════════════════════════════════════════════════
-router.get("/intelligence", (req, res) => {
+router.get('/intelligence', (req, res) => {
   try {
     let performance = {};
     let strategies = {};
     let evolution = {};
     let userModel = {};
-    let patterns = "";
-    let proactive = "";
+    let patterns = '';
+    let proactive = '';
 
     try {
-      performance = require("../k1-performance").getReport();
+      performance = require('../k1-performance').getReport();
     } catch {
       /* ignored */
     }
     try {
-      strategies = require("../k1-meta-learning").getStrategies();
+      strategies = require('../k1-meta-learning').getStrategies();
     } catch {
       /* ignored */
     }
     try {
-      evolution = require("../k1-meta-learning").getEvolutionReport();
+      evolution = require('../k1-meta-learning').getEvolutionReport();
     } catch {
       /* ignored */
     }
     try {
-      userModel = require("../k1-meta-learning").getUserModel();
+      userModel = require('../k1-meta-learning').getUserModel();
     } catch {
       /* ignored */
     }
     try {
-      patterns = require("../k1-meta-learning").getPatternsText();
+      patterns = require('../k1-meta-learning').getPatternsText();
     } catch {
       /* ignored */
     }
     try {
-      proactive = require("../k1-meta-learning").getProactiveSuggestion();
+      proactive = require('../k1-meta-learning').getProactiveSuggestion();
     } catch {
       /* ignored */
     }
@@ -2710,15 +2480,12 @@ router.get("/intelligence", (req, res) => {
       strategies,
       evolution,
       userModel,
-      patterns: patterns || "No patterns detected yet",
-      proactive: proactive || "",
+      patterns: patterns || 'No patterns detected yet',
+      proactive: proactive || '',
       timestamp: new Date().toISOString(),
     });
   } catch {
-    logger.error(
-      { component: "Intelligence", err: e.message },
-      "Intelligence data failed",
-    );
+    logger.error({ component: 'Intelligence', err: e.message }, 'Intelligence data failed');
     res.status(500).json({ error: e.message });
   }
 });
@@ -2726,15 +2493,15 @@ router.get("/intelligence", (req, res) => {
 // ══════════════════════════════════════════════════════════
 // GET /api/admin/conversations — List all conversations
 // ══════════════════════════════════════════════════════════
-router.get("/conversations", async (req, res) => {
+router.get('/conversations', async (req, res) => {
   try {
     const { supabaseAdmin } = req.app.locals;
     if (!supabaseAdmin) return res.json({ conversations: [] });
 
     const { data } = await supabaseAdmin
-      .from("conversations")
-      .select("id, user_id, created_at, messages_text")
-      .order("created_at", { ascending: false })
+      .from('conversations')
+      .select('id, user_id, created_at, messages_text')
+      .order('created_at', { ascending: false })
       .limit(200);
 
     res.json({ conversations: data || [], total: (data || []).length });
@@ -2746,23 +2513,23 @@ router.get("/conversations", async (req, res) => {
 // ══════════════════════════════════════════════════════════
 // GET /api/admin/conversations/export — Export ALL as JSON
 // ══════════════════════════════════════════════════════════
-router.get("/conversations/export", async (req, res) => {
+router.get('/conversations/export', async (req, res) => {
   try {
     const { supabaseAdmin } = req.app.locals;
-    if (!supabaseAdmin) return res.status(500).json({ error: "No DB" });
+    if (!supabaseAdmin) return res.status(500).json({ error: 'No DB' });
 
     // Get all conversations
     const { data: convs } = await supabaseAdmin
-      .from("conversations")
-      .select("id, user_id, created_at, messages_text")
-      .order("created_at", { ascending: false })
+      .from('conversations')
+      .select('id, user_id, created_at, messages_text')
+      .order('created_at', { ascending: false })
       .limit(500);
 
     // Get all messages
     const { data: msgs } = await supabaseAdmin
-      .from("messages")
-      .select("id, conversation_id, role, content, created_at")
-      .order("created_at", { ascending: true })
+      .from('messages')
+      .select('id, conversation_id, role, content, created_at')
+      .order('created_at', { ascending: true })
       .limit(10000);
 
     // Group messages by conversation
@@ -2784,9 +2551,9 @@ router.get("/conversations/export", async (req, res) => {
       messages: msgMap[c.id] || [],
     }));
 
-    const filename = `kelionai_conversations_${new Date().toISOString().split("T")[0]}.json`;
-    res.setHeader("Content-Type", "application/json");
-    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    const filename = `kelionai_conversations_${new Date().toISOString().split('T')[0]}.json`;
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.json({
       exported_at: new Date().toISOString(),
       total_conversations: exported.length,
@@ -2794,10 +2561,7 @@ router.get("/conversations/export", async (req, res) => {
       conversations: exported,
     });
   } catch {
-    logger.error(
-      { component: "Admin", err: e.message },
-      "Conversation export failed",
-    );
+    logger.error({ component: 'Admin', err: e.message }, 'Conversation export failed');
     res.status(500).json({ error: e.message });
   }
 });
@@ -2805,66 +2569,66 @@ router.get("/conversations/export", async (req, res) => {
 // ══════════════════════════════════════════════════════════
 // A/B TESTING ENDPOINTS
 // ══════════════════════════════════════════════════════════
-router.get("/ab-tests", (_req, res) => {
+router.get('/ab-tests', (_req, res) => {
   res.json({ experiments: abTest.getAllExperiments() });
 });
 
-router.post("/ab-tests", (req, res) => {
+router.post('/ab-tests', (req, res) => {
   try {
     const exp = abTest.createExperiment(req.body);
-    notify("system", `🧪 New A/B test: ${exp.name}`);
+    notify('system', `🧪 New A/B test: ${exp.name}`);
     res.json({ experiment: exp });
   } catch {
     res.status(400).json({ error: e.message });
   }
 });
 
-router.post("/ab-tests/:id/winner", (req, res) => {
+router.post('/ab-tests/:id/winner', (req, res) => {
   const result = abTest.declareWinner(req.params.id, req.body.variant);
-  if (!result) return res.status(404).json({ error: "Experiment not found" });
-  notify("success", `🏆 A/B test winner: ${result.name} → ${req.body.variant}`);
+  if (!result) return res.status(404).json({ error: 'Experiment not found' });
+  notify('success', `🏆 A/B test winner: ${result.name} → ${req.body.variant}`);
   res.json({ experiment: result });
 });
 
-router.delete("/ab-tests/:id", (req, res) => {
+router.delete('/ab-tests/:id', (req, res) => {
   const ok = abTest.deleteExperiment(req.params.id);
-  if (!ok) return res.status(404).json({ error: "Not found" });
+  if (!ok) return res.status(404).json({ error: 'Not found' });
   res.json({ deleted: true });
 });
 
 // ══════════════════════════════════════════════════════════
 // SPRINT #2 ENDPOINTS
 // ══════════════════════════════════════════════════════════
-router.get("/feedback-stats", (_req, res) =>
-  res.json(sprint2.getFeedbackStats()),
-);
-router.get("/live-users", (_req, res) => res.json(sprint2.getLiveSessions()));
-router.get("/errors", (_req, res) => res.json(sprint2.getErrorStats()));
-router.post("/errors", (req, res) => {
+router.get('/feedback-stats', (_req, res) => res.json(sprint2.getFeedbackStats()));
+router.get('/live-users', (_req, res) => res.json(sprint2.getLiveSessions()));
+router.get('/errors', (_req, res) => res.json(sprint2.getErrorStats()));
+router.post('/errors', (req, res) => {
   sprint2.trackError(req.body);
   res.json({ ok: true });
 });
 
 // ══════════════════════════════════════════════════════════
 // CHAIN OF THOUGHT
-router.get("/cot", (_req, res) => res.json({ enabled: cot.isEnabled() }));
-router.post("/cot/toggle", (req, res) =>
-  res.json({ enabled: cot.toggle(req.body.enabled) }),
-);
+router.get('/cot', (_req, res) => res.json({ enabled: cot.isEnabled() }));
+router.post('/cot/toggle', (req, res) => res.json({ enabled: cot.toggle(req.body.enabled) }));
 
 // QUICK WINS ENDPOINTS
 // ══════════════════════════════════════════════════════════
-router.post("/templates", (req, res) => res.json(qw.createTemplate(req.body)));
-router.delete("/templates/:id", (req, res) => {
+router.post('/templates', (req, res) => res.json(qw.createTemplate(req.body)));
+router.delete('/templates/:id', (req, res) => {
   qw.deleteTemplate(req.params.id);
   res.json({ ok: true });
 });
-router.get("/webhooks", (_req, res) => res.json(qw.getWebhooks()));
-router.post("/webhooks", (req, res) => res.json(qw.registerWebhook(req.body)));
-router.delete("/webhooks/:id", (req, res) => {
+router.get('/webhooks', (_req, res) => res.json(qw.getWebhooks()));
+router.post('/webhooks', (req, res) => res.json(qw.registerWebhook(req.body)));
+router.delete('/webhooks/:id', (req, res) => {
   qw.deleteWebhook(req.params.id);
   res.json({ ok: true });
 });
-router.get("/rate-limits", (_req, res) => res.json(qw.getRateLimitStats()));
+router.get('/rate-limits', (_req, res) => res.json(qw.getRateLimitStats()));
 
+/**
+ * undefined
+ * @returns {*}
+ */
 module.exports = router;

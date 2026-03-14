@@ -7,7 +7,7 @@
 //   3. Brain can trigger GPS request via KGeo.requestGPS()
 // ═══════════════════════════════════════════════════════════════
 (function () {
-  "use strict";
+  'use strict';
 
   var cachedPosition = null;
   var permissionGranted = false;
@@ -37,10 +37,10 @@
           resolve(cachedPosition);
         },
         function (err) {
-          console.warn("[Geo] Location unavailable:", err.message);
+          console.warn('[Geo] Location unavailable:', err.message);
           resolve(cachedPosition); // return stale cache or null
         },
-        { timeout: 8000, maximumAge: 300000, enableHighAccuracy: false },
+        { timeout: 8000, maximumAge: 300000, enableHighAccuracy: false }
       );
     });
   }
@@ -50,7 +50,7 @@
   function requestGPS() {
     return new Promise(function (resolve) {
       if (!navigator.geolocation) {
-        resolve({ granted: false, reason: "Geolocation not supported" });
+        resolve({ granted: false, reason: 'Geolocation not supported' });
         return;
       }
       navigator.geolocation.getCurrentPosition(
@@ -69,7 +69,7 @@
         function (err) {
           resolve({ granted: false, reason: err.message });
         },
-        { timeout: 10000, maximumAge: 0, enableHighAccuracy: true },
+        { timeout: 10000, maximumAge: 0, enableHighAccuracy: true }
       );
     });
   }
@@ -89,7 +89,7 @@
       function () {
         /* silent fail on watch errors */
       },
-      { maximumAge: 60000, enableHighAccuracy: false },
+      { maximumAge: 60000, enableHighAccuracy: false }
     );
   }
 
@@ -115,13 +115,13 @@
   function checkPermission() {
     return new Promise(function (resolve) {
       if (!navigator.permissions) {
-        resolve("unknown");
+        resolve('unknown');
         return;
       }
       navigator.permissions
-        .query({ name: "geolocation" })
+        .query({ name: 'geolocation' })
         .then(function (result) {
-          permissionGranted = result.state === "granted";
+          permissionGranted = result.state === 'granted';
           if (permissionGranted && !cachedPosition) {
             // Permission was already granted → silently get position
             getLocation();
@@ -129,7 +129,7 @@
           resolve(result.state); // 'granted', 'denied', 'prompt'
         })
         .catch(function () {
-          resolve("unknown");
+          resolve('unknown');
         });
     });
   }

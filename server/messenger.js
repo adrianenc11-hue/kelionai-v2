@@ -1,28 +1,23 @@
 // KelionAI v2.4 — MESSENGER BOT (Full AI: Text + Audio + Video + Image + Documents)
 // Webhook: configured via APP_URL env var
-"use strict";
+'use strict';
 
-const express = require("express");
-const crypto = require("crypto");
-const fetch = require("node-fetch");
-const logger = require("./logger");
-const pdfParse = require("pdf-parse");
-const mammoth = require("mammoth");
-const { getVoiceId } = require("./config/voices");
-const { MODELS } = require("./config/models");
+const express = require('express');
+const crypto = require('crypto');
+const fetch = require('node-fetch');
+const logger = require('./logger');
+const pdfParse = require('pdf-parse');
+const mammoth = require('mammoth');
+const { getVoiceId } = require('./config/voices');
+const { MODELS } = require('./config/models');
 
 const router = express.Router();
 
 // ═══ TIMEOUT HELPER — prevents hanging on slow/dead APIs ═══
-function withTimeout(promise, ms = 10000, label = "operation") {
+function withTimeout(promise, ms = 10000, label = 'operation') {
   return Promise.race([
     promise,
-    new Promise((_, reject) =>
-      setTimeout(
-        () => reject(new Error(`${label} timed out after ${ms}ms`)),
-        ms,
-      ),
-    ),
+    new Promise((_, reject) => setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)),
   ]);
 }
 
@@ -31,31 +26,22 @@ if (process.env.FB_PAGE_ACCESS_TOKEN) {
   setTimeout(async () => {
     try {
       const res = await withTimeout(
-        fetch(
-          "https://graph.facebook.com/v21.0/me?access_token=" +
-            process.env.FB_PAGE_ACCESS_TOKEN,
-        ),
+        fetch('https://graph.facebook.com/v21.0/me?access_token=' + process.env.FB_PAGE_ACCESS_TOKEN),
         5000,
-        "fb:tokenHealthCheck",
+        'fb:tokenHealthCheck'
       );
       if (res.ok) {
         const data = await res.json();
-        logger.info(
-          { component: "Messenger", pageId: data.id, name: data.name },
-          "✅ Token VALID — Messenger ready",
-        );
+        logger.info({ component: 'Messenger', pageId: data.id, name: data.name }, '✅ Token VALID — Messenger ready');
       } else {
-        const err = await res.text().catch(() => "(no body)");
+        const err = await res.text().catch(() => '(no body)');
         logger.error(
-          { component: "Messenger", status: res.status, body: err },
-          "❌ Token INVALID or EXPIRED — Messenger will NOT work",
+          { component: 'Messenger', status: res.status, body: err },
+          '❌ Token INVALID or EXPIRED — Messenger will NOT work'
         );
       }
     } catch (e) {
-      logger.error(
-        { component: "Messenger", err: e.message },
-        "❌ Token health check FAILED",
-      );
+      logger.error({ component: 'Messenger', err: e.message }, '❌ Token health check FAILED');
     }
   }, 4000);
 }
@@ -66,43 +52,49 @@ const stats = { messagesReceived: 0, repliesSent: 0, uniqueSenders: 0 };
 // CONVERSATION CONTEXT — stored in Supabase messenger_messages
 const MAX_CONTEXT_MESSAGES = 50;
 
+/**
+ * addToHistory
+ * @param {*} senderId
+ * @param {*} from
+ * @param {*} text
+ * @returns {*}
+ */
 async function addToHistory(senderId, from, text) {
   if (_supabase) {
     try {
-      await _supabase.from("messenger_messages").insert({
+      await _supabase.from('messenger_messages').insert({
         sender_id: senderId,
-        role: from === "user" ? "user" : "assistant",
-        content: (text || "").slice(0, 2000),
+        role: from === 'user' ? 'user' : 'assistant',
+        content: (text || '').slice(0, 2000),
       });
     } catch (e) {
-      logger.warn(
-        { component: "Messenger", err: e.message },
-        "DB history write failed",
-      );
+      logger.warn({ component: 'Messenger', err: e.message }, 'DB history write failed');
     }
   }
 }
 
+/**
+ * getContextSummary
+ * @param {*} senderId
+ * @returns {*}
+ */
 async function getContextSummary(senderId) {
-  if (!_supabase) return "";
+  if (!_supabase) return '';
   try {
     const { data } = await _supabase
-      .from("messenger_messages")
-      .select("role, content")
-      .eq("sender_id", senderId)
-      .order("created_at", { ascending: false })
+      .from('messenger_messages')
+      .select('role, content')
+      .eq('sender_id', senderId)
+      .order('created_at', { ascending: false })
       .limit(MAX_CONTEXT_MESSAGES);
-    if (!data || data.length === 0) return "";
+    if (!data || data.length === 0) return '';
     return data
       .reverse()
-      .map((h) => h.role + ": " + h.content)
-      .join("\n");
+      .map((h) => h.role + ': ' + h.content)
+      .join('\n');
   } catch (e) {
-    logger.warn(
-      { component: "Messenger", err: e.message },
-      "DB history read failed",
-    );
-    return "";
+    logger.warn({ component: 'Messenger', err: e.message }, 'DB history read failed');
+    return '';
   }
 }
 
@@ -116,29 +108,31 @@ const subscribedUsers = new Set();
 const lastMessageTime = new Map();
 let _supabase = null;
 
+/**
+ * setSupabase
+ * @param {*} client
+ * @returns {*}
+ */
 function setSupabase(client) {
   _supabase = client;
   // Restore subscribers from DB on startup
   if (client) {
     client
-      .from("messenger_subscribers")
-      .select("sender_id")
+      .from('messenger_subscribers')
+      .select('sender_id')
       .then(function (result) {
         if (result.data) {
           result.data.forEach(function (row) {
             subscribedUsers.add(row.sender_id);
           });
           if (subscribedUsers.size > 0)
-            logger.info(
-              { component: "Messenger", count: subscribedUsers.size },
-              "Subscribers restored",
-            );
+            logger.info({ component: 'Messenger', count: subscribedUsers.size }, 'Subscribers restored');
         }
       })
       .catch(function (err) {
         logger.warn(
-          { component: "Messenger", err: err && err.message },
-          "Could not restore messenger_subscribers (table may not exist)",
+          { component: 'Messenger', err: err && err.message },
+          'Could not restore messenger_subscribers (table may not exist)'
         );
       });
   }
@@ -155,23 +149,25 @@ setInterval(function () {
   });
 }, 600000).unref();
 
+/**
+ * getKnownUser
+ * @param {*} senderId
+ * @param {*} supabase
+ * @returns {*}
+ */
 async function getKnownUser(senderId, supabase) {
   // Check tiny LRU cache first
   if (_userCache.has(senderId)) return _userCache.get(senderId);
   const db = supabase || _supabase;
   if (db) {
     try {
-      const { data } = await db
-        .from("messenger_users")
-        .select("*")
-        .eq("sender_id", senderId)
-        .single();
+      const { data } = await db.from('messenger_users').select('*').eq('sender_id', senderId).single();
       if (data) {
         const user = {
           lang: data.language,
           name: data.name,
           firstSeen: data.first_seen,
-          character: data.character || "kelion",
+          character: data.character || 'kelion',
           messageCount: data.message_count || 0,
         };
         // LRU eviction
@@ -183,15 +179,20 @@ async function getKnownUser(senderId, supabase) {
         return user;
       }
     } catch (e) {
-      logger.warn(
-        { component: "Messenger", err: e.message },
-        "table may not exist",
-      );
+      logger.warn({ component: 'Messenger', err: e.message }, 'table may not exist');
     }
   }
   return null;
 }
 
+/**
+ * saveKnownUser
+ * @param {*} senderId
+ * @param {*} lang
+ * @param {*} name
+ * @param {*} supabase
+ * @returns {*}
+ */
 async function saveKnownUser(senderId, lang, name, supabase) {
   const db = supabase || _supabase;
   // Update cache
@@ -209,7 +210,7 @@ async function saveKnownUser(senderId, lang, name, supabase) {
   _userCache.set(senderId, user);
   if (db) {
     try {
-      await db.from("messenger_users").upsert(
+      await db.from('messenger_users').upsert(
         {
           sender_id: senderId,
           language: lang,
@@ -217,13 +218,10 @@ async function saveKnownUser(senderId, lang, name, supabase) {
           first_seen: user.firstSeen,
           last_seen: new Date().toISOString(),
         },
-        { onConflict: "sender_id" },
+        { onConflict: 'sender_id' }
       );
     } catch (e) {
-      logger.warn(
-        { component: "Messenger", err: e.message },
-        "DB write failed",
-      );
+      logger.warn({ component: 'Messenger', err: e.message }, 'DB write failed');
     }
   }
 }
@@ -231,24 +229,24 @@ async function saveKnownUser(senderId, lang, name, supabase) {
 // Character selection — stored in Supabase messenger_users.character
 async function getChatCharacter(senderId) {
   const user = await getKnownUser(senderId, _supabase);
-  return (user && user.character) || "kelion";
+  return (user && user.character) || 'kelion';
 }
 
+/**
+ * setChatCharacter
+ * @param {*} senderId
+ * @param {*} character
+ * @returns {*}
+ */
 async function setChatCharacter(senderId, character) {
   // Update cache
   const cached = _userCache.get(senderId);
   if (cached) cached.character = character;
   if (_supabase) {
     try {
-      await _supabase
-        .from("messenger_users")
-        .update({ character })
-        .eq("sender_id", senderId);
+      await _supabase.from('messenger_users').update({ character }).eq('sender_id', senderId);
     } catch (e) {
-      logger.warn(
-        { component: "Messenger", err: e.message },
-        "character update failed",
-      );
+      logger.warn({ component: 'Messenger', err: e.message }, 'character update failed');
     }
   }
 }
@@ -259,77 +257,55 @@ async function _getUserMessageCount(senderId) {
   return (user && user.messageCount) || 0;
 }
 
+/**
+ * incrementUserMessageCount
+ * @param {*} senderId
+ * @returns {*}
+ */
 async function incrementUserMessageCount(senderId) {
   const cached = _userCache.get(senderId);
   if (cached) cached.messageCount = (cached.messageCount || 0) + 1;
   if (_supabase) {
     try {
-      await _supabase
-        .rpc("increment_messenger_message_count", { p_sender_id: senderId })
-        .catch(() => {
-          // Fallback if RPC not available
-          _supabase
-            .from("messenger_users")
-            .update({ message_count: (cached && cached.messageCount) || 1 })
-            .eq("sender_id", senderId);
-        });
+      await _supabase.rpc('increment_messenger_message_count', { p_sender_id: senderId }).catch(() => {
+        // Fallback if RPC not available
+        _supabase
+          .from('messenger_users')
+          .update({ message_count: (cached && cached.messageCount) || 1 })
+          .eq('sender_id', senderId);
+      });
     } catch (e) {
-      logger.warn(
-        { component: "Messenger", err: e.message },
-        "message count update failed",
-      );
+      logger.warn({ component: 'Messenger', err: e.message }, 'message count update failed');
     }
   }
 }
 
 // LANGUAGE DETECTION
 function detectLanguage(text) {
-  const t = (text || "").toLowerCase();
+  const t = (text || '').toLowerCase();
   // Script-based detection first (unambiguous)
-  if (/[\u0600-\u06FF]/.test(text)) return "ar";
-  if (/[\u0590-\u05FF]/.test(text)) return "he";
-  if (/[\u3040-\u309F\u30A0-\u30FF]/.test(text)) return "ja";
-  if (/[\u4E00-\u9FFF]/.test(text)) return "zh";
-  if (/[\uAC00-\uD7AF]/.test(text)) return "ko";
-  if (/[\u0900-\u097F]/.test(text)) return "hi";
+  if (/[\u0600-\u06FF]/.test(text)) return 'ar';
+  if (/[\u0590-\u05FF]/.test(text)) return 'he';
+  if (/[\u3040-\u309F\u30A0-\u30FF]/.test(text)) return 'ja';
+  if (/[\u4E00-\u9FFF]/.test(text)) return 'zh';
+  if (/[\uAC00-\uD7AF]/.test(text)) return 'ko';
+  if (/[\u0900-\u097F]/.test(text)) return 'hi';
   if (/[\u0400-\u04FF]/.test(text)) {
-    if (/\b(я|ти|він|вона|ми|ви|вони|привіт|дякую|так|ні)\b/.test(text))
-      return "uk";
-    return "ru";
+    if (/\b(я|ти|він|вона|ми|ви|вони|привіт|дякую|так|ні)\b/.test(text)) return 'uk';
+    return 'ru';
   }
   // Latin-based detection
-  if (
-    /\b(the|is|are|what|how|can|will|do|you|my|hi|hello|help|please)\b/.test(t)
-  )
-    return "en";
-  if (
-    /\b(și|sau|este|sunt|pentru|care|cum|unde|vreau|poți|bună|salut|mulțumesc)\b/.test(
-      t,
-    )
-  )
-    return "ro";
-  if (
-    /\b(ich|du|er|sie|wir|ist|sind|mit|für|auf|hallo|danke|bitte|wie|was)\b/.test(
-      t,
-    )
-  )
-    return "de";
-  if (
-    /\b(je|tu|il|elle|nous|est|avec|pour|dans|bonjour|merci|oui|non|comment)\b/.test(
-      t,
-    )
-  )
-    return "fr";
-  if (/\b(yo|tú|él|ella|nosotros|hola|gracias|sí|cómo|para)\b/.test(t))
-    return "es";
-  if (/\b(io|tu|lui|lei|noi|ciao|grazie|sì|come|sono)\b/.test(t)) return "it";
-  if (/\b(eu|tu|ele|ela|nós|olá|obrigado|sim|não|como|para)\b/.test(t))
-    return "pt";
-  if (/\b(ik|jij|hij|zij|wij|hallo|dank|ja|nee|hoe)\b/.test(t)) return "nl";
-  if (/\b(ja|ty|on|ona|my|cześć|dziękuję|tak|nie|jak)\b/.test(t)) return "pl";
-  if (/\b(ben|sen|bu|için|ile|merhaba|teşekkür|evet|hayır)\b/.test(t))
-    return "tr";
-  return "ro";
+  if (/\b(the|is|are|what|how|can|will|do|you|my|hi|hello|help|please)\b/.test(t)) return 'en';
+  if (/\b(și|sau|este|sunt|pentru|care|cum|unde|vreau|poți|bună|salut|mulțumesc)\b/.test(t)) return 'ro';
+  if (/\b(ich|du|er|sie|wir|ist|sind|mit|für|auf|hallo|danke|bitte|wie|was)\b/.test(t)) return 'de';
+  if (/\b(je|tu|il|elle|nous|est|avec|pour|dans|bonjour|merci|oui|non|comment)\b/.test(t)) return 'fr';
+  if (/\b(yo|tú|él|ella|nosotros|hola|gracias|sí|cómo|para)\b/.test(t)) return 'es';
+  if (/\b(io|tu|lui|lei|noi|ciao|grazie|sì|come|sono)\b/.test(t)) return 'it';
+  if (/\b(eu|tu|ele|ela|nós|olá|obrigado|sim|não|como|para)\b/.test(t)) return 'pt';
+  if (/\b(ik|jij|hij|zij|wij|hallo|dank|ja|nee|hoe)\b/.test(t)) return 'nl';
+  if (/\b(ja|ty|on|ona|my|cześć|dziękuję|tak|nie|jak)\b/.test(t)) return 'pl';
+  if (/\b(ben|sen|bu|için|ile|merhaba|teşekkür|evet|hayır)\b/.test(t)) return 'tr';
+  return 'ro';
 }
 
 // RATE LIMITING — stays in memory (ephemeral, needs speed)
@@ -338,6 +314,11 @@ const RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const _RATE_LIMIT_MAX_ENTRIES = 200;
 const senderRateLimits = new Map();
 
+/**
+ * isRateLimited
+ * @param {*} senderId
+ * @returns {*}
+ */
 function isRateLimited(senderId) {
   const now = Date.now();
   const entry = senderRateLimits.get(senderId);
@@ -369,6 +350,12 @@ const messengerGroupState = new Map(); // chatId -> { lastActivity, unansweredQu
 const GROUP_INTERVENTION_COOLDOWN = 5 * 60 * 1000;
 const GROUP_PAUSE_THRESHOLD = 2 * 60 * 1000;
 
+/**
+ * _updateMessengerGroupState
+ * @param {*} chatId
+ * @param {*} text
+ * @returns {*}
+ */
 function _updateMessengerGroupState(chatId, text) {
   const state = messengerGroupState.get(chatId) || {
     lastActivity: 0,
@@ -376,44 +363,47 @@ function _updateMessengerGroupState(chatId, text) {
     lastIntervention: 0,
   };
   state.lastActivity = Date.now();
-  if (text && text.trim().endsWith("?")) {
+  if (text && text.trim().endsWith('?')) {
     state.unansweredQuestions.push({ text: text, time: Date.now() });
     if (state.unansweredQuestions.length > 5) state.unansweredQuestions.shift();
   }
   messengerGroupState.set(chatId, state);
 }
 
+/**
+ * _messengerShouldIntervene
+ * @param {*} chatId
+ * @param {*} isDirectlyAddressed
+ * @returns {*}
+ */
 function _messengerShouldIntervene(chatId, isDirectlyAddressed) {
   if (isDirectlyAddressed) return true;
   const state = messengerGroupState.get(chatId);
   if (!state) return false;
-  if (
-    state.lastIntervention &&
-    Date.now() - state.lastIntervention < GROUP_INTERVENTION_COOLDOWN
-  )
-    return false;
-  if (
-    Date.now() - state.lastActivity > GROUP_PAUSE_THRESHOLD &&
-    state.unansweredQuestions.length > 0
-  )
-    return true;
+  if (state.lastIntervention && Date.now() - state.lastIntervention < GROUP_INTERVENTION_COOLDOWN) return false;
+  if (Date.now() - state.lastActivity > GROUP_PAUSE_THRESHOLD && state.unansweredQuestions.length > 0) return true;
   return false;
 }
 
+/**
+ * _getMessengerInterventionPrefix
+ * @param {*} lang
+ * @returns {*}
+ */
 function _getMessengerInterventionPrefix(lang) {
   const prefixes = {
-    ro: "Scuzați că intervin, dar cred că pot ajuta cu asta... ",
-    en: "Sorry to jump in, but I might be able to help with that... ",
-    es: "Disculpen la interrupción, pero creo que puedo ayudar... ",
+    ro: 'Scuzați că intervin, dar cred că pot ajuta cu asta... ',
+    en: 'Sorry to jump in, but I might be able to help with that... ',
+    es: 'Disculpen la interrupción, pero creo que puedo ayudar... ',
     fr: "Excusez-moi d'intervenir, mais je peux peut-être aider... ",
-    de: "Entschuldigung, dass ich mich einmische, aber ich kann vielleicht helfen... ",
-    it: "Scusate se mi intrometto, ma credo di poter aiutare... ",
-    pt: "Desculpem a intromissão, mas talvez eu possa ajudar... ",
-    nl: "Sorry dat ik me erbij mengt, maar ik kan misschien helpen... ",
-    pl: "Przepraszam, że się wtrącam, ale może mogę pomóc... ",
-    ru: "Извините, что вмешиваюсь, но я, возможно, могу помочь... ",
-    ja: "割り込んですみませんが、お手伝いできるかもしれません... ",
-    zh: "打扰一下，我或许可以帮上忙... ",
+    de: 'Entschuldigung, dass ich mich einmische, aber ich kann vielleicht helfen... ',
+    it: 'Scusate se mi intrometto, ma credo di poter aiutare... ',
+    pt: 'Desculpem a intromissão, mas talvez eu possa ajudar... ',
+    nl: 'Sorry dat ik me erbij mengt, maar ik kan misschien helpen... ',
+    pl: 'Przepraszam, że się wtrącam, ale może mogę pomóc... ',
+    ru: 'Извините, что вмешиваюсь, но я, возможно, могу помочь... ',
+    ja: '割り込んですみませんが、お手伝いできるかもしれません... ',
+    zh: '打扰一下，我或许可以帮上忙... ',
   };
   return prefixes[lang] || prefixes.en;
 }
@@ -424,26 +414,16 @@ async function getSenderProfile(senderId) {
   if (!token) return null;
   try {
     const res = await withTimeout(
-      fetch(
-        "https://graph.facebook.com/v21.0/" +
-          senderId +
-          "?fields=first_name,last_name&access_token=" +
-          token,
-      ),
+      fetch('https://graph.facebook.com/v21.0/' + senderId + '?fields=first_name,last_name&access_token=' + token),
       5000,
-      "getSenderProfile",
+      'getSenderProfile'
     );
     if (res.ok) {
       const data = await res.json();
-      return data.first_name
-        ? (data.first_name + " " + (data.last_name || "")).trim()
-        : null;
+      return data.first_name ? (data.first_name + ' ' + (data.last_name || '')).trim() : null;
     }
   } catch (e) {
-    logger.warn(
-      { component: "Messenger", senderId, err: e.message },
-      "Failed to get sender profile",
-    );
+    logger.warn({ component: 'Messenger', senderId, err: e.message }, 'Failed to get sender profile');
   }
   return null;
 }
@@ -451,20 +431,13 @@ async function getSenderProfile(senderId) {
 // DOWNLOAD MEDIA FROM URL
 async function downloadMediaFromUrl(url) {
   try {
-    const res = await withTimeout(fetch(url), 10000, "downloadMediaFromUrl");
+    const res = await withTimeout(fetch(url), 10000, 'downloadMediaFromUrl');
     if (res.ok) {
-      const ab = await withTimeout(
-        res.arrayBuffer(),
-        10000,
-        "downloadMediaFromUrl:readBody",
-      );
+      const ab = await withTimeout(res.arrayBuffer(), 10000, 'downloadMediaFromUrl:readBody');
       return Buffer.from(ab);
     }
   } catch (e) {
-    logger.error(
-      { component: "Messenger", err: e.message },
-      "Media download failed",
-    );
+    logger.error({ component: 'Messenger', err: e.message }, 'Media download failed');
   }
   return null;
 }
@@ -472,39 +445,36 @@ async function downloadMediaFromUrl(url) {
 // ANALYZE IMAGE WITH GPT-5.4 VISION
 async function analyzeImage(imageBuffer, caption, mimeType) {
   const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey)
-    return (
-      caption || "I received an image but no vision API key is configured."
-    );
+  if (!apiKey) return caption || 'I received an image but no vision API key is configured.';
 
-  const base64Image = imageBuffer.toString("base64");
-  const mediaType = mimeType || "image/jpeg";
+  const base64Image = imageBuffer.toString('base64');
+  const mediaType = mimeType || 'image/jpeg';
   const userPrompt = caption
     ? 'Utilizatorul a trimis aceasta imagine cu textul: "' +
       caption +
       '". Descrie ce vezi, identifica persoane, obiecte, locuri, texte.'
-    : "Descrie in detaliu ce vezi in aceasta imagine. Identifica persoane, obiecte, locuri, texte vizibile, culori, actiuni.";
+    : 'Descrie in detaliu ce vezi in aceasta imagine. Identifica persoane, obiecte, locuri, texte vizibile, culori, actiuni.';
 
   try {
     const res = await withTimeout(
-      fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
+      fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
         headers: {
-          Authorization: "Bearer " + apiKey,
-          "Content-Type": "application/json",
+          Authorization: 'Bearer ' + apiKey,
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           model: MODELS.OPENAI_VISION,
           messages: [
             {
-              role: "user",
+              role: 'user',
               content: [
-                { type: "text", text: userPrompt },
+                { type: 'text', text: userPrompt },
                 {
-                  type: "image_url",
+                  type: 'image_url',
                   image_url: {
-                    url: "data:" + mediaType + ";base64," + base64Image,
-                    detail: "high",
+                    url: 'data:' + mediaType + ';base64,' + base64Image,
+                    detail: 'high',
                   },
                 },
               ],
@@ -514,91 +484,70 @@ async function analyzeImage(imageBuffer, caption, mimeType) {
         }),
       }),
       25000,
-      "analyzeImage",
+      'analyzeImage'
     );
     if (res.ok) {
       const data = await res.json();
       return (
-        (data.choices &&
-          data.choices[0] &&
-          data.choices[0].message &&
-          data.choices[0].message.content) ||
-        "Am vazut imaginea."
+        (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) ||
+        'Am vazut imaginea.'
       );
     }
   } catch (e) {
-    logger.error({ component: "Messenger", err: e.message }, "Vision error");
+    logger.error({ component: 'Messenger', err: e.message }, 'Vision error');
   }
-  return "Nu am putut analiza imaginea momentan.";
+  return 'Nu am putut analiza imaginea momentan.';
 }
 
 // TRANSCRIBE AUDIO (Whisper)
 async function transcribeAudio(audioBuffer, mimeType) {
   const apiKey = process.env.GROQ_API_KEY || process.env.OPENAI_API_KEY;
   if (!apiKey) return null;
-  const baseUrl = process.env.GROQ_API_KEY
-    ? "https://api.groq.com/openai/v1"
-    : "https://api.openai.com/v1";
-  const FormData = require("form-data");
+  const baseUrl = process.env.GROQ_API_KEY ? 'https://api.groq.com/openai/v1' : 'https://api.openai.com/v1';
+  const FormData = require('form-data');
   const form = new FormData();
-  form.append("file", audioBuffer, {
-    filename: "audio.mp4",
-    contentType: mimeType || "audio/mp4",
+  form.append('file', audioBuffer, {
+    filename: 'audio.mp4',
+    contentType: mimeType || 'audio/mp4',
   });
-  form.append(
-    "model",
-    process.env.GROQ_API_KEY ? MODELS.WHISPER : MODELS.OPENAI_WHISPER,
-  );
+  form.append('model', process.env.GROQ_API_KEY ? MODELS.WHISPER : MODELS.OPENAI_WHISPER);
   try {
     const res = await withTimeout(
-      fetch(baseUrl + "/audio/transcriptions", {
-        method: "POST",
-        headers: Object.assign(
-          { Authorization: "Bearer " + apiKey },
-          form.getHeaders(),
-        ),
+      fetch(baseUrl + '/audio/transcriptions', {
+        method: 'POST',
+        headers: Object.assign({ Authorization: 'Bearer ' + apiKey }, form.getHeaders()),
         body: form,
       }),
       20000,
-      "transcribeAudio",
+      'transcribeAudio'
     );
     if (res.ok) {
       const data = await res.json();
-      return data.text || "";
+      return data.text || '';
     }
   } catch (e) {
-    logger.error({ component: "Messenger", err: e.message }, "STT failed");
+    logger.error({ component: 'Messenger', err: e.message }, 'STT failed');
   }
   return null;
 }
 
 // FEATURE 1: EXTRACT DOCUMENT TEXT
 async function extractDocumentText(buffer, mimeType, filename) {
-  const ext = (filename || "").split(".").pop().toLowerCase();
+  const ext = (filename || '').split('.').pop().toLowerCase();
   try {
-    if (mimeType === "application/pdf" || ext === "pdf") {
+    if (mimeType === 'application/pdf' || ext === 'pdf') {
       const data = await pdfParse(buffer);
-      return (data.text || "").slice(0, 3000);
+      return (data.text || '').slice(0, 3000);
     }
-    if (
-      mimeType ===
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
-      ext === "docx"
-    ) {
+    if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || ext === 'docx') {
       const result = await mammoth.extractRawText({ buffer: buffer });
-      return (result.value || "").slice(0, 3000);
+      return (result.value || '').slice(0, 3000);
     }
-    if (
-      ["txt", "csv", "json", "md"].includes(ext) ||
-      (mimeType && mimeType.startsWith("text/"))
-    ) {
-      return buffer.toString("utf8").slice(0, 3000);
+    if (['txt', 'csv', 'json', 'md'].includes(ext) || (mimeType && mimeType.startsWith('text/'))) {
+      return buffer.toString('utf8').slice(0, 3000);
     }
   } catch (e) {
-    logger.warn(
-      { component: "Messenger", err: e.message },
-      "Document extraction failed",
-    );
+    logger.warn({ component: 'Messenger', err: e.message }, 'Document extraction failed');
   }
   return null;
 }
@@ -611,11 +560,11 @@ async function sendMessage(recipientId, text, quickReplies) {
   if (quickReplies && quickReplies.length > 0) {
     message.quick_replies = quickReplies
       .map(function (qr) {
-        if (typeof qr === "string") {
+        if (typeof qr === 'string') {
           return {
-            content_type: "text",
+            content_type: 'text',
             title: qr.slice(0, 20),
-            payload: qr.toUpperCase().replace(/[^A-Z0-9]/g, "_"),
+            payload: qr.toUpperCase().replace(/[^A-Z0-9]/g, '_'),
           };
         }
         return qr;
@@ -623,26 +572,20 @@ async function sendMessage(recipientId, text, quickReplies) {
       .slice(0, 13);
   }
   const res = await withTimeout(
-    fetch(
-      "https://graph.facebook.com/v21.0/me/messages?access_token=" + token,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          recipient: { id: recipientId },
-          message: message,
-        }),
-      },
-    ),
+    fetch('https://graph.facebook.com/v21.0/me/messages?access_token=' + token, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        recipient: { id: recipientId },
+        message: message,
+      }),
+    }),
     10000,
-    "sendMessage",
+    'sendMessage'
   );
   if (!res.ok) {
     const body = await res.text();
-    logger.error(
-      { component: "Messenger", status: res.status, body: body },
-      "Send failed",
-    );
+    logger.error({ component: 'Messenger', status: res.status, body: body }, 'Send failed');
   }
 }
 
@@ -652,25 +595,19 @@ async function sendTypingOn(recipientId) {
   if (!token) return;
   try {
     await withTimeout(
-      fetch(
-        "https://graph.facebook.com/v21.0/me/messages?access_token=" + token,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            recipient: { id: recipientId },
-            sender_action: "typing_on",
-          }),
-        },
-      ),
+      fetch('https://graph.facebook.com/v21.0/me/messages?access_token=' + token, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recipient: { id: recipientId },
+          sender_action: 'typing_on',
+        }),
+      }),
       5000,
-      "sendTypingOn",
+      'sendTypingOn'
     );
   } catch (e) {
-    logger.warn(
-      { component: "Messenger", err: e.message },
-      "sendTypingOn failed",
-    );
+    logger.warn({ component: 'Messenger', err: e.message }, 'sendTypingOn failed');
   }
 }
 
@@ -680,37 +617,28 @@ async function sendAudioMessage(recipientId, audioUrl) {
   if (!token) return;
   try {
     const res = await withTimeout(
-      fetch(
-        "https://graph.facebook.com/v21.0/me/messages?access_token=" + token,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            recipient: { id: recipientId },
-            message: {
-              attachment: {
-                type: "audio",
-                payload: { url: audioUrl, is_reusable: true },
-              },
+      fetch('https://graph.facebook.com/v21.0/me/messages?access_token=' + token, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recipient: { id: recipientId },
+          message: {
+            attachment: {
+              type: 'audio',
+              payload: { url: audioUrl, is_reusable: true },
             },
-          }),
-        },
-      ),
+          },
+        }),
+      }),
       10000,
-      "sendAudioMessage",
+      'sendAudioMessage'
     );
     if (!res.ok) {
       const body = await res.text();
-      logger.error(
-        { component: "Messenger", status: res.status, body: body },
-        "Audio send failed",
-      );
+      logger.error({ component: 'Messenger', status: res.status, body: body }, 'Audio send failed');
     }
   } catch (e) {
-    logger.error(
-      { component: "Messenger", err: e.message },
-      "sendAudioMessage error",
-    );
+    logger.error({ component: 'Messenger', err: e.message }, 'sendAudioMessage error');
   }
 }
 
@@ -722,9 +650,9 @@ async function generateAndSendVoice(recipientId, text, character) {
   try {
     const voiceId = getVoiceId(character);
     const res = await withTimeout(
-      fetch("https://api.elevenlabs.io/v1/text-to-speech/" + voiceId, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "xi-api-key": apiKey },
+      fetch('https://api.elevenlabs.io/v1/text-to-speech/' + voiceId, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'xi-api-key': apiKey },
         body: JSON.stringify({
           text: text.slice(0, 500),
           model_id: MODELS.ELEVENLABS_MODEL,
@@ -732,29 +660,21 @@ async function generateAndSendVoice(recipientId, text, character) {
         }),
       }),
       12000,
-      "generateVoice:elevenlabs",
+      'generateVoice:elevenlabs'
     );
     if (!res.ok) return;
-    const audioBuffer = Buffer.from(
-      await withTimeout(res.arrayBuffer(), 10000, "generateVoice:readBody"),
-    );
-    const audioId = crypto.randomBytes(16).toString("hex");
+    const audioBuffer = Buffer.from(await withTimeout(res.arrayBuffer(), 10000, 'generateVoice:readBody'));
+    const audioId = crypto.randomBytes(16).toString('hex');
     mediaBuffers.set(audioId, {
       buffer: audioBuffer,
-      contentType: "audio/mpeg",
+      contentType: 'audio/mpeg',
       expiresAt: Date.now() + 3600000,
     });
-    const audioUrl = appUrl + "/api/messenger/media/" + audioId;
+    const audioUrl = appUrl + '/api/messenger/media/' + audioId;
     await sendAudioMessage(recipientId, audioUrl);
-    logger.info(
-      { component: "Messenger", recipientId: recipientId },
-      "Voice reply sent",
-    );
+    logger.info({ component: 'Messenger', recipientId: recipientId }, 'Voice reply sent');
   } catch (e) {
-    logger.warn(
-      { component: "Messenger", err: e.message },
-      "Voice generation failed",
-    );
+    logger.warn({ component: 'Messenger', err: e.message }, 'Voice generation failed');
   }
 }
 
@@ -764,37 +684,28 @@ async function sendImageMessage(recipientId, imageUrl) {
   if (!token) return;
   try {
     const res = await withTimeout(
-      fetch(
-        "https://graph.facebook.com/v21.0/me/messages?access_token=" + token,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            recipient: { id: recipientId },
-            message: {
-              attachment: {
-                type: "image",
-                payload: { url: imageUrl, is_reusable: true },
-              },
+      fetch('https://graph.facebook.com/v21.0/me/messages?access_token=' + token, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recipient: { id: recipientId },
+          message: {
+            attachment: {
+              type: 'image',
+              payload: { url: imageUrl, is_reusable: true },
             },
-          }),
-        },
-      ),
+          },
+        }),
+      }),
       10000,
-      "sendImageMessage",
+      'sendImageMessage'
     );
     if (!res.ok) {
       const body = await res.text();
-      logger.error(
-        { component: "Messenger", status: res.status, body: body },
-        "Image send failed",
-      );
+      logger.error({ component: 'Messenger', status: res.status, body: body }, 'Image send failed');
     }
   } catch (e) {
-    logger.error(
-      { component: "Messenger", err: e.message },
-      "sendImageMessage error",
-    );
+    logger.error({ component: 'Messenger', err: e.message }, 'sendImageMessage error');
   }
 }
 
@@ -804,40 +715,31 @@ async function sendGenericTemplate(recipientId, elements) {
   if (!token) return;
   try {
     const res = await withTimeout(
-      fetch(
-        "https://graph.facebook.com/v21.0/me/messages?access_token=" + token,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            recipient: { id: recipientId },
-            message: {
-              attachment: {
-                type: "template",
-                payload: {
-                  template_type: "generic",
-                  elements: elements.slice(0, 10),
-                },
+      fetch('https://graph.facebook.com/v21.0/me/messages?access_token=' + token, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recipient: { id: recipientId },
+          message: {
+            attachment: {
+              type: 'template',
+              payload: {
+                template_type: 'generic',
+                elements: elements.slice(0, 10),
               },
             },
-          }),
-        },
-      ),
+          },
+        }),
+      }),
       10000,
-      "sendGenericTemplate",
+      'sendGenericTemplate'
     );
     if (!res.ok) {
       const body = await res.text();
-      logger.error(
-        { component: "Messenger", status: res.status, body: body },
-        "Generic template send failed",
-      );
+      logger.error({ component: 'Messenger', status: res.status, body: body }, 'Generic template send failed');
     }
   } catch (e) {
-    logger.error(
-      { component: "Messenger", err: e.message },
-      "sendGenericTemplate error",
-    );
+    logger.error({ component: 'Messenger', err: e.message }, 'sendGenericTemplate error');
   }
 }
 
@@ -847,99 +749,80 @@ async function _sendButtonTemplate(recipientId, text, buttons) {
   if (!token) return;
   try {
     const res = await withTimeout(
-      fetch(
-        "https://graph.facebook.com/v21.0/me/messages?access_token=" + token,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            recipient: { id: recipientId },
-            message: {
-              attachment: {
-                type: "template",
-                payload: {
-                  template_type: "button",
-                  text: text.slice(0, 640),
-                  buttons: buttons.slice(0, 3),
-                },
+      fetch('https://graph.facebook.com/v21.0/me/messages?access_token=' + token, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recipient: { id: recipientId },
+          message: {
+            attachment: {
+              type: 'template',
+              payload: {
+                template_type: 'button',
+                text: text.slice(0, 640),
+                buttons: buttons.slice(0, 3),
               },
             },
-          }),
-        },
-      ),
+          },
+        }),
+      }),
       10000,
-      "sendButtonTemplate",
+      'sendButtonTemplate'
     );
     if (!res.ok) {
       const body = await res.text();
-      logger.error(
-        { component: "Messenger", status: res.status, body: body },
-        "Button template send failed",
-      );
+      logger.error({ component: 'Messenger', status: res.status, body: body }, 'Button template send failed');
     }
   } catch (e) {
-    logger.error(
-      { component: "Messenger", err: e.message },
-      "sendButtonTemplate error",
-    );
+    logger.error({ component: 'Messenger', err: e.message }, 'sendButtonTemplate error');
   }
 }
 
 // FEATURE 4: SETUP PERSISTENT MENU
 async function setupPersistentMenu() {
   const token = process.env.FB_PAGE_ACCESS_TOKEN;
-  if (!token) return { error: "No page token configured" };
+  if (!token) return { error: 'No page token configured' };
   try {
     const res = await withTimeout(
-      fetch(
-        "https://graph.facebook.com/v21.0/me/messenger_profile?access_token=" +
-          token,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            persistent_menu: [
-              {
-                locale: "default",
-                composer_input_disabled: false,
-                call_to_actions: [
-                  {
-                    type: "postback",
-                    title: "🤖 Kelion",
-                    payload: "SWITCH_KELION",
-                  },
-                  {
-                    type: "postback",
-                    title: "👩‍💻 Kira",
-                    payload: "SWITCH_KIRA",
-                  },
-                  {
-                    type: "web_url",
-                    title: "🌐 KelionAI",
-                    url: process.env.APP_URL,
-                  },
-                  { type: "postback", title: "📰 Știri", payload: "GET_NEWS" },
-                  { type: "postback", title: "❓ Ajutor", payload: "GET_HELP" },
-                ],
-              },
-            ],
-          }),
-        },
-      ),
+      fetch('https://graph.facebook.com/v21.0/me/messenger_profile?access_token=' + token, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          persistent_menu: [
+            {
+              locale: 'default',
+              composer_input_disabled: false,
+              call_to_actions: [
+                {
+                  type: 'postback',
+                  title: '🤖 Kelion',
+                  payload: 'SWITCH_KELION',
+                },
+                {
+                  type: 'postback',
+                  title: '👩‍💻 Kira',
+                  payload: 'SWITCH_KIRA',
+                },
+                {
+                  type: 'web_url',
+                  title: '🌐 KelionAI',
+                  url: process.env.APP_URL,
+                },
+                { type: 'postback', title: '📰 Știri', payload: 'GET_NEWS' },
+                { type: 'postback', title: '❓ Ajutor', payload: 'GET_HELP' },
+              ],
+            },
+          ],
+        }),
+      }),
       10000,
-      "setupPersistentMenu",
+      'setupPersistentMenu'
     );
     const data = await res.json();
-    logger.info(
-      { component: "Messenger", result: data },
-      "Persistent menu set up",
-    );
+    logger.info({ component: 'Messenger', result: data }, 'Persistent menu set up');
     return data;
   } catch (e) {
-    logger.error(
-      { component: "Messenger", err: e.message },
-      "setupPersistentMenu failed",
-    );
+    logger.error({ component: 'Messenger', err: e.message }, 'setupPersistentMenu failed');
     return { error: e.message };
   }
 }
@@ -947,59 +830,45 @@ async function setupPersistentMenu() {
 // FEATURE 4: HANDLE POSTBACK EVENTS
 async function handlePostback(senderId, payload, appLocals) {
   try {
-    if (payload === "SWITCH_KELION") {
-      await setChatCharacter(senderId, "kelion");
-      await sendMessage(senderId, "🤖 Kelion este acum asistentul tau!", [
-        "💬 Chat",
-        "📰 Știri",
-        "🌤️ Meteo",
-      ]);
-    } else if (payload === "SWITCH_KIRA") {
-      await setChatCharacter(senderId, "kira");
-      await sendMessage(senderId, "👩‍💻 Kira este acum asistenta ta!", [
-        "💬 Chat",
-        "📰 Știri",
-        "🌤️ Meteo",
-      ]);
-    } else if (payload === "GET_NEWS") {
+    if (payload === 'SWITCH_KELION') {
+      await setChatCharacter(senderId, 'kelion');
+      await sendMessage(senderId, '🤖 Kelion este acum asistentul tau!', ['💬 Chat', '📰 Știri', '🌤️ Meteo']);
+    } else if (payload === 'SWITCH_KIRA') {
+      await setChatCharacter(senderId, 'kira');
+      await sendMessage(senderId, '👩‍💻 Kira este acum asistenta ta!', ['💬 Chat', '📰 Știri', '🌤️ Meteo']);
+    } else if (payload === 'GET_NEWS') {
       const getArticles = appLocals && appLocals._getNewsArticles;
       const articles = getArticles ? getArticles() : [];
       if (articles && articles.length > 0) {
-        await sendMessage(senderId, "📰 Ultimele stiri:");
-        await sendGenericTemplate(
-          senderId,
-          buildNewsElements(articles.slice(0, 3)),
-        );
+        await sendMessage(senderId, '📰 Ultimele stiri:');
+        await sendGenericTemplate(senderId, buildNewsElements(articles.slice(0, 3)));
       } else {
-        await sendMessage(
-          senderId,
-          "📰 Nu am stiri disponibile momentan. Revino curand!",
-        );
+        await sendMessage(senderId, '📰 Nu am stiri disponibile momentan. Revino curand!');
       }
-    } else if (payload === "GET_HELP") {
+    } else if (payload === 'GET_HELP') {
       await sendMessage(
         senderId,
-        "❓ Cum te pot ajuta:\n\n" +
-          "📝 Trimite text — raspund intrebarii tale\n" +
-          "🖼️ Trimite imagine — analizez poza\n" +
-          "🎤 Trimite mesaj vocal — transcriu si raspund\n" +
-          "📄 Trimite document — extrag si analizez textul\n" +
+        '❓ Cum te pot ajuta:\n\n' +
+          '📝 Trimite text — raspund intrebarii tale\n' +
+          '🖼️ Trimite imagine — analizez poza\n' +
+          '🎤 Trimite mesaj vocal — transcriu si raspund\n' +
+          '📄 Trimite document — extrag si analizez textul\n' +
           '📰 Scrie "stiri" — iti trimit ultimele stiri\n' +
           '🤖 Scrie "kelion" sau "kira" — schimba asistentul\n' +
           '🔔 Scrie "aboneaza-ma" — notificari stiri\n\n' +
           `🌐 Mai multe pe ${process.env.APP_URL}`,
-        ["💬 Chat", "📰 Știri", "🌐 Site"],
+        ['💬 Chat', '📰 Știri', '🌐 Site']
       );
     }
   } catch (e) {
     logger.warn(
       {
-        component: "Messenger",
+        component: 'Messenger',
         senderId: senderId,
         payload: payload,
         err: e.message,
       },
-      "Postback handling failed",
+      'Postback handling failed'
     );
   }
 }
@@ -1008,17 +877,17 @@ async function handlePostback(senderId, payload, appLocals) {
 function buildNewsElements(articles) {
   return articles.map(function (a) {
     return {
-      title: (a.title || "Știre").slice(0, 80),
-      subtitle: (a.description || a.summary || "").slice(0, 80),
-      image_url: a.image || a.imageUrl || process.env.APP_URL + "/og-image.jpg",
+      title: (a.title || 'Știre').slice(0, 80),
+      subtitle: (a.description || a.summary || '').slice(0, 80),
+      image_url: a.image || a.imageUrl || process.env.APP_URL + '/og-image.jpg',
       default_action: {
-        type: "web_url",
+        type: 'web_url',
         url: a.url || a.link || process.env.APP_URL,
       },
       buttons: [
         {
-          type: "web_url",
-          title: "🔗 Citeste",
+          type: 'web_url',
+          title: '🔗 Citeste',
           url: a.url || a.link || process.env.APP_URL,
         },
       ],
@@ -1038,10 +907,7 @@ async function _broadcastToSubscribers(message, quickReplies) {
       await sendMessage(userId, message, quickReplies);
       sent++;
     } catch (e) {
-      logger.warn(
-        { component: "Messenger", userId: userId, err: e.message },
-        "Broadcast to subscriber failed",
-      );
+      logger.warn({ component: 'Messenger', userId: userId, err: e.message }, 'Broadcast to subscriber failed');
     }
   }
   return sent;
@@ -1060,17 +926,11 @@ async function notifySubscribersNews(articles) {
     const lastMsg = lastMessageTime.get(userId) || 0;
     if (now - lastMsg > windowMs) continue;
     try {
-      await sendMessage(userId, "📰 Stiri noi pentru tine:");
+      await sendMessage(userId, '📰 Stiri noi pentru tine:');
       await sendGenericTemplate(userId, elements);
-      logger.info(
-        { component: "Messenger", userId: userId },
-        "News notification sent",
-      );
+      logger.info({ component: 'Messenger', userId: userId }, 'News notification sent');
     } catch (e) {
-      logger.warn(
-        { component: "Messenger", userId: userId, err: e.message },
-        "News notification failed",
-      );
+      logger.warn({ component: 'Messenger', userId: userId, err: e.message }, 'News notification failed');
     }
   }
 }
@@ -1081,111 +941,95 @@ async function generateImage(prompt) {
   if (!apiKey) return null;
   try {
     const res = await withTimeout(
-      fetch("https://api.openai.com/v1/images/generations", {
-        method: "POST",
+      fetch('https://api.openai.com/v1/images/generations', {
+        method: 'POST',
         headers: {
-          Authorization: "Bearer " + apiKey,
-          "Content-Type": "application/json",
+          Authorization: 'Bearer ' + apiKey,
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           model: MODELS.DALL_E,
           prompt: prompt,
           n: 1,
-          size: "1024x1024",
-          response_format: "url",
+          size: '1024x1024',
+          response_format: 'url',
         }),
       }),
       30000,
-      "generateImage:DALL-E",
+      'generateImage:DALL-E'
     );
     if (res.ok) {
       const data = await res.json();
       return data.data && data.data[0] && data.data[0].url;
     }
   } catch (e) {
-    logger.warn(
-      { component: "Messenger", err: e.message },
-      "Image generation failed",
-    );
+    logger.warn({ component: 'Messenger', err: e.message }, 'Image generation failed');
   }
   return null;
 }
 
 // SERVE TEMPORARY MEDIA BUFFERS (audio/images)
-router.get("/media/:id", function (req, res) {
+router.get('/media/:id', function (req, res) {
   const entry = mediaBuffers.get(req.params.id);
-  if (!entry || Date.now() > entry.expiresAt)
-    return res.status(404).send("Not found");
-  res.set("Content-Type", entry.contentType);
+  if (!entry || Date.now() > entry.expiresAt) return res.status(404).send('Not found');
+  res.set('Content-Type', entry.contentType);
   res.send(entry.buffer);
 });
 
 // WEBHOOK VERIFICATION — accept any of the configured verify tokens
-router.get("/webhook", function (req, res) {
-  const mode = req.query["hub.mode"];
-  const token = req.query["hub.verify_token"];
-  const challenge = req.query["hub.challenge"];
-  const validTokens = [
-    process.env.FB_VERIFY_TOKEN,
-    process.env.MESSENGER_VERIFY_TOKEN,
-  ].filter(Boolean);
-  if (mode === "subscribe" && validTokens.includes(token)) {
-    logger.info({ component: "Messenger" }, "Webhook verified");
+router.get('/webhook', function (req, res) {
+  const mode = req.query['hub.mode'];
+  const token = req.query['hub.verify_token'];
+  const challenge = req.query['hub.challenge'];
+  const validTokens = [process.env.FB_VERIFY_TOKEN, process.env.MESSENGER_VERIFY_TOKEN].filter(Boolean);
+  if (mode === 'subscribe' && validTokens.includes(token)) {
+    logger.info({ component: 'Messenger' }, 'Webhook verified');
     return res.status(200).send(challenge);
   }
   res.sendStatus(403);
 });
 
 // ═══ AUTO-SUBSCRIBE PAGE TO WEBHOOKS ═══
-router.get("/subscribe", async function (req, res) {
+router.get('/subscribe', async function (req, res) {
   const token = process.env.FB_PAGE_ACCESS_TOKEN;
-  if (!token)
-    return res.status(500).json({ error: "FB_PAGE_ACCESS_TOKEN not set" });
+  if (!token) return res.status(500).json({ error: 'FB_PAGE_ACCESS_TOKEN not set' });
   try {
     const meRes = await withTimeout(
-      fetch("https://graph.facebook.com/v21.0/me?access_token=" + token),
+      fetch('https://graph.facebook.com/v21.0/me?access_token=' + token),
       10000,
-      "subscribe:getPageId",
+      'subscribe:getPageId'
     );
     const me = await meRes.json();
-    if (!me.id)
-      return res.status(500).json({ error: "Cannot get page ID", details: me });
+    if (!me.id) return res.status(500).json({ error: 'Cannot get page ID', details: me });
     const subRes = await withTimeout(
-      fetch("https://graph.facebook.com/v21.0/" + me.id + "/subscribed_apps", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      fetch('https://graph.facebook.com/v21.0/' + me.id + '/subscribed_apps', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          subscribed_fields:
-            "messages,messaging_postbacks,message_deliveries,message_reads",
+          subscribed_fields: 'messages,messaging_postbacks,message_deliveries,message_reads',
           access_token: token,
         }),
       }),
       10000,
-      "subscribe:subscribeApps",
+      'subscribe:subscribeApps'
     );
     const result = await subRes.json();
-    logger.info(
-      { component: "Messenger", pageId: me.id, result: result },
-      "Webhook subscription result",
-    );
+    logger.info({ component: 'Messenger', pageId: me.id, result: result }, 'Webhook subscription result');
     res.json({ success: result.success, pageId: me.id, pageName: me.name });
   } catch (e) {
-    logger.error(
-      { component: "Messenger", err: e.message },
-      "Subscribe failed",
-    );
+    logger.error({ component: 'Messenger', err: e.message }, 'Subscribe failed');
     res.status(500).json({ error: e.message });
   }
 });
 
 // FEATURE 4: SETUP MENU ENDPOINT
-router.get("/setup-menu", async function (req, res) {
+router.get('/setup-menu', async function (req, res) {
   const result = await setupPersistentMenu();
   res.json(result);
 });
 
 // INCOMING MESSAGE HANDLER
-router.post("/webhook", async function (req, res) {
+router.post('/webhook', async function (req, res) {
   res.sendStatus(200);
   try {
     // CRITICAL: req.body should be a Buffer because of express.raw() in index.js
@@ -1194,39 +1038,34 @@ router.post("/webhook", async function (req, res) {
     if (Buffer.isBuffer(req.body)) {
       rawBody = req.body;
       body = JSON.parse(rawBody.toString());
-    } else if (typeof req.body === "string") {
+    } else if (typeof req.body === 'string') {
       rawBody = Buffer.from(req.body);
       body = JSON.parse(req.body);
-    } else if (req.body && typeof req.body === "object") {
+    } else if (req.body && typeof req.body === 'object') {
       // Already parsed by express.json()
       rawBody = Buffer.from(JSON.stringify(req.body));
       body = req.body;
     } else {
-      logger.warn({ component: "Messenger" }, "Empty or missing body");
+      logger.warn({ component: 'Messenger' }, 'Empty or missing body');
       return;
     }
 
     // HMAC-SHA256 validation
     const appSecret = process.env.FB_APP_SECRET;
     if (appSecret) {
-      const sig = req.headers["x-hub-signature-256"];
+      const sig = req.headers['x-hub-signature-256'];
       if (!sig) {
-        logger.warn({ component: "Messenger" }, "Missing signature");
+        logger.warn({ component: 'Messenger' }, 'Missing signature');
         return;
       }
-      const expected =
-        "sha256=" +
-        crypto.createHmac("sha256", appSecret).update(rawBody).digest("hex");
-      if (
-        sig.length !== expected.length ||
-        !crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))
-      ) {
-        logger.warn({ component: "Messenger" }, "Invalid signature");
+      const expected = 'sha256=' + crypto.createHmac('sha256', appSecret).update(rawBody).digest('hex');
+      if (sig.length !== expected.length || !crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) {
+        logger.warn({ component: 'Messenger' }, 'Invalid signature');
         return;
       }
     }
 
-    if (body.object !== "page") return;
+    if (body.object !== 'page') return;
 
     for (let e = 0; e < (body.entry || []).length; e++) {
       const entry = body.entry[e];
@@ -1238,11 +1077,7 @@ router.post("/webhook", async function (req, res) {
         // FEATURE 4: HANDLE POSTBACK EVENTS
         if (event.postback) {
           lastMessageTime.set(senderId, Date.now());
-          await handlePostback(
-            senderId,
-            event.postback.payload,
-            req.app.locals,
-          );
+          await handlePostback(senderId, event.postback.payload, req.app.locals);
           stats.messagesReceived++;
           stats.uniqueSenders++;
           stats.repliesSent++;
@@ -1259,7 +1094,7 @@ router.post("/webhook", async function (req, res) {
 
         await sendTypingOn(senderId);
 
-        let userText = "";
+        let userText = '';
         let visionResponse = null;
         const attachments = message.attachments || [];
         let receivedAudio = false;
@@ -1268,10 +1103,10 @@ router.post("/webhook", async function (req, res) {
         if (message.quick_reply && message.quick_reply.payload) {
           const qrPayload = message.quick_reply.payload;
           if (
-            qrPayload === "SWITCH_KELION" ||
-            qrPayload === "SWITCH_KIRA" ||
-            qrPayload === "GET_NEWS" ||
-            qrPayload === "GET_HELP"
+            qrPayload === 'SWITCH_KELION' ||
+            qrPayload === 'SWITCH_KIRA' ||
+            qrPayload === 'GET_NEWS' ||
+            qrPayload === 'GET_HELP'
           ) {
             await handlePostback(senderId, qrPayload, req.app.locals);
             stats.repliesSent++;
@@ -1293,71 +1128,53 @@ router.post("/webhook", async function (req, res) {
           const attUrl = att.payload && att.payload.url;
           if (!attUrl) continue;
 
-          if (attType === "image") {
+          if (attType === 'image') {
             const imgBuffer = await downloadMediaFromUrl(attUrl);
             if (imgBuffer) {
-              visionResponse = await analyzeImage(
-                imgBuffer,
-                message.text || null,
-                "image/jpeg",
-              );
-              if (!userText) userText = "Am trimis o imagine";
+              visionResponse = await analyzeImage(imgBuffer, message.text || null, 'image/jpeg');
+              if (!userText) userText = 'Am trimis o imagine';
             }
-          } else if (attType === "audio") {
+          } else if (attType === 'audio') {
             receivedAudio = true;
             const audBuffer = await downloadMediaFromUrl(attUrl);
             if (audBuffer) {
-              const transcript = await transcribeAudio(audBuffer, "audio/mp4");
+              const transcript = await transcribeAudio(audBuffer, 'audio/mp4');
               if (transcript) {
                 userText = transcript;
               } else {
-                userText = "[Voice message - could not transcribe]";
+                userText = '[Voice message - could not transcribe]';
               }
             }
-          } else if (attType === "video") {
+          } else if (attType === 'video') {
             const vidBuffer = await downloadMediaFromUrl(attUrl);
             if (vidBuffer) {
-              const vidTranscript = await transcribeAudio(
-                vidBuffer,
-                "video/mp4",
-              );
+              const vidTranscript = await transcribeAudio(vidBuffer, 'video/mp4');
               if (vidTranscript) {
-                visionResponse =
-                  'Am analizat videoclipul tau. Am auzit: "' +
-                  vidTranscript +
-                  '"';
+                visionResponse = 'Am analizat videoclipul tau. Am auzit: "' + vidTranscript + '"';
               } else {
-                visionResponse =
-                  "Am primit videoclipul dar nu am putut extrage continut.";
+                visionResponse = 'Am primit videoclipul dar nu am putut extrage continut.';
               }
-              if (!userText) userText = "Am trimis un videoclip";
+              if (!userText) userText = 'Am trimis un videoclip';
             }
-          } else if (attType === "file") {
+          } else if (attType === 'file') {
             // FEATURE 1: DOCUMENT TEXT ANALYSIS
             const fileBuffer = await downloadMediaFromUrl(attUrl);
             if (fileBuffer) {
-              const fileName = (att.payload && att.payload.name) || "";
-              const fileMime = (att.payload && att.payload.mime_type) || "";
-              const extractedText = await extractDocumentText(
-                fileBuffer,
-                fileMime,
-                fileName,
-              );
+              const fileName = (att.payload && att.payload.name) || '';
+              const fileMime = (att.payload && att.payload.mime_type) || '';
+              const extractedText = await extractDocumentText(fileBuffer, fileMime, fileName);
               if (extractedText) {
-                if (!userText) userText = "Am trimis un document";
+                if (!userText) userText = 'Am trimis un document';
                 visionResponse = null; // will use AI for document
-                userText =
-                  "Analizeaza urmatorul continut din documentul meu:\n\n" +
-                  extractedText;
+                userText = 'Analizeaza urmatorul continut din documentul meu:\n\n' + extractedText;
               } else {
-                if (!userText) userText = "Am trimis un document";
+                if (!userText) userText = 'Am trimis un document';
                 visionResponse =
-                  "Am primit documentul. Formatul nu este suportat momentan (suport: PDF, DOCX, TXT, CSV, JSON, MD).";
+                  'Am primit documentul. Formatul nu este suportat momentan (suport: PDF, DOCX, TXT, CSV, JSON, MD).';
               }
             } else {
-              if (!userText) userText = "Am trimis un document";
-              visionResponse =
-                "Nu am putut descarca documentul. Te rog incearca din nou.";
+              if (!userText) userText = 'Am trimis un document';
+              visionResponse = 'Nu am putut descarca documentul. Te rog incearca din nou.';
             }
           }
         }
@@ -1368,50 +1185,44 @@ router.post("/webhook", async function (req, res) {
         if (userText && ADMIN_KEYWORDS.test(userText)) continue;
 
         // GET SENDER NAME
-        const senderName = (await getSenderProfile(senderId)) || "User";
+        const senderName = (await getSenderProfile(senderId)) || 'User';
         addToHistory(senderId, senderName, userText);
 
         // CHARACTER SELECTION
-        if (/^(kelion|kira)$/i.test((userText || "").trim())) {
+        if (/^(kelion|kira)$/i.test((userText || '').trim())) {
           const charName = userText.trim().toLowerCase();
           await setChatCharacter(senderId, charName);
-          const displayName = charName === "kelion" ? "Kelion" : "Kira";
+          const displayName = charName === 'kelion' ? 'Kelion' : 'Kira';
           await sendMessage(
             senderId,
-            (charName === "kelion" ? "🤖 " : "👩‍💻 ") +
-              displayName +
-              " este acum asistentul tau. Cu ce te pot ajuta?",
-            ["💬 Chat", "📰 Știri", "🌤️ Meteo"],
+            (charName === 'kelion' ? '🤖 ' : '👩‍💻 ') + displayName + ' este acum asistentul tau. Cu ce te pot ajuta?',
+            ['💬 Chat', '📰 Știri', '🌤️ Meteo']
           );
           stats.repliesSent++;
           continue;
         }
 
         // FEATURE 6: SUBSCRIBE / UNSUBSCRIBE
-        const supabase =
-          req.app.locals.supabaseAdmin || req.app.locals.supabase;
-        const textLower = (userText || "").toLowerCase().trim();
+        const supabase = req.app.locals.supabaseAdmin || req.app.locals.supabase;
+        const textLower = (userText || '').toLowerCase().trim();
         if (/^(subscribe|aboneaza-ma|notificari)$/i.test(textLower)) {
           subscribedUsers.add(senderId);
           if (supabase) {
             try {
-              await supabase.from("messenger_subscribers").upsert(
+              await supabase.from('messenger_subscribers').upsert(
                 {
                   sender_id: senderId,
                   subscribed_at: new Date().toISOString(),
                 },
-                { onConflict: "sender_id" },
+                { onConflict: 'sender_id' }
               );
             } catch (ex) {
-              logger.warn(
-                { component: "Messenger", err: ex.message },
-                "table may not exist",
-              );
+              logger.warn({ component: 'Messenger', err: ex.message }, 'table may not exist');
             }
           }
           await sendMessage(
             senderId,
-            '✅ Esti abonat la notificari de stiri! Vei fi notificat cand apar stiri noi.\n\nScrie "dezaboneaza-ma" oricand pentru a opri notificarile.',
+            '✅ Esti abonat la notificari de stiri! Vei fi notificat cand apar stiri noi.\n\nScrie "dezaboneaza-ma" oricand pentru a opri notificarile.'
           );
           stats.repliesSent++;
           continue;
@@ -1420,21 +1231,12 @@ router.post("/webhook", async function (req, res) {
           subscribedUsers.delete(senderId);
           if (supabase) {
             try {
-              await supabase
-                .from("messenger_subscribers")
-                .delete()
-                .eq("sender_id", senderId);
+              await supabase.from('messenger_subscribers').delete().eq('sender_id', senderId);
             } catch (ex) {
-              logger.warn(
-                { component: "Messenger", err: ex.message },
-                "table may not exist",
-              );
+              logger.warn({ component: 'Messenger', err: ex.message }, 'table may not exist');
             }
           }
-          await sendMessage(
-            senderId,
-            "❌ Ai fost dezabonat de la notificari. Ne vedem curand! 👋",
-          );
+          await sendMessage(senderId, '❌ Ai fost dezabonat de la notificari. Ne vedem curand! 👋');
           stats.repliesSent++;
           continue;
         }
@@ -1444,53 +1246,37 @@ router.post("/webhook", async function (req, res) {
           const getArticles = req.app.locals._getNewsArticles;
           const articles = getArticles ? getArticles() : [];
           if (articles && articles.length > 0) {
-            await sendMessage(senderId, "📰 Ultimele stiri:");
-            await sendGenericTemplate(
-              senderId,
-              buildNewsElements(articles.slice(0, 3)),
-            );
-            addToHistory(
-              senderId,
-              (await getChatCharacter(senderId)) === "kira" ? "Kira" : "Kelion",
-              "Stiri trimise",
-            );
+            await sendMessage(senderId, '📰 Ultimele stiri:');
+            await sendGenericTemplate(senderId, buildNewsElements(articles.slice(0, 3)));
+            addToHistory(senderId, (await getChatCharacter(senderId)) === 'kira' ? 'Kira' : 'Kelion', 'Stiri trimise');
             stats.repliesSent++;
             continue;
           }
         }
 
-        const character = (await getChatCharacter(senderId)) || "kelion";
+        const character = (await getChatCharacter(senderId)) || 'kelion';
 
         // IMAGE GENERATION REQUEST (Feature 3)
         if (
           !visionResponse &&
-          /\b(genereaz[aă]\s+imagine|generate\s+image|creeaz[aă]\s+(o\s+)?imagine|deseneaz[aă])\b/i.test(
-            userText,
-          )
+          /\b(genereaz[aă]\s+imagine|generate\s+image|creeaz[aă]\s+(o\s+)?imagine|deseneaz[aă])\b/i.test(userText)
         ) {
           const imageUrl = await generateImage(userText);
           if (imageUrl) {
-            await sendMessage(
-              senderId,
-              "🎨 Iata imaginea generata pentru tine!",
-            );
+            await sendMessage(senderId, '🎨 Iata imaginea generata pentru tine!');
             await sendImageMessage(senderId, imageUrl);
-            addToHistory(
-              senderId,
-              character === "kira" ? "Kira" : "Kelion",
-              "Imagine generata",
-            );
+            addToHistory(senderId, character === 'kira' ? 'Kira' : 'Kelion', 'Imagine generata');
             stats.repliesSent++;
             continue;
           }
         }
 
         // ═══ K1 COGNITIVE BRIDGE — Pre-process prin reasoning loop ═══
-        const k1Bridge = require("./k1-messenger-bridge");
+        const k1Bridge = require('./k1-messenger-bridge');
         let k1Context = null;
         try {
-          k1Context = await k1Bridge.preProcess(userText || "", {
-            platform: "messenger",
+          k1Context = await k1Bridge.preProcess(userText || '', {
+            platform: 'messenger',
             userId: senderId,
             userName: senderName || senderId,
             supabase: req.app.locals.supabaseAdmin || req.app.locals.supabase,
@@ -1501,44 +1287,32 @@ router.post("/webhook", async function (req, res) {
 
         // AI RESPONSE
         let reply;
-        const detectedLangForReply = detectLanguage(userText || "");
+        const detectedLangForReply = detectLanguage(userText || '');
         if (visionResponse) {
           reply = visionResponse;
         } else {
           const brain = req.app.locals.brain;
           const context = await getContextSummary(senderId);
-          const k1SystemCtx = k1Context
-            ? k1Bridge.getK1SystemContext(k1Context)
-            : "";
+          const k1SystemCtx = k1Context ? k1Bridge.getK1SystemContext(k1Context) : '';
           const prompt = context
-            ? "[Context:\n" + context + "]\nUser: " + userText + k1SystemCtx
+            ? '[Context:\n' + context + ']\nUser: ' + userText + k1SystemCtx
             : userText + k1SystemCtx;
 
           if (brain) {
             try {
               const timeout = new Promise(function (_, reject) {
                 setTimeout(function () {
-                  reject(new Error("Brain timeout"));
+                  reject(new Error('Brain timeout'));
                 }, 20000);
               });
               const result = await Promise.race([
-                brain.think(
-                  prompt,
-                  character,
-                  [],
-                  detectedLangForReply || "auto",
-                ),
+                brain.think(prompt, character, [], detectedLangForReply || 'auto'),
                 timeout,
               ]);
-              reply =
-                (result && result.enrichedMessage) ||
-                "Nu am putut procesa mesajul.";
+              reply = (result && result.enrichedMessage) || 'Nu am putut procesa mesajul.';
             } catch (err) {
-              logger.warn(
-                { component: "Messenger", err: err.message },
-                "Brain error",
-              );
-              reply = "Momentan sunt ocupat. Incearca din nou.";
+              logger.warn({ component: 'Messenger', err: err.message }, 'Brain error');
+              reply = 'Momentan sunt ocupat. Incearca din nou.';
             }
           } else {
             reply = `Sunt KelionAI! Viziteaza ${process.env.APP_URL}`;
@@ -1548,9 +1322,9 @@ router.post("/webhook", async function (req, res) {
         // ═══ K1 POST-PROCESS — Confidence + Memory save ═══
         try {
           await k1Bridge.postProcess(reply, {
-            platform: "messenger",
+            platform: 'messenger',
             userId: senderId,
-            domain: k1Context?.k1?.domain || "general",
+            domain: k1Context?.k1?.domain || 'general',
             supabase: req.app.locals.supabaseAdmin || req.app.locals.supabase,
           });
         } catch {
@@ -1561,11 +1335,11 @@ router.post("/webhook", async function (req, res) {
         const msgCount = await incrementUserMessageCount(senderId);
         let replyQuickReplies;
         if (msgCount === FREE_MESSAGES_LIMIT) {
-          replyQuickReplies = ["💎 Upgrade", "🌐 Site"];
+          replyQuickReplies = ['💎 Upgrade', '🌐 Site'];
         }
 
         await sendMessage(senderId, reply, replyQuickReplies);
-        addToHistory(senderId, character === "kira" ? "Kira" : "Kelion", reply);
+        addToHistory(senderId, character === 'kira' ? 'Kira' : 'Kelion', reply);
         stats.repliesSent++;
 
         // ═══ BRAIN INTEGRATION — save chat memory ═══
@@ -1574,19 +1348,21 @@ router.post("/webhook", async function (req, res) {
           brainRef
             .saveMemory(
               null,
-              "text",
-              "Messenger " +
+              'text',
+              'Messenger ' +
                 (senderName || senderId) +
-                ": " +
-                (userText || "").substring(0, 200) +
-                " | Reply: " +
+                ': ' +
+                (userText || '').substring(0, 200) +
+                ' | Reply: ' +
                 reply.substring(0, 300),
               {
-                platform: "messenger",
+                platform: 'messenger',
                 character,
-              },
+              }
             )
-            .catch(() => {});
+            .catch((err) => {
+              console.error(err);
+            });
         }
 
         // FEATURE 2: VOICE REPLY when user sent audio
@@ -1598,49 +1374,40 @@ router.post("/webhook", async function (req, res) {
         const known = await getKnownUser(senderId, supabase);
 
         if (!known) {
-          const detectedLang = detectLanguage(userText || "");
+          const detectedLang = detectLanguage(userText || '');
           await saveKnownUser(senderId, detectedLang, senderName, supabase);
           // FEATURE 5: Quick replies for new users
           setTimeout(async function () {
             try {
               await sendMessage(
                 senderId,
-                "👋 Bun venit! Sunt " +
-                  (character === "kira" ? "Kira" : "Kelion") +
-                  ", asistentul tau AI.\n\nCe doresti sa faci?",
-                ["🤖 Kelion", "👩‍💻 Kira", "📰 Știri", "❓ Ajutor"],
+                '👋 Bun venit! Sunt ' +
+                  (character === 'kira' ? 'Kira' : 'Kelion') +
+                  ', asistentul tau AI.\n\nCe doresti sa faci?',
+                ['🤖 Kelion', '👩‍💻 Kira', '📰 Știri', '❓ Ajutor']
               );
             } catch (ex) {
-              logger.warn(
-                { component: "Messenger", err: ex.message },
-                "Welcome message failed",
-              );
+              logger.warn({ component: 'Messenger', err: ex.message }, 'Welcome message failed');
             }
           }, 1500);
         } else {
           if (msgCount === 1) {
             const greetings = {
-              ro: "Bine ai revenit, " + (known.name || "prietene") + "! 😊",
-              en: "Welcome back, " + (known.name || "friend") + "! 😊",
-              de: "Willkommen zuruck, " + (known.name || "Freund") + "! 😊",
-              fr: "Bon retour, " + (known.name || "ami") + "! 😊",
-              es: "Bienvenido de nuevo, " + (known.name || "amigo") + "! 😊",
+              ro: 'Bine ai revenit, ' + (known.name || 'prietene') + '! 😊',
+              en: 'Welcome back, ' + (known.name || 'friend') + '! 😊',
+              de: 'Willkommen zuruck, ' + (known.name || 'Freund') + '! 😊',
+              fr: 'Bon retour, ' + (known.name || 'ami') + '! 😊',
+              es: 'Bienvenido de nuevo, ' + (known.name || 'amigo') + '! 😊',
             };
             setTimeout(async function () {
               try {
-                await sendMessage(
-                  senderId,
-                  greetings[known.lang] || greetings.en,
-                );
+                await sendMessage(senderId, greetings[known.lang] || greetings.en);
               } catch (ex) {
-                logger.warn(
-                  { component: "Messenger", err: ex.message },
-                  "Return greeting failed",
-                );
+                logger.warn({ component: 'Messenger', err: ex.message }, 'Return greeting failed');
               }
             }, 1000);
           }
-          const newLang = detectLanguage(userText || "");
+          const newLang = detectLanguage(userText || '');
           if (newLang !== known.lang) {
             await saveKnownUser(senderId, newLang, known.name, supabase);
           }
@@ -1651,19 +1418,16 @@ router.post("/webhook", async function (req, res) {
             try {
               await sendMessage(
                 senderId,
-                "Ai folosit " +
+                'Ai folosit ' +
                   FREE_MESSAGES_LIMIT +
-                  " mesaje gratuite!\n\n" +
+                  ' mesaje gratuite!\n\n' +
                   `Continua cu functii premium pe ${process.env.APP_URL}:\n` +
-                  "Chat nelimitat cu AI\nAvatare 3D\nVoce naturala\n\n" +
+                  'Chat nelimitat cu AI\nAvatare 3D\nVoce naturala\n\n' +
                   `Aboneaza-te: ${process.env.APP_URL}/pricing`,
-                ["💎 Upgrade", "🌐 Site"],
+                ['💎 Upgrade', '🌐 Site']
               );
             } catch (ex) {
-              logger.warn(
-                { component: "Messenger", err: ex.message },
-                "Free limit message failed",
-              );
+              logger.warn({ component: 'Messenger', err: ex.message }, 'Free limit message failed');
             }
           }, 3000);
         }
@@ -1671,59 +1435,51 @@ router.post("/webhook", async function (req, res) {
         // SAVE TO SUPABASE
         if (supabase) {
           try {
-            await supabase.from("messenger_messages").insert({
+            await supabase.from('messenger_messages').insert({
               sender_id: senderId,
-              direction: "in",
-              message_type:
-                attachments.length > 0 ? attachments[0].type : "text",
+              direction: 'in',
+              message_type: attachments.length > 0 ? attachments[0].type : 'text',
               text: userText,
               created_at: new Date().toISOString(),
             });
-            await supabase.from("messenger_messages").insert({
+            await supabase.from('messenger_messages').insert({
               sender_id: senderId,
-              direction: "out",
-              message_type: "text",
+              direction: 'out',
+              message_type: 'text',
               text: reply,
               created_at: new Date().toISOString(),
             });
           } catch (ex) {
-            logger.warn(
-              { component: "Messenger", err: ex.message },
-              "table may not exist",
-            );
+            logger.warn({ component: 'Messenger', err: ex.message }, 'table may not exist');
           }
         }
       }
     }
   } catch (ex) {
-    logger.error(
-      { component: "Messenger", err: ex.message },
-      "Webhook handler error",
-    );
+    logger.error({ component: 'Messenger', err: ex.message }, 'Webhook handler error');
   }
 });
 
 // HEALTH
-router.get("/health", function (req, res) {
+router.get('/health', function (req, res) {
   res.json({
-    status:
-      process.env.FB_PAGE_ACCESS_TOKEN && process.env.FB_APP_SECRET
-        ? "configured"
-        : "misconfigured",
+    status: process.env.FB_PAGE_ACCESS_TOKEN && process.env.FB_APP_SECRET ? 'configured' : 'misconfigured',
     hasPageToken: !!process.env.FB_PAGE_ACCESS_TOKEN,
     hasAppSecret: !!process.env.FB_APP_SECRET,
-    hasVerifyToken: !!(
-      process.env.FB_VERIFY_TOKEN || process.env.MESSENGER_VERIFY_TOKEN
-    ),
-    graphApiVersion: "v21.0",
+    hasVerifyToken: !!(process.env.FB_VERIFY_TOKEN || process.env.MESSENGER_VERIFY_TOKEN),
+    graphApiVersion: 'v21.0',
     visionEnabled: !!process.env.OPENAI_API_KEY,
     sttEnabled: !!(process.env.GROQ_API_KEY || process.env.OPENAI_API_KEY),
     ttsEnabled: !!process.env.ELEVENLABS_API_KEY,
     stats: getStats(),
-    webhookUrl: process.env.APP_URL + "/api/messenger/webhook",
+    webhookUrl: process.env.APP_URL + '/api/messenger/webhook',
   });
 });
 
+/**
+ * getStats
+ * @returns {*}
+ */
 function getStats() {
   return {
     messagesReceived: stats.messagesReceived,
@@ -1733,6 +1489,10 @@ function getStats() {
   };
 }
 
+/**
+ * undefined
+ * @returns {*}
+ */
 module.exports = {
   router,
   getStats,

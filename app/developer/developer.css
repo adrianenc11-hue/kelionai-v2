@@ -32,8 +32,8 @@
   --radius-xl: 24px;
   --glow: 0 0 30px rgba(99, 102, 241, 0.25);
   --transition: 0.25s ease;
-  --font: "Inter", -apple-system, sans-serif;
-  --font-mono: "JetBrains Mono", "Fira Code", monospace;
+  --font: 'Inter', -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
 }
 
 body {
@@ -49,20 +49,12 @@ body {
 
 /* Fundal mesh */
 body::before {
-  content: "";
+  content: '';
   position: fixed;
   inset: 0;
   background:
-    radial-gradient(
-      ellipse at 20% 50%,
-      rgba(99, 102, 241, 0.06) 0%,
-      transparent 50%
-    ),
-    radial-gradient(
-      ellipse at 80% 20%,
-      rgba(6, 182, 212, 0.04) 0%,
-      transparent 50%
-    );
+    radial-gradient(ellipse at 20% 50%, rgba(99, 102, 241, 0.06) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 20%, rgba(6, 182, 212, 0.04) 0%, transparent 50%);
   pointer-events: none;
   z-index: 0;
 }
@@ -231,7 +223,7 @@ body::before {
 }
 
 .btn-primary::before {
-  content: "";
+  content: '';
   position: absolute;
   inset: 0;
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.12), transparent);

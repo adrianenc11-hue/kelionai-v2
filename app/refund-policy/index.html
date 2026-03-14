@@ -20,7 +20,7 @@
       body {
         background: var(--kelion-bg, #050510);
         color: var(--kelion-text, #f0f0ff);
-        font-family: "Inter", system-ui, sans-serif;
+        font-family: 'Inter', system-ui, sans-serif;
         margin: 0;
         min-height: 100vh;
       }
@@ -158,7 +158,7 @@
   <body>
     <header class="legal-header">
       <a href="/" class="legal-logo">Kelion<span>AI</span></a>
-      <nav class="legal-nav">
+      <nav role="navigation" class="legal-nav">
         <a href="/">Home</a>
         <a href="/pricing/">Pricing</a>
         <a href="/terms/">Terms</a>
@@ -171,83 +171,46 @@
       <p class="legal-meta">Effective date: March 1, 2026 · Version 1.0</p>
 
       <div class="refund-highlight">
-        <strong>💡 Our commitment:</strong> We want you to be fully satisfied
-        with KelionAI. If you're not happy with your subscription, we offer a
-        straightforward refund process.
+        <strong>💡 Our commitment:</strong> We want you to be fully satisfied with KelionAI. If you're not happy with
+        your subscription, we offer a straightforward refund process.
       </div>
 
       <div class="legal-section">
         <h2>1. Eligibility for Refund</h2>
         <p>You may request a full refund under the following conditions:</p>
         <ul>
+          <li><strong>Within 14 days</strong> of your initial subscription purchase (first-time subscribers only)</li>
           <li>
-            <strong>Within 14 days</strong> of your initial subscription
-            purchase (first-time subscribers only)
+            <strong>Service unavailability</strong> — if KelionAI was unavailable for more than 48 consecutive hours
+            during your billing period
           </li>
-          <li>
-            <strong>Service unavailability</strong> — if KelionAI was
-            unavailable for more than 48 consecutive hours during your billing
-            period
-          </li>
-          <li>
-            <strong>Unauthorized charges</strong> — if you were charged without
-            your consent
-          </li>
-          <li>
-            <strong>Duplicate charges</strong> — if you were charged more than
-            once for the same subscription
-          </li>
+          <li><strong>Unauthorized charges</strong> — if you were charged without your consent</li>
+          <li><strong>Duplicate charges</strong> — if you were charged more than once for the same subscription</li>
         </ul>
       </div>
 
       <div class="legal-section">
         <h2>2. Monthly Subscriptions</h2>
-        <p>
-          For monthly subscriptions (Pro at €9.99/month, Premium at
-          €19.99/month):
-        </p>
+        <p>For monthly subscriptions (Pro at €9.99/month, Premium at €19.99/month):</p>
         <ul>
-          <li>
-            You may cancel at any time from your account settings or the Stripe
-            billing portal
-          </li>
-          <li>
-            Cancellation takes effect at the end of your current billing period
-            — you retain access until then
-          </li>
-          <li>
-            Refunds for the current month are available within 14 days of the
-            charge date
-          </li>
-          <li>
-            No refunds are provided for partial months after the 14-day window
-          </li>
+          <li>You may cancel at any time from your account settings or the Stripe billing portal</li>
+          <li>Cancellation takes effect at the end of your current billing period — you retain access until then</li>
+          <li>Refunds for the current month are available within 14 days of the charge date</li>
+          <li>No refunds are provided for partial months after the 14-day window</li>
         </ul>
       </div>
 
       <div class="legal-section">
         <h2>3. Annual Subscriptions</h2>
-        <p>
-          For annual subscriptions (Pro at €99.90/year, Premium at
-          €199.90/year):
-        </p>
+        <p>For annual subscriptions (Pro at €99.90/year, Premium at €199.90/year):</p>
         <ul>
+          <li><strong>Full refund</strong> within the first 30 days of the annual subscription</li>
           <li>
-            <strong>Full refund</strong> within the first 30 days of the annual
-            subscription
+            <strong>Pro-rated refund</strong> available within the first 90 days, calculated based on the remaining
+            months
           </li>
-          <li>
-            <strong>Pro-rated refund</strong> available within the first 90
-            days, calculated based on the remaining months
-          </li>
-          <li>
-            After 90 days, no refunds are provided — you may cancel to prevent
-            renewal
-          </li>
-          <li>
-            Cancellation stops auto-renewal; you retain access until the end of
-            the annual period
-          </li>
+          <li>After 90 days, no refunds are provided — you may cancel to prevent renewal</li>
+          <li>Cancellation stops auto-renewal; you retain access until the end of the annual period</li>
         </ul>
       </div>
 
@@ -256,17 +219,9 @@
         <p>The following are not eligible for refunds:</p>
         <ul>
           <li>Free plan usage (no charges to refund)</li>
-          <li>
-            Referral bonus periods (7-day Pro trials earned through referral
-            codes)
-          </li>
-          <li>
-            Promotional or discounted subscriptions (unless stated otherwise in
-            the promotion terms)
-          </li>
-          <li>
-            Subscriptions where the user has violated our Terms of Service
-          </li>
+          <li>Referral bonus periods (7-day Pro trials earned through referral codes)</li>
+          <li>Promotional or discounted subscriptions (unless stated otherwise in the promotion terms)</li>
+          <li>Subscriptions where the user has violated our Terms of Service</li>
         </ul>
       </div>
 
@@ -276,9 +231,7 @@
         <ul>
           <li>
             <strong>Email us</strong> at
-            <a href="mailto:support@kelionai.app" style="color: #06b6d4"
-              >support@kelionai.app</a
-            >
+            <a href="mailto:support@kelionai.app" style="color: #06b6d4">support@kelionai.app</a>
             with the subject line "Refund Request"
           </li>
           <li>
@@ -301,56 +254,40 @@
             Refunds are issued to the
             <strong>original payment method</strong> (credit/debit card)
           </li>
-          <li>
-            Processing time: <strong>5–10 business days</strong> depending on
-            your bank
-          </li>
-          <li>
-            You will receive an email confirmation when the refund is issued
-          </li>
-          <li>
-            Your subscription will be downgraded to the Free plan upon refund
-          </li>
+          <li>Processing time: <strong>5–10 business days</strong> depending on your bank</li>
+          <li>You will receive an email confirmation when the refund is issued</li>
+          <li>Your subscription will be downgraded to the Free plan upon refund</li>
         </ul>
       </div>
 
       <div class="legal-section">
         <h2>7. Chargebacks</h2>
         <p>
-          We strongly encourage you to contact us directly before initiating a
-          chargeback with your bank. Chargebacks result in additional fees and
-          may lead to your account being suspended. We are committed to
-          resolving any billing issues promptly and fairly.
+          We strongly encourage you to contact us directly before initiating a chargeback with your bank. Chargebacks
+          result in additional fees and may lead to your account being suspended. We are committed to resolving any
+          billing issues promptly and fairly.
         </p>
       </div>
 
       <div class="legal-section">
         <h2>8. Changes to This Policy</h2>
         <p>
-          We may update this refund policy from time to time. Any changes will
-          be posted on this page with an updated effective date. Continued use
-          of KelionAI after changes constitutes acceptance of the revised
-          policy.
+          We may update this refund policy from time to time. Any changes will be posted on this page with an updated
+          effective date. Continued use of KelionAI after changes constitutes acceptance of the revised policy.
         </p>
       </div>
 
       <div class="legal-section">
         <h2>9. Contact Us</h2>
-        <p>
-          If you have questions about this refund policy, please contact us:
-        </p>
+        <p>If you have questions about this refund policy, please contact us:</p>
         <ul>
           <li>
             Email:
-            <a href="mailto:support@kelionai.app" style="color: #06b6d4"
-              >support@kelionai.app</a
-            >
+            <a href="mailto:support@kelionai.app" style="color: #06b6d4">support@kelionai.app</a>
           </li>
           <li>
             Website:
-            <a href="https://kelionai.app" style="color: #06b6d4"
-              >kelionai.app</a
-            >
+            <a href="https://kelionai.app" style="color: #06b6d4">kelionai.app</a>
           </li>
         </ul>
       </div>
@@ -358,8 +295,7 @@
 
     <footer class="legal-footer">
       <p>
-        © 2026 KelionAI. <a href="/terms/">Terms</a> ·
-        <a href="/privacy/">Privacy</a> · <a href="/gdpr/">GDPR</a> ·
+        © 2026 KelionAI. <a href="/terms/">Terms</a> · <a href="/privacy/">Privacy</a> · <a href="/gdpr/">GDPR</a> ·
         <a href="/refund-policy/">Refund Policy</a>
       </p>
     </footer>

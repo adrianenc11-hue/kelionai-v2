@@ -1,11 +1,11 @@
 // ═══════════════════════════════════════════════════════════════
 // KelionAI — Auth Routes
 // ═══════════════════════════════════════════════════════════════
-"use strict";
+'use strict';
 
-const express = require("express");
-const rateLimit = require("express-rate-limit");
-const logger = require("../logger");
+const express = require('express');
+const rateLimit = require('express-rate-limit');
+const logger = require('../logger');
 const {
   validate,
   registerSchema,
@@ -15,107 +15,90 @@ const {
   resetPasswordSchema,
   changePasswordSchema,
   changeEmailSchema,
-} = require("../validation");
+} = require('../validation');
 
 const router = express.Router();
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,
-  message: { error: "Too many attempts. Please wait 15 minutes." },
-  skip: (req) => req.headers["x-admin-secret"] === process.env.ADMIN_SECRET_KEY,
+  message: { error: 'Too many attempts. Please wait 15 minutes.' },
+  skip: (req) => req.headers['x-admin-secret'] === process.env.ADMIN_SECRET_KEY,
 });
 
 // POST /api/auth/register
-router.post(
-  "/register",
-  authLimiter,
-  validate(registerSchema),
-  async (req, res) => {
-    try {
-      const { supabase, supabaseAdmin } = req.app.locals;
-      const { email, password, name } = req.body;
-      if (!email || !password)
-        return res
-          .status(400)
-          .json({ error: "Email and password are required" });
-      if (!supabase)
-        return res.status(503).json({ error: "Auth service unavailable" });
+router.post('/register', authLimiter, validate(registerSchema), async (req, res) => {
+  try {
+    const { supabase, supabaseAdmin } = req.app.locals;
+    const { email, password, name } = req.body;
+    if (!email || !password) return res.status(400).json({ error: 'Email and password are required' });
+    if (!supabase) return res.status(503).json({ error: 'Auth service unavailable' });
 
-      // Admin bypass: use admin API (no Supabase rate limit)
-      const isAdmin =
-        req.headers["x-admin-secret"] === process.env.ADMIN_SECRET_KEY;
-      if (isAdmin && supabaseAdmin) {
-        const { data, error } = await supabaseAdmin.auth.admin.createUser({
-          email,
-          password,
-          email_confirm: true,
-          user_metadata: { full_name: name || email.split("@")[0] },
-        });
-        if (error) {
-          // Already exists = still 200 (security: don't reveal)
-          if (
-            error.message.includes("already") ||
-            error.message.includes("exists")
-          ) {
-            return res.json({
-              user: { email },
-              message:
-                "If this email is not already in use, a verification email has been sent.",
-            });
-          }
-          return res.status(400).json({ error: error.message });
-        }
-        return res.json({
-          user: {
-            id: data.user.id,
-            email: data.user.email,
-            name: data.user.user_metadata?.full_name,
-          },
-          message: "Account created (admin bypass).",
-        });
-      }
-
-      const redirectUrl = process.env.APP_URL;
-      const { data, error } = await supabase.auth.signUp({
+    // Admin bypass: use admin API (no Supabase rate limit)
+    const isAdmin = req.headers['x-admin-secret'] === process.env.ADMIN_SECRET_KEY;
+    if (isAdmin && supabaseAdmin) {
+      const { data, error } = await supabaseAdmin.auth.admin.createUser({
         email,
         password,
-        options: {
-          data: { full_name: name || email.split("@")[0] },
-          emailRedirectTo: redirectUrl,
-        },
+        email_confirm: true,
+        user_metadata: { full_name: name || email.split('@')[0] },
       });
       if (error) {
-        // Don't expose whether email is already registered
-        const safeMessage = error.message.includes("already registered")
-          ? "If this email is not already in use, a verification email has been sent."
-          : error.message;
-        return res.status(400).json({ error: safeMessage });
+        // Already exists = still 200 (security: don't reveal)
+        if (error.message.includes('already') || error.message.includes('exists')) {
+          return res.json({
+            user: { email },
+            message: 'If this email is not already in use, a verification email has been sent.',
+          });
+        }
+        return res.status(400).json({ error: error.message });
       }
-      res.json({
+      return res.json({
         user: {
           id: data.user.id,
           email: data.user.email,
           name: data.user.user_metadata?.full_name,
         },
-        message:
-          "Please check your email to verify your account before signing in.",
+        message: 'Account created (admin bypass).',
       });
-    } catch {
-      res.status(500).json({ error: "Registration error" });
     }
-  },
-);
+
+    const redirectUrl = process.env.APP_URL;
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { full_name: name || email.split('@')[0] },
+        emailRedirectTo: redirectUrl,
+      },
+    });
+    if (error) {
+      // Don't expose whether email is already registered
+      const safeMessage = error.message.includes('already registered')
+        ? 'If this email is not already in use, a verification email has been sent.'
+        : error.message;
+      return res.status(400).json({ error: safeMessage });
+    }
+    res.json({
+      user: {
+        id: data.user.id,
+        email: data.user.email,
+        name: data.user.user_metadata?.full_name,
+      },
+      message: 'Please check your email to verify your account before signing in.',
+    });
+  } catch {
+    res.status(500).json({ error: 'Registration error' });
+  }
+});
 
 // POST /api/auth/login
-router.post("/login", authLimiter, validate(loginSchema), async (req, res) => {
+router.post('/login', authLimiter, validate(loginSchema), async (req, res) => {
   try {
     const { supabase } = req.app.locals;
     const { email, password } = req.body;
-    if (!email || !password)
-      return res.status(400).json({ error: "Email and password are required" });
-    if (!supabase)
-      return res.status(503).json({ error: "Auth service unavailable" });
+    if (!email || !password) return res.status(400).json({ error: 'Email and password are required' });
+    if (!supabase) return res.status(503).json({ error: 'Auth service unavailable' });
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -123,68 +106,61 @@ router.post("/login", authLimiter, validate(loginSchema), async (req, res) => {
     if (error) return res.status(401).json({ error: error.message });
     if (!data.user.email_confirmed_at) {
       return res.status(403).json({
-        error:
-          "Email not verified. Please check your inbox and verify your email before signing in.",
+        error: 'Email not verified. Please check your inbox and verify your email before signing in.',
       });
     }
-    const adminEmail = (
-      process.env.ADMIN_EMAIL || "adrianenc11@gmail.com"
-    ).toLowerCase();
+    const adminEmail = (process.env.ADMIN_EMAIL || 'adrianenc11@gmail.com').toLowerCase();
     const isAdmin = data.user.email?.toLowerCase() === adminEmail;
     res.json({
       user: {
         id: data.user.id,
         email: data.user.email,
         name: data.user.user_metadata?.full_name,
-        role: isAdmin ? "admin" : data.user.role || "user",
+        role: isAdmin ? 'admin' : data.user.role || 'user',
       },
       session: data.session,
     });
   } catch {
-    res.status(500).json({ error: "Login error" });
+    res.status(500).json({ error: 'Login error' });
   }
 });
 
 // POST /api/auth/logout
-router.post("/logout", async (req, res) => {
+router.post('/logout', async (req, res) => {
   try {
     const { supabase } = req.app.locals;
     if (supabase) await supabase.auth.signOut();
   } catch (e) {
-    logger.warn(
-      { component: "Auth", err: e.message },
-      "logout failed (non-critical)",
-    );
+    logger.warn({ component: 'Auth', err: e.message }, 'logout failed (non-critical)');
   }
   res.json({ success: true });
 });
 
 // GET /api/auth/me
-router.get("/me", async (req, res) => {
+router.get('/me', async (req, res) => {
   try {
     const { getUserFromToken } = req.app.locals;
     const u = await getUserFromToken(req);
-    if (!u) return res.status(401).json({ error: "Not authenticated" });
+    if (!u) return res.status(401).json({ error: 'Not authenticated' });
     res.json({
       user: {
         id: u.id,
         email: u.email,
         name: u.user_metadata?.full_name,
-        role: u.role || "user",
+        role: u.role || 'user',
       },
     });
   } catch {
-    res.status(500).json({ error: "Auth error" });
+    res.status(500).json({ error: 'Auth error' });
   }
 });
 
 // POST /api/auth/refresh
-router.post("/refresh", validate(refreshSchema), async (req, res) => {
+router.post('/refresh', validate(refreshSchema), async (req, res) => {
   try {
     const { supabase } = req.app.locals;
     const { refresh_token } = req.body;
-    if (!refresh_token || !supabase)
-      return res.status(400).json({ error: "Token missing" });
+    if (!refresh_token || !supabase) return res.status(400).json({ error: 'Token missing' });
     const { data, error } = await supabase.auth.refreshSession({
       refresh_token,
     });
@@ -198,108 +174,84 @@ router.post("/refresh", validate(refreshSchema), async (req, res) => {
       session: data.session,
     });
   } catch {
-    res.status(500).json({ error: "Refresh error" });
+    res.status(500).json({ error: 'Refresh error' });
   }
 });
 
 // POST /api/auth/forgot-password
-router.post(
-  "/forgot-password",
-  authLimiter,
-  validate(forgotPasswordSchema),
-  async (req, res) => {
-    try {
-      const { supabase } = req.app.locals;
-      const { email } = req.body;
-      if (!supabase)
-        return res.status(503).json({ error: "Auth service unavailable" });
-      const redirectTo = process.env.APP_URL + "/reset-password.html";
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo,
-      });
-      if (error) return res.status(400).json({ error: error.message });
-      res.json({
-        message:
-          "If an account with that email exists, a password reset link has been sent.",
-      });
-    } catch {
-      res.status(500).json({ error: "Password reset error" });
-    }
-  },
-);
+router.post('/forgot-password', authLimiter, validate(forgotPasswordSchema), async (req, res) => {
+  try {
+    const { supabase } = req.app.locals;
+    const { email } = req.body;
+    if (!supabase) return res.status(503).json({ error: 'Auth service unavailable' });
+    const redirectTo = process.env.APP_URL + '/reset-password.html';
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo,
+    });
+    if (error) return res.status(400).json({ error: error.message });
+    res.json({
+      message: 'If an account with that email exists, a password reset link has been sent.',
+    });
+  } catch {
+    res.status(500).json({ error: 'Password reset error' });
+  }
+});
 
 // POST /api/auth/reset-password
-router.post(
-  "/reset-password",
-  authLimiter,
-  validate(resetPasswordSchema),
-  async (req, res) => {
-    try {
-      const { supabase } = req.app.locals;
-      const { access_token, password } = req.body;
-      if (!supabase)
-        return res.status(503).json({ error: "Auth service unavailable" });
-      const { error: sessionError } = await supabase.auth.setSession({
-        access_token,
-        refresh_token: access_token,
-      });
-      if (sessionError)
-        return res
-          .status(401)
-          .json({ error: "Invalid or expired reset token" });
-      const { error } = await supabase.auth.updateUser({ password });
-      if (error) return res.status(400).json({ error: error.message });
-      res.json({ message: "Password updated successfully." });
-    } catch {
-      res.status(500).json({ error: "Password reset error" });
-    }
-  },
-);
+router.post('/reset-password', authLimiter, validate(resetPasswordSchema), async (req, res) => {
+  try {
+    const { supabase } = req.app.locals;
+    const { access_token, password } = req.body;
+    if (!supabase) return res.status(503).json({ error: 'Auth service unavailable' });
+    const { error: sessionError } = await supabase.auth.setSession({
+      access_token,
+      refresh_token: access_token,
+    });
+    if (sessionError) return res.status(401).json({ error: 'Invalid or expired reset token' });
+    const { error } = await supabase.auth.updateUser({ password });
+    if (error) return res.status(400).json({ error: error.message });
+    res.json({ message: 'Password updated successfully.' });
+  } catch {
+    res.status(500).json({ error: 'Password reset error' });
+  }
+});
 
 // POST /api/auth/change-password
-router.post(
-  "/change-password",
-  authLimiter,
-  validate(changePasswordSchema),
-  async (req, res) => {
-    try {
-      const { getUserFromToken, supabase } = req.app.locals;
-      const u = await getUserFromToken(req);
-      if (!u) return res.status(401).json({ error: "Not authenticated" });
-      if (!supabase)
-        return res.status(503).json({ error: "Auth service unavailable" });
-      const { password } = req.body;
-      const { error } = await supabase.auth.updateUser({ password });
-      if (error) return res.status(400).json({ error: error.message });
-      res.json({ message: "Password updated successfully." });
-    } catch {
-      res.status(500).json({ error: "Change password error" });
-    }
-  },
-);
+router.post('/change-password', authLimiter, validate(changePasswordSchema), async (req, res) => {
+  try {
+    const { getUserFromToken, supabase } = req.app.locals;
+    const u = await getUserFromToken(req);
+    if (!u) return res.status(401).json({ error: 'Not authenticated' });
+    if (!supabase) return res.status(503).json({ error: 'Auth service unavailable' });
+    const { password } = req.body;
+    const { error } = await supabase.auth.updateUser({ password });
+    if (error) return res.status(400).json({ error: error.message });
+    res.json({ message: 'Password updated successfully.' });
+  } catch {
+    res.status(500).json({ error: 'Change password error' });
+  }
+});
 
 // POST /api/auth/change-email
-router.post(
-  "/change-email",
-  authLimiter,
-  validate(changeEmailSchema),
-  async (req, res) => {
-    try {
-      const { getUserFromToken, supabase } = req.app.locals;
-      const u = await getUserFromToken(req);
-      if (!u) return res.status(401).json({ error: "Not authenticated" });
-      if (!supabase)
-        return res.status(503).json({ error: "Auth service unavailable" });
-      const { email } = req.body;
-      const { error } = await supabase.auth.updateUser({ email });
-      if (error) return res.status(400).json({ error: error.message });
-      res.json({
-        message: "A confirmation email has been sent to the new address.",
-      });
-    } catch {
-      res.status(500).json({ error: "Change email error" });
-    }
-  },
-);
+router.post('/change-email', authLimiter, validate(changeEmailSchema), async (req, res) => {
+  try {
+    const { getUserFromToken, supabase } = req.app.locals;
+    const u = await getUserFromToken(req);
+    if (!u) return res.status(401).json({ error: 'Not authenticated' });
+    if (!supabase) return res.status(503).json({ error: 'Auth service unavailable' });
+    const { email } = req.body;
+    const { error } = await supabase.auth.updateUser({ email });
+    if (error) return res.status(400).json({ error: error.message });
+    res.json({
+      message: 'A confirmation email has been sent to the new address.',
+    });
+  } catch {
+    res.status(500).json({ error: 'Change email error' });
+  }
+});
 
+/**
+ * undefined
+ * @returns {*}
+ */
 module.exports = router;

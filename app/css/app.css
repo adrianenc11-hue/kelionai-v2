@@ -1416,7 +1416,7 @@ body {
 }
 
 .msg.assistant.streaming::after {
-  content: "▋";
+  content: '▋';
   animation: blink 0.8s infinite;
   color: var(--kelion-primary);
 }

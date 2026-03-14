@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="en">
   <head>
+  <meta name="description" content="Page description">
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>KelionAI — Sports Betting Admin</title>
@@ -69,7 +70,7 @@
         width: 240px;
       }
 
-      input[type="number"].admin-input {
+      input[type='number'].admin-input {
         width: 110px;
       }
 
@@ -433,6 +434,7 @@
 
   <body>
     <nav
+      role="navigation"
       style="
         display: flex;
         align-items: center;
@@ -443,31 +445,18 @@
         font-size: 0.82rem;
       "
     >
-      <a
-        href="/"
-        style="color: #00ffff; text-decoration: none; font-weight: bold"
-        >← KelionAI</a
-      >
+      <a href="/" style="color: #00ffff; text-decoration: none; font-weight: bold">← KelionAI</a>
       <span style="color: #333">|</span>
-      <a href="/admin/health.html" style="color: #888; text-decoration: none"
-        >Health</a
-      >
-      <a href="/admin/news.html" style="color: #888; text-decoration: none"
-        >News</a
-      >
-      <a href="/admin/trading.html" style="color: #888; text-decoration: none"
-        >Trading</a
-      >
-      <a href="/admin/sports.html" style="color: #00ffff; text-decoration: none"
-        >Sports</a
-      >
+      <a href="/admin/health.html" style="color: #888; text-decoration: none">Health</a>
+      <a href="/admin/news.html" style="color: #888; text-decoration: none">News</a>
+      <a href="/admin/trading.html" style="color: #888; text-decoration: none">Trading</a>
+      <a href="/admin/sports.html" style="color: #00ffff; text-decoration: none">Sports</a>
     </nav>
     <h1>⚽ KelionAI — Sports Betting Bot</h1>
     <p class="subtitle">Sports betting management panel</p>
 
     <div class="disclaimer">
-      ⚠️ INFORMATIONAL — Gambling can be addictive. We do not guarantee
-      winnings. Play responsibly. 18+
+      ⚠️ INFORMATIONAL — Gambling can be addictive. We do not guarantee winnings. Play responsibly. 18+
     </div>
 
     <div style="margin-bottom: 16px">
@@ -475,10 +464,8 @@
     </div>
 
     <div class="toolbar">
-      <button class="btn secondary" onclick="loadAll()">🔄 Reload</button>
-      <button class="btn secondary" onclick="exportJson()">
-        ⬇ Export JSON
-      </button>
+      <button type="button" class="btn secondary" onclick="loadAll()">🔄 Reload</button>
+      <button type="button" class="btn secondary" onclick="exportJson()">⬇ Export JSON</button>
     </div>
 
     <!-- STATUS PANEL -->
@@ -520,38 +507,17 @@
         <div class="kelly-form">
           <div class="form-group">
             <label>Estimated Probability (%)</label>
-            <input
-              type="number"
-              id="kelly-prob"
-              class="admin-input"
-              min="1"
-              max="99"
-              value="55"
-              step="1"
-            />
+            <input type="number" id="kelly-prob" class="admin-input" min="1" max="99" value="55" step="1" />
           </div>
           <div class="form-group">
             <label>Offered Odds</label>
-            <input
-              type="number"
-              id="kelly-odds"
-              class="admin-input"
-              min="1.01"
-              step="0.01"
-              value="2.00"
-            />
+            <input type="number" id="kelly-odds" class="admin-input" min="1.01" step="0.01" value="2.00" />
           </div>
           <div class="form-group">
             <label>Bankroll (RON)</label>
-            <input
-              type="number"
-              id="kelly-bankroll"
-              class="admin-input"
-              min="1"
-              value="1000"
-            />
+            <input type="number" id="kelly-bankroll" class="admin-input" min="1" value="1000" />
           </div>
-          <button class="btn" onclick="calcKelly()">Calculate</button>
+          <button type="button" class="btn" onclick="calcKelly()">Calculate</button>
         </div>
         <div id="kelly-result" style="display: none" class="kelly-result">
           <div class="kr-label">Recommended Stake (Quarter Kelly ¼)</div>
@@ -570,79 +536,76 @@
     </div>
 
     <script>
-      "use strict";
+      'use strict';
 
-      let adminSecret = "kAI-adm1n-s3cr3t-2026-pr0d";
+      let adminSecret = 'kAI-adm1n-s3cr3t-2026-pr0d';
       let snapshot = {};
 
       function getHeaders() {
-        return { "x-admin-secret": adminSecret };
+        return { 'x-admin-secret': adminSecret };
       }
 
       function setStatus(msg, isError) {
-        const el = document.getElementById("status-bar");
-        el.innerHTML = isError
-          ? `<span class="error-msg">${escHtml(msg)}</span>`
-          : `<span>${escHtml(msg)}</span>`;
+        const el = document.getElementById('status-bar');
+        el.innerHTML = isError ? `<span class="error-msg">${escHtml(msg)}</span>` : `<span>${escHtml(msg)}</span>`;
       }
 
       function escHtml(str) {
-        return String(str || "")
-          .replace(/&/g, "&amp;")
-          .replace(/</g, "&lt;")
-          .replace(/>/g, "&gt;")
-          .replace(/"/g, "&quot;");
+        return String(str || '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
       }
 
       function fmtDate(iso) {
         try {
-          return new Date(iso).toLocaleString("en-US", {
-            day: "2-digit",
-            month: "short",
-            hour: "2-digit",
-            minute: "2-digit",
+          return new Date(iso).toLocaleString('en-US', {
+            day: '2-digit',
+            month: 'short',
+            hour: '2-digit',
+            minute: '2-digit',
           });
         } catch (e) {
-          return iso || "—";
+          return iso || '—';
         }
       }
 
       function confClass(confidence) {
         const c = parseFloat(confidence);
-        if (c >= 70) return "conf-high";
-        if (c >= 50) return "conf-med";
-        return "conf-low";
+        if (c >= 70) return 'conf-high';
+        if (c >= 50) return 'conf-med';
+        return 'conf-low';
       }
 
       // ═══ STATUS ═══
       async function loadStatus() {
-        const el = document.getElementById("status-grid");
+        const el = document.getElementById('status-grid');
         try {
-          const res = await fetch("/api/sports/status", {
+          const res = await fetch('/api/sports/status', {
             headers: getHeaders(),
           });
           if (res.status === 401) {
-            el.innerHTML =
-              '<div class="error-msg">Unauthorized — check admin secret.</div>';
+            el.innerHTML = '<div class="error-msg">Unauthorized — check admin secret.</div>';
             return;
           }
           const data = await res.json();
           snapshot.status = data;
           const activeSports = Array.isArray(data.activeSports)
-            ? data.activeSports.join(", ")
-            : data.activeSports || "—";
+            ? data.activeSports.join(', ')
+            : data.activeSports || '—';
           const items = [
-            { label: "Bot Status", value: escHtml(data.status || "N/A") },
-            { label: "Active Sports", value: escHtml(activeSports) },
+            { label: 'Bot Status', value: escHtml(data.status || 'N/A') },
+            { label: 'Active Sports', value: escHtml(activeSports) },
             {
-              label: "Predictions Today",
-              value: escHtml(String(data.predictionsToday ?? "—")),
+              label: 'Predictions Today',
+              value: escHtml(String(data.predictionsToday ?? '—')),
             },
             {
-              label: "Tracked Matches",
-              value: escHtml(String(data.matchesTracked ?? "—")),
+              label: 'Tracked Matches',
+              value: escHtml(String(data.matchesTracked ?? '—')),
             },
-            { label: "Last Update", value: fmtDate(data.lastUpdate) },
+            { label: 'Last Update', value: fmtDate(data.lastUpdate) },
           ];
           el.innerHTML = items
             .map(
@@ -650,9 +613,9 @@
                     <div class="stat-item">
                         <div class="stat-label">${i.label}</div>
                         <div class="stat-value">${i.value}</div>
-                    </div>`,
+                    </div>`
             )
-            .join("");
+            .join('');
         } catch (e) {
           el.innerHTML = `<div class="error-msg">Status error: ${escHtml(e.message)}</div>`;
         }
@@ -660,9 +623,9 @@
 
       // ═══ PREDICTIONS ═══
       async function loadPredictions() {
-        const el = document.getElementById("predictions-grid");
+        const el = document.getElementById('predictions-grid');
         try {
-          const res = await fetch("/api/sports/predictions", {
+          const res = await fetch('/api/sports/predictions', {
             headers: getHeaders(),
           });
           if (res.status === 401) {
@@ -672,29 +635,27 @@
           const data = await res.json();
           snapshot.predictions = data;
           const preds = (data.predictions || []).sort(
-            (a, b) =>
-              (parseFloat(b.confidence) || 0) - (parseFloat(a.confidence) || 0),
+            (a, b) => (parseFloat(b.confidence) || 0) - (parseFloat(a.confidence) || 0)
           );
           if (!preds.length) {
-            el.innerHTML =
-              '<div class="empty-state">No predictions available today.</div>';
+            el.innerHTML = '<div class="empty-state">No predictions available today.</div>';
             return;
           }
           el.innerHTML = preds
             .map(
               (p) => `
-                    <div class="pred-card${p.valueBet ? " value-bet" : ""}">
-                        <div class="pred-match">${escHtml(p.match || (p.homeTeam && p.awayTeam) ? p.homeTeam + " vs " + p.awayTeam : "—")}</div>
-                        <div class="pred-meta">${escHtml(p.competition || p.league || "—")} · ${fmtDate(p.kickoff || p.date)}</div>
-                        <div class="pred-pick">🎯 ${escHtml(p.pick || p.prediction || "—")}</div>
+                    <div class="pred-card${p.valueBet ? ' value-bet' : ''}">
+                        <div class="pred-match">${escHtml(p.match || (p.homeTeam && p.awayTeam) ? p.homeTeam + ' vs ' + p.awayTeam : '—')}</div>
+                        <div class="pred-meta">${escHtml(p.competition || p.league || '—')} · ${fmtDate(p.kickoff || p.date)}</div>
+                        <div class="pred-pick">🎯 ${escHtml(p.pick || p.prediction || '—')}</div>
                         <div class="pred-footer">
-                            <span class="conf-badge ${confClass(p.confidence)}">${escHtml(String(p.confidence ?? "—"))}% conf.</span>
-                            ${p.valueBet ? '<span class="value-badge">💎 VALUE BET</span>' : ""}
-                            ${p.odds != null ? `<span class="odds-label">Cotă: ${escHtml(String(p.odds))}</span>` : ""}
+                            <span class="conf-badge ${confClass(p.confidence)}">${escHtml(String(p.confidence ?? '—'))}% conf.</span>
+                            ${p.valueBet ? '<span class="value-badge">💎 VALUE BET</span>' : ''}
+                            ${p.odds != null ? `<span class="odds-label">Cotă: ${escHtml(String(p.odds))}</span>` : ''}
                         </div>
-                    </div>`,
+                    </div>`
             )
-            .join("");
+            .join('');
         } catch (e) {
           el.innerHTML = `<div class="error-msg">Predictions error: ${escHtml(e.message)}</div>`;
         }
@@ -702,9 +663,9 @@
 
       // ═══ LIVE SCORES ═══
       async function loadLive() {
-        const el = document.getElementById("live-list");
+        const el = document.getElementById('live-list');
         try {
-          const res = await fetch("/api/sports/live", {
+          const res = await fetch('/api/sports/live', {
             headers: getHeaders(),
           });
           if (res.status === 401) {
@@ -715,35 +676,24 @@
           snapshot.live = data;
           const matches = data.matches || data.live || [];
           if (!matches.length) {
-            el.innerHTML =
-              '<div class="empty-state">No live matches at the moment.</div>';
+            el.innerHTML = '<div class="empty-state">No live matches at the moment.</div>';
             return;
           }
           el.innerHTML = matches
             .map((m) => {
               // Backend returns { match: 'A vs B', score: '1-1', minute: 67, status: 'LIVE', competition: '...' }
-              const scoreParts = String(m.score || "").split("-");
-              const homeScore =
-                m.homeScore != null
-                  ? m.homeScore
-                  : scoreParts[0] != null
-                    ? scoreParts[0]
-                    : "—";
-              const awayScore =
-                m.awayScore != null
-                  ? m.awayScore
-                  : scoreParts[1] != null
-                    ? scoreParts[1]
-                    : "—";
+              const scoreParts = String(m.score || '').split('-');
+              const homeScore = m.homeScore != null ? m.homeScore : scoreParts[0] != null ? scoreParts[0] : '—';
+              const awayScore = m.awayScore != null ? m.awayScore : scoreParts[1] != null ? scoreParts[1] : '—';
               return `<div class="live-item">
                         <div>
-                            <div class="live-teams">${escHtml(m.match || (m.homeTeam || m.home || "") + " vs " + (m.awayTeam || m.away || ""))}</div>
-                            <div class="live-info">${escHtml(m.competition || m.league || "—")} · ${escHtml(m.minute != null ? String(m.minute) + "'" : m.status || "—")}</div>
+                            <div class="live-teams">${escHtml(m.match || (m.homeTeam || m.home || '') + ' vs ' + (m.awayTeam || m.away || ''))}</div>
+                            <div class="live-info">${escHtml(m.competition || m.league || '—')} · ${escHtml(m.minute != null ? String(m.minute) + "'" : m.status || '—')}</div>
                         </div>
                         <div class="live-score">${escHtml(String(homeScore))} – ${escHtml(String(awayScore))}</div>
                     </div>`;
             })
-            .join("");
+            .join('');
         } catch (e) {
           el.innerHTML = `<div class="error-msg">Live scores error: ${escHtml(e.message)}</div>`;
         }
@@ -751,9 +701,9 @@
 
       // ═══ LEAGUES ═══
       async function loadLeagues() {
-        const el = document.getElementById("leagues-grid");
+        const el = document.getElementById('leagues-grid');
         try {
-          const res = await fetch("/api/sports/leagues", {
+          const res = await fetch('/api/sports/leagues', {
             headers: getHeaders(),
           });
           if (res.status === 401) {
@@ -764,8 +714,7 @@
           snapshot.leagues = data;
           const leagues = data.leagues || [];
           if (!leagues.length) {
-            el.innerHTML =
-              '<div class="empty-state">No leagues configured.</div>';
+            el.innerHTML = '<div class="empty-state">No leagues configured.</div>';
             return;
           }
           el.innerHTML = leagues
@@ -773,10 +722,10 @@
               (l) => `
                     <div class="league-item">
                         <div>${escHtml(l.name || l)}</div>
-                        ${l.sport ? `<div class="league-sport">${escHtml(l.sport)}</div>` : ""}
-                    </div>`,
+                        ${l.sport ? `<div class="league-sport">${escHtml(l.sport)}</div>` : ''}
+                    </div>`
             )
-            .join("");
+            .join('');
         } catch (e) {
           el.innerHTML = `<div class="error-msg">Leagues error: ${escHtml(e.message)}</div>`;
         }
@@ -784,23 +733,12 @@
 
       // ═══ KELLY CALCULATOR ═══
       function calcKelly() {
-        const prob =
-          parseFloat(document.getElementById("kelly-prob").value) / 100;
-        const odds = parseFloat(document.getElementById("kelly-odds").value);
-        const bankroll = parseFloat(
-          document.getElementById("kelly-bankroll").value,
-        );
+        const prob = parseFloat(document.getElementById('kelly-prob').value) / 100;
+        const odds = parseFloat(document.getElementById('kelly-odds').value);
+        const bankroll = parseFloat(document.getElementById('kelly-bankroll').value);
 
-        if (
-          isNaN(prob) ||
-          isNaN(odds) ||
-          isNaN(bankroll) ||
-          prob <= 0 ||
-          prob >= 1 ||
-          odds <= 1 ||
-          bankroll <= 0
-        ) {
-          document.getElementById("kelly-result").style.display = "none";
+        if (isNaN(prob) || isNaN(odds) || isNaN(bankroll) || prob <= 0 || prob >= 1 || odds <= 1 || bankroll <= 0) {
+          document.getElementById('kelly-result').style.display = 'none';
           return;
         }
 
@@ -810,24 +748,23 @@
         const kellyFrac = kellyFull / 4; // Quarter Kelly for safety
         const stake = Math.max(0, kellyFrac * bankroll);
 
-        const resultEl = document.getElementById("kelly-result");
-        document.getElementById("kelly-stake").textContent =
-          stake.toFixed(2) + " RON";
+        const resultEl = document.getElementById('kelly-result');
+        document.getElementById('kelly-stake').textContent = stake.toFixed(2) + ' RON';
         const noteText =
           kellyFull <= 0
-            ? "⚠️ Negative Kelly — no statistical edge at this odds/probability."
+            ? '⚠️ Negative Kelly — no statistical edge at this odds/probability.'
             : `Full Kelly: ${(kellyFull * 100).toFixed(1)}% | Quarter Kelly (recommended): ${(kellyFrac * 100).toFixed(1)}% of bankroll`;
-        document.getElementById("kelly-note").textContent = noteText;
-        resultEl.style.display = "block";
+        document.getElementById('kelly-note').textContent = noteText;
+        resultEl.style.display = 'block';
       }
 
       // ═══ ROI & BANKROLL ═══
       async function loadRoi() {
-        const el = document.getElementById("roi-grid");
+        const el = document.getElementById('roi-grid');
         try {
           const [roiRes, bankrollRes] = await Promise.all([
-            fetch("/api/sports/roi", { headers: getHeaders() }),
-            fetch("/api/sports/bankroll", { headers: getHeaders() }),
+            fetch('/api/sports/roi', { headers: getHeaders() }),
+            fetch('/api/sports/bankroll', { headers: getHeaders() }),
           ]);
           if (roiRes.status === 401 || bankrollRes.status === 401) {
             el.innerHTML = '<div class="error-msg">Unauthorized.</div>';
@@ -842,41 +779,37 @@
           const profitVal = parseFloat(roi.profit ?? roi.netProfit);
           const metrics = [
             {
-              label: "ROI",
-              value:
-                roi.roi != null
-                  ? (roiVal >= 0 ? "+" : "") + roiVal.toFixed(2) + "%"
-                  : "—",
-              cls: roiVal >= 0 ? "pos" : "neg",
+              label: 'ROI',
+              value: roi.roi != null ? (roiVal >= 0 ? '+' : '') + roiVal.toFixed(2) + '%' : '—',
+              cls: roiVal >= 0 ? 'pos' : 'neg',
             },
             {
-              label: "Net Profit",
+              label: 'Net Profit',
               value:
                 roi.profit != null || roi.netProfit != null
-                  ? (profitVal >= 0 ? "+" : "") + profitVal.toFixed(2) + " RON"
-                  : "—",
-              cls: profitVal >= 0 ? "pos" : "neg",
+                  ? (profitVal >= 0 ? '+' : '') + profitVal.toFixed(2) + ' RON'
+                  : '—',
+              cls: profitVal >= 0 ? 'pos' : 'neg',
             },
-            { label: "Total Bets", value: String(roi.totalBets ?? "—") },
+            { label: 'Total Bets', value: String(roi.totalBets ?? '—') },
             {
-              label: "Win Rate",
-              value: roi.winRate != null ? roi.winRate + "%" : "—",
-            },
-            {
-              label: "Current Bankroll",
-              value: bankroll.current != null ? bankroll.current + " RON" : "—",
+              label: 'Win Rate',
+              value: roi.winRate != null ? roi.winRate + '%' : '—',
             },
             {
-              label: "Initial Bankroll",
-              value: bankroll.initial != null ? bankroll.initial + " RON" : "—",
+              label: 'Current Bankroll',
+              value: bankroll.current != null ? bankroll.current + ' RON' : '—',
             },
             {
-              label: "Max Drawdown",
-              value:
-                bankroll.maxDrawdown != null ? bankroll.maxDrawdown + "%" : "—",
+              label: 'Initial Bankroll',
+              value: bankroll.initial != null ? bankroll.initial + ' RON' : '—',
             },
             {
-              label: "Last Update",
+              label: 'Max Drawdown',
+              value: bankroll.maxDrawdown != null ? bankroll.maxDrawdown + '%' : '—',
+            },
+            {
+              label: 'Last Update',
               value: fmtDate(roi.updatedAt || bankroll.updatedAt),
             },
           ];
@@ -885,10 +818,10 @@
               (m) => `
                     <div class="roi-item">
                         <div class="roi-label">${escHtml(m.label)}</div>
-                        <div class="roi-value ${m.cls || ""}">${escHtml(String(m.value))}</div>
-                    </div>`,
+                        <div class="roi-value ${m.cls || ''}">${escHtml(String(m.value))}</div>
+                    </div>`
             )
-            .join("");
+            .join('');
         } catch (e) {
           el.innerHTML = `<div class="error-msg">ROI error: ${escHtml(e.message)}</div>`;
         }
@@ -897,10 +830,10 @@
       // ═══ EXPORT ═══
       function exportJson() {
         const blob = new Blob([JSON.stringify(snapshot, null, 2)], {
-          type: "application/json",
+          type: 'application/json',
         });
         const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
+        const a = document.createElement('a');
         a.href = url;
         a.download = `sports-snapshot-${new Date().toISOString().slice(0, 10)}.json`;
         a.click();
@@ -909,15 +842,9 @@
 
       // ═══ INIT ═══
       async function loadAll() {
-        setStatus("Loading data...");
-        await Promise.all([
-          loadStatus(),
-          loadPredictions(),
-          loadLive(),
-          loadLeagues(),
-          loadRoi(),
-        ]);
-        setStatus(`Updated at ${new Date().toLocaleTimeString("en-US")}`);
+        setStatus('Loading data...');
+        await Promise.all([loadStatus(), loadPredictions(), loadLive(), loadLeagues(), loadRoi()]);
+        setStatus(`Updated at ${new Date().toLocaleTimeString('en-US')}`);
       }
 
       loadAll();

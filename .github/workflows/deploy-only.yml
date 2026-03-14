@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       environment:
-        description: "Deploy environment"
+        description: 'Deploy environment'
         required: true
-        default: "production"
+        default: 'production'
         type: choice
         options:
           - production
@@ -76,10 +76,10 @@ jobs:
         if: steps.check-secrets.outputs.skip == 'false'
         uses: nwtgck/actions-netlify@v3.0
         with:
-          publish-dir: "./app"
+          publish-dir: './app'
           production-deploy: ${{ inputs.environment == 'production' }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          deploy-message: "Manual deploy — ${{ github.sha }}"
+          deploy-message: 'Manual deploy — ${{ github.sha }}'
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
           NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}

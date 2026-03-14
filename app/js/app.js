@@ -17,6 +17,15 @@
   // ── #155: FRONTEND ERROR CAPTURE → Brain ──
   let _errCount = 0,
     _errResetTimer = null;
+  /**
+   * reportError
+   * @param {*} type
+   * @param {*} message
+   * @param {*} source
+   * @param {*} line
+   * @param {*} col
+   * @returns {*}
+   */
   function reportError(type, message, source, line, col) {
     if (_errCount >= 5) return; // max 5 per minute
     _errCount++;
@@ -50,10 +59,18 @@
     reportError("promise", e.reason?.message || String(e.reason), "", 0, 0);
   });
 
+  /**
+   * _adminHeaders
+   * @returns {*}
+   */
   function _adminHeaders() {
     return { ...authHeaders(), "x-admin-secret": adminSecret || "" };
   }
 
+  /**
+   * authHeaders
+   * @returns {*}
+   */
   function authHeaders() {
     return {
       "Content-Type": "application/json",
@@ -61,6 +78,11 @@
     };
   }
 
+  /**
+   * persistConvId
+   * @param {*} id
+   * @returns {*}
+   */
   function persistConvId(id) {
     currentConversationId = id;
     try {
@@ -70,6 +92,10 @@
       console.warn("[App] localStorage write:", e.message);
     }
   }
+  /**
+   * restoreConvId
+   * @returns {*}
+   */
   function restoreConvId() {
     try {
       return localStorage.getItem("kelion_conv_id") || null;
@@ -79,6 +105,10 @@
     }
   }
 
+  /**
+   * unlockAudio
+   * @returns {*}
+   */
   function unlockAudio() {
     if (!audioUnlocked) {
       audioUnlocked = true;
@@ -97,6 +127,12 @@
     if (window.KVoice) KVoice.ensureAudioUnlocked();
   }
 
+  /**
+   * showOnMonitor
+   * @param {*} content
+   * @param {*} type
+   * @returns {*}
+   */
   function showOnMonitor(content, type) {
     if (window.MonitorManager) MonitorManager.show(content, type);
   }
@@ -133,6 +169,11 @@
     "ce e în jurul",
     "ce e in jurul",
   ];
+  /**
+   * isVisionRequest
+   * @param {*} t
+   * @returns {*}
+   */
   function isVisionRequest(t) {
     const l = t.toLowerCase();
     return VISION_TRIGGERS.some((v) => l.includes(v));
@@ -163,6 +204,11 @@
   };
   const WEB_CMDS =
     /\b(deschide|pune|open|play|start|go to|du-te pe|arata|arată|mergi pe|porneste|pornește|navighează|navigheaza)\b/i;
+  /**
+   * tryWebCommand
+   * @param {*} text
+   * @returns {*}
+   */
   function tryWebCommand(text) {
     const lower = text.toLowerCase();
     if (!WEB_CMDS.test(lower)) return null;
@@ -188,11 +234,20 @@
     "inchide monitorul",
     "închide monitorul",
   ];
+  /**
+   * isMonitorClear
+   * @param {*} t
+   * @returns {*}
+   */
   function isMonitorClear(t) {
     const l = t.toLowerCase();
     return CLEAR_TRIGGERS.some((v) => l.includes(v));
   }
 
+  /**
+   * triggerVision
+   * @returns {*}
+   */
   async function triggerVision() {
     showThinking(false);
     addMessage("assistant", "👁️ Activating camera...");
@@ -255,6 +310,11 @@
   // ═══════════════════════════════════════════════════════════
   let pendingMedia = null; // { base64, mimeType, name, size, previewUrl }
 
+  /**
+   * handleFileAttach
+   * @param {*} file
+   * @returns {*}
+   */
   function handleFileAttach(file) {
     if (!file) return;
     // Max 20MB for direct base64 (Gemini limit ~20MB inline)
@@ -282,6 +342,10 @@
     reader.readAsDataURL(file);
   }
 
+  /**
+   * showMediaPreview
+   * @returns {*}
+   */
   function showMediaPreview() {
     removeMediaPreview(); // clean previous
     if (!pendingMedia) return;
@@ -310,11 +374,15 @@
       ")</span>";
     content +=
       '<button onclick="window._clearPendingMedia()" style="background:none;border:none;color:#f87171;cursor:pointer;font-size:1rem;padding:2px 6px" title="Elimină">✕</button>';
-    preview.innerHTML = content;
+    preview.textContent = content;
     const inputRow = document.getElementById("input-row");
     if (inputRow) inputRow.parentNode.insertBefore(preview, inputRow);
   }
 
+  /**
+   * removeMediaPreview
+   * @returns {*}
+   */
   function removeMediaPreview() {
     const el = document.getElementById("media-preview");
     if (el) el.remove();
@@ -401,6 +469,12 @@
   // ═══════════════════════════════════════════════════════════
   let _speakGeneration = 0; // atomic counter to prevent voice overlap
 
+  /**
+   * sendToAI_Regular
+   * @param {*} message
+   * @param {*} language
+   * @returns {*}
+   */
   async function sendToAI_Regular(message, language) {
     showThinking(true);
     // Stop any ongoing speech BEFORE starting new request
@@ -458,17 +532,17 @@
       // ═══════════════════════════════════════════════════════
       // Prepare UI for streaming
       const overlay = document.getElementById("chat-overlay");
-      overlay.innerHTML = "";
+      overlay.textContent = "";
       const actionBar = document.createElement("div");
       actionBar.className = "msg-actions";
-      actionBar.innerHTML =
+      actionBar.textContent =
         '<button class="msg-action-btn" id="btn-copy-msg" title="Copiază text">📋</button>' +
         '<button class="msg-action-btn" id="btn-save-msg" title="Salvează ca fișier">💾</button>';
       overlay.appendChild(actionBar);
       const msgEl = document.createElement("div");
       msgEl.className = "msg assistant";
       msgEl.style.userSelect = "text";
-      msgEl.innerHTML = '<span style="color:#6366f1;opacity:0.6">⏳</span>';
+      msgEl.textContent = '<span style="color:#6366f1;opacity:0.6">⏳</span>';
       overlay.appendChild(msgEl);
 
       let fullReply = "";
@@ -509,14 +583,14 @@
                   if (evt.type === "chunk" && evt.text) {
                     fullReply += evt.text;
                     // Progressive display — show text as it arrives
-                    msgEl.innerHTML = parseMarkdown(fullReply);
+                    msgEl.textContent = parseMarkdown(fullReply);
                     overlay.scrollTop = overlay.scrollHeight;
                   } else if (evt.type === "start") {
                     streamEngine = evt.engine || "Gemini";
                   } else if (evt.type === "monitor" && evt.content) {
                     showOnMonitor(evt.content, evt.monitorType || "html");
                   } else if (evt.type === "thinking") {
-                    msgEl.innerHTML =
+                    msgEl.textContent =
                       '<span style="color:#6366f1;opacity:0.6">🧠 Thinking...</span>';
                   } else if (evt.type === "done") {
                     if (evt.conversationId) persistConvId(evt.conversationId);
@@ -694,7 +768,7 @@
       chatHistory.push({ role: "assistant", content: fullReply });
 
       // Final display (clean text without tags)
-      msgEl.innerHTML = parseMarkdown(fullReply);
+      msgEl.textContent = parseMarkdown(fullReply);
       overlay.scrollTop = overlay.scrollHeight;
 
       // Wire copy/save buttons
@@ -808,7 +882,7 @@
   async function loadConversations() {
     const list = document.getElementById("history-list");
     if (!list) return;
-    list.innerHTML = '<div class="history-empty">Loading...</div>';
+    list.textContent = '<div class="history-empty">Loading...</div>';
 
     try {
       const r = await fetch(API_BASE + "/api/conversations", {
@@ -819,19 +893,19 @@
       const convs = data.conversations || data || [];
 
       if (convs.length === 0) {
-        list.innerHTML =
+        list.textContent =
           '<div class="history-empty">No conversations yet.<br>Start chatting!</div>';
         return;
       }
 
-      list.innerHTML = "";
+      list.textContent = "";
       for (const c of convs) {
         const item = document.createElement("div");
         item.className =
           "history-item" + (c.id === currentConversationId ? " active" : "");
         const date = new Date(c.updated_at || c.created_at);
         const timeAgo = formatTimeAgo(date);
-        item.innerHTML =
+        item.textContent =
           '<div class="history-item-title">' +
           escapeHtml(c.title || "Conversation") +
           "</div>" +
@@ -846,11 +920,17 @@
         list.appendChild(item);
       }
     } catch (_e) {
-      list.innerHTML =
+      list.textContent =
         '<div class="history-empty">Unable to load history.<br>Check authentication.</div>';
     }
   }
 
+  /**
+   * resumeConversation
+   * @param {*} convId
+   * @param {*} avatar
+   * @returns {*}
+   */
   async function resumeConversation(convId, avatar) {
     try {
       if (avatar && avatar !== KAvatar.getCurrentAvatar()) switchAvatar(avatar);
@@ -866,7 +946,7 @@
 
       chatHistory = [];
       const overlay = document.getElementById("chat-overlay");
-      overlay.innerHTML = "";
+      overlay.textContent = "";
 
       for (const m of msgs) {
         const role = m.role === "assistant" ? "assistant" : "user";
@@ -883,17 +963,26 @@
     }
   }
 
+  /**
+   * startNewChat
+   * @returns {*}
+   */
   function startNewChat() {
     persistConvId(null);
     chatHistory = [];
     const overlay = document.getElementById("chat-overlay");
-    if (overlay) overlay.innerHTML = "";
+    if (overlay) overlay.textContent = "";
     document.querySelectorAll(".history-item").forEach(function (el) {
       el.classList.remove("active");
     });
     if (window.innerWidth < 768) toggleHistory(false);
   }
 
+  /**
+   * toggleHistory
+   * @param {*} forceState
+   * @returns {*}
+   */
   function toggleHistory(forceState) {
     const sidebar = document.getElementById("history-sidebar");
     if (!sidebar) return;
@@ -902,6 +991,11 @@
     if (historyOpen) loadConversations();
   }
 
+  /**
+   * formatTimeAgo
+   * @param {*} date
+   * @returns {*}
+   */
   function formatTimeAgo(date) {
     const now = new Date(),
       diff = now - date;
@@ -915,6 +1009,11 @@
     return date.toLocaleDateString("en-US", { day: "numeric", month: "short" });
   }
 
+  /**
+   * escapeHtml
+   * @param {*} t
+   * @returns {*}
+   */
   function escapeHtml(t) {
     const d = document.createElement("div");
     d.textContent = t;
@@ -967,11 +1066,11 @@
       .trim();
     if (!text) return; // Don't show empty messages
     const o = document.getElementById("chat-overlay");
-    o.innerHTML = ""; // Clear previous — max 1 phrase on screen at a time
+    o.textContent = ""; // Clear previous — max 1 phrase on screen at a time
     const m = document.createElement("div");
     m.className = "msg " + type;
     if (type === "assistant") {
-      m.innerHTML = parseMarkdown(text);
+      m.textContent = parseMarkdown(text);
     } else {
       m.textContent = text;
     }
@@ -982,18 +1081,38 @@
       if (o.contains(m)) o.removeChild(m);
     }, 5000);
   }
+  /**
+   * _updateSubtitle
+   * @param {*} /* type
+   * @param {*} text */
+   * @returns {*}
+   */
   function _updateSubtitle(/* type, text */) {
     // Disabled — messages already visible in chat overlay, subtitle caused duplicate display
     return;
   }
+  /**
+   * showThinking
+   * @param {*} v
+   * @returns {*}
+   */
   function showThinking(v) {
     document.getElementById("thinking").classList.toggle("active", v);
   }
+  /**
+   * hideWelcome
+   * @returns {*}
+   */
   function hideWelcome() {
     const w = document.getElementById("welcome");
     if (w) w.classList.add("hidden");
   }
 
+  /**
+   * switchAvatar
+   * @param {*} name
+   * @returns {*}
+   */
   function switchAvatar(name) {
     if (window.KVoice) KVoice.stopSpeaking();
     try {
@@ -1012,7 +1131,6 @@
     document.title = displayName + "AI";
     // DO NOT clear chat history or chat overlay when switching avatars
     // chatHistory = []; persistConvId(null);
-    // var o = document.getElementById('chat-overlay'); if (o) o.innerHTML = '';
   }
 
   // ─── Upgrade voice command detection ─────────────────────
@@ -1150,6 +1268,11 @@
     });
   }
 
+  /**
+   * handleFiles
+   * @param {*} fileList
+   * @returns {*}
+   */
   async function handleFiles(fileList) {
     hideWelcome();
     for (let i = 0; i < fileList.length; i++) {
@@ -1236,6 +1359,10 @@
     // NOTE: This is just the loading overlay. Auth-screen (with START button) stays visible
     // until user clicks START — that click is the user gesture needed for AudioContext
     const splashEl = document.getElementById("splash-screen");
+    /**
+     * dismissSplash
+     * @returns {*}
+     */
     function dismissSplash() {
       if (splashEl && splashEl.parentNode) {
         splashEl.style.opacity = "0";
@@ -1294,7 +1421,7 @@
             const overlay = document.getElementById("chat-overlay");
             const imgEl = document.createElement("div");
             imgEl.className = "msg user";
-            imgEl.innerHTML =
+            imgEl.textContent =
               '<img src="' +
               b64 +
               '" style="max-width:200px;border-radius:8px;margin:4px 0;">';
@@ -1396,7 +1523,6 @@
               if (micLang === "fr") micLang = "fr-FR";
               if (micLang === "es") micLang = "es-ES";
               window._directSpeech.lang = micLang;
-              console.log("[Mic] ✅ SpeechRecognition language:", micLang);
               window._directSpeech.onresult = function (ev) {
                 _micRetryCount = 0; // reset on successful result
                 // Clear no-speech warning timer
@@ -1430,13 +1556,11 @@
                     // Interim result — show user that mic is hearing
                     const interim = ev.results[i][0].transcript.trim();
                     if (interim.length > 2) {
-                      console.log("[Mic] 🔄 Hearing:", interim);
                     }
                   }
                 }
               };
               window._directSpeech.onaudiostart = function () {
-                console.log("[Mic] 🎤 Audio capture started");
                 // Start no-speech warning timer (8s)
                 _micNoSpeechTimer = setTimeout(function () {
                   console.warn(
@@ -1445,14 +1569,12 @@
                 }, 8000);
               };
               window._directSpeech.onspeechstart = function () {
-                console.log("[Mic] 🗣️ Speech detected");
                 if (_micNoSpeechTimer) {
                   clearTimeout(_micNoSpeechTimer);
                   _micNoSpeechTimer = null;
                 }
               };
               window._directSpeech.onsoundstart = function () {
-                console.log("[Mic] 🔊 Sound detected");
               };
               window._directSpeech.onnomatch = function () {
                 console.warn(
@@ -1482,7 +1604,6 @@
                         if (micOn) {
                           try {
                             window._directSpeech.start();
-                            console.log("[Mic] ▶️ Restarted after AI speech");
                           } catch (e) {
                             console.warn("[Mic] Restart failed:", e.message);
                           }
@@ -1533,7 +1654,6 @@
                 }
               };
               window._directSpeech.start();
-              console.log("[Mic] ▶️ SpeechRecognition started successfully");
             } else {
               console.error(
                 "[Mic] ❌ SpeechRecognition API not available in this browser",
@@ -1549,7 +1669,6 @@
             micToggle.style.color = "#00ff88";
             micToggle.style.boxShadow = "0 0 12px rgba(0,255,136,0.4)";
             micToggle.title = "🟢 Mic ON — vorbește liber! (ro-RO)";
-            console.log("[App] ✅ Mic ON — direct speech mode, lang:", micLang);
             // Start mic monitor for visual feedback
             if (window.KVoice && KVoice.startMicMonitor)
               KVoice.startMicMonitor();
@@ -1586,7 +1705,6 @@
           // Hide bargraph indicator
           const micLevelEl = document.getElementById("mic-level");
           if (micLevelEl) micLevelEl.style.display = "none";
-          console.log("[App] Mic OFF");
         }
       });
     }
@@ -1628,7 +1746,7 @@
         popup.id = "plus-popup";
         popup.style.cssText =
           "position:absolute;bottom:44px;right:0;background:#1a1a2e;border:1px solid #333;border-radius:8px;padding:6px;z-index:100;display:flex;gap:6px;box-shadow:0 4px 16px rgba(0,0,0,0.5);";
-        popup.innerHTML =
+        popup.textContent =
           '<button id="plus-import" style="background:#2a2a4a;color:#a5b4fc;border:1px solid #444;border-radius:6px;padding:8px 16px;cursor:pointer;font-size:0.85rem;">📂 Adaugă fișier</button>' +
           '<button id="plus-export" style="background:#2a2a4a;color:#86efac;border:1px solid #444;border-radius:6px;padding:8px 16px;cursor:pointer;font-size:0.85rem;">💾 Salvează tot</button>' +
           '<button id="plus-export-chat" style="background:#2a2a4a;color:#fbbf24;border:1px solid #444;border-radius:6px;padding:8px 16px;cursor:pointer;font-size:0.85rem;">📥 Export chat</button>';
@@ -1759,7 +1877,6 @@
             /* ignored */
           }
         }
-        console.log("[App] Free tier: memory cleared on exit");
       }
 
       sessionStorage.clear();
@@ -1791,6 +1908,10 @@
 
     // ─── Idle detection: logout after 30 min of inactivity ───────
     let idleTimer = null;
+    /**
+     * resetIdleTimer
+     * @returns {*}
+     */
     function resetIdleTimer() {
       clearTimeout(idleTimer);
       if (sessionStorage.getItem("kelion_token")) {
@@ -1857,7 +1978,7 @@
           if (msgs.length === 0) return;
           hideWelcome();
           const overlay = document.getElementById("chat-overlay");
-          overlay.innerHTML = "";
+          overlay.textContent = "";
           chatHistory = [];
           for (let i = 0; i < msgs.length; i++) {
             const role = msgs[i].role === "assistant" ? "assistant" : "user";
@@ -1875,7 +1996,6 @@
     clearTimeout(splashTimer);
     dismissSplash();
 
-    console.log("[App] ✅ KelionAI v2.3 — STREAMING + HISTORY");
   }
 
   window.KApp = {

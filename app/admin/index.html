@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="ro">
   <head>
+  <meta name="description" content="Page description">
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>KelionAI — Admin Panel V2</title>
@@ -31,88 +32,53 @@
         </div>
         <div class="header-right">
           <span id="admin-uptime" class="admin-uptime">—</span>
-          <a href="/admin/brain-chat.html" class="admin-btn admin-btn-k1"
-            >🧠 K1 Chat</a
-          >
-          <a href="/admin/intelligence.html" class="admin-btn admin-btn-intel"
-            >🔬 Intelligence</a
-          >
-          <a href="/admin/ab-testing.html" class="admin-btn admin-btn-ab"
-            >🧪 A/B Test</a
-          >
-          <a href="/admin/live-users.html" class="admin-btn admin-btn-live"
-            >👥 Live</a
-          >
-          <a href="/admin/errors.html" class="admin-btn admin-btn-errors"
-            >🚨 Errors</a
-          >
-          <a
-            href="/admin/cost-analytics.html"
-            class="admin-btn admin-btn-export"
-            >💰 Costs</a
-          >
-          <a href="/admin/sessions.html" class="admin-btn admin-btn-k1"
-            >🔐 Sessions</a
-          >
-          <a href="/admin/templates.html" class="admin-btn admin-btn-intel"
-            >📝 Templates</a
-          >
-          <a href="/admin/webhooks.html" class="admin-btn admin-btn-live"
-            >🔗 Webhooks</a
-          >
-          <a href="/admin/plugins.html" class="admin-btn admin-btn-ab"
-            >🔌 Plugins</a
-          >
-          <a href="/admin/models.html" class="admin-btn admin-btn-k1"
-            >🏠 Models</a
-          >
+          <a href="/admin/brain-chat.html" class="admin-btn admin-btn-k1">🧠 K1 Chat</a>
+          <a href="/admin/intelligence.html" class="admin-btn admin-btn-intel">🔬 Intelligence</a>
+          <a href="/admin/ab-testing.html" class="admin-btn admin-btn-ab">🧪 A/B Test</a>
+          <a href="/admin/live-users.html" class="admin-btn admin-btn-live">👥 Live</a>
+          <a href="/admin/errors.html" class="admin-btn admin-btn-errors">🚨 Errors</a>
+          <a href="/admin/cost-analytics.html" class="admin-btn admin-btn-export">💰 Costs</a>
+          <a href="/admin/sessions.html" class="admin-btn admin-btn-k1">🔐 Sessions</a>
+          <a href="/admin/templates.html" class="admin-btn admin-btn-intel">📝 Templates</a>
+          <a href="/admin/webhooks.html" class="admin-btn admin-btn-live">🔗 Webhooks</a>
+          <a href="/admin/plugins.html" class="admin-btn admin-btn-ab">🔌 Plugins</a>
+          <a href="/admin/models.html" class="admin-btn admin-btn-k1">🏠 Models</a>
           <button
+            type="button"
             class="admin-btn admin-btn-export"
             onclick="window.open('/api/admin/conversations/export', '_blank')"
           >
             📥 Export
           </button>
           <div class="notif-wrapper" id="notif-wrapper">
-            <button
-              class="admin-btn notif-bell"
-              onclick="toggleNotifications()"
-              id="notif-bell"
-            >
+            <button type="button" class="admin-btn notif-bell" onclick="toggleNotifications()" id="notif-bell">
               🔔
               <span id="notif-badge" class="notif-badge">0</span>
             </button>
             <div id="notif-dropdown" class="notif-dropdown">
               <div class="notif-hdr">
                 <span class="notif-title">🔔 Notifications</span>
-                <button onclick="clearNotifications()" class="notif-clear">
-                  Clear all
-                </button>
+                <button type="button" onclick="clearNotifications()" class="notif-clear">Clear all</button>
               </div>
               <div id="notif-list" class="notif-list"></div>
             </div>
           </div>
-          <button class="admin-btn" onclick="location.reload()">
-            🔄 Refresh
-          </button>
-          <button class="admin-btn" id="theme-toggle" onclick="toggleTheme()">
-            🌙
-          </button>
+          <button type="button" class="admin-btn" onclick="location.reload()">🔄 Refresh</button>
+          <button type="button" class="admin-btn" id="theme-toggle" onclick="toggleTheme()">🌙</button>
         </div>
       </header>
       <script>
         function toggleTheme() {
-          document.body.classList.toggle("light-theme");
-          const isLight = document.body.classList.contains("light-theme");
-          localStorage.setItem("admin-theme", isLight ? "light" : "dark");
-          document.getElementById("theme-toggle").textContent = isLight
-            ? "☀️"
-            : "🌙";
+          document.body.classList.toggle('light-theme');
+          const isLight = document.body.classList.contains('light-theme');
+          localStorage.setItem('admin-theme', isLight ? 'light' : 'dark');
+          document.getElementById('theme-toggle').textContent = isLight ? '☀️' : '🌙';
         }
-        if (localStorage.getItem("admin-theme") === "light") {
-          document.body.classList.add("light-theme");
-          document.addEventListener("DOMContentLoaded", () => {
-            const t = document.getElementById("theme-toggle");
-            if (t) t.textContent = "☀️";
+        if (localStorage.getItem('admin-theme') === 'light') {
+          document.body.classList.add('light-theme');
+          document.addEventListener('DOMContentLoaded', () => {
+            const t = document.getElementById('theme-toggle');
+            if (t) t.textContent = '☀️';
           });
         }
       </script>
@@ -155,16 +121,11 @@
       <div class="sections-list">
         <!-- AI STATUS -->
         <div class="section-panel open" id="sec-ai">
-          <button class="section-toggle" onclick="toggleSection('sec-ai')">
+          <button type="button" class="section-toggle" onclick="toggleSection('sec-ai')">
             <span>🤖 AI Providers — Status Live</span>
             <span class="toggle-arrow">▼</span>
           </button>
-          <a
-            href="/admin/health.html"
-            class="section-live-link"
-            title="Health Dashboard"
-            >🔗 Live</a
-          >
+          <a href="/admin/health.html" class="section-live-link" title="Health Dashboard">🔗 Live</a>
           <div class="section-body">
             <div id="ai-status-grid" class="ai-grid">
               <div class="ai-card loading">
@@ -176,16 +137,11 @@
 
         <!-- BRAIN STATUS -->
         <div class="section-panel open" id="sec-brain">
-          <button class="section-toggle" onclick="toggleSection('sec-brain')">
+          <button type="button" class="section-toggle" onclick="toggleSection('sec-brain')">
             <span>🧠 Brain — Status Live</span>
             <span class="toggle-arrow">▼</span>
           </button>
-          <a
-            href="/admin/k1-dashboard.html"
-            class="section-live-link"
-            title="K1 Brain Dashboard"
-            >🔗 K1</a
-          >
+          <a href="/admin/k1-dashboard.html" class="section-live-link" title="K1 Brain Dashboard">🔗 K1</a>
           <div class="section-body">
             <div class="mini-stats" id="brain-stats">
               <div class="mini-stat">
@@ -201,26 +157,16 @@
                 <span id="brain-providers">—</span>
               </div>
             </div>
-            <h4 style="margin: 12px 0 8px; color: #a78bfa; font-size: 0.85rem">
-              🔧 Tool Usage (sesiune curentă)
-            </h4>
-            <div
-              id="brain-tools"
-              style="display: flex; gap: 8px; flex-wrap: wrap"
-            ></div>
-            <h4 style="margin: 12px 0 8px; color: #a78bfa; font-size: 0.85rem">
-              🌐 Provider Keys
-            </h4>
-            <div
-              id="brain-provider-keys"
-              style="display: flex; gap: 8px; flex-wrap: wrap"
-            ></div>
+            <h4 style="margin: 12px 0 8px; color: #a78bfa; font-size: 0.85rem">🔧 Tool Usage (sesiune curentă)</h4>
+            <div id="brain-tools" style="display: flex; gap: 8px; flex-wrap: wrap"></div>
+            <h4 style="margin: 12px 0 8px; color: #a78bfa; font-size: 0.85rem">🌐 Provider Keys</h4>
+            <div id="brain-provider-keys" style="display: flex; gap: 8px; flex-wrap: wrap"></div>
           </div>
         </div>
 
         <!-- TRAFFIC -->
         <div class="section-panel" id="sec-traffic">
-          <button class="section-toggle" onclick="toggleSection('sec-traffic')">
+          <button type="button" class="section-toggle" onclick="toggleSection('sec-traffic')">
             <span>🌐 Trafic (ultimele 7 zile)</span>
             <span class="toggle-arrow">▶</span>
           </button>
@@ -245,19 +191,13 @@
 
         <!-- CREDIT REPORT -->
         <div class="section-panel" id="sec-credit">
-          <button class="section-toggle" onclick="toggleSection('sec-credit')">
+          <button type="button" class="section-toggle" onclick="toggleSection('sec-credit')">
             <span>📊 Credit per AI Provider</span>
             <span class="toggle-arrow">▶</span>
           </button>
           <div class="section-body">
             <div style="text-align: right; margin-bottom: 10px">
-              <button
-                class="recharge-btn"
-                id="btn-recharge"
-                onclick="recharge()"
-              >
-                ⚡ Reîncărcare
-              </button>
+              <button type="button" class="recharge-btn" id="btn-recharge" onclick="recharge()">⚡ Reîncărcare</button>
             </div>
             <table class="admin-table" id="credit-table">
               <thead>
@@ -282,15 +222,13 @@
 
         <!-- CLIENTS & SUBSCRIPTIONS -->
         <div class="section-panel" id="sec-clients">
-          <button class="section-toggle" onclick="toggleSection('sec-clients')">
+          <button type="button" class="section-toggle" onclick="toggleSection('sec-clients')">
             <span>👥 Clienți & Abonamente</span>
             <span class="toggle-arrow">▶</span>
           </button>
           <div class="section-body">
             <div style="text-align: right; margin-bottom: 10px">
-              <button class="admin-btn" onclick="loadClients()">
-                🔄 Refresh
-              </button>
+              <button type="button" class="admin-btn" onclick="loadClients()">🔄 Refresh</button>
             </div>
             <table class="admin-table" id="clients-table">
               <thead>
@@ -314,15 +252,13 @@
 
         <!-- ADMIN CODES -->
         <div class="section-panel" id="sec-codes">
-          <button class="section-toggle" onclick="toggleSection('sec-codes')">
+          <button type="button" class="section-toggle" onclick="toggleSection('sec-codes')">
             <span>🔑 Coduri Admin</span>
             <span class="toggle-arrow">▶</span>
           </button>
           <div class="section-body">
             <div style="text-align: right; margin-bottom: 10px">
-              <button class="admin-btn" onclick="generateCode()">
-                ➕ Generează Cod
-              </button>
+              <button type="button" class="admin-btn" onclick="generateCode()">➕ Generează Cod</button>
             </div>
             <table class="admin-table" id="codes-table">
               <thead>
@@ -346,7 +282,7 @@
 
         <!-- RECENT VISITS -->
         <div class="section-panel" id="sec-visits">
-          <button class="section-toggle" onclick="toggleSection('sec-visits')">
+          <button type="button" class="section-toggle" onclick="toggleSection('sec-visits')">
             <span>📋 Vizite Recente</span>
             <span class="toggle-arrow">▶</span>
           </button>
@@ -374,37 +310,25 @@
 
         <!-- CODE AUDIT -->
         <div class="section-panel" id="sec-audit">
-          <button class="section-toggle" onclick="toggleSection('sec-audit')">
+          <button type="button" class="section-toggle" onclick="toggleSection('sec-audit')">
             <span>🔍 Code Audit — Hardcoded Values</span>
             <span class="toggle-arrow">▶</span>
           </button>
-          <a
-            href="/admin/audit-tracker.html"
-            class="section-live-link"
-            title="Audit Tracker"
-            >🔗 Live</a
-          >
+          <a href="/admin/audit-tracker.html" class="section-live-link" title="Audit Tracker">🔗 Live</a>
           <div class="section-body">
             <div id="audit-results" style="min-height: 60px">
-              <div style="color: #888; text-align: center; padding: 20px">
-                Scanning...
-              </div>
+              <div style="color: #888; text-align: center; padding: 20px">Scanning...</div>
             </div>
           </div>
         </div>
 
         <!-- MEDIA HISTORY -->
         <div class="section-panel" id="sec-media">
-          <button class="section-toggle" onclick="toggleSection('sec-media')">
+          <button type="button" class="section-toggle" onclick="toggleSection('sec-media')">
             <span>🎨 Media History</span>
             <span class="toggle-arrow">▶</span>
           </button>
-          <a
-            href="/admin/news.html"
-            class="section-live-link"
-            title="News & Media Dashboard"
-            >🔗 Live</a
-          >
+          <a href="/admin/news.html" class="section-live-link" title="News & Media Dashboard">🔗 Live</a>
           <div class="section-body">
             <div class="mini-stats" id="media-stats">
               <div class="mini-stat">
@@ -445,16 +369,11 @@
 
         <!-- TRADING -->
         <div class="section-panel" id="sec-trading">
-          <button class="section-toggle" onclick="toggleSection('sec-trading')">
+          <button type="button" class="section-toggle" onclick="toggleSection('sec-trading')">
             <span>📈 Trading Intelligence</span>
             <span class="toggle-arrow">▶</span>
           </button>
-          <a
-            href="/admin/trading.html"
-            class="section-live-link"
-            title="Trading Dashboard"
-            >🔗 Live</a
-          >
+          <a href="/admin/trading.html" class="section-live-link" title="Trading Dashboard">🔗 Live</a>
           <div class="section-body">
             <div class="mini-stats" id="trading-stats">
               <div class="mini-stat">
@@ -478,9 +397,7 @@
                 <span id="trade-binance">—</span>
               </div>
             </div>
-            <h4 style="margin: 16px 0 8px; color: #a5b4fc; font-size: 0.9rem">
-              Recent Trades
-            </h4>
+            <h4 style="margin: 16px 0 8px; color: #a5b4fc; font-size: 0.9rem">Recent Trades</h4>
             <table class="admin-table">
               <thead>
                 <tr>
@@ -499,9 +416,7 @@
                 </tr>
               </tbody>
             </table>
-            <h4 style="margin: 16px 0 8px; color: #a5b4fc; font-size: 0.9rem">
-              AI Trade Intelligence
-            </h4>
+            <h4 style="margin: 16px 0 8px; color: #a5b4fc; font-size: 0.9rem">AI Trade Intelligence</h4>
             <table class="admin-table">
               <thead>
                 <tr>
@@ -523,23 +438,12 @@
 
         <!-- BRAIN MEMORIES -->
         <div class="section-panel" id="sec-memories">
-          <button
-            class="section-toggle"
-            onclick="toggleSection('sec-memories')"
-          >
+          <button type="button" class="section-toggle" onclick="toggleSection('sec-memories')">
             <span>🧠 Brain Memories & Learned Facts</span>
             <span class="toggle-arrow">▶</span>
           </button>
           <div class="section-body">
-            <div
-              style="
-                display: flex;
-                gap: 10px;
-                align-items: center;
-                margin-bottom: 12px;
-                flex-wrap: wrap;
-              "
-            >
+            <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 12px; flex-wrap: wrap">
               <div id="memory-stats"></div>
               <input
                 type="text"
@@ -557,21 +461,11 @@
                 "
                 onkeyup="if (event.key === 'Enter') searchMemories();"
               />
-              <button class="admin-btn" onclick="searchMemories()">🔍</button>
-              <button class="admin-btn" onclick="loadMemories()">🔄</button>
+              <button type="button" class="admin-btn" onclick="searchMemories()">🔍</button>
+              <button type="button" class="admin-btn" onclick="loadMemories()">🔄</button>
             </div>
-            <div
-              id="memory-filters"
-              style="
-                display: flex;
-                gap: 6px;
-                flex-wrap: wrap;
-                margin-bottom: 12px;
-              "
-            ></div>
-            <h4 style="margin: 8px 0 6px; color: #a78bfa; font-size: 0.85rem">
-              📝 Brain Memories
-            </h4>
+            <div id="memory-filters" style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px"></div>
+            <h4 style="margin: 8px 0 6px; color: #a78bfa; font-size: 0.85rem">📝 Brain Memories</h4>
             <table class="admin-table">
               <thead>
                 <tr>
@@ -588,9 +482,7 @@
                 </tr>
               </tbody>
             </table>
-            <h4 style="margin: 16px 0 6px; color: #a78bfa; font-size: 0.85rem">
-              📚 Learned Facts
-            </h4>
+            <h4 style="margin: 16px 0 6px; color: #a78bfa; font-size: 0.85rem">📚 Learned Facts</h4>
             <table class="admin-table">
               <thead>
                 <tr>
@@ -634,19 +526,10 @@
           • Max 15 zile de la activare
         </div>
         <label>Motiv:</label>
-        <input
-          type="text"
-          id="refund-reason"
-          placeholder="Motiv refund..."
-          class="modal-input"
-        />
+        <input type="text" id="refund-reason" placeholder="Motiv refund..." class="modal-input" />
         <div class="modal-actions">
-          <button class="admin-btn danger" onclick="confirmRefund()">
-            ✅ Confirmă Refund
-          </button>
-          <button class="admin-btn" onclick="closeModal('refund-modal')">
-            ❌ Anulează
-          </button>
+          <button type="button" class="admin-btn danger" onclick="confirmRefund()">✅ Confirmă Refund</button>
+          <button type="button" class="admin-btn" onclick="closeModal('refund-modal')">❌ Anulează</button>
         </div>
       </div>
     </div>

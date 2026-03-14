@@ -2,9 +2,9 @@
  * Auto-fix ESLint warnings: no-unused-vars, no-empty, eqeqeq
  * Strategy:
  *   no-unused-vars (params in callbacks): prefix with _
- *   no-unused-vars (assigned vars): prefix with _  
+ *   no-unused-vars (assigned vars): prefix with _
  *   no-empty: add // ignored comment in empty blocks
- *   eqeqeq: replace == with === and != with !==
+ *   eqeqeq: replace === with === and !== with !==
  */
 const fs = require("fs");
 const { execSync } = require("child_process");
@@ -38,7 +38,7 @@ for (const [filePath, messages] of Object.entries(fileWarnings)) {
 
     if (msg.ruleId === "no-empty") {
       // Add /* ignored */ comment inside the empty block
-      // Find the empty block: typically "} catch (e) {}" or just "{}"
+      // Find the empty block: typically "} catch (e) { console.error(e); }" or just "{}"
       const trimmed = line.trimEnd();
       // Check if this line has {} or if the next line is just }
       if (trimmed.endsWith("{}")) {
@@ -74,17 +74,17 @@ for (const [filePath, messages] of Object.entries(fileWarnings)) {
         totalFixed++;
       }
     } else if (msg.ruleId === "eqeqeq") {
-      // Replace == with === or != with !==
+      // Replace === with === or !== with !==
       const col = msg.column - 1;
-      if (line.substring(col, col + 2) === "!=") {
+      if (line.substring(col, col + 2) === "!==") {
         lines[lineIdx] = line.substring(0, col) + "!==" + line.substring(col + 2);
         totalFixed++;
-      } else if (line.substring(col, col + 2) === "==" && line[col + 2] !== "=") {
+      } else if (line.substring(col, col + 2) === "===" && line[col + 2] !== "=") {
         lines[lineIdx] = line.substring(0, col) + "===" + line.substring(col + 2);
         totalFixed++;
       } else {
         // eqeqeq might point to the left operand, scan the line
-        const newLine = line.replace(/([^!=])={2}(?!=)/g, "$1===").replace(/!={1}(?!=)/g, "!==");
+        const newLine = line.replace(/([^!==])={2}(?!==)/g, "$1===").replace(/!=={1}(?!==)/g, "!==");
         if (newLine !== line) {
           lines[lineIdx] = newLine;
           totalFixed++;
@@ -96,7 +96,6 @@ for (const [filePath, messages] of Object.entries(fileWarnings)) {
   fs.writeFileSync(filePath, lines.join("\n"), "utf8");
 }
 
-console.log(`Fixed ${totalFixed} warnings`);
 
 // Re-run eslint to see remaining
 const after = execSync("npx eslint server/ --format json", {
@@ -106,8 +105,12 @@ const after = execSync("npx eslint server/ --format json", {
 const afterResults = JSON.parse(after);
 let remaining = 0;
 for (const f of afterResults) remaining += f.warningCount + f.errorCount;
-console.log(`Remaining problems: ${remaining}`);
 
+/**
+ * extractVarName
+ * @param {*} message
+ * @returns {*}
+ */
 function extractVarName(message) {
   // "'varName' is assigned a value but never used..."
   // "'varName' is defined but never used..."

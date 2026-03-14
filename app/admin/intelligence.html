@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="en">
   <head>
+  <meta name="description" content="Page description">
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>KelionAI — Intelligence Dashboard</title>
@@ -13,11 +14,11 @@
       body {
         background: #060612;
         color: #e0e0e0;
-        font-family: "Inter", system-ui, sans-serif;
+        font-family: 'Inter', system-ui, sans-serif;
         padding: 16px;
         min-height: 100vh;
       }
-      @import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap");
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
 
       h1 {
         color: #00ffff;
@@ -152,7 +153,7 @@
       }
 
       .pattern-block {
-        font-family: "Fira Code", monospace;
+        font-family: 'Fira Code', monospace;
         font-size: 0.75rem;
         line-height: 1.6;
         background: rgba(0, 0, 0, 0.4);
@@ -176,11 +177,7 @@
       }
 
       .proactive-box {
-        background: linear-gradient(
-          135deg,
-          rgba(0, 255, 255, 0.05),
-          rgba(167, 139, 250, 0.08)
-        );
+        background: linear-gradient(135deg, rgba(0, 255, 255, 0.05), rgba(167, 139, 250, 0.08));
         border: 1px solid rgba(0, 255, 255, 0.15);
         border-radius: 12px;
         padding: 16px;
@@ -318,7 +315,7 @@
 
       <!-- Actions -->
       <div class="section" style="display: flex; gap: 8px; flex-wrap: wrap">
-        <button class="btn" onclick="loadDashboard()">🔄 Refresh</button>
+        <button type="button" class="btn" onclick="loadDashboard()">🔄 Refresh</button>
       </div>
 
       <p class="mini" id="lastUpdate">Last update: —</p>
@@ -326,21 +323,19 @@
 
     <script src="admin-app.js"></script>
     <script>
-      const API = "/api/admin";
+      const API = '/api/admin';
 
       async function loadDashboard() {
         try {
           const r = await fetch(`${API}/intelligence`, { headers: hdrs() });
           if (!r.ok) throw new Error(`HTTP ${r.status}`);
           const d = await r.json();
-          document.getElementById("loading").style.display = "none";
-          document.getElementById("dashboard").style.display = "block";
+          document.getElementById('loading').style.display = 'none';
+          document.getElementById('dashboard').style.display = 'block';
           renderDashboard(d);
-          document.getElementById("lastUpdate").textContent =
-            `Last update: ${new Date().toLocaleTimeString()}`;
+          document.getElementById('lastUpdate').textContent = `Last update: ${new Date().toLocaleTimeString()}`;
         } catch (e) {
-          document.getElementById("loading").innerHTML =
-            `<span class="red">❌ Error: ${e.message}</span>`;
+          document.getElementById('loading').innerHTML = `<span class="red">❌ Error: ${e.message}</span>`;
         }
       }
 
@@ -354,49 +349,36 @@
 
         // ── Overview Cards ──
         const totalTasks = overall.totalTasks || 0;
-        const accuracy = overall.accuracy != null ? overall.accuracy : "—";
-        const accColor =
-          accuracy >= 80
-            ? "green"
-            : accuracy >= 60
-              ? "yellow"
-              : accuracy === "—"
-                ? "cyan"
-                : "red";
+        const accuracy = overall.accuracy != null ? overall.accuracy : '—';
+        const accColor = accuracy >= 80 ? 'green' : accuracy >= 60 ? 'yellow' : accuracy === '—' ? 'cyan' : 'red';
         const corrections = overall.totalCorrections || 0;
 
-        document.getElementById("overviewGrid").innerHTML = `
-                ${oCard("📊 Overall Accuracy", accuracy !== "—" ? accuracy + "%" : "—", totalTasks + " tasks tracked", accColor)}
-                ${oCard("🔄 Corrections", corrections, corrections > 0 ? "learning from mistakes" : "clean run", corrections === 0 ? "green" : "yellow")}
-                ${oCard("👤 Interactions", um.totalInteractions || 0, um.preferredDomain ? "Top: " + um.preferredDomain : "gathering data", "purple")}
-                ${oCard("🧬 Patterns", d.patterns !== "No patterns detected yet" ? "✅ Active" : "⏳ Waiting", d.patterns !== "No patterns detected yet" ? "Influencing responses" : "Need more data", d.patterns !== "No patterns detected yet" ? "cyan" : "yellow")}
+        document.getElementById('overviewGrid').innerHTML = `
+                ${oCard('📊 Overall Accuracy', accuracy !== '—' ? accuracy + '%' : '—', totalTasks + ' tasks tracked', accColor)}
+                ${oCard('🔄 Corrections', corrections, corrections > 0 ? 'learning from mistakes' : 'clean run', corrections === 0 ? 'green' : 'yellow')}
+                ${oCard('👤 Interactions', um.totalInteractions || 0, um.preferredDomain ? 'Top: ' + um.preferredDomain : 'gathering data', 'purple')}
+                ${oCard('🧬 Patterns', d.patterns !== 'No patterns detected yet' ? '✅ Active' : '⏳ Waiting', d.patterns !== 'No patterns detected yet' ? 'Influencing responses' : 'Need more data', d.patterns !== 'No patterns detected yet' ? 'cyan' : 'yellow')}
             `;
 
         // ── Domain Performance ──
-        const domainEl = document.getElementById("domainList");
+        const domainEl = document.getElementById('domainList');
         if (domains.length > 0 && domains.some((d) => d.tasks > 0)) {
           domainEl.innerHTML = domains
             .filter((d) => d.tasks > 0)
             .map((dm) => {
               const acc = dm.accuracy != null ? dm.accuracy : 0;
-              const barColor =
-                acc >= 80 ? "#00ff88" : acc >= 60 ? "#ffcc00" : "#ff4444";
-              const trendEmoji =
-                dm.trend === "improving"
-                  ? "📈"
-                  : dm.trend === "declining"
-                    ? "📉"
-                    : "➡️";
+              const barColor = acc >= 80 ? '#00ff88' : acc >= 60 ? '#ffcc00' : '#ff4444';
+              const trendEmoji = dm.trend === 'improving' ? '📈' : dm.trend === 'declining' ? '📉' : '➡️';
               const icon =
-                dm.domain === "trading"
-                  ? "📈"
-                  : dm.domain === "coding"
-                    ? "💻"
-                    : dm.domain === "research"
-                      ? "🔍"
-                      : dm.domain === "news"
-                        ? "📰"
-                        : "💬";
+                dm.domain === 'trading'
+                  ? '📈'
+                  : dm.domain === 'coding'
+                    ? '💻'
+                    : dm.domain === 'research'
+                      ? '🔍'
+                      : dm.domain === 'news'
+                        ? '📰'
+                        : '💬';
               return `
                         <div class="domain-row">
                             <div>
@@ -408,22 +390,21 @@
                         <div class="progress-bar"><div class="progress-fill" style="width:${acc}%;background:${barColor}"></div></div>
                     `;
             })
-            .join("");
+            .join('');
         } else {
           domainEl.innerHTML =
             '<div class="mini" style="padding:12px;text-align:center">No domain data yet. Send messages to start tracking accuracy.</div>';
         }
 
         // ── Patterns ──
-        document.getElementById("patternsBlock").textContent =
-          d.patterns || "No patterns detected yet";
+        document.getElementById('patternsBlock').textContent = d.patterns || 'No patterns detected yet';
 
         // ── Proactive ──
-        const proactiveEl = document.getElementById("proactiveBlock");
+        const proactiveEl = document.getElementById('proactiveBlock');
         if (d.proactive && d.proactive.trim()) {
           const clean = d.proactive
-            .replace(/\[PROACTIVE\]/g, "")
-            .replace(/\[\/PROACTIVE\]/g, "")
+            .replace(/\[PROACTIVE\]/g, '')
+            .replace(/\[\/PROACTIVE\]/g, '')
             .trim();
           proactiveEl.innerHTML = `<div class="proactive-box">💡 ${clean}</div>`;
         } else {
@@ -432,17 +413,17 @@
         }
 
         // ── User Model ──
-        const umGrid = document.getElementById("userModelGrid");
+        const umGrid = document.getElementById('userModelGrid');
         if (um.totalInteractions > 0) {
           umGrid.innerHTML = `
                     <div class="label">Total Interactions</div><div class="value">${um.totalInteractions}</div>
                     <div class="label">Corrections</div><div class="value">${um.totalCorrections || 0} (${um.correctionRate || 0}%)</div>
-                    <div class="label">Preferred Domain</div><div class="value cyan">${um.preferredDomain || "—"}</div>
-                    <div class="label">Peak Hour</div><div class="value">${um.peakHour != null ? um.peakHour + ":00 UTC" : "—"}</div>
-                    <div class="label">Preferred Style</div><div class="value">${um.communication?.preferredStyle || "—"}</div>
-                    <div class="label">Language</div><div class="value">${um.communication?.preferredLanguage || "—"}</div>
-                    <div class="label">Avg Complexity</div><div class="value">${um.communication?.avgComplexity?.toFixed(1) || "—"}</div>
-                    <div class="label">Sentiment</div><div class="value">${um.communication?.sentimentTrend || "—"}</div>
+                    <div class="label">Preferred Domain</div><div class="value cyan">${um.preferredDomain || '—'}</div>
+                    <div class="label">Peak Hour</div><div class="value">${um.peakHour != null ? um.peakHour + ':00 UTC' : '—'}</div>
+                    <div class="label">Preferred Style</div><div class="value">${um.communication?.preferredStyle || '—'}</div>
+                    <div class="label">Language</div><div class="value">${um.communication?.preferredLanguage || '—'}</div>
+                    <div class="label">Avg Complexity</div><div class="value">${um.communication?.avgComplexity?.toFixed(1) || '—'}</div>
+                    <div class="label">Sentiment</div><div class="value">${um.communication?.sentimentTrend || '—'}</div>
                 `;
         } else {
           umGrid.innerHTML =
@@ -450,7 +431,7 @@
         }
 
         // ── Strategies ──
-        const stratEl = document.getElementById("strategiesBlock");
+        const stratEl = document.getElementById('strategiesBlock');
         const rp = strats.riskParams || [];
         if (rp.length > 0) {
           stratEl.innerHTML =
@@ -460,9 +441,9 @@
                   `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.04)">
                         <span class="mini">${p.name}</span>
                         <span style="font-weight:600;color:#a78bfa">${p.current}</span>
-                    </div>`,
+                    </div>`
               )
-              .join("") +
+              .join('') +
             `<div class="mini" style="margin-top:8px">Templates: ${strats.promptTemplates?.length || 0} · Tools: ${Object.keys(strats.toolPreferences || {}).length}</div>`;
         } else {
           stratEl.innerHTML =
@@ -470,22 +451,20 @@
         }
 
         // ── Evolution ──
-        const evoEl = document.getElementById("evolutionBlock");
+        const evoEl = document.getElementById('evolutionBlock');
         if (evo && Object.keys(evo).length > 0) {
-          let evoHtml = "";
+          let evoHtml = '';
           if (evo.performanceSummary) {
-            evoHtml += `<div style="margin-bottom:12px"><span class="big cyan">${evo.performanceSummary.accuracy || "—"}%</span> <span class="mini">overall accuracy</span></div>`;
-            evoHtml += `<div class="mini">${evo.performanceSummary.totalTasks || 0} tasks · ${evo.performanceSummary.corrections || 0} corrections · Status: ${evo.performanceSummary.status || "—"}</div>`;
+            evoHtml += `<div style="margin-bottom:12px"><span class="big cyan">${evo.performanceSummary.accuracy || '—'}%</span> <span class="mini">overall accuracy</span></div>`;
+            evoHtml += `<div class="mini">${evo.performanceSummary.totalTasks || 0} tasks · ${evo.performanceSummary.corrections || 0} corrections · Status: ${evo.performanceSummary.status || '—'}</div>`;
           }
           if (evo.weakAreas && evo.weakAreas.length > 0) {
-            evoHtml += `<div style="margin-top:8px" class="mini red">⚠️ Weak areas: ${evo.weakAreas.join(", ")}</div>`;
+            evoHtml += `<div style="margin-top:8px" class="mini red">⚠️ Weak areas: ${evo.weakAreas.join(', ')}</div>`;
           }
           if (evo.strongAreas && evo.strongAreas.length > 0) {
-            evoHtml += `<div style="margin-top:4px" class="mini green">✅ Strong areas: ${evo.strongAreas.join(", ")}</div>`;
+            evoHtml += `<div style="margin-top:4px" class="mini green">✅ Strong areas: ${evo.strongAreas.join(', ')}</div>`;
           }
-          evoEl.innerHTML =
-            evoHtml ||
-            '<div class="mini">Evolution data available but empty.</div>';
+          evoEl.innerHTML = evoHtml || '<div class="mini">Evolution data available but empty.</div>';
         } else {
           evoEl.innerHTML =
             '<div class="mini" style="padding:12px;text-align:center">Evolution report will appear after K1 processes enough interactions.</div>';
@@ -494,14 +473,14 @@
 
       function oCard(title, value, sub, color) {
         const colors = {
-          cyan: "#00ffff",
-          green: "#00ff88",
-          pink: "#ff6bff",
-          yellow: "#ffcc00",
-          red: "#ff4444",
-          purple: "#a78bfa",
+          cyan: '#00ffff',
+          green: '#00ff88',
+          pink: '#ff6bff',
+          yellow: '#ffcc00',
+          red: '#ff4444',
+          purple: '#a78bfa',
         };
-        return `<div class="card"><h3>${title}</h3><div class="big" style="color:${colors[color] || "#fff"}">${value}</div><div class="mini" style="margin-top:4px">${sub}</div></div>`;
+        return `<div class="card"><h3>${title}</h3><div class="big" style="color:${colors[color] || '#fff'}">${value}</div><div class="mini" style="margin-top:4px">${sub}</div></div>`;
       }
 
       // Auto-refresh

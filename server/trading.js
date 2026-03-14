@@ -1,46 +1,45 @@
-"use strict";
+'use strict';
 
 // ═══════════════════════════════════════════════════════════════
 // KelionAI v2 — TRADING BOT (Admin Only)
 // Technical analysis, signals, backtesting, risk assessment
 // ═══════════════════════════════════════════════════════════════
 
-const express = require("express");
-const rateLimit = require("express-rate-limit");
-const logger = require("./logger");
-const tradeEngine = require("./trade-executor");
-const wsEngine = require("./ws-engine");
-const marketLearner = require("./market-learner");
-const aiScorer = require("./ai-scoring");
-const perfTracker = require("./performance-tracker");
-const tradePersist = require("./trade-persistence");
-const histLoader = require("./historical-data-loader");
-const geopolitical = require("./geopolitical");
-const investSim = require("./investment-simulator");
-const paperTrading = require("./paper-trading");
+const express = require('express');
+const rateLimit = require('express-rate-limit');
+const logger = require('./logger');
+const tradeEngine = require('./trade-executor');
+const wsEngine = require('./ws-engine');
+const marketLearner = require('./market-learner');
+const aiScorer = require('./ai-scoring');
+const perfTracker = require('./performance-tracker');
+const tradePersist = require('./trade-persistence');
+const histLoader = require('./historical-data-loader');
+const geopolitical = require('./geopolitical');
+const investSim = require('./investment-simulator');
+const paperTrading = require('./paper-trading');
 
 const router = express.Router();
 
-const DISCLAIMER =
-  "INFORMATIV — Nu constituie sfat financiar. KelionAI nu garantează câștiguri.";
+const DISCLAIMER = 'INFORMATIV — Nu constituie sfat financiar. KelionAI nu garantează câștiguri.';
 const MAX_SEARCH_CONTEXT_LENGTH = 500;
 
 const ASSETS = {
-  crypto: ["BTC", "ETH", "SOL"],
-  forex: ["EUR/USD", "GBP/USD"],
-  indices: ["S&P 500", "NASDAQ"],
-  commodities: ["Gold", "Oil"],
+  crypto: ['BTC', 'ETH', 'SOL'],
+  forex: ['EUR/USD', 'GBP/USD'],
+  indices: ['S&P 500', 'NASDAQ'],
+  commodities: ['Gold', 'Oil'],
 };
 
 const STRATEGIES = [
-  "RSI",
-  "MACD",
-  "BollingerBands",
-  "EMACrossover",
-  "SmartConfluence",
-  "Fibonacci",
-  "VolumeProfile",
-  "Sentiment",
+  'RSI',
+  'MACD',
+  'BollingerBands',
+  'EMACrossover',
+  'SmartConfluence',
+  'Fibonacci',
+  'VolumeProfile',
+  'Sentiment',
 ];
 
 /**
@@ -48,22 +47,26 @@ const STRATEGIES = [
  * BUY only if 3/5+ indicators agree. Much fewer false signals.
  * Fear&Greed updates async from cache (updated every 30min).
  */
-let _fgCache = { signal: "HOLD", value: 50, ts: 0 };
+let _fgCache = { signal: 'HOLD', value: 50, ts: 0 };
+/**
+ * updateFearGreedCache
+ * @returns {*}
+ */
 async function updateFearGreedCache() {
   try {
-    const r = await fetch("https://api.alternative.me/fng/?limit=1", {
+    const r = await fetch('https://api.alternative.me/fng/?limit=1', {
       signal: AbortSignal.timeout(5000),
     });
     if (r.ok) {
       const d = await r.json();
-      const val = parseInt(d.data?.[0]?.value || 50);
-      let sig = "HOLD";
+      const val = parseInt(d.data?.[0]?.value || 50, 10);
+      let sig = 'HOLD';
       if (val <= 25)
-        sig = "STRONG BUY"; // Extreme fear = buy opportunity
-      else if (val <= 40) sig = "BUY";
+        sig = 'STRONG BUY'; // Extreme fear = buy opportunity
+      else if (val <= 40) sig = 'BUY';
       else if (val >= 75)
-        sig = "STRONG SELL"; // Extreme greed = sell
-      else if (val >= 60) sig = "SELL";
+        sig = 'STRONG SELL'; // Extreme greed = sell
+      else if (val >= 60) sig = 'SELL';
       _fgCache = {
         signal: sig,
         value: val,
@@ -79,6 +82,12 @@ async function updateFearGreedCache() {
 setInterval(updateFearGreedCache, 30 * 60 * 1000);
 setTimeout(updateFearGreedCache, 5000); // first update 5s after boot
 
+/**
+ * calculateSmartConfluence
+ * @param {*} prices
+ * @param {*} _volumes
+ * @returns {*}
+ */
 function calculateSmartConfluence(prices, _volumes) {
   const rsi = calculateRSI(prices);
   const macd = calculateMACD(prices);
@@ -86,24 +95,24 @@ function calculateSmartConfluence(prices, _volumes) {
   const ema = calculateEMACrossover(prices);
 
   const indicators = [
-    { name: "RSI", signal: rsi.signal },
-    { name: "MACD", signal: macd.crossSignal },
-    { name: "Bollinger", signal: bollinger.signal },
-    { name: "EMA", signal: ema.signal },
-    { name: "Fear&Greed", signal: _fgCache.signal },
+    { name: 'RSI', signal: rsi.signal },
+    { name: 'MACD', signal: macd.crossSignal },
+    { name: 'Bollinger', signal: bollinger.signal },
+    { name: 'EMA', signal: ema.signal },
+    { name: 'Fear&Greed', signal: _fgCache.signal },
   ];
 
   let buyVotes = 0,
     sellVotes = 0;
   indicators.forEach((ind) => {
-    if (ind.signal === "BUY" || ind.signal === "STRONG BUY") buyVotes++;
-    if (ind.signal === "SELL" || ind.signal === "STRONG SELL") sellVotes++;
+    if (ind.signal === 'BUY' || ind.signal === 'STRONG BUY') buyVotes++;
+    if (ind.signal === 'SELL' || ind.signal === 'STRONG SELL') sellVotes++;
   });
 
   const confidence = (Math.max(buyVotes, sellVotes) / indicators.length) * 100;
-  let signal = "HOLD";
-  if (buyVotes >= 3) signal = buyVotes >= 4 ? "STRONG BUY" : "BUY";
-  else if (sellVotes >= 3) signal = sellVotes >= 4 ? "STRONG SELL" : "SELL";
+  let signal = 'HOLD';
+  if (buyVotes >= 3) signal = buyVotes >= 4 ? 'STRONG BUY' : 'BUY';
+  else if (sellVotes >= 3) signal = sellVotes >= 4 ? 'STRONG SELL' : 'SELL';
 
   return {
     signal,
@@ -111,7 +120,7 @@ function calculateSmartConfluence(prices, _volumes) {
     buyVotes,
     sellVotes,
     totalIndicators: indicators.length,
-    indicators: indicators.map((i) => i.name + "=" + i.signal).join(","),
+    indicators: indicators.map((i) => i.name + '=' + i.signal).join(','),
     fearGreed: _fgCache.value,
     rsiValue: rsi.value,
     rsiMomentum: rsi.momentum,
@@ -124,19 +133,22 @@ let cacheTsMs = 0;
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
 // Init Supabase tables for trading persistence
-tradePersist.ensureTables().catch(() => {});
+tradePersist.ensureTables().catch((err) => {
+  console.error(err);
+});
 
 // Init historical data loader with Supabase + AUTO-LEARNING
 try {
-  const { createClient } = require("@supabase/supabase-js");
+  const { createClient } = require('@supabase/supabase-js');
   const SUPABASE_URL = process.env.SUPABASE_URL;
-  const SUPABASE_KEY =
-    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
+  const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
   if (SUPABASE_URL && SUPABASE_KEY) {
     const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
     histLoader.init(sb);
-    histLoader.ensureTable().catch(() => {});
-    logger.info("[Trading] Historical data loader initialized");
+    histLoader.ensureTable().catch((err) => {
+      console.error(err);
+    });
+    logger.info('[Trading] Historical data loader initialized');
 
     // AUTO-LEARNING: Collect new price data every 24 hours
     const DAY_MS = 24 * 60 * 60 * 1000;
@@ -144,33 +156,17 @@ try {
       histLoader
         .loadAllHistory()
         .then((r) =>
-          logger.info(
-            { assets: Object.keys(r.assets || {}).length },
-            "[AutoLearn] Daily data collection complete",
-          ),
+          logger.info({ assets: Object.keys(r.assets || {}).length }, '[AutoLearn] Daily data collection complete')
         )
-        .catch((e) =>
-          logger.error(
-            { err: e.message },
-            "[AutoLearn] Daily collection failed",
-          ),
-        );
+        .catch((e) => logger.error({ err: e.message }, '[AutoLearn] Daily collection failed'));
     }, 60000); // First run 1 min after boot
     setInterval(() => {
       histLoader
         .loadAllHistory()
         .then((r) =>
-          logger.info(
-            { assets: Object.keys(r.assets || {}).length },
-            "[AutoLearn] Daily data collection complete",
-          ),
+          logger.info({ assets: Object.keys(r.assets || {}).length }, '[AutoLearn] Daily data collection complete')
         )
-        .catch((e) =>
-          logger.error(
-            { err: e.message },
-            "[AutoLearn] Daily collection failed",
-          ),
-        );
+        .catch((e) => logger.error({ err: e.message }, '[AutoLearn] Daily collection failed'));
     }, DAY_MS);
 
     // BRAIN SCAN: Geopolitical risk check every 15 minutes
@@ -184,14 +180,12 @@ try {
                 riskScore: r.currentRisk?.riskScore,
                 level: r.currentRisk?.riskLevel,
               },
-              "[BrainScan] Geopolitical scan complete",
-            ),
+              '[BrainScan] Geopolitical scan complete'
+            )
           )
-          .catch((e) =>
-            logger.debug({ err: e.message }, "[BrainScan] Scan failed"),
-          );
+          .catch((e) => logger.debug({ err: e.message }, '[BrainScan] Scan failed'));
       },
-      15 * 60 * 1000,
+      15 * 60 * 1000
     );
 
     // AUTO-RESEARCH: Run investment simulation every 6 hours
@@ -199,7 +193,7 @@ try {
     const RESEARCH_MS = 6 * 60 * 60 * 1000; // 6 hours
     const runResearch = async () => {
       try {
-        logger.info("[AutoResearch] Starting investment simulation...");
+        logger.info('[AutoResearch] Starting investment simulation...');
         const simResults = await investSim.runFullSimulation(sb);
 
         // Save per-asset rules to Supabase with lifecycle tracking
@@ -207,17 +201,17 @@ try {
           for (const rule of simResults.brainRules) {
             // Check if rule exists — to promote status
             const { data: existing } = await sb
-              .from("trading_brain_rules")
-              .select("*")
-              .eq("rule_name", rule.rule)
-              .eq("asset", rule.asset)
+              .from('trading_brain_rules')
+              .select('*')
+              .eq('rule_name', rule.rule)
+              .eq('asset', rule.asset)
               .limit(1)
               .catch(() => ({ data: null }));
 
             const promoted = investSim.updateRuleStatus(existing?.[0], rule);
 
             await sb
-              .from("trading_brain_rules")
+              .from('trading_brain_rules')
               .upsert(
                 {
                   rule_name: promoted.rule,
@@ -227,26 +221,21 @@ try {
                   action: promoted.action,
                   status: promoted.status, // POTENTIAL → TESTING → CONFIRMED
                   confirmations: promoted.confirmations,
-                  source: "auto_research",
+                  source: 'auto_research',
                   simulation_data: JSON.stringify(promoted.data),
                   first_seen: promoted.first_seen,
                   last_confirmed: promoted.last_confirmed,
                   updated_at: new Date().toISOString(),
                 },
-                { onConflict: "rule_name,asset" },
+                { onConflict: 'rule_name,asset' }
               )
               .catch(() => {
                 // Table might not exist yet
               });
           }
           const statusCounts = { POTENTIAL: 0, TESTING: 0, CONFIRMED: 0 };
-          simResults.brainRules.forEach(
-            (r) => (statusCounts[r.status] = (statusCounts[r.status] || 0) + 1),
-          );
-          logger.info(
-            { rules: simResults.brainRules.length, ...statusCounts },
-            "[AutoResearch] Rules saved",
-          );
+          simResults.brainRules.forEach((r) => (statusCounts[r.status] = (statusCounts[r.status] || 0) + 1));
+          logger.info({ rules: simResults.brainRules.length, ...statusCounts }, '[AutoResearch] Rules saved');
         }
 
         logger.info(
@@ -255,10 +244,10 @@ try {
             bestReturn: simResults.bestStrategies?.[0]?.returnPct,
             rulesGenerated: simResults.brainRules?.length,
           },
-          "[AutoResearch] Simulation complete",
+          '[AutoResearch] Simulation complete'
         );
       } catch (e) {
-        logger.error({ err: e.message }, "[AutoResearch] Simulation failed");
+        logger.error({ err: e.message }, '[AutoResearch] Simulation failed');
       }
     };
     // First research run 5 min after boot (after data collection starts)
@@ -266,7 +255,7 @@ try {
     setInterval(runResearch, RESEARCH_MS);
   }
 } catch (e) {
-  logger.warn("[Trading] Historical loader init failed: " + e.message);
+  logger.warn('[Trading] Historical loader init failed: ' + e.message);
 }
 
 // ═══ HISTORY ═══
@@ -277,7 +266,7 @@ const MAX_HISTORY = 100;
 const tradingLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 30,
-  message: { error: "Prea multe cereri trading. Așteaptă un minut." },
+  message: { error: 'Prea multe cereri trading. Așteaptă un minut.' },
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -312,7 +301,7 @@ function calculateEMA(prices, period) {
  */
 function calculateRSI(prices, period = 14) {
   if (!prices || prices.length < period + 1) {
-    return { value: 50, signal: "HOLD", momentum: "neutral" };
+    return { value: 50, signal: 'HOLD', momentum: 'neutral' };
   }
   let gains = 0;
   let losses = 0;
@@ -339,8 +328,7 @@ function calculateRSI(prices, period = 14) {
     rsiHistory.push(100 - 100 / (1 + avgGain / avgLoss));
   }
 
-  if (avgLoss === 0)
-    return { value: 100, signal: "SELL", momentum: "overbought" };
+  if (avgLoss === 0) return { value: 100, signal: 'SELL', momentum: 'overbought' };
   const rs = avgGain / avgLoss;
   const value = 100 - 100 / (1 + rs);
 
@@ -348,23 +336,23 @@ function calculateRSI(prices, period = 14) {
   const momentum =
     rsiHistory.length >= 3
       ? rsiHistory[rsiHistory.length - 1] > rsiHistory[rsiHistory.length - 3]
-        ? "rising"
-        : "falling"
-      : "neutral";
+        ? 'rising'
+        : 'falling'
+      : 'neutral';
 
   // Optimized thresholds with STRONG signals
-  let signal = "HOLD";
+  let signal = 'HOLD';
   if (value < 25)
-    signal = "STRONG BUY"; // Extreme oversold
-  else if (value < 35 && momentum === "rising")
-    signal = "BUY"; // Oversold + momentum up
+    signal = 'STRONG BUY'; // Extreme oversold
+  else if (value < 35 && momentum === 'rising')
+    signal = 'BUY'; // Oversold + momentum up
   else if (value < 35)
-    signal = "HOLD"; // Oversold but still falling = don't catch knife
+    signal = 'HOLD'; // Oversold but still falling = don't catch knife
   else if (value > 75)
-    signal = "STRONG SELL"; // Extreme overbought
-  else if (value > 65 && momentum === "falling")
-    signal = "SELL"; // Overbought + momentum down
-  else if (value > 65) signal = "HOLD"; // Overbought but still rising = let it run
+    signal = 'STRONG SELL'; // Extreme overbought
+  else if (value > 65 && momentum === 'falling')
+    signal = 'SELL'; // Overbought + momentum down
+  else if (value > 65) signal = 'HOLD'; // Overbought but still rising = let it run
 
   return { value: Math.round(value * 100) / 100, signal, momentum };
 }
@@ -379,7 +367,7 @@ function calculateRSI(prices, period = 14) {
  */
 function calculateMACD(prices, fast = 12, slow = 26, signal = 9) {
   if (!prices || prices.length < slow + signal) {
-    return { macd: 0, signal: 0, histogram: 0, crossSignal: "HOLD" };
+    return { macd: 0, signal: 0, histogram: 0, crossSignal: 'HOLD' };
   }
   const fastEMA = calculateEMA(prices, fast);
   const slowEMA = calculateEMA(prices, slow);
@@ -393,9 +381,9 @@ function calculateMACD(prices, fast = 12, slow = 26, signal = 9) {
 
   const prevMacd = macdLine[lastIdx - 1] || macdVal;
   const prevSignal = signalLine[lastSignalIdx - 1] || signalVal;
-  let crossSignal = "HOLD";
-  if (prevMacd <= prevSignal && macdVal > signalVal) crossSignal = "BUY";
-  else if (prevMacd >= prevSignal && macdVal < signalVal) crossSignal = "SELL";
+  let crossSignal = 'HOLD';
+  if (prevMacd <= prevSignal && macdVal > signalVal) crossSignal = 'BUY';
+  else if (prevMacd >= prevSignal && macdVal < signalVal) crossSignal = 'SELL';
 
   return {
     macd: Math.round(macdVal * 10000) / 10000,
@@ -415,20 +403,19 @@ function calculateMACD(prices, fast = 12, slow = 26, signal = 9) {
 function calculateBollingerBands(prices, period = 20, stdMult = 2) {
   if (!prices || prices.length < period) {
     const last = prices ? prices[prices.length - 1] || 0 : 0;
-    return { middle: last, upper: last, lower: last, signal: "HOLD" };
+    return { middle: last, upper: last, lower: last, signal: 'HOLD' };
   }
   const slice = prices.slice(-period);
   const middle = slice.reduce((a, b) => a + b, 0) / period;
-  const variance =
-    slice.reduce((a, b) => a + Math.pow(b - middle, 2), 0) / period;
+  const variance = slice.reduce((a, b) => a + Math.pow(b - middle, 2), 0) / period;
   const std = Math.sqrt(variance);
   const upper = middle + stdMult * std;
   const lower = middle - stdMult * std;
   const last = prices[prices.length - 1];
 
-  let signal = "HOLD";
-  if (last < lower) signal = "BUY";
-  else if (last > upper) signal = "SELL";
+  let signal = 'HOLD';
+  if (last < lower) signal = 'BUY';
+  else if (last > upper) signal = 'SELL';
 
   return {
     middle: Math.round(middle * 100) / 100,
@@ -448,7 +435,7 @@ function calculateBollingerBands(prices, period = 20, stdMult = 2) {
 function calculateEMACrossover(prices, fast = 50, slow = 200) {
   if (!prices || prices.length < slow) {
     const last = prices ? prices[prices.length - 1] || 0 : 0;
-    return { signal: "HOLD", fastEMA: last, slowEMA: last };
+    return { signal: 'HOLD', fastEMA: last, slowEMA: last };
   }
   const fastArr = calculateEMA(prices, fast);
   const slowArr = calculateEMA(prices, slow);
@@ -457,11 +444,11 @@ function calculateEMACrossover(prices, fast = 50, slow = 200) {
   const prevFast = fastArr[fastArr.length - 2] || fastVal;
   const prevSlow = slowArr[slowArr.length - 2] || slowVal;
 
-  let signal = "HOLD";
-  if (prevFast <= prevSlow && fastVal > slowVal) signal = "BUY";
-  else if (prevFast >= prevSlow && fastVal < slowVal) signal = "SELL";
-  else if (fastVal > slowVal) signal = "BUY";
-  else if (fastVal < slowVal) signal = "SELL";
+  let signal = 'HOLD';
+  if (prevFast <= prevSlow && fastVal > slowVal) signal = 'BUY';
+  else if (prevFast >= prevSlow && fastVal < slowVal) signal = 'SELL';
+  else if (fastVal > slowVal) signal = 'BUY';
+  else if (fastVal < slowVal) signal = 'SELL';
 
   return {
     signal,
@@ -487,7 +474,7 @@ function calculateFibonacci(high, low) {
     78.6: Math.round((high - 0.786 * diff) * 100) / 100,
     100: Math.round(low * 100) / 100,
   };
-  return { levels, signal: "HOLD" };
+  return { levels, signal: 'HOLD' };
 }
 
 /**
@@ -498,7 +485,7 @@ function calculateFibonacci(high, low) {
  */
 function analyzeVolume(prices, volumes) {
   if (!prices || !volumes || prices.length === 0 || volumes.length === 0) {
-    return { vwap: 0, phase: "neutral", signal: "HOLD" };
+    return { vwap: 0, phase: 'neutral', signal: 'HOLD' };
   }
   const len = Math.min(prices.length, volumes.length);
   let totalPV = 0;
@@ -512,14 +499,14 @@ function analyzeVolume(prices, volumes) {
   const recentVol = volumes.slice(-5).reduce((a, b) => a + b, 0) / 5;
   const avgVol = totalV / len;
 
-  let phase = "neutral";
-  let signal = "HOLD";
+  let phase = 'neutral';
+  let signal = 'HOLD';
   if (last > vwap && recentVol > avgVol * 1.2) {
-    phase = "accumulation";
-    signal = "BUY";
+    phase = 'accumulation';
+    signal = 'BUY';
   } else if (last < vwap && recentVol > avgVol * 1.2) {
-    phase = "distribution";
-    signal = "SELL";
+    phase = 'distribution';
+    signal = 'SELL';
   }
 
   return { vwap: Math.round(vwap * 100) / 100, phase, signal };
@@ -531,47 +518,47 @@ function analyzeVolume(prices, volumes) {
  * @returns {{ score: number, label: 'bullish'|'bearish'|'neutral' }}
  */
 function analyzeSentiment(text) {
-  if (!text || typeof text !== "string") return { score: 0, label: "neutral" };
+  if (!text || typeof text !== 'string') return { score: 0, label: 'neutral' };
 
   const bullishWords = [
-    "bullish",
-    "surge",
-    "rally",
-    "gain",
-    "rise",
-    "pump",
-    "moon",
-    "ath",
-    "breakout",
-    "buy",
-    "long",
-    "positive",
-    "growth",
-    "boom",
-    "record",
-    "profit",
-    "uptrend",
-    "higher",
+    'bullish',
+    'surge',
+    'rally',
+    'gain',
+    'rise',
+    'pump',
+    'moon',
+    'ath',
+    'breakout',
+    'buy',
+    'long',
+    'positive',
+    'growth',
+    'boom',
+    'record',
+    'profit',
+    'uptrend',
+    'higher',
   ];
   const bearishWords = [
-    "bearish",
-    "crash",
-    "drop",
-    "fall",
-    "dump",
-    "bear",
-    "decline",
-    "loss",
-    "sell",
-    "short",
-    "negative",
-    "fear",
-    "panic",
-    "correction",
-    "downtrend",
-    "lower",
-    "risk",
-    "warning",
+    'bearish',
+    'crash',
+    'drop',
+    'fall',
+    'dump',
+    'bear',
+    'decline',
+    'loss',
+    'sell',
+    'short',
+    'negative',
+    'fear',
+    'panic',
+    'correction',
+    'downtrend',
+    'lower',
+    'risk',
+    'warning',
   ];
 
   const words = text.toLowerCase().split(/\s+/);
@@ -584,9 +571,9 @@ function analyzeSentiment(text) {
   });
   score = Math.max(-100, Math.min(100, score));
 
-  let label = "neutral";
-  if (score > 15) label = "bullish";
-  else if (score < -15) label = "bearish";
+  let label = 'neutral';
+  if (score > 15) label = 'bullish';
+  else if (score < -15) label = 'bearish';
 
   return { score, label };
 }
@@ -611,11 +598,11 @@ function calculateConfluence(signals) {
   };
   // Extended scoreMap: handle all possible signal types
   const scoreMap = {
-    "STRONG BUY": 1,
+    'STRONG BUY': 1,
     BUY: 0.7,
     HOLD: 0,
     SELL: -0.7,
-    "STRONG SELL": -1,
+    'STRONG SELL': -1,
     OVERBOUGHT: -0.5,
     OVERSOLD: 0.5,
     bullish: 0.7,
@@ -641,11 +628,7 @@ function calculateConfluence(signals) {
     fibonacci: signals.fibonacci?.signal,
     volume: signals.volume?.signal || signals.volume?.phase,
     sentiment:
-      signals.sentiment?.label === "bullish"
-        ? "BUY"
-        : signals.sentiment?.label === "bearish"
-          ? "SELL"
-          : "HOLD",
+      signals.sentiment?.label === 'bullish' ? 'BUY' : signals.sentiment?.label === 'bearish' ? 'SELL' : 'HOLD',
   };
 
   for (const [key, sig] of Object.entries(map)) {
@@ -659,8 +642,7 @@ function calculateConfluence(signals) {
     }
   }
 
-  if (totalWeight === 0)
-    return { signal: "HOLD", confidence: 0, weightsUsed: weights };
+  if (totalWeight === 0) return { signal: 'HOLD', confidence: 0, weightsUsed: weights };
 
   const normalized = weightedScore / totalWeight; // -1 to 1
   // Confidence: scale to 0-100 based on agreement strength
@@ -669,11 +651,11 @@ function calculateConfluence(signals) {
   const agreementBonus = Math.min(20, activeSignals * 5);
   const confidence = Math.min(100, Math.round(rawConfidence + agreementBonus));
 
-  let signal = "HOLD";
-  if (normalized >= 0.5) signal = "STRONG BUY";
-  else if (normalized >= 0.15) signal = "BUY";
-  else if (normalized <= -0.5) signal = "STRONG SELL";
-  else if (normalized <= -0.15) signal = "SELL";
+  let signal = 'HOLD';
+  if (normalized >= 0.5) signal = 'STRONG BUY';
+  else if (normalized >= 0.15) signal = 'BUY';
+  else if (normalized <= -0.5) signal = 'STRONG SELL';
+  else if (normalized <= -0.15) signal = 'SELL';
 
   return { signal, confidence, weightsUsed: weights, activeSignals };
 }
@@ -682,11 +664,17 @@ function calculateConfluence(signals) {
 // SMART MONEY FLOW DETECTION (Wyckoff, Volume Divergence, Order Blocks)
 // ═══════════════════════════════════════════════════════════════
 
+/**
+ * detectSmartMoney
+ * @param {*} prices
+ * @param {*} volumes
+ * @returns {*}
+ */
 function detectSmartMoney(prices, volumes) {
   if (!prices || prices.length < 30 || !volumes || volumes.length < 30) {
     return {
-      phase: "unknown",
-      signal: "HOLD",
+      phase: 'unknown',
+      signal: 'HOLD',
       divergence: null,
       orderBlocks: [],
     };
@@ -698,32 +686,26 @@ function detectSmartMoney(prices, volumes) {
   const _last = p[p.length - 1];
 
   // ── Volume Divergence ──
-  const priceTrend =
-    (p[p.length - 1] - p[Math.max(0, p.length - 20)]) /
-    p[Math.max(0, p.length - 20)];
+  const priceTrend = (p[p.length - 1] - p[Math.max(0, p.length - 20)]) / p[Math.max(0, p.length - 20)];
   const volAvgRecent = v.slice(-10).reduce((s, x) => s + x, 0) / 10;
   const volAvgPast = v.slice(-30, -10).reduce((s, x) => s + x, 0) / 20;
-  const volTrend =
-    volAvgPast > 0 ? (volAvgRecent - volAvgPast) / volAvgPast : 0;
+  const volTrend = volAvgPast > 0 ? (volAvgRecent - volAvgPast) / volAvgPast : 0;
 
   let divergence = null;
-  if (priceTrend > 0.02 && volTrend < -0.15) divergence = "bearish_divergence";
-  else if (priceTrend < -0.02 && volTrend > 0.15)
-    divergence = "bullish_divergence";
+  if (priceTrend > 0.02 && volTrend < -0.15) divergence = 'bearish_divergence';
+  else if (priceTrend < -0.02 && volTrend > 0.15) divergence = 'bullish_divergence';
 
   // ── Order Block Detection (high volume zones) ──
   const avgVol = v.reduce((s, x) => s + x, 0) / v.length;
   const orderBlocks = [];
   for (let i = 5; i < p.length - 1; i++) {
     if (v[i] > avgVol * 2.0) {
-      const wickRatio =
-        Math.abs(p[i] - p[i - 1]) /
-        (Math.abs(p[i] - p[Math.max(0, i - 5)]) || 1);
+      const wickRatio = Math.abs(p[i] - p[i - 1]) / (Math.abs(p[i] - p[Math.max(0, i - 5)]) || 1);
       if (wickRatio > 0.3) {
         orderBlocks.push({
           price: p[i],
           volume: v[i],
-          type: p[i] > p[i - 1] ? "demand" : "supply",
+          type: p[i] > p[i - 1] ? 'demand' : 'supply',
           index: i,
         });
       }
@@ -736,48 +718,41 @@ function detectSmartMoney(prices, volumes) {
   const priceRange = Math.max(...p.slice(-50)) - Math.min(...p.slice(-50));
   const recentRange = Math.max(...p.slice(-10)) - Math.min(...p.slice(-10));
   const rangeRatio = priceRange > 0 ? recentRange / priceRange : 0;
-  const priceChange20 =
-    p.length >= 20
-      ? (p[p.length - 1] - p[p.length - 20]) / p[p.length - 20]
-      : 0;
+  const priceChange20 = p.length >= 20 ? (p[p.length - 1] - p[p.length - 20]) / p[p.length - 20] : 0;
 
-  let phase = "neutral";
-  if (rangeRatio < 0.3 && volTrend < 0) phase = "accumulation";
-  else if (priceChange20 > 0.05 && volTrend > 0) phase = "markup";
-  else if (rangeRatio < 0.3 && volTrend > 0 && priceChange20 > 0)
-    phase = "distribution";
-  else if (priceChange20 < -0.05 && volTrend > 0) phase = "markdown";
+  let phase = 'neutral';
+  if (rangeRatio < 0.3 && volTrend < 0) phase = 'accumulation';
+  else if (priceChange20 > 0.05 && volTrend > 0) phase = 'markup';
+  else if (rangeRatio < 0.3 && volTrend > 0 && priceChange20 > 0) phase = 'distribution';
+  else if (priceChange20 < -0.05 && volTrend > 0) phase = 'markdown';
 
   // ── Absorption Detection ──
   let absorption = false;
   if (p.length >= 3) {
     const lastCandle = Math.abs(p[p.length - 1] - p[p.length - 2]);
     const lastWick = Math.abs(p[p.length - 1] - p[p.length - 3]) - lastCandle;
-    if (lastWick > lastCandle * 1.5 && v[v.length - 1] > avgVol * 1.5)
-      absorption = true;
+    if (lastWick > lastCandle * 1.5 && v[v.length - 1] > avgVol * 1.5) absorption = true;
   }
 
   // ── Signal from Smart Money ──
-  let signal = "HOLD";
-  if (phase === "accumulation" || divergence === "bullish_divergence")
-    signal = "BUY";
-  else if (phase === "distribution" || divergence === "bearish_divergence")
-    signal = "SELL";
-  else if (phase === "markup") signal = "BUY";
-  else if (phase === "markdown") signal = "SELL";
+  let signal = 'HOLD';
+  if (phase === 'accumulation' || divergence === 'bullish_divergence') signal = 'BUY';
+  else if (phase === 'distribution' || divergence === 'bearish_divergence') signal = 'SELL';
+  else if (phase === 'markup') signal = 'BUY';
+  else if (phase === 'markdown') signal = 'SELL';
 
   return {
     phase,
     signal,
     divergence,
     absorption,
-    volumeTrend: +(volTrend * 100).toFixed(1) + "%",
+    volumeTrend: +(volTrend * 100).toFixed(1) + '%',
     orderBlocks: recentBlocks.map((b) => ({
       price: +b.price.toFixed(2),
       type: b.type,
       volume: Math.round(b.volume),
     })),
-    priceTrend: +(priceTrend * 100).toFixed(2) + "%",
+    priceTrend: +(priceTrend * 100).toFixed(2) + '%',
   };
 }
 
@@ -785,13 +760,22 @@ function detectSmartMoney(prices, volumes) {
 // KELLY CRITERION POSITION SIZING
 // ═══════════════════════════════════════════════════════════════
 
+/**
+ * kellyPosition
+ * @param {*} winRate
+ * @param {*} avgWin
+ * @param {*} avgLoss
+ * @param {*} balance
+ * @param {*} maxRiskPct
+ * @returns {*}
+ */
 function kellyPosition(winRate, avgWin, avgLoss, balance, maxRiskPct = 0.05) {
   if (!winRate || !avgWin || !avgLoss || avgLoss === 0 || balance <= 0) {
     return {
       kellyPct: 0,
       halfKelly: 0,
       positionSize: 0,
-      reason: "insufficient_data",
+      reason: 'insufficient_data',
     };
   }
   const W = winRate;
@@ -807,7 +791,7 @@ function kellyPosition(winRate, avgWin, avgLoss, balance, maxRiskPct = 0.05) {
     cappedPct: +(cappedKelly * 100).toFixed(2),
     positionSize,
     balance,
-    reason: kellyPct <= 0 ? "negative_edge" : "ok",
+    reason: kellyPct <= 0 ? 'negative_edge' : 'ok',
   };
 }
 
@@ -815,15 +799,20 @@ function kellyPosition(winRate, avgWin, avgLoss, balance, maxRiskPct = 0.05) {
 // MULTI-TIMEFRAME ANALYSIS
 // ═══════════════════════════════════════════════════════════════
 
+/**
+ * analyzeMultiTimeframe
+ * @param {*} asset
+ * @returns {*}
+ */
 async function analyzeMultiTimeframe(asset) {
-  const timeframes = ["1m", "5m", "15m", "1h", "4h", "1d"];
+  const timeframes = ['1m', '5m', '15m', '1h', '4h', '1d'];
   const results = {};
   const scoreMap = {
     BUY: 1,
-    "STRONG BUY": 2,
+    'STRONG BUY': 2,
     HOLD: 0,
     SELL: -1,
-    "STRONG SELL": -2,
+    'STRONG SELL': -2,
   };
   let totalScore = 0;
   let tfCount = 0;
@@ -871,14 +860,13 @@ async function analyzeMultiTimeframe(asset) {
 
   // Cross-TF alignment
   const avgScore = tfCount > 0 ? totalScore / tfCount : 0;
-  let overallSignal = "HOLD";
-  if (avgScore >= 1.5) overallSignal = "STRONG BUY";
-  else if (avgScore >= 0.5) overallSignal = "BUY";
-  else if (avgScore <= -1.5) overallSignal = "STRONG SELL";
-  else if (avgScore <= -0.5) overallSignal = "SELL";
+  let overallSignal = 'HOLD';
+  if (avgScore >= 1.5) overallSignal = 'STRONG BUY';
+  else if (avgScore >= 0.5) overallSignal = 'BUY';
+  else if (avgScore <= -1.5) overallSignal = 'STRONG SELL';
+  else if (avgScore <= -0.5) overallSignal = 'SELL';
 
-  const alignment =
-    tfCount > 0 ? Math.round((Math.abs(avgScore) / 2) * 100) : 0;
+  const alignment = tfCount > 0 ? Math.round((Math.abs(avgScore) / 2) * 100) : 0;
 
   return {
     asset,
@@ -894,6 +882,13 @@ async function analyzeMultiTimeframe(asset) {
 // ADVANCED ENTRY/EXIT (DCA, Trailing Stop, Partial TP)
 // ═══════════════════════════════════════════════════════════════
 
+/**
+ * calculateAdvancedEntry
+ * @param {*} entryPrice
+ * @param {*} signal
+ * @param {*} riskProfile
+ * @returns {*}
+ */
 function calculateAdvancedEntry(entryPrice, signal, riskProfile) {
   const profile = tradeEngine.getRiskProfile();
   const p = profile.profiles?.[riskProfile] ||
@@ -903,23 +898,23 @@ function calculateAdvancedEntry(entryPrice, signal, riskProfile) {
     };
   const slPct = p.DEFAULT_STOP_LOSS_PCT;
   const tpPct = p.DEFAULT_TAKE_PROFIT_PCT;
-  const isBuy = signal.includes("BUY");
+  const isBuy = signal.includes('BUY');
   const dir = isBuy ? 1 : -1;
 
   return {
-    strategy: "DCA_TRAILING_PARTIAL_TP",
+    strategy: 'DCA_TRAILING_PARTIAL_TP',
     dca: {
       level1: {
         price: +(entryPrice * (1 - dir * 0.01)).toFixed(4),
-        size: "40%",
+        size: '40%',
       },
       level2: {
         price: +(entryPrice * (1 - dir * 0.02)).toFixed(4),
-        size: "35%",
+        size: '35%',
       },
       level3: {
         price: +(entryPrice * (1 - dir * 0.03)).toFixed(4),
-        size: "25%",
+        size: '25%',
       },
     },
     stopLoss: {
@@ -928,20 +923,20 @@ function calculateAdvancedEntry(entryPrice, signal, riskProfile) {
         trigger: +(entryPrice * (1 + dir * 0.02)).toFixed(4),
         moveTo: entryPrice,
       },
-      trailing: { distance: "1.5%", activateAfter: "+2%" },
+      trailing: { distance: '1.5%', activateAfter: '+2%' },
     },
     takeProfit: {
       tp1: {
         price: +(entryPrice * (1 + dir * tpPct * 0.5)).toFixed(4),
-        size: "50%",
+        size: '50%',
       },
       tp2: {
         price: +(entryPrice * (1 + dir * tpPct * 0.8)).toFixed(4),
-        size: "30%",
+        size: '30%',
       },
       tp3: {
         price: +(entryPrice * (1 + dir * tpPct * 1.2)).toFixed(4),
-        size: "20%",
+        size: '20%',
       },
     },
     riskReward: +(tpPct / slPct).toFixed(2),
@@ -952,11 +947,15 @@ function calculateAdvancedEntry(entryPrice, signal, riskProfile) {
 // BINANCE OPEN INTEREST (free, no API key needed)
 // ═══════════════════════════════════════════════════════════════
 const oiCache = {};
+/**
+ * fetchOpenInterest
+ * @param {*} asset
+ * @returns {*}
+ */
 async function fetchOpenInterest(asset) {
-  if (oiCache[asset] && Date.now() - oiCache[asset].ts < 5 * 60 * 1000)
-    return oiCache[asset].data;
+  if (oiCache[asset] && Date.now() - oiCache[asset].ts < 5 * 60 * 1000) return oiCache[asset].data;
 
-  const binanceSymbols = { BTC: "BTCUSDT", ETH: "ETHUSDT", SOL: "SOLUSDT" };
+  const binanceSymbols = { BTC: 'BTCUSDT', ETH: 'ETHUSDT', SOL: 'SOLUSDT' };
   const symbol = binanceSymbols[asset];
   if (!symbol) return null;
 
@@ -983,27 +982,19 @@ async function fetchOpenInterest(asset) {
     const result = {
       openInterest: oi,
       oiChange24h: oiChange,
-      signal:
-        oiChange > 10
-          ? "rising_OI"
-          : oiChange < -10
-            ? "falling_OI"
-            : "stable_OI",
+      signal: oiChange > 10 ? 'rising_OI' : oiChange < -10 ? 'falling_OI' : 'stable_OI',
       implication:
         oiChange > 10
-          ? "New money entering — trend likely continues"
+          ? 'New money entering — trend likely continues'
           : oiChange < -10
-            ? "Positions closing — trend may reverse"
-            : "Stable — no strong conviction",
+            ? 'Positions closing — trend may reverse'
+            : 'Stable — no strong conviction',
     };
 
     oiCache[asset] = { data: result, ts: Date.now() };
     return result;
   } catch (e) {
-    logger.warn(
-      { component: "Trading", asset, err: e.message },
-      "OI fetch failed",
-    );
+    logger.warn({ component: 'Trading', asset, err: e.message }, 'OI fetch failed');
     return null;
   }
 }
@@ -1012,46 +1003,41 @@ async function fetchOpenInterest(asset) {
 // WHALE ALERT DETECTION (Blockchain.com API — free, no key)
 // ═══════════════════════════════════════════════════════════════
 const whaleCache = {};
+/**
+ * detectWhaleActivity
+ * @param {*} asset
+ * @returns {*}
+ */
 async function detectWhaleActivity(asset) {
-  if (whaleCache[asset] && Date.now() - whaleCache[asset].ts < 10 * 60 * 1000)
-    return whaleCache[asset].data;
+  if (whaleCache[asset] && Date.now() - whaleCache[asset].ts < 10 * 60 * 1000) return whaleCache[asset].data;
 
-  if (!["BTC", "ETH"].includes(asset)) return null;
+  if (!['BTC', 'ETH'].includes(asset)) return null;
 
   try {
     // Use Blockchain.com for BTC large transactions
-    if (asset === "BTC") {
-      const url =
-        "https://blockchain.info/unconfirmed-transactions?format=json";
+    if (asset === 'BTC') {
+      const url = 'https://blockchain.info/unconfirmed-transactions?format=json';
       const r = await fetch(url, { signal: AbortSignal.timeout(5000) });
       if (r.ok) {
         const d = await r.json();
         const txs = d.txs || [];
         const largeTxs = txs.filter((tx) => {
-          const total =
-            (tx.out || []).reduce((s, o) => s + (o.value || 0), 0) / 1e8; // satoshi to BTC
+          const total = (tx.out || []).reduce((s, o) => s + (o.value || 0), 0) / 1e8; // satoshi to BTC
           return total > 10; // > 10 BTC
         });
 
         const result = {
           largeTransactions: largeTxs.length,
           totalVolumeBTC: +(
-            largeTxs.reduce(
-              (s, tx) =>
-                s + (tx.out || []).reduce((ss, o) => ss + (o.value || 0), 0),
-              0,
-            ) / 1e8
+            largeTxs.reduce((s, tx) => s + (tx.out || []).reduce((ss, o) => ss + (o.value || 0), 0), 0) / 1e8
           ).toFixed(2),
           signal:
             largeTxs.length > 5
-              ? "high_whale_activity"
+              ? 'high_whale_activity'
               : largeTxs.length > 2
-                ? "moderate_whale_activity"
-                : "low_whale_activity",
-          implication:
-            largeTxs.length > 5
-              ? "Whales moving — potential big move coming"
-              : "Normal activity",
+                ? 'moderate_whale_activity'
+                : 'low_whale_activity',
+          implication: largeTxs.length > 5 ? 'Whales moving — potential big move coming' : 'Normal activity',
         };
         whaleCache[asset] = { data: result, ts: Date.now() };
         return result;
@@ -1059,10 +1045,7 @@ async function detectWhaleActivity(asset) {
     }
     return null;
   } catch (e) {
-    logger.warn(
-      { component: "Trading", asset, err: e.message },
-      "Whale detection failed",
-    );
+    logger.warn({ component: 'Trading', asset, err: e.message }, 'Whale detection failed');
     return null;
   }
 }
@@ -1072,56 +1055,56 @@ async function detectWhaleActivity(asset) {
 // ═══════════════════════════════════════════════════════════════
 function enhancedSentimentScore(texts) {
   const bullishWords = [
-    "surge",
-    "rally",
-    "breakout",
-    "bullish",
-    "moon",
-    "pump",
-    "adoption",
-    "institutional",
-    "approval",
-    "etf",
-    "upgrade",
-    "partnership",
-    "growth",
-    "record high",
-    "accumulation",
-    "buy signal",
-    "golden cross",
-    "support holds",
+    'surge',
+    'rally',
+    'breakout',
+    'bullish',
+    'moon',
+    'pump',
+    'adoption',
+    'institutional',
+    'approval',
+    'etf',
+    'upgrade',
+    'partnership',
+    'growth',
+    'record high',
+    'accumulation',
+    'buy signal',
+    'golden cross',
+    'support holds',
   ];
   const bearishWords = [
-    "crash",
-    "dump",
-    "bearish",
-    "collapse",
-    "bankruptcy",
-    "hack",
-    "exploit",
-    "liquidation",
-    "ban",
-    "regulation",
-    "crackdown",
-    "death cross",
-    "recession",
-    "default",
-    "fraud",
-    "sec lawsuit",
-    "sell off",
-    "panic",
+    'crash',
+    'dump',
+    'bearish',
+    'collapse',
+    'bankruptcy',
+    'hack',
+    'exploit',
+    'liquidation',
+    'ban',
+    'regulation',
+    'crackdown',
+    'death cross',
+    'recession',
+    'default',
+    'fraud',
+    'sec lawsuit',
+    'sell off',
+    'panic',
   ];
   const fearWords = [
-    "war",
-    "invasion",
-    "military",
-    "sanctions",
-    "crisis",
-    "emergency",
-    "pandemic",
-    "inflation",
-    "recession",
-    "unemployment",
+    'war',
+    'invasion',
+    'military',
+    'sanctions',
+    'crisis',
+    'emergency',
+    'pandemic',
+    'inflation',
+    'recession',
+    'unemployment',
   ];
 
   let bullScore = 0,
@@ -1130,7 +1113,7 @@ function enhancedSentimentScore(texts) {
     total = 0;
 
   texts.forEach((text) => {
-    const lower = (text || "").toLowerCase();
+    const lower = (text || '').toLowerCase();
     bullishWords.forEach((w) => {
       if (lower.includes(w)) bullScore++;
     });
@@ -1143,18 +1126,14 @@ function enhancedSentimentScore(texts) {
     total++;
   });
 
-  if (total === 0) return { score: 0, label: "neutral", confidence: 0 };
+  if (total === 0) return { score: 0, label: 'neutral', confidence: 0 };
 
-  const netScore =
-    (bullScore - bearScore - fearScore * 0.5) / Math.max(total, 1);
-  const confidence = Math.min(
-    100,
-    Math.round(((bullScore + bearScore + fearScore) / Math.max(total, 1)) * 50),
-  );
+  const netScore = (bullScore - bearScore - fearScore * 0.5) / Math.max(total, 1);
+  const confidence = Math.min(100, Math.round(((bullScore + bearScore + fearScore) / Math.max(total, 1)) * 50));
 
   return {
     score: +netScore.toFixed(2),
-    label: netScore > 0.3 ? "bullish" : netScore < -0.3 ? "bearish" : "neutral",
+    label: netScore > 0.3 ? 'bullish' : netScore < -0.3 ? 'bearish' : 'neutral',
     confidence,
     bullish: bullScore,
     bearish: bearScore,
@@ -1169,9 +1148,9 @@ function enhancedSentimentScore(texts) {
 
 // Map asset names to CoinGecko IDs
 const COINGECKO_IDS = {
-  BTC: "bitcoin",
-  ETH: "ethereum",
-  SOL: "solana",
+  BTC: 'bitcoin',
+  ETH: 'ethereum',
+  SOL: 'solana',
 };
 
 // Per-asset price cache (5 min TTL)
@@ -1195,41 +1174,34 @@ async function fetchRealPrices(asset, length = 300) {
 
   // ── PRIORITY 0: SUPABASE market_candles (real stored data) ──
   try {
-    const { supabaseAdmin } = require("./supabase");
+    const { supabaseAdmin } = require('./supabase');
     if (supabaseAdmin) {
       // Symbol mapping: UI uses BTC, DB might store as "bitcoin"
-      const SYMBOL_MAP = { BTC: "bitcoin", ETH: "ethereum", SOL: "solana" };
+      const SYMBOL_MAP = { BTC: 'bitcoin', ETH: 'ethereum', SOL: 'solana' };
       const symbolsToTry = [asset];
       if (SYMBOL_MAP[asset]) symbolsToTry.push(SYMBOL_MAP[asset]);
       // Also try reverse mapping
-      const reverseMap = Object.fromEntries(
-        Object.entries(SYMBOL_MAP).map(([k, v]) => [v, k]),
-      );
+      const reverseMap = Object.fromEntries(Object.entries(SYMBOL_MAP).map(([k, v]) => [v, k]));
       if (reverseMap[asset]) symbolsToTry.push(reverseMap[asset]);
 
       let bestData = null;
       for (const sym of symbolsToTry) {
         const { data, error } = await supabaseAdmin
-          .from("market_candles")
-          .select("close, volume")
-          .eq("symbol", sym)
-          .order("timestamp", { ascending: true })
+          .from('market_candles')
+          .select('close, volume')
+          .eq('symbol', sym)
+          .order('timestamp', { ascending: true })
           .limit(length);
-        if (
-          !error &&
-          data &&
-          data.length >= 20 &&
-          (!bestData || data.length > bestData.length)
-        ) {
+        if (!error && data && data.length >= 20 && (!bestData || data.length > bestData.length)) {
           bestData = data;
           logger.info(
             {
-              component: "Trading",
+              component: 'Trading',
               asset,
               queriedAs: sym,
               points: data.length,
             },
-            `💾 Found ${data.length} candles for ${asset} (queried as "${sym}")`,
+            `💾 Found ${data.length} candles for ${asset} (queried as "${sym}")`
           );
         }
       }
@@ -1240,69 +1212,63 @@ async function fetchRealPrices(asset, length = 300) {
         priceCache[cacheKey] = {
           prices: dbPrices,
           volumes: dbVolumes,
-          source: "Supabase-market_candles",
+          source: 'Supabase-market_candles',
           ts: Date.now(),
         };
         logger.info(
           {
-            component: "Trading",
+            component: 'Trading',
             asset,
-            source: "Supabase",
+            source: 'Supabase',
             points: dbPrices.length,
           },
-          `💾 ${asset}: ${dbPrices.length} real data points from Supabase`,
+          `💾 ${asset}: ${dbPrices.length} real data points from Supabase`
         );
         return {
           prices: dbPrices,
           volumes: dbVolumes,
-          source: "Supabase-market_candles",
+          source: 'Supabase-market_candles',
         };
       }
     }
   } catch (e) {
-    logger.debug(
-      { component: "Trading", asset, err: e.message },
-      "Supabase candles not available, falling back",
-    );
+    logger.debug({ component: 'Trading', asset, err: e.message }, 'Supabase candles not available, falling back');
   }
 
   // ── PRIORITY 1: WS-ENGINE (real-time, lowest latency) ──
   try {
-    const candles = wsEngine.getCandles(asset, "1m", length);
+    const candles = wsEngine.getCandles(asset, '1m', length);
     if (candles && candles.length >= Math.min(length * 0.5, 20)) {
       const wsPrices = candles.map((c) => c.close);
       const wsVolumes = candles.map((c) => c.volume || 0);
       priceCache[cacheKey] = {
         prices: wsPrices,
         volumes: wsVolumes,
-        source: "ws-engine-realtime",
+        source: 'ws-engine-realtime',
         ts: Date.now(),
       };
       logger.info(
         {
-          component: "Trading",
+          component: 'Trading',
           asset,
-          source: "ws-engine",
+          source: 'ws-engine',
           points: wsPrices.length,
         },
-        `⚡ ${asset}: ${wsPrices.length} real-time points from WS-Engine`,
+        `⚡ ${asset}: ${wsPrices.length} real-time points from WS-Engine`
       );
       return {
         prices: wsPrices,
         volumes: wsVolumes,
-        source: "ws-engine-realtime",
+        source: 'ws-engine-realtime',
       };
     }
   } catch (e) {
-    logger.debug(
-      { component: "Trading", asset, err: e.message },
-      "WS-Engine not available, falling back",
-    );
+    logger.debug({ component: 'Trading', asset, err: e.message }, 'WS-Engine not available, falling back');
   }
 
   let prices = [];
   let volumes = [];
-  let source = "fallback";
+  let source = 'fallback';
 
   // ── CRYPTO (CoinGecko — free, 30 req/min) ──
   const cgId = COINGECKO_IDS[asset];
@@ -1315,53 +1281,42 @@ async function fetchRealPrices(asset, length = 300) {
         const d = await r.json();
         if (d.prices && d.prices.length > 0) {
           prices = d.prices.map((p) => p[1]); // [timestamp, price]
-          volumes = d.total_volumes
-            ? d.total_volumes.map((v) => v[1])
-            : prices.map(() => 0);
+          volumes = d.total_volumes ? d.total_volumes.map((v) => v[1]) : prices.map(() => 0);
           // Trim or pad to requested length
           if (prices.length > length) {
             prices = prices.slice(-length);
             volumes = volumes.slice(-length);
           }
-          source = "CoinGecko";
+          source = 'CoinGecko';
           logger.info(
-            { component: "Trading", asset, source, points: prices.length },
-            `📈 ${asset}: ${prices.length} real data points from CoinGecko`,
+            { component: 'Trading', asset, source, points: prices.length },
+            `📈 ${asset}: ${prices.length} real data points from CoinGecko`
           );
         }
       } else {
-        logger.warn(
-          { component: "Trading", asset, status: r.status },
-          `CoinGecko ${r.status} for ${asset}`,
-        );
+        logger.warn({ component: 'Trading', asset, status: r.status }, `CoinGecko ${r.status} for ${asset}`);
       }
     } catch (e) {
-      logger.warn(
-        { component: "Trading", asset, err: e.message },
-        `CoinGecko error for ${asset}`,
-      );
+      logger.warn({ component: 'Trading', asset, err: e.message }, `CoinGecko error for ${asset}`);
     }
   }
 
   // ── FOREX + CRYPTO FALLBACK (Yahoo Finance — full historical OHLCV) ──
-  if (
-    prices.length === 0 &&
-    (asset === "EUR/USD" || asset === "GBP/USD" || cgId)
-  ) {
+  if (prices.length === 0 && (asset === 'EUR/USD' || asset === 'GBP/USD' || cgId)) {
     const yahooForexMap = {
-      "EUR/USD": "EURUSD%3DX",
-      "GBP/USD": "GBPUSD%3DX",
-      BTC: "BTC-USD",
-      ETH: "ETH-USD",
-      SOL: "SOL-USD",
+      'EUR/USD': 'EURUSD%3DX',
+      'GBP/USD': 'GBPUSD%3DX',
+      BTC: 'BTC-USD',
+      ETH: 'ETH-USD',
+      SOL: 'SOL-USD',
     };
     const ySym = yahooForexMap[asset];
     if (ySym) {
       try {
-        const range = length > 200 ? "1y" : "6mo";
+        const range = length > 200 ? '1y' : '6mo';
         const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ySym}?range=${range}&interval=1d`;
         const r = await fetch(url, {
-          headers: { "User-Agent": "KelionAI/2.0" },
+          headers: { 'User-Agent': 'KelionAI/2.0' },
         });
         if (r.ok) {
           const d = await r.json();
@@ -1369,49 +1324,41 @@ async function fetchRealPrices(asset, length = 300) {
           if (result?.indicators?.quote?.[0]) {
             const closePrices = result.indicators.quote[0].close || [];
             const vols = result.indicators.quote[0].volume || [];
-            prices = closePrices
-              .filter((p) => p !== null)
-              .map((p) => Math.round(p * 10000) / 10000);
+            prices = closePrices.filter((p) => p !== null).map((p) => Math.round(p * 10000) / 10000);
             volumes = vols.filter((v) => v !== null);
             if (prices.length > length) {
               prices = prices.slice(-length);
               volumes = volumes.slice(-length);
             }
-            source = "Yahoo Finance";
+            source = 'Yahoo Finance';
             logger.info(
-              { component: "Trading", asset, source, points: prices.length },
-              `📊 ${asset}: ${prices.length} real data points from Yahoo Finance`,
+              { component: 'Trading', asset, source, points: prices.length },
+              `📊 ${asset}: ${prices.length} real data points from Yahoo Finance`
             );
           }
         }
       } catch (e) {
-        logger.warn(
-          { component: "Trading", asset, err: e.message },
-          `Yahoo Finance error for ${asset}`,
-        );
+        logger.warn({ component: 'Trading', asset, err: e.message }, `Yahoo Finance error for ${asset}`);
       }
     }
   }
 
   // ── STOCKS/COMMODITIES (Yahoo Finance) ──
-  if (
-    prices.length === 0 &&
-    ["S&P 500", "NASDAQ", "Gold", "Oil"].includes(asset)
-  ) {
+  if (prices.length === 0 && ['S&P 500', 'NASDAQ', 'Gold', 'Oil'].includes(asset)) {
     const yahooSymbols = {
-      "S&P 500": "%5EGSPC",
-      NASDAQ: "%5EIXIC",
-      Gold: "GC%3DF",
-      Oil: "CL%3DF",
+      'S&P 500': '%5EGSPC',
+      NASDAQ: '%5EIXIC',
+      Gold: 'GC%3DF',
+      Oil: 'CL%3DF',
     };
     const sym = yahooSymbols[asset];
     if (sym) {
       try {
         // Yahoo Finance chart API (unofficial but widely used)
-        const range = length > 200 ? "1y" : "6mo";
+        const range = length > 200 ? '1y' : '6mo';
         const url = `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?range=${range}&interval=1d`;
         const r = await fetch(url, {
-          headers: { "User-Agent": "KelionAI/2.0" },
+          headers: { 'User-Agent': 'KelionAI/2.0' },
         });
         if (r.ok) {
           const d = await r.json();
@@ -1419,26 +1366,21 @@ async function fetchRealPrices(asset, length = 300) {
           if (result?.indicators?.quote?.[0]) {
             const closePrices = result.indicators.quote[0].close || [];
             const vols = result.indicators.quote[0].volume || [];
-            prices = closePrices
-              .filter((p) => p !== null)
-              .map((p) => Math.round(p * 100) / 100);
+            prices = closePrices.filter((p) => p !== null).map((p) => Math.round(p * 100) / 100);
             volumes = vols.filter((v) => v !== null);
             if (prices.length > length) {
               prices = prices.slice(-length);
               volumes = volumes.slice(-length);
             }
-            source = "Yahoo Finance";
+            source = 'Yahoo Finance';
             logger.info(
-              { component: "Trading", asset, source, points: prices.length },
-              `📊 ${asset}: ${prices.length} real data points from Yahoo Finance`,
+              { component: 'Trading', asset, source, points: prices.length },
+              `📊 ${asset}: ${prices.length} real data points from Yahoo Finance`
             );
           }
         }
       } catch (e) {
-        logger.warn(
-          { component: "Trading", asset, err: e.message },
-          `Yahoo error for ${asset}`,
-        );
+        logger.warn({ component: 'Trading', asset, err: e.message }, `Yahoo error for ${asset}`);
       }
     }
   }
@@ -1446,24 +1388,18 @@ async function fetchRealPrices(asset, length = 300) {
   // ── NO SIMULATION — if all APIs fail, return error ──
   if (prices.length === 0) {
     if (cached && cached.prices.length > 0) {
-      logger.warn(
-        { component: "Trading", asset },
-        `⚠️ ${asset}: using stale cached data (APIs failed)`,
-      );
+      logger.warn({ component: 'Trading', asset }, `⚠️ ${asset}: using stale cached data (APIs failed)`);
       return {
         prices: cached.prices,
         volumes: cached.volumes,
-        source: cached.source + " (stale)",
+        source: cached.source + ' (stale)',
       };
     }
-    logger.error(
-      { component: "Trading", asset },
-      `❌ ${asset}: ALL APIs failed — NO DATA AVAILABLE (zero simulation)`,
-    );
+    logger.error({ component: 'Trading', asset }, `❌ ${asset}: ALL APIs failed — NO DATA AVAILABLE (zero simulation)`);
     return {
       prices: [],
       volumes: [],
-      source: "NO_DATA",
+      source: 'NO_DATA',
       error: `No real data available for ${asset}`,
     };
   }
@@ -1478,12 +1414,7 @@ async function fetchRealPrices(asset, length = 300) {
 
 /** Run all technical indicators on an asset — NOW ASYNC with real data. */
 async function analyzeAsset(asset) {
-  const {
-    prices,
-    volumes,
-    source,
-    error: fetchError,
-  } = await fetchRealPrices(asset, 300);
+  const { prices, volumes, source, error: fetchError } = await fetchRealPrices(asset, 300);
 
   // Guard: no data available — return safe response, don't crash
   if (!prices || prices.length < 2) {
@@ -1492,19 +1423,19 @@ async function analyzeAsset(asset) {
       asset,
       symbol: asset,
       price: currentPrice,
-      signal: "HOLD",
+      signal: 'HOLD',
       confidence: 0,
       changePercent: 0,
-      rsi: { value: 50, signal: "HOLD" },
-      macd: { crossSignal: "HOLD" },
-      bollinger: { signal: "HOLD" },
-      ema: { signal: "HOLD" },
-      fibonacci: { signal: "HOLD" },
-      volume: { phase: "neutral", signal: "HOLD" },
-      sentiment: { label: "neutral" },
-      confluence: { signal: "HOLD", confidence: 0 },
-      dataSource: source || "NO_DATA",
-      error: fetchError || "Insufficient price data for analysis",
+      rsi: { value: 50, signal: 'HOLD' },
+      macd: { crossSignal: 'HOLD' },
+      bollinger: { signal: 'HOLD' },
+      ema: { signal: 'HOLD' },
+      fibonacci: { signal: 'HOLD' },
+      volume: { phase: 'neutral', signal: 'HOLD' },
+      sentiment: { label: 'neutral' },
+      confluence: { signal: 'HOLD', confidence: 0 },
+      dataSource: source || 'NO_DATA',
+      error: fetchError || 'Insufficient price data for analysis',
     };
   }
 
@@ -1524,14 +1455,12 @@ async function analyzeAsset(asset) {
   let sentimentText = `${asset} market`;
   let newsHeadlines = [];
   try {
-    const TI = require("./trade-intelligence");
-    if (typeof TI.fetchMarketNews === "function") {
-      const news = await TI.fetchMarketNews(
-        asset.includes("/") ? "forex" : "crypto",
-      );
+    const TI = require('./trade-intelligence');
+    if (typeof TI.fetchMarketNews === 'function') {
+      const news = await TI.fetchMarketNews(asset.includes('/') ? 'forex' : 'crypto');
       if (news && news.length > 0) {
         newsHeadlines = news.map((n) => n.title || n);
-        sentimentText = newsHeadlines.join(" ");
+        sentimentText = newsHeadlines.join(' ');
       }
     }
   } catch (_e) {
@@ -1545,15 +1474,12 @@ async function analyzeAsset(asset) {
   let enhancedSentiment = null;
 
   try {
-    [openInterest, whaleActivity] = await Promise.all([
-      fetchOpenInterest(asset),
-      detectWhaleActivity(asset),
-    ]);
+    [openInterest, whaleActivity] = await Promise.all([fetchOpenInterest(asset), detectWhaleActivity(asset)]);
     if (newsHeadlines.length > 0) {
       enhancedSentiment = enhancedSentimentScore(newsHeadlines);
     }
   } catch (e) {
-    logger.debug({ asset, err: e.message }, "Advanced tools partial failure");
+    logger.debug({ asset, err: e.message }, 'Advanced tools partial failure');
   }
 
   const confluence = calculateConfluence({
@@ -1567,9 +1493,8 @@ async function analyzeAsset(asset) {
   });
 
   // Format price based on asset type
-  const fmtPrice = asset.includes("/") ? +last.toFixed(5) : +last.toFixed(2);
-  const changePercent =
-    prev !== 0 ? +(((last - prev) / prev) * 100).toFixed(2) : 0;
+  const fmtPrice = asset.includes('/') ? +last.toFixed(5) : +last.toFixed(2);
+  const changePercent = prev !== 0 ? +(((last - prev) / prev) * 100).toFixed(2) : 0;
 
   return {
     asset,
@@ -1598,41 +1523,37 @@ async function analyzeAsset(asset) {
 // ═══════════════════════════════════════════════════════════════
 
 // GET /status
-router.get("/status", (req, res) => {
+router.get('/status', (req, res) => {
   const positions = tradeEngine.getPositions ? tradeEngine.getPositions() : [];
   const uptimeSec = process.uptime();
   const hrs = Math.floor(uptimeSec / 3600);
   const mins = Math.floor((uptimeSec % 3600) / 60);
   res.json({
     active: true,
-    status: "ACTIVE",
-    version: "1.0",
+    status: 'ACTIVE',
+    version: '1.0',
     strategies: STRATEGIES,
     assets: ASSETS,
     activeTrades: Array.isArray(positions) ? positions.length : 0,
     uptime: `${hrs}h ${mins}m`,
-    lastUpdate: analysisCache
-      ? new Date(cacheTsMs).toISOString()
-      : new Date().toISOString(),
+    lastUpdate: analysisCache ? new Date(cacheTsMs).toISOString() : new Date().toISOString(),
     lastAnalysis: analysisCache ? new Date(cacheTsMs).toISOString() : null,
-    cacheAge: analysisCache
-      ? Math.round((Date.now() - cacheTsMs) / 1000) + "s"
-      : null,
+    cacheAge: analysisCache ? Math.round((Date.now() - cacheTsMs) / 1000) + 's' : null,
     historyEntries: analysisHistory.length,
     disclaimer: DISCLAIMER,
   });
 });
 
 // GET /analysis
-router.get("/analysis", async (req, res) => {
+router.get('/analysis', async (req, res) => {
   try {
     const now = Date.now();
     if (analysisCache && now - cacheTsMs < CACHE_TTL_MS) {
-      logger.info("[Trading] Returning cached analysis");
+      logger.info('[Trading] Returning cached analysis');
       return res.json(analysisCache);
     }
 
-    logger.info("[Trading] Running fresh market analysis");
+    logger.info('[Trading] Running fresh market analysis');
     const brain = req.app.locals.brain;
     let searchSummary = null;
 
@@ -1640,20 +1561,18 @@ router.get("/analysis", async (req, res) => {
     if (brain) {
       try {
         const searchFn =
-          typeof brain.search === "function"
+          typeof brain.search === 'function'
             ? brain.search.bind(brain)
-            : typeof brain._search === "function"
+            : typeof brain._search === 'function'
               ? brain._search.bind(brain)
               : null;
         if (searchFn) {
-          searchSummary = await searchFn(
-            "crypto bitcoin ethereum market analysis today",
-          );
+          searchSummary = await searchFn('crypto bitcoin ethereum market analysis today');
         }
       } catch (searchErr) {
         logger.warn(
           { err: searchErr.message },
-          "[Trading] Brain search unavailable, proceeding without real-time market context",
+          '[Trading] Brain search unavailable, proceeding without real-time market context'
         );
       }
     }
@@ -1664,9 +1583,7 @@ router.get("/analysis", async (req, res) => {
     const entry = {
       timestamp: new Date().toISOString(),
       assets: results,
-      searchContext: searchSummary
-        ? String(searchSummary).substring(0, MAX_SEARCH_CONTEXT_LENGTH)
-        : null,
+      searchContext: searchSummary ? String(searchSummary).substring(0, MAX_SEARCH_CONTEXT_LENGTH) : null,
       stale: false,
       disclaimer: DISCLAIMER,
     };
@@ -1677,47 +1594,41 @@ router.get("/analysis", async (req, res) => {
     if (analysisHistory.length > MAX_HISTORY) analysisHistory.shift();
 
     // ═══ PERSIST TO SUPABASE ═══
-    tradePersist.saveAllAnalyses(results).catch(() => {});
+    tradePersist.saveAllAnalyses(results).catch((err) => {
+      console.error(err);
+    });
 
     // ═══ BRAIN INTEGRATION — save analysis to memory ═══
     if (brain) {
       const topSignals = results
         .slice(0, 3)
-        .map(
-          (r) =>
-            r.asset +
-            ":" +
-            r.confluence.signal +
-            "(" +
-            r.confluence.confidence +
-            "%)",
-        )
-        .join(", ");
+        .map((r) => r.asset + ':' + r.confluence.signal + '(' + r.confluence.confidence + '%)')
+        .join(', ');
       brain
-        .saveMemory(null, "context", "Trading analysis: " + topSignals, {
-          platform: "trading",
-          type: "analysis",
+        .saveMemory(null, 'context', 'Trading analysis: ' + topSignals, {
+          platform: 'trading',
+          type: 'analysis',
         })
-        .catch(() => {});
+        .catch((err) => {
+          console.error(err);
+        });
     }
 
     res.json(entry);
   } catch (err) {
-    logger.error({ err: err.message }, "[Trading] Analysis error");
+    logger.error({ err: err.message }, '[Trading] Analysis error');
     if (analysisCache) {
       return res.json({ ...analysisCache, stale: true });
     }
-    res.status(500).json({ error: "Analiza nu este disponibilă momentan." });
+    res.status(500).json({ error: 'Analiza nu este disponibilă momentan.' });
   }
 });
 
 // GET /signals
-router.get("/signals", async (req, res) => {
+router.get('/signals', async (req, res) => {
   try {
     const allAssets = Object.values(ASSETS).flat();
-    const allData = await Promise.all(
-      allAssets.map((a) => fetchRealPrices(a, 300)),
-    );
+    const allData = await Promise.all(allAssets.map((a) => fetchRealPrices(a, 300)));
     const signals = allAssets
       .map((asset, idx) => {
         const { prices, volumes } = allData[idx];
@@ -1752,19 +1663,18 @@ router.get("/signals", async (req, res) => {
           }
           atr /= atrPeriod;
         }
-        const stopLossPct =
-          atr > 0 ? Math.max(0.005, Math.min(0.05, (atr * 2) / last)) : 0.02;
+        const stopLossPct = atr > 0 ? Math.max(0.005, Math.min(0.05, (atr * 2) / last)) : 0.02;
         const takeProfitPct = stopLossPct * 2; // R:R = 2:1
         const entry = last;
-        const stop = confluence.signal.includes("BUY")
+        const stop = confluence.signal.includes('BUY')
           ? Math.round(entry * (1 - stopLossPct) * 100) / 100
           : Math.round(entry * (1 + stopLossPct) * 100) / 100;
-        const target = confluence.signal.includes("BUY")
+        const target = confluence.signal.includes('BUY')
           ? Math.round(entry * (1 + takeProfitPct) * 100) / 100
           : Math.round(entry * (1 - takeProfitPct) * 100) / 100;
 
         // Format prices based on asset type
-        const fmt = asset.includes("/") ? 5 : 2;
+        const fmt = asset.includes('/') ? 5 : 2;
         return {
           asset,
           symbol: asset,
@@ -1775,13 +1685,13 @@ router.get("/signals", async (req, res) => {
           stopLoss: +stop.toFixed(fmt),
           takeProfit: +target.toFixed(fmt),
           riskReward: +(takeProfitPct / stopLossPct).toFixed(1),
-          timeframe: "4h",
+          timeframe: '4h',
           rsi: rsi.value,
           generatedAt: new Date().toISOString(),
           timestamp: new Date().toISOString(),
         };
       })
-      .filter((s) => s && s.signal !== "HOLD")
+      .filter((s) => s && s.signal !== 'HOLD')
       .sort((a, b) => b.confidence - a.confidence);
 
     // ═══ GEOPOLITICAL RISK ADJUSTMENT ═══
@@ -1790,11 +1700,7 @@ router.get("/signals", async (req, res) => {
       geoRisk = await geopolitical.calculateGeopoliticalRisk();
       if (geoRisk.riskScore >= 30) {
         signals.forEach((s) => {
-          const adj = geopolitical.adjustStrategyForRisk(
-            geoRisk.riskScore,
-            s.confidence,
-            s.signal,
-          );
+          const adj = geopolitical.adjustStrategyForRisk(geoRisk.riskScore, s.confidence, s.signal);
           s.confidence = adj.confidence;
           s.signal = adj.signal;
           s.geoAdjusted = adj.geoAdjusted;
@@ -1802,11 +1708,15 @@ router.get("/signals", async (req, res) => {
         });
       }
     } catch (e) {
-      logger.warn("[Trading] Geopolitical risk check failed: " + e.message);
+      logger.warn('[Trading] Geopolitical risk check failed: ' + e.message);
     }
 
     // ═══ PERSIST SIGNALS TO SUPABASE ═══
-    signals.forEach((s) => tradePersist.saveSignal(s).catch(() => {}));
+    signals.forEach((s) =>
+      tradePersist.saveSignal(s).catch((err) => {
+        console.error(err);
+      })
+    );
 
     res.json({
       signals,
@@ -1821,13 +1731,13 @@ router.get("/signals", async (req, res) => {
       disclaimer: DISCLAIMER,
     });
   } catch (err) {
-    logger.error({ err: err.message }, "[Trading] Signals error");
-    res.status(500).json({ error: "Semnalele nu sunt disponibile." });
+    logger.error({ err: err.message }, '[Trading] Signals error');
+    res.status(500).json({ error: 'Semnalele nu sunt disponibile.' });
   }
 });
 
 // GET /geopolitical — geopolitical risk + all monitored sources
-router.get("/geopolitical", async (req, res) => {
+router.get('/geopolitical', async (req, res) => {
   try {
     const [risk, gdelt, fearGreed, fred] = await Promise.all([
       geopolitical.calculateGeopoliticalRisk(),
@@ -1843,50 +1753,50 @@ router.get("/geopolitical", async (req, res) => {
       factors: risk.factors,
       monitoredSources: [
         {
-          name: "GDELT Project",
-          type: "Geopolitical Events",
-          url: "gdeltproject.org",
-          status: gdelt.events?.length > 0 ? "ACTIVE" : "NO_DATA",
+          name: 'GDELT Project',
+          type: 'Geopolitical Events',
+          url: 'gdeltproject.org',
+          status: gdelt.events?.length > 0 ? 'ACTIVE' : 'NO_DATA',
           events: gdelt.count,
         },
         {
-          name: "Fear & Greed Index",
-          type: "Market Sentiment",
-          url: "alternative.me",
-          status: fearGreed.current ? "ACTIVE" : "NO_DATA",
+          name: 'Fear & Greed Index',
+          type: 'Market Sentiment',
+          url: 'alternative.me',
+          status: fearGreed.current ? 'ACTIVE' : 'NO_DATA',
           value: fearGreed.current?.value,
           label: fearGreed.current?.label,
         },
         {
-          name: "FRED (St. Louis Fed)",
-          type: "Macro Economic",
-          url: "fred.stlouisfed.org",
-          status: fred.hasApiKey ? "ACTIVE" : "NO_KEY",
+          name: 'FRED (St. Louis Fed)',
+          type: 'Macro Economic',
+          url: 'fred.stlouisfed.org',
+          status: fred.hasApiKey ? 'ACTIVE' : 'NO_KEY',
           indicators: Object.keys(fred.indicators || {}).length,
         },
         {
-          name: "CoinGecko",
-          type: "Crypto Prices",
-          url: "coingecko.com",
-          status: "ACTIVE",
+          name: 'CoinGecko',
+          type: 'Crypto Prices',
+          url: 'coingecko.com',
+          status: 'ACTIVE',
         },
         {
-          name: "Yahoo Finance",
-          type: "Stocks/Commodities/Forex",
-          url: "finance.yahoo.com",
-          status: "ACTIVE",
+          name: 'Yahoo Finance',
+          type: 'Stocks/Commodities/Forex',
+          url: 'finance.yahoo.com',
+          status: 'ACTIVE',
         },
         {
-          name: "ExchangeRate-API",
-          type: "Forex Rates",
-          url: "exchangerate-api.com",
-          status: "ACTIVE",
+          name: 'ExchangeRate-API',
+          type: 'Forex Rates',
+          url: 'exchangerate-api.com',
+          status: 'ACTIVE',
         },
         {
-          name: "CryptoPanic",
-          type: "Crypto News Sentiment",
-          url: "cryptopanic.com",
-          status: process.env.CRYPTOPANIC_API_KEY ? "ACTIVE" : "NO_KEY",
+          name: 'CryptoPanic',
+          type: 'Crypto News Sentiment',
+          url: 'cryptopanic.com',
+          status: process.env.CRYPTOPANIC_API_KEY ? 'ACTIVE' : 'NO_KEY',
         },
       ],
       gdeltEvents: (gdelt.events || []).slice(0, 10),
@@ -1895,13 +1805,13 @@ router.get("/geopolitical", async (req, res) => {
       disclaimer: DISCLAIMER,
     });
   } catch (err) {
-    logger.error({ err: err.message }, "[Trading] Geopolitical error");
-    res.status(500).json({ error: "Geopolitical data unavailable" });
+    logger.error({ err: err.message }, '[Trading] Geopolitical error');
+    res.status(500).json({ error: 'Geopolitical data unavailable' });
   }
 });
 
 // GET /portfolio — REAL positions from trade engine
-router.get("/portfolio", async (req, res) => {
+router.get('/portfolio', async (req, res) => {
   try {
     const openPositions = tradeEngine.getOpenPositions();
     const paperBalance = tradeEngine.getPaperBalance();
@@ -1910,9 +1820,7 @@ router.get("/portfolio", async (req, res) => {
     const profile = tradeEngine.getRiskProfile();
 
     // Get current prices for open positions
-    const uniqueAssets = [
-      ...new Set(openPositions.map((p) => p.symbol.replace("/USDT", ""))),
-    ];
+    const uniqueAssets = [...new Set(openPositions.map((p) => p.symbol.replace('/USDT', '')))];
     const priceData = {};
     for (const asset of uniqueAssets) {
       try {
@@ -1925,52 +1833,34 @@ router.get("/portfolio", async (req, res) => {
 
     // Calculate P&L for each open position
     const positions = openPositions.map((pos) => {
-      const asset = pos.symbol.replace("/USDT", "");
+      const asset = pos.symbol.replace('/USDT', '');
       const currentPrice = priceData[asset] || pos.price;
       const unrealizedPnl =
-        pos.action === "BUY"
-          ? (currentPrice - pos.price) * pos.size
-          : (pos.price - currentPrice) * pos.size;
-      const pnlPct =
-        ((currentPrice - pos.price) / pos.price) *
-        100 *
-        (pos.action === "BUY" ? 1 : -1);
+        pos.action === 'BUY' ? (currentPrice - pos.price) * pos.size : (pos.price - currentPrice) * pos.size;
+      const pnlPct = ((currentPrice - pos.price) / pos.price) * 100 * (pos.action === 'BUY' ? 1 : -1);
       return {
         ...pos,
         currentPrice,
         unrealizedPnl: +unrealizedPnl.toFixed(2),
         pnlPct: +pnlPct.toFixed(2),
-        distanceToSL:
-          +(
-            (Math.abs(currentPrice - pos.stopLoss) / currentPrice) *
-            100
-          ).toFixed(2) + "%",
-        distanceToTP:
-          +(
-            (Math.abs(pos.takeProfit - currentPrice) / currentPrice) *
-            100
-          ).toFixed(2) + "%",
+        distanceToSL: +((Math.abs(currentPrice - pos.stopLoss) / currentPrice) * 100).toFixed(2) + '%',
+        distanceToTP: +((Math.abs(pos.takeProfit - currentPrice) / currentPrice) * 100).toFixed(2) + '%',
       };
     });
 
     // Closed trades summary
-    const closedTrades = paperTrades.filter(
-      (t) => t.status === "CLOSED" || t.closedAt,
-    );
+    const closedTrades = paperTrades.filter((t) => t.status === 'CLOSED' || t.closedAt);
     const wins = closedTrades.filter((t) => (t.pnl || 0) > 0).length;
     const losses = closedTrades.filter((t) => (t.pnl || 0) <= 0).length;
 
-    const totalUnrealizedPnl = positions.reduce(
-      (s, p) => s + p.unrealizedPnl,
-      0,
-    );
+    const totalUnrealizedPnl = positions.reduce((s, p) => s + p.unrealizedPnl, 0);
 
     res.json({
-      mode: isPaper ? "PAPER" : "LIVE",
+      mode: isPaper ? 'PAPER' : 'LIVE',
       riskProfile: {
         name: profile.name,
         emoji: profile.emoji,
-        risk: profile.riskPct + "%",
+        risk: profile.riskPct + '%',
       },
       balance: paperBalance,
       openPositions: positions,
@@ -1983,22 +1873,19 @@ router.get("/portfolio", async (req, res) => {
         total: closedTrades.length,
         wins,
         losses,
-        winRate:
-          closedTrades.length > 0
-            ? +((wins / closedTrades.length) * 100).toFixed(1)
-            : 0,
+        winRate: closedTrades.length > 0 ? +((wins / closedTrades.length) * 100).toFixed(1) : 0,
       },
       recentTrades: paperTrades.slice(-10),
       disclaimer: DISCLAIMER,
     });
   } catch (err) {
-    logger.error({ err: err.message }, "[Trading] Portfolio error");
-    res.status(500).json({ error: "Portofoliul nu este disponibil." });
+    logger.error({ err: err.message }, '[Trading] Portfolio error');
+    res.status(500).json({ error: 'Portofoliul nu este disponibil.' });
   }
 });
 
 // GET /market — alias for /analysis (audit fix)
-router.get("/market", async (req, res) => {
+router.get('/market', async (req, res) => {
   try {
     const allAssets = Object.values(ASSETS).flat();
     const results = [];
@@ -2007,10 +1894,7 @@ router.get("/market", async (req, res) => {
         const { prices, source } = await fetchRealPrices(asset, 50);
         const price = prices.length > 0 ? prices[prices.length - 1] : null;
         const prevPrice = prices.length > 1 ? prices[prices.length - 2] : price;
-        const change =
-          price && prevPrice
-            ? +(((price - prevPrice) / prevPrice) * 100).toFixed(2)
-            : 0;
+        const change = price && prevPrice ? +(((price - prevPrice) / prevPrice) * 100).toFixed(2) : 0;
         results.push({
           symbol: asset,
           price: price ? +price.toFixed(4) : null,
@@ -2022,45 +1906,33 @@ router.get("/market", async (req, res) => {
           symbol: asset,
           price: null,
           changePercent: 0,
-          source: "error",
+          source: 'error',
         });
       }
     }
     res.json({ assets: results, timestamp: new Date().toISOString() });
   } catch (err) {
-    logger.error({ err: err.message }, "[Trading] Market data error");
-    res.status(500).json({ error: "Market data unavailable" });
+    logger.error({ err: err.message }, '[Trading] Market data error');
+    res.status(500).json({ error: 'Market data unavailable' });
   }
 });
 
 // POST /backtest
-router.post("/backtest", async (req, res) => {
+router.post('/backtest', async (req, res) => {
   try {
-    const {
-      strategy = "RSI",
-      asset = "BTC",
-      period = 90,
-      riskProfile = "moderate",
-    } = req.body || {};
+    const { strategy = 'RSI', asset = 'BTC', period = 90, riskProfile = 'moderate' } = req.body || {};
     const allAssets = Object.values(ASSETS).flat();
     if (!STRATEGIES.includes(strategy)) {
       return res.status(400).json({
-        error: `Strategie invalidă. Opțiuni: ${STRATEGIES.join(", ")}.`,
+        error: `Strategie invalidă. Opțiuni: ${STRATEGIES.join(', ')}.`,
       });
     }
     if (!allAssets.includes(asset)) {
-      return res
-        .status(400)
-        .json({ error: `Asset invalid. Opțiuni: ${allAssets.join(", ")}.` });
+      return res.status(400).json({ error: `Asset invalid. Opțiuni: ${allAssets.join(', ')}.` });
     }
-    const len = Math.min(Math.max(parseInt(period) || 90, 30), 365);
-    const profile =
-      tradeEngine.RISK_PROFILES[riskProfile] ||
-      tradeEngine.RISK_PROFILES.moderate;
-    logger.info(
-      { strategy, asset, period: len, riskProfile: profile.name },
-      "[Trading] Running backtest",
-    );
+    const len = Math.min(Math.max(parseInt(period, 10) || 90, 30), 365);
+    const profile = tradeEngine.RISK_PROFILES[riskProfile] || tradeEngine.RISK_PROFILES.moderate;
+    logger.info({ strategy, asset, period: len, riskProfile: profile.name }, '[Trading] Running backtest');
 
     const COMMISSION_PCT = 0.001; // 0.1% per trade (Binance standard)
     const SLIPPAGE_PCT = 0.0005; // 0.05% slippage simulation
@@ -2077,27 +1949,21 @@ router.post("/backtest", async (req, res) => {
 
     for (let i = 20; i < prices.length; i++) {
       const slice = prices.slice(0, i + 1);
-      let signal = "HOLD";
+      let signal = 'HOLD';
 
-      if (strategy === "RSI") {
+      if (strategy === 'RSI') {
         signal = calculateRSI(slice).signal;
-      } else if (strategy === "MACD") {
+      } else if (strategy === 'MACD') {
         signal = calculateMACD(slice).crossSignal;
-      } else if (strategy === "BollingerBands") {
+      } else if (strategy === 'BollingerBands') {
         signal = calculateBollingerBands(slice).signal;
-      } else if (strategy === "EMACrossover") {
+      } else if (strategy === 'EMACrossover') {
         signal = calculateEMACrossover(slice).signal;
-      } else if (strategy === "SmartConfluence") {
-        signal = calculateSmartConfluence(
-          slice,
-          volumes.slice(0, i + 1),
-        ).signal;
+      } else if (strategy === 'SmartConfluence') {
+        signal = calculateSmartConfluence(slice, volumes.slice(0, i + 1)).signal;
       } else {
         // Fallback for Fibonacci/VolumeProfile/Sentiment
-        signal = calculateSmartConfluence(
-          slice,
-          volumes.slice(0, i + 1),
-        ).signal;
+        signal = calculateSmartConfluence(slice, volumes.slice(0, i + 1)).signal;
       }
 
       const price = prices[i];
@@ -2110,13 +1976,13 @@ router.post("/backtest", async (req, res) => {
         let exitPrice = price;
 
         if (price <= slPrice) {
-          exitReason = "STOP_LOSS";
+          exitReason = 'STOP_LOSS';
           exitPrice = slPrice;
         } else if (price >= tpPrice) {
-          exitReason = "TAKE_PROFIT";
+          exitReason = 'TAKE_PROFIT';
           exitPrice = tpPrice;
-        } else if (signal === "SELL" || signal === "STRONG SELL") {
-          exitReason = "SIGNAL";
+        } else if (signal === 'SELL' || signal === 'STRONG SELL') {
+          exitReason = 'SIGNAL';
           exitPrice = price;
         }
 
@@ -2134,9 +2000,7 @@ router.post("/backtest", async (req, res) => {
             exit: +actualExit.toFixed(2),
             grossPnlPct: +(grossPnlPct * 100).toFixed(2),
             netPnlPct: +(netPnlPct * 100).toFixed(2),
-            commission: +(commission + position.entry * COMMISSION_PCT).toFixed(
-              2,
-            ),
+            commission: +(commission + position.entry * COMMISSION_PCT).toFixed(2),
             exitReason,
             bars: i - position.idx,
           });
@@ -2145,7 +2009,7 @@ router.post("/backtest", async (req, res) => {
       }
 
       // Open new position
-      if (!position && (signal === "BUY" || signal === "STRONG BUY")) {
+      if (!position && (signal === 'BUY' || signal === 'STRONG BUY')) {
         const slippage = price * SLIPPAGE_PCT;
         position = { entry: price + slippage, idx: i, slippage };
       }
@@ -2154,18 +2018,9 @@ router.post("/backtest", async (req, res) => {
     const wins = trades.filter((t) => t.netPnlPct > 0).length;
     const losses = trades.filter((t) => t.netPnlPct <= 0).length;
     const totalReturn = Math.round((equity - startEquity) * 100) / 100;
-    const grossWins = trades
-      .filter((t) => t.netPnlPct > 0)
-      .reduce((s, t) => s + t.netPnlPct, 0);
-    const grossLosses = Math.abs(
-      trades
-        .filter((t) => t.netPnlPct <= 0)
-        .reduce((s, t) => s + t.netPnlPct, 0),
-    );
-    const avgBars =
-      trades.length > 0
-        ? Math.round(trades.reduce((s, t) => s + t.bars, 0) / trades.length)
-        : 0;
+    const grossWins = trades.filter((t) => t.netPnlPct > 0).reduce((s, t) => s + t.netPnlPct, 0);
+    const grossLosses = Math.abs(trades.filter((t) => t.netPnlPct <= 0).reduce((s, t) => s + t.netPnlPct, 0));
+    const avgBars = trades.length > 0 ? Math.round(trades.reduce((s, t) => s + t.bars, 0) / trades.length) : 0;
 
     // Max drawdown from equity curve
     let equityCurve = startEquity;
@@ -2183,36 +2038,33 @@ router.post("/backtest", async (req, res) => {
       asset,
       period: len,
       riskProfile: profile.name,
-      stopLoss: SL_PCT * 100 + "%",
-      takeProfit: TP_PCT * 100 + "%",
+      stopLoss: SL_PCT * 100 + '%',
+      takeProfit: TP_PCT * 100 + '%',
       trades: trades.length,
       wins,
       losses,
       winRate: trades.length ? +((wins / trades.length) * 100).toFixed(1) : 0,
-      profitFactor:
-        grossLosses > 0 ? +(grossWins / grossLosses).toFixed(2) : Infinity,
+      profitFactor: grossLosses > 0 ? +(grossWins / grossLosses).toFixed(2) : Infinity,
       totalReturn,
       maxDrawdown: +maxDrawdown.toFixed(2),
       finalEquity: +equity.toFixed(2),
       totalCommissions: +totalCommissions.toFixed(2),
       totalSlippage: +totalSlippage.toFixed(2),
-      avgTradeDuration: avgBars + " bars",
+      avgTradeDuration: avgBars + ' bars',
       recentTrades: trades.slice(-10),
       disclaimer: DISCLAIMER,
     });
   } catch (err) {
-    logger.error({ err: err.message }, "[Trading] Backtest error");
-    res.status(500).json({ error: "Backtestul a eșuat." });
+    logger.error({ err: err.message }, '[Trading] Backtest error');
+    res.status(500).json({ error: 'Backtestul a eșuat.' });
   }
 });
 
 // GET /alerts
-router.get("/alerts", async (req, res) => {
+router.get('/alerts', async (req, res) => {
   try {
     const allAssets = Object.values(ASSETS).flat();
-    const allData = await Promise.all(
-      allAssets.map((a) => fetchRealPrices(a, 30)),
-    );
+    const allData = await Promise.all(allAssets.map((a) => fetchRealPrices(a, 30)));
     const alerts = allAssets
       .map((asset, i) => {
         const { prices } = allData[i];
@@ -2222,8 +2074,7 @@ router.get("/alerts", async (req, res) => {
           asset,
           price: last,
           rsiValue: rsi.value,
-          alert:
-            rsi.value < 30 ? "OVERSOLD" : rsi.value > 70 ? "OVERBOUGHT" : null,
+          alert: rsi.value < 30 ? 'OVERSOLD' : rsi.value > 70 ? 'OVERBOUGHT' : null,
           threshold: { low: last * 0.95, high: last * 1.05 },
         };
       })
@@ -2231,18 +2082,16 @@ router.get("/alerts", async (req, res) => {
 
     res.json({ alerts, count: alerts.length, disclaimer: DISCLAIMER });
   } catch (err) {
-    logger.error({ err: err.message }, "[Trading] Alerts error");
-    res.status(500).json({ error: "Alertele nu sunt disponibile." });
+    logger.error({ err: err.message }, '[Trading] Alerts error');
+    res.status(500).json({ error: 'Alertele nu sunt disponibile.' });
   }
 });
 
 // GET /correlation
-router.get("/correlation", async (req, res) => {
+router.get('/correlation', async (req, res) => {
   try {
     const allAssets = Object.values(ASSETS).flat();
-    const allData = await Promise.all(
-      allAssets.map((a) => fetchRealPrices(a, 100)),
-    );
+    const allData = await Promise.all(allAssets.map((a) => fetchRealPrices(a, 100)));
     const priceData = {};
     allAssets.forEach((a, i) => {
       priceData[a] = allData[i].prices;
@@ -2278,22 +2127,20 @@ router.get("/correlation", async (req, res) => {
     res.json({
       matrix,
       assets: allAssets,
-      note: "Corelații calculate din date reale",
+      note: 'Corelații calculate din date reale',
       disclaimer: DISCLAIMER,
     });
   } catch (err) {
-    logger.error({ err: err.message }, "[Trading] Correlation error");
-    res.status(500).json({ error: "Corelațiile nu sunt disponibile." });
+    logger.error({ err: err.message }, '[Trading] Correlation error');
+    res.status(500).json({ error: 'Corelațiile nu sunt disponibile.' });
   }
 });
 
 // GET /risk
-router.get("/risk", async (req, res) => {
+router.get('/risk', async (req, res) => {
   try {
     const allAssets = Object.values(ASSETS).flat();
-    const allData = await Promise.all(
-      allAssets.map((a) => fetchRealPrices(a, 252)),
-    );
+    const allData = await Promise.all(allAssets.map((a) => fetchRealPrices(a, 252)));
     const riskData = allAssets.map((asset, idx) => {
       const { prices } = allData[idx];
       // Guard empty prices
@@ -2306,27 +2153,16 @@ router.get("/risk", async (req, res) => {
           annualizedVol: 0,
         };
       }
-      const returns = prices
-        .slice(1)
-        .map((p, i) => (p - prices[i]) / prices[i]);
+      const returns = prices.slice(1).map((p, i) => (p - prices[i]) / prices[i]);
       const avgReturn = returns.reduce((a, b) => a + b, 0) / returns.length;
-      const variance =
-        returns.reduce((a, r) => a + Math.pow(r - avgReturn, 2), 0) /
-        returns.length;
+      const variance = returns.reduce((a, r) => a + Math.pow(r - avgReturn, 2), 0) / returns.length;
       const stdDev = Math.sqrt(variance);
-      const sharpe =
-        stdDev > 0
-          ? Math.round((avgReturn / stdDev) * Math.sqrt(252) * 100) / 100
-          : 0;
+      const sharpe = stdDev > 0 ? Math.round((avgReturn / stdDev) * Math.sqrt(252) * 100) / 100 : 0;
       const sortedReturns = [...returns].sort((a, b) => a - b);
       const varIdx = Math.max(0, Math.floor(returns.length * 0.05));
-      const var95 = sortedReturns[varIdx]
-        ? Math.round(sortedReturns[varIdx] * 10000) / 100
-        : 0;
+      const var95 = sortedReturns[varIdx] ? Math.round(sortedReturns[varIdx] * 10000) / 100 : 0;
       const varIdx99 = Math.max(0, Math.floor(returns.length * 0.01));
-      const var99 = sortedReturns[varIdx99]
-        ? Math.round(sortedReturns[varIdx99] * 10000) / 100
-        : 0;
+      const var99 = sortedReturns[varIdx99] ? Math.round(sortedReturns[varIdx99] * 10000) / 100 : 0;
       let peak = prices[0];
       let maxDD = 0;
       prices.forEach((p) => {
@@ -2336,15 +2172,9 @@ router.get("/risk", async (req, res) => {
       });
       // Sortino: downside deviation only
       const negReturns = returns.filter((r) => r < 0);
-      const downsideVar =
-        negReturns.length > 0
-          ? negReturns.reduce((a, r) => a + r * r, 0) / negReturns.length
-          : 0;
+      const downsideVar = negReturns.length > 0 ? negReturns.reduce((a, r) => a + r * r, 0) / negReturns.length : 0;
       const downsideDev = Math.sqrt(downsideVar);
-      const sortino =
-        downsideDev > 0
-          ? Math.round((avgReturn / downsideDev) * Math.sqrt(252) * 100) / 100
-          : 0;
+      const sortino = downsideDev > 0 ? Math.round((avgReturn / downsideDev) * Math.sqrt(252) * 100) / 100 : 0;
 
       return {
         asset,
@@ -2358,51 +2188,21 @@ router.get("/risk", async (req, res) => {
     });
 
     // Aggregate portfolio-level metrics
-    const validRisk = riskData.filter(
-      (r) => r.sharpeRatio !== 0 || r.maxDrawdown !== 0,
-    );
+    const validRisk = riskData.filter((r) => r.sharpeRatio !== 0 || r.maxDrawdown !== 0);
     const avgSharpe =
-      validRisk.length > 0
-        ? +(
-            validRisk.reduce((s, r) => s + r.sharpeRatio, 0) / validRisk.length
-          ).toFixed(2)
-        : 0;
-    const worstDD =
-      validRisk.length > 0
-        ? Math.min(...validRisk.map((r) => r.maxDrawdown))
-        : 0;
+      validRisk.length > 0 ? +(validRisk.reduce((s, r) => s + r.sharpeRatio, 0) / validRisk.length).toFixed(2) : 0;
+    const worstDD = validRisk.length > 0 ? Math.min(...validRisk.map((r) => r.maxDrawdown)) : 0;
     const avgVar95 =
-      validRisk.length > 0
-        ? +(
-            validRisk.reduce((s, r) => s + r.var95Pct, 0) / validRisk.length
-          ).toFixed(2)
-        : 0;
+      validRisk.length > 0 ? +(validRisk.reduce((s, r) => s + r.var95Pct, 0) / validRisk.length).toFixed(2) : 0;
     const avgVar99 =
-      validRisk.length > 0
-        ? +(
-            validRisk.reduce((s, r) => s + (r.var99Pct || 0), 0) /
-            validRisk.length
-          ).toFixed(2)
-        : 0;
+      validRisk.length > 0 ? +(validRisk.reduce((s, r) => s + (r.var99Pct || 0), 0) / validRisk.length).toFixed(2) : 0;
     const avgSortino =
       validRisk.length > 0
-        ? +(
-            validRisk.reduce((s, r) => s + (r.sortinoRatio || 0), 0) /
-            validRisk.length
-          ).toFixed(2)
+        ? +(validRisk.reduce((s, r) => s + (r.sortinoRatio || 0), 0) / validRisk.length).toFixed(2)
         : 0;
-    const calmar =
-      worstDD !== 0 ? +(avgSharpe / Math.abs(worstDD / 100)).toFixed(2) : 0;
-    const exposure =
-      validRisk.length > 0
-        ? Math.round((validRisk.length / allAssets.length) * 100)
-        : 0;
-    const riskLevel =
-      Math.abs(worstDD) > 25
-        ? "HIGH"
-        : Math.abs(worstDD) > 10
-          ? "MODERATE"
-          : "LOW";
+    const calmar = worstDD !== 0 ? +(avgSharpe / Math.abs(worstDD / 100)).toFixed(2) : 0;
+    const exposure = validRisk.length > 0 ? Math.round((validRisk.length / allAssets.length) * 100) : 0;
+    const riskLevel = Math.abs(worstDD) > 25 ? 'HIGH' : Math.abs(worstDD) > 10 ? 'MODERATE' : 'LOW';
 
     res.json({
       // Portfolio aggregated (for dashboard)
@@ -2419,13 +2219,13 @@ router.get("/risk", async (req, res) => {
       disclaimer: DISCLAIMER,
     });
   } catch (err) {
-    logger.error({ err: err.message }, "[Trading] Risk error");
-    res.status(500).json({ error: "Analiza de risc nu este disponibilă." });
+    logger.error({ err: err.message }, '[Trading] Risk error');
+    res.status(500).json({ error: 'Analiza de risc nu este disponibilă.' });
   }
 });
 
 // ═══ HISTORY ═══
-router.get("/history", (req, res) => {
+router.get('/history', (req, res) => {
   res.json({
     history: analysisHistory.slice(-20),
     total: analysisHistory.length,
@@ -2433,26 +2233,20 @@ router.get("/history", (req, res) => {
 });
 
 // ═══ LOAD FULL HISTORICAL DATA FROM YAHOO FINANCE → SUPABASE ═══
-router.post("/history/load", async (req, res) => {
+router.post('/history/load', async (req, res) => {
   try {
     res.json({
-      status: "loading",
-      message: "Historical data import started in background",
+      status: 'loading',
+      message: 'Historical data import started in background',
     });
     // Run in background — don't block the response
     histLoader
       .loadAllHistory()
       .then((result) => {
-        logger.info(
-          { result: JSON.stringify(result).slice(0, 500) },
-          "[Trading] Historical data load complete",
-        );
+        logger.info({ result: JSON.stringify(result).slice(0, 500) }, '[Trading] Historical data load complete');
       })
       .catch((e) => {
-        logger.error(
-          { err: e.message },
-          "[Trading] Historical data load failed",
-        );
+        logger.error({ err: e.message }, '[Trading] Historical data load failed');
       });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -2460,38 +2254,39 @@ router.post("/history/load", async (req, res) => {
 });
 
 // ═══ DOWNLOAD PROGRESS — live counter per asset ═══
-router.get("/history/progress", (req, res) => {
+router.get('/history/progress', (req, res) => {
   res.json(histLoader.getProgress());
 });
 
 // ═══ PAPER TRADING — ON/OFF 24/7 automated trading ═══
-router.post("/paper/on", (req, res) => {
-  const { createClient } = require("@supabase/supabase-js");
+router.post('/paper/on', (req, res) => {
+  const { createClient } = require('@supabase/supabase-js');
   const sbUrl = process.env.SUPABASE_URL;
-  const sbKey =
-    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
+  const sbKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
   const sb = createClient(sbUrl, sbKey);
   const result = paperTrading.turnOn(sb);
   res.json(result);
 });
 
-router.post("/paper/off", (req, res) => {
+router.post('/paper/off', (req, res) => {
   const result = paperTrading.turnOff();
   // Save active=false to Supabase so it doesn't auto-restart
   try {
     const { supabaseAdmin } = req.app.locals;
     if (supabaseAdmin) {
       supabaseAdmin
-        .from("trading_state")
+        .from('trading_state')
         .upsert(
           {
-            id: "paper_bot",
+            id: 'paper_bot',
             active: false,
             updated_at: new Date().toISOString(),
           },
-          { onConflict: "id" },
+          { onConflict: 'id' }
         )
-        .catch(() => {});
+        .catch((err) => {
+          console.error(err);
+        });
     }
   } catch {
     /* ignored */
@@ -2503,45 +2298,31 @@ router.post("/paper/off", (req, res) => {
 // On boot: check Supabase if bot was active before restart → auto-start
 setTimeout(async () => {
   try {
-    const { createClient } = require("@supabase/supabase-js");
+    const { createClient } = require('@supabase/supabase-js');
     const sbUrl = process.env.SUPABASE_URL;
-    const sbKey =
-      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
+    const sbKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
     if (!sbUrl || !sbKey) {
-      logger.warn(
-        "[Trading] SUPABASE_URL or SUPABASE_SERVICE_KEY missing — skipping auto-restart",
-      );
+      logger.warn('[Trading] SUPABASE_URL or SUPABASE_SERVICE_KEY missing — skipping auto-restart');
       return;
     }
     const sb = createClient(sbUrl, sbKey);
-    const { data } = await sb
-      .from("trading_state")
-      .select("active, mode")
-      .eq("id", "paper_bot")
-      .single();
+    const { data } = await sb.from('trading_state').select('active, mode').eq('id', 'paper_bot').single();
     if (data && data.active === true) {
-      logger.info(
-        "[Trading] 🔄 Auto-restart: bot was active before deploy — restarting automatically",
-      );
+      logger.info('[Trading] 🔄 Auto-restart: bot was active before deploy — restarting automatically');
       paperTrading.turnOn(sb);
     } else {
-      logger.info("[Trading] Bot was OFF before deploy — staying off");
+      logger.info('[Trading] Bot was OFF before deploy — staying off');
     }
 
     // ── ALWAYS START LEARNING PIPELINE (independent of paper trading) ──
     tradingLearner.startLearning(sb);
   } catch (e) {
-    logger.warn(
-      { err: e.message },
-      "[Trading] Auto-restart check failed (table may not exist yet)",
-    );
+    logger.warn({ err: e.message }, '[Trading] Auto-restart check failed (table may not exist yet)');
     // Still try to start learner even if trading_state check fails
     try {
-      const { createClient: cc } = require("@supabase/supabase-js");
+      const { createClient: cc } = require('@supabase/supabase-js');
       const fallbackUrl = process.env.SUPABASE_URL;
-      const fallbackKey =
-        process.env.SUPABASE_SERVICE_ROLE_KEY ||
-        process.env.SUPABASE_SERVICE_KEY;
+      const fallbackKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
       if (fallbackUrl && fallbackKey) {
         const sbFallback = cc(fallbackUrl, fallbackKey);
         tradingLearner.startLearning(sbFallback);
@@ -2552,88 +2333,82 @@ setTimeout(async () => {
   }
 }, 10000); // 10s after boot to let DB connections initialize
 
-router.get("/paper/status", (req, res) => {
+router.get('/paper/status', (req, res) => {
   res.json(paperTrading.getState());
 });
 
-router.get("/paper/history", async (req, res) => {
+router.get('/paper/history', async (req, res) => {
   const { supabaseAdmin } = req.app.locals;
   res.json(await paperTrading.getTradeHistory(supabaseAdmin));
 });
 
-router.post("/paper/reset", (req, res) => {
-  const { createClient } = require("@supabase/supabase-js");
+router.post('/paper/reset', (req, res) => {
+  const { createClient } = require('@supabase/supabase-js');
   const sbUrl = process.env.SUPABASE_URL;
-  const sbKey =
-    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
+  const sbKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
   const sb = createClient(sbUrl, sbKey);
   res.json(paperTrading.reset(sb));
 });
 
-router.post("/paper/switch", (req, res) => {
-  const { createClient } = require("@supabase/supabase-js");
+router.post('/paper/switch', (req, res) => {
+  const { createClient } = require('@supabase/supabase-js');
   const sbUrl = process.env.SUPABASE_URL;
-  const sbKey =
-    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
+  const sbKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
   const sb = createClient(sbUrl, sbKey);
-  const mode = req.body?.mode || req.query?.mode || "PAPER";
+  const mode = req.body?.mode || req.query?.mode || 'PAPER';
   res.json(paperTrading.switchMode(mode, sb));
 });
 
 // ═══ SELF-LEARNING ENGINE ═══
-const tradingLearner = require("./trading-learner");
+const tradingLearner = require('./trading-learner');
 
-router.get("/paper/analysis", async (req, res) => {
+router.get('/paper/analysis', async (req, res) => {
   const report = tradingLearner.getAnalysisReport();
   res.json(report);
 });
 
-router.post("/paper/learn", async (req, res) => {
+router.post('/paper/learn', async (req, res) => {
   const { supabaseAdmin } = req.app.locals;
   const result = await tradingLearner.analyzeAndLearn(supabaseAdmin);
   res.json(result);
 });
 
 // ═══ INVESTMENT SIMULATOR — 100€ backtesting across all assets/periods ═══
-router.get("/simulate", async (req, res) => {
+router.get('/simulate', async (req, res) => {
   try {
-    const { createClient } = require("@supabase/supabase-js");
+    const { createClient } = require('@supabase/supabase-js');
     const sbUrl = process.env.SUPABASE_URL;
-    const sbKey =
-      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
-    if (!sbUrl || !sbKey)
-      return res.status(503).json({ error: "Supabase not configured" });
+    const sbKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
+    if (!sbUrl || !sbKey) return res.status(503).json({ error: 'Supabase not configured' });
     const sb = createClient(sbUrl, sbKey);
     const results = await investSim.runFullSimulation(sb);
     res.json(results);
   } catch (e) {
-    logger.error({ err: e.message }, "[Simulate] Simulation failed");
+    logger.error({ err: e.message }, '[Simulate] Simulation failed');
     res.status(500).json({ error: e.message });
   }
 });
 
 // ═══ BRAIN RULES — per-asset rules accumulated from auto-research ═══
-router.get("/brain-rules", async (req, res) => {
+router.get('/brain-rules', async (req, res) => {
   try {
-    const { createClient } = require("@supabase/supabase-js");
+    const { createClient } = require('@supabase/supabase-js');
     const sbUrl = process.env.SUPABASE_URL;
-    const sbKey =
-      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
-    if (!sbUrl || !sbKey)
-      return res.status(503).json({ error: "Supabase not configured" });
+    const sbKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
+    if (!sbUrl || !sbKey) return res.status(503).json({ error: 'Supabase not configured' });
     const sb = createClient(sbUrl, sbKey);
     const { data, error } = await sb
-      .from("trading_brain_rules")
-      .select("*")
-      .order("confirmations", { ascending: false });
+      .from('trading_brain_rules')
+      .select('*')
+      .order('confirmations', { ascending: false });
 
     if (error) return res.json({ rules: [], error: error.message });
 
     // Group by status
     const grouped = {
-      CONFIRMED: (data || []).filter((r) => r.status === "CONFIRMED"),
-      TESTING: (data || []).filter((r) => r.status === "TESTING"),
-      POTENTIAL: (data || []).filter((r) => r.status === "POTENTIAL"),
+      CONFIRMED: (data || []).filter((r) => r.status === 'CONFIRMED'),
+      TESTING: (data || []).filter((r) => r.status === 'TESTING'),
+      POTENTIAL: (data || []).filter((r) => r.status === 'POTENTIAL'),
     };
 
     res.json({
@@ -2650,20 +2425,20 @@ router.get("/brain-rules", async (req, res) => {
 });
 
 // ═══ HISTORICAL DATA SUMMARY ═══
-router.get("/history/summary", async (req, res) => {
+router.get('/history/summary', async (req, res) => {
   try {
     const summary = await histLoader.getHistorySummary();
-    res.json({ summary, source: "supabase" });
+    res.json({ summary, source: 'supabase' });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
 
 // ═══ HISTORICAL PRICES FOR SPECIFIC ASSET ═══
-router.get("/history/prices/:asset", async (req, res) => {
+router.get('/history/prices/:asset', async (req, res) => {
   try {
     const asset = decodeURIComponent(req.params.asset);
-    const limit = parseInt(req.query.limit) || null;
+    const limit = parseInt(req.query.limit, 10) || null;
     const data = await histLoader.getHistory(asset, limit);
     res.json({ asset, count: data.length, prices: data });
   } catch (e) {
@@ -2672,7 +2447,7 @@ router.get("/history/prices/:asset", async (req, res) => {
 });
 
 // ═══ SUPABASE FULL HISTORY — all data since account creation ═══
-router.get("/history/full", async (req, res) => {
+router.get('/history/full', async (req, res) => {
   try {
     const analyses = await tradePersist.getRecentAnalyses(null, 1000);
     const trades = await tradePersist.getTradeHistory(500);
@@ -2683,7 +2458,7 @@ router.get("/history/full", async (req, res) => {
       recentAnalyses: analyses.slice(0, 50),
       recentTrades: trades,
       strategyStats,
-      source: "supabase",
+      source: 'supabase',
       dataRange:
         analyses.length > 0
           ? {
@@ -2693,8 +2468,8 @@ router.get("/history/full", async (req, res) => {
           : null,
     });
   } catch (e) {
-    logger.error({ err: e.message }, "[Trading] Full history error");
-    res.status(500).json({ error: "History not available" });
+    logger.error({ err: e.message }, '[Trading] Full history error');
+    res.status(500).json({ error: 'History not available' });
   }
 });
 
@@ -2702,28 +2477,24 @@ router.get("/history/full", async (req, res) => {
 // TRADE EXECUTION ROUTES — Full integration of ALL modules
 // ═══════════════════════════════════════════════════════════════
 
-const tradeIntel = require("./trade-intelligence");
+const tradeIntel = require('./trade-intelligence');
 
 // Initialize exchange on module load
 tradeEngine.initExchange();
 
 // POST /execute — FULL analysis + rules check + auto-trade
-router.post("/execute", async (req, res) => {
+router.post('/execute', async (req, res) => {
   try {
-    const { symbol = "BTC/USDT", action } = req.body || {};
-    const asset = symbol.replace("/USDT", "");
+    const { symbol = 'BTC/USDT', action } = req.body || {};
+    const asset = symbol.replace('/USDT', '');
     const { prices, volumes, source } = await fetchRealPrices(asset, 300);
     if (!prices || prices.length < 50) {
-      return res.status(400).json({ error: "Insufficient price data." });
+      return res.status(400).json({ error: 'Insufficient price data.' });
     }
 
     // Build OHLCV from close prices
-    const highs = prices.map((p, i) =>
-      i > 0 ? Math.max(p, prices[i - 1]) * 1.002 : p * 1.002,
-    );
-    const lows = prices.map((p, i) =>
-      i > 0 ? Math.min(p, prices[i - 1]) * 0.998 : p * 0.998,
-    );
+    const highs = prices.map((p, i) => (i > 0 ? Math.max(p, prices[i - 1]) * 1.002 : p * 1.002));
+    const lows = prices.map((p, i) => (i > 0 ? Math.min(p, prices[i - 1]) * 0.998 : p * 0.998));
     const candles = prices.map((p, i) => ({
       open: i > 0 ? prices[i - 1] : p,
       high: highs[i],
@@ -2776,7 +2547,7 @@ router.post("/execute", async (req, res) => {
       Math.max(...prices.slice(-24)),
       Math.min(...prices.slice(-24)),
       prices[prices.length - 1],
-      prices[prices.length - 24] || prices[0],
+      prices[prices.length - 24] || prices[0]
     );
     const keltner = tradeIntel.calculateKeltnerChannels(highs, lows, prices);
     const aroon = tradeIntel.calculateAroon(highs, lows);
@@ -2818,15 +2589,11 @@ router.post("/execute", async (req, res) => {
     // Determine trade action
     const tradeAction =
       action ||
-      (superConfluence.signal.includes("BUY")
-        ? "BUY"
-        : superConfluence.signal.includes("SELL")
-          ? "SELL"
-          : null);
+      (superConfluence.signal.includes('BUY') ? 'BUY' : superConfluence.signal.includes('SELL') ? 'SELL' : null);
 
     // ── TRADING RULES ENGINE — Must pass before execution ──
     let rulesCheck = null;
-    let result = { executed: false, reason: "No clear signal" };
+    let result = { executed: false, reason: 'No clear signal' };
 
     if (tradeAction) {
       rulesCheck = tradeIntel.evaluateTradingRules({
@@ -2844,17 +2611,8 @@ router.post("/execute", async (req, res) => {
         openPositions: tradeEngine.getOpenPositions(),
       });
 
-      if (
-        rulesCheck.approved &&
-        superConfluence.confidence >= tradeEngine.CONFIG.MIN_CONFLUENCE
-      ) {
-        result = await tradeEngine.executeTrade(
-          tradeAction,
-          symbol,
-          lastPrice,
-          superConfluence,
-          atrPct,
-        );
+      if (rulesCheck.approved && superConfluence.confidence >= tradeEngine.CONFIG.MIN_CONFLUENCE) {
+        result = await tradeEngine.executeTrade(tradeAction, symbol, lastPrice, superConfluence, atrPct);
       } else if (!rulesCheck.approved) {
         result = { executed: false, reason: rulesCheck.summary };
       } else {
@@ -2870,21 +2628,23 @@ router.post("/execute", async (req, res) => {
     if (tradeBrain) {
       const memo =
         symbol +
-        " " +
-        (tradeAction || "HOLD") +
-        " @ $" +
+        ' ' +
+        (tradeAction || 'HOLD') +
+        ' @ $' +
         lastPrice +
-        " | Confluence: " +
+        ' | Confluence: ' +
         superConfluence.confidence +
-        "% | " +
-        (result.executed ? "EXECUTED" : result.reason);
+        '% | ' +
+        (result.executed ? 'EXECUTED' : result.reason);
       tradeBrain
-        .saveMemory(null, "context", "Trade: " + memo, {
-          platform: "trading",
-          type: "execution",
+        .saveMemory(null, 'context', 'Trade: ' + memo, {
+          platform: 'trading',
+          type: 'execution',
           symbol,
         })
-        .catch(() => {});
+        .catch((err) => {
+          console.error(err);
+        });
     }
 
     res.json({
@@ -2910,7 +2670,7 @@ router.post("/execute", async (req, res) => {
         mfi,
         williamsR,
         roc,
-        atr: { value: atr, pctOfPrice: +(atrPct * 100).toFixed(2) + "%" },
+        atr: { value: atr, pctOfPrice: +(atrPct * 100).toFixed(2) + '%' },
         // Intelligence (4)
         keltner,
         aroon,
@@ -2932,41 +2692,34 @@ router.post("/execute", async (req, res) => {
       superConfluence,
       tradingRules: rulesCheck,
       execution: result,
-      mode: tradeEngine.isPaperMode() ? "PAPER" : "LIVE",
+      mode: tradeEngine.isPaperMode() ? 'PAPER' : 'LIVE',
       totalIndicators: 21,
       totalPatternTypes: 38,
       disclaimer: DISCLAIMER,
     });
   } catch (err) {
-    logger.error({ err: err.message }, "[Trading] Execute error");
-    res.status(500).json({ error: "Eroare la execuție." });
+    logger.error({ err: err.message }, '[Trading] Execute error');
+    res.status(500).json({ error: 'Eroare la execuție.' });
   }
 });
 
 // GET /analyze/:asset — alias for /full-analysis/:asset
-router.get("/analyze/:asset?", (req, res) =>
-  res.redirect(307, `/api/trading/full-analysis/${req.params.asset || "BTC"}`),
+router.get('/analyze/:asset?', (req, res) =>
+  res.redirect(307, `/api/trading/full-analysis/${req.params.asset || 'BTC'}`)
 );
 
 // GET /paper-trades — alias for /paper/history
-router.get("/paper-trades", (req, res) =>
-  res.redirect(307, "/api/trading/paper/history"),
-);
+router.get('/paper-trades', (req, res) => res.redirect(307, '/api/trading/paper/history'));
 
 // GET /full-analysis — Read-only analysis (no execution)
-router.get("/full-analysis/:asset?", async (req, res) => {
+router.get('/full-analysis/:asset?', async (req, res) => {
   try {
-    const asset = req.params.asset || "BTC";
+    const asset = req.params.asset || 'BTC';
     const { prices, _volumes, source } = await fetchRealPrices(asset, 300);
-    if (!prices || prices.length < 50)
-      return res.status(400).json({ error: "Insufficient data" });
+    if (!prices || prices.length < 50) return res.status(400).json({ error: 'Insufficient data' });
 
-    const highs = prices.map((p, i) =>
-      i > 0 ? Math.max(p, prices[i - 1]) * 1.002 : p * 1.002,
-    );
-    const lows = prices.map((p, i) =>
-      i > 0 ? Math.min(p, prices[i - 1]) * 0.998 : p * 0.998,
-    );
+    const highs = prices.map((p, i) => (i > 0 ? Math.max(p, prices[i - 1]) * 1.002 : p * 1.002));
+    const lows = prices.map((p, i) => (i > 0 ? Math.min(p, prices[i - 1]) * 0.998 : p * 0.998));
     const candles = prices.map((p, i) => ({
       open: i > 0 ? prices[i - 1] : p,
       high: highs[i],
@@ -2992,7 +2745,7 @@ router.get("/full-analysis/:asset?", async (req, res) => {
       Math.max(...prices.slice(-24)),
       Math.min(...prices.slice(-24)),
       lastPrice,
-      prices[Math.max(0, prices.length - 24)],
+      prices[Math.max(0, prices.length - 24)]
     );
     const economicRisks = tradeIntel.getEconomicCalendarRisks();
 
@@ -3019,72 +2772,67 @@ router.get("/full-analysis/:asset?", async (req, res) => {
       disclaimer: DISCLAIMER,
     });
   } catch (err) {
-    logger.error({ err: err.message }, "[Trading] Full analysis error");
-    res.status(500).json({ error: "Eroare la analiză." });
+    logger.error({ err: err.message }, '[Trading] Full analysis error');
+    res.status(500).json({ error: 'Eroare la analiză.' });
   }
 });
 
 // GET /calendar — Economic calendar risks
-router.get("/calendar", (req, res) => {
+router.get('/calendar', (req, res) => {
   res.json(tradeIntel.getEconomicCalendarRisks());
 });
 
-router.get("/positions", (req, res) => {
+router.get('/positions', (req, res) => {
   res.json({
     positions: tradeEngine.getOpenPositions(),
     dailyPnL: tradeEngine.getDailyPnL(),
     weeklyPnL: tradeEngine.getWeeklyPnL(),
-    mode: tradeEngine.isPaperMode() ? "PAPER" : "LIVE",
+    mode: tradeEngine.isPaperMode() ? 'PAPER' : 'LIVE',
   });
 });
 
-router.post("/close/:tradeId", async (req, res) => {
+router.post('/close/:tradeId', async (req, res) => {
   const { currentPrice } = req.body || {};
-  if (!currentPrice)
-    return res.status(400).json({ error: "currentPrice required" });
-  const result = await tradeEngine.closePosition(
-    req.params.tradeId,
-    currentPrice,
-    "admin_manual",
-  );
+  if (!currentPrice) return res.status(400).json({ error: 'currentPrice required' });
+  const result = await tradeEngine.closePosition(req.params.tradeId, currentPrice, 'admin_manual');
   res.json(result);
 });
 
-router.post("/kill-switch", async (req, res) => {
+router.post('/kill-switch', async (req, res) => {
   const result = await tradeEngine.killSwitch(req.body?.prices || {});
   res.json({ killed: true, closedPositions: result });
 });
 
-router.get("/paper-balance", (req, res) => {
+router.get('/paper-balance', (req, res) => {
   res.json({
     balance: tradeEngine.getPaperBalance(),
     trades: tradeEngine.getPaperTrades().slice(-20),
-    mode: tradeEngine.isPaperMode() ? "PAPER" : "LIVE",
+    mode: tradeEngine.isPaperMode() ? 'PAPER' : 'LIVE',
   });
 });
 
 // ═══ RISK PROFILES ═══
 
-router.get("/risk-profile", (req, res) => {
+router.get('/risk-profile', (req, res) => {
   res.json(tradeEngine.getRiskProfile());
 });
 
-router.post("/risk-profile", (req, res) => {
+router.post('/risk-profile', (req, res) => {
   const { profile } = req.body || {};
   if (!profile)
     return res.status(400).json({
-      error: "profile required (conservative, moderate, aggressive, yolo)",
+      error: 'profile required (conservative, moderate, aggressive, yolo)',
     });
   const result = tradeEngine.setRiskProfile(profile.toLowerCase());
   if (result.error) return res.status(400).json(result);
   logger.info(
-    { component: "Trading", profile: result.profile },
-    `Risk profile changed to ${result.emoji} ${result.profile}`,
+    { component: 'Trading', profile: result.profile },
+    `Risk profile changed to ${result.emoji} ${result.profile}`
   );
   res.json(result);
 });
 
-router.get("/projections", (req, res) => {
+router.get('/projections', (req, res) => {
   const capital = parseFloat(req.query.capital) || 10;
   const profiles = {};
   for (const [key, p] of Object.entries(tradeEngine.RISK_PROFILES)) {
@@ -3092,25 +2840,23 @@ router.get("/projections", (req, res) => {
     profiles[key] = {
       name: p.name,
       emoji: p.emoji,
-      risk: p.riskPct + "%",
-      sl: p.DEFAULT_STOP_LOSS_PCT * 100 + "%",
-      tp: p.DEFAULT_TAKE_PROFIT_PCT * 100 + "%",
+      risk: p.riskPct + '%',
+      sl: p.DEFAULT_STOP_LOSS_PCT * 100 + '%',
+      tp: p.DEFAULT_TAKE_PROFIT_PCT * 100 + '%',
       results: {
-        "1_day": +(capital * Math.pow(dailyRate, 1)).toFixed(2),
-        "1_week": +(capital * Math.pow(dailyRate, 7)).toFixed(2),
-        "1_month": +(capital * Math.pow(dailyRate, 30)).toFixed(2),
-        "3_months": +(capital * Math.pow(dailyRate, 90)).toFixed(2),
-        "6_months": +(capital * Math.pow(dailyRate, 180)).toFixed(2),
-        "1_year": +(capital * Math.pow(dailyRate, 365)).toFixed(2),
+        '1_day': +(capital * Math.pow(dailyRate, 1)).toFixed(2),
+        '1_week': +(capital * Math.pow(dailyRate, 7)).toFixed(2),
+        '1_month': +(capital * Math.pow(dailyRate, 30)).toFixed(2),
+        '3_months': +(capital * Math.pow(dailyRate, 90)).toFixed(2),
+        '6_months': +(capital * Math.pow(dailyRate, 180)).toFixed(2),
+        '1_year': +(capital * Math.pow(dailyRate, 365)).toFixed(2),
       },
-      maxDrawdown5Losses:
-        +((1 - Math.pow(1 - p.DEFAULT_STOP_LOSS_PCT, 5)) * 100).toFixed(1) +
-        "%",
+      maxDrawdown5Losses: +((1 - Math.pow(1 - p.DEFAULT_STOP_LOSS_PCT, 5)) * 100).toFixed(1) + '%',
     };
   }
   res.json({
     capital,
-    currency: "lei",
+    currency: 'lei',
     profiles,
     activeProfile: tradeEngine.getRiskProfile().active,
     disclaimer: DISCLAIMER,
@@ -3122,27 +2868,23 @@ router.get("/projections", (req, res) => {
 // ═══════════════════════════════════════════════════════════════
 
 // GET /mta/:asset — Multi-Timeframe Analysis
-router.get("/mta/:asset", async (req, res) => {
+router.get('/mta/:asset', async (req, res) => {
   try {
     const asset = req.params.asset.toUpperCase();
     const allAssets = Object.values(ASSETS).flat();
     if (!allAssets.includes(asset) && !allAssets.includes(req.params.asset)) {
       return res.status(400).json({ error: `Asset invalid: ${asset}` });
     }
-    const mta = await analyzeMultiTimeframe(
-      allAssets.includes(asset) ? asset : req.params.asset,
-    );
+    const mta = await analyzeMultiTimeframe(allAssets.includes(asset) ? asset : req.params.asset);
     res.json({ ...mta, disclaimer: DISCLAIMER });
   } catch (err) {
-    logger.error({ err: err.message }, "[Trading] MTA error");
-    res
-      .status(500)
-      .json({ error: "Multi-Timeframe Analysis nu este disponibil." });
+    logger.error({ err: err.message }, '[Trading] MTA error');
+    res.status(500).json({ error: 'Multi-Timeframe Analysis nu este disponibil.' });
   }
 });
 
 // GET /smart-money/:asset — Smart Money Flow Detection
-router.get("/smart-money/:asset", async (req, res) => {
+router.get('/smart-money/:asset', async (req, res) => {
   try {
     const asset = req.params.asset.toUpperCase();
     const allAssets = Object.values(ASSETS).flat();
@@ -3151,18 +2893,13 @@ router.get("/smart-money/:asset", async (req, res) => {
       : allAssets.includes(req.params.asset)
         ? req.params.asset
         : null;
-    if (!realAsset)
-      return res.status(400).json({ error: `Asset invalid: ${asset}` });
+    if (!realAsset) return res.status(400).json({ error: `Asset invalid: ${asset}` });
 
     const { prices, volumes, source } = await fetchRealPrices(realAsset, 300);
     const smartMoney = detectSmartMoney(prices, volumes);
     const advancedEntry =
-      smartMoney.signal !== "HOLD"
-        ? calculateAdvancedEntry(
-            prices[prices.length - 1],
-            smartMoney.signal,
-            tradeEngine.getRiskProfile().active,
-          )
+      smartMoney.signal !== 'HOLD'
+        ? calculateAdvancedEntry(prices[prices.length - 1], smartMoney.signal, tradeEngine.getRiskProfile().active)
         : null;
 
     res.json({
@@ -3174,13 +2911,13 @@ router.get("/smart-money/:asset", async (req, res) => {
       disclaimer: DISCLAIMER,
     });
   } catch (err) {
-    logger.error({ err: err.message }, "[Trading] Smart Money error");
-    res.status(500).json({ error: "Smart Money Analysis nu este disponibil." });
+    logger.error({ err: err.message }, '[Trading] Smart Money error');
+    res.status(500).json({ error: 'Smart Money Analysis nu este disponibil.' });
   }
 });
 
 // GET /kelly/:asset — Kelly Criterion Position Sizing
-router.get("/kelly/:asset", async (req, res) => {
+router.get('/kelly/:asset', async (req, res) => {
   try {
     const asset = req.params.asset.toUpperCase();
     const allAssets = Object.values(ASSETS).flat();
@@ -3189,28 +2926,18 @@ router.get("/kelly/:asset", async (req, res) => {
       : allAssets.includes(req.params.asset)
         ? req.params.asset
         : null;
-    if (!realAsset)
-      return res.status(400).json({ error: `Asset invalid: ${asset}` });
+    if (!realAsset) return res.status(400).json({ error: `Asset invalid: ${asset}` });
 
     // Get win rate from market-learner or paper trades
     const paperTrades = tradeEngine.getPaperTrades();
-    const assetTrades = paperTrades.filter(
-      (t) => t.asset === realAsset || t.symbol?.includes(realAsset),
-    );
+    const assetTrades = paperTrades.filter((t) => t.asset === realAsset || t.symbol?.includes(realAsset));
     const closedTrades = assetTrades.filter((t) => t.exitPrice);
     const wins = closedTrades.filter((t) => (t.pnl || 0) > 0);
     const losses = closedTrades.filter((t) => (t.pnl || 0) <= 0);
 
-    const winRate =
-      closedTrades.length > 0 ? wins.length / closedTrades.length : 0.5;
-    const avgWin =
-      wins.length > 0
-        ? wins.reduce((s, t) => s + Math.abs(t.pnl || 0), 0) / wins.length
-        : 0.03;
-    const avgLoss =
-      losses.length > 0
-        ? losses.reduce((s, t) => s + Math.abs(t.pnl || 0), 0) / losses.length
-        : 0.02;
+    const winRate = closedTrades.length > 0 ? wins.length / closedTrades.length : 0.5;
+    const avgWin = wins.length > 0 ? wins.reduce((s, t) => s + Math.abs(t.pnl || 0), 0) / wins.length : 0.03;
+    const avgLoss = losses.length > 0 ? losses.reduce((s, t) => s + Math.abs(t.pnl || 0), 0) / losses.length : 0.02;
     const balance = tradeEngine.getPaperBalance();
 
     const kelly = kellyPosition(winRate, avgWin, avgLoss, balance);
@@ -3223,25 +2950,25 @@ router.get("/kelly/:asset", async (req, res) => {
         totalTrades: closedTrades.length,
         wins: wins.length,
         losses: losses.length,
-        winRate: +(winRate * 100).toFixed(1) + "%",
+        winRate: +(winRate * 100).toFixed(1) + '%',
         avgWin: +avgWin.toFixed(4),
         avgLoss: +avgLoss.toFixed(4),
       },
       learnerAccuracy,
       recommendation:
-        kelly.reason === "ok"
+        kelly.reason === 'ok'
           ? `Invest ${kelly.cappedPct}% ($${kelly.positionSize}) per trade`
-          : "Nu exista edge matematic — reduce riscul sau nu tranzactiona",
+          : 'Nu exista edge matematic — reduce riscul sau nu tranzactiona',
       disclaimer: DISCLAIMER,
     });
   } catch (err) {
-    logger.error({ err: err.message }, "[Trading] Kelly error");
-    res.status(500).json({ error: "Kelly Criterion nu este disponibil." });
+    logger.error({ err: err.message }, '[Trading] Kelly error');
+    res.status(500).json({ error: 'Kelly Criterion nu este disponibil.' });
   }
 });
 
 // GET /learner/weights — Current adaptive weights from MarketLearner
-router.get("/learner/weights", (req, res) => {
+router.get('/learner/weights', (req, res) => {
   try {
     const report = marketLearner.getReport();
     res.json({
@@ -3250,13 +2977,13 @@ router.get("/learner/weights", (req, res) => {
       disclaimer: DISCLAIMER,
     });
   } catch (err) {
-    logger.error({ err: err.message }, "[Trading] Learner weights error");
-    res.status(500).json({ error: "Learner weights nu sunt disponibile." });
+    logger.error({ err: err.message }, '[Trading] Learner weights error');
+    res.status(500).json({ error: 'Learner weights nu sunt disponibile.' });
   }
 });
 
 // GET /learner/accuracy/:asset — Accuracy per indicator for an asset
-router.get("/learner/accuracy/:asset", (req, res) => {
+router.get('/learner/accuracy/:asset', (req, res) => {
   try {
     const asset = req.params.asset.toUpperCase();
     const accuracy = {};
@@ -3269,12 +2996,12 @@ router.get("/learner/accuracy/:asset", (req, res) => {
       asset,
       accuracy,
       meanPredictionError: meanError,
-      experienceLevel: marketLearner.getReport()?.experienceLevel || "beginner",
+      experienceLevel: marketLearner.getReport()?.experienceLevel || 'beginner',
       disclaimer: DISCLAIMER,
     });
   } catch (err) {
-    logger.error({ err: err.message }, "[Trading] Learner accuracy error");
-    res.status(500).json({ error: "Learner accuracy nu este disponibil." });
+    logger.error({ err: err.message }, '[Trading] Learner accuracy error');
+    res.status(500).json({ error: 'Learner accuracy nu este disponibil.' });
   }
 });
 
@@ -3283,7 +3010,7 @@ router.get("/learner/accuracy/:asset", (req, res) => {
 // ═══════════════════════════════════════════════════════════════
 
 // GET /ai-score/:asset — AI-powered signal evaluation
-router.get("/ai-score/:asset", async (req, res) => {
+router.get('/ai-score/:asset', async (req, res) => {
   try {
     const asset = req.params.asset.toUpperCase();
     const allAssets = Object.values(ASSETS).flat();
@@ -3292,8 +3019,7 @@ router.get("/ai-score/:asset", async (req, res) => {
       : allAssets.includes(req.params.asset)
         ? req.params.asset
         : null;
-    if (!realAsset)
-      return res.status(400).json({ error: `Asset invalid: ${asset}` });
+    if (!realAsset) return res.status(400).json({ error: `Asset invalid: ${asset}` });
 
     // Gather all data for scoring
     const analysis = await analyzeAsset(realAsset);
@@ -3318,13 +3044,10 @@ router.get("/ai-score/:asset", async (req, res) => {
     });
 
     // Record signal in learner
-    if (analysis.confluence?.signal !== "HOLD") {
+    if (analysis.confluence?.signal !== 'HOLD') {
       for (const ind of STRATEGIES) {
-        const sig =
-          analysis[ind.toLowerCase()]?.signal ||
-          analysis[ind.toLowerCase()]?.crossSignal;
-        if (sig)
-          marketLearner.recordSignal(realAsset, ind, sig, analysis.price);
+        const sig = analysis[ind.toLowerCase()]?.signal || analysis[ind.toLowerCase()]?.crossSignal;
+        if (sig) marketLearner.recordSignal(realAsset, ind, sig, analysis.price);
       }
     }
 
@@ -3336,24 +3059,23 @@ router.get("/ai-score/:asset", async (req, res) => {
       smartMoney: { phase: smartMoney.phase, signal: smartMoney.signal },
       mta: mta ? { signal: mta.overallSignal, alignment: mta.alignment } : null,
       advancedEntry:
-        scoreResult.action.includes("BUY") ||
-        scoreResult.action.includes("SELL")
+        scoreResult.action.includes('BUY') || scoreResult.action.includes('SELL')
           ? calculateAdvancedEntry(
               analysis.price,
-              scoreResult.action.replace("_", " "),
-              tradeEngine.getRiskProfile().active,
+              scoreResult.action.replace('_', ' '),
+              tradeEngine.getRiskProfile().active
             )
           : null,
       disclaimer: DISCLAIMER,
     });
   } catch (err) {
-    logger.error({ err: err.message }, "[Trading] AI Score error");
-    res.status(500).json({ error: "AI Scoring nu este disponibil." });
+    logger.error({ err: err.message }, '[Trading] AI Score error');
+    res.status(500).json({ error: 'AI Scoring nu este disponibil.' });
   }
 });
 
 // GET /performance — Full performance report
-router.get("/performance", (req, res) => {
+router.get('/performance', (req, res) => {
   try {
     const report = perfTracker.getReport();
     res.json({
@@ -3363,13 +3085,13 @@ router.get("/performance", (req, res) => {
       disclaimer: DISCLAIMER,
     });
   } catch (err) {
-    logger.error({ err: err.message }, "[Trading] Performance error");
-    res.status(500).json({ error: "Performance report nu este disponibil." });
+    logger.error({ err: err.message }, '[Trading] Performance error');
+    res.status(500).json({ error: 'Performance report nu este disponibil.' });
   }
 });
 
 // GET /alert-check — Check for actionable alerts (signals > 70% confidence)
-router.get("/alert-check", async (req, res) => {
+router.get('/alert-check', async (req, res) => {
   try {
     const allAssets = Object.values(ASSETS).flat();
     const alerts = [];
@@ -3377,17 +3099,14 @@ router.get("/alert-check", async (req, res) => {
     for (const asset of allAssets) {
       try {
         const analysis = await analyzeAsset(asset);
-        if (!analysis.confluence || analysis.confluence.signal === "HOLD")
-          continue;
+        if (!analysis.confluence || analysis.confluence.signal === 'HOLD') continue;
         if (analysis.confluence.confidence < 70) continue;
 
         const { prices, volumes } = await fetchRealPrices(asset, 100);
         const smartMoney = detectSmartMoney(prices, volumes);
 
         // Only alert if Smart Money agrees
-        const smAgrees =
-          smartMoney.signal ===
-          analysis.confluence.signal.replace("STRONG ", "");
+        const smAgrees = smartMoney.signal === analysis.confluence.signal.replace('STRONG ', '');
 
         alerts.push({
           asset,
@@ -3397,7 +3116,7 @@ router.get("/alert-check", async (req, res) => {
           rsi: analysis.rsi?.value,
           smartMoneyPhase: smartMoney.phase,
           smartMoneyAgrees: smAgrees,
-          priority: smAgrees ? "HIGH" : "MEDIUM",
+          priority: smAgrees ? 'HIGH' : 'MEDIUM',
           timestamp: new Date().toISOString(),
         });
       } catch (_e) {
@@ -3410,18 +3129,18 @@ router.get("/alert-check", async (req, res) => {
     res.json({
       alerts,
       count: alerts.length,
-      highPriority: alerts.filter((a) => a.priority === "HIGH").length,
+      highPriority: alerts.filter((a) => a.priority === 'HIGH').length,
       checkedAt: new Date().toISOString(),
       disclaimer: DISCLAIMER,
     });
   } catch (err) {
-    logger.error({ err: err.message }, "[Trading] Alert check error");
-    res.status(500).json({ error: "Alert check nu este disponibil." });
+    logger.error({ err: err.message }, '[Trading] Alert check error');
+    res.status(500).json({ error: 'Alert check nu este disponibil.' });
   }
 });
 
 // GET /full-intelligence/:asset — Everything in one call
-router.get("/full-intelligence/:asset", async (req, res) => {
+router.get('/full-intelligence/:asset', async (req, res) => {
   try {
     const asset = req.params.asset.toUpperCase();
     const allAssets = Object.values(ASSETS).flat();
@@ -3430,8 +3149,7 @@ router.get("/full-intelligence/:asset", async (req, res) => {
       : allAssets.includes(req.params.asset)
         ? req.params.asset
         : null;
-    if (!realAsset)
-      return res.status(400).json({ error: `Asset invalid: ${asset}` });
+    if (!realAsset) return res.status(400).json({ error: `Asset invalid: ${asset}` });
 
     const [analysis, mta] = await Promise.all([
       analyzeAsset(realAsset),
@@ -3454,12 +3172,8 @@ router.get("/full-intelligence/:asset", async (req, res) => {
     const kelly = kellyPosition(0.5, 0.03, 0.02, tradeEngine.getPaperBalance());
 
     const advEntry =
-      aiScore.action !== "HOLD"
-        ? calculateAdvancedEntry(
-            analysis.price,
-            aiScore.action.replace("_", " "),
-            profile.active,
-          )
+      aiScore.action !== 'HOLD'
+        ? calculateAdvancedEntry(analysis.price, aiScore.action.replace('_', ' '), profile.active)
         : null;
 
     res.json({
@@ -3489,8 +3203,8 @@ router.get("/full-intelligence/:asset", async (req, res) => {
       disclaimer: DISCLAIMER,
     });
   } catch (err) {
-    logger.error({ err: err.message }, "[Trading] Full intelligence error");
-    res.status(500).json({ error: "Full intelligence nu este disponibil." });
+    logger.error({ err: err.message }, '[Trading] Full intelligence error');
+    res.status(500).json({ error: 'Full intelligence nu este disponibil.' });
   }
 });
 
@@ -3511,13 +3225,13 @@ module.exports.calculateConfluence = calculateConfluence;
 // ═══════════════════════════════════════════════════════════════
 // AI MODEL WATCHER — Check current vs latest model versions
 // ═══════════════════════════════════════════════════════════════
-const modelWatcher = require("./model-watcher");
+const modelWatcher = require('./model-watcher');
 
-router.get("/models", (req, res) => {
+router.get('/models', (req, res) => {
   res.json(modelWatcher.getModelStatus());
 });
 
-router.post("/models/check", async (req, res) => {
+router.post('/models/check', async (req, res) => {
   const result = await modelWatcher.checkForUpdates();
   res.json(result);
 });
@@ -3528,37 +3242,29 @@ router.post("/models/check", async (req, res) => {
 const brainTasks = [];
 let taskIdCounter = 1;
 
-router.get("/brain/tasks", (req, res) => {
+router.get('/brain/tasks', (req, res) => {
   const status = req.query.status; // filter by status
-  const filtered = status
-    ? brainTasks.filter((t) => t.status === status)
-    : brainTasks;
+  const filtered = status ? brainTasks.filter((t) => t.status === status) : brainTasks;
   res.json({
     total: brainTasks.length,
-    pending: brainTasks.filter((t) => t.status === "pending").length,
-    inProgress: brainTasks.filter((t) => t.status === "in_progress").length,
-    completed: brainTasks.filter((t) => t.status === "completed").length,
-    failed: brainTasks.filter((t) => t.status === "failed").length,
+    pending: brainTasks.filter((t) => t.status === 'pending').length,
+    inProgress: brainTasks.filter((t) => t.status === 'in_progress').length,
+    completed: brainTasks.filter((t) => t.status === 'completed').length,
+    failed: brainTasks.filter((t) => t.status === 'failed').length,
     tasks: filtered.slice(-50), // last 50
   });
 });
 
-router.post("/brain/tasks", (req, res) => {
-  const {
-    title,
-    description,
-    priority = "normal",
-    assignTo = "auto",
-    source = "admin",
-  } = req.body || {};
-  if (!title) return res.status(400).json({ error: "Title required" });
+router.post('/brain/tasks', (req, res) => {
+  const { title, description, priority = 'normal', assignTo = 'auto', source = 'admin' } = req.body || {};
+  if (!title) return res.status(400).json({ error: 'Title required' });
 
   const task = {
     id: taskIdCounter++,
     title,
-    description: description || "",
+    description: description || '',
     priority, // low, normal, high, urgent
-    status: "pending",
+    status: 'pending',
     assignTo, // auto, gemini, tool, sub-agent
     assignedTo: null,
     source, // admin, monitor, bot, user
@@ -3568,76 +3274,61 @@ router.post("/brain/tasks", (req, res) => {
     maxAttempts: 3,
     result: null,
     feedback: null,
-    history: [{ action: "created", at: new Date().toISOString(), by: source }],
+    history: [{ action: 'created', at: new Date().toISOString(), by: source }],
   };
 
   // Auto-assign based on type
-  if (assignTo === "auto") {
-    if (
-      title.toLowerCase().includes("analyze") ||
-      title.toLowerCase().includes("research")
-    ) {
-      task.assignedTo = "gemini";
-    } else if (
-      title.toLowerCase().includes("fix") ||
-      title.toLowerCase().includes("update")
-    ) {
-      task.assignedTo = "tool";
+  if (assignTo === 'auto') {
+    if (title.toLowerCase().includes('analyze') || title.toLowerCase().includes('research')) {
+      task.assignedTo = 'gemini';
+    } else if (title.toLowerCase().includes('fix') || title.toLowerCase().includes('update')) {
+      task.assignedTo = 'tool';
     } else {
-      task.assignedTo = "gemini";
+      task.assignedTo = 'gemini';
     }
   } else {
     task.assignedTo = assignTo;
   }
-  task.status = "assigned";
+  task.status = 'assigned';
   task.history.push({
-    action: "assigned",
+    action: 'assigned',
     to: task.assignedTo,
     at: new Date().toISOString(),
   });
 
   brainTasks.push(task);
-  logger.info(
-    { taskId: task.id, title, assignedTo: task.assignedTo },
-    "[BrainTasks] New task created",
-  );
+  logger.info({ taskId: task.id, title, assignedTo: task.assignedTo }, '[BrainTasks] New task created');
   res.json(task);
 });
 
-router.put("/brain/tasks/:id", (req, res) => {
-  const task = brainTasks.find((t) => t.id === parseInt(req.params.id));
-  if (!task) return res.status(404).json({ error: "Task not found" });
+router.put('/brain/tasks/:id', (req, res) => {
+  const task = brainTasks.find((t) => t.id === parseInt(req.params.id, 10));
+  if (!task) return res.status(404).json({ error: 'Task not found' });
 
   const { status, result, feedback } = req.body || {};
 
   if (status) {
     task.status = status;
     task.updatedAt = new Date().toISOString();
-    task.history.push({ action: "status_change", status, at: task.updatedAt });
+    task.history.push({ action: 'status_change', status, at: task.updatedAt });
 
     // Escalation: if failed and attempts < max, retry
-    if (status === "failed") {
+    if (status === 'failed') {
       task.attempts++;
       if (task.attempts < task.maxAttempts) {
-        task.status = "retry";
+        task.status = 'retry';
         task.history.push({
-          action: "escalation",
+          action: 'escalation',
           attempt: task.attempts,
           at: task.updatedAt,
         });
-        logger.warn(
-          { taskId: task.id, attempt: task.attempts },
-          "[BrainTasks] Task failed, retrying",
-        );
+        logger.warn({ taskId: task.id, attempt: task.attempts }, '[BrainTasks] Task failed, retrying');
       } else {
         task.history.push({
-          action: "max_attempts_reached",
+          action: 'max_attempts_reached',
           at: task.updatedAt,
         });
-        logger.error(
-          { taskId: task.id },
-          "[BrainTasks] Task failed permanently after max attempts",
-        );
+        logger.error({ taskId: task.id }, '[BrainTasks] Task failed permanently after max attempts');
       }
     }
   }
@@ -3645,23 +3336,20 @@ router.put("/brain/tasks/:id", (req, res) => {
   if (feedback) {
     task.feedback = feedback;
     task.history.push({
-      action: "feedback",
+      action: 'feedback',
       feedback,
       at: new Date().toISOString(),
     });
     // Learning: log what worked
-    logger.info(
-      { taskId: task.id, feedback },
-      "[BrainTasks] Feedback recorded (learning)",
-    );
+    logger.info({ taskId: task.id, feedback }, '[BrainTasks] Feedback recorded (learning)');
   }
 
   res.json(task);
 });
 
-router.delete("/brain/tasks/:id", (req, res) => {
-  const idx = brainTasks.findIndex((t) => t.id === parseInt(req.params.id));
-  if (idx === -1) return res.status(404).json({ error: "Task not found" });
+router.delete('/brain/tasks/:id', (req, res) => {
+  const idx = brainTasks.findIndex((t) => t.id === parseInt(req.params.id, 10));
+  if (idx === -1) return res.status(404).json({ error: 'Task not found' });
   brainTasks.splice(idx, 1);
   res.json({ success: true });
 });
@@ -3669,12 +3357,12 @@ router.delete("/brain/tasks/:id", (req, res) => {
 // ═══════════════════════════════════════════════════════════════
 // K1 COGNITIVE CORE — AGI Foundation endpoints
 // ═══════════════════════════════════════════════════════════════
-const k1Cognitive = require("./k1-cognitive");
-const k1World = require("./k1-world-state");
-const k1Memory = require("./k1-memory");
+const k1Cognitive = require('./k1-cognitive');
+const k1World = require('./k1-world-state');
+const k1Memory = require('./k1-memory');
 
 // Status complet K1
-router.get("/k1/status", (req, res) => {
+router.get('/k1/status', (req, res) => {
   res.json({
     cognitive: {
       monologue: k1Cognitive.getMonologue(10),
@@ -3687,35 +3375,35 @@ router.get("/k1/status", (req, res) => {
 });
 
 // World state
-router.get("/k1/world", (req, res) => {
+router.get('/k1/world', (req, res) => {
   res.json(k1World.getWorldState());
 });
 
-router.get("/k1/alerts", (req, res) => {
-  const unread = req.query.unread === "true";
+router.get('/k1/alerts', (req, res) => {
+  const unread = req.query.unread === 'true';
   res.json(k1World.getAlerts(unread));
 });
 
-router.post("/k1/alerts/read", (req, res) => {
+router.post('/k1/alerts/read', (req, res) => {
   k1World.markAlertsRead();
   res.json({ success: true });
 });
 
 // Memory — retrieve
-router.get("/k1/memory", async (req, res) => {
+router.get('/k1/memory', async (req, res) => {
   const { q, domain, limit } = req.query;
   const { supabaseAdmin } = req.app.locals;
-  const results = await k1Memory.retrieve(supabaseAdmin, q || "", {
+  const results = await k1Memory.retrieve(supabaseAdmin, q || '', {
     domain,
-    limit: parseInt(limit) || 10,
+    limit: parseInt(limit, 10) || 10,
   });
   res.json({ results, stats: k1Memory.getStats() });
 });
 
 // Memory — save
-router.post("/k1/memory", async (req, res) => {
+router.post('/k1/memory', async (req, res) => {
   const { content, type, domain, importance, tags } = req.body || {};
-  if (!content) return res.status(400).json({ error: "Content required" });
+  if (!content) return res.status(400).json({ error: 'Content required' });
 
   // Save to hot
   k1Memory.addToHot({ content, type, domain, importance, tags });
@@ -3734,16 +3422,16 @@ router.post("/k1/memory", async (req, res) => {
 });
 
 // Reasoning loop — procesare cognitivă
-router.post("/k1/think", (req, res) => {
+router.post('/k1/think', (req, res) => {
   const { input, domain } = req.body || {};
-  if (!input) return res.status(400).json({ error: "Input required" });
+  if (!input) return res.status(400).json({ error: 'Input required' });
 
   const result = k1Cognitive.reason(input, { domain });
 
   // Salvăm gândul în memory
   k1Memory.addToHot({
     content: `[THOUGHT] ${input.slice(0, 200)}`,
-    type: "reasoning",
+    type: 'reasoning',
     domain: result.reasoning.domain,
     importance: 6,
   });
@@ -3752,22 +3440,21 @@ router.post("/k1/think", (req, res) => {
 });
 
 // Feedback — userul confirmă sau corectează
-router.post("/k1/feedback", (req, res) => {
+router.post('/k1/feedback', (req, res) => {
   const { domain, wasCorrect } = req.body || {};
-  if (!domain || wasCorrect === undefined)
-    return res.status(400).json({ error: "domain + wasCorrect required" });
+  if (!domain || wasCorrect === undefined) return res.status(400).json({ error: 'domain + wasCorrect required' });
 
   k1Cognitive.recordFeedback(domain, wasCorrect);
   res.json({ recorded: true, meta: k1Cognitive.getMetaCognition() });
 });
 
 // Meta-cognition — auto-evaluare
-router.get("/k1/meta", (req, res) => {
+router.get('/k1/meta', (req, res) => {
   res.json(k1Cognitive.getMetaCognition());
 });
 
 // Forgetting engine — cleanup manual
-router.post("/k1/memory/forget", async (req, res) => {
+router.post('/k1/memory/forget', async (req, res) => {
   const { supabaseAdmin } = req.app.locals;
   const result = await k1Memory.forget(supabaseAdmin, req.body || {});
   res.json(result);
@@ -3776,12 +3463,12 @@ router.post("/k1/memory/forget", async (req, res) => {
 // ═══════════════════════════════════════════════════════════════
 // K1 FAZA 2: INTELLIGENCE — Agents, Truth, Performance
 // ═══════════════════════════════════════════════════════════════
-const k1Agents = require("./k1-agents");
-const k1Truth = require("./k1-truth");
-const k1Perf = require("./k1-performance");
+const k1Agents = require('./k1-agents');
+const k1Truth = require('./k1-truth');
+const k1Perf = require('./k1-performance');
 
 // --- AGENTS ---
-router.get("/k1/agents", (req, res) => {
+router.get('/k1/agents', (req, res) => {
   res.json({
     agents: k1Agents.getActiveAgents(),
     stats: k1Agents.getStats(),
@@ -3789,46 +3476,38 @@ router.get("/k1/agents", (req, res) => {
   });
 });
 
-router.post("/k1/agents/spawn", (req, res) => {
+router.post('/k1/agents/spawn', (req, res) => {
   const { template, role, prompt, task } = req.body || {};
-  const agent = k1Agents.spawn(template || "research", { role, prompt, task });
+  const agent = k1Agents.spawn(template || 'research', { role, prompt, task });
   if (agent.error) return res.status(400).json(agent);
   if (task) k1Agents.brief(agent.id, task);
   res.json(agent);
 });
 
-router.post("/k1/agents/:id/complete", (req, res) => {
+router.post('/k1/agents/:id/complete', (req, res) => {
   const { result, confidence } = req.body || {};
-  const agent = k1Agents.complete(
-    parseInt(req.params.id),
-    result,
-    confidence || 50,
-  );
+  const agent = k1Agents.complete(parseInt(req.params.id), result, confidence || 50);
   if (agent.error) return res.status(404).json(agent);
   res.json(agent);
 });
 
-router.post("/k1/agents/:id/evaluate", (req, res) => {
+router.post('/k1/agents/:id/evaluate', (req, res) => {
   const { score, feedback } = req.body || {};
-  const agent = k1Agents.evaluate(
-    parseInt(req.params.id),
-    score || 50,
-    feedback,
-  );
+  const agent = k1Agents.evaluate(parseInt(req.params.id), score || 50, feedback);
   if (agent.error) return res.status(404).json(agent);
   res.json(agent);
 });
 
-router.delete("/k1/agents/:id", (req, res) => {
-  const result = k1Agents.kill(parseInt(req.params.id), "manual");
+router.delete('/k1/agents/:id', (req, res) => {
+  const result = k1Agents.kill(parseInt(req.params.id), 'manual');
   if (result.error) return res.status(404).json(result);
   res.json(result);
 });
 
 // Swarm patterns — REAL LLM EXECUTION
-router.post("/k1/agents/debate", async (req, res) => {
+router.post('/k1/agents/debate', async (req, res) => {
   const { task } = req.body || {};
-  if (!task) return res.status(400).json({ error: "task required" });
+  if (!task) return res.status(400).json({ error: 'task required' });
   try {
     const result = await k1Agents.executeDebate(task);
     res.json(result);
@@ -3842,9 +3521,9 @@ router.post("/k1/agents/debate", async (req, res) => {
   }
 });
 
-router.post("/k1/agents/ensemble", async (req, res) => {
+router.post('/k1/agents/ensemble', async (req, res) => {
   const { task, types } = req.body || {};
-  if (!task) return res.status(400).json({ error: "task required" });
+  if (!task) return res.status(400).json({ error: 'task required' });
   try {
     const result = await k1Agents.executeEnsemble(task, types);
     res.json(result);
@@ -3857,59 +3536,58 @@ router.post("/k1/agents/ensemble", async (req, res) => {
   }
 });
 
-router.post("/k1/agents/adversarial", (req, res) => {
+router.post('/k1/agents/adversarial', (req, res) => {
   const { task } = req.body || {};
-  if (!task) return res.status(400).json({ error: "task required" });
+  if (!task) return res.status(400).json({ error: 'task required' });
   res.json(k1Agents.setupAdversarial(task));
 });
 
 // --- TRUTH GUARD ---
-router.post("/k1/truth/verify", (req, res) => {
+router.post('/k1/truth/verify', (req, res) => {
   const { text, liveData } = req.body || {};
-  if (!text) return res.status(400).json({ error: "text required" });
+  if (!text) return res.status(400).json({ error: 'text required' });
   res.json(k1Truth.verify(text, liveData || {}));
 });
 
-router.post("/k1/truth/self-test", (req, res) => {
+router.post('/k1/truth/self-test', (req, res) => {
   const { domain } = req.body || {};
-  res.json(k1Truth.runSelfTest(domain || "trading"));
+  res.json(k1Truth.runSelfTest(domain || 'trading'));
 });
 
-router.get("/k1/truth/history", (req, res) => {
+router.get('/k1/truth/history', (req, res) => {
   res.json(k1Truth.getSelfTestHistory());
 });
 
 // --- PERFORMANCE ---
-router.get("/k1/performance", (req, res) => {
+router.get('/k1/performance', (req, res) => {
   res.json(k1Perf.getReport());
 });
 
-router.get("/k1/performance/recommendations", (req, res) => {
+router.get('/k1/performance/recommendations', (req, res) => {
   res.json(k1Perf.getRecommendations());
 });
 
-router.post("/k1/performance/record", (req, res) => {
+router.post('/k1/performance/record', (req, res) => {
   const { domain, correct, errorType, responseTimeMs } = req.body || {};
-  if (!domain) return res.status(400).json({ error: "domain required" });
+  if (!domain) return res.status(400).json({ error: 'domain required' });
   k1Perf.recordTask(domain, responseTimeMs);
   if (correct === true) k1Perf.recordCorrect(domain);
-  else if (correct === false)
-    k1Perf.recordCorrection(domain, errorType || "unknown");
+  else if (correct === false) k1Perf.recordCorrection(domain, errorType || 'unknown');
   res.json({ recorded: true, report: k1Perf.getReport() });
 });
 
 // ═══════════════════════════════════════════════════════════════
 // K1 FAZA 3: EVOLUTION — Meta-Learning, User Model, Scheduled Jobs
 // ═══════════════════════════════════════════════════════════════
-const k1Meta = require("./k1-meta-learning");
-const k1Persist = require("./k1-persistence");
+const k1Meta = require('./k1-meta-learning');
+const k1Persist = require('./k1-persistence');
 
 // K1 Persistence: Load saved state 5s after boot (before market feed at 10s)
 setTimeout(async () => {
   try {
-    const { supabaseAdmin: sb } = require("./supabase");
+    const { supabaseAdmin: sb } = require('./supabase');
     await k1Persist.loadState(sb);
-    logger.info("[K1] State loaded from Supabase");
+    logger.info('[K1] State loaded from Supabase');
   } catch {
     /* ignored */
   }
@@ -3918,39 +3596,39 @@ setTimeout(async () => {
 // Start scheduled jobs (forgetting@6h, self-test@12h)
 setTimeout(() => {
   try {
-    const { supabaseAdmin: sb } = require("./supabase");
+    const { supabaseAdmin: sb } = require('./supabase');
     k1Meta.startScheduledJobs(sb);
   } catch {
     /* ignored */
   }
 }, 15000); // 15s after boot
 
-router.get("/k1/evolution", (req, res) => {
+router.get('/k1/evolution', (req, res) => {
   res.json(k1Meta.getEvolutionReport());
 });
 
-router.get("/k1/user", (req, res) => {
+router.get('/k1/user', (req, res) => {
   res.json(k1Meta.getUserModel());
 });
 
-router.get("/k1/strategies", (req, res) => {
+router.get('/k1/strategies', (req, res) => {
   res.json(k1Meta.getStrategies());
 });
 
-router.post("/k1/user/interaction", (req, res) => {
+router.post('/k1/user/interaction', (req, res) => {
   const { domain, wasCorrection, correctionNote } = req.body || {};
   k1Meta.recordUserInteraction({ domain, wasCorrection, correctionNote });
   res.json({ recorded: true, model: k1Meta.getUserModel() });
 });
 
-router.post("/k1/risk/adjust", (req, res) => {
+router.post('/k1/risk/adjust', (req, res) => {
   const { pnlPct, reason, holdHours } = req.body || {};
   k1Meta.adjustRisk({ pnlPct, reason, holdHours });
   res.json({ adjusted: true, strategies: k1Meta.getStrategies() });
 });
 
 // ═══ FULL K1 DASHBOARD — Tot într-un singur endpoint ═══
-router.get("/k1/dashboard", (req, res) => {
+router.get('/k1/dashboard', (req, res) => {
   res.json({
     cognitive: {
       monologue: k1Cognitive.getMonologue(10),
@@ -3971,10 +3649,14 @@ router.get("/k1/dashboard", (req, res) => {
 // Runs every 5 minutes, uses existing fetchRealPrices + CoinGecko
 // ═══════════════════════════════════════════════════════════════
 
+/**
+ * k1MarketDataFeed
+ * @returns {*}
+ */
 async function k1MarketDataFeed() {
   try {
     const marketData = {};
-    const cryptoAssets = ["BTC", "ETH", "SOL"];
+    const cryptoAssets = ['BTC', 'ETH', 'SOL'];
 
     // Fetch latest price for each crypto asset
     await Promise.all(
@@ -3984,11 +3666,10 @@ async function k1MarketDataFeed() {
           if (prices && prices.length > 1) {
             const last = prices[prices.length - 1];
             const prev = prices[0];
-            const change24h =
-              prev > 0 ? +(((last - prev) / prev) * 100).toFixed(2) : 0;
-            let signal = "HOLD";
-            if (change24h > 3) signal = "BUY";
-            else if (change24h < -3) signal = "SELL";
+            const change24h = prev > 0 ? +(((last - prev) / prev) * 100).toFixed(2) : 0;
+            let signal = 'HOLD';
+            if (change24h > 3) signal = 'BUY';
+            else if (change24h < -3) signal = 'SELL';
             marketData[asset.toLowerCase()] = {
               price: last,
               change24h,
@@ -3998,51 +3679,47 @@ async function k1MarketDataFeed() {
         } catch {
           /* ignored */
         }
-      }),
+      })
     );
 
     // Fetch GOLD + NASDAQ + S&P500 + Oil + Forex via Yahoo Finance (free, no API key)
     const yahooAssets = {
-      gold: "GC=F",
-      nasdaq: "^IXIC",
-      sp500: "^GSPC",
-      oil: "CL=F",
-      eurusd: "EURUSD=X",
-      gbpusd: "GBPUSD=X",
+      gold: 'GC=F',
+      nasdaq: '^IXIC',
+      sp500: '^GSPC',
+      oil: 'CL=F',
+      eurusd: 'EURUSD=X',
+      gbpusd: 'GBPUSD=X',
     };
     await Promise.all(
       Object.entries(yahooAssets).map(async ([k, ticker]) => {
         try {
           const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=2d`;
           const yRes = await fetch(url, {
-            headers: { "User-Agent": "KelionAI/1.0" },
+            headers: { 'User-Agent': 'KelionAI/1.0' },
           });
           if (yRes.ok) {
             const yData = await yRes.json();
             const meta = yData?.chart?.result?.[0]?.meta;
             if (meta && meta.regularMarketPrice) {
               const price = meta.regularMarketPrice;
-              const prevClose =
-                meta.chartPreviousClose || meta.previousClose || price;
-              const change24h =
-                prevClose > 0
-                  ? +(((price - prevClose) / prevClose) * 100).toFixed(2)
-                  : 0;
-              let signal = "HOLD";
-              if (change24h > 2) signal = "BUY";
-              else if (change24h < -2) signal = "SELL";
+              const prevClose = meta.chartPreviousClose || meta.previousClose || price;
+              const change24h = prevClose > 0 ? +(((price - prevClose) / prevClose) * 100).toFixed(2) : 0;
+              let signal = 'HOLD';
+              if (change24h > 2) signal = 'BUY';
+              else if (change24h < -2) signal = 'SELL';
               marketData[k] = { price, change24h, signal };
             }
           }
         } catch {
           /* ignored */
         }
-      }),
+      })
     );
 
     // Fetch Fear&Greed index
     try {
-      const fgRes = await fetch("https://api.alternative.me/fng/?limit=1");
+      const fgRes = await fetch('https://api.alternative.me/fng/?limit=1');
       if (fgRes.ok) {
         const fgData = await fgRes.json();
         if (fgData.data && fgData.data[0]) {
@@ -4050,8 +3727,8 @@ async function k1MarketDataFeed() {
           const fgVal = parseInt(fg.value, 10);
           marketData.fearGreed = {
             value: fgVal,
-            label: fg.value_classification || "Neutral",
-            signal: fgVal <= 25 ? "BUY" : fgVal >= 75 ? "SELL" : "HOLD",
+            label: fg.value_classification || 'Neutral',
+            signal: fgVal <= 25 ? 'BUY' : fgVal >= 75 ? 'SELL' : 'HOLD',
           };
         }
       }
@@ -4062,34 +3739,23 @@ async function k1MarketDataFeed() {
     // Update K1 World State with real market data
     if (Object.keys(marketData).length > 0) {
       k1World.updateMarkets(marketData);
-      logger.info(
-        { assets: Object.keys(marketData).join(",") },
-        "[K1-Feed] Market data updated",
-      );
+      logger.info({ assets: Object.keys(marketData).join(',') }, '[K1-Feed] Market data updated');
     }
 
     // Update K1 system state with bot status
     try {
       k1World.updateSystem({
         botActive: tradeEngine.isActive(),
-        botMode: tradeEngine.isPaperMode() ? "PAPER" : "LIVE",
+        botMode: tradeEngine.isPaperMode() ? 'PAPER' : 'LIVE',
         botBalance: tradeEngine.getPaperBalance(),
         openPositions: tradeEngine.getOpenPositions().length,
-        activeModules: [
-          "cognitive",
-          "memory",
-          "world",
-          "agents",
-          "truth",
-          "performance",
-          "meta-learning",
-        ],
+        activeModules: ['cognitive', 'memory', 'world', 'agents', 'truth', 'performance', 'meta-learning'],
       });
     } catch {
       /* ignored */
     }
   } catch (err) {
-    logger.warn({ err: err.message }, "[K1-Feed] Market data feed error");
+    logger.warn({ err: err.message }, '[K1-Feed] Market data feed error');
   }
 }
 
@@ -4101,42 +3767,43 @@ setInterval(k1MarketDataFeed, 5 * 60 * 1000);
 setInterval(
   async () => {
     try {
-      const k1Bridge = require("./k1-messenger-bridge");
+      const k1Bridge = require('./k1-messenger-bridge');
       const proactive = k1Bridge.getProactiveMessages();
       if (proactive.length > 0) {
-        const tg = require("./telegram");
+        const tg = require('./telegram');
         const chatId = tg.CHANNEL_ID || process.env.TELEGRAM_ADMIN_CHAT_ID;
         if (chatId && tg.sendMessage) {
           for (const msg of proactive) {
-            const text = `🔔 <b>K1 Alert</b>\n\n${msg.text}\n\n<i>Priority: ${msg.priority || "normal"} | ${new Date().toLocaleTimeString("ro-RO")}</i>`;
+            const text = `🔔 <b>K1 Alert</b>\n\n${msg.text}\n\n<i>Priority: ${msg.priority || 'normal'} | ${new Date().toLocaleTimeString('ro-RO')}</i>`;
             await tg.sendMessage(chatId, text);
           }
-          logger.info(
-            { count: proactive.length },
-            "[K1-Proactive] Alerts sent to Telegram",
-          );
+          logger.info({ count: proactive.length }, '[K1-Proactive] Alerts sent to Telegram');
         }
       }
     } catch {
       /* ignored */
     }
   },
-  5 * 60 * 1000,
+  5 * 60 * 1000
 );
 
 // K1 Persistence: Save state every 5 min
 setInterval(
   async () => {
     try {
-      const { supabaseAdmin: sb } = require("./supabase");
+      const { supabaseAdmin: sb } = require('./supabase');
       await k1Persist.saveState(sb);
     } catch {
       /* ignored */
     }
   },
-  5 * 60 * 1000,
+  5 * 60 * 1000
 );
 
+/**
+ * undefined
+ * @returns {*}
+ */
 module.exports = router;
 module.exports.detectSmartMoney = detectSmartMoney;
 module.exports.kellyPosition = kellyPosition;

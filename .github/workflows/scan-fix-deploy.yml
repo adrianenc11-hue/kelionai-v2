@@ -4,24 +4,24 @@ on:
   workflow_dispatch:
     inputs:
       dry_run:
-        description: "Simulate all steps without making real changes"
+        description: 'Simulate all steps without making real changes'
         required: false
-        default: "false"
+        default: 'false'
         type: boolean
       base_url:
-        description: "Override scan base URL"
+        description: 'Override scan base URL'
         required: false
-        default: "https://kelionai.app"
+        default: 'https://kelionai.app'
         type: string
       auto_merge:
-        description: "Automatically merge the auto-fix PR if created"
+        description: 'Automatically merge the auto-fix PR if created'
         required: false
-        default: "false"
+        default: 'false'
         type: boolean
       skip_deploy:
-        description: "Skip the Railway redeploy step"
+        description: 'Skip the Railway redeploy step'
         required: false
-        default: "false"
+        default: 'false'
         type: boolean
 
 jobs:

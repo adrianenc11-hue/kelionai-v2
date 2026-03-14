@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="en">
   <head>
+  <meta name="description" content="Page description">
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>KelionAI — Trading Bot Admin</title>
@@ -500,6 +501,7 @@
 
   <body>
     <nav
+      role="navigation"
       style="
         display: flex;
         align-items: center;
@@ -510,122 +512,69 @@
         font-size: 0.82rem;
       "
     >
-      <a
-        href="/"
-        style="color: #00ffff; text-decoration: none; font-weight: bold"
-        >← KelionAI</a
-      >
+      <a href="/" style="color: #00ffff; text-decoration: none; font-weight: bold">← KelionAI</a>
       <span style="color: #333">|</span>
-      <a href="/admin/health.html" style="color: #888; text-decoration: none"
-        >Health</a
-      >
-      <a href="/admin/news.html" style="color: #888; text-decoration: none"
-        >News</a
-      >
-      <a
-        href="/admin/trading.html"
-        style="color: #00ffff; text-decoration: none"
-        >Trading</a
-      >
-      <a href="/admin/sports.html" style="color: #888; text-decoration: none"
-        >Sports</a
-      >
+      <a href="/admin/health.html" style="color: #888; text-decoration: none">Health</a>
+      <a href="/admin/news.html" style="color: #888; text-decoration: none">News</a>
+      <a href="/admin/trading.html" style="color: #00ffff; text-decoration: none">Trading</a>
+      <a href="/admin/sports.html" style="color: #888; text-decoration: none">Sports</a>
     </nav>
     <h1>📈 KelionAI — Trading Bot</h1>
     <p class="subtitle">Trading management panel</p>
 
     <div class="disclaimer">
-      ⚠️ INFORMATIONAL — This does not constitute investment advice. KelionAI
-      does not provide financial counseling.
+      ⚠️ INFORMATIONAL — This does not constitute investment advice. KelionAI does not provide financial counseling.
     </div>
 
     <!-- ═══ PAPER TRADING — Balance + ON/OFF ═══ -->
     <div
       style="
-        background: linear-gradient(
-          135deg,
-          rgba(0, 255, 255, 0.08),
-          rgba(0, 200, 100, 0.06)
-        );
+        background: linear-gradient(135deg, rgba(0, 255, 255, 0.08), rgba(0, 200, 100, 0.06));
         border: 1px solid rgba(0, 255, 255, 0.2);
         border-radius: 14px;
         padding: 20px;
         margin-bottom: 18px;
       "
     >
-      <div
-        style="
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          flex-wrap: wrap;
-          gap: 12px;
-        "
-      >
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px">
         <div>
-          <div
-            style="
-              font-size: 0.72rem;
-              color: #888;
-              text-transform: uppercase;
-              letter-spacing: 1px;
-            "
-          >
+          <div style="font-size: 0.72rem; color: #888; text-transform: uppercase; letter-spacing: 1px">
             💰 Paper Trading Balance
           </div>
           <div
             id="pt-balance"
             onclick="openTradeHistory()"
-            style="
-              font-size: 2.2rem;
-              font-weight: bold;
-              color: #00ffff;
-              cursor: pointer;
-              transition: all 0.2s;
-            "
+            style="font-size: 2.2rem; font-weight: bold; color: #00ffff; cursor: pointer; transition: all 0.2s"
             onmouseover="this.style.color = '#00ff88'"
             onmouseout="this.style.color = '#00ffff'"
             title="Click to see trade history"
           >
             €100.00
           </div>
-          <div
-            style="display: flex; gap: 16px; margin-top: 6px; font-size: 0.8rem"
-          >
+          <div style="display: flex; gap: 16px; margin-top: 6px; font-size: 0.8rem">
             <span>P&L: <b id="pt-pnl" style="color: #00dd66">€0.00</b></span>
             <span>Return: <b id="pt-return" style="color: #00dd66">0%</b></span>
             <span>Trades: <b id="pt-trades" style="color: #00ffff">0</b></span>
             <span>Win: <b id="pt-winrate" style="color: #ffc800">0%</b></span>
           </div>
           <div style="font-size: 0.7rem; color: #555; margin-top: 4px">
-            Mode: <b id="pt-mode" style="color: #ffc800">PAPER</b> · Last check:
-            <span id="pt-lastcheck">—</span> ·
+            Mode: <b id="pt-mode" style="color: #ffc800">PAPER</b> · Last check: <span id="pt-lastcheck">—</span> ·
             <span id="pt-positions" style="color: #aaa">0 positions open</span>
           </div>
         </div>
-        <div
-          style="
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            align-items: center;
-          "
-        >
+        <div style="display: flex; flex-direction: column; gap: 8px; align-items: center">
           <button
+            type="button"
             id="pt-toggle"
             class="btn"
             onclick="toggleBot()"
-            style="
-              font-size: 1rem;
-              padding: 12px 28px;
-              border-radius: 12px;
-              min-width: 120px;
-            "
+            style="font-size: 1rem; padding: 12px 28px; border-radius: 12px; min-width: 120px"
           >
             ▶ START BOT
           </button>
           <div style="display: flex; gap: 6px">
             <button
+              type="button"
               class="btn secondary"
               onclick="resetBot()"
               style="font-size: 0.72rem; padding: 4px 10px"
@@ -633,6 +582,7 @@
               🔄 Reset
             </button>
             <button
+              type="button"
               class="btn secondary"
               onclick="switchBotMode()"
               style="font-size: 0.72rem; padding: 4px 10px"
@@ -655,111 +605,28 @@
         <div class="modal-header">
           <h3>📜 Trade History — Pierdut / Câștigat / Total</h3>
           <button
+            type="button"
             class="modal-close"
-            onclick="
-              document
-                .getElementById('trade-history-modal')
-                .classList.remove('open')
-            "
+            onclick="document.getElementById('trade-history-modal').classList.remove('open')"
           >
             ✕
           </button>
         </div>
         <div
           id="trade-summary"
-          style="
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 10px;
-            margin-bottom: 16px;
-          "
+          style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px"
         ></div>
-        <table
-          style="width: 100%; border-collapse: collapse; font-size: 0.82rem"
-          id="trade-table"
-        >
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.82rem" id="trade-table">
           <thead>
             <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.1)">
-              <th
-                style="
-                  text-align: left;
-                  padding: 8px;
-                  color: #888;
-                  font-size: 0.72rem;
-                "
-              >
-                DATE
-              </th>
-              <th
-                style="
-                  text-align: left;
-                  padding: 8px;
-                  color: #888;
-                  font-size: 0.72rem;
-                "
-              >
-                ASSET
-              </th>
-              <th
-                style="
-                  text-align: left;
-                  padding: 8px;
-                  color: #888;
-                  font-size: 0.72rem;
-                "
-              >
-                ACTION
-              </th>
-              <th
-                style="
-                  text-align: right;
-                  padding: 8px;
-                  color: #888;
-                  font-size: 0.72rem;
-                "
-              >
-                PRICE
-              </th>
-              <th
-                style="
-                  text-align: right;
-                  padding: 8px;
-                  color: #888;
-                  font-size: 0.72rem;
-                "
-              >
-                VALUE
-              </th>
-              <th
-                style="
-                  text-align: right;
-                  padding: 8px;
-                  color: #888;
-                  font-size: 0.72rem;
-                "
-              >
-                PIERDUT
-              </th>
-              <th
-                style="
-                  text-align: right;
-                  padding: 8px;
-                  color: #888;
-                  font-size: 0.72rem;
-                "
-              >
-                CÂȘTIGAT
-              </th>
-              <th
-                style="
-                  text-align: right;
-                  padding: 8px;
-                  color: #888;
-                  font-size: 0.72rem;
-                "
-              >
-                TOTAL
-              </th>
+              <th style="text-align: left; padding: 8px; color: #888; font-size: 0.72rem">DATE</th>
+              <th style="text-align: left; padding: 8px; color: #888; font-size: 0.72rem">ASSET</th>
+              <th style="text-align: left; padding: 8px; color: #888; font-size: 0.72rem">ACTION</th>
+              <th style="text-align: right; padding: 8px; color: #888; font-size: 0.72rem">PRICE</th>
+              <th style="text-align: right; padding: 8px; color: #888; font-size: 0.72rem">VALUE</th>
+              <th style="text-align: right; padding: 8px; color: #888; font-size: 0.72rem">PIERDUT</th>
+              <th style="text-align: right; padding: 8px; color: #888; font-size: 0.72rem">CÂȘTIGAT</th>
+              <th style="text-align: right; padding: 8px; color: #888; font-size: 0.72rem">TOTAL</th>
             </tr>
           </thead>
           <tbody id="trade-tbody"></tbody>
@@ -772,10 +639,8 @@
     </div>
 
     <div class="toolbar">
-      <button class="btn secondary" onclick="loadAll()">🔄 Reload</button>
-      <button class="btn secondary" onclick="exportJson()">
-        ⬇ Export JSON
-      </button>
+      <button type="button" class="btn secondary" onclick="loadAll()">🔄 Reload</button>
+      <button type="button" class="btn secondary" onclick="exportJson()">⬇ Export JSON</button>
     </div>
 
     <!-- STATUS PANEL -->
@@ -810,9 +675,7 @@
           <div class="form-group">
             <label>Strategy</label>
             <select id="bt-strategy" class="admin-input">
-              <option value="SmartConfluence" selected>
-                ⭐ SmartConfluence
-              </option>
+              <option value="SmartConfluence" selected>⭐ SmartConfluence</option>
               <option value="RSI">RSI</option>
               <option value="MACD">MACD</option>
               <option value="BollingerBands">Bollinger Bands</option>
@@ -852,19 +715,13 @@
           <div class="form-group">
             <label>Risk Profile</label>
             <select id="bt-risk" class="admin-input">
-              <option value="conservative">
-                🛡️ Conservative (SL 1% / TP 2%)
-              </option>
-              <option value="moderate" selected>
-                ⚖️ Moderate (SL 2% / TP 4%)
-              </option>
+              <option value="conservative">🛡️ Conservative (SL 1% / TP 2%)</option>
+              <option value="moderate" selected>⚖️ Moderate (SL 2% / TP 4%)</option>
               <option value="aggressive">🔥 Aggressive (SL 5% / TP 10%)</option>
               <option value="yolo">💀 YOLO (SL 10% / TP 20%)</option>
             </select>
           </div>
-          <button class="btn" id="btn-backtest" onclick="runBacktest()">
-            ▶ Run Backtest
-          </button>
+          <button type="button" class="btn" id="btn-backtest" onclick="runBacktest()">▶ Run Backtest</button>
         </div>
         <div class="backtest-result" id="backtest-result"></div>
       </div>
@@ -873,21 +730,14 @@
     <!-- GEOPOLITICAL RISK -->
     <div class="section">
       <div class="section-title">🌍 Geopolitical Risk & Sources</div>
-      <div
-        id="geo-risk-header"
-        style="display: flex; gap: 12px; margin-bottom: 12px; flex-wrap: wrap"
-      >
+      <div id="geo-risk-header" style="display: flex; gap: 12px; margin-bottom: 12px; flex-wrap: wrap">
         <div class="loading">Loading geopolitical data...</div>
       </div>
-      <div class="section-title" style="font-size: 0.85rem; margin-top: 8px">
-        📡 Monitored Sources
-      </div>
+      <div class="section-title" style="font-size: 0.85rem; margin-top: 8px">📡 Monitored Sources</div>
       <div id="geo-sources" class="risk-grid" style="margin-bottom: 10px">
         <div class="loading">Loading...</div>
       </div>
-      <div class="section-title" style="font-size: 0.85rem; margin-top: 8px">
-        📰 Recent Events
-      </div>
+      <div class="section-title" style="font-size: 0.85rem; margin-top: 8px">📰 Recent Events</div>
       <div id="geo-events" style="max-height: 200px; overflow-y: auto">
         <div class="loading">Loading...</div>
       </div>
@@ -902,15 +752,11 @@
     </div>
 
     <!-- ASSET DETAIL MODAL -->
-    <div
-      class="modal-overlay"
-      id="asset-modal"
-      onclick="if (event.target === this) closeModal();"
-    >
+    <div class="modal-overlay" id="asset-modal" onclick="if (event.target === this) closeModal();">
       <div class="modal-content">
         <div class="modal-header">
           <h2 id="modal-title" style="color: #00ffff; margin: 0">—</h2>
-          <button class="modal-close" onclick="closeModal()">✕</button>
+          <button type="button" class="modal-close" onclick="closeModal()">✕</button>
         </div>
         <div class="chart-container" id="chart-container"></div>
         <div class="detail-grid" id="modal-details"></div>
@@ -918,74 +764,71 @@
     </div>
 
     <script>
-      "use strict";
+      'use strict';
 
-      let adminSecret = "kAI-adm1n-s3cr3t-2026-pr0d";
+      let adminSecret = 'kAI-adm1n-s3cr3t-2026-pr0d';
       let snapshot = {};
 
       function getHeaders() {
-        return { "x-admin-secret": adminSecret };
+        return { 'x-admin-secret': adminSecret };
       }
 
       function setStatus(msg, isError) {
-        const el = document.getElementById("status-bar");
-        el.innerHTML = isError
-          ? `<span class="error-msg">${escHtml(msg)}</span>`
-          : `<span>${escHtml(msg)}</span>`;
+        const el = document.getElementById('status-bar');
+        el.innerHTML = isError ? `<span class="error-msg">${escHtml(msg)}</span>` : `<span>${escHtml(msg)}</span>`;
       }
 
       function escHtml(str) {
-        return String(str || "")
-          .replace(/&/g, "&amp;")
-          .replace(/</g, "&lt;")
-          .replace(/>/g, "&gt;")
-          .replace(/"/g, "&quot;");
+        return String(str || '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
       }
 
       function fmtDate(iso) {
         try {
-          return new Date(iso).toLocaleString("en-US", {
-            day: "2-digit",
-            month: "short",
-            hour: "2-digit",
-            minute: "2-digit",
+          return new Date(iso).toLocaleString('en-US', {
+            day: '2-digit',
+            month: 'short',
+            hour: '2-digit',
+            minute: '2-digit',
           });
         } catch (e) {
-          return iso || "—";
+          return iso || '—';
         }
       }
 
       function signalClass(signal) {
-        if (!signal) return "signal-hold";
+        if (!signal) return 'signal-hold';
         const s = String(signal).toUpperCase();
-        if (s === "BUY") return "signal-buy";
-        if (s === "SELL") return "signal-sell";
-        return "signal-hold";
+        if (s === 'BUY') return 'signal-buy';
+        if (s === 'SELL') return 'signal-sell';
+        return 'signal-hold';
       }
 
       // ═══ STATUS ═══
       async function loadStatus() {
-        const el = document.getElementById("status-grid");
+        const el = document.getElementById('status-grid');
         try {
-          const res = await fetch("/api/trading/status", {
+          const res = await fetch('/api/trading/status', {
             headers: getHeaders(),
           });
           if (res.status === 401) {
-            el.innerHTML =
-              '<div class="error-msg">Unauthorized — check admin secret.</div>';
+            el.innerHTML = '<div class="error-msg">Unauthorized — check admin secret.</div>';
             return;
           }
           const data = await res.json();
           snapshot.status = data;
           const items = [
-            { label: "Bot Status", value: escHtml(data.status || "N/A") },
-            { label: "Version", value: escHtml(data.version || "N/A") },
-            { label: "Last Update", value: fmtDate(data.lastUpdate) },
+            { label: 'Bot Status', value: escHtml(data.status || 'N/A') },
+            { label: 'Version', value: escHtml(data.version || 'N/A') },
+            { label: 'Last Update', value: fmtDate(data.lastUpdate) },
             {
-              label: "Active Trades",
-              value: escHtml(String(data.activeTrades ?? "—")),
+              label: 'Active Trades',
+              value: escHtml(String(data.activeTrades ?? '—')),
             },
-            { label: "Uptime", value: escHtml(data.uptime || "—") },
+            { label: 'Uptime', value: escHtml(data.uptime || '—') },
           ];
           el.innerHTML = items
             .map(
@@ -993,9 +836,9 @@
                     <div class="stat-item">
                         <div class="stat-label">${i.label}</div>
                         <div class="stat-value">${i.value}</div>
-                    </div>`,
+                    </div>`
             )
-            .join("");
+            .join('');
         } catch (e) {
           el.innerHTML = `<div class="error-msg">Status error: ${escHtml(e.message)}</div>`;
         }
@@ -1003,9 +846,9 @@
 
       // ═══ MARKET OVERVIEW ═══
       async function loadAnalysis() {
-        const el = document.getElementById("market-grid");
+        const el = document.getElementById('market-grid');
         try {
-          const res = await fetch("/api/trading/analysis", {
+          const res = await fetch('/api/trading/analysis', {
             headers: getHeaders(),
           });
           if (res.status === 401) {
@@ -1016,31 +859,29 @@
           snapshot.analysis = data;
           const assets = data.assets || data.analysis || [];
           if (!assets.length) {
-            el.innerHTML =
-              '<div class="empty-state">No analysis available.</div>';
+            el.innerHTML = '<div class="empty-state">No analysis available.</div>';
             return;
           }
           el.innerHTML = assets
             .map((a) => {
               const srcClass = !a.dataSource
-                ? ""
-                : a.dataSource.includes("SIMULATED") ||
-                    a.dataSource === "NO_DATA"
-                  ? "nodata"
-                  : a.dataSource.includes("stale")
-                    ? "stale"
-                    : "real";
-              const srcLabel = a.dataSource || "unknown";
+                ? ''
+                : a.dataSource.includes('SIMULATED') || a.dataSource === 'NO_DATA'
+                  ? 'nodata'
+                  : a.dataSource.includes('stale')
+                    ? 'stale'
+                    : 'real';
+              const srcLabel = a.dataSource || 'unknown';
               return `
                     <div class="asset-card" onclick="openAssetDetail('${escHtml(a.symbol || a.asset)}')">
                         <div class="asset-name">${escHtml(a.symbol || a.asset)}</div>
-                        <div class="asset-price">${escHtml(a.price ? String(a.price) : "—")}</div>
-                        <span class="signal-badge ${signalClass(a.signal)}">${escHtml(a.signal || "HOLD")}</span>
-                        ${a.changePercent != null ? `<div style="font-size:0.78rem;margin-top:6px;color:${parseFloat(a.changePercent) >= 0 ? "#00dd66" : "#ff6666"}">${parseFloat(a.changePercent) >= 0 ? "+" : ""}${escHtml(String(a.changePercent))}%</div>` : ""}
+                        <div class="asset-price">${escHtml(a.price ? String(a.price) : '—')}</div>
+                        <span class="signal-badge ${signalClass(a.signal)}">${escHtml(a.signal || 'HOLD')}</span>
+                        ${a.changePercent != null ? `<div style="font-size:0.78rem;margin-top:6px;color:${parseFloat(a.changePercent) >= 0 ? '#00dd66' : '#ff6666'}">${parseFloat(a.changePercent) >= 0 ? '+' : ''}${escHtml(String(a.changePercent))}%</div>` : ''}
                         <div class="data-source ${srcClass}">📡 ${escHtml(srcLabel)}</div>
                     </div>`;
             })
-            .join("");
+            .join('');
         } catch (e) {
           el.innerHTML = `<div class="error-msg">Analysis error: ${escHtml(e.message)}</div>`;
         }
@@ -1048,9 +889,9 @@
 
       // ═══ SIGNALS ═══
       async function loadSignals() {
-        const el = document.getElementById("signal-list");
+        const el = document.getElementById('signal-list');
         try {
-          const res = await fetch("/api/trading/signals", {
+          const res = await fetch('/api/trading/signals', {
             headers: getHeaders(),
           });
           if (res.status === 401) {
@@ -1071,21 +912,21 @@
                         <div class="signal-header">
                             <span class="signal-asset">${escHtml(s.symbol || s.asset)}</span>
                             <div style="display:flex;gap:6px;align-items:center;">
-                                <span class="signal-badge ${signalClass(s.signal)}">${escHtml(s.signal || "HOLD")}</span>
-                                ${s.riskReward ? `<span class="rr-badge">R:R ${escHtml(String(s.riskReward))}</span>` : ""}
+                                <span class="signal-badge ${signalClass(s.signal)}">${escHtml(s.signal || 'HOLD')}</span>
+                                ${s.riskReward ? `<span class="rr-badge">R:R ${escHtml(String(s.riskReward))}</span>` : ''}
                             </div>
                         </div>
                         <div class="signal-details">
-                            <div class="signal-detail-item"><div class="detail-label">Entry</div><div class="detail-val">${escHtml(s.entry != null ? String(s.entry) : "—")}</div></div>
-                            <div class="signal-detail-item"><div class="detail-label">Target</div><div class="detail-val" style="color:#00dd66">${escHtml(s.target != null ? String(s.target) : "—")}</div></div>
-                            <div class="signal-detail-item"><div class="detail-label">Stop Loss</div><div class="detail-val" style="color:#ff6666">${escHtml(s.stopLoss != null ? String(s.stopLoss) : "—")}</div></div>
-                            <div class="signal-detail-item"><div class="detail-label">Timeframe</div><div class="detail-val">${escHtml(s.timeframe || "—")}</div></div>
-                            <div class="signal-detail-item"><div class="detail-label">Confidence</div><div class="detail-val">${escHtml(s.confidence != null ? String(s.confidence) + "%" : "—")}</div></div>
+                            <div class="signal-detail-item"><div class="detail-label">Entry</div><div class="detail-val">${escHtml(s.entry != null ? String(s.entry) : '—')}</div></div>
+                            <div class="signal-detail-item"><div class="detail-label">Target</div><div class="detail-val" style="color:#00dd66">${escHtml(s.target != null ? String(s.target) : '—')}</div></div>
+                            <div class="signal-detail-item"><div class="detail-label">Stop Loss</div><div class="detail-val" style="color:#ff6666">${escHtml(s.stopLoss != null ? String(s.stopLoss) : '—')}</div></div>
+                            <div class="signal-detail-item"><div class="detail-label">Timeframe</div><div class="detail-val">${escHtml(s.timeframe || '—')}</div></div>
+                            <div class="signal-detail-item"><div class="detail-label">Confidence</div><div class="detail-val">${escHtml(s.confidence != null ? String(s.confidence) + '%' : '—')}</div></div>
                             <div class="signal-detail-item"><div class="detail-label">Generated At</div><div class="detail-val">${fmtDate(s.generatedAt)}</div></div>
                         </div>
-                    </div>`,
+                    </div>`
             )
-            .join("");
+            .join('');
         } catch (e) {
           el.innerHTML = `<div class="error-msg">Signals error: ${escHtml(e.message)}</div>`;
         }
@@ -1093,20 +934,20 @@
 
       // ═══ BACKTEST ═══
       async function runBacktest() {
-        const btn = document.getElementById("btn-backtest");
-        const resultEl = document.getElementById("backtest-result");
+        const btn = document.getElementById('btn-backtest');
+        const resultEl = document.getElementById('backtest-result');
         btn.disabled = true;
         resultEl.innerHTML = '<div class="loading">Running backtest...</div>';
         const payload = {
-          strategy: document.getElementById("bt-strategy").value,
-          asset: document.getElementById("bt-asset").value,
-          period: document.getElementById("bt-period").value,
-          riskProfile: document.getElementById("bt-risk").value,
+          strategy: document.getElementById('bt-strategy').value,
+          asset: document.getElementById('bt-asset').value,
+          period: document.getElementById('bt-period').value,
+          riskProfile: document.getElementById('bt-risk').value,
         };
         try {
-          const res = await fetch("/api/trading/backtest", {
-            method: "POST",
-            headers: { ...getHeaders(), "Content-Type": "application/json" },
+          const res = await fetch('/api/trading/backtest', {
+            method: 'POST',
+            headers: { ...getHeaders(), 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
           });
           if (res.status === 401) {
@@ -1117,26 +958,19 @@
           const data = await res.json();
           snapshot.backtest = data;
           const rows = [
-            ["Total Trades", data.trades ?? data.totalTrades ?? "—"],
-            ["Win Rate", data.winRate != null ? data.winRate + "%" : "—"],
+            ['Total Trades', data.trades ?? data.totalTrades ?? '—'],
+            ['Win Rate', data.winRate != null ? data.winRate + '%' : '—'],
             [
-              "Net Profit",
-              data.totalReturn != null
-                ? "€" + data.totalReturn
-                : data.netProfit != null
-                  ? data.netProfit + "%"
-                  : "—",
+              'Net Profit',
+              data.totalReturn != null ? '€' + data.totalReturn : data.netProfit != null ? data.netProfit + '%' : '—',
             ],
-            [
-              "Max Drawdown",
-              data.maxDrawdown != null ? data.maxDrawdown + "%" : "—",
-            ],
-            ["Sharpe Ratio", data.sharpeRatio ?? "—"],
-            ["Profit Factor", data.profitFactor ?? "—"],
+            ['Max Drawdown', data.maxDrawdown != null ? data.maxDrawdown + '%' : '—'],
+            ['Sharpe Ratio', data.sharpeRatio ?? '—'],
+            ['Profit Factor', data.profitFactor ?? '—'],
           ];
           resultEl.innerHTML = `<table>
-                    <tr>${rows.map((r) => `<th>${escHtml(String(r[0]))}</th>`).join("")}</tr>
-                    <tr>${rows.map((r) => `<td>${escHtml(String(r[1]))}</td>`).join("")}</tr>
+                    <tr>${rows.map((r) => `<th>${escHtml(String(r[0]))}</th>`).join('')}</tr>
+                    <tr>${rows.map((r) => `<td>${escHtml(String(r[1]))}</td>`).join('')}</tr>
                 </table>`;
         } catch (e) {
           resultEl.innerHTML = `<div class="error-msg">Backtest error: ${escHtml(e.message)}</div>`;
@@ -1146,9 +980,9 @@
 
       // ═══ RISK ═══
       async function loadRisk() {
-        const el = document.getElementById("risk-grid");
+        const el = document.getElementById('risk-grid');
         try {
-          const res = await fetch("/api/trading/risk", {
+          const res = await fetch('/api/trading/risk', {
             headers: getHeaders(),
           });
           if (res.status === 401) {
@@ -1159,45 +993,44 @@
           snapshot.risk = data;
           const metrics = [
             {
-              label: "Sharpe Ratio",
-              value: data.sharpeRatio ?? "—",
+              label: 'Sharpe Ratio',
+              value: data.sharpeRatio ?? '—',
               warn: parseFloat(data.sharpeRatio) < 1,
             },
             {
-              label: "Max Drawdown",
-              value: data.maxDrawdown != null ? data.maxDrawdown + "%" : "—",
+              label: 'Max Drawdown',
+              value: data.maxDrawdown != null ? data.maxDrawdown + '%' : '—',
               warn: parseFloat(data.maxDrawdown) > 15,
               danger: parseFloat(data.maxDrawdown) > 25,
             },
             {
-              label: "VaR (95%)",
-              value: data.var95 != null ? data.var95 + "%" : "—",
+              label: 'VaR (95%)',
+              value: data.var95 != null ? data.var95 + '%' : '—',
               warn: parseFloat(data.var95) > 5,
             },
             {
-              label: "VaR (99%)",
-              value: data.var99 != null ? data.var99 + "%" : "—",
+              label: 'VaR (99%)',
+              value: data.var99 != null ? data.var99 + '%' : '—',
               warn: parseFloat(data.var99) > 8,
             },
-            { label: "Sortino Ratio", value: data.sortinoRatio ?? "—" },
-            { label: "Calmar Ratio", value: data.calmarRatio ?? "—" },
+            { label: 'Sortino Ratio', value: data.sortinoRatio ?? '—' },
+            { label: 'Calmar Ratio', value: data.calmarRatio ?? '—' },
             {
-              label: "Total Exposure",
-              value:
-                data.totalExposure != null ? data.totalExposure + "%" : "—",
+              label: 'Total Exposure',
+              value: data.totalExposure != null ? data.totalExposure + '%' : '—',
               warn: parseFloat(data.totalExposure) > 50,
             },
-            { label: "Risk Level", value: data.riskLevel || "—" },
+            { label: 'Risk Level', value: data.riskLevel || '—' },
           ];
           el.innerHTML = metrics
             .map((m) => {
-              const cls = m.danger ? "danger" : m.warn ? "warn" : "";
+              const cls = m.danger ? 'danger' : m.warn ? 'warn' : '';
               return `<div class="risk-item">
                         <div class="risk-label">${escHtml(m.label)}</div>
                         <div class="risk-value ${cls}">${escHtml(String(m.value))}</div>
                     </div>`;
             })
-            .join("");
+            .join('');
         } catch (e) {
           el.innerHTML = `<div class="error-msg">Risk error: ${escHtml(e.message)}</div>`;
         }
@@ -1206,10 +1039,10 @@
       // ═══ EXPORT ═══
       function exportJson() {
         const blob = new Blob([JSON.stringify(snapshot, null, 2)], {
-          type: "application/json",
+          type: 'application/json',
         });
         const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
+        const a = document.createElement('a');
         a.href = url;
         a.download = `trading-snapshot-${new Date().toISOString().slice(0, 10)}.json`;
         a.click();
@@ -1218,36 +1051,31 @@
 
       // ═══ INIT ═══
       async function loadAll() {
-        setStatus("Loading data...");
-        await Promise.all([
-          loadStatus(),
-          loadAnalysis(),
-          loadSignals(),
-          loadRisk(),
-        ]);
-        setStatus(`Updated at ${new Date().toLocaleTimeString("en-US")}`);
+        setStatus('Loading data...');
+        await Promise.all([loadStatus(), loadAnalysis(), loadSignals(), loadRisk()]);
+        setStatus(`Updated at ${new Date().toLocaleTimeString('en-US')}`);
       }
 
       loadAll();
 
       // ═══ ASSET DETAIL MODAL ═══
       const TV_SYMBOLS = {
-        BTC: "BINANCE:BTCUSDT",
-        ETH: "BINANCE:ETHUSDT",
-        SOL: "BINANCE:SOLUSDT",
-        "EUR/USD": "FX:EURUSD",
-        "GBP/USD": "FX:GBPUSD",
-        "S&P 500": "SP:SPX",
-        NASDAQ: "NASDAQ:IXIC",
-        Gold: "TVC:GOLD",
-        Oil: "TVC:USOIL",
+        BTC: 'BINANCE:BTCUSDT',
+        ETH: 'BINANCE:ETHUSDT',
+        SOL: 'BINANCE:SOLUSDT',
+        'EUR/USD': 'FX:EURUSD',
+        'GBP/USD': 'FX:GBPUSD',
+        'S&P 500': 'SP:SPX',
+        NASDAQ: 'NASDAQ:IXIC',
+        Gold: 'TVC:GOLD',
+        Oil: 'TVC:USOIL',
       };
 
       function openAssetDetail(symbol) {
-        document.getElementById("modal-title").textContent = "📊 " + symbol;
-        const chartEl = document.getElementById("chart-container");
-        const detailsEl = document.getElementById("modal-details");
-        const tvSymbol = TV_SYMBOLS[symbol] || "BINANCE:BTCUSDT";
+        document.getElementById('modal-title').textContent = '📊 ' + symbol;
+        const chartEl = document.getElementById('chart-container');
+        const detailsEl = document.getElementById('modal-details');
+        const tvSymbol = TV_SYMBOLS[symbol] || 'BINANCE:BTCUSDT';
 
         // TradingView widget — direct embed URL (no CSP issues)
         const tvUrl = `https://s.tradingview.com/widgetembed/?frameElementId=tv_chart&symbol=${encodeURIComponent(tvSymbol)}&interval=60&hidesidetoolbar=0&symboledit=1&saveimage=0&toolbarbg=0a0a1a&studies=[]&theme=dark&style=1&timezone=Etc%2FUTC&studies_overrides={}&overrides={}&enabled_features=[]&disabled_features=[]&locale=en&utm_source=kelionai.app&utm_medium=widget_new&utm_campaign=chart`;
@@ -1260,63 +1088,57 @@
         const sig = signals.find((x) => (x.symbol || x.asset) === symbol) || {};
 
         detailsEl.innerHTML = [
-          { label: "Price", value: a.price || sig.entry || "—" },
-          { label: "Signal", value: a.signal || sig.signal || "—" },
+          { label: 'Price', value: a.price || sig.entry || '—' },
+          { label: 'Signal', value: a.signal || sig.signal || '—' },
           {
-            label: "Confidence",
-            value: (a.confidence || sig.confidence || "—") + "%",
+            label: 'Confidence',
+            value: (a.confidence || sig.confidence || '—') + '%',
           },
-          { label: "RSI", value: a.rsi?.value ?? sig.rsi ?? "—" },
-          { label: "MACD Signal", value: a.macd?.crossSignal || "—" },
-          { label: "Bollinger", value: a.bollinger?.signal || "—" },
-          { label: "EMA Cross", value: a.ema?.signal || "—" },
-          { label: "Volume Phase", value: a.volume?.phase || "—" },
-          { label: "Sentiment", value: a.sentiment?.label || "—" },
-          { label: "Entry", value: sig.entry || "—" },
-          { label: "Target", value: sig.target || "—" },
-          { label: "Stop Loss", value: sig.stopLoss || "—" },
-          { label: "Data Source", value: a.dataSource || "—" },
+          { label: 'RSI', value: a.rsi?.value ?? sig.rsi ?? '—' },
+          { label: 'MACD Signal', value: a.macd?.crossSignal || '—' },
+          { label: 'Bollinger', value: a.bollinger?.signal || '—' },
+          { label: 'EMA Cross', value: a.ema?.signal || '—' },
+          { label: 'Volume Phase', value: a.volume?.phase || '—' },
+          { label: 'Sentiment', value: a.sentiment?.label || '—' },
+          { label: 'Entry', value: sig.entry || '—' },
+          { label: 'Target', value: sig.target || '—' },
+          { label: 'Stop Loss', value: sig.stopLoss || '—' },
+          { label: 'Data Source', value: a.dataSource || '—' },
           {
-            label: "Change %",
-            value: a.changePercent != null ? a.changePercent + "%" : "—",
+            label: 'Change %',
+            value: a.changePercent != null ? a.changePercent + '%' : '—',
           },
         ]
           .map(
             (d) => `<div class="detail-item">
                 <div class="detail-label2">${escHtml(d.label)}</div>
                 <div class="detail-val2">${escHtml(String(d.value))}</div>
-            </div>`,
+            </div>`
           )
-          .join("");
+          .join('');
 
-        document.getElementById("asset-modal").classList.add("open");
+        document.getElementById('asset-modal').classList.add('open');
       }
 
       function closeModal() {
-        document.getElementById("asset-modal").classList.remove("open");
-        document.getElementById("chart-container").innerHTML = "";
+        document.getElementById('asset-modal').classList.remove('open');
+        document.getElementById('chart-container').innerHTML = '';
       }
 
-      document.addEventListener("keydown", (e) => {
-        if (e.key === "Escape") closeModal();
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') closeModal();
       });
 
       // ═══ GEOPOLITICAL ═══
       async function loadGeo() {
         try {
-          const r = await fetch("/api/trading/geopolitical");
+          const r = await fetch('/api/trading/geopolitical');
           const d = await r.json();
 
           // Risk header
           const riskColor =
-            d.riskScore >= 70
-              ? "#ff4444"
-              : d.riskScore >= 50
-                ? "#ff8800"
-                : d.riskScore >= 30
-                  ? "#ffcc00"
-                  : "#00ff88";
-          document.getElementById("geo-risk-header").innerHTML = `
+            d.riskScore >= 70 ? '#ff4444' : d.riskScore >= 50 ? '#ff8800' : d.riskScore >= 30 ? '#ffcc00' : '#00ff88';
+          document.getElementById('geo-risk-header').innerHTML = `
                     <div class="risk-item" style="border-color:${riskColor}">
                         <div class="risk-label">GEO RISK SCORE</div>
                         <div class="risk-value" style="color:${riskColor}">${d.riskScore}/100</div>
@@ -1327,55 +1149,49 @@
                     </div>
                     <div class="risk-item" style="flex:2">
                         <div class="risk-label">RECOMMENDATION</div>
-                        <div class="risk-value" style="font-size:0.8rem;color:#e0e0e0">${d.recommendation || "—"}</div>
+                        <div class="risk-value" style="font-size:0.8rem;color:#e0e0e0">${d.recommendation || '—'}</div>
                     </div>
                     ${
                       d.fearGreed
                         ? `<div class="risk-item">
                         <div class="risk-label">FEAR & GREED</div>
-                        <div class="risk-value" style="color:${d.fearGreed.value <= 25 ? "#ff4444" : d.fearGreed.value >= 75 ? "#00ff88" : "#ffcc00"}">${d.fearGreed.value} (${d.fearGreed.label})</div>
+                        <div class="risk-value" style="color:${d.fearGreed.value <= 25 ? '#ff4444' : d.fearGreed.value >= 75 ? '#00ff88' : '#ffcc00'}">${d.fearGreed.value} (${d.fearGreed.label})</div>
                     </div>`
-                        : ""
+                        : ''
                     }`;
 
           // Sources
           if (d.monitoredSources) {
-            document.getElementById("geo-sources").innerHTML =
-              d.monitoredSources
-                .map((s) => {
-                  const statusColor =
-                    s.status === "ACTIVE"
-                      ? "#00ff88"
-                      : s.status === "NO_KEY"
-                        ? "#ff8800"
-                        : "#ff4444";
-                  return `<div class="risk-item">
+            document.getElementById('geo-sources').innerHTML = d.monitoredSources
+              .map((s) => {
+                const statusColor = s.status === 'ACTIVE' ? '#00ff88' : s.status === 'NO_KEY' ? '#ff8800' : '#ff4444';
+                return `<div class="risk-item">
                             <div class="risk-label">${escHtml(s.name)}</div>
                             <div class="risk-value" style="font-size:0.75rem;color:#aaa">${escHtml(s.type)}</div>
-                            <div style="color:${statusColor};font-size:0.7rem;margin-top:4px">● ${s.status}${s.events ? " (" + s.events + " events)" : ""}${s.value != null ? " — " + s.value : ""}</div>
+                            <div style="color:${statusColor};font-size:0.7rem;margin-top:4px">● ${s.status}${s.events ? ' (' + s.events + ' events)' : ''}${s.value != null ? ' — ' + s.value : ''}</div>
                         </div>`;
-                })
-                .join("");
+              })
+              .join('');
           }
 
           // Events
           if (d.gdeltEvents && d.gdeltEvents.length > 0) {
-            document.getElementById("geo-events").innerHTML = d.gdeltEvents
+            document.getElementById('geo-events').innerHTML = d.gdeltEvents
               .map(
                 (e) => `
                         <div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.05);font-size:0.78rem;">
-                            <span style="color:${e.category === "MILITARY" ? "#ff4444" : e.category === "SANCTIONS" ? "#ff8800" : "#aaa"};font-weight:bold">[${e.category}]</span>
+                            <span style="color:${e.category === 'MILITARY' ? '#ff4444' : e.category === 'SANCTIONS' ? '#ff8800' : '#aaa'};font-weight:bold">[${e.category}]</span>
                             <span style="color:#e0e0e0">${escHtml(e.title?.substring(0, 100))}</span>
                             <span style="color:#666;font-size:0.65rem;margin-left:6px">${escHtml(e.source)}</span>
-                        </div>`,
+                        </div>`
               )
-              .join("");
+              .join('');
           } else {
-            document.getElementById("geo-events").innerHTML =
+            document.getElementById('geo-events').innerHTML =
               '<div style="color:#666">No high-impact events in last 24h</div>';
           }
         } catch (e) {
-          document.getElementById("geo-risk-header").innerHTML =
+          document.getElementById('geo-risk-header').innerHTML =
             '<div style="color:#ff4444">Geopolitical data unavailable</div>';
         }
       }
@@ -1387,55 +1203,51 @@
       let _ptActive = false;
       async function updatePaperUI() {
         try {
-          const r = await fetch("/api/trading/paper/status", {
+          const r = await fetch('/api/trading/paper/status', {
             headers: getHeaders(),
           });
           const d = await r.json();
           if (!d || d.error) return;
           _ptActive = d.active;
-          document.getElementById("pt-balance").textContent =
-            "€" + (d.portfolioValue || 100).toFixed(2);
+          document.getElementById('pt-balance').textContent = '€' + (d.portfolioValue || 100).toFixed(2);
           const pnl = d.totalPnL || 0;
-          const pnlEl = document.getElementById("pt-pnl");
-          pnlEl.textContent = (pnl >= 0 ? "+" : "") + "€" + pnl.toFixed(2);
-          pnlEl.style.color = pnl >= 0 ? "#00dd66" : "#ff4444";
+          const pnlEl = document.getElementById('pt-pnl');
+          pnlEl.textContent = (pnl >= 0 ? '+' : '') + '€' + pnl.toFixed(2);
+          pnlEl.style.color = pnl >= 0 ? '#00dd66' : '#ff4444';
           const ret = d.returnPct || 0;
-          const retEl = document.getElementById("pt-return");
-          retEl.textContent = (ret >= 0 ? "+" : "") + ret.toFixed(1) + "%";
-          retEl.style.color = ret >= 0 ? "#00dd66" : "#ff4444";
-          document.getElementById("pt-trades").textContent = d.totalTrades || 0;
-          document.getElementById("pt-winrate").textContent =
-            (d.winRate || 0) + "%";
-          document.getElementById("pt-mode").textContent = d.mode || "PAPER";
-          document.getElementById("pt-positions").textContent =
-            (d.openPositions || 0) + " positions open";
-          document.getElementById("pt-lastcheck").textContent =
-            d.lastSignalCheck
-              ? new Date(d.lastSignalCheck).toLocaleTimeString()
-              : "—";
-          const btn = document.getElementById("pt-toggle");
-          const mode = d.mode || "PAPER";
-          const isReal = mode === "REAL";
+          const retEl = document.getElementById('pt-return');
+          retEl.textContent = (ret >= 0 ? '+' : '') + ret.toFixed(1) + '%';
+          retEl.style.color = ret >= 0 ? '#00dd66' : '#ff4444';
+          document.getElementById('pt-trades').textContent = d.totalTrades || 0;
+          document.getElementById('pt-winrate').textContent = (d.winRate || 0) + '%';
+          document.getElementById('pt-mode').textContent = d.mode || 'PAPER';
+          document.getElementById('pt-positions').textContent = (d.openPositions || 0) + ' positions open';
+          document.getElementById('pt-lastcheck').textContent = d.lastSignalCheck
+            ? new Date(d.lastSignalCheck).toLocaleTimeString()
+            : '—';
+          const btn = document.getElementById('pt-toggle');
+          const mode = d.mode || 'PAPER';
+          const isReal = mode === 'REAL';
           if (d.active) {
-            btn.innerHTML = "⏹ STOP " + (isReal ? "REAL" : "TRAINING");
-            btn.style.background = "#ff4444";
-            btn.style.color = "#fff";
+            btn.innerHTML = '⏹ STOP ' + (isReal ? 'REAL' : 'TRAINING');
+            btn.style.background = '#ff4444';
+            btn.style.color = '#fff';
           } else {
-            btn.innerHTML = "▶ START " + (isReal ? "REAL" : "TRAINING");
-            btn.style.background = isReal ? "#ff8800" : "#00ffff";
-            btn.style.color = isReal ? "#fff" : "#000";
+            btn.innerHTML = '▶ START ' + (isReal ? 'REAL' : 'TRAINING');
+            btn.style.background = isReal ? '#ff8800' : '#00ffff';
+            btn.style.color = isReal ? '#fff' : '#000';
           }
-          const sw = document.getElementById("pt-switch");
+          const sw = document.getElementById('pt-switch');
           if (isReal) {
-            sw.textContent = "→ TRAINING MODE";
-            sw.style.background = "rgba(0,255,255,0.15)";
-            sw.style.color = "#00ffff";
-            sw.style.border = "1px solid rgba(0,255,255,0.3)";
+            sw.textContent = '→ TRAINING MODE';
+            sw.style.background = 'rgba(0,255,255,0.15)';
+            sw.style.color = '#00ffff';
+            sw.style.border = '1px solid rgba(0,255,255,0.3)';
           } else {
-            sw.textContent = "→ REAL MODE";
-            sw.style.background = "rgba(255,136,0,0.15)";
-            sw.style.color = "#ff8800";
-            sw.style.border = "1px solid rgba(255,136,0,0.3)";
+            sw.textContent = '→ REAL MODE';
+            sw.style.background = 'rgba(255,136,0,0.15)';
+            sw.style.color = '#ff8800';
+            sw.style.border = '1px solid rgba(255,136,0,0.3)';
           }
         } catch (e) {
           /* API not available yet */
@@ -1443,104 +1255,88 @@
       }
 
       async function toggleBot() {
-        const endpoint = _ptActive
-          ? "/api/trading/paper/off"
-          : "/api/trading/paper/on";
+        const endpoint = _ptActive ? '/api/trading/paper/off' : '/api/trading/paper/on';
         try {
           const r = await fetch(endpoint, {
-            method: "POST",
+            method: 'POST',
             headers: getHeaders(),
           });
           const d = await r.json();
           if (d.error) {
-            alert("Error: " + d.error);
+            alert('Error: ' + d.error);
             return;
           }
           updatePaperUI();
         } catch (e) {
-          alert("Error: " + e.message);
+          alert('Error: ' + e.message);
         }
       }
 
       async function resetBot() {
-        if (
-          !confirm(
-            "Reset all paper trading data? This clears all trades and positions.",
-          )
-        )
-          return;
+        if (!confirm('Reset all paper trading data? This clears all trades and positions.')) return;
         try {
-          await fetch("/api/trading/paper/reset", {
-            method: "POST",
+          await fetch('/api/trading/paper/reset', {
+            method: 'POST',
             headers: getHeaders(),
           });
           updatePaperUI();
         } catch (e) {
-          alert("Error: " + e.message);
+          alert('Error: ' + e.message);
         }
       }
 
       async function switchBotMode() {
-        const newMode =
-          document.getElementById("pt-mode").textContent === "PAPER"
-            ? "REAL"
-            : "PAPER";
-        if (
-          newMode === "REAL" &&
-          !confirm("Switch to REAL mode? This will clear all paper trades.")
-        )
-          return;
+        const newMode = document.getElementById('pt-mode').textContent === 'PAPER' ? 'REAL' : 'PAPER';
+        if (newMode === 'REAL' && !confirm('Switch to REAL mode? This will clear all paper trades.')) return;
         try {
-          await fetch("/api/trading/paper/switch?mode=" + newMode, {
-            method: "POST",
+          await fetch('/api/trading/paper/switch?mode=' + newMode, {
+            method: 'POST',
             headers: getHeaders(),
           });
           updatePaperUI();
         } catch (e) {
-          alert("Error: " + e.message);
+          alert('Error: ' + e.message);
         }
       }
 
       async function openTradeHistory() {
-        document.getElementById("trade-history-modal").classList.add("open");
+        document.getElementById('trade-history-modal').classList.add('open');
         try {
-          const r = await fetch("/api/trading/paper/history", {
+          const r = await fetch('/api/trading/paper/history', {
             headers: getHeaders(),
           });
           const d = await r.json();
           const summary = d.summary || {};
-          document.getElementById("trade-summary").innerHTML = `
+          document.getElementById('trade-summary').innerHTML = `
                     <div class="stat-item"><div class="stat-label">Total Trades</div><div class="stat-value">${summary.totalTrades || 0}</div></div>
                     <div class="stat-item"><div class="stat-label">Câștigat</div><div class="stat-value" style="color:#00dd66">€${(summary.totalWon || 0).toFixed(2)}</div></div>
                     <div class="stat-item"><div class="stat-label">Pierdut</div><div class="stat-value" style="color:#ff4444">€${(summary.totalLost || 0).toFixed(2)}</div></div>
-                    <div class="stat-item"><div class="stat-label">NET Total</div><div class="stat-value" style="color:${(summary.netPnL || 0) >= 0 ? "#00dd66" : "#ff4444"}">€${(summary.netPnL || 0).toFixed(2)}</div></div>
+                    <div class="stat-item"><div class="stat-label">NET Total</div><div class="stat-value" style="color:${(summary.netPnL || 0) >= 0 ? '#00dd66' : '#ff4444'}">€${(summary.netPnL || 0).toFixed(2)}</div></div>
                 `;
           const trades = d.trades || [];
           let runningTotal = 0;
-          document.getElementById("trade-tbody").innerHTML =
+          document.getElementById('trade-tbody').innerHTML =
             trades.length === 0
               ? '<tr><td colspan="8" style="text-align:center;padding:20px;color:#666;">No trades yet. Start the bot to begin trading.</td></tr>'
               : trades
                   .map((t) => {
                     if (t.pnl != null) runningTotal += t.pnl;
-                    const lost =
-                      t.pnl != null && t.pnl < 0 ? t.pnl.toFixed(2) : "—";
-                    const won =
-                      t.pnl != null && t.pnl > 0 ? "+" + t.pnl.toFixed(2) : "—";
+                    const lost = t.pnl != null && t.pnl < 0 ? t.pnl.toFixed(2) : '—';
+                    const won = t.pnl != null && t.pnl > 0 ? '+' + t.pnl.toFixed(2) : '—';
                     return `<tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
                             <td style="padding:6px 8px;color:#888;font-size:0.75rem;">${new Date(t.date).toLocaleString()}</td>
                             <td style="padding:6px 8px;color:#fff;font-weight:bold;">${escHtml(t.asset)}</td>
-                            <td style="padding:6px 8px;color:${t.action === "BUY" ? "#00dd66" : "#ff4444"};font-weight:bold;">${t.action}</td>
-                            <td style="padding:6px 8px;text-align:right;color:#aaa;">€${t.price?.toFixed(2) || "—"}</td>
-                            <td style="padding:6px 8px;text-align:right;color:#e0e0e0;">€${t.value?.toFixed(2) || "—"}</td>
+                            <td style="padding:6px 8px;color:${t.action === 'BUY' ? '#00dd66' : '#ff4444'};font-weight:bold;">${t.action}</td>
+                            <td style="padding:6px 8px;text-align:right;color:#aaa;">€${t.price?.toFixed(2) || '—'}</td>
+                            <td style="padding:6px 8px;text-align:right;color:#e0e0e0;">€${t.value?.toFixed(2) || '—'}</td>
                             <td style="padding:6px 8px;text-align:right;color:#ff4444;">${lost}</td>
                             <td style="padding:6px 8px;text-align:right;color:#00dd66;">${won}</td>
-                            <td style="padding:6px 8px;text-align:right;color:${runningTotal >= 0 ? "#00dd66" : "#ff4444"};font-weight:bold;">€${runningTotal.toFixed(2)}</td>
+                            <td style="padding:6px 8px;text-align:right;color:${runningTotal >= 0 ? '#00dd66' : '#ff4444'};font-weight:bold;">€${runningTotal.toFixed(2)}</td>
                         </tr>`;
                   })
-                  .join("");
+                  .join('');
         } catch (e) {
-          document.getElementById("trade-tbody").innerHTML =
+          document.getElementById('trade-tbody').innerHTML =
             '<tr><td colspan="8" style="text-align:center;padding:20px;color:#ff4444;">API not available — deploy pending</td></tr>';
         }
       }

@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="en">
   <head>
+  <meta name="description" content="Page description">
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Welcome — KelionAI</title>
@@ -35,7 +36,7 @@
         --radius-lg: 24px;
         --glow: 0 0 40px rgba(99, 102, 241, 0.2);
         --gradient: linear-gradient(135deg, #6366f1, #06b6d4);
-        --font: "Inter", -apple-system, sans-serif;
+        --font: 'Inter', -apple-system, sans-serif;
       }
 
       body {
@@ -47,16 +48,8 @@
 
       .neural-bg {
         background-image:
-          radial-gradient(
-            circle at 20% 20%,
-            rgba(99, 102, 241, 0.04) 0%,
-            transparent 50%
-          ),
-          radial-gradient(
-            circle at 80% 80%,
-            rgba(6, 182, 212, 0.03) 0%,
-            transparent 50%
-          );
+          radial-gradient(circle at 20% 20%, rgba(99, 102, 241, 0.04) 0%, transparent 50%),
+          radial-gradient(circle at 80% 80%, rgba(6, 182, 212, 0.03) 0%, transparent 50%);
       }
 
       .onboarding-container {
@@ -305,16 +298,8 @@
             <span data-i18n="onboarding.title">Welcome to</span>
             <span class="gradient-text">KelionAI</span>
           </h1>
-          <p data-i18n="onboarding.subtitle">
-            Your personal AI assistant — smart, fast, multilingual.
-          </p>
-          <button
-            class="btn-primary"
-            id="btn-start"
-            data-i18n="onboarding.start"
-          >
-            Get Started →
-          </button>
+          <p data-i18n="onboarding.subtitle">Your personal AI assistant — smart, fast, multilingual.</p>
+          <button type="button" class="btn-primary" id="btn-start" data-i18n="onboarding.start">Get Started →</button>
         </div>
 
         <!-- Step 2 — Choose plan -->
@@ -324,60 +309,30 @@
             <div class="plan-card" data-plan="free">
               <span class="plan-icon">🆓</span>
               <div class="plan-info">
-                <div class="plan-name" data-i18n="onboarding.plan.free.name">
-                  Free
-                </div>
-                <div class="plan-desc" data-i18n="onboarding.plan.free.desc">
-                  20 messages/day · Basic features
-                </div>
+                <div class="plan-name" data-i18n="onboarding.plan.free.name">Free</div>
+                <div class="plan-desc" data-i18n="onboarding.plan.free.desc">20 messages/day · Basic features</div>
               </div>
-              <span class="plan-price" data-i18n="onboarding.plan.free.price"
-                >Free</span
-              >
+              <span class="plan-price" data-i18n="onboarding.plan.free.price">Free</span>
             </div>
             <div class="plan-card featured" data-plan="pro">
               <span class="plan-icon">⚡</span>
               <div class="plan-info">
-                <div class="plan-name" data-i18n="onboarding.plan.pro.name">
-                  Pro
-                </div>
-                <div class="plan-desc" data-i18n="onboarding.plan.pro.desc">
-                  200 messages/day · All features
-                </div>
+                <div class="plan-name" data-i18n="onboarding.plan.pro.name">Pro</div>
+                <div class="plan-desc" data-i18n="onboarding.plan.pro.desc">200 messages/day · All features</div>
               </div>
-              <span class="plan-price" data-i18n="onboarding.plan.pro.price"
-                >€9/month</span
-              >
+              <span class="plan-price" data-i18n="onboarding.plan.pro.price">€9/month</span>
             </div>
             <div class="plan-card" data-plan="premium">
               <span class="plan-icon">👑</span>
               <div class="plan-info">
-                <div class="plan-name" data-i18n="onboarding.plan.premium.name">
-                  Premium
-                </div>
-                <div class="plan-desc" data-i18n="onboarding.plan.premium.desc">
-                  Unlimited · Maximum priority
-                </div>
+                <div class="plan-name" data-i18n="onboarding.plan.premium.name">Premium</div>
+                <div class="plan-desc" data-i18n="onboarding.plan.premium.desc">Unlimited · Maximum priority</div>
               </div>
-              <span class="plan-price" data-i18n="onboarding.plan.premium.price"
-                >€19/month</span
-              >
+              <span class="plan-price" data-i18n="onboarding.plan.premium.price">€19/month</span>
             </div>
           </div>
-          <button
-            class="btn-primary"
-            id="btn-finish"
-            data-i18n="onboarding.finish"
-          >
-            Finish →
-          </button>
-          <button
-            class="btn-secondary"
-            id="btn-plan-back"
-            data-i18n="onboarding.back"
-          >
-            ← Back
-          </button>
+          <button type="button" class="btn-primary" id="btn-finish" data-i18n="onboarding.finish">Finish →</button>
+          <button type="button" class="btn-secondary" id="btn-plan-back" data-i18n="onboarding.back">← Back</button>
         </div>
       </div>
     </div>

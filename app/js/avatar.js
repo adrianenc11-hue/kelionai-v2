@@ -3,12 +3,12 @@
 // Three.js loaded via global bundle (THREE.*)
 // ═══════════════════════════════════════════════════════════════
 (function () {
-  "use strict";
+  'use strict';
 
   const CACHE_BUST = Date.now();
   const MODELS = {
-    kelion: "/models/k-male.glb?v=" + CACHE_BUST,
-    kira: "/models/k-female.glb?v=" + CACHE_BUST,
+    kelion: '/models/k-male.glb?v=' + CACHE_BUST,
+    kira: '/models/k-female.glb?v=' + CACHE_BUST,
   };
 
   let scene, camera, renderer, clock;
@@ -17,17 +17,22 @@
   let mixer = null;
   let lipSync = null;
   let textLipSync = null;
-  let currentAvatar = "kelion";
+  let currentAvatar = 'kelion';
   let loadPromise = null;
   let initRetryCount = 0;
   const MAX_INIT_RETRIES = 50; // up to 5s total
 
   // Per-avatar background textures (IIFE scope — accessible from init + loadAvatar)
   const _bgTextures = {
-    kelion: "/models/avatar-bg.png",
-    kira: "/models/avatar-bg-kira.png",
+    kelion: '/models/avatar-bg.png',
+    kira: '/models/avatar-bg-kira.png',
   };
   let _bgLoader = null;
+  /**
+   * _loadAvatarBg
+   * @param {*} _name
+   * @returns {*}
+   */
   function _loadAvatarBg(_name) {
     if (!scene) return;
     if (!_bgLoader) _bgLoader = new THREE.TextureLoader();
@@ -37,13 +42,12 @@
       function (tex) {
         tex.colorSpace = THREE.SRGBColorSpace;
         scene.background = tex;
-        console.log("[Avatar] Background loaded:", path);
       },
       null,
       function () {
         // Fallback to solid color if texture fails
         scene.background = new THREE.Color(0x060614);
-      },
+      }
     );
   }
 
@@ -56,10 +60,14 @@
   // Expression
   let targetExpression = {};
   const currentExpression = {};
-  let currentExpressionName = "neutral";
+  let currentExpressionName = 'neutral';
 
   // Mouth morph cache — populated at loadAvatar, used in animate for force-close
   let _mouthMorphCache = [];
+  /**
+   * _cacheMouthMorphs
+   * @returns {*}
+   */
   function _cacheMouthMorphs() {
     _mouthMorphCache = [];
     morphMeshes.forEach(function (m) {
@@ -67,21 +75,17 @@
       Object.keys(m.morphTargetDictionary).forEach(function (k) {
         const kl = k.toLowerCase();
         if (
-          kl.indexOf("mouth") >= 0 ||
-          kl.indexOf("jaw") >= 0 ||
-          kl.indexOf("viseme") >= 0 ||
-          kl.indexOf("lip") >= 0 ||
-          kl === "smile"
+          kl.indexOf('mouth') >= 0 ||
+          kl.indexOf('jaw') >= 0 ||
+          kl.indexOf('viseme') >= 0 ||
+          kl.indexOf('lip') >= 0 ||
+          kl === 'smile'
         ) {
           _mouthMorphCache.push({ mesh: m, idx: m.morphTargetDictionary[k] });
         }
       });
     });
-    console.log(
-      "[Avatar] Mouth morph cache:",
-      _mouthMorphCache.length,
-      "targets",
-    );
+    console.log('[Avatar] Mouth morph cache:', _mouthMorphCache.length, 'targets');
   }
 
   // Attention state — stops idle when listening
@@ -99,7 +103,7 @@
   let _spineBone = null;
   let _neckBone = null;
   const _fingerBones = { left: {}, right: {} };
-  document.addEventListener("mousemove", function (e) {
+  document.addEventListener('mousemove', function (e) {
     if (_faceTrackingActive) return; // Camera overrides mouse
     _mouseX = (e.clientX / window.innerWidth) * 2 - 1;
     _mouseY = -((e.clientY / window.innerHeight) * 2 - 1);
@@ -110,19 +114,19 @@
   let _faceTrackingTimeout = null;
 
   // Listen for vision-detection events (from RealtimeVision COCO-SSD)
-  window.addEventListener("vision-detection", function (e) {
+  window.addEventListener('vision-detection', function (e) {
     if (!e.detail || !e.detail.predictions) return;
     const preds = e.detail.predictions;
     let person = null;
     for (let i = 0; i < preds.length; i++) {
-      if (preds[i].class === "person" && preds[i].score > 0.4) {
+      if (preds[i].class === 'person' && preds[i].score > 0.4) {
         person = preds[i];
         break;
       }
     }
     if (person) {
       _faceTrackingActive = true;
-      const video = document.querySelector("video");
+      const video = document.querySelector('video');
       const vw = video ? video.videoWidth || 640 : 640;
       const vh = video ? video.videoHeight || 480 : 480;
       const faceCenterX = person.bbox[0] + person.bbox[2] / 2;
@@ -138,7 +142,7 @@
   });
 
   // Listen for face-position events (from KAutoCamera lightweight face detection)
-  window.addEventListener("face-position", function (e) {
+  window.addEventListener('face-position', function (e) {
     if (!e.detail) return;
     _faceTrackingActive = true;
     // e.detail.x, e.detail.y are normalized -1..1 (already mirrored)
@@ -154,26 +158,26 @@
   let _microTimer = 0;
   let _nextMicro = 3 + Math.random() * 5; // 3-8s between twitches
   let _microActive = false;
-  let _microMorph = "";
+  let _microMorph = '';
   let _microValue = 0;
   let _microDuration = 0;
   let _microElapsed = 0;
   const MICRO_EXPRESSIONS = [
-    { morph: "browInnerUp", max: 0.15, duration: 0.3 },
-    { morph: "browOuterUpLeft", max: 0.12, duration: 0.25 },
-    { morph: "browOuterUpRight", max: 0.12, duration: 0.25 },
-    { morph: "cheekSquintLeft", max: 0.1, duration: 0.2 },
-    { morph: "cheekSquintRight", max: 0.1, duration: 0.2 },
-    { morph: "cheekPuff", max: 0.06, duration: 0.3 },
-    { morph: "noseSneerLeft", max: 0.08, duration: 0.15 },
-    { morph: "noseSneerRight", max: 0.08, duration: 0.15 },
-    { morph: "mouthPressLeft", max: 0.06, duration: 0.2 },
-    { morph: "mouthSmileLeft", max: 0.08, duration: 0.3 },
-    { morph: "mouthDimpleLeft", max: 0.05, duration: 0.2 },
-    { morph: "mouthDimpleRight", max: 0.05, duration: 0.2 },
-    { morph: "mouthShrugLower", max: 0.06, duration: 0.25 },
-    { morph: "eyeSquintLeft", max: 0.1, duration: 0.2 },
-    { morph: "eyeSquintRight", max: 0.1, duration: 0.2 },
+    { morph: 'browInnerUp', max: 0.15, duration: 0.3 },
+    { morph: 'browOuterUpLeft', max: 0.12, duration: 0.25 },
+    { morph: 'browOuterUpRight', max: 0.12, duration: 0.25 },
+    { morph: 'cheekSquintLeft', max: 0.1, duration: 0.2 },
+    { morph: 'cheekSquintRight', max: 0.1, duration: 0.2 },
+    { morph: 'cheekPuff', max: 0.06, duration: 0.3 },
+    { morph: 'noseSneerLeft', max: 0.08, duration: 0.15 },
+    { morph: 'noseSneerRight', max: 0.08, duration: 0.15 },
+    { morph: 'mouthPressLeft', max: 0.06, duration: 0.2 },
+    { morph: 'mouthSmileLeft', max: 0.08, duration: 0.3 },
+    { morph: 'mouthDimpleLeft', max: 0.05, duration: 0.2 },
+    { morph: 'mouthDimpleRight', max: 0.05, duration: 0.2 },
+    { morph: 'mouthShrugLower', max: 0.06, duration: 0.25 },
+    { morph: 'eyeSquintLeft', max: 0.1, duration: 0.2 },
+    { morph: 'eyeSquintRight', max: 0.1, duration: 0.2 },
   ];
 
   // ══ INNOVATIVE: Eye Saccades ══════════════════════════════
@@ -207,10 +211,14 @@
     curious: 0.35,
   };
 
+  /**
+   * init
+   * @returns {*}
+   */
   function init() {
-    const canvas = document.getElementById("avatar-canvas");
+    const canvas = document.getElementById('avatar-canvas');
     if (!canvas || !window.THREE) {
-      console.error("[Avatar] THREE.js not loaded");
+      console.error('[Avatar] THREE.js not loaded');
       return;
     }
 
@@ -223,17 +231,11 @@
       if (initRetryCount < MAX_INIT_RETRIES) {
         initRetryCount++;
         console.warn(
-          "[Avatar] Container has 0 size, retrying in 100ms... (" +
-            initRetryCount +
-            "/" +
-            MAX_INIT_RETRIES +
-            ")",
+          '[Avatar] Container has 0 size, retrying in 100ms... (' + initRetryCount + '/' + MAX_INIT_RETRIES + ')'
         );
         setTimeout(init, 100);
       } else {
-        console.error(
-          "[Avatar] Container never got a size after 5s — init aborted",
-        );
+        console.error('[Avatar] Container never got a size after 5s — init aborted');
       }
       return;
     }
@@ -246,7 +248,7 @@
       canvas,
       antialias: true,
       alpha: true,
-      powerPreference: "high-performance",
+      powerPreference: 'high-performance',
     });
     renderer.setSize(w, h);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 3)); // CINEMATIC: up to 3x for 4K/retina
@@ -278,42 +280,43 @@
 
     // Init texture loader and load initial background
     _bgLoader = new THREE.TextureLoader();
-    _loadAvatarBg("kelion");
+    _loadAvatarBg('kelion');
 
     // Lip sync — simple, uses Smile morph
     if (window.SimpleLipSync) lipSync = new SimpleLipSync();
     if (window.TextLipSync) textLipSync = new TextLipSync({ msPerChar: 38 });
 
-    loadAvatar("kelion")
+    loadAvatar('kelion')
       .then(function () {
-        console.log("[Avatar] Kelion loaded");
         // Preload Kira model silently into browser cache
         const preloader = new THREE.GLTFLoader();
         preloader.load(
           MODELS.kira,
           function () {
-            console.log("[Avatar] Kira model preloaded into cache");
-            console.log("[Avatar] ✅ Both avatars ready!");
-            window.dispatchEvent(new CustomEvent("avatars-ready"));
+            window.dispatchEvent(new CustomEvent('avatars-ready'));
           },
           null,
           function () {
             // Even if Kira fails, still signal ready
-            window.dispatchEvent(new CustomEvent("avatars-ready"));
-          },
+            window.dispatchEvent(new CustomEvent('avatars-ready'));
+          }
         );
       })
       .catch(function () {
         // Even if Kelion fails, signal ready after timeout
         setTimeout(function () {
-          window.dispatchEvent(new CustomEvent("avatars-ready"));
+          window.dispatchEvent(new CustomEvent('avatars-ready'));
         }, 3000);
       });
-    window.addEventListener("resize", onResize);
+    window.addEventListener('resize', onResize);
     animate();
-    console.log("[Avatar] Initialized");
   }
 
+  /**
+   * loadAvatar
+   * @param {*} name
+   * @returns {*}
+   */
   function loadAvatar(name) {
     if (!MODELS[name]) return Promise.resolve();
     currentAvatar = name;
@@ -354,28 +357,17 @@
               if (child.isMesh && child.morphTargetDictionary) {
                 morphMeshes.push(child);
                 child.morphTargetInfluences.fill(0);
-                console.log(
-                  "[Avatar] Morph:",
-                  child.name,
-                  Object.keys(child.morphTargetDictionary).join(", "),
-                );
+                console.log('[Avatar] Morph:', child.name, Object.keys(child.morphTargetDictionary).join(', '));
               }
               // After last mesh, rebuild mouth cache
               _cacheMouthMorphs();
 
               // Z-fighting fix for eyebrows/lashes (from v1)
-              const nm = (child.name || "").toLowerCase();
-              const matNm =
-                child.material && child.material.name
-                  ? child.material.name.toLowerCase()
-                  : "";
-              const isHead =
-                (nm.indexOf("head") !== -1 && nm.indexOf("eye") === -1) ||
-                matNm === "head";
-              const isBrow =
-                nm.indexOf("brow") !== -1 || matNm.indexOf("brow") !== -1;
-              const isLash =
-                nm.indexOf("lash") !== -1 || matNm.indexOf("lash") !== -1;
+              const nm = (child.name || '').toLowerCase();
+              const matNm = child.material && child.material.name ? child.material.name.toLowerCase() : '';
+              const isHead = (nm.indexOf('head') !== -1 && nm.indexOf('eye') === -1) || matNm === 'head';
+              const isBrow = nm.indexOf('brow') !== -1 || matNm.indexOf('brow') !== -1;
+              const isLash = nm.indexOf('lash') !== -1 || matNm.indexOf('lash') !== -1;
 
               if (isHead && child.material) {
                 child.renderOrder = 0;
@@ -396,15 +388,12 @@
 
           // MIRROR FIX for k-female.glb — Blender mirror modifier not applied
           // Brows and lashes only have geometry on one side, clone + flip X
-          if (name === "kira") {
+          if (name === 'kira') {
             const meshesToMirror = [];
             currentModel.traverse(function (child) {
               if (!child.isMesh) return;
-              const nmLow = (child.name || "").toLowerCase();
-              if (
-                nmLow.indexOf("brow") !== -1 ||
-                nmLow.indexOf("lash") !== -1
-              ) {
+              const nmLow = (child.name || '').toLowerCase();
+              if (nmLow.indexOf('brow') !== -1 || nmLow.indexOf('lash') !== -1) {
                 meshesToMirror.push(child);
               }
             });
@@ -442,36 +431,31 @@
                 mirrorMesh = new THREE.Mesh(mirrorGeo, mirrorMat);
               }
               mirrorMesh.renderOrder = 2;
-              mirrorMesh.name = origMesh.name + "_mirror";
+              mirrorMesh.name = origMesh.name + '_mirror';
               mirrorMesh.frustumCulled = false;
               mirrorMesh.position.copy(origMesh.position);
               mirrorMesh.rotation.copy(origMesh.rotation);
               mirrorMesh.scale.copy(origMesh.scale);
               origMesh.parent.add(mirrorMesh);
             });
-            console.log(
-              "[Avatar] Kira mirror fix applied to",
-              meshesToMirror.length,
-              "meshes",
-            );
+            console.log('[Avatar] Kira mirror fix applied to', meshesToMirror.length, 'meshes');
           }
 
           // ARM POSE — find bones and set default relaxed pose
           try {
-            if (typeof findArmBones === "function") findArmBones();
+            if (typeof findArmBones === 'function') findArmBones();
           } catch (e) {
-            console.warn("[Avatar] findArmBones skipped:", e.message);
+            console.warn('[Avatar] findArmBones skipped:', e.message);
           }
           try {
-            if (typeof _findEyeAndSpineBones === "function")
-              _findEyeAndSpineBones();
+            if (typeof _findEyeAndSpineBones === 'function') _findEyeAndSpineBones();
           } catch (e) {
-            console.warn("[Avatar] _findEyeAndSpineBones skipped:", e.message);
+            console.warn('[Avatar] _findEyeAndSpineBones skipped:', e.message);
           }
           try {
-            if (typeof setPose === "function") setPose("relaxed");
+            if (typeof setPose === 'function') setPose('relaxed');
           } catch (e) {
-            console.warn("[Avatar] setPose skipped:", e.message);
+            console.warn('[Avatar] setPose skipped:', e.message);
           }
 
           scene.add(currentModel);
@@ -482,30 +466,25 @@
 
           if (gltf.animations && gltf.animations.length) {
             mixer = new THREE.AnimationMixer(currentModel);
-            console.log("[Avatar] 🎬 Animation clips:", gltf.animations.length);
             gltf.animations.forEach(function (clip, i) {
               console.log(
-                "[Avatar]   Clip " +
+                '[Avatar]   Clip ' +
                   i +
                   ': "' +
                   clip.name +
                   '" ' +
                   clip.duration.toFixed(1) +
-                  "s, tracks=" +
-                  clip.tracks.length,
+                  's, tracks=' +
+                  clip.tracks.length
               );
               mixer.clipAction(clip).play();
             });
           } else {
-            console.log("[Avatar] ⚠️ No animation clips in model");
           }
 
-          document.getElementById("avatar-name").textContent =
-            name === "kira" ? "Kira" : "Kelion";
-          document.getElementById("status-text").textContent = "Online";
-          console.log(
-            `[Avatar] ${name} loaded — ${morphMeshes.length} morph meshes`,
-          );
+          document.getElementById('avatar-name').textContent = name === 'kira' ? 'Kira' : 'Kelion';
+          document.getElementById('status-text').textContent = 'Online';
+          console.log(`[Avatar] ${name} loaded — ${morphMeshes.length} morph meshes`);
           renderer.render(scene, camera);
           setTimeout(function () {
             renderer.render(scene, camera);
@@ -515,29 +494,38 @@
         (progress) => {
           if (progress.total) {
             const pct = Math.round((progress.loaded / progress.total) * 100);
-            document.getElementById("status-text").textContent =
-              `Loading... ${pct}%`;
+            document.getElementById('status-text').textContent = `Loading... ${pct}%`;
           }
         },
         (err) => {
           console.error(`[Avatar] Load error:`, err);
-          document.getElementById("status-text").textContent = "Model error";
+          document.getElementById('status-text').textContent = 'Model error';
           reject(err);
-        },
+        }
       );
     });
 
     return loadPromise;
   }
 
+  /**
+   * setMorph
+   * @param {*} name
+   * @param {*} value
+   * @returns {*}
+   */
   function setMorph(name, value) {
     for (const mesh of morphMeshes) {
       const idx = mesh.morphTargetDictionary[name];
-      if (idx !== undefined)
-        mesh.morphTargetInfluences[idx] = Math.max(0, Math.min(1, value));
+      if (idx !== undefined) mesh.morphTargetInfluences[idx] = Math.max(0, Math.min(1, value));
     }
   }
 
+  /**
+   * updateBlink
+   * @param {*} dt
+   * @returns {*}
+   */
   function updateBlink(dt) {
     blinkTimer += dt;
     if (blinkPhase === 0 && blinkTimer >= nextBlink) {
@@ -557,13 +545,19 @@
         blinkTimer = 0;
       }
     }
-    setMorph("eyeBlinkLeft", blinkValue);
-    setMorph("eyeBlinkRight", blinkValue);
-    setMorph("eyeBlink_L", blinkValue);
-    setMorph("eyeBlink_R", blinkValue);
-    setMorph("EyeBlink", blinkValue);
+    setMorph('eyeBlinkLeft', blinkValue);
+    setMorph('eyeBlinkRight', blinkValue);
+    setMorph('eyeBlink_L', blinkValue);
+    setMorph('eyeBlink_R', blinkValue);
+    setMorph('EyeBlink', blinkValue);
   }
 
+  /**
+   * setExpression
+   * @param {*} name
+   * @param {*} intensity
+   * @returns {*}
+   */
   function setExpression(name, intensity) {
     // Smart intensity — use table if no explicit override
     if (intensity === undefined || intensity === null) {
@@ -701,6 +695,11 @@
   // Mood lighting target
   const targetBgColor = new THREE.Color(0x060614);
 
+  /**
+   * setMoodLighting
+   * @param {*} mood
+   * @returns {*}
+   */
   function setMoodLighting(mood) {
     if (!scene) return;
     const colors = {
@@ -718,6 +717,10 @@
     targetBgColor.set(colors[mood] || colors.neutral);
   }
 
+  /**
+   * updateMoodLighting
+   * @returns {*}
+   */
   function updateMoodLighting() {
     if (!scene || !scene.background) return;
     // Manual lerp — THREE.Color may not have .lerp() in all versions
@@ -734,10 +737,20 @@
   let gestureDuration = 0;
   let gestureData = null;
 
+  /**
+   * playGesture
+   * @param {*} type
+   * @returns {*}
+   */
   function playGesture(type) {
     gestureQueue.push(type);
   }
 
+  /**
+   * updateGesture
+   * @param {*} dt
+   * @returns {*}
+   */
   function updateGesture(dt) {
     if (!currentModel) return;
     if (gestureActive) {
@@ -754,52 +767,36 @@
       }
       const angle = Math.sin(t * Math.PI);
       // DAMPENED: reduced amplitudes ~60% + slower lerp to avoid bouncy puppet effect
-      if (gestureData === "nod") {
-        currentModel.rotation.x +=
-          (angle * 0.025 - currentModel.rotation.x) * 0.08;
-      } else if (gestureData === "shake") {
-        currentModel.rotation.y +=
-          (Math.sin(t * Math.PI * 3) * 0.02 - currentModel.rotation.y) * 0.08;
-      } else if (gestureData === "tilt") {
-        currentModel.rotation.z +=
-          (angle * 0.015 - currentModel.rotation.z) * 0.06;
-      } else if (gestureData === "lookAway") {
-        currentModel.rotation.y +=
-          (Math.sin(t * Math.PI) * 0.03 - currentModel.rotation.y) * 0.06;
-      } else if (gestureData === "wave") {
-        currentModel.rotation.z +=
-          (Math.sin(t * Math.PI * 2) * 0.012 - currentModel.rotation.z) * 0.08;
-        currentModel.rotation.x +=
-          (angle * 0.008 - currentModel.rotation.x) * 0.06;
-      } else if (gestureData === "shrug") {
-        currentModel.rotation.z +=
-          (angle * 0.012 - currentModel.rotation.z) * 0.06;
-      } else if (gestureData === "think") {
-        currentModel.rotation.z +=
-          (angle * 0.015 - currentModel.rotation.z) * 0.05;
-        currentModel.rotation.x +=
-          (angle * 0.015 - currentModel.rotation.x) * 0.05;
-      } else if (gestureData === "point") {
-        currentModel.rotation.x +=
-          (angle * 0.02 - currentModel.rotation.x) * 0.08;
+      if (gestureData === 'nod') {
+        currentModel.rotation.x += (angle * 0.025 - currentModel.rotation.x) * 0.08;
+      } else if (gestureData === 'shake') {
+        currentModel.rotation.y += (Math.sin(t * Math.PI * 3) * 0.02 - currentModel.rotation.y) * 0.08;
+      } else if (gestureData === 'tilt') {
+        currentModel.rotation.z += (angle * 0.015 - currentModel.rotation.z) * 0.06;
+      } else if (gestureData === 'lookAway') {
+        currentModel.rotation.y += (Math.sin(t * Math.PI) * 0.03 - currentModel.rotation.y) * 0.06;
+      } else if (gestureData === 'wave') {
+        currentModel.rotation.z += (Math.sin(t * Math.PI * 2) * 0.012 - currentModel.rotation.z) * 0.08;
+        currentModel.rotation.x += (angle * 0.008 - currentModel.rotation.x) * 0.06;
+      } else if (gestureData === 'shrug') {
+        currentModel.rotation.z += (angle * 0.012 - currentModel.rotation.z) * 0.06;
+      } else if (gestureData === 'think') {
+        currentModel.rotation.z += (angle * 0.015 - currentModel.rotation.z) * 0.05;
+        currentModel.rotation.x += (angle * 0.015 - currentModel.rotation.x) * 0.05;
+      } else if (gestureData === 'point') {
+        currentModel.rotation.x += (angle * 0.02 - currentModel.rotation.x) * 0.08;
       }
     } else if (gestureQueue.length > 0) {
       gestureData = gestureQueue.shift();
       gestureActive = true;
       gestureTimer = 0;
       gestureDuration =
-        gestureData === "shake"
-          ? 1.0
-          : gestureData === "wave"
-            ? 1.2
-            : gestureData === "think"
-              ? 1.5
-              : 0.6;
+        gestureData === 'shake' ? 1.0 : gestureData === 'wave' ? 1.2 : gestureData === 'think' ? 1.5 : 0.6;
     }
   }
 
   // ── Pose system (body posture) ────────────────────────────
-  let currentPose = "relaxed";
+  let currentPose = 'relaxed';
   let armBones = {
     leftShoulder: null,
     rightShoulder: null,
@@ -811,6 +808,10 @@
     rightHand: null,
   };
 
+  /**
+   * findArmBones
+   * @returns {*}
+   */
   function findArmBones() {
     if (!currentModel) return;
     armBones = {
@@ -830,14 +831,19 @@
       allBones.push(bone);
     });
     console.log(
-      "[Avatar] All bones:",
+      '[Avatar] All bones:',
       allBones
         .map(function (b) {
           return b.name;
         })
-        .join(", "),
+        .join(', ')
     );
 
+    /**
+     * findBone
+     * @param {*} patterns
+     * @returns {*}
+     */
     function findBone(patterns) {
       for (let pi = 0; pi < patterns.length; pi++) {
         for (let bi = 0; bi < allBones.length; bi++) {
@@ -850,78 +856,38 @@
       });
       for (let pi2 = 0; pi2 < lowerPatterns.length; pi2++) {
         for (let bi2 = 0; bi2 < allBones.length; bi2++) {
-          if (allBones[bi2].name.toLowerCase() === lowerPatterns[pi2])
-            return allBones[bi2];
+          if (allBones[bi2].name.toLowerCase() === lowerPatterns[pi2]) return allBones[bi2];
         }
       }
       return null;
     }
 
-    armBones.leftShoulder = findBone([
-      "LeftShoulder",
-      "Left_Shoulder",
-      "shoulder_l",
-      "shoulder.L",
-    ]);
-    armBones.rightShoulder = findBone([
-      "RightShoulder",
-      "Right_Shoulder",
-      "shoulder_r",
-      "shoulder.R",
-    ]);
-    armBones.leftArm = findBone([
-      "LeftArm",
-      "LeftArm1",
-      "Left_Arm",
-      "upperarm_l",
-      "upper_arm.L",
-    ]);
-    armBones.rightArm = findBone([
-      "RightArm",
-      "RightArm1",
-      "Right_Arm",
-      "upperarm_r",
-      "upper_arm.R",
-    ]);
-    armBones.leftForeArm = findBone([
-      "LeftForeArm",
-      "LeftForeArm1",
-      "Left_ForeArm",
-      "lowerarm_l",
-      "forearm.L",
-    ]);
-    armBones.rightForeArm = findBone([
-      "RightForeArm",
-      "RightForeArm1",
-      "Right_ForeArm",
-      "lowerarm_r",
-      "forearm.R",
-    ]);
-    armBones.leftHand = findBone(["LeftHand", "Left_Hand", "hand_l", "hand.L"]);
-    armBones.rightHand = findBone([
-      "RightHand",
-      "Right_Hand",
-      "hand_r",
-      "hand.R",
-    ]);
+    armBones.leftShoulder = findBone(['LeftShoulder', 'Left_Shoulder', 'shoulder_l', 'shoulder.L']);
+    armBones.rightShoulder = findBone(['RightShoulder', 'Right_Shoulder', 'shoulder_r', 'shoulder.R']);
+    armBones.leftArm = findBone(['LeftArm', 'LeftArm1', 'Left_Arm', 'upperarm_l', 'upper_arm.L']);
+    armBones.rightArm = findBone(['RightArm', 'RightArm1', 'Right_Arm', 'upperarm_r', 'upper_arm.R']);
+    armBones.leftForeArm = findBone(['LeftForeArm', 'LeftForeArm1', 'Left_ForeArm', 'lowerarm_l', 'forearm.L']);
+    armBones.rightForeArm = findBone(['RightForeArm', 'RightForeArm1', 'Right_ForeArm', 'lowerarm_r', 'forearm.R']);
+    armBones.leftHand = findBone(['LeftHand', 'Left_Hand', 'hand_l', 'hand.L']);
+    armBones.rightHand = findBone(['RightHand', 'Right_Hand', 'hand_r', 'hand.R']);
 
     console.log(
-      "[Avatar] Arm bones found — LS:",
+      '[Avatar] Arm bones found — LS:',
       !!(armBones.leftShoulder && armBones.leftShoulder.name),
-      "RS:",
+      'RS:',
       !!(armBones.rightShoulder && armBones.rightShoulder.name),
-      "LA:",
+      'LA:',
       !!(armBones.leftArm && armBones.leftArm.name),
-      "RA:",
+      'RA:',
       !!(armBones.rightArm && armBones.rightArm.name),
-      "LFA:",
+      'LFA:',
       !!(armBones.leftForeArm && armBones.leftForeArm.name),
-      "RFA:",
+      'RFA:',
       !!(armBones.rightForeArm && armBones.rightForeArm.name),
-      "LH:",
+      'LH:',
       !!(armBones.leftHand && armBones.leftHand.name),
-      "RH:",
-      !!(armBones.rightHand && armBones.rightHand.name),
+      'RH:',
+      !!(armBones.rightHand && armBones.rightHand.name)
     );
 
     // Auto-compute arms-down quaternions from current A-pose
@@ -938,29 +904,23 @@
     currentModel.traverse(function (bone) {
       if (!bone.isBone) return;
       const nm = bone.name;
-      if (nm === "LeftEye" || nm === "Eye_L" || nm === "leftEye")
-        _eyeBones.left = bone;
-      if (nm === "RightEye" || nm === "Eye_R" || nm === "rightEye")
-        _eyeBones.right = bone;
-      if (nm === "Head" || nm === "head") _headBone = bone;
-      if (nm === "Neck" || nm === "neck") _neckBone = bone;
-      if (
-        !_spineBone &&
-        (nm === "Spine1" || nm === "Spine2" || nm === "Spine" || nm === "spine")
-      )
-        _spineBone = bone;
+      if (nm === 'LeftEye' || nm === 'Eye_L' || nm === 'leftEye') _eyeBones.left = bone;
+      if (nm === 'RightEye' || nm === 'Eye_R' || nm === 'rightEye') _eyeBones.right = bone;
+      if (nm === 'Head' || nm === 'head') _headBone = bone;
+      if (nm === 'Neck' || nm === 'neck') _neckBone = bone;
+      if (!_spineBone && (nm === 'Spine1' || nm === 'Spine2' || nm === 'Spine' || nm === 'spine')) _spineBone = bone;
     });
     console.log(
-      "[Avatar] Bones found — Head:",
+      '[Avatar] Bones found — Head:',
       !!_headBone,
-      "Neck:",
+      'Neck:',
       !!_neckBone,
-      "Spine:",
+      'Spine:',
       !!_spineBone,
-      "LeftEye:",
+      'LeftEye:',
       !!_eyeBones.left,
-      "RightEye:",
-      !!_eyeBones.right,
+      'RightEye:',
+      !!_eyeBones.right
     );
   }
 
@@ -974,48 +934,51 @@
   let _armRestRight = null;
   let _currentArmAngle = 35; // DEFAULT: 35° — relaxed arms alongside body
 
+  /**
+   * _computeArmDownQuaternions
+   * @param {*} angleDeg
+   * @returns {*}
+   */
   function _computeArmDownQuaternions(angleDeg) {
-    if (typeof THREE === "undefined") return;
+    if (typeof THREE === 'undefined') return;
     if (angleDeg !== undefined) _currentArmAngle = angleDeg;
     const angle = (_currentArmAngle * Math.PI) / 180;
 
     // Capture rest-pose quaternions ONCE
-    if (!_armRestLeft && armBones.leftArm)
-      _armRestLeft = armBones.leftArm.quaternion.clone();
-    if (!_armRestRight && armBones.rightArm)
-      _armRestRight = armBones.rightArm.quaternion.clone();
+    if (!_armRestLeft && armBones.leftArm) _armRestLeft = armBones.leftArm.quaternion.clone();
+    if (!_armRestRight && armBones.rightArm) _armRestRight = armBones.rightArm.quaternion.clone();
 
     _computedArmDown = {};
 
     // Left arm: rotate around local Z axis by -angle
     if (armBones.leftArm && _armRestLeft) {
-      const delta = new THREE.Quaternion().setFromAxisAngle(
-        new THREE.Vector3(0, 0, 1),
-        -angle,
-      );
+      const delta = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -angle);
       _computedArmDown.la = _armRestLeft.clone().multiply(delta);
     }
     // Right arm: rotate around local Z axis by +angle (mirrored)
     if (armBones.rightArm && _armRestRight) {
-      const delta = new THREE.Quaternion().setFromAxisAngle(
-        new THREE.Vector3(0, 0, 1),
-        angle,
-      );
+      const delta = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), angle);
       _computedArmDown.ra = _armRestRight.clone().multiply(delta);
     }
-
-    console.log("[Avatar] Arm-down:", _currentArmAngle + "°");
   }
 
   // ── CALIBRATION SLIDER UI ──────────────────────────────
   function showArmCalibrator() {
-    if (document.getElementById("arm-calibrator")) {
-      document.getElementById("arm-calibrator").remove();
+    if (document.getElementById('arm-calibrator')) {
+      document.getElementById('arm-calibrator').remove();
     }
-    const panel = document.createElement("div");
-    panel.id = "arm-calibrator";
+    const panel = document.createElement('div');
+    panel.id = 'arm-calibrator';
     panel.style.cssText =
-      "position:fixed;bottom:60px;left:50%;transform:translateX(-50%);z-index:9999;background:rgba(0,0,0,0.95);border:1px solid #6366f1;border-radius:12px;padding:12px 20px;display:flex;flex-direction:column;align-items:center;gap:4px;font-family:var(--kelion-font);color:#fff;min-width:340px;";
+      'position:fixed;bottom:60px;left:50%;transform:translateX(-50%);z-index:9999;background:rgba(0,0,0,0.95);border:1px solid #6366f1;border-radius:12px;padding:12px 20px;display:flex;flex-direction:column;align-items:center;gap:4px;font-family:var(--kelion-font);color:#fff;min-width:340px;';
+    /**
+     * row
+     * @param {*} label
+     * @param {*} id
+     * @param {*} val
+     * @param {*} color
+     * @returns {*}
+     */
     function row(label, id, val, color) {
       return (
         '<div style="display:flex;align-items:center;gap:6px;width:100%;"><span style="font-size:0.75rem;font-weight:700;color:' +
@@ -1034,43 +997,41 @@
         color +
         ';width:40px;text-align:right;">' +
         val +
-        "°</span></div>"
+        '°</span></div>'
       );
     }
-    panel.innerHTML =
+    panel.textContent =
       '<div style="font-size:0.85rem;font-weight:600;">🔧 Brațe L / R</div>' +
       '<div style="font-size:0.7rem;color:#f97316;">── Stânga ──</div>' +
-      row("X", "lx", _armL.x, "#ef4444") +
-      row("Y", "ly", _armL.y, "#22c55e") +
-      row("Z", "lz", _armL.z, "#3b82f6") +
+      row('X', 'lx', _armL.x, '#ef4444') +
+      row('Y', 'ly', _armL.y, '#22c55e') +
+      row('Z', 'lz', _armL.z, '#3b82f6') +
       '<div style="font-size:0.7rem;color:#f97316;">── Dreapta ──</div>' +
-      row("X", "rx", _armR.x, "#ef4444") +
-      row("Y", "ry", _armR.y, "#22c55e") +
-      row("Z", "rz", _armR.z, "#3b82f6") +
+      row('X', 'rx', _armR.x, '#ef4444') +
+      row('Y', 'ry', _armR.y, '#22c55e') +
+      row('Z', 'rz', _armR.z, '#3b82f6') +
       '<div style="font-size:0.6rem;color:#555;">X=sus/jos Y=twist Z=față/spate</div>' +
       '<button id="arm-cal-close" style="padding:3px 14px;background:#6366f1;border:none;border-radius:8px;color:#fff;cursor:pointer;font-size:0.75rem;">Închide</button>';
     document.body.appendChild(panel);
-    const lmap = { lx: "x", ly: "y", lz: "z" };
-    ["lx", "ly", "lz"].forEach(function (id) {
-      document.getElementById(id).addEventListener("input", function () {
-        const v = parseInt(this.value);
-        document.getElementById(id + "-v").textContent = v + "°";
+    const lmap = { lx: 'x', ly: 'y', lz: 'z' };
+    ['lx', 'ly', 'lz'].forEach(function (id) {
+      document.getElementById(id).addEventListener('input', function () {
+        const v = parseInt(this.value, 10);
+        document.getElementById(id + '-v').textContent = v + '°';
         _armL[lmap[id]] = v;
       });
     });
-    const rmap = { rx: "x", ry: "y", rz: "z" };
-    ["rx", "ry", "rz"].forEach(function (id) {
-      document.getElementById(id).addEventListener("input", function () {
-        const v = parseInt(this.value);
-        document.getElementById(id + "-v").textContent = v + "°";
+    const rmap = { rx: 'x', ry: 'y', rz: 'z' };
+    ['rx', 'ry', 'rz'].forEach(function (id) {
+      document.getElementById(id).addEventListener('input', function () {
+        const v = parseInt(this.value, 10);
+        document.getElementById(id + '-v').textContent = v + '°';
         _armR[rmap[id]] = v;
       });
     });
-    document
-      .getElementById("arm-cal-close")
-      .addEventListener("click", function () {
-        panel.remove();
-      });
+    document.getElementById('arm-cal-close').addEventListener('click', function () {
+      panel.remove();
+    });
   }
 
   // MetaPerson bone quaternions for arm poses
@@ -1097,11 +1058,15 @@
     },
   };
 
+  /**
+   * setPose
+   * @param {*} pose
+   * @returns {*}
+   */
   function setPose(pose) {
-    currentPose = pose || "relaxed";
+    currentPose = pose || 'relaxed';
     if (!armBones.leftShoulder && !armBones.rightShoulder) findArmBones();
     _enforcePose();
-    console.log("[Avatar] Pose set:", currentPose);
   }
 
   const _mixerArmsStopped = false;
@@ -1109,24 +1074,20 @@
   const _armL = { x: 27, y: -9, z: -4 }; // LEFT arm defaults (user-calibrated)
   const _armR = { x: 27, y: -9, z: -4 }; // RIGHT arm defaults (user-calibrated)
 
+  /**
+   * _enforcePose
+   * @returns {*}
+   */
   function _enforcePose() {
-    if (typeof THREE === "undefined") return;
-    if (
-      !_armRestLeft ||
-      !_armRestRight ||
-      !armBones.leftArm ||
-      !armBones.rightArm
-    )
-      return;
+    if (typeof THREE === 'undefined') return;
+    if (!_armRestLeft || !_armRestRight || !armBones.leftArm || !armBones.rightArm) return;
 
     // Left arm
     if (_armL.x !== 0 || _armL.y !== 0 || _armL.z !== 0) {
       const rx = (_armL.x * Math.PI) / 180;
       const ry = (_armL.y * Math.PI) / 180;
       const rz = (_armL.z * Math.PI) / 180;
-      const deltaL = new THREE.Quaternion().setFromEuler(
-        new THREE.Euler(rx, -ry, -rz, "XYZ"),
-      );
+      const deltaL = new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, -ry, -rz, 'XYZ'));
       armBones.leftArm.quaternion.copy(_armRestLeft).multiply(deltaL);
     }
     // Right arm
@@ -1134,13 +1095,16 @@
       const rx = (_armR.x * Math.PI) / 180;
       const ry = (_armR.y * Math.PI) / 180;
       const rz = (_armR.z * Math.PI) / 180;
-      const deltaR = new THREE.Quaternion().setFromEuler(
-        new THREE.Euler(rx, ry, rz, "XYZ"),
-      );
+      const deltaR = new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, ry, rz, 'XYZ'));
       armBones.rightArm.quaternion.copy(_armRestRight).multiply(deltaR);
     }
   }
 
+  /**
+   * updateExpression
+   * @param {*} dt
+   * @returns {*}
+   */
   function updateExpression(dt) {
     const speed = 3 * dt;
     const allKeys = {};
@@ -1292,23 +1256,29 @@
     bow: { lx: 10, ly: 0, lz: 0, rx: 10, ry: 0, rz: 0, dur: 2.5 },
   };
 
+  /**
+   * playBodyAction
+   * @param {*} type
+   * @returns {*}
+   */
   function playBodyAction(type) {
     const action = _BODY_EULER[type];
     if (!action) {
-      console.warn("[Avatar] Unknown body action:", type);
+      console.warn('[Avatar] Unknown body action:', type);
       return;
     }
     _bodyActionType = type;
     _bodyActionActive = true;
     _bodyActionTimer = 0;
     _bodyActionDuration = action.dur || 2.0;
-    console.log(
-      "[Avatar] Body action:",
-      type,
-      "(" + _bodyActionDuration + "s)",
-    );
+    console.log('[Avatar] Body action:', type, '(' + _bodyActionDuration + 's)');
   }
 
+  /**
+   * updateBodyAction
+   * @param {*} dt
+   * @returns {*}
+   */
   function updateBodyAction(dt) {
     if (!_bodyActionActive || !_bodyActionType) return;
     _bodyActionTimer += dt;
@@ -1331,20 +1301,18 @@
       _bodyActionType = null;
       return;
     }
-    if (action.lx !== null)
-      _armL.x = _armDefaultL.x + (action.lx - _armDefaultL.x) * blend;
-    if (action.ly !== null)
-      _armL.y = _armDefaultL.y + (action.ly - _armDefaultL.y) * blend;
-    if (action.lz !== null)
-      _armL.z = _armDefaultL.z + (action.lz - _armDefaultL.z) * blend;
-    if (action.rx !== null)
-      _armR.x = _armDefaultR.x + (action.rx - _armDefaultR.x) * blend;
-    if (action.ry !== null)
-      _armR.y = _armDefaultR.y + (action.ry - _armDefaultR.y) * blend;
-    if (action.rz !== null)
-      _armR.z = _armDefaultR.z + (action.rz - _armDefaultR.z) * blend;
+    if (action.lx !== null) _armL.x = _armDefaultL.x + (action.lx - _armDefaultL.x) * blend;
+    if (action.ly !== null) _armL.y = _armDefaultL.y + (action.ly - _armDefaultL.y) * blend;
+    if (action.lz !== null) _armL.z = _armDefaultL.z + (action.lz - _armDefaultL.z) * blend;
+    if (action.rx !== null) _armR.x = _armDefaultR.x + (action.rx - _armDefaultR.x) * blend;
+    if (action.ry !== null) _armR.y = _armDefaultR.y + (action.ry - _armDefaultR.y) * blend;
+    if (action.rz !== null) _armR.z = _armDefaultR.z + (action.rz - _armDefaultR.z) * blend;
   }
 
+  /**
+   * animate
+   * @returns {*}
+   */
   function animate() {
     requestAnimationFrame(animate);
     if (!renderer || !scene || !camera) return; // Guard against init race
@@ -1375,9 +1343,7 @@
       _breathPhase += dt * BREATH_SPEED;
       if (_spineBone) {
         const breathVal = Math.sin(_breathPhase * Math.PI * 2) * BREATH_AMOUNT;
-        _spineBone.rotation.x +=
-          (breathVal - (_spineBone.rotation.x - (_spineBone._baseRotX || 0))) *
-          0.1;
+        _spineBone.rotation.x += (breathVal - (_spineBone.rotation.x - (_spineBone._baseRotX || 0))) * 0.1;
         if (!_spineBone._baseRotX) _spineBone._baseRotX = _spineBone.rotation.x;
       }
 
@@ -1395,10 +1361,7 @@
         _microActive = true;
         _microTimer = 0;
         _microElapsed = 0;
-        const me =
-          MICRO_EXPRESSIONS[
-            Math.floor(Math.random() * MICRO_EXPRESSIONS.length)
-          ];
+        const me = MICRO_EXPRESSIONS[Math.floor(Math.random() * MICRO_EXPRESSIONS.length)];
         _microMorph = me.morph;
         _microValue = me.max;
         _microDuration = me.duration;
@@ -1441,30 +1404,26 @@
       const gazeY = _mouseY * 0.25 + _saccadeCurrentY;
 
       // Horizontal gaze (parallel — both eyes look the same direction)
-      setMorph("eyeLookInLeft", Math.max(0, gazeX * 0.6)); // left eye → right
-      setMorph("eyeLookOutLeft", Math.max(0, -gazeX * 0.6)); // left eye → left
-      setMorph("eyeLookOutRight", Math.max(0, gazeX * 0.6)); // right eye → right
-      setMorph("eyeLookInRight", Math.max(0, -gazeX * 0.6)); // right eye → left
+      setMorph('eyeLookInLeft', Math.max(0, gazeX * 0.6)); // left eye → right
+      setMorph('eyeLookOutLeft', Math.max(0, -gazeX * 0.6)); // left eye → left
+      setMorph('eyeLookOutRight', Math.max(0, gazeX * 0.6)); // right eye → right
+      setMorph('eyeLookInRight', Math.max(0, -gazeX * 0.6)); // right eye → left
       // Vertical gaze
-      setMorph("eyeLookUpLeft", Math.max(0, gazeY * 0.4));
-      setMorph("eyeLookUpRight", Math.max(0, gazeY * 0.4));
-      setMorph("eyeLookDownLeft", Math.max(0, -gazeY * 0.4));
-      setMorph("eyeLookDownRight", Math.max(0, -gazeY * 0.4));
+      setMorph('eyeLookUpLeft', Math.max(0, gazeY * 0.4));
+      setMorph('eyeLookUpRight', Math.max(0, gazeY * 0.4));
+      setMorph('eyeLookDownLeft', Math.max(0, -gazeY * 0.4));
+      setMorph('eyeLookDownRight', Math.max(0, -gazeY * 0.4));
 
       // ══ Bone-based eye rotation — SUBTLE SUPPLEMENT ONLY ══
       // Very gentle embellishment (10x less than before), with mirror correction
       if (_eyeBones.left) {
-        _eyeBones.left.rotation.y +=
-          (gazeX * 0.04 - _eyeBones.left.rotation.y) * 0.06;
-        _eyeBones.left.rotation.x +=
-          (gazeY * 0.03 - _eyeBones.left.rotation.x) * 0.06;
+        _eyeBones.left.rotation.y += (gazeX * 0.04 - _eyeBones.left.rotation.y) * 0.06;
+        _eyeBones.left.rotation.x += (gazeY * 0.03 - _eyeBones.left.rotation.x) * 0.06;
       }
       if (_eyeBones.right) {
         // MIRROR CORRECTION: negate Y for right eye bone (mirrored skeleton)
-        _eyeBones.right.rotation.y +=
-          (-gazeX * 0.04 - _eyeBones.right.rotation.y) * 0.06;
-        _eyeBones.right.rotation.x +=
-          (gazeY * 0.03 - _eyeBones.right.rotation.x) * 0.06;
+        _eyeBones.right.rotation.y += (-gazeX * 0.04 - _eyeBones.right.rotation.y) * 0.06;
+        _eyeBones.right.rotation.x += (gazeY * 0.03 - _eyeBones.right.rotation.x) * 0.06;
       }
 
       // Body stays STILL — only brain-triggered gestures move the model
@@ -1475,39 +1434,35 @@
         currentModel.rotation.x += (0 - currentModel.rotation.x) * 0.02;
         currentModel.rotation.z += (0 - currentModel.rotation.z) * 0.02;
       } else if (currentModel && isPresenting) {
-        currentModel.rotation.y +=
-          (-PRESENT_ANGLE - currentModel.rotation.y) * 0.04; // was 0.08
+        currentModel.rotation.y += (-PRESENT_ANGLE - currentModel.rotation.y) * 0.04; // was 0.08
       } else if (currentModel && isAttentive) {
-        currentModel.rotation.y +=
-          (_mouseX * 0.02 - currentModel.rotation.y) * 0.03; // was 0.04/0.05
+        currentModel.rotation.y += (_mouseX * 0.02 - currentModel.rotation.y) * 0.03; // was 0.04/0.05
       }
       // SMOOTH mouth close — exponential decay instead of instant zero
       const _lipRan =
-        (window.AlignmentLipSync && AlignmentLipSync.isActive()) ||
-        (lipSync && window.KVoice && KVoice.isSpeaking());
+        (window.AlignmentLipSync && AlignmentLipSync.isActive()) || (lipSync && window.KVoice && KVoice.isSpeaking());
       if (!_lipRan) {
         for (let ci = 0; ci < _mouthMorphCache.length; ci++) {
-          const curr =
-            _mouthMorphCache[ci].mesh.morphTargetInfluences[
-              _mouthMorphCache[ci].idx
-            ];
-          _mouthMorphCache[ci].mesh.morphTargetInfluences[
-            _mouthMorphCache[ci].idx
-          ] = curr * 0.7; // TEST-A: faster mouth close
+          const curr = _mouthMorphCache[ci].mesh.morphTargetInfluences[_mouthMorphCache[ci].idx];
+          _mouthMorphCache[ci].mesh.morphTargetInfluences[_mouthMorphCache[ci].idx] = curr * 0.7; // TEST-A: faster mouth close
         }
       }
     } catch (e) {
       // Don't let errors kill the render loop
       if (!animate._errLogged) {
-        console.error("[Avatar] Animate error:", e.message);
+        console.error('[Avatar] Animate error:', e.message);
         animate._errLogged = true;
       }
     }
     renderer.render(scene, camera);
   }
 
+  /**
+   * onResize
+   * @returns {*}
+   */
   function onResize() {
-    const canvas = document.getElementById("avatar-canvas");
+    const canvas = document.getElementById('avatar-canvas');
     if (!canvas || !renderer) return;
     const container = canvas.parentElement;
     const w = container.clientWidth;
@@ -1528,21 +1483,26 @@
     thumbsup: { thumb: -0.3, others: 1.3 }, // thumb out, rest curled
   };
 
+  /**
+   * setFingerPose
+   * @param {*} hand
+   * @param {*} pose
+   * @returns {*}
+   */
   function setFingerPose(hand, pose) {
-    const bones = hand === "left" ? _fingerBones.left : _fingerBones.right;
+    const bones = hand === 'left' ? _fingerBones.left : _fingerBones.right;
     if (!bones || Object.keys(bones).length === 0) return;
     const p = FINGER_POSES[pose] || FINGER_POSES.relaxed;
-    const fingerNames = ["Thumb", "Index", "Middle", "Ring", "Pinky"];
+    const fingerNames = ['Thumb', 'Index', 'Middle', 'Ring', 'Pinky'];
     for (let i = 0; i < fingerNames.length; i++) {
       const fn = fingerNames[i];
       const joints = bones[fn];
       if (!joints) continue;
       let curl = p.curl !== undefined ? p.curl : 0;
       // Special per-finger overrides (for point/thumbsup)
-      if (fn === "Index" && p.index !== undefined) curl = p.index;
-      else if (fn === "Thumb" && p.thumb !== undefined) curl = p.thumb;
-      else if (fn !== "Index" && fn !== "Thumb" && p.others !== undefined)
-        curl = p.others;
+      if (fn === 'Index' && p.index !== undefined) curl = p.index;
+      else if (fn === 'Thumb' && p.thumb !== undefined) curl = p.thumb;
+      else if (fn !== 'Index' && fn !== 'Thumb' && p.others !== undefined) curl = p.others;
       for (let j = 0; j < joints.length; j++) {
         joints[j].rotation.x += (curl - joints[j].rotation.x) * 0.15;
       }
@@ -1550,10 +1510,14 @@
   }
 
   // Default finger pose — apply every frame for consistency
-  let _currentFingerPose = "relaxed";
+  let _currentFingerPose = 'relaxed';
+  /**
+   * _enforceFingerPose
+   * @returns {*}
+   */
   function _enforceFingerPose() {
-    setFingerPose("left", _currentFingerPose);
-    setFingerPose("right", _currentFingerPose);
+    setFingerPose('left', _currentFingerPose);
+    setFingerPose('right', _currentFingerPose);
   }
 
   window.KAvatar = {
@@ -1585,7 +1549,7 @@
     setPose: setPose,
     setFingerPose: function (hand, pose) {
       if (!hand) {
-        _currentFingerPose = pose || "relaxed";
+        _currentFingerPose = pose || 'relaxed';
         return;
       }
       setFingerPose(hand, pose);
@@ -1600,30 +1564,35 @@
       if (scene.background && scene.background.isTexture) {
         scene._savedBg = scene.background;
         scene.background = new THREE.Color(0x111111);
-        console.log("[Avatar] Background OFF (solid dark)");
       } else if (scene._savedBg) {
         scene.background = scene._savedBg;
-        console.log("[Avatar] Background ON (texture)");
       }
     },
     setZoom: function (z) {
       if (!camera) return;
       camera.position.z = z;
-      console.log("[Avatar] Zoom:", z);
     },
     showCameraCalibrator: function () {
-      if (document.getElementById("camera-calibrator")) {
-        document.getElementById("camera-calibrator").remove();
+      if (document.getElementById('camera-calibrator')) {
+        document.getElementById('camera-calibrator').remove();
       }
-      const p = document.createElement("div");
-      p.id = "camera-calibrator";
+      const p = document.createElement('div');
+      p.id = 'camera-calibrator';
       p.style.cssText =
-        "position:fixed;top:80px;right:20px;z-index:9999;background:rgba(0,0,0,0.95);border:1px solid #6366f1;border-radius:12px;padding:16px 20px;display:flex;flex-direction:column;align-items:center;gap:6px;font-family:var(--kelion-font);color:#fff;min-width:280px;";
+        'position:fixed;top:80px;right:20px;z-index:9999;background:rgba(0,0,0,0.95);border:1px solid #6366f1;border-radius:12px;padding:16px 20px;display:flex;flex-direction:column;align-items:center;gap:6px;font-family:var(--kelion-font);color:#fff;min-width:280px;';
       const curY = camera ? Math.round(camera.position.y * 100) : 45;
       const curZ = camera ? Math.round(camera.position.z * 100) : 190;
-      const curMY = currentModel
-        ? Math.round(currentModel.position.y * 100)
-        : -8;
+      const curMY = currentModel ? Math.round(currentModel.position.y * 100) : -8;
+      /**
+       * row
+       * @param {*} label
+       * @param {*} id
+       * @param {*} min
+       * @param {*} max
+       * @param {*} val
+       * @param {*} color
+       * @returns {*}
+       */
       function row(label, id, min, max, val, color) {
         return (
           '<div style="display:flex;align-items:center;gap:6px;width:100%;">' +
@@ -1631,7 +1600,7 @@
           color +
           ';width:60px;">' +
           label +
-          "</span>" +
+          '</span>' +
           '<input type="range" id="' +
           id +
           '" min="' +
@@ -1649,58 +1618,55 @@
           color +
           ';width:50px;text-align:right;">' +
           (val / 100).toFixed(2) +
-          "</span></div>"
+          '</span></div>'
         );
       }
-      p.innerHTML =
+      p.textContent =
         '<div style="font-size:0.9rem;font-weight:600;">📐 Camera Calibrator</div>' +
-        row("Cam Y ↕", "cam-y", 0, 100, curY, "#22c55e") +
-        row("Zoom Z", "cam-z", 100, 300, curZ, "#3b82f6") +
-        row("Model Y", "mod-y", -50, 50, curMY, "#f59e0b") +
+        row('Cam Y ↕', 'cam-y', 0, 100, curY, '#22c55e') +
+        row('Zoom Z', 'cam-z', 100, 300, curZ, '#3b82f6') +
+        row('Model Y', 'mod-y', -50, 50, curMY, '#f59e0b') +
         '<div id="cam-values" style="font-size:0.7rem;color:#888;margin-top:4px;">cam(0, ' +
         (curY / 100).toFixed(2) +
-        ", " +
+        ', ' +
         (curZ / 100).toFixed(2) +
-        ") model.y=" +
+        ') model.y=' +
         (curMY / 100).toFixed(2) +
-        "</div>" +
+        '</div>' +
         '<button id="cam-cal-close" style="padding:4px 16px;background:#6366f1;border:none;border-radius:8px;color:#fff;cursor:pointer;font-size:0.8rem;margin-top:4px;">Închide</button>';
       document.body.appendChild(p);
+      /**
+       * updateValues
+       * @returns {*}
+       */
       function updateValues() {
-        const y = parseInt(document.getElementById("cam-y").value);
-        const z = parseInt(document.getElementById("cam-z").value);
-        const my = parseInt(document.getElementById("mod-y").value);
-        document.getElementById("cam-values").textContent =
-          "cam(0, " +
-          (y / 100).toFixed(2) +
-          ", " +
-          (z / 100).toFixed(2) +
-          ") model.y=" +
-          (my / 100).toFixed(2);
+        const y = parseInt(document.getElementById('cam-y', 10).value);
+        const z = parseInt(document.getElementById('cam-z', 10).value);
+        const my = parseInt(document.getElementById('mod-y', 10).value);
+        document.getElementById('cam-values').textContent =
+          'cam(0, ' + (y / 100).toFixed(2) + ', ' + (z / 100).toFixed(2) + ') model.y=' + (my / 100).toFixed(2);
       }
-      document.getElementById("cam-y").addEventListener("input", function () {
-        const v = parseInt(this.value) / 100;
-        document.getElementById("cam-y-v").textContent = v.toFixed(2);
+      document.getElementById('cam-y').addEventListener('input', function () {
+        const v = parseInt(this.value, 10) / 100;
+        document.getElementById('cam-y-v').textContent = v.toFixed(2);
         if (camera) camera.position.y = v;
         updateValues();
       });
-      document.getElementById("cam-z").addEventListener("input", function () {
-        const v = parseInt(this.value) / 100;
-        document.getElementById("cam-z-v").textContent = v.toFixed(2);
+      document.getElementById('cam-z').addEventListener('input', function () {
+        const v = parseInt(this.value, 10) / 100;
+        document.getElementById('cam-z-v').textContent = v.toFixed(2);
         if (camera) camera.position.z = v;
         updateValues();
       });
-      document.getElementById("mod-y").addEventListener("input", function () {
-        const v = parseInt(this.value) / 100;
-        document.getElementById("mod-y-v").textContent = v.toFixed(2);
+      document.getElementById('mod-y').addEventListener('input', function () {
+        const v = parseInt(this.value, 10) / 100;
+        document.getElementById('mod-y-v').textContent = v.toFixed(2);
         if (currentModel) currentModel.position.y = v;
         updateValues();
       });
-      document
-        .getElementById("cam-cal-close")
-        .addEventListener("click", function () {
-          p.remove();
-        });
+      document.getElementById('cam-cal-close').addEventListener('click', function () {
+        p.remove();
+      });
     },
     // Legacy alias
     showZoomCalibrator: function () {
@@ -1715,39 +1681,33 @@
         right: { right: intensity },
         up: { up: intensity },
         down: { down: intensity },
-        "up-left": { up: intensity * 0.7, left: intensity * 0.7 },
-        "up-right": { up: intensity * 0.7, right: intensity * 0.7 },
-        "down-left": { down: intensity * 0.7, left: intensity * 0.7 },
-        "down-right": { down: intensity * 0.7, right: intensity * 0.7 },
+        'up-left': { up: intensity * 0.7, left: intensity * 0.7 },
+        'up-right': { up: intensity * 0.7, right: intensity * 0.7 },
+        'down-left': { down: intensity * 0.7, left: intensity * 0.7 },
+        'down-right': { down: intensity * 0.7, right: intensity * 0.7 },
       };
       const g = gazeMap[direction] || {};
       Object.assign(target, g);
       // Apply directly using setMorph — smooth enough via RPM blendshapes
-      setMorph("eyeLookUpLeft", target.up);
-      setMorph("eyeLookUpRight", target.up);
-      setMorph("eyeLookDownLeft", target.down);
-      setMorph("eyeLookDownRight", target.down);
+      setMorph('eyeLookUpLeft', target.up);
+      setMorph('eyeLookUpRight', target.up);
+      setMorph('eyeLookDownLeft', target.down);
+      setMorph('eyeLookDownRight', target.down);
       // Left gaze: left-eye Out, right-eye In
-      setMorph("eyeLookOutLeft", target.left);
-      setMorph("eyeLookInRight", target.left);
+      setMorph('eyeLookOutLeft', target.left);
+      setMorph('eyeLookInRight', target.left);
       // Right gaze: left-eye In, right-eye Out
-      setMorph("eyeLookInLeft", target.right);
-      setMorph("eyeLookOutRight", target.right);
+      setMorph('eyeLookInLeft', target.right);
+      setMorph('eyeLookOutRight', target.right);
     },
     startEyeIdle: function () {
       if (this._eyeIdleTimer) return;
       const self = this;
-      const directions = [
-        "center",
-        "center",
-        "center",
-        "left",
-        "right",
-        "up",
-        "up-left",
-        "up-right",
-        "down",
-      ];
+      const directions = ['center', 'center', 'center', 'left', 'right', 'up', 'up-left', 'up-right', 'down'];
+      /**
+       * nextGaze
+       * @returns {*}
+       */
       function nextGaze() {
         const dir = directions[Math.floor(Math.random() * directions.length)];
         const intensity = 0.1 + Math.random() * 0.25;
@@ -1762,7 +1722,7 @@
         clearTimeout(this._eyeIdleTimer);
         this._eyeIdleTimer = null;
       }
-      this.setEyeGaze("center");
+      this.setEyeGaze('center');
     },
     _eyeIdleTimer: null,
     getLipSync: function () {
