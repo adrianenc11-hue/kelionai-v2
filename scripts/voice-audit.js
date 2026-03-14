@@ -211,7 +211,7 @@ async function runAudit() {
     const elStart = Date.now();
     try {
       const voiceId =
-        process.env.ELEVENLABS_VOICE_KELION || "pNInz6obpgDQGcFmaJgB";
+        process.env.ELEVENLABS_VOICE_KELION || process.env.ELEVENLABS_VOICE_ID;
       const ws = new WebSocket(
         `wss://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream-input?model_id=eleven_flash_v2_5&output_format=pcm_24000`,
       );

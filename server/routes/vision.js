@@ -116,7 +116,7 @@ Answer in ${LANGS[language] || "English"}.`;
     const geminiKey = process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
     if (!description && geminiKey) {
       try {
-        const geminiModel = MODELS.GEMINI_VISION || "gemini-3.1-flash";
+        const geminiModel = MODELS.GEMINI_VISION;
         const r = await withTimeout(
           fetch(
             `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiKey}`,

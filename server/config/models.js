@@ -13,6 +13,8 @@ const MODELS = {
   OPENAI_VISION: "gpt-5.4",
   GEMINI_CHAT: "gemini-2.5-flash",
   GEMINI_VISION: "gemini-2.5-flash",
+  GEMINI_PRO: "gemini-2.5-pro-preview-06-05",   // Deep reasoning for complex tasks
+  GEMINI_MULTIMODAL: "gemini-2.5-flash",         // Multimodal (video/audio/image/doc)
   DEEPSEEK: "deepseek-chat",
   OPENAI_TOOLS: "gpt-5.4",      // V5: primary tool calling model
   GEMINI_QA: "gemini-2.5-flash", // V5: Quality Gate verifier (free)
@@ -35,6 +37,32 @@ const MODELS = {
 
   // ── Search ──
   PERPLEXITY: "sonar-pro",
+};
+
+// ── Centralized API Endpoints — NO hardcoding in routes ──
+const API_ENDPOINTS = {
+  OPENAI: "https://api.openai.com/v1",
+  GROQ: "https://api.groq.com/openai/v1",
+  DEEPSEEK: "https://api.deepseek.com/v1",
+  GEMINI: "https://generativelanguage.googleapis.com/v1beta",
+  ELEVENLABS: "https://api.elevenlabs.io/v1",
+  PERPLEXITY: "https://api.perplexity.ai",
+  TAVILY: "https://api.tavily.com",
+  SERPER: "https://google.serper.dev",
+  GRAPH_API: "https://graph.facebook.com/v21.0",
+  NVIDIA_A2F: "https://grpc.nvcf.nvidia.com/nvidia/audio2face",
+  OPEN_METEO: "https://api.open-meteo.com/v1",
+  OPEN_METEO_GEO: "https://geocoding-api.open-meteo.com/v1",
+  IP_API: "http://ip-api.com/json",
+  MEDIASTACK: "http://api.mediastack.com/v1",
+  CRYPTOPANIC: "https://cryptopanic.com/api/free/v1",
+  BINANCE_FUTURES: "https://fapi.binance.com",
+  YAHOO_FINANCE: "https://query1.finance.yahoo.com/v8/finance",
+  COINGECKO: "https://api.coingecko.com/api/v3",
+  FEAR_GREED: "https://api.alternative.me/fng",
+  BLOCKCHAIN_INFO: "https://blockchain.info",
+  TELEGRAM: "https://api.telegram.org",
+  TOGETHER: "https://api.together.xyz/v1",
 };
 
 const PERSONAS = {
@@ -63,4 +91,4 @@ const VOICE_EMOTIONS = {
   loving: { stability: 0.5, similarity_boost: 0.9, style: 0.6 },
 };
 
-module.exports = { MODELS, PERSONAS, VOICE_DEFAULTS, VOICE_EMOTIONS };
+module.exports = { MODELS, API_ENDPOINTS, PERSONAS, VOICE_DEFAULTS, VOICE_EMOTIONS };

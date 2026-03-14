@@ -150,11 +150,11 @@ router.post("/chat", chatLimiter, validate(chatSchema), async (req, res) => {
         const brainChat = require("./brain-chat");
         const k1Message = message.replace(/^k1[\s:,]*/i, "").trim();
         // Forward to brain-chat internally
-        const fakeReq = {
+        const proxyReq = {
           body: { message: k1Message, sessionId: "k1_chat_" + Date.now() },
           app: req.app,
         };
-        const fakeRes = {
+        const proxyRes = {
           json: (data) => {
             // Return as K1 response with different voice marker
             res.json({
@@ -167,7 +167,7 @@ router.post("/chat", chatLimiter, validate(chatSchema), async (req, res) => {
           },
           status: (code) => ({ json: (d) => res.status(code).json(d) }),
         };
-        await brainChat.handle(fakeReq, fakeRes);
+        await brainChat.handle(proxyReq, proxyRes);
         return;
       } catch (e) {
         // K1 not available, fall through to normal chat
@@ -225,29 +225,7 @@ router.post("/chat", chatLimiter, validate(chatSchema), async (req, res) => {
         userId: user?.id, avatar, engine: thought.agent
       });
     } catch { /* non-blocking */ }
-    // #region agent log
-    fetch("http://127.0.0.1:7257/ingest/9ae34db2-4176-48c4-a1ff-ca0fe87de92a", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Debug-Session-Id": "90d20d",
-      },
-      body: JSON.stringify({
-        sessionId: "90d20d",
-        runId: "brain-run-1",
-        hypothesisId: "H4",
-        location: "server/routes/chat.js:post-thinkV4",
-        message: "Chat route received thought",
-        data: {
-          engine,
-          hasReply: !!reply,
-          replyLen: (reply || "").length,
-          toolsUsed: (thought.toolsUsed || []).length,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
+    // Agent logging removed — was hardcoded to localhost:7257 (non-functional on Railway)
 
     if (!reply) return res.status(503).json({ error: "AI unavailable" });
 
@@ -567,7 +545,7 @@ router.post(
       const geminiKey = process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
       if (geminiKey) {
         try {
-          const geminiModel = MODELS.GEMINI_CHAT || "gemini-3.1-flash";
+          const geminiModel = MODELS.GEMINI_CHAT;
           const r = await fetch(
             `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:streamGenerateContent?alt=sse&key=${geminiKey}`,
             {

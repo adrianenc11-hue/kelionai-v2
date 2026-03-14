@@ -103,7 +103,7 @@ router.post("/analyze", upload.single("file"), async (req, res) => {
     // Use Gemini 3.1 Pro for multi-modal (more capable than Flash for video/audio)
     const model =
       mediaType === "video" || mediaType === "audio"
-        ? "gemini-3.1-pro"
+        ? MODELS.GEMINI_MULTIMODAL
         : MODELS.GEMINI_VISION;
 
     const geminiResponse = await fetch(
@@ -193,7 +193,7 @@ router.get("/formats", (_req, res) => {
       document: ["pdf"],
     },
     maxSize: "25MB",
-    model: "gemini-3.1-pro (video/audio) / gemini-3.1-flash (image/doc)",
+    model: `${MODELS.GEMINI_MULTIMODAL} (video/audio) / ${MODELS.GEMINI_VISION} (image/doc)`,
   });
 });
 
@@ -201,7 +201,7 @@ router.get("/formats", (_req, res) => {
 router.get("/health", (_req, res) => {
   res.json({
     status: "ok",
-    model: "gemini-3.1-pro",
+    model: MODELS.GEMINI_MULTIMODAL,
     maxUploadSize: "25MB",
     supportedTypes: ["image", "video", "audio", "pdf"],
   });

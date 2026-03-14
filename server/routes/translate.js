@@ -29,7 +29,7 @@ router.post("/translate", translateLimiter, async (req, res) => {
     }
 
     const MODELS = require("../config/models");
-    const model = MODELS.GEMINI_CHAT || "gemini-2.0-flash";
+    const model = MODELS.GEMINI_CHAT;
 
     const prompt = sourceLang
       ? `Translate the following text from ${sourceLang} to ${targetLang}. Return ONLY the translated text, nothing else. No explanations, no quotes, no formatting.\n\nText: ${text}`

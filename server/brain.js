@@ -5255,9 +5255,9 @@ Rules:
     if ((tier === "balanced" || tier === "fast") && this.geminiKey) {
       return {
         provider: "gemini",
-        model: "gemini-2.0-flash",
+        model: MODELS.GEMINI_CHAT,
         apiKey: this.geminiKey,
-        endpoint: `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent`,
+        endpoint: `https://generativelanguage.googleapis.com/v1beta/models/${MODELS.GEMINI_CHAT}:generateContent`,
         reason: `Balanced model for ${complexityResult.name} task`,
         maxTokens: complexityResult.maxTokens,
         costPerToken: 0.0000003,
@@ -5268,9 +5268,9 @@ Rules:
     if (tier === "premium" && this.geminiKey) {
       return {
         provider: "gemini",
-        model: "gemini-2.5-pro-preview-06-05",
+        model: MODELS.GEMINI_PRO,
         apiKey: this.geminiKey,
-        endpoint: `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro-preview-06-05:generateContent`,
+        endpoint: `https://generativelanguage.googleapis.com/v1beta/models/${MODELS.GEMINI_PRO}:generateContent`,
         reason: `🧠 Deep reasoning (Gemini Pro) for ${complexityResult.name} task`,
         maxTokens: Math.max(complexityResult.maxTokens, 4000),
         costPerToken: 0.00000125,
@@ -5294,9 +5294,9 @@ Rules:
     if (this.geminiKey) {
       return {
         provider: "gemini",
-        model: "gemini-2.0-flash",
+        model: MODELS.GEMINI_CHAT,
         apiKey: this.geminiKey,
-        endpoint: `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent`,
+        endpoint: `https://generativelanguage.googleapis.com/v1beta/models/${MODELS.GEMINI_CHAT}:generateContent`,
         reason: "Fallback to Gemini",
         maxTokens: complexityResult.maxTokens,
         costPerToken: 0.0000003,
@@ -8552,8 +8552,7 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
 
     if (process.env.ELEVENLABS_API_KEY) {
       try {
-        const voiceId =
-          process.env.ELEVENLABS_VOICE_ID || "pNInz6obpgDQGcFmaJgB";
+        const voiceId = process.env.ELEVENLABS_VOICE_KELION || process.env.ELEVENLABS_VOICE_ID;
         const r = await fetch(
           `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
           {

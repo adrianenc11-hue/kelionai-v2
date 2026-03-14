@@ -2504,12 +2504,14 @@ router.post("/paper/off", (req, res) => {
 setTimeout(async () => {
   try {
     const { createClient } = require("@supabase/supabase-js");
-    const sbUrl =
-      process.env.SUPABASE_URL;
+    const sbUrl = process.env.SUPABASE_URL;
     const sbKey =
       process.env.SUPABASE_SERVICE_ROLE_KEY ||
-      process.env.SUPABASE_SERVICE_KEY ||
-      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5xbG9ieWJmd210a21zcWFkcXFyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTg3MzAyMiwiZXhwIjoyMDg3NDQ5MDIyfQ.AngYdhgIOXas4UssEP1ENLiZCW9CYPgecvYej3PvLOQ";
+      process.env.SUPABASE_SERVICE_KEY;
+    if (!sbUrl || !sbKey) {
+      logger.warn("[Trading] SUPABASE_URL or SUPABASE_SERVICE_KEY missing — skipping auto-restart");
+      return;
+    }
     const sb = createClient(sbUrl, sbKey);
     const { data } = await sb
       .from("trading_state")
@@ -2535,11 +2537,12 @@ setTimeout(async () => {
     // Still try to start learner even if trading_state check fails
     try {
       const { createClient: cc } = require("@supabase/supabase-js");
-      const sbFallback = cc(
-        process.env.SUPABASE_URL || "https://nqlobybfwmtkmsqadqqr.supabase.co",
-        process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || ""
-      );
-      tradingLearner.startLearning(sbFallback);
+      const fallbackUrl = process.env.SUPABASE_URL;
+      const fallbackKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
+      if (fallbackUrl && fallbackKey) {
+        const sbFallback = cc(fallbackUrl, fallbackKey);
+        tradingLearner.startLearning(sbFallback);
+      }
     } catch (_) { /* non-critical */ }
   }
 }, 10000); // 10s after boot to let DB connections initialize
@@ -2594,12 +2597,11 @@ router.post("/paper/learn", async (req, res) => {
 router.get("/simulate", async (req, res) => {
   try {
     const { createClient } = require("@supabase/supabase-js");
-    const sbUrl =
-      process.env.SUPABASE_URL;
+    const sbUrl = process.env.SUPABASE_URL;
     const sbKey =
       process.env.SUPABASE_SERVICE_ROLE_KEY ||
-      process.env.SUPABASE_SERVICE_KEY ||
-      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5xbG9ieWJmd210a21zcWFkcXFyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTg3MzAyMiwiZXhwIjoyMDg3NDQ5MDIyfQ.AngYdhgIOXas4UssEP1ENLiZCW9CYPgecvYej3PvLOQ";
+      process.env.SUPABASE_SERVICE_KEY;
+    if (!sbUrl || !sbKey) return res.status(503).json({ error: "Supabase not configured" });
     const sb = createClient(sbUrl, sbKey);
     const results = await investSim.runFullSimulation(sb);
     res.json(results);
@@ -2613,12 +2615,11 @@ router.get("/simulate", async (req, res) => {
 router.get("/brain-rules", async (req, res) => {
   try {
     const { createClient } = require("@supabase/supabase-js");
-    const sbUrl =
-      process.env.SUPABASE_URL;
+    const sbUrl = process.env.SUPABASE_URL;
     const sbKey =
       process.env.SUPABASE_SERVICE_ROLE_KEY ||
-      process.env.SUPABASE_SERVICE_KEY ||
-      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5xbG9ieWJmd210a21zcWFkcXFyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTg3MzAyMiwiZXhwIjoyMDg3NDQ5MDIyfQ.AngYdhgIOXas4UssEP1ENLiZCW9CYPgecvYej3PvLOQ";
+      process.env.SUPABASE_SERVICE_KEY;
+    if (!sbUrl || !sbKey) return res.status(503).json({ error: "Supabase not configured" });
     const sb = createClient(sbUrl, sbKey);
     const { data, error } = await sb
       .from("trading_brain_rules")

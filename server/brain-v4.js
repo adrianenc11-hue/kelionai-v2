@@ -2778,28 +2778,7 @@ async function thinkV4(
   brain._currentMediaData = mediaData || {};
 
   try {
-    // #region agent log
-    fetch("http://127.0.0.1:7257/ingest/9ae34db2-4176-48c4-a1ff-ca0fe87de92a", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Debug-Session-Id": "90d20d",
-      },
-      body: JSON.stringify({
-        sessionId: "90d20d",
-        runId: "brain-run-1",
-        hypothesisId: "H1",
-        location: "server/brain-v4.js:thinkV4-entry",
-        message: "thinkV4 entry",
-        data: {
-          hasGeminiKey: !!(process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY),
-          userIdPresent: !!userId,
-          msgLen: (message || "").length,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
+    // Agent logging removed — was hardcoded to localhost:7257
     // ── 1. Quota check ──
     const quota = await brain.checkQuota(userId);
     if (!quota.allowed) {
@@ -2956,24 +2935,7 @@ async function thinkV4(
     const geminiApiKey =
       process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
     if (!geminiApiKey) {
-      // #region agent log
-      fetch("http://127.0.0.1:7257/ingest/9ae34db2-4176-48c4-a1ff-ca0fe87de92a", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Debug-Session-Id": "90d20d",
-        },
-        body: JSON.stringify({
-          sessionId: "90d20d",
-          runId: "brain-run-1",
-          hypothesisId: "H1",
-          location: "server/brain-v4.js:missing-gemini-key",
-          message: "Gemini key missing in thinkV4",
-          data: {},
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
+      // Agent logging removed — was hardcoded to localhost:7257
       throw new Error("GOOGLE_AI_KEY not configured — cannot call Gemini API");
     }
 
@@ -3150,29 +3112,7 @@ async function thinkV4(
       `🧠 V4 Think: ${toolsUsed.length} tools | ${thinkTime}ms | ${totalTokens} tokens`,
     );
 
-    // #region agent log
-    fetch("http://127.0.0.1:7257/ingest/9ae34db2-4176-48c4-a1ff-ca0fe87de92a", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Debug-Session-Id": "90d20d",
-      },
-      body: JSON.stringify({
-        sessionId: "90d20d",
-        runId: "brain-run-1",
-        hypothesisId: "H3",
-        location: "server/brain-v4.js:thinkV4-before-return",
-        message: "thinkV4 return candidate",
-        data: {
-          finalResponseLen: (finalResponse || "").length,
-          toolsUsed: toolsUsed.length,
-          failedTools: toolResults.filter((r) => r.result?.error).length,
-          confidence,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
+    // Agent logging removed — was hardcoded to localhost:7257
     // ── Self-evaluate response quality ──
     try {
       const evalDomain = toolsUsed.includes("trading_analysis") ? "trading"
@@ -3217,24 +3157,8 @@ async function thinkV4(
       { component: "BrainV4", err: e.message, thinkTime },
       `🧠 V4 Think failed: ${e.message}`,
     );
-    // #region agent log
-    fetch("http://127.0.0.1:7257/ingest/9ae34db2-4176-48c4-a1ff-ca0fe87de92a", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Debug-Session-Id": "90d20d",
-      },
-      body: JSON.stringify({
-        sessionId: "90d20d",
-        runId: "brain-run-1",
-        hypothesisId: "H2",
-        location: "server/brain-v4.js:thinkV4-catch",
-        message: "thinkV4 failed, entering fallback",
-        data: { err: e.message },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
+    // Agent logging removed — was hardcoded to localhost:7257
+
 
     // FALLBACK to v3 think
     logger.info({ component: "BrainV4" }, "⚠️ Falling back to v3 think");
@@ -3250,24 +3174,7 @@ async function thinkV4(
         isAdmin,
       );
     } catch (e2) {
-      // #region agent log
-      fetch("http://127.0.0.1:7257/ingest/9ae34db2-4176-48c4-a1ff-ca0fe87de92a", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Debug-Session-Id": "90d20d",
-        },
-        body: JSON.stringify({
-          sessionId: "90d20d",
-          runId: "brain-run-1",
-          hypothesisId: "H2",
-          location: "server/brain-v4.js:v3-fallback-failed",
-          message: "v3 fallback failed, returning echo response",
-          data: { err: e2.message, echoedMsgLen: (message || "").length },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
+      // Agent logging removed — was hardcoded to localhost:7257
       return {
         enrichedMessage:
           (language === "ro"

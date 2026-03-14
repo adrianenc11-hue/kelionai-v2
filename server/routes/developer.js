@@ -399,7 +399,7 @@ router.post("/v1/chat", v1Limiter, apiKeyAuth, async (req, res) => {
     const geminiKey = process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
     if (!reply && geminiKey) {
       try {
-        const geminiModel = MODELS.GEMINI_CHAT || "gemini-3.1-flash";
+        const geminiModel = MODELS.GEMINI_CHAT;
         const r = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiKey}`,
           {

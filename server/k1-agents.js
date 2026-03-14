@@ -14,6 +14,7 @@
 
 const logger = require("pino")({ name: "k1-agents" });
 const k1Cognitive = require("./k1-cognitive");
+const { MODELS } = require("./config/models");
 
 // ═══════════════════════════════════════════════════════════════
 // AGENT REGISTRY — Agenți activi și template-uri
@@ -357,7 +358,7 @@ async function callGemini(systemPrompt, userPrompt, maxTokens = 600) {
   const key = process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
   if (!key) throw new Error("No Gemini API key");
 
-  const model = "gemini-2.0-flash";
+  const model = MODELS.GEMINI_CHAT;
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
 
   const r = await fetch(url, {
