@@ -28,8 +28,6 @@ const crypto = require("crypto");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 const { supabase, supabaseAdmin } = require("./supabase");
-const selfHealWatchdog = require("./self-heal-watchdog");
-const serviceHealthMonitor = require("./service-health-monitor");
 const { initCache, cacheGet, cacheSet, getCacheStats } = require("./cache");
 const { runMigration } = require("./migrate");
 const { KelionBrain } = require("./brain");
@@ -2017,14 +2015,7 @@ if (require.main === module) {
         );
         // Smoke test internal routes (async, non-blocking)
         smokeTest(PORT).catch(() => {});
-        // 🐕 Self-Healing Watchdog — auto-detect errors & create GitHub issues
-        selfHealWatchdog.start({
-          errorPatterns: _errorPatterns,
-          brain,
-          supabaseAdmin,
-        });
-        // 🏥 Service Health Monitor — probe external APIs every 10 min
-        serviceHealthMonitor.start();
+
         // Self-ping keepalive — prevent Railway idle sleep (every 4 min)
         const APP_URL = process.env.APP_URL || `http://localhost:${PORT}`;
         setInterval(
