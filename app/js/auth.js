@@ -489,11 +489,12 @@
       }
     });
     // Fallback: enter after 10s max even if avatars not loaded
-    setTimeout(function () {
+    function fallbackEnter() {
       if (_sessionChecked && !currentUser && !scr.classList.contains('hidden')) {
         enterApp();
       }
-    }, 10000);
+    }
+    setTimeout(fallbackEnter, 10000);
 
     const ab = document.getElementById('btn-auth');
     if (ab)
@@ -623,19 +624,18 @@
       }
       window.history.replaceState({}, '', window.location.pathname);
     }
-    setInterval(
-      async () => {
-        if (sessionStorage.getItem('kelion_token') && isTokenExpired()) {
-          const ok = await refreshToken();
-          if (!ok) {
-            updateUI();
-            document.getElementById('auth-screen')?.classList.remove('hidden');
-            document.getElementById('app-layout')?.classList.add('hidden');
-          }
+    async function tokenRefreshCheck() {
+      if (sessionStorage.getItem('kelion_token') && isTokenExpired()) {
+        const ok = await refreshToken();
+        if (!ok) {
+          updateUI();
+          document.getElementById('auth-screen')?.classList.remove('hidden');
+          document.getElementById('app-layout')?.classList.add('hidden');
         }
-      },
-      5 * 60 * 1000
-    );
+      }
+      setTimeout(tokenRefreshCheck, 5 * 60 * 1000);
+    }
+    tokenRefreshCheck();
   }
 
   window.KAuth = {

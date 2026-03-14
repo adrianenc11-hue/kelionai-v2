@@ -369,9 +369,13 @@
           method: 'POST',
           headers: authHeaders(),
           body: JSON.stringify({ tool: 'all' }),
-        }).then(function () {
-          loadBrain();
-        });
+        })
+          .then(function () {
+            loadBrain();
+          })
+          .catch(function (e) {
+            console.error('Error resetting tools:', e.message);
+          });
       });
   }
 

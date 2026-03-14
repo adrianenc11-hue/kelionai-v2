@@ -138,9 +138,6 @@ function setSupabase(client) {
   }
 }
 
-// TEMPORARY MEDIA BUFFERS (for TTS voice + image serving)
-const mediaBuffers = new Map();
-
 // Clean up expired media buffers every 10 minutes
 setInterval(function () {
   const now = Date.now();

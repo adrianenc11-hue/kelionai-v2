@@ -664,16 +664,19 @@
   // ─── Apply translations to DOM ─────────────────────────────────────────
   function applyTranslations() {
     // Text content
-    document.querySelectorAll('[data-i18n]').forEach(function (el) {
+    const elements = document.querySelectorAll('[data-i18n]');
+    elements.forEach(function (el) {
       var key = el.getAttribute('data-i18n');
       el.textContent = t(key);
     });
     // Placeholder attribute
-    document.querySelectorAll('[data-i18n-placeholder]').forEach(function (el) {
+    const placeholderElements = document.querySelectorAll('[data-i18n-placeholder]');
+    placeholderElements.forEach(function (el) {
       el.placeholder = t(el.getAttribute('data-i18n-placeholder'));
     });
     // aria-label attribute
-    document.querySelectorAll('[data-i18n-aria]').forEach(function (el) {
+    const ariaElements = document.querySelectorAll('[data-i18n-aria]');
+    ariaElements.forEach(function (el) {
       el.setAttribute('aria-label', t(el.getAttribute('data-i18n-aria')));
     });
     // Update <html lang="...">

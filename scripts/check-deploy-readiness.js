@@ -56,7 +56,7 @@ function run(cmd, args, opts = {}) {
 function parseEnv(filePath) {
   const out = new Map();
   if (!fs.existsSync(filePath)) return out;
-  const lines = fs.readFileSync(filePath, 'utf8').split('\n');
+  const lines = readFileCached(filePath).split('\n');
   for (const line of lines) {
     const t = line.trim();
     if (!t || t.startsWith('#')) continue;
@@ -67,6 +67,22 @@ function parseEnv(filePath) {
     if (key) out.set(key, value);
   }
   return out;
+}
+
+let fileCache = new Map();
+
+/**
+ * readFileCached
+ * @param {*} filePath
+ * @returns {string}
+ */
+function readFileCached(filePath) {
+  if (fileCache.has(filePath)) {
+    return fileCache.get(filePath);
+  }
+  const content = fs.readFileSync(filePath, 'utf8');
+  fileCache.set(filePath, content);
+  return content;
 }
 
 /**

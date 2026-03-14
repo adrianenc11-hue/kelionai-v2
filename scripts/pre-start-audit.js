@@ -42,6 +42,7 @@ const WHITELIST = [
  */
 function scan() {
   const findings = [];
+  const fileCache = new Map();
 
   for (const dir of SCAN_DIRS) {
     const absDir = path.join(ROOT, dir);
@@ -57,7 +58,14 @@ function scan() {
         }
         if (!e.name.endsWith('.js')) continue;
 
-        const lines = fs.readFileSync(fp, 'utf8').split('\n');
+        let lines;
+        if (fileCache.has(fp)) {
+          lines = fileCache.get(fp);
+        } else {
+          lines = fs.readFileSync(fp, 'utf8').split('\n');
+          fileCache.set(fp, lines);
+        }
+
         for (let i = 0; i < lines.length; i++) {
           const line = lines[i];
           if (WHITELIST.some((re) => re.test(line))) continue;

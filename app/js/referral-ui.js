@@ -20,9 +20,7 @@
 
   // ─── Show/Hide invite button based on auth state ───
   function updateInviteVisibility() {
-    const token =
-      localStorage.getItem('kelion_token') ||
-      (window.KelionAuth && window.KelionAuth.getToken && window.KelionAuth.getToken());
+    const token = getToken();
     if (btnInvite) {
       btnInvite.style.display = token ? '' : 'none';
     }
@@ -114,22 +112,7 @@
   if (btnCopy) {
     btnCopy.addEventListener('click', function () {
       if (currentCode) {
-        navigator.clipboard
-          .writeText(currentCode)
-          .then(function () {
-            btnCopy.textContent = '✅';
-            setTimeout(function () {
-              btnCopy.textContent = '📋';
-            }, 2000);
-          })
-          .catch(function () {
-            codeDisplay.select();
-            document.execCommand('copy');
-            btnCopy.textContent = '✅';
-            setTimeout(function () {
-              btnCopy.textContent = '📋';
-            }, 2000);
-          });
+        copyToClipboard(currentCode, btnCopy);
       }
     });
   }
@@ -192,5 +175,29 @@
       statusEl.textContent = msg;
       statusEl.style.color = color || '#8888AA';
     }
+  }
+
+  /**
+   * copyToClipboard
+   * @param {string} text
+   * @param {HTMLElement} button
+   */
+  function copyToClipboard(text, button) {
+    navigator.clipboard
+      .writeText(text)
+      .then(function () {
+        button.textContent = '✅';
+        setTimeout(function () {
+          button.textContent = '📋';
+        }, 2000);
+      })
+      .catch(function () {
+        codeDisplay.select();
+        document.execCommand('copy');
+        button.textContent = '✅';
+        setTimeout(function () {
+          button.textContent = '📋';
+        }, 2000);
+      });
   }
 })();
