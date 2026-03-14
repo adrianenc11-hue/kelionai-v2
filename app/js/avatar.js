@@ -226,7 +226,7 @@
         scene.add(bottomLight);
 
         // Init texture loader and load initial background
-        bgLoader = new THREE.TextureLoader();
+        _bgLoader = new THREE.TextureLoader();
         _loadAvatarBg('kelion');
 
         // Lip sync — simple, uses Smile morph
