@@ -101,26 +101,22 @@
       if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       if (audioCtx.state === 'suspended') audioCtx.resume();
       if (connectedElements.has(audioEl)) return true;
-      return this._createMediaElementSource(audioEl);
+      try {
+        var sourceNode = audioCtx.createMediaElementSource(audioEl);
+        analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 512; // CINEMATIC: doubled
+        analyser.smoothingTimeConstant = 0.35;
+        sourceNode.connect(analyser);
+        analyser.connect(audioCtx.destination);
+        dataArray = new Uint8Array(analyser.frequencyBinCount);
+        connectedElements.add(audioEl);
+        return true;
+      } catch (e) {
+        console.warn('[LipSync] MediaElementSource failed');
+        return false;
+      }
     } catch (e) {
       console.error('[LipSync] Connect error:', e);
-      return false;
-    }
-  };
-
-  SimpleLipSync.prototype._createMediaElementSource = function (audioEl) {
-    try {
-      var sourceNode = audioCtx.createMediaElementSource(audioEl);
-      analyser = audioCtx.createAnalyser();
-      analyser.fftSize = 512; // CINEMATIC: doubled
-      analyser.smoothingTimeConstant = 0.35;
-      sourceNode.connect(analyser);
-      analyser.connect(audioCtx.destination);
-      dataArray = new Uint8Array(analyser.frequencyBinCount);
-      connectedElements.add(audioEl);
-      return true;
-    } catch (e) {
-      console.warn('[LipSync] MediaElementSource failed');
       return false;
     }
   };

@@ -53,7 +53,7 @@ function parseEnvFile(filePath) {
   const result = new Map();
   if (!fs.existsSync(filePath)) return result;
 
-  const lines = fs.readFileSync(filePath, 'utf8').split('\n');
+  const lines = cacheFileRead(filePath).split('\n');
   for (const line of lines) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith('#')) continue;
@@ -81,7 +81,7 @@ function parseEnvExampleKeys(filePath) {
   const keys = [];
   if (!fs.existsSync(filePath)) return keys;
 
-  const lines = fs.readFileSync(filePath, 'utf8').split('\n');
+  const lines = cacheFileRead(filePath).split('\n');
   for (const line of lines) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith('#')) continue;
@@ -91,6 +91,16 @@ function parseEnvExampleKeys(filePath) {
     if (key) keys.push(key);
   }
   return keys;
+}
+
+/** Cache file contents to avoid repeated sync reads */
+const fileCache = new Map();
+function cacheFileRead(filePath) {
+  if (!fileCache.has(filePath)) {
+    const content = fs.readFileSync(filePath, 'utf8');
+    fileCache.set(filePath, content);
+  }
+  return fileCache.get(filePath);
 }
 
 /** Rulează o comandă și returnează stdout sau null la eroare. */
@@ -286,7 +296,7 @@ async function main() {
   if (generatedValues.size > 0) {
     const lines = [];
     if (fs.existsSync(ENV_GENERATED)) {
-      const existing = fs.readFileSync(ENV_GENERATED, 'utf8').split('\n');
+      const existing = cacheFileRead(ENV_GENERATED).split('\n');
       for (const line of existing) {
         const eqIdx = line.indexOf('=');
         if (eqIdx !== -1) {

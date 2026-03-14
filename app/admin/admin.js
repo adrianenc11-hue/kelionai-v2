@@ -374,7 +374,7 @@
             loadBrain();
           })
           .catch(function (e) {
-            console.error('Error resetting tools:', e.message);
+            console.error('Reset error:', e.message);
           });
       });
   }

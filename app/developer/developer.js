@@ -438,7 +438,7 @@ function hideAlert(id) {
  */
 function fmtDate(iso) {
   if (!iso) return 'never';
-  return new Date(iso).toLocaleDateString();
+  return new Date(iso).toLocaleDateString('en-US');
 }
 /**
  * escHtml

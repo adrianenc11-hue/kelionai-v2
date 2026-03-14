@@ -257,7 +257,25 @@
       console.warn('[VoiceStream] Not connected');
       return false;
     }
-    ws.send(JSON.stringify({ type: 'text_input', text: text }));
+    var data = { type: 'text_input', text: text };
+    if (validateData(data)) {
+      ws.send(JSON.stringify(data));
+      return true;
+    } else {
+      console.warn('[VoiceStream] Invalid data:', data);
+      return false;
+    }
+  }
+
+  /**
+   * validateData
+   * @param {*} data
+   * @returns {boolean}
+   */
+  function validateData(data) {
+    if (typeof data !== 'object' || data === null) return false;
+    if (!data.type || typeof data.type !== 'string') return false;
+    if (!data.text || typeof data.text !== 'string') return false;
     return true;
   }
 

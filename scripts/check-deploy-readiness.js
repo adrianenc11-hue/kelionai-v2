@@ -22,6 +22,8 @@ const ENV_EXAMPLE = path.join(ROOT, '.env.example');
 
 const REQUIRED_RAILWAY_KEYS = ['GOOGLE_AI_KEY', 'SUPABASE_URL', 'SUPABASE_ANON_KEY', 'SUPABASE_SERVICE_KEY'];
 
+let cachedEnvContent = null;
+
 /**
  * log
  * @param {*} title
@@ -56,7 +58,12 @@ function run(cmd, args, opts = {}) {
 function parseEnv(filePath) {
   const out = new Map();
   if (!fs.existsSync(filePath)) return out;
-  const lines = readFileCached(filePath).split('\n');
+
+  if (cachedEnvContent === null) {
+    cachedEnvContent = fs.readFileSync(filePath, 'utf8');
+  }
+
+  const lines = cachedEnvContent.split('\n');
   for (const line of lines) {
     const t = line.trim();
     if (!t || t.startsWith('#')) continue;
@@ -67,22 +74,6 @@ function parseEnv(filePath) {
     if (key) out.set(key, value);
   }
   return out;
-}
-
-let fileCache = new Map();
-
-/**
- * readFileCached
- * @param {*} filePath
- * @returns {string}
- */
-function readFileCached(filePath) {
-  if (fileCache.has(filePath)) {
-    return fileCache.get(filePath);
-  }
-  const content = fs.readFileSync(filePath, 'utf8');
-  fileCache.set(filePath, content);
-  return content;
 }
 
 /**

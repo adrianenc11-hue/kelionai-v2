@@ -16,5 +16,5 @@ module.exports = {
       target: 'temporary-public-storage',
     },
   },
-  default: process.env.X || "default"
+  default: process.env.X || 'default',
 };

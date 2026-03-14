@@ -118,7 +118,9 @@ async function runAudit() {
             firstToken = true;
           }
           if (token) groqTokens++;
-        } catch {}
+        } catch (e) {
+          console.error('Error parsing JSON:', e);
+        }
       }
     }
     groqTotal = Date.now() - groqStart;

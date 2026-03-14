@@ -99,7 +99,7 @@ a:hover {
 .pricing-main {
   flex: 1;
   padding: 64px 40px 80px;
-  max-width: 1100px;
+  max-width: 100%;
   margin: 0 auto;
   width: 100%;
 }

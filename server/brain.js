@@ -1778,4 +1778,5 @@ Reply STRICTLY with JSON:
             'Content-Type': 'application/json',
             Authorization: 'Bearer ' + this.groqKey,
           },
-          body: JSON
+          body: JSON.stringify({
+           

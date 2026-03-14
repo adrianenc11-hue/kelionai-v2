@@ -624,7 +624,7 @@
       }
       window.history.replaceState({}, '', window.location.pathname);
     }
-    async function tokenRefreshCheck() {
+    async function checkTokenAndRefresh() {
       if (sessionStorage.getItem('kelion_token') && isTokenExpired()) {
         const ok = await refreshToken();
         if (!ok) {
@@ -633,9 +633,9 @@
           document.getElementById('app-layout')?.classList.add('hidden');
         }
       }
-      setTimeout(tokenRefreshCheck, 5 * 60 * 1000);
+      setTimeout(checkTokenAndRefresh, 5 * 60 * 1000);
     }
-    tokenRefreshCheck();
+    checkTokenAndRefresh();
   }
 
   window.KAuth = {
