@@ -66,7 +66,6 @@ async function measure(label, fn) {
   const ttfb = Date.now() - streamStart;
 
   const total = stt.ms + chat.ms + tts.ms;
-  console.log(`  CHAT: ${chat.ms}ms (${((chat.ms / total) * 100).toFixed(0)}%)`);
   console.log(
     `\n=== BOTTLENECK: ${chat.ms > tts.ms ? (chat.ms > stt.ms ? 'CHAT' : 'STT') : tts.ms > stt.ms ? 'TTS' : 'STT'} ===`
   );

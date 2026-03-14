@@ -142,7 +142,6 @@
       } catch (_e) {
         // FaceDetector failed, fall through to motion tracking
         _faceDetector = null;
-        console.log('[AutoCamera] FaceDetector unavailable, using motion fallback');
       }
     }
 

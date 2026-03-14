@@ -21,7 +21,6 @@ const results = [];
 function log(name, status, detail) {
   const icon = status === 'OK' ? '✅' : status === 'MISSING' ? '⬜' : status === 'EXPIRED' ? '🔴' : '❌';
   results.push({ name, status, detail });
-  console.log(`${icon} ${name.padEnd(30)} ${status.padEnd(10)} ${detail || ''}`);
 }
 
 /**
@@ -289,18 +288,14 @@ async function run() {
   const expired = results.filter(
     (r) => r.status === 'EXPIRED' || r.status === 'INVALID' || r.status === 'ERROR'
   ).length;
-  console.log(`  ✅ OK/SET: ${ok}   ⬜ MISSING: ${missing}   🔴 EXPIRED/INVALID: ${expired}`);
 
   // ═══ NAME MISMATCHES ═══
-  console.log('  Code: MESSENGER_PAGE_TOKEN → List: MESSENGER_PAGE_TOKEN ✅ match');
 
   if (expired > 0) {
     results
       .filter((r) => r.status === 'EXPIRED' || r.status === 'INVALID' || r.status === 'ERROR')
       .forEach((r) => console.log(`   → ${r.name}: ${r.detail}`));
   }
-
-  console.log('\n═══════════════════════════════════════════════════════════\n');
 }
 
 run().catch((e) => console.error('Validator error:', e));

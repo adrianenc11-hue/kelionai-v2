@@ -33,8 +33,6 @@ async function testEndpoint(name, method, path, body = null) {
       data = await res.text();
     }
 
-    console.log(`Response:`, typeof data === 'string' ? data.slice(0, 100) : data);
-
     if (res.status !== 404) {
     } else {
     }
@@ -48,8 +46,6 @@ async function testEndpoint(name, method, path, body = null) {
  * @returns {*}
  */
 async function runAll() {
-  console.log("Starting tests for 'missing' items in IMPLEMENTATION_STATUS.md...\n");
-
   // 1. WhatsApp send POST
   await testEndpoint('WhatsApp Send', 'POST', '/api/whatsapp/send', {
     to: '123456789',

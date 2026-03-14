@@ -32,14 +32,10 @@ const RO_PATTERNS =
       else failed++;
       const mark = ok ? '✅ PASS' : '❌ FAIL';
       const extra = loc ? ` → ${loc}` : ` (${(await res.text()).length} bytes)`;
-      console.log(`  ${mark}  ${r.path.padEnd(22)} ${status}${extra}  [${r.desc}]`);
     } catch (e) {
       failed++;
-      console.log(`  ❌ FAIL  ${r.path.padEnd(22)} ERROR: ${e.message}  [${r.desc}]`);
     }
   }
-
-  console.log(`\n  Result: ${passed}/${routes.length} passed, ${failed} failed\n`);
 
   const runtimeChecks = [
     { path: '/api/legal/terms', desc: 'API Terms JSON' },
@@ -58,7 +54,6 @@ const RO_PATTERNS =
       const text = await res.text();
       const hasRo = RO_PATTERNS.test(text);
       if (hasRo) roFound++;
-      console.log(`  ${hasRo ? '❌ ROMANIAN FOUND' : '✅ ENGLISH ONLY'}  ${c.path.padEnd(22)}  [${c.desc}]`);
     } catch (e) {
       console.error(e);
     }
@@ -74,8 +69,5 @@ const RO_PATTERNS =
     const r1 = await fetch(BASE + p);
     const r2 = await fetch(BASE + p);
     const ok = r1.status === 200 && r2.status === 200;
-    console.log(`  ${ok ? '✅ PASS' : '❌ FAIL'}  ${p.padEnd(15)} access=${r1.status}  refresh=${r2.status}`);
   }
-
-  console.log(`  Romanian:  ${roFound === 0 ? '0 found ✅' : roFound + ' found ❌'}`);
 })();

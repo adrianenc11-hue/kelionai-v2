@@ -118,7 +118,6 @@ async function main() {
   }
 
   fs.writeFileSync(envPath, envContent, 'utf8');
-  console.log(`  📝 ${Object.keys(env).filter((k) => env[k]).length} variables configured`);
 
   console.log(`
   ═══════════════════════════════════════════

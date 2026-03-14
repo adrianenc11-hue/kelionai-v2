@@ -148,7 +148,6 @@ const RealtimeVision = (() => {
 
       isRunning = true;
       intervalId = setInterval(detect, intervalMs);
-      console.log(`[VISION] ✅ Real-time detection started (${intervalMs}ms interval)`);
       return true;
     },
 

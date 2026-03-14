@@ -617,7 +617,6 @@
         resumeWakeDetection();
       }
     }, audioDurationMs);
-    console.log('[Voice] ✅ Audio playing (' + arrayBuf.byteLength + 'B, ' + Math.round(audioBuf.duration) + 's)');
   }
 
   /**

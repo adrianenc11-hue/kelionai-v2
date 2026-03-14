@@ -85,7 +85,6 @@
         }
       });
     });
-    console.log('[Avatar] Mouth morph cache:', _mouthMorphCache.length, 'targets');
   }
 
   // Attention state — stops idle when listening
@@ -357,7 +356,6 @@
               if (child.isMesh && child.morphTargetDictionary) {
                 morphMeshes.push(child);
                 child.morphTargetInfluences.fill(0);
-                console.log('[Avatar] Morph:', child.name, Object.keys(child.morphTargetDictionary).join(', '));
               }
               // After last mesh, rebuild mouth cache
               _cacheMouthMorphs();
@@ -438,7 +436,6 @@
               mirrorMesh.scale.copy(origMesh.scale);
               origMesh.parent.add(mirrorMesh);
             });
-            console.log('[Avatar] Kira mirror fix applied to', meshesToMirror.length, 'meshes');
           }
 
           // ARM POSE — find bones and set default relaxed pose
@@ -484,7 +481,6 @@
 
           document.getElementById('avatar-name').textContent = name === 'kira' ? 'Kira' : 'Kelion';
           document.getElementById('status-text').textContent = 'Online';
-          console.log(`[Avatar] ${name} loaded — ${morphMeshes.length} morph meshes`);
           renderer.render(scene, camera);
           setTimeout(function () {
             renderer.render(scene, camera);
@@ -1271,7 +1267,6 @@
     _bodyActionActive = true;
     _bodyActionTimer = 0;
     _bodyActionDuration = action.dur || 2.0;
-    console.log('[Avatar] Body action:', type, '(' + _bodyActionDuration + 's)');
   }
 
   /**

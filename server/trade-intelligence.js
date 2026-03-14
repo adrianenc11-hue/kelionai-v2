@@ -166,6 +166,16 @@ function calculatePivotPoints(high, low, close, _open) {
 // III. KELTNER CHANNELS — Volatility-based bands (complementary to Bollinger)
 // ═══════════════════════════════════════════════════════════════════════════
 
+/**
+ * calculateKeltnerChannels
+ * @param {*} highs
+ * @param {*} lows
+ * @param {*} closes
+ * @param {*} emaPeriod
+ * @param {*} atrPeriod
+ * @param {*} multiplier
+ * @returns {*}
+ */
 function calculateKeltnerChannels(highs, lows, closes, emaPeriod = 20, atrPeriod = 10, multiplier = 2) {
   if (closes.length < Math.max(emaPeriod, atrPeriod))
     return {

@@ -44,14 +44,12 @@ async function probe({ path, expectStatus, expectJson, checkField }) {
     const duration = Date.now() - start;
 
     if (res.status !== expectStatus) {
-      console.log(`❌ ${path} → ${res.status} (expected ${expectStatus}) [${duration}ms]`);
       return false;
     }
 
     if (expectJson) {
       const data = await res.json();
       if (checkField && !(checkField in data)) {
-        console.log(`❌ ${path} → 200 but missing "${checkField}" field [${duration}ms]`);
         return false;
       }
     }

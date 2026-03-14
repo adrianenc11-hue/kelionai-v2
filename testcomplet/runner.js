@@ -1558,7 +1558,9 @@ const runners = {
   },
   async Failover(f) {
     if (f.type === 'api') {
-      await req(f.method, f.url, { invalid: '\u2620\ufe0f' }, {}, 3000).catch(() => {});
+      await req(f.method, f.url, { invalid: '\u2620\ufe0f' }, {}, 3000).catch((err) => {
+        console.error(err);
+      });
       await sleep(2000);
       const r = await callAPI(f);
       return {

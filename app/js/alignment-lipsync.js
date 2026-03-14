@@ -398,7 +398,6 @@
     _audioStartTime = audioStartTime || 0;
     _active = true;
     _prevValues = {};
-    console.log('[AlignmentLipSync] ▶ Started at audioCtx.currentTime =', audioStartTime.toFixed(3));
   }
 
   /**

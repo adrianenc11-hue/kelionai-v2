@@ -1592,7 +1592,9 @@ When asked "what can you do?" list these real capabilities. Use them proactively
         .trim();
 
       // Track usage (non-blocking)
-      this.incrementUsage(userId, Object.keys(results).length, 0).catch(() => {});
+      this.incrementUsage(userId, Object.keys(results).length, 0).catch((err) => {
+        console.error(err);
+      });
 
       // ── Anti-Hallucination: tag data sources ──
       const sourceTags = [];

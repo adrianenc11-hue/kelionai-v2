@@ -43,7 +43,6 @@ setTimeout(async () => {
   // 4. Service Worker
   res = await fetch(`${BASE_URL}/sw.js`, { method: 'GET' });
   const swText = await res.text();
-  console.log(`RĂSPUNS (Primele 150 caractere): ${swText.substring(0, 150).replace(/\n/g, ' ')}\n`);
 
   server.kill();
   process.exit(0);

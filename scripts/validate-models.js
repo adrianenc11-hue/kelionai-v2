@@ -69,7 +69,6 @@ for (const avatar of AVATARS) {
     }
     hasErrors = true;
   } else {
-    console.log(`✅ ${avatar.name} (${avatar.file}, ${size}MB): All ${allRequired.length} morph targets present`);
   }
 }
 

@@ -13,8 +13,6 @@ const MAX_WORKERS = parseInt(process.env.CLUSTER_WORKERS || '0', 10) || Math.min
 const RESTART_DELAY = 2000; // ms before restarting crashed worker
 
 if (cluster.isPrimary || cluster.isMaster) {
-  console.log(`[Cluster] 🚀 Master PID ${process.pid} — spawning ${MAX_WORKERS} workers`);
-
   // Fork workers
   for (let i = 0; i < MAX_WORKERS; i++) {
     cluster.fork();

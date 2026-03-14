@@ -79,6 +79,15 @@ SUPPORTED LANGUAGES (examples — support ANY language):
 
 DEFAULT: If no user input yet → English`;
 
+/**
+ * buildSystemPrompt
+ * @param {*} avatar
+ * @param {*} language
+ * @param {*} memory
+ * @param {*} diagnostics
+ * @param {*} chainOfThought
+ * @returns {*}
+ */
 function buildSystemPrompt(avatar, language, memory, diagnostics, chainOfThought) {
   const LANGS = {
     ro: 'română',

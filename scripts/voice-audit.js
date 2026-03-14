@@ -38,7 +38,6 @@ async function runAudit() {
       body: JSON.stringify({ text: 'Test transcription passthrough' }),
     })
   );
-  console.log(`  🎙️  STT  (Groq Whisper batch):  ${oldSTT.ms}ms  [${oldSTT.status}]`);
 
   const oldChat = await measureHTTP('  CHAT /api/chat', () =>
     fetch(`${BASE}/api/chat`, {
@@ -51,7 +50,6 @@ async function runAudit() {
       }),
     })
   );
-  console.log(`  🧠  CHAT (Groq→GPT→Gemini):     ${oldChat.ms}ms  [${oldChat.status}]`);
 
   const oldTTS = await measureHTTP('  TTS  /api/speak', () =>
     fetch(`${BASE}/api/speak`, {
@@ -63,10 +61,8 @@ async function runAudit() {
       }),
     })
   );
-  console.log(`  🔊  TTS  (ElevenLabs batch):     ${oldTTS.ms}ms  [${oldTTS.status}]`);
 
   const oldTotal = oldSTT.ms + oldChat.ms + oldTTS.ms;
-  console.log(`  📊  TOTAL VECHI:                  ${oldTotal}ms  (~${(oldTotal / 1000).toFixed(1)}s)`);
 
   // ────────────────────────────────────────────
   // PART 2: New pipeline components (individual)
@@ -153,7 +149,6 @@ async function runAudit() {
         }, 3000);
       });
       const dgTime = Date.now() - dgStart;
-      console.log(`  🎙️  STT  Deepgram connect:       ${dgTime}ms  ${deepgramOk ? '✅' : '❌'}`);
     } catch (e) {
       console.error(e);
     }
@@ -183,7 +178,6 @@ async function runAudit() {
         }, 3000);
       });
       const ctTime = Date.now() - ctStart;
-      console.log(`  🔊  TTS  Cartesia connect:       ${ctTime}ms  ${cartesiaOk ? '✅' : '❌'}`);
     } catch (e) {
       console.error(e);
     }
@@ -214,7 +208,6 @@ async function runAudit() {
         }, 3000);
       });
       const elTime = Date.now() - elStart;
-      console.log(`  🔊  TTS  ElevenLabs WS connect:  ${elTime}ms  ${elevenOk ? '✅' : '❌'}`);
     } catch (e) {
       console.error(e);
     }
@@ -229,30 +222,18 @@ async function runAudit() {
   const ttsEstimate = cartesiaOk ? 90 : elevenOk ? 150 : oldTTS.ms;
   const newEstimate = sttEstimate + groqTTFT + ttsEstimate;
 
-  console.log(`  │  STT:   ${String(oldSTT.ms).padStart(5)}ms                                │`);
-  console.log(`  │  CHAT:  ${String(oldChat.ms).padStart(5)}ms                                │`);
-  console.log(`  │  TTS:   ${String(oldTTS.ms).padStart(5)}ms                                │`);
   console.log(
     `  │  TOTAL: ${String(oldTotal).padStart(5)}ms  (~${(oldTotal / 1000).toFixed(1)}s)                     │`
   );
-  console.log(`  │  STT:    ~${String(sttEstimate).padStart(4)}ms  (Deepgram Nova-3)           │`);
-  console.log(`  │  LLM TTFT: ${String(groqTTFT).padStart(4)}ms  (Groq Llama 3.3 70B)       │`);
   console.log(
     `  │  TTS TTFA: ~${String(ttsEstimate).padStart(3)}ms  (${cartesiaOk ? 'Cartesia Sonic' : elevenOk ? 'ElevenLabs Flash' : 'ElevenLabs batch'})         │`
   );
-  console.log(`  │  TOTAL:  ~${String(newEstimate).padStart(4)}ms  (⚡ streaming paralel)     │`);
 
   const speedup = (oldTotal / newEstimate).toFixed(1);
   const under1s = newEstimate < 1000;
-  console.log(`  │  🚀 SPEEDUP: ${speedup}x mai rapid                        │`);
   console.log(
     `  │  ${under1s ? '✅' : '⚠️'} TARGET SUB-1s: ${under1s ? 'DA ✅' : 'NU ❌'}  (${newEstimate}ms)               │`
   );
-
-  console.log(`    Deepgram STT:      ${deepgramOk ? '✅ LIVE' : '❌ OFFLINE'}`);
-  console.log(`    Groq LLM:          ${groqTTFT > 0 ? '✅ LIVE' : '❌ OFFLINE'}  (TTFT: ${groqTTFT}ms)`);
-  console.log(`    Cartesia TTS:      ${cartesiaOk ? '✅ LIVE' : '❌ OFFLINE'}`);
-  console.log(`    ElevenLabs TTS:    ${elevenOk ? '✅ LIVE (fallback)' : '❌ OFFLINE'}`);
 }
 
 runAudit().catch(console.error);

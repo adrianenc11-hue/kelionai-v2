@@ -770,6 +770,16 @@ function calculateParabolicSAR(highs, lows, afStart = 0.02, afMax = 0.2) {
   return { sar: Math.round(sar * 10000) / 10000, trend: isUp ? 'BUY' : 'SELL' };
 }
 
+/**
+ * calculateIchimoku
+ * @param {*} highs
+ * @param {*} lows
+ * @param {*} closes
+ * @param {*} tenkanP
+ * @param {*} kijunP
+ * @param {*} senkouBP
+ * @returns {*}
+ */
 function calculateIchimoku(highs, lows, closes, tenkanP = 9, kijunP = 26, senkouBP = 52) {
   const calc = (h, l, p) => {
     if (h.length < p) return null;

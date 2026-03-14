@@ -168,7 +168,6 @@
   function handleMessage(msg) {
     switch (msg.type) {
       case 'ready':
-        console.log('[VoiceStream] Pipeline ready:', msg.stt, '→', msg.llm, '→', msg.tts);
         window.dispatchEvent(new CustomEvent('voice-stream-ready', { detail: msg }));
         break;
 

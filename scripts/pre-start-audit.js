@@ -95,5 +95,4 @@ if (findings.length > 0) {
   console.error('Fix: Replace hardcoded URLs with process.env.APP_URL\n');
   process.exit(1); // Block deploy
 } else {
-  console.log('✅ Pre-start audit: CLEAN — zero hardcoded values. Starting server...\n');
 }

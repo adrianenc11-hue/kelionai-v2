@@ -21,8 +21,6 @@ async function migrate() {
   });
   // If RPC doesn't exist, user needs to run it manually in Supabase SQL Editor
   if (extErr) {
-    console.log('⚠️  Cannot run SQL via RPC. Please run this in Supabase SQL Editor:\n');
-    console.log('   ALTER TABLE brain_memory ADD COLUMN IF NOT EXISTS embedding vector(1536);');
     console.log(
       '   CREATE INDEX IF NOT EXISTS brain_memory_embedding_idx ON brain_memory USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);'
     );
@@ -91,8 +89,6 @@ async function migrate() {
       ORDER BY bm.embedding <=> query_embedding LIMIT match_count;
     END; $$;`,
   });
-
-  console.log('   Brain will now use embeddings for "understanding" memories.\n');
 }
 
 migrate().catch(console.error);

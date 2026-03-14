@@ -161,7 +161,8 @@
           (p.cost_usd || 0).toFixed(4) +
           '</td></tr>';
       });
-      document.querySelector('#costs-provider tbody').textContent = tbody || '<tr><td colspan="5">No data yet</td></tr>';
+      document.querySelector('#costs-provider tbody').textContent =
+        tbody || '<tr><td colspan="5">No data yet</td></tr>';
 
       // User costs
       var utbody = '';
