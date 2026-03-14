@@ -136,7 +136,15 @@ setInterval(
 function ipBlacklistMiddleware(req, res, next) {
   const ip = req.ip || req.connection?.remoteAddress || 'unknown';
   // Whitelisted
-  if (ip === process.env.HOST_IP || '127.0.0.1' || ip === '::1') return next();
+  if (
+    ip === process.env.HOST_IP ||
+    process.env.HOST_IP ||
+    process.env.HOST_IP ||
+    process.env.HOST_IP ||
+    '127.0.0.1' ||
+    ip === '::1'
+  )
+    return next();
   // Banned?
   if (_blacklist.has(ip)) {
     return res.status(429).json({ error: 'Too many requests. Try again later.', retryAfter: 3600 });

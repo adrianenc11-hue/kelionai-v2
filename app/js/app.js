@@ -1275,56 +1275,77 @@
    */
   async function handleFiles(fileList) {
     hideWelcome();
-    for (let i = 0; i < fileList.length; i++) {
-      const file = fileList[i];
-      const reader = new FileReader();
-      reader.onload = async function () {
-        storedFiles.push({
-          name: file.name,
-          size: file.size,
-          type: file.type,
-          data: reader.result,
-        });
-        addMessage(
-          "user",
-          "📎 " + file.name + " (" + Math.round(file.size / 1024) + " KB)",
-        );
-        if (file.type.startsWith("image/")) {
-          const b64 = reader.result.split(",")[1];
-          KAvatar.setExpression("thinking", 0.5);
-          showThinking(true);
-          try {
-            const r = await fetch(API_BASE + "/api/vision", {
-              method: "POST",
-              headers: authHeaders(),
-              body: JSON.stringify({
-                image: b64,
-                avatar: KAvatar.getCurrentAvatar(),
-                language: window.KVoice ? KVoice.getLanguage() : "en",
-              }),
+    const files = Array.from(fileList);
+    const fileData = await Promise.all(
+      files.map((file) => {
+        return new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = function () {
+            resolve({
+              name: file.name,
+              size: file.size,
+              type: file.type,
+              data: reader.result,
             });
-            const d = await r.json();
-            showThinking(false);
-            addMessage("assistant", d.description || "Could not analyze.");
-            KAvatar.setExpression("happy", 0.3);
-            if (window.KVoice) await KVoice.speak(d.description);
-          } catch (_e) {
-            showThinking(false);
-            addMessage("assistant", "Analysis error.");
-          }
-        } else {
-          addMessage(
-            "assistant",
-            "I received " + file.name + ". What should I do with it?",
-          );
-        }
-      };
-      if (
-        file.type.startsWith("text/") ||
-        file.name.match(/\.(txt|md|json|csv)$/)
-      )
-        reader.readAsText(file);
-      else reader.readAsDataURL(file);
+          };
+          if (
+            file.type.startsWith("text/") ||
+            file.name.match(/\.(txt|md|json|csv)$/)
+          )
+            reader.readAsText(file);
+          else reader.readAsDataURL(file);
+        });
+      }),
+    );
+
+    storedFiles.push(...fileData);
+    const imageFiles = fileData.filter((file) =>
+      file.type.startsWith("image/"),
+    );
+
+    for (const file of fileData) {
+      addMessage(
+        "user",
+        "📎 " + file.name + " (" + Math.round(file.size / 1024) + " KB)",
+      );
+    }
+
+    if (imageFiles.length > 0) {
+      KAvatar.setExpression("thinking", 0.5);
+      showThinking(true);
+      const imagePromises = imageFiles.map((file) => {
+        const b64 = file.data.split(",")[1];
+        return fetch(API_BASE + "/api/vision", {
+          method: "POST",
+          headers: authHeaders(),
+          body: JSON.stringify({
+            image: b64,
+            avatar: KAvatar.getCurrentAvatar(),
+            language: window.KVoice ? KVoice.getLanguage() : "en",
+          }),
+        });
+      });
+
+      try {
+        const responses = await Promise.all(imagePromises);
+        const descriptions = await Promise.all(
+          responses.map((r) => r.json()),
+        );
+        showThinking(false);
+        descriptions.forEach((d) => {
+          addMessage("assistant", d.description || "Could not analyze.");
+          if (window.KVoice) KVoice.speak(d.description);
+        });
+        KAvatar.setExpression("happy", 0.3);
+      } catch (_e) {
+        showThinking(false);
+        addMessage("assistant", "Analysis error.");
+      }
+    } else {
+      addMessage(
+        "assistant",
+        "I received the files. What should I do with them?",
+      );
     }
   }
 
@@ -1966,44 +1987,4 @@
     const savedConvId = restoreConvId();
     if (savedConvId) {
       currentConversationId = savedConvId;
-      fetch(API_BASE + "/api/conversations/" + savedConvId + "/messages", {
-        headers: authHeaders(),
-      })
-        .then(function (r) {
-          return r.ok ? r.json() : null;
-        })
-        .then(function (data) {
-          if (!data) return;
-          const msgs = data.messages || data || [];
-          if (msgs.length === 0) return;
-          hideWelcome();
-          const overlay = document.getElementById("chat-overlay");
-          overlay.textContent = "";
-          chatHistory = [];
-          for (let i = 0; i < msgs.length; i++) {
-            const role = msgs[i].role === "assistant" ? "assistant" : "user";
-            addMessage(role, msgs[i].content);
-            chatHistory.push({ role: role, content: msgs[i].content });
-          }
-        })
-        .catch(function (e) {
-          console.warn("[App] restore conversation:", e.message);
-          persistConvId(null);
-        });
-    }
-
-    // ─── Dismiss splash loading overlay ─────────────────────
-    clearTimeout(splashTimer);
-    dismissSplash();
-
-  }
-
-  window.KApp = {
-    loadConversations: loadConversations,
-    toggleHistory: toggleHistory,
-    startNewChat: startNewChat,
-  };
-  if (document.readyState === "loading")
-    document.addEventListener("DOMContentLoaded", init);
-  else init();
-})();
+      fetch(API_BASE + "/api/conversations/" + savedConvId + "/

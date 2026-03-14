@@ -402,7 +402,11 @@ router.get('/traffic', async (req, res) => {
 
     const today = new Date().toISOString().split('T')[0];
     // Internal IPs/paths to exclude from real traffic
-    const INTERNAL_IPS = [process.env.HOST_IP || '127.0.0.1', '::1', '::ffff:127.0.0.1'];
+    const INTERNAL_IPS = [
+      process.env.HOST_IP || process.env.HOST_IP || process.env.HOST_IP || process.env.HOST_IP || '127.0.0.1',
+      '::1',
+      '::ffff:127.0.0.1',
+    ];
     const _INTERNAL_PATHS = ['/health', '/metrics'];
 
     // Recent 50 REAL visits (exclude internal)

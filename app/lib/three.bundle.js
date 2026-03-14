@@ -20415,14 +20415,17 @@ void main() {
          * @returns {*}
          */
         function ae(T) {
-          (T.preventDefault(), /* console.log('THREE.WebGLRenderer: Context Lost.') (removed) */, (v = !0));
+          (T.preventDefault(),
+            /* /* /* /* console.log('THREE.WebGLRenderer: Context Lost.') (removed) */ (removed) */ removed * / (removed) */,
+            (v = !0));
         }
         /**
          * L
          * @returns {*}
          */
         function L() {
-          (/* console.log('THREE.WebGLRenderer: Context Restored.') (removed) */, (v = !1));
+          /* /* /* /* console.log('THREE.WebGLRenderer: Context Restored.') (removed) */ (removed) */ (removed * / (removed) */,
+            (v = !1));
           let T = Ae.autoReset,
             U = Q.enabled,
             z = Q.autoUpdate,

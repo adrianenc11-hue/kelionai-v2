@@ -239,7 +239,7 @@ const FUNCS = [
     type: 'api',
     method: 'POST',
     url: '/api/auth/change-email',
-    body: { email: process.env.ADMIN_EMAIL || "admin@example.com" },
+    body: { email: process.env.ADMIN_EMAIL || 'admin@example.com' },
     expect: [200, 401, 429],
     timeout: LATENCY.GENERAL_API,
     module: 'auth.js',
@@ -484,7 +484,7 @@ const FUNCS = [
     type: 'api',
     method: 'POST',
     url: '/api/referral/send-invite',
-    body: { email: process.env.ADMIN_EMAIL || "admin@example.com" },
+    body: { email: process.env.ADMIN_EMAIL || 'admin@example.com' },
     expect: [200, 400, 401],
     timeout: LATENCY.GENERAL_API,
     module: 'referral.js',
@@ -1718,7 +1718,9 @@ async function main() {
     } else {
       state.failed++;
       const fails = state.results.filter((r) => r.id === f.id && r.status === 'FAIL');
-      fails.forEach((f2) => /* console.log(`      \u274c ${f2.type}: ${f2.note}`) (removed) */);
+      fails.forEach(
+        (f2) => /* /* /* /* console.log(`      \u274c ${f2.type}: ${f2.note}`) (removed) */ (removed) */ removed * / (removed) */
+      );
       state.inProgress = `STOP: #${f.id} ${f.name} \u2014 ${fails.length} FAIL`;
       save();
       process.exit(1);

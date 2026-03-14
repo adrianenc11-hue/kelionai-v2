@@ -183,7 +183,7 @@ const TOOL_DEFINITIONS = [
       properties: {
         code: {
           type: 'string',
-          description: 'JavaScript code to execute. Must return a value or use /* console.log() (removed) */.',
+          description: 'JavaScript code to execute. Must return a value or use /* /* /* /* console.log() (removed) */ (removed) */ (removed) */ (removed) */.',
         },
       },
       required: ['code'],
@@ -556,7 +556,7 @@ const TOOL_DEFINITIONS = [
   {
     name: 'task_manager',
     description:
-      'Manage tasks and 
+      'Manage tasks and
     input_schema: {
       type: 'object',
       properties: {

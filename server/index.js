@@ -227,7 +227,16 @@ app.use((req, res, next) => {
       if (!isBot && !isHealth) {
         const realIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || 'unknown';
         // Skip internal IPs entirely
-        if (realIp === process.env.HOST_IP || '127.0.0.1' || realIp === '::1' || realIp === '::ffff:127.0.0.1') return;
+        if (
+          realIp === process.env.HOST_IP ||
+          process.env.HOST_IP ||
+          process.env.HOST_IP ||
+          process.env.HOST_IP ||
+          '127.0.0.1' ||
+          realIp === '::1' ||
+          realIp === '::ffff:127.0.0.1'
+        )
+          return;
 
         // Country from CDN headers first, then IP geolocation
         let country = req.headers['cf-ipcountry'] || req.headers['x-vercel-ip-country'] || null;
@@ -1806,60 +1815,66 @@ if (require.main === module) {
       // Prevent Railway proxy timeouts
       server.keepAliveTimeout = 65000; // 65s (Railway proxy = 60s)
       server.headersTimeout = 70000; // 70s > keepAliveTimeout
-      server.listen(PORT, process.env.HOST_IP || '127.0.0.1', () => {
-        logger.info(
-          {
-            component: 'Server',
-            port: PORT,
-            ai: {
-              gemini: !!(process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY),
-              gpt4o: !!process.env.OPENAI_API_KEY,
-              deepseek: !!process.env.DEEPSEEK_API_KEY,
+      server.listen(
+        PORT,
+        process.env.HOST_IP || process.env.HOST_IP || process.env.HOST_IP || process.env.HOST_IP || '127.0.0.1',
+        () => {
+          logger.info(
+            {
+              component: 'Server',
+              port: PORT,
+              ai: {
+                gemini: !!(process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY),
+                gpt4o: !!process.env.OPENAI_API_KEY,
+                deepseek: !!process.env.DEEPSEEK_API_KEY,
+              },
+              tts: !!process.env.ELEVENLABS_API_KEY,
+              voiceStream: true,
+              payments: !!process.env.STRIPE_SECRET_KEY,
+              db: !!supabaseAdmin,
+              migration: !!migrated,
             },
-            tts: !!process.env.ELEVENLABS_API_KEY,
-            voiceStream: true,
-            payments: !!process.env.STRIPE_SECRET_KEY,
-            db: !!supabaseAdmin,
-            migration: !!migrated,
-          },
-          'KelionAI v2.5 started on port ' + PORT + ' (with voice streaming)'
-        );
-        // Smoke test internal routes (async, non-blocking)
-        smokeTest(PORT).catch((err) => {
-          console.error(err);
-        });
+            'KelionAI v2.5 started on port ' + PORT + ' (with voice streaming)'
+          );
+          // Smoke test internal routes (async, non-blocking)
+          smokeTest(PORT).catch((err) => {
+            console.error(err);
+          });
 
-        // Self-ping keepalive — prevent Railway idle sleep (every 4 min)
-        const APP_URL = process.env.APP_URL || `http://localhost:${PORT}`;
-        setInterval(
-          () => {
-            fetch(`${APP_URL}/api/health`).catch((err) => {
-              console.error(err);
-            });
-          },
-          4 * 60 * 1000
-        ).unref();
-        // Auto-register Telegram webhook
-        if (process.env.TELEGRAM_BOT_TOKEN && process.env.APP_URL) {
-          const webhookUrl = `${process.env.APP_URL}/api/telegram/webhook`;
-          fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/setWebhook`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url: webhookUrl }),
-          })
-            .then((r) => r.json())
-            .then((data) => {
-              if (data.ok) logger.info({ component: 'Telegram' }, `✅ Webhook registered: ${webhookUrl}`);
-              else logger.warn({ component: 'Telegram', error: data.description }, '❌ Webhook registration failed');
+          // Self-ping keepalive — prevent Railway idle sleep (every 4 min)
+          const APP_URL = process.env.APP_URL || `http://localhost:${PORT}`;
+          setInterval(
+            () => {
+              fetch(`${APP_URL}/api/health`).catch((err) => {
+                console.error(err);
+              });
+            },
+            4 * 60 * 1000
+          ).unref();
+          // Auto-register Telegram webhook
+          if (process.env.TELEGRAM_BOT_TOKEN && process.env.APP_URL) {
+            const webhookUrl = `${process.env.APP_URL}/api/telegram/webhook`;
+            fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/setWebhook`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ url: webhookUrl }),
             })
-            .catch((e) => logger.error({ component: 'Telegram', err: e.message }, 'Webhook registration error'));
+              .then((r) => r.json())
+              .then((data) => {
+                if (data.ok) logger.info({ component: 'Telegram' }, `✅ Webhook registered: ${webhookUrl}`);
+                else logger.warn({ component: 'Telegram', error: data.description }, '❌ Webhook registration failed');
+              })
+              .catch((e) => logger.error({ component: 'Telegram', err: e.message }, 'Webhook registration error'));
+          }
         }
-      });
+      );
     })
     .catch(() => {
       logger.error({ component: 'Server' }, 'Migration error');
-      server.listen(PORT, process.env.HOST_IP || '127.0.0.1', () =>
-        logger.info({ component: 'Server', port: PORT }, 'KelionAI v2.5 on port ' + PORT + ' (migration failed)')
+      server.listen(
+        PORT,
+        process.env.HOST_IP || process.env.HOST_IP || process.env.HOST_IP || process.env.HOST_IP || '127.0.0.1',
+        () => logger.info({ component: 'Server', port: PORT }, 'KelionAI v2.5 on port ' + PORT + ' (migration failed)')
       );
     });
 }
