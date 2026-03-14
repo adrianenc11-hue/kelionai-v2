@@ -301,8 +301,12 @@ function setupRealtimeVoice(io, appLocals) {
         { component: 'VoiceRealtime', duration, id: socket.id },
         `Client disconnected (${Math.round(duration / 1000)}s session)`
       );
-      if (openaiWs && openaiWs.readyState === WebSocket.OPEN) {
-        openaiWs.close();
+      if (openaiWs) {
+        // Remove the message listener to prevent memory leaks
+        openaiWs.off('message', handleOpenAiMessage);
+        if (openaiWs.readyState === WebSocket.OPEN) {
+          openaiWs.close();
+        }
       }
     });
   });
