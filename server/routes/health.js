@@ -143,4 +143,37 @@ router.get("/test-tables", async (req, res) => {
   });
 });
 
+// GET /api/health/services — Live service health status (probed every 10 min)
+router.get("/services", (req, res) => {
+  // Require admin key for detailed service health
+  const adminKey = req.headers["x-admin-key"] || req.query.key;
+  if (adminKey !== process.env.ADMIN_SECRET_KEY) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  try {
+    const monitor = require("../service-health-monitor");
+    const status = monitor.getStatus();
+    res.json(status);
+  } catch (e) {
+    res.status(500).json({ error: "Health monitor not available", message: e.message });
+  }
+});
+
+// POST /api/health/services/:name/probe — Force probe a single service
+router.post("/services/:name/probe", async (req, res) => {
+  const adminKey = req.headers["x-admin-key"] || req.query.key;
+  if (adminKey !== process.env.ADMIN_SECRET_KEY) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  try {
+    const monitor = require("../service-health-monitor");
+    const result = await monitor.probeSingle(req.params.name);
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;
