@@ -489,11 +489,17 @@ function setupVoiceStream(server, appLocals) {
     clientWs.on('message', handleClientMessage);
 
     clientWs.on('close', () => {
-      logger.info({ component: 'VoiceStream', duration: Date.now() - startTime }, 'Client disconnected');
-      clientWs.off('message', handleClientMessage);
-      if (sttHandler) sttHandler.close();
-      if (ttsHandler) ttsHandler.close();
-    });
+    logger.info({ component: 'VoiceStream', duration: Date.now() - startTime }, 'Client disconnected');
+    clientWs.off('message', handleClientMessage);
+    if (sttHandler) {
+      sttHandler.ws.off('message');
+      sttHandler.close();
+    }
+    if (ttsHandler) {
+      if (ttsHandler.ws) ttsHandler.ws.off('message');
+      ttsHandler.close();
+    }
+  });
 
     // Send ready signal
     clientWs.send(
