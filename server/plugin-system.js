@@ -20,8 +20,18 @@ const path = require('path');
 const fs = require('fs');
 const logger = require('./logger');
 const { executeSandboxed, validateCode } = require('./plugin-sandbox');
+const rateLimit = require('express-rate-limit');
 
 const router = express.Router();
+
+// Rate limiting for public API routes
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per windowMs
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+  message: { error: 'Too many requests, please try again later.' },
+});
 
 // ═══ IN-MEMORY PLUGIN REGISTRY ═══
 const installedPlugins = new Map(); // id → { manifest, module, status, type }

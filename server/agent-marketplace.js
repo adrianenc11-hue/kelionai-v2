@@ -8,9 +8,19 @@
 'use strict';
 
 const express = require('express');
+const rateLimit = require('express-rate-limit');
 const logger = require('./logger');
 const { _MODELS } = require('./config/models');
 const router = express.Router();
+
+// Rate limiting for public API routes
+const publicApiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per windowMs
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later.' }
+});
 
 // ═══ DEFAULT AGENT TEMPLATES ═══
 const TEMPLATES = {

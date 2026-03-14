@@ -134,7 +134,7 @@ class WSEngine extends EventEmitter {
       this.emit('connected', { exchange: 'binance' });
     });
 
-    ws.on('message', (raw) => {
+    const messageHandler = (raw) => {
       try {
         const msg = JSON.parse(raw);
         if (msg.e === 'trade') {
@@ -145,11 +145,13 @@ class WSEngine extends EventEmitter {
       } catch (_err) {
         this.stats.errors++;
       }
-    });
+    };
+    ws.on('message', messageHandler);
 
     ws.on('close', () => {
       this.stats.binanceConnected = false;
       logger.warn({ component: 'WSEngine' }, '⚠️ Binance WS disconnected');
+      ws.removeListener('message', messageHandler);
       this._reconnect('binance');
     });
 
@@ -246,7 +248,7 @@ class WSEngine extends EventEmitter {
       this.connections.oanda = res;
 
       let buffer = '';
-      res.on('data', (chunk) => {
+      const dataHandler = (chunk) => {
         buffer += chunk.toString();
         const lines = buffer.split('\n');
         buffer = lines.pop(); // keep incomplete line
@@ -261,11 +263,13 @@ class WSEngine extends EventEmitter {
             /* heartbeat or parse error */
           }
         }
-      });
+      };
+      res.on('data', dataHandler);
 
       res.on('end', () => {
         this.stats.oandaConnected = false;
         logger.warn({ component: 'WSEngine' }, 'OANDA stream ended');
+        res.removeListener('data', dataHandler);
         this._reconnect('oanda');
       });
     });

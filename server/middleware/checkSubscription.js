@@ -6,6 +6,7 @@
 //   app.get('/api/premium-feature', checkSubscription(), handler);
 //   app.get('/api/pro-feature', checkSubscription(['pro','enterprise']), handler);
 // ═══════════════════════════════════════════════════════════════
+const rateLimit = require('express-rate-limit');
 const { getUserPlan, _PLAN_LIMITS } = require('../payments');
 
 /**

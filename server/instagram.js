@@ -6,6 +6,7 @@
 'use strict';
 
 const express = require('express');
+const rateLimit = require('express-rate-limit');
 const logger = require('./logger');
 
 const PAGE_TOKEN = process.env.FB_PAGE_ACCESS_TOKEN; // Same token — Instagram uses FB token
@@ -33,6 +34,18 @@ function setSupabase(s) {
 }
 
 const router = express.Router();
+
+// Rate limiting for public API routes
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per windowMs
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: 'Too many requests from this IP, please try again later.'
+});
+
+// Apply rate limiting to public-facing routes
+router.use('/webhook', apiLimiter);
 
 // ═══════════════════════════════════════════════════════════════
 // INSTAGRAM DM CHAT BOT — Webhook
