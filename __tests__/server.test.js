@@ -130,7 +130,11 @@ describe("GET /api/admin/health-check", () => {
 
   test("admin endpoints return silent 200 for non-admin users (stealth)", async () => {
     // All /api/admin/* routes silently ignore non-admin requests
-    const endpoints = ["/api/admin/brain", "/api/admin/health-check", "/api/admin/users"];
+    const endpoints = [
+      "/api/admin/brain",
+      "/api/admin/health-check",
+      "/api/admin/users",
+    ];
     for (const ep of endpoints) {
       const res = await request(app).get(ep);
       expect(res.status).toBe(200);

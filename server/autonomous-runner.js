@@ -418,7 +418,9 @@ async function updateTaskInDB(brain, task) {
       },
       { onConflict: "id" },
     );
-  } catch { /* ignored */ }
+  } catch {
+    /* ignored */
+  }
 }
 
 /**

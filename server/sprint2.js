@@ -23,17 +23,29 @@ function recordFeedback(data) {
   };
   feedbackStore.unshift(entry);
   if (feedbackStore.length > 500) feedbackStore.pop();
-  logger.info({ component: "Feedback", type: entry.type, user: entry.userId }, "Feedback recorded");
+  logger.info(
+    { component: "Feedback", type: entry.type, user: entry.userId },
+    "Feedback recorded",
+  );
   return entry;
 }
 
 function getFeedbackStats() {
   const total = feedbackStore.length;
-  const up = feedbackStore.filter(f => f.type === "up").length;
-  const down = feedbackStore.filter(f => f.type === "down").length;
+  const up = feedbackStore.filter((f) => f.type === "up").length;
+  const down = feedbackStore.filter((f) => f.type === "down").length;
   const rate = total > 0 ? ((up / total) * 100).toFixed(1) : "0";
-  const last24h = feedbackStore.filter(f => Date.now() - new Date(f.timestamp).getTime() < 86400000);
-  return { total, up, down, satisfactionRate: rate + "%", last24h: last24h.length, recent: feedbackStore.slice(0, 50) };
+  const last24h = feedbackStore.filter(
+    (f) => Date.now() - new Date(f.timestamp).getTime() < 86400000,
+  );
+  return {
+    total,
+    up,
+    down,
+    satisfactionRate: rate + "%",
+    last24h: last24h.length,
+    recent: feedbackStore.slice(0, 50),
+  };
 }
 
 // ══════════════════════════════════════════════════════════
@@ -48,7 +60,9 @@ function trackSession(userId, data) {
     avatar: data.avatar || "kelion",
     page: data.page || "/",
     lastSeen: Date.now(),
-    connectedAt: activeSessions.has(userId) ? activeSessions.get(userId).connectedAt : Date.now(),
+    connectedAt: activeSessions.has(userId)
+      ? activeSessions.get(userId).connectedAt
+      : Date.now(),
     ip: data.ip || "",
     userAgent: data.userAgent || "",
   });
@@ -101,14 +115,21 @@ function trackError(data) {
   const key = entry.message.slice(0, 100);
   errorCounts[key] = (errorCounts[key] || 0) + 1;
 
-  logger.error({ component: "ErrorTracker", source: entry.source, route: entry.route }, entry.message);
+  logger.error(
+    { component: "ErrorTracker", source: entry.source, route: entry.route },
+    entry.message,
+  );
   return entry;
 }
 
 function getErrorStats() {
   const total = errorLog.length;
-  const last1h = errorLog.filter(e => Date.now() - new Date(e.timestamp).getTime() < 3600000).length;
-  const last24h = errorLog.filter(e => Date.now() - new Date(e.timestamp).getTime() < 86400000).length;
+  const last1h = errorLog.filter(
+    (e) => Date.now() - new Date(e.timestamp).getTime() < 3600000,
+  ).length;
+  const last24h = errorLog.filter(
+    (e) => Date.now() - new Date(e.timestamp).getTime() < 86400000,
+  ).length;
 
   // Top errors by frequency
   const topErrors = Object.entries(errorCounts)
@@ -122,11 +143,22 @@ function getErrorStats() {
     bySource[e.source] = (bySource[e.source] || 0) + 1;
   }
 
-  return { total, last1h, last24h, topErrors, bySource, recent: errorLog.slice(0, 50) };
+  return {
+    total,
+    last1h,
+    last24h,
+    topErrors,
+    bySource,
+    recent: errorLog.slice(0, 50),
+  };
 }
 
 module.exports = {
-  recordFeedback, getFeedbackStats,
-  trackSession, heartbeat, getLiveSessions,
-  trackError, getErrorStats,
+  recordFeedback,
+  getFeedbackStats,
+  trackSession,
+  heartbeat,
+  getLiveSessions,
+  trackError,
+  getErrorStats,
 };

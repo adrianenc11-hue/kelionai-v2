@@ -25,7 +25,9 @@ function adminAuth(req, res, next) {
       ) {
         return next(); // Secret matches — allow
       }
-    } catch { /* fall through to JWT check */ }
+    } catch {
+      /* fall through to JWT check */
+    }
   }
 
   // Method 2: Supabase JWT — verify admin email
@@ -48,7 +50,9 @@ function adminAuth(req, res, next) {
           .catch(() => res.status(401).json({ error: "Unauthorized" }));
         return; // async — don't fall through
       }
-    } catch { /* fall through */ }
+    } catch {
+      /* fall through */
+    }
   }
 
   res.status(401).json({ error: "Unauthorized" });

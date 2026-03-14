@@ -71,7 +71,9 @@ async function closeBrowser() {
   if (browserInstance) {
     try {
       await browserInstance.close();
-    } catch { /* ignored */ }
+    } catch {
+      /* ignored */
+    }
     browserInstance = null;
   }
 }
@@ -288,7 +290,9 @@ async function submitForm(sessionId, formSelector, data = {}) {
       } catch {
         try {
           await page.type(`#${name}`, value, { delay: 30 });
-        } catch { /* ignored */ }
+        } catch {
+          /* ignored */
+        }
       }
     }
 

@@ -174,9 +174,15 @@ function validateCode(code) {
     { pattern: /child_process/g, reason: "child_process is not allowed" },
     { pattern: /fs\./g, reason: "filesystem access is not allowed" },
     { pattern: /eval\s*\(/g, reason: "eval() is not allowed" },
-    { pattern: /Function\s*\(/g, reason: "Function() constructor is not allowed" },
+    {
+      pattern: /Function\s*\(/g,
+      reason: "Function() constructor is not allowed",
+    },
     { pattern: /__proto__/g, reason: "__proto__ access is not allowed" },
-    { pattern: /constructor\s*\[/g, reason: "constructor access is not allowed" },
+    {
+      pattern: /constructor\s*\[/g,
+      reason: "constructor access is not allowed",
+    },
     {
       pattern: /globalThis\s*\./g,
       reason: "globalThis access is not allowed",

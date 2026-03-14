@@ -93,7 +93,10 @@ const messengerBot = require("./messenger");
 const instagramBot = require("./instagram");
 const tradingRouter = require("./trading");
 const { router: marketplaceRouter } = require("./agent-marketplace");
-const { router: pluginRouter, restorePlugins: _restorePlugins } = require("./plugin-system");
+const {
+  router: pluginRouter,
+  restorePlugins: _restorePlugins,
+} = require("./plugin-system");
 const autonomousRunner = require("./autonomous-runner");
 const ollama = require("./ai-providers/ollama");
 const { tenantMiddleware } = require("./middleware/tenant");
@@ -716,26 +719,54 @@ app.get("/api/admin/models", adminAuth, async (_req, res) => {
   const models = available ? await ollama.listModels() : { models: [] };
   res.json({ available, ...models });
 });
-app.post("/api/admin/models/pull", adminAuth, express.json(), async (req, res) => {
-  const result = await ollama.pullModel(req.body.model);
-  res.json(result);
-});
-app.post("/api/admin/models/delete", adminAuth, express.json(), async (req, res) => {
-  const result = await ollama.deleteModel(req.body.model);
-  res.json(result);
-});
-app.post("/api/admin/models/test", adminAuth, express.json(), async (req, res) => {
-  const result = await ollama.chat(req.body.prompt || "Hello", { model: req.body.model });
-  res.json(result);
-});
+app.post(
+  "/api/admin/models/pull",
+  adminAuth,
+  express.json(),
+  async (req, res) => {
+    const result = await ollama.pullModel(req.body.model);
+    res.json(result);
+  },
+);
+app.post(
+  "/api/admin/models/delete",
+  adminAuth,
+  express.json(),
+  async (req, res) => {
+    const result = await ollama.deleteModel(req.body.model);
+    res.json(result);
+  },
+);
+app.post(
+  "/api/admin/models/test",
+  adminAuth,
+  express.json(),
+  async (req, res) => {
+    const result = await ollama.chat(req.body.prompt || "Hello", {
+      model: req.body.model,
+    });
+    res.json(result);
+  },
+);
 app.get("/api/ai/status", async (_req, res) => {
   const localAvailable = await ollama.checkStatus();
   res.json({
-    local: { available: localAvailable, provider: "ollama", model: ollama.defaultModel },
-    cloud: { available: true, providers: ["openai", "gemini", "groq"].filter(p => {
-      const keys = { openai: "OPENAI_API_KEY", gemini: "GOOGLE_AI_KEY", groq: "GROQ_API_KEY" };
-      return !!process.env[keys[p]];
-    })},
+    local: {
+      available: localAvailable,
+      provider: "ollama",
+      model: ollama.defaultModel,
+    },
+    cloud: {
+      available: true,
+      providers: ["openai", "gemini", "groq"].filter((p) => {
+        const keys = {
+          openai: "OPENAI_API_KEY",
+          gemini: "GOOGLE_AI_KEY",
+          groq: "GROQ_API_KEY",
+        };
+        return !!process.env[keys[p]];
+      }),
+    },
     mode: localAvailable ? "hybrid" : "cloud",
   });
 });
@@ -767,7 +798,9 @@ app.delete("/api/templates/:id", adminAuth, (req, res) => {
   res.json({ ok: quickWins.deleteTemplate(req.params.id) });
 });
 
-app.get("/api/webhooks", adminAuth, (_req, res) => res.json(quickWins.getWebhooks()));
+app.get("/api/webhooks", adminAuth, (_req, res) =>
+  res.json(quickWins.getWebhooks()),
+);
 app.post("/api/webhooks", adminAuth, express.json(), (req, res) => {
   res.json(quickWins.registerWebhook(req.body));
 });
@@ -775,7 +808,9 @@ app.delete("/api/webhooks/:id", adminAuth, (req, res) => {
   res.json({ ok: quickWins.deleteWebhook(req.params.id) });
 });
 
-app.get("/api/rate-limits", adminAuth, (_req, res) => res.json(quickWins.getRateLimitStats()));
+app.get("/api/rate-limits", adminAuth, (_req, res) =>
+  res.json(quickWins.getRateLimitStats()),
+);
 
 // ═══ AUTONOMOUS TASKS API ═══
 app.post("/api/autonomous/start", express.json(), async (req, res) => {

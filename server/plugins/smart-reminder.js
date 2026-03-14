@@ -78,9 +78,7 @@ async function onCommand(ctx) {
 
   // /reminders — list active reminders
   if (ctx.command === "/reminders" || (args[0] && args[0] === "list")) {
-    const reminders = await ctx.kelion.memory.list(
-      `plugin:reminder:${userId}`,
-    );
+    const reminders = await ctx.kelion.memory.list(`plugin:reminder:${userId}`);
     if (!reminders || reminders.length === 0) {
       return { response: "📭 No active reminders." };
     }
@@ -96,14 +94,15 @@ async function onCommand(ctx) {
   if (!args || args.length < 2) {
     return {
       response:
-        'Usage: /remind <time> <message>\nExamples:\n- /remind in 30 minutes Check email\n- /remind tomorrow Call dentist\n- /remind in 2 hours Take a break',
+        "Usage: /remind <time> <message>\nExamples:\n- /remind in 30 minutes Check email\n- /remind tomorrow Call dentist\n- /remind in 2 hours Take a break",
     };
   }
 
   // Parse time from first part, message from rest
   const timeText = args.slice(0, 3).join(" ");
   const fireAt = parseTime(timeText);
-  const message = args.slice(timeText.split(" ").length).join(" ") || args.join(" ");
+  const message =
+    args.slice(timeText.split(" ").length).join(" ") || args.join(" ");
 
   // Save reminder
   await ctx.kelion.memory.set(`plugin:reminder:${userId}`, {

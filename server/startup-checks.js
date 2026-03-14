@@ -114,7 +114,9 @@ function setupGracefulShutdown(server) {
       const k1Meta = require("./k1-meta-learning");
       k1Meta.stopScheduledJobs();
       logger.info({ component: "Shutdown" }, "✅ K1 scheduled jobs stopped");
-    } catch { /* ignored */ }
+    } catch {
+      /* ignored */
+    }
 
     // Save K1 state before exit
     try {
@@ -122,7 +124,9 @@ function setupGracefulShutdown(server) {
       const { supabaseAdmin: sb } = require("./supabase");
       await k1Persist.saveState(sb);
       logger.info({ component: "Shutdown" }, "✅ K1 state saved to Supabase");
-    } catch { /* ignored */ }
+    } catch {
+      /* ignored */
+    }
 
     // Stop accepting new connections
     server.close(() => {

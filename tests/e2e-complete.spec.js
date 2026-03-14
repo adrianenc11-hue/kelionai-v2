@@ -9,9 +9,12 @@ const { test, expect } = require("@playwright/test");
 let siteIsUp = true;
 test.beforeAll(async ({ request }) => {
   try {
-    const r = await request.get((process.env.BASE_URL || process.env.APP_URL) + "/api/health", {
-      timeout: 15000,
-    });
+    const r = await request.get(
+      (process.env.BASE_URL || process.env.APP_URL) + "/api/health",
+      {
+        timeout: 15000,
+      },
+    );
     if (r.status() >= 500) siteIsUp = false;
   } catch {
     siteIsUp = false;
@@ -108,7 +111,7 @@ test.describe("Buttons Extended", () => {
     await page.goto("/");
     await page
       .waitForLoadState("networkidle", { timeout: 30000 })
-      .catch(() => { });
+      .catch(() => {});
     try {
       const authScreen = page.locator("#auth-screen, .auth-overlay");
       if (await authScreen.isVisible({ timeout: 3000 }).catch(() => false)) {
@@ -120,7 +123,7 @@ test.describe("Buttons Extended", () => {
             });
         });
       }
-    } catch { }
+    } catch {}
   });
 
   test("#27 back buttons work", async ({ page }) => {
@@ -128,7 +131,7 @@ test.describe("Buttons Extended", () => {
     await page.goto("/settings");
     await page
       .waitForLoadState("networkidle", { timeout: 15000 })
-      .catch(() => { });
+      .catch(() => {});
     await page.goBack();
     await expect(page.locator("body")).toBeVisible();
   });
@@ -344,7 +347,7 @@ test.describe("Microphone & Camera UI", () => {
     await page.goto("/");
     await page
       .waitForLoadState("networkidle", { timeout: 60000 })
-      .catch(() => { });
+      .catch(() => {});
     // Try multiple selectors for mic button (real ID: #btn-mic-toggle)
     const mic = page
       .locator(
@@ -541,7 +544,7 @@ test.describe("Geolocation", () => {
     await page.goto("/");
     await page
       .waitForLoadState("networkidle", { timeout: 30000 })
-      .catch(() => { });
+      .catch(() => {});
     // Just verify page loaded with geolocation granted
     await expect(page.locator("body")).toBeVisible();
     await page.screenshot({ path: "test-results/geolocation.png" });
@@ -684,12 +687,12 @@ test.describe("i18n", () => {
     await page.goto("/");
     await page
       .waitForLoadState("networkidle", { timeout: 30000 })
-      .catch(() => { });
+      .catch(() => {});
     // Reload and check language is still EN
     await page.reload();
     await page
       .waitForLoadState("networkidle", { timeout: 30000 })
-      .catch(() => { });
+      .catch(() => {});
     const lang = await page.evaluate(() => localStorage.getItem("kelion_lang"));
     expect(lang).toBe("en");
     await page.screenshot({ path: "test-results/i18n-persist.png" });
@@ -776,7 +779,7 @@ test.describe("UI Layout", () => {
         state: "visible",
         timeout: 60000,
       })
-      .catch(() => { });
+      .catch(() => {});
     const chatArea = page
       .locator("#chat-messages, .chat-area, .messages-container")
       .first();
@@ -887,7 +890,10 @@ test.describe.serial("E2E Flows", () => {
     expect(chatR.status()).toBeLessThan(500);
     if (chatR.status() === 200) {
       const d = await chatR.json();
-      if (!d.reply || d.reply.length <= 20) { test.skip(); return; }
+      if (!d.reply || d.reply.length <= 20) {
+        test.skip();
+        return;
+      }
       expect(d.reply.length).toBeGreaterThan(20);
     }
   });
@@ -933,7 +939,10 @@ test.describe("AI Simulations — Role-Based", () => {
     expect(r.status()).toBeLessThan(500);
     if (r.status() === 200) {
       const d = await r.json();
-      if (!d.reply || d.reply.length <= 50) { test.skip(); return; }
+      if (!d.reply || d.reply.length <= 50) {
+        test.skip();
+        return;
+      }
       expect(d.reply.length).toBeGreaterThan(50);
     }
   });
@@ -974,7 +983,10 @@ test.describe("AI Simulations — Role-Based", () => {
     expect(r.status()).toBeLessThan(500);
     if (r.status() === 200) {
       const d = await r.json();
-      if (!d.reply || d.reply.length <= 100) { test.skip(); return; }
+      if (!d.reply || d.reply.length <= 100) {
+        test.skip();
+        return;
+      }
       expect(d.reply.length).toBeGreaterThan(100);
     }
   });
@@ -995,7 +1007,10 @@ test.describe("AI Simulations — Role-Based", () => {
     expect(r.status()).toBeLessThan(500);
     if (r.status() === 200) {
       const d = await r.json();
-      if (!d.reply || d.reply.length <= 100) { test.skip(); return; }
+      if (!d.reply || d.reply.length <= 100) {
+        test.skip();
+        return;
+      }
       expect(d.reply.length).toBeGreaterThan(100);
     }
   });
@@ -1039,7 +1054,10 @@ test.describe("AI Simulations — Role-Based", () => {
     expect(r.status()).toBeLessThan(500);
     if (r.status() === 200) {
       const d = await r.json();
-      if (!d.reply || d.reply.length <= 50) { test.skip(); return; }
+      if (!d.reply || d.reply.length <= 50) {
+        test.skip();
+        return;
+      }
       expect(d.reply.length).toBeGreaterThan(50);
       if (d.thinkTime !== undefined) {
         expect(d.thinkTime).toBeGreaterThan(0);
@@ -1071,7 +1089,10 @@ test.describe("Brain Intelligence", () => {
     expect(r.status()).toBeLessThan(500);
     if (r.status() === 200) {
       const d = await r.json();
-      if (!d.reply || d.reply.length <= 20) { test.skip(); return; }
+      if (!d.reply || d.reply.length <= 20) {
+        test.skip();
+        return;
+      }
       expect(d.reply.length).toBeGreaterThan(20);
       if (d.thinkTime !== undefined)
         expect(d.thinkTime).toBeGreaterThanOrEqual(0);
@@ -1151,7 +1172,10 @@ test.describe("Persona & Emotions", () => {
     expect(r.status()).toBeLessThan(500);
     if (r.status() === 200) {
       const d = await r.json();
-      if (!d.reply || d.reply.length <= 20) { test.skip(); return; }
+      if (!d.reply || d.reply.length <= 20) {
+        test.skip();
+        return;
+      }
       expect(d.reply.length).toBeGreaterThan(20);
     }
   });
@@ -1194,7 +1218,10 @@ test.describe("Persona & Emotions", () => {
     expect(r.status()).toBeLessThan(500);
     if (r.status() === 200) {
       const d = await r.json();
-      if (!d.reply || d.reply.length <= 10) { test.skip(); return; }
+      if (!d.reply || d.reply.length <= 10) {
+        test.skip();
+        return;
+      }
       expect(d.reply.length).toBeGreaterThan(10);
     }
   });

@@ -187,7 +187,9 @@ function processToolCall(toolCall) {
       let cur = "";
       try {
         cur = fs.readFileSync(path.resolve(fp), "utf8");
-      } catch { /* ignored */ }
+      } catch {
+        /* ignored */
+      }
       let occ = 0;
       let editFn;
       if (startLine && endLine) {
@@ -258,7 +260,9 @@ function processToolCall(toolCall) {
       let cur = "";
       try {
         cur = fs.readFileSync(path.resolve(fp), "utf8");
-      } catch { /* ignored */ }
+      } catch {
+        /* ignored */
+      }
       _pendingOps.set(opId, {
         type: "writeFile",
         preview: {

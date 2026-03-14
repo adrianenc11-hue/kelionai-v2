@@ -13,10 +13,10 @@ const MODELS = {
   OPENAI_VISION: "gpt-5.4",
   GEMINI_CHAT: "gemini-2.5-flash",
   GEMINI_VISION: "gemini-2.5-flash",
-  GEMINI_PRO: "gemini-2.5-pro-preview-06-05",   // Deep reasoning for complex tasks
-  GEMINI_MULTIMODAL: "gemini-2.5-flash",         // Multimodal (video/audio/image/doc)
+  GEMINI_PRO: "gemini-2.5-pro-preview-06-05", // Deep reasoning for complex tasks
+  GEMINI_MULTIMODAL: "gemini-2.5-flash", // Multimodal (video/audio/image/doc)
   DEEPSEEK: "deepseek-chat",
-  OPENAI_TOOLS: "gpt-5.4",      // V5: primary tool calling model
+  OPENAI_TOOLS: "gpt-5.4", // V5: primary tool calling model
   GEMINI_QA: "gemini-2.5-flash", // V5: Quality Gate verifier (free)
   GPT_REALTIME: "gpt-4o-realtime-preview", // Voice-First: audio→audio
 
@@ -91,4 +91,10 @@ const VOICE_EMOTIONS = {
   loving: { stability: 0.5, similarity_boost: 0.9, style: 0.6 },
 };
 
-module.exports = { MODELS, API_ENDPOINTS, PERSONAS, VOICE_DEFAULTS, VOICE_EMOTIONS };
+module.exports = {
+  MODELS,
+  API_ENDPOINTS,
+  PERSONAS,
+  VOICE_DEFAULTS,
+  VOICE_EMOTIONS,
+};

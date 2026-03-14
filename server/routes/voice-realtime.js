@@ -147,8 +147,7 @@ function setupRealtimeVoice(io, appLocals) {
                   .saveMemory(
                     null,
                     "audio",
-                    "VoiceFirst reply: " +
-                      event.transcript.substring(0, 300),
+                    "VoiceFirst reply: " + event.transcript.substring(0, 300),
                     { avatar, language, mode: "realtime" },
                   )
                   .catch(() => {});

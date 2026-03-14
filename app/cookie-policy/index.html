@@ -1,228 +1,266 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Cookie Policy — KelionAI</title>
-    <meta name="description" content="KelionAI Cookie Policy. Learn how we use cookies and similar technologies.">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap">
-    <link rel="stylesheet" href="/styles/design-system.css">
-    <link rel="stylesheet" href="/styles/mobile.css">
+    <meta
+      name="description"
+      content="KelionAI Cookie Policy. Learn how we use cookies and similar technologies."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+    />
+    <link rel="stylesheet" href="/styles/design-system.css" />
+    <link rel="stylesheet" href="/styles/mobile.css" />
     <style>
-        body {
-            background: var(--kelion-bg, #050510);
-            color: var(--kelion-text, #F0F0FF);
-            font-family: 'Inter', system-ui, sans-serif;
-            margin: 0;
-            min-height: 100vh;
-        }
+      body {
+        background: var(--kelion-bg, #050510);
+        color: var(--kelion-text, #f0f0ff);
+        font-family: "Inter", system-ui, sans-serif;
+        margin: 0;
+        min-height: 100vh;
+      }
 
+      .legal-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 20px 40px;
+        border-bottom: 1px solid rgba(99, 102, 241, 0.1);
+      }
+
+      .legal-logo {
+        text-decoration: none;
+        font-size: 1.4rem;
+        font-weight: 800;
+        color: #f0f0ff;
+      }
+
+      .legal-logo span {
+        background: linear-gradient(135deg, #6366f1, #06b6d4);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+
+      .legal-nav {
+        display: flex;
+        gap: 24px;
+      }
+
+      .legal-nav a {
+        color: #8888aa;
+        text-decoration: none;
+        font-size: 0.9rem;
+        transition: color 0.2s;
+      }
+
+      .legal-nav a:hover {
+        color: #f0f0ff;
+      }
+
+      .legal-main {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 60px 24px 80px;
+      }
+
+      .legal-main h1 {
+        font-size: 2.2rem;
+        font-weight: 800;
+        margin-bottom: 8px;
+        background: linear-gradient(135deg, #6366f1, #06b6d4);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+
+      .legal-meta {
+        color: #555577;
+        font-size: 0.85rem;
+        margin-bottom: 40px;
+      }
+
+      .legal-section {
+        margin-bottom: 32px;
+      }
+
+      .legal-section h2 {
+        font-size: 1.15rem;
+        font-weight: 700;
+        color: #a5b4fc;
+        margin-bottom: 12px;
+      }
+
+      .legal-section p,
+      .legal-section ul {
+        color: #b0b0cc;
+        line-height: 1.7;
+        font-size: 0.95rem;
+      }
+
+      .legal-section ul {
+        padding-left: 24px;
+      }
+
+      .legal-section li {
+        margin-bottom: 6px;
+      }
+
+      .legal-footer {
+        text-align: center;
+        padding: 32px;
+        border-top: 1px solid rgba(99, 102, 241, 0.1);
+        color: #555577;
+        font-size: 0.82rem;
+      }
+
+      .legal-footer a {
+        color: #6366f1;
+        text-decoration: none;
+        margin: 0 8px;
+      }
+
+      .legal-footer a:hover {
+        text-decoration: underline;
+      }
+
+      @media (max-width: 600px) {
         .legal-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 20px 40px;
-            border-bottom: 1px solid rgba(99, 102, 241, 0.1);
-        }
-
-        .legal-logo {
-            text-decoration: none;
-            font-size: 1.4rem;
-            font-weight: 800;
-            color: #F0F0FF;
-        }
-
-        .legal-logo span {
-            background: linear-gradient(135deg, #6366F1, #06B6D4);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        .legal-nav {
-            display: flex;
-            gap: 24px;
-        }
-
-        .legal-nav a {
-            color: #8888AA;
-            text-decoration: none;
-            font-size: 0.9rem;
-            transition: color 0.2s;
-        }
-
-        .legal-nav a:hover {
-            color: #F0F0FF;
+          padding: 16px 20px;
         }
 
         .legal-main {
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 60px 24px 80px;
+          padding: 32px 16px 60px;
         }
 
         .legal-main h1 {
-            font-size: 2.2rem;
-            font-weight: 800;
-            margin-bottom: 8px;
-            background: linear-gradient(135deg, #6366F1, #06B6D4);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+          font-size: 1.6rem;
         }
-
-        .legal-meta {
-            color: #555577;
-            font-size: 0.85rem;
-            margin-bottom: 40px;
-        }
-
-        .legal-section {
-            margin-bottom: 32px;
-        }
-
-        .legal-section h2 {
-            font-size: 1.15rem;
-            font-weight: 700;
-            color: #a5b4fc;
-            margin-bottom: 12px;
-        }
-
-        .legal-section p,
-        .legal-section ul {
-            color: #b0b0cc;
-            line-height: 1.7;
-            font-size: 0.95rem;
-        }
-
-        .legal-section ul {
-            padding-left: 24px;
-        }
-
-        .legal-section li {
-            margin-bottom: 6px;
-        }
-
-        .legal-footer {
-            text-align: center;
-            padding: 32px;
-            border-top: 1px solid rgba(99, 102, 241, 0.1);
-            color: #555577;
-            font-size: 0.82rem;
-        }
-
-        .legal-footer a {
-            color: #6366F1;
-            text-decoration: none;
-            margin: 0 8px;
-        }
-
-        .legal-footer a:hover {
-            text-decoration: underline;
-        }
-
-        @media (max-width: 600px) {
-            .legal-header {
-                padding: 16px 20px;
-            }
-
-            .legal-main {
-                padding: 32px 16px 60px;
-            }
-
-            .legal-main h1 {
-                font-size: 1.6rem;
-            }
-        }
+      }
     </style>
-</head>
+  </head>
 
-<body>
+  <body>
     <header class="legal-header">
-        <a href="/" class="legal-logo">Kelion<span>AI</span></a>
-        <nav class="legal-nav">
-            <a href="/">Home</a>
-            <a href="/privacy/">Privacy</a>
-            <a href="/terms/">Terms</a>
-            <a href="/gdpr/">GDPR</a>
-        </nav>
+      <a href="/" class="legal-logo">Kelion<span>AI</span></a>
+      <nav class="legal-nav">
+        <a href="/">Home</a>
+        <a href="/privacy/">Privacy</a>
+        <a href="/terms/">Terms</a>
+        <a href="/gdpr/">GDPR</a>
+      </nav>
     </header>
 
     <main class="legal-main">
-        <h1>Cookie Policy</h1>
-        <p class="legal-meta">Effective date: March 1, 2026 · Version 1.0</p>
+      <h1>Cookie Policy</h1>
+      <p class="legal-meta">Effective date: March 1, 2026 · Version 1.0</p>
 
-        <div class="legal-section">
-            <h2>1. What Are Cookies?</h2>
-            <p>Cookies are small text files stored on your device when you visit a website. They help us remember your
-                preferences, understand how you use KelionAI, and improve your experience.</p>
-        </div>
+      <div class="legal-section">
+        <h2>1. What Are Cookies?</h2>
+        <p>
+          Cookies are small text files stored on your device when you visit a
+          website. They help us remember your preferences, understand how you
+          use KelionAI, and improve your experience.
+        </p>
+      </div>
 
-        <div class="legal-section">
-            <h2>2. Types of Cookies We Use</h2>
-            <ul>
-                <li><strong>Essential Cookies:</strong> Required for authentication, session management, and security.
-                    These cannot be disabled as they are necessary for the service to function.</li>
-                <li><strong>Functional Cookies:</strong> Remember your language, theme, avatar preferences, and voice
-                    settings to provide a personalized experience.</li>
-                <li><strong>Analytics Cookies:</strong> Help us understand how visitors interact with KelionAI, which
-                    features are most used, and where we can improve. We use privacy-friendly analytics.</li>
-                <li><strong>Performance Cookies:</strong> Monitor page load times, API response speeds, and service
-                    health to maintain optimal performance.</li>
-            </ul>
-        </div>
+      <div class="legal-section">
+        <h2>2. Types of Cookies We Use</h2>
+        <ul>
+          <li>
+            <strong>Essential Cookies:</strong> Required for authentication,
+            session management, and security. These cannot be disabled as they
+            are necessary for the service to function.
+          </li>
+          <li>
+            <strong>Functional Cookies:</strong> Remember your language, theme,
+            avatar preferences, and voice settings to provide a personalized
+            experience.
+          </li>
+          <li>
+            <strong>Analytics Cookies:</strong> Help us understand how visitors
+            interact with KelionAI, which features are most used, and where we
+            can improve. We use privacy-friendly analytics.
+          </li>
+          <li>
+            <strong>Performance Cookies:</strong> Monitor page load times, API
+            response speeds, and service health to maintain optimal performance.
+          </li>
+        </ul>
+      </div>
 
-        <div class="legal-section">
-            <h2>3. Third-Party Cookies</h2>
-            <p>We use minimal third-party services that may set their own cookies:</p>
-            <ul>
-                <li><strong>Supabase:</strong> Authentication and database services</li>
-                <li><strong>Stripe:</strong> Payment processing (only on payment pages)</li>
-                <li><strong>Google Fonts:</strong> Typography delivery</li>
-            </ul>
-        </div>
+      <div class="legal-section">
+        <h2>3. Third-Party Cookies</h2>
+        <p>
+          We use minimal third-party services that may set their own cookies:
+        </p>
+        <ul>
+          <li>
+            <strong>Supabase:</strong> Authentication and database services
+          </li>
+          <li>
+            <strong>Stripe:</strong> Payment processing (only on payment pages)
+          </li>
+          <li><strong>Google Fonts:</strong> Typography delivery</li>
+        </ul>
+      </div>
 
-        <div class="legal-section">
-            <h2>4. Cookie Consent</h2>
-            <p>When you first visit KelionAI, a cookie consent banner is displayed. You can choose to accept all cookies
-                or only essential ones. Your consent preference is stored in our database and can be changed at any time
-                through the Settings page.</p>
-        </div>
+      <div class="legal-section">
+        <h2>4. Cookie Consent</h2>
+        <p>
+          When you first visit KelionAI, a cookie consent banner is displayed.
+          You can choose to accept all cookies or only essential ones. Your
+          consent preference is stored in our database and can be changed at any
+          time through the Settings page.
+        </p>
+      </div>
 
-        <div class="legal-section">
-            <h2>5. Managing Cookies</h2>
-            <p>You can control cookies through your browser settings. Most browsers allow you to block or delete
-                cookies. Please note that disabling essential cookies may prevent KelionAI from functioning correctly.
-            </p>
-        </div>
+      <div class="legal-section">
+        <h2>5. Managing Cookies</h2>
+        <p>
+          You can control cookies through your browser settings. Most browsers
+          allow you to block or delete cookies. Please note that disabling
+          essential cookies may prevent KelionAI from functioning correctly.
+        </p>
+      </div>
 
-        <div class="legal-section">
-            <h2>6. Data Retention</h2>
-            <p>Session cookies are deleted when you close your browser. Persistent cookies (preferences, consent) are
-                retained for up to 12 months. Analytics data is aggregated and anonymized.</p>
-        </div>
+      <div class="legal-section">
+        <h2>6. Data Retention</h2>
+        <p>
+          Session cookies are deleted when you close your browser. Persistent
+          cookies (preferences, consent) are retained for up to 12 months.
+          Analytics data is aggregated and anonymized.
+        </p>
+      </div>
 
-        <div class="legal-section">
-            <h2>7. Your Rights</h2>
-            <p>Under GDPR and applicable privacy laws, you have the right to access, modify, or delete your cookie data.
-                Contact us at <strong>privacy@kelionai.app</strong> for any cookie-related requests.</p>
-        </div>
+      <div class="legal-section">
+        <h2>7. Your Rights</h2>
+        <p>
+          Under GDPR and applicable privacy laws, you have the right to access,
+          modify, or delete your cookie data. Contact us at
+          <strong>privacy@kelionai.app</strong> for any cookie-related requests.
+        </p>
+      </div>
 
-        <div class="legal-section">
-            <h2>8. Updates</h2>
-            <p>We may update this Cookie Policy periodically. Changes will be posted on this page with a revised
-                effective date.</p>
-        </div>
+      <div class="legal-section">
+        <h2>8. Updates</h2>
+        <p>
+          We may update this Cookie Policy periodically. Changes will be posted
+          on this page with a revised effective date.
+        </p>
+      </div>
     </main>
 
     <footer class="legal-footer">
-        <p>© 2026 KelionAI. <a href="/terms/">Terms of Service</a> · <a href="/privacy/">Privacy Policy</a> · <a
-                href="/gdpr/">GDPR</a></p>
+      <p>
+        © 2026 KelionAI. <a href="/terms/">Terms of Service</a> ·
+        <a href="/privacy/">Privacy Policy</a> · <a href="/gdpr/">GDPR</a>
+      </p>
     </footer>
 
     <a href="/" id="home-btn-fixed" class="home-btn-fixed" title="Home">🏠</a>
-</body>
-
+  </body>
 </html>

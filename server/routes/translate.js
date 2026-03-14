@@ -58,8 +58,7 @@ router.post("/translate", translateLimiter, async (req, res) => {
     }
 
     const data = await r.json();
-    const raw =
-      data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
+    const raw = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
 
     if (!raw) {
       return res.status(502).json({ error: "Empty translation result" });
@@ -96,7 +95,10 @@ router.post("/translate", translateLimiter, async (req, res) => {
       targetLang,
     });
   } catch (e) {
-    logger.error({ component: "Translate", err: e.message }, "Translation error");
+    logger.error(
+      { component: "Translate", err: e.message },
+      "Translation error",
+    );
     res.status(500).json({ error: "Translation error" });
   }
 });

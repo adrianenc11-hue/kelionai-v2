@@ -9,7 +9,11 @@
 const logger = require("./logger");
 const { MODELS } = require("./config/models");
 const { buildSystemPrompt, buildNewbornPrompt } = require("./persona");
-const { getPatternsText, recordUserInteraction, getProactiveSuggestion } = require("./k1-meta-learning");
+const {
+  getPatternsText,
+  recordUserInteraction,
+  getProactiveSuggestion,
+} = require("./k1-meta-learning");
 const { selfEvaluate, getQualityHints } = require("./k1-performance");
 
 // Reuse tool definitions and executor from V4 — no duplication
@@ -108,7 +112,10 @@ function stripLeakedTags(text) {
   r = r.replace(/<tool_call>[\s\S]*?<\/tool_call>/gi, "");
   r = r.replace(/<function_call>[\s\S]*?<\/function_call>/gi, "");
   // System instruction blocks
-  r = r.replace(/\[SYSTEM INSTRUCTION[^\]]*\][\s\S]*?\[END SYSTEM INSTRUCTION\]\s*/gi, "");
+  r = r.replace(
+    /\[SYSTEM INSTRUCTION[^\]]*\][\s\S]*?\[END SYSTEM INSTRUCTION\]\s*/gi,
+    "",
+  );
   r = r.replace(/\[LEARNED PATTERNS\][\s\S]*?\[\/LEARNED PATTERNS\]\s*/gi, "");
   r = r.replace(/\[SELF-EVAL HINTS\][\s\S]*?\[\/SELF-EVAL HINTS\]\s*/gi, "");
   r = r.replace(/\[CONTEXT SWITCH\][^\n]*\n?/gi, "");
@@ -116,7 +123,10 @@ function stripLeakedTags(text) {
   r = r.replace(/\[EMOTIONAL CONTEXT\][^\n]*\n?/gi, "");
   r = r.replace(/\[CURRENT DATE & TIME\][^\n]*\n?/gi, "");
   r = r.replace(/\[USER LOCATION\][^\n]*\n?/gi, "");
-  r = r.replace(/\[REZULTATE CAUTARE WEB REALE\][\s\S]*?Citeaza sursele\.\s*/gi, "");
+  r = r.replace(
+    /\[REZULTATE CAUTARE WEB REALE\][\s\S]*?Citeaza sursele\.\s*/gi,
+    "",
+  );
   r = r.replace(/\[DATE METEO REALE\][^\n]*\n?/gi, "");
   r = r.replace(/\[CONTEXT DIN MEMORIE\][^\n]*\n?/gi, "");
   // Raw JSON tool results that leak
@@ -128,13 +138,21 @@ function stripLeakedTags(text) {
 function extractMonitor(toolResults) {
   for (const r of toolResults) {
     if (r.result && typeof r.result === "object") {
-      if (r.result.monitorURL) return { content: r.result.monitorURL, type: "url" };
+      if (r.result.monitorURL)
+        return { content: r.result.monitorURL, type: "url" };
       if (r.result.mapURL) return { content: r.result.mapURL, type: "map" };
-      if (r.result.imageUrl) return { content: r.result.imageUrl, type: "image" };
+      if (r.result.imageUrl)
+        return { content: r.result.imageUrl, type: "image" };
       if (r.result.radioURL || r.result.streamUrl)
-        return { content: r.result.radioURL || r.result.streamUrl, type: "radio" };
+        return {
+          content: r.result.radioURL || r.result.streamUrl,
+          type: "radio",
+        };
       if (r.result.videoURL || r.result.youtubeURL)
-        return { content: r.result.videoURL || r.result.youtubeURL, type: "video" };
+        return {
+          content: r.result.videoURL || r.result.youtubeURL,
+          type: "video",
+        };
     }
   }
   return { content: null, type: null };
@@ -149,10 +167,7 @@ async function callOpenAI(messages, systemPrompt, tools, model) {
 
   const body = {
     model: model || MODELS.OPENAI_CHAT,
-    messages: [
-      { role: "system", content: systemPrompt },
-      ...messages,
-    ],
+    messages: [{ role: "system", content: systemPrompt }, ...messages],
     max_tokens: 4096,
     temperature: 0.7,
   };
@@ -184,14 +199,14 @@ async function callOpenAI(messages, systemPrompt, tools, model) {
 // Call Gemini Flash (for simple messages and Quality Gate)
 // ═══════════════════════════════════════════════════════════════
 
-
 // ═══════════════════════════════════════════════════════════════
 // Quality Gate: Gemini Flash verifies critical GPT-5.4 responses
 // ═══════════════════════════════════════════════════════════════
 async function qualityGate(question, answer, domain) {
   // Only QA critical domains
   const criticalDomains = ["trading", "medical", "legal", "financial"];
-  if (!criticalDomains.includes(domain)) return { passed: true, corrected: null };
+  if (!criticalDomains.includes(domain))
+    return { passed: true, corrected: null };
 
   try {
     const apiKey = process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
@@ -228,13 +243,19 @@ Be concise. Only correct factual errors, not style.`;
 
     // QA suggests correction — use it if substantially different
     if (qaText.length > 20 && qaText.length < answer.length * 2) {
-      logger.info({ component: "BrainV5" }, "🔍 Quality Gate: correction applied");
+      logger.info(
+        { component: "BrainV5" },
+        "🔍 Quality Gate: correction applied",
+      );
       return { passed: false, corrected: qaText };
     }
 
     return { passed: true, corrected: null };
   } catch (e) {
-    logger.warn({ component: "BrainV5", err: e.message }, "Quality Gate failed (non-blocking)");
+    logger.warn(
+      { component: "BrainV5", err: e.message },
+      "Quality Gate failed (non-blocking)",
+    );
     return { passed: true, corrected: null };
   }
 }
@@ -285,7 +306,12 @@ async function thinkV5(
       brain.loadFacts(userId, 20),
       brain._loadProfileCached(userId),
     ]);
-    const memoryContext = brain.buildMemoryContext(memories, visualMem, audioMem, facts);
+    const memoryContext = brain.buildMemoryContext(
+      memories,
+      visualMem,
+      audioMem,
+      facts,
+    );
     const profileContext = profile ? profile.toContextString() : "";
 
     // ── 3. Emotion detection (fast, no AI needed) ──
@@ -311,36 +337,52 @@ async function thinkV5(
 
     // ── 3b. Context switch detection ──
     const topicKeywords = {
-      trading: /\b(trade|trading|buy|sell|BTC|ETH|crypto|piață|preț|analiză|signal|RSI|MACD|invest|portofoliu|acțiuni|bursă|forex)\b/i,
-      coding: /\b(code|coding|bug|error|function|deploy|API|server|git|commit|script|database|program)\b/i,
+      trading:
+        /\b(trade|trading|buy|sell|BTC|ETH|crypto|piață|preț|analiză|signal|RSI|MACD|invest|portofoliu|acțiuni|bursă|forex)\b/i,
+      coding:
+        /\b(code|coding|bug|error|function|deploy|API|server|git|commit|script|database|program)\b/i,
       news: /\b(news|știri|știre|politic|război|eveniment|actual|azi|ieri|breaking)\b/i,
-      weather: /\b(vreme|meteo|weather|ploaie|soare|temperatură|grad|frig|cald)\b/i,
+      weather:
+        /\b(vreme|meteo|weather|ploaie|soare|temperatură|grad|frig|cald)\b/i,
       music: /\b(muzică|music|song|cântec|artist|album|concert|playlist)\b/i,
-      personal: /\b(eu|mine|viața|familie|sănătate|hobby|plan|sentiment|gândesc|simt)\b/i,
+      personal:
+        /\b(eu|mine|viața|familie|sănătate|hobby|plan|sentiment|gândesc|simt)\b/i,
     };
     let currentTopic = "general";
     for (const [topic, pattern] of Object.entries(topicKeywords)) {
-      if (pattern.test(message)) { currentTopic = topic; break; }
+      if (pattern.test(message)) {
+        currentTopic = topic;
+        break;
+      }
     }
     if (!brain._lastTopic) brain._lastTopic = "general";
     let contextSwitchHint = "";
-    if (brain._lastTopic !== currentTopic && brain._lastTopic !== "general" && currentTopic !== "general") {
+    if (
+      brain._lastTopic !== currentTopic &&
+      brain._lastTopic !== "general" &&
+      currentTopic !== "general"
+    ) {
       contextSwitchHint = `\n[CONTEXT SWITCH] Userul a trecut de la ${brain._lastTopic} la ${currentTopic}. Ajustează-ți tonul și cunoștințele.`;
     }
     brain._lastTopic = currentTopic;
 
     // ── 4. Determine domain for Quality Gate ──
     let domain = "general";
-    if (/trading|crypto|btc|eth|invest|piață/i.test(message)) domain = "trading";
-    else if (/medical|mri|ct|doză|cancer|diagnostic/i.test(message)) domain = "medical";
+    if (/trading|crypto|btc|eth|invest|piață/i.test(message))
+      domain = "trading";
+    else if (/medical|mri|ct|doză|cancer|diagnostic/i.test(message))
+      domain = "medical";
     else if (/legal|lege|contract|gdpr|drept/i.test(message)) domain = "legal";
-    else if (/financ|credit|impozit|salariu|roi|npv/i.test(message)) domain = "financial";
+    else if (/financ|credit|impozit|salariu|roi|npv/i.test(message))
+      domain = "financial";
 
     // ── 5. Build system prompt with FULL context ──
     const geoBlock = mediaData.geo
       ? `\n[USER LOCATION] Lat: ${mediaData.geo.lat}, Lng: ${mediaData.geo.lng}${mediaData.geo.accuracy ? ` (accuracy: ${Math.round(mediaData.geo.accuracy)}m)` : ""}. Use this for weather, nearby places, and location-aware responses. DO NOT call any tool to get user location — you already have it.`
       : "";
-    const memoryBlock = [profileContext, memoryContext].filter(Boolean).join(" || ");
+    const memoryBlock = [profileContext, memoryContext]
+      .filter(Boolean)
+      .join(" || ");
     const emotionBlock = emotionHint
       ? `\n[EMOTIONAL CONTEXT] User mood: ${emotionalTone}. ${emotionHint}`
       : "";
@@ -349,22 +391,42 @@ async function thinkV5(
     const patternsBlock = getPatternsText();
     const qualityHints = getQualityHints();
     const proactiveHint = getProactiveSuggestion();
-    const systemPrompt = process.env.NEWBORN_MODE === "true"
-      ? buildNewbornPrompt(memoryBlock + patternsBlock + qualityHints + contextSwitchHint + proactiveHint)
-      : buildSystemPrompt(
-          avatar,
-          language,
-          memoryBlock + emotionBlock + geoBlock + dateTimeBlock + patternsBlock + qualityHints + contextSwitchHint + proactiveHint,
-          "",
-          null,
-        );
+    const systemPrompt =
+      process.env.NEWBORN_MODE === "true"
+        ? buildNewbornPrompt(
+            memoryBlock +
+              patternsBlock +
+              qualityHints +
+              contextSwitchHint +
+              proactiveHint,
+          )
+        : buildSystemPrompt(
+            avatar,
+            language,
+            memoryBlock +
+              emotionBlock +
+              geoBlock +
+              dateTimeBlock +
+              patternsBlock +
+              qualityHints +
+              contextSwitchHint +
+              proactiveHint,
+            "",
+            null,
+          );
 
     // ── 6. Classify message complexity ──
     const complexity = classifyComplexity(message, history);
     const useGPT = complexity === "complex" || !!mediaData.imageBase64;
 
     logger.info(
-      { component: "BrainV5", complexity, useGPT, domain, hasImage: !!mediaData.imageBase64 },
+      {
+        component: "BrainV5",
+        complexity,
+        useGPT,
+        domain,
+        hasImage: !!mediaData.imageBase64,
+      },
       `🧠 V5 routing: ${complexity} → ${useGPT ? "GPT-5.4" : "Gemini Flash"}`,
     );
 
@@ -384,7 +446,8 @@ async function thinkV5(
       // Build OpenAI message array
       const msgs = recentHistory.map((h) => ({
         role: h.role === "ai" ? "assistant" : h.role,
-        content: typeof h.content === "string" ? h.content : JSON.stringify(h.content),
+        content:
+          typeof h.content === "string" ? h.content : JSON.stringify(h.content),
       }));
 
       // Handle vision: if image provided, use content array format
@@ -399,10 +462,11 @@ async function thinkV5(
         if (mediaData.isAutoCamera) {
           userContent.push({
             type: "text",
-            text: "[AUTO-CAMERA] Aceasta e imagine automată de la camera utilizatorului. " +
-                  "Regulă: NU descrie toată camera/scena. Fii SCURT (1-2 propoziții). " +
-                  "Menționează DOAR: persoane (culori exacte de haine), pericole, text vizibil. " +
-                  "Dacă nu e nimic nou de spus, nu comenta imaginea deloc — răspunde normal la mesaj.",
+            text:
+              "[AUTO-CAMERA] Aceasta e imagine automată de la camera utilizatorului. " +
+              "Regulă: NU descrie toată camera/scena. Fii SCURT (1-2 propoziții). " +
+              "Menționează DOAR: persoane (culori exacte de haine), pericole, text vizibil. " +
+              "Dacă nu e nimic nou de spus, nu comenta imaginea deloc — răspunde normal la mesaj.",
           });
         }
         userContent.push({ type: "text", text: message });
@@ -422,7 +486,7 @@ async function thinkV5(
           mediaData.imageBase64 ? MODELS.OPENAI_VISION : MODELS.OPENAI_CHAT,
         );
 
-        totalTokens += (response.usage?.total_tokens || 0);
+        totalTokens += response.usage?.total_tokens || 0;
         const choice = response.choices?.[0];
 
         if (!choice?.message) {
@@ -442,16 +506,25 @@ async function thinkV5(
             } catch {
               args = {};
             }
-            const result = await executeTool(brain, tc.function.name, args, userId);
+            const result = await executeTool(
+              brain,
+              tc.function.name,
+              args,
+              userId,
+            );
             toolsUsed.push(tc.function.name);
             toolResults.push({ name: tc.function.name, result });
-            brain.toolStats[tc.function.name] = (brain.toolStats[tc.function.name] || 0) + 1;
+            brain.toolStats[tc.function.name] =
+              (brain.toolStats[tc.function.name] || 0) + 1;
             return {
               role: "tool",
               tool_call_id: tc.id,
-              content: typeof result === "string"
-                ? result
-                : JSON.stringify(result, (_, v) => typeof v === "string" ? v.substring(0, 4000) : v),
+              content:
+                typeof result === "string"
+                  ? result
+                  : JSON.stringify(result, (_, v) =>
+                      typeof v === "string" ? v.substring(0, 4000) : v,
+                    ),
             };
           });
 
@@ -477,7 +550,7 @@ async function thinkV5(
             [], // No tools — force text response
             MODELS.OPENAI_CHAT,
           );
-          totalTokens += (finalCall.usage?.total_tokens || 0);
+          totalTokens += finalCall.usage?.total_tokens || 0;
           finalResponse = finalCall.choices?.[0]?.message?.content || "";
         }
       }
@@ -498,8 +571,9 @@ async function thinkV5(
         });
         if (mediaData.isAutoCamera) {
           userParts.push({
-            text: "[AUTO-CAMERA] Aceasta e imagine automată de la camera utilizatorului. " +
-                  "Regulă: NU descrie toată camera/scena. Fii SCURT (1-2 propoziții).",
+            text:
+              "[AUTO-CAMERA] Aceasta e imagine automată de la camera utilizatorului. " +
+              "Regulă: NU descrie toată camera/scena. Fii SCURT (1-2 propoziții).",
           });
         }
       }
@@ -508,17 +582,27 @@ async function thinkV5(
       const geminiMessages = [
         ...recentHistory.map((h) => ({
           role: h.role === "user" ? "user" : "model",
-          parts: [{ text: typeof h.content === "string" ? h.content : JSON.stringify(h.content) }],
+          parts: [
+            {
+              text:
+                typeof h.content === "string"
+                  ? h.content
+                  : JSON.stringify(h.content),
+            },
+          ],
         })),
         { role: "user", parts: userParts },
       ];
 
       // Gemini tool calling loop — MAX 2 rounds
       let currentMessages = geminiMessages;
-      const geminiApiKey = process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
+      const geminiApiKey =
+        process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
 
       if (!geminiApiKey) {
-        throw new Error("No AI API key configured (OPENAI_API_KEY or GOOGLE_AI_KEY required)");
+        throw new Error(
+          "No AI API key configured (OPENAI_API_KEY or GOOGLE_AI_KEY required)",
+        );
       }
 
       const geminiModel = MODELS.GEMINI_CHAT || "gemini-2.5-flash";
@@ -546,7 +630,9 @@ async function thinkV5(
 
         if (!r.ok) {
           const errText = await r.text().catch(() => "unknown");
-          throw new Error(`Gemini API ${r.status}: ${errText.substring(0, 200)}`);
+          throw new Error(
+            `Gemini API ${r.status}: ${errText.substring(0, 200)}`,
+          );
         }
 
         const response = await r.json();
@@ -556,8 +642,13 @@ async function thinkV5(
 
         const candidate = response.candidates?.[0];
         if (!candidate?.content?.parts) {
-          const blockReason = candidate?.finishReason || response.promptFeedback?.blockReason;
-          if (blockReason) logger.warn({ component: "BrainV5", blockReason }, "Gemini blocked");
+          const blockReason =
+            candidate?.finishReason || response.promptFeedback?.blockReason;
+          if (blockReason)
+            logger.warn(
+              { component: "BrainV5", blockReason },
+              "Gemini blocked",
+            );
           break;
         }
 
@@ -565,22 +656,36 @@ async function thinkV5(
         const functionCalls = parts.filter((p) => p.functionCall);
 
         if (functionCalls.length === 0) {
-          finalResponse = parts.filter((p) => p.text).map((p) => p.text).join("\n");
+          finalResponse = parts
+            .filter((p) => p.text)
+            .map((p) => p.text)
+            .join("\n");
           break;
         }
 
         // Execute tools
         const toolPromises = functionCalls.map(async (fc) => {
-          const result = await executeTool(brain, fc.functionCall.name, fc.functionCall.args || {}, userId);
+          const result = await executeTool(
+            brain,
+            fc.functionCall.name,
+            fc.functionCall.args || {},
+            userId,
+          );
           toolsUsed.push(fc.functionCall.name);
           toolResults.push({ name: fc.functionCall.name, result });
-          brain.toolStats[fc.functionCall.name] = (brain.toolStats[fc.functionCall.name] || 0) + 1;
+          brain.toolStats[fc.functionCall.name] =
+            (brain.toolStats[fc.functionCall.name] || 0) + 1;
           return {
             functionResponse: {
               name: fc.functionCall.name,
-              response: typeof result === "string"
-                ? { result }
-                : JSON.parse(JSON.stringify(result, (_, v) => typeof v === "string" ? v.substring(0, 4000) : v)),
+              response:
+                typeof result === "string"
+                  ? { result }
+                  : JSON.parse(
+                      JSON.stringify(result, (_, v) =>
+                        typeof v === "string" ? v.substring(0, 4000) : v,
+                      ),
+                    ),
             },
           };
         });
@@ -612,10 +717,21 @@ async function thinkV5(
     const thinkTime = Date.now() - startTime;
 
     // Save memory (async, non-blocking)
-    brain.saveMemory(userId, "text", message, { response: finalResponse.substring(0, 200) }, 5).catch(() => {});
+    brain
+      .saveMemory(
+        userId,
+        "text",
+        message,
+        { response: finalResponse.substring(0, 200) },
+        5,
+      )
+      .catch(() => {});
     brain.learnFromConversation(userId, message, finalResponse).catch(() => {});
     if (profile) {
-      profile.updateFromConversation(message, language, { emotionalTone, topics: [] });
+      profile.updateFromConversation(message, language, {
+        emotionalTone,
+        topics: [],
+      });
       profile.save(brain.supabaseAdmin).catch(() => {});
     }
 
@@ -631,16 +747,28 @@ async function thinkV5(
 
     // Self-evaluate
     try {
-      const evalDomain = toolsUsed.includes("get_trading_intelligence") ? "trading"
-        : toolsUsed.includes("search_web") ? "research"
-        : toolsUsed.includes("execute_javascript") ? "coding"
-        : "general";
+      const evalDomain = toolsUsed.includes("get_trading_intelligence")
+        ? "trading"
+        : toolsUsed.includes("search_web")
+          ? "research"
+          : toolsUsed.includes("execute_javascript")
+            ? "coding"
+            : "general";
       selfEvaluate(message, finalResponse, evalDomain);
       recordUserInteraction({ domain: evalDomain, userMessage: message });
-    } catch (_) { /* non-blocking */ }
+    } catch (_) {
+      /* non-blocking */
+    }
 
     logger.info(
-      { component: "BrainV5", engine, tools: toolsUsed, thinkTime, tokens: totalTokens, complexity },
+      {
+        component: "BrainV5",
+        engine,
+        tools: toolsUsed,
+        thinkTime,
+        tokens: totalTokens,
+        complexity,
+      },
       `🧠 V5 Think: ${engine} | ${toolsUsed.length} tools | ${thinkTime}ms | ${totalTokens} tokens`,
     );
 
@@ -659,7 +787,9 @@ async function thinkV5(
       },
       chainOfThought: null,
       compressedHistory: recentHistory,
-      failedTools: toolResults.filter((r) => r.result?.error).map((r) => r.name),
+      failedTools: toolResults
+        .filter((r) => r.result?.error)
+        .map((r) => r.name),
       thinkTime,
       confidence,
       sourceTags:
@@ -672,17 +802,42 @@ async function thinkV5(
   } catch (e) {
     const thinkTime = Date.now() - startTime;
     brain.recordError("thinkV5", e.message);
-    logger.error({ component: "BrainV5", err: e.message, thinkTime }, `🧠 V5 Think failed: ${e.message}`);
+    logger.error(
+      { component: "BrainV5", err: e.message, thinkTime },
+      `🧠 V5 Think failed: ${e.message}`,
+    );
 
     // FALLBACK CHAIN: V5 fails → try V4 → try V3 → error message
-    logger.info({ component: "BrainV5" }, "⚠️ Falling back to V4 (Gemini tool calling)");
+    logger.info(
+      { component: "BrainV5" },
+      "⚠️ Falling back to V4 (Gemini tool calling)",
+    );
     try {
       const { thinkV4 } = require("./brain-v4");
-      return await thinkV4(brain, message, avatar, history, language, userId, conversationId, mediaData, isAdmin);
+      return await thinkV4(
+        brain,
+        message,
+        avatar,
+        history,
+        language,
+        userId,
+        conversationId,
+        mediaData,
+        isAdmin,
+      );
     } catch (e2) {
       logger.info({ component: "BrainV5" }, "⚠️ V4 failed, falling back to V3");
       try {
-        return await brain.think(message, avatar, history, language, userId, conversationId, mediaData, isAdmin);
+        return await brain.think(
+          message,
+          avatar,
+          history,
+          language,
+          userId,
+          conversationId,
+          mediaData,
+          isAdmin,
+        );
       } catch (e3) {
         return {
           enrichedMessage:
@@ -691,7 +846,12 @@ async function thinkV5(
               : "I'm sorry, I encountered a technical issue and can't respond right now. Please try again. 🔧",
           toolsUsed: [],
           monitor: { content: null, type: null },
-          analysis: { complexity: "simple", language: language || "ro", emotionalTone: "neutral", topics: [] },
+          analysis: {
+            complexity: "simple",
+            language: language || "ro",
+            emotionalTone: "neutral",
+            topics: [],
+          },
           chainOfThought: null,
           compressedHistory: history || [],
           failedTools: [],
@@ -705,4 +865,10 @@ async function thinkV5(
   }
 }
 
-module.exports = { thinkV5, TOOL_DEFINITIONS, classifyComplexity, stripLeakedTags, qualityGate };
+module.exports = {
+  thinkV5,
+  TOOL_DEFINITIONS,
+  classifyComplexity,
+  stripLeakedTags,
+  qualityGate,
+};

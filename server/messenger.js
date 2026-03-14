@@ -1495,7 +1495,9 @@ router.post("/webhook", async function (req, res) {
             userName: senderName || senderId,
             supabase: req.app.locals.supabaseAdmin || req.app.locals.supabase,
           });
-        } catch { /* ignored */ }
+        } catch {
+          /* ignored */
+        }
 
         // AI RESPONSE
         let reply;
@@ -1551,7 +1553,9 @@ router.post("/webhook", async function (req, res) {
             domain: k1Context?.k1?.domain || "general",
             supabase: req.app.locals.supabaseAdmin || req.app.locals.supabase,
           });
-        } catch { /* ignored */ }
+        } catch {
+          /* ignored */
+        }
 
         // DETERMINE QUICK REPLIES FOR RESPONSE
         const msgCount = await incrementUserMessageCount(senderId);

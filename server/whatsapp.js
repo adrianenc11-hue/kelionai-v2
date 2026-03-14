@@ -1068,7 +1068,9 @@ router.post("/webhook", async (req, res) => {
               userName: contactName || phone,
               supabase: req.app.locals.supabaseAdmin || req.app.locals.supabase,
             });
-          } catch { /* ignored */ }
+          } catch {
+            /* ignored */
+          }
 
           // ═══ AI RESPONSE (with conversation context) ═══
           let reply;
@@ -1119,7 +1121,9 @@ router.post("/webhook", async (req, res) => {
               domain: k1Context?.k1?.domain || "general",
               supabase: req.app.locals.supabaseAdmin || req.app.locals.supabase,
             });
-          } catch { /* ignored */ }
+          } catch {
+            /* ignored */
+          }
 
           // Prefix polite intervention phrase for unsolicited group responses
           if (isGroup && !getAddressedCharacter(userText)) {

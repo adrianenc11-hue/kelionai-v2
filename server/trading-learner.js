@@ -593,13 +593,22 @@ function detectCandlestickPattern(candles, i) {
   const patterns = [];
 
   // 1. HAMMER (bullish reversal) — small body on top, long lower shadow
-  if (lowerShadow > body * 2 && upperShadow < body * 0.5 && body > 0 && range > 0) {
+  if (
+    lowerShadow > body * 2 &&
+    upperShadow < body * 0.5 &&
+    body > 0 &&
+    range > 0
+  ) {
     patterns.push({ name: "Hammer", direction: "bullish", strength: 2 });
   }
 
   // 2. INVERTED HAMMER (bullish reversal) — small body on bottom, long upper shadow
   if (upperShadow > body * 2 && lowerShadow < body * 0.5 && body > 0) {
-    patterns.push({ name: "Inverted Hammer", direction: "bullish", strength: 1 });
+    patterns.push({
+      name: "Inverted Hammer",
+      direction: "bullish",
+      strength: 1,
+    });
   }
 
   // 3. DOJI — open ≈ close (body < 10% of range)
@@ -608,36 +617,88 @@ function detectCandlestickPattern(candles, i) {
   }
 
   // 4. BULLISH ENGULFING — bearish candle followed by larger bullish candle
-  if (pIsBearish && isBullish && c.open <= p.close && c.close >= p.open && body > pBody) {
-    patterns.push({ name: "Bullish Engulfing", direction: "bullish", strength: 3 });
+  if (
+    pIsBearish &&
+    isBullish &&
+    c.open <= p.close &&
+    c.close >= p.open &&
+    body > pBody
+  ) {
+    patterns.push({
+      name: "Bullish Engulfing",
+      direction: "bullish",
+      strength: 3,
+    });
   }
 
   // 5. BEARISH ENGULFING — bullish candle followed by larger bearish candle
-  if (pIsBullish && isBearish && c.open >= p.close && c.close <= p.open && body > pBody) {
-    patterns.push({ name: "Bearish Engulfing", direction: "bearish", strength: 3 });
+  if (
+    pIsBullish &&
+    isBearish &&
+    c.open >= p.close &&
+    c.close <= p.open &&
+    body > pBody
+  ) {
+    patterns.push({
+      name: "Bearish Engulfing",
+      direction: "bearish",
+      strength: 3,
+    });
   }
 
   // 6. MORNING STAR (bullish, 3 candles) — bearish + small body + bullish
   const ppBody = Math.abs(pp.close - pp.open);
   const ppIsBearish = pp.close < pp.open;
-  if (ppIsBearish && ppBody > 0 && pBody < ppBody * 0.3 && isBullish && body > ppBody * 0.5) {
+  if (
+    ppIsBearish &&
+    ppBody > 0 &&
+    pBody < ppBody * 0.3 &&
+    isBullish &&
+    body > ppBody * 0.5
+  ) {
     patterns.push({ name: "Morning Star", direction: "bullish", strength: 3 });
   }
 
   // 7. EVENING STAR (bearish, 3 candles) — bullish + small body + bearish
   const ppIsBullish = pp.close > pp.open;
-  if (ppIsBullish && ppBody > 0 && pBody < ppBody * 0.3 && isBearish && body > ppBody * 0.5) {
+  if (
+    ppIsBullish &&
+    ppBody > 0 &&
+    pBody < ppBody * 0.3 &&
+    isBearish &&
+    body > ppBody * 0.5
+  ) {
     patterns.push({ name: "Evening Star", direction: "bearish", strength: 3 });
   }
 
   // 8. THREE WHITE SOLDIERS (bullish) — 3 consecutive bullish candles with higher closes
-  if (ppIsBullish && pIsBullish && isBullish && c.close > p.close && p.close > pp.close) {
-    patterns.push({ name: "Three White Soldiers", direction: "bullish", strength: 3 });
+  if (
+    ppIsBullish &&
+    pIsBullish &&
+    isBullish &&
+    c.close > p.close &&
+    p.close > pp.close
+  ) {
+    patterns.push({
+      name: "Three White Soldiers",
+      direction: "bullish",
+      strength: 3,
+    });
   }
 
   // 9. THREE BLACK CROWS (bearish) — 3 consecutive bearish candles with lower closes
-  if (ppIsBearish && pIsBearish && isBearish && c.close < p.close && p.close < pp.close) {
-    patterns.push({ name: "Three Black Crows", direction: "bearish", strength: 3 });
+  if (
+    ppIsBearish &&
+    pIsBearish &&
+    isBearish &&
+    c.close < p.close &&
+    p.close < pp.close
+  ) {
+    patterns.push({
+      name: "Three Black Crows",
+      direction: "bearish",
+      strength: 3,
+    });
   }
 
   return patterns.length > 0 ? patterns : null;
@@ -662,7 +723,10 @@ async function analyzeCandlestickPatterns(supabase) {
         continue;
       }
       if (!candles || candles.length < 50) {
-        logger.info({ asset, candles: candles?.length || 0 }, `[Learner] Skip ${asset} — need 50+ candles`);
+        logger.info(
+          { asset, candles: candles?.length || 0 },
+          `[Learner] Skip ${asset} — need 50+ candles`,
+        );
         continue;
       }
 
@@ -675,11 +739,20 @@ async function analyzeCandlestickPatterns(supabase) {
           const key = `${asset}:${pat.name}`;
           if (!patternStats[key]) {
             patternStats[key] = {
-              asset, pattern: pat.name, direction: pat.direction, strength: pat.strength,
+              asset,
+              pattern: pat.name,
+              direction: pat.direction,
+              strength: pat.strength,
               occurrences: 0,
-              wins1d: 0, wins3d: 0, wins5d: 0,
-              avgMove1d: 0, avgMove3d: 0, avgMove5d: 0,
-              moves1d: [], moves3d: [], moves5d: [],
+              wins1d: 0,
+              wins3d: 0,
+              wins5d: 0,
+              avgMove1d: 0,
+              avgMove3d: 0,
+              avgMove5d: 0,
+              moves1d: [],
+              moves3d: [],
+              moves5d: [],
             };
           }
           const s = patternStats[key];
@@ -689,13 +762,21 @@ async function analyzeCandlestickPatterns(supabase) {
           const isBullish = pat.direction === "bullish";
 
           // Check outcome after 1, 3, 5 days
-          for (const [days, winsKey, movesKey] of [[1, "wins1d", "moves1d"], [3, "wins3d", "moves3d"], [5, "wins5d", "moves5d"]]) {
+          for (const [days, winsKey, movesKey] of [
+            [1, "wins1d", "moves1d"],
+            [3, "wins3d", "moves3d"],
+            [5, "wins5d", "moves5d"],
+          ]) {
             if (i + days < candles.length) {
               const exitPrice = candles[i + days].close;
               const movePct = ((exitPrice - entryPrice) / entryPrice) * 100;
               s[movesKey].push(movePct);
               // Win = price moved in predicted direction
-              if ((isBullish && movePct > 0) || (!isBullish && movePct < 0) || (pat.direction === "neutral" && Math.abs(movePct) > 1)) {
+              if (
+                (isBullish && movePct > 0) ||
+                (!isBullish && movePct < 0) ||
+                (pat.direction === "neutral" && Math.abs(movePct) > 1)
+              ) {
                 s[winsKey]++;
               }
             }
@@ -709,15 +790,35 @@ async function analyzeCandlestickPatterns(supabase) {
     for (const [_key, s] of Object.entries(patternStats)) {
       if (s.occurrences < 5) continue; // need minimum 5 occurrences
 
-      s.avgMove1d = s.moves1d.length > 0 ? +(s.moves1d.reduce((a, b) => a + b, 0) / s.moves1d.length).toFixed(3) : 0;
-      s.avgMove3d = s.moves3d.length > 0 ? +(s.moves3d.reduce((a, b) => a + b, 0) / s.moves3d.length).toFixed(3) : 0;
-      s.avgMove5d = s.moves5d.length > 0 ? +(s.moves5d.reduce((a, b) => a + b, 0) / s.moves5d.length).toFixed(3) : 0;
-      s.winRate1d = s.occurrences > 0 ? +(s.wins1d / s.occurrences * 100).toFixed(1) : 0;
-      s.winRate3d = s.occurrences > 0 ? +(s.wins3d / s.occurrences * 100).toFixed(1) : 0;
-      s.winRate5d = s.occurrences > 0 ? +(s.wins5d / s.occurrences * 100).toFixed(1) : 0;
+      s.avgMove1d =
+        s.moves1d.length > 0
+          ? +(s.moves1d.reduce((a, b) => a + b, 0) / s.moves1d.length).toFixed(
+              3,
+            )
+          : 0;
+      s.avgMove3d =
+        s.moves3d.length > 0
+          ? +(s.moves3d.reduce((a, b) => a + b, 0) / s.moves3d.length).toFixed(
+              3,
+            )
+          : 0;
+      s.avgMove5d =
+        s.moves5d.length > 0
+          ? +(s.moves5d.reduce((a, b) => a + b, 0) / s.moves5d.length).toFixed(
+              3,
+            )
+          : 0;
+      s.winRate1d =
+        s.occurrences > 0 ? +((s.wins1d / s.occurrences) * 100).toFixed(1) : 0;
+      s.winRate3d =
+        s.occurrences > 0 ? +((s.wins3d / s.occurrences) * 100).toFixed(1) : 0;
+      s.winRate5d =
+        s.occurrences > 0 ? +((s.wins5d / s.occurrences) * 100).toFixed(1) : 0;
 
       // Clean up raw arrays (don't save to DB)
-      delete s.moves1d; delete s.moves3d; delete s.moves5d;
+      delete s.moves1d;
+      delete s.moves3d;
+      delete s.moves5d;
 
       // Proven = win rate > 55% AND 5+ occurrences
       if (s.winRate3d > 55 || s.winRate5d > 55) {
@@ -729,28 +830,34 @@ async function analyzeCandlestickPatterns(supabase) {
     if (provenPatterns.length > 0 && supabase) {
       for (const p of provenPatterns) {
         try {
-          await supabase.from("trading_pattern_stats").upsert({
-            asset: p.asset,
-            pattern: p.pattern,
-            direction: p.direction,
-            strength: p.strength,
-            occurrences: p.occurrences,
-            win_rate_1d: p.winRate1d,
-            win_rate_3d: p.winRate3d,
-            win_rate_5d: p.winRate5d,
-            avg_move_1d: p.avgMove1d,
-            avg_move_3d: p.avgMove3d,
-            avg_move_5d: p.avgMove5d,
-            updated_at: new Date().toISOString(),
-          }, { onConflict: "asset,pattern" });
-        } catch (_e) { /* table might not exist yet */ }
+          await supabase.from("trading_pattern_stats").upsert(
+            {
+              asset: p.asset,
+              pattern: p.pattern,
+              direction: p.direction,
+              strength: p.strength,
+              occurrences: p.occurrences,
+              win_rate_1d: p.winRate1d,
+              win_rate_3d: p.winRate3d,
+              win_rate_5d: p.winRate5d,
+              avg_move_1d: p.avgMove1d,
+              avg_move_3d: p.avgMove3d,
+              avg_move_5d: p.avgMove5d,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: "asset,pattern" },
+          );
+        } catch (_e) {
+          /* table might not exist yet */
+        }
       }
     }
 
     // Also save to in-memory learned rules
     for (const p of provenPatterns) {
       if (!learnedRules[p.asset]) learnedRules[p.asset] = { ...DEFAULT_RULES };
-      if (!learnedRules[p.asset].provenPatterns) learnedRules[p.asset].provenPatterns = [];
+      if (!learnedRules[p.asset].provenPatterns)
+        learnedRules[p.asset].provenPatterns = [];
       learnedRules[p.asset].provenPatterns.push({
         pattern: p.pattern,
         direction: p.direction,
@@ -759,17 +866,24 @@ async function analyzeCandlestickPatterns(supabase) {
       });
     }
 
-    logger.info({
-      totalPatterns: Object.keys(patternStats).length,
-      proven: provenPatterns.length,
-      topPatterns: provenPatterns
-        .sort((a, b) => b.winRate3d - a.winRate3d)
-        .slice(0, 5)
-        .map(p => `${p.asset}:${p.pattern}(WR3d:${p.winRate3d}%)`)
-        .join(", "),
-    }, "[Learner] 🕯️ Candlestick pattern analysis complete");
+    logger.info(
+      {
+        totalPatterns: Object.keys(patternStats).length,
+        proven: provenPatterns.length,
+        topPatterns: provenPatterns
+          .sort((a, b) => b.winRate3d - a.winRate3d)
+          .slice(0, 5)
+          .map((p) => `${p.asset}:${p.pattern}(WR3d:${p.winRate3d}%)`)
+          .join(", "),
+      },
+      "[Learner] 🕯️ Candlestick pattern analysis complete",
+    );
 
-    return { total: Object.keys(patternStats).length, proven: provenPatterns.length, patterns: provenPatterns };
+    return {
+      total: Object.keys(patternStats).length,
+      proven: provenPatterns.length,
+      patterns: provenPatterns,
+    };
   } catch (e) {
     logger.error({ err: e.message }, "[Learner] Candlestick analysis failed");
     return null;
@@ -789,7 +903,9 @@ async function trackSignalAccuracy(supabase) {
     if (!supabase) return null;
 
     // Get signals from last 30 days that haven't been verified yet
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const thirtyDaysAgo = new Date(
+      Date.now() - 30 * 24 * 60 * 60 * 1000,
+    ).toISOString();
     const { data: signals } = await supabase
       .from("trading_signals")
       .select("*")
@@ -800,7 +916,9 @@ async function trackSignalAccuracy(supabase) {
     if (!signals || signals.length === 0) return { verified: 0 };
 
     const histLoader = require("./historical-data-loader");
-    let verified = 0, correct = 0, incorrect = 0;
+    let verified = 0,
+      correct = 0,
+      incorrect = 0;
 
     for (const sig of signals) {
       // Check if enough time has passed (3 days minimum)
@@ -816,24 +934,35 @@ async function trackSignalAccuracy(supabase) {
         if (!entryPrice) continue;
 
         const movePct = ((latestPrice - entryPrice) / entryPrice) * 100;
-        const wasCorrect = (sig.signal === "BUY" && movePct > 0) || (sig.signal === "SELL" && movePct < 0);
+        const wasCorrect =
+          (sig.signal === "BUY" && movePct > 0) ||
+          (sig.signal === "SELL" && movePct < 0);
 
         // Update the signal
-        await supabase.from("trading_signals").update({
-          outcome_verified: true,
-          outcome_pct: +movePct.toFixed(2),
-          outcome_correct: wasCorrect,
-          verified_at: new Date().toISOString(),
-        }).eq("id", sig.id);
+        await supabase
+          .from("trading_signals")
+          .update({
+            outcome_verified: true,
+            outcome_pct: +movePct.toFixed(2),
+            outcome_correct: wasCorrect,
+            verified_at: new Date().toISOString(),
+          })
+          .eq("id", sig.id);
 
         verified++;
         if (wasCorrect) correct++;
         else incorrect++;
-      } catch (_e) { /* skip */ }
+      } catch (_e) {
+        /* skip */
+      }
     }
 
-    const accuracy = verified > 0 ? +(correct / verified * 100).toFixed(1) : 0;
-    logger.info({ verified, correct, incorrect, accuracy }, "[Learner] 📊 Signal accuracy tracked");
+    const accuracy =
+      verified > 0 ? +((correct / verified) * 100).toFixed(1) : 0;
+    logger.info(
+      { verified, correct, incorrect, accuracy },
+      "[Learner] 📊 Signal accuracy tracked",
+    );
 
     return { verified, correct, incorrect, accuracy };
   } catch (e) {

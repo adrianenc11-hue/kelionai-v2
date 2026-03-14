@@ -43,7 +43,10 @@ async function main() {
   // ── Server ──
   section("🖥️  Server");
   env.PORT = await ask("Port", "3000");
-  env.NODE_ENV = await ask("Environment (development/production)", "production");
+  env.NODE_ENV = await ask(
+    "Environment (development/production)",
+    "production",
+  );
 
   // ── Database ──
   section("🗄️  Database (Supabase)");
@@ -114,7 +117,9 @@ async function main() {
 
   fs.writeFileSync(envPath, envContent, "utf8");
   console.log(`  ✅ .env created at: ${envPath}`);
-  console.log(`  📝 ${Object.keys(env).filter((k) => env[k]).length} variables configured`);
+  console.log(
+    `  📝 ${Object.keys(env).filter((k) => env[k]).length} variables configured`,
+  );
 
   console.log(`
   ═══════════════════════════════════════════

@@ -131,7 +131,9 @@ ${memoryContext}`;
         const parsed = JSON.parse(data);
         const token = parsed.choices?.[0]?.delta?.content;
         if (token) yield token;
-      } catch { /* ignored */ }
+      } catch {
+        /* ignored */
+      }
     }
   }
 }

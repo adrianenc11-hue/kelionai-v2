@@ -47,7 +47,9 @@ async function preProcess(message, options = {}) {
       domain: reasoning.reasoning.domain,
       limit: 3,
     });
-  } catch { /* ignored */ }
+  } catch {
+    /* ignored */
+  }
 
   // 3. World state awareness
   const world = k1World.getMarketSummary();
@@ -146,7 +148,9 @@ async function postProcess(response, options = {}) {
         importance: 4,
         tags: [platform],
       });
-    } catch { /* ignored */ }
+    } catch {
+      /* ignored */
+    }
   }
 
   // 3. Calculate confidence on response
@@ -160,7 +164,9 @@ async function postProcess(response, options = {}) {
   try {
     k1Meta.useTemplate(`${domain}_analysis`, confidence.score > 70);
     k1Meta.scoreTools("llm_response", domain, confidence.score);
-  } catch { /* ignored */ }
+  } catch {
+    /* ignored */
+  }
 
   // 5. Optional: add confidence badge
   let enhancedResponse = response;

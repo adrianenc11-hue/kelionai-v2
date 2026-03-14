@@ -42,10 +42,7 @@ function notify(type, message, data = {}) {
     }
   }
 
-  logger.info(
-    { component: "Notify", type, msg: message },
-    `📢 ${message}`
-  );
+  logger.info({ component: "Notify", type, msg: message }, `📢 ${message}`);
 }
 
 /**
@@ -75,12 +72,18 @@ function sseHandler(req, res) {
   }, 30000);
 
   clients.add(res);
-  logger.info({ component: "Notify" }, `Admin SSE connected (${clients.size} total)`);
+  logger.info(
+    { component: "Notify" },
+    `Admin SSE connected (${clients.size} total)`,
+  );
 
   req.on("close", () => {
     clients.delete(res);
     clearInterval(heartbeat);
-    logger.info({ component: "Notify" }, `Admin SSE disconnected (${clients.size} remaining)`);
+    logger.info(
+      { component: "Notify" },
+      `Admin SSE disconnected (${clients.size} remaining)`,
+    );
   });
 }
 

@@ -175,7 +175,10 @@ function validateManifest(manifest) {
   if (!manifest.description) errors.push("description required");
   if (manifest.id && !/^[a-z0-9-]+$/.test(manifest.id))
     errors.push("id must be lowercase alphanumeric with hyphens");
-  if (manifest.type && !["command", "middleware", "widget", "builtin"].includes(manifest.type))
+  if (
+    manifest.type &&
+    !["command", "middleware", "widget", "builtin"].includes(manifest.type)
+  )
     errors.push("type must be: command, middleware, widget");
   return errors;
 }
@@ -437,9 +440,9 @@ router.delete("/:id", async (req, res) => {
   if (plugin.builtin)
     return res.status(403).json({ error: "Cannot uninstall builtin plugins" });
   if (plugin.local)
-    return res
-      .status(403)
-      .json({ error: "Cannot uninstall local plugins via API. Delete the file instead." });
+    return res.status(403).json({
+      error: "Cannot uninstall local plugins via API. Delete the file instead.",
+    });
 
   installedPlugins.delete(pluginId);
 
@@ -482,10 +485,15 @@ router.post("/:id/toggle", async (req, res) => {
 // POST /api/plugins/:id/execute — Execute plugin command
 router.post("/:id/execute", express.json(), async (req, res) => {
   try {
-    const result = await executePlugin(req.params.id, req.body.action, req.body.params, {
-      userId: req.body.userId || "admin",
-      kelion: req.body.kelion || {},
-    });
+    const result = await executePlugin(
+      req.params.id,
+      req.body.action,
+      req.body.params,
+      {
+        userId: req.body.userId || "admin",
+        kelion: req.body.kelion || {},
+      },
+    );
     res.json(result);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -508,7 +516,11 @@ async function restorePlugins(supabase) {
             typeof row.manifest === "string"
               ? JSON.parse(row.manifest)
               : row.manifest;
-          if (manifest.id && !manifest.builtin && !installedPlugins.has(manifest.id)) {
+          if (
+            manifest.id &&
+            !manifest.builtin &&
+            !installedPlugins.has(manifest.id)
+          ) {
             installedPlugins.set(manifest.id, {
               ...manifest,
               status: row.status,

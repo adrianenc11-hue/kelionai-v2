@@ -72,9 +72,16 @@ async function requireAdmin(req, res, next) {
 router.post("/verify-code", express.json(), (req, res) => {
   const { code: rawCode } = req.body || {};
   const code = (rawCode || "").trim();
-  const accessCode =
-    (process.env.ADMIN_ACCESS_CODE || process.env.ADMIN_EXIT_CODE || "").trim();
-  const exitCode = (process.env.ADMIN_EXIT_CODE || process.env.ADMIN_ACCESS_CODE || "").trim();
+  const accessCode = (
+    process.env.ADMIN_ACCESS_CODE ||
+    process.env.ADMIN_EXIT_CODE ||
+    ""
+  ).trim();
+  const exitCode = (
+    process.env.ADMIN_EXIT_CODE ||
+    process.env.ADMIN_ACCESS_CODE ||
+    ""
+  ).trim();
   const secret = (process.env.ADMIN_SECRET_KEY || "").trim();
 
   if (!code) return res.status(400).json({ error: "Code required" });
@@ -105,13 +112,19 @@ router.get("/auth-token", async (req, res) => {
     const { getUserFromToken } = req.app.locals;
     const user = await getUserFromToken(req);
     if (!user) return res.status(401).json({ error: "Not authenticated" });
-    const adminEmail = (process.env.ADMIN_EMAIL || "adrianenc11@gmail.com").toLowerCase();
+    const adminEmail = (
+      process.env.ADMIN_EMAIL || "adrianenc11@gmail.com"
+    ).toLowerCase();
     if (user.email?.toLowerCase() !== adminEmail) {
       return res.status(403).json({ error: "Not admin" });
     }
     const secret = (process.env.ADMIN_SECRET_KEY || "").trim();
-    if (!secret) return res.status(500).json({ error: "Admin secret not configured" });
-    logger.info({ component: "Admin" }, "Admin secret issued via JWT for " + user.email);
+    if (!secret)
+      return res.status(500).json({ error: "Admin secret not configured" });
+    logger.info(
+      { component: "Admin" },
+      "Admin secret issued via JWT for " + user.email,
+    );
     return res.json({ secret });
   } catch (e) {
     logger.warn({ component: "Admin", err: e.message }, "auth-token error");
@@ -121,31 +134,58 @@ router.get("/auth-token", async (req, res) => {
 
 // ── Public: User Feedback (no admin required) ──
 router.post("/feedback", (req, res) => {
-  const entry = sprint2.recordFeedback({ userId: req.body.userId, messageId: req.body.messageId, type: req.body.type, comment: req.body.comment, avatar: req.body.avatar });
-  abTest.recordFeedback(req.body.userId, req.body.type === "up" ? "thumbsUp" : "thumbsDown");
+  const entry = sprint2.recordFeedback({
+    userId: req.body.userId,
+    messageId: req.body.messageId,
+    type: req.body.type,
+    comment: req.body.comment,
+    avatar: req.body.avatar,
+  });
+  abTest.recordFeedback(
+    req.body.userId,
+    req.body.type === "up" ? "thumbsUp" : "thumbsDown",
+  );
   res.json({ ok: true, feedback: entry });
 });
 
 // ── Public: Session heartbeat (no admin required) ──
 router.post("/heartbeat", (req, res) => {
-  sprint2.trackSession(req.body.userId || "anon", { email: req.body.email, avatar: req.body.avatar, page: req.body.page, ip: req.ip, userAgent: req.headers["user-agent"] });
+  sprint2.trackSession(req.body.userId || "anon", {
+    email: req.body.email,
+    avatar: req.body.avatar,
+    page: req.body.page,
+    ip: req.ip,
+    userAgent: req.headers["user-agent"],
+  });
   res.json({ ok: true });
 });
 
 // ── Public: Bookmarks (no admin required) ──
-router.post("/bookmarks", (req, res) => res.json(qw.addBookmark(req.body.userId || "anon", req.body)));
-router.get("/bookmarks/:userId", (req, res) => res.json(qw.getBookmarks(req.params.userId)));
-router.delete("/bookmarks/:userId/:id", (req, res) => { qw.deleteBookmark(req.params.userId, req.params.id); res.json({ ok: true }); });
+router.post("/bookmarks", (req, res) =>
+  res.json(qw.addBookmark(req.body.userId || "anon", req.body)),
+);
+router.get("/bookmarks/:userId", (req, res) =>
+  res.json(qw.getBookmarks(req.params.userId)),
+);
+router.delete("/bookmarks/:userId/:id", (req, res) => {
+  qw.deleteBookmark(req.params.userId, req.params.id);
+  res.json({ ok: true });
+});
 
 // ── Public: Templates (no admin required) ──
 router.get("/templates", (_req, res) => res.json(qw.getTemplates()));
-router.get("/templates/:id", (req, res) => { const t = qw.getTemplate(req.params.id); t ? res.json(t) : res.status(404).json({ error: "Not found" }); });
+router.get("/templates/:id", (req, res) => {
+  const t = qw.getTemplate(req.params.id);
+  t ? res.json(t) : res.status(404).json({ error: "Not found" });
+});
 
 router.use(requireAdmin);
 
 // ── SSE Notifications Stream (must be BEFORE JSON middleware) ──
 router.get("/notifications/stream", sseHandler);
-router.get("/notifications", (req, res) => res.json({ notifications: getRecent(30) }));
+router.get("/notifications", (req, res) =>
+  res.json({ notifications: getRecent(30) }),
+);
 
 // ── Log ALL admin actions to Supabase ──
 router.use(async (req, res, next) => {
@@ -585,7 +625,9 @@ router.delete("/users/:id", async (req, res) => {
     for (const t of tables) {
       try {
         await supabaseAdmin.from(t.table).delete().eq(t.column, userId);
-      } catch { /* ignored */ }
+      } catch {
+        /* ignored */
+      }
     }
 
     // Delete from Supabase Auth
@@ -599,7 +641,9 @@ router.delete("/users/:id", async (req, res) => {
         details: { userId, email },
         admin_id: req.adminUser?.id || "admin",
       });
-    } catch { /* ignored */ }
+    } catch {
+      /* ignored */
+    }
 
     logger.info(
       { component: "Admin", userId, email },
@@ -1135,7 +1179,9 @@ router.post("/upgrade", async (req, res) => {
         admin_id: req.adminUser?.id || "admin",
         created_at: new Date().toISOString(),
       });
-    } catch { /* ignored */ }
+    } catch {
+      /* ignored */
+    }
 
     logger.info({ component: "Admin", userId, plan }, "User plan updated");
     res.json({ success: true, message: "Plan actualizat la " + plan + "!" });
@@ -2628,12 +2674,36 @@ router.get("/intelligence", (req, res) => {
     let patterns = "";
     let proactive = "";
 
-    try { performance = require("../k1-performance").getReport(); } catch { /* ignored */ }
-    try { strategies = require("../k1-meta-learning").getStrategies(); } catch { /* ignored */ }
-    try { evolution = require("../k1-meta-learning").getEvolutionReport(); } catch { /* ignored */ }
-    try { userModel = require("../k1-meta-learning").getUserModel(); } catch { /* ignored */ }
-    try { patterns = require("../k1-meta-learning").getPatternsText(); } catch { /* ignored */ }
-    try { proactive = require("../k1-meta-learning").getProactiveSuggestion(); } catch { /* ignored */ }
+    try {
+      performance = require("../k1-performance").getReport();
+    } catch {
+      /* ignored */
+    }
+    try {
+      strategies = require("../k1-meta-learning").getStrategies();
+    } catch {
+      /* ignored */
+    }
+    try {
+      evolution = require("../k1-meta-learning").getEvolutionReport();
+    } catch {
+      /* ignored */
+    }
+    try {
+      userModel = require("../k1-meta-learning").getUserModel();
+    } catch {
+      /* ignored */
+    }
+    try {
+      patterns = require("../k1-meta-learning").getPatternsText();
+    } catch {
+      /* ignored */
+    }
+    try {
+      proactive = require("../k1-meta-learning").getProactiveSuggestion();
+    } catch {
+      /* ignored */
+    }
 
     res.json({
       performance,
@@ -2642,10 +2712,13 @@ router.get("/intelligence", (req, res) => {
       userModel,
       patterns: patterns || "No patterns detected yet",
       proactive: proactive || "",
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   } catch {
-    logger.error({ component: "Intelligence", err: e.message }, "Intelligence data failed");
+    logger.error(
+      { component: "Intelligence", err: e.message },
+      "Intelligence data failed",
+    );
     res.status(500).json({ error: e.message });
   }
 });
@@ -2694,34 +2767,37 @@ router.get("/conversations/export", async (req, res) => {
 
     // Group messages by conversation
     const msgMap = {};
-    (msgs || []).forEach(m => {
+    (msgs || []).forEach((m) => {
       if (!msgMap[m.conversation_id]) msgMap[m.conversation_id] = [];
       msgMap[m.conversation_id].push({
         role: m.role,
         content: m.content,
-        created_at: m.created_at
+        created_at: m.created_at,
       });
     });
 
-    const exported = (convs || []).map(c => ({
+    const exported = (convs || []).map((c) => ({
       id: c.id,
       user_id: c.user_id,
       created_at: c.created_at,
       messages_text: c.messages_text,
-      messages: msgMap[c.id] || []
+      messages: msgMap[c.id] || [],
     }));
 
-    const filename = `kelionai_conversations_${new Date().toISOString().split('T')[0]}.json`;
+    const filename = `kelionai_conversations_${new Date().toISOString().split("T")[0]}.json`;
     res.setHeader("Content-Type", "application/json");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     res.json({
       exported_at: new Date().toISOString(),
       total_conversations: exported.length,
       total_messages: (msgs || []).length,
-      conversations: exported
+      conversations: exported,
     });
   } catch {
-    logger.error({ component: "Admin", err: e.message }, "Conversation export failed");
+    logger.error(
+      { component: "Admin", err: e.message },
+      "Conversation export failed",
+    );
     res.status(500).json({ error: e.message });
   }
 });
@@ -2759,24 +2835,36 @@ router.delete("/ab-tests/:id", (req, res) => {
 // ══════════════════════════════════════════════════════════
 // SPRINT #2 ENDPOINTS
 // ══════════════════════════════════════════════════════════
-router.get("/feedback-stats", (_req, res) => res.json(sprint2.getFeedbackStats()));
+router.get("/feedback-stats", (_req, res) =>
+  res.json(sprint2.getFeedbackStats()),
+);
 router.get("/live-users", (_req, res) => res.json(sprint2.getLiveSessions()));
 router.get("/errors", (_req, res) => res.json(sprint2.getErrorStats()));
-router.post("/errors", (req, res) => { sprint2.trackError(req.body); res.json({ ok: true }); });
+router.post("/errors", (req, res) => {
+  sprint2.trackError(req.body);
+  res.json({ ok: true });
+});
 
 // ══════════════════════════════════════════════════════════
 // CHAIN OF THOUGHT
 router.get("/cot", (_req, res) => res.json({ enabled: cot.isEnabled() }));
-router.post("/cot/toggle", (req, res) => res.json({ enabled: cot.toggle(req.body.enabled) }));
+router.post("/cot/toggle", (req, res) =>
+  res.json({ enabled: cot.toggle(req.body.enabled) }),
+);
 
 // QUICK WINS ENDPOINTS
 // ══════════════════════════════════════════════════════════
 router.post("/templates", (req, res) => res.json(qw.createTemplate(req.body)));
-router.delete("/templates/:id", (req, res) => { qw.deleteTemplate(req.params.id); res.json({ ok: true }); });
+router.delete("/templates/:id", (req, res) => {
+  qw.deleteTemplate(req.params.id);
+  res.json({ ok: true });
+});
 router.get("/webhooks", (_req, res) => res.json(qw.getWebhooks()));
 router.post("/webhooks", (req, res) => res.json(qw.registerWebhook(req.body)));
-router.delete("/webhooks/:id", (req, res) => { qw.deleteWebhook(req.params.id); res.json({ ok: true }); });
+router.delete("/webhooks/:id", (req, res) => {
+  qw.deleteWebhook(req.params.id);
+  res.json({ ok: true });
+});
 router.get("/rate-limits", (_req, res) => res.json(qw.getRateLimitStats()));
 
 module.exports = router;
-

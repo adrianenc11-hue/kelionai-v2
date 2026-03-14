@@ -1291,7 +1291,9 @@ router.get("/usage", async (req, res) => {
           data.forEach((d) => {
             usage[d.type] = d.count;
           });
-      } catch { /* ignored */ }
+      } catch {
+        /* ignored */
+      }
     }
     res.json({ ...planInfo, usage });
   } catch {

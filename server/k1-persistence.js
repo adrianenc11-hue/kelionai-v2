@@ -37,7 +37,9 @@ async function ensureTable(supabase) {
           );
         });
     }
-  } catch { /* ignored */ }
+  } catch {
+    /* ignored */
+  }
 }
 
 /**
@@ -55,7 +57,9 @@ async function saveState(supabase) {
       entries.push({ key: "world_markets", value: ws.markets || {} });
       entries.push({ key: "world_system", value: ws.system || {} });
     }
-  } catch { /* ignored */ }
+  } catch {
+    /* ignored */
+  }
 
   try {
     // 2. Performance metrics
@@ -65,7 +69,9 @@ async function saveState(supabase) {
         value: performance.getReport(),
       });
     }
-  } catch { /* ignored */ }
+  } catch {
+    /* ignored */
+  }
 
   try {
     // 3. User model
@@ -77,7 +83,9 @@ async function saveState(supabase) {
         value: metaLearning.getEvolutionReport(),
       });
     }
-  } catch { /* ignored */ }
+  } catch {
+    /* ignored */
+  }
 
   try {
     // 4. Cognitive performance history
@@ -87,7 +95,9 @@ async function saveState(supabase) {
         value: cognitive.getMetaCognition(),
       });
     }
-  } catch { /* ignored */ }
+  } catch {
+    /* ignored */
+  }
 
   // Upsert fiecare entry
   let saved = 0;
@@ -102,7 +112,9 @@ async function saveState(supabase) {
         { onConflict: "key" },
       );
       if (!error) saved++;
-    } catch { /* ignored */ }
+    } catch {
+      /* ignored */
+    }
   }
 
   if (saved > 0) {
@@ -123,16 +135,24 @@ async function loadState(supabase) {
   // Lazy require — avoid circular deps
   try {
     worldState = require("./k1-world-state");
-  } catch { /* ignored */ }
+  } catch {
+    /* ignored */
+  }
   try {
     performance = require("./k1-performance");
-  } catch { /* ignored */ }
+  } catch {
+    /* ignored */
+  }
   try {
     metaLearning = require("./k1-meta-learning");
-  } catch { /* ignored */ }
+  } catch {
+    /* ignored */
+  }
   try {
     cognitive = require("./k1-cognitive");
-  } catch { /* ignored */ }
+  } catch {
+    /* ignored */
+  }
 
   await ensureTable(supabase);
 
@@ -156,7 +176,9 @@ async function loadState(supabase) {
         worldState.updateMarkets(stateMap.world_markets);
         loaded++;
         logger.info("[K1-Persist] ✅ World state markets restored");
-      } catch { /* ignored */ }
+      } catch {
+        /* ignored */
+      }
     }
 
     // Restore system info
@@ -164,7 +186,9 @@ async function loadState(supabase) {
       try {
         worldState.updateSystem(stateMap.world_system);
         loaded++;
-      } catch { /* ignored */ }
+      } catch {
+        /* ignored */
+      }
     }
 
     // Note: Performance, UserModel, Cognitive are in-memory singletons

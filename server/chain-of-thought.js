@@ -6,8 +6,13 @@
 
 let cotEnabled = false;
 
-function isEnabled() { return cotEnabled; }
-function toggle(val) { cotEnabled = typeof val === "boolean" ? val : !cotEnabled; return cotEnabled; }
+function isEnabled() {
+  return cotEnabled;
+}
+function toggle(val) {
+  cotEnabled = typeof val === "boolean" ? val : !cotEnabled;
+  return cotEnabled;
+}
 
 /**
  * Wraps a system prompt with CoT instructions when enabled
@@ -16,7 +21,9 @@ function toggle(val) { cotEnabled = typeof val === "boolean" ? val : !cotEnabled
  */
 function enhancePrompt(systemPrompt) {
   if (!cotEnabled) return systemPrompt;
-  return systemPrompt + `
+  return (
+    systemPrompt +
+    `
 
 [CHAIN OF THOUGHT MODE ACTIVE]
 Before giving your final answer, show your reasoning process in a collapsible section.
@@ -32,7 +39,8 @@ Format your response like this:
 </details>
 
 Then provide your final answer below the thinking section.
-This helps the user understand HOW you reached your conclusion.`;
+This helps the user understand HOW you reached your conclusion.`
+  );
 }
 
 /**

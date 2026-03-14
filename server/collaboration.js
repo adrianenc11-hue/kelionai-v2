@@ -29,7 +29,8 @@ function setupCollaboration(httpServer) {
     // Parse query params for auth
     const url = new URL(req.url, `http://${req.headers.host}`);
     const userId = url.searchParams.get("userId") || `anon_${Date.now()}`;
-    const userName = url.searchParams.get("name") || `User-${userId.slice(0, 6)}`;
+    const userName =
+      url.searchParams.get("name") || `User-${userId.slice(0, 6)}`;
 
     let currentRoom = null;
 
@@ -47,7 +48,9 @@ function setupCollaboration(httpServer) {
           case "join": {
             const roomId = msg.roomId;
             if (!roomId) {
-              ws.send(JSON.stringify({ type: "error", error: "roomId required" }));
+              ws.send(
+                JSON.stringify({ type: "error", error: "roomId required" }),
+              );
               return;
             }
 
@@ -57,7 +60,12 @@ function setupCollaboration(httpServer) {
             }
 
             // Join room
-            const result = sharedSessions.joinRoom(roomId, userId, userName, ws);
+            const result = sharedSessions.joinRoom(
+              roomId,
+              userId,
+              userName,
+              ws,
+            );
             if (result.error) {
               ws.send(JSON.stringify({ type: "error", error: result.error }));
               return;
@@ -97,7 +105,9 @@ function setupCollaboration(httpServer) {
 
           case "message": {
             if (!currentRoom) {
-              ws.send(JSON.stringify({ type: "error", error: "Not in a room" }));
+              ws.send(
+                JSON.stringify({ type: "error", error: "Not in a room" }),
+              );
               return;
             }
 
@@ -138,15 +148,15 @@ function setupCollaboration(httpServer) {
           case "rooms": {
             const myRooms = sharedSessions.getUserRooms(userId);
             const publicRooms = sharedSessions.listPublicRooms();
-            ws.send(
-              JSON.stringify({ type: "rooms", myRooms, publicRooms }),
-            );
+            ws.send(JSON.stringify({ type: "rooms", myRooms, publicRooms }));
             break;
           }
 
           case "info": {
             if (!currentRoom) {
-              ws.send(JSON.stringify({ type: "error", error: "Not in a room" }));
+              ws.send(
+                JSON.stringify({ type: "error", error: "Not in a room" }),
+              );
               return;
             }
             const info = sharedSessions.getRoomInfo(currentRoom);

@@ -8,7 +8,11 @@
 const logger = require("./logger");
 const { MODELS } = require("./config/models");
 const { buildSystemPrompt, buildNewbornPrompt } = require("./persona");
-const { getPatternsText, recordUserInteraction, getProactiveSuggestion } = require("./k1-meta-learning");
+const {
+  getPatternsText,
+  recordUserInteraction,
+  getProactiveSuggestion,
+} = require("./k1-meta-learning");
 const { selfEvaluate, getQualityHints } = require("./k1-performance");
 const vm = require("vm");
 
@@ -2835,21 +2839,32 @@ async function thinkV4(
 
     // ── 3b. Context switch detection ──
     const topicKeywords = {
-      trading: /\b(trade|trading|buy|sell|BTC|ETH|crypto|piață|preț|analiză|signal|RSI|MACD|invest|portofoliu|acțiuni|bursă|forex)\b/i,
-      coding: /\b(code|coding|bug|error|function|deploy|API|server|git|commit|script|database|program)\b/i,
+      trading:
+        /\b(trade|trading|buy|sell|BTC|ETH|crypto|piață|preț|analiză|signal|RSI|MACD|invest|portofoliu|acțiuni|bursă|forex)\b/i,
+      coding:
+        /\b(code|coding|bug|error|function|deploy|API|server|git|commit|script|database|program)\b/i,
       news: /\b(news|știri|știre|politic|război|eveniment|actual|azi|ieri|breaking)\b/i,
-      weather: /\b(vreme|meteo|weather|ploaie|soare|temperatură|grad|frig|cald)\b/i,
+      weather:
+        /\b(vreme|meteo|weather|ploaie|soare|temperatură|grad|frig|cald)\b/i,
       music: /\b(muzică|music|song|cântec|artist|album|concert|playlist)\b/i,
-      personal: /\b(eu|mine|viața|familie|sănătate|hobby|plan|sentiment|gândesc|simt)\b/i,
+      personal:
+        /\b(eu|mine|viața|familie|sănătate|hobby|plan|sentiment|gândesc|simt)\b/i,
     };
     let currentTopic = "general";
     for (const [topic, pattern] of Object.entries(topicKeywords)) {
-      if (pattern.test(message)) { currentTopic = topic; break; }
+      if (pattern.test(message)) {
+        currentTopic = topic;
+        break;
+      }
     }
     // Static var to track previous topic across calls
     if (!brain._lastTopic) brain._lastTopic = "general";
     let contextSwitchHint = "";
-    if (brain._lastTopic !== currentTopic && brain._lastTopic !== "general" && currentTopic !== "general") {
+    if (
+      brain._lastTopic !== currentTopic &&
+      brain._lastTopic !== "general" &&
+      currentTopic !== "general"
+    ) {
       contextSwitchHint = `\n[CONTEXT SWITCH] Userul a trecut de la ${brain._lastTopic} la ${currentTopic}. Ajustează-ți tonul și cunoștințele.`;
     }
     brain._lastTopic = currentTopic;
@@ -2869,15 +2884,29 @@ async function thinkV4(
     const patternsBlock = getPatternsText();
     const qualityHints = getQualityHints();
     const proactiveHint = getProactiveSuggestion();
-    const systemPrompt = process.env.NEWBORN_MODE === "true"
-      ? buildNewbornPrompt(memoryBlock + patternsBlock + qualityHints + contextSwitchHint + proactiveHint)
-      : buildSystemPrompt(
-          avatar,
-          language,
-          memoryBlock + emotionBlock + geoBlock + dateTimeBlock + patternsBlock + qualityHints + contextSwitchHint + proactiveHint,
-          "",
-          null,
-        );
+    const systemPrompt =
+      process.env.NEWBORN_MODE === "true"
+        ? buildNewbornPrompt(
+            memoryBlock +
+              patternsBlock +
+              qualityHints +
+              contextSwitchHint +
+              proactiveHint,
+          )
+        : buildSystemPrompt(
+            avatar,
+            language,
+            memoryBlock +
+              emotionBlock +
+              geoBlock +
+              dateTimeBlock +
+              patternsBlock +
+              qualityHints +
+              contextSwitchHint +
+              proactiveHint,
+            "",
+            null,
+          );
 
     // ── 5. Prepare messages for Gemini ──
     // Compress history to last 20 messages max
@@ -2905,10 +2934,11 @@ async function thinkV4(
       // Auto-camera: add accessibility hint for concise descriptions
       if (mediaData.isAutoCamera) {
         userParts.push({
-          text: "[AUTO-CAMERA] Aceasta e imagine automată de la camera utilizatorului. " +
-                "Regulă: NU descrie toată camera/scena. Fii SCURT (1-2 propoziții). " +
-                "Menționează DOAR: persoane (culori exacte de haine), pericole, text vizibil. " +
-                "Dacă nu e nimic nou de spus, nu comenta imaginea deloc — răspunde normal la mesaj.",
+          text:
+            "[AUTO-CAMERA] Aceasta e imagine automată de la camera utilizatorului. " +
+            "Regulă: NU descrie toată camera/scena. Fii SCURT (1-2 propoziții). " +
+            "Menționează DOAR: persoane (culori exacte de haine), pericole, text vizibil. " +
+            "Dacă nu e nimic nou de spus, nu comenta imaginea deloc — răspunde normal la mesaj.",
         });
       }
     }
@@ -3115,13 +3145,18 @@ async function thinkV4(
     // Agent logging removed — was hardcoded to localhost:7257
     // ── Self-evaluate response quality ──
     try {
-      const evalDomain = toolsUsed.includes("trading_analysis") ? "trading"
-        : toolsUsed.includes("web_search") ? "research"
-        : toolsUsed.includes("code_execute") ? "coding"
-        : "general";
+      const evalDomain = toolsUsed.includes("trading_analysis")
+        ? "trading"
+        : toolsUsed.includes("web_search")
+          ? "research"
+          : toolsUsed.includes("code_execute")
+            ? "coding"
+            : "general";
       selfEvaluate(message, finalResponse, evalDomain);
       recordUserInteraction({ domain: evalDomain, userMessage: message });
-    } catch (_) { /* non-blocking */ }
+    } catch (_) {
+      /* non-blocking */
+    }
 
     return {
       enrichedMessage: finalResponse,
@@ -3159,7 +3194,6 @@ async function thinkV4(
     );
     // Agent logging removed — was hardcoded to localhost:7257
 
-
     // FALLBACK to v3 think
     logger.info({ component: "BrainV4" }, "⚠️ Falling back to v3 think");
     try {
@@ -3177,9 +3211,9 @@ async function thinkV4(
       // Agent logging removed — was hardcoded to localhost:7257
       return {
         enrichedMessage:
-          (language === "ro"
+          language === "ro"
             ? "Îmi pare rău, am întâmpinat o problemă tehnică și nu pot răspunde acum. Te rog să încerci din nou. 🔧"
-            : "I'm sorry, I encountered a technical issue and can't respond right now. Please try again. 🔧"),
+            : "I'm sorry, I encountered a technical issue and can't respond right now. Please try again. 🔧",
         toolsUsed: [],
         monitor: { content: null, type: null },
         analysis: {

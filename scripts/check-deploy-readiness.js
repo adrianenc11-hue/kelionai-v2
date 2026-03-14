@@ -135,9 +135,13 @@ function checkNetlifySecrets() {
     return;
   }
 
-  const repo = run("gh", ["repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"], {
-    silent: true,
-  });
+  const repo = run(
+    "gh",
+    ["repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"],
+    {
+      silent: true,
+    },
+  );
   if (repo.status !== 0) {
     log(
       "NETLIFY",
@@ -189,4 +193,3 @@ function main() {
 }
 
 main();
-

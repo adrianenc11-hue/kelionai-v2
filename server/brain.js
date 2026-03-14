@@ -247,7 +247,9 @@ class KelionBrain {
             .from("brain_memory")
             .update({ content: JSON.stringify(parsed) })
             .eq("id", task.id);
-        } catch { /* ignored */ }
+        } catch {
+          /* ignored */
+        }
       }
     } catch (e) {
       logger.warn(
@@ -478,7 +480,9 @@ class KelionBrain {
         .eq("status", "active")
         .single();
       if (sub?.plan) plan = sub.plan;
-    } catch { /* ignored */ }
+    } catch {
+      /* ignored */
+    }
 
     const limit = this.PLAN_LIMITS[plan] || 50;
 
@@ -1154,7 +1158,9 @@ When asked "what can you do?" list these real capabilities. Use them proactively
           });
           return config;
         }
-      } catch { /* ignored */ }
+      } catch {
+        /* ignored */
+      }
     }
 
     return this._defaultTenantConfig();
@@ -4213,7 +4219,9 @@ Rules:
           const txt = d.choices?.[0]?.message?.content?.trim();
           try {
             queryPlan = JSON.parse(txt.replace(/```json|```/g, "").trim());
-          } catch { /* ignored */ }
+          } catch {
+            /* ignored */
+          }
         }
       }
 
@@ -4340,7 +4348,9 @@ Rules:
               `⏰ Reminder fired: ${parsed.text.substring(0, 50)}`,
             );
           }
-        } catch { /* ignored */ }
+        } catch {
+          /* ignored */
+        }
       }
     } catch (e) {
       logger.warn(
@@ -8552,7 +8562,9 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
 
     if (process.env.ELEVENLABS_API_KEY) {
       try {
-        const voiceId = process.env.ELEVENLABS_VOICE_KELION || process.env.ELEVENLABS_VOICE_ID;
+        const voiceId =
+          process.env.ELEVENLABS_VOICE_KELION ||
+          process.env.ELEVENLABS_VOICE_ID;
         const r = await fetch(
           `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
           {
@@ -9369,42 +9381,72 @@ Dacă nu poți extrage: {}`;
 
       let txt = null;
       if (this.groqKey) {
-        const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: "Bearer " + this.groqKey },
-          body: JSON.stringify({ model: MODELS.GROQ_PRIMARY, max_tokens: 150, messages: [{ role: "user", content: extractPrompt }] }),
-        });
-        if (r.ok) { const d = await r.json(); txt = d.choices?.[0]?.message?.content?.trim(); }
+        const r = await fetch(
+          "https://api.groq.com/openai/v1/chat/completions",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: "Bearer " + this.groqKey,
+            },
+            body: JSON.stringify({
+              model: MODELS.GROQ_PRIMARY,
+              max_tokens: 150,
+              messages: [{ role: "user", content: extractPrompt }],
+            }),
+          },
+        );
+        if (r.ok) {
+          const d = await r.json();
+          txt = d.choices?.[0]?.message?.content?.trim();
+        }
       }
       if (!txt) {
-        const geminiKey = process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
+        const geminiKey =
+          process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
         if (geminiKey) {
-          const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODELS.GEMINI_CHAT}:generateContent?key=${geminiKey}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: extractPrompt }] }], generationConfig: { maxOutputTokens: 150 } }),
-          });
-          if (r.ok) { const d = await r.json(); txt = d.candidates?.[0]?.content?.parts?.[0]?.text?.trim(); }
+          const r = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${MODELS.GEMINI_CHAT}:generateContent?key=${geminiKey}`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                contents: [{ role: "user", parts: [{ text: extractPrompt }] }],
+                generationConfig: { maxOutputTokens: 150 },
+              }),
+            },
+          );
+          if (r.ok) {
+            const d = await r.json();
+            txt = d.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+          }
         }
       }
       if (!txt || txt === "{}") return;
 
       let correction;
-      try { correction = JSON.parse(txt.replace(/```json|```/g, "").trim()); } catch { return; }
+      try {
+        correction = JSON.parse(txt.replace(/```json|```/g, "").trim());
+      } catch {
+        return;
+      }
       if (!correction.rule) return;
 
       // Save correction to Supabase (max 20 corrections per user)
       const correctionKey = "correction_" + Date.now();
-      await this.supabaseAdmin.from("user_preferences").upsert({
-        user_id: userId,
-        key: correctionKey,
-        value: {
-          wrong: correction.wrong,
-          correct: correction.correct,
-          rule: correction.rule,
-          at: new Date().toISOString(),
+      await this.supabaseAdmin.from("user_preferences").upsert(
+        {
+          user_id: userId,
+          key: correctionKey,
+          value: {
+            wrong: correction.wrong,
+            correct: correction.correct,
+            rule: correction.rule,
+            at: new Date().toISOString(),
+          },
         },
-      }, { onConflict: "user_id,key" });
+        { onConflict: "user_id,key" },
+      );
 
       // Clean old corrections (keep max 20)
       const { data: allCorrections } = await this.supabaseAdmin
@@ -9416,7 +9458,10 @@ Dacă nu poți extrage: {}`;
       if (allCorrections && allCorrections.length > 20) {
         const toDelete = allCorrections.slice(0, allCorrections.length - 20);
         for (const old of toDelete) {
-          await this.supabaseAdmin.from("user_preferences").delete().eq("id", old.id);
+          await this.supabaseAdmin
+            .from("user_preferences")
+            .delete()
+            .eq("id", old.id);
         }
       }
 
@@ -9424,15 +9469,30 @@ Dacă nu poți extrage: {}`;
       if (typeof require === "function") {
         try {
           const k1Meta = require("./k1-meta-learning");
-          k1Meta.recordUserInteraction({ domain: "general", wasCorrection: true, correctionNote: correction.rule });
+          k1Meta.recordUserInteraction({
+            domain: "general",
+            wasCorrection: true,
+            correctionNote: correction.rule,
+          });
           const k1Perf = require("./k1-performance");
-          k1Perf.recordCorrection("general", correction.wrong?.substring(0, 50) || "unknown");
-        } catch (_e) { /* non-critical */ }
+          k1Perf.recordCorrection(
+            "general",
+            correction.wrong?.substring(0, 50) || "unknown",
+          );
+        } catch (_e) {
+          /* non-critical */
+        }
       }
 
-      logger.info({ component: "Brain", correction: correction.rule }, "🎓 Learned correction: " + correction.rule);
+      logger.info(
+        { component: "Brain", correction: correction.rule },
+        "🎓 Learned correction: " + correction.rule,
+      );
     } catch (e) {
-      logger.warn({ component: "Brain", err: e.message }, "Correction learning failed (non-critical)");
+      logger.warn(
+        { component: "Brain", err: e.message },
+        "Correction learning failed (non-critical)",
+      );
     }
   }
 
@@ -9448,7 +9508,7 @@ Dacă nu poți extrage: {}`;
     // ── Check for corrections FIRST (no rate limit for corrections) ──
     if (this.detectCorrection(userMessage)) {
       this.learnCorrection(userId, userMessage, aiReply).catch((e) =>
-        logger.warn({ err: e.message }, "learnCorrection failed")
+        logger.warn({ err: e.message }, "learnCorrection failed"),
       );
     }
 

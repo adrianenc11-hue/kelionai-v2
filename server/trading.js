@@ -71,7 +71,9 @@ async function updateFearGreedCache() {
         ts: Date.now(),
       };
     }
-  } catch { /* ignored */ }
+  } catch {
+    /* ignored */
+  }
 }
 // Update Fear&Greed every 30 min
 setInterval(updateFearGreedCache, 30 * 60 * 1000);
@@ -127,11 +129,9 @@ tradePersist.ensureTables().catch(() => {});
 // Init historical data loader with Supabase + AUTO-LEARNING
 try {
   const { createClient } = require("@supabase/supabase-js");
-  const SUPABASE_URL =
-    process.env.SUPABASE_URL;
+  const SUPABASE_URL = process.env.SUPABASE_URL;
   const SUPABASE_KEY =
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.SUPABASE_SERVICE_KEY;
+    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
   if (SUPABASE_URL && SUPABASE_KEY) {
     const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
     histLoader.init(sb);
@@ -2467,11 +2467,9 @@ router.get("/history/progress", (req, res) => {
 // ═══ PAPER TRADING — ON/OFF 24/7 automated trading ═══
 router.post("/paper/on", (req, res) => {
   const { createClient } = require("@supabase/supabase-js");
-  const sbUrl =
-    process.env.SUPABASE_URL;
+  const sbUrl = process.env.SUPABASE_URL;
   const sbKey =
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.SUPABASE_SERVICE_KEY;
+    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
   const sb = createClient(sbUrl, sbKey);
   const result = paperTrading.turnOn(sb);
   res.json(result);
@@ -2495,7 +2493,9 @@ router.post("/paper/off", (req, res) => {
         )
         .catch(() => {});
     }
-  } catch { /* ignored */ }
+  } catch {
+    /* ignored */
+  }
   res.json(result);
 });
 
@@ -2506,10 +2506,11 @@ setTimeout(async () => {
     const { createClient } = require("@supabase/supabase-js");
     const sbUrl = process.env.SUPABASE_URL;
     const sbKey =
-      process.env.SUPABASE_SERVICE_ROLE_KEY ||
-      process.env.SUPABASE_SERVICE_KEY;
+      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
     if (!sbUrl || !sbKey) {
-      logger.warn("[Trading] SUPABASE_URL or SUPABASE_SERVICE_KEY missing — skipping auto-restart");
+      logger.warn(
+        "[Trading] SUPABASE_URL or SUPABASE_SERVICE_KEY missing — skipping auto-restart",
+      );
       return;
     }
     const sb = createClient(sbUrl, sbKey);
@@ -2538,12 +2539,16 @@ setTimeout(async () => {
     try {
       const { createClient: cc } = require("@supabase/supabase-js");
       const fallbackUrl = process.env.SUPABASE_URL;
-      const fallbackKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
+      const fallbackKey =
+        process.env.SUPABASE_SERVICE_ROLE_KEY ||
+        process.env.SUPABASE_SERVICE_KEY;
       if (fallbackUrl && fallbackKey) {
         const sbFallback = cc(fallbackUrl, fallbackKey);
         tradingLearner.startLearning(sbFallback);
       }
-    } catch (_) { /* non-critical */ }
+    } catch (_) {
+      /* non-critical */
+    }
   }
 }, 10000); // 10s after boot to let DB connections initialize
 
@@ -2558,22 +2563,18 @@ router.get("/paper/history", async (req, res) => {
 
 router.post("/paper/reset", (req, res) => {
   const { createClient } = require("@supabase/supabase-js");
-  const sbUrl =
-    process.env.SUPABASE_URL;
+  const sbUrl = process.env.SUPABASE_URL;
   const sbKey =
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.SUPABASE_SERVICE_KEY;
+    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
   const sb = createClient(sbUrl, sbKey);
   res.json(paperTrading.reset(sb));
 });
 
 router.post("/paper/switch", (req, res) => {
   const { createClient } = require("@supabase/supabase-js");
-  const sbUrl =
-    process.env.SUPABASE_URL;
+  const sbUrl = process.env.SUPABASE_URL;
   const sbKey =
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.SUPABASE_SERVICE_KEY;
+    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
   const sb = createClient(sbUrl, sbKey);
   const mode = req.body?.mode || req.query?.mode || "PAPER";
   res.json(paperTrading.switchMode(mode, sb));
@@ -2599,9 +2600,9 @@ router.get("/simulate", async (req, res) => {
     const { createClient } = require("@supabase/supabase-js");
     const sbUrl = process.env.SUPABASE_URL;
     const sbKey =
-      process.env.SUPABASE_SERVICE_ROLE_KEY ||
-      process.env.SUPABASE_SERVICE_KEY;
-    if (!sbUrl || !sbKey) return res.status(503).json({ error: "Supabase not configured" });
+      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
+    if (!sbUrl || !sbKey)
+      return res.status(503).json({ error: "Supabase not configured" });
     const sb = createClient(sbUrl, sbKey);
     const results = await investSim.runFullSimulation(sb);
     res.json(results);
@@ -2617,9 +2618,9 @@ router.get("/brain-rules", async (req, res) => {
     const { createClient } = require("@supabase/supabase-js");
     const sbUrl = process.env.SUPABASE_URL;
     const sbKey =
-      process.env.SUPABASE_SERVICE_ROLE_KEY ||
-      process.env.SUPABASE_SERVICE_KEY;
-    if (!sbUrl || !sbKey) return res.status(503).json({ error: "Supabase not configured" });
+      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
+    if (!sbUrl || !sbKey)
+      return res.status(503).json({ error: "Supabase not configured" });
     const sb = createClient(sbUrl, sbKey);
     const { data, error } = await sb
       .from("trading_brain_rules")
@@ -3909,7 +3910,9 @@ setTimeout(async () => {
     const { supabaseAdmin: sb } = require("./supabase");
     await k1Persist.loadState(sb);
     logger.info("[K1] State loaded from Supabase");
-  } catch { /* ignored */ }
+  } catch {
+    /* ignored */
+  }
 }, 5000);
 
 // Start scheduled jobs (forgetting@6h, self-test@12h)
@@ -3917,7 +3920,9 @@ setTimeout(() => {
   try {
     const { supabaseAdmin: sb } = require("./supabase");
     k1Meta.startScheduledJobs(sb);
-  } catch { /* ignored */ }
+  } catch {
+    /* ignored */
+  }
 }, 15000); // 15s after boot
 
 router.get("/k1/evolution", (req, res) => {
@@ -3990,7 +3995,9 @@ async function k1MarketDataFeed() {
               signal,
             };
           }
-        } catch { /* ignored */ }
+        } catch {
+          /* ignored */
+        }
       }),
     );
 
@@ -4027,7 +4034,9 @@ async function k1MarketDataFeed() {
               marketData[k] = { price, change24h, signal };
             }
           }
-        } catch { /* ignored */ }
+        } catch {
+          /* ignored */
+        }
       }),
     );
 
@@ -4046,7 +4055,9 @@ async function k1MarketDataFeed() {
           };
         }
       }
-    } catch { /* ignored */ }
+    } catch {
+      /* ignored */
+    }
 
     // Update K1 World State with real market data
     if (Object.keys(marketData).length > 0) {
@@ -4074,7 +4085,9 @@ async function k1MarketDataFeed() {
           "meta-learning",
         ],
       });
-    } catch { /* ignored */ }
+    } catch {
+      /* ignored */
+    }
   } catch (err) {
     logger.warn({ err: err.message }, "[K1-Feed] Market data feed error");
   }
@@ -4104,7 +4117,9 @@ setInterval(
           );
         }
       }
-    } catch { /* ignored */ }
+    } catch {
+      /* ignored */
+    }
   },
   5 * 60 * 1000,
 );
@@ -4115,7 +4130,9 @@ setInterval(
     try {
       const { supabaseAdmin: sb } = require("./supabase");
       await k1Persist.saveState(sb);
-    } catch { /* ignored */ }
+    } catch {
+      /* ignored */
+    }
   },
   5 * 60 * 1000,
 );

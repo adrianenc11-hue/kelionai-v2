@@ -771,7 +771,9 @@ router.post("/webhook", async (req, res) => {
         userName,
         supabase: req.app.locals.supabaseAdmin || req.app.locals.supabase,
       });
-    } catch { /* ignored */ }
+    } catch {
+      /* ignored */
+    }
 
     // Use Brain AI
     const detectedLangTg = detectLanguage(text);
@@ -819,7 +821,9 @@ router.post("/webhook", async (req, res) => {
         domain: k1Context?.k1?.domain || "general",
         supabase: req.app.locals.supabaseAdmin || req.app.locals.supabase,
       });
-    } catch { /* ignored */ }
+    } catch {
+      /* ignored */
+    }
 
     await sendMessage(chatId, escapeHtml(reply), { parseMode: undefined });
 

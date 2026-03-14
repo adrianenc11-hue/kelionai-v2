@@ -1,455 +1,656 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ro">
-
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>KelionAI — Admin Panel V2</title>
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/admin/admin.css">
-</head>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/admin/admin.css" />
+  </head>
 
-<body>
+  <body>
     <div class="admin-container">
-        <!-- HEADER -->
-        <header class="admin-header">
-            <div class="header-left">
-                <a href="#" onclick="exitAdmin(); return false;" class="back-link">← Back</a>
-                <span class="admin-logo">🛡️ KelionAI</span>
-                <span class="admin-badge">ADMIN V2</span>
+      <!-- HEADER -->
+      <header class="admin-header">
+        <div class="header-left">
+          <a
+            href="#"
+            onclick="
+              exitAdmin();
+              return false;
+            "
+            class="back-link"
+            >← Back</a
+          >
+          <span class="admin-logo">🛡️ KelionAI</span>
+          <span class="admin-badge">ADMIN V2</span>
+        </div>
+        <div class="header-right">
+          <span id="admin-uptime" class="admin-uptime">—</span>
+          <a href="/admin/brain-chat.html" class="admin-btn admin-btn-k1"
+            >🧠 K1 Chat</a
+          >
+          <a href="/admin/intelligence.html" class="admin-btn admin-btn-intel"
+            >🔬 Intelligence</a
+          >
+          <a href="/admin/ab-testing.html" class="admin-btn admin-btn-ab"
+            >🧪 A/B Test</a
+          >
+          <a href="/admin/live-users.html" class="admin-btn admin-btn-live"
+            >👥 Live</a
+          >
+          <a href="/admin/errors.html" class="admin-btn admin-btn-errors"
+            >🚨 Errors</a
+          >
+          <a
+            href="/admin/cost-analytics.html"
+            class="admin-btn admin-btn-export"
+            >💰 Costs</a
+          >
+          <a href="/admin/sessions.html" class="admin-btn admin-btn-k1"
+            >🔐 Sessions</a
+          >
+          <a href="/admin/templates.html" class="admin-btn admin-btn-intel"
+            >📝 Templates</a
+          >
+          <a href="/admin/webhooks.html" class="admin-btn admin-btn-live"
+            >🔗 Webhooks</a
+          >
+          <a href="/admin/plugins.html" class="admin-btn admin-btn-ab"
+            >🔌 Plugins</a
+          >
+          <a href="/admin/models.html" class="admin-btn admin-btn-k1"
+            >🏠 Models</a
+          >
+          <button
+            class="admin-btn admin-btn-export"
+            onclick="window.open('/api/admin/conversations/export', '_blank')"
+          >
+            📥 Export
+          </button>
+          <div class="notif-wrapper" id="notif-wrapper">
+            <button
+              class="admin-btn notif-bell"
+              onclick="toggleNotifications()"
+              id="notif-bell"
+            >
+              🔔
+              <span id="notif-badge" class="notif-badge">0</span>
+            </button>
+            <div id="notif-dropdown" class="notif-dropdown">
+              <div class="notif-hdr">
+                <span class="notif-title">🔔 Notifications</span>
+                <button onclick="clearNotifications()" class="notif-clear">
+                  Clear all
+                </button>
+              </div>
+              <div id="notif-list" class="notif-list"></div>
             </div>
-            <div class="header-right">
-                <span id="admin-uptime" class="admin-uptime">—</span>
-                <a href="/admin/brain-chat.html" class="admin-btn admin-btn-k1">🧠 K1 Chat</a>
-                <a href="/admin/intelligence.html" class="admin-btn admin-btn-intel">🔬 Intelligence</a>
-                <a href="/admin/ab-testing.html" class="admin-btn admin-btn-ab">🧪 A/B Test</a>
-                <a href="/admin/live-users.html" class="admin-btn admin-btn-live">👥 Live</a>
-                <a href="/admin/errors.html" class="admin-btn admin-btn-errors">🚨 Errors</a>
-                <a href="/admin/cost-analytics.html" class="admin-btn admin-btn-export">💰 Costs</a>
-                <a href="/admin/sessions.html" class="admin-btn admin-btn-k1">🔐 Sessions</a>
-                <a href="/admin/templates.html" class="admin-btn admin-btn-intel">📝 Templates</a>
-                <a href="/admin/webhooks.html" class="admin-btn admin-btn-live">🔗 Webhooks</a>
-                <a href="/admin/plugins.html" class="admin-btn admin-btn-ab">🔌 Plugins</a>
-                <a href="/admin/models.html" class="admin-btn admin-btn-k1">🏠 Models</a>
-                <button class="admin-btn admin-btn-export" onclick="window.open('/api/admin/conversations/export','_blank')">📥 Export</button>
-                <div class="notif-wrapper" id="notif-wrapper">
-                    <button class="admin-btn notif-bell" onclick="toggleNotifications()" id="notif-bell">🔔
-                        <span id="notif-badge" class="notif-badge">0</span>
-                    </button>
-                    <div id="notif-dropdown" class="notif-dropdown">
-                        <div class="notif-hdr">
-                            <span class="notif-title">🔔 Notifications</span>
-                            <button onclick="clearNotifications()" class="notif-clear">Clear all</button>
-                        </div>
-                        <div id="notif-list" class="notif-list"></div>
-                    </div>
+          </div>
+          <button class="admin-btn" onclick="location.reload()">
+            🔄 Refresh
+          </button>
+          <button class="admin-btn" id="theme-toggle" onclick="toggleTheme()">
+            🌙
+          </button>
+        </div>
+      </header>
+      <script>
+        function toggleTheme() {
+          document.body.classList.toggle("light-theme");
+          const isLight = document.body.classList.contains("light-theme");
+          localStorage.setItem("admin-theme", isLight ? "light" : "dark");
+          document.getElementById("theme-toggle").textContent = isLight
+            ? "☀️"
+            : "🌙";
+        }
+        if (localStorage.getItem("admin-theme") === "light") {
+          document.body.classList.add("light-theme");
+          document.addEventListener("DOMContentLoaded", () => {
+            const t = document.getElementById("theme-toggle");
+            if (t) t.textContent = "☀️";
+          });
+        }
+      </script>
 
-                </div>
-                <button class="admin-btn" onclick="location.reload()">🔄 Refresh</button>
-                <button class="admin-btn" id="theme-toggle" onclick="toggleTheme()">🌙</button>
-            </div>
-        </header>
-<script>
-function toggleTheme(){
-    document.body.classList.toggle('light-theme');
-    const isLight = document.body.classList.contains('light-theme');
-    localStorage.setItem('admin-theme', isLight ? 'light' : 'dark');
-    document.getElementById('theme-toggle').textContent = isLight ? '☀️' : '🌙';
-}
-if(localStorage.getItem('admin-theme') === 'light'){
-    document.body.classList.add('light-theme');
-    document.addEventListener('DOMContentLoaded', () => { const t = document.getElementById('theme-toggle'); if(t) t.textContent = '☀️'; });
-}
-</script>
+      <!-- QUICK STATS -->
+      <div class="stats-bar">
+        <div class="stat-card">
+          <div class="stat-icon">👥</div>
+          <div class="stat-value" id="val-users">—</div>
+          <div class="stat-label">Total Users</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">💬</div>
+          <div class="stat-value" id="val-conversations">—</div>
+          <div class="stat-label">Conversații</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">👁️</div>
+          <div class="stat-value" id="val-views-today">—</div>
+          <div class="stat-label">Vizite (total)</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">💰</div>
+          <div class="stat-value" id="val-cost-today">—</div>
+          <div class="stat-label">Cost Azi ($)</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">💳</div>
+          <div class="stat-value" id="val-cost-month">—</div>
+          <div class="stat-label">Cost Luna ($)</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">⭐</div>
+          <div class="stat-value" id="val-subs">—</div>
+          <div class="stat-label">Abonați</div>
+        </div>
+      </div>
 
-        <!-- QUICK STATS -->
-        <div class="stats-bar">
-            <div class="stat-card">
-                <div class="stat-icon">👥</div>
-                <div class="stat-value" id="val-users">—</div>
-                <div class="stat-label">Total Users</div>
+      <!-- COLLAPSIBLE SECTIONS -->
+      <div class="sections-list">
+        <!-- AI STATUS -->
+        <div class="section-panel open" id="sec-ai">
+          <button class="section-toggle" onclick="toggleSection('sec-ai')">
+            <span>🤖 AI Providers — Status Live</span>
+            <span class="toggle-arrow">▼</span>
+          </button>
+          <a
+            href="/admin/health.html"
+            class="section-live-link"
+            title="Health Dashboard"
+            >🔗 Live</a
+          >
+          <div class="section-body">
+            <div id="ai-status-grid" class="ai-grid">
+              <div class="ai-card loading">
+                <div class="ai-name">Loading...</div>
+              </div>
             </div>
-            <div class="stat-card">
-                <div class="stat-icon">💬</div>
-                <div class="stat-value" id="val-conversations">—</div>
-                <div class="stat-label">Conversații</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon">👁️</div>
-                <div class="stat-value" id="val-views-today">—</div>
-                <div class="stat-label">Vizite (total)</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon">💰</div>
-                <div class="stat-value" id="val-cost-today">—</div>
-                <div class="stat-label">Cost Azi ($)</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon">💳</div>
-                <div class="stat-value" id="val-cost-month">—</div>
-                <div class="stat-label">Cost Luna ($)</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon">⭐</div>
-                <div class="stat-value" id="val-subs">—</div>
-                <div class="stat-label">Abonați</div>
-            </div>
+          </div>
         </div>
 
-        <!-- COLLAPSIBLE SECTIONS -->
-        <div class="sections-list">
-
-            <!-- AI STATUS -->
-            <div class="section-panel open" id="sec-ai">
-                <button class="section-toggle" onclick="toggleSection('sec-ai')">
-                    <span>🤖 AI Providers — Status Live</span>
-                    <span class="toggle-arrow">▼</span>
-                </button>
-                <a href="/admin/health.html" class="section-live-link" title="Health Dashboard">🔗 Live</a>
-                <div class="section-body">
-                    <div id="ai-status-grid" class="ai-grid">
-                        <div class="ai-card loading">
-                            <div class="ai-name">Loading...</div>
-                        </div>
-                    </div>
-                </div>
+        <!-- BRAIN STATUS -->
+        <div class="section-panel open" id="sec-brain">
+          <button class="section-toggle" onclick="toggleSection('sec-brain')">
+            <span>🧠 Brain — Status Live</span>
+            <span class="toggle-arrow">▼</span>
+          </button>
+          <a
+            href="/admin/k1-dashboard.html"
+            class="section-live-link"
+            title="K1 Brain Dashboard"
+            >🔗 K1</a
+          >
+          <div class="section-body">
+            <div class="mini-stats" id="brain-stats">
+              <div class="mini-stat">
+                <span class="label">Uptime:</span>
+                <span id="brain-uptime">—</span>
+              </div>
+              <div class="mini-stat">
+                <span class="label">Conversații:</span>
+                <span id="brain-conversations">—</span>
+              </div>
+              <div class="mini-stat">
+                <span class="label">Providers activi:</span>
+                <span id="brain-providers">—</span>
+              </div>
             </div>
-
-            <!-- BRAIN STATUS -->
-            <div class="section-panel open" id="sec-brain">
-                <button class="section-toggle" onclick="toggleSection('sec-brain')">
-                    <span>🧠 Brain — Status Live</span>
-                    <span class="toggle-arrow">▼</span>
-                </button>
-                <a href="/admin/k1-dashboard.html" class="section-live-link" title="K1 Brain Dashboard">🔗 K1</a>
-                <div class="section-body">
-                    <div class="mini-stats" id="brain-stats">
-                        <div class="mini-stat"><span class="label">Uptime:</span> <span id="brain-uptime">—</span></div>
-                        <div class="mini-stat"><span class="label">Conversații:</span> <span id="brain-conversations">—</span></div>
-                        <div class="mini-stat"><span class="label">Providers activi:</span> <span id="brain-providers">—</span></div>
-                    </div>
-                    <h4 style="margin:12px 0 8px;color:#a78bfa;font-size:0.85rem">🔧 Tool Usage (sesiune curentă)</h4>
-                    <div id="brain-tools" style="display:flex;gap:8px;flex-wrap:wrap"></div>
-                    <h4 style="margin:12px 0 8px;color:#a78bfa;font-size:0.85rem">🌐 Provider Keys</h4>
-                    <div id="brain-provider-keys" style="display:flex;gap:8px;flex-wrap:wrap"></div>
-                </div>
-            </div>
-
-            <!-- TRAFFIC -->
-            <div class="section-panel" id="sec-traffic">
-                <button class="section-toggle" onclick="toggleSection('sec-traffic')">
-                    <span>🌐 Trafic (ultimele 7 zile)</span>
-                    <span class="toggle-arrow">▶</span>
-                </button>
-                <div class="section-body">
-                    <div id="traffic-chart" class="traffic-chart"></div>
-                    <div class="traffic-details">
-                        <div><span class="label">Unici azi:</span> <span id="traffic-unique">—</span></div>
-                        <div><span class="label">Total azi:</span> <span id="traffic-total">—</span></div>
-                        <div><span class="label">Conexiuni active:</span> <span id="traffic-active">—</span></div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- CREDIT REPORT -->
-            <div class="section-panel" id="sec-credit">
-                <button class="section-toggle" onclick="toggleSection('sec-credit')">
-                    <span>📊 Credit per AI Provider</span>
-                    <span class="toggle-arrow">▶</span>
-                </button>
-                <div class="section-body">
-                    <div style="text-align:right;margin-bottom:10px">
-                        <button class="recharge-btn" id="btn-recharge" onclick="recharge()">⚡ Reîncărcare</button>
-                    </div>
-                    <table class="admin-table" id="credit-table">
-                        <thead>
-                            <tr>
-                                <th>Provider</th>
-                                <th>Status</th>
-                                <th>Requests</th>
-                                <th>Cost Luna ($)</th>
-                                <th>Cost Azi ($)</th>
-                                <th>Alert</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td colspan="6">Loading...</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                    <div id="credit-distribution" class="credit-dist"></div>
-                </div>
-            </div>
-
-            <!-- CLIENTS & SUBSCRIPTIONS -->
-            <div class="section-panel" id="sec-clients">
-                <button class="section-toggle" onclick="toggleSection('sec-clients')">
-                    <span>👥 Clienți & Abonamente</span>
-                    <span class="toggle-arrow">▶</span>
-                </button>
-                <div class="section-body">
-                    <div style="text-align:right;margin-bottom:10px">
-                        <button class="admin-btn" onclick="loadClients()">🔄 Refresh</button>
-                    </div>
-                    <table class="admin-table" id="clients-table">
-                        <thead>
-                            <tr>
-                                <th>Email</th>
-                                <th>Plan</th>
-                                <th>Status</th>
-                                <th>Înregistrat</th>
-                                <th>Mesaje</th>
-                                <th>Acțiuni</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td colspan="6">Loading...</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- ADMIN CODES -->
-            <div class="section-panel" id="sec-codes">
-                <button class="section-toggle" onclick="toggleSection('sec-codes')">
-                    <span>🔑 Coduri Admin</span>
-                    <span class="toggle-arrow">▶</span>
-                </button>
-                <div class="section-body">
-                    <div style="text-align:right;margin-bottom:10px">
-                        <button class="admin-btn" onclick="generateCode()">➕ Generează Cod</button>
-                    </div>
-                    <table class="admin-table" id="codes-table">
-                        <thead>
-                            <tr>
-                                <th>Cod</th>
-                                <th>Tip</th>
-                                <th>Status</th>
-                                <th>Creat</th>
-                                <th>Folosit de</th>
-                                <th>Acțiuni</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td colspan="6">Loading...</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- RECENT VISITS -->
-            <div class="section-panel" id="sec-visits">
-                <button class="section-toggle" onclick="toggleSection('sec-visits')">
-                    <span>📋 Vizite Recente</span>
-                    <span class="toggle-arrow">▶</span>
-                </button>
-                <div class="section-body">
-                    <table class="admin-table" id="visits-table">
-                        <thead>
-                            <tr>
-                                <th>Ora</th>
-                                <th>Pagina</th>
-                                <th>IP</th>
-                                <th>Țara</th>
-                                <th>Browser</th>
-                                <th>Dispozitiv</th>
-                                <th>🗑️</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td colspan="7">Loading...</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- CODE AUDIT -->
-            <div class="section-panel" id="sec-audit">
-                <button class="section-toggle" onclick="toggleSection('sec-audit')">
-                    <span>🔍 Code Audit — Hardcoded Values</span>
-                    <span class="toggle-arrow">▶</span>
-                </button>
-                <a href="/admin/audit-tracker.html" class="section-live-link" title="Audit Tracker">🔗 Live</a>
-                <div class="section-body">
-                    <div id="audit-results" style="min-height:60px">
-                        <div style="color:#888;text-align:center;padding:20px">Scanning...</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- MEDIA HISTORY -->
-            <div class="section-panel" id="sec-media">
-                <button class="section-toggle" onclick="toggleSection('sec-media')">
-                    <span>🎨 Media History</span>
-                    <span class="toggle-arrow">▶</span>
-                </button>
-                <a href="/admin/news.html" class="section-live-link" title="News & Media Dashboard">🔗 Live</a>
-                <div class="section-body">
-                    <div class="mini-stats" id="media-stats">
-                        <div class="mini-stat"><span class="label">Total generated:</span> <span
-                                id="media-total">—</span></div>
-                        <div class="mini-stat"><span class="label">Images:</span> <span id="media-images">—</span></div>
-                        <div class="mini-stat"><span class="label">TTS Audio:</span> <span id="media-tts">—</span></div>
-                        <div class="mini-stat"><span class="label">Other:</span> <span id="media-other">—</span></div>
-                    </div>
-                    <table class="admin-table">
-                        <thead>
-                            <tr>
-                                <th>Date</th>
-                                <th>Type</th>
-                                <th>User</th>
-                                <th>Prompt</th>
-                                <th>URL</th>
-                            </tr>
-                        </thead>
-                        <tbody id="media-tbody">
-                            <tr>
-                                <td colspan="5">Loading...</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- TRADING -->
-            <div class="section-panel" id="sec-trading">
-                <button class="section-toggle" onclick="toggleSection('sec-trading')">
-                    <span>📈 Trading Intelligence</span>
-                    <span class="toggle-arrow">▶</span>
-                </button>
-                <a href="/admin/trading.html" class="section-live-link" title="Trading Dashboard">🔗 Live</a>
-                <div class="section-body">
-                    <div class="mini-stats" id="trading-stats">
-                        <div class="mini-stat"><span class="label">Total trades:</span> <span id="trade-total">—</span>
-                        </div>
-                        <div class="mini-stat"><span class="label">Active:</span> <span id="trade-active">—</span></div>
-                        <div class="mini-stat"><span class="label">P&amp;L:</span> <span id="trade-pnl">—</span></div>
-                        <div class="mini-stat"><span class="label">Win rate:</span> <span id="trade-winrate">—</span>
-                        </div>
-                        <div class="mini-stat"><span class="label">Binance:</span> <span id="trade-binance">—</span>
-                        </div>
-                    </div>
-                    <h4 style="margin:16px 0 8px;color:#a5b4fc;font-size:0.9rem">Recent Trades</h4>
-                    <table class="admin-table">
-                        <thead>
-                            <tr>
-                                <th>Date</th>
-                                <th>Symbol</th>
-                                <th>Side</th>
-                                <th>Qty</th>
-                                <th>Price</th>
-                                <th>Status</th>
-                                <th>P&amp;L</th>
-                            </tr>
-                        </thead>
-                        <tbody id="trading-tbody">
-                            <tr>
-                                <td colspan="7">Loading...</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                    <h4 style="margin:16px 0 8px;color:#a5b4fc;font-size:0.9rem">AI Trade Intelligence</h4>
-                    <table class="admin-table">
-                        <thead>
-                            <tr>
-                                <th>Date</th>
-                                <th>Symbol</th>
-                                <th>Signal</th>
-                                <th>Confidence</th>
-                                <th>Analysis</th>
-                            </tr>
-                        </thead>
-                        <tbody id="intel-tbody">
-                            <tr>
-                                <td colspan="5">Loading...</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- BRAIN MEMORIES -->
-            <div class="section-panel" id="sec-memories">
-                <button class="section-toggle" onclick="toggleSection('sec-memories')">
-                    <span>🧠 Brain Memories & Learned Facts</span>
-                    <span class="toggle-arrow">▶</span>
-                </button>
-                <div class="section-body">
-                    <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
-                        <div id="memory-stats"></div>
-                        <input type="text" id="memory-search" placeholder="🔍 Caută în memorii..."
-                            style="flex:1;min-width:200px;padding:6px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.05);color:#e0e0e0;font-size:0.85rem"
-                            onkeyup="if(event.key==='Enter')searchMemories()">
-                        <button class="admin-btn" onclick="searchMemories()">🔍</button>
-                        <button class="admin-btn" onclick="loadMemories()">🔄</button>
-                    </div>
-                    <div id="memory-filters" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px"></div>
-                    <h4 style="margin:8px 0 6px;color:#a78bfa;font-size:0.85rem">📝 Brain Memories</h4>
-                    <table class="admin-table">
-                        <thead>
-                            <tr>
-                                <th>Data</th>
-                                <th>Tip</th>
-                                <th>Conținut</th>
-                                <th>Imp.</th>
-                                <th>🗑️</th>
-                            </tr>
-                        </thead>
-                        <tbody id="memories-tbody">
-                            <tr><td colspan="5">Loading...</td></tr>
-                        </tbody>
-                    </table>
-                    <h4 style="margin:16px 0 6px;color:#a78bfa;font-size:0.85rem">📚 Learned Facts</h4>
-                    <table class="admin-table">
-                        <thead>
-                            <tr>
-                                <th>Data</th>
-                                <th>Categorie</th>
-                                <th>Fapt</th>
-                                <th>Sursă</th>
-                            </tr>
-                        </thead>
-                        <tbody id="facts-tbody">
-                            <tr><td colspan="4">Loading...</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
+            <h4 style="margin: 12px 0 8px; color: #a78bfa; font-size: 0.85rem">
+              🔧 Tool Usage (sesiune curentă)
+            </h4>
+            <div
+              id="brain-tools"
+              style="display: flex; gap: 8px; flex-wrap: wrap"
+            ></div>
+            <h4 style="margin: 12px 0 8px; color: #a78bfa; font-size: 0.85rem">
+              🌐 Provider Keys
+            </h4>
+            <div
+              id="brain-provider-keys"
+              style="display: flex; gap: 8px; flex-wrap: wrap"
+            ></div>
+          </div>
         </div>
+
+        <!-- TRAFFIC -->
+        <div class="section-panel" id="sec-traffic">
+          <button class="section-toggle" onclick="toggleSection('sec-traffic')">
+            <span>🌐 Trafic (ultimele 7 zile)</span>
+            <span class="toggle-arrow">▶</span>
+          </button>
+          <div class="section-body">
+            <div id="traffic-chart" class="traffic-chart"></div>
+            <div class="traffic-details">
+              <div>
+                <span class="label">Unici azi:</span>
+                <span id="traffic-unique">—</span>
+              </div>
+              <div>
+                <span class="label">Total azi:</span>
+                <span id="traffic-total">—</span>
+              </div>
+              <div>
+                <span class="label">Conexiuni active:</span>
+                <span id="traffic-active">—</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- CREDIT REPORT -->
+        <div class="section-panel" id="sec-credit">
+          <button class="section-toggle" onclick="toggleSection('sec-credit')">
+            <span>📊 Credit per AI Provider</span>
+            <span class="toggle-arrow">▶</span>
+          </button>
+          <div class="section-body">
+            <div style="text-align: right; margin-bottom: 10px">
+              <button
+                class="recharge-btn"
+                id="btn-recharge"
+                onclick="recharge()"
+              >
+                ⚡ Reîncărcare
+              </button>
+            </div>
+            <table class="admin-table" id="credit-table">
+              <thead>
+                <tr>
+                  <th>Provider</th>
+                  <th>Status</th>
+                  <th>Requests</th>
+                  <th>Cost Luna ($)</th>
+                  <th>Cost Azi ($)</th>
+                  <th>Alert</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td colspan="6">Loading...</td>
+                </tr>
+              </tbody>
+            </table>
+            <div id="credit-distribution" class="credit-dist"></div>
+          </div>
+        </div>
+
+        <!-- CLIENTS & SUBSCRIPTIONS -->
+        <div class="section-panel" id="sec-clients">
+          <button class="section-toggle" onclick="toggleSection('sec-clients')">
+            <span>👥 Clienți & Abonamente</span>
+            <span class="toggle-arrow">▶</span>
+          </button>
+          <div class="section-body">
+            <div style="text-align: right; margin-bottom: 10px">
+              <button class="admin-btn" onclick="loadClients()">
+                🔄 Refresh
+              </button>
+            </div>
+            <table class="admin-table" id="clients-table">
+              <thead>
+                <tr>
+                  <th>Email</th>
+                  <th>Plan</th>
+                  <th>Status</th>
+                  <th>Înregistrat</th>
+                  <th>Mesaje</th>
+                  <th>Acțiuni</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td colspan="6">Loading...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ADMIN CODES -->
+        <div class="section-panel" id="sec-codes">
+          <button class="section-toggle" onclick="toggleSection('sec-codes')">
+            <span>🔑 Coduri Admin</span>
+            <span class="toggle-arrow">▶</span>
+          </button>
+          <div class="section-body">
+            <div style="text-align: right; margin-bottom: 10px">
+              <button class="admin-btn" onclick="generateCode()">
+                ➕ Generează Cod
+              </button>
+            </div>
+            <table class="admin-table" id="codes-table">
+              <thead>
+                <tr>
+                  <th>Cod</th>
+                  <th>Tip</th>
+                  <th>Status</th>
+                  <th>Creat</th>
+                  <th>Folosit de</th>
+                  <th>Acțiuni</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td colspan="6">Loading...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- RECENT VISITS -->
+        <div class="section-panel" id="sec-visits">
+          <button class="section-toggle" onclick="toggleSection('sec-visits')">
+            <span>📋 Vizite Recente</span>
+            <span class="toggle-arrow">▶</span>
+          </button>
+          <div class="section-body">
+            <table class="admin-table" id="visits-table">
+              <thead>
+                <tr>
+                  <th>Ora</th>
+                  <th>Pagina</th>
+                  <th>IP</th>
+                  <th>Țara</th>
+                  <th>Browser</th>
+                  <th>Dispozitiv</th>
+                  <th>🗑️</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td colspan="7">Loading...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- CODE AUDIT -->
+        <div class="section-panel" id="sec-audit">
+          <button class="section-toggle" onclick="toggleSection('sec-audit')">
+            <span>🔍 Code Audit — Hardcoded Values</span>
+            <span class="toggle-arrow">▶</span>
+          </button>
+          <a
+            href="/admin/audit-tracker.html"
+            class="section-live-link"
+            title="Audit Tracker"
+            >🔗 Live</a
+          >
+          <div class="section-body">
+            <div id="audit-results" style="min-height: 60px">
+              <div style="color: #888; text-align: center; padding: 20px">
+                Scanning...
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- MEDIA HISTORY -->
+        <div class="section-panel" id="sec-media">
+          <button class="section-toggle" onclick="toggleSection('sec-media')">
+            <span>🎨 Media History</span>
+            <span class="toggle-arrow">▶</span>
+          </button>
+          <a
+            href="/admin/news.html"
+            class="section-live-link"
+            title="News & Media Dashboard"
+            >🔗 Live</a
+          >
+          <div class="section-body">
+            <div class="mini-stats" id="media-stats">
+              <div class="mini-stat">
+                <span class="label">Total generated:</span>
+                <span id="media-total">—</span>
+              </div>
+              <div class="mini-stat">
+                <span class="label">Images:</span>
+                <span id="media-images">—</span>
+              </div>
+              <div class="mini-stat">
+                <span class="label">TTS Audio:</span>
+                <span id="media-tts">—</span>
+              </div>
+              <div class="mini-stat">
+                <span class="label">Other:</span>
+                <span id="media-other">—</span>
+              </div>
+            </div>
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Type</th>
+                  <th>User</th>
+                  <th>Prompt</th>
+                  <th>URL</th>
+                </tr>
+              </thead>
+              <tbody id="media-tbody">
+                <tr>
+                  <td colspan="5">Loading...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- TRADING -->
+        <div class="section-panel" id="sec-trading">
+          <button class="section-toggle" onclick="toggleSection('sec-trading')">
+            <span>📈 Trading Intelligence</span>
+            <span class="toggle-arrow">▶</span>
+          </button>
+          <a
+            href="/admin/trading.html"
+            class="section-live-link"
+            title="Trading Dashboard"
+            >🔗 Live</a
+          >
+          <div class="section-body">
+            <div class="mini-stats" id="trading-stats">
+              <div class="mini-stat">
+                <span class="label">Total trades:</span>
+                <span id="trade-total">—</span>
+              </div>
+              <div class="mini-stat">
+                <span class="label">Active:</span>
+                <span id="trade-active">—</span>
+              </div>
+              <div class="mini-stat">
+                <span class="label">P&amp;L:</span>
+                <span id="trade-pnl">—</span>
+              </div>
+              <div class="mini-stat">
+                <span class="label">Win rate:</span>
+                <span id="trade-winrate">—</span>
+              </div>
+              <div class="mini-stat">
+                <span class="label">Binance:</span>
+                <span id="trade-binance">—</span>
+              </div>
+            </div>
+            <h4 style="margin: 16px 0 8px; color: #a5b4fc; font-size: 0.9rem">
+              Recent Trades
+            </h4>
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Symbol</th>
+                  <th>Side</th>
+                  <th>Qty</th>
+                  <th>Price</th>
+                  <th>Status</th>
+                  <th>P&amp;L</th>
+                </tr>
+              </thead>
+              <tbody id="trading-tbody">
+                <tr>
+                  <td colspan="7">Loading...</td>
+                </tr>
+              </tbody>
+            </table>
+            <h4 style="margin: 16px 0 8px; color: #a5b4fc; font-size: 0.9rem">
+              AI Trade Intelligence
+            </h4>
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Symbol</th>
+                  <th>Signal</th>
+                  <th>Confidence</th>
+                  <th>Analysis</th>
+                </tr>
+              </thead>
+              <tbody id="intel-tbody">
+                <tr>
+                  <td colspan="5">Loading...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- BRAIN MEMORIES -->
+        <div class="section-panel" id="sec-memories">
+          <button
+            class="section-toggle"
+            onclick="toggleSection('sec-memories')"
+          >
+            <span>🧠 Brain Memories & Learned Facts</span>
+            <span class="toggle-arrow">▶</span>
+          </button>
+          <div class="section-body">
+            <div
+              style="
+                display: flex;
+                gap: 10px;
+                align-items: center;
+                margin-bottom: 12px;
+                flex-wrap: wrap;
+              "
+            >
+              <div id="memory-stats"></div>
+              <input
+                type="text"
+                id="memory-search"
+                placeholder="🔍 Caută în memorii..."
+                style="
+                  flex: 1;
+                  min-width: 200px;
+                  padding: 6px 12px;
+                  border-radius: 8px;
+                  border: 1px solid rgba(255, 255, 255, 0.1);
+                  background: rgba(255, 255, 255, 0.05);
+                  color: #e0e0e0;
+                  font-size: 0.85rem;
+                "
+                onkeyup="if (event.key === 'Enter') searchMemories();"
+              />
+              <button class="admin-btn" onclick="searchMemories()">🔍</button>
+              <button class="admin-btn" onclick="loadMemories()">🔄</button>
+            </div>
+            <div
+              id="memory-filters"
+              style="
+                display: flex;
+                gap: 6px;
+                flex-wrap: wrap;
+                margin-bottom: 12px;
+              "
+            ></div>
+            <h4 style="margin: 8px 0 6px; color: #a78bfa; font-size: 0.85rem">
+              📝 Brain Memories
+            </h4>
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>Tip</th>
+                  <th>Conținut</th>
+                  <th>Imp.</th>
+                  <th>🗑️</th>
+                </tr>
+              </thead>
+              <tbody id="memories-tbody">
+                <tr>
+                  <td colspan="5">Loading...</td>
+                </tr>
+              </tbody>
+            </table>
+            <h4 style="margin: 16px 0 6px; color: #a78bfa; font-size: 0.85rem">
+              📚 Learned Facts
+            </h4>
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>Categorie</th>
+                  <th>Fapt</th>
+                  <th>Sursă</th>
+                </tr>
+              </thead>
+              <tbody id="facts-tbody">
+                <tr>
+                  <td colspan="4">Loading...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- REFUND MODAL -->
     <div id="refund-modal" class="modal hidden">
-        <div class="modal-box">
-            <h3>💸 Refund</h3>
-            <p>User: <strong id="refund-email">—</strong></p>
-            <p>Plan: <strong id="refund-plan">—</strong></p>
-            <div
-                style="margin:12px 0;padding:10px 14px;background:rgba(245,158,11,0.1);border-radius:8px;font-size:0.82rem;color:#f59e0b;border:1px solid rgba(245,158,11,0.2)">
-                <strong>⚠️ Politica refund:</strong><br>
-                • Lunar — doar anulare, fără rambursare<br>
-                • Anual — se oprește luna curentă, refund luni rămase<br>
-                • Max 15 zile de la activare
-            </div>
-            <label>Motiv:</label>
-            <input type="text" id="refund-reason" placeholder="Motiv refund..." class="modal-input">
-            <div class="modal-actions">
-                <button class="admin-btn danger" onclick="confirmRefund()">✅ Confirmă Refund</button>
-                <button class="admin-btn" onclick="closeModal('refund-modal')">❌ Anulează</button>
-            </div>
+      <div class="modal-box">
+        <h3>💸 Refund</h3>
+        <p>User: <strong id="refund-email">—</strong></p>
+        <p>Plan: <strong id="refund-plan">—</strong></p>
+        <div
+          style="
+            margin: 12px 0;
+            padding: 10px 14px;
+            background: rgba(245, 158, 11, 0.1);
+            border-radius: 8px;
+            font-size: 0.82rem;
+            color: #f59e0b;
+            border: 1px solid rgba(245, 158, 11, 0.2);
+          "
+        >
+          <strong>⚠️ Politica refund:</strong><br />
+          • Lunar — doar anulare, fără rambursare<br />
+          • Anual — se oprește luna curentă, refund luni rămase<br />
+          • Max 15 zile de la activare
         </div>
+        <label>Motiv:</label>
+        <input
+          type="text"
+          id="refund-reason"
+          placeholder="Motiv refund..."
+          class="modal-input"
+        />
+        <div class="modal-actions">
+          <button class="admin-btn danger" onclick="confirmRefund()">
+            ✅ Confirmă Refund
+          </button>
+          <button class="admin-btn" onclick="closeModal('refund-modal')">
+            ❌ Anulează
+          </button>
+        </div>
+      </div>
     </div>
 
     <script src="/admin/admin-app.js?v=20260311"></script>
-</body>
-
+  </body>
 </html>

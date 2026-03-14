@@ -32,25 +32,21 @@ describe("GET /api/messenger/webhook (verification)", () => {
 
   test("returns 403 when verify token does not match", async () => {
     process.env.FB_VERIFY_TOKEN = "correct-token";
-    const res = await request(app)
-      .get("/api/messenger/webhook")
-      .query({
-        "hub.mode": "subscribe",
-        "hub.verify_token": "wrong-token",
-        "hub.challenge": "abc123",
-      });
+    const res = await request(app).get("/api/messenger/webhook").query({
+      "hub.mode": "subscribe",
+      "hub.verify_token": "wrong-token",
+      "hub.challenge": "abc123",
+    });
     expect(res.status).toBe(403);
   });
 
   test("returns 200 with challenge when verify token matches", async () => {
     process.env.FB_VERIFY_TOKEN = "test-verify-token";
-    const res = await request(app)
-      .get("/api/messenger/webhook")
-      .query({
-        "hub.mode": "subscribe",
-        "hub.verify_token": "test-verify-token",
-        "hub.challenge": "challenge_abc",
-      });
+    const res = await request(app).get("/api/messenger/webhook").query({
+      "hub.mode": "subscribe",
+      "hub.verify_token": "test-verify-token",
+      "hub.challenge": "challenge_abc",
+    });
     expect(res.status).toBe(200);
     expect(res.text).toBe("challenge_abc");
   });

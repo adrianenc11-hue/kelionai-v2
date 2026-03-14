@@ -19,8 +19,7 @@
 
 const logger = require("../logger");
 
-const OLLAMA_BASE =
-  process.env.OLLAMA_URL || "http://localhost:11434";
+const OLLAMA_BASE = process.env.OLLAMA_URL || "http://localhost:11434";
 const OLLAMA_TIMEOUT = parseInt(process.env.OLLAMA_TIMEOUT || "30000", 10);
 const DEFAULT_MODEL = process.env.OLLAMA_MODEL || "llama3";
 

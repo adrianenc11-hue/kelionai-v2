@@ -1,168 +1,272 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>KelionAI — Intelligence Dashboard</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            background: #060612;
-            color: #e0e0e0;
-            font-family: 'Inter', system-ui, sans-serif;
-            padding: 16px;
-            min-height: 100vh;
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        background: #060612;
+        color: #e0e0e0;
+        font-family: "Inter", system-ui, sans-serif;
+        padding: 16px;
+        min-height: 100vh;
+      }
+      @import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap");
+
+      h1 {
+        color: #00ffff;
+        margin-bottom: 4px;
+        font-size: 1.5rem;
+        font-weight: 700;
+      }
+      h2 {
+        color: #a78bfa;
+        font-size: 1rem;
+        margin: 20px 0 10px;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+      }
+      .subtitle {
+        color: #666;
+        font-size: 0.82rem;
+        margin-bottom: 14px;
+      }
+
+      a {
+        color: #00ffff;
+        text-decoration: none;
+      }
+      .nav {
+        display: flex;
+        gap: 16px;
+        margin-bottom: 14px;
+        font-size: 0.85rem;
+        flex-wrap: wrap;
+      }
+      .nav a {
+        color: #666;
+        transition: color 0.3s;
+      }
+      .nav a:hover,
+      .nav a.active {
+        color: #00ffff;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 14px;
+      }
+
+      .card {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        border-radius: 14px;
+        padding: 18px;
+        -webkit-backdrop-filter: blur(10px);
+        backdrop-filter: blur(10px);
+        transition:
+          border-color 0.3s,
+          transform 0.2s;
+      }
+      .card:hover {
+        border-color: rgba(0, 255, 255, 0.2);
+        transform: translateY(-2px);
+      }
+      .card h3 {
+        font-size: 0.72rem;
+        color: #888;
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+        margin-bottom: 8px;
+        font-weight: 600;
+      }
+
+      .big {
+        font-size: 2rem;
+        font-weight: 700;
+        line-height: 1;
+      }
+      .green {
+        color: #00ff88;
+      }
+      .yellow {
+        color: #ffcc00;
+      }
+      .red {
+        color: #ff4444;
+      }
+      .cyan {
+        color: #00ffff;
+      }
+      .pink {
+        color: #ff6bff;
+      }
+      .purple {
+        color: #a78bfa;
+      }
+      .mini {
+        font-size: 0.72rem;
+        color: #666;
+      }
+
+      .progress-bar {
+        height: 6px;
+        background: rgba(255, 255, 255, 0.06);
+        border-radius: 3px;
+        overflow: hidden;
+        margin-top: 6px;
+      }
+      .progress-fill {
+        height: 100%;
+        border-radius: 3px;
+        transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      .domain-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 8px 12px;
+        border-radius: 8px;
+        margin-bottom: 4px;
+        background: rgba(255, 255, 255, 0.02);
+        transition: background 0.2s;
+      }
+      .domain-row:hover {
+        background: rgba(255, 255, 255, 0.05);
+      }
+      .domain-name {
+        font-weight: 600;
+        font-size: 0.85rem;
+      }
+      .domain-score {
+        font-weight: 700;
+        font-size: 1.1rem;
+      }
+
+      .pattern-block {
+        font-family: "Fira Code", monospace;
+        font-size: 0.75rem;
+        line-height: 1.6;
+        background: rgba(0, 0, 0, 0.4);
+        border: 1px solid rgba(167, 139, 250, 0.2);
+        border-radius: 10px;
+        padding: 14px;
+        max-height: 200px;
+        overflow-y: auto;
+        white-space: pre-wrap;
+      }
+
+      .stat-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        margin: 2px;
+      }
+
+      .proactive-box {
+        background: linear-gradient(
+          135deg,
+          rgba(0, 255, 255, 0.05),
+          rgba(167, 139, 250, 0.08)
+        );
+        border: 1px solid rgba(0, 255, 255, 0.15);
+        border-radius: 12px;
+        padding: 16px;
+        margin-top: 8px;
+        font-size: 0.85rem;
+        line-height: 1.6;
+      }
+
+      .section {
+        margin-bottom: 20px;
+      }
+
+      .btn {
+        background: linear-gradient(135deg, #00ffff, #a78bfa);
+        color: #000;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 10px;
+        cursor: pointer;
+        font-weight: 700;
+        font-size: 0.82rem;
+        transition: opacity 0.2s;
+      }
+      .btn:hover {
+        opacity: 0.85;
+      }
+
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(8px);
         }
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
-
-        h1 { color: #00ffff; margin-bottom: 4px; font-size: 1.5rem; font-weight: 700; }
-        h2 { color: #a78bfa; font-size: 1rem; margin: 20px 0 10px; font-weight: 600; letter-spacing: 0.5px; }
-        .subtitle { color: #666; font-size: 0.82rem; margin-bottom: 14px; }
-
-        a { color: #00ffff; text-decoration: none; }
-        .nav { display: flex; gap: 16px; margin-bottom: 14px; font-size: 0.85rem; flex-wrap: wrap; }
-        .nav a { color: #666; transition: color 0.3s; }
-        .nav a:hover, .nav a.active { color: #00ffff; }
-
-        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
-
-        .card {
-            background: rgba(255,255,255,0.03);
-            border: 1px solid rgba(255,255,255,0.06);
-            border-radius: 14px;
-            padding: 18px;
-            -webkit-backdrop-filter: blur(10px);
-            backdrop-filter: blur(10px);
-            transition: border-color 0.3s, transform 0.2s;
+        to {
+          opacity: 1;
+          transform: none;
         }
-        .card:hover {
-            border-color: rgba(0,255,255,0.2);
-            transform: translateY(-2px);
+      }
+      .fade-in {
+        animation: fadeIn 0.5s ease-out;
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
         }
-        .card h3 {
-            font-size: 0.72rem;
-            color: #888;
-            text-transform: uppercase;
-            letter-spacing: 1.5px;
-            margin-bottom: 8px;
-            font-weight: 600;
+        50% {
+          opacity: 0.4;
         }
+      }
+      .pulse {
+        animation: pulse 2s infinite;
+      }
 
-        .big { font-size: 2rem; font-weight: 700; line-height: 1; }
-        .green { color: #00ff88; } .yellow { color: #ffcc00; } .red { color: #ff4444; }
-        .cyan { color: #00ffff; } .pink { color: #ff6bff; } .purple { color: #a78bfa; }
-        .mini { font-size: 0.72rem; color: #666; }
+      #loading {
+        text-align: center;
+        padding: 60px;
+        color: #444;
+        font-size: 1rem;
+      }
 
-        .progress-bar {
-            height: 6px;
-            background: rgba(255,255,255,0.06);
-            border-radius: 3px;
-            overflow: hidden;
-            margin-top: 6px;
-        }
-        .progress-fill {
-            height: 100%;
-            border-radius: 3px;
-            transition: width 0.8s cubic-bezier(.4,0,.2,1);
-        }
-
-        .domain-row {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 8px 12px;
-            border-radius: 8px;
-            margin-bottom: 4px;
-            background: rgba(255,255,255,0.02);
-            transition: background 0.2s;
-        }
-        .domain-row:hover { background: rgba(255,255,255,0.05); }
-        .domain-name { font-weight: 600; font-size: 0.85rem; }
-        .domain-score { font-weight: 700; font-size: 1.1rem; }
-
-        .pattern-block {
-            font-family: 'Fira Code', monospace;
-            font-size: 0.75rem;
-            line-height: 1.6;
-            background: rgba(0,0,0,0.4);
-            border: 1px solid rgba(167,139,250,0.2);
-            border-radius: 10px;
-            padding: 14px;
-            max-height: 200px;
-            overflow-y: auto;
-            white-space: pre-wrap;
-        }
-
-        .stat-pill {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 0.75rem;
-            font-weight: 600;
-            margin: 2px;
-        }
-
-        .proactive-box {
-            background: linear-gradient(135deg, rgba(0,255,255,0.05), rgba(167,139,250,0.08));
-            border: 1px solid rgba(0,255,255,0.15);
-            border-radius: 12px;
-            padding: 16px;
-            margin-top: 8px;
-            font-size: 0.85rem;
-            line-height: 1.6;
-        }
-
-        .section { margin-bottom: 20px; }
-
-        .btn {
-            background: linear-gradient(135deg, #00ffff, #a78bfa);
-            color: #000;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 10px;
-            cursor: pointer;
-            font-weight: 700;
-            font-size: 0.82rem;
-            transition: opacity 0.2s;
-        }
-        .btn:hover { opacity: 0.85; }
-
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
-        .fade-in { animation: fadeIn 0.5s ease-out; }
-
-        @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
-        .pulse { animation: pulse 2s infinite; }
-
-        #loading {
-            text-align: center;
-            padding: 60px;
-            color: #444;
-            font-size: 1rem;
-        }
-
-        .user-model-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 8px;
-            font-size: 0.82rem;
-        }
-        .user-model-grid .label { color: #888; }
-        .user-model-grid .value { color: #e0e0e0; font-weight: 600; }
+      .user-model-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        font-size: 0.82rem;
+      }
+      .user-model-grid .label {
+        color: #888;
+      }
+      .user-model-grid .value {
+        color: #e0e0e0;
+        font-weight: 600;
+      }
     </style>
-</head>
+  </head>
 
-<body>
+  <body>
     <div class="nav">
-        <a href="/admin/">← Admin</a> |
-        <a href="/admin/health.html">Health</a>
-        <a href="/admin/news.html">News</a>
-        <a href="/admin/trading.html">Trading</a>
-        <a href="/admin/sports.html">Sports</a>
-        <a href="/admin/k1-dashboard.html">🧠 K1 Brain</a>
-        <a class="active" href="/admin/intelligence.html">🔬 Intelligence</a>
+      <a href="/admin/">← Admin</a> |
+      <a href="/admin/health.html">Health</a>
+      <a href="/admin/news.html">News</a>
+      <a href="/admin/trading.html">Trading</a>
+      <a href="/admin/sports.html">Sports</a>
+      <a href="/admin/k1-dashboard.html">🧠 K1 Brain</a>
+      <a class="active" href="/admin/intelligence.html">🔬 Intelligence</a>
     </div>
 
     <h1>🔬 Intelligence Dashboard</h1>
@@ -170,104 +274,130 @@
 
     <div id="loading" class="pulse">⏳ Loading intelligence data...</div>
 
-    <div id="dashboard" style="display:none">
-        <!-- ROW 1: Overview Scores -->
-        <div class="grid section fade-in" id="overviewGrid"></div>
+    <div id="dashboard" style="display: none">
+      <!-- ROW 1: Overview Scores -->
+      <div class="grid section fade-in" id="overviewGrid"></div>
 
-        <!-- ROW 2: Domain Performance -->
-        <div class="section fade-in">
-            <h2>📊 Domain Accuracy</h2>
-            <div id="domainList"></div>
+      <!-- ROW 2: Domain Performance -->
+      <div class="section fade-in">
+        <h2>📊 Domain Accuracy</h2>
+        <div id="domainList"></div>
+      </div>
+
+      <!-- ROW 3: Patterns + Proactive -->
+      <div class="grid section fade-in">
+        <div class="card">
+          <h3>🧬 Detected Patterns</h3>
+          <div class="pattern-block" id="patternsBlock">Loading...</div>
         </div>
-
-        <!-- ROW 3: Patterns + Proactive -->
-        <div class="grid section fade-in">
-            <div class="card">
-                <h3>🧬 Detected Patterns</h3>
-                <div class="pattern-block" id="patternsBlock">Loading...</div>
-            </div>
-            <div class="card">
-                <h3>💡 Proactive Intelligence</h3>
-                <div id="proactiveBlock">No proactive suggestions yet.</div>
-            </div>
+        <div class="card">
+          <h3>💡 Proactive Intelligence</h3>
+          <div id="proactiveBlock">No proactive suggestions yet.</div>
         </div>
+      </div>
 
-        <!-- ROW 4: User Model + Strategies -->
-        <div class="grid section fade-in">
-            <div class="card">
-                <h3>👤 User Model</h3>
-                <div class="user-model-grid" id="userModelGrid">Loading...</div>
-            </div>
-            <div class="card">
-                <h3>⚙️ Active Strategies</h3>
-                <div id="strategiesBlock">Loading...</div>
-            </div>
+      <!-- ROW 4: User Model + Strategies -->
+      <div class="grid section fade-in">
+        <div class="card">
+          <h3>👤 User Model</h3>
+          <div class="user-model-grid" id="userModelGrid">Loading...</div>
         </div>
-
-        <!-- ROW 5: Evolution Report -->
-        <div class="section fade-in">
-            <h2>🧬 Evolution Report</h2>
-            <div class="card">
-                <div id="evolutionBlock">Loading...</div>
-            </div>
+        <div class="card">
+          <h3>⚙️ Active Strategies</h3>
+          <div id="strategiesBlock">Loading...</div>
         </div>
+      </div>
 
-        <!-- Actions -->
-        <div class="section" style="display:flex;gap:8px;flex-wrap:wrap">
-            <button class="btn" onclick="loadDashboard()">🔄 Refresh</button>
+      <!-- ROW 5: Evolution Report -->
+      <div class="section fade-in">
+        <h2>🧬 Evolution Report</h2>
+        <div class="card">
+          <div id="evolutionBlock">Loading...</div>
         </div>
+      </div>
 
-        <p class="mini" id="lastUpdate">Last update: —</p>
+      <!-- Actions -->
+      <div class="section" style="display: flex; gap: 8px; flex-wrap: wrap">
+        <button class="btn" onclick="loadDashboard()">🔄 Refresh</button>
+      </div>
+
+      <p class="mini" id="lastUpdate">Last update: —</p>
     </div>
 
     <script src="admin-app.js"></script>
     <script>
-        const API = '/api/admin';
+      const API = "/api/admin";
 
-        async function loadDashboard() {
-            try {
-                const r = await fetch(`${API}/intelligence`, { headers: hdrs() });
-                if (!r.ok) throw new Error(`HTTP ${r.status}`);
-                const d = await r.json();
-                document.getElementById('loading').style.display = 'none';
-                document.getElementById('dashboard').style.display = 'block';
-                renderDashboard(d);
-                document.getElementById('lastUpdate').textContent = `Last update: ${new Date().toLocaleTimeString()}`;
-            } catch (e) {
-                document.getElementById('loading').innerHTML = `<span class="red">❌ Error: ${e.message}</span>`;
-            }
+      async function loadDashboard() {
+        try {
+          const r = await fetch(`${API}/intelligence`, { headers: hdrs() });
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          const d = await r.json();
+          document.getElementById("loading").style.display = "none";
+          document.getElementById("dashboard").style.display = "block";
+          renderDashboard(d);
+          document.getElementById("lastUpdate").textContent =
+            `Last update: ${new Date().toLocaleTimeString()}`;
+        } catch (e) {
+          document.getElementById("loading").innerHTML =
+            `<span class="red">❌ Error: ${e.message}</span>`;
         }
+      }
 
-        function renderDashboard(d) {
-            const perf = d.performance || {};
-            const overall = perf.overall || {};
-            const domains = perf.domains || [];
-            const um = d.userModel || {};
-            const strats = d.strategies || {};
-            const evo = d.evolution || {};
+      function renderDashboard(d) {
+        const perf = d.performance || {};
+        const overall = perf.overall || {};
+        const domains = perf.domains || [];
+        const um = d.userModel || {};
+        const strats = d.strategies || {};
+        const evo = d.evolution || {};
 
-            // ── Overview Cards ──
-            const totalTasks = overall.totalTasks || 0;
-            const accuracy = overall.accuracy != null ? overall.accuracy : '—';
-            const accColor = accuracy >= 80 ? 'green' : accuracy >= 60 ? 'yellow' : accuracy === '—' ? 'cyan' : 'red';
-            const corrections = overall.totalCorrections || 0;
+        // ── Overview Cards ──
+        const totalTasks = overall.totalTasks || 0;
+        const accuracy = overall.accuracy != null ? overall.accuracy : "—";
+        const accColor =
+          accuracy >= 80
+            ? "green"
+            : accuracy >= 60
+              ? "yellow"
+              : accuracy === "—"
+                ? "cyan"
+                : "red";
+        const corrections = overall.totalCorrections || 0;
 
-            document.getElementById('overviewGrid').innerHTML = `
-                ${oCard('📊 Overall Accuracy', accuracy !== '—' ? accuracy + '%' : '—', totalTasks + ' tasks tracked', accColor)}
-                ${oCard('🔄 Corrections', corrections, corrections > 0 ? 'learning from mistakes' : 'clean run', corrections === 0 ? 'green' : 'yellow')}
-                ${oCard('👤 Interactions', um.totalInteractions || 0, um.preferredDomain ? 'Top: ' + um.preferredDomain : 'gathering data', 'purple')}
-                ${oCard('🧬 Patterns', d.patterns !== 'No patterns detected yet' ? '✅ Active' : '⏳ Waiting', d.patterns !== 'No patterns detected yet' ? 'Influencing responses' : 'Need more data', d.patterns !== 'No patterns detected yet' ? 'cyan' : 'yellow')}
+        document.getElementById("overviewGrid").innerHTML = `
+                ${oCard("📊 Overall Accuracy", accuracy !== "—" ? accuracy + "%" : "—", totalTasks + " tasks tracked", accColor)}
+                ${oCard("🔄 Corrections", corrections, corrections > 0 ? "learning from mistakes" : "clean run", corrections === 0 ? "green" : "yellow")}
+                ${oCard("👤 Interactions", um.totalInteractions || 0, um.preferredDomain ? "Top: " + um.preferredDomain : "gathering data", "purple")}
+                ${oCard("🧬 Patterns", d.patterns !== "No patterns detected yet" ? "✅ Active" : "⏳ Waiting", d.patterns !== "No patterns detected yet" ? "Influencing responses" : "Need more data", d.patterns !== "No patterns detected yet" ? "cyan" : "yellow")}
             `;
 
-            // ── Domain Performance ──
-            const domainEl = document.getElementById('domainList');
-            if (domains.length > 0 && domains.some(d => d.tasks > 0)) {
-                domainEl.innerHTML = domains.filter(d => d.tasks > 0).map(dm => {
-                    const acc = dm.accuracy != null ? dm.accuracy : 0;
-                    const barColor = acc >= 80 ? '#00ff88' : acc >= 60 ? '#ffcc00' : '#ff4444';
-                    const trendEmoji = dm.trend === 'improving' ? '📈' : dm.trend === 'declining' ? '📉' : '➡️';
-                    const icon = dm.domain === 'trading' ? '📈' : dm.domain === 'coding' ? '💻' : dm.domain === 'research' ? '🔍' : dm.domain === 'news' ? '📰' : '💬';
-                    return `
+        // ── Domain Performance ──
+        const domainEl = document.getElementById("domainList");
+        if (domains.length > 0 && domains.some((d) => d.tasks > 0)) {
+          domainEl.innerHTML = domains
+            .filter((d) => d.tasks > 0)
+            .map((dm) => {
+              const acc = dm.accuracy != null ? dm.accuracy : 0;
+              const barColor =
+                acc >= 80 ? "#00ff88" : acc >= 60 ? "#ffcc00" : "#ff4444";
+              const trendEmoji =
+                dm.trend === "improving"
+                  ? "📈"
+                  : dm.trend === "declining"
+                    ? "📉"
+                    : "➡️";
+              const icon =
+                dm.domain === "trading"
+                  ? "📈"
+                  : dm.domain === "coding"
+                    ? "💻"
+                    : dm.domain === "research"
+                      ? "🔍"
+                      : dm.domain === "news"
+                        ? "📰"
+                        : "💬";
+              return `
                         <div class="domain-row">
                             <div>
                                 <span class="domain-name">${icon} ${dm.domain.charAt(0).toUpperCase() + dm.domain.slice(1)}</span>
@@ -277,84 +407,106 @@
                         </div>
                         <div class="progress-bar"><div class="progress-fill" style="width:${acc}%;background:${barColor}"></div></div>
                     `;
-                }).join('');
-            } else {
-                domainEl.innerHTML = '<div class="mini" style="padding:12px;text-align:center">No domain data yet. Send messages to start tracking accuracy.</div>';
-            }
+            })
+            .join("");
+        } else {
+          domainEl.innerHTML =
+            '<div class="mini" style="padding:12px;text-align:center">No domain data yet. Send messages to start tracking accuracy.</div>';
+        }
 
-            // ── Patterns ──
-            document.getElementById('patternsBlock').textContent = d.patterns || 'No patterns detected yet';
+        // ── Patterns ──
+        document.getElementById("patternsBlock").textContent =
+          d.patterns || "No patterns detected yet";
 
-            // ── Proactive ──
-            const proactiveEl = document.getElementById('proactiveBlock');
-            if (d.proactive && d.proactive.trim()) {
-                const clean = d.proactive.replace(/\[PROACTIVE\]/g, '').replace(/\[\/PROACTIVE\]/g, '').trim();
-                proactiveEl.innerHTML = `<div class="proactive-box">💡 ${clean}</div>`;
-            } else {
-                proactiveEl.innerHTML = '<div class="mini" style="padding:12px">No proactive suggestions right now. The AI generates these based on user patterns and conversation context.</div>';
-            }
+        // ── Proactive ──
+        const proactiveEl = document.getElementById("proactiveBlock");
+        if (d.proactive && d.proactive.trim()) {
+          const clean = d.proactive
+            .replace(/\[PROACTIVE\]/g, "")
+            .replace(/\[\/PROACTIVE\]/g, "")
+            .trim();
+          proactiveEl.innerHTML = `<div class="proactive-box">💡 ${clean}</div>`;
+        } else {
+          proactiveEl.innerHTML =
+            '<div class="mini" style="padding:12px">No proactive suggestions right now. The AI generates these based on user patterns and conversation context.</div>';
+        }
 
-            // ── User Model ──
-            const umGrid = document.getElementById('userModelGrid');
-            if (um.totalInteractions > 0) {
-                umGrid.innerHTML = `
+        // ── User Model ──
+        const umGrid = document.getElementById("userModelGrid");
+        if (um.totalInteractions > 0) {
+          umGrid.innerHTML = `
                     <div class="label">Total Interactions</div><div class="value">${um.totalInteractions}</div>
                     <div class="label">Corrections</div><div class="value">${um.totalCorrections || 0} (${um.correctionRate || 0}%)</div>
-                    <div class="label">Preferred Domain</div><div class="value cyan">${um.preferredDomain || '—'}</div>
-                    <div class="label">Peak Hour</div><div class="value">${um.peakHour != null ? um.peakHour + ':00 UTC' : '—'}</div>
-                    <div class="label">Preferred Style</div><div class="value">${um.communication?.preferredStyle || '—'}</div>
-                    <div class="label">Language</div><div class="value">${um.communication?.preferredLanguage || '—'}</div>
-                    <div class="label">Avg Complexity</div><div class="value">${um.communication?.avgComplexity?.toFixed(1) || '—'}</div>
-                    <div class="label">Sentiment</div><div class="value">${um.communication?.sentimentTrend || '—'}</div>
+                    <div class="label">Preferred Domain</div><div class="value cyan">${um.preferredDomain || "—"}</div>
+                    <div class="label">Peak Hour</div><div class="value">${um.peakHour != null ? um.peakHour + ":00 UTC" : "—"}</div>
+                    <div class="label">Preferred Style</div><div class="value">${um.communication?.preferredStyle || "—"}</div>
+                    <div class="label">Language</div><div class="value">${um.communication?.preferredLanguage || "—"}</div>
+                    <div class="label">Avg Complexity</div><div class="value">${um.communication?.avgComplexity?.toFixed(1) || "—"}</div>
+                    <div class="label">Sentiment</div><div class="value">${um.communication?.sentimentTrend || "—"}</div>
                 `;
-            } else {
-                umGrid.innerHTML = '<div class="mini" style="grid-column:1/-1;text-align:center;padding:12px">No user interactions recorded yet.</div>';
-            }
+        } else {
+          umGrid.innerHTML =
+            '<div class="mini" style="grid-column:1/-1;text-align:center;padding:12px">No user interactions recorded yet.</div>';
+        }
 
-            // ── Strategies ──
-            const stratEl = document.getElementById('strategiesBlock');
-            const rp = strats.riskParams || [];
-            if (rp.length > 0) {
-                stratEl.innerHTML = rp.map(p =>
-                    `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.04)">
+        // ── Strategies ──
+        const stratEl = document.getElementById("strategiesBlock");
+        const rp = strats.riskParams || [];
+        if (rp.length > 0) {
+          stratEl.innerHTML =
+            rp
+              .map(
+                (p) =>
+                  `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.04)">
                         <span class="mini">${p.name}</span>
                         <span style="font-weight:600;color:#a78bfa">${p.current}</span>
-                    </div>`
-                ).join('') +
-                `<div class="mini" style="margin-top:8px">Templates: ${strats.promptTemplates?.length || 0} · Tools: ${Object.keys(strats.toolPreferences || {}).length}</div>`;
-            } else {
-                stratEl.innerHTML = '<div class="mini" style="padding:12px">No active strategies yet. These develop as K1 learns from interactions.</div>';
-            }
-
-            // ── Evolution ──
-            const evoEl = document.getElementById('evolutionBlock');
-            if (evo && Object.keys(evo).length > 0) {
-                let evoHtml = '';
-                if (evo.performanceSummary) {
-                    evoHtml += `<div style="margin-bottom:12px"><span class="big cyan">${evo.performanceSummary.accuracy || '—'}%</span> <span class="mini">overall accuracy</span></div>`;
-                    evoHtml += `<div class="mini">${evo.performanceSummary.totalTasks || 0} tasks · ${evo.performanceSummary.corrections || 0} corrections · Status: ${evo.performanceSummary.status || '—'}</div>`;
-                }
-                if (evo.weakAreas && evo.weakAreas.length > 0) {
-                    evoHtml += `<div style="margin-top:8px" class="mini red">⚠️ Weak areas: ${evo.weakAreas.join(', ')}</div>`;
-                }
-                if (evo.strongAreas && evo.strongAreas.length > 0) {
-                    evoHtml += `<div style="margin-top:4px" class="mini green">✅ Strong areas: ${evo.strongAreas.join(', ')}</div>`;
-                }
-                evoEl.innerHTML = evoHtml || '<div class="mini">Evolution data available but empty.</div>';
-            } else {
-                evoEl.innerHTML = '<div class="mini" style="padding:12px;text-align:center">Evolution report will appear after K1 processes enough interactions.</div>';
-            }
+                    </div>`,
+              )
+              .join("") +
+            `<div class="mini" style="margin-top:8px">Templates: ${strats.promptTemplates?.length || 0} · Tools: ${Object.keys(strats.toolPreferences || {}).length}</div>`;
+        } else {
+          stratEl.innerHTML =
+            '<div class="mini" style="padding:12px">No active strategies yet. These develop as K1 learns from interactions.</div>';
         }
 
-        function oCard(title, value, sub, color) {
-            const colors = { cyan: '#00ffff', green: '#00ff88', pink: '#ff6bff', yellow: '#ffcc00', red: '#ff4444', purple: '#a78bfa' };
-            return `<div class="card"><h3>${title}</h3><div class="big" style="color:${colors[color] || '#fff'}">${value}</div><div class="mini" style="margin-top:4px">${sub}</div></div>`;
+        // ── Evolution ──
+        const evoEl = document.getElementById("evolutionBlock");
+        if (evo && Object.keys(evo).length > 0) {
+          let evoHtml = "";
+          if (evo.performanceSummary) {
+            evoHtml += `<div style="margin-bottom:12px"><span class="big cyan">${evo.performanceSummary.accuracy || "—"}%</span> <span class="mini">overall accuracy</span></div>`;
+            evoHtml += `<div class="mini">${evo.performanceSummary.totalTasks || 0} tasks · ${evo.performanceSummary.corrections || 0} corrections · Status: ${evo.performanceSummary.status || "—"}</div>`;
+          }
+          if (evo.weakAreas && evo.weakAreas.length > 0) {
+            evoHtml += `<div style="margin-top:8px" class="mini red">⚠️ Weak areas: ${evo.weakAreas.join(", ")}</div>`;
+          }
+          if (evo.strongAreas && evo.strongAreas.length > 0) {
+            evoHtml += `<div style="margin-top:4px" class="mini green">✅ Strong areas: ${evo.strongAreas.join(", ")}</div>`;
+          }
+          evoEl.innerHTML =
+            evoHtml ||
+            '<div class="mini">Evolution data available but empty.</div>';
+        } else {
+          evoEl.innerHTML =
+            '<div class="mini" style="padding:12px;text-align:center">Evolution report will appear after K1 processes enough interactions.</div>';
         }
+      }
 
-        // Auto-refresh
-        loadDashboard();
-        setInterval(loadDashboard, 30000);
+      function oCard(title, value, sub, color) {
+        const colors = {
+          cyan: "#00ffff",
+          green: "#00ff88",
+          pink: "#ff6bff",
+          yellow: "#ffcc00",
+          red: "#ff4444",
+          purple: "#a78bfa",
+        };
+        return `<div class="card"><h3>${title}</h3><div class="big" style="color:${colors[color] || "#fff"}">${value}</div><div class="mini" style="margin-top:4px">${sub}</div></div>`;
+      }
+
+      // Auto-refresh
+      loadDashboard();
+      setInterval(loadDashboard, 30000);
     </script>
-</body>
-
+  </body>
 </html>

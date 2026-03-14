@@ -379,15 +379,10 @@ router.post("/v1/chat", v1Limiter, apiKeyAuth, async (req, res) => {
     );
 
     const { buildSystemPrompt, buildNewbornPrompt } = require("../persona");
-    const systemPrompt = process.env.NEWBORN_MODE === "true"
-      ? buildNewbornPrompt("")
-      : buildSystemPrompt(
-          avatar,
-          language,
-          "",
-          {},
-          thought.chainOfThought,
-        );
+    const systemPrompt =
+      process.env.NEWBORN_MODE === "true"
+        ? buildNewbornPrompt("")
+        : buildSystemPrompt(avatar, language, "", {}, thought.chainOfThought);
     const msgs = (thought.compressedHistory || history).map((h) => ({
       role: h.role === "ai" ? "assistant" : h.role,
       content: h.content,

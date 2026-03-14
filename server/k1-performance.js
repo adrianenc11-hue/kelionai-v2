@@ -264,36 +264,54 @@ function selfEvaluate(userMessage, aiResponse, domain = "general") {
 
   // 3. GENERIC RESPONSE DETECTION — penalize filler phrases
   const genericPatterns = [
-    "as an ai", "i cannot", "i don't have access",
-    "nu am acces", "ca model de limbaj", "nu pot să",
-    "sigur, pot", "desigur!", "bineînțeles!",
+    "as an ai",
+    "i cannot",
+    "i don't have access",
+    "nu am acces",
+    "ca model de limbaj",
+    "nu pot să",
+    "sigur, pot",
+    "desigur!",
+    "bineînțeles!",
   ];
-  const genericCount = genericPatterns.filter(p => aResp.toLowerCase().includes(p)).length;
+  const genericCount = genericPatterns.filter((p) =>
+    aResp.toLowerCase().includes(p),
+  ).length;
   if (genericCount >= 2) {
     score -= 20;
     issues.push("generic_filler");
   }
 
   // 4. REPETITION — response repeating user's question verbatim
-  if (uMsg.length > 20 && aResp.toLowerCase().includes(uMsg.slice(0, Math.min(50, uMsg.length)))) {
+  if (
+    uMsg.length > 20 &&
+    aResp.toLowerCase().includes(uMsg.slice(0, Math.min(50, uMsg.length)))
+  ) {
     score -= 5;
     issues.push("echoes_question");
   }
 
   // 5. QUESTION ANSWERING — if user asks a question, response should have substance
-  const isQuestion = uMsg.includes("?") || /^(ce|cine|când|cum|unde|de ce|cât|care|what|who|when|how|where|why)/i.test(uMsg);
+  const isQuestion =
+    uMsg.includes("?") ||
+    /^(ce|cine|când|cum|unde|de ce|cât|care|what|who|when|how|where|why)/i.test(
+      uMsg,
+    );
   if (isQuestion && aResp.length < 80) {
     score -= 10;
     issues.push("shallow_answer");
   }
 
   // 6. ERROR INDICATORS — response contains error messages
-  if (/error|eroare|failed|eșuat|undefined|null|NaN/i.test(aResp) && !/```/.test(aResp)) {
+  if (
+    /error|eroare|failed|eșuat|undefined|null|NaN/i.test(aResp) &&
+    !/```/.test(aResp)
+  ) {
     score -= 15;
     issues.push("error_in_response");
   }
 
-  // 7. POSITIVE SIGNALS — boost score  
+  // 7. POSITIVE SIGNALS — boost score
   if (aResp.includes("```")) score += 5; // code blocks = structured
   if (/\d+/.test(aResp) && domain === "trading") score += 5; // numbers in trading = good
   if (aResp.split("\n").length > 3) score += 3; // multi-line = structured
@@ -303,7 +321,8 @@ function selfEvaluate(userMessage, aiResponse, domain = "general") {
 
   const evaluation = {
     score,
-    quality: score >= 80 ? "good" : score >= 60 ? "ok" : score >= 40 ? "weak" : "poor",
+    quality:
+      score >= 80 ? "good" : score >= 60 ? "ok" : score >= 40 ? "weak" : "poor",
     issues,
     domain,
     timestamp: new Date().toISOString(),
@@ -321,7 +340,10 @@ function selfEvaluate(userMessage, aiResponse, domain = "general") {
 
   // Log warnings for poor quality
   if (score < 50) {
-    logger.warn({ score, issues, domain }, "[K1-Perf] ⚠️ Low quality response detected");
+    logger.warn(
+      { score, issues, domain },
+      "[K1-Perf] ⚠️ Low quality response detected",
+    );
   }
 
   return evaluation;
@@ -335,23 +357,45 @@ function getQualityHints() {
   if (recentEvals.length < 3) return ""; // not enough data
 
   const recent = recentEvals.slice(-10);
-  const avgScore = Math.round(recent.reduce((s, e) => s + e.score, 0) / recent.length);
+  const avgScore = Math.round(
+    recent.reduce((s, e) => s + e.score, 0) / recent.length,
+  );
   const hints = [];
 
   // Count issues across recent evaluations
   const issueCounts = {};
-  recent.forEach(e => e.issues.forEach(i => { issueCounts[i] = (issueCounts[i] || 0) + 1; }));
+  recent.forEach((e) =>
+    e.issues.forEach((i) => {
+      issueCounts[i] = (issueCounts[i] || 0) + 1;
+    }),
+  );
 
   // Only emit hints for recurring issues (2+ occurrences)
-  if (issueCounts.too_short >= 2) hints.push("Răspunsurile recente sunt prea scurte. Oferă mai mult detaliu.");
-  if (issueCounts.verbose >= 2) hints.push("Răspunsurile recente sunt prea lungi. Fii mai concis.");
-  if (issueCounts.generic_filler >= 2) hints.push("Evită frazele generice ('ca model AI', 'nu pot'). Răspunde direct.");
-  if (issueCounts.language_mismatch >= 2) hints.push("Răspunde în aceeași limbă ca userul.");
-  if (issueCounts.shallow_answer >= 2) hints.push("La întrebări, oferă răspunsuri mai substanțiale.");
-  if (issueCounts.error_in_response >= 2) hints.push("Verifică răspunsurile pentru erori înainte de a le trimite.");
+  if (issueCounts.too_short >= 2)
+    hints.push(
+      "Răspunsurile recente sunt prea scurte. Oferă mai mult detaliu.",
+    );
+  if (issueCounts.verbose >= 2)
+    hints.push("Răspunsurile recente sunt prea lungi. Fii mai concis.");
+  if (issueCounts.generic_filler >= 2)
+    hints.push(
+      "Evită frazele generice ('ca model AI', 'nu pot'). Răspunde direct.",
+    );
+  if (issueCounts.language_mismatch >= 2)
+    hints.push("Răspunde în aceeași limbă ca userul.");
+  if (issueCounts.shallow_answer >= 2)
+    hints.push("La întrebări, oferă răspunsuri mai substanțiale.");
+  if (issueCounts.error_in_response >= 2)
+    hints.push("Verifică răspunsurile pentru erori înainte de a le trimite.");
 
   if (hints.length === 0) return "";
-  return "\n[SELF-EVAL HINTS] Avg quality: " + avgScore + "%. " + hints.join(" ") + " [/SELF-EVAL HINTS]";
+  return (
+    "\n[SELF-EVAL HINTS] Avg quality: " +
+    avgScore +
+    "%. " +
+    hints.join(" ") +
+    " [/SELF-EVAL HINTS]"
+  );
 }
 
 module.exports = {

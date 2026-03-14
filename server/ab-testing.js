@@ -58,7 +58,10 @@ function createExperiment(config) {
     }
   }
 
-  logger.info({ component: "ABTest", experiment: config.id }, `🧪 Experiment created: ${config.name}`);
+  logger.info(
+    { component: "ABTest", experiment: config.id },
+    `🧪 Experiment created: ${config.name}`,
+  );
   return experiment;
 }
 
@@ -72,7 +75,7 @@ function getVariant(userId, experimentId) {
 
   // Check traffic allocation
   const userHash = simpleHash(userId || "anonymous");
-  if ((userHash % 100) >= exp.trafficPercent) return null; // User not in experiment
+  if (userHash % 100 >= exp.trafficPercent) return null; // User not in experiment
 
   // Check if already assigned
   const userExps = userAssignments.get(userId) || {};
@@ -86,7 +89,10 @@ function getVariant(userId, experimentId) {
   userExps[experimentId] = variant;
   userAssignments.set(userId, userExps);
 
-  logger.info({ component: "ABTest", experiment: experimentId, user: userId, variant }, "User assigned to variant");
+  logger.info(
+    { component: "ABTest", experiment: experimentId, user: userId, variant },
+    "User assigned to variant",
+  );
   return variant;
 }
 
@@ -127,7 +133,8 @@ function applyExperiments(userId, promptConfig) {
         promptConfig.model = value;
         break;
       case "system_instruction":
-        promptConfig.systemInstructionAppend = (promptConfig.systemInstructionAppend || "") + "\n" + value;
+        promptConfig.systemInstructionAppend =
+          (promptConfig.systemInstructionAppend || "") + "\n" + value;
         break;
       case "response_style":
         promptConfig.responseStyle = value;
@@ -153,10 +160,18 @@ function recordFeedback(userId, type) {
     if (!m) continue;
 
     switch (type) {
-      case "thumbsUp": m.thumbsUp++; break;
-      case "thumbsDown": m.thumbsDown++; break;
-      case "correction": m.corrections++; break;
-      case "followUp": m.followUps++; break;
+      case "thumbsUp":
+        m.thumbsUp++;
+        break;
+      case "thumbsDown":
+        m.thumbsDown++;
+        break;
+      case "correction":
+        m.corrections++;
+        break;
+      case "followUp":
+        m.followUps++;
+        break;
     }
   }
 }
@@ -171,7 +186,8 @@ function recordResponseTime(userId, timeMs) {
     const m = variantMetrics.get(key);
     if (!m) continue;
     m.totalResponseTime += timeMs;
-    m.avgResponseTime = m.impressions > 0 ? m.totalResponseTime / m.impressions : 0;
+    m.avgResponseTime =
+      m.impressions > 0 ? m.totalResponseTime / m.impressions : 0;
   }
 }
 
@@ -189,13 +205,21 @@ function getExperimentReport(experimentId) {
 
   for (const v of exp.variantNames) {
     const key = `${experimentId}:${v}`;
-    const m = variantMetrics.get(key) || { impressions: 0, thumbsUp: 0, thumbsDown: 0 };
+    const m = variantMetrics.get(key) || {
+      impressions: 0,
+      thumbsUp: 0,
+      thumbsDown: 0,
+    };
     const total = m.thumbsUp + m.thumbsDown;
     report.variants[v] = {
       ...m,
       value: exp.variants[v],
-      satisfactionRate: total > 0 ? ((m.thumbsUp / total) * 100).toFixed(1) + "%" : "N/A",
-      correctionRate: m.impressions > 0 ? ((m.corrections / m.impressions) * 100).toFixed(1) + "%" : "N/A",
+      satisfactionRate:
+        total > 0 ? ((m.thumbsUp / total) * 100).toFixed(1) + "%" : "N/A",
+      correctionRate:
+        m.impressions > 0
+          ? ((m.corrections / m.impressions) * 100).toFixed(1) + "%"
+          : "N/A",
     };
   }
 
@@ -222,7 +246,10 @@ function declareWinner(experimentId, winnerVariant) {
   exp.status = "completed";
   exp.winner = winnerVariant;
   exp.completedAt = new Date().toISOString();
-  logger.info({ component: "ABTest", experiment: experimentId, winner: winnerVariant }, `🏆 Winner declared: ${winnerVariant}`);
+  logger.info(
+    { component: "ABTest", experiment: experimentId, winner: winnerVariant },
+    `🏆 Winner declared: ${winnerVariant}`,
+  );
   return exp;
 }
 
@@ -251,7 +278,7 @@ function simpleHash(str) {
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
     const char = str.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
+    hash = (hash << 5) - hash + char;
     hash = hash & hash; // Convert to 32-bit int
   }
   return Math.abs(hash);
@@ -264,9 +291,12 @@ createExperiment({
   description: "Testing concise vs detailed responses",
   target: "system_instruction",
   variants: {
-    concise: "CRITICAL: Keep ALL responses under 2 sentences. Be extremely brief.",
-    detailed: "Provide thorough, comprehensive responses with examples when helpful.",
-    balanced: "Be concise for simple questions, detailed for complex ones. Adapt naturally.",
+    concise:
+      "CRITICAL: Keep ALL responses under 2 sentences. Be extremely brief.",
+    detailed:
+      "Provide thorough, comprehensive responses with examples when helpful.",
+    balanced:
+      "Be concise for simple questions, detailed for complex ones. Adapt naturally.",
   },
   trafficPercent: 50,
 });
@@ -278,7 +308,8 @@ createExperiment({
   target: "system_instruction",
   variants: {
     warm: "Be extra warm, use emojis occasionally, be like a close friend.",
-    professional: "Be professional and precise. No emojis. Direct and efficient.",
+    professional:
+      "Be professional and precise. No emojis. Direct and efficient.",
   },
   trafficPercent: 30,
 });

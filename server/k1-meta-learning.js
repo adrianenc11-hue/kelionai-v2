@@ -269,13 +269,13 @@ function recordUserInteraction(data) {
 
 // Counters for style detection (not hardcoded rules)
 const styleCounters = {
-  messageLengths: [],     // track message lengths
-  technicalWords: 0,      // count of technical terms used
-  simpleWords: 0,         // count of simple/casual terms
-  formalPhrases: 0,       // formal language indicators
-  informalPhrases: 0,     // informal language indicators
-  emojiCount: 0,          // emoji usage
-  totalAnalyzed: 0,       // total messages analyzed
+  messageLengths: [], // track message lengths
+  technicalWords: 0, // count of technical terms used
+  simpleWords: 0, // count of simple/casual terms
+  formalPhrases: 0, // formal language indicators
+  informalPhrases: 0, // informal language indicators
+  emojiCount: 0, // emoji usage
+  totalAnalyzed: 0, // total messages analyzed
 };
 
 /**
@@ -289,34 +289,42 @@ function analyzeUserStyle(message) {
 
   styleCounters.totalAnalyzed++;
   styleCounters.messageLengths.push(m.length);
-  if (styleCounters.messageLengths.length > 50) styleCounters.messageLengths.shift();
+  if (styleCounters.messageLengths.length > 50)
+    styleCounters.messageLengths.shift();
 
   // Technical vocabulary detection (RO + EN)
-  const techTerms = /\b(API|backend|frontend|deploy|server|database|function|variabil[aă]|algoritm|framework|debug|commit|merge|branch|endpoint|token|hash|crypto|blockchain|RSI|MACD|fibonacci|bollinger|volatilitat|portofoliu|hedging|leverage|margin)\b/gi;
+  const techTerms =
+    /\b(API|backend|frontend|deploy|server|database|function|variabil[aă]|algoritm|framework|debug|commit|merge|branch|endpoint|token|hash|crypto|blockchain|RSI|MACD|fibonacci|bollinger|volatilitat|portofoliu|hedging|leverage|margin)\b/gi;
   const techMatches = m.match(techTerms);
   if (techMatches) styleCounters.technicalWords += techMatches.length;
 
   // Simple/casual vocabulary
-  const simpleTerms = /\b(ok|da|nu|bine|mersi|ms|hai|super|tare|misto|fain|wow|cool|nice|perfect|bravo|salut|hey|yo)\b/gi;
+  const simpleTerms =
+    /\b(ok|da|nu|bine|mersi|ms|hai|super|tare|misto|fain|wow|cool|nice|perfect|bravo|salut|hey|yo)\b/gi;
   const simpleMatches = m.match(simpleTerms);
   if (simpleMatches) styleCounters.simpleWords += simpleMatches.length;
 
   // Formal indicators
-  const formalPattern = /\b(vă rog|mulțumesc|dumneavoastră|domnul|doamna|aș dori|permiteți|referitor la|conform|please|thank you|regards|kindly)\b/gi;
+  const formalPattern =
+    /\b(vă rog|mulțumesc|dumneavoastră|domnul|doamna|aș dori|permiteți|referitor la|conform|please|thank you|regards|kindly)\b/gi;
   if (formalPattern.test(m)) styleCounters.formalPhrases++;
 
   // Informal indicators
-  const informalPattern = /\b(yo|hey|bro|frate|boss|sefu|nush|stii|zic|zici|mna|bre|ba|:D|:P|XD|lol|haha)\b/gi;
+  const informalPattern =
+    /\b(yo|hey|bro|frate|boss|sefu|nush|stii|zic|zici|mna|bre|ba|:D|:P|XD|lol|haha)\b/gi;
   if (informalPattern.test(m)) styleCounters.informalPhrases++;
 
   // Emoji detection
-  const emojiPattern = /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2702}-\u{27B0}\u{24C2}-\u{1F251}]/gu;
+  const emojiPattern =
+    /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2702}-\u{27B0}\u{24C2}-\u{1F251}]/gu;
   const emojis = m.match(emojiPattern);
   if (emojis) styleCounters.emojiCount += emojis.length;
 
   // ── Update userModel only after 10+ messages (real observed data) ──
   if (styleCounters.totalAnalyzed >= 10) {
-    const avgLen = styleCounters.messageLengths.reduce((a, b) => a + b, 0) / styleCounters.messageLengths.length;
+    const avgLen =
+      styleCounters.messageLengths.reduce((a, b) => a + b, 0) /
+      styleCounters.messageLengths.length;
 
     // Message length → style preference
     if (avgLen < 30) {
@@ -330,7 +338,9 @@ function analyzeUserStyle(message) {
     }
 
     // Technical level from vocabulary
-    const techRatio = styleCounters.technicalWords / Math.max(1, styleCounters.technicalWords + styleCounters.simpleWords);
+    const techRatio =
+      styleCounters.technicalWords /
+      Math.max(1, styleCounters.technicalWords + styleCounters.simpleWords);
     if (techRatio > 0.6) {
       userModel.communication.technicalLevel = "avansat";
     } else if (techRatio > 0.3) {
@@ -342,14 +352,18 @@ function analyzeUserStyle(message) {
     // Formality level
     if (styleCounters.formalPhrases > styleCounters.informalPhrases * 2) {
       userModel.communication.formality = "formal";
-    } else if (styleCounters.informalPhrases > styleCounters.formalPhrases * 2) {
+    } else if (
+      styleCounters.informalPhrases >
+      styleCounters.formalPhrases * 2
+    ) {
       userModel.communication.formality = "informal";
     } else {
       userModel.communication.formality = "normal";
     }
 
     // Emoji preference
-    userModel.communication.usesEmoji = styleCounters.emojiCount > styleCounters.totalAnalyzed * 0.3;
+    userModel.communication.usesEmoji =
+      styleCounters.emojiCount > styleCounters.totalAnalyzed * 0.3;
 
     // Mark as observed (not default)
     userModel.communication._observed = true;
@@ -419,7 +433,9 @@ function startScheduledJobs(supabaseGetter) {
       try {
         const k1Truth = require("./k1-truth");
         k1Truth.runSelfTest("trading");
-      } catch { /* ignored */ }
+      } catch {
+        /* ignored */
+      }
     },
     2 * 60 * 1000,
   );
@@ -525,16 +541,23 @@ function synthesizePatterns() {
     const top = sortedInterests[0];
     const topPct = Math.round((top[1] / m.totalInteractions) * 100);
     if (topPct > 40) {
-      rules.push(`Userul e interesat în principal de ${top[0]} (${topPct}% din ${m.totalInteractions} conversații).`);
+      rules.push(
+        `Userul e interesat în principal de ${top[0]} (${topPct}% din ${m.totalInteractions} conversații).`,
+      );
     }
     if (sortedInterests.length > 1) {
-      const secondary = sortedInterests.slice(1, 3).map(([k]) => k).join(", ");
+      const secondary = sortedInterests
+        .slice(1, 3)
+        .map(([k]) => k)
+        .join(", ");
       rules.push(`Interese secundare: ${secondary}.`);
     }
   }
 
   // 2. Temporal patterns — doar dacă ≥5 ore distincte înregistrate
-  const hourEntries = Object.entries(m.temporal.activeHours).filter(([, v]) => v >= 2);
+  const hourEntries = Object.entries(m.temporal.activeHours).filter(
+    ([, v]) => v >= 2,
+  );
   if (hourEntries.length >= 3) {
     const topHours = hourEntries
       .sort(([, a], [, b]) => b - a)
@@ -542,7 +565,9 @@ function synthesizePatterns() {
       .map(([h]) => h + ":00");
     rules.push(`Userul e cel mai activ la: ${topHours.join(", ")}.`);
   }
-  const dayEntries = Object.entries(m.temporal.activeDays).filter(([, v]) => v >= 2);
+  const dayEntries = Object.entries(m.temporal.activeDays).filter(
+    ([, v]) => v >= 2,
+  );
   if (dayEntries.length >= 2) {
     const topDays = dayEntries
       .sort(([, a], [, b]) => b - a)
@@ -554,9 +579,17 @@ function synthesizePatterns() {
   // 3. Correction rate — doar din date reale (≥5 interacțiuni)
   if (m.totalCorrections > 0) {
     if (m.correctionRate > 30) {
-      rules.push("Atenție: rată mare de corecții (" + m.correctionRate + "%). Verifică de două ori înainte de a răspunde.");
+      rules.push(
+        "Atenție: rată mare de corecții (" +
+          m.correctionRate +
+          "%). Verifică de două ori înainte de a răspunde.",
+      );
     } else if (m.correctionRate > 15) {
-      rules.push("Userul corectează ocazional (" + m.correctionRate + "%). Reconfirmă când nu ești sigur.");
+      rules.push(
+        "Userul corectează ocazional (" +
+          m.correctionRate +
+          "%). Reconfirmă când nu ești sigur.",
+      );
     }
   }
 
@@ -564,8 +597,8 @@ function synthesizePatterns() {
   if (m.communication.corrections.length > 0) {
     const correctionNotes = m.communication.corrections
       .slice(-5)
-      .filter(c => c.what && c.what !== "unknown")
-      .map(c => c.what);
+      .filter((c) => c.what && c.what !== "unknown")
+      .map((c) => c.what);
     if (correctionNotes.length > 0) {
       rules.push("Corecții de reținut: " + correctionNotes.join("; ") + ".");
     }
@@ -574,7 +607,8 @@ function synthesizePatterns() {
   // 5. Communication style — DOAR dacă a fost observat din date reale
   if (m.communication._observed) {
     const styleMap = {
-      foarte_concis: "Userul preferă mesaje foarte scurte. Răspunde concis, fără explicații inutile.",
+      foarte_concis:
+        "Userul preferă mesaje foarte scurte. Răspunde concis, fără explicații inutile.",
       concis: "Userul preferă răspunsuri scurte și la obiect.",
       normal: "Userul preferă răspunsuri de lungime medie.",
       detaliat: "Userul preferă răspunsuri detaliate cu explicații complete.",
@@ -622,12 +656,23 @@ function getProactiveSuggestion() {
 
   const now = new Date();
   const currentHour = now.getUTCHours().toString();
-  const currentDay = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][now.getUTCDay()];
+  const currentDay = [
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+  ][now.getUTCDay()];
 
   const suggestions = [];
 
   // 1. Peak hour + preferred domain → contextual suggestion
-  if (m.peakHour !== undefined && Math.abs(parseInt(currentHour) - m.peakHour) <= 1) {
+  if (
+    m.peakHour !== undefined &&
+    Math.abs(parseInt(currentHour) - m.peakHour) <= 1
+  ) {
     const topDomain = m.preferredDomain;
     const domainSuggestions = {
       trading: "E ora ta de trading — vrei o analiză rapidă a pieței?",
@@ -647,14 +692,22 @@ function getProactiveSuggestion() {
     .slice(0, 2)
     .map(([d]) => d);
   const _isWeekend = currentDay === "Saturday" || currentDay === "Sunday";
-  if (topDays.length > 0 && !topDays.includes(currentDay) && m.totalInteractions > 30) {
+  if (
+    topDays.length > 0 &&
+    !topDays.includes(currentDay) &&
+    m.totalInteractions > 30
+  ) {
     // User is active on an unusual day
-    suggestions.push(`De obicei ești mai activ ${topDays.join(" și ")} — astăzi e o zi bonus! 😊`);
+    suggestions.push(
+      `De obicei ești mai activ ${topDays.join(" și ")} — astăzi e o zi bonus! 😊`,
+    );
   }
 
   // 3. High correction rate warning (proactive self-improvement)
   if (m.correctionRate > 20 && m.totalInteractions > 15) {
-    suggestions.push("Atenție sporită la acuratețe — rata de corecții e ridicată recent.");
+    suggestions.push(
+      "Atenție sporită la acuratețe — rata de corecții e ridicată recent.",
+    );
   }
 
   // Return first suggestion (keep it subtle, one at a time)

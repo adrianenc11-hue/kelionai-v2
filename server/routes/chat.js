@@ -21,7 +21,10 @@ const router = express.Router();
 function sanitizeReply(text) {
   if (!text) return text;
   let r = text;
-  r = r.replace(/\[SYSTEM INSTRUCTION[^\]]*\][\s\S]*?\[END SYSTEM INSTRUCTION\]\s*/gi, "");
+  r = r.replace(
+    /\[SYSTEM INSTRUCTION[^\]]*\][\s\S]*?\[END SYSTEM INSTRUCTION\]\s*/gi,
+    "",
+  );
   r = r.replace(/\[LEARNED PATTERNS\][\s\S]*?\[\/LEARNED PATTERNS\]\s*/gi, "");
   r = r.replace(/\[SELF-EVAL HINTS\][\s\S]*?\[\/SELF-EVAL HINTS\]\s*/gi, "");
   r = r.replace(/\[CONTEXT SWITCH\][^\n]*\n?/gi, "");
@@ -29,7 +32,10 @@ function sanitizeReply(text) {
   r = r.replace(/\[EMOTIONAL CONTEXT\][^\n]*\n?/gi, "");
   r = r.replace(/\[CURRENT DATE & TIME\][^\n]*\n?/gi, "");
   r = r.replace(/\[USER LOCATION\][^\n]*\n?/gi, "");
-  r = r.replace(/\[REZULTATE CAUTARE WEB REALE\][\s\S]*?Citeaza sursele\.\s*/gi, "");
+  r = r.replace(
+    /\[REZULTATE CAUTARE WEB REALE\][\s\S]*?Citeaza sursele\.\s*/gi,
+    "",
+  );
   r = r.replace(/\[DATE METEO REALE\][^\n]*\n?/gi, "");
   r = r.replace(/\[CONTEXT DIN MEMORIE\][^\n]*\n?/gi, "");
   return r.trim();
@@ -206,7 +212,12 @@ router.post("/chat", chatLimiter, validate(chatSchema), async (req, res) => {
       language,
       user?.id,
       conversationId,
-      { imageBase64, audioBase64, geo, isAutoCamera: req.body.isAutoCamera || false },
+      {
+        imageBase64,
+        audioBase64,
+        geo,
+        isAutoCamera: req.body.isAutoCamera || false,
+      },
       isAdmin,
     );
 
@@ -221,10 +232,18 @@ router.post("/chat", chatLimiter, validate(chatSchema), async (req, res) => {
 
     // ── Push notification to admin ──
     try {
-      notify("info", `💬 ${user?.email || "guest"}: ${(message || "").slice(0, 60)}`, {
-        userId: user?.id, avatar, engine: thought.agent
-      });
-    } catch { /* non-blocking */ }
+      notify(
+        "info",
+        `💬 ${user?.email || "guest"}: ${(message || "").slice(0, 60)}`,
+        {
+          userId: user?.id,
+          avatar,
+          engine: thought.agent,
+        },
+      );
+    } catch {
+      /* non-blocking */
+    }
     // Agent logging removed — was hardcoded to localhost:7257 (non-functional on Railway)
 
     if (!reply) return res.status(503).json({ error: "AI unavailable" });
@@ -512,21 +531,25 @@ router.post(
           );
         }
       }
-      const systemPrompt = process.env.NEWBORN_MODE === "true"
-        ? buildNewbornPrompt(memoryContext)
-        : buildSystemPrompt(
-            avatar,
-            language,
-            memoryContext,
-            { failedTools: thought.failedTools },
-            thought.chainOfThought,
-          );
+      const systemPrompt =
+        process.env.NEWBORN_MODE === "true"
+          ? buildNewbornPrompt(memoryContext)
+          : buildSystemPrompt(
+              avatar,
+              language,
+              memoryContext,
+              { failedTools: thought.failedTools },
+              thought.chainOfThought,
+            );
       const compressedHist = thought.compressedHistory || history.slice(-10);
       const msgs = compressedHist.map((h) => ({
         role: h.role === "ai" ? "assistant" : h.role,
         content: h.content,
       }));
-      msgs.push({ role: "user", content: sanitizeReply(thought.enrichedMessage) });
+      msgs.push({
+        role: "user",
+        content: sanitizeReply(thought.enrichedMessage),
+      });
 
       let fullReply = "";
       const _heartbeat = setInterval(() => {

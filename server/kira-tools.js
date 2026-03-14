@@ -980,8 +980,7 @@ async function scrapeFullArticle(url) {
 
     const res = await fetch(url, {
       headers: {
-        "User-Agent":
-          `Mozilla/5.0 (compatible; KelionAI/2.5; +${process.env.APP_URL || "https://kelionai.app"})`,
+        "User-Agent": `Mozilla/5.0 (compatible; KelionAI/2.5; +${process.env.APP_URL || "https://kelionai.app"})`,
         Accept: "text/html",
       },
       signal: controller.signal,
