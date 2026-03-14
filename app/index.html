@@ -916,6 +916,7 @@
         (function() {
             var vfBtn = document.getElementById('btn-voicefirst');
             var ccBtn = document.getElementById('btn-cc-toggle');
+            var micBtn = document.getElementById('btn-mic-toggle');
             var vfActive = false;
             if (!vfBtn) return;
 
@@ -932,8 +933,9 @@
                     vfBtn.style.color = '#10B981';
                     vfBtn.style.boxShadow = '0 0 10px rgba(16,185,129,0.4)';
                     vfBtn.title = 'Voice-First ACTIV — Click pentru a opri';
-                    // Show CC toggle
+                    // Show CC toggle, hide classic mic
                     if (ccBtn) ccBtn.style.display = '';
+                    if (micBtn) micBtn.style.display = 'none';
                 } else {
                     // Deactivate Voice-First
                     KVoiceFirst.disconnect();
@@ -942,8 +944,9 @@
                     vfBtn.style.color = '#888';
                     vfBtn.style.boxShadow = '';
                     vfBtn.title = 'Voice-First Mode';
-                    // Hide CC toggle
+                    // Hide CC toggle, show classic mic
                     if (ccBtn) ccBtn.style.display = 'none';
+                    if (micBtn) micBtn.style.display = '';
                 }
             });
 
