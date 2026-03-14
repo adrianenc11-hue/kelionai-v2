@@ -1723,6 +1723,14 @@ app.get("/api/media/history", async (req, res) => {
   }
 });
 
+// WebSocket endpoints — placeholder so Express doesn't 404 before upgrade
+app.get("/api/voice-stream", (req, res) => {
+  res.status(426).json({ error: "Upgrade to WebSocket required" });
+});
+app.get("/api/voice-realtime", (req, res) => {
+  res.status(426).json({ error: "Upgrade to WebSocket required" });
+});
+
 // 404 for unknown API routes — must come before the catch-all
 app.use("/api", (req, res, _next) => {
   res.status(404).json({ error: "API endpoint not found" });
