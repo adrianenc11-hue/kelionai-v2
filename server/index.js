@@ -267,7 +267,7 @@ app.use((req, res, next) => {
           process.env.HOST_IP ||
           process.env.HOST_IP ||
           process.env.HOST_IP ||
-          '127.0.0.1' ||
+          process.env.HOST_IP || "127.0.0.1" ||
           realIp === '::1' ||
           realIp === '::ffff:127.0.0.1'
         )
@@ -1891,7 +1891,7 @@ if (require.main === module) {
           process.env.HOST_IP ||
           process.env.HOST_IP ||
           process.env.HOST_IP ||
-          '127.0.0.1',
+          process.env.HOST_IP || "127.0.0.1",
         () => {
           logger.info(
             {
@@ -1986,7 +1986,7 @@ if (require.main === module) {
           process.env.HOST_IP ||
           process.env.HOST_IP ||
           process.env.HOST_IP ||
-          '127.0.0.1',
+          process.env.HOST_IP || "127.0.0.1",
         () => logger.info({ component: 'Server', port: PORT }, 'KelionAI v2.5 on port ' + PORT + ' (migration failed)')
       );
     });
