@@ -16,6 +16,35 @@ const _serviceStatus = {};
 let _probeInterval = null;
 let _isProbing = false;
 
+// ── Error Classification ──
+function _classifyError(errMsg) {
+  const msg = (errMsg || "").toLowerCase();
+  if (msg.includes("unauthorized") || msg.includes("invalid_api_key") || msg.includes("incorrect api key") || msg.includes("invalid api key") || msg.includes("authentication")) {
+    return { type: "auth_invalid", needsHumanAction: true, action: "API key is invalid/revoked — generate a new one" };
+  }
+  if (msg.includes("timeout") || msg.includes("timed out") || msg.includes("abort")) {
+    return { type: "timeout", needsHumanAction: false, action: "Service is slow — will auto-retry" };
+  }
+  if (msg.includes("enotfound") || msg.includes("econnrefused") || msg.includes("network")) {
+    return { type: "network", needsHumanAction: false, action: "Network issue — will auto-retry" };
+  }
+  if (msg.includes("rate limit") || msg.includes("429") || msg.includes("too many")) {
+    return { type: "rate_limit", needsHumanAction: false, action: "Rate limited — will auto-retry later" };
+  }
+  if (msg.includes("insufficient_quota") || msg.includes("billing") || msg.includes("payment")) {
+    return { type: "billing", needsHumanAction: true, action: "Account billing issue — check payment method" };
+  }
+  return { type: "unknown", needsHumanAction: false, action: "Investigating — will auto-retry" };
+}
+
+// ── Safe error message extraction ──
+function _safeErrorMsg(err) {
+  if (!err) return "Unknown error";
+  if (typeof err === "string") return err;
+  if (typeof err.message === "string") return err.message;
+  try { return JSON.stringify(err); } catch { return String(err); }
+}
+
 // ── Service Definitions ──
 function _getServiceProbes() {
   return [
@@ -249,16 +278,22 @@ async function probeAll() {
       status.details = details;
       results.push({ name: service.name, status: "healthy" });
     } catch (err) {
-      status.status = "down";
+      const errMsg = _safeErrorMsg(err);
+      const classification = _classifyError(errMsg);
+
+      status.status = classification.needsHumanAction ? "needs_action" : "down";
       status.lastCheck = new Date().toISOString();
-      status.lastError = err.message;
+      status.lastError = errMsg;
+      status.errorType = classification.type;
+      status.needsHumanAction = classification.needsHumanAction;
+      status.suggestedAction = classification.action;
       status.consecutiveFails++;
       status.details = null;
-      results.push({ name: service.name, status: "down", error: err.message });
+      results.push({ name: service.name, status: status.status, error: errMsg, errorType: classification.type });
 
       logger.warn(
-        { component: "HealthMonitor", service: service.name, error: err.message },
-        `⚠️ ${service.label} is DOWN: ${err.message}`
+        { component: "HealthMonitor", service: service.name, errorType: classification.type, error: errMsg },
+        `⚠️ ${service.label} ${classification.needsHumanAction ? "NEEDS HUMAN ACTION" : "is DOWN"}: ${errMsg}`
       );
 
       // Alert if consecutive failures >= threshold
@@ -292,12 +327,15 @@ async function _sendAlert(service, status) {
   }
 
   const severity = service.critical ? "🔴 CRITICAL" : "🟡 WARNING";
+  const humanTag = status.needsHumanAction ? "\n⚠️ REQUIRES HUMAN ACTION — cannot auto-repair!\n" : "";
   const message =
-    `${severity}: ${service.label} is DOWN!\n\n` +
+    `${severity}: ${service.label} is DOWN!\n${humanTag}\n` +
     `Error: ${status.lastError}\n` +
+    `Type: ${status.errorType || "unknown"}\n` +
     `Consecutive fails: ${status.consecutiveFails}\n` +
     `Last OK: ${status.lastOk || "never"}\n\n` +
-    `🔧 Fix: ${service.repairHint}`;
+    `🔧 Action: ${status.suggestedAction || service.repairHint}\n` +
+    `📋 Repair: ${service.repairHint}`;
 
   // 1. Telegram alert
   await _sendTelegramAlert(message);
