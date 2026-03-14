@@ -77,7 +77,7 @@ function setupRealtimeVoice(io, appLocals) {
           session: {
             modalities: ["text", "audio"],
             instructions: `${persona}\n\nRespond in ${langName}. Keep responses concise for voice conversation (2-3 sentences max). Be warm, natural, and conversational. Do NOT use markdown formatting — this is a spoken conversation.\n\nYou are a voice-first assistant. The user is speaking to you directly via microphone.`,
-            voice: avatar === "kira" ? "shimmer" : "alloy",
+            voice: avatar === "kira" ? "shimmer" : "echo",
             input_audio_format: "pcm16",
             output_audio_format: "pcm16",
             input_audio_transcription: {
