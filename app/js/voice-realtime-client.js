@@ -62,14 +62,71 @@
         return audioCtx;
     }
 
+    // ── Fallback state ──
+    let _fallbackActive = false;
+    let _lastAvatar = 'kelion';
+    let _lastLanguage = 'ro';
+
+    function _activateFallback(reason) {
+        if (_fallbackActive) return;
+        _fallbackActive = true;
+        isConnected = false;
+        stopMic();
+
+        console.warn('[VoiceFirst] ⚠️ Falling back to classic pipeline:', reason);
+
+        // Alert admin via custom event (admin panel picks this up)
+        window.dispatchEvent(new CustomEvent('admin-alert', {
+            detail: {
+                type: 'voice-fallback',
+                severity: 'warning',
+                message: 'Voice-First Realtime API down → classic pipeline active. Reason: ' + reason,
+                timestamp: new Date().toISOString()
+            }
+        }));
+
+        // Show mic button as fallback + activate classic voice
+        const micBtn = document.getElementById('btn-mic-toggle');
+        if (micBtn) {
+            micBtn.style.display = '';
+            micBtn.style.borderColor = '#f59e0b';
+            micBtn.style.color = '#f59e0b';
+            micBtn.title = '⚠️ Voice-First indisponibil — mod clasic activ';
+        }
+
+        // Update 🗣️ button to show fallback state
+        const vfBtn = document.getElementById('btn-voicefirst');
+        if (vfBtn) {
+            vfBtn.style.borderColor = '#f59e0b';
+            vfBtn.style.color = '#f59e0b';
+            vfBtn.style.boxShadow = '0 0 10px rgba(245,158,11,0.4)';
+            vfBtn.title = '⚠️ Realtime indisponibil — fallback activ';
+        }
+
+        // Try to log to server (admin notification)
+        fetch('/api/health', { method: 'GET' }).catch(function () { });
+
+        window.dispatchEvent(new CustomEvent('voicefirst-fallback', { detail: { reason: reason } }));
+    }
+
+    function _clearFallback() {
+        _fallbackActive = false;
+        const micBtn = document.getElementById('btn-mic-toggle');
+        if (micBtn) micBtn.style.display = 'none';
+    }
+
     // ── Connect to Voice-First server proxy ──
     function connect(avatar, language) {
         if (ws && ws.readyState <= WebSocket.OPEN) return; // already connected
 
+        _lastAvatar = avatar || 'kelion';
+        _lastLanguage = language || 'ro';
+        _clearFallback();
+
         const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const url = proto + '//' + window.location.host + WS_PATH +
-            '?avatar=' + encodeURIComponent(avatar || 'kelion') +
-            '&language=' + encodeURIComponent(language || 'ro');
+            '?avatar=' + encodeURIComponent(_lastAvatar) +
+            '&language=' + encodeURIComponent(_lastLanguage);
 
         ws = new WebSocket(url);
 
@@ -82,20 +139,24 @@
                 const msg = JSON.parse(event.data);
                 _handleMessage(msg);
             } catch (_e) {
-                // Binary data shouldn't arrive in JSON mode
                 console.warn('[VoiceFirst] Unexpected binary data');
             }
         };
 
-        ws.onclose = function () {
-            console.log('[VoiceFirst] WebSocket disconnected');
+        ws.onclose = function (e) {
+            console.log('[VoiceFirst] WebSocket disconnected, code:', e.code);
             isConnected = false;
             stopMic();
+            // Auto-fallback if closed unexpectedly (not user-initiated)
+            if (e.code !== 1000 && e.code !== 1005) {
+                _activateFallback('WebSocket closed (code ' + e.code + ')');
+            }
             window.dispatchEvent(new CustomEvent('voicefirst-disconnected'));
         };
 
-        ws.onerror = function (e) {
-            console.error('[VoiceFirst] WebSocket error', e);
+        ws.onerror = function (_e) {
+            console.error('[VoiceFirst] WebSocket error');
+            _activateFallback('Connection error');
         };
     }
 
@@ -157,6 +218,7 @@
 
             case 'error':
                 console.error('[VoiceFirst] Server error:', msg.error);
+                _activateFallback(msg.error || 'Server error');
                 window.dispatchEvent(new CustomEvent('voicefirst-error', { detail: msg }));
                 break;
 
