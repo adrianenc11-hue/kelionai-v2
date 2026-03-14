@@ -480,7 +480,7 @@ router.post('/chat/stream', chatLimiter, validate(chatSchema), async (req, res) 
           const nodeStream = typeof r.body.on === 'function' ? r.body : Readable.fromWeb(r.body);
 
           await new Promise((resolve, reject) => {
-            nodeStream.on('data', (chunk) => {
+            const onData = (chunk) => {
               buffer += chunk.toString();
               const lines = buffer.split('\n');
               buffer = lines.pop() || '';
@@ -500,9 +500,20 @@ router.post('/chat/stream', chatLimiter, validate(chatSchema), async (req, res) 
                   logger.warn({ component: 'Chat', err: e.message }, 'skip parse errors');
                 }
               }
+            };
+            const onEnd = () => resolve();
+            const onError = (err) => reject(err);
+
+            nodeStream.on('data', onData);
+            nodeStream.on('end', onEnd);
+            nodeStream.on('error', onError);
+
+            // Cleanup listeners on connection close
+            req.on('close', () => {
+              nodeStream.removeListener('data', onData);
+              nodeStream.removeListener('end', onEnd);
+              nodeStream.removeListener('error', onError);
             });
-            nodeStream.on('end', resolve);
-            nodeStream.on('error', reject);
           });
         }
       } catch (e) {
