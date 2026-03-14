@@ -434,6 +434,8 @@ router.get('/traffic', async (req, res) => {
         process.env.HOST_IP ||
         process.env.HOST_IP ||
         process.env.HOST_IP ||
+        process.env.HOST_IP ||
+        process.env.HOST_IP ||
         '127.0.0.1',
       '::1',
       '::ffff:127.0.0.1',
