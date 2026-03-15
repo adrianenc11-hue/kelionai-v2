@@ -1,287 +1,277 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ro">
-  <head>
-    <meta name="description" content="Page description" />
+
+<head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AI Software Audit Error Tracker</title>
     <style>
-      :root {
-        --bg: #0b1020;
-        --panel: #121933;
-        --panel-2: #0f1530;
-        --line: #263154;
-        --text: #eef3ff;
-        --muted: #a8b4d6;
-        --accent: #6ea8fe;
-        --good: #20c997;
-        --warn: #ffb020;
-        --bad: #ff6b6b;
-        --chip: #1a2347;
-      }
+        :root {
+            --bg: #0b1020;
+            --panel: #121933;
+            --panel-2: #0f1530;
+            --line: #263154;
+            --text: #eef3ff;
+            --muted: #a8b4d6;
+            --accent: #6ea8fe;
+            --good: #20c997;
+            --warn: #ffb020;
+            --bad: #ff6b6b;
+            --chip: #1a2347;
+        }
 
-      * {
-        box-sizing: border-box;
-      }
+        * {
+            box-sizing: border-box;
+        }
 
-      body {
-        margin: 0;
-        font-family:
-          Inter,
-          Segoe UI,
-          Roboto,
-          Arial,
-          sans-serif;
-        background: linear-gradient(180deg, #0b1020 0%, #090d18 100%);
-        color: var(--text);
-      }
+        body {
+            margin: 0;
+            font-family: Inter, Segoe UI, Roboto, Arial, sans-serif;
+            background: linear-gradient(180deg, #0b1020 0%, #090d18 100%);
+            color: var(--text);
+        }
 
-      .wrap {
-        max-width: 1400px;
-        margin: 0 auto;
-        padding: 24px;
-      }
+        .wrap {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 24px;
+        }
 
-      h1,
-      h2,
-      h3 {
-        margin: 0 0 12px;
-      }
+        h1,
+        h2,
+        h3 {
+            margin: 0 0 12px;
+        }
 
-      p {
-        color: var(--muted);
-        line-height: 1.5;
-      }
+        p {
+            color: var(--muted);
+            line-height: 1.5;
+        }
 
-      .grid {
-        display: grid;
-        grid-template-columns: 1.2fr 1fr;
-        gap: 20px;
-      }
-
-      .panel {
-        background: rgba(18, 25, 51, 0.96);
-        border: 1px solid var(--line);
-        border-radius: 18px;
-        padding: 18px;
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
-      }
-
-      .row {
-        display: grid;
-        grid-template-columns: repeat(2, 1fr);
-        gap: 12px;
-        margin-bottom: 12px;
-      }
-
-      label {
-        display: block;
-        font-size: 13px;
-        color: var(--muted);
-        margin-bottom: 6px;
-      }
-
-      input,
-      textarea,
-      select {
-        width: 100%;
-        background: var(--panel-2);
-        color: var(--text);
-        border: 1px solid var(--line);
-        border-radius: 12px;
-        padding: 12px 14px;
-        outline: none;
-      }
-
-      textarea {
-        min-height: 140px;
-        resize: vertical;
-        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-        line-height: 1.4;
-      }
-
-      .big {
-        min-height: 250px;
-      }
-
-      .actions {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-        margin-top: 12px;
-      }
-
-      button {
-        background: var(--accent);
-        color: #071224;
-        border: 0;
-        padding: 11px 14px;
-        border-radius: 12px;
-        font-weight: 700;
-        cursor: pointer;
-      }
-
-      button.secondary {
-        background: transparent;
-        color: var(--text);
-        border: 1px solid var(--line);
-      }
-
-      .stats {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 10px;
-        margin-top: 16px;
-      }
-
-      .stat {
-        background: var(--chip);
-        border: 1px solid var(--line);
-        border-radius: 14px;
-        padding: 12px;
-      }
-
-      .stat .n {
-        font-size: 26px;
-        font-weight: 800;
-        margin-top: 6px;
-      }
-
-      .muted {
-        color: var(--muted);
-      }
-
-      table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-top: 14px;
-        font-size: 14px;
-      }
-
-      th,
-      td {
-        border-bottom: 1px solid var(--line);
-        padding: 10px 8px;
-        text-align: left;
-        vertical-align: top;
-      }
-
-      th {
-        color: var(--muted);
-        font-weight: 700;
-      }
-
-      .chip {
-        display: inline-block;
-        padding: 4px 8px;
-        border-radius: 999px;
-        font-size: 12px;
-        font-weight: 700;
-        background: var(--chip);
-        border: 1px solid var(--line);
-      }
-
-      .sev-critical {
-        color: #fff;
-        background: rgba(255, 107, 107, 0.18);
-        border-color: rgba(255, 107, 107, 0.45);
-      }
-
-      .sev-high {
-        color: #ffd8d8;
-        background: rgba(255, 107, 107, 0.1);
-        border-color: rgba(255, 107, 107, 0.35);
-      }
-
-      .sev-medium {
-        color: #ffe6b8;
-        background: rgba(255, 176, 32, 0.1);
-        border-color: rgba(255, 176, 32, 0.35);
-      }
-
-      .sev-low {
-        color: #d4f8ea;
-        background: rgba(32, 201, 151, 0.1);
-        border-color: rgba(32, 201, 151, 0.35);
-      }
-
-      .toolbar {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 12px;
-        flex-wrap: wrap;
-      }
-
-      .small {
-        font-size: 12px;
-        color: var(--muted);
-      }
-
-      .hint {
-        margin-top: 10px;
-        padding: 10px 12px;
-        border: 1px dashed var(--line);
-        border-radius: 12px;
-        background: rgba(255, 255, 255, 0.02);
-      }
-
-      @media (max-width: 1100px) {
         .grid {
-          grid-template-columns: 1fr;
+            display: grid;
+            grid-template-columns: 1.2fr 1fr;
+            gap: 20px;
         }
 
-        .row,
+        .panel {
+            background: rgba(18, 25, 51, 0.96);
+            border: 1px solid var(--line);
+            border-radius: 18px;
+            padding: 18px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, .22);
+        }
+
+        .row {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        label {
+            display: block;
+            font-size: 13px;
+            color: var(--muted);
+            margin-bottom: 6px;
+        }
+
+        input,
+        textarea,
+        select {
+            width: 100%;
+            background: var(--panel-2);
+            color: var(--text);
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            padding: 12px 14px;
+            outline: none;
+        }
+
+        textarea {
+            min-height: 140px;
+            resize: vertical;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            line-height: 1.4;
+        }
+
+        .big {
+            min-height: 250px;
+        }
+
+        .actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 12px;
+        }
+
+        button {
+            background: var(--accent);
+            color: #071224;
+            border: 0;
+            padding: 11px 14px;
+            border-radius: 12px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        button.secondary {
+            background: transparent;
+            color: var(--text);
+            border: 1px solid var(--line);
+        }
+
         .stats {
-          grid-template-columns: 1fr;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin-top: 16px;
         }
-      }
+
+        .stat {
+            background: var(--chip);
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            padding: 12px;
+        }
+
+        .stat .n {
+            font-size: 26px;
+            font-weight: 800;
+            margin-top: 6px;
+        }
+
+        .muted {
+            color: var(--muted);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 14px;
+            font-size: 14px;
+        }
+
+        th,
+        td {
+            border-bottom: 1px solid var(--line);
+            padding: 10px 8px;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        th {
+            color: var(--muted);
+            font-weight: 700;
+        }
+
+        .chip {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 700;
+            background: var(--chip);
+            border: 1px solid var(--line);
+        }
+
+        .sev-critical {
+            color: #fff;
+            background: rgba(255, 107, 107, .18);
+            border-color: rgba(255, 107, 107, .45);
+        }
+
+        .sev-high {
+            color: #ffd8d8;
+            background: rgba(255, 107, 107, .10);
+            border-color: rgba(255, 107, 107, .35);
+        }
+
+        .sev-medium {
+            color: #ffe6b8;
+            background: rgba(255, 176, 32, .10);
+            border-color: rgba(255, 176, 32, .35);
+        }
+
+        .sev-low {
+            color: #d4f8ea;
+            background: rgba(32, 201, 151, .10);
+            border-color: rgba(32, 201, 151, .35);
+        }
+
+        .toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .small {
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+        .hint {
+            margin-top: 10px;
+            padding: 10px 12px;
+            border: 1px dashed var(--line);
+            border-radius: 12px;
+            background: rgba(255, 255, 255, .02);
+        }
+
+        @media (max-width: 1100px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+
+            .row,
+            .stats {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
-  </head>
+</head>
 
-  <body>
+<body>
     <div class="wrap">
-      <div class="toolbar">
-        <div>
-          <h1>AI Software Audit Error Tracker</h1>
-          <p>
-            O pagină unică în care generezi promptul de audit pentru AI, apoi lipești răspunsul și aplicația îți extrage
-            un tabel cu erori, severitate, rută, test și status.
-          </p>
+        <div class="toolbar">
+            <div>
+                <h1>AI Software Audit Error Tracker</h1>
+                <p>O pagină unică în care generezi promptul de audit pentru AI, apoi lipești răspunsul și aplicația îți
+                    extrage un tabel cu erori, severitate, rută, test și status.</p>
+            </div>
+            <div class="small">Single-file HTML • fără backend • export CSV</div>
         </div>
-        <div class="small">Single-file HTML • fără backend • export CSV</div>
-      </div>
 
-      <div class="grid">
-        <section class="panel">
-          <h2>1) Configurează auditul</h2>
-          <div class="row">
-            <div>
-              <label>Nume produs / proiect</label>
-              <input id="projectName" value="KelionAI" />
-            </div>
-            <div>
-              <label>URL producție</label>
-              <input id="prodUrl" value="https://kelionai.app/" />
-            </div>
-          </div>
-          <div class="row">
-            <div>
-              <label>Rute publice (câte una pe linie)</label>
-              <textarea id="routes">
-/
+        <div class="grid">
+            <section class="panel">
+                <h2>1) Configurează auditul</h2>
+                <div class="row">
+                    <div>
+                        <label>Nume produs / proiect</label>
+                        <input id="projectName" value="KelionAI" />
+                    </div>
+                    <div>
+                        <label>URL producție</label>
+                        <input id="prodUrl" value="https://kelionai.app/" />
+                    </div>
+                </div>
+                <div class="row">
+                    <div>
+                        <label>Rute publice (câte una pe linie)</label>
+                        <textarea id="routes">/
 /landing
 /premium
 /privacy
 /terms
 /gdpr
-/404</textarea
-              >
-            </div>
-            <div>
-              <label>Test suites dorite (câte una pe linie)</label>
-              <textarea id="suites">
-Smoke Tests
+/404</textarea>
+                    </div>
+                    <div>
+                        <label>Test suites dorite (câte una pe linie)</label>
+                        <textarea id="suites">Smoke Tests
 UI Functional Tests
 Accessibility Tests (a11y)
 End-to-End Tests (E2E)
@@ -289,132 +279,115 @@ Performance Tests
 Visual Regression Tests
 SAST
 DAST
-SCA</textarea
-              >
-            </div>
-          </div>
-          <div>
-            <label>Cerințe obligatorii</label>
-            <textarea id="requirements">
-Entire public site must be in English.
+SCA</textarea>
+                    </div>
+                </div>
+                <div>
+                    <label>Cerințe obligatorii</label>
+                    <textarea id="requirements">Entire public site must be in English.
 No required public route may return 404.
 Do not claim fixed/done without executable proof.
 Verify runtime, not source only.
 Production verification overrides local/staging claims.
-Provide screenshots, commands, and exact files changed.</textarea
-            >
-          </div>
-          <div class="actions">
-            <button type="button" id="generatePromptBtn">Generează prompt de audit</button>
-            <button type="button" class="secondary" id="copyPromptBtn">Copiază promptul</button>
-            <button type="button" class="secondary" id="loadDemoBtn">Încarcă demo report</button>
-          </div>
-          <div class="hint small">
-            Sugestie: dă promptul generat oricărui AI agent. Cere-i să răspundă în formatul structurat de mai jos ca
-            parserul să construiască tabelul automat.
-          </div>
+Provide screenshots, commands, and exact files changed.</textarea>
+                </div>
+                <div class="actions">
+                    <button id="generatePromptBtn">Generează prompt de audit</button>
+                    <button class="secondary" id="copyPromptBtn">Copiază promptul</button>
+                    <button class="secondary" id="loadDemoBtn">Încarcă demo report</button>
+                </div>
+                <div class="hint small">Sugestie: dă promptul generat oricărui AI agent. Cere-i să răspundă în formatul
+                    structurat de mai jos ca parserul să construiască tabelul automat.</div>
+            </section>
+
+            <section class="panel">
+                <h2>2) Prompt gata de trimis AI-ului</h2>
+                <textarea id="auditPrompt" class="big" placeholder="Aici apare promptul complet..."></textarea>
+            </section>
+        </div>
+
+        <section class="panel" style="margin-top:20px;">
+            <h2>3) Lipește raportul AI aici</h2>
+            <p>Parserul recunoaște cel mai bine linii de forma:<br>
+                <span class="small">ISSUE | severity=critical | area=routing | route=/privacy | test=E2E | status=fail |
+                    title=Direct route returns 404 | evidence=Direct open shows 404 | fix=Add route</span>
+            </p>
+            <textarea id="reportInput" class="big" placeholder="Lipește răspunsul AI aici..."></textarea>
+            <div class="actions">
+                <button id="parseBtn">Extrage erorile în tabel</button>
+                <button class="secondary" id="clearBtn">Curăță</button>
+                <button class="secondary" id="exportCsvBtn">Exportă CSV</button>
+            </div>
+            <div class="stats">
+                <div class="stat">
+                    <div class="muted">Total erori</div>
+                    <div class="n" id="totalCount">0</div>
+                </div>
+                <div class="stat">
+                    <div class="muted">Critical / High</div>
+                    <div class="n" id="criticalCount">0</div>
+                </div>
+                <div class="stat">
+                    <div class="muted">Rute afectate</div>
+                    <div class="n" id="routeCount">0</div>
+                </div>
+                <div class="stat">
+                    <div class="muted">Teste fail</div>
+                    <div class="n" id="testCount">0</div>
+                </div>
+            </div>
         </section>
 
-        <section class="panel">
-          <h2>2) Prompt gata de trimis AI-ului</h2>
-          <textarea id="auditPrompt" class="big" placeholder="Aici apare promptul complet..."></textarea>
+        <section class="panel" style="margin-top:20px;">
+            <div class="toolbar">
+                <h2>4) Tabel erori găsite</h2>
+                <div class="small">Poți sorta ulterior în Excel după CSV-ul exportat.</div>
+            </div>
+            <div style="overflow:auto;">
+                <table id="issuesTable">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Severity</th>
+                            <th>Area</th>
+                            <th>Route / Page</th>
+                            <th>Test</th>
+                            <th>Status</th>
+                            <th>Title</th>
+                            <th>Evidence</th>
+                            <th>Suggested Fix</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
         </section>
-      </div>
-
-      <section class="panel" style="margin-top: 20px">
-        <h2>3) Lipește raportul AI aici</h2>
-        <p>
-          Parserul recunoaște cel mai bine linii de forma:<br />
-          <span class="small"
-            >ISSUE | severity=critical | area=routing | route=/privacy | test=E2E | status=fail | title=Direct route
-            returns 404 | evidence=Direct open shows 404 | fix=Add route</span
-          >
-        </p>
-        <textarea id="reportInput" class="big" placeholder="Lipește răspunsul AI aici..."></textarea>
-        <div class="actions">
-          <button type="button" id="parseBtn">Extrage erorile în tabel</button>
-          <button type="button" class="secondary" id="clearBtn">Curăță</button>
-          <button type="button" class="secondary" id="exportCsvBtn">Exportă CSV</button>
-        </div>
-        <div class="stats">
-          <div class="stat">
-            <div class="muted">Total erori</div>
-            <div class="n" id="totalCount">0</div>
-          </div>
-          <div class="stat">
-            <div class="muted">Critical / High</div>
-            <div class="n" id="criticalCount">0</div>
-          </div>
-          <div class="stat">
-            <div class="muted">Rute afectate</div>
-            <div class="n" id="routeCount">0</div>
-          </div>
-          <div class="stat">
-            <div class="muted">Teste fail</div>
-            <div class="n" id="testCount">0</div>
-          </div>
-        </div>
-      </section>
-
-      <section class="panel" style="margin-top: 20px">
-        <div class="toolbar">
-          <h2>4) Tabel erori găsite</h2>
-          <div class="small">Poți sorta ulterior în Excel după CSV-ul exportat.</div>
-        </div>
-        <div style="overflow: auto">
-          <table id="issuesTable">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Severity</th>
-                <th>Area</th>
-                <th>Route / Page</th>
-                <th>Test</th>
-                <th>Status</th>
-                <th>Title</th>
-                <th>Evidence</th>
-                <th>Suggested Fix</th>
-              </tr>
-            </thead>
-            <tbody></tbody>
-          </table>
-        </div>
-      </section>
     </div>
 
     <script>
-      const $ = (id) => document.getElementById(id);
-      const state = { issues: [] };
+        const $ = (id) => document.getElementById(id);
+        const state = { issues: [] };
 
-      function buildPrompt() {
-        const projectName = $('projectName').value.trim();
-        const prodUrl = $('prodUrl').value.trim();
-        const routes = $('routes')
-          .value.split(/\n+/)
-          .map((s) => s.trim())
-          .filter(Boolean);
-        const suites = $('suites')
-          .value.split(/\n+/)
-          .map((s) => s.trim())
-          .filter(Boolean);
-        const requirements = $('requirements')
-          .value.split(/\n+/)
-          .map((s) => s.trim())
-          .filter(Boolean);
+        function buildPrompt() {
+            const projectName = $("projectName").value.trim();
+            const prodUrl = $("prodUrl").value.trim();
+            const routes = $("routes").value.split(/\n+/).map(s => s.trim()).filter(Boolean);
+            const suites = $("suites").value.split(/\n+/).map(s => s.trim()).filter(Boolean);
+            const requirements = $("requirements").value.split(/\n+/).map(s => s.trim()).filter(Boolean);
 
-        const prompt = `You are a strict QA + production verification agent for ${projectName}.
+            const prompt = `You are a strict QA + production verification agent for ${projectName}.
 
 Target production URL:
 ${prodUrl}
 
 Public routes that must be verified one by one:
-${routes.map((r) => `- ${r}`).join('\n')}
+${routes.map(r => `- ${r}`).join("\n")}
 
 Mandatory requirements:
-${requirements.map((r) => `- ${r}`).join('\n')}
+${requirements.map(r => `- ${r}`).join("\n")}
 
 Test suites to run or verify where possible:
-${suites.map((s) => `- ${s}`).join('\n')}
+${suites.map(s => `- ${s}`).join("\n")}
 
 Rules:
 - Do not say fixed, done, resolved, passed, or verified without proof.
@@ -431,145 +404,109 @@ COMMANDS_RUN | <semicolon separated commands>
 
 Be honest. If a suite cannot be truly executed without repo or internal access, mark it blocked and say why.`;
 
-        $('auditPrompt').value = prompt;
-      }
-
-      function normalizeSeverity(value) {
-        const v = (value || '').toLowerCase();
-        if (['critical', 'crit', 'p0', 'p1'].includes(v)) return 'critical';
-        if (['high', 'major', 'p2'].includes(v)) return 'high';
-        if (['medium', 'med', 'p3'].includes(v)) return 'medium';
-        return 'low';
-      }
-
-      function parseIssueLine(line) {
-        if (!line.trim().startsWith('ISSUE |')) return null;
-        const obj = {
-          severity: 'low',
-          area: 'other',
-          route: '',
-          test: '',
-          status: 'warning',
-          title: '',
-          evidence: '',
-          fix: '',
-        };
-        const parts = line
-          .split('|')
-          .map((p) => p.trim())
-          .slice(1);
-        for (const part of parts) {
-          const idx = part.indexOf('=');
-          if (idx === -1) continue;
-          const key = part.slice(0, idx).trim().toLowerCase();
-          const value = part.slice(idx + 1).trim();
-          if (key in obj) obj[key] = value;
+            $("auditPrompt").value = prompt;
         }
-        obj.severity = normalizeSeverity(obj.severity);
-        return obj.title ? obj : null;
-      }
 
-      function fallbackParse(raw) {
-        const issues = [];
-        const lines = raw
-          .split(/\n+/)
-          .map((l) => l.trim())
-          .filter(Boolean);
-        const patterns = [
-          {
-            regex: /(404|not found)/i,
-            severity: 'critical',
-            area: 'routing',
-            status: 'fail',
-            title: 'Route returns 404',
-          },
-          {
-            regex: /(romanian|rom[aâ]n|Abonamente|Se încarcă|Invită|Trimite)/i,
-            severity: 'high',
-            area: 'localization',
-            status: 'fail',
-            title: 'Romanian text found in public UI',
-          },
-          {
-            regex: /(csp|helmet|blocked script)/i,
-            severity: 'high',
-            area: 'security',
-            status: 'warning',
-            title: 'CSP or script blocking issue',
-          },
-          {
-            regex: /(accessibility|a11y|aria|contrast)/i,
-            severity: 'medium',
-            area: 'accessibility',
-            status: 'warning',
-            title: 'Accessibility issue mentioned',
-          },
-          {
-            regex: /(performance|slow|lighthouse|load time)/i,
-            severity: 'medium',
-            area: 'performance',
-            status: 'warning',
-            title: 'Performance issue mentioned',
-          },
-        ];
+        function normalizeSeverity(value) {
+            const v = (value || "").toLowerCase();
+            if (["critical", "crit", "p0", "p1"].includes(v)) return "critical";
+            if (["high", "major", "p2"].includes(v)) return "high";
+            if (["medium", "med", "p3"].includes(v)) return "medium";
+            return "low";
+        }
 
-        lines.forEach((line) => {
-          for (const p of patterns) {
-            if (p.regex.test(line)) {
-              issues.push({
-                severity: p.severity,
-                area: p.area,
-                route: extractRoute(line),
-                test: extractTest(line),
-                status: p.status,
-                title: p.title,
-                evidence: line,
-                fix: '',
-              });
-              break;
+        function parseIssueLine(line) {
+            if (!line.trim().startsWith("ISSUE |")) return null;
+            const obj = {
+                severity: "low",
+                area: "other",
+                route: "",
+                test: "",
+                status: "warning",
+                title: "",
+                evidence: "",
+                fix: ""
+            };
+            const parts = line.split("|").map(p => p.trim()).slice(1);
+            for (const part of parts) {
+                const idx = part.indexOf("=");
+                if (idx === -1) continue;
+                const key = part.slice(0, idx).trim().toLowerCase();
+                const value = part.slice(idx + 1).trim();
+                if (key in obj) obj[key] = value;
             }
-          }
-        });
-        return dedupeIssues(issues);
-      }
+            obj.severity = normalizeSeverity(obj.severity);
+            return obj.title ? obj : null;
+        }
 
-      function extractRoute(text) {
-        const m = text.match(/\/(?:[a-zA-Z0-9._-]+(?:\/[a-zA-Z0-9._-]+)*)?/);
-        return m ? m[0] : '';
-      }
+        function fallbackParse(raw) {
+            const issues = [];
+            const lines = raw.split(/\n+/).map(l => l.trim()).filter(Boolean);
+            const patterns = [
+                { regex: /(404|not found)/i, severity: 'critical', area: 'routing', status: 'fail', title: 'Route returns 404' },
+                { regex: /(romanian|rom[aâ]n|Abonamente|Se încarcă|Invită|Trimite)/i, severity: 'high', area: 'localization', status: 'fail', title: 'Romanian text found in public UI' },
+                { regex: /(csp|helmet|blocked script)/i, severity: 'high', area: 'security', status: 'warning', title: 'CSP or script blocking issue' },
+                { regex: /(accessibility|a11y|aria|contrast)/i, severity: 'medium', area: 'accessibility', status: 'warning', title: 'Accessibility issue mentioned' },
+                { regex: /(performance|slow|lighthouse|load time)/i, severity: 'medium', area: 'performance', status: 'warning', title: 'Performance issue mentioned' }
+            ];
 
-      function extractTest(text) {
-        const known = ['E2E', 'Smoke', 'Accessibility', 'a11y', 'Performance', 'UI', 'SAST', 'DAST', 'SCA'];
-        const found = known.find((k) => new RegExp(k, 'i').test(text));
-        return found || '';
-      }
+            lines.forEach(line => {
+                for (const p of patterns) {
+                    if (p.regex.test(line)) {
+                        issues.push({
+                            severity: p.severity,
+                            area: p.area,
+                            route: extractRoute(line),
+                            test: extractTest(line),
+                            status: p.status,
+                            title: p.title,
+                            evidence: line,
+                            fix: ''
+                        });
+                        break;
+                    }
+                }
+            });
+            return dedupeIssues(issues);
+        }
 
-      function dedupeIssues(items) {
-        const seen = new Set();
-        return items.filter((it) => {
-          const key = [it.severity, it.area, it.route, it.test, it.title].join('||');
-          if (seen.has(key)) return false;
-          seen.add(key);
-          return true;
-        });
-      }
+        function extractRoute(text) {
+            const m = text.match(/\/(?:[a-zA-Z0-9._-]+(?:\/[a-zA-Z0-9._-]+)*)?/);
+            return m ? m[0] : '';
+        }
 
-      function parseReport() {
-        const raw = $('reportInput').value;
-        const issueLines = raw.split(/\n+/).map(parseIssueLine).filter(Boolean);
-        state.issues = issueLines.length ? dedupeIssues(issueLines) : fallbackParse(raw);
-        renderTable();
-        updateStats();
-      }
+        function extractTest(text) {
+            const known = ['E2E', 'Smoke', 'Accessibility', 'a11y', 'Performance', 'UI', 'SAST', 'DAST', 'SCA'];
+            const found = known.find(k => new RegExp(k, 'i').test(text));
+            return found || '';
+        }
 
-      function renderTable() {
-        const tbody = $('issuesTable').querySelector('tbody');
-        tbody.textContent = '';
-        state.issues.forEach((issue, i) => {
-          const tr = document.createElement('tr');
-          tr.innerHTML = `
+        function dedupeIssues(items) {
+            const seen = new Set();
+            return items.filter(it => {
+                const key = [it.severity, it.area, it.route, it.test, it.title].join('||');
+                if (seen.has(key)) return false;
+                seen.add(key);
+                return true;
+            });
+        }
+
+        function parseReport() {
+            const raw = $("reportInput").value;
+            const issueLines = raw.split(/\n+/).map(parseIssueLine).filter(Boolean);
+            state.issues = issueLines.length ? dedupeIssues(issueLines) : fallbackParse(raw);
+            renderTable();
+            updateStats();
+        }
+
+        function renderTable() {
+            const tbody = $("issuesTable").querySelector("tbody");
+            tbody.innerHTML = "";
+            state.issues.forEach((issue, i) => {
+                const tr = document.createElement("tr");
+                tr.innerHTML = `
           <td>${i + 1}</td>
-          <td><span class="chip sev-${issue.severity}">${escapeHtml(issue.severity)}</span></td>
+          <td><span class="chip sev-${issue.severity}">${issue.severity}</span></td>
           <td>${escapeHtml(issue.area || '')}</td>
           <td>${escapeHtml(issue.route || '')}</td>
           <td>${escapeHtml(issue.test || '')}</td>
@@ -578,80 +515,80 @@ Be honest. If a suite cannot be truly executed without repo or internal access, 
           <td>${escapeHtml(issue.evidence || '')}</td>
           <td>${escapeHtml(issue.fix || '')}</td>
         `;
-          tbody.appendChild(tr);
-        });
-      }
+                tbody.appendChild(tr);
+            });
+        }
 
-      function updateStats() {
-        const total = state.issues.length;
-        const critical = state.issues.filter((i) => i.severity === 'critical' || i.severity === 'high').length;
-        const routeCount = new Set(state.issues.map((i) => i.route).filter(Boolean)).size;
-        const testCount = new Set(state.issues.map((i) => i.test).filter(Boolean)).size;
-        $('totalCount').textContent = String(total);
-        $('criticalCount').textContent = String(critical);
-        $('routeCount').textContent = String(routeCount);
-        $('testCount').textContent = String(testCount);
-      }
+        function updateStats() {
+            const total = state.issues.length;
+            const critical = state.issues.filter(i => i.severity === 'critical' || i.severity === 'high').length;
+            const routeCount = new Set(state.issues.map(i => i.route).filter(Boolean)).size;
+            const testCount = new Set(state.issues.map(i => i.test).filter(Boolean)).size;
+            $("totalCount").textContent = String(total);
+            $("criticalCount").textContent = String(critical);
+            $("routeCount").textContent = String(routeCount);
+            $("testCount").textContent = String(testCount);
+        }
 
-      function exportCsv() {
-        if (!state.issues.length) return;
-        const header = ['severity', 'area', 'route', 'test', 'status', 'title', 'evidence', 'fix'];
-        const rows = state.issues.map((i) => header.map((h) => csvEscape(i[h] || '')).join(','));
-        const csv = [header.join(','), ...rows].join('\n');
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'audit_issues.csv';
-        a.click();
-        URL.revokeObjectURL(url);
-      }
+        function exportCsv() {
+            if (!state.issues.length) return;
+            const header = ['severity', 'area', 'route', 'test', 'status', 'title', 'evidence', 'fix'];
+            const rows = state.issues.map(i => header.map(h => csvEscape(i[h] || '')).join(','));
+            const csv = [header.join(','), ...rows].join('\n');
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'audit_issues.csv';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
 
-      function csvEscape(value) {
-        const s = String(value).replace(/"/g, '""');
-        return `"${s}"`;
-      }
+        function csvEscape(value) {
+            const s = String(value).replace(/"/g, '""');
+            return `"${s}"`;
+        }
 
-      function escapeHtml(str) {
-        return String(str)
-          .replace(/&/g, '&amp;')
-          .replace(/</g, '&lt;')
-          .replace(/>/g, '&gt;')
-          .replace(/"/g, '&quot;')
-          .replace(/'/g, '&#039;');
-      }
+        function escapeHtml(str) {
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
 
-      function copyPrompt() {
-        $('auditPrompt').select();
-        document.execCommand('copy');
-      }
+        function copyPrompt() {
+            $("auditPrompt").select();
+            document.execCommand('copy');
+        }
 
-      function clearAll() {
-        $('reportInput').value = '';
-        state.issues = [];
-        renderTable();
-        updateStats();
-      }
+        function clearAll() {
+            $("reportInput").value = '';
+            state.issues = [];
+            renderTable();
+            updateStats();
+        }
 
-      function loadDemo() {
-        $('reportInput').value =
-          `ISSUE | severity=critical | area=routing | route=/privacy | test=E2E | status=fail | title=Direct route returns 404 | evidence=Opening /privacy directly shows Page not found | fix=Add server route or SPA rewrite for /privacy
+        function loadDemo() {
+            $("reportInput").value = `ISSUE | severity=critical | area=routing | route=/privacy | test=E2E | status=fail | title=Direct route returns 404 | evidence=Opening /privacy directly shows Page not found | fix=Add server route or SPA rewrite for /privacy
 ISSUE | severity=high | area=localization | route=/ | test=UI Functional Tests | status=fail | title=Romanian text visible on homepage | evidence=Homepage still shows 'Abonamente' and 'Invită prieteni' | fix=Replace runtime strings and verify production bundle
 ISSUE | severity=medium | area=accessibility | route=/premium | test=Accessibility Tests (a11y) | status=warning | title=Icon-only controls may lack clear labels | evidence=Found minimal controls without obvious textual labels | fix=Add aria-label and visible accessible names
 SUMMARY | total_issues=3 | critical=1 | high=1 | medium=1 | low=0
 FILES_CHANGED | app/pricing/pricing.js, server/legal.js
 COMMANDS_RUN | npm run test:e2e; npm audit; rg -n "Abonamente|Invită" .`;
-        parseReport();
-      }
+            parseReport();
+        }
 
-      $('generatePromptBtn').addEventListener('click', buildPrompt);
-      $('copyPromptBtn').addEventListener('click', copyPrompt);
-      $('parseBtn').addEventListener('click', parseReport);
-      $('clearBtn').addEventListener('click', clearAll);
-      $('exportCsvBtn').addEventListener('click', exportCsv);
-      $('loadDemoBtn').addEventListener('click', loadDemo);
+        $("generatePromptBtn").addEventListener('click', buildPrompt);
+        $("copyPromptBtn").addEventListener('click', copyPrompt);
+        $("parseBtn").addEventListener('click', parseReport);
+        $("clearBtn").addEventListener('click', clearAll);
+        $("exportCsvBtn").addEventListener('click', exportCsv);
+        $("loadDemoBtn").addEventListener('click', loadDemo);
 
-      buildPrompt();
+        buildPrompt();
     </script>
-  </body>
+</body>
+
 </html>

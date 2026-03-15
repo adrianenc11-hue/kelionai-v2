@@ -1,292 +1,273 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ro">
-  <head>
-    <meta name="description" content="Page description" />
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>KelionAI — Model Manager</title>
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
-      rel="stylesheet"
-    />
-    <link rel="stylesheet" href="/admin/admin.css" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/admin/admin.css">
     <style>
-      .model-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-        gap: 16px;
-        margin-top: 16px;
-      }
+        .model-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 16px;
+            margin-top: 16px;
+        }
 
-      .model-card {
-        background: rgba(255, 255, 255, 0.04);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 14px;
-        padding: 20px;
-        -webkit-backdrop-filter: blur(10px);
-        backdrop-filter: blur(10px);
-        transition:
-          border-color 0.3s,
-          transform 0.2s;
-      }
+        .model-card {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 14px;
+            padding: 20px;
+            -webkit-backdrop-filter: blur(10px);
+            backdrop-filter: blur(10px);
+            transition: border-color 0.3s, transform 0.2s;
+        }
 
-      .model-card:hover {
-        border-color: rgba(16, 185, 129, 0.3);
-        transform: translateY(-2px);
-      }
+        .model-card:hover {
+            border-color: rgba(16, 185, 129, 0.3);
+            transform: translateY(-2px);
+        }
 
-      .model-name {
-        font-size: 1.1rem;
-        font-weight: 600;
-        color: #e0e0e0;
-        margin-bottom: 8px;
-      }
+        .model-name {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #e0e0e0;
+            margin-bottom: 8px;
+        }
 
-      .model-meta {
-        display: flex;
-        gap: 8px;
-        flex-wrap: wrap;
-        margin-bottom: 12px;
-      }
+        .model-meta {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+        }
 
-      .model-tag {
-        padding: 3px 10px;
-        border-radius: 20px;
-        font-size: 0.72rem;
-        font-weight: 500;
-        background: rgba(16, 185, 129, 0.15);
-        color: #6ee7b7;
-      }
+        .model-tag {
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 0.72rem;
+            font-weight: 500;
+            background: rgba(16, 185, 129, 0.15);
+            color: #6ee7b7;
+        }
 
-      .tag-size {
-        background: rgba(139, 92, 246, 0.15);
-        color: #c4b5fd;
-      }
+        .tag-size {
+            background: rgba(139, 92, 246, 0.15);
+            color: #c4b5fd;
+        }
 
-      .tag-family {
-        background: rgba(245, 158, 11, 0.15);
-        color: #fbbf24;
-      }
+        .tag-family {
+            background: rgba(245, 158, 11, 0.15);
+            color: #fbbf24;
+        }
 
-      .model-actions {
-        display: flex;
-        gap: 8px;
-        margin-top: 12px;
-      }
+        .model-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+        }
 
-      .model-actions button {
-        padding: 6px 14px;
-        border-radius: 8px;
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        background: rgba(255, 255, 255, 0.05);
-        color: #e0e0e0;
-        font-size: 0.8rem;
-        cursor: pointer;
-        transition: all 0.2s;
-      }
+        .model-actions button {
+            padding: 6px 14px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.05);
+            color: #e0e0e0;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
 
-      .model-actions button:hover {
-        background: rgba(99, 102, 241, 0.2);
-      }
+        .model-actions button:hover {
+            background: rgba(99, 102, 241, 0.2);
+        }
 
-      .model-actions .btn-danger {
-        border-color: rgba(239, 68, 68, 0.3);
-        color: #f87171;
-      }
+        .model-actions .btn-danger {
+            border-color: rgba(239, 68, 68, 0.3);
+            color: #f87171;
+        }
 
-      .model-actions .btn-danger:hover {
-        background: rgba(239, 68, 68, 0.2);
-      }
+        .model-actions .btn-danger:hover {
+            background: rgba(239, 68, 68, 0.2);
+        }
 
-      .status-badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        padding: 8px 16px;
-        border-radius: 10px;
-        font-size: 0.85rem;
-        font-weight: 500;
-      }
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
+            border-radius: 10px;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
 
-      .status-online {
-        background: rgba(16, 185, 129, 0.15);
-        color: #34d399;
-        border: 1px solid rgba(16, 185, 129, 0.3);
-      }
+        .status-online {
+            background: rgba(16, 185, 129, 0.15);
+            color: #34d399;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
 
-      .status-offline {
-        background: rgba(239, 68, 68, 0.1);
-        color: #f87171;
-        border: 1px solid rgba(239, 68, 68, 0.2);
-      }
+        .status-offline {
+            background: rgba(239, 68, 68, 0.1);
+            color: #f87171;
+            border: 1px solid rgba(239, 68, 68, 0.2);
+        }
 
-      .download-section {
-        background: rgba(255, 255, 255, 0.03);
-        border: 1px solid rgba(255, 255, 255, 0.06);
-        border-radius: 14px;
-        padding: 20px;
-        margin-top: 20px;
-      }
+        .download-section {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 14px;
+            padding: 20px;
+            margin-top: 20px;
+        }
 
-      .download-section h3 {
-        margin: 0 0 12px;
-        font-size: 0.95rem;
-        color: #a5b4fc;
-      }
+        .download-section h3 {
+            margin: 0 0 12px;
+            font-size: 0.95rem;
+            color: #a5b4fc;
+        }
 
-      .download-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-        gap: 10px;
-      }
+        .download-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 10px;
+        }
 
-      .download-btn {
-        padding: 10px 16px;
-        border-radius: 10px;
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        background: rgba(255, 255, 255, 0.04);
-        color: #e0e0e0;
-        font-size: 0.82rem;
-        cursor: pointer;
-        transition: all 0.2s;
-        text-align: left;
-      }
+        .download-btn {
+            padding: 10px 16px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.04);
+            color: #e0e0e0;
+            font-size: 0.82rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: left;
+        }
 
-      .download-btn:hover {
-        background: rgba(16, 185, 129, 0.15);
-        border-color: rgba(16, 185, 129, 0.3);
-      }
+        .download-btn:hover {
+            background: rgba(16, 185, 129, 0.15);
+            border-color: rgba(16, 185, 129, 0.3);
+        }
 
-      .download-btn .dl-name {
-        font-weight: 600;
-        display: block;
-      }
+        .download-btn .dl-name {
+            font-weight: 600;
+            display: block;
+        }
 
-      .download-btn .dl-size {
-        font-size: 0.72rem;
-        color: #888;
-      }
+        .download-btn .dl-size {
+            font-size: 0.72rem;
+            color: #888;
+        }
 
-      #pull-status {
-        margin-top: 10px;
-        font-size: 0.82rem;
-        min-height: 24px;
-      }
+        #pull-status {
+            margin-top: 10px;
+            font-size: 0.82rem;
+            min-height: 24px;
+        }
     </style>
-  </head>
+</head>
 
-  <body>
+<body>
     <div class="admin-container">
-      <header class="admin-header">
-        <div class="header-left">
-          <a href="/admin" class="back-link">← Admin</a>
-          <span class="admin-logo">🏠 Local AI</span>
-          <span class="admin-badge">v3.4</span>
-        </div>
-        <div class="header-right">
-          <span id="ollama-status" class="status-badge status-offline">⏳ Checking...</span>
-          <button type="button" class="admin-btn" onclick="loadAll()">🔄 Refresh</button>
-        </div>
-      </header>
+        <header class="admin-header">
+            <div class="header-left">
+                <a href="/admin" class="back-link">← Admin</a>
+                <span class="admin-logo">🏠 Local AI</span>
+                <span class="admin-badge">v3.4</span>
+            </div>
+            <div class="header-right">
+                <span id="ollama-status" class="status-badge status-offline">⏳ Checking...</span>
+                <button class="admin-btn" onclick="loadAll()">🔄 Refresh</button>
+            </div>
+        </header>
 
-      <!-- MODELS -->
-      <h2 style="color: #e0e0e0; font-size: 1.1rem; margin: 20px 0 0">📦 Installed Models</h2>
-      <div class="model-grid" id="model-grid">
-        <div style="color: #888; text-align: center; padding: 40px">Checking Ollama...</div>
-      </div>
-
-      <!-- DOWNLOAD SECTION -->
-      <div class="download-section">
-        <h3>📥 Download New Model</h3>
-        <div class="download-grid">
-          <button type="button" class="download-btn" onclick="pullModel('llama3.2')">
-            <span class="dl-name">Llama 3.2</span>
-            <span class="dl-size">3B · 2.0 GB</span>
-          </button>
-          <button type="button" class="download-btn" onclick="pullModel('llama3.1')">
-            <span class="dl-name">Llama 3.1</span>
-            <span class="dl-size">8B · 4.7 GB</span>
-          </button>
-          <button type="button" class="download-btn" onclick="pullModel('mistral')">
-            <span class="dl-name">Mistral</span>
-            <span class="dl-size">7B · 4.1 GB</span>
-          </button>
-          <button type="button" class="download-btn" onclick="pullModel('phi3')">
-            <span class="dl-name">Phi-3</span>
-            <span class="dl-size">3.8B · 2.3 GB</span>
-          </button>
-          <button type="button" class="download-btn" onclick="pullModel('gemma2')">
-            <span class="dl-name">Gemma 2</span>
-            <span class="dl-size">9B · 5.4 GB</span>
-          </button>
-          <button type="button" class="download-btn" onclick="pullModel('qwen2.5')">
-            <span class="dl-name">Qwen 2.5</span>
-            <span class="dl-size">7B · 4.4 GB</span>
-          </button>
-          <button type="button" class="download-btn" onclick="pullModel('codellama')">
-            <span class="dl-name">CodeLlama</span>
-            <span class="dl-size">7B · 3.8 GB</span>
-          </button>
-          <button type="button" class="download-btn" onclick="pullModel('deepseek-coder-v2')">
-            <span class="dl-name">DeepSeek Coder v2</span>
-            <span class="dl-size">16B · 8.9 GB</span>
-          </button>
+        <!-- MODELS -->
+        <h2 style="color:#e0e0e0;font-size:1.1rem;margin:20px 0 0">📦 Installed Models</h2>
+        <div class="model-grid" id="model-grid">
+            <div style="color:#888;text-align:center;padding:40px">Checking Ollama...</div>
         </div>
-        <div id="pull-status"></div>
 
-        <!-- Custom pull -->
-        <div style="margin-top: 16px; display: flex; gap: 10px; align-items: center">
-          <input
-            type="text"
-            id="custom-model"
-            placeholder="Model name (e.g. llama3:70b)"
-            style="
-              flex: 1;
-              padding: 8px 14px;
-              border-radius: 8px;
-              border: 1px solid rgba(255, 255, 255, 0.1);
-              background: rgba(0, 0, 0, 0.3);
-              color: #e0e0e0;
-              font-size: 0.85rem;
-            "
-          />
-          <button type="button" class="download-btn" onclick="pullCustom()" style="white-space: nowrap">
-            <span class="dl-name">📥 Pull Custom</span>
-          </button>
+        <!-- DOWNLOAD SECTION -->
+        <div class="download-section">
+            <h3>📥 Download New Model</h3>
+            <div class="download-grid">
+                <button class="download-btn" onclick="pullModel('llama3.2')">
+                    <span class="dl-name">Llama 3.2</span>
+                    <span class="dl-size">3B · 2.0 GB</span>
+                </button>
+                <button class="download-btn" onclick="pullModel('llama3.1')">
+                    <span class="dl-name">Llama 3.1</span>
+                    <span class="dl-size">8B · 4.7 GB</span>
+                </button>
+                <button class="download-btn" onclick="pullModel('mistral')">
+                    <span class="dl-name">Mistral</span>
+                    <span class="dl-size">7B · 4.1 GB</span>
+                </button>
+                <button class="download-btn" onclick="pullModel('phi3')">
+                    <span class="dl-name">Phi-3</span>
+                    <span class="dl-size">3.8B · 2.3 GB</span>
+                </button>
+                <button class="download-btn" onclick="pullModel('gemma2')">
+                    <span class="dl-name">Gemma 2</span>
+                    <span class="dl-size">9B · 5.4 GB</span>
+                </button>
+                <button class="download-btn" onclick="pullModel('qwen2.5')">
+                    <span class="dl-name">Qwen 2.5</span>
+                    <span class="dl-size">7B · 4.4 GB</span>
+                </button>
+                <button class="download-btn" onclick="pullModel('codellama')">
+                    <span class="dl-name">CodeLlama</span>
+                    <span class="dl-size">7B · 3.8 GB</span>
+                </button>
+                <button class="download-btn" onclick="pullModel('deepseek-coder-v2')">
+                    <span class="dl-name">DeepSeek Coder v2</span>
+                    <span class="dl-size">16B · 8.9 GB</span>
+                </button>
+            </div>
+            <div id="pull-status"></div>
+
+            <!-- Custom pull -->
+            <div style="margin-top:16px;display:flex;gap:10px;align-items:center">
+                <input type="text" id="custom-model" placeholder="Model name (e.g. llama3:70b)"
+                    style="flex:1;padding:8px 14px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(0,0,0,0.3);color:#e0e0e0;font-size:0.85rem">
+                <button class="download-btn" onclick="pullCustom()" style="white-space:nowrap">
+                    <span class="dl-name">📥 Pull Custom</span>
+                </button>
+            </div>
         </div>
-      </div>
     </div>
 
     <script>
-      async function loadAll() {
+    async function loadAll() {
         try {
-          const res = await fetch('/api/admin/models');
-          const data = await res.json();
+            const res = await fetch('/api/admin/models');
+            const data = await res.json();
 
-          // Status badge
-          const badge = document.getElementById('ollama-status');
-          if (data.available) {
-            badge.className = 'status-badge status-online';
-            badge.textContent = '🟢 Ollama Online';
-          } else {
-            badge.className = 'status-badge status-offline';
-            badge.textContent = '🔴 Ollama Offline';
-          }
+            // Status badge
+            const badge = document.getElementById('ollama-status');
+            if (data.available) {
+                badge.className = 'status-badge status-online';
+                badge.textContent = '🟢 Ollama Online';
+            } else {
+                badge.className = 'status-badge status-offline';
+                badge.textContent = '🔴 Ollama Offline';
+            }
 
-          // Render models
-          const grid = document.getElementById('model-grid');
-          const models = data.models || [];
-          if (!models.length) {
-            grid.innerHTML = data.available
-              ? '<div style="color:#888;text-align:center;padding:40px">No models installed. Download one below!</div>'
-              : '<div style="color:#f87171;text-align:center;padding:40px">Ollama not detected. Install from <a href="https://ollama.ai" target="_blank" style="color:#a5b4fc">ollama.ai</a></div>';
-            return;
-          }
+            // Render models
+            const grid = document.getElementById('model-grid');
+            const models = data.models || [];
+            if (!models.length) {
+                grid.innerHTML = data.available
+                    ? '<div style="color:#888;text-align:center;padding:40px">No models installed. Download one below!</div>'
+                    : '<div style="color:#f87171;text-align:center;padding:40px">Ollama not detected. Install from <a href="https://ollama.ai" target="_blank" style="color:#a5b4fc">ollama.ai</a></div>';
+                return;
+            }
 
-          grid.innerHTML = models
-            .map(
-              (m) => `
+            grid.innerHTML = models.map(m => `
                 <div class="model-card">
                     <div class="model-name">${esc(m.name)}</div>
                     <div class="model-meta">
@@ -297,104 +278,100 @@
                     </div>
                     <div style="font-size:0.75rem;color:#666">Digest: ${esc(m.digest || '—')}</div>
                     <div class="model-actions">
-                        <button type="button" onclick="testModel('${esc(m.name)}')">🧪 Test</button>
-                        <button type="button" class="btn-danger" onclick="deleteModel('${esc(m.name)}')">🗑️ Delete</button>
+                        <button onclick="testModel('${esc(m.name)}')">🧪 Test</button>
+                        <button class="btn-danger" onclick="deleteModel('${esc(m.name)}')">🗑️ Delete</button>
                     </div>
                 </div>
-            `
-            )
-            .join('');
+            `).join('');
         } catch (e) {
-          document.getElementById('ollama-status').className = 'status-badge status-offline';
-          document.getElementById('ollama-status').textContent = '🔴 Error';
-          document.getElementById('model-grid').innerHTML =
-            `<div style="color:#f87171;padding:20px">Error: ${e.message}</div>`;
+            document.getElementById('ollama-status').className = 'status-badge status-offline';
+            document.getElementById('ollama-status').textContent = '🔴 Error';
+            document.getElementById('model-grid').innerHTML =
+                `<div style="color:#f87171;padding:20px">Error: ${e.message}</div>`;
         }
-      }
+    }
 
-      async function pullModel(name) {
+    async function pullModel(name) {
         const status = document.getElementById('pull-status');
         status.innerHTML = `⏳ Downloading <strong>${esc(name)}</strong>... (this may take a few minutes)`;
         status.style.color = '#a5b4fc';
 
         try {
-          const res = await fetch('/api/admin/models/pull', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ model: name }),
-          });
-          const data = await res.json();
-          if (data.success) {
-            status.innerHTML = `✅ <strong>${esc(name)}</strong> downloaded!`;
-            status.style.color = '#34d399';
-            loadAll();
-          } else {
-            status.innerHTML = `❌ Failed: ${esc(data.error || 'Unknown')}`;
-            status.style.color = '#f87171';
-          }
+            const res = await fetch('/api/admin/models/pull', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ model: name })
+            });
+            const data = await res.json();
+            if (data.success) {
+                status.innerHTML = `✅ <strong>${esc(name)}</strong> downloaded!`;
+                status.style.color = '#34d399';
+                loadAll();
+            } else {
+                status.innerHTML = `❌ Failed: ${esc(data.error || 'Unknown')}`;
+                status.style.color = '#f87171';
+            }
         } catch (e) {
-          status.innerHTML = `❌ Error: ${esc(e.message)}`;
-          status.style.color = '#f87171';
+            status.innerHTML = `❌ Error: ${esc(e.message)}`;
+            status.style.color = '#f87171';
         }
-      }
+    }
 
-      function pullCustom() {
+    function pullCustom() {
         const name = document.getElementById('custom-model').value.trim();
         if (!name) return alert('Enter model name');
         pullModel(name);
-      }
+    }
 
-      async function deleteModel(name) {
+    async function deleteModel(name) {
         if (!confirm(`Delete model "${name}"?`)) return;
         try {
-          const res = await fetch('/api/admin/models/delete', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ model: name }),
-          });
-          const data = await res.json();
-          if (data.success) loadAll();
-          else alert('Error: ' + (data.error || 'Failed'));
+            const res = await fetch('/api/admin/models/delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ model: name })
+            });
+            const data = await res.json();
+            if (data.success) loadAll();
+            else alert('Error: ' + (data.error || 'Failed'));
         } catch (e) {
-          alert('Error: ' + e.message);
+            alert('Error: ' + e.message);
         }
-      }
+    }
 
-      async function testModel(name) {
+    async function testModel(name) {
         const status = document.getElementById('pull-status');
         status.innerHTML = `🧪 Testing <strong>${esc(name)}</strong>...`;
         status.style.color = '#a5b4fc';
 
         try {
-          const res = await fetch('/api/admin/models/test', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              model: name,
-              prompt: 'Say hello in one sentence.',
-            }),
-          });
-          const data = await res.json();
-          if (data.success) {
-            status.innerHTML = `✅ <strong>${esc(name)}</strong>: "${esc(data.response?.substring(0, 200))}" (${data.durationMs || 0}ms)`;
-            status.style.color = '#34d399';
-          } else {
-            status.innerHTML = `❌ Test failed: ${esc(data.error || 'Unknown')}`;
-            status.style.color = '#f87171';
-          }
+            const res = await fetch('/api/admin/models/test', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ model: name, prompt: 'Say hello in one sentence.' })
+            });
+            const data = await res.json();
+            if (data.success) {
+                status.innerHTML = `✅ <strong>${esc(name)}</strong>: "${esc(data.response?.substring(0, 200))}" (${data.durationMs || 0}ms)`;
+                status.style.color = '#34d399';
+            } else {
+                status.innerHTML = `❌ Test failed: ${esc(data.error || 'Unknown')}`;
+                status.style.color = '#f87171';
+            }
         } catch (e) {
-          status.innerHTML = `❌ Error: ${esc(e.message)}`;
-          status.style.color = '#f87171';
+            status.innerHTML = `❌ Error: ${esc(e.message)}`;
+            status.style.color = '#f87171';
         }
-      }
+    }
 
-      function esc(str) {
+    function esc(str) {
         const d = document.createElement('div');
         d.textContent = str || '';
         return d.innerHTML;
-      }
+    }
 
-      loadAll();
+    loadAll();
     </script>
-  </body>
+</body>
+
 </html>

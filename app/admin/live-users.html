@@ -1,227 +1,68 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta name="description" content="Page description" />
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>KelionAI — Live Users & Feedback</title>
     <style>
-      * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
-      }
-      body {
-        font-family: 'Inter', 'Segoe UI', sans-serif;
-        background: #060614;
-        color: #e0e0e0;
-        min-height: 100vh;
-      }
-      .header {
-        padding: 16px 24px;
-        background: rgba(0, 0, 0, 0.4);
-        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-      }
-      .header h1 {
-        font-size: 1.3rem;
-        background: linear-gradient(135deg, #22c55e, #06b6d4);
-        -webkit-background-clip: text;
-        background-clip: text;
-        -webkit-text-fill-color: transparent;
-      }
-      .back {
-        background: rgba(255, 255, 255, 0.1);
-        border: none;
-        color: #fff;
-        padding: 8px 16px;
-        border-radius: 8px;
-        cursor: pointer;
-        text-decoration: none;
-        font-size: 0.85rem;
-      }
-      .container {
-        max-width: 1000px;
-        margin: 24px auto;
-        padding: 0 20px;
-      }
-      .stats {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-        gap: 12px;
-        margin-bottom: 20px;
-      }
-      .stat {
-        background: rgba(255, 255, 255, 0.03);
-        border: 1px solid rgba(255, 255, 255, 0.06);
-        border-radius: 12px;
-        padding: 16px;
-        text-align: center;
-      }
-      .stat .num {
-        font-size: 2rem;
-        font-weight: 700;
-        color: #22c55e;
-      }
-      .stat .num.warn {
-        color: #f59e0b;
-      }
-      .stat .num.bad {
-        color: #ef4444;
-      }
-      .stat .lbl {
-        font-size: 0.78rem;
-        color: #888;
-        margin-top: 4px;
-      }
-      .section {
-        background: rgba(255, 255, 255, 0.03);
-        border: 1px solid rgba(255, 255, 255, 0.06);
-        border-radius: 12px;
-        padding: 16px;
-        margin-bottom: 16px;
-      }
-      .section h3 {
-        margin-bottom: 12px;
-        color: #a78bfa;
-      }
-      .user-row {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 8px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-        font-size: 0.85rem;
-      }
-      .user-row .email {
-        color: #e0e0e0;
-        font-weight: 500;
-      }
-      .user-row .meta {
-        color: #666;
-        font-size: 0.78rem;
-      }
-      .badge {
-        display: inline-block;
-        padding: 2px 8px;
-        border-radius: 10px;
-        font-size: 0.7rem;
-        font-weight: 600;
-      }
-      .badge.online {
-        background: rgba(34, 197, 94, 0.2);
-        color: #22c55e;
-      }
-      .badge.idle {
-        background: rgba(245, 158, 11, 0.2);
-        color: #f59e0b;
-      }
-      .fb-item {
-        display: flex;
-        gap: 8px;
-        align-items: center;
-        padding: 6px 0;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-        font-size: 0.85rem;
-      }
-      .fb-up {
-        color: #22c55e;
-      }
-      .fb-down {
-        color: #ef4444;
-      }
-      .refresh {
-        text-align: center;
-        color: #444;
-        font-size: 0.75rem;
-        margin-top: 16px;
-      }
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Inter','Segoe UI',sans-serif;background:#060614;color:#e0e0e0;min-height:100vh}
+        .header{padding:16px 24px;background:rgba(0,0,0,0.4);border-bottom:1px solid rgba(255,255,255,0.06);display:flex;justify-content:space-between;align-items:center}
+        .header h1{font-size:1.3rem;background:linear-gradient(135deg,#22c55e,#06b6d4);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+        .back{background:rgba(255,255,255,0.1);border:none;color:#fff;padding:8px 16px;border-radius:8px;cursor:pointer;text-decoration:none;font-size:.85rem}
+        .container{max-width:1000px;margin:24px auto;padding:0 20px}
+        .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px}
+        .stat{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:16px;text-align:center}
+        .stat .num{font-size:2rem;font-weight:700;color:#22c55e}
+        .stat .num.warn{color:#f59e0b}
+        .stat .num.bad{color:#ef4444}
+        .stat .lbl{font-size:.78rem;color:#888;margin-top:4px}
+        .section{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:16px;margin-bottom:16px}
+        .section h3{margin-bottom:12px;color:#a78bfa}
+        .user-row{display:flex;justify-content:space-between;align-items:center;padding:8px;border-bottom:1px solid rgba(255,255,255,0.04);font-size:.85rem}
+        .user-row .email{color:#e0e0e0;font-weight:500}
+        .user-row .meta{color:#666;font-size:.78rem}
+        .badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:.7rem;font-weight:600}
+        .badge.online{background:rgba(34,197,94,0.2);color:#22c55e}
+        .badge.idle{background:rgba(245,158,11,0.2);color:#f59e0b}
+        .fb-item{display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.04);font-size:.85rem}
+        .fb-up{color:#22c55e}.fb-down{color:#ef4444}
+        .refresh{text-align:center;color:#444;font-size:.75rem;margin-top:16px}
     </style>
-  </head>
-  <body>
-    <div class="header">
-      <h1>👥 Live Users & Feedback</h1>
-      <a href="/admin/" class="back">← Admin</a>
-    </div>
+</head>
+<body>
+    <div class="header"><h1>👥 Live Users & Feedback</h1><a href="/admin/" class="back">← Admin</a></div>
     <div class="container">
-      <div class="stats">
-        <div class="stat">
-          <div class="num" id="s-online">0</div>
-          <div class="lbl">Online Now</div>
+        <div class="stats">
+            <div class="stat"><div class="num" id="s-online">0</div><div class="lbl">Online Now</div></div>
+            <div class="stat"><div class="num" id="s-total">0</div><div class="lbl">Total Feedback</div></div>
+            <div class="stat"><div class="num" id="s-up">0</div><div class="lbl">👍 Thumbs Up</div></div>
+            <div class="stat"><div class="num" id="s-down">0</div><div class="lbl">👎 Thumbs Down</div></div>
+            <div class="stat"><div class="num" id="s-rate">-</div><div class="lbl">Satisfaction</div></div>
         </div>
-        <div class="stat">
-          <div class="num" id="s-total">0</div>
-          <div class="lbl">Total Feedback</div>
-        </div>
-        <div class="stat">
-          <div class="num" id="s-up">0</div>
-          <div class="lbl">👍 Thumbs Up</div>
-        </div>
-        <div class="stat">
-          <div class="num" id="s-down">0</div>
-          <div class="lbl">👎 Thumbs Down</div>
-        </div>
-        <div class="stat">
-          <div class="num" id="s-rate">-</div>
-          <div class="lbl">Satisfaction</div>
-        </div>
-      </div>
-      <div class="section">
-        <h3>🟢 Live Sessions</h3>
-        <div id="live-list"></div>
-      </div>
-      <div class="section">
-        <h3>📝 Recent Feedback</h3>
-        <div id="fb-list"></div>
-      </div>
-      <div class="refresh">Auto-refreshes every 10s</div>
+        <div class="section"><h3>🟢 Live Sessions</h3><div id="live-list"></div></div>
+        <div class="section"><h3>📝 Recent Feedback</h3><div id="fb-list"></div></div>
+        <div class="refresh">Auto-refreshes every 10s</div>
     </div>
     <script>
-      const T = localStorage.getItem('supabase_token') || '';
-      const H = {
-        'Content-Type': 'application/json',
-        Authorization: 'Bearer ' + T,
-      };
-      async function load() {
-        try {
-          const [lr, fr] = await Promise.all([
-            fetch('/api/admin/live-users', { headers: H }),
-            fetch('/api/admin/feedback-stats', { headers: H }),
-          ]);
-          const l = await lr.json(),
-            f = await fr.json();
-          document.getElementById('s-online').textContent = l.online || 0;
-          document.getElementById('s-total').textContent = f.total || 0;
-          document.getElementById('s-up').textContent = f.up || 0;
-          document.getElementById('s-down').textContent = f.down || 0;
-          document.getElementById('s-rate').textContent = f.satisfactionRate || '-';
-          const el = document.getElementById('live-list');
-          el.innerHTML = (l.sessions || []).length
-            ? l.sessions
-                .map(
-                  (s) =>
-                    `<div class="user-row"><span class="email">${s.email}</span><span class="meta">${s.avatar} · ${Math.round(s.duration / 60)}min · <span class="badge ${s.idle < 30 ? 'online' : 'idle'}">${s.idle < 30 ? 'active' : 'idle ' + s.idle + 's'}</span></span></div>`
-                )
-                .join('')
-            : '<div style="text-align:center;color:#666;padding:20px">No users online</div>';
-          const fl = document.getElementById('fb-list');
-          fl.innerHTML = (f.recent || []).length
-            ? f.recent
-                .slice(0, 20)
-                .map(
-                  (r) =>
-                    `<div class="fb-item"><span class="${r.type === 'up' ? 'fb-up' : 'fb-down'}">${r.type === 'up' ? '👍' : '👎'}</span><span>${r.userId}</span><span class="meta">${r.comment || ''}</span><span class="meta">${new Date(r.timestamp).toLocaleTimeString()}</span></div>`
-                )
-                .join('')
-            : '<div style="text-align:center;color:#666;padding:20px">No feedback yet</div>';
-        } catch (e) {
-          console.error(e);
+        const T=localStorage.getItem('supabase_token')||'';
+        const H={'Content-Type':'application/json','Authorization':'Bearer '+T};
+        async function load(){
+            try{
+                const[lr,fr]=await Promise.all([fetch('/api/admin/live-users',{headers:H}),fetch('/api/admin/feedback-stats',{headers:H})]);
+                const l=await lr.json(),f=await fr.json();
+                document.getElementById('s-online').textContent=l.online||0;
+                document.getElementById('s-total').textContent=f.total||0;
+                document.getElementById('s-up').textContent=f.up||0;
+                document.getElementById('s-down').textContent=f.down||0;
+                document.getElementById('s-rate').textContent=f.satisfactionRate||'-';
+                const el=document.getElementById('live-list');
+                el.innerHTML=(l.sessions||[]).length?l.sessions.map(s=>`<div class="user-row"><span class="email">${s.email}</span><span class="meta">${s.avatar} · ${Math.round(s.duration/60)}min · <span class="badge ${s.idle<30?'online':'idle'}">${s.idle<30?'active':'idle '+s.idle+'s'}</span></span></div>`).join(''):'<div style="text-align:center;color:#666;padding:20px">No users online</div>';
+                const fl=document.getElementById('fb-list');
+                fl.innerHTML=(f.recent||[]).length?f.recent.slice(0,20).map(r=>`<div class="fb-item"><span class="${r.type==='up'?'fb-up':'fb-down'}">${r.type==='up'?'👍':'👎'}</span><span>${r.userId}</span><span class="meta">${r.comment||''}</span><span class="meta">${new Date(r.timestamp).toLocaleTimeString()}</span></div>`).join(''):'<div style="text-align:center;color:#666;padding:20px">No feedback yet</div>';
+            }catch(e){console.error(e)}
         }
-      }
-      load();
-      setInterval(load, 10000);
+        load();setInterval(load,10000);
     </script>
-  </body>
+</body>
 </html>

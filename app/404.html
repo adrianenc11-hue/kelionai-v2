@@ -1,154 +1,133 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta name="description" content="Page description" />
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>404 — KelionAI</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap">
     <style>
-      *,
-      *::before,
-      *::after {
-        box-sizing: border-box;
-        margin: 0;
-        padding: 0;
-      }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-      body {
-        font-family:
-          'Inter',
-          -apple-system,
-          sans-serif;
-        background: #050510;
-        color: #f0f0ff;
-        min-height: 100vh;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        -webkit-font-smoothing: antialiased;
-        position: relative;
-        overflow: hidden;
-      }
-
-      /* Fundal */
-      body::before {
-        content: '';
-        position: fixed;
-        inset: 0;
-        background:
-          radial-gradient(ellipse at 30% 40%, rgba(99, 102, 241, 0.1) 0%, transparent 50%),
-          radial-gradient(ellipse at 70% 60%, rgba(6, 182, 212, 0.08) 0%, transparent 50%);
-        pointer-events: none;
-      }
-
-      .error-container {
-        text-align: center;
-        padding: 48px 32px;
-        position: relative;
-        z-index: 1;
-        max-width: 500px;
-      }
-
-      .error-code {
-        font-size: 8rem;
-        font-weight: 900;
-        line-height: 1;
-        background: linear-gradient(135deg, #6366f1, #06b6d4);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-        margin-bottom: 16px;
-        animation: float 4s ease-in-out infinite;
-      }
-
-      @keyframes float {
-        0%,
-        100% {
-          transform: translateY(0);
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: #050510;
+            color: #F0F0FF;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            -webkit-font-smoothing: antialiased;
+            position: relative;
+            overflow: hidden;
         }
-        50% {
-          transform: translateY(-16px);
+
+        /* Fundal */
+        body::before {
+            content: '';
+            position: fixed; inset: 0;
+            background:
+                radial-gradient(ellipse at 30% 40%, rgba(99,102,241,0.1) 0%, transparent 50%),
+                radial-gradient(ellipse at 70% 60%, rgba(6,182,212,0.08) 0%, transparent 50%);
+            pointer-events: none;
         }
-      }
 
-      .error-icon {
-        font-size: 3.5rem;
-        margin-bottom: 20px;
-        display: block;
-        opacity: 0.8;
-      }
+        .error-container {
+            text-align: center;
+            padding: 48px 32px;
+            position: relative;
+            z-index: 1;
+            max-width: 500px;
+        }
 
-      h1 {
-        font-size: 1.5rem;
-        font-weight: 700;
-        margin-bottom: 12px;
-      }
+        .error-code {
+            font-size: 8rem;
+            font-weight: 900;
+            line-height: 1;
+            background: linear-gradient(135deg, #6366F1, #06B6D4);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 16px;
+            animation: float 4s ease-in-out infinite;
+        }
 
-      p {
-        color: #9090b0;
-        font-size: 1rem;
-        line-height: 1.6;
-        margin-bottom: 36px;
-      }
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-16px); }
+        }
 
-      .error-actions {
-        display: flex;
-        gap: 12px;
-        justify-content: center;
-        flex-wrap: wrap;
-      }
+        .error-icon {
+            font-size: 3.5rem;
+            margin-bottom: 20px;
+            display: block;
+            opacity: 0.8;
+        }
 
-      .btn {
-        padding: 13px 28px;
-        border-radius: 12px;
-        font-family: 'Inter', sans-serif;
-        font-size: 0.95rem;
-        font-weight: 600;
-        cursor: pointer;
-        transition: all 0.25s;
-        text-decoration: none;
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        border: none;
-      }
+        h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
 
-      .btn-primary {
-        background: linear-gradient(135deg, #6366f1, #06b6d4);
-        color: #fff;
-      }
+        p {
+            color: #9090B0;
+            font-size: 1rem;
+            line-height: 1.6;
+            margin-bottom: 36px;
+        }
 
-      .btn-primary:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 0 30px rgba(99, 102, 241, 0.3);
-      }
+        .error-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
 
-      .btn-secondary {
-        background: transparent;
-        color: #9090b0;
-        border: 1px solid rgba(99, 102, 241, 0.15);
-      }
+        .btn {
+            padding: 13px 28px;
+            border-radius: 12px;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.25s;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            border: none;
+        }
 
-      .btn-secondary:hover {
-        border-color: rgba(99, 102, 241, 0.3);
-        color: #f0f0ff;
-        background: rgba(99, 102, 241, 0.05);
-      }
+        .btn-primary {
+            background: linear-gradient(135deg, #6366F1, #06B6D4);
+            color: #fff;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 0 30px rgba(99, 102, 241, 0.3);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: #9090B0;
+            border: 1px solid rgba(99, 102, 241, 0.15);
+        }
+
+        .btn-secondary:hover {
+            border-color: rgba(99, 102, 241, 0.3);
+            color: #F0F0FF;
+            background: rgba(99, 102, 241, 0.05);
+        }
     </style>
-  </head>
-  <body>
+</head>
+<body>
     <div class="error-container">
-      <div class="error-code">404</div>
-      <span class="error-icon">🔭</span>
-      <h1>Page not found</h1>
-      <p>It seems you've wandered into digital space. The page you're looking for doesn't exist or has been moved.</p>
-      <div class="error-actions">
-        <a href="/" class="btn btn-primary">🏠 Home</a>
-        <a href="/pricing/" class="btn btn-secondary">💎 Pricing</a>
-        <a href="/developer" class="btn btn-secondary">⚡ Developer</a>
-      </div>
+        <div class="error-code">404</div>
+        <span class="error-icon">🔭</span>
+        <h1>Page not found</h1>
+        <p>It seems you've wandered into digital space. The page you're looking for doesn't exist or has been moved.</p>
+        <div class="error-actions">
+            <a href="/" class="btn btn-primary">🏠 Home</a>
+            <a href="/pricing/" class="btn btn-secondary">💎 Pricing</a>
+            <a href="/developer" class="btn btn-secondary">⚡ Developer</a>
+        </div>
     </div>
-  </body>
+</body>
 </html>

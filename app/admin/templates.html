@@ -1,220 +1,70 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta name="description" content="Page description" />
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>KelionAI — Prompt Templates</title>
     <style>
-      * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
-      }
-      body {
-        font-family: 'Inter', 'Segoe UI', sans-serif;
-        background: #060614;
-        color: #e0e0e0;
-        min-height: 100vh;
-      }
-      .header {
-        padding: 16px 24px;
-        background: rgba(0, 0, 0, 0.4);
-        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-      }
-      .header h1 {
-        font-size: 1.3rem;
-        background: linear-gradient(135deg, #a78bfa, #6366f1);
-        -webkit-background-clip: text;
-        background-clip: text;
-        -webkit-text-fill-color: transparent;
-      }
-      .back {
-        background: rgba(255, 255, 255, 0.1);
-        border: none;
-        color: #fff;
-        padding: 8px 16px;
-        border-radius: 8px;
-        text-decoration: none;
-        font-size: 0.85rem;
-      }
-      .container {
-        max-width: 1000px;
-        margin: 24px auto;
-        padding: 0 20px;
-      }
-      .form {
-        background: rgba(255, 255, 255, 0.03);
-        border: 1px solid rgba(255, 255, 255, 0.06);
-        border-radius: 12px;
-        padding: 16px;
-        margin-bottom: 16px;
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 10px;
-      }
-      .form input,
-      .form select,
-      .form textarea {
-        background: rgba(255, 255, 255, 0.06);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: 8px;
-        padding: 8px 12px;
-        color: #fff;
-        font-size: 0.85rem;
-        font-family: inherit;
-      }
-      .form textarea {
-        grid-column: 1/-1;
-        min-height: 60px;
-        resize: vertical;
-      }
-      .form button {
-        grid-column: 1/-1;
-        background: linear-gradient(135deg, #6366f1, #a78bfa);
-        border: none;
-        color: #fff;
-        padding: 10px;
-        border-radius: 8px;
-        font-weight: 600;
-        cursor: pointer;
-        font-size: 0.9rem;
-      }
-      .grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-        gap: 12px;
-      }
-      .card {
-        background: rgba(255, 255, 255, 0.03);
-        border: 1px solid rgba(255, 255, 255, 0.06);
-        border-radius: 12px;
-        padding: 16px;
-        transition: border-color 0.2s;
-      }
-      .card:hover {
-        border-color: rgba(99, 102, 241, 0.4);
-      }
-      .card .top {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 8px;
-      }
-      .card .icon {
-        font-size: 1.5rem;
-      }
-      .card .name {
-        font-weight: 600;
-        font-size: 0.95rem;
-      }
-      .card .cat {
-        font-size: 0.7rem;
-        padding: 2px 8px;
-        border-radius: 8px;
-        background: rgba(99, 102, 241, 0.15);
-        color: #a78bfa;
-      }
-      .card .prompt {
-        color: #888;
-        font-size: 0.8rem;
-        line-height: 1.4;
-        margin-top: 6px;
-        max-height: 60px;
-        overflow: hidden;
-      }
-      .card .actions {
-        display: flex;
-        gap: 8px;
-        margin-top: 10px;
-      }
-      .btn-copy,
-      .btn-del {
-        padding: 4px 10px;
-        border-radius: 6px;
-        border: none;
-        cursor: pointer;
-        font-size: 0.75rem;
-        font-weight: 600;
-      }
-      .btn-copy {
-        background: rgba(99, 102, 241, 0.2);
-        color: #a78bfa;
-      }
-      .btn-del {
-        background: rgba(239, 68, 68, 0.2);
-        color: #ef4444;
-      }
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Inter','Segoe UI',sans-serif;background:#060614;color:#e0e0e0;min-height:100vh}
+        .header{padding:16px 24px;background:rgba(0,0,0,0.4);border-bottom:1px solid rgba(255,255,255,0.06);display:flex;justify-content:space-between;align-items:center}
+        .header h1{font-size:1.3rem;background:linear-gradient(135deg,#a78bfa,#6366f1);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+        .back{background:rgba(255,255,255,0.1);border:none;color:#fff;padding:8px 16px;border-radius:8px;text-decoration:none;font-size:.85rem}
+        .container{max-width:1000px;margin:24px auto;padding:0 20px}
+        .form{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:16px;margin-bottom:16px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+        .form input,.form select,.form textarea{background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:8px 12px;color:#fff;font-size:.85rem;font-family:inherit}
+        .form textarea{grid-column:1/-1;min-height:60px;resize:vertical}
+        .form button{grid-column:1/-1;background:linear-gradient(135deg,#6366f1,#a78bfa);border:none;color:#fff;padding:10px;border-radius:8px;font-weight:600;cursor:pointer;font-size:.9rem}
+        .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+        .card{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:16px;transition:border-color .2s}
+        .card:hover{border-color:rgba(99,102,241,0.4)}
+        .card .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+        .card .icon{font-size:1.5rem}
+        .card .name{font-weight:600;font-size:.95rem}
+        .card .cat{font-size:.7rem;padding:2px 8px;border-radius:8px;background:rgba(99,102,241,0.15);color:#a78bfa}
+        .card .prompt{color:#888;font-size:.8rem;line-height:1.4;margin-top:6px;max-height:60px;overflow:hidden}
+        .card .actions{display:flex;gap:8px;margin-top:10px}
+        .btn-copy,.btn-del{padding:4px 10px;border-radius:6px;border:none;cursor:pointer;font-size:.75rem;font-weight:600}
+        .btn-copy{background:rgba(99,102,241,0.2);color:#a78bfa}
+        .btn-del{background:rgba(239,68,68,0.2);color:#ef4444}
     </style>
-  </head>
-  <body>
-    <div class="header">
-      <h1>📝 Prompt Templates</h1>
-      <a href="/admin/" class="back">← Admin</a>
-    </div>
+</head>
+<body>
+    <div class="header"><h1>📝 Prompt Templates</h1><a href="/admin/" class="back">← Admin</a></div>
     <div class="container">
-      <div class="form">
-        <input id="t-name" placeholder="Template name" />
-        <select id="t-cat" aria-label="Category">
-          <option>coding</option>
-          <option>writing</option>
-          <option>trading</option>
-          <option>research</option>
-          <option>language</option>
-          <option>learning</option>
-          <option>general</option>
-        </select>
-        <textarea id="t-prompt" placeholder="Prompt text (use {variable} for placeholders)"></textarea>
-        <button type="button" onclick="createT()">+ Create Template</button>
-      </div>
-      <div class="grid" id="templates"></div>
+        <div class="form">
+            <input id="t-name" placeholder="Template name">
+            <select id="t-cat" aria-label="Category"><option>coding</option><option>writing</option><option>trading</option><option>research</option><option>language</option><option>learning</option><option>general</option></select>
+            <textarea id="t-prompt" placeholder="Prompt text (use {variable} for placeholders)"></textarea>
+            <button onclick="createT()">+ Create Template</button>
+        </div>
+        <div class="grid" id="templates"></div>
     </div>
     <script>
-      const T = localStorage.getItem('supabase_token') || '';
-      const H = {
-        'Content-Type': 'application/json',
-        Authorization: 'Bearer ' + T,
-      };
-      async function load() {
-        const r = await fetch('/api/admin/templates', { headers: H });
-        const d = await r.json();
-        document.getElementById('templates').innerHTML = d
-          .map(
-            (t) => `<div class="card">
+        const T=localStorage.getItem('supabase_token')||'';
+        const H={'Content-Type':'application/json','Authorization':'Bearer '+T};
+        async function load(){
+            const r=await fetch('/api/admin/templates',{headers:H});
+            const d=await r.json();
+            document.getElementById('templates').innerHTML=d.map(t=>`<div class="card">
                 <div class="top"><span class="icon">${t.icon}</span><span class="cat">${t.category}</span></div>
                 <div class="name">${t.name}</div>
                 <div class="prompt">${t.prompt}</div>
                 <div class="actions">
-                    <button type="button" class="btn-copy" onclick="navigator.clipboard.writeText(\`${t.prompt.replace(/`/g, '\\`')}\`);this.textContent='Copied!'">📋 Copy</button>
-                    ${!t.isDefault ? `<button type="button" class="btn-del" onclick="delT('${t.id}')">🗑️ Delete</button>` : ''}
+                    <button class="btn-copy" onclick="navigator.clipboard.writeText(\`${t.prompt.replace(/`/g,"\\`")}\`);this.textContent='Copied!'">📋 Copy</button>
+                    ${!t.isDefault?`<button class="btn-del" onclick="delT('${t.id}')">🗑️ Delete</button>`:''}
                 </div>
-            </div>`
-          )
-          .join('');
-      }
-      async function createT() {
-        await fetch('/api/admin/templates', {
-          method: 'POST',
-          headers: H,
-          body: JSON.stringify({
-            name: document.getElementById('t-name').value,
-            category: document.getElementById('t-cat').value,
-            prompt: document.getElementById('t-prompt').value,
-          }),
-        });
+            </div>`).join('');
+        }
+        async function createT(){
+            await fetch('/api/admin/templates',{method:'POST',headers:H,body:JSON.stringify({name:document.getElementById('t-name').value,category:document.getElementById('t-cat').value,prompt:document.getElementById('t-prompt').value})});
+            load();
+        }
+        async function delT(id){
+            await fetch('/api/admin/templates/'+id,{method:'DELETE',headers:H});
+            load();
+        }
         load();
-      }
-      async function delT(id) {
-        await fetch('/api/admin/templates/' + id, {
-          method: 'DELETE',
-          headers: H,
-        });
-        load();
-      }
-      load();
     </script>
-  </body>
+</body>
 </html>

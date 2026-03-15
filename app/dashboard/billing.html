@@ -1,531 +1,349 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta name="description" content="Page description" />
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Billing — KelionAI</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
-    />
-    <link rel="stylesheet" href="/styles/design-system.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap">
+    <link rel="stylesheet" href="/styles/design-system.css">
     <style>
-      *,
-      *::before,
-      *::after {
-        box-sizing: border-box;
-        margin: 0;
-        padding: 0;
-      }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-      :root {
-        --bg: #050510;
-        --bg2: #0a0a1b;
-        --surface: rgba(15, 15, 40, 0.7);
-        --border: rgba(99, 102, 241, 0.12);
-        --border-hover: rgba(99, 102, 241, 0.25);
-        --primary: #6366f1;
-        --secondary: #06b6d4;
-        --gradient: linear-gradient(135deg, #6366f1, #06b6d4);
-        --success: #10b981;
-        --warning: #f59e0b;
-        --danger: #ef4444;
-        --text: #f0f0ff;
-        --text-sec: #8888aa;
-        --text-muted: #555577;
-        --radius: 12px;
-        --radius-lg: 20px;
-        --font: 'Inter', -apple-system, sans-serif;
-        --transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-        --glass: rgba(10, 10, 30, 0.6);
-        --glass-blur: blur(20px);
-      }
-
-      body {
-        font-family: var(--font);
-        background: var(--bg);
-        color: var(--text);
-        min-height: 100vh;
-        display: flex;
-        flex-direction: column;
-        -webkit-font-smoothing: antialiased;
-      }
-
-      a {
-        color: var(--secondary);
-        text-decoration: none;
-      }
-      a:hover {
-        color: var(--text);
-      }
-
-      /* ─── Header ─── */
-      .billing-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 18px 40px;
-        border-bottom: 1px solid var(--border);
-        background: rgba(5, 5, 16, 0.75);
-        backdrop-filter: blur(24px);
-        position: sticky;
-        top: 0;
-        z-index: 100;
-      }
-      .billing-logo {
-        font-size: 1.4rem;
-        font-weight: 800;
-        text-decoration: none;
-        color: var(--text);
-      }
-      .billing-logo span {
-        background: var(--gradient);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-      }
-      .billing-nav {
-        display: flex;
-        gap: 24px;
-      }
-      .nav-link {
-        color: var(--text-sec);
-        font-size: 0.9rem;
-        font-weight: 500;
-        transition: color var(--transition);
-      }
-      .nav-link:hover {
-        color: var(--text);
-        text-decoration: none;
-      }
-
-      /* ─── Main ─── */
-      .billing-main {
-        flex: 1;
-        max-width: 760px;
-        margin: 0 auto;
-        width: 100%;
-        padding: 52px 32px 80px;
-      }
-
-      .billing-hero {
-        text-align: center;
-        margin-bottom: 40px;
-      }
-      .billing-hero h1 {
-        font-size: 2.2rem;
-        font-weight: 800;
-        margin-bottom: 10px;
-        background: var(--gradient);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-      }
-      .billing-hero p {
-        color: var(--text-sec);
-        font-size: 1rem;
-      }
-
-      /* ─── Sections ─── */
-      .billing-section {
-        background: var(--glass);
-        backdrop-filter: var(--glass-blur);
-        -webkit-backdrop-filter: var(--glass-blur);
-        border: 1px solid var(--border);
-        border-radius: var(--radius-lg);
-        padding: 28px 32px;
-        margin-bottom: 20px;
-        transition: border-color 0.3s;
-      }
-      .billing-section:hover {
-        border-color: var(--border-hover);
-      }
-
-      .billing-section h2 {
-        font-size: 0.82rem;
-        font-weight: 700;
-        color: var(--text-sec);
-        text-transform: uppercase;
-        letter-spacing: 1px;
-        margin-bottom: 20px;
-        padding-bottom: 10px;
-        border-bottom: 1px solid rgba(99, 102, 241, 0.06);
-      }
-
-      .billing-row {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 12px 0;
-        border-bottom: 1px solid rgba(99, 102, 241, 0.05);
-        font-size: 0.9rem;
-      }
-      .billing-row:last-child {
-        border: none;
-      }
-      .billing-row .label {
-        color: var(--text-sec);
-      }
-      .billing-row .value {
-        font-weight: 600;
-      }
-      .billing-row .value.active {
-        color: var(--success);
-      }
-      .billing-row .value.cancelled {
-        color: var(--danger);
-      }
-      .billing-row .value.past_due {
-        color: var(--warning);
-      }
-
-      /* ─── Usage bars ─── */
-      .usage-bar-wrap {
-        margin-top: 10px;
-      }
-      .usage-label {
-        display: flex;
-        justify-content: space-between;
-        font-size: 0.78rem;
-        color: var(--text-sec);
-        margin-bottom: 5px;
-      }
-      .usage-track {
-        height: 6px;
-        background: rgba(99, 102, 241, 0.08);
-        border-radius: 4px;
-        overflow: hidden;
-      }
-      .usage-fill {
-        height: 100%;
-        border-radius: 4px;
-        background: var(--gradient);
-        transition: width 0.5s ease;
-      }
-      .usage-fill.warn {
-        background: linear-gradient(90deg, #f59e0b, #ef4444);
-      }
-      .usage-fill.exceeded {
-        background: linear-gradient(90deg, #ef4444, #dc2626);
-      }
-
-      /* ─── Buttons ─── */
-      .billing-actions {
-        display: flex;
-        gap: 12px;
-        flex-wrap: wrap;
-        margin-top: 8px;
-      }
-      .btn {
-        padding: 11px 24px;
-        border-radius: var(--radius);
-        border: none;
-        font-size: 0.88rem;
-        font-weight: 600;
-        cursor: pointer;
-        transition: var(--transition);
-        font-family: var(--font);
-      }
-      .btn:hover {
-        opacity: 0.85;
-      }
-      .btn-primary {
-        background: var(--gradient);
-        color: #fff;
-        box-shadow: 0 2px 12px rgba(99, 102, 241, 0.2);
-      }
-      .btn-secondary {
-        background: rgba(99, 102, 241, 0.08);
-        color: var(--secondary);
-        border: 1px solid rgba(99, 102, 241, 0.2);
-      }
-      .btn-danger {
-        background: rgba(239, 68, 68, 0.08);
-        color: var(--danger);
-        border: 1px solid rgba(239, 68, 68, 0.15);
-      }
-
-      /* ─── Message ─── */
-      #billing-message {
-        padding: 14px 20px;
-        border-radius: var(--radius);
-        font-size: 0.88rem;
-        margin-bottom: 20px;
-        display: none;
-      }
-      #billing-message.success {
-        background: rgba(16, 185, 129, 0.08);
-        color: var(--success);
-        border: 1px solid rgba(16, 185, 129, 0.2);
-      }
-      #billing-message.error {
-        background: rgba(239, 68, 68, 0.08);
-        color: var(--danger);
-        border: 1px solid rgba(239, 68, 68, 0.2);
-      }
-
-      .no-sub {
-        color: var(--text-sec);
-        font-size: 0.9rem;
-        line-height: 1.65;
-      }
-      .plan-loading {
-        color: var(--text-sec);
-        text-align: center;
-        padding: 40px;
-      }
-
-      .spinner {
-        display: inline-block;
-        width: 16px;
-        height: 16px;
-        border: 2px solid rgba(99, 102, 241, 0.15);
-        border-top-color: var(--secondary);
-        border-radius: 50%;
-        animation: spin 0.7s linear infinite;
-        vertical-align: middle;
-        margin-left: 8px;
-      }
-      @keyframes spin {
-        to {
-          transform: rotate(360deg);
+        :root {
+            --bg: #050510;
+            --bg2: #0A0A1B;
+            --surface: rgba(15, 15, 40, 0.7);
+            --border: rgba(99, 102, 241, 0.12);
+            --border-hover: rgba(99, 102, 241, 0.25);
+            --primary: #6366F1;
+            --secondary: #06B6D4;
+            --gradient: linear-gradient(135deg, #6366F1, #06B6D4);
+            --success: #10B981;
+            --warning: #F59E0B;
+            --danger: #EF4444;
+            --text: #F0F0FF;
+            --text-sec: #8888AA;
+            --text-muted: #555577;
+            --radius: 12px;
+            --radius-lg: 20px;
+            --font: 'Inter', -apple-system, sans-serif;
+            --transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            --glass: rgba(10, 10, 30, 0.6);
+            --glass-blur: blur(20px);
         }
-      }
 
-      /* ─── Footer ─── */
-      .billing-footer {
-        text-align: center;
-        padding: 28px;
-        color: var(--text-muted);
-        font-size: 0.8rem;
-        border-top: 1px solid rgba(99, 102, 241, 0.06);
-      }
-      .billing-footer a {
-        color: var(--text-sec);
-      }
-      .billing-footer a:hover {
-        color: var(--text);
-      }
+        body {
+            font-family: var(--font);
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            -webkit-font-smoothing: antialiased;
+        }
 
-      @media (max-width: 600px) {
+        a { color: var(--secondary); text-decoration: none; }
+        a:hover { color: var(--text); }
+
+        /* ─── Header ─── */
         .billing-header {
-          padding: 14px 20px;
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 18px 40px;
+            border-bottom: 1px solid var(--border);
+            background: rgba(5, 5, 16, 0.75);
+            backdrop-filter: blur(24px);
+            position: sticky; top: 0; z-index: 100;
         }
+        .billing-logo {
+            font-size: 1.4rem; font-weight: 800; text-decoration: none; color: var(--text);
+        }
+        .billing-logo span {
+            background: var(--gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .billing-nav { display: flex; gap: 24px; }
+        .nav-link { color: var(--text-sec); font-size: 0.9rem; font-weight: 500; transition: color var(--transition); }
+        .nav-link:hover { color: var(--text); text-decoration: none; }
+
+        /* ─── Main ─── */
         .billing-main {
-          padding: 32px 16px;
+            flex: 1; max-width: 760px; margin: 0 auto; width: 100%;
+            padding: 52px 32px 80px;
         }
+
+        .billing-hero { text-align: center; margin-bottom: 40px; }
         .billing-hero h1 {
-          font-size: 1.6rem;
+            font-size: 2.2rem; font-weight: 800; margin-bottom: 10px;
+            background: var(--gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
         }
-      }
+        .billing-hero p { color: var(--text-sec); font-size: 1rem; }
+
+        /* ─── Sections ─── */
+        .billing-section {
+            background: var(--glass);
+            backdrop-filter: var(--glass-blur);
+            -webkit-backdrop-filter: var(--glass-blur);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 28px 32px;
+            margin-bottom: 20px;
+            transition: border-color 0.3s;
+        }
+        .billing-section:hover { border-color: var(--border-hover); }
+
+        .billing-section h2 {
+            font-size: 0.82rem; font-weight: 700; color: var(--text-sec);
+            text-transform: uppercase; letter-spacing: 1px;
+            margin-bottom: 20px; padding-bottom: 10px;
+            border-bottom: 1px solid rgba(99, 102, 241, 0.06);
+        }
+
+        .billing-row {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid rgba(99, 102, 241, 0.05);
+            font-size: 0.9rem;
+        }
+        .billing-row:last-child { border: none; }
+        .billing-row .label { color: var(--text-sec); }
+        .billing-row .value { font-weight: 600; }
+        .billing-row .value.active { color: var(--success); }
+        .billing-row .value.cancelled { color: var(--danger); }
+        .billing-row .value.past_due { color: var(--warning); }
+
+        /* ─── Usage bars ─── */
+        .usage-bar-wrap { margin-top: 10px; }
+        .usage-label {
+            display: flex; justify-content: space-between;
+            font-size: 0.78rem; color: var(--text-sec); margin-bottom: 5px;
+        }
+        .usage-track {
+            height: 6px; background: rgba(99, 102, 241, 0.08);
+            border-radius: 4px; overflow: hidden;
+        }
+        .usage-fill {
+            height: 100%; border-radius: 4px;
+            background: var(--gradient);
+            transition: width 0.5s ease;
+        }
+        .usage-fill.warn { background: linear-gradient(90deg, #F59E0B, #EF4444); }
+        .usage-fill.exceeded { background: linear-gradient(90deg, #EF4444, #DC2626); }
+
+        /* ─── Buttons ─── */
+        .billing-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 8px; }
+        .btn {
+            padding: 11px 24px; border-radius: var(--radius); border: none;
+            font-size: 0.88rem; font-weight: 600; cursor: pointer;
+            transition: var(--transition); font-family: var(--font);
+        }
+        .btn:hover { opacity: 0.85; }
+        .btn-primary {
+            background: var(--gradient); color: #fff;
+            box-shadow: 0 2px 12px rgba(99, 102, 241, 0.2);
+        }
+        .btn-secondary {
+            background: rgba(99, 102, 241, 0.08); color: var(--secondary);
+            border: 1px solid rgba(99, 102, 241, 0.2);
+        }
+        .btn-danger {
+            background: rgba(239, 68, 68, 0.08); color: var(--danger);
+            border: 1px solid rgba(239, 68, 68, 0.15);
+        }
+
+        /* ─── Message ─── */
+        #billing-message {
+            padding: 14px 20px; border-radius: var(--radius);
+            font-size: 0.88rem; margin-bottom: 20px; display: none;
+        }
+        #billing-message.success {
+            background: rgba(16, 185, 129, 0.08); color: var(--success);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+        #billing-message.error {
+            background: rgba(239, 68, 68, 0.08); color: var(--danger);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+        }
+
+        .no-sub { color: var(--text-sec); font-size: 0.9rem; line-height: 1.65; }
+        .plan-loading { color: var(--text-sec); text-align: center; padding: 40px; }
+
+        .spinner {
+            display: inline-block; width: 16px; height: 16px;
+            border: 2px solid rgba(99, 102, 241, 0.15);
+            border-top-color: var(--secondary);
+            border-radius: 50%; animation: spin 0.7s linear infinite;
+            vertical-align: middle; margin-left: 8px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ─── Footer ─── */
+        .billing-footer {
+            text-align: center; padding: 28px;
+            color: var(--text-muted); font-size: 0.8rem;
+            border-top: 1px solid rgba(99, 102, 241, 0.06);
+        }
+        .billing-footer a { color: var(--text-sec); }
+        .billing-footer a:hover { color: var(--text); }
+
+        @media (max-width: 600px) {
+            .billing-header { padding: 14px 20px; }
+            .billing-main { padding: 32px 16px; }
+            .billing-hero h1 { font-size: 1.6rem; }
+        }
     </style>
-  </head>
-  <body>
+</head>
+<body>
     <header class="billing-header">
-      <a href="/" class="billing-logo">Kelion<span>AI</span></a>
-      <nav role="navigation" class="billing-nav">
-        <a href="/" class="nav-link">Home</a>
-        <a href="/pricing/" class="nav-link">Pricing</a>
-      </nav>
+        <a href="/" class="billing-logo">Kelion<span>AI</span></a>
+        <nav class="billing-nav">
+            <a href="/" class="nav-link">Home</a>
+            <a href="/pricing/" class="nav-link">Pricing</a>
+        </nav>
     </header>
 
     <main class="billing-main">
-      <div class="billing-hero">
-        <h1>Billing & Subscription</h1>
-        <p>Manage your plan and payments</p>
-      </div>
+        <div class="billing-hero">
+            <h1>Billing & Subscription</h1>
+            <p>Manage your plan and payments</p>
+        </div>
 
-      <div id="billing-message"></div>
+        <div id="billing-message"></div>
 
-      <div id="billing-content">
-        <div class="plan-loading">Loading account data...<span class="spinner"></span></div>
-      </div>
+        <div id="billing-content">
+            <div class="plan-loading">Loading account data...<span class="spinner"></span></div>
+        </div>
     </main>
 
     <footer class="billing-footer">
-      <p>
-        &copy; 2026 KelionAI. <a href="/api/legal/terms">Terms</a> ·
-        <a href="/api/legal/privacy">Privacy</a>
-      </p>
+        <p>&copy; 2026 KelionAI. <a href="/api/legal/terms">Terms</a> · <a href="/api/legal/privacy">Privacy</a></p>
     </footer>
 
     <script src="/js/shared.js"></script>
     <script>
-      (function () {
+    (function () {
         'use strict';
         var API = window.location.origin;
 
         function showMsg(text, type) {
-          var el = document.getElementById('billing-message');
-          el.textContent = text;
-          el.className = type;
-          el.style.display = 'block';
-          if (type === 'success')
-            setTimeout(function () {
-              el.style.display = 'none';
-            }, 5000);
+            var el = document.getElementById('billing-message');
+            el.textContent = text;
+            el.className = type;
+            el.style.display = 'block';
+            if (type === 'success') setTimeout(function () { el.style.display = 'none'; }, 5000);
         }
 
         function usageBar(used, limit, label) {
-          if (limit === -1) {
-            return (
-              '<div class="usage-bar-wrap"><div class="usage-label"><span>' +
-              label +
-              '</span><span>∞</span></div>' +
-              '<div class="usage-track"><div class="usage-fill" style="width:10%"></div></div></div>'
-            );
-          }
-          var pct = limit > 0 ? Math.min(100, (used / limit) * 100) : 0;
-          var cls = pct >= 100 ? 'exceeded' : pct >= 80 ? 'warn' : '';
-          return (
-            '<div class="usage-bar-wrap"><div class="usage-label"><span>' +
-            label +
-            '</span><span>' +
-            used +
-            ' / ' +
-            limit +
-            '</span></div>' +
-            '<div class="usage-track"><div class="usage-fill ' +
-            cls +
-            '" style="width:' +
-            pct +
-            '%"></div></div></div>'
-          );
+            if (limit === -1) {
+                return '<div class="usage-bar-wrap"><div class="usage-label"><span>' + label + '</span><span>∞</span></div>' +
+                    '<div class="usage-track"><div class="usage-fill" style="width:10%"></div></div></div>';
+            }
+            var pct = limit > 0 ? Math.min(100, (used / limit) * 100) : 0;
+            var cls = pct >= 100 ? 'exceeded' : pct >= 80 ? 'warn' : '';
+            return '<div class="usage-bar-wrap"><div class="usage-label"><span>' + label + '</span><span>' + used + ' / ' + limit + '</span></div>' +
+                '<div class="usage-track"><div class="usage-fill ' + cls + '" style="width:' + pct + '%"></div></div></div>';
         }
 
         async function openPortal() {
-          try {
-            var r = await fetch(API + '/api/payments/portal', {
-              method: 'POST',
-              headers: KShared.authHeaders(),
-            });
-            var d = await r.json();
-            if (d.url) window.location.href = d.url;
-            else showMsg(d.error || 'Portal error.', 'error');
-          } catch (e) {
-            showMsg('Error opening portal.', 'error');
-          }
+            try {
+                var r = await fetch(API + '/api/payments/portal', { method: 'POST', headers: KShared.authHeaders() });
+                var d = await r.json();
+                if (d.url) window.location.href = d.url;
+                else showMsg(d.error || 'Portal error.', 'error');
+            } catch (e) { showMsg('Error opening portal.', 'error'); }
         }
 
         async function init() {
-          var token = KShared.getToken();
-          if (!token) {
-            document.getElementById('billing-content').innerHTML =
-              '<div class="billing-section"><p class="no-sub">You need to be signed in to view billing data. ' +
-              '<a href="/">Go to the app</a> and sign in.</p></div>';
-            return;
-          }
+            var token = KShared.getToken();
+            if (!token) {
+                document.getElementById('billing-content').innerHTML =
+                    '<div class="billing-section"><p class="no-sub">You need to be signed in to view billing data. ' +
+                    '<a href="/">Go to the app</a> and sign in.</p></div>';
+                return;
+            }
 
-          var status;
-          try {
-            var r = await fetch(API + '/api/payments/status', {
-              headers: KShared.authHeaders(),
-            });
-            if (!r.ok) throw new Error('HTTP ' + r.status);
-            status = await r.json();
-          } catch (e) {
-            document.getElementById('billing-content').innerHTML =
-              '<div class="billing-section"><p class="no-sub">Could not load data. Please try again.</p></div>';
-            return;
-          }
+            var status;
+            try {
+                var r = await fetch(API + '/api/payments/status', { headers: KShared.authHeaders() });
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                status = await r.json();
+            } catch (e) {
+                document.getElementById('billing-content').innerHTML =
+                    '<div class="billing-section"><p class="no-sub">Could not load data. Please try again.</p></div>';
+                return;
+            }
 
-          var plan = status.plan || 'free';
-          var sub = status.subscription;
-          var limits = status.limits || {};
-          var usage = status.usage || {};
+            var plan = status.plan || 'free';
+            var sub = status.subscription;
+            var limits = status.limits || {};
+            var usage = status.usage || {};
 
-          var statusText = sub ? sub.status : 'free';
-          var statusClass =
-            statusText === 'active'
-              ? 'active'
-              : statusText === 'cancelled'
-                ? 'cancelled'
-                : statusText === 'past_due'
-                  ? 'past_due'
-                  : '';
+            var statusText = sub ? sub.status : 'free';
+            var statusClass = statusText === 'active' ? 'active' : statusText === 'cancelled' ? 'cancelled' : statusText === 'past_due' ? 'past_due' : '';
 
-          var renewHtml = '';
-          if (sub && sub.current_period_end) {
-            var d = new Date(sub.current_period_end);
-            renewHtml =
-              '<div class="billing-row"><span class="label">Renews</span><span class="value">' +
-              d.toLocaleDateString('en-US', {
-                day: '2-digit',
-                month: 'long',
-                year: 'numeric',
-              }) +
-              '</span></div>';
-          }
+            var renewHtml = '';
+            if (sub && sub.current_period_end) {
+                var d = new Date(sub.current_period_end);
+                renewHtml = '<div class="billing-row"><span class="label">Renews</span><span class="value">' + d.toLocaleDateString('en-US', { day: '2-digit', month: 'long', year: 'numeric' }) + '</span></div>';
+            }
 
-          var planHtml =
-            '<div class="billing-section">' +
-            '<h2>Current Plan</h2>' +
-            '<div class="billing-row"><span class="label">Plan</span><span class="value">' +
-            plan.toUpperCase() +
-            '</span></div>' +
-            (sub
-              ? '<div class="billing-row"><span class="label">Status</span><span class="value ' +
-                statusClass +
-                '">' +
-                statusText +
-                '</span></div>'
-              : '') +
-            renewHtml +
-            '<div class="billing-actions" style="margin-top:16px">';
+            var planHtml = '<div class="billing-section">' +
+                '<h2>Current Plan</h2>' +
+                '<div class="billing-row"><span class="label">Plan</span><span class="value">' + plan.toUpperCase() + '</span></div>' +
+                (sub ? '<div class="billing-row"><span class="label">Status</span><span class="value ' + statusClass + '">' + statusText + '</span></div>' : '') +
+                renewHtml +
+                '<div class="billing-actions" style="margin-top:16px">';
 
-          if (plan === 'free' || plan === 'guest') {
-            planHtml +=
-              '<button type="button" class="btn btn-primary" onclick="window.location.href=\'/pricing/\'">Upgrade plan</button>';
-          } else {
-            planHtml += '<button type="button" class="btn btn-secondary" id="btn-portal">Manage subscription</button>';
-            planHtml += '<button type="button" class="btn btn-danger" id="btn-cancel">Cancel subscription</button>';
-          }
+            if (plan === 'free' || plan === 'guest') {
+                planHtml += '<button class="btn btn-primary" onclick="window.location.href=\'/pricing/\'">Upgrade plan</button>';
+            } else {
+                planHtml += '<button class="btn btn-secondary" id="btn-portal">Manage subscription</button>';
+                planHtml += '<button class="btn btn-danger" id="btn-cancel">Cancel subscription</button>';
+            }
 
-          planHtml += '</div></div>';
+            planHtml += '</div></div>';
 
-          var usageHtml =
-            '<div class="billing-section"><h2>Usage Today</h2>' +
-            usageBar(usage.chat || 0, limits.chat, '💬 Chat') +
-            usageBar(usage.search || 0, limits.search, '🔍 Search') +
-            usageBar(usage.image || 0, limits.image, '🖼 Images') +
-            usageBar(usage.vision || 0, limits.vision, '👁 Vision') +
-            usageBar(usage.tts || 0, limits.tts, '🔊 TTS') +
-            '</div>';
+            var usageHtml = '<div class="billing-section"><h2>Usage Today</h2>' +
+                usageBar(usage.chat || 0, limits.chat, '💬 Chat') +
+                usageBar(usage.search || 0, limits.search, '🔍 Search') +
+                usageBar(usage.image || 0, limits.image, '🖼 Images') +
+                usageBar(usage.vision || 0, limits.vision, '👁 Vision') +
+                usageBar(usage.tts || 0, limits.tts, '🔊 TTS') +
+                '</div>';
 
-          document.getElementById('billing-content').innerHTML = planHtml + usageHtml;
+            document.getElementById('billing-content').innerHTML = planHtml + usageHtml;
 
-          var portalBtn = document.getElementById('btn-portal');
-          if (portalBtn) portalBtn.addEventListener('click', openPortal);
+            var portalBtn = document.getElementById('btn-portal');
+            if (portalBtn) portalBtn.addEventListener('click', openPortal);
 
-          var cancelBtn = document.getElementById('btn-cancel');
-          if (cancelBtn) {
-            cancelBtn.addEventListener('click', function () {
-              if (
-                confirm(
-                  'Are you sure you want to cancel your subscription? You will lose access to premium features at the end of the current period.'
-                )
-              ) {
-                openPortal();
-              }
-            });
-          }
+            var cancelBtn = document.getElementById('btn-cancel');
+            if (cancelBtn) {
+                cancelBtn.addEventListener('click', function () {
+                    if (confirm('Are you sure you want to cancel your subscription? You will lose access to premium features at the end of the current period.')) {
+                        openPortal();
+                    }
+                });
+            }
 
-          var params = new URLSearchParams(window.location.search);
-          if (params.get('payment') === 'success') {
-            showMsg('✅ Payment processed successfully! Your plan has been activated.', 'success');
-            window.history.replaceState({}, '', window.location.pathname);
-          } else if (params.get('payment') === 'cancel') {
-            showMsg('Payment was cancelled.', 'error');
-            window.history.replaceState({}, '', window.location.pathname);
-          }
+            var params = new URLSearchParams(window.location.search);
+            if (params.get('payment') === 'success') {
+                showMsg('✅ Payment processed successfully! Your plan has been activated.', 'success');
+                window.history.replaceState({}, '', window.location.pathname);
+            } else if (params.get('payment') === 'cancel') {
+                showMsg('Payment was cancelled.', 'error');
+                window.history.replaceState({}, '', window.location.pathname);
+            }
         }
 
         if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
         else init();
-      })();
+    })();
     </script>
-  </body>
+</body>
 </html>
