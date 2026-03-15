@@ -387,6 +387,7 @@ Nu înseamnă:
 ### 10.2 Locații declarate
 
 - **Local (PC Adrian):** `C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2`
+- **Container (Codex):** `/workspace/kelionai-v2`
 - **Railway (producție):** proiect `kelionai-v2`
 - **Supabase:** proiect asociat prin `SUPABASE_URL`
 
@@ -422,6 +423,8 @@ npm run dev
 ## 12. GIT
 
 Repo local declarat: `C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2`
+
+Repo local în container (Codex): `/workspace/kelionai-v2`
 
 Nu se presupune existența unui remote până la verificare.
 
