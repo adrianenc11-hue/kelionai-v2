@@ -419,12 +419,17 @@ class KelionBrain {
   /** Update tool stats in DB (async, non-blocking) */
   _updateToolStats(toolId, latencyMs, success) {
     if (!this.supabaseAdmin) return;
+    const existing = this._toolRegistry.get(toolId);
+    const oldCalls = existing?.total_calls || 0;
+    const oldAvg = existing?.avg_latency_ms || latencyMs;
+    const newCalls = oldCalls + 1;
+    const newAvg = Math.round((oldAvg * oldCalls + latencyMs) / newCalls);
     const updates = {
-      total_calls: this._toolRegistry.get(toolId)?.total_calls + 1 || 1,
+      total_calls: newCalls,
       last_used_at: new Date().toISOString(),
-      avg_latency_ms: latencyMs,
+      avg_latency_ms: newAvg,
     };
-    if (!success) updates.total_errors = (this._toolRegistry.get(toolId)?.total_errors || 0) + 1;
+    if (!success) updates.total_errors = (existing?.total_errors || 0) + 1;
 
     this.supabaseAdmin
       .from('brain_tools')
@@ -438,9 +443,9 @@ class KelionBrain {
     // Update local cache
     const local = this._toolRegistry.get(toolId);
     if (local) {
-      local.total_calls = updates.total_calls;
+      local.total_calls = newCalls;
       local.last_used_at = updates.last_used_at;
-      local.avg_latency_ms = latencyMs;
+      local.avg_latency_ms = newAvg;
       if (!success) local.total_errors = updates.total_errors;
     }
   }
