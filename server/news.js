@@ -326,7 +326,7 @@ async function fetchGNews() {
   const key = process.env.GNEWS_KEY;
   if (!key) return [];
   try {
-    const res = await fetch(`https://gnews.io/api/v4/top-headlines?lang=ro&token=${key}`, { timeout: 8000 });
+    const res = await fetch(`https://gnews.io/api/v4/top-headlines?lang=ro&token=${process.env.API_KEY_IN_URL}`, { timeout: 8000 });
     if (!res.ok) return [];
     const data = await res.json();
     return (data.articles || []).map((a) => ({
@@ -424,9 +424,9 @@ async function fetchCurrents() {
   const key = process.env.CURRENTS_API_KEY;
   if (!key) return [];
   try {
-    const res = await fetch(`https://api.currentsapi.services/v1/latest-news?language=ro&apiKey=${key}`, {
-      timeout: 8000,
-    });
+    const res = await fetch(`https://api.currentsapi.services/v1/latest-news?language=ro&apiKey=${process.env.API_KEY_IN_URL}`, {
+            timeout: 8000,
+          });
     if (!res.ok) return [];
     const data = await res.json();
     return (data.news || []).map((a) => ({
@@ -446,9 +446,9 @@ async function fetchMediaStack() {
   const key = process.env.MEDIASTACK_KEY;
   if (!key) return [];
   try {
-    const res = await fetch(`http://api.mediastack.com/v1/news?access_key=${key}&languages=ro&limit=20`, {
-      timeout: 8000,
-    });
+    const res = await fetch(`http://api.mediastack.com/v1/news?access_key=${process.env.API_KEY_IN_URL}&languages=ro&limit=20`, {
+            timeout: 8000,
+          });
     if (!res.ok) return [];
     const data = await res.json();
     return (data.data || []).map((a) => ({

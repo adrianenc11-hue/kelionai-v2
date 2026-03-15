@@ -1,47 +1,67 @@
 <<<<
-  // Method 2: Supabase JWT — verify admin email
-  const authHeader = req.headers['authorization'];
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    const _token = authHeader.slice(7);
-    try {
-      const { getUserFromToken } = req.app.locals;
-      if (getUserFromToken) {
-        getUserFromToken(req)
-          .then((user) => {
-            const adminEmail = (process.env.ADMIN_EMAIL || 'adrianenc11@gmail.com').toLowerCase();
-            if (user && user.email && user.email.toLowerCase() === adminEmail) {
-              return next(); // Admin user authenticated via JWT
-            }
-            res.status(401).json({ error: 'Unauthorized' });
-          })
-          .catch(() => res.status(401).json({ error: 'Unauthorized' }));
-        return; // async — don't fall through
-      }
-    } catch {
-      /* fall through */
-    }
-  }
+          // POST /api/auth/login
+          router.post('/login', validate(loginSchema), async (req, res) => {
+              try {
+                  const { supabase } = req.app.locals;
+                  const { email, password } = req.body;
+                  if (!email || !password) return res.status(400).json({ error: 'Email and password are required' });
+                  if (!supabase) return res.status(503).json({ error: 'Auth service unavailable' });
+                  const { data, error } = await supabase.auth.signInWithPassword({
+                      email,
+                      password,
+                  });
+                  if (error) return res.status(401).json({ error: error.message });
+                  if (!data.user.email_confirmed_at) {
+                      return res.status(403).json({
+                          error: 'Email not verified. Please check your inbox and verify your email before signing in.',
+                      });
+                  }
+                  const adminEmail = (process.env.ADMIN_EMAIL || 'adrianenc11@gmail.com').toLowerCase();
+                  const isAdmin = data.user.email?.toLowerCase() === adminEmail;
+                  res.json({
+                      user: {
+                          id: data.user.id,
+                          email: data.user.email,
+                          name: data.user.user_metadata?.full_name,
+                          role: isAdmin ? 'admin' : data.user.role || 'user',
+                      },
+                      session: data.session,
+                  });
+              } catch {
+                  res.status(500).json({ error: 'Login error' });
+              }
+          });
 ====
-  // Method 2: Supabase JWT — verify admin email
-  const authHeader = req.headers['authorization'];
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    const _token = authHeader.slice(7);
-    try {
-      const { getUserFromToken } = req.app.locals;
-      if (getUserFromToken) {
-        getUserFromToken(req)
-          .then((user) => {
-            const adminEmail = (process.env.ADMIN_EMAIL || 'adrianenc11@gmail.com').toLowerCase();
-            if (user && user.email && user.email.toLowerCase() === adminEmail && authHeader === `Bearer ${process.env.BEARER_TOKEN}`) {
-              return next(); // Admin user authenticated via JWT
-            }
-            res.status(401).json({ error: 'Unauthorized' });
-          })
-          .catch(() => res.status(401).json({ error: 'Unauthorized' }));
-        return; // async — don't fall through
-      }
-    } catch {
-      /* fall through */
-    }
-  }
+          // POST /api/auth/login
+          router.post('/login', authLimiter, validate(loginSchema), async (req, res) => {
+              try {
+                  const { supabase } = req.app.locals;
+                  const { email, password } = req.body;
+                  if (!email || !password) return res.status(400).json({ error: 'Email and password are required' });
+                  if (!supabase) return res.status(503).json({ error: 'Auth service unavailable' });
+                  const { data, error } = await supabase.auth.signInWithPassword({
+                      email,
+                      password,
+                  });
+                  if (error) return res.status(401).json({ error: error.message });
+                  if (!data.user.email_confirmed_at) {
+                      return res.status(403).json({
+                          error: 'Email not verified. Please check your inbox and verify your email before signing in.',
+                      });
+                  }
+                  const adminEmail = (process.env.ADMIN_EMAIL || 'adrianenc11@gmail.com').toLowerCase();
+                  const isAdmin = data.user.email?.toLowerCase() === adminEmail;
+                  res.json({
+                      user: {
+                          id: data.user.id,
+                          email: data.user.email,
+                          name: data.user.user_metadata?.full_name,
+                          role: isAdmin ? 'admin' : data.user.role || 'user',
+                      },
+                      session: data.session,
+                  });
+              } catch {
+                  res.status(500).json({ error: 'Login error' });
+              }
+          });
 >>>>

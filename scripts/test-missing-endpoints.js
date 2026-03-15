@@ -5,10 +5,10 @@ const PORT = process.env.PORT || 3000;
 const BASE_URL = `http://localhost:${PORT}`;
 
 const headers = {
-            'Content-Type': 'application/json',
-            'x-admin-secret': ADMIN_SECRET,
-            Authorization: `Bearer ${process.env.BEARER_TOKEN}`,
-          };
+  'Content-Type': 'application/json',
+  'x-admin-secret': ADMIN_SECRET,
+  Authorization: `Bearer ${process.env.BEARER_TOKEN}`,
+};
 
 /**
  * testEndpoint

@@ -101,11 +101,17 @@ $('auth-submit-btn').addEventListener('click', async () => {
   try {
     const endpoint = isRegister ? '/api/auth/register' : '/api/auth/login';
     const body = isRegister ? { email, password, name } : { email, password };
-    const res = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
+          const sanitizedBody = {};
+          Object.keys(body).forEach((key) => {
+            if (key === 'email' || key === 'password' || key === 'name') {
+              sanitizedBody[key] = body[key];
+            }
+          });
+          const res = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(sanitizedBody),
+          });
     const data = await res.json();
     if (!res.ok) {
       $('auth-err').textContent = data.error || 'Auth failed';
