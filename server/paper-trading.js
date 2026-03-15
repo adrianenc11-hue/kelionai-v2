@@ -9,15 +9,15 @@
  * Open Interest, Whale Activity, Geopolitical Risk, Fear & Greed
  */
 
-const logger = require('pino')({ name: 'paper-trading' });
-const investSim = require('./investment-simulator');
-const learner = require('./trading-learner');
-const marketData = require('./market-data');
+const logger = require("pino")({ name: "paper-trading" });
+const investSim = require("./investment-simulator");
+const learner = require("./trading-learner");
+const marketData = require("./market-data");
 
 // ═══ STATE ═══
 const state = {
   active: false, // ON/OFF
-  mode: 'PAPER', // PAPER or REAL
+  mode: "PAPER", // PAPER or REAL
   startBalance: 100, // €100 start
   cash: 100,
   positions: {}, // { BTC: { qty: 0.001, avgPrice: 60000, openDate: '...' }, ... }
@@ -31,46 +31,51 @@ const state = {
 };
 
 // Assets to trade
-const TRADE_ASSETS = ['BTC', 'ETH', 'SOL', 'Gold', 'Oil', 'S&P 500', 'NASDAQ', 'EUR/USD', 'GBP/USD'];
+const TRADE_ASSETS = [
+  "BTC",
+  "ETH",
+  "SOL",
+  "Gold",
+  "Oil",
+  "S&P 500",
+  "NASDAQ",
+  "EUR/USD",
+  "GBP/USD",
+];
 
 // ═══ MARKET HOURS (UTC) ═══
 const MARKET_HOURS = {
   // Crypto: 24/7
-  BTC: { type: 'crypto', always: true },
-  ETH: { type: 'crypto', always: true },
-  SOL: { type: 'crypto', always: true },
+  BTC: { type: "crypto", always: true },
+  ETH: { type: "crypto", always: true },
+  SOL: { type: "crypto", always: true },
   // Forex: Sun 21:00 → Fri 21:00 UTC (effectively Mon-Fri)
-  'EUR/USD': { type: 'forex', days: [1, 2, 3, 4, 5], open: 0, close: 23 },
-  'GBP/USD': { type: 'forex', days: [1, 2, 3, 4, 5], open: 0, close: 23 },
+  "EUR/USD": { type: "forex", days: [1, 2, 3, 4, 5], open: 0, close: 23 },
+  "GBP/USD": { type: "forex", days: [1, 2, 3, 4, 5], open: 0, close: 23 },
   // US Stocks: Mon-Fri 13:30-20:00 UTC (NYSE/NASDAQ)
-  'S&P 500': { type: 'stocks', days: [1, 2, 3, 4, 5], open: 13, close: 20 },
-  NASDAQ: { type: 'stocks', days: [1, 2, 3, 4, 5], open: 13, close: 20 },
+  "S&P 500": { type: "stocks", days: [1, 2, 3, 4, 5], open: 13, close: 20 },
+  NASDAQ: { type: "stocks", days: [1, 2, 3, 4, 5], open: 13, close: 20 },
   // Commodities: Mon-Fri ~01:00-22:00 UTC (with gaps)
-  Gold: { type: 'commodity', days: [1, 2, 3, 4, 5], open: 1, close: 22 },
-  Oil: { type: 'commodity', days: [1, 2, 3, 4, 5], open: 1, close: 22 },
+  Gold: { type: "commodity", days: [1, 2, 3, 4, 5], open: 1, close: 22 },
+  Oil: { type: "commodity", days: [1, 2, 3, 4, 5], open: 1, close: 22 },
 };
 
 // Forex sessions (UTC hours)
 const FOREX_SESSIONS = {
-  tokyo: { open: 0, close: 9, name: 'Tokyo 🇯🇵', quality: 'medium' },
-  london: { open: 7, close: 16, name: 'London 🇬🇧', quality: 'high' },
-  newYork: { open: 13, close: 22, name: 'New York 🇺🇸', quality: 'high' },
-  sydney: { open: 22, close: 7, name: 'Sydney 🇦🇺', quality: 'low' },
+  tokyo: { open: 0, close: 9, name: "Tokyo 🇯🇵", quality: "medium" },
+  london: { open: 7, close: 16, name: "London 🇬🇧", quality: "high" },
+  newYork: { open: 13, close: 22, name: "New York 🇺🇸", quality: "high" },
+  sydney: { open: 22, close: 7, name: "Sydney 🇦🇺", quality: "low" },
 };
 
 const OVERLAP_HOURS = {
-  'London-NY': { start: 13, end: 16, quality: 'premium', emoji: '🔥' },
-  'Tokyo-London': { start: 7, end: 9, quality: 'good', emoji: '⚡' },
+  "London-NY": { start: 13, end: 16, quality: "premium", emoji: "🔥" },
+  "Tokyo-London": { start: 7, end: 9, quality: "good", emoji: "⚡" },
 };
 
 // Session state tracking
 let _lastSessionLog = {};
 
-/**
- * isMarketOpen
- * @param {*} asset
- * @returns {*}
- */
 function isMarketOpen(asset) {
   const mh = MARKET_HOURS[asset];
   if (!mh || mh.always) return true; // crypto = always open
@@ -86,15 +91,14 @@ function isMarketOpen(asset) {
   return hour >= mh.open && hour < mh.close;
 }
 
-/**
- * getActiveSessions
- * @returns {*}
- */
 function getActiveSessions() {
   const hour = new Date().getUTCHours();
   const active = [];
   for (const [key, ses] of Object.entries(FOREX_SESSIONS)) {
-    const isOpen = ses.open < ses.close ? hour >= ses.open && hour < ses.close : hour >= ses.open || hour < ses.close;
+    const isOpen =
+      ses.open < ses.close
+        ? hour >= ses.open && hour < ses.close
+        : hour >= ses.open || hour < ses.close;
     if (isOpen) active.push({ key, ...ses });
   }
   // Check overlaps
@@ -110,21 +114,28 @@ function getActiveSessions() {
   return active;
 }
 
-/**
- * logSessionChanges
- * @returns {*}
- */
 function logSessionChanges() {
   const sessions = getActiveSessions();
   const activeKeys = sessions
     .map((s) => s.key)
     .sort()
-    .join(',');
+    .join(",");
   if (_lastSessionLog.keys !== activeKeys) {
-    const opened = sessions.filter((s) => !(_lastSessionLog.sessions || []).find((ls) => ls.key === s.key));
-    const closed = (_lastSessionLog.sessions || []).filter((ls) => !sessions.find((s) => s.key === ls.key));
-    opened.forEach((s) => logger.info({ session: s.name, quality: s.quality }, `📈 Session OPENED: ${s.name}`));
-    closed.forEach((s) => logger.info({ session: s.name }, `📉 Session CLOSED: ${s.name}`));
+    const opened = sessions.filter(
+      (s) => !(_lastSessionLog.sessions || []).find((ls) => ls.key === s.key),
+    );
+    const closed = (_lastSessionLog.sessions || []).filter(
+      (ls) => !sessions.find((s) => s.key === ls.key),
+    );
+    opened.forEach((s) =>
+      logger.info(
+        { session: s.name, quality: s.quality },
+        `📈 Session OPENED: ${s.name}`,
+      ),
+    );
+    closed.forEach((s) =>
+      logger.info({ session: s.name }, `📉 Session CLOSED: ${s.name}`),
+    );
     _lastSessionLog = {
       keys: activeKeys,
       sessions,
@@ -136,14 +147,13 @@ function logSessionChanges() {
 
 // ═══ CORE FUNCTIONS ═══
 
-/**
- * getState
- * @returns {*}
- */
 function getState() {
-  const totalPositionValue = Object.entries(state.positions).reduce((sum, [_asset, pos]) => {
-    return sum + pos.qty * (pos.currentPrice || pos.avgPrice);
-  }, 0);
+  const totalPositionValue = Object.entries(state.positions).reduce(
+    (sum, [_asset, pos]) => {
+      return sum + pos.qty * (pos.currentPrice || pos.avgPrice);
+    },
+    0,
+  );
 
   // Session info
   const sessions = getActiveSessions();
@@ -159,14 +169,22 @@ function getState() {
     cash: +state.cash.toFixed(2),
     positionsValue: +totalPositionValue.toFixed(2),
     portfolioValue: +(state.cash + totalPositionValue).toFixed(2),
-    returnPct: +(((state.cash + totalPositionValue - state.startBalance) / state.startBalance) * 100).toFixed(2),
+    returnPct: +(
+      ((state.cash + totalPositionValue - state.startBalance) /
+        state.startBalance) *
+      100
+    ).toFixed(2),
     positions: state.positions,
     openPositions: Object.keys(state.positions).length,
     totalTrades: state.trades.length,
     winCount: state.winCount,
     lossCount: state.lossCount,
     winRate:
-      state.trades.length > 0 ? +((state.winCount / (state.winCount + state.lossCount)) * 100 || 0).toFixed(1) : 0,
+      state.trades.length > 0
+        ? +(
+            (state.winCount / (state.winCount + state.lossCount)) * 100 || 0
+          ).toFixed(1)
+        : 0,
     totalPnL: +state.totalPnL.toFixed(2),
     startedAt: state.startedAt,
     lastSignalCheck: state.lastSignalCheck,
@@ -182,7 +200,7 @@ function getState() {
  * Restores state from Supabase on startup
  */
 function turnOn(supabase) {
-  if (state.active) return { status: 'already_on', state: getState() };
+  if (state.active) return { status: "already_on", state: getState() };
 
   state.active = true;
   state.startedAt = new Date().toISOString();
@@ -193,7 +211,10 @@ function turnOn(supabase) {
   // Restore state from Supabase (survive restarts)
   if (supabase) {
     restoreFromDB(supabase).catch((e) => {
-      logger.error({ err: e.message }, '[PaperTrading] Failed to restore from DB');
+      logger.error(
+        { err: e.message },
+        "[PaperTrading] Failed to restore from DB",
+      );
     });
   }
 
@@ -203,36 +224,36 @@ function turnOn(supabase) {
   // Start self-learning engine (after data downloads)
   learner.startLearning(supabase);
 
-  logger.info({ balance: state.cash }, '[PaperTrading] BOT ON — trading + real data + self-learning active');
+  logger.info(
+    { balance: state.cash },
+    "[PaperTrading] BOT ON — trading + real data + self-learning active",
+  );
 
   // Check signals every 5 minutes
   state.intervalId = setInterval(
     () => {
       checkAndTrade(supabase).catch((e) => {
-        logger.error({ err: e.message }, '[PaperTrading] Trade cycle error');
+        logger.error({ err: e.message }, "[PaperTrading] Trade cycle error");
       });
     },
-    5 * 60 * 1000
+    5 * 60 * 1000,
   );
 
   // First check immediately
-  setTimeout(
-    () =>
-      checkAndTrade(supabase).catch((err) => {
-        console.error(err);
-      }),
-    5000
-  );
+  setTimeout(() => checkAndTrade(supabase).catch(() => {}), 5000);
 
   // ═══ AUTOSAVE — save state to Supabase every 60 seconds ═══
   state._autosaveInterval = setInterval(async () => {
     try {
-      const totalPositionValue = Object.entries(state.positions).reduce((sum, [, pos]) => {
-        return sum + pos.qty * (pos.currentPrice || pos.avgPrice);
-      }, 0);
-      await supabase.from('trading_state').upsert(
+      const totalPositionValue = Object.entries(state.positions).reduce(
+        (sum, [, pos]) => {
+          return sum + pos.qty * (pos.currentPrice || pos.avgPrice);
+        },
+        0,
+      );
+      await supabase.from("trading_state").upsert(
         {
-          id: 'paper_bot',
+          id: "paper_bot",
           cash: +state.cash.toFixed(2),
           positions: JSON.stringify(state.positions),
           positions_value: +totalPositionValue.toFixed(2),
@@ -245,14 +266,14 @@ function turnOn(supabase) {
           active: state.active,
           updated_at: new Date().toISOString(),
         },
-        { onConflict: 'id' }
+        { onConflict: "id" },
       );
     } catch (_e) {
       /* table may not exist yet */
     }
   }, 60 * 1000); // every 60 seconds
 
-  logger.info('[PaperTrading] 💾 Autosave enabled — state saved every 60s');
+  logger.info("[PaperTrading] 💾 Autosave enabled — state saved every 60s");
 
   // ═══ SESSION SCHEDULER — pre-market warmup 5s before open ═══
   state._sessionInterval = setInterval(() => {
@@ -270,25 +291,27 @@ function turnOn(supabase) {
 
       // Calculate seconds until market open
       const openH = mh.open;
-      const secsUntilOpen = (openH - utcH) * 3600 + (0 - utcM) * 60 + (0 - utcS);
+      const secsUntilOpen =
+        (openH - utcH) * 3600 + (0 - utcM) * 60 + (0 - utcS);
 
       // Pre-market warmup: 5 seconds before open
       if (secsUntilOpen > 0 && secsUntilOpen <= 5) {
         logger.info(
-          { asset, type: mh.type, opensIn: secsUntilOpen + 's' },
-          `🔔 PRE-MARKET WARMUP: ${asset} opens in ${secsUntilOpen}s — fetching latest data`
+          { asset, type: mh.type, opensIn: secsUntilOpen + "s" },
+          `🔔 PRE-MARKET WARMUP: ${asset} opens in ${secsUntilOpen}s — fetching latest data`,
         );
 
         // Trigger immediate data refresh for this asset
         getCurrentPrice(asset, supabase)
           .then((price) => {
             if (price) {
-              logger.info({ asset, price }, `📊 ${asset} pre-open price: $${price}`);
+              logger.info(
+                { asset, price },
+                `📊 ${asset} pre-open price: $${price}`,
+              );
             }
           })
-          .catch((err) => {
-            console.error(err);
-          });
+          .catch(() => {});
       }
 
       // Log market open event
@@ -299,12 +322,10 @@ function turnOn(supabase) {
           state._openLogged[todayKey] = true;
           logger.info(
             { asset, type: mh.type, hour: openH },
-            `🔔 MARKET OPEN: ${asset} (${mh.type}) — trading session started`
+            `🔔 MARKET OPEN: ${asset} (${mh.type}) — trading session started`,
           );
           // Immediate trade check on open
-          checkAndTrade(supabase).catch((err) => {
-            console.error(err);
-          });
+          checkAndTrade(supabase).catch(() => {});
         }
       }
 
@@ -316,7 +337,7 @@ function turnOn(supabase) {
           state._closeLogged[todayKey] = true;
           logger.info(
             { asset, type: mh.type, hour: mh.close },
-            `🔕 MARKET CLOSE: ${asset} (${mh.type}) — session ended`
+            `🔕 MARKET CLOSE: ${asset} (${mh.type}) — session ended`,
           );
         }
       }
@@ -326,14 +347,14 @@ function turnOn(supabase) {
     logSessionChanges();
   }, 10 * 1000); // Check every 10 seconds for precise timing
 
-  return { status: 'on', state: getState() };
+  return { status: "on", state: getState() };
 }
 
 /**
  * Turn OFF the bot — stops trading but keeps state
  */
 function turnOff() {
-  if (!state.active) return { status: 'already_off', state: getState() };
+  if (!state.active) return { status: "already_off", state: getState() };
 
   state.active = false;
   if (state.intervalId) {
@@ -351,8 +372,11 @@ function turnOff() {
   learner.stopLearning();
   marketData.stopDownloader();
 
-  logger.info({ pnl: state.totalPnL, trades: state.trades.length }, '[PaperTrading] BOT OFF — all stopped');
-  return { status: 'off', state: getState() };
+  logger.info(
+    { pnl: state.totalPnL, trades: state.trades.length },
+    "[PaperTrading] BOT OFF — all stopped",
+  );
+  return { status: "off", state: getState() };
 }
 
 /**
@@ -384,10 +408,11 @@ async function checkAndTrade(supabase) {
         state.positions[asset].currentPrice = price;
         const pos = state.positions[asset];
         const pnlPct = ((price - pos.avgPrice) / pos.avgPrice) * 100;
-        const holdHours = (Date.now() - new Date(pos.openDate).getTime()) / (1000 * 60 * 60);
+        const holdHours =
+          (Date.now() - new Date(pos.openDate).getTime()) / (1000 * 60 * 60);
 
         let shouldClose = false;
-        let closeReason = '';
+        let closeReason = "";
 
         // Stop-loss: -5%
         if (pnlPct <= -5) {
@@ -405,9 +430,14 @@ async function checkAndTrade(supabase) {
           if (!pos.highestPrice || price > pos.highestPrice) {
             pos.highestPrice = price;
           }
-          const fromPeak = ((price - pos.highestPrice) / pos.highestPrice) * 100;
+          const fromPeak =
+            ((price - pos.highestPrice) / pos.highestPrice) * 100;
           // If was up +5% but dropped 3% from peak → close
-          if (pnlPct > 0 && pos.highestPrice > pos.avgPrice * 1.03 && fromPeak <= -3) {
+          if (
+            pnlPct > 0 &&
+            pos.highestPrice > pos.avgPrice * 1.03 &&
+            fromPeak <= -3
+          ) {
             shouldClose = true;
             closeReason = `TRAILING-STOP (peak: +${(((pos.highestPrice - pos.avgPrice) / pos.avgPrice) * 100).toFixed(1)}%, now: ${pnlPct.toFixed(1)}%)`;
           }
@@ -431,7 +461,7 @@ async function checkAndTrade(supabase) {
           const trade = {
             id: state.trades.length + 1,
             asset,
-            action: 'SELL',
+            action: "SELL",
             price,
             qty: pos.qty,
             value: +sellValue.toFixed(2),
@@ -446,7 +476,7 @@ async function checkAndTrade(supabase) {
 
           logger.info(
             { asset, price, pnl: +pnl.toFixed(2), reason: closeReason },
-            `[PaperTrading] AUTO-CLOSE ${asset} — ${closeReason} — PnL: €${pnl.toFixed(2)}`
+            `[PaperTrading] AUTO-CLOSE ${asset} — ${closeReason} — PnL: €${pnl.toFixed(2)}`,
           );
 
           await saveTrade(supabase, trade);
@@ -465,14 +495,17 @@ async function checkAndTrade(supabase) {
 
       // BUY: signal + confidence + no existing position + market open
       if (
-        signal === 'BUY' &&
+        signal === "BUY" &&
         confidence >= rules.minConfidence &&
         !state.positions[asset] &&
         state.cash > 0 &&
         marketOpen &&
         rules.enabled
       ) {
-        const allocation = Math.min(state.cash, state.cash * rules.maxAllocation);
+        const allocation = Math.min(
+          state.cash,
+          state.cash * rules.maxAllocation,
+        );
         if (allocation < 1) continue;
 
         const qty = allocation / price;
@@ -488,7 +521,7 @@ async function checkAndTrade(supabase) {
         const trade = {
           id: state.trades.length + 1,
           asset,
-          action: 'BUY',
+          action: "BUY",
           price,
           qty,
           value: +allocation.toFixed(2),
@@ -506,11 +539,15 @@ async function checkAndTrade(supabase) {
             value: +allocation.toFixed(2),
             confidence,
           },
-          `[PaperTrading] BUY ${asset}`
+          `[PaperTrading] BUY ${asset}`,
         );
 
         await saveTrade(supabase, trade);
-      } else if (signal === 'SELL' && confidence >= rules.minConfidence - 10 && state.positions[asset]) {
+      } else if (
+        signal === "SELL" &&
+        confidence >= rules.minConfidence - 10 &&
+        state.positions[asset]
+      ) {
         // Signal-based SELL
         const pos = state.positions[asset];
         const sellValue = pos.qty * price;
@@ -525,7 +562,7 @@ async function checkAndTrade(supabase) {
         const trade = {
           id: state.trades.length + 1,
           asset,
-          action: 'SELL',
+          action: "SELL",
           price,
           qty: pos.qty,
           value: +sellValue.toFixed(2),
@@ -533,7 +570,7 @@ async function checkAndTrade(supabase) {
           date: new Date().toISOString(),
           pnl: +pnl.toFixed(2),
           holdTime: timeDiff(pos.openDate, new Date().toISOString()),
-          reason: 'SIGNAL-SELL',
+          reason: "SIGNAL-SELL",
         };
         state.trades.push(trade);
         delete state.positions[asset];
@@ -545,33 +582,30 @@ async function checkAndTrade(supabase) {
             pnl: +pnl.toFixed(2),
             total: +state.totalPnL.toFixed(2),
           },
-          `[PaperTrading] SELL ${asset} — PnL: €${pnl.toFixed(2)}`
+          `[PaperTrading] SELL ${asset} — PnL: €${pnl.toFixed(2)}`,
         );
 
         await saveTrade(supabase, trade);
       }
     } catch (e) {
-      logger.warn({ asset, err: e.message }, `[PaperTrading] Error processing ${asset}`);
+      logger.warn(
+        { asset, err: e.message },
+        `[PaperTrading] Error processing ${asset}`,
+      );
     }
   }
 }
 
 // ═══ HELPERS ═══
 
-/**
- * getCurrentPrice
- * @param {*} asset
- * @param {*} supabase
- * @returns {*}
- */
 async function getCurrentPrice(asset, supabase) {
   try {
     // Try to get latest from Supabase first
     const { data } = await supabase
-      .from('trading_price_history')
-      .select('close')
-      .eq('asset', asset)
-      .order('date', { ascending: false })
+      .from("trading_price_history")
+      .select("close")
+      .eq("asset", asset)
+      .order("date", { ascending: false })
       .limit(1);
     if (data?.[0]?.close) return data[0].close;
   } catch (_e) {
@@ -580,23 +614,20 @@ async function getCurrentPrice(asset, supabase) {
 
   // NO FAKE FALLBACK — return 0 if no real price in DB
   // Bot will skip assets without real data
-  logger.warn({ asset }, `[PaperTrading] No real price for ${asset} — skipping (no fallback)`);
+  logger.warn(
+    { asset },
+    `[PaperTrading] No real price for ${asset} — skipping (no fallback)`,
+  );
   return 0;
 }
 
-/**
- * getRecentPrices
- * @param {*} asset
- * @param {*} supabase
- * @returns {*}
- */
 async function getRecentPrices(asset, supabase) {
   try {
     const { data } = await supabase
-      .from('trading_price_history')
-      .select('close')
-      .eq('asset', asset)
-      .order('date', { ascending: true })
+      .from("trading_price_history")
+      .select("close")
+      .eq("asset", asset)
+      .order("date", { ascending: true })
       .limit(100);
     if (data && data.length > 0) return data.map((d) => d.close);
   } catch (_e) {
@@ -605,19 +636,16 @@ async function getRecentPrices(asset, supabase) {
 
   // NO SYNTHETIC DATA — return null if no real history
   // Bot will skip this asset (requires 50+ real candles)
-  logger.info({ asset }, `[PaperTrading] No real price history for ${asset} — skipping (no synthetic data)`);
+  logger.info(
+    { asset },
+    `[PaperTrading] No real price history for ${asset} — skipping (no synthetic data)`,
+  );
   return null;
 }
 
-/**
- * saveTrade
- * @param {*} supabase
- * @param {*} trade
- * @returns {*}
- */
 async function saveTrade(supabase, trade) {
   try {
-    await supabase.from('trading_paper_trades').insert({
+    await supabase.from("trading_paper_trades").insert({
       trade_id: trade.id,
       asset: trade.asset,
       action: trade.action,
@@ -628,19 +656,13 @@ async function saveTrade(supabase, trade) {
       pnl: trade.pnl,
       hold_time: trade.holdTime || null,
       created_at: trade.date,
-      mode: state.mode || 'PAPER',
+      mode: state.mode || "PAPER",
     });
   } catch (_e) {
     // Table might not exist yet — will auto-create
   }
 }
 
-/**
- * timeDiff
- * @param {*} start
- * @param {*} end
- * @returns {*}
- */
 function timeDiff(start, end) {
   const diff = new Date(end) - new Date(start);
   const hours = Math.floor(diff / 3600000);
@@ -660,9 +682,9 @@ async function getTradeHistory(supabase) {
   if (supabase) {
     try {
       const { data } = await supabase
-        .from('trading_paper_trades')
-        .select('*')
-        .order('created_at', { ascending: true })
+        .from("trading_paper_trades")
+        .select("*")
+        .order("created_at", { ascending: true })
         .limit(500);
       if (data && data.length > 0) {
         trades = data.map((r) => ({
@@ -676,7 +698,7 @@ async function getTradeHistory(supabase) {
           pnl: r.pnl,
           holdTime: r.hold_time,
           date: r.created_at,
-          mode: r.mode || 'PAPER',
+          mode: r.mode || "PAPER",
         }));
       }
     } catch (_e) {
@@ -699,15 +721,14 @@ async function getTradeHistory(supabase) {
       totalWon: +totalWon.toFixed(2),
       totalLost: +totalLost.toFixed(2),
       netPnL: +(totalWon + totalLost).toFixed(2),
-      winRate: closedTrades.length > 0 ? +((wins.length / closedTrades.length) * 100).toFixed(1) : 0,
+      winRate:
+        closedTrades.length > 0
+          ? +((wins.length / closedTrades.length) * 100).toFixed(1)
+          : 0,
     },
   };
 }
 
-/**
- * undefined
- * @returns {*}
- */
 module.exports = {
   turnOn,
   turnOff,
@@ -738,8 +759,10 @@ function reset(_supabase) {
   // NOTE: Supabase trade history is NEVER deleted
   // Real history persists forever — only in-memory simulation resets
 
-  logger.info('[PaperTrading] RESET — simulation state cleared (DB history preserved)');
-  return { status: 'reset', state: getState() };
+  logger.info(
+    "[PaperTrading] RESET — simulation state cleared (DB history preserved)",
+  );
+  return { status: "reset", state: getState() };
 }
 
 /**
@@ -749,13 +772,13 @@ function reset(_supabase) {
 async function restoreFromDB(supabase) {
   try {
     const { data: trades } = await supabase
-      .from('trading_paper_trades')
-      .select('*')
-      .eq('mode', state.mode)
-      .order('created_at', { ascending: true });
+      .from("trading_paper_trades")
+      .select("*")
+      .eq("mode", state.mode)
+      .order("created_at", { ascending: true });
 
     if (!trades || trades.length === 0) {
-      logger.info('[PaperTrading] No previous trades in DB — starting fresh');
+      logger.info("[PaperTrading] No previous trades in DB — starting fresh");
       return;
     }
 
@@ -782,7 +805,7 @@ async function restoreFromDB(supabase) {
       };
       memTrades.push(trade);
 
-      if (r.action === 'BUY') {
+      if (r.action === "BUY") {
         cash -= r.value;
         positions[r.asset] = {
           qty: r.qty,
@@ -790,7 +813,7 @@ async function restoreFromDB(supabase) {
           currentPrice: r.price,
           openDate: r.created_at,
         };
-      } else if (r.action === 'SELL') {
+      } else if (r.action === "SELL") {
         cash += r.value;
         if (r.pnl !== null) {
           totalPnL += r.pnl;
@@ -815,10 +838,10 @@ async function restoreFromDB(supabase) {
         positions: Object.keys(positions).length,
         pnl: +totalPnL.toFixed(2),
       },
-      `[PaperTrading] Restored ${memTrades.length} trades from DB`
+      `[PaperTrading] Restored ${memTrades.length} trades from DB`,
     );
   } catch (e) {
-    logger.error({ err: e.message }, '[PaperTrading] DB restore failed');
+    logger.error({ err: e.message }, "[PaperTrading] DB restore failed");
   }
 }
 
@@ -827,16 +850,16 @@ async function restoreFromDB(supabase) {
  * When switching to REAL → auto-clears all paper data
  */
 function switchMode(newMode, supabase) {
-  if (newMode === 'REAL' && state.mode === 'PAPER') {
+  if (newMode === "REAL" && state.mode === "PAPER") {
     reset(supabase); // auto-clear paper data
-    state.mode = 'REAL';
-    logger.info('[PaperTrading] Switched to REAL mode — paper data cleared');
-    return { status: 'switched_to_real', state: getState() };
-  } else if (newMode === 'PAPER') {
-    state.mode = 'PAPER';
+    state.mode = "REAL";
+    logger.info("[PaperTrading] Switched to REAL mode — paper data cleared");
+    return { status: "switched_to_real", state: getState() };
+  } else if (newMode === "PAPER") {
+    state.mode = "PAPER";
     state.cash = state.startBalance; // fresh start
-    logger.info('[PaperTrading] Switched to PAPER mode — fresh start');
-    return { status: 'switched_to_paper', state: getState() };
+    logger.info("[PaperTrading] Switched to PAPER mode — fresh start");
+    return { status: "switched_to_paper", state: getState() };
   }
-  return { status: 'no_change', mode: state.mode, state: getState() };
+  return { status: "no_change", mode: state.mode, state: getState() };
 }

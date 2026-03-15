@@ -1,6 +1,6 @@
-'use strict';
+"use strict";
 
-const { z } = require('zod');
+const { z } = require("zod");
 
 // ═══ SCHEMAS ═══
 
@@ -20,14 +20,14 @@ const refreshSchema = z.object({
 });
 
 const chatSchema = z.object({
-  message: z.string().min(1).max(10000).default(''),
-  avatar: z.enum(['kelion', 'kira']).optional(),
+  message: z.string().min(1).max(10000).default(""),
+  avatar: z.enum(["kelion", "kira"]).optional(),
   history: z
     .array(
       z.object({
         role: z.string(),
         content: z.string(),
-      })
+      }),
     )
     .max(100)
     .optional(),
@@ -41,24 +41,24 @@ const chatSchema = z.object({
 
 const speakSchema = z.object({
   text: z.string().min(1).max(10000),
-  avatar: z.enum(['kelion', 'kira']).optional(),
+  avatar: z.enum(["kelion", "kira"]).optional(),
   language: z.string().min(2).max(10).optional(),
   mood: z
     .enum([
-      'happy',
-      'sad',
-      'laughing',
-      'thinking',
-      'excited',
-      'concerned',
-      'neutral',
-      'surprised',
-      'playful',
-      'determined',
-      'loving',
-      'sleepy',
-      'frustrated',
-      'anxious',
+      "happy",
+      "sad",
+      "laughing",
+      "thinking",
+      "excited",
+      "concerned",
+      "neutral",
+      "surprised",
+      "playful",
+      "determined",
+      "loving",
+      "sleepy",
+      "frustrated",
+      "anxious",
     ])
     .optional(),
 });
@@ -69,12 +69,12 @@ const listenSchema = z
     audio: z.string().min(1).optional(),
   })
   .refine((data) => data.text !== undefined || data.audio !== undefined, {
-    message: 'text sau audio obligatoriu',
+    message: "text sau audio obligatoriu",
   });
 
 const visionSchema = z.object({
   image: z.string().min(1),
-  avatar: z.enum(['kelion', 'kira']).optional(),
+  avatar: z.enum(["kelion", "kira"]).optional(),
   language: z.string().min(2).max(10).optional(),
 });
 
@@ -93,7 +93,7 @@ const imagineSchema = z.object({
 });
 
 const memorySchema = z.object({
-  action: z.enum(['save', 'load', 'list']),
+  action: z.enum(["save", "load", "list"]),
   key: z.string().max(200).optional(),
   value: z.any().optional(),
 });
@@ -132,19 +132,14 @@ const referralRedeemSchema = z.object({
 
 // ═══ MIDDLEWARE FACTORY ═══
 
-/**
- * validate
- * @param {*} schema
- * @returns {*}
- */
 function validate(schema) {
   return (req, res, next) => {
     const result = schema.safeParse(req.body);
     if (!result.success) {
       return res.status(400).json({
-        error: 'Validation failed',
+        error: "Validation failed",
         details: result.error.issues.map((i) => ({
-          field: i.path.join('.'),
+          field: i.path.join("."),
           message: i.message,
         })),
       });
@@ -154,10 +149,6 @@ function validate(schema) {
   };
 }
 
-/**
- * undefined
- * @returns {*}
- */
 module.exports = {
   validate,
   registerSchema,

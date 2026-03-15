@@ -1,4 +1,4 @@
-'use strict';
+"use strict";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // KelionAI v2 — TRADE EXECUTOR ENGINE (Expert Level)
@@ -6,8 +6,8 @@
 // Macro intelligence: Fear & Greed, Market Regime, Volatility Guard
 // ═══════════════════════════════════════════════════════════════════════════
 
-const ccxt = require('ccxt');
-const logger = require('./logger');
+const ccxt = require("ccxt");
+const logger = require("./logger");
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CONFIGURATION
@@ -17,8 +17,8 @@ const logger = require('./logger');
 const RISK_PROFILES = {
   conservative: {
     // 1% risk — VERY SELECTIVE
-    name: 'CONSERVATIVE',
-    emoji: '🛡️',
+    name: "CONSERVATIVE",
+    emoji: "🛡️",
     riskPct: 1,
     MAX_RISK_PCT: 0.01,
     MIN_CONFLUENCE: 80,
@@ -40,8 +40,8 @@ const RISK_PROFILES = {
   },
   moderate: {
     // 2% risk (DEFAULT) — OPTIMIZED from 60→75% confluence, wider SL/TP
-    name: 'MODERATE',
-    emoji: '⚖️',
+    name: "MODERATE",
+    emoji: "⚖️",
     riskPct: 2,
     MAX_RISK_PCT: 0.02,
     MIN_CONFLUENCE: 75,
@@ -63,8 +63,8 @@ const RISK_PROFILES = {
   },
   aggressive: {
     // 5% risk
-    name: 'AGGRESSIVE',
-    emoji: '🔥',
+    name: "AGGRESSIVE",
+    emoji: "🔥",
     riskPct: 5,
     MAX_RISK_PCT: 0.05,
     MIN_CONFLUENCE: 55,
@@ -81,13 +81,13 @@ const RISK_PROFILES = {
       weekly: 25.2,
       monthly: 161,
       sixMonths: 31820,
-      yearly: 'extreme',
+      yearly: "extreme",
     },
   },
   yolo: {
     // 10% risk
-    name: 'YOLO',
-    emoji: '💀',
+    name: "YOLO",
+    emoji: "💀",
     riskPct: 10,
     MAX_RISK_PCT: 0.1,
     MIN_CONFLUENCE: 50,
@@ -103,14 +103,14 @@ const RISK_PROFILES = {
       daily: 6.5,
       weekly: 55.9,
       monthly: 562,
-      sixMonths: 'extreme',
-      yearly: 'extreme',
+      sixMonths: "extreme",
+      yearly: "extreme",
     },
   },
 };
 
 // Active profile (changeable via API)
-let activeProfile = 'moderate';
+let activeProfile = "moderate";
 
 const CONFIG = {
   ...RISK_PROFILES[activeProfile],
@@ -120,21 +120,16 @@ const CONFIG = {
   EXTREME_FEAR_THRESHOLD: 20,
   EXTREME_GREED_THRESHOLD: 80,
   CORRELATED_ASSETS: {
-    BTC: ['ETH', 'SOL'],
-    ETH: ['BTC', 'SOL'],
-    SOL: ['BTC', 'ETH'],
+    BTC: ["ETH", "SOL"],
+    ETH: ["BTC", "SOL"],
+    SOL: ["BTC", "ETH"],
   },
 };
 
-/**
- * setRiskProfile
- * @param {*} profile
- * @returns {*}
- */
 function setRiskProfile(profile) {
   if (!RISK_PROFILES[profile])
     return {
-      error: `Unknown profile. Available: ${Object.keys(RISK_PROFILES).join(', ')}`,
+      error: `Unknown profile. Available: ${Object.keys(RISK_PROFILES).join(", ")}`,
     };
   activeProfile = profile;
   const p = RISK_PROFILES[profile];
@@ -148,10 +143,6 @@ function setRiskProfile(profile) {
   };
 }
 
-/**
- * getRiskProfile
- * @returns {*}
- */
 function getRiskProfile() {
   const p = RISK_PROFILES[activeProfile];
   return {
@@ -159,21 +150,21 @@ function getRiskProfile() {
     name: p.name,
     emoji: p.emoji,
     riskPct: p.riskPct,
-    stopLoss: p.DEFAULT_STOP_LOSS_PCT * 100 + '%',
-    takeProfit: p.DEFAULT_TAKE_PROFIT_PCT * 100 + '%',
-    rr: '2:1',
+    stopLoss: p.DEFAULT_STOP_LOSS_PCT * 100 + "%",
+    takeProfit: p.DEFAULT_TAKE_PROFIT_PCT * 100 + "%",
+    rr: "2:1",
     maxPositions: p.MAX_OPEN_POSITIONS,
     maxDailyTrades: p.MAX_DAILY_TRADES,
-    dailyLossLimit: p.MAX_DAILY_LOSS_PCT * 100 + '%',
-    weeklyLossLimit: p.MAX_WEEKLY_LOSS_PCT * 100 + '%',
+    dailyLossLimit: p.MAX_DAILY_LOSS_PCT * 100 + "%",
+    weeklyLossLimit: p.MAX_WEEKLY_LOSS_PCT * 100 + "%",
     projections: p.projections,
     allProfiles: Object.entries(RISK_PROFILES).map(([k, v]) => ({
       id: k,
       name: v.name,
       emoji: v.emoji,
-      risk: v.riskPct + '%',
-      sl: v.DEFAULT_STOP_LOSS_PCT * 100 + '%',
-      tp: v.DEFAULT_TAKE_PROFIT_PCT * 100 + '%',
+      risk: v.riskPct + "%",
+      sl: v.DEFAULT_STOP_LOSS_PCT * 100 + "%",
+      tp: v.DEFAULT_TAKE_PROFIT_PCT * 100 + "%",
     })),
   };
 }
@@ -186,113 +177,99 @@ let fearGreedCache = { value: null, label: null, ts: 0 };
 let weeklyPnL = 0;
 let weekStart = new Date().toISOString().slice(0, 10);
 
-/**
- * fetchFearAndGreed
- * @returns {*}
- */
 async function fetchFearAndGreed() {
-  if (fearGreedCache.value !== null && Date.now() - fearGreedCache.ts < 30 * 60 * 1000) {
+  if (
+    fearGreedCache.value !== null &&
+    Date.now() - fearGreedCache.ts < 30 * 60 * 1000
+  ) {
     return fearGreedCache;
   }
   try {
-    const r = await fetch('https://api.alternative.me/fng/?limit=1');
+    const r = await fetch("https://api.alternative.me/fng/?limit=1");
     if (r.ok) {
       const d = await r.json();
       if (d.data?.[0]) {
-        const value = parseInt(d.data[0].value, 10);
+        const value = parseInt(d.data[0].value);
         const label = d.data[0].value_classification;
-        let signal = 'HOLD';
-        if (value <= CONFIG.EXTREME_FEAR_THRESHOLD) signal = 'BUY';
-        else if (value >= CONFIG.EXTREME_GREED_THRESHOLD) signal = 'SELL';
-        else if (value < 40) signal = 'BUY';
-        else if (value > 60) signal = 'SELL';
+        let signal = "HOLD";
+        if (value <= CONFIG.EXTREME_FEAR_THRESHOLD) signal = "BUY";
+        else if (value >= CONFIG.EXTREME_GREED_THRESHOLD) signal = "SELL";
+        else if (value < 40) signal = "BUY";
+        else if (value > 60) signal = "SELL";
         fearGreedCache = {
           value,
           label,
           signal,
           ts: Date.now(),
-          source: 'alternative.me',
+          source: "alternative.me",
         };
-        logger.info({ component: 'Macro', value, label, signal }, `🧠 Fear & Greed: ${value} (${label}) → ${signal}`);
+        logger.info(
+          { component: "Macro", value, label, signal },
+          `🧠 Fear & Greed: ${value} (${label}) → ${signal}`,
+        );
         return fearGreedCache;
       }
     }
   } catch (e) {
-    logger.warn({ component: 'Macro', err: e.message }, 'Fear & Greed fetch failed');
+    logger.warn(
+      { component: "Macro", err: e.message },
+      "Fear & Greed fetch failed",
+    );
   }
   // NO FAKE FALLBACK — return null if real API fails, trading will skip macro check
   return null;
 }
 
-/**
- * detectMarketRegime
- * @param {*} adx
- * @param {*} atrPct
- * @param {*} roc
- * @returns {*}
- */
 function detectMarketRegime(adx, atrPct, roc) {
   const adxVal = adx?.adx || 20;
   const absRoc = Math.abs(roc?.value || 0);
   if (adxVal > 30 && absRoc > 3) {
     return {
-      regime: 'STRONG_TREND',
+      regime: "STRONG_TREND",
       tradeable: true,
-      strategy: 'Follow the trend — EMA crossover + MACD',
+      strategy: "Follow the trend — EMA crossover + MACD",
       riskMultiplier: 1.0,
     };
   }
   if (atrPct > CONFIG.MAX_VOLATILITY_PCT) {
     return {
-      regime: 'VOLATILE_CHAOS',
+      regime: "VOLATILE_CHAOS",
       tradeable: false,
-      strategy: 'DO NOT TRADE — volatility too high',
+      strategy: "DO NOT TRADE — volatility too high",
       riskMultiplier: 0,
     };
   }
   if (adxVal > 20 && adxVal <= 30) {
     return {
-      regime: 'WEAK_TREND',
+      regime: "WEAK_TREND",
       tradeable: true,
-      strategy: 'Trade cautiously — half position',
+      strategy: "Trade cautiously — half position",
       riskMultiplier: 0.5,
     };
   }
   return {
-    regime: 'RANGING',
+    regime: "RANGING",
     tradeable: true,
-    strategy: 'Mean reversion — Bollinger + RSI',
+    strategy: "Mean reversion — Bollinger + RSI",
     riskMultiplier: 0.5,
   };
 }
 
-/**
- * checkCorrelationBlock
- * @param {*} symbol
- * @param {*} positions
- * @returns {*}
- */
 function checkCorrelationBlock(symbol, positions) {
-  const asset = symbol.replace('/USDT', '');
+  const asset = symbol.replace("/USDT", "");
   const correlated = CONFIG.CORRELATED_ASSETS[asset] || [];
   if (correlated.length === 0) return { blocked: false };
-  const openAssets = positions.map((p) => p.symbol.replace('/USDT', ''));
+  const openAssets = positions.map((p) => p.symbol.replace("/USDT", ""));
   const conflicting = correlated.filter((c) => openAssets.includes(c));
   if (conflicting.length >= 2) {
     return {
       blocked: true,
-      reason: `Too many correlated positions: ${conflicting.join(', ')} already open`,
+      reason: `Too many correlated positions: ${conflicting.join(", ")} already open`,
     };
   }
   return { blocked: false };
 }
 
-/**
- * volatilityAdjustedSize
- * @param {*} baseSize
- * @param {*} atrPct
- * @returns {*}
- */
 function volatilityAdjustedSize(baseSize, atrPct) {
   if (atrPct <= 0.01) return baseSize;
   if (atrPct <= 0.03) return baseSize * 0.8;
@@ -301,10 +278,6 @@ function volatilityAdjustedSize(baseSize, atrPct) {
   return 0;
 }
 
-/**
- * checkWeeklyReset
- * @returns {*}
- */
 function checkWeeklyReset() {
   const today = new Date().toISOString().slice(0, 10);
   if (new Date().getDay() === 1 && today !== weekStart) {
@@ -313,21 +286,11 @@ function checkWeeklyReset() {
   }
 }
 
-/**
- * recordWeeklyPnL
- * @param {*} pnl
- * @returns {*}
- */
 function recordWeeklyPnL(pnl) {
   checkWeeklyReset();
   weeklyPnL += pnl;
 }
 
-/**
- * isWeeklyLimitHit
- * @param {*} portfolioValue
- * @returns {*}
- */
 function isWeeklyLimitHit(portfolioValue) {
   checkWeeklyReset();
   return weeklyPnL < -portfolioValue * CONFIG.MAX_WEEKLY_LOSS_PCT;
@@ -337,11 +300,6 @@ function isWeeklyLimitHit(portfolioValue) {
 // I. CANDLESTICK PATTERN RECOGNITION (30+ patterns)
 // ═══════════════════════════════════════════════════════════════════════════
 
-/**
- * parseCandle
- * @param {*} c
- * @returns {*}
- */
 function parseCandle(c) {
   const body = Math.abs(c.close - c.open);
   const range = c.high - c.low;
@@ -362,11 +320,6 @@ function parseCandle(c) {
   };
 }
 
-/**
- * detectCandlestickPatterns
- * @param {*} candles
- * @returns {*}
- */
 function detectCandlestickPatterns(candles) {
   if (!candles || candles.length < 5) return [];
   const patterns = [];
@@ -378,87 +331,168 @@ function detectCandlestickPatterns(candles) {
   // Single candle
   if (c.bodyPct < 0.1 && c.range > 0) {
     if (c.upperShadow > c.body * 2 && c.lowerShadow > c.body * 2)
-      patterns.push({ pattern: 'Doji', type: 'neutral', strength: 1 });
+      patterns.push({ pattern: "Doji", type: "neutral", strength: 1 });
     else if (c.upperShadow > c.body * 3 && c.lowerShadow < c.body)
       patterns.push({
-        pattern: 'Gravestone Doji',
-        type: 'bearish',
+        pattern: "Gravestone Doji",
+        type: "bearish",
         strength: 2,
       });
     else if (c.lowerShadow > c.body * 3 && c.upperShadow < c.body)
       patterns.push({
-        pattern: 'Dragonfly Doji',
-        type: 'bullish',
+        pattern: "Dragonfly Doji",
+        type: "bullish",
         strength: 2,
       });
   }
-  if (c.lowerShadow >= c.body * 2 && c.upperShadow < c.body * 0.5 && c.bodyPct < 0.4 && c.bodyPct > 0.05)
-    patterns.push({ pattern: 'Hammer', type: 'bullish', strength: 2 });
-  if (c.upperShadow >= c.body * 2 && c.lowerShadow < c.body * 0.5 && c.bodyPct < 0.4 && c.bodyPct > 0.05)
-    patterns.push({ pattern: 'Inverted Hammer', type: 'bullish', strength: 1 });
-  if (c.lowerShadow >= c.body * 2 && c.upperShadow < c.body * 0.5 && c.bodyPct < 0.4 && p1 && p1.isBullish)
-    patterns.push({ pattern: 'Hanging Man', type: 'bearish', strength: 2 });
-  if (c.upperShadow >= c.body * 2 && c.lowerShadow < c.body * 0.5 && c.bodyPct < 0.4 && p1 && p1.isBullish)
-    patterns.push({ pattern: 'Shooting Star', type: 'bearish', strength: 2 });
+  if (
+    c.lowerShadow >= c.body * 2 &&
+    c.upperShadow < c.body * 0.5 &&
+    c.bodyPct < 0.4 &&
+    c.bodyPct > 0.05
+  )
+    patterns.push({ pattern: "Hammer", type: "bullish", strength: 2 });
+  if (
+    c.upperShadow >= c.body * 2 &&
+    c.lowerShadow < c.body * 0.5 &&
+    c.bodyPct < 0.4 &&
+    c.bodyPct > 0.05
+  )
+    patterns.push({ pattern: "Inverted Hammer", type: "bullish", strength: 1 });
+  if (
+    c.lowerShadow >= c.body * 2 &&
+    c.upperShadow < c.body * 0.5 &&
+    c.bodyPct < 0.4 &&
+    p1 &&
+    p1.isBullish
+  )
+    patterns.push({ pattern: "Hanging Man", type: "bearish", strength: 2 });
+  if (
+    c.upperShadow >= c.body * 2 &&
+    c.lowerShadow < c.body * 0.5 &&
+    c.bodyPct < 0.4 &&
+    p1 &&
+    p1.isBullish
+  )
+    patterns.push({ pattern: "Shooting Star", type: "bearish", strength: 2 });
   if (c.bodyPct > 0.95)
     patterns.push({
-      pattern: c.isBullish ? 'Bullish Marubozu' : 'Bearish Marubozu',
-      type: c.isBullish ? 'bullish' : 'bearish',
+      pattern: c.isBullish ? "Bullish Marubozu" : "Bearish Marubozu",
+      type: c.isBullish ? "bullish" : "bearish",
       strength: 2,
     });
-  if (c.bodyPct > 0.1 && c.bodyPct < 0.3 && c.upperShadow > c.body && c.lowerShadow > c.body)
-    patterns.push({ pattern: 'Spinning Top', type: 'neutral', strength: 1 });
+  if (
+    c.bodyPct > 0.1 &&
+    c.bodyPct < 0.3 &&
+    c.upperShadow > c.body &&
+    c.lowerShadow > c.body
+  )
+    patterns.push({ pattern: "Spinning Top", type: "neutral", strength: 1 });
 
   // Two candle
   if (p1) {
-    if (p1.isBearish && c.isBullish && c.open <= p1.close && c.close >= p1.open && c.body > p1.body)
+    if (
+      p1.isBearish &&
+      c.isBullish &&
+      c.open <= p1.close &&
+      c.close >= p1.open &&
+      c.body > p1.body
+    )
       patterns.push({
-        pattern: 'Bullish Engulfing',
-        type: 'bullish',
+        pattern: "Bullish Engulfing",
+        type: "bullish",
         strength: 3,
       });
-    if (p1.isBullish && c.isBearish && c.open >= p1.close && c.close <= p1.open && c.body > p1.body)
+    if (
+      p1.isBullish &&
+      c.isBearish &&
+      c.open >= p1.close &&
+      c.close <= p1.open &&
+      c.body > p1.body
+    )
       patterns.push({
-        pattern: 'Bearish Engulfing',
-        type: 'bearish',
+        pattern: "Bearish Engulfing",
+        type: "bearish",
         strength: 3,
       });
-    if (p1.isBearish && c.isBullish && c.body < p1.body && c.open > p1.close && c.close < p1.open)
+    if (
+      p1.isBearish &&
+      c.isBullish &&
+      c.body < p1.body &&
+      c.open > p1.close &&
+      c.close < p1.open
+    )
       patterns.push({
-        pattern: 'Bullish Harami',
-        type: 'bullish',
+        pattern: "Bullish Harami",
+        type: "bullish",
         strength: 1,
       });
-    if (p1.isBullish && c.isBearish && c.body < p1.body && c.open < p1.close && c.close > p1.open)
+    if (
+      p1.isBullish &&
+      c.isBearish &&
+      c.body < p1.body &&
+      c.open < p1.close &&
+      c.close > p1.open
+    )
       patterns.push({
-        pattern: 'Bearish Harami',
-        type: 'bearish',
+        pattern: "Bearish Harami",
+        type: "bearish",
         strength: 1,
       });
-    if (p1.isBearish && c.isBullish && c.open < p1.low && c.close > (p1.open + p1.close) / 2 && c.close < p1.open)
-      patterns.push({ pattern: 'Piercing Line', type: 'bullish', strength: 2 });
-    if (p1.isBullish && c.isBearish && c.open > p1.high && c.close < (p1.open + p1.close) / 2 && c.close > p1.open)
+    if (
+      p1.isBearish &&
+      c.isBullish &&
+      c.open < p1.low &&
+      c.close > (p1.open + p1.close) / 2 &&
+      c.close < p1.open
+    )
+      patterns.push({ pattern: "Piercing Line", type: "bullish", strength: 2 });
+    if (
+      p1.isBullish &&
+      c.isBearish &&
+      c.open > p1.high &&
+      c.close < (p1.open + p1.close) / 2 &&
+      c.close > p1.open
+    )
       patterns.push({
-        pattern: 'Dark Cloud Cover',
-        type: 'bearish',
+        pattern: "Dark Cloud Cover",
+        type: "bearish",
         strength: 2,
       });
-    if (Math.abs(p1.low - c.low) < c.range * 0.05 && p1.isBearish && c.isBullish)
+    if (
+      Math.abs(p1.low - c.low) < c.range * 0.05 &&
+      p1.isBearish &&
+      c.isBullish
+    )
       patterns.push({
-        pattern: 'Tweezer Bottom',
-        type: 'bullish',
+        pattern: "Tweezer Bottom",
+        type: "bullish",
         strength: 2,
       });
-    if (Math.abs(p1.high - c.high) < c.range * 0.05 && p1.isBullish && c.isBearish)
-      patterns.push({ pattern: 'Tweezer Top', type: 'bearish', strength: 2 });
+    if (
+      Math.abs(p1.high - c.high) < c.range * 0.05 &&
+      p1.isBullish &&
+      c.isBearish
+    )
+      patterns.push({ pattern: "Tweezer Top", type: "bearish", strength: 2 });
   }
 
   // Three candle
   if (p1 && p2) {
-    if (p2.isBearish && p1.bodyPct < 0.2 && c.isBullish && c.close > (p2.open + p2.close) / 2)
-      patterns.push({ pattern: 'Morning Star', type: 'bullish', strength: 3 });
-    if (p2.isBullish && p1.bodyPct < 0.2 && c.isBearish && c.close < (p2.open + p2.close) / 2)
-      patterns.push({ pattern: 'Evening Star', type: 'bearish', strength: 3 });
+    if (
+      p2.isBearish &&
+      p1.bodyPct < 0.2 &&
+      c.isBullish &&
+      c.close > (p2.open + p2.close) / 2
+    )
+      patterns.push({ pattern: "Morning Star", type: "bullish", strength: 3 });
+    if (
+      p2.isBullish &&
+      p1.bodyPct < 0.2 &&
+      c.isBearish &&
+      c.close < (p2.open + p2.close) / 2
+    )
+      patterns.push({ pattern: "Evening Star", type: "bearish", strength: 3 });
     if (
       p2.isBullish &&
       p1.isBullish &&
@@ -470,8 +504,8 @@ function detectCandlestickPatterns(candles) {
       c.bodyPct > 0.5
     )
       patterns.push({
-        pattern: 'Three White Soldiers',
-        type: 'bullish',
+        pattern: "Three White Soldiers",
+        type: "bullish",
         strength: 3,
       });
     if (
@@ -485,32 +519,56 @@ function detectCandlestickPatterns(candles) {
       c.bodyPct > 0.5
     )
       patterns.push({
-        pattern: 'Three Black Crows',
-        type: 'bearish',
+        pattern: "Three Black Crows",
+        type: "bearish",
         strength: 3,
       });
-    if (p2.isBearish && p1.isBullish && p1.body < p2.body && c.isBullish && c.close > p2.open)
+    if (
+      p2.isBearish &&
+      p1.isBullish &&
+      p1.body < p2.body &&
+      c.isBullish &&
+      c.close > p2.open
+    )
       patterns.push({
-        pattern: 'Three Inside Up',
-        type: 'bullish',
+        pattern: "Three Inside Up",
+        type: "bullish",
         strength: 2,
       });
-    if (p2.isBullish && p1.isBearish && p1.body < p2.body && c.isBearish && c.close < p2.open)
+    if (
+      p2.isBullish &&
+      p1.isBearish &&
+      p1.body < p2.body &&
+      c.isBearish &&
+      c.close < p2.open
+    )
       patterns.push({
-        pattern: 'Three Inside Down',
-        type: 'bearish',
+        pattern: "Three Inside Down",
+        type: "bearish",
         strength: 2,
       });
-    if (p2.isBearish && p1.bodyPct < 0.05 && p1.high < p2.low && c.isBullish && c.low > p1.high)
+    if (
+      p2.isBearish &&
+      p1.bodyPct < 0.05 &&
+      p1.high < p2.low &&
+      c.isBullish &&
+      c.low > p1.high
+    )
       patterns.push({
-        pattern: 'Abandoned Baby (Bull)',
-        type: 'bullish',
+        pattern: "Abandoned Baby (Bull)",
+        type: "bullish",
         strength: 3,
       });
-    if (p2.isBullish && p1.bodyPct < 0.05 && p1.low > p2.high && c.isBearish && c.high < p1.low)
+    if (
+      p2.isBullish &&
+      p1.bodyPct < 0.05 &&
+      p1.low > p2.high &&
+      c.isBearish &&
+      c.high < p1.low
+    )
       patterns.push({
-        pattern: 'Abandoned Baby (Bear)',
-        type: 'bearish',
+        pattern: "Abandoned Baby (Bear)",
+        type: "bearish",
         strength: 3,
       });
   }
@@ -521,17 +579,8 @@ function detectCandlestickPatterns(candles) {
 // II. ADVANCED INDICATORS
 // ═══════════════════════════════════════════════════════════════════════════
 
-/**
- * calculateStochastic
- * @param {*} highs
- * @param {*} lows
- * @param {*} closes
- * @param {*} kPeriod
- * @param {*} dPeriod
- * @returns {*}
- */
 function calculateStochastic(highs, lows, closes, kPeriod = 14, dPeriod = 3) {
-  if (closes.length < kPeriod) return { k: 50, d: 50, signal: 'HOLD' };
+  if (closes.length < kPeriod) return { k: 50, d: 50, signal: "HOLD" };
   const kValues = [];
   for (let i = kPeriod - 1; i < closes.length; i++) {
     const hh = Math.max(...highs.slice(i - kPeriod + 1, i + 1));
@@ -541,79 +590,66 @@ function calculateStochastic(highs, lows, closes, kPeriod = 14, dPeriod = 3) {
   const k = kValues[kValues.length - 1];
   const dValues = [];
   for (let i = dPeriod - 1; i < kValues.length; i++) {
-    dValues.push(kValues.slice(i - dPeriod + 1, i + 1).reduce((a, b) => a + b, 0) / dPeriod);
+    dValues.push(
+      kValues.slice(i - dPeriod + 1, i + 1).reduce((a, b) => a + b, 0) /
+        dPeriod,
+    );
   }
   const d = dValues[dValues.length - 1] || k;
-  let signal = 'HOLD';
-  if (k < 20 && d < 20) signal = 'BUY';
-  else if (k > 80 && d > 80) signal = 'SELL';
+  let signal = "HOLD";
+  if (k < 20 && d < 20) signal = "BUY";
+  else if (k > 80 && d > 80) signal = "SELL";
   else if (
     k > d &&
     kValues.length >= 2 &&
     dValues.length >= 2 &&
     kValues[kValues.length - 2] <= dValues[dValues.length - 2]
   )
-    signal = 'BUY';
+    signal = "BUY";
   else if (
     k < d &&
     kValues.length >= 2 &&
     dValues.length >= 2 &&
     kValues[kValues.length - 2] >= dValues[dValues.length - 2]
   )
-    signal = 'SELL';
+    signal = "SELL";
   return { k: Math.round(k * 100) / 100, d: Math.round(d * 100) / 100, signal };
 }
 
-/**
- * calculateWilliamsR
- * @param {*} highs
- * @param {*} lows
- * @param {*} closes
- * @param {*} period
- * @returns {*}
- */
 function calculateWilliamsR(highs, lows, closes, period = 14) {
-  if (closes.length < period) return { value: -50, signal: 'HOLD' };
+  if (closes.length < period) return { value: -50, signal: "HOLD" };
   const i = closes.length - 1;
   const hh = Math.max(...highs.slice(i - period + 1, i + 1));
   const ll = Math.min(...lows.slice(i - period + 1, i + 1));
   const value = hh !== ll ? ((hh - closes[i]) / (hh - ll)) * -100 : -50;
-  let signal = 'HOLD';
-  if (value < -80) signal = 'BUY';
-  else if (value > -20) signal = 'SELL';
+  let signal = "HOLD";
+  if (value < -80) signal = "BUY";
+  else if (value > -20) signal = "SELL";
   return { value: Math.round(value * 100) / 100, signal };
 }
 
-/**
- * calculateATR
- * @param {*} highs
- * @param {*} lows
- * @param {*} closes
- * @param {*} period
- * @returns {*}
- */
 function calculateATR(highs, lows, closes, period = 14) {
   if (closes.length < 2) return 0;
   const trs = [];
   for (let i = 1; i < closes.length; i++) {
-    trs.push(Math.max(highs[i] - lows[i], Math.abs(highs[i] - closes[i - 1]), Math.abs(lows[i] - closes[i - 1])));
+    trs.push(
+      Math.max(
+        highs[i] - lows[i],
+        Math.abs(highs[i] - closes[i - 1]),
+        Math.abs(lows[i] - closes[i - 1]),
+      ),
+    );
   }
   if (trs.length < period) return trs.reduce((a, b) => a + b, 0) / trs.length;
   let atr = trs.slice(0, period).reduce((a, b) => a + b, 0) / period;
-  for (let i = period; i < trs.length; i++) atr = (atr * (period - 1) + trs[i]) / period;
+  for (let i = period; i < trs.length; i++)
+    atr = (atr * (period - 1) + trs[i]) / period;
   return Math.round(atr * 10000) / 10000;
 }
 
-/**
- * calculateADX
- * @param {*} highs
- * @param {*} lows
- * @param {*} closes
- * @param {*} period
- * @returns {*}
- */
 function calculateADX(highs, lows, closes, period = 14) {
-  if (closes.length < period + 1) return { adx: 25, diPlus: 25, diMinus: 25, signal: 'HOLD' };
+  if (closes.length < period + 1)
+    return { adx: 25, diPlus: 25, diMinus: 25, signal: "HOLD" };
   const dmPlus = [],
     dmMinus = [],
     tr = [];
@@ -622,7 +658,13 @@ function calculateADX(highs, lows, closes, period = 14) {
     const down = lows[i - 1] - lows[i];
     dmPlus.push(up > down && up > 0 ? up : 0);
     dmMinus.push(down > up && down > 0 ? down : 0);
-    tr.push(Math.max(highs[i] - lows[i], Math.abs(highs[i] - closes[i - 1]), Math.abs(lows[i] - closes[i - 1])));
+    tr.push(
+      Math.max(
+        highs[i] - lows[i],
+        Math.abs(highs[i] - closes[i - 1]),
+        Math.abs(lows[i] - closes[i - 1]),
+      ),
+    );
   }
   let atr = tr.slice(0, period).reduce((a, b) => a + b, 0);
   let sDmP = dmPlus.slice(0, period).reduce((a, b) => a + b, 0);
@@ -642,12 +684,13 @@ function calculateADX(highs, lows, closes, period = 14) {
       : dx.length > 0
         ? dx.reduce((a, b) => a + b, 0) / dx.length
         : 25;
-  for (let i = period; i < dx.length; i++) adx = (adx * (period - 1) + dx[i]) / period;
+  for (let i = period; i < dx.length; i++)
+    adx = (adx * (period - 1) + dx[i]) / period;
   const diPlus = atr > 0 ? (sDmP / atr) * 100 : 0;
   const diMinus = atr > 0 ? (sDmM / atr) * 100 : 0;
-  let signal = 'HOLD';
-  if (adx > 25 && diPlus > diMinus) signal = 'BUY';
-  else if (adx > 25 && diMinus > diPlus) signal = 'SELL';
+  let signal = "HOLD";
+  if (adx > 25 && diPlus > diMinus) signal = "BUY";
+  else if (adx > 25 && diMinus > diPlus) signal = "SELL";
   return {
     adx: Math.round(adx * 100) / 100,
     diPlus: Math.round(diPlus * 100) / 100,
@@ -656,14 +699,9 @@ function calculateADX(highs, lows, closes, period = 14) {
   };
 }
 
-/**
- * calculateOBV
- * @param {*} closes
- * @param {*} volumes
- * @returns {*}
- */
 function calculateOBV(closes, volumes) {
-  if (!closes || !volumes || closes.length < 2) return { obv: 0, signal: 'HOLD', divergence: null };
+  if (!closes || !volumes || closes.length < 2)
+    return { obv: 0, signal: "HOLD", divergence: null };
   let obv = 0;
   const obvArr = [0];
   for (let i = 1; i < closes.length; i++) {
@@ -677,66 +715,57 @@ function calculateOBV(closes, volumes) {
   const emaPeriod = 20;
   const k = 2 / (emaPeriod + 1);
   obvEMA[0] = obvArr[0];
-  for (let i = 1; i < obvArr.length; i++) obvEMA[i] = obvArr[i] * k + obvEMA[i - 1] * (1 - k);
+  for (let i = 1; i < obvArr.length; i++)
+    obvEMA[i] = obvArr[i] * k + obvEMA[i - 1] * (1 - k);
 
   const obvAboveEMA = obvArr[obvArr.length - 1] > obvEMA[obvEMA.length - 1];
-  const obvMomentum = obvArr.length > 5 ? obvArr[obvArr.length - 1] - obvArr[obvArr.length - 5] : 0;
+  const obvMomentum =
+    obvArr.length > 5
+      ? obvArr[obvArr.length - 1] - obvArr[obvArr.length - 5]
+      : 0;
 
   // Divergence detection (20 bar lookback)
   const lookback = Math.min(20, closes.length - 1);
-  const priceTrend = closes[closes.length - 1] - closes[closes.length - 1 - lookback];
-  const obvTrend = obvArr[obvArr.length - 1] - obvArr[obvArr.length - 1 - lookback];
+  const priceTrend =
+    closes[closes.length - 1] - closes[closes.length - 1 - lookback];
+  const obvTrend =
+    obvArr[obvArr.length - 1] - obvArr[obvArr.length - 1 - lookback];
   let divergence = null;
-  if (priceTrend < 0 && obvTrend > 0) divergence = 'bullish';
-  else if (priceTrend > 0 && obvTrend < 0) divergence = 'bearish';
+  if (priceTrend < 0 && obvTrend > 0) divergence = "bullish";
+  else if (priceTrend > 0 && obvTrend < 0) divergence = "bearish";
 
-  let signal = 'HOLD';
-  if (obvAboveEMA && obvMomentum > 0) signal = 'BUY';
-  else if (!obvAboveEMA && obvMomentum < 0) signal = 'SELL';
+  let signal = "HOLD";
+  if (obvAboveEMA && obvMomentum > 0) signal = "BUY";
+  else if (!obvAboveEMA && obvMomentum < 0) signal = "SELL";
   // Divergence overrides
-  if (divergence === 'bullish') signal = 'BUY';
-  else if (divergence === 'bearish') signal = 'SELL';
+  if (divergence === "bullish") signal = "BUY";
+  else if (divergence === "bearish") signal = "SELL";
 
   return {
     obv,
     obvEMA: +obvEMA[obvEMA.length - 1].toFixed(0),
     signal,
     divergence,
-    momentum: obvMomentum > 0 ? 'rising' : 'falling',
+    momentum: obvMomentum > 0 ? "rising" : "falling",
   };
 }
 
-/**
- * calculateCCI
- * @param {*} highs
- * @param {*} lows
- * @param {*} closes
- * @param {*} period
- * @returns {*}
- */
 function calculateCCI(highs, lows, closes, period = 20) {
-  if (closes.length < period) return { value: 0, signal: 'HOLD' };
+  if (closes.length < period) return { value: 0, signal: "HOLD" };
   const tp = closes.map((c, i) => (highs[i] + lows[i] + c) / 3);
   const tpSlice = tp.slice(-period);
   const mean = tpSlice.reduce((a, b) => a + b, 0) / period;
   const meanDev = tpSlice.reduce((a, b) => a + Math.abs(b - mean), 0) / period;
-  const value = meanDev > 0 ? (tp[tp.length - 1] - mean) / (0.015 * meanDev) : 0;
-  let signal = 'HOLD';
-  if (value < -100) signal = 'BUY';
-  else if (value > 100) signal = 'SELL';
+  const value =
+    meanDev > 0 ? (tp[tp.length - 1] - mean) / (0.015 * meanDev) : 0;
+  let signal = "HOLD";
+  if (value < -100) signal = "BUY";
+  else if (value > 100) signal = "SELL";
   return { value: Math.round(value * 100) / 100, signal };
 }
 
-/**
- * calculateParabolicSAR
- * @param {*} highs
- * @param {*} lows
- * @param {*} afStart
- * @param {*} afMax
- * @returns {*}
- */
 function calculateParabolicSAR(highs, lows, afStart = 0.02, afMax = 0.2) {
-  if (highs.length < 3) return { sar: 0, trend: 'HOLD' };
+  if (highs.length < 3) return { sar: 0, trend: "HOLD" };
   let isUp = true,
     sar = lows[0],
     ep = highs[0],
@@ -767,27 +796,25 @@ function calculateParabolicSAR(highs, lows, afStart = 0.02, afMax = 0.2) {
       }
     }
   }
-  return { sar: Math.round(sar * 10000) / 10000, trend: isUp ? 'BUY' : 'SELL' };
+  return { sar: Math.round(sar * 10000) / 10000, trend: isUp ? "BUY" : "SELL" };
 }
 
-/**
- * calculateIchimoku
- * @param {*} highs
- * @param {*} lows
- * @param {*} closes
- * @param {*} tenkanP
- * @param {*} kijunP
- * @param {*} senkouBP
- * @returns {*}
- */
-function calculateIchimoku(highs, lows, closes, tenkanP = 9, kijunP = 26, senkouBP = 52) {
+function calculateIchimoku(
+  highs,
+  lows,
+  closes,
+  tenkanP = 9,
+  kijunP = 26,
+  senkouBP = 52,
+) {
   const calc = (h, l, p) => {
     if (h.length < p) return null;
     return (Math.max(...h.slice(-p)) + Math.min(...l.slice(-p))) / 2;
   };
   const tenkan = calc(highs, lows, tenkanP);
   const kijun = calc(highs, lows, kijunP);
-  const senkouA = tenkan !== null && kijun !== null ? (tenkan + kijun) / 2 : null;
+  const senkouA =
+    tenkan !== null && kijun !== null ? (tenkan + kijun) / 2 : null;
   const senkouB = calc(highs, lows, senkouBP);
   const price = closes[closes.length - 1];
 
@@ -795,13 +822,18 @@ function calculateIchimoku(highs, lows, closes, tenkanP = 9, kijunP = 26, senkou
   const chikouIdx = closes.length - 1 - kijunP;
   const chikou = chikouIdx >= 0 ? closes[closes.length - 1] : null;
   const chikouRef = chikouIdx >= 0 ? closes[chikouIdx] : null;
-  const chikouAbove = chikou !== null && chikouRef !== null ? chikou > chikouRef : null;
+  const chikouAbove =
+    chikou !== null && chikouRef !== null ? chikou > chikouRef : null;
 
   // Cloud (kumo) properties
-  const cloudTop = senkouA !== null && senkouB !== null ? Math.max(senkouA, senkouB) : null;
-  const cloudBottom = senkouA !== null && senkouB !== null ? Math.min(senkouA, senkouB) : null;
+  const cloudTop =
+    senkouA !== null && senkouB !== null ? Math.max(senkouA, senkouB) : null;
+  const cloudBottom =
+    senkouA !== null && senkouB !== null ? Math.min(senkouA, senkouB) : null;
   const cloudThickness =
-    cloudTop !== null && cloudBottom !== null ? +(((cloudTop - cloudBottom) / price) * 100).toFixed(2) : 0;
+    cloudTop !== null && cloudBottom !== null
+      ? +(((cloudTop - cloudBottom) / price) * 100).toFixed(2)
+      : 0;
   const priceAboveCloud = cloudTop !== null ? price > cloudTop : null;
   const priceBelowCloud = cloudBottom !== null ? price < cloudBottom : null;
   const _priceInCloud = !priceAboveCloud && !priceBelowCloud;
@@ -810,22 +842,39 @@ function calculateIchimoku(highs, lows, closes, tenkanP = 9, kijunP = 26, senkou
   const kumoTwist =
     senkouA !== null && senkouB !== null
       ? senkouA > senkouB
-        ? 'bullish'
+        ? "bullish"
         : senkouA < senkouB
-          ? 'bearish'
-          : 'flat'
+          ? "bearish"
+          : "flat"
       : null;
 
   // Full signal logic
-  let signal = 'HOLD';
+  let signal = "HOLD";
   const tkCross =
-    tenkan !== null && kijun !== null ? (tenkan > kijun ? 'bullish' : tenkan < kijun ? 'bearish' : 'flat') : null;
+    tenkan !== null && kijun !== null
+      ? tenkan > kijun
+        ? "bullish"
+        : tenkan < kijun
+          ? "bearish"
+          : "flat"
+      : null;
 
-  if (priceAboveCloud && tkCross === 'bullish' && chikouAbove && kumoTwist === 'bullish') signal = 'STRONG BUY';
-  else if (priceAboveCloud && tkCross === 'bullish') signal = 'BUY';
-  else if (priceBelowCloud && tkCross === 'bearish' && chikouAbove === false && kumoTwist === 'bearish')
-    signal = 'STRONG SELL';
-  else if (priceBelowCloud && tkCross === 'bearish') signal = 'SELL';
+  if (
+    priceAboveCloud &&
+    tkCross === "bullish" &&
+    chikouAbove &&
+    kumoTwist === "bullish"
+  )
+    signal = "STRONG BUY";
+  else if (priceAboveCloud && tkCross === "bullish") signal = "BUY";
+  else if (
+    priceBelowCloud &&
+    tkCross === "bearish" &&
+    chikouAbove === false &&
+    kumoTwist === "bearish"
+  )
+    signal = "STRONG SELL";
+  else if (priceBelowCloud && tkCross === "bearish") signal = "SELL";
 
   return {
     tenkan: tenkan ? +tenkan.toFixed(2) : null,
@@ -833,25 +882,21 @@ function calculateIchimoku(highs, lows, closes, tenkanP = 9, kijunP = 26, senkou
     senkouA: senkouA ? +senkouA.toFixed(2) : null,
     senkouB: senkouB ? +senkouB.toFixed(2) : null,
     chikou: chikou ? +chikou.toFixed(2) : null,
-    cloudThickness: cloudThickness + '%',
+    cloudThickness: cloudThickness + "%",
     kumoTwist,
     tkCross,
-    priceVsCloud: priceAboveCloud ? 'ABOVE' : priceBelowCloud ? 'BELOW' : 'INSIDE',
+    priceVsCloud: priceAboveCloud
+      ? "ABOVE"
+      : priceBelowCloud
+        ? "BELOW"
+        : "INSIDE",
     signal,
   };
 }
 
-/**
- * calculateMFI
- * @param {*} highs
- * @param {*} lows
- * @param {*} closes
- * @param {*} volumes
- * @param {*} period
- * @returns {*}
- */
 function calculateMFI(highs, lows, closes, volumes, period = 14) {
-  if (closes.length < period + 1 || !volumes) return { value: 50, signal: 'HOLD' };
+  if (closes.length < period + 1 || !volumes)
+    return { value: 50, signal: "HOLD" };
   const tp = closes.map((c, i) => (highs[i] + lows[i] + c) / 3);
   let posFlow = 0,
     negFlow = 0;
@@ -861,27 +906,23 @@ function calculateMFI(highs, lows, closes, volumes, period = 14) {
     else negFlow += mf;
   }
   const mfi = negFlow > 0 ? 100 - 100 / (1 + posFlow / negFlow) : 100;
-  let signal = 'HOLD';
-  if (mfi < 20) signal = 'BUY';
-  else if (mfi > 80) signal = 'SELL';
+  let signal = "HOLD";
+  if (mfi < 20) signal = "BUY";
+  else if (mfi > 80) signal = "SELL";
   return { value: Math.round(mfi * 100) / 100, signal };
 }
 
-/**
- * calculateROC
- * @param {*} closes
- * @param {*} period
- * @returns {*}
- */
 function calculateROC(closes, period = 12) {
-  if (closes.length < period + 1) return { value: 0, signal: 'HOLD' };
+  if (closes.length < period + 1) return { value: 0, signal: "HOLD" };
   const value =
     closes[closes.length - 1 - period] !== 0
-      ? ((closes[closes.length - 1] - closes[closes.length - 1 - period]) / closes[closes.length - 1 - period]) * 100
+      ? ((closes[closes.length - 1] - closes[closes.length - 1 - period]) /
+          closes[closes.length - 1 - period]) *
+        100
       : 0;
-  let signal = 'HOLD';
-  if (value > 5) signal = 'BUY';
-  else if (value < -5) signal = 'SELL';
+  let signal = "HOLD";
+  if (value > 5) signal = "BUY";
+  else if (value < -5) signal = "SELL";
   return { value: Math.round(value * 100) / 100, signal };
 }
 
@@ -889,41 +930,38 @@ function calculateROC(closes, period = 12) {
 // III. CHART PATTERN DETECTION
 // ═══════════════════════════════════════════════════════════════════════════
 
-/**
- * findPivots
- * @param {*} prices
- * @param {*} window
- * @returns {*}
- */
 function findPivots(prices, window = 5) {
   const peaks = [],
     troughs = [];
   for (let i = window; i < prices.length - window; i++) {
     const slice = prices.slice(i - window, i + window + 1);
-    if (prices[i] === Math.max(...slice)) peaks.push({ index: i, price: prices[i] });
-    if (prices[i] === Math.min(...slice)) troughs.push({ index: i, price: prices[i] });
+    if (prices[i] === Math.max(...slice))
+      peaks.push({ index: i, price: prices[i] });
+    if (prices[i] === Math.min(...slice))
+      troughs.push({ index: i, price: prices[i] });
   }
   return { peaks, troughs };
 }
 
-/**
- * detectChartPatterns
- * @param {*} prices
- * @returns {*}
- */
 function detectChartPatterns(prices) {
   if (prices.length < 50) return [];
   const patterns = [];
   const { peaks, troughs } = findPivots(prices, 5);
   if (peaks.length >= 2) {
     const [p1, p2] = peaks.slice(-2);
-    if (Math.abs(p1.price - p2.price) / p1.price < 0.02 && p2.index - p1.index > 10)
-      patterns.push({ pattern: 'Double Top', type: 'bearish', strength: 3 });
+    if (
+      Math.abs(p1.price - p2.price) / p1.price < 0.02 &&
+      p2.index - p1.index > 10
+    )
+      patterns.push({ pattern: "Double Top", type: "bearish", strength: 3 });
   }
   if (troughs.length >= 2) {
     const [t1, t2] = troughs.slice(-2);
-    if (Math.abs(t1.price - t2.price) / t1.price < 0.02 && t2.index - t1.index > 10)
-      patterns.push({ pattern: 'Double Bottom', type: 'bullish', strength: 3 });
+    if (
+      Math.abs(t1.price - t2.price) / t1.price < 0.02 &&
+      t2.index - t1.index > 10
+    )
+      patterns.push({ pattern: "Double Bottom", type: "bullish", strength: 3 });
   }
   if (peaks.length >= 3) {
     const [ls, h, rs] = peaks.slice(-3);
@@ -934,17 +972,21 @@ function detectChartPatterns(prices) {
       h.price > ls.price * 1.03
     )
       patterns.push({
-        pattern: 'Head & Shoulders',
-        type: 'bearish',
+        pattern: "Head & Shoulders",
+        type: "bearish",
         strength: 3,
       });
   }
   if (troughs.length >= 3) {
     const [ls, h, rs] = troughs.slice(-3);
-    if (h.price < ls.price && h.price < rs.price && Math.abs(ls.price - rs.price) / ls.price < 0.05)
+    if (
+      h.price < ls.price &&
+      h.price < rs.price &&
+      Math.abs(ls.price - rs.price) / ls.price < 0.05
+    )
       patterns.push({
-        pattern: 'Inv Head & Shoulders',
-        type: 'bullish',
+        pattern: "Inv Head & Shoulders",
+        type: "bullish",
         strength: 3,
       });
   }
@@ -952,8 +994,10 @@ function detectChartPatterns(prices) {
   const recent = prices.slice(-50);
   const support = Math.min(...recent);
   const resistance = Math.max(...recent);
-  if ((last - support) / last < 0.01) patterns.push({ pattern: 'At Support', type: 'bullish', strength: 2 });
-  if ((resistance - last) / last < 0.01) patterns.push({ pattern: 'At Resistance', type: 'bearish', strength: 2 });
+  if ((last - support) / last < 0.01)
+    patterns.push({ pattern: "At Support", type: "bullish", strength: 2 });
+  if ((resistance - last) / last < 0.01)
+    patterns.push({ pattern: "At Resistance", type: "bearish", strength: 2 });
   return patterns;
 }
 
@@ -961,11 +1005,6 @@ function detectChartPatterns(prices) {
 // IV. SUPER CONFLUENCE — combines ALL signals + macro
 // ═══════════════════════════════════════════════════════════════════════════
 
-/**
- * calculateSuperConfluence
- * @param {*} indicators
- * @returns {*}
- */
 function calculateSuperConfluence(indicators) {
   const weights = {
     rsi: 8,
@@ -993,8 +1032,8 @@ function calculateSuperConfluence(indicators) {
     BUY: 1,
     HOLD: 0,
     SELL: -1,
-    'STRONG BUY': 1.5,
-    'STRONG SELL': -1.5,
+    "STRONG BUY": 1.5,
+    "STRONG SELL": -1.5,
   };
 
   let weightedScore = 0,
@@ -1007,7 +1046,11 @@ function calculateSuperConfluence(indicators) {
     fibonacci: indicators.fibonacci?.signal,
     volume: indicators.volume?.signal,
     sentiment:
-      indicators.sentiment?.label === 'bullish' ? 'BUY' : indicators.sentiment?.label === 'bearish' ? 'SELL' : 'HOLD',
+      indicators.sentiment?.label === "bullish"
+        ? "BUY"
+        : indicators.sentiment?.label === "bearish"
+          ? "SELL"
+          : "HOLD",
     stochastic: indicators.stochastic?.signal,
     williamsR: indicators.williamsR?.signal,
     adx: indicators.adx?.signal,
@@ -1018,18 +1061,27 @@ function calculateSuperConfluence(indicators) {
     mfi: indicators.mfi?.signal,
     roc: indicators.roc?.signal,
     fearGreed: indicators.fearGreed?.signal,
-    marketRegime: indicators.marketRegime?.tradeable === false ? 'HOLD' : undefined,
+    marketRegime:
+      indicators.marketRegime?.tradeable === false ? "HOLD" : undefined,
   };
 
   if (indicators.candlestickPatterns?.length > 0) {
-    const b = indicators.candlestickPatterns.filter((p) => p.type === 'bullish').reduce((s, p) => s + p.strength, 0);
-    const r = indicators.candlestickPatterns.filter((p) => p.type === 'bearish').reduce((s, p) => s + p.strength, 0);
-    signals.candlestickPatterns = b > r ? 'BUY' : r > b ? 'SELL' : 'HOLD';
+    const b = indicators.candlestickPatterns
+      .filter((p) => p.type === "bullish")
+      .reduce((s, p) => s + p.strength, 0);
+    const r = indicators.candlestickPatterns
+      .filter((p) => p.type === "bearish")
+      .reduce((s, p) => s + p.strength, 0);
+    signals.candlestickPatterns = b > r ? "BUY" : r > b ? "SELL" : "HOLD";
   }
   if (indicators.chartPatterns?.length > 0) {
-    const b = indicators.chartPatterns.filter((p) => p.type === 'bullish').reduce((s, p) => s + p.strength, 0);
-    const r = indicators.chartPatterns.filter((p) => p.type === 'bearish').reduce((s, p) => s + p.strength, 0);
-    signals.chartPatterns = b > r ? 'BUY' : r > b ? 'SELL' : 'HOLD';
+    const b = indicators.chartPatterns
+      .filter((p) => p.type === "bullish")
+      .reduce((s, p) => s + p.strength, 0);
+    const r = indicators.chartPatterns
+      .filter((p) => p.type === "bearish")
+      .reduce((s, p) => s + p.strength, 0);
+    signals.chartPatterns = b > r ? "BUY" : r > b ? "SELL" : "HOLD";
   }
 
   for (const [key, sig] of Object.entries(signals)) {
@@ -1039,21 +1091,24 @@ function calculateSuperConfluence(indicators) {
     }
   }
 
-  if (totalWeight === 0) return { signal: 'HOLD', confidence: 0, details: signals };
+  if (totalWeight === 0)
+    return { signal: "HOLD", confidence: 0, details: signals };
   const normalized = weightedScore / totalWeight;
 
   // Market regime multiplier
   const regimeMultiplier = indicators.marketRegime?.riskMultiplier ?? 1;
-  const adjustedConfidence = Math.round(Math.abs(normalized) * 100 * regimeMultiplier);
+  const adjustedConfidence = Math.round(
+    Math.abs(normalized) * 100 * regimeMultiplier,
+  );
 
-  let signal = 'HOLD';
-  if (normalized >= 0.6) signal = 'STRONG BUY';
-  else if (normalized >= 0.25) signal = 'BUY';
-  else if (normalized <= -0.6) signal = 'STRONG SELL';
-  else if (normalized <= -0.25) signal = 'SELL';
+  let signal = "HOLD";
+  if (normalized >= 0.6) signal = "STRONG BUY";
+  else if (normalized >= 0.25) signal = "BUY";
+  else if (normalized <= -0.6) signal = "STRONG SELL";
+  else if (normalized <= -0.25) signal = "SELL";
 
   // Override: if regime is not tradeable, force HOLD
-  if (indicators.marketRegime?.tradeable === false) signal = 'HOLD';
+  if (indicators.marketRegime?.tradeable === false) signal = "HOLD";
 
   return {
     signal,
@@ -1077,17 +1132,16 @@ let dailyTrades = [];
 let dailyPnL = 0;
 let lastLossTime = 0;
 
-/**
- * initExchange
- * @returns {*}
- */
 function initExchange() {
   const apiKey = process.env.BINANCE_API_KEY;
   const secret = process.env.BINANCE_API_SECRET;
-  const testnet = process.env.BINANCE_TESTNET === 'true';
+  const testnet = process.env.BINANCE_TESTNET === "true";
   if (!apiKey || !secret) {
     paperMode = true;
-    logger.info({ component: 'TradeExecutor' }, '📝 No Binance API keys — PAPER MODE');
+    logger.info(
+      { component: "TradeExecutor" },
+      "📝 No Binance API keys — PAPER MODE",
+    );
     return;
   }
   try {
@@ -1096,41 +1150,35 @@ function initExchange() {
       secret,
       sandbox: testnet,
       enableRateLimit: true,
-      options: { defaultType: 'spot' },
+      options: { defaultType: "spot" },
     });
     paperMode = testnet;
-    logger.info({ component: 'TradeExecutor', testnet }, `🔗 Binance ${testnet ? 'TESTNET' : '🔴 LIVE'}`);
+    logger.info(
+      { component: "TradeExecutor", testnet },
+      `🔗 Binance ${testnet ? "TESTNET" : "🔴 LIVE"}`,
+    );
   } catch (err) {
-    logger.error({ component: 'TradeExecutor', err: err.message }, 'Init failed');
+    logger.error(
+      { component: "TradeExecutor", err: err.message },
+      "Init failed",
+    );
     paperMode = true;
   }
 }
 
-/**
- * getBalance
- * @returns {*}
- */
 async function getBalance() {
   if (paperMode || !exchange) return paperBalance;
   try {
     const b = await exchange.fetchBalance();
     return b.total || {};
   } catch (err) {
-    logger.error({ err: err.message }, 'Balance failed');
+    logger.error({ err: err.message }, "Balance failed");
     return paperBalance;
   }
 }
 
-/**
- * calculatePositionSize
- * @param {*} balance
- * @param {*} price
- * @param {*} stopLossPrice
- * @param {*} atrPct
- * @returns {*}
- */
 function calculatePositionSize(balance, price, stopLossPrice, atrPct) {
-  const maxTradeAmount = parseFloat(process.env.MAX_TRADE_AMOUNT || '100');
+  const maxTradeAmount = parseFloat(process.env.MAX_TRADE_AMOUNT || "100");
   const riskAmount = (balance.USDT || 0) * CONFIG.MAX_RISK_PCT;
   const riskPerUnit = Math.abs(price - stopLossPrice);
   const positionByRisk = riskPerUnit > 0 ? riskAmount / riskPerUnit : 0;
@@ -1145,19 +1193,12 @@ function calculatePositionSize(balance, price, stopLossPrice, atrPct) {
 // VI. ORDER EXECUTION with full protection
 // ═══════════════════════════════════════════════════════════════════════════
 
-/**
- * executeTrade
- * @param {*} action
- * @param {*} symbol
- * @param {*} price
- * @param {*} analysis
- * @param {*} atrPct
- * @returns {*}
- */
 async function executeTrade(action, symbol, price, analysis, atrPct) {
   const now = Date.now();
   const today = new Date().toDateString();
-  dailyTrades = dailyTrades.filter((t) => new Date(t.time).toDateString() === today);
+  dailyTrades = dailyTrades.filter(
+    (t) => new Date(t.time).toDateString() === today,
+  );
 
   if (dailyTrades.length >= CONFIG.MAX_DAILY_TRADES)
     return {
@@ -1197,9 +1238,13 @@ async function executeTrade(action, symbol, price, analysis, atrPct) {
     };
 
   const slPrice =
-    action === 'BUY' ? price * (1 - CONFIG.DEFAULT_STOP_LOSS_PCT) : price * (1 + CONFIG.DEFAULT_STOP_LOSS_PCT);
+    action === "BUY"
+      ? price * (1 - CONFIG.DEFAULT_STOP_LOSS_PCT)
+      : price * (1 + CONFIG.DEFAULT_STOP_LOSS_PCT);
   const tpPrice =
-    action === 'BUY' ? price * (1 + CONFIG.DEFAULT_TAKE_PROFIT_PCT) : price * (1 - CONFIG.DEFAULT_TAKE_PROFIT_PCT);
+    action === "BUY"
+      ? price * (1 + CONFIG.DEFAULT_TAKE_PROFIT_PCT)
+      : price * (1 - CONFIG.DEFAULT_TAKE_PROFIT_PCT);
   const size = calculatePositionSize(balance, price, slPrice, atrPct);
   if (size * price < 10)
     return {
@@ -1219,26 +1264,37 @@ async function executeTrade(action, symbol, price, analysis, atrPct) {
     confluence: analysis.confidence,
     signal: analysis.signal,
     time: new Date().toISOString(),
-    mode: paperMode ? 'PAPER' : 'LIVE',
-    status: 'OPEN',
+    mode: paperMode ? "PAPER" : "LIVE",
+    status: "OPEN",
   };
 
   if (paperMode) {
-    if (action === 'BUY') {
+    if (action === "BUY") {
       paperBalance.USDT -= trade.cost;
-      paperBalance[symbol.replace('/USDT', '')] = (paperBalance[symbol.replace('/USDT', '')] || 0) + size;
+      paperBalance[symbol.replace("/USDT", "")] =
+        (paperBalance[symbol.replace("/USDT", "")] || 0) + size;
     }
     paperTrades.push(trade);
-    logger.info({ component: 'Trade', trade }, `📝 PAPER ${action}: ${symbol} x${size} @ $${price}`);
+    logger.info(
+      { component: "Trade", trade },
+      `📝 PAPER ${action}: ${symbol} x${size} @ $${price}`,
+    );
   } else {
     try {
-      const order = await exchange.createMarketOrder(symbol, action.toLowerCase(), size);
+      const order = await exchange.createMarketOrder(
+        symbol,
+        action.toLowerCase(),
+        size,
+      );
       trade.orderId = order.id;
       trade.filled = order.filled;
       trade.avgPrice = order.average;
-      logger.info({ component: 'Trade', orderId: order.id }, `🔴 LIVE ${action}: ${symbol}`);
+      logger.info(
+        { component: "Trade", orderId: order.id },
+        `🔴 LIVE ${action}: ${symbol}`,
+      );
     } catch (err) {
-      logger.error({ err: err.message }, 'Trade FAILED');
+      logger.error({ err: err.message }, "Trade FAILED");
       return { executed: false, reason: `Exchange error: ${err.message}` };
     }
   }
@@ -1247,60 +1303,59 @@ async function executeTrade(action, symbol, price, analysis, atrPct) {
   return { executed: true, trade };
 }
 
-/**
- * closePosition
- * @param {*} tradeId
- * @param {*} currentPrice
- * @param {*} reason
- * @returns {*}
- */
-async function closePosition(tradeId, currentPrice, reason = 'manual') {
+async function closePosition(tradeId, currentPrice, reason = "manual") {
   const idx = openPositions.findIndex((p) => p.id === tradeId);
-  if (idx === -1) return { closed: false, reason: 'Not found' };
+  if (idx === -1) return { closed: false, reason: "Not found" };
   const pos = openPositions[idx];
-  const pnl = pos.action === 'BUY' ? (currentPrice - pos.price) * pos.size : (pos.price - currentPrice) * pos.size;
+  const pnl =
+    pos.action === "BUY"
+      ? (currentPrice - pos.price) * pos.size
+      : (pos.price - currentPrice) * pos.size;
   pos.closePrice = currentPrice;
   pos.pnl = +pnl.toFixed(2);
   pos.closeTime = new Date().toISOString();
   pos.closeReason = reason;
-  pos.status = 'CLOSED';
-  if (paperMode && pos.action === 'BUY') {
+  pos.status = "CLOSED";
+  if (paperMode && pos.action === "BUY") {
     paperBalance.USDT += currentPrice * pos.size;
-    const a = pos.symbol.replace('/USDT', '');
+    const a = pos.symbol.replace("/USDT", "");
     paperBalance[a] = (paperBalance[a] || 0) - pos.size;
   } else if (!paperMode && exchange) {
     try {
-      await exchange.createMarketOrder(pos.symbol, pos.action === 'BUY' ? 'sell' : 'buy', pos.size);
+      await exchange.createMarketOrder(
+        pos.symbol,
+        pos.action === "BUY" ? "sell" : "buy",
+        pos.size,
+      );
     } catch (e) {
-      logger.error({ err: e.message }, 'Close failed');
+      logger.error({ err: e.message }, "Close failed");
     }
   }
   dailyPnL += pnl;
   recordWeeklyPnL(pnl);
   if (pnl < 0) lastLossTime = Date.now();
   openPositions.splice(idx, 1);
-  logger.info({ tradeId, pnl: pos.pnl, reason }, `${pnl >= 0 ? '✅' : '❌'} Closed: ${pos.symbol} PnL: $${pos.pnl}`);
+  logger.info(
+    { tradeId, pnl: pos.pnl, reason },
+    `${pnl >= 0 ? "✅" : "❌"} Closed: ${pos.symbol} PnL: $${pos.pnl}`,
+  );
   return { closed: true, trade: pos };
 }
 
-/**
- * killSwitch
- * @param {*} currentPrices
- * @returns {*}
- */
 async function killSwitch(currentPrices = {}) {
-  logger.warn({ component: 'Trade' }, '⛔ KILL SWITCH — closing ALL');
+  logger.warn({ component: "Trade" }, "⛔ KILL SWITCH — closing ALL");
   const results = [];
   for (const pos of [...openPositions])
-    results.push(await closePosition(pos.id, currentPrices[pos.symbol] || pos.price, 'KILL_SWITCH'));
+    results.push(
+      await closePosition(
+        pos.id,
+        currentPrices[pos.symbol] || pos.price,
+        "KILL_SWITCH",
+      ),
+    );
   return results;
 }
 
-/**
- * checkStopsAndTargets
- * @param {*} currentPrices
- * @returns {*}
- */
 async function checkStopsAndTargets(currentPrices) {
   const results = [];
   for (const pos of [...openPositions]) {
@@ -1310,7 +1365,7 @@ async function checkStopsAndTargets(currentPrices) {
     // ── TRAILING STOP LOGIC ──
     // Track high water mark (best price since entry)
     if (!pos.highWaterMark) pos.highWaterMark = pos.price;
-    if (pos.action === 'BUY') {
+    if (pos.action === "BUY") {
       if (price > pos.highWaterMark) pos.highWaterMark = price;
     } else {
       if (price < pos.highWaterMark) pos.highWaterMark = price;
@@ -1318,12 +1373,14 @@ async function checkStopsAndTargets(currentPrices) {
 
     // Activate trailing stop once profit exceeds activation threshold
     const profitPct =
-      pos.action === 'BUY' ? (pos.highWaterMark - pos.price) / pos.price : (pos.price - pos.highWaterMark) / pos.price;
+      pos.action === "BUY"
+        ? (pos.highWaterMark - pos.price) / pos.price
+        : (pos.price - pos.highWaterMark) / pos.price;
 
     if (profitPct >= CONFIG.TRAILING_STOP_ACTIVATION) {
       const trailingDistance = CONFIG.TRAILING_STOP_DISTANCE;
       let newSL;
-      if (pos.action === 'BUY') {
+      if (pos.action === "BUY") {
         newSL = +(pos.highWaterMark * (1 - trailingDistance)).toFixed(2);
         if (newSL > pos.stopLoss) {
           pos.stopLoss = newSL;
@@ -1342,14 +1399,15 @@ async function checkStopsAndTargets(currentPrices) {
     // At 50% of target distance, close half the position and move SL to breakeven
     if (!pos.partialClosed) {
       const tp1Distance = Math.abs(pos.takeProfit - pos.price) * 0.5;
-      const currentProfit = pos.action === 'BUY' ? price - pos.price : pos.price - price;
+      const currentProfit =
+        pos.action === "BUY" ? price - pos.price : pos.price - price;
       if (currentProfit >= tp1Distance && pos.size > 0.001) {
         const halfSize = +(pos.size / 2).toFixed(6);
         const halfPnl = currentProfit * halfSize;
         // Close half
         if (paperMode) {
-          const asset = pos.symbol.replace('/USDT', '');
-          if (pos.action === 'BUY') {
+          const asset = pos.symbol.replace("/USDT", "");
+          if (pos.action === "BUY") {
             paperBalance.USDT += price * halfSize;
             paperBalance[asset] = (paperBalance[asset] || 0) - halfSize;
           }
@@ -1362,10 +1420,10 @@ async function checkStopsAndTargets(currentPrices) {
         recordWeeklyPnL(halfPnl);
         logger.info(
           { tradeId: pos.id, halfPnl: +halfPnl.toFixed(2) },
-          `📊 PARTIAL TP1: ${pos.symbol} closed 50% @ $${price}, SL → breakeven`
+          `📊 PARTIAL TP1: ${pos.symbol} closed 50% @ $${price}, SL → breakeven`,
         );
         results.push({
-          type: 'PARTIAL_TP',
+          type: "PARTIAL_TP",
           trade: pos,
           pnl: +halfPnl.toFixed(2),
         });
@@ -1373,14 +1431,28 @@ async function checkStopsAndTargets(currentPrices) {
     }
 
     // ── STOP LOSS / TAKE PROFIT CHECK ──
-    if (pos.action === 'BUY') {
+    if (pos.action === "BUY") {
       if (price <= pos.stopLoss)
-        results.push(await closePosition(pos.id, price, pos.trailingActive ? 'TRAILING_STOP' : 'STOP_LOSS'));
-      else if (price >= pos.takeProfit) results.push(await closePosition(pos.id, price, 'TAKE_PROFIT'));
+        results.push(
+          await closePosition(
+            pos.id,
+            price,
+            pos.trailingActive ? "TRAILING_STOP" : "STOP_LOSS",
+          ),
+        );
+      else if (price >= pos.takeProfit)
+        results.push(await closePosition(pos.id, price, "TAKE_PROFIT"));
     } else {
       if (price >= pos.stopLoss)
-        results.push(await closePosition(pos.id, price, pos.trailingActive ? 'TRAILING_STOP' : 'STOP_LOSS'));
-      else if (price <= pos.takeProfit) results.push(await closePosition(pos.id, price, 'TAKE_PROFIT'));
+        results.push(
+          await closePosition(
+            pos.id,
+            price,
+            pos.trailingActive ? "TRAILING_STOP" : "STOP_LOSS",
+          ),
+        );
+      else if (price <= pos.takeProfit)
+        results.push(await closePosition(pos.id, price, "TAKE_PROFIT"));
     }
   }
   return results;
@@ -1390,10 +1462,6 @@ async function checkStopsAndTargets(currentPrices) {
 // EXPORTS
 // ═══════════════════════════════════════════════════════════════════════════
 
-/**
- * undefined
- * @returns {*}
- */
 module.exports = {
   detectCandlestickPatterns,
   detectChartPatterns,

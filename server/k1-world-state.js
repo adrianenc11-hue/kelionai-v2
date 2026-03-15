@@ -1,4 +1,4 @@
-'use strict';
+"use strict";
 
 /**
  * K1 WORLD STATE — Modelul lumii K1
@@ -14,7 +14,7 @@
  * Proactive Intelligence: alertează când se schimbă ceva important
  */
 
-const logger = require('pino')({ name: 'k1-world-state' });
+const logger = require("pino")({ name: "k1-world-state" });
 
 // ═══════════════════════════════════════════════════════════════
 // WORLD STATE — Snapshot al realității
@@ -22,16 +22,16 @@ const logger = require('pino')({ name: 'k1-world-state' });
 
 const worldState = {
   markets: {
-    btc: { price: 0, change24h: 0, trend: 'unknown', signal: 'HOLD' },
-    eth: { price: 0, change24h: 0, trend: 'unknown', signal: 'HOLD' },
-    sol: { price: 0, change24h: 0, trend: 'unknown', signal: 'HOLD' },
-    gold: { price: 0, change24h: 0, trend: 'unknown', signal: 'HOLD' },
-    nasdaq: { price: 0, change24h: 0, trend: 'unknown', signal: 'HOLD' },
-    sp500: { price: 0, change24h: 0, trend: 'unknown', signal: 'HOLD' },
-    oil: { price: 0, change24h: 0, trend: 'unknown', signal: 'HOLD' },
-    eurusd: { price: 0, change24h: 0, trend: 'unknown', signal: 'HOLD' },
-    gbpusd: { price: 0, change24h: 0, trend: 'unknown', signal: 'HOLD' },
-    fearGreed: { value: 50, label: 'Neutral', signal: 'HOLD' },
+    btc: { price: 0, change24h: 0, trend: "unknown", signal: "HOLD" },
+    eth: { price: 0, change24h: 0, trend: "unknown", signal: "HOLD" },
+    sol: { price: 0, change24h: 0, trend: "unknown", signal: "HOLD" },
+    gold: { price: 0, change24h: 0, trend: "unknown", signal: "HOLD" },
+    nasdaq: { price: 0, change24h: 0, trend: "unknown", signal: "HOLD" },
+    sp500: { price: 0, change24h: 0, trend: "unknown", signal: "HOLD" },
+    oil: { price: 0, change24h: 0, trend: "unknown", signal: "HOLD" },
+    eurusd: { price: 0, change24h: 0, trend: "unknown", signal: "HOLD" },
+    gbpusd: { price: 0, change24h: 0, trend: "unknown", signal: "HOLD" },
+    fearGreed: { value: 50, label: "Neutral", signal: "HOLD" },
   },
   system: {
     health: 100,
@@ -40,16 +40,16 @@ const worldState = {
     activeModules: [],
     lastError: null,
     botActive: false,
-    botMode: 'PAPER',
+    botMode: "PAPER",
     botBalance: 0,
     openPositions: 0,
   },
   user: {
     lastSeen: null,
     lastMessage: null,
-    activeProject: 'unknown',
+    activeProject: "unknown",
     interactionCount: 0,
-    preferredDomain: 'general',
+    preferredDomain: "general",
     sessionStart: null,
   },
   environment: {
@@ -76,16 +76,22 @@ const bootTime = Date.now();
 function updateMarkets(marketData) {
   if (!marketData) return;
 
-  const oldState = structuredClone(worldState.markets);
+  const oldState = JSON.parse(JSON.stringify(worldState.markets));
 
   Object.entries(marketData).forEach(([key, data]) => {
-    const k = key.toLowerCase().replace('/', '').replace(' ', '');
-    const target = worldState.markets[k] || worldState.markets[key.toLowerCase()];
+    const k = key.toLowerCase().replace("/", "").replace(" ", "");
+    const target =
+      worldState.markets[k] || worldState.markets[key.toLowerCase()];
     if (target && data) {
       if (data.price) target.price = data.price;
       if (data.change24h !== undefined) target.change24h = data.change24h;
       if (data.signal) target.signal = data.signal;
-      target.trend = data.change24h > 2 ? 'bullish' : data.change24h < -2 ? 'bearish' : 'sideways';
+      target.trend =
+        data.change24h > 2
+          ? "bullish"
+          : data.change24h < -2
+            ? "bearish"
+            : "sideways";
     }
   });
 
@@ -98,10 +104,13 @@ function updateMarkets(marketData) {
  */
 function updateSystem(data) {
   if (data.health !== undefined) worldState.system.health = data.health;
-  if (data.botActive !== undefined) worldState.system.botActive = data.botActive;
+  if (data.botActive !== undefined)
+    worldState.system.botActive = data.botActive;
   if (data.botMode) worldState.system.botMode = data.botMode;
-  if (data.botBalance !== undefined) worldState.system.botBalance = data.botBalance;
-  if (data.openPositions !== undefined) worldState.system.openPositions = data.openPositions;
+  if (data.botBalance !== undefined)
+    worldState.system.botBalance = data.botBalance;
+  if (data.openPositions !== undefined)
+    worldState.system.openPositions = data.openPositions;
   if (data.lastError) worldState.system.lastError = data.lastError;
   if (data.activeModules) worldState.system.activeModules = data.activeModules;
   worldState.system.uptime = Math.round((Date.now() - bootTime) / 1000 / 60); // minutes
@@ -115,7 +124,8 @@ function updateUser(data) {
   if (data.lastMessage) worldState.user.lastMessage = data.lastMessage;
   if (data.activeProject) worldState.user.activeProject = data.activeProject;
   if (data.interactionCount) worldState.user.interactionCount++;
-  if (data.preferredDomain) worldState.user.preferredDomain = data.preferredDomain;
+  if (data.preferredDomain)
+    worldState.user.preferredDomain = data.preferredDomain;
   if (data.sessionStart) worldState.user.sessionStart = data.sessionStart;
 }
 
@@ -131,22 +141,22 @@ function refreshEnvironment() {
   // Ce piețe sunt deschise acum?
   const h = now.getUTCHours();
   const day = now.getUTCDay();
-  const open = ['crypto']; // Crypto mereu
+  const open = ["crypto"]; // Crypto mereu
 
   if (day >= 1 && day <= 5) {
-    if (h >= 8 && h <= 16) open.push('europe'); // LSE
-    if (h >= 14 && h <= 21) open.push('us'); // NYSE/NASDAQ
-    if (h >= 0 && h <= 6) open.push('asia'); // Tokyo
+    if (h >= 8 && h <= 16) open.push("europe"); // LSE
+    if (h >= 14 && h <= 21) open.push("us"); // NYSE/NASDAQ
+    if (h >= 0 && h <= 6) open.push("asia"); // Tokyo
     // Forex: Luni-Vineri non-stop
-    open.push('forex');
+    open.push("forex");
   }
 
   worldState.environment.marketsOpen = open;
 
   // Sesiuni de overlap (cele mai bune momente de trading)
   const sessions = [];
-  if (h >= 13 && h <= 16) sessions.push('🔥 London-NY overlap (premium)');
-  if (h >= 7 && h <= 9) sessions.push('⚡ Tokyo-London overlap');
+  if (h >= 13 && h <= 16) sessions.push("🔥 London-NY overlap (premium)");
+  if (h >= 7 && h <= 9) sessions.push("⚡ Tokyo-London overlap");
   worldState.environment.activeSessions = sessions;
 
   worldState.lastUpdate = now.toISOString();
@@ -158,11 +168,6 @@ function refreshEnvironment() {
 
 const MAX_ALERTS = 50;
 
-/**
- * checkMarketAlerts
- * @param {*} oldMarkets
- * @returns {*}
- */
 function checkMarketAlerts(oldMarkets) {
   // BTC scade >5% → alertă
   const btcOld = oldMarkets.btc?.price || 0;
@@ -170,29 +175,32 @@ function checkMarketAlerts(oldMarkets) {
   if (btcOld > 0 && btcNew > 0) {
     const change = ((btcNew - btcOld) / btcOld) * 100;
     if (change <= -5) {
-      addAlert('warning', `⚠️ BTC a scăzut ${change.toFixed(1)}% — de la $${btcOld} la $${btcNew}`);
+      addAlert(
+        "warning",
+        `⚠️ BTC a scăzut ${change.toFixed(1)}% — de la $${btcOld} la $${btcNew}`,
+      );
     }
     if (change >= 5) {
-      addAlert('info', `📈 BTC a crescut ${change.toFixed(1)}% — de la $${btcOld} la $${btcNew}`);
+      addAlert(
+        "info",
+        `📈 BTC a crescut ${change.toFixed(1)}% — de la $${btcOld} la $${btcNew}`,
+      );
     }
   }
 
   // Fear & Greed extreme
   const fg = worldState.markets.fearGreed;
   if (fg.value <= 20 && fg.value > 0) {
-    addAlert('opportunity', `😱 Extreme Fear (${fg.value}) — posibilitate de cumpărare`);
+    addAlert(
+      "opportunity",
+      `😱 Extreme Fear (${fg.value}) — posibilitate de cumpărare`,
+    );
   }
   if (fg.value >= 80) {
-    addAlert('warning', `🤑 Extreme Greed (${fg.value}) — atenție la corecție`);
+    addAlert("warning", `🤑 Extreme Greed (${fg.value}) — atenție la corecție`);
   }
 }
 
-/**
- * addAlert
- * @param {*} type
- * @param {*} message
- * @returns {*}
- */
 function addAlert(type, message) {
   const alert = {
     id: worldState.alerts.length + 1,
@@ -206,20 +214,11 @@ function addAlert(type, message) {
   logger.info({ type }, `[K1-World] 🔔 ${message}`);
 }
 
-/**
- * getAlerts
- * @param {*} unreadOnly
- * @returns {*}
- */
 function getAlerts(unreadOnly = false) {
   if (unreadOnly) return worldState.alerts.filter((a) => !a.read);
   return worldState.alerts.slice(-20);
 }
 
-/**
- * markAlertsRead
- * @returns {*}
- */
 function markAlertsRead() {
   worldState.alerts.forEach((a) => {
     a.read = true;
@@ -230,19 +229,11 @@ function markAlertsRead() {
 // GETTERS
 // ═══════════════════════════════════════════════════════════════
 
-/**
- * getWorldState
- * @returns {*}
- */
 function getWorldState() {
   refreshEnvironment();
   return { ...worldState };
 }
 
-/**
- * getMarketSummary
- * @returns {*}
- */
 function getMarketSummary() {
   return {
     markets: worldState.markets,
@@ -252,10 +243,6 @@ function getMarketSummary() {
   };
 }
 
-/**
- * getSystemHealth
- * @returns {*}
- */
 function getSystemHealth() {
   return worldState.system;
 }
@@ -264,10 +251,6 @@ function getSystemHealth() {
 setInterval(refreshEnvironment, 5 * 60 * 1000);
 refreshEnvironment(); // Prima dată la boot
 
-/**
- * undefined
- * @returns {*}
- */
 module.exports = {
   getWorldState,
   getMarketSummary,

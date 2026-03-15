@@ -2,9 +2,9 @@
 // KelionAI — Real-time Notification System (SSE-based)
 // Lightweight server → admin push notifications
 // ═══════════════════════════════════════════════════════════════
-'use strict';
+"use strict";
 
-const logger = require('./logger');
+const logger = require("./logger");
 
 // Connected SSE clients
 const clients = new Set();
@@ -21,8 +21,8 @@ const MAX_RECENT = 50;
  */
 function notify(type, message, data = {}) {
   const notification = {
-    id: Date.now() + '-' + Math.random().toString(36).slice(2, 6),
-    type: type || 'info',
+    id: Date.now() + "-" + Math.random().toString(36).slice(2, 6),
+    type: type || "info",
     message,
     data,
     timestamp: new Date().toISOString(),
@@ -42,7 +42,10 @@ function notify(type, message, data = {}) {
     }
   }
 
-  logger.info({ component: 'Notify', type, msg: message }, `📢 ${message}`);
+  logger.info(
+    { component: "Notify", type, msg: message },
+    `📢 ${message}`
+  );
 }
 
 /**
@@ -51,10 +54,10 @@ function notify(type, message, data = {}) {
  */
 function sseHandler(req, res) {
   res.writeHead(200, {
-    'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
-    Connection: 'keep-alive',
-    'Access-Control-Allow-Origin': '*',
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    Connection: "keep-alive",
+    "Access-Control-Allow-Origin": "*",
   });
 
   // Send recent notifications on connect
@@ -72,12 +75,12 @@ function sseHandler(req, res) {
   }, 30000);
 
   clients.add(res);
-  logger.info({ component: 'Notify' }, `Admin SSE connected (${clients.size} total)`);
+  logger.info({ component: "Notify" }, `Admin SSE connected (${clients.size} total)`);
 
-  req.on('close', () => {
+  req.on("close", () => {
     clients.delete(res);
     clearInterval(heartbeat);
-    logger.info({ component: 'Notify' }, `Admin SSE disconnected (${clients.size} remaining)`);
+    logger.info({ component: "Notify" }, `Admin SSE disconnected (${clients.size} remaining)`);
   });
 }
 
@@ -88,8 +91,4 @@ function getRecent(limit = 20) {
   return recentNotifications.slice(-limit);
 }
 
-/**
- * undefined
- * @returns {*}
- */
 module.exports = { notify, sseHandler, getRecent };

@@ -1,4 +1,4 @@
-'use strict';
+"use strict";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // KelionAI — WebSocket Real-Time Market Engine
@@ -6,9 +6,9 @@
 // Multi-Timeframe Candle Builder + Persistent Supabase Storage (UNLIMITED)
 // ═══════════════════════════════════════════════════════════════════════════
 
-const EventEmitter = require('events');
-const WebSocket = require('ws');
-const logger = require('./logger');
+const EventEmitter = require("events");
+const WebSocket = require("ws");
+const logger = require("./logger");
 
 class WSEngine extends EventEmitter {
   constructor(opts = {}) {
@@ -17,14 +17,24 @@ class WSEngine extends EventEmitter {
 
     // ── Config from env ──
     this.config = {
-      binanceWsUrl: process.env.BINANCE_WS_URL || 'wss://stream.binance.com:9443/ws',
-      oandaApiKey: process.env.OANDA_API_KEY || '',
-      oandaAccountId: process.env.OANDA_ACCOUNT_ID || '',
-      oandaEnv: process.env.OANDA_ENV || 'practice', // practice=demo, live=real
-      cryptoPairs: ['btcusdt', 'ethusdt', 'solusdt'],
-      forexPairs: ['EUR_USD', 'GBP_USD', 'USD_JPY', 'GBP_JPY', 'EUR_GBP', 'AUD_USD', 'USD_CHF', 'USD_CAD'],
-      stockSymbols: ['^GSPC', '^IXIC', 'GC=F', 'CL=F'],
-      timeframes: ['1m', '5m', '15m', '1h', '4h', '1D'],
+      binanceWsUrl:
+        process.env.BINANCE_WS_URL || "wss://stream.binance.com:9443/ws",
+      oandaApiKey: process.env.OANDA_API_KEY || "",
+      oandaAccountId: process.env.OANDA_ACCOUNT_ID || "",
+      oandaEnv: process.env.OANDA_ENV || "practice", // practice=demo, live=real
+      cryptoPairs: ["btcusdt", "ethusdt", "solusdt"],
+      forexPairs: [
+        "EUR_USD",
+        "GBP_USD",
+        "USD_JPY",
+        "GBP_JPY",
+        "EUR_GBP",
+        "AUD_USD",
+        "USD_CHF",
+        "USD_CAD",
+      ],
+      stockSymbols: ["^GSPC", "^IXIC", "GC=F", "CL=F"],
+      timeframes: ["1m", "5m", "15m", "1h", "4h", "1D"],
       maxCandlesPerTF: 500,
       persistToDb: true,
       saveUnlimited: true,
@@ -65,11 +75,17 @@ class WSEngine extends EventEmitter {
 
   setSupabase(sb) {
     this.supabase = sb;
-    logger.info({ component: 'WSEngine' }, 'Supabase connected for unlimited market data storage');
+    logger.info(
+      { component: "WSEngine" },
+      "Supabase connected for unlimited market data storage",
+    );
   }
 
   start() {
-    logger.info({ component: 'WSEngine' }, '🚀 Starting Multi-Market Real-Time Engine');
+    logger.info(
+      { component: "WSEngine" },
+      "🚀 Starting Multi-Market Real-Time Engine",
+    );
     this._startBinance();
     if (this.config.oandaApiKey) this._startOanda();
     this._startStockPolling();
@@ -88,14 +104,14 @@ class WSEngine extends EventEmitter {
     }
     this.stats.binanceConnected = false;
     this.stats.oandaConnected = false;
-    logger.info({ component: 'WSEngine' }, '⛔ Engine stopped');
+    logger.info({ component: "WSEngine" }, "⛔ Engine stopped");
   }
 
   getPrice(asset) {
     return this.lastPrices[asset] || null;
   }
 
-  getCandles(asset, tf = '1m', count = 100) {
+  getCandles(asset, tf = "1m", count = 100) {
     const key = `${asset}/${tf}`;
     const arr = this.candles[key] || [];
     return arr.slice(-count);
@@ -119,50 +135,56 @@ class WSEngine extends EventEmitter {
   // ═══════════════════════════════════════════════════════════════
 
   _startBinance() {
-    const streams = this.config.cryptoPairs.map((p) => `${p}@trade/${p}@kline_1m`).join('/');
+    const streams = this.config.cryptoPairs
+      .map((p) => `${p}@trade/${p}@kline_1m`)
+      .join("/");
     const url = `${this.config.binanceWsUrl}/${streams}`;
 
-    logger.info({ component: 'WSEngine', url: url.substring(0, 80) }, '📡 Connecting Binance WS...');
+    logger.info(
+      { component: "WSEngine", url: url.substring(0, 80) },
+      "📡 Connecting Binance WS...",
+    );
 
     const ws = new WebSocket(url);
     this.connections.binance = ws;
 
-    ws.on('open', () => {
+    ws.on("open", () => {
       this.stats.binanceConnected = true;
       this.reconnectAttempts.binance = 0;
-      logger.info({ component: 'WSEngine' }, '✅ Binance WebSocket CONNECTED');
-      this.emit('connected', { exchange: 'binance' });
+      logger.info({ component: "WSEngine" }, "✅ Binance WebSocket CONNECTED");
+      this.emit("connected", { exchange: "binance" });
     });
 
-    const messageHandler = (raw) => {
+    ws.on("message", (raw) => {
       try {
         const msg = JSON.parse(raw);
-        if (msg.e === 'trade') {
+        if (msg.e === "trade") {
           this._handleBinanceTrade(msg);
-        } else if (msg.e === 'kline') {
+        } else if (msg.e === "kline") {
           this._handleBinanceKline(msg);
         }
       } catch (_err) {
         this.stats.errors++;
       }
-    };
-    ws.on('message', messageHandler);
-
-    ws.on('close', () => {
-      this.stats.binanceConnected = false;
-      logger.warn({ component: 'WSEngine' }, '⚠️ Binance WS disconnected');
-      ws.removeListener('message', messageHandler);
-      this._reconnect('binance');
     });
 
-    ws.on('error', (err) => {
+    ws.on("close", () => {
+      this.stats.binanceConnected = false;
+      logger.warn({ component: "WSEngine" }, "⚠️ Binance WS disconnected");
+      this._reconnect("binance");
+    });
+
+    ws.on("error", (err) => {
       this.stats.errors++;
-      logger.error({ component: 'WSEngine', err: err.message }, 'Binance WS error');
+      logger.error(
+        { component: "WSEngine", err: err.message },
+        "Binance WS error",
+      );
     });
   }
 
   _handleBinanceTrade(msg) {
-    const symbol = msg.s.replace('USDT', ''); // BTCUSDT → BTC
+    const symbol = msg.s.replace("USDT", ""); // BTCUSDT → BTC
     const price = parseFloat(msg.p);
     const volume = parseFloat(msg.q);
     const ts = msg.T;
@@ -173,18 +195,19 @@ class WSEngine extends EventEmitter {
     // Store tick
     if (!this.ticks[symbol]) this.ticks[symbol] = [];
     this.ticks[symbol].push({ price, volume, ts });
-    if (this.ticks[symbol].length > 1000) this.ticks[symbol] = this.ticks[symbol].slice(-500);
+    if (this.ticks[symbol].length > 1000)
+      this.ticks[symbol] = this.ticks[symbol].slice(-500);
 
     // Update candle builders for ALL timeframes
     this._updateCandleBuilder(symbol, price, volume, ts);
 
     // Emit real-time
-    this.emit('tick', { asset: symbol, price, volume, ts, source: 'binance' });
+    this.emit("tick", { asset: symbol, price, volume, ts, source: "binance" });
   }
 
   _handleBinanceKline(msg) {
     const k = msg.k;
-    const symbol = k.s.replace('USDT', '');
+    const symbol = k.s.replace("USDT", "");
     const candle = {
       openTime: k.t,
       closeTime: k.T,
@@ -201,14 +224,16 @@ class WSEngine extends EventEmitter {
       if (!this.candles[key]) this.candles[key] = [];
       this.candles[key].push(candle);
       if (this.candles[key].length > this.config.maxCandlesPerTF) {
-        this.candles[key] = this.candles[key].slice(-this.config.maxCandlesPerTF);
+        this.candles[key] = this.candles[key].slice(
+          -this.config.maxCandlesPerTF,
+        );
       }
       this.stats.candlesBuilt++;
-      this.emit('candle', {
+      this.emit("candle", {
         asset: symbol,
-        tf: '1m',
+        tf: "1m",
         candle,
-        source: 'binance',
+        source: "binance",
       });
 
       // Build higher timeframes from 1m
@@ -221,63 +246,73 @@ class WSEngine extends EventEmitter {
   // ═══════════════════════════════════════════════════════════════
 
   _startOanda() {
-    const host = this.config.oandaEnv === 'live' ? 'stream-fxtrade.oanda.com' : 'stream-fxpractice.oanda.com';
-    const instruments = this.config.forexPairs.join(',');
+    const host =
+      this.config.oandaEnv === "live"
+        ? "stream-fxtrade.oanda.com"
+        : "stream-fxpractice.oanda.com";
+    const instruments = this.config.forexPairs.join(",");
     const url = `https://${host}/v3/accounts/${this.config.oandaAccountId}/pricing/stream?instruments=${instruments}`;
 
-    logger.info({ component: 'WSEngine', pairs: this.config.forexPairs.length }, '📡 Connecting OANDA stream...');
+    logger.info(
+      { component: "WSEngine", pairs: this.config.forexPairs.length },
+      "📡 Connecting OANDA stream...",
+    );
 
-    const https = require('https');
+    const https = require("https");
     const options = {
       headers: {
         Authorization: `Bearer ${this.config.oandaApiKey}`,
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
     };
 
     const req = https.get(url, options, (res) => {
       if (res.statusCode !== 200) {
-        logger.error({ component: 'WSEngine', status: res.statusCode }, 'OANDA stream failed');
-        this._reconnect('oanda');
+        logger.error(
+          { component: "WSEngine", status: res.statusCode },
+          "OANDA stream failed",
+        );
+        this._reconnect("oanda");
         return;
       }
       this.stats.oandaConnected = true;
       this.reconnectAttempts.oanda = 0;
-      logger.info({ component: 'WSEngine' }, '✅ OANDA Stream CONNECTED');
-      this.emit('connected', { exchange: 'oanda' });
+      logger.info({ component: "WSEngine" }, "✅ OANDA Stream CONNECTED");
+      this.emit("connected", { exchange: "oanda" });
       this.connections.oanda = res;
 
-      let buffer = '';
-      const dataHandler = (chunk) => {
+      let buffer = "";
+      res.on("data", (chunk) => {
         buffer += chunk.toString();
-        const lines = buffer.split('\n');
+        const lines = buffer.split("\n");
         buffer = lines.pop(); // keep incomplete line
         for (const line of lines) {
           if (!line.trim()) continue;
           try {
             const data = JSON.parse(line);
-            if (data.type === 'PRICE') {
+            if (data.type === "PRICE") {
               this._handleOandaTick(data);
             }
           } catch (_e) {
             /* heartbeat or parse error */
           }
         }
-      };
-      res.on('data', dataHandler);
+      });
 
-      res.on('end', () => {
+      res.on("end", () => {
         this.stats.oandaConnected = false;
-        logger.warn({ component: 'WSEngine' }, 'OANDA stream ended');
-        res.removeListener('data', dataHandler);
-        this._reconnect('oanda');
+        logger.warn({ component: "WSEngine" }, "OANDA stream ended");
+        this._reconnect("oanda");
       });
     });
 
-    req.on('error', (err) => {
+    req.on("error", (err) => {
       this.stats.errors++;
-      logger.error({ component: 'WSEngine', err: err.message }, 'OANDA connection error');
-      this._reconnect('oanda');
+      logger.error(
+        { component: "WSEngine", err: err.message },
+        "OANDA connection error",
+      );
+      this._reconnect("oanda");
     });
   }
 
@@ -295,19 +330,20 @@ class WSEngine extends EventEmitter {
     // Store tick
     if (!this.ticks[pair]) this.ticks[pair] = [];
     this.ticks[pair].push({ bid, ask, mid, spread, ts });
-    if (this.ticks[pair].length > 1000) this.ticks[pair] = this.ticks[pair].slice(-500);
+    if (this.ticks[pair].length > 1000)
+      this.ticks[pair] = this.ticks[pair].slice(-500);
 
     // Build candles
     this._updateCandleBuilder(pair, mid, 0, ts);
 
-    this.emit('tick', {
+    this.emit("tick", {
       asset: pair,
       price: mid,
       bid,
       ask,
       spread,
       ts,
-      source: 'oanda',
+      source: "oanda",
     });
   }
 
@@ -317,10 +353,10 @@ class WSEngine extends EventEmitter {
 
   _startStockPolling() {
     const nameMap = {
-      '^GSPC': 'SP500',
-      '^IXIC': 'NASDAQ',
-      'GC=F': 'Gold',
-      'CL=F': 'Oil',
+      "^GSPC": "SP500",
+      "^IXIC": "NASDAQ",
+      "GC=F": "Gold",
+      "CL=F": "Oil",
     };
 
     const poll = async () => {
@@ -328,7 +364,7 @@ class WSEngine extends EventEmitter {
         try {
           const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?interval=1m&range=1d`;
           const r = await fetch(url, {
-            headers: { 'User-Agent': 'KelionAI/2.0' },
+            headers: { "User-Agent": "KelionAI/2.0" },
           });
           if (r.ok) {
             const d = await r.json();
@@ -339,11 +375,11 @@ class WSEngine extends EventEmitter {
               const name = nameMap[sym] || sym;
               this.lastPrices[name] = price;
               this._updateCandleBuilder(name, price, 0, Date.now());
-              this.emit('tick', {
+              this.emit("tick", {
                 asset: name,
                 price,
                 ts: Date.now(),
-                source: 'yahoo',
+                source: "yahoo",
               });
             }
           }
@@ -367,17 +403,22 @@ class WSEngine extends EventEmitter {
       const interval = this._tfToMs(tf);
       const bucketStart = Math.floor(ts / interval) * interval;
 
-      if (!this._builders[key] || this._builders[key].openTime !== bucketStart) {
+      if (
+        !this._builders[key] ||
+        this._builders[key].openTime !== bucketStart
+      ) {
         // Close previous candle
         if (this._builders[key]) {
           const prev = { ...this._builders[key], closed: true };
           if (!this.candles[key]) this.candles[key] = [];
           this.candles[key].push(prev);
           if (this.candles[key].length > this.config.maxCandlesPerTF) {
-            this.candles[key] = this.candles[key].slice(-this.config.maxCandlesPerTF);
+            this.candles[key] = this.candles[key].slice(
+              -this.config.maxCandlesPerTF,
+            );
           }
           this.stats.candlesBuilt++;
-          this.emit('candle', { asset, tf, candle: prev, source: 'builder' });
+          this.emit("candle", { asset, tf, candle: prev, source: "builder" });
         }
         // Start new candle
         this._builders[key] = {
@@ -409,12 +450,12 @@ class WSEngine extends EventEmitter {
 
   _tfToMs(tf) {
     const map = {
-      '1m': 60000,
-      '5m': 300000,
-      '15m': 900000,
-      '1h': 3600000,
-      '4h': 14400000,
-      '1D': 86400000,
+      "1m": 60000,
+      "5m": 300000,
+      "15m": 900000,
+      "1h": 3600000,
+      "4h": 14400000,
+      "1D": 86400000,
     };
     return map[tf] || 60000;
   }
@@ -433,7 +474,7 @@ class WSEngine extends EventEmitter {
 
     const rows = [];
     for (const [key, arr] of Object.entries(this.candles)) {
-      const [asset, tf] = key.split('/');
+      const [asset, tf] = key.split("/");
       // Only flush closed candles not yet persisted
       for (const c of arr) {
         if (c.closed && !c._persisted) {
@@ -458,19 +499,27 @@ class WSEngine extends EventEmitter {
 
     try {
       // Batch insert (Supabase handles duplicates via upsert)
-      const { error } = await this.supabase.from('market_candles').upsert(rows, {
-        onConflict: 'asset,timeframe,open_time',
-        ignoreDuplicates: true,
-      });
+      const { error } = await this.supabase
+        .from("market_candles")
+        .upsert(rows, {
+          onConflict: "asset,timeframe,open_time",
+          ignoreDuplicates: true,
+        });
 
       if (error) {
-        logger.warn({ component: 'WSEngine', err: error.message }, 'Candle persist error');
+        logger.warn(
+          { component: "WSEngine", err: error.message },
+          "Candle persist error",
+        );
       } else {
         this.stats.candlesPersisted += rows.length;
-        logger.debug({ component: 'WSEngine', count: rows.length }, 'Candles persisted to Supabase');
+        logger.debug(
+          { component: "WSEngine", count: rows.length },
+          "Candles persisted to Supabase",
+        );
       }
     } catch (e) {
-      logger.warn({ component: 'WSEngine', err: e.message }, 'DB flush error');
+      logger.warn({ component: "WSEngine", err: e.message }, "DB flush error");
     }
   }
 
@@ -481,17 +530,20 @@ class WSEngine extends EventEmitter {
   _reconnect(exchange) {
     const attempts = this.reconnectAttempts[exchange]++;
     if (attempts >= this.maxReconnect) {
-      logger.error({ component: 'WSEngine', exchange }, `Max reconnect attempts reached for ${exchange}`);
+      logger.error(
+        { component: "WSEngine", exchange },
+        `Max reconnect attempts reached for ${exchange}`,
+      );
       return;
     }
     const delay = Math.min(1000 * Math.pow(2, attempts), 60000); // max 60s
     logger.info(
-      { component: 'WSEngine', exchange, delay, attempt: attempts },
-      `Reconnecting ${exchange} in ${delay}ms...`
+      { component: "WSEngine", exchange, delay, attempt: attempts },
+      `Reconnecting ${exchange} in ${delay}ms...`,
     );
     setTimeout(() => {
-      if (exchange === 'binance') this._startBinance();
-      else if (exchange === 'oanda') this._startOanda();
+      if (exchange === "binance") this._startBinance();
+      else if (exchange === "oanda") this._startOanda();
     }, delay);
   }
 
@@ -523,9 +575,5 @@ class WSEngine extends EventEmitter {
 // Singleton
 const engine = new WSEngine();
 
-/**
- * undefined
- * @returns {*}
- */
 module.exports = engine;
 module.exports.WSEngine = WSEngine;

@@ -15,19 +15,19 @@
  *   Oil:     2000-08-23 (Yahoo CL=F inception)
  */
 
-const logger = require('pino')({ name: 'historical-loader' });
+const logger = require("pino")({ name: "historical-loader" });
 
 // Yahoo Finance symbols mapped to our asset names
 const YAHOO_SYMBOLS = {
-  BTC: { symbol: 'BTC-USD', since: '2014-09-17' },
-  ETH: { symbol: 'ETH-USD', since: '2017-11-09' },
-  SOL: { symbol: 'SOL-USD', since: '2020-04-10' },
-  'EUR/USD': { symbol: 'EURUSD=X', since: '2003-12-01' },
-  'GBP/USD': { symbol: 'GBPUSD=X', since: '2003-12-01' },
-  'S&P 500': { symbol: '%5EGSPC', since: '1950-01-03' },
-  NASDAQ: { symbol: '%5EIXIC', since: '1971-02-05' },
-  Gold: { symbol: 'GC=F', since: '2000-08-30' },
-  Oil: { symbol: 'CL=F', since: '2000-08-23' },
+  BTC: { symbol: "BTC-USD", since: "2014-09-17" },
+  ETH: { symbol: "ETH-USD", since: "2017-11-09" },
+  SOL: { symbol: "SOL-USD", since: "2020-04-10" },
+  "EUR/USD": { symbol: "EURUSD=X", since: "2003-12-01" },
+  "GBP/USD": { symbol: "GBPUSD=X", since: "2003-12-01" },
+  "S&P 500": { symbol: "%5EGSPC", since: "1950-01-03" },
+  NASDAQ: { symbol: "%5EIXIC", since: "1971-02-05" },
+  Gold: { symbol: "GC=F", since: "2000-08-30" },
+  Oil: { symbol: "CL=F", since: "2000-08-23" },
 };
 
 let supabase = null;
@@ -44,19 +44,10 @@ const downloadProgress = {
   totalRowsInserted: 0,
 };
 
-/**
- * init
- * @param {*} supabaseClient
- * @returns {*}
- */
 function init(supabaseClient) {
   supabase = supabaseClient;
 }
 
-/**
- * getProgress
- * @returns {*}
- */
 function getProgress() {
   return { ...downloadProgress };
 }
@@ -68,13 +59,16 @@ async function ensureTable() {
   if (!supabase) return;
   try {
     // Try to select from the table; if it fails, create it via RPC or insert
-    const { error } = await supabase.from('trading_price_history').select('id').limit(1);
+    const { error } = await supabase
+      .from("trading_price_history")
+      .select("id")
+      .limit(1);
 
-    if (error && error.code === '42P01') {
+    if (error && error.code === "42P01") {
       // Table doesn't exist — create via SQL (requires service_role key)
-      logger.info('Creating trading_price_history table...');
+      logger.info("Creating trading_price_history table...");
       await supabase
-        .rpc('exec_sql', {
+        .rpc("exec_sql", {
           sql: `
           CREATE TABLE IF NOT EXISTS trading_price_history (
             id BIGSERIAL PRIMARY KEY,
@@ -96,11 +90,11 @@ async function ensureTable() {
         })
         .catch(() => {
           // If RPC doesn't exist, try direct insert approach — table will auto-create
-          logger.warn('Could not create table via RPC, will attempt upsert');
+          logger.warn("Could not create table via RPC, will attempt upsert");
         });
     }
   } catch (e) {
-    logger.error({ err: e.message }, 'Error ensuring table');
+    logger.error({ err: e.message }, "Error ensuring table");
   }
 }
 
@@ -129,15 +123,15 @@ async function fetchYahooHistory(assetName, retryCount = 0) {
       retry: retryCount,
       since: config.since,
     },
-    `Fetching ${assetName} history...`
+    `Fetching ${assetName} history...`,
   );
 
   try {
     const res = await fetch(url, {
       headers: {
-        'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        Accept: 'application/json',
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        Accept: "application/json",
       },
       signal: AbortSignal.timeout(30000),
     });
@@ -147,17 +141,17 @@ async function fetchYahooHistory(assetName, retryCount = 0) {
       const waitSec = 10 * Math.pow(2, retryCount); // 10s, 20s, 40s
       logger.warn(
         { asset: assetName, waitSec, retry: retryCount + 1 },
-        `Yahoo 429 rate limit — waiting ${waitSec}s then retry`
+        `Yahoo 429 rate limit — waiting ${waitSec}s then retry`,
       );
       await new Promise((r) => setTimeout(r, waitSec * 1000));
       return fetchYahooHistory(assetName, retryCount + 1);
     }
 
     if (!res.ok) {
-      const body = await res.text().catch(() => '');
+      const body = await res.text().catch(() => "");
       logger.error(
         { asset: assetName, status: res.status, body: body.slice(0, 200) },
-        `Yahoo returned ${res.status} for ${assetName}`
+        `Yahoo returned ${res.status} for ${assetName}`,
       );
       return [];
     }
@@ -165,7 +159,10 @@ async function fetchYahooHistory(assetName, retryCount = 0) {
     const json = await res.json();
     const result = json.chart?.result?.[0];
     if (!result || !result.timestamp) {
-      logger.warn({ asset: assetName, chartError: json.chart?.error }, `No data for ${assetName}`);
+      logger.warn(
+        { asset: assetName, chartError: json.chart?.error },
+        `No data for ${assetName}`,
+      );
       return [];
     }
 
@@ -189,7 +186,7 @@ async function fetchYahooHistory(assetName, retryCount = 0) {
         low: lows[i] ?? closes[i],
         close: closes[i],
         volume: volumes[i] ?? 0,
-        source: 'yahoo_finance',
+        source: "yahoo_finance",
       });
     }
 
@@ -200,17 +197,23 @@ async function fetchYahooHistory(assetName, retryCount = 0) {
         from: rows[0]?.date,
         to: rows[rows.length - 1]?.date,
       },
-      `${assetName}: ${rows.length} daily candles`
+      `${assetName}: ${rows.length} daily candles`,
     );
     return rows;
   } catch (e) {
     if (retryCount < MAX_RETRIES) {
       const waitSec = 10 * Math.pow(2, retryCount);
-      logger.warn({ asset: assetName, err: e.message, waitSec }, `Fetch error — retrying in ${waitSec}s`);
+      logger.warn(
+        { asset: assetName, err: e.message, waitSec },
+        `Fetch error — retrying in ${waitSec}s`,
+      );
       await new Promise((r) => setTimeout(r, waitSec * 1000));
       return fetchYahooHistory(assetName, retryCount + 1);
     }
-    logger.error({ err: e.message, asset: assetName }, `Failed fetching ${assetName} after ${MAX_RETRIES} retries`);
+    logger.error(
+      { err: e.message, asset: assetName },
+      `Failed fetching ${assetName} after ${MAX_RETRIES} retries`,
+    );
     return [];
   }
 }
@@ -228,8 +231,8 @@ async function storeInSupabase(rows) {
     const batch = rows.slice(i, i + BATCH);
     try {
       const { error, _count } = await supabase
-        .from('trading_price_history')
-        .upsert(batch, { onConflict: 'asset,date', ignoreDuplicates: true });
+        .from("trading_price_history")
+        .upsert(batch, { onConflict: "asset,date", ignoreDuplicates: true });
 
       if (error) {
         logger.error({ err: error.message }, `Batch insert error at ${i}`);
@@ -249,7 +252,7 @@ async function storeInSupabase(rows) {
  */
 async function loadAllHistory() {
   if (!supabase) {
-    return { error: 'Supabase not configured', assets: {} };
+    return { error: "Supabase not configured", assets: {} };
   }
 
   await ensureTable();
@@ -271,10 +274,10 @@ async function loadAllHistory() {
     try {
       // Check what we already have
       const { data: existing } = await supabase
-        .from('trading_price_history')
-        .select('date')
-        .eq('asset', asset)
-        .order('date', { ascending: false })
+        .from("trading_price_history")
+        .select("date")
+        .eq("asset", asset)
+        .order("date", { ascending: false })
         .limit(1);
 
       const lastDate = existing?.[0]?.date;
@@ -283,7 +286,9 @@ async function loadAllHistory() {
       const allRows = await fetchYahooHistory(asset);
 
       // Filter: only insert rows newer than what we have
-      const newRows = lastDate ? allRows.filter((r) => r.date > lastDate) : allRows;
+      const newRows = lastDate
+        ? allRows.filter((r) => r.date > lastDate)
+        : allRows;
 
       if (newRows.length > 0) {
         const { inserted } = await storeInSupabase(newRows);
@@ -300,15 +305,15 @@ async function loadAllHistory() {
           totalFetched: allRows.length,
           newInserted: inserted,
           dateRange,
-          lastExisting: lastDate || 'none',
+          lastExisting: lastDate || "none",
         };
       } else {
         downloadProgress.assetsCompleted[asset] = {
           rows: 0,
-          status: 'up-to-date',
+          status: "up-to-date",
         };
         results[asset] = {
-          status: 'up-to-date',
+          status: "up-to-date",
           lastDate,
           totalAvailable: allRows.length,
         };
@@ -337,10 +342,10 @@ async function getHistory(asset, limit = null) {
   if (!supabase) return [];
 
   let query = supabase
-    .from('trading_price_history')
-    .select('date, open, high, low, close, volume')
-    .eq('asset', asset)
-    .order('date', { ascending: true });
+    .from("trading_price_history")
+    .select("date, open, high, low, close, volume")
+    .eq("asset", asset)
+    .order("date", { ascending: true });
 
   if (limit) query = query.limit(limit);
 
@@ -363,28 +368,28 @@ async function getHistorySummary() {
 
   for (const asset of assets) {
     const { count } = await supabase
-      .from('trading_price_history')
-      .select('id', { count: 'exact', head: true })
-      .eq('asset', asset);
+      .from("trading_price_history")
+      .select("id", { count: "exact", head: true })
+      .eq("asset", asset);
 
     const { data: oldest } = await supabase
-      .from('trading_price_history')
-      .select('date')
-      .eq('asset', asset)
-      .order('date', { ascending: true })
+      .from("trading_price_history")
+      .select("date")
+      .eq("asset", asset)
+      .order("date", { ascending: true })
       .limit(1);
 
     const { data: newest } = await supabase
-      .from('trading_price_history')
-      .select('date')
-      .eq('asset', asset)
-      .order('date', { ascending: false })
+      .from("trading_price_history")
+      .select("date")
+      .eq("asset", asset)
+      .order("date", { ascending: false })
       .limit(1);
 
     summary[asset] = {
       totalCandles: count || 0,
-      oldestDate: oldest?.[0]?.date || 'no data',
-      newestDate: newest?.[0]?.date || 'no data',
+      oldestDate: oldest?.[0]?.date || "no data",
+      newestDate: newest?.[0]?.date || "no data",
       expectedSince: YAHOO_SYMBOLS[asset].since,
     };
   }
@@ -392,10 +397,6 @@ async function getHistorySummary() {
   return summary;
 }
 
-/**
- * undefined
- * @returns {*}
- */
 module.exports = {
   init,
   ensureTable,

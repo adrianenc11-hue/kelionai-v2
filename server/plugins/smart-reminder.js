@@ -6,16 +6,17 @@
  */
 
 const manifest = {
-  id: 'smart-reminder',
-  name: 'Smart Reminder',
-  version: '1.0.0',
-  description: 'Set intelligent reminders with natural language. Supports one-time and recurring reminders.',
-  author: 'KelionAI',
-  icon: '⏰',
-  category: 'productivity',
-  type: 'command',
-  pricing: 'free',
-  commands: ['/remind', '/reminders'],
+  id: "smart-reminder",
+  name: "Smart Reminder",
+  version: "1.0.0",
+  description:
+    "Set intelligent reminders with natural language. Supports one-time and recurring reminders.",
+  author: "KelionAI",
+  icon: "⏰",
+  category: "productivity",
+  type: "command",
+  pricing: "free",
+  commands: ["/remind", "/reminders"],
   endpoints: [],
   config: {
     maxRemindersPerUser: 50,
@@ -30,7 +31,9 @@ function parseTime(text) {
   const lower = text.toLowerCase().trim();
 
   // Relative: "in 5 minutes", "in 2 hours", "in 3 days"
-  const relMatch = lower.match(/in\s+(\d+)\s+(minute|minut|hour|ora|ore|day|zi|zile|week|saptamana)s?/i);
+  const relMatch = lower.match(
+    /in\s+(\d+)\s+(minute|minut|hour|ora|ore|day|zi|zile|week|saptamana)s?/i,
+  );
   if (relMatch) {
     const amount = parseInt(relMatch[1], 10);
     const unit = relMatch[2].toLowerCase();
@@ -74,14 +77,19 @@ async function onCommand(ctx) {
   const { args, userId } = ctx;
 
   // /reminders — list active reminders
-  if (ctx.command === '/reminders' || (args[0] && args[0] === 'list')) {
-    const reminders = await ctx.kelion.memory.list(`plugin:reminder:${userId}`);
+  if (ctx.command === "/reminders" || (args[0] && args[0] === "list")) {
+    const reminders = await ctx.kelion.memory.list(
+      `plugin:reminder:${userId}`,
+    );
     if (!reminders || reminders.length === 0) {
-      return { response: '📭 No active reminders.' };
+      return { response: "📭 No active reminders." };
     }
     const list = reminders
-      .map((r, i) => `${i + 1}. ⏰ ${r.message} — ${new Date(r.fireAt).toLocaleString()}`)
-      .join('\n');
+      .map(
+        (r, i) =>
+          `${i + 1}. ⏰ ${r.message} — ${new Date(r.fireAt).toLocaleString()}`,
+      )
+      .join("\n");
     return { response: `📋 Your reminders:\n${list}` };
   }
 
@@ -93,9 +101,9 @@ async function onCommand(ctx) {
   }
 
   // Parse time from first part, message from rest
-  const timeText = args.slice(0, 3).join(' ');
+  const timeText = args.slice(0, 3).join(" ");
   const fireAt = parseTime(timeText);
-  const message = args.slice(timeText.split(' ').length).join(' ') || args.join(' ');
+  const message = args.slice(timeText.split(" ").length).join(" ") || args.join(" ");
 
   // Save reminder
   await ctx.kelion.memory.set(`plugin:reminder:${userId}`, {
@@ -105,9 +113,9 @@ async function onCommand(ctx) {
     userId,
   });
 
-  const timeStr = fireAt.toLocaleString('ro-RO', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
+  const timeStr = fireAt.toLocaleString("ro-RO", {
+    dateStyle: "medium",
+    timeStyle: "short",
   });
 
   return {
@@ -115,8 +123,4 @@ async function onCommand(ctx) {
   };
 }
 
-/**
- * undefined
- * @returns {*}
- */
 module.exports = { manifest, onCommand, parseTime };

@@ -15,13 +15,14 @@
  * - delete: Remove model
  * - status: Connection check
  */
-'use strict';
+"use strict";
 
-const logger = require('../logger');
+const logger = require("../logger");
 
-const OLLAMA_BASE = process.env.OLLAMA_URL || 'http://localhost:11434';
-const OLLAMA_TIMEOUT = parseInt(process.env.OLLAMA_TIMEOUT || '30000', 10);
-const DEFAULT_MODEL = process.env.OLLAMA_MODEL || 'llama3';
+const OLLAMA_BASE =
+  process.env.OLLAMA_URL || "http://localhost:11434";
+const OLLAMA_TIMEOUT = parseInt(process.env.OLLAMA_TIMEOUT || "30000", 10);
+const DEFAULT_MODEL = process.env.OLLAMA_MODEL || "llama3";
 
 // ── Connection state ──
 let isAvailable = false;
@@ -47,11 +48,11 @@ async function checkStatus() {
       const data = await res.json();
       logger.info(
         {
-          component: 'Ollama',
+          component: "Ollama",
           models: (data.models || []).length,
           url: OLLAMA_BASE,
         },
-        `🏠 Ollama connected: ${(data.models || []).length} models available`
+        `🏠 Ollama connected: ${(data.models || []).length} models available`,
       );
     }
   } catch {
@@ -71,7 +72,7 @@ async function checkStatus() {
 async function chat(prompt, options = {}) {
   const available = await checkStatus();
   if (!available) {
-    return { success: false, error: 'Ollama not available', local: false };
+    return { success: false, error: "Ollama not available", local: false };
   }
 
   const model = options.model || DEFAULT_MODEL;
@@ -79,26 +80,26 @@ async function chat(prompt, options = {}) {
 
   // System prompt
   if (options.systemPrompt) {
-    messages.push({ role: 'system', content: options.systemPrompt });
+    messages.push({ role: "system", content: options.systemPrompt });
   }
 
   // History
   if (options.history && Array.isArray(options.history)) {
     for (const msg of options.history.slice(-10)) {
       messages.push({
-        role: msg.role === 'assistant' ? 'assistant' : 'user',
+        role: msg.role === "assistant" ? "assistant" : "user",
         content: msg.content,
       });
     }
   }
 
   // Current message
-  messages.push({ role: 'user', content: prompt });
+  messages.push({ role: "user", content: prompt });
 
   try {
     const res = await fetch(`${OLLAMA_BASE}/api/chat`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         model,
         messages,
@@ -117,16 +118,16 @@ async function chat(prompt, options = {}) {
     }
 
     const data = await res.json();
-    const response = data.message?.content || '';
+    const response = data.message?.content || "";
 
     logger.info(
       {
-        component: 'Ollama',
+        component: "Ollama",
         model,
         tokensEval: data.eval_count,
         durationMs: Math.round((data.total_duration || 0) / 1e6),
       },
-      `🏠 Local AI response: ${model} (${data.eval_count || 0} tokens)`
+      `🏠 Local AI response: ${model} (${data.eval_count || 0} tokens)`,
     );
 
     return {
@@ -134,12 +135,15 @@ async function chat(prompt, options = {}) {
       response,
       model,
       local: true,
-      provider: 'ollama',
+      provider: "ollama",
       tokensUsed: data.eval_count || 0,
       durationMs: Math.round((data.total_duration || 0) / 1e6),
     };
   } catch (e) {
-    logger.warn({ component: 'Ollama', model, err: e.message }, 'Local AI chat failed');
+    logger.warn(
+      { component: "Ollama", model, err: e.message },
+      "Local AI chat failed",
+    );
     return { success: false, error: e.message, local: true };
   }
 }
@@ -163,9 +167,9 @@ async function listModels() {
         sizeHuman: formatBytes(m.size),
         modified: m.modified_at,
         digest: m.digest?.substring(0, 12),
-        family: m.details?.family || 'unknown',
-        parameters: m.details?.parameter_size || 'unknown',
-        quantization: m.details?.quantization_level || 'unknown',
+        family: m.details?.family || "unknown",
+        parameters: m.details?.parameter_size || "unknown",
+        quantization: m.details?.quantization_level || "unknown",
       })),
     };
   } catch (e) {
@@ -179,11 +183,14 @@ async function listModels() {
  */
 async function pullModel(modelName) {
   try {
-    logger.info({ component: 'Ollama', model: modelName }, `📥 Pulling model: ${modelName}`);
+    logger.info(
+      { component: "Ollama", model: modelName },
+      `📥 Pulling model: ${modelName}`,
+    );
 
     const res = await fetch(`${OLLAMA_BASE}/api/pull`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: modelName, stream: false }),
       signal: AbortSignal.timeout(600000), // 10 min timeout for downloads
     });
@@ -191,11 +198,17 @@ async function pullModel(modelName) {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
 
-    logger.info({ component: 'Ollama', model: modelName, status: data.status }, `✅ Model pulled: ${modelName}`);
+    logger.info(
+      { component: "Ollama", model: modelName, status: data.status },
+      `✅ Model pulled: ${modelName}`,
+    );
 
-    return { success: true, status: data.status || 'success' };
+    return { success: true, status: data.status || "success" };
   } catch (e) {
-    logger.warn({ component: 'Ollama', model: modelName, err: e.message }, 'Model pull failed');
+    logger.warn(
+      { component: "Ollama", model: modelName, err: e.message },
+      "Model pull failed",
+    );
     return { success: false, error: e.message };
   }
 }
@@ -206,15 +219,18 @@ async function pullModel(modelName) {
 async function deleteModel(modelName) {
   try {
     const res = await fetch(`${OLLAMA_BASE}/api/delete`, {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: modelName }),
       signal: AbortSignal.timeout(10000),
     });
 
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-    logger.info({ component: 'Ollama', model: modelName }, `🗑️ Model deleted: ${modelName}`);
+    logger.info(
+      { component: "Ollama", model: modelName },
+      `🗑️ Model deleted: ${modelName}`,
+    );
     return { success: true };
   } catch (e) {
     return { success: false, error: e.message };
@@ -227,8 +243,8 @@ async function deleteModel(modelName) {
 async function showModel(modelName) {
   try {
     const res = await fetch(`${OLLAMA_BASE}/api/show`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: modelName }),
       signal: AbortSignal.timeout(5000),
     });
@@ -242,8 +258,8 @@ async function showModel(modelName) {
 
 // ── Utility ──
 function formatBytes(bytes) {
-  if (!bytes) return '0 B';
-  const units = ['B', 'KB', 'MB', 'GB'];
+  if (!bytes) return "0 B";
+  const units = ["B", "KB", "MB", "GB"];
   let i = 0;
   let val = bytes;
   while (val >= 1024 && i < units.length - 1) {
@@ -254,18 +270,17 @@ function formatBytes(bytes) {
 }
 
 // ── Check on module load ──
-if (process.env.OLLAMA_ENABLED === 'true') {
+if (process.env.OLLAMA_ENABLED === "true") {
   checkStatus().then((ok) => {
     if (!ok) {
-      logger.info({ component: 'Ollama' }, '🏠 Ollama not detected — will use cloud providers');
+      logger.info(
+        { component: "Ollama" },
+        "🏠 Ollama not detected — will use cloud providers",
+      );
     }
   });
 }
 
-/**
- * undefined
- * @returns {*}
- */
 module.exports = {
   chat,
   listModels,

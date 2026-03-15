@@ -79,48 +79,45 @@ SUPPORTED LANGUAGES (examples — support ANY language):
 
 DEFAULT: If no user input yet → English`;
 
-/**
- * buildSystemPrompt
- * @param {*} avatar
- * @param {*} language
- * @param {*} memory
- * @param {*} diagnostics
- * @param {*} chainOfThought
- * @returns {*}
- */
-function buildSystemPrompt(avatar, language, memory, diagnostics, chainOfThought) {
+function buildSystemPrompt(
+  avatar,
+  language,
+  memory,
+  diagnostics,
+  chainOfThought,
+) {
   const LANGS = {
-    ro: 'română',
-    en: 'English',
-    es: 'español',
-    fr: 'français',
-    de: 'Deutsch',
-    it: 'italiano',
-    pt: 'português',
-    nl: 'Nederlands',
-    pl: 'polski',
-    ru: 'русский',
-    ja: '日本語',
-    zh: '中文',
-    ar: 'العربية',
-    tr: 'Türkçe',
-    uk: 'українська',
-    sv: 'svenska',
-    no: 'norsk',
-    da: 'dansk',
-    fi: 'suomi',
-    cs: 'čeština',
-    sk: 'slovenčina',
-    hu: 'magyar',
-    hr: 'hrvatski',
-    bg: 'български',
-    el: 'ελληνικά',
-    he: 'עברית',
-    ko: '한국어',
-    hi: 'हिन्दी',
-    vi: 'Tiếng Việt',
+    ro: "română",
+    en: "English",
+    es: "español",
+    fr: "français",
+    de: "Deutsch",
+    it: "italiano",
+    pt: "português",
+    nl: "Nederlands",
+    pl: "polski",
+    ru: "русский",
+    ja: "日本語",
+    zh: "中文",
+    ar: "العربية",
+    tr: "Türkçe",
+    uk: "українська",
+    sv: "svenska",
+    no: "norsk",
+    da: "dansk",
+    fi: "suomi",
+    cs: "čeština",
+    sk: "slovenčina",
+    hu: "magyar",
+    hr: "hrvatski",
+    bg: "български",
+    el: "ελληνικά",
+    he: "עברית",
+    ko: "한국어",
+    hi: "हिन्दी",
+    vi: "Tiếng Việt",
   };
-  const langName = LANGS[language] || language || 'English';
+  const langName = LANGS[language] || language || "English";
 
   // ── CORE THINKING FRAMEWORK ──────────────────────────────
   const THINKING = `
@@ -515,7 +512,7 @@ KelionAI a fost creat de ** Adrian ** — el este fondatorul, proprietarul și c
 
   // ── AVATAR PERSONA ───────────────────────────────────────
   let persona;
-  if (avatar === 'kira') {
+  if (avatar === "kira") {
     persona = `Ești KIRA — NU ești Kelion.Numele tău este KIRA.
 
 IDENTITATE OBLIGATORIE:
@@ -653,21 +650,21 @@ Exemplu: [GAZE:up] Hmm, lasă-mă să mă gândesc...
 `;
 
   // ── ASSEMBLY ─────────────────────────────────────────────
-  let prompt = TRUTH_ENGINE + '\n'; // FIRST — overrides everything
-  prompt += LANGUAGE_RULES + '\n'; // Language/tone rules — mandatory
-  prompt += persona + '\n';
-  prompt += CREATOR + '\n';
-  prompt += THINKING + '\n';
-  prompt += EMOTIONAL_IQ + '\n';
-  prompt += HUMOR_IQ + '\n';
-  prompt += TEMPORAL_AWARENESS + '\n';
-  prompt += PROACTIVE + '\n';
-  prompt += CURIOSITY + '\n';
-  prompt += TOOLS + '\n';
-  prompt += ACCESSIBILITY + '\n';
-  prompt += SELF_REPAIR + '\n';
-  prompt += AVATAR_BODY_LANGUAGE + '\n'; // Body control for avatar
-  prompt += RULES + '\n';
+  let prompt = TRUTH_ENGINE + "\n"; // FIRST — overrides everything
+  prompt += LANGUAGE_RULES + "\n"; // Language/tone rules — mandatory
+  prompt += persona + "\n";
+  prompt += CREATOR + "\n";
+  prompt += THINKING + "\n";
+  prompt += EMOTIONAL_IQ + "\n";
+  prompt += HUMOR_IQ + "\n";
+  prompt += TEMPORAL_AWARENESS + "\n";
+  prompt += PROACTIVE + "\n";
+  prompt += CURIOSITY + "\n";
+  prompt += TOOLS + "\n";
+  prompt += ACCESSIBILITY + "\n";
+  prompt += SELF_REPAIR + "\n";
+  prompt += AVATAR_BODY_LANGUAGE + "\n"; // Body control for avatar
+  prompt += RULES + "\n";
 
   // Inject memory
   if (memory && memory.length > 0) {
@@ -676,58 +673,67 @@ Exemplu: [GAZE:up] Hmm, lasă-mă să mă gândesc...
 
   // Inject system state awareness
   if (diagnostics?.failedTools?.length > 0) {
-    prompt += `\n## STARE SISTEM\nUnelte temporar indisponibile: ${diagnostics.failedTools.join(', ')}. Oferă alternative.\n`;
+    prompt += `\n## STARE SISTEM\nUnelte temporar indisponibile: ${diagnostics.failedTools.join(", ")}. Oferă alternative.\n`;
   }
 
   // Inject chain-of-thought guidance
-  if (chainOfThought && typeof chainOfThought === 'object') {
-    if (chainOfThought.tone) prompt += `\nTon recomandat de gandire: ${chainOfThought.tone} \n`;
+  if (chainOfThought && typeof chainOfThought === "object") {
+    if (chainOfThought.tone)
+      prompt += `\nTon recomandat de gandire: ${chainOfThought.tone} \n`;
   }
 
   // Inject current time context
   const now = new Date();
   const hour = now.getHours();
   const LOCALE_MAP = {
-    ro: 'ro-RO',
-    en: 'en-US',
-    fr: 'fr-FR',
-    de: 'de-DE',
-    es: 'es-ES',
-    it: 'it-IT',
-    pt: 'pt-PT',
-    nl: 'nl-NL',
-    pl: 'pl-PL',
-    ru: 'ru-RU',
-    ja: 'ja-JP',
-    zh: 'zh-CN',
-    ar: 'ar-SA',
-    tr: 'tr-TR',
-    uk: 'uk-UA',
-    sv: 'sv-SE',
-    no: 'nb-NO',
-    da: 'da-DK',
-    fi: 'fi-FI',
-    cs: 'cs-CZ',
-    sk: 'sk-SK',
-    hu: 'hu-HU',
-    hr: 'hr-HR',
-    bg: 'bg-BG',
-    el: 'el-GR',
-    he: 'he-IL',
-    ko: 'ko-KR',
-    hi: 'hi-IN',
-    vi: 'vi-VN',
+    ro: "ro-RO",
+    en: "en-US",
+    fr: "fr-FR",
+    de: "de-DE",
+    es: "es-ES",
+    it: "it-IT",
+    pt: "pt-PT",
+    nl: "nl-NL",
+    pl: "pl-PL",
+    ru: "ru-RU",
+    ja: "ja-JP",
+    zh: "zh-CN",
+    ar: "ar-SA",
+    tr: "tr-TR",
+    uk: "uk-UA",
+    sv: "sv-SE",
+    no: "nb-NO",
+    da: "da-DK",
+    fi: "fi-FI",
+    cs: "cs-CZ",
+    sk: "sk-SK",
+    hu: "hu-HU",
+    hr: "hr-HR",
+    bg: "bg-BG",
+    el: "el-GR",
+    he: "he-IL",
+    ko: "ko-KR",
+    hi: "hi-IN",
+    vi: "vi-VN",
   };
-  const locale = LOCALE_MAP[language] || 'en-US';
+  const locale = LOCALE_MAP[language] || "en-US";
   let day;
   try {
-    day = now.toLocaleDateString(locale, { weekday: 'long' });
+    day = now.toLocaleDateString(locale, { weekday: "long" });
   } catch {
-    day = now.toLocaleDateString('en-US', { weekday: 'long' });
+    day = now.toLocaleDateString("en-US", { weekday: "long" });
   }
   const timeOfDay =
-    hour < 6 ? 'night' : hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : hour < 22 ? 'evening' : 'night';
-  prompt += `\nNOW: ${day}, ${hour}:${String(now.getMinutes()).padStart(2, '0')}, ${timeOfDay}. Adapt your tone naturally.\n`;
+    hour < 6
+      ? "night"
+      : hour < 12
+        ? "morning"
+        : hour < 18
+          ? "afternoon"
+          : hour < 22
+            ? "evening"
+            : "night";
+  prompt += `\nNOW: ${day}, ${hour}:${String(now.getMinutes()).padStart(2, "0")}, ${timeOfDay}. Adapt your tone naturally.\n`;
 
   prompt += `\nRESPOND in ${langName}. Be concise but complete.`;
 
@@ -745,11 +751,7 @@ function buildNewbornPrompt(memory) {
     return memory;
   }
   // Altfel — string gol. Creierul pornește de la zero absolut.
-  return '';
+  return "";
 }
 
-/**
- * undefined
- * @returns {*}
- */
 module.exports = { buildSystemPrompt, TRUTH_ENGINE, buildNewbornPrompt };

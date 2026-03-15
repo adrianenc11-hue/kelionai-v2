@@ -1,19 +1,17 @@
-'use strict';
+"use strict";
 
-const pino = require('pino');
+const pino = require("pino");
 
 const logger = pino({
-  level: process.env.LOG_LEVEL || (process.env.NODE_ENV === 'production' ? 'info' : 'debug'),
-  ...(process.env.NODE_ENV !== 'production' && {
+  level:
+    process.env.LOG_LEVEL ||
+    (process.env.NODE_ENV === "production" ? "info" : "debug"),
+  ...(process.env.NODE_ENV !== "production" && {
     transport: {
-      target: 'pino/file',
+      target: "pino/file",
       options: { destination: 1 }, // stdout
     },
   }),
 });
 
-/**
- * undefined
- * @returns {*}
- */
 module.exports = logger;

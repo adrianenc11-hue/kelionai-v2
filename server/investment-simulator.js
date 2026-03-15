@@ -14,16 +14,10 @@
  * Assets: BTC, ETH, SOL, EUR/USD, GBP/USD, S&P 500, NASDAQ, Gold, Oil
  */
 
-const _logger = require('pino')({ name: 'investment-sim' });
+const _logger = require("pino")({ name: "investment-sim" });
 
 // ═══ TECHNICAL INDICATORS ═══
 
-/**
- * calcRSI
- * @param {*} prices
- * @param {*} period
- * @returns {*}
- */
 function calcRSI(prices, period = 14) {
   if (prices.length < period + 1) return 50;
   let gains = 0,
@@ -39,12 +33,6 @@ function calcRSI(prices, period = 14) {
   return +(100 - 100 / (1 + avgGain / avgLoss)).toFixed(2);
 }
 
-/**
- * calcEMA
- * @param {*} prices
- * @param {*} period
- * @returns {*}
- */
 function calcEMA(prices, period) {
   const k = 2 / (period + 1);
   let ema = prices[0];
@@ -56,13 +44,8 @@ function calcEMA(prices, period) {
 
 // ═══ SIGNAL ENGINE — confluence of 5 indicators ═══
 
-/**
- * generateSignal
- * @param {*} priceWindow
- * @returns {*}
- */
 function generateSignal(priceWindow) {
-  if (priceWindow.length < 50) return { signal: 'HOLD', confidence: 0 };
+  if (priceWindow.length < 50) return { signal: "HOLD", confidence: 0 };
   const last = priceWindow[priceWindow.length - 1];
   let bullish = 0,
     bearish = 0,
@@ -86,38 +69,35 @@ function generateSignal(priceWindow) {
   else bearish++;
 
   // 4. Momentum (5-day)
-  const mom = (last - priceWindow[priceWindow.length - 6]) / priceWindow[priceWindow.length - 6];
+  const mom =
+    (last - priceWindow[priceWindow.length - 6]) /
+    priceWindow[priceWindow.length - 6];
   total++;
   if (mom > 0.02) bullish++;
   else if (mom < -0.02) bearish++;
 
   // 5. Bollinger Bands
-  const std = Math.sqrt(priceWindow.slice(-20).reduce((s, p) => s + Math.pow(p - sma20, 2), 0) / 20);
+  const std = Math.sqrt(
+    priceWindow.slice(-20).reduce((s, p) => s + Math.pow(p - sma20, 2), 0) / 20,
+  );
   total++;
   if (last < sma20 - 2 * std) bullish++;
   else if (last > sma20 + 2 * std) bearish++;
 
   const bullPct = Math.round((bullish / total) * 100);
   const bearPct = Math.round((bearish / total) * 100);
-  if (bullPct >= 60) return { signal: 'BUY', confidence: bullPct };
-  if (bearPct >= 60) return { signal: 'SELL', confidence: bearPct };
-  return { signal: 'HOLD', confidence: Math.max(bullPct, bearPct) };
+  if (bullPct >= 60) return { signal: "BUY", confidence: bullPct };
+  if (bearPct >= 60) return { signal: "SELL", confidence: bearPct };
+  return { signal: "HOLD", confidence: Math.max(bullPct, bearPct) };
 }
 
 // ═══ SIMULATION PER ASSET ═══
 
-/**
- * simulateAsset
- * @param {*} asset
- * @param {*} prices
- * @param {*} startCapital
- * @returns {*}
- */
 function simulateAsset(asset, prices, startCapital = 100) {
   if (!prices || prices.length < 60) {
     return {
       asset,
-      error: 'Insufficient data',
+      error: "Insufficient data",
       dataPoints: prices?.length || 0,
     };
   }
@@ -144,19 +124,19 @@ function simulateAsset(asset, prices, startCapital = 100) {
     const dd = (maxValue - value) / maxValue;
     if (dd > maxDrawdown) maxDrawdown = dd;
 
-    if (signal === 'BUY' && confidence >= 60 && cash > 0) {
+    if (signal === "BUY" && confidence >= 60 && cash > 0) {
       holdings = cash / price;
       lastBuyPrice = price;
       cash = 0;
       totalTrades++;
-      tradeLog.push({ date, action: 'BUY', price, confidence });
-    } else if (signal === 'SELL' && confidence >= 60 && holdings > 0) {
+      tradeLog.push({ date, action: "BUY", price, confidence });
+    } else if (signal === "SELL" && confidence >= 60 && holdings > 0) {
       cash = holdings * price;
       if (price > lastBuyPrice) winTrades++;
       else lossTrades++;
       holdings = 0;
       totalTrades++;
-      tradeLog.push({ date, action: 'SELL', price, confidence });
+      tradeLog.push({ date, action: "SELL", price, confidence });
     }
   }
 
@@ -173,35 +153,43 @@ function simulateAsset(asset, prices, startCapital = 100) {
     returnPct: +returnPct.toFixed(2),
     holdReturn: +holdReturn.toFixed(2),
     beatHold: returnPct > holdReturn,
-    annualizedReturn: +(years > 0 ? (Math.pow(finalValue / startCapital, 1 / years) - 1) * 100 : 0).toFixed(2),
+    annualizedReturn: +(
+      years > 0 ? (Math.pow(finalValue / startCapital, 1 / years) - 1) * 100 : 0
+    ).toFixed(2),
     totalTrades,
     winTrades,
     lossTrades,
-    winRate: totalTrades > 0 ? +((winTrades / totalTrades) * 100).toFixed(1) : 0,
+    winRate:
+      totalTrades > 0 ? +((winTrades / totalTrades) * 100).toFixed(1) : 0,
     maxDrawdown: +(-maxDrawdown * 100).toFixed(2),
     dataPoints: prices.length,
     period: { from: prices[0]?.date, to: prices[prices.length - 1]?.date },
-    strategy: 'Confluence (RSI+EMA+SMA+Momentum+Bollinger)',
+    strategy: "Confluence (RSI+EMA+SMA+Momentum+Bollinger)",
     lastTrades: tradeLog.slice(-5),
   };
 }
 
 // ═══ FULL SIMULATION ═══
 
-/**
- * runFullSimulation
- * @param {*} supabase
- * @returns {*}
- */
 async function runFullSimulation(supabase) {
   const PERIODS = [
-    { name: '1Y', days: 252 },
-    { name: '3Y', days: 756 },
-    { name: '5Y', days: 1260 },
-    { name: '10Y', days: 2520 },
-    { name: 'MAX', days: null },
+    { name: "1Y", days: 252 },
+    { name: "3Y", days: 756 },
+    { name: "5Y", days: 1260 },
+    { name: "10Y", days: 2520 },
+    { name: "MAX", days: null },
   ];
-  const ASSETS = ['BTC', 'ETH', 'SOL', 'EUR/USD', 'GBP/USD', 'S&P 500', 'NASDAQ', 'Gold', 'Oil'];
+  const ASSETS = [
+    "BTC",
+    "ETH",
+    "SOL",
+    "EUR/USD",
+    "GBP/USD",
+    "S&P 500",
+    "NASDAQ",
+    "Gold",
+    "Oil",
+  ];
 
   const results = {};
   const bestStrategies = [];
@@ -211,21 +199,21 @@ async function runFullSimulation(supabase) {
     for (const period of PERIODS) {
       try {
         let query = supabase
-          .from('trading_price_history')
-          .select('date, close')
-          .eq('asset', asset)
-          .order('date', { ascending: true });
+          .from("trading_price_history")
+          .select("date, close")
+          .eq("asset", asset)
+          .order("date", { ascending: true });
 
         if (period.days) {
           const since = new Date();
           since.setDate(since.getDate() - period.days);
-          query = query.gte('date', since.toISOString().slice(0, 10));
+          query = query.gte("date", since.toISOString().slice(0, 10));
         }
 
         const { data, error } = await query;
         if (error || !data || data.length < 60) {
           results[asset][period.name] = {
-            error: 'Insufficient data',
+            error: "Insufficient data",
             dataPoints: data?.length || 0,
           };
           continue;
@@ -258,36 +246,35 @@ async function runFullSimulation(supabase) {
     bestStrategies: bestStrategies.slice(0, 10),
     brainRules,
     timestamp: new Date().toISOString(),
-    note: 'Per-asset simulation. Rules are POTENTIAL until confirmed 5+ times.',
+    note: "Per-asset simulation. Rules are POTENTIAL until confirmed 5+ times.",
   };
 }
 
 // ═══ PER-ASSET BRAIN RULES — lifecycle: POTENTIAL → TESTING → CONFIRMED ═══
 
-/**
- * generateBrainRules
- * @param {*} results
- * @returns {*}
- */
 function generateBrainRules(results) {
   const rules = [];
 
   for (const [asset, periods] of Object.entries(results)) {
-    const valid = Object.entries(periods).filter(([, p]) => p.returnPct !== null);
+    const valid = Object.entries(periods).filter(
+      ([, p]) => p.returnPct !== null,
+    );
     if (valid.length === 0) continue;
 
-    const tag = asset.replace(/[^A-Z0-9]/g, '_');
+    const tag = asset.replace(/[^A-Z0-9]/g, "_");
 
     // Best period for THIS asset
-    const best = [...valid].sort(([, a], [, b]) => (b.returnPct || 0) - (a.returnPct || 0))[0];
+    const best = [...valid].sort(
+      ([, a], [, b]) => (b.returnPct || 0) - (a.returnPct || 0),
+    )[0];
     if (best && best[1].returnPct > 0) {
       rules.push({
         rule: `OPTIMAL_PERIOD_${tag}`,
         asset,
-        type: 'OPTIMAL_PERIOD',
+        type: "OPTIMAL_PERIOD",
         description: `${asset}: best in ${best[0]} (+${best[1].returnPct}%, WR ${best[1].winRate}%)`,
         action: `Use ${best[0]} timeframe for ${asset}`,
-        status: 'POTENTIAL',
+        status: "POTENTIAL",
         confirmations: 1,
         data: {
           period: best[0],
@@ -304,10 +291,10 @@ function generateBrainRules(results) {
       rules.push({
         rule: `ACTIVE_VS_HOLD_${tag}`,
         asset,
-        type: 'ACTIVE_VS_HOLD',
-        description: `${asset}: active beats hold in ${beating.map(([p]) => p).join(',')}`,
+        type: "ACTIVE_VS_HOLD",
+        description: `${asset}: active beats hold in ${beating.map(([p]) => p).join(",")}`,
         action: `Active trading recommended for ${asset}`,
-        status: 'POTENTIAL',
+        status: "POTENTIAL",
         confirmations: 1,
         data: {
           periods: beating.map(([p, d]) => ({
@@ -326,10 +313,10 @@ function generateBrainRules(results) {
       rules.push({
         rule: `WIN_RATE_${tag}`,
         asset,
-        type: 'WIN_RATE',
+        type: "WIN_RATE",
         description: `${asset}: ${bestWR[1].winRate}% win rate in ${bestWR[0]}`,
         action: `High-confidence signals for ${asset}`,
-        status: 'POTENTIAL',
+        status: "POTENTIAL",
         confirmations: 1,
         data: {
           period: bestWR[0],
@@ -344,10 +331,10 @@ function generateBrainRules(results) {
       rules.push({
         rule: `AVOID_${tag}`,
         asset,
-        type: 'AVOID',
+        type: "AVOID",
         description: `${asset}: negative in ALL periods`,
         action: `Avoid or reduce ${asset}`,
-        status: 'POTENTIAL',
+        status: "POTENTIAL",
         confirmations: 1,
         data: {
           periods: valid.map(([p, d]) => ({
@@ -364,10 +351,10 @@ function generateBrainRules(results) {
       rules.push({
         rule: `DD_RISK_${tag}`,
         asset,
-        type: 'DRAWDOWN_RISK',
+        type: "DRAWDOWN_RISK",
         description: `${asset}: max DD ${bigDD[0][1].maxDrawdown}% in ${bigDD[0][0]}`,
         action: `Use stop-loss for ${asset}`,
-        status: 'POTENTIAL',
+        status: "POTENTIAL",
         confirmations: 1,
         data: { period: bigDD[0][0], maxDD: bigDD[0][1].maxDrawdown },
       });
@@ -386,16 +373,12 @@ function updateRuleStatus(existing, newRule) {
   return {
     ...newRule,
     confirmations: c,
-    status: c >= 5 ? 'CONFIRMED' : c >= 3 ? 'TESTING' : 'POTENTIAL',
+    status: c >= 5 ? "CONFIRMED" : c >= 3 ? "TESTING" : "POTENTIAL",
     first_seen: existing?.first_seen || new Date().toISOString(),
     last_confirmed: new Date().toISOString(),
   };
 }
 
-/**
- * undefined
- * @returns {*}
- */
 module.exports = {
   simulateAsset,
   runFullSimulation,

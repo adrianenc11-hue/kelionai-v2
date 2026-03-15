@@ -10,7 +10,7 @@
  * - Runs every hour automatically when bot is ON
  */
 
-const logger = require('pino')({ name: 'trading-learner' });
+const logger = require("pino")({ name: "trading-learner" });
 
 // Default rules per asset — will be overwritten by learned rules
 const DEFAULT_RULES = {
@@ -18,7 +18,7 @@ const DEFAULT_RULES = {
   maxAllocation: 0.2, // max % of cash per position (20%)
   preferredSessions: [], // best sessions for this asset
   enabled: true, // can the bot trade this asset?
-  notes: '', // AI-generated notes
+  notes: "", // AI-generated notes
 };
 
 // In-memory learned rules (restored from DB on startup)
@@ -34,13 +34,13 @@ async function analyzeAndLearn(supabase) {
   try {
     // Get ALL trades from Supabase
     const { data: trades } = await supabase
-      .from('trading_paper_trades')
-      .select('*')
-      .order('created_at', { ascending: true });
+      .from("trading_paper_trades")
+      .select("*")
+      .order("created_at", { ascending: true });
 
     if (!trades || trades.length < 2) {
-      logger.info('[Learner] Not enough trades to analyze yet');
-      return { status: 'insufficient_data', trades: trades?.length || 0 };
+      logger.info("[Learner] Not enough trades to analyze yet");
+      return { status: "insufficient_data", trades: trades?.length || 0 };
     }
 
     // ═══ PER-ASSET ANALYSIS ═══
@@ -90,23 +90,33 @@ async function analyzeAndLearn(supabase) {
       let sharpe = 0;
       if (s.pnls.length > 1) {
         const mean = s.pnls.reduce((a, b) => a + b, 0) / s.pnls.length;
-        const variance = s.pnls.reduce((a, b) => a + (b - mean) ** 2, 0) / s.pnls.length;
+        const variance =
+          s.pnls.reduce((a, b) => a + (b - mean) ** 2, 0) / s.pnls.length;
         const stdDev = Math.sqrt(variance);
         sharpe = stdDev > 0 ? +(mean / stdDev).toFixed(3) : 0;
       }
 
       // Profit Factor
-      const grossProfit = s.pnls.filter((p) => p > 0).reduce((a, b) => a + b, 0);
-      const grossLoss = Math.abs(s.pnls.filter((p) => p < 0).reduce((a, b) => a + b, 0));
-      const profitFactor = grossLoss > 0 ? +(grossProfit / grossLoss).toFixed(2) : grossProfit > 0 ? 999 : 0;
+      const grossProfit = s.pnls
+        .filter((p) => p > 0)
+        .reduce((a, b) => a + b, 0);
+      const grossLoss = Math.abs(
+        s.pnls.filter((p) => p < 0).reduce((a, b) => a + b, 0),
+      );
+      const profitFactor =
+        grossLoss > 0
+          ? +(grossProfit / grossLoss).toFixed(2)
+          : grossProfit > 0
+            ? 999
+            : 0;
 
       // Grade: A (excellent), B (good), C (ok), D (poor), F (avoid)
-      let grade = 'C';
-      if (winRate >= 65 && sharpe > 0.5) grade = 'A';
-      else if (winRate >= 55 && sharpe > 0.2) grade = 'B';
-      else if (winRate >= 45) grade = 'C';
-      else if (winRate >= 30) grade = 'D';
-      else grade = 'F';
+      let grade = "C";
+      if (winRate >= 65 && sharpe > 0.5) grade = "A";
+      else if (winRate >= 55 && sharpe > 0.2) grade = "B";
+      else if (winRate >= 45) grade = "C";
+      else if (winRate >= 30) grade = "D";
+      else grade = "F";
 
       assetPerformance[asset] = {
         asset,
@@ -131,16 +141,16 @@ async function analyzeAndLearn(supabase) {
       const rules = { ...DEFAULT_RULES, ...(learnedRules[asset] || {}) };
 
       // Adjust confidence threshold based on performance
-      if (perf.grade === 'A') {
+      if (perf.grade === "A") {
         rules.minConfidence = Math.max(50, rules.minConfidence - 5); // Lower threshold = more trades
         rules.maxAllocation = Math.min(0.3, rules.maxAllocation + 0.02); // Bigger positions
-      } else if (perf.grade === 'B') {
+      } else if (perf.grade === "B") {
         rules.minConfidence = 60; // Standard
         rules.maxAllocation = 0.2;
-      } else if (perf.grade === 'D') {
+      } else if (perf.grade === "D") {
         rules.minConfidence = Math.min(80, rules.minConfidence + 5); // Higher threshold = fewer trades
         rules.maxAllocation = Math.max(0.1, rules.maxAllocation - 0.03); // Smaller positions
-      } else if (perf.grade === 'F') {
+      } else if (perf.grade === "F") {
         rules.minConfidence = 85; // Very selective
         rules.maxAllocation = 0.05; // Minimal exposure
         rules.notes = `⚠️ Poor performance (WR:${perf.winRate}%, Sharpe:${perf.sharpe}). Consider disabling.`;
@@ -167,36 +177,43 @@ async function analyzeAndLearn(supabase) {
       // Apply AI recommendations to learned rules
       for (const [asset, advice] of Object.entries(aiAdvice)) {
         if (learnedRules[asset]) {
-          if (advice.minConfidence) learnedRules[asset].minConfidence = advice.minConfidence;
-          if (advice.maxAllocation) learnedRules[asset].maxAllocation = advice.maxAllocation;
-          if (advice.enabled !== undefined) learnedRules[asset].enabled = advice.enabled;
-          if (advice.notes) learnedRules[asset].notes = `🤖 AI: ${advice.notes}`;
+          if (advice.minConfidence)
+            learnedRules[asset].minConfidence = advice.minConfidence;
+          if (advice.maxAllocation)
+            learnedRules[asset].maxAllocation = advice.maxAllocation;
+          if (advice.enabled !== undefined)
+            learnedRules[asset].enabled = advice.enabled;
+          if (advice.notes)
+            learnedRules[asset].notes = `🤖 AI: ${advice.notes}`;
         }
       }
-      logger.info({ assets: Object.keys(aiAdvice).length }, '[Learner] Gemini AI recommendations applied');
+      logger.info(
+        { assets: Object.keys(aiAdvice).length },
+        "[Learner] Gemini AI recommendations applied",
+      );
     }
 
     // ═══ SAVE TO SUPABASE ═══
     for (const [asset, rules] of Object.entries(learnedRules)) {
       const perf = assetPerformance[asset] || {};
       try {
-        await supabase.from('trading_brain_rules').upsert(
+        await supabase.from("trading_brain_rules").upsert(
           {
             asset,
             min_confidence: rules.minConfidence,
             max_allocation: rules.maxAllocation,
             enabled: rules.enabled,
-            grade: perf.grade || '?',
+            grade: perf.grade || "?",
             win_rate: perf.winRate || 0,
             sharpe_ratio: perf.sharpe || 0,
             profit_factor: perf.profitFactor || 0,
             total_pnl: perf.totalPnL || 0,
             total_trades: perf.totalTrades || 0,
-            notes: rules.notes || '',
-            ai_advice: aiAdvice?.[asset]?.notes || '',
+            notes: rules.notes || "",
+            ai_advice: aiAdvice?.[asset]?.notes || "",
             updated_at: new Date().toISOString(),
           },
-          { onConflict: 'asset' }
+          { onConflict: "asset" },
         );
       } catch (_e) {
         /* table might not exist */
@@ -217,15 +234,19 @@ async function analyzeAndLearn(supabase) {
         assets: Object.keys(assetPerformance).length,
         trades: trades.length,
         aiActive: !!aiAdvice,
-        bestAsset: Object.entries(assetPerformance).sort((a, b) => b[1].winRate - a[1].winRate)[0]?.[0],
-        worstAsset: Object.entries(assetPerformance).sort((a, b) => a[1].winRate - b[1].winRate)[0]?.[0],
+        bestAsset: Object.entries(assetPerformance).sort(
+          (a, b) => b[1].winRate - a[1].winRate,
+        )[0]?.[0],
+        worstAsset: Object.entries(assetPerformance).sort(
+          (a, b) => a[1].winRate - b[1].winRate,
+        )[0]?.[0],
       },
-      '[Learner] Analysis complete — rules updated'
+      "[Learner] Analysis complete — rules updated",
     );
 
     return _lastAnalysis;
   } catch (e) {
-    logger.error({ err: e.message }, '[Learner] Analysis failed');
+    logger.error({ err: e.message }, "[Learner] Analysis failed");
     return { error: e.message };
   }
 }
@@ -237,7 +258,7 @@ async function analyzeAndLearn(supabase) {
 async function askGeminiForAdvice(assetPerformance, currentRules) {
   const geminiKey = process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
   if (!geminiKey) {
-    logger.info('[Learner] No Gemini API key — skipping AI analysis');
+    logger.info("[Learner] No Gemini API key — skipping AI analysis");
     return null;
   }
 
@@ -245,16 +266,16 @@ async function askGeminiForAdvice(assetPerformance, currentRules) {
     const perfSummary = Object.entries(assetPerformance)
       .map(
         ([asset, p]) =>
-          `${asset}: ${p.totalTrades} trades, WR=${p.winRate}%, PnL=€${p.totalPnL}, Sharpe=${p.sharpe}, PF=${p.profitFactor}, Grade=${p.grade}`
+          `${asset}: ${p.totalTrades} trades, WR=${p.winRate}%, PnL=€${p.totalPnL}, Sharpe=${p.sharpe}, PF=${p.profitFactor}, Grade=${p.grade}`,
       )
-      .join('\n');
+      .join("\n");
 
     const rulesSummary = Object.entries(currentRules)
       .map(
         ([asset, r]) =>
-          `${asset}: confidence=${r.minConfidence}%, allocation=${(r.maxAllocation * 100).toFixed(0)}%, enabled=${r.enabled}`
+          `${asset}: confidence=${r.minConfidence}%, allocation=${(r.maxAllocation * 100).toFixed(0)}%, enabled=${r.enabled}`,
       )
-      .join('\n');
+      .join("\n");
 
     const prompt = `You are an AI trading strategy advisor for a paper trading bot.
 
@@ -279,55 +300,57 @@ RESPOND ONLY WITH VALID JSON in this exact format:
   "ETH": {"minConfidence": 60, "maxAllocation": 0.2, "enabled": true, "notes": "Stable performance..."}
 }`;
 
-    const { MODELS } = require('./config/models');
+    const { MODELS } = require("./config/models");
     const r = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${MODELS.GEMINI_CHAT}:generateContent?key=${geminiKey}`,
       {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: { temperature: 0.3, maxOutputTokens: 1500 },
         }),
-      }
+      },
     );
 
     if (!r.ok) {
-      logger.warn({ status: r.status }, '[Learner] Gemini API error');
+      logger.warn({ status: r.status }, "[Learner] Gemini API error");
       return null;
     }
 
     const data = await r.json();
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
 
     // Extract JSON from response (handle markdown code blocks)
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
-      logger.warn('[Learner] Gemini returned no valid JSON');
+      logger.warn("[Learner] Gemini returned no valid JSON");
       return null;
     }
 
     const advice = JSON.parse(jsonMatch[0]);
-    logger.info({ assets: Object.keys(advice).length }, '[Learner] 🤖 Gemini AI advice received');
+    logger.info(
+      { assets: Object.keys(advice).length },
+      "[Learner] 🤖 Gemini AI advice received",
+    );
     return advice;
   } catch (e) {
-    logger.warn({ err: e.message }, '[Learner] Gemini analysis failed (will use rule-based)');
+    logger.warn(
+      { err: e.message },
+      "[Learner] Gemini analysis failed (will use rule-based)",
+    );
     return null;
   }
 }
 
-/**
- * getActiveSessionNames
- * @returns {*}
- */
 function getActiveSessionNames() {
   const hour = new Date().getUTCHours();
   const sessions = [];
-  if (hour >= 0 && hour < 9) sessions.push('Tokyo');
-  if (hour >= 7 && hour < 16) sessions.push('London');
-  if (hour >= 13 && hour < 22) sessions.push('New York');
-  if (hour >= 22 || hour < 7) sessions.push('Sydney');
-  return sessions.join(', ') || 'none';
+  if (hour >= 0 && hour < 9) sessions.push("Tokyo");
+  if (hour >= 7 && hour < 16) sessions.push("London");
+  if (hour >= 13 && hour < 22) sessions.push("New York");
+  if (hour >= 22 || hour < 7) sessions.push("Sydney");
+  return sessions.join(", ") || "none";
 }
 
 /**
@@ -342,7 +365,7 @@ function getRulesForAsset(asset) {
  * Get full analysis report
  */
 function getAnalysisReport() {
-  return _lastAnalysis || { status: 'no_analysis_yet' };
+  return _lastAnalysis || { status: "no_analysis_yet" };
 }
 
 /**
@@ -350,7 +373,7 @@ function getAnalysisReport() {
  */
 async function restoreRules(supabase) {
   try {
-    const { data } = await supabase.from('trading_brain_rules').select('*');
+    const { data } = await supabase.from("trading_brain_rules").select("*");
     if (data && data.length > 0) {
       data.forEach((r) => {
         learnedRules[r.asset] = {
@@ -358,10 +381,13 @@ async function restoreRules(supabase) {
           maxAllocation: r.max_allocation || DEFAULT_RULES.maxAllocation,
           enabled: r.enabled !== false,
           preferredSessions: [],
-          notes: r.notes || '',
+          notes: r.notes || "",
         };
       });
-      logger.info({ rules: data.length }, `[Learner] Restored ${data.length} learned rules from DB`);
+      logger.info(
+        { rules: data.length },
+        `[Learner] Restored ${data.length} learned rules from DB`,
+      );
     }
   } catch (_e) {
     /* table might not exist */
@@ -373,20 +399,35 @@ async function restoreRules(supabase) {
  * Identifies best strategy per asset, saves to rules
  * Called every 6 hours (no human intervention)
  */
-const STRATEGIES = ['RSI', 'MACD', 'BollingerBands', 'EMACrossover', 'Fibonacci', 'VolumeProfile', 'Sentiment'];
-const ALL_ASSETS = ['BTC', 'ETH', 'SOL', 'Gold', 'Oil', 'S&P 500', 'NASDAQ', 'EUR/USD', 'GBP/USD'];
+const STRATEGIES = [
+  "RSI",
+  "MACD",
+  "BollingerBands",
+  "EMACrossover",
+  "Fibonacci",
+  "VolumeProfile",
+  "Sentiment",
+];
+const ALL_ASSETS = [
+  "BTC",
+  "ETH",
+  "SOL",
+  "Gold",
+  "Oil",
+  "S&P 500",
+  "NASDAQ",
+  "EUR/USD",
+  "GBP/USD",
+];
 
-/**
- * autoBacktest
- * @param {*} supabase
- * @returns {*}
- */
 async function autoBacktest(supabase) {
   try {
-    const investSim = require('./investment-simulator');
+    const investSim = require("./investment-simulator");
     const results = {};
 
-    logger.info('[Learner] 🔄 AUTO-BACKTEST starting — 7 strategies × 9 assets = 63 combinations');
+    logger.info(
+      "[Learner] 🔄 AUTO-BACKTEST starting — 7 strategies × 9 assets = 63 combinations",
+    );
 
     for (const asset of ALL_ASSETS) {
       results[asset] = {
@@ -402,10 +443,10 @@ async function autoBacktest(supabase) {
           let prices = [];
           if (supabase) {
             const { data } = await supabase
-              .from('market_candles')
-              .select('close')
-              .eq('asset', asset)
-              .order('timestamp', { ascending: true })
+              .from("market_candles")
+              .select("close")
+              .eq("asset", asset)
+              .order("timestamp", { ascending: true })
               .limit(365);
             if (data && data.length > 0) {
               prices = data.map((d) => d.close);
@@ -416,7 +457,7 @@ async function autoBacktest(supabase) {
           if (prices.length < 50) {
             logger.info(
               { asset, candles: prices.length },
-              `[Learner] Skipping ${asset} — need 50+ real candles, have ${prices.length}`
+              `[Learner] Skipping ${asset} — need 50+ real candles, have ${prices.length}`,
             );
             continue;
           }
@@ -429,7 +470,7 @@ async function autoBacktest(supabase) {
           for (let i = windowSize; i < prices.length - 1; i++) {
             const window = prices.slice(i - windowSize, i + 1);
             const { signal, confidence } = investSim.generateSignal(window);
-            if (signal === 'BUY' && confidence >= 60) {
+            if (signal === "BUY" && confidence >= 60) {
               const buyPrice = prices[i];
               const sellPrice = prices[Math.min(i + 5, prices.length - 1)]; // hold 5 periods
               const pnl = ((sellPrice - buyPrice) / buyPrice) * 100;
@@ -453,7 +494,8 @@ async function autoBacktest(supabase) {
           // Track best strategy
           if (
             winRate > results[asset].bestWinRate ||
-            (winRate === results[asset].bestWinRate && profitFactor > results[asset].bestPF)
+            (winRate === results[asset].bestWinRate &&
+              profitFactor > results[asset].bestPF)
           ) {
             results[asset].bestStrategy = strategy;
             results[asset].bestWinRate = winRate;
@@ -477,7 +519,7 @@ async function autoBacktest(supabase) {
     for (const [asset, r] of Object.entries(results)) {
       if (r.bestStrategy) {
         try {
-          await supabase.from('trading_brain_rules').upsert(
+          await supabase.from("trading_brain_rules").upsert(
             {
               asset,
               best_strategy: r.bestStrategy,
@@ -485,7 +527,7 @@ async function autoBacktest(supabase) {
               backtest_pf: r.bestPF,
               updated_at: new Date().toISOString(),
             },
-            { onConflict: 'asset' }
+            { onConflict: "asset" },
           );
         } catch (_e) {
           /* ignore */
@@ -498,14 +540,14 @@ async function autoBacktest(supabase) {
         combinations: Object.keys(results).length * STRATEGIES.length,
         bestPerAsset: Object.entries(results)
           .map(([a, r]) => `${a}→${r.bestStrategy}(WR:${r.bestWinRate}%)`)
-          .join(', '),
+          .join(", "),
       },
-      '[Learner] ✅ AUTO-BACKTEST complete — best strategies identified per asset'
+      "[Learner] ✅ AUTO-BACKTEST complete — best strategies identified per asset",
     );
 
     return results;
   } catch (e) {
-    logger.error({ err: e.message }, '[Learner] Auto-backtest failed');
+    logger.error({ err: e.message }, "[Learner] Auto-backtest failed");
     return null;
   }
 }
@@ -552,70 +594,50 @@ function detectCandlestickPattern(candles, i) {
 
   // 1. HAMMER (bullish reversal) — small body on top, long lower shadow
   if (lowerShadow > body * 2 && upperShadow < body * 0.5 && body > 0 && range > 0) {
-    patterns.push({ name: 'Hammer', direction: 'bullish', strength: 2 });
+    patterns.push({ name: "Hammer", direction: "bullish", strength: 2 });
   }
 
   // 2. INVERTED HAMMER (bullish reversal) — small body on bottom, long upper shadow
   if (upperShadow > body * 2 && lowerShadow < body * 0.5 && body > 0) {
-    patterns.push({
-      name: 'Inverted Hammer',
-      direction: 'bullish',
-      strength: 1,
-    });
+    patterns.push({ name: "Inverted Hammer", direction: "bullish", strength: 1 });
   }
 
   // 3. DOJI — open ≈ close (body < 10% of range)
   if (range > 0 && body / range < 0.1) {
-    patterns.push({ name: 'Doji', direction: 'neutral', strength: 1 });
+    patterns.push({ name: "Doji", direction: "neutral", strength: 1 });
   }
 
   // 4. BULLISH ENGULFING — bearish candle followed by larger bullish candle
   if (pIsBearish && isBullish && c.open <= p.close && c.close >= p.open && body > pBody) {
-    patterns.push({
-      name: 'Bullish Engulfing',
-      direction: 'bullish',
-      strength: 3,
-    });
+    patterns.push({ name: "Bullish Engulfing", direction: "bullish", strength: 3 });
   }
 
   // 5. BEARISH ENGULFING — bullish candle followed by larger bearish candle
   if (pIsBullish && isBearish && c.open >= p.close && c.close <= p.open && body > pBody) {
-    patterns.push({
-      name: 'Bearish Engulfing',
-      direction: 'bearish',
-      strength: 3,
-    });
+    patterns.push({ name: "Bearish Engulfing", direction: "bearish", strength: 3 });
   }
 
   // 6. MORNING STAR (bullish, 3 candles) — bearish + small body + bullish
   const ppBody = Math.abs(pp.close - pp.open);
   const ppIsBearish = pp.close < pp.open;
   if (ppIsBearish && ppBody > 0 && pBody < ppBody * 0.3 && isBullish && body > ppBody * 0.5) {
-    patterns.push({ name: 'Morning Star', direction: 'bullish', strength: 3 });
+    patterns.push({ name: "Morning Star", direction: "bullish", strength: 3 });
   }
 
   // 7. EVENING STAR (bearish, 3 candles) — bullish + small body + bearish
   const ppIsBullish = pp.close > pp.open;
   if (ppIsBullish && ppBody > 0 && pBody < ppBody * 0.3 && isBearish && body > ppBody * 0.5) {
-    patterns.push({ name: 'Evening Star', direction: 'bearish', strength: 3 });
+    patterns.push({ name: "Evening Star", direction: "bearish", strength: 3 });
   }
 
   // 8. THREE WHITE SOLDIERS (bullish) — 3 consecutive bullish candles with higher closes
   if (ppIsBullish && pIsBullish && isBullish && c.close > p.close && p.close > pp.close) {
-    patterns.push({
-      name: 'Three White Soldiers',
-      direction: 'bullish',
-      strength: 3,
-    });
+    patterns.push({ name: "Three White Soldiers", direction: "bullish", strength: 3 });
   }
 
   // 9. THREE BLACK CROWS (bearish) — 3 consecutive bearish candles with lower closes
   if (ppIsBearish && pIsBearish && isBearish && c.close < p.close && p.close < pp.close) {
-    patterns.push({
-      name: 'Three Black Crows',
-      direction: 'bearish',
-      strength: 3,
-    });
+    patterns.push({ name: "Three Black Crows", direction: "bearish", strength: 3 });
   }
 
   return patterns.length > 0 ? patterns : null;
@@ -628,7 +650,7 @@ function detectCandlestickPattern(candles, i) {
  */
 async function analyzeCandlestickPatterns(supabase) {
   try {
-    const histLoader = require('./historical-data-loader');
+    const histLoader = require("./historical-data-loader");
 
     const patternStats = {}; // { "BTC:Hammer": { occurrences: N, wins1d: N, ... } }
 
@@ -653,44 +675,27 @@ async function analyzeCandlestickPatterns(supabase) {
           const key = `${asset}:${pat.name}`;
           if (!patternStats[key]) {
             patternStats[key] = {
-              asset,
-              pattern: pat.name,
-              direction: pat.direction,
-              strength: pat.strength,
+              asset, pattern: pat.name, direction: pat.direction, strength: pat.strength,
               occurrences: 0,
-              wins1d: 0,
-              wins3d: 0,
-              wins5d: 0,
-              avgMove1d: 0,
-              avgMove3d: 0,
-              avgMove5d: 0,
-              moves1d: [],
-              moves3d: [],
-              moves5d: [],
+              wins1d: 0, wins3d: 0, wins5d: 0,
+              avgMove1d: 0, avgMove3d: 0, avgMove5d: 0,
+              moves1d: [], moves3d: [], moves5d: [],
             };
           }
           const s = patternStats[key];
           s.occurrences++;
 
           const entryPrice = candles[i].close;
-          const isBullish = pat.direction === 'bullish';
+          const isBullish = pat.direction === "bullish";
 
           // Check outcome after 1, 3, 5 days
-          for (const [days, winsKey, movesKey] of [
-            [1, 'wins1d', 'moves1d'],
-            [3, 'wins3d', 'moves3d'],
-            [5, 'wins5d', 'moves5d'],
-          ]) {
+          for (const [days, winsKey, movesKey] of [[1, "wins1d", "moves1d"], [3, "wins3d", "moves3d"], [5, "wins5d", "moves5d"]]) {
             if (i + days < candles.length) {
               const exitPrice = candles[i + days].close;
               const movePct = ((exitPrice - entryPrice) / entryPrice) * 100;
               s[movesKey].push(movePct);
               // Win = price moved in predicted direction
-              if (
-                (isBullish && movePct > 0) ||
-                (!isBullish && movePct < 0) ||
-                (pat.direction === 'neutral' && Math.abs(movePct) > 1)
-              ) {
+              if ((isBullish && movePct > 0) || (!isBullish && movePct < 0) || (pat.direction === "neutral" && Math.abs(movePct) > 1)) {
                 s[winsKey]++;
               }
             }
@@ -707,14 +712,12 @@ async function analyzeCandlestickPatterns(supabase) {
       s.avgMove1d = s.moves1d.length > 0 ? +(s.moves1d.reduce((a, b) => a + b, 0) / s.moves1d.length).toFixed(3) : 0;
       s.avgMove3d = s.moves3d.length > 0 ? +(s.moves3d.reduce((a, b) => a + b, 0) / s.moves3d.length).toFixed(3) : 0;
       s.avgMove5d = s.moves5d.length > 0 ? +(s.moves5d.reduce((a, b) => a + b, 0) / s.moves5d.length).toFixed(3) : 0;
-      s.winRate1d = s.occurrences > 0 ? +((s.wins1d / s.occurrences) * 100).toFixed(1) : 0;
-      s.winRate3d = s.occurrences > 0 ? +((s.wins3d / s.occurrences) * 100).toFixed(1) : 0;
-      s.winRate5d = s.occurrences > 0 ? +((s.wins5d / s.occurrences) * 100).toFixed(1) : 0;
+      s.winRate1d = s.occurrences > 0 ? +(s.wins1d / s.occurrences * 100).toFixed(1) : 0;
+      s.winRate3d = s.occurrences > 0 ? +(s.wins3d / s.occurrences * 100).toFixed(1) : 0;
+      s.winRate5d = s.occurrences > 0 ? +(s.wins5d / s.occurrences * 100).toFixed(1) : 0;
 
       // Clean up raw arrays (don't save to DB)
-      delete s.moves1d;
-      delete s.moves3d;
-      delete s.moves5d;
+      delete s.moves1d; delete s.moves3d; delete s.moves5d;
 
       // Proven = win rate > 55% AND 5+ occurrences
       if (s.winRate3d > 55 || s.winRate5d > 55) {
@@ -726,26 +729,21 @@ async function analyzeCandlestickPatterns(supabase) {
     if (provenPatterns.length > 0 && supabase) {
       for (const p of provenPatterns) {
         try {
-          await supabase.from('trading_pattern_stats').upsert(
-            {
-              asset: p.asset,
-              pattern: p.pattern,
-              direction: p.direction,
-              strength: p.strength,
-              occurrences: p.occurrences,
-              win_rate_1d: p.winRate1d,
-              win_rate_3d: p.winRate3d,
-              win_rate_5d: p.winRate5d,
-              avg_move_1d: p.avgMove1d,
-              avg_move_3d: p.avgMove3d,
-              avg_move_5d: p.avgMove5d,
-              updated_at: new Date().toISOString(),
-            },
-            { onConflict: 'asset,pattern' }
-          );
-        } catch (_e) {
-          /* table might not exist yet */
-        }
+          await supabase.from("trading_pattern_stats").upsert({
+            asset: p.asset,
+            pattern: p.pattern,
+            direction: p.direction,
+            strength: p.strength,
+            occurrences: p.occurrences,
+            win_rate_1d: p.winRate1d,
+            win_rate_3d: p.winRate3d,
+            win_rate_5d: p.winRate5d,
+            avg_move_1d: p.avgMove1d,
+            avg_move_3d: p.avgMove3d,
+            avg_move_5d: p.avgMove5d,
+            updated_at: new Date().toISOString(),
+          }, { onConflict: "asset,pattern" });
+        } catch (_e) { /* table might not exist yet */ }
       }
     }
 
@@ -761,26 +759,19 @@ async function analyzeCandlestickPatterns(supabase) {
       });
     }
 
-    logger.info(
-      {
-        totalPatterns: Object.keys(patternStats).length,
-        proven: provenPatterns.length,
-        topPatterns: provenPatterns
-          .sort((a, b) => b.winRate3d - a.winRate3d)
-          .slice(0, 5)
-          .map((p) => `${p.asset}:${p.pattern}(WR3d:${p.winRate3d}%)`)
-          .join(', '),
-      },
-      '[Learner] 🕯️ Candlestick pattern analysis complete'
-    );
-
-    return {
-      total: Object.keys(patternStats).length,
+    logger.info({
+      totalPatterns: Object.keys(patternStats).length,
       proven: provenPatterns.length,
-      patterns: provenPatterns,
-    };
+      topPatterns: provenPatterns
+        .sort((a, b) => b.winRate3d - a.winRate3d)
+        .slice(0, 5)
+        .map(p => `${p.asset}:${p.pattern}(WR3d:${p.winRate3d}%)`)
+        .join(", "),
+    }, "[Learner] 🕯️ Candlestick pattern analysis complete");
+
+    return { total: Object.keys(patternStats).length, proven: provenPatterns.length, patterns: provenPatterns };
   } catch (e) {
-    logger.error({ err: e.message }, '[Learner] Candlestick analysis failed');
+    logger.error({ err: e.message }, "[Learner] Candlestick analysis failed");
     return null;
   }
 }
@@ -800,18 +791,16 @@ async function trackSignalAccuracy(supabase) {
     // Get signals from last 30 days that haven't been verified yet
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
     const { data: signals } = await supabase
-      .from('trading_signals')
-      .select('*')
-      .gte('created_at', thirtyDaysAgo)
-      .is('outcome_verified', null)
+      .from("trading_signals")
+      .select("*")
+      .gte("created_at", thirtyDaysAgo)
+      .is("outcome_verified", null)
       .limit(100);
 
     if (!signals || signals.length === 0) return { verified: 0 };
 
-    const histLoader = require('./historical-data-loader');
-    let verified = 0,
-      correct = 0,
-      incorrect = 0;
+    const histLoader = require("./historical-data-loader");
+    let verified = 0, correct = 0, incorrect = 0;
 
     for (const sig of signals) {
       // Check if enough time has passed (3 days minimum)
@@ -827,33 +816,28 @@ async function trackSignalAccuracy(supabase) {
         if (!entryPrice) continue;
 
         const movePct = ((latestPrice - entryPrice) / entryPrice) * 100;
-        const wasCorrect = (sig.signal === 'BUY' && movePct > 0) || (sig.signal === 'SELL' && movePct < 0);
+        const wasCorrect = (sig.signal === "BUY" && movePct > 0) || (sig.signal === "SELL" && movePct < 0);
 
         // Update the signal
-        await supabase
-          .from('trading_signals')
-          .update({
-            outcome_verified: true,
-            outcome_pct: +movePct.toFixed(2),
-            outcome_correct: wasCorrect,
-            verified_at: new Date().toISOString(),
-          })
-          .eq('id', sig.id);
+        await supabase.from("trading_signals").update({
+          outcome_verified: true,
+          outcome_pct: +movePct.toFixed(2),
+          outcome_correct: wasCorrect,
+          verified_at: new Date().toISOString(),
+        }).eq("id", sig.id);
 
         verified++;
         if (wasCorrect) correct++;
         else incorrect++;
-      } catch (_e) {
-        /* skip */
-      }
+      } catch (_e) { /* skip */ }
     }
 
-    const accuracy = verified > 0 ? +((correct / verified) * 100).toFixed(1) : 0;
-    logger.info({ verified, correct, incorrect, accuracy }, '[Learner] 📊 Signal accuracy tracked');
+    const accuracy = verified > 0 ? +(correct / verified * 100).toFixed(1) : 0;
+    logger.info({ verified, correct, incorrect, accuracy }, "[Learner] 📊 Signal accuracy tracked");
 
     return { verified, correct, incorrect, accuracy };
   } catch (e) {
-    logger.error({ err: e.message }, '[Learner] Signal tracking failed');
+    logger.error({ err: e.message }, "[Learner] Signal tracking failed");
     return null;
   }
 }
@@ -865,88 +849,49 @@ function getProvenPatterns(asset) {
   return learnedRules[asset]?.provenPatterns || [];
 }
 
-/**
- * startLearning
- * @param {*} supabase
- * @returns {*}
- */
 function startLearning(supabase) {
   // Restore rules from DB first
-  restoreRules(supabase).catch((err) => {
-    console.error(err);
-  });
+  restoreRules(supabase).catch(() => {});
 
   // Run initial analysis after 15s (let server warm up)
-  setTimeout(
-    () =>
-      analyzeAndLearn(supabase).catch((err) => {
-        console.error(err);
-      }),
-    15000
-  );
+  setTimeout(() => analyzeAndLearn(supabase).catch(() => {}), 15000);
 
   // Run auto-backtest after 30s
-  setTimeout(
-    () =>
-      autoBacktest(supabase).catch((err) => {
-        console.error(err);
-      }),
-    30000
-  );
+  setTimeout(() => autoBacktest(supabase).catch(() => {}), 30000);
 
   // Run candlestick pattern analysis after 60s
-  setTimeout(
-    () =>
-      analyzeCandlestickPatterns(supabase).catch((err) => {
-        console.error(err);
-      }),
-    60000
-  );
+  setTimeout(() => analyzeCandlestickPatterns(supabase).catch(() => {}), 60000);
 
   // Track signal accuracy after 90s
-  setTimeout(
-    () =>
-      trackSignalAccuracy(supabase).catch((err) => {
-        console.error(err);
-      }),
-    90000
-  );
+  setTimeout(() => trackSignalAccuracy(supabase).catch(() => {}), 90000);
 
   // Analyze real trades every hour
   _learnerInterval = setInterval(
     () => {
-      analyzeAndLearn(supabase).catch((err) => {
-        console.error(err);
-      });
-      trackSignalAccuracy(supabase).catch((err) => {
-        console.error(err);
-      });
+      analyzeAndLearn(supabase).catch(() => {});
+      trackSignalAccuracy(supabase).catch(() => {});
     },
-    60 * 60 * 1000
+    60 * 60 * 1000,
   );
 
   // Re-run full backtest every 6 hours
   _backtestInterval = setInterval(
     () => {
-      autoBacktest(supabase).catch((err) => {
-        console.error(err);
-      });
+      autoBacktest(supabase).catch(() => {});
     },
-    6 * 60 * 60 * 1000
+    6 * 60 * 60 * 1000,
   );
 
   // Re-run candlestick analysis every 24 hours (daily candles update)
   _candlestickInterval = setInterval(
     () => {
-      analyzeCandlestickPatterns(supabase).catch((err) => {
-        console.error(err);
-      });
+      analyzeCandlestickPatterns(supabase).catch(() => {});
     },
-    24 * 60 * 60 * 1000
+    24 * 60 * 60 * 1000,
   );
 
   logger.info(
-    '[Learner] 🧠 AUTONOMOUS PIPELINE started — candles@24h, backtest@6h, analysis@1h, signals@1h, zero human intervention'
+    "[Learner] 🧠 AUTONOMOUS PIPELINE started — candles@24h, backtest@6h, analysis@1h, signals@1h, zero human intervention",
   );
 }
 
@@ -966,13 +911,9 @@ function stopLearning() {
     clearInterval(_candlestickInterval);
     _candlestickInterval = null;
   }
-  logger.info('[Learner] Autonomous pipeline stopped');
+  logger.info("[Learner] Autonomous pipeline stopped");
 }
 
-/**
- * undefined
- * @returns {*}
- */
 module.exports = {
   analyzeAndLearn,
   autoBacktest,

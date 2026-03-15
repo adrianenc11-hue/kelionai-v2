@@ -3,26 +3,21 @@
 // Circuit breaker, IP blacklist, compression, static cache,
 // graceful degradation, request queue
 // ═══════════════════════════════════════════════════════════════
-'use strict';
+"use strict";
 
-const zlib = require('zlib');
-const logger = require('./logger');
+const zlib = require("zlib");
+const logger = require("./logger");
 
 // ── 1. CIRCUIT BREAKER ──────────────────────────────────────
 // Tracks failure rates for external services (AI providers, APIs)
 // If failures exceed threshold, circuit opens → fast-fail for cooldown period
 const _circuits = {};
 
-/**
- * getCircuit
- * @param {*} name
- * @returns {*}
- */
 function getCircuit(name) {
   if (!_circuits[name]) {
     _circuits[name] = {
       name,
-      state: 'closed', // closed=normal, open=failing, half-open=testing
+      state: "closed", // closed=normal, open=failing, half-open=testing
       failures: 0,
       successes: 0,
       lastFailure: 0,
@@ -34,17 +29,12 @@ function getCircuit(name) {
   return _circuits[name];
 }
 
-/**
- * circuitAllow
- * @param {*} name
- * @returns {*}
- */
 function circuitAllow(name) {
   const c = getCircuit(name);
-  if (c.state === 'closed') return true;
-  if (c.state === 'open') {
+  if (c.state === "closed") return true;
+  if (c.state === "open") {
     if (Date.now() - c.lastFailure > c.cooldown) {
-      c.state = 'half-open';
+      c.state = "half-open";
       c.successes = 0;
       return true;
     }
@@ -54,40 +44,32 @@ function circuitAllow(name) {
   return c.successes < c.halfOpenMax;
 }
 
-/**
- * circuitSuccess
- * @param {*} name
- * @returns {*}
- */
 function circuitSuccess(name) {
   const c = getCircuit(name);
   c.successes++;
-  if (c.state === 'half-open' && c.successes >= c.halfOpenMax) {
-    c.state = 'closed';
+  if (c.state === "half-open" && c.successes >= c.halfOpenMax) {
+    c.state = "closed";
     c.failures = 0;
-    logger.info({ component: 'CircuitBreaker' }, `✅ ${name} circuit CLOSED (recovered)`);
+    logger.info(
+      { component: "CircuitBreaker" },
+      `✅ ${name} circuit CLOSED (recovered)`,
+    );
   }
 }
 
-/**
- * circuitFailure
- * @param {*} name
- * @returns {*}
- */
 function circuitFailure(name) {
   const c = getCircuit(name);
   c.failures++;
   c.lastFailure = Date.now();
-  if (c.failures >= c.threshold && c.state !== 'open') {
-    c.state = 'open';
-    logger.warn({ component: 'CircuitBreaker' }, `🔴 ${name} circuit OPEN (${c.failures} failures)`);
+  if (c.failures >= c.threshold && c.state !== "open") {
+    c.state = "open";
+    logger.warn(
+      { component: "CircuitBreaker" },
+      `🔴 ${name} circuit OPEN (${c.failures} failures)`,
+    );
   }
 }
 
-/**
- * getCircuitStats
- * @returns {*}
- */
 function getCircuitStats() {
   const stats = {};
   for (const [name, c] of Object.entries(_circuits)) {
@@ -123,86 +105,18 @@ setInterval(
       if (now - data.firstSeen > IP_WINDOW) _ipCounts.delete(ip);
     }
   },
-  5 * 60 * 1000
+  5 * 60 * 1000,
 );
 
-/**
- * ipBlacklistMiddleware
- * @param {*} req
- * @param {*} res
- * @param {*} next
- * @returns {*}
- */
 function ipBlacklistMiddleware(req, res, next) {
-  const ip = req.ip || req.connection?.remoteAddress || 'unknown';
+  const ip = req.ip || req.connection?.remoteAddress || "unknown";
   // Whitelisted
-  if (
-    ip === process.env.HOST_IP ||
-    process.env.HOST_IP ||
-    process.env.HOST_IP ||
-    process.env.HOST_IP ||
-    process.env.HOST_IP ||
-    process.env.HOST_IP ||
-    process.env.HOST_IP ||
-    process.env.HOST_IP ||
-    process.env.HOST_IP ||
-    process.env.HOST_IP ||
-    process.env.HOST_IP ||
-    process.env.HOST_IP ||
-    process.env.HOST_IP ||
-    process.env.HOST_IP ||
-    process.env.HOST_IP ||
-    process.env.HOST_IP ||
-    process.env.HOST_IP ||
-    process.env.HOST_IP ||
-    process.env.HOST_IP ||
-    process.env.HOST_IP ||
-    process.env.HOST_IP ||
-    process.env.HOST_IP ||
-    process.env.HOST_IP ||
-    process.env.HOST_IP ||
-    process.env.HOST_IP ||
-    process.env.HOST_IP ||
-    process.env.HOST_IP ||
-    process.env.HOST_IP ||
-    process.env.HOST_IP ||
-    process.env.HOST_IP ||
-    process.env.HOST_IP ||
-    process.env.HOST_IP ||
-    process.env.HOST_IP ||
-    process.env.HOST_IP ||
-    process.env.HOST_IP ||
-    process.env.HOST_IP ||
-    process.env.HOST_IP ||
-    process.env.HOST_IP ||
-    process.env.HOST_IP ||
-    process.env.HOST_IP ||
-    process.env.HOST_IP ||
-    process.env.HOST_IP ||
-    process.env.HOST_IP ||
-    process.env.HOST_IP ||
-    process.env.HOST_IP ||
-    process.env.HOST_IP ||
-    process.env.HOST_IP ||
-    process.env.HOST_IP ||
-    process.env.HOST_IP ||
-    process.env.HOST_IP ||
-    process.env.HOST_IP ||
-    process.env.HOST_IP ||
-    process.env.HOST_IP ||
-    process.env.HOST_IP ||
-    process.env.HOST_IP ||
-    process.env.HOST_IP ||
-    process.env.HOST_IP ||
-    process.env.HOST_IP ||
-    process.env.HOST_IP ||
-    '127.0.0.1' ||
-    ip === '::1'
-  )
-    return next();
+  if (ip === "127.0.0.1" || ip === "::1") return next();
   // Banned?
   if (_blacklist.has(ip)) {
-    return res.status(429).json({ error: 'Too many requests. Try again later.', retryAfter: 3600 });
+    return res
+      .status(429)
+      .json({ error: "Too many requests. Try again later.", retryAfter: 3600 });
   }
   // Count
   const now = Date.now();
@@ -215,16 +129,17 @@ function ipBlacklistMiddleware(req, res, next) {
   if (data.count > IP_MAX) {
     _blacklist.add(ip);
     _banExpiry.set(ip, now + BAN_DURATION);
-    logger.warn({ component: 'IPBlacklist', ip, count: data.count }, `🚫 IP ${ip} auto-banned (${data.count} req/min)`);
-    return res.status(429).json({ error: 'Rate limit exceeded. Banned for 1 hour.' });
+    logger.warn(
+      { component: "IPBlacklist", ip, count: data.count },
+      `🚫 IP ${ip} auto-banned (${data.count} req/min)`,
+    );
+    return res
+      .status(429)
+      .json({ error: "Rate limit exceeded. Banned for 1 hour." });
   }
   next();
 }
 
-/**
- * getBlacklistStats
- * @returns {*}
- */
 function getBlacklistStats() {
   return {
     banned: _blacklist.size,
@@ -236,8 +151,9 @@ function getBlacklistStats() {
 // ── 3. COMPRESSION MIDDLEWARE ───────────────────────────────
 // Gzip/Deflate for responses > 1KB
 function compressionMiddleware(req, res, next) {
-  const acceptEncoding = req.headers['accept-encoding'] || '';
-  if (!acceptEncoding.includes('gzip') && !acceptEncoding.includes('deflate')) return next();
+  const acceptEncoding = req.headers["accept-encoding"] || "";
+  if (!acceptEncoding.includes("gzip") && !acceptEncoding.includes("deflate"))
+    return next();
 
   const originalWrite = res.write;
   const originalEnd = res.end;
@@ -256,24 +172,29 @@ function compressionMiddleware(req, res, next) {
     const body = Buffer.concat(chunks);
 
     // Skip small responses and already-compressed content
-    const ct = res.getHeader('content-type') || '';
-    if (body.length < 1024 || ct.includes('image/') || ct.includes('video/') || ct.includes('audio/')) {
-      res.setHeader('content-length', body.length);
+    const ct = res.getHeader("content-type") || "";
+    if (
+      body.length < 1024 ||
+      ct.includes("image/") ||
+      ct.includes("video/") ||
+      ct.includes("audio/")
+    ) {
+      res.setHeader("content-length", body.length);
       originalWrite.call(res, body);
       originalEnd.call(res);
       return;
     }
 
-    const encoding = acceptEncoding.includes('gzip') ? 'gzip' : 'deflate';
-    const compress = encoding === 'gzip' ? zlib.gzipSync : zlib.deflateSync;
+    const encoding = acceptEncoding.includes("gzip") ? "gzip" : "deflate";
+    const compress = encoding === "gzip" ? zlib.gzipSync : zlib.deflateSync;
 
     try {
       const compressed = compress(body);
-      res.setHeader('content-encoding', encoding);
-      res.setHeader('content-length', compressed.length);
-      res.removeHeader('content-length'); // let chunked
-      res.setHeader('content-encoding', encoding);
-      res.setHeader('vary', 'Accept-Encoding');
+      res.setHeader("content-encoding", encoding);
+      res.setHeader("content-length", compressed.length);
+      res.removeHeader("content-length"); // let chunked
+      res.setHeader("content-encoding", encoding);
+      res.setHeader("vary", "Accept-Encoding");
       originalWrite.call(res, compressed);
       originalEnd.call(res);
     } catch (_e) {
@@ -289,10 +210,20 @@ function compressionMiddleware(req, res, next) {
 // ── 4. STATIC CACHE HEADERS ─────────────────────────────────
 function staticCacheMiddleware(req, res, next) {
   const url = req.url;
-  if (/\.(js|css|woff2?|ttf|eot|svg|png|jpg|jpeg|webp|gif|ico|glb|gltf|mp3|wav)(\?|$)/i.test(url)) {
-    res.setHeader('Cache-Control', 'public, max-age=86400, stale-while-revalidate=3600');
+  if (
+    /\.(js|css|woff2?|ttf|eot|svg|png|jpg|jpeg|webp|gif|ico|glb|gltf|mp3|wav)(\?|$)/i.test(
+      url,
+    )
+  ) {
+    res.setHeader(
+      "Cache-Control",
+      "public, max-age=86400, stale-while-revalidate=3600",
+    );
   } else if (/\.(html?)(\?|$)/i.test(url)) {
-    res.setHeader('Cache-Control', 'public, max-age=300, stale-while-revalidate=60');
+    res.setHeader(
+      "Cache-Control",
+      "public, max-age=300, stale-while-revalidate=60",
+    );
   }
   next();
 }
@@ -300,27 +231,23 @@ function staticCacheMiddleware(req, res, next) {
 // ── 5. GRACEFUL DEGRADATION ─────────────────────────────────
 // When server is under heavy load, return cached/simplified responses
 let _requestsInFlight = 0;
-const MAX_CONCURRENT = parseInt(process.env.MAX_CONCURRENT_REQUESTS || '200', 10);
+const MAX_CONCURRENT = parseInt(
+  process.env.MAX_CONCURRENT_REQUESTS || "200",
+  10,
+);
 
-/**
- * gracefulDegradationMiddleware
- * @param {*} req
- * @param {*} res
- * @param {*} next
- * @returns {*}
- */
 function gracefulDegradationMiddleware(req, res, next) {
   _requestsInFlight++;
-  res.on('finish', () => {
+  res.on("finish", () => {
     _requestsInFlight--;
   });
 
   if (_requestsInFlight > MAX_CONCURRENT) {
     // Only degrade API requests, not static files
-    if (req.url.startsWith('/api/')) {
+    if (req.url.startsWith("/api/")) {
       _requestsInFlight--;
       return res.status(503).json({
-        error: 'Server is under heavy load. Please try again in a few seconds.',
+        error: "Server is under heavy load. Please try again in a few seconds.",
         retryAfter: 5,
       });
     }
@@ -328,10 +255,6 @@ function gracefulDegradationMiddleware(req, res, next) {
   next();
 }
 
-/**
- * getLoadStats
- * @returns {*}
- */
 function getLoadStats() {
   return {
     requestsInFlight: _requestsInFlight,
@@ -344,14 +267,8 @@ function getLoadStats() {
 // For heavy operations: trading analysis, image generation, etc.
 const _taskQueue = [];
 let _taskRunning = 0;
-const MAX_PARALLEL_TASKS = parseInt(process.env.MAX_PARALLEL_TASKS || '3', 10);
+const MAX_PARALLEL_TASKS = parseInt(process.env.MAX_PARALLEL_TASKS || "3", 10);
 
-/**
- * enqueueTask
- * @param {*} name
- * @param {*} fn
- * @returns {*}
- */
 async function enqueueTask(name, fn) {
   return new Promise((resolve, reject) => {
     _taskQueue.push({ name, fn, resolve, reject, enqueued: Date.now() });
@@ -359,10 +276,6 @@ async function enqueueTask(name, fn) {
   });
 }
 
-/**
- * _processQueue
- * @returns {*}
- */
 async function _processQueue() {
   while (_taskRunning < MAX_PARALLEL_TASKS && _taskQueue.length > 0) {
     const task = _taskQueue.shift();
@@ -379,10 +292,6 @@ async function _processQueue() {
   }
 }
 
-/**
- * getQueueStats
- * @returns {*}
- */
 function getQueueStats() {
   return {
     pending: _taskQueue.length,
@@ -391,10 +300,6 @@ function getQueueStats() {
   };
 }
 
-/**
- * undefined
- * @returns {*}
- */
 module.exports = {
   // Circuit breaker
   circuitAllow,

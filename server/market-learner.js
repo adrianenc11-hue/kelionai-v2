@@ -1,4 +1,4 @@
-'use strict';
+"use strict";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // KelionAI — Market Learner
@@ -7,7 +7,7 @@
 // "Ca unul care are o viață în spate" — acumulează experiență reală.
 // ═══════════════════════════════════════════════════════════════════════════
 
-const logger = require('./logger');
+const logger = require("./logger");
 
 class MarketLearner {
   constructor() {
@@ -54,7 +54,10 @@ class MarketLearner {
   async init(supabase) {
     this.supabase = supabase;
     if (!supabase) {
-      logger.warn({ component: 'Learner' }, 'No Supabase — learning in memory only');
+      logger.warn(
+        { component: "Learner" },
+        "No Supabase — learning in memory only",
+      );
       this.initialized = true;
       return;
     }
@@ -62,51 +65,66 @@ class MarketLearner {
     // Load previous learnings from DB
     try {
       const { data: weights } = await supabase
-        .from('market_learnings')
-        .select('*')
-        .eq('type', 'strategy_weights')
-        .order('created_at', { ascending: false })
+        .from("market_learnings")
+        .select("*")
+        .eq("type", "strategy_weights")
+        .order("created_at", { ascending: false })
         .limit(1);
 
       if (weights?.[0]?.data) {
         this.strategyWeights = { ...this.strategyWeights, ...weights[0].data };
-        logger.info({ component: 'Learner', weights: weights[0].data }, '📚 Loaded learned strategy weights');
+        logger.info(
+          { component: "Learner", weights: weights[0].data },
+          "📚 Loaded learned strategy weights",
+        );
       }
 
       // Load signal accuracy history
       const { data: accuracy } = await supabase
-        .from('market_learnings')
-        .select('*')
-        .eq('type', 'signal_accuracy')
-        .order('created_at', { ascending: false })
+        .from("market_learnings")
+        .select("*")
+        .eq("type", "signal_accuracy")
+        .order("created_at", { ascending: false })
         .limit(1);
 
       if (accuracy?.[0]?.data) {
         this.signalAccuracy = accuracy[0].data;
         const totalSignals = Object.values(this.signalAccuracy).reduce(
           (s, v) => s + (v.hits || 0) + (v.misses || 0),
-          0
+          0,
         );
-        logger.info({ component: 'Learner', totalSignals }, '📊 Loaded signal accuracy data');
+        logger.info(
+          { component: "Learner", totalSignals },
+          "📊 Loaded signal accuracy data",
+        );
       }
 
       // Load pattern memory
       const { data: patterns, count } = await supabase
-        .from('market_patterns')
-        .select('*', { count: 'exact' })
-        .order('created_at', { ascending: false })
+        .from("market_patterns")
+        .select("*", { count: "exact" })
+        .order("created_at", { ascending: false })
         .limit(500);
 
       if (patterns?.length > 0) {
         this.patternMemory = patterns;
-        logger.info({ component: 'Learner', loaded: patterns.length, total: count }, '🧠 Loaded pattern memory');
+        logger.info(
+          { component: "Learner", loaded: patterns.length, total: count },
+          "🧠 Loaded pattern memory",
+        );
       }
     } catch (e) {
-      logger.warn({ component: 'Learner', err: e.message }, 'Error loading learnings — starting fresh');
+      logger.warn(
+        { component: "Learner", err: e.message },
+        "Error loading learnings — starting fresh",
+      );
     }
 
     this.initialized = true;
-    logger.info({ component: 'Learner' }, '🧠 Market Learner initialized — ready to learn');
+    logger.info(
+      { component: "Learner" },
+      "🧠 Market Learner initialized — ready to learn",
+    );
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -137,14 +155,16 @@ class MarketLearner {
 
   resolveSignal(asset, indicator, signal, exitPrice, holdBars = 0) {
     const key = `${asset}/${indicator}/${signal}`;
-    const pending = this.tradeOutcomes.find((t) => t.key === key && !t.resolved);
+    const pending = this.tradeOutcomes.find(
+      (t) => t.key === key && !t.resolved,
+    );
     if (!pending) return;
 
     pending.resolved = true;
     pending.exitPrice = exitPrice;
     pending.holdBars = holdBars;
 
-    const pnlPct = signal.includes('BUY')
+    const pnlPct = signal.includes("BUY")
       ? ((exitPrice - pending.entryPrice) / pending.entryPrice) * 100
       : ((pending.entryPrice - exitPrice) / pending.entryPrice) * 100;
 
@@ -164,13 +184,15 @@ class MarketLearner {
     if (isHit) acc.hits++;
     else acc.misses++;
     acc.totalPnl += pnlPct;
-    acc.avgHoldBars = (acc.avgHoldBars * (acc.hits + acc.misses - 1) + holdBars) / (acc.hits + acc.misses);
+    acc.avgHoldBars =
+      (acc.avgHoldBars * (acc.hits + acc.misses - 1) + holdBars) /
+      (acc.hits + acc.misses);
 
     // ── ADAPTIVE WEIGHT UPDATE ──
     this._updateWeights(indicator, isHit, Math.abs(pnlPct));
 
     // ── PERSIST ──
-    this._persistLearning('signal_outcome', {
+    this._persistLearning("signal_outcome", {
       key,
       asset,
       indicator,
@@ -183,7 +205,7 @@ class MarketLearner {
     });
 
     this.sessionLearnings.push({
-      type: 'signal_resolved',
+      type: "signal_resolved",
       key,
       isHit,
       pnlPct: +pnlPct.toFixed(4),
@@ -201,18 +223,30 @@ class MarketLearner {
     if (!this.strategyWeights[indicator]) return;
 
     // Learning rate decays with experience
-    const totalExperience = Object.values(this.signalAccuracy).reduce((s, v) => s + (v.hits || 0) + (v.misses || 0), 0);
+    const totalExperience = Object.values(this.signalAccuracy).reduce(
+      (s, v) => s + (v.hits || 0) + (v.misses || 0),
+      0,
+    );
     const learningRate = Math.max(0.01, 0.1 / (1 + totalExperience / 1000));
 
     // Adjust weight
     const adjustment = learningRate * magnitude * (isHit ? 1 : -1);
-    this.strategyWeights[indicator] = Math.max(1, Math.min(30, this.strategyWeights[indicator] + adjustment));
+    this.strategyWeights[indicator] = Math.max(
+      1,
+      Math.min(30, this.strategyWeights[indicator] + adjustment),
+    );
 
     // Normalize weights to sum to 100
-    const total = Object.values(this.strategyWeights).reduce((s, v) => s + v, 0);
+    const total = Object.values(this.strategyWeights).reduce(
+      (s, v) => s + v,
+      0,
+    );
     if (total > 0) {
       for (const k of Object.keys(this.strategyWeights)) {
-        this.strategyWeights[k] = +((this.strategyWeights[k] / total) * 100).toFixed(2);
+        this.strategyWeights[k] = +(
+          (this.strategyWeights[k] / total) *
+          100
+        ).toFixed(2);
       }
     }
   }
@@ -235,29 +269,32 @@ class MarketLearner {
     this.patternMemory.push(entry);
 
     // Calculate pattern confidence from history
-    const similar = this.patternMemory.filter((p) => p.pattern_type === patternType && p.asset === asset);
-    const bullish = similar.filter((p) => p.outcome === 'bullish').length;
+    const similar = this.patternMemory.filter(
+      (p) => p.pattern_type === patternType && p.asset === asset,
+    );
+    const bullish = similar.filter((p) => p.outcome === "bullish").length;
     const total = similar.length;
     entry.confidence = total > 0 ? bullish / total : 0.5;
 
     // Persist to Supabase
     if (this.supabase) {
       this.supabase
-        .from('market_patterns')
+        .from("market_patterns")
         .insert(entry)
-        .catch((err) => {
-          console.error(err);
-        });
+        .catch(() => {});
     }
 
     return entry;
   }
 
   getPatternConfidence(asset, patternType) {
-    const similar = this.patternMemory.filter((p) => p.pattern_type === patternType && p.asset === asset);
-    if (similar.length < 5) return { confidence: 0.5, samples: similar.length, reliable: false };
+    const similar = this.patternMemory.filter(
+      (p) => p.pattern_type === patternType && p.asset === asset,
+    );
+    if (similar.length < 5)
+      return { confidence: 0.5, samples: similar.length, reliable: false };
 
-    const bullish = similar.filter((p) => p.outcome === 'bullish').length;
+    const bullish = similar.filter((p) => p.outcome === "bullish").length;
     return {
       confidence: +(bullish / similar.length).toFixed(4),
       samples: similar.length,
@@ -280,7 +317,7 @@ class MarketLearner {
     this.marketRegimeHistory.push(entry);
 
     // Persist
-    this._persistLearning('regime_change', entry);
+    this._persistLearning("regime_change", entry);
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -306,7 +343,7 @@ class MarketLearner {
     }
 
     // Persist
-    this._persistLearning('prediction_error', {
+    this._persistLearning("prediction_error", {
       asset,
       predicted,
       actual,
@@ -315,7 +352,9 @@ class MarketLearner {
   }
 
   getMeanError(asset, last = 100) {
-    const errors = this.predictionErrors.filter((e) => !asset || e.asset === asset).slice(-last);
+    const errors = this.predictionErrors
+      .filter((e) => !asset || e.asset === asset)
+      .slice(-last);
     if (errors.length === 0) return { meanPctError: 0, samples: 0 };
 
     const meanPct = errors.reduce((s, e) => s + e.pctError, 0) / errors.length;
@@ -336,10 +375,12 @@ class MarketLearner {
     const stdDev = Math.sqrt(variance);
 
     // Skewness (asymmetry)
-    const skew = returns.reduce((s, r) => s + Math.pow((r - mean) / stdDev, 3), 0) / n;
+    const skew =
+      returns.reduce((s, r) => s + Math.pow((r - mean) / stdDev, 3), 0) / n;
 
     // Kurtosis (tail heaviness — >3 = fat tails, more extreme events)
-    const kurtosis = returns.reduce((s, r) => s + Math.pow((r - mean) / stdDev, 4), 0) / n;
+    const kurtosis =
+      returns.reduce((s, r) => s + Math.pow((r - mean) / stdDev, 4), 0) / n;
 
     this.priceDistributions[asset] = {
       mean: +mean.toFixed(8),
@@ -348,7 +389,8 @@ class MarketLearner {
       skew: +skew.toFixed(4),
       kurtosis: +kurtosis.toFixed(4),
       fatTails: kurtosis > 3,
-      biasDirection: skew > 0.1 ? 'bullish' : skew < -0.1 ? 'bearish' : 'neutral',
+      biasDirection:
+        skew > 0.1 ? "bullish" : skew < -0.1 ? "bearish" : "neutral",
       samples: n,
       updatedAt: Date.now(),
     };
@@ -381,8 +423,14 @@ class MarketLearner {
   // ═══════════════════════════════════════════════════════════════
 
   getReport() {
-    const totalSignals = Object.values(this.signalAccuracy).reduce((s, v) => s + (v.hits || 0) + (v.misses || 0), 0);
-    const totalHits = Object.values(this.signalAccuracy).reduce((s, v) => s + (v.hits || 0), 0);
+    const totalSignals = Object.values(this.signalAccuracy).reduce(
+      (s, v) => s + (v.hits || 0) + (v.misses || 0),
+      0,
+    );
+    const totalHits = Object.values(this.signalAccuracy).reduce(
+      (s, v) => s + (v.hits || 0),
+      0,
+    );
 
     // Top performers
     const performers = Object.entries(this.signalAccuracy)
@@ -397,7 +445,8 @@ class MarketLearner {
 
     return {
       totalSignalsTracked: totalSignals,
-      overallWinRate: totalSignals > 0 ? +((totalHits / totalSignals) * 100).toFixed(1) : 0,
+      overallWinRate:
+        totalSignals > 0 ? +((totalHits / totalSignals) * 100).toFixed(1) : 0,
       adaptiveWeights: this.strategyWeights,
       topPerformers: performers.slice(0, 10),
       worstPerformers: performers.slice(-5).reverse(),
@@ -411,12 +460,17 @@ class MarketLearner {
   }
 
   _getExperienceLevel(totalSignals) {
-    if (totalSignals < 10) return { level: '🐣 Novice', desc: 'Still learning basics' };
-    if (totalSignals < 50) return { level: '📚 Student', desc: 'Gathering experience' };
-    if (totalSignals < 200) return { level: '🎓 Graduate', desc: 'Developing intuition' };
-    if (totalSignals < 1000) return { level: '💼 Professional', desc: 'Pattern recognition active' };
-    if (totalSignals < 5000) return { level: '🏆 Expert', desc: 'Deep market understanding' };
-    return { level: '🧙 Master', desc: 'A lifetime of market wisdom' };
+    if (totalSignals < 10)
+      return { level: "🐣 Novice", desc: "Still learning basics" };
+    if (totalSignals < 50)
+      return { level: "📚 Student", desc: "Gathering experience" };
+    if (totalSignals < 200)
+      return { level: "🎓 Graduate", desc: "Developing intuition" };
+    if (totalSignals < 1000)
+      return { level: "💼 Professional", desc: "Pattern recognition active" };
+    if (totalSignals < 5000)
+      return { level: "🏆 Expert", desc: "Deep market understanding" };
+    return { level: "🧙 Master", desc: "A lifetime of market wisdom" };
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -426,7 +480,7 @@ class MarketLearner {
   async _persistLearning(type, data) {
     if (!this.supabase) return;
     try {
-      await this.supabase.from('market_learnings').insert({
+      await this.supabase.from("market_learnings").insert({
         type,
         data,
         created_at: new Date().toISOString(),
@@ -440,28 +494,34 @@ class MarketLearner {
     if (!this.supabase) return;
     try {
       // Save current weights
-      await this.supabase.from('market_learnings').upsert(
+      await this.supabase.from("market_learnings").upsert(
         {
-          type: 'strategy_weights',
+          type: "strategy_weights",
           data: this.strategyWeights,
           created_at: new Date().toISOString(),
         },
-        { onConflict: 'type' }
+        { onConflict: "type" },
       );
 
       // Save accuracy
-      await this.supabase.from('market_learnings').upsert(
+      await this.supabase.from("market_learnings").upsert(
         {
-          type: 'signal_accuracy',
+          type: "signal_accuracy",
           data: this.signalAccuracy,
           created_at: new Date().toISOString(),
         },
-        { onConflict: 'type' }
+        { onConflict: "type" },
       );
 
-      logger.info({ component: 'Learner' }, '💾 Learning state saved to Supabase');
+      logger.info(
+        { component: "Learner" },
+        "💾 Learning state saved to Supabase",
+      );
     } catch (e) {
-      logger.warn({ component: 'Learner', err: e.message }, 'State save failed');
+      logger.warn(
+        { component: "Learner", err: e.message },
+        "State save failed",
+      );
     }
   }
 }
@@ -472,9 +532,5 @@ const learner = new MarketLearner();
 // Auto-save every 5 minutes
 setInterval(() => learner.saveState(), 300000);
 
-/**
- * undefined
- * @returns {*}
- */
 module.exports = learner;
 module.exports.MarketLearner = MarketLearner;

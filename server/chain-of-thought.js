@@ -2,26 +2,12 @@
 // KelionAI — Chain-of-Thought (CoT) Module
 // Shows AI reasoning steps when enabled
 // ═══════════════════════════════════════════════════════════════
-'use strict';
+"use strict";
 
 let cotEnabled = false;
 
-/**
- * isEnabled
- * @returns {*}
- */
-function isEnabled() {
-  return cotEnabled;
-}
-/**
- * toggle
- * @param {*} val
- * @returns {*}
- */
-function toggle(val) {
-  cotEnabled = typeof val === 'boolean' ? val : !cotEnabled;
-  return cotEnabled;
-}
+function isEnabled() { return cotEnabled; }
+function toggle(val) { cotEnabled = typeof val === "boolean" ? val : !cotEnabled; return cotEnabled; }
 
 /**
  * Wraps a system prompt with CoT instructions when enabled
@@ -30,9 +16,7 @@ function toggle(val) {
  */
 function enhancePrompt(systemPrompt) {
   if (!cotEnabled) return systemPrompt;
-  return (
-    systemPrompt +
-    `
+  return systemPrompt + `
 
 [CHAIN OF THOUGHT MODE ACTIVE]
 Before giving your final answer, show your reasoning process in a collapsible section.
@@ -48,8 +32,7 @@ Format your response like this:
 </details>
 
 Then provide your final answer below the thinking section.
-This helps the user understand HOW you reached your conclusion.`
-  );
+This helps the user understand HOW you reached your conclusion.`;
 }
 
 /**
@@ -60,11 +43,7 @@ This helps the user understand HOW you reached your conclusion.`
 function cleanResponse(response) {
   if (cotEnabled) return response; // Keep CoT visible
   // Strip <details> blocks if they leaked through
-  return response.replace(/<details>[\s\S]*?<\/details>/gi, '').trim();
+  return response.replace(/<details>[\s\S]*?<\/details>/gi, "").trim();
 }
 
-/**
- * undefined
- * @returns {*}
- */
 module.exports = { isEnabled, toggle, enhancePrompt, cleanResponse };

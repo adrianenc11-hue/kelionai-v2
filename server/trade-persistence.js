@@ -1,4 +1,4 @@
-'use strict';
+"use strict";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TRADE PERSISTENCE — Supabase storage for all trading data
@@ -6,27 +6,30 @@
 // Brain reads this for strategy learning and optimization
 // ═══════════════════════════════════════════════════════════════════════════
 
-const logger = require('./logger');
-const { supabaseAdmin } = require('./supabase');
+const logger = require("./logger");
+const { supabaseAdmin } = require("./supabase");
 
 const TABLE = {
-  ANALYSES: 'trading_analyses',
-  SIGNALS: 'trading_signals',
-  TRADES: 'trading_trades',
-  PERFORMANCE: 'trading_performance',
-  STRATEGIES: 'trading_strategy_log',
+  ANALYSES: "trading_analyses",
+  SIGNALS: "trading_signals",
+  TRADES: "trading_trades",
+  PERFORMANCE: "trading_performance",
+  STRATEGIES: "trading_strategy_log",
 };
 
 // ═══ ENSURE TABLES EXIST ═══
 async function ensureTables() {
   if (!supabaseAdmin) {
-    logger.warn({ component: 'TradePersistence' }, '⚠️ Supabase not configured — trading data will NOT be persisted');
+    logger.warn(
+      { component: "TradePersistence" },
+      "⚠️ Supabase not configured — trading data will NOT be persisted",
+    );
     return false;
   }
 
   try {
     // Create tables if they don't exist via raw SQL
-    const { error } = await supabaseAdmin.rpc('exec_sql', {
+    const { error } = await supabaseAdmin.rpc("exec_sql", {
       query: `
         CREATE TABLE IF NOT EXISTS trading_analyses (
           id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -133,16 +136,22 @@ async function ensureTables() {
     if (error) {
       // If rpc doesn't exist, try direct insert to check if tables exist
       logger.warn(
-        { component: 'TradePersistence', err: error.message },
-        'RPC not available, tables may need manual creation'
+        { component: "TradePersistence", err: error.message },
+        "RPC not available, tables may need manual creation",
       );
       return false;
     }
 
-    logger.info({ component: 'TradePersistence' }, '✅ Trading tables ensured in Supabase');
+    logger.info(
+      { component: "TradePersistence" },
+      "✅ Trading tables ensured in Supabase",
+    );
     return true;
   } catch (e) {
-    logger.warn({ component: 'TradePersistence', err: e.message }, 'Table creation skipped — will try direct inserts');
+    logger.warn(
+      { component: "TradePersistence", err: e.message },
+      "Table creation skipped — will try direct inserts",
+    );
     return true; // Try anyway
   }
 }
@@ -171,9 +180,15 @@ async function saveAnalysis(assetData) {
     const { error } = await supabaseAdmin.from(TABLE.ANALYSES).insert(record);
 
     if (error) throw error;
-    logger.debug({ component: 'TradePersistence', asset: record.asset }, `💾 Analysis saved: ${record.asset}`);
+    logger.debug(
+      { component: "TradePersistence", asset: record.asset },
+      `💾 Analysis saved: ${record.asset}`,
+    );
   } catch (e) {
-    logger.warn({ component: 'TradePersistence', err: e.message }, 'Failed to save analysis');
+    logger.warn(
+      { component: "TradePersistence", err: e.message },
+      "Failed to save analysis",
+    );
   }
 }
 
@@ -202,11 +217,14 @@ async function saveAllAnalyses(assetsArray) {
 
     if (error) throw error;
     logger.info(
-      { component: 'TradePersistence', count: records.length },
-      `💾 ${records.length} analyses saved to Supabase`
+      { component: "TradePersistence", count: records.length },
+      `💾 ${records.length} analyses saved to Supabase`,
     );
   } catch (e) {
-    logger.warn({ component: 'TradePersistence', err: e.message }, 'Failed to save batch analyses');
+    logger.warn(
+      { component: "TradePersistence", err: e.message },
+      "Failed to save batch analyses",
+    );
   }
 }
 
@@ -231,11 +249,14 @@ async function saveSignal(signalData) {
 
     if (error) throw error;
     logger.debug(
-      { component: 'TradePersistence', asset: record.asset },
-      `💾 Signal saved: ${record.asset} ${record.signal}`
+      { component: "TradePersistence", asset: record.asset },
+      `💾 Signal saved: ${record.asset} ${record.signal}`,
     );
   } catch (e) {
-    logger.warn({ component: 'TradePersistence', err: e.message }, 'Failed to save signal');
+    logger.warn(
+      { component: "TradePersistence", err: e.message },
+      "Failed to save signal",
+    );
   }
 }
 
@@ -255,7 +276,7 @@ async function saveTrade(tradeData) {
       reason: tradeData.reason,
       strategy: tradeData.strategy,
       confluence: tradeData.confluence,
-      status: tradeData.exitPrice ? 'closed' : 'open',
+      status: tradeData.exitPrice ? "closed" : "open",
       closed_at: tradeData.exitPrice ? new Date().toISOString() : null,
     };
 
@@ -264,14 +285,17 @@ async function saveTrade(tradeData) {
     if (error) throw error;
     logger.info(
       {
-        component: 'TradePersistence',
+        component: "TradePersistence",
         asset: record.asset,
         action: record.action,
       },
-      `💾 Trade saved: ${record.action} ${record.asset}`
+      `💾 Trade saved: ${record.action} ${record.asset}`,
     );
   } catch (e) {
-    logger.warn({ component: 'TradePersistence', err: e.message }, 'Failed to save trade');
+    logger.warn(
+      { component: "TradePersistence", err: e.message },
+      "Failed to save trade",
+    );
   }
 }
 
@@ -295,12 +319,20 @@ async function saveDailyPerformance(perfData) {
     };
 
     // Upsert by date
-    const { error } = await supabaseAdmin.from(TABLE.PERFORMANCE).upsert(record, { onConflict: 'date' });
+    const { error } = await supabaseAdmin
+      .from(TABLE.PERFORMANCE)
+      .upsert(record, { onConflict: "date" });
 
     if (error) throw error;
-    logger.info({ component: 'TradePersistence', date: today }, `💾 Daily performance saved`);
+    logger.info(
+      { component: "TradePersistence", date: today },
+      `💾 Daily performance saved`,
+    );
   } catch (e) {
-    logger.warn({ component: 'TradePersistence', err: e.message }, 'Failed to save performance');
+    logger.warn(
+      { component: "TradePersistence", err: e.message },
+      "Failed to save performance",
+    );
   }
 }
 
@@ -323,9 +355,15 @@ async function logStrategy(strategyData) {
     const { error } = await supabaseAdmin.from(TABLE.STRATEGIES).insert(record);
 
     if (error) throw error;
-    logger.debug({ component: 'TradePersistence' }, `💾 Strategy logged: ${record.strategy} on ${record.asset}`);
+    logger.debug(
+      { component: "TradePersistence" },
+      `💾 Strategy logged: ${record.strategy} on ${record.asset}`,
+    );
   } catch (e) {
-    logger.warn({ component: 'TradePersistence', err: e.message }, 'Failed to log strategy');
+    logger.warn(
+      { component: "TradePersistence", err: e.message },
+      "Failed to log strategy",
+    );
   }
 }
 
@@ -334,14 +372,21 @@ async function getRecentAnalyses(asset, limit = 50) {
   if (!supabaseAdmin) return [];
 
   try {
-    let query = supabaseAdmin.from(TABLE.ANALYSES).select('*').order('created_at', { ascending: false }).limit(limit);
+    let query = supabaseAdmin
+      .from(TABLE.ANALYSES)
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(limit);
 
-    if (asset) query = query.eq('asset', asset);
+    if (asset) query = query.eq("asset", asset);
     const { data, error } = await query;
     if (error) throw error;
     return data || [];
   } catch (e) {
-    logger.warn({ component: 'TradePersistence', err: e.message }, 'Failed to read analyses');
+    logger.warn(
+      { component: "TradePersistence", err: e.message },
+      "Failed to read analyses",
+    );
     return [];
   }
 }
@@ -353,14 +398,17 @@ async function getTradeHistory(limit = 100) {
   try {
     const { data, error } = await supabaseAdmin
       .from(TABLE.TRADES)
-      .select('*')
-      .order('opened_at', { ascending: false })
+      .select("*")
+      .order("opened_at", { ascending: false })
       .limit(limit);
 
     if (error) throw error;
     return data || [];
   } catch (e) {
-    logger.warn({ component: 'TradePersistence', err: e.message }, 'Failed to read trades');
+    logger.warn(
+      { component: "TradePersistence", err: e.message },
+      "Failed to read trades",
+    );
     return [];
   }
 }
@@ -370,7 +418,9 @@ async function getStrategyStats() {
   if (!supabaseAdmin) return {};
 
   try {
-    const { data, error } = await supabaseAdmin.from(TABLE.STRATEGIES).select('strategy, outcome, pnl');
+    const { data, error } = await supabaseAdmin
+      .from(TABLE.STRATEGIES)
+      .select("strategy, outcome, pnl");
 
     if (error) throw error;
     if (!data?.length) return {};
@@ -382,26 +432,28 @@ async function getStrategyStats() {
         stats[row.strategy] = { total: 0, wins: 0, losses: 0, totalPnl: 0 };
       }
       stats[row.strategy].total++;
-      if (row.outcome === 'win') stats[row.strategy].wins++;
-      if (row.outcome === 'loss') stats[row.strategy].losses++;
+      if (row.outcome === "win") stats[row.strategy].wins++;
+      if (row.outcome === "loss") stats[row.strategy].losses++;
       stats[row.strategy].totalPnl += row.pnl || 0;
     });
 
     for (const s of Object.keys(stats)) {
-      stats[s].winRate = stats[s].total > 0 ? Math.round((stats[s].wins / stats[s].total) * 100) : 0;
+      stats[s].winRate =
+        stats[s].total > 0
+          ? Math.round((stats[s].wins / stats[s].total) * 100)
+          : 0;
     }
 
     return stats;
   } catch (e) {
-    logger.warn({ component: 'TradePersistence', err: e.message }, 'Failed to read strategy stats');
+    logger.warn(
+      { component: "TradePersistence", err: e.message },
+      "Failed to read strategy stats",
+    );
     return {};
   }
 }
 
-/**
- * undefined
- * @returns {*}
- */
 module.exports = {
   ensureTables,
   saveAnalysis,

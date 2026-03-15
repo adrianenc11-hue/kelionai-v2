@@ -13,25 +13,15 @@
  * - Admin API for CRUD operations
  * - Persistent state via Supabase
  */
-'use strict';
+"use strict";
 
-const express = require('express');
-const path = require('path');
-const fs = require('fs');
-const logger = require('./logger');
-const { executeSandboxed, validateCode } = require('./plugin-sandbox');
-const rateLimit = require('express-rate-limit');
+const express = require("express");
+const path = require("path");
+const fs = require("fs");
+const logger = require("./logger");
+const { executeSandboxed, validateCode } = require("./plugin-sandbox");
 
 const router = express.Router();
-
-// Rate limiting for public API routes
-const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
-  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
-  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
-  message: { error: 'Too many requests, please try again later.' },
-});
 
 // ═══ IN-MEMORY PLUGIN REGISTRY ═══
 const installedPlugins = new Map(); // id → { manifest, module, status, type }
@@ -39,78 +29,81 @@ const installedPlugins = new Map(); // id → { manifest, module, status, type }
 // ═══ BUILT-IN PLUGINS ═══
 const BUILTIN_PLUGINS = [
   {
-    id: 'search-tavily',
-    name: 'Tavily Search',
-    version: '1.0.0',
-    description: 'AI-optimized web search with summarized results',
-    author: 'KelionAI',
-    icon: '🔍',
-    category: 'search',
+    id: "search-tavily",
+    name: "Tavily Search",
+    version: "1.0.0",
+    description: "AI-optimized web search with summarized results",
+    author: "KelionAI",
+    icon: "🔍",
+    category: "search",
     builtin: true,
-    status: 'active',
-    type: 'builtin',
-    endpoints: [{ method: 'POST', path: '/api/brain/search', description: 'Web search' }],
-    auth: { type: 'api_key', envKey: 'TAVILY_API_KEY' },
+    status: "active",
+    type: "builtin",
+    endpoints: [
+      { method: "POST", path: "/api/brain/search", description: "Web search" },
+    ],
+    auth: { type: "api_key", envKey: "TAVILY_API_KEY" },
   },
   {
-    id: 'tts-elevenlabs',
-    name: 'ElevenLabs TTS',
-    version: '3.0.0',
-    description: 'Natural text-to-speech with emotion control and voice cloning',
-    author: 'KelionAI',
-    icon: '🎙️',
-    category: 'voice',
+    id: "tts-elevenlabs",
+    name: "ElevenLabs TTS",
+    version: "3.0.0",
+    description:
+      "Natural text-to-speech with emotion control and voice cloning",
+    author: "KelionAI",
+    icon: "🎙️",
+    category: "voice",
     builtin: true,
-    status: 'active',
-    type: 'builtin',
+    status: "active",
+    type: "builtin",
     endpoints: [
       {
-        method: 'POST',
-        path: '/api/voice/tts',
-        description: 'Text to speech',
+        method: "POST",
+        path: "/api/voice/tts",
+        description: "Text to speech",
       },
     ],
-    auth: { type: 'api_key', envKey: 'ELEVENLABS_API_KEY' },
+    auth: { type: "api_key", envKey: "ELEVENLABS_API_KEY" },
   },
   {
-    id: 'vision-gpt',
-    name: 'GPT Vision',
-    version: '5.4.0',
-    description: 'Image analysis, OCR, scene description with GPT-5.4',
-    author: 'KelionAI',
-    icon: '👁️',
-    category: 'vision',
+    id: "vision-gpt",
+    name: "GPT Vision",
+    version: "5.4.0",
+    description: "Image analysis, OCR, scene description with GPT-5.4",
+    author: "KelionAI",
+    icon: "👁️",
+    category: "vision",
     builtin: true,
-    status: 'active',
-    type: 'builtin',
+    status: "active",
+    type: "builtin",
     endpoints: [
       {
-        method: 'POST',
-        path: '/api/vision/analyze',
-        description: 'Analyze image',
+        method: "POST",
+        path: "/api/vision/analyze",
+        description: "Analyze image",
       },
     ],
-    auth: { type: 'api_key', envKey: 'OPENAI_API_KEY' },
+    auth: { type: "api_key", envKey: "OPENAI_API_KEY" },
   },
   {
-    id: 'trading-engine',
-    name: 'Trading Intelligence',
-    version: '2.0.0',
-    description: '11 technical indicators, AI scoring, paper trading',
-    author: 'KelionAI',
-    icon: '📈',
-    category: 'finance',
+    id: "trading-engine",
+    name: "Trading Intelligence",
+    version: "2.0.0",
+    description: "11 technical indicators, AI scoring, paper trading",
+    author: "KelionAI",
+    icon: "📈",
+    category: "finance",
     builtin: true,
-    status: 'active',
-    type: 'builtin',
+    status: "active",
+    type: "builtin",
     endpoints: [
       {
-        method: 'GET',
-        path: '/api/trading/analysis',
-        description: 'Market analysis',
+        method: "GET",
+        path: "/api/trading/analysis",
+        description: "Market analysis",
       },
     ],
-    auth: { type: 'none' },
+    auth: { type: "none" },
   },
 ];
 
@@ -119,10 +112,10 @@ BUILTIN_PLUGINS.forEach((p) => installedPlugins.set(p.id, p));
 
 // ═══ LOCAL PLUGIN DISCOVERY ═══
 function discoverLocalPlugins() {
-  const pluginsDir = path.join(__dirname, 'plugins');
+  const pluginsDir = path.join(__dirname, "plugins");
   if (!fs.existsSync(pluginsDir)) return;
 
-  const files = fs.readdirSync(pluginsDir).filter((f) => f.endsWith('.js'));
+  const files = fs.readdirSync(pluginsDir).filter((f) => f.endsWith(".js"));
   let loaded = 0;
 
   for (const file of files) {
@@ -131,28 +124,40 @@ function discoverLocalPlugins() {
       const pluginModule = require(pluginPath);
 
       if (!pluginModule.manifest || !pluginModule.manifest.id) {
-        logger.warn({ component: 'Plugin', file }, `Skipping ${file}: no manifest.id`);
+        logger.warn(
+          { component: "Plugin", file },
+          `Skipping ${file}: no manifest.id`,
+        );
         continue;
       }
 
       const m = pluginModule.manifest;
       installedPlugins.set(m.id, {
         ...m,
-        status: m.status || 'active',
+        status: m.status || "active",
         local: true,
         module: pluginModule, // Keep reference to hooks
         loadedFrom: pluginPath,
       });
 
       loaded++;
-      logger.info({ component: 'Plugin', id: m.id, type: m.type }, `🔌 Local plugin loaded: ${m.name} v${m.version}`);
+      logger.info(
+        { component: "Plugin", id: m.id, type: m.type },
+        `🔌 Local plugin loaded: ${m.name} v${m.version}`,
+      );
     } catch (e) {
-      logger.warn({ component: 'Plugin', file, err: e.message }, `Failed to load local plugin: ${file}`);
+      logger.warn(
+        { component: "Plugin", file, err: e.message },
+        `Failed to load local plugin: ${file}`,
+      );
     }
   }
 
   if (loaded > 0) {
-    logger.info({ component: 'Plugin', count: loaded }, `🔌 ${loaded} local plugins discovered`);
+    logger.info(
+      { component: "Plugin", count: loaded },
+      `🔌 ${loaded} local plugins discovered`,
+    );
   }
 }
 
@@ -162,13 +167,16 @@ discoverLocalPlugins();
 // ═══ PLUGIN MANIFEST VALIDATION ═══
 function validateManifest(manifest) {
   const errors = [];
-  if (!manifest.id || typeof manifest.id !== 'string') errors.push('id required (string)');
-  if (!manifest.name || manifest.name.length < 2) errors.push('name required (min 2 chars)');
-  if (!manifest.version) errors.push('version required (semver)');
-  if (!manifest.description) errors.push('description required');
-  if (manifest.id && !/^[a-z0-9-]+$/.test(manifest.id)) errors.push('id must be lowercase alphanumeric with hyphens');
-  if (manifest.type && !['command', 'middleware', 'widget', 'builtin'].includes(manifest.type))
-    errors.push('type must be: command, middleware, widget');
+  if (!manifest.id || typeof manifest.id !== "string")
+    errors.push("id required (string)");
+  if (!manifest.name || manifest.name.length < 2)
+    errors.push("name required (min 2 chars)");
+  if (!manifest.version) errors.push("version required (semver)");
+  if (!manifest.description) errors.push("description required");
+  if (manifest.id && !/^[a-z0-9-]+$/.test(manifest.id))
+    errors.push("id must be lowercase alphanumeric with hyphens");
+  if (manifest.type && !["command", "middleware", "widget", "builtin"].includes(manifest.type))
+    errors.push("type must be: command, middleware, widget");
   return errors;
 }
 
@@ -181,14 +189,21 @@ function validateManifest(manifest) {
  */
 async function runBeforeResponseHooks(ctx) {
   for (const [_id, plugin] of installedPlugins) {
-    if (plugin.type === 'middleware' && plugin.status === 'active' && plugin.module?.beforeResponse) {
+    if (
+      plugin.type === "middleware" &&
+      plugin.status === "active" &&
+      plugin.module?.beforeResponse
+    ) {
       try {
         const result = await plugin.module.beforeResponse(ctx);
         if (result) {
           ctx = { ...ctx, ...result };
         }
       } catch (e) {
-        logger.warn({ component: 'Plugin', pluginId: plugin.id, err: e.message }, 'beforeResponse hook failed');
+        logger.warn(
+          { component: "Plugin", pluginId: plugin.id, err: e.message },
+          "beforeResponse hook failed",
+        );
       }
     }
   }
@@ -203,14 +218,21 @@ async function runBeforeResponseHooks(ctx) {
 async function runAfterResponseHooks(ctx) {
   let modifications = null;
   for (const [_id, plugin] of installedPlugins) {
-    if (plugin.type === 'middleware' && plugin.status === 'active' && plugin.module?.afterResponse) {
+    if (
+      plugin.type === "middleware" &&
+      plugin.status === "active" &&
+      plugin.module?.afterResponse
+    ) {
       try {
         const result = await plugin.module.afterResponse(ctx);
         if (result) {
           modifications = { ...(modifications || {}), ...result };
         }
       } catch (e) {
-        logger.warn({ component: 'Plugin', pluginId: plugin.id, err: e.message }, 'afterResponse hook failed');
+        logger.warn(
+          { component: "Plugin", pluginId: plugin.id, err: e.message },
+          "afterResponse hook failed",
+        );
       }
     }
   }
@@ -228,11 +250,12 @@ async function runAfterResponseHooks(ctx) {
  */
 async function executePlugin(pluginId, action, params = {}, ctx = {}) {
   const plugin = installedPlugins.get(pluginId);
-  if (!plugin) return { success: false, error: 'Plugin not found' };
-  if (plugin.status !== 'active') return { success: false, error: 'Plugin is disabled' };
+  if (!plugin) return { success: false, error: "Plugin not found" };
+  if (plugin.status !== "active")
+    return { success: false, error: "Plugin is disabled" };
 
   // Auth check
-  if (plugin.auth?.type === 'api_key' && plugin.auth.envKey) {
+  if (plugin.auth?.type === "api_key" && plugin.auth.envKey) {
     if (!process.env[plugin.auth.envKey]) {
       return { success: false, error: `Missing env: ${plugin.auth.envKey}` };
     }
@@ -249,7 +272,10 @@ async function executePlugin(pluginId, action, params = {}, ctx = {}) {
       });
       return { success: true, ...result, plugin: plugin.name };
     } catch (e) {
-      logger.warn({ component: 'Plugin', pluginId, err: e.message }, 'Plugin command failed');
+      logger.warn(
+        { component: "Plugin", pluginId, err: e.message },
+        "Plugin command failed",
+      );
       return { success: false, error: e.message, plugin: plugin.name };
     }
   }
@@ -260,7 +286,7 @@ async function executePlugin(pluginId, action, params = {}, ctx = {}) {
     if (violations.length > 0) {
       return {
         success: false,
-        error: `Code security violations: ${violations.join(', ')}`,
+        error: `Code security violations: ${violations.join(", ")}`,
       };
     }
 
@@ -273,7 +299,9 @@ async function executePlugin(pluginId, action, params = {}, ctx = {}) {
   // Builtin plugins — route through internal handlers
   if (plugin.builtin && plugin.endpoints?.length > 0) {
     const endpoint = plugin.endpoints.find(
-      (ep) => ep.path.includes(action) || ep.description?.toLowerCase().includes(action.toLowerCase())
+      (ep) =>
+        ep.path.includes(action) ||
+        ep.description?.toLowerCase().includes(action.toLowerCase()),
     );
     if (endpoint) {
       return {
@@ -285,23 +313,23 @@ async function executePlugin(pluginId, action, params = {}, ctx = {}) {
     }
   }
 
-  return { success: false, error: 'No executable handler found' };
+  return { success: false, error: "No executable handler found" };
 }
 
 // ═══ API ROUTES ═══
 
 // GET /api/plugins — List all installed plugins
-router.get('/', (_req, res) => {
+router.get("/", (_req, res) => {
   const plugins = [...installedPlugins.values()].map((p) => ({
     id: p.id,
     name: p.name,
     version: p.version,
     description: p.description,
-    author: p.author || 'Unknown',
-    icon: p.icon || '🔌',
-    category: p.category || 'general',
+    author: p.author || "Unknown",
+    icon: p.icon || "🔌",
+    category: p.category || "general",
     status: p.status,
-    type: p.type || 'builtin',
+    type: p.type || "builtin",
     builtin: p.builtin || false,
     local: p.local || false,
     hasAuth: !!p.auth?.envKey && !!process.env[p.auth?.envKey],
@@ -312,34 +340,35 @@ router.get('/', (_req, res) => {
 });
 
 // GET /api/plugins/stats — Plugin system stats
-router.get('/stats', (_req, res) => {
+router.get("/stats", (_req, res) => {
   const all = [...installedPlugins.values()];
   res.json({
     total: all.length,
-    active: all.filter((p) => p.status === 'active').length,
-    disabled: all.filter((p) => p.status === 'disabled').length,
+    active: all.filter((p) => p.status === "active").length,
+    disabled: all.filter((p) => p.status === "disabled").length,
     builtin: all.filter((p) => p.builtin).length,
     local: all.filter((p) => p.local).length,
     custom: all.filter((p) => !p.builtin && !p.local).length,
     byCategory: all.reduce((acc, p) => {
-      acc[p.category || 'general'] = (acc[p.category || 'general'] || 0) + 1;
+      acc[p.category || "general"] = (acc[p.category || "general"] || 0) + 1;
       return acc;
     }, {}),
     byType: all.reduce((acc, p) => {
-      acc[p.type || 'unknown'] = (acc[p.type || 'unknown'] || 0) + 1;
+      acc[p.type || "unknown"] = (acc[p.type || "unknown"] || 0) + 1;
       return acc;
     }, {}),
   });
 });
 
 // POST /api/plugins/install — Install a new plugin from manifest
-router.post('/install', express.json(), async (req, res) => {
+router.post("/install", express.json(), async (req, res) => {
   try {
     const { manifest, code } = req.body;
-    if (!manifest) return res.status(400).json({ error: 'manifest required' });
+    if (!manifest) return res.status(400).json({ error: "manifest required" });
 
     const errors = validateManifest(manifest);
-    if (errors.length > 0) return res.status(400).json({ error: 'Invalid manifest', errors });
+    if (errors.length > 0)
+      return res.status(400).json({ error: "Invalid manifest", errors });
 
     if (installedPlugins.has(manifest.id)) {
       return res.status(409).json({
@@ -351,14 +380,16 @@ router.post('/install', express.json(), async (req, res) => {
     if (code) {
       const violations = validateCode(code);
       if (violations.length > 0) {
-        return res.status(400).json({ error: 'Code security violations', violations });
+        return res
+          .status(400)
+          .json({ error: "Code security violations", violations });
       }
     }
 
     const plugin = {
       ...manifest,
       code: code || null,
-      status: 'active',
+      status: "active",
       installedAt: new Date().toISOString(),
     };
     installedPlugins.set(manifest.id, plugin);
@@ -367,23 +398,24 @@ router.post('/install', express.json(), async (req, res) => {
     const { supabaseAdmin } = req.app.locals;
     if (supabaseAdmin) {
       await supabaseAdmin
-        .from('brain_plugins')
+        .from("brain_plugins")
         .upsert(
           {
             id: manifest.id,
             manifest: JSON.stringify(plugin),
-            status: 'active',
-            installed_by: 'admin',
+            status: "active",
+            installed_by: "admin",
             installed_at: new Date().toISOString(),
           },
-          { onConflict: 'id' }
+          { onConflict: "id" },
         )
-        .catch((err) => {
-          console.error(err);
-        });
+        .catch(() => {});
     }
 
-    logger.info({ component: 'Plugin', pluginId: manifest.id }, `🔌 Plugin installed: ${manifest.name}`);
+    logger.info(
+      { component: "Plugin", pluginId: manifest.id },
+      `🔌 Plugin installed: ${manifest.name}`,
+    );
     res.json({
       success: true,
       plugin: {
@@ -398,60 +430,60 @@ router.post('/install', express.json(), async (req, res) => {
 });
 
 // DELETE /api/plugins/:id — Uninstall plugin
-router.delete('/:id', async (req, res) => {
+router.delete("/:id", async (req, res) => {
   const pluginId = req.params.id;
   const plugin = installedPlugins.get(pluginId);
-  if (!plugin) return res.status(404).json({ error: 'Plugin not found' });
-  if (plugin.builtin) return res.status(403).json({ error: 'Cannot uninstall builtin plugins' });
+  if (!plugin) return res.status(404).json({ error: "Plugin not found" });
+  if (plugin.builtin)
+    return res.status(403).json({ error: "Cannot uninstall builtin plugins" });
   if (plugin.local)
-    return res.status(403).json({
-      error: 'Cannot uninstall local plugins via API. Delete the file instead.',
-    });
+    return res
+      .status(403)
+      .json({ error: "Cannot uninstall local plugins via API. Delete the file instead." });
 
   installedPlugins.delete(pluginId);
 
   const { supabaseAdmin } = req.app.locals;
   if (supabaseAdmin) {
     await supabaseAdmin
-      .from('brain_plugins')
+      .from("brain_plugins")
       .delete()
-      .eq('id', pluginId)
-      .catch((err) => {
-        console.error(err);
-      });
+      .eq("id", pluginId)
+      .catch(() => {});
   }
 
-  logger.info({ component: 'Plugin', pluginId }, `🔌 Plugin uninstalled: ${plugin.name}`);
+  logger.info(
+    { component: "Plugin", pluginId },
+    `🔌 Plugin uninstalled: ${plugin.name}`,
+  );
   res.json({ success: true });
 });
 
 // POST /api/plugins/:id/toggle — Enable/disable plugin
-router.post('/:id/toggle', async (req, res) => {
+router.post("/:id/toggle", async (req, res) => {
   const plugin = installedPlugins.get(req.params.id);
-  if (!plugin) return res.status(404).json({ error: 'Plugin not found' });
+  if (!plugin) return res.status(404).json({ error: "Plugin not found" });
 
-  plugin.status = plugin.status === 'active' ? 'disabled' : 'active';
+  plugin.status = plugin.status === "active" ? "disabled" : "active";
 
   // Persist status change
   const { supabaseAdmin } = req.app.locals;
   if (supabaseAdmin && !plugin.builtin) {
     await supabaseAdmin
-      .from('brain_plugins')
+      .from("brain_plugins")
       .update({ status: plugin.status, updated_at: new Date().toISOString() })
-      .eq('id', req.params.id)
-      .catch((err) => {
-        console.error(err);
-      });
+      .eq("id", req.params.id)
+      .catch(() => {});
   }
 
   res.json({ success: true, id: req.params.id, status: plugin.status });
 });
 
 // POST /api/plugins/:id/execute — Execute plugin command
-router.post('/:id/execute', express.json(), async (req, res) => {
+router.post("/:id/execute", express.json(), async (req, res) => {
   try {
     const result = await executePlugin(req.params.id, req.body.action, req.body.params, {
-      userId: req.body.userId || 'admin',
+      userId: req.body.userId || "admin",
       kelion: req.body.kelion || {},
     });
     res.json(result);
@@ -464,12 +496,18 @@ router.post('/:id/execute', express.json(), async (req, res) => {
 async function restorePlugins(supabase) {
   if (!supabase) return;
   try {
-    const { data } = await supabase.from('brain_plugins').select('manifest, status').eq('status', 'active');
+    const { data } = await supabase
+      .from("brain_plugins")
+      .select("manifest, status")
+      .eq("status", "active");
     if (data) {
       let restored = 0;
       data.forEach((row) => {
         try {
-          const manifest = typeof row.manifest === 'string' ? JSON.parse(row.manifest) : row.manifest;
+          const manifest =
+            typeof row.manifest === "string"
+              ? JSON.parse(row.manifest)
+              : row.manifest;
           if (manifest.id && !manifest.builtin && !installedPlugins.has(manifest.id)) {
             installedPlugins.set(manifest.id, {
               ...manifest,
@@ -482,7 +520,10 @@ async function restorePlugins(supabase) {
         }
       });
       if (restored > 0) {
-        logger.info({ component: 'Plugin', count: restored }, `🔌 Restored ${restored} plugins from DB`);
+        logger.info(
+          { component: "Plugin", count: restored },
+          `🔌 Restored ${restored} plugins from DB`,
+        );
       }
     }
   } catch {
@@ -490,10 +531,6 @@ async function restorePlugins(supabase) {
   }
 }
 
-/**
- * undefined
- * @returns {*}
- */
 module.exports = {
   router,
   executePlugin,

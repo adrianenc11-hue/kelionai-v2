@@ -2,27 +2,27 @@
 // KelionAI — Brain Profile Module
 // User profiling, long-term memory, and learning persistence
 // ═══════════════════════════════════════════════════════════════
-'use strict';
+"use strict";
 
-const logger = require('./logger');
+const logger = require("./logger");
 
 // ── UserProfile — aggregated user intelligence ──
 class UserProfile {
   constructor(userId) {
     this.userId = userId;
-    this.language = 'ro';
+    this.language = "ro";
     this.timezone = null;
     this.name = null;
     this.profession = null;
     this.interests = [];
-    this.communicationStyle = 'neutral'; // formal, casual, technical, friendly
-    this.expertiseLevel = 'general'; // beginner, general, expert
-    this.preferredAvatar = 'kelion';
-    this.plan = 'free';
+    this.communicationStyle = "neutral"; // formal, casual, technical, friendly
+    this.expertiseLevel = "general"; // beginner, general, expert
+    this.preferredAvatar = "kelion";
+    this.plan = "free";
     this.totalMessages = 0;
     this.topTopics = []; // [{topic, count}]
     this.preferredLanguages = []; // [{lang, count}]
-    this.emotionalBaseline = 'neutral';
+    this.emotionalBaseline = "neutral";
     this.lastSeen = null;
     this.firstSeen = null;
     this.facts = []; // extracted personal facts
@@ -36,37 +36,47 @@ class UserProfile {
 
     try {
       // 1. Load user data from profiles table
-      const { data: userData } = await supabase.from('profiles').select('*').eq('id', userId).single();
+      const { data: userData } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", userId)
+        .single();
 
       if (userData) {
         profile.name = userData.full_name || userData.display_name || null;
-        profile.plan = userData.plan || 'free';
-        profile.language = userData.language || 'ro';
-        profile.preferredAvatar = userData.preferred_avatar || 'kelion';
+        profile.plan = userData.plan || "free";
+        profile.language = userData.language || "ro";
+        profile.preferredAvatar = userData.preferred_avatar || "kelion";
         profile.firstSeen = userData.created_at;
         profile.totalMessages = userData.message_count || 0;
       }
 
       // 2. Load stored profile from brain_profiles table
-      const { data: brainProfile } = await supabase.from('brain_profiles').select('*').eq('user_id', userId).single();
+      const { data: brainProfile } = await supabase
+        .from("brain_profiles")
+        .select("*")
+        .eq("user_id", userId)
+        .single();
 
       if (brainProfile) {
         profile.profession = brainProfile.profession || null;
         profile.interests = brainProfile.interests || [];
-        profile.communicationStyle = brainProfile.communication_style || 'neutral';
-        profile.expertiseLevel = brainProfile.expertise_level || 'general';
+        profile.communicationStyle =
+          brainProfile.communication_style || "neutral";
+        profile.expertiseLevel = brainProfile.expertise_level || "general";
         profile.topTopics = brainProfile.top_topics || [];
         profile.preferredLanguages = brainProfile.preferred_languages || [];
-        profile.emotionalBaseline = brainProfile.emotional_baseline || 'neutral';
+        profile.emotionalBaseline =
+          brainProfile.emotional_baseline || "neutral";
         profile.timezone = brainProfile.timezone || null;
       }
 
       // 3. Load personal facts
       const { data: facts } = await supabase
-        .from('brain_facts')
-        .select('fact, category')
-        .eq('user_id', userId)
-        .order('importance', { ascending: false })
+        .from("brain_facts")
+        .select("fact, category")
+        .eq("user_id", userId)
+        .order("importance", { ascending: false })
         .limit(20);
 
       if (facts) profile.facts = facts;
@@ -76,15 +86,18 @@ class UserProfile {
 
       logger.info(
         {
-          component: 'BrainProfile',
+          component: "BrainProfile",
           userId,
           name: profile.name,
           topics: profile.topTopics.length,
         },
-        'Profile loaded'
+        "Profile loaded",
       );
     } catch (e) {
-      logger.warn({ component: 'BrainProfile', userId, err: e.message }, 'Profile load failed (tables may not exist)');
+      logger.warn(
+        { component: "BrainProfile", userId, err: e.message },
+        "Profile load failed (tables may not exist)",
+      );
     }
 
     return profile;
@@ -94,7 +107,7 @@ class UserProfile {
   async save(supabase) {
     if (!supabase || !this.userId) return;
     try {
-      await supabase.from('brain_profiles').upsert(
+      await supabase.from("brain_profiles").upsert(
         {
           user_id: this.userId,
           profession: this.profession,
@@ -107,10 +120,13 @@ class UserProfile {
           timezone: this.timezone,
           updated_at: new Date().toISOString(),
         },
-        { onConflict: 'user_id' }
+        { onConflict: "user_id" },
       );
     } catch (e) {
-      logger.warn({ component: 'BrainProfile', err: e.message }, 'Profile save failed');
+      logger.warn(
+        { component: "BrainProfile", err: e.message },
+        "Profile save failed",
+      );
     }
   }
 
@@ -133,45 +149,54 @@ class UserProfile {
         else this.topTopics.push({ topic, count: 1 });
       }
       this.topTopics.sort((a, b) => b.count - a.count);
-      if (this.topTopics.length > 20) this.topTopics = this.topTopics.slice(0, 20);
+      if (this.topTopics.length > 20)
+        this.topTopics = this.topTopics.slice(0, 20);
     }
 
     // Detect communication style from message patterns
-    const lower = (message || '').toLowerCase();
-    if (/\b(please|thank|kindly|would you)\b/i.test(message)) this.communicationStyle = 'formal';
-    else if (/\b(yo|sup|hey|lol|haha)\b/i.test(lower)) this.communicationStyle = 'casual';
-    else if (/\b(api|function|algorithm|database|code|server|deploy)\b/i.test(lower))
-      this.communicationStyle = 'technical';
+    const lower = (message || "").toLowerCase();
+    if (/\b(please|thank|kindly|would you)\b/i.test(message))
+      this.communicationStyle = "formal";
+    else if (/\b(yo|sup|hey|lol|haha)\b/i.test(lower))
+      this.communicationStyle = "casual";
+    else if (
+      /\b(api|function|algorithm|database|code|server|deploy)\b/i.test(lower)
+    )
+      this.communicationStyle = "technical";
 
     // Detect expertise level
-    if (/\b(implement|refactor|architecture|microservic|kubernetes|docker|ci\/cd)\b/i.test(lower)) {
-      this.expertiseLevel = 'expert';
+    if (
+      /\b(implement|refactor|architecture|microservic|kubernetes|docker|ci\/cd)\b/i.test(
+        lower,
+      )
+    ) {
+      this.expertiseLevel = "expert";
     } else if (/\b(how do i|what is|explain|help me|can you)\b/i.test(lower)) {
-      this.expertiseLevel = 'general';
+      this.expertiseLevel = "general";
     }
 
     // Detect profession hints
     const professionHints = [
       {
         pattern: /\b(programm|develop|cod(e|ing)|software|engineer)\b/i,
-        prof: 'developer',
+        prof: "developer",
       },
-      { pattern: /\b(design|ui|ux|figma|photoshop)\b/i, prof: 'designer' },
+      { pattern: /\b(design|ui|ux|figma|photoshop)\b/i, prof: "designer" },
       {
         pattern: /\b(market|seo|brand|campaign|advertis)\b/i,
-        prof: 'marketer',
+        prof: "marketer",
       },
       {
         pattern: /\b(trad(e|ing)|invest|stock|crypto|bitcoin|forex)\b/i,
-        prof: 'trader',
+        prof: "trader",
       },
       {
         pattern: /\b(student|learn|university|school|homework)\b/i,
-        prof: 'student',
+        prof: "student",
       },
       {
         pattern: /\b(business|startup|entrepreneur|ceo|founder)\b/i,
-        prof: 'entrepreneur',
+        prof: "entrepreneur",
       },
     ];
     for (const hint of professionHints) {
@@ -189,13 +214,14 @@ class UserProfile {
     const parts = [];
     if (this.name) parts.push(`User name: ${this.name}`);
     if (this.profession) parts.push(`Profession: ${this.profession}`);
-    if (this.interests.length) parts.push(`Interests: ${this.interests.slice(0, 5).join(', ')}`);
+    if (this.interests.length)
+      parts.push(`Interests: ${this.interests.slice(0, 5).join(", ")}`);
     if (this.topTopics.length)
       parts.push(
         `Frequent topics: ${this.topTopics
           .slice(0, 5)
           .map((t) => t.topic)
-          .join(', ')}`
+          .join(", ")}`,
       );
     parts.push(`Communication style: ${this.communicationStyle}`);
     parts.push(`Expertise: ${this.expertiseLevel}`);
@@ -206,10 +232,10 @@ class UserProfile {
         `Known facts: ${this.facts
           .slice(0, 8)
           .map((f) => f.fact)
-          .join('; ')}`
+          .join("; ")}`,
       );
     }
-    return parts.length > 0 ? `[USER PROFILE] ${parts.join(' | ')}` : '';
+    return parts.length > 0 ? `[USER PROFILE] ${parts.join(" | ")}` : "";
   }
 }
 
@@ -226,13 +252,16 @@ class LearningStore {
     if (!supabase) return;
     try {
       const { data } = await supabase
-        .from('brain_learnings')
-        .select('*')
-        .order('success_rate', { ascending: false })
+        .from("brain_learnings")
+        .select("*")
+        .order("success_rate", { ascending: false })
         .limit(100);
       if (data) this.patterns = data;
     } catch (e) {
-      logger.warn({ component: 'LearningStore', err: e.message }, 'Load failed (table may not exist)');
+      logger.warn(
+        { component: "LearningStore", err: e.message },
+        "Load failed (table may not exist)",
+      );
     }
   }
 
@@ -256,8 +285,8 @@ class LearningStore {
     }
 
     // Find or create pattern entry
-    const complexity = analysis?.complexity || 'simple';
-    const topics = (analysis?.topics || []).sort().join(',');
+    const complexity = analysis?.complexity || "simple";
+    const topics = (analysis?.topics || []).sort().join(",");
     const key = `${complexity}:${topics}`;
 
     const existing = this.patterns.find((p) => p.pattern_key === key);
@@ -267,7 +296,10 @@ class LearningStore {
         ? Math.min(1, (existing.success_rate || 0.5) + 0.05)
         : Math.max(0, (existing.success_rate || 0.5) - 0.1);
       existing.best_tools = toolsUsed;
-      existing.avg_latency = Math.round((existing.avg_latency * (existing.count - 1) + latency) / existing.count);
+      existing.avg_latency = Math.round(
+        (existing.avg_latency * (existing.count - 1) + latency) /
+          existing.count,
+      );
     } else {
       this.patterns.push({
         pattern_key: key,
@@ -283,18 +315,22 @@ class LearningStore {
     // Persist to Supabase (async, non-blocking)
     if (supabase) {
       try {
-        await supabase.from('brain_learnings').upsert(
+        await supabase.from("brain_learnings").upsert(
           {
             pattern_key: key,
             complexity,
             topics,
             best_tools: toolsUsed,
-            success_rate: existing ? existing.success_rate : success ? 0.8 : 0.3,
+            success_rate: existing
+              ? existing.success_rate
+              : success
+                ? 0.8
+                : 0.3,
             avg_latency: existing ? existing.avg_latency : latency,
             count: existing ? existing.count : 1,
             updated_at: new Date().toISOString(),
           },
-          { onConflict: 'pattern_key' }
+          { onConflict: "pattern_key" },
         );
       } catch (_e) {
         /* ignore persistence failures */
@@ -304,10 +340,12 @@ class LearningStore {
 
   // Get recommended tools for a given analysis
   recommendTools(analysis) {
-    const complexity = analysis?.complexity || 'simple';
-    const topics = (analysis?.topics || []).sort().join(',');
+    const complexity = analysis?.complexity || "simple";
+    const topics = (analysis?.topics || []).sort().join(",");
     const key = `${complexity}:${topics}`;
-    const match = this.patterns.find((p) => p.pattern_key === key && p.success_rate > 0.6);
+    const match = this.patterns.find(
+      (p) => p.pattern_key === key && p.success_rate > 0.6,
+    );
     return match ? match.best_tools : null;
   }
 
@@ -335,8 +373,8 @@ class LearningStore {
     if (cb.failures >= 3) {
       cb.open = true;
       logger.warn(
-        { component: 'CircuitBreaker', tool, failures: cb.failures },
-        `🔴 Circuit breaker OPEN for ${tool} — skipping for 5 min`
+        { component: "CircuitBreaker", tool, failures: cb.failures },
+        `🔴 Circuit breaker OPEN for ${tool} — skipping for 5 min`,
       );
     }
   }
@@ -363,7 +401,10 @@ class AutonomousMonitor {
     // default 30 min
     if (this.interval) return;
     this.interval = setInterval(() => this.run(), intervalMs);
-    logger.info({ component: 'AutonomousMonitor' }, '🤖 Autonomous monitor started (30min loop)');
+    logger.info(
+      { component: "AutonomousMonitor" },
+      "🤖 Autonomous monitor started (30min loop)",
+    );
     // Run first check after 60s
     setTimeout(() => this.run(), 60000);
   }
@@ -382,16 +423,22 @@ class AutonomousMonitor {
 
       // Check for anomalies
       if (report.errorRate > 0.3) {
-        this.alert('high_error_rate', `Error rate at ${(report.errorRate * 100).toFixed(0)}% — investigate tools`);
+        this.alert(
+          "high_error_rate",
+          `Error rate at ${(report.errorRate * 100).toFixed(0)}% — investigate tools`,
+        );
       }
       if (report.memoryMB > 400) {
-        this.alert('high_memory', `Memory at ${report.memoryMB}MB — approaching limits`);
+        this.alert(
+          "high_memory",
+          `Memory at ${report.memoryMB}MB — approaching limits`,
+        );
       }
 
       // Persist metrics (async)
       if (this.brain.supabaseAdmin) {
         try {
-          await this.brain.supabaseAdmin.from('brain_metrics').insert({
+          await this.brain.supabaseAdmin.from("brain_metrics").insert({
             timestamp: new Date().toISOString(),
             uptime_sec: report.uptimeSec,
             conversations: report.conversations,
@@ -407,21 +454,28 @@ class AutonomousMonitor {
 
       logger.info(
         {
-          component: 'AutonomousMonitor',
+          component: "AutonomousMonitor",
           errorRate: report.errorRate,
           conversations: report.conversations,
         },
-        `🤖 Health check: ${report.conversations} convos, ${(report.errorRate * 100).toFixed(0)}% errors, ${report.memoryMB}MB mem`
+        `🤖 Health check: ${report.conversations} convos, ${(report.errorRate * 100).toFixed(0)}% errors, ${report.memoryMB}MB mem`,
       );
     } catch (e) {
-      logger.warn({ component: 'AutonomousMonitor', err: e.message }, 'Health check failed');
+      logger.warn(
+        { component: "AutonomousMonitor", err: e.message },
+        "Health check failed",
+      );
     }
   }
 
   healthCheck() {
     const brain = this.brain;
-    const totalOps = Object.values(brain.toolStats).reduce((a, b) => a + b, 0) || 1;
-    const totalErrors = Object.values(brain.toolErrors).reduce((a, b) => a + b, 0);
+    const totalOps =
+      Object.values(brain.toolStats).reduce((a, b) => a + b, 0) || 1;
+    const totalErrors = Object.values(brain.toolErrors).reduce(
+      (a, b) => a + b,
+      0,
+    );
     const mem = process.memoryUsage();
 
     return {
@@ -433,7 +487,9 @@ class AutonomousMonitor {
       toolStats: { ...brain.toolStats },
       toolErrors: { ...brain.toolErrors },
       circuitBreakers: brain.learningStore
-        ? Object.keys(brain.learningStore.circuitBreakers).filter((k) => brain.learningStore.circuitBreakers[k].open)
+        ? Object.keys(brain.learningStore.circuitBreakers).filter(
+            (k) => brain.learningStore.circuitBreakers[k].open,
+          )
         : [],
       alerts: this.alerts.filter((a) => !a.resolved).length,
       checkedAt: new Date().toISOString(),
@@ -443,7 +499,10 @@ class AutonomousMonitor {
   alert(type, message) {
     // Don't spam same alert
     const recent = this.alerts.find(
-      (a) => a.type === type && !a.resolved && Date.now() - new Date(a.timestamp).getTime() < 30 * 60 * 1000
+      (a) =>
+        a.type === type &&
+        !a.resolved &&
+        Date.now() - new Date(a.timestamp).getTime() < 30 * 60 * 1000,
     );
     if (recent) return;
 
@@ -453,7 +512,10 @@ class AutonomousMonitor {
       timestamp: new Date().toISOString(),
       resolved: false,
     });
-    logger.warn({ component: 'AutonomousMonitor', type }, `⚠️ ALERT: ${message}`);
+    logger.warn(
+      { component: "AutonomousMonitor", type },
+      `⚠️ ALERT: ${message}`,
+    );
 
     // Keep alerts manageable
     if (this.alerts.length > 50) this.alerts = this.alerts.slice(-30);
@@ -469,8 +531,4 @@ class AutonomousMonitor {
   }
 }
 
-/**
- * undefined
- * @returns {*}
- */
 module.exports = { UserProfile, LearningStore, AutonomousMonitor };
