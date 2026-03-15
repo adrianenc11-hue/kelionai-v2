@@ -1,1220 +1,754 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en" data-theme="dark">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="apple-touch-icon" href="/models/kelion-reference.png" />
-    <meta name="sentry-dsn" content="" />
-    <meta name="theme-color" content="#050510" />
-    <meta
-      name="description"
-      content="KelionAI — Your intelligent AI assistant with real-time voice, 3D avatar, and powerful brain."
-    />
-    <meta property="og:title" content="KelionAI" />
-    <meta
-      property="og:description"
-      content="Your intelligent AI assistant with real-time voice, 3D avatar, and powerful brain."
-    />
-    <meta property="og:image" content="https://kelionai.app/models/kelion-reference.png" />
-    <meta property="og:url" content="https://kelionai.app" />
-    <meta property="og:type" content="website" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="KelionAI" />
-    <meta
-      name="twitter:description"
-      content="Your intelligent AI assistant with real-time voice, 3D avatar, and powerful brain."
-    />
-    <meta name="twitter:image" content="https://kelionai.app/models/kelion-reference.png" />
-    <link rel="manifest" href="/manifest.json" />
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="apple-touch-icon" href="/models/kelion-reference.png">
+    <meta name="sentry-dsn" content="">
+    <meta name="theme-color" content="#050510">
+    <meta name="description"
+        content="KelionAI — Your intelligent AI assistant with real-time voice, 3D avatar, and powerful brain.">
+    <meta property="og:title" content="KelionAI">
+    <meta property="og:description"
+        content="Your intelligent AI assistant with real-time voice, 3D avatar, and powerful brain.">
+    <meta property="og:image" content="https://kelionai.app/models/kelion-reference.png">
+    <meta property="og:url" content="https://kelionai.app">
+    <meta property="og:type" content="website">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="KelionAI">
+    <meta name="twitter:description"
+        content="Your intelligent AI assistant with real-time voice, 3D avatar, and powerful brain.">
+    <meta name="twitter:image" content="https://kelionai.app/models/kelion-reference.png">
+    <link rel="manifest" href="/manifest.json">
     <title>KelionAI</title>
     <script>
-      // ─── Onboarding redirect (first visit) ───────────────────
-      try {
-        if (!localStorage.getItem('kelion_onboarded')) {
-          window.location.replace('/onboarding.html');
-          throw new Error('redirect');
+        // ─── Onboarding redirect (first visit) ───────────────────
+        try {
+            if (!localStorage.getItem('kelion_onboarded')) {
+                window.location.replace('/onboarding.html');
+                throw new Error('redirect');
+            }
+        } catch (e) {
+            if (e.message === 'redirect') throw e;
         }
-      } catch (e) {
-        if (e.message === 'redirect') throw e;
-      }
     </script>
     <script>
-      // ─── Theme: apply before paint (anti-flash) ──────────────
-      try {
-        var savedTheme = localStorage.getItem('kelion_theme') || 'dark';
-        document.documentElement.setAttribute('data-theme', savedTheme);
-        if (savedTheme === 'light') document.querySelector('meta[name="theme-color"]').content = '#F8F9FC';
-      } catch (e) {}
+        // ─── Theme: apply before paint (anti-flash) ──────────────
+        try {
+            var savedTheme = localStorage.getItem('kelion_theme') || 'dark';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+            if (savedTheme === 'light') document.querySelector('meta[name="theme-color"]').content = '#F8F9FC';
+        } catch(e) {}
     </script>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap"
-    />
-    <link rel="stylesheet" href="/styles/design-system.css" />
-    <link rel="stylesheet" href="/styles/components.css" />
-    <link rel="stylesheet" href="/styles/animations.css" />
-    <link rel="stylesheet" href="/css/app.css" />
-    <link rel="stylesheet" href="/styles/mobile.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap">
+    <link rel="stylesheet" href="/styles/design-system.css">
+    <link rel="stylesheet" href="/styles/components.css">
+    <link rel="stylesheet" href="/styles/animations.css">
+    <link rel="stylesheet" href="/css/app.css">
+    <link rel="stylesheet" href="/styles/mobile.css">
     <style>
-      /* ─── Splash Screen Premium ─── */
-      .splash {
-        position: fixed;
-        inset: 0;
-        background: #050510;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        z-index: 9999;
-        transition:
-          opacity 0.6s ease,
-          visibility 0.6s;
-      }
-
-      .splash.hidden {
-        opacity: 0;
-        visibility: hidden;
-        pointer-events: none;
-      }
-
-      .splash-logo {
-        display: flex;
-        align-items: center;
-        gap: 4px;
-      }
-
-      .splash .animate-glow {
-        animation: splashGlow 2.5s ease-in-out infinite alternate;
-      }
-
-      @keyframes splashGlow {
-        from {
-          filter: drop-shadow(0 0 12px rgba(99, 102, 241, 0.4));
+        /* ─── Splash Screen Premium ─── */
+        .splash {
+            position: fixed;
+            inset: 0;
+            background: #050510;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            transition: opacity 0.6s ease, visibility 0.6s;
         }
 
-        to {
-          filter: drop-shadow(0 0 32px rgba(6, 182, 212, 0.5));
-        }
-      }
-
-      .splash .typing-indicator {
-        margin-top: 28px;
-      }
-
-      .splash .typing-indicator span {
-        width: 8px;
-        height: 8px;
-        background: var(--kelion-primary, #6366f1);
-      }
-
-      /* ─── PWA Install Banner Premium ─── */
-      .pwa-banner {
-        position: fixed;
-        bottom: 24px;
-        left: 50%;
-        transform: translateX(-50%);
-        background: var(--kelion-glass, rgba(10, 10, 30, 0.6));
-        -webkit-backdrop-filter: blur(20px);
-        backdrop-filter: blur(20px);
-        border: 1px solid var(--kelion-glass-border, rgba(99, 102, 241, 0.15));
-        border-radius: var(--kelion-radius-lg, 20px);
-        padding: 16px 20px;
-        display: flex;
-        align-items: center;
-        gap: 16px;
-        box-shadow: var(--kelion-shadow-lg, 0 8px 48px rgba(0, 0, 0, 0.6));
-        z-index: 1500;
-        max-width: 420px;
-        width: calc(100% - 48px);
-        animation: slideUp 0.4s ease;
-      }
-
-      .pwa-banner-content {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        flex: 1;
-      }
-
-      .pwa-banner-content > span {
-        font-size: 1.6rem;
-      }
-
-      .pwa-banner-content strong {
-        color: var(--kelion-text, #f0f0ff);
-        font-size: 0.9rem;
-      }
-
-      .pwa-banner-content p {
-        color: var(--kelion-text-secondary, #8888aa);
-        font-size: 0.78rem;
-        margin: 2px 0 0;
-      }
-
-      .pwa-banner-actions {
-        display: flex;
-        gap: 8px;
-        flex-shrink: 0;
-      }
-
-      .pwa-btn-primary {
-        padding: 8px 16px;
-        font-size: 13px;
-        font-weight: 600;
-        background: var(--kelion-gradient);
-        color: #fff;
-        border: none;
-        border-radius: var(--kelion-radius-sm, 8px);
-        cursor: pointer;
-        font-family: var(--kelion-font);
-        transition: var(--kelion-transition);
-      }
-
-      .pwa-btn-primary:hover {
-        opacity: 0.88;
-        transform: translateY(-1px);
-      }
-
-      .pwa-btn-secondary {
-        padding: 8px 14px;
-        font-size: 13px;
-        background: rgba(255, 255, 255, 0.05);
-        color: var(--kelion-text-secondary, #8888aa);
-        border: 1px solid var(--kelion-border, rgba(99, 102, 241, 0.12));
-        border-radius: var(--kelion-radius-sm, 8px);
-        cursor: pointer;
-        font-family: var(--kelion-font);
-        transition: var(--kelion-transition);
-      }
-
-      .pwa-btn-secondary:hover {
-        background: rgba(255, 255, 255, 0.08);
-        color: var(--kelion-text);
-      }
-
-      /* ─── Landing Page (Auth Screen) ─── */
-      .welcome-text {
-        font-size: 1.6rem;
-        font-weight: 700;
-        color: #f0f0ff;
-        margin-bottom: 4px;
-      }
-
-      .welcome-subtitle {
-        font-size: 0.9rem;
-        color: #8888aa;
-        margin-bottom: 28px;
-      }
-
-      .avatars-row {
-        display: flex;
-        justify-content: center;
-        gap: 40px;
-        margin-bottom: 28px;
-      }
-
-      .avatar-card {
-        text-align: center;
-        padding: 16px 24px;
-      }
-
-      .avatar-card .avatar-emoji {
-        font-size: 4rem;
-        display: block;
-        margin-bottom: 8px;
-      }
-
-      .avatar-card .avatar-label {
-        font-size: 0.9rem;
-        font-weight: 600;
-        color: #f0f0ff;
-      }
-
-      #start-btn {
-        display: inline-flex;
-        align-items: center;
-        gap: 10px;
-        padding: 18px 64px;
-        font-size: 1.3rem;
-        font-weight: 700;
-        letter-spacing: 2px;
-        text-transform: uppercase;
-        color: #fff;
-        background: linear-gradient(135deg, #6366f1, #06b6d4);
-        border: none;
-        border-radius: 50px;
-        cursor: pointer;
-        transition: all 0.25s;
-        box-shadow: 0 8px 32px rgba(99, 102, 241, 0.35);
-        font-family: Inter, sans-serif;
-      }
-
-      #start-btn:hover {
-        transform: translateY(-3px);
-        box-shadow:
-          0 0 30px rgba(99, 102, 241, 0.3),
-          0 0 30px rgba(6, 182, 212, 0.3);
-      }
-
-      /* ─── #65 Hourglass Premium Animation ─── */
-      @keyframes hourglassFlip {
-        0% {
-          transform: rotate(0deg);
+        .splash.hidden {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
         }
 
-        25% {
-          transform: rotate(180deg);
+        .splash-logo {
+            display: flex;
+            align-items: center;
+            gap: 4px;
         }
 
-        50% {
-          transform: rotate(180deg);
+        .splash .animate-glow {
+            animation: splashGlow 2.5s ease-in-out infinite alternate;
         }
 
-        75% {
-          transform: rotate(360deg);
+        @keyframes splashGlow {
+            from {
+                filter: drop-shadow(0 0 12px rgba(99, 102, 241, 0.4));
+            }
+
+            to {
+                filter: drop-shadow(0 0 32px rgba(6, 182, 212, 0.5));
+            }
         }
 
-        100% {
-          transform: rotate(360deg);
-        }
-      }
-
-      #loading-icon {
-        animation: hourglassFlip 2s ease-in-out infinite !important;
-      }
-
-      /* ─── #64 Showcase Features ─── */
-      .showcase-grid {
-        display: none;
-        /* Hidden — AI brain controls visibility */
-        grid-template-columns: 1fr 1fr;
-        gap: 8px;
-        padding: 12px;
-        max-height: 220px;
-        overflow-y: auto;
-      }
-
-      .showcase-card {
-        background: rgba(99, 102, 241, 0.06);
-        border: 1px solid rgba(99, 102, 241, 0.12);
-        border-radius: 12px;
-        padding: 12px 10px;
-        text-align: center;
-        transition: all 0.25s;
-        cursor: default;
-      }
-
-      .showcase-card:hover {
-        background: rgba(99, 102, 241, 0.12);
-        border-color: rgba(99, 102, 241, 0.25);
-        transform: translateY(-2px);
-      }
-
-      .showcase-card .sc-icon {
-        font-size: 1.4rem;
-        display: block;
-        margin-bottom: 4px;
-      }
-
-      .showcase-card .sc-label {
-        font-size: 0.7rem;
-        color: #a5b4fc;
-        font-weight: 600;
-      }
-
-      .showcase-card .sc-desc {
-        font-size: 0.6rem;
-        color: #555577;
-        margin-top: 2px;
-      }
-
-      /* ─── #53 Brain-map Tab ─── */
-      .brain-map-panel {
-        padding: 16px;
-        display: none;
-        flex-direction: column;
-        gap: 10px;
-        height: 100%;
-        overflow-y: auto;
-      }
-
-      .brain-map-panel.active {
-        display: flex;
-      }
-
-      .brain-node {
-        background: rgba(99, 102, 241, 0.08);
-        border: 1px solid rgba(99, 102, 241, 0.15);
-        border-radius: 10px;
-        padding: 10px 14px;
-        font-size: 0.8rem;
-        color: #c4b5fd;
-        animation: brainFadeIn 0.3s ease;
-      }
-
-      .brain-node .bn-label {
-        font-size: 0.65rem;
-        color: #6366f1;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-        margin-bottom: 4px;
-      }
-
-      @keyframes brainFadeIn {
-        from {
-          opacity: 0;
-          transform: translateY(8px);
+        .splash .typing-indicator {
+            margin-top: 28px;
         }
 
-        to {
-          opacity: 1;
-          transform: translateY(0);
+        .splash .typing-indicator span {
+            width: 8px;
+            height: 8px;
+            background: var(--kelion-primary, #6366F1);
         }
-      }
 
-      .display-tabs {
-        display: flex;
-        gap: 0;
-        margin-left: 12px;
-      }
+        /* ─── PWA Install Banner Premium ─── */
+        .pwa-banner {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--kelion-glass, rgba(10, 10, 30, 0.6));
+            -webkit-backdrop-filter: blur(20px);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--kelion-glass-border, rgba(99, 102, 241, 0.15));
+            border-radius: var(--kelion-radius-lg, 20px);
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            box-shadow: var(--kelion-shadow-lg, 0 8px 48px rgba(0, 0, 0, 0.6));
+            z-index: 1500;
+            max-width: 420px;
+            width: calc(100% - 48px);
+            animation: slideUp 0.4s ease;
+        }
 
-      .display-tab {
-        padding: 6px 14px;
-        font-size: 0.75rem;
-        font-weight: 600;
-        color: #555577;
-        background: none;
-        border: none;
-        border-bottom: 2px solid transparent;
-        cursor: pointer;
-        transition: all 0.2s;
-        font-family: var(--kelion-font);
-      }
+        .pwa-banner-content {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex: 1;
+        }
 
-      .display-tab:hover {
-        color: #a5b4fc;
-      }
+        .pwa-banner-content>span {
+            font-size: 1.6rem;
+        }
 
-      .display-tab.active {
-        color: #a5b4fc;
-        border-bottom-color: #6366f1;
-      }
+        .pwa-banner-content strong {
+            color: var(--kelion-text, #F0F0FF);
+            font-size: 0.9rem;
+        }
+
+        .pwa-banner-content p {
+            color: var(--kelion-text-secondary, #8888AA);
+            font-size: 0.78rem;
+            margin: 2px 0 0;
+        }
+
+        .pwa-banner-actions {
+            display: flex;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        .pwa-btn-primary {
+            padding: 8px 16px;
+            font-size: 13px;
+            font-weight: 600;
+            background: var(--kelion-gradient);
+            color: #fff;
+            border: none;
+            border-radius: var(--kelion-radius-sm, 8px);
+            cursor: pointer;
+            font-family: var(--kelion-font);
+            transition: var(--kelion-transition);
+        }
+
+        .pwa-btn-primary:hover {
+            opacity: 0.88;
+            transform: translateY(-1px);
+        }
+
+        .pwa-btn-secondary {
+            padding: 8px 14px;
+            font-size: 13px;
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--kelion-text-secondary, #8888AA);
+            border: 1px solid var(--kelion-border, rgba(99, 102, 241, 0.12));
+            border-radius: var(--kelion-radius-sm, 8px);
+            cursor: pointer;
+            font-family: var(--kelion-font);
+            transition: var(--kelion-transition);
+        }
+
+        .pwa-btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--kelion-text);
+        }
+
+        /* ─── Landing Page (Auth Screen) ─── */
+        .welcome-text {
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: #F0F0FF;
+            margin-bottom: 4px;
+        }
+
+        .welcome-subtitle {
+            font-size: 0.9rem;
+            color: #8888AA;
+            margin-bottom: 28px;
+        }
+
+        .avatars-row {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            margin-bottom: 28px;
+        }
+
+        .avatar-card {
+            text-align: center;
+            padding: 16px 24px;
+        }
+
+        .avatar-card .avatar-emoji {
+            font-size: 4rem;
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        .avatar-card .avatar-label {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #F0F0FF;
+        }
+
+        #start-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 18px 64px;
+            font-size: 1.3rem;
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: #fff;
+            background: linear-gradient(135deg, #6366F1, #06B6D4);
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.25s;
+            box-shadow: 0 8px 32px rgba(99, 102, 241, 0.35);
+            font-family: Inter, sans-serif;
+        }
+
+        #start-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 0 30px rgba(99, 102, 241, 0.3), 0 0 30px rgba(6, 182, 212, 0.3);
+        }
+
+        /* ─── #65 Hourglass Premium Animation ─── */
+        @keyframes hourglassFlip {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            25% {
+                transform: rotate(180deg);
+            }
+
+            50% {
+                transform: rotate(180deg);
+            }
+
+            75% {
+                transform: rotate(360deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        #loading-icon {
+            animation: hourglassFlip 2s ease-in-out infinite !important;
+        }
+
+        /* ─── #64 Showcase Features ─── */
+        .showcase-grid {
+            display: none;
+            /* Hidden — AI brain controls visibility */
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            padding: 12px;
+            max-height: 220px;
+            overflow-y: auto;
+        }
+
+        .showcase-card {
+            background: rgba(99, 102, 241, 0.06);
+            border: 1px solid rgba(99, 102, 241, 0.12);
+            border-radius: 12px;
+            padding: 12px 10px;
+            text-align: center;
+            transition: all 0.25s;
+            cursor: default;
+        }
+
+        .showcase-card:hover {
+            background: rgba(99, 102, 241, 0.12);
+            border-color: rgba(99, 102, 241, 0.25);
+            transform: translateY(-2px);
+        }
+
+        .showcase-card .sc-icon {
+            font-size: 1.4rem;
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .showcase-card .sc-label {
+            font-size: 0.7rem;
+            color: #a5b4fc;
+            font-weight: 600;
+        }
+
+        .showcase-card .sc-desc {
+            font-size: 0.6rem;
+            color: #555577;
+            margin-top: 2px;
+        }
+
+        /* ─── #53 Brain-map Tab ─── */
+        .brain-map-panel {
+            padding: 16px;
+            display: none;
+            flex-direction: column;
+            gap: 10px;
+            height: 100%;
+            overflow-y: auto;
+        }
+
+        .brain-map-panel.active {
+            display: flex;
+        }
+
+        .brain-node {
+            background: rgba(99, 102, 241, 0.08);
+            border: 1px solid rgba(99, 102, 241, 0.15);
+            border-radius: 10px;
+            padding: 10px 14px;
+            font-size: 0.8rem;
+            color: #c4b5fd;
+            animation: brainFadeIn 0.3s ease;
+        }
+
+        .brain-node .bn-label {
+            font-size: 0.65rem;
+            color: #6366f1;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 4px;
+        }
+
+        @keyframes brainFadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .display-tabs {
+            display: flex;
+            gap: 0;
+            margin-left: 12px;
+        }
+
+        .display-tab {
+            padding: 6px 14px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #555577;
+            background: none;
+            border: none;
+            border-bottom: 2px solid transparent;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: var(--kelion-font);
+        }
+
+        .display-tab:hover {
+            color: #a5b4fc;
+        }
+
+        .display-tab.active {
+            color: #a5b4fc;
+            border-bottom-color: #6366f1;
+        }
     </style>
-    <script
-      src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js"
-      crossorigin="anonymous"
-    ></script>
-    <script
-      src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"
-      crossorigin="anonymous"
-    ></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
     <script src="https://browser.sentry-cdn.com/8.46.0/bundle.tracing.replay.min.js" crossorigin="anonymous"></script>
     <script>
-      var _sentryDsn = (document.querySelector('meta[name="sentry-dsn"]') || {}).content;
-      if (window.Sentry && _sentryDsn)
-        Sentry.init({
-          dsn: _sentryDsn,
-          integrations: [Sentry.browserTracingIntegration(), Sentry.replayIntegration()],
-          tracesSampleRate: 1.0,
-          replaysOnErrorSampleRate: 1.0,
+        var _sentryDsn = (document.querySelector('meta[name="sentry-dsn"]') || {}).content;
+        if (window.Sentry && _sentryDsn) Sentry.init({
+            dsn: _sentryDsn,
+            integrations: [Sentry.browserTracingIntegration(), Sentry.replayIntegration()],
+            tracesSampleRate: 1.0, replaysOnErrorSampleRate: 1.0
         });
     </script>
 
-    <script
-      src="https://cdn.lr-in-prod.com/LogRocket.min.js"
-      crossorigin="anonymous"
-    ></script>
-    <script>
-      LogRocket.init('bdaej1/kelionai');
-    </script>
-  </head>
+    <script src="https://cdn.lr-in-prod.com/LogRocket.min.js"></script>
+    <script>LogRocket.init('bdaej1/kelionai');</script>
+</head>
 
-  <body>
+<body>
+
     <!-- SPLASH SCREEN -->
     <div id="splash-screen" class="splash">
-      <div class="splash-logo animate-glow">
-        <span style="font-size: 52px; font-weight: 900; color: #f0f0ff">Kelion</span>
-        <span class="gradient-text" style="font-size: 52px; font-weight: 900">AI</span>
-      </div>
-      <div class="typing-indicator" style="margin-top: 28px"><span></span><span></span><span></span></div>
-      <p style="margin-top: 16px; color: #555577; font-size: 0.8rem; letter-spacing: 1px">YOUR INTELLIGENT ASSISTANT</p>
+        <div class="splash-logo animate-glow">
+            <span style="font-size:52px;font-weight:900;color:#F0F0FF">Kelion</span>
+            <span class="gradient-text" style="font-size:52px;font-weight:900">AI</span>
+        </div>
+        <div class="typing-indicator" style="margin-top:28px">
+            <span></span><span></span><span></span>
+        </div>
+        <p style="margin-top:16px;color:#555577;font-size:0.8rem;letter-spacing:1px">YOUR INTELLIGENT ASSISTANT</p>
     </div>
 
     <!-- AUTH SCREEN — Premium Landing -->
     <div id="auth-screen">
-      <div id="auth-container" style="text-align: center; max-width: 480px; margin: 0 auto">
-        <div id="auth-logo">
-          <div class="auth-avatar-icon animate-float" style="font-size: 4.5rem; margin-bottom: 12px">🤖</div>
-          <h1 style="font-size: 3rem; font-weight: 900; margin-bottom: 4px">
-            Kelion<span class="gradient-text">AI</span>
-          </h1>
-          <p class="auth-subtitle" style="color: #8888aa; font-size: 1rem; margin-bottom: 8px">
-            Your intelligent AI assistant
-          </p>
-        </div>
-        <div style="display: flex; justify-content: center; gap: 32px; margin: 28px 0 12px">
-          <div style="text-align: center">
-            <span style="font-size: 2.2rem; display: block; margin-bottom: 4px">💬</span>
-            <span style="color: #8888aa; font-size: 0.75rem">Smart Chat</span>
-          </div>
-          <div style="text-align: center">
-            <span style="font-size: 2.2rem; display: block; margin-bottom: 4px">🎙️</span>
-            <span style="color: #8888aa; font-size: 0.75rem">Voice</span>
-          </div>
-          <div style="text-align: center">
-            <span style="font-size: 2.2rem; display: block; margin-bottom: 4px">🔍</span>
-            <span style="color: #8888aa; font-size: 0.75rem">Search</span>
-          </div>
-          <div style="text-align: center">
-            <span style="font-size: 2.2rem; display: block; margin-bottom: 4px">🖼️</span>
-            <span style="color: #8888aa; font-size: 0.75rem">Images</span>
-          </div>
-        </div>
-        <p style="color: #555577; font-size: 0.8rem; margin-bottom: 32px">
-          Multilingual • 3D Avatars • Voice Chat • Web Search • AI-Powered
-        </p>
-        <button type="button" id="start-btn">
-          <span id="loading-icon" style="display: inline-block; animation: spin 1.5s ease-in-out infinite">⏳</span>
-          Loading...
-        </button>
-        <style>
-          @keyframes spin {
-            0% {
-              transform: rotate(0deg);
-            }
+        <div id="auth-container" style="text-align:center;max-width:480px;margin:0 auto;">
+            <div id="auth-logo">
+                <div class="auth-avatar-icon animate-float" style="font-size:4.5rem;margin-bottom:12px;">🤖</div>
+                <h1 style="font-size:3rem;font-weight:900;margin-bottom:4px;">Kelion<span
+                        class="gradient-text">AI</span></h1>
+                <p class="auth-subtitle" style="color:#8888AA;font-size:1rem;margin-bottom:8px;">Your intelligent AI
+                    assistant</p>
+            </div>
+            <div style="display:flex;justify-content:center;gap:32px;margin:28px 0 12px;">
+                <div style="text-align:center;">
+                    <span style="font-size:2.2rem;display:block;margin-bottom:4px;">💬</span>
+                    <span style="color:#8888AA;font-size:0.75rem;">Smart Chat</span>
+                </div>
+                <div style="text-align:center;">
+                    <span style="font-size:2.2rem;display:block;margin-bottom:4px;">🎙️</span>
+                    <span style="color:#8888AA;font-size:0.75rem;">Voice</span>
+                </div>
+                <div style="text-align:center;">
+                    <span style="font-size:2.2rem;display:block;margin-bottom:4px;">🔍</span>
+                    <span style="color:#8888AA;font-size:0.75rem;">Search</span>
+                </div>
+                <div style="text-align:center;">
+                    <span style="font-size:2.2rem;display:block;margin-bottom:4px;">🖼️</span>
+                    <span style="color:#8888AA;font-size:0.75rem;">Images</span>
+                </div>
+            </div>
+            <p style="color:#555577;font-size:0.8rem;margin-bottom:32px;">Multilingual • 3D Avatars • Voice Chat • Web
+                Search • AI-Powered</p>
+            <button id="start-btn"><span id="loading-icon"
+                    style="display:inline-block;animation:spin 1.5s ease-in-out infinite;">⏳</span>
+                Loading...</button>
+            <style>
+                @keyframes spin {
+                    0% {
+                        transform: rotate(0deg)
+                    }
 
-            50% {
-              transform: rotate(180deg);
-            }
+                    50% {
+                        transform: rotate(180deg)
+                    }
 
-            100% {
-              transform: rotate(360deg);
-            }
-          }
-        </style>
-        <div style="margin-top: 20px; display: flex; flex-direction: column; gap: 8px; align-items: center">
-          <span
-            id="auth-guest"
-            style="color: #6366f1; font-size: 0.85rem; cursor: pointer; text-decoration: underline; display: none"
-            >Continue without account</span
-          >
+                    100% {
+                        transform: rotate(360deg)
+                    }
+                }
+            </style>
+            <div style="margin-top:20px;display:flex;flex-direction:column;gap:8px;align-items:center;">
+                <span id="auth-guest"
+                    style="color:#6366F1;font-size:0.85rem;cursor:pointer;text-decoration:underline;display:none;">Continue
+                    without account</span>
+            </div>
+            <!-- Login form (hidden by default, toggled by btn-auth) -->
+            <button id="auth-back"
+                style="display:none;background:none;border:none;color:#6366F1;font-size:0.9rem;cursor:pointer;margin-bottom:12px;"
+                onclick="document.getElementById('auth-form').style.display='none';document.getElementById('auth-back').style.display='none';document.getElementById('start-btn').style.display='';document.getElementById('auth-guest').style.display='';">←
+                Back</button>
+            <form id="auth-form" style="display:none;margin-top:24px;text-align:left;">
+                <div id="auth-name-group" style="display:none;margin-bottom:12px;">
+                    <input type="text" id="auth-name" placeholder="Name"
+                        style="width:100%;padding:12px 16px;background:rgba(10,10,30,0.6);border:1px solid rgba(99,102,241,0.2);border-radius:10px;color:#f0f0ff;font-family:var(--kelion-font);font-size:0.9rem;outline:none;" />
+                </div>
+                <input type="email" id="auth-email" placeholder="Email" required
+                    style="width:100%;padding:12px 16px;background:rgba(10,10,30,0.6);border:1px solid rgba(99,102,241,0.2);border-radius:10px;color:#f0f0ff;font-family:var(--kelion-font);font-size:0.9rem;outline:none;margin-bottom:12px;" />
+                <input type="password" id="auth-password" placeholder="Password" required
+                    autocomplete="current-password"
+                    style="width:100%;padding:12px 16px;background:rgba(10,10,30,0.6);border:1px solid rgba(99,102,241,0.2);border-radius:10px;color:#f0f0ff;font-family:var(--kelion-font);font-size:0.9rem;outline:none;margin-bottom:12px;" />
+                <button type="submit" id="auth-submit"
+                    style="width:100%;padding:14px;background:linear-gradient(135deg,#6366f1,#06b6d4);border:none;border-radius:10px;color:#fff;font-size:1rem;font-weight:600;cursor:pointer;font-family:var(--kelion-font);">Sign
+                    In</button>
+                <div id="auth-forgot" style="margin-top:8px;text-align:center;"><a href="#" id="auth-forgot-link"
+                        style="color:#6366F1;font-size:0.8rem;">Forgot password?</a></div>
+                <p id="auth-error" style="color:#f87171;font-size:0.85rem;margin-top:8px;text-align:center;"></p>
+                <div style="text-align:center;margin-top:12px;"><a href="#" id="auth-toggle"
+                        style="color:#8888AA;font-size:0.85rem;">No account → Create</a></div>
+                <h3 id="auth-title" style="display:none;">Sign In</h3>
+            </form>
         </div>
-        <!-- Login form (hidden by default, toggled by btn-auth) -->
-        <button
-          type="button"
-          id="auth-back"
-          style="
-            display: none;
-            background: none;
-            border: none;
-            color: #6366f1;
-            font-size: 0.9rem;
-            cursor: pointer;
-            margin-bottom: 12px;
-          "
-          onclick="
-            document.getElementById('auth-form').style.display = 'none';
-            document.getElementById('auth-back').style.display = 'none';
-            document.getElementById('start-btn').style.display = '';
-            document.getElementById('auth-guest').style.display = '';
-          "
-        >
-          ← Back
-        </button>
-        <form aria-label="form" id="auth-form" style="display: none; margin-top: 24px; text-align: left">
-          <div id="auth-name-group" style="display: none; margin-bottom: 12px">
-            <input
-              type="text"
-              id="auth-name"
-              placeholder="Name"
-              style="
-                width: 100%;
-                padding: 12px 16px;
-                background: rgba(10, 10, 30, 0.6);
-                border: 1px solid rgba(99, 102, 241, 0.2);
-                border-radius: 10px;
-                color: #f0f0ff;
-                font-family: var(--kelion-font);
-                font-size: 0.9rem;
-                outline: none;
-              "
-            />
-          </div>
-          <input
-            type="email"
-            id="auth-email"
-            placeholder="Email"
-            required
-            style="
-              width: 100%;
-              padding: 12px 16px;
-              background: rgba(10, 10, 30, 0.6);
-              border: 1px solid rgba(99, 102, 241, 0.2);
-              border-radius: 10px;
-              color: #f0f0ff;
-              font-family: var(--kelion-font);
-              font-size: 0.9rem;
-              outline: none;
-              margin-bottom: 12px;
-            "
-          />
-          <input
-            type="password"
-            id="auth-password"
-            placeholder="Password"
-            required
-            autocomplete="current-password"
-            style="
-              width: 100%;
-              padding: 12px 16px;
-              background: rgba(10, 10, 30, 0.6);
-              border: 1px solid rgba(99, 102, 241, 0.2);
-              border-radius: 10px;
-              color: #f0f0ff;
-              font-family: var(--kelion-font);
-              font-size: 0.9rem;
-              outline: none;
-              margin-bottom: 12px;
-            "
-          />
-          <button
-            type="submit"
-            id="auth-submit"
-            style="
-              width: 100%;
-              padding: 14px;
-              background: linear-gradient(135deg, #6366f1, #06b6d4);
-              border: none;
-              border-radius: 10px;
-              color: #fff;
-              font-size: 1rem;
-              font-weight: 600;
-              cursor: pointer;
-              font-family: var(--kelion-font);
-            "
-          >
-            Sign In
-          </button>
-          <div id="auth-forgot" style="margin-top: 8px; text-align: center">
-            <a href="#" id="auth-forgot-link" style="color: #6366f1; font-size: 0.8rem">Forgot password?</a>
-          </div>
-          <p id="auth-error" style="color: #f87171; font-size: 0.85rem; margin-top: 8px; text-align: center"></p>
-          <div style="text-align: center; margin-top: 12px">
-            <a href="#" id="auth-toggle" style="color: #8888aa; font-size: 0.85rem">No account → Create</a>
-          </div>
-          <h3 id="auth-title" style="display: none">Sign In</h3>
-        </form>
-      </div>
     </div>
 
     <!-- MAIN APP -->
     <div id="app-layout" class="hidden">
-      <!-- NAVBAR -->
-      <nav role="navigation" class="navbar" id="app-navbar">
-        <a href="/" class="navbar-logo"><span id="navbar-avatar-name">Kelion</span><span>AI</span></a>
-        <div
-          id="status-indicator"
-          style="
-            margin-left: 10px;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 0.75rem;
-            color: var(--kelion-text-secondary);
-            opacity: 0.8;
-          "
-        >
-          <div
-            id="status-dot"
-            style="
-              width: 8px;
-              height: 8px;
-              border-radius: 50%;
-              background: #10b981;
-              box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
-            "
-          ></div>
-          <span id="status-text">Online</span>
-        </div>
-        <span id="user-name" class="user-badge" style="margin-left: 12px">Guest</span>
-        <div class="navbar-right">
-          <button
-            type="button"
-            class="ctrl-btn-sm"
-            id="btn-history"
-            title="Conversation history"
-            aria-label="Conversation history"
-            style="
-              background: none;
-              border: none;
-              cursor: pointer;
-              font-size: 1.1rem;
-              padding: 4px 8px;
-              color: var(--kelion-text-secondary);
-            "
-          >
-            📋
-          </button>
-          <input type="file" id="file-input-hidden" style="display: none" accept="*/*" />
-          <button
-            type="button"
-            class="btn-secondary"
-            id="btn-admin"
-            title="Admin Panel — Locked"
-            data-locked="true"
-            style="
-              display: none;
-              padding: 8px 14px;
-              font-size: 0.85rem;
-              background: rgba(239, 68, 68, 0.12);
-              border: 1px solid rgba(239, 68, 68, 0.3);
-              border-radius: 8px;
-              color: #fca5a5;
-              cursor: not-allowed;
-              font-family: var(--kelion-font);
-              transition: all 0.4s;
-              opacity: 0.7;
-            "
-          >
-            🔒 Admin
-          </button>
-          <button
-            type="button"
-            class="btn-secondary"
-            id="btn-subscriptions"
-            title="Plans"
-            style="
-              padding: 8px 14px;
-              font-size: 0.85rem;
-              background: rgba(99, 102, 241, 0.12);
-              border: 1px solid rgba(99, 102, 241, 0.3);
-              border-radius: 8px;
-              color: #a5b4fc;
-              cursor: pointer;
-              font-family: var(--kelion-font);
-              transition: all 0.2s;
-            "
-          >
-            ⭐ Plans
-          </button>
-          <button
-            type="button"
-            class="btn-secondary"
-            id="btn-invite"
-            title="Invite friends"
-            style="
-              display: none;
-              padding: 8px 14px;
-              font-size: 0.85rem;
-              background: rgba(16, 185, 129, 0.12);
-              border: 1px solid rgba(16, 185, 129, 0.3);
-              border-radius: 8px;
-              color: #6ee7b7;
-              cursor: pointer;
-              font-family: var(--kelion-font);
-              transition: all 0.2s;
-            "
-          >
-            🎁 Invite
-          </button>
-          <button
-            type="button"
-            id="navbar-get-started"
-            class="btn-primary"
-            title="Get Started"
-            style="
-              padding: 8px 18px;
-              font-size: 0.85rem;
-              background: linear-gradient(135deg, #6366f1, #06b6d4);
-              border: none;
-              border-radius: 8px;
-              color: #fff;
-              cursor: pointer;
-              font-family: var(--kelion-font);
-              font-weight: 600;
-              transition: all 0.2s;
-              display: none;
-            "
-          >
-            🚀 Get Started
-          </button>
-          <button
-            type="button"
-            class="btn-primary"
-            id="btn-auth"
-            title="Sign in"
-            style="padding: 8px 18px; font-size: 0.85rem"
-          >
-            🔑 Login
-          </button>
-          <button
-            type="button"
-            id="navbar-hamburger"
-            class="ctrl-btn-sm"
-            title="Menu"
-            aria-label="Mobile menu"
-            style="
-              display: none;
-              background: none;
-              border: none;
-              cursor: pointer;
-              font-size: 1.4rem;
-              padding: 4px 8px;
-              color: var(--kelion-text-secondary);
-            "
-          >
-            ☰
-          </button>
-        </div>
-        <!-- Mobile nav menu (hidden by default) -->
-        <div
-          id="navbar-mobile-menu"
-          class="hidden"
-          style="
-            position: absolute;
-            top: 100%;
-            right: 0;
-            width: 220px;
-            background: rgba(5, 5, 16, 0.95);
-            backdrop-filter: blur(20px);
-            border: 1px solid rgba(99, 102, 241, 0.15);
-            border-radius: 12px;
-            padding: 12px;
-            z-index: 100;
-            display: none;
-            flex-direction: column;
-            gap: 8px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-          "
-        >
-          <a
-            href="/pricing"
-            style="color: #a5b4fc; text-decoration: none; padding: 10px; border-radius: 8px; font-size: 0.9rem"
-            >💎 Pricing</a
-          >
-          <a
-            href="/settings"
-            style="color: #a5b4fc; text-decoration: none; padding: 10px; border-radius: 8px; font-size: 0.9rem"
-            >⚙️ Settings</a
-          >
-          <a
-            href="/developer"
-            style="color: #a5b4fc; text-decoration: none; padding: 10px; border-radius: 8px; font-size: 0.9rem"
-            >👨‍💻 Developer</a
-          >
-        </div>
-      </nav>
 
-      <!-- MAIN CONTENT -->
-      <div id="main-content">
-        <!-- CONVERSATION HISTORY SIDEBAR -->
-        <div id="history-sidebar" class="hidden">
-          <div id="history-header">
-            <h3 data-i18n="history.title">Conversations</h3>
-            <button type="button" id="btn-new-chat" title="New conversation">＋</button>
-            <button type="button" id="btn-close-history" title="Close">✕</button>
-          </div>
-          <div id="history-list"></div>
-        </div>
+        <!-- NAVBAR -->
+        <nav class="navbar" id="app-navbar">
+            <a href="/" class="navbar-logo"><span id="navbar-avatar-name">Kelion</span><span>AI</span></a>
+            <div id="status-indicator"
+                style="margin-left: 10px; display: inline-flex; align-items: center; gap: 6px; font-size: 0.75rem; color: var(--kelion-text-secondary); opacity: 0.8;">
+                <div id="status-dot"
+                    style="width: 8px; height: 8px; border-radius: 50%; background: #10B981; box-shadow: 0 0 10px rgba(16,185,129,0.5);">
+                </div>
+                <span id="status-text">Online</span>
+            </div>
+            <span id="user-name" class="user-badge" style="margin-left:12px;">Guest</span>
+            <div class="navbar-right">
+                <button class="ctrl-btn-sm" id="btn-history" title="Conversation history"
+                    aria-label="Conversation history"
+                    style="background:none;border:none;cursor:pointer;font-size:1.1rem;padding:4px 8px;color:var(--kelion-text-secondary);">📋</button>
+                <input type="file" id="file-input-hidden" style="display:none" accept="*/*">
+                <button class="btn-secondary" id="btn-admin" title="Admin Panel — Locked" data-locked="true"
+                    style="display:none;padding:8px 14px;font-size:0.85rem;background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);border-radius:8px;color:#fca5a5;cursor:not-allowed;font-family:var(--kelion-font);transition:all 0.4s;opacity:0.7;">🔒
+                    Admin</button>
+                <button class="btn-secondary" id="btn-subscriptions" title="Plans"
+                    style="padding:8px 14px;font-size:0.85rem;background:rgba(99,102,241,0.12);border:1px solid rgba(99,102,241,0.3);border-radius:8px;color:#a5b4fc;cursor:pointer;font-family:var(--kelion-font);transition:all 0.2s;">⭐
+                    Plans</button>
+                <button class="btn-secondary" id="btn-invite" title="Invite friends"
+                    style="display:none;padding:8px 14px;font-size:0.85rem;background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.3);border-radius:8px;color:#6ee7b7;cursor:pointer;font-family:var(--kelion-font);transition:all 0.2s;">🎁
+                    Invite</button>
+                <button id="navbar-get-started" class="btn-primary" title="Get Started"
+                    style="padding:8px 18px;font-size:0.85rem;background:linear-gradient(135deg,#6366F1,#06B6D4);border:none;border-radius:8px;color:#fff;cursor:pointer;font-family:var(--kelion-font);font-weight:600;transition:all 0.2s;display:none;">🚀
+                    Get Started</button>
+                <button class="btn-primary" id="btn-auth" title="Sign in" style="padding:8px 18px;font-size:0.85rem;">🔑
+                    Login</button>
+                <button id="navbar-hamburger" class="ctrl-btn-sm" title="Menu" aria-label="Mobile menu"
+                    style="display:none;background:none;border:none;cursor:pointer;font-size:1.4rem;padding:4px 8px;color:var(--kelion-text-secondary);">☰</button>
+            </div>
+            <!-- Mobile nav menu (hidden by default) -->
+            <div id="navbar-mobile-menu" class="hidden"
+                style="position:absolute;top:100%;right:0;width:220px;background:rgba(5,5,16,0.95);backdrop-filter:blur(20px);border:1px solid rgba(99,102,241,0.15);border-radius:12px;padding:12px;z-index:100;display:none;flex-direction:column;gap:8px;box-shadow:0 8px 32px rgba(0,0,0,0.5);">
+                <a href="/pricing"
+                    style="color:#a5b4fc;text-decoration:none;padding:10px;border-radius:8px;font-size:0.9rem;">💎
+                    Pricing</a>
+                <a href="/settings"
+                    style="color:#a5b4fc;text-decoration:none;padding:10px;border-radius:8px;font-size:0.9rem;">⚙️
+                    Settings</a>
+                <a href="/developer"
+                    style="color:#a5b4fc;text-decoration:none;padding:10px;border-radius:8px;font-size:0.9rem;">👨‍💻
+                    Developer</a>
+            </div>
+        </nav>
 
-        <div id="left-panel">
-          <div id="avatar-area">
-            <canvas id="avatar-canvas"></canvas>
-            <div id="avatar-label">
-              <span id="avatar-name" style="display: none">Kelion</span>
-            </div>
-            <div id="avatar-switcher">
-              <button type="button" class="avatar-pill active" data-avatar="kelion">Kelion</button>
-              <button type="button" class="avatar-pill" data-avatar="kira">Kira</button>
-            </div>
-            <!-- Live subtitle bar (inside avatar) -->
-            <div id="live-subtitle" style="display: none !important">
-              <span id="subtitle-speaker" style="color: #00ffff; font-weight: 600; margin-right: 8px"></span>
-              <span id="subtitle-text"></span>
-            </div>
-          </div>
-        </div>
+        <!-- MAIN CONTENT -->
+        <div id="main-content">
 
-        <!-- #64 SHOWCASE — hidden by default, AI brain shows when relevant -->
-        <div id="showcase-panel" class="showcase-grid">
-          <div class="showcase-card">
-            <span class="sc-icon">🧠</span><span class="sc-label">AI Brain</span
-            ><span class="sc-desc">Multi-model intelligence</span>
-          </div>
-          <div class="showcase-card">
-            <span class="sc-icon">🎙️</span><span class="sc-label">Voice</span
-            ><span class="sc-desc">Real-time conversation</span>
-          </div>
-          <div class="showcase-card">
-            <span class="sc-icon">👁️</span><span class="sc-label">Vision</span
-            ><span class="sc-desc">Image understanding</span>
-          </div>
-          <div class="showcase-card">
-            <span class="sc-icon">🔍</span><span class="sc-label">Search</span
-            ><span class="sc-desc">Live web results</span>
-          </div>
-          <div class="showcase-card">
-            <span class="sc-icon">🖼️</span><span class="sc-label">Create</span
-            ><span class="sc-desc">AI image generation</span>
-          </div>
-          <div class="showcase-card">
-            <span class="sc-icon">📊</span><span class="sc-label">Trading</span
-            ><span class="sc-desc">Market analysis</span>
-          </div>
-          <div class="showcase-card">
-            <span class="sc-icon">🌐</span><span class="sc-label">i18n</span><span class="sc-desc">6 languages</span>
-          </div>
-          <div class="showcase-card">
-            <span class="sc-icon">🔐</span><span class="sc-label">Security</span
-            ><span class="sc-desc">GDPR compliant</span>
-          </div>
-        </div>
-        <div id="display-panel">
-          <div id="display-header">
-            <span id="display-title" data-i18n="monitor.title">Monitor</span>
-            <!-- #53 BRAIN-MAP TAB -->
-            <div class="display-tabs">
-              <button type="button" class="display-tab active" data-tab="chat" onclick="switchDisplayTab('chat')">
-                💬 Chat
-              </button>
-              <button type="button" class="display-tab" data-tab="brain" onclick="switchDisplayTab('brain')">
-                🧠 Brain
-              </button>
+            <!-- CONVERSATION HISTORY SIDEBAR -->
+            <div id="history-sidebar" class="hidden">
+                <div id="history-header">
+                    <h3 data-i18n="history.title">Conversations</h3>
+                    <button id="btn-new-chat" title="New conversation">＋</button>
+                    <button id="btn-close-history" title="Close">✕</button>
+                </div>
+                <div id="history-list"></div>
             </div>
-          </div>
-          <!-- #53 BRAIN-MAP PANEL -->
-          <div id="brain-map" class="brain-map-panel">
-            <div class="brain-node">
-              <div class="bn-label">Status</div>
-              Waiting for conversation...
-            </div>
-          </div>
-          <!-- Chat messages (main zone) -->
-          <div id="chat-messages" style="flex: 1; overflow-y: auto; padding: 8px 16px; scroll-behavior: smooth"></div>
-          <div id="chat-overlay"></div>
-          <div id="display-content">
-            <!-- Monitor panels (used inline in chat) -->
-            <div id="monitor-image" style="display: none"></div>
-            <div id="monitor-map" style="display: none"></div>
-            <div id="monitor-text" style="display: none"></div>
-            <div id="monitor-search" style="display: none"></div>
-            <div id="monitor-weather" style="display: none"></div>
-            <div id="monitor-iframe" style="display: none">
-              <iframe
-                id="monitor-iframe-src"
-                src=""
-                allow="autoplay; encrypted-media"
-                allowfullscreen
-                style="width: 100%; height: 100%; border: none; border-radius: 8px"
-              ></iframe>
-            </div>
-            <div id="monitor-audio" style="display: none">
-              <div id="radio-info" style="text-align: center; padding: 20px">
-                <div style="font-size: 3rem" id="radio-logo">📻</div>
-                <div id="radio-name" style="font-size: 1.3rem; font-weight: 600; margin: 10px 0; color: #fff"></div>
-                <audio id="radio-player" controls autoplay style="width: 100%; margin-top: 10px"></audio>
-              </div>
-            </div>
-            <div id="monitor-video" style="display: none">
-              <iframe
-                id="monitor-video-src"
-                src=""
-                allow="autoplay; encrypted-media; picture-in-picture"
-                allowfullscreen
-                style="width: 100%; height: 100%; border: none; border-radius: 8px"
-              ></iframe>
-            </div>
-            <div id="monitor-default" style="display: none"></div>
-          </div>
-          <!-- Thinking indicator -->
-          <div id="thinking" style="display: none; padding: 8px 16px">
-            <div class="thinking-dots"><span></span><span></span><span></span></div>
-            <span data-i18n="thinking.text">Thinking...</span>
-          </div>
-        </div>
-      </div>
-      <!-- /#main-content -->
 
-      <!-- Input row — FULL WIDTH at page bottom -->
-      <div id="input-row" style="padding: 8px 16px; border-top: 1px solid rgba(99, 102, 241, 0.1)">
-        <button
-          type="button"
-          id="btn-mic-toggle"
-          title="Microphone ON/OFF"
-          aria-label="Toggle microphone"
-          style="
-            display: none;
-            background: none;
-            border: 2px solid #555;
-            border-radius: 50%;
-            width: 36px;
-            height: 36px;
-            cursor: pointer;
-            font-size: 1.1rem;
-            color: #888;
-            transition: all 0.3s;
-          "
-        >
-          🎙️
-        </button>
-        <button
-          type="button"
-          id="btn-camera-inline"
-          title="Camera ON/OFF"
-          aria-label="Toggle camera"
-          style="
-            background: none;
-            border: 2px solid #555;
-            border-radius: 50%;
-            width: 36px;
-            height: 36px;
-            cursor: pointer;
-            font-size: 1.1rem;
-            color: #888;
-            transition: all 0.3s;
-          "
-        >
-          📷
-        </button>
-        <button
-          type="button"
-          id="btn-voicefirst"
-          title="Voice-First Mode"
-          aria-label="Toggle Voice-First mode"
-          style="
-            background: none;
-            border: 2px solid #555;
-            border-radius: 50%;
-            width: 36px;
-            height: 36px;
-            cursor: pointer;
-            font-size: 1.1rem;
-            color: #888;
-            transition: all 0.3s;
-          "
-        >
-          🗣️
-        </button>
-        <button
-          type="button"
-          id="btn-cc-toggle"
-          title="CC Subtitles"
-          aria-label="Toggle CC subtitles"
-          style="
-            display: none;
-            background: none;
-            border: 2px solid #555;
-            border-radius: 50%;
-            width: 36px;
-            height: 36px;
-            cursor: pointer;
-            font-size: 0.75rem;
-            font-weight: 700;
-            color: #888;
-            transition: all 0.3s;
-            font-family: var(--kelion-font);
-          "
-        >
-          CC
-        </button>
+            <div id="left-panel">
+                <div id="avatar-area">
+                    <canvas id="avatar-canvas"></canvas>
+                    <div id="avatar-label">
+                        <span id="avatar-name" style="display:none">Kelion</span>
+                    </div>
+                    <div id="avatar-switcher">
+                        <button class="avatar-pill active" data-avatar="kelion">Kelion</button>
+                        <button class="avatar-pill" data-avatar="kira">Kira</button>
+                    </div>
+                    <!-- Live subtitle bar (inside avatar) -->
+                    <div id="live-subtitle" style="
+                        display:none !important;
+                    ">
+                        <span id="subtitle-speaker" style="color:#00ffff;font-weight:600;margin-right:8px;"></span>
+                        <span id="subtitle-text"></span>
+                    </div>
+                </div>
+            </div>
 
-        <div id="mic-level" title="Mic level" style="display: none">
-          <span></span><span></span><span></span><span></span><span></span>
+            <!-- #64 SHOWCASE — hidden by default, AI brain shows when relevant -->
+            <div id="showcase-panel" class="showcase-grid">
+                <div class="showcase-card"><span class="sc-icon">🧠</span><span class="sc-label">AI Brain</span><span
+                        class="sc-desc">Multi-model intelligence</span></div>
+                <div class="showcase-card"><span class="sc-icon">🎙️</span><span class="sc-label">Voice</span><span
+                        class="sc-desc">Real-time conversation</span></div>
+                <div class="showcase-card"><span class="sc-icon">👁️</span><span class="sc-label">Vision</span><span
+                        class="sc-desc">Image understanding</span></div>
+                <div class="showcase-card"><span class="sc-icon">🔍</span><span class="sc-label">Search</span><span
+                        class="sc-desc">Live web results</span></div>
+                <div class="showcase-card"><span class="sc-icon">🖼️</span><span class="sc-label">Create</span><span
+                        class="sc-desc">AI image generation</span></div>
+                <div class="showcase-card"><span class="sc-icon">📊</span><span class="sc-label">Trading</span><span
+                        class="sc-desc">Market analysis</span></div>
+                <div class="showcase-card"><span class="sc-icon">🌐</span><span class="sc-label">i18n</span><span
+                        class="sc-desc">6 languages</span></div>
+                <div class="showcase-card"><span class="sc-icon">🔐</span><span class="sc-label">Security</span><span
+                        class="sc-desc">GDPR compliant</span></div>
+            </div>
+            <div id="display-panel">
+                <div id="display-header">
+                    <span id="display-title" data-i18n="monitor.title">Monitor</span>
+                    <!-- #53 BRAIN-MAP TAB -->
+                    <div class="display-tabs">
+                        <button class="display-tab active" data-tab="chat" onclick="switchDisplayTab('chat')">💬
+                            Chat</button>
+                        <button class="display-tab" data-tab="brain" onclick="switchDisplayTab('brain')">🧠
+                            Brain</button>
+                    </div>
+                </div>
+                <!-- #53 BRAIN-MAP PANEL -->
+                <div id="brain-map" class="brain-map-panel">
+                    <div class="brain-node">
+                        <div class="bn-label">Status</div>Waiting for conversation...
+                    </div>
+                </div>
+                <!-- Chat messages (main zone) -->
+                <div id="chat-messages" style="flex:1;overflow-y:auto;padding:8px 16px;scroll-behavior:smooth;"></div>
+                <div id="chat-overlay"></div>
+                <div id="display-content">
+                    <!-- Monitor panels (used inline in chat) -->
+                    <div id="monitor-image" style="display:none"></div>
+                    <div id="monitor-map" style="display:none"></div>
+                    <div id="monitor-text" style="display:none"></div>
+                    <div id="monitor-search" style="display:none"></div>
+                    <div id="monitor-weather" style="display:none"></div>
+                    <div id="monitor-iframe" style="display:none"><iframe id="monitor-iframe-src" src=""
+                            allow="autoplay; encrypted-media" allowfullscreen
+                            style="width:100%;height:100%;border:none;border-radius:8px"></iframe></div>
+                    <div id="monitor-audio" style="display:none">
+                        <div id="radio-info" style="text-align:center;padding:20px">
+                            <div style="font-size:3rem" id="radio-logo">📻</div>
+                            <div id="radio-name" style="font-size:1.3rem;font-weight:600;margin:10px 0;color:#fff">
+                            </div><audio id="radio-player" controls autoplay style="width:100%;margin-top:10px"></audio>
+                        </div>
+                    </div>
+                    <div id="monitor-video" style="display:none"><iframe id="monitor-video-src" src=""
+                            allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen
+                            style="width:100%;height:100%;border:none;border-radius:8px"></iframe></div>
+                    <div id="monitor-default" style="display:none"></div>
+                </div>
+                <!-- Thinking indicator -->
+                <div id="thinking" style="display:none;padding:8px 16px;">
+                    <div class="thinking-dots"><span></span><span></span><span></span></div>
+                    <span data-i18n="thinking.text">Thinking...</span>
+                </div>
+            </div>
+        </div><!-- /#main-content -->
+
+        <!-- Input row — FULL WIDTH at page bottom -->
+        <div id="input-row" style="padding:8px 16px;border-top:1px solid rgba(99,102,241,0.1);">
+            <button id="btn-mic-toggle" title="Microphone ON/OFF" aria-label="Toggle microphone"
+                style="display:none;background:none;border:2px solid #555;border-radius:50%;width:36px;height:36px;cursor:pointer;font-size:1.1rem;color:#888;transition:all 0.3s;">🎙️</button>
+            <button id="btn-camera-inline" title="Camera ON/OFF" aria-label="Toggle camera"
+                style="background:none;border:2px solid #555;border-radius:50%;width:36px;height:36px;cursor:pointer;font-size:1.1rem;color:#888;transition:all 0.3s;">📷</button>
+            <button id="btn-voicefirst" title="Voice-First Mode" aria-label="Toggle Voice-First mode"
+                style="background:none;border:2px solid #555;border-radius:50%;width:36px;height:36px;cursor:pointer;font-size:1.1rem;color:#888;transition:all 0.3s;">🗣️</button>
+            <button id="btn-cc-toggle" title="CC Subtitles" aria-label="Toggle CC subtitles"
+                style="display:none;background:none;border:2px solid #555;border-radius:50%;width:36px;height:36px;cursor:pointer;font-size:0.75rem;font-weight:700;color:#888;transition:all 0.3s;font-family:var(--kelion-font);">CC</button>
+
+            <div id="mic-level" title="Mic level" style="display:none">
+                <span></span><span></span><span></span><span></span><span></span>
+            </div>
+            <input type="text" id="text-input" data-i18n-placeholder="input.placeholder" placeholder="Type or speak..."
+                autocomplete="off">
+            <button id="btn-send" title="Send" aria-label="Send message"
+                style="background:none;border:none;cursor:pointer;font-size:1.3rem;color:var(--kelion-text-secondary);padding:0 6px;transition:color 0.2s;">➤</button>
+            <button id="btn-plus" title="Import / Export" aria-label="Files"
+                style="background:none;border:none;cursor:pointer;font-size:1.3rem;color:var(--kelion-text-secondary);padding:0 4px;">+</button>
         </div>
-        <input
-          type="text"
-          id="text-input"
-          data-i18n-placeholder="input.placeholder"
-          placeholder="Type or speak..."
-          autocomplete="off"
-        />
-        <button
-          type="button"
-          id="btn-send"
-          title="Send"
-          aria-label="Send message"
-          style="
-            background: none;
-            border: none;
-            cursor: pointer;
-            font-size: 1.3rem;
-            color: var(--kelion-text-secondary);
-            padding: 0 6px;
-            transition: color 0.2s;
-          "
-        >
-          ➤
-        </button>
-        <button
-          type="button"
-          id="btn-plus"
-          title="Import / Export"
-          aria-label="Files"
-          style="
-            background: none;
-            border: none;
-            cursor: pointer;
-            font-size: 1.3rem;
-            color: var(--kelion-text-secondary);
-            padding: 0 4px;
-          "
-        >
-          +
-        </button>
-      </div>
-    </div>
-    <!-- /#app-layout -->
+    </div><!-- /#app-layout -->
 
     <!-- GUEST TIMER BAR — removed (server-side limits apply) -->
 
     <!-- GUEST EXPIRED OVERLAY — removed (server-side limits apply) -->
 
     <div id="drop-zone" class="hidden">
-      <div class="drop-zone-content">
-        <div class="drop-icon animate-float">📂</div>
-        <p data-i18n="drop.text">Drop file here</p>
-      </div>
+        <div class="drop-zone-content">
+            <div class="drop-icon animate-float">📂</div>
+            <p data-i18n="drop.text">Drop file here</p>
+        </div>
     </div>
 
     <!-- PRICING MODAL -->
     <div id="pricing-modal" class="modal-overlay hidden">
-      <div class="modal-content pricing-modal">
-        <button type="button" class="modal-close" id="pricing-close">&times;</button>
-        <h2 class="pricing-title" data-i18n="pricing.modal.title">Choose your plan</h2>
-        <div id="current-plan-info" class="current-plan-info"></div>
-        <div class="pricing-grid" id="pricing-grid"></div>
-        <div id="pricing-referral" class="pricing-referral"></div>
-      </div>
+        <div class="modal-content pricing-modal">
+            <button class="modal-close" id="pricing-close">&times;</button>
+            <h2 class="pricing-title" data-i18n="pricing.modal.title">Choose your plan</h2>
+            <div id="current-plan-info" class="current-plan-info"></div>
+            <div class="pricing-grid" id="pricing-grid"></div>
+            <div id="pricing-referral" class="pricing-referral"></div>
+        </div>
     </div>
 
     <!-- REFERRAL/INVITE MODAL -->
     <div id="referral-modal" class="modal-overlay hidden">
-      <div class="modal-content" style="max-width: 480px; padding: 32px">
-        <button type="button" class="modal-close" id="referral-close">&times;</button>
-        <h2 style="font-size: 1.4rem; font-weight: 700; margin-bottom: 8px">🎁 Invite Friends</h2>
-        <p style="color: #8888aa; font-size: 0.85rem; margin-bottom: 20px">
-          Generate an invite code and share it with a friend. You both get bonus days!
-        </p>
+        <div class="modal-content" style="max-width:480px;padding:32px;">
+            <button class="modal-close" id="referral-close">&times;</button>
+            <h2 style="font-size:1.4rem;font-weight:700;margin-bottom:8px;">🎁 Invite Friends</h2>
+            <p style="color:#8888AA;font-size:0.85rem;margin-bottom:20px;">Generate an invite code and share it with a
+                friend. You both get bonus days!</p>
 
-        <div id="referral-code-section" style="margin-bottom: 20px">
-          <label
-            style="color: #a5b4fc; font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1px"
-            >Your invite code</label
-          >
-          <div style="display: flex; gap: 8px; margin-top: 8px">
-            <input
-              type="text"
-              id="referral-code-display"
-              readonly
-              style="
-                flex: 1;
-                padding: 12px 16px;
-                background: rgba(10, 10, 30, 0.8);
-                border: 1px solid rgba(99, 102, 241, 0.3);
-                border-radius: 10px;
-                color: #6ee7b7;
-                font-family: 'JetBrains Mono', monospace;
-                font-size: 1rem;
-                letter-spacing: 1px;
-                text-align: center;
-              "
-              placeholder="Click Generate..."
-            />
-            <button
-              type="button"
-              id="btn-copy-code"
-              style="
-                padding: 8px 14px;
-                background: rgba(99, 102, 241, 0.15);
-                border: 1px solid rgba(99, 102, 241, 0.3);
-                border-radius: 10px;
-                color: #a5b4fc;
-                cursor: pointer;
-                font-size: 1rem;
-              "
-              title="Copy"
-            >
-              📋
-            </button>
-          </div>
-          <div id="referral-expiry" style="color: #555577; font-size: 0.75rem; margin-top: 6px"></div>
-          <div id="referral-remaining" style="color: #555577; font-size: 0.75rem; margin-top: 2px"></div>
+            <div id="referral-code-section" style="margin-bottom:20px;">
+                <label
+                    style="color:#a5b4fc;font-size:0.8rem;font-weight:600;text-transform:uppercase;letter-spacing:1px;">Your
+                    invite code</label>
+                <div style="display:flex;gap:8px;margin-top:8px;">
+                    <input type="text" id="referral-code-display" readonly
+                        style="flex:1;padding:12px 16px;background:rgba(10,10,30,0.8);border:1px solid rgba(99,102,241,0.3);border-radius:10px;color:#6ee7b7;font-family:'JetBrains Mono',monospace;font-size:1rem;letter-spacing:1px;text-align:center;"
+                        placeholder="Click Generate...">
+                    <button id="btn-copy-code"
+                        style="padding:8px 14px;background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.3);border-radius:10px;color:#a5b4fc;cursor:pointer;font-size:1rem;"
+                        title="Copy">📋</button>
+                </div>
+                <div id="referral-expiry" style="color:#555577;font-size:0.75rem;margin-top:6px;"></div>
+                <div id="referral-remaining" style="color:#555577;font-size:0.75rem;margin-top:2px;"></div>
+            </div>
+
+            <button id="btn-generate-code"
+                style="width:100%;padding:12px;background:linear-gradient(135deg,#10B981,#06B6D4);border:none;border-radius:10px;color:#fff;font-size:0.95rem;font-weight:600;cursor:pointer;font-family:var(--kelion-font);margin-bottom:20px;transition:all 0.2s;">✨
+                Generate invite code</button>
+
+            <div style="border-top:1px solid rgba(99,102,241,0.12);padding-top:20px;">
+                <label
+                    style="color:#a5b4fc;font-size:0.8rem;font-weight:600;text-transform:uppercase;letter-spacing:1px;">Send
+                    invite via email</label>
+                <div style="display:flex;gap:8px;margin-top:8px;">
+                    <input type="email" id="referral-email" placeholder="friend@email.com"
+                        style="flex:1;padding:12px 16px;background:rgba(10,10,30,0.6);border:1px solid rgba(99,102,241,0.2);border-radius:10px;color:#f0f0ff;font-family:var(--kelion-font);font-size:0.9rem;outline:none;">
+                    <button id="btn-send-invite"
+                        style="padding:8px 18px;background:linear-gradient(135deg,#6366F1,#06B6D4);border:none;border-radius:10px;color:#fff;font-size:0.9rem;font-weight:600;cursor:pointer;font-family:var(--kelion-font);white-space:nowrap;">📧
+                        Send</button>
+                </div>
+                <p id="referral-status" style="font-size:0.8rem;margin-top:8px;min-height:20px;"></p>
+            </div>
         </div>
-
-        <button
-          type="button"
-          id="btn-generate-code"
-          style="
-            width: 100%;
-            padding: 12px;
-            background: linear-gradient(135deg, #10b981, #06b6d4);
-            border: none;
-            border-radius: 10px;
-            color: #fff;
-            font-size: 0.95rem;
-            font-weight: 600;
-            cursor: pointer;
-            font-family: var(--kelion-font);
-            margin-bottom: 20px;
-            transition: all 0.2s;
-          "
-        >
-          ✨ Generate invite code
-        </button>
-
-        <div style="border-top: 1px solid rgba(99, 102, 241, 0.12); padding-top: 20px">
-          <label
-            style="color: #a5b4fc; font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1px"
-            >Send invite via email</label
-          >
-          <div style="display: flex; gap: 8px; margin-top: 8px">
-            <input
-              type="email"
-              id="referral-email"
-              placeholder="friend@email.com"
-              style="
-                flex: 1;
-                padding: 12px 16px;
-                background: rgba(10, 10, 30, 0.6);
-                border: 1px solid rgba(99, 102, 241, 0.2);
-                border-radius: 10px;
-                color: #f0f0ff;
-                font-family: var(--kelion-font);
-                font-size: 0.9rem;
-                outline: none;
-              "
-            />
-            <button
-              type="button"
-              id="btn-send-invite"
-              style="
-                padding: 8px 18px;
-                background: linear-gradient(135deg, #6366f1, #06b6d4);
-                border: none;
-                border-radius: 10px;
-                color: #fff;
-                font-size: 0.9rem;
-                font-weight: 600;
-                cursor: pointer;
-                font-family: var(--kelion-font);
-                white-space: nowrap;
-              "
-            >
-              📧 Send
-            </button>
-          </div>
-          <p id="referral-status" style="font-size: 0.8rem; margin-top: 8px; min-height: 20px"></p>
-        </div>
-      </div>
     </div>
 
     <!-- TICKER BAR -->
     <div id="ticker-bar" class="ticker-bar hidden">
-      <span id="ticker-text"></span>
-      <button type="button" id="ticker-disable" class="ticker-disable hidden" title="Disable ticker">✕</button>
+        <span id="ticker-text"></span>
+        <button id="ticker-disable" class="ticker-disable hidden" title="Disable ticker">✕</button>
     </div>
 
     <script src="/lib/three.bundle.js"></script>
@@ -1243,213 +777,201 @@
 
     <!-- #53 Brain-map + #85 Visits refresh JS -->
     <script>
-      // ─── #53 Brain-map tab switching ───
-      function switchDisplayTab(tab) {
-        document.querySelectorAll('.display-tab').forEach(function (t) {
-          t.classList.toggle('active', t.dataset.tab === tab);
-        });
-        var brainMap = document.getElementById('brain-map');
-        var chatOverlay = document.getElementById('chat-overlay');
-        var displayContent = document.getElementById('display-content');
-        if (tab === 'brain') {
-          brainMap.classList.add('active');
-          if (chatOverlay) chatOverlay.style.display = 'none';
-          if (displayContent) displayContent.style.display = 'none';
-        } else {
-          brainMap.classList.remove('active');
-          if (chatOverlay) chatOverlay.style.display = '';
-          if (displayContent) displayContent.style.display = '';
+        // ─── #53 Brain-map tab switching ───
+        function switchDisplayTab(tab) {
+            document.querySelectorAll('.display-tab').forEach(function (t) {
+                t.classList.toggle('active', t.dataset.tab === tab);
+            });
+            var brainMap = document.getElementById('brain-map');
+            var chatOverlay = document.getElementById('chat-overlay');
+            var displayContent = document.getElementById('display-content');
+            if (tab === 'brain') {
+                brainMap.classList.add('active');
+                if (chatOverlay) chatOverlay.style.display = 'none';
+                if (displayContent) displayContent.style.display = 'none';
+            } else {
+                brainMap.classList.remove('active');
+                if (chatOverlay) chatOverlay.style.display = '';
+                if (displayContent) displayContent.style.display = '';
+            }
         }
-      }
 
-      // Add a node to brain-map (called from app.js on each AI response)
-      function addBrainNode(label, text) {
-        var panel = document.getElementById('brain-map');
-        if (!panel) return;
-        var node = document.createElement('div');
-        node.className = 'brain-node';
-        node.innerHTML = '<div class=\"bn-label\">' + label + '</div>' + text;
-        panel.prepend(node);
-        // Keep max 20 nodes
-        while (panel.children.length > 20) panel.removeChild(panel.lastChild);
-      }
+        // Add a node to brain-map (called from app.js on each AI response)
+        function addBrainNode(label, text) {
+            var panel = document.getElementById('brain-map');
+            if (!panel) return;
+            var node = document.createElement('div');
+            node.className = 'brain-node';
+            node.innerHTML = '<div class=\"bn-label\">' + label + '</div>' + text;
+            panel.prepend(node);
+            // Keep max 20 nodes
+            while (panel.children.length > 20) panel.removeChild(panel.lastChild);
+        }
     </script>
 
-    <a href="/" id="home-btn-fixed" class="home-btn-fixed" title="Home" style="display: none">🏠</a>
+    <a href="/" id="home-btn-fixed" class="home-btn-fixed" title="Home" style="display:none">🏠</a>
 
     <!-- PWA INSTALL BANNER -->
-    <div id="pwa-install-banner" class="pwa-banner" style="display: none">
-      <div class="pwa-banner-content">
-        <span>📱</span>
-        <div>
-          <strong data-i18n="pwa.title">Install KelionAI</strong>
-          <p data-i18n="pwa.subtitle">Quick access from your screen</p>
+    <div id="pwa-install-banner" class="pwa-banner" style="display:none">
+        <div class="pwa-banner-content">
+            <span>📱</span>
+            <div>
+                <strong data-i18n="pwa.title">Install KelionAI</strong>
+                <p data-i18n="pwa.subtitle">Quick access from your screen</p>
+            </div>
         </div>
-      </div>
-      <div class="pwa-banner-actions">
-        <button type="button" id="pwa-install-btn" class="pwa-btn-primary" data-i18n="pwa.install">Install</button>
-        <button type="button" id="pwa-dismiss-btn" class="pwa-btn-secondary" data-i18n="pwa.dismiss">Not now</button>
-      </div>
+        <div class="pwa-banner-actions">
+            <button id="pwa-install-btn" class="pwa-btn-primary" data-i18n="pwa.install">Install</button>
+            <button id="pwa-dismiss-btn" class="pwa-btn-secondary" data-i18n="pwa.dismiss">Not now</button>
+        </div>
     </div>
 
     <script>
-      // ─── PWA Install banner ───────────────────────────────────────
-      var deferredInstallPrompt = null;
-      window.addEventListener('beforeinstallprompt', function (e) {
-        e.preventDefault();
-        deferredInstallPrompt = e;
-        try {
-          var dismissed = localStorage.getItem('pwa_dismissed');
-          if (dismissed && Date.now() - Number(dismissed) < 7 * 24 * 60 * 60 * 1000) return;
-        } catch (e2) {}
-        var banner = document.getElementById('pwa-install-banner');
-        if (banner) banner.style.display = 'flex';
-      });
-      var installBtn = document.getElementById('pwa-install-btn');
-      if (installBtn) {
-        installBtn.addEventListener('click', function () {
-          var banner = document.getElementById('pwa-install-banner');
-          if (banner) banner.style.display = 'none';
-          if (deferredInstallPrompt) {
-            deferredInstallPrompt.prompt();
-            deferredInstallPrompt.userChoice.then(function () {
-              deferredInstallPrompt = null;
+        // ─── PWA Install banner ───────────────────────────────────────
+        var deferredInstallPrompt = null;
+        window.addEventListener('beforeinstallprompt', function (e) {
+            e.preventDefault();
+            deferredInstallPrompt = e;
+            try {
+                var dismissed = localStorage.getItem('pwa_dismissed');
+                if (dismissed && Date.now() - Number(dismissed) < 7 * 24 * 60 * 60 * 1000) return;
+            } catch (e2) { }
+            var banner = document.getElementById('pwa-install-banner');
+            if (banner) banner.style.display = 'flex';
+        });
+        var installBtn = document.getElementById('pwa-install-btn');
+        if (installBtn) {
+            installBtn.addEventListener('click', function () {
+                var banner = document.getElementById('pwa-install-banner');
+                if (banner) banner.style.display = 'none';
+                if (deferredInstallPrompt) {
+                    deferredInstallPrompt.prompt();
+                    deferredInstallPrompt.userChoice.then(function () { deferredInstallPrompt = null; });
+                }
             });
-          }
-        });
-      }
-      var dismissBtn = document.getElementById('pwa-dismiss-btn');
-      if (dismissBtn) {
-        dismissBtn.addEventListener('click', function () {
-          var banner = document.getElementById('pwa-install-banner');
-          if (banner) banner.style.display = 'none';
-          try {
-            localStorage.setItem('pwa_dismissed', Date.now());
-          } catch (e) {}
-        });
-      }
+        }
+        var dismissBtn = document.getElementById('pwa-dismiss-btn');
+        if (dismissBtn) {
+            dismissBtn.addEventListener('click', function () {
+                var banner = document.getElementById('pwa-install-banner');
+                if (banner) banner.style.display = 'none';
+                try { localStorage.setItem('pwa_dismissed', Date.now()); } catch (e) { }
+            });
+        }
     </script>
     <!-- Theme Toggle (hidden — replaced by camera) -->
-    <button
-      type="button"
-      class="theme-toggle"
-      id="theme-toggle"
-      style="display: none !important"
-      title="Toggle dark/light theme"
-      aria-hidden="true"
-    >
-      <span id="theme-icon">☀️</span>
+    <button class="theme-toggle" id="theme-toggle" style="display:none!important" title="Toggle dark/light theme" aria-hidden="true">
+        <span id="theme-icon">☀️</span>
     </button>
     <!-- Camera Toggle — now inline in input row (btn-camera-inline) -->
     <script>
-      (function () {
-        var camBtn = document.getElementById('btn-camera-inline');
-        var camActive = false;
-        if (!camBtn) return;
+        (function() {
+            var camBtn = document.getElementById('btn-camera-inline');
+            var camActive = false;
+            if (!camBtn) return;
 
-        camBtn.addEventListener('click', async function () {
-          if (!window.KAutoCamera) return;
-          var active = await KAutoCamera.toggle();
-          camActive = active;
-          if (active) {
-            camBtn.textContent = '📷';
-            camBtn.style.borderColor = '#10B981';
-            camBtn.style.color = '#10B981';
-            camBtn.style.boxShadow = '0 0 10px rgba(16,185,129,0.4)';
-            camBtn.title = 'Camera ACTIVĂ — Click pentru a opri';
-          } else {
-            camBtn.textContent = '📷';
-            camBtn.style.borderColor = '#555';
-            camBtn.style.color = '#888';
-            camBtn.style.boxShadow = '';
-            camBtn.title = 'Camera ON/OFF';
-          }
-        });
-      })();
+            camBtn.addEventListener('click', async function() {
+                if (!window.KAutoCamera) return;
+                var active = await KAutoCamera.toggle();
+                camActive = active;
+                if (active) {
+                    camBtn.textContent = '📷';
+                    camBtn.style.borderColor = '#10B981';
+                    camBtn.style.color = '#10B981';
+                    camBtn.style.boxShadow = '0 0 10px rgba(16,185,129,0.4)';
+                    camBtn.title = 'Camera ACTIVĂ — Click pentru a opri';
+                } else {
+                    camBtn.textContent = '📷';
+                    camBtn.style.borderColor = '#555';
+                    camBtn.style.color = '#888';
+                    camBtn.style.boxShadow = '';
+                    camBtn.title = 'Camera ON/OFF';
+                }
+            });
+        })();
     </script>
     <!-- Voice-First Mode Toggle + CC Subtitle -->
     <style>
-      .voice-cc-subtitle {
-        position: absolute;
-        bottom: 12px;
-        left: 50%;
-        transform: translateX(-50%);
-        max-width: 90%;
-        background: rgba(0, 0, 0, 0.75);
-        -webkit-backdrop-filter: blur(8px);
-        backdrop-filter: blur(8px);
-        color: #fff;
-        font-size: 0.85rem;
-        padding: 6px 16px;
-        border-radius: 8px;
-        text-align: center;
-        opacity: 0;
-        transition: opacity 0.3s;
-        pointer-events: none;
-        z-index: 50;
-      }
-      .voice-cc-subtitle.visible {
-        opacity: 1;
-      }
+        .voice-cc-subtitle {
+            position: absolute;
+            bottom: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            max-width: 90%;
+            background: rgba(0,0,0,0.75);
+            -webkit-backdrop-filter: blur(8px);
+            backdrop-filter: blur(8px);
+            color: #fff;
+            font-size: 0.85rem;
+            padding: 6px 16px;
+            border-radius: 8px;
+            text-align: center;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            z-index: 50;
+        }
+        .voice-cc-subtitle.visible { opacity: 1; }
     </style>
     <script>
-      (function () {
-        var vfBtn = document.getElementById('btn-voicefirst');
-        var ccBtn = document.getElementById('btn-cc-toggle');
-        var micBtn = document.getElementById('btn-mic-toggle');
-        var vfActive = false;
-        if (!vfBtn) return;
+        (function() {
+            var vfBtn = document.getElementById('btn-voicefirst');
+            var ccBtn = document.getElementById('btn-cc-toggle');
+            var micBtn = document.getElementById('btn-mic-toggle');
+            var vfActive = false;
+            if (!vfBtn) return;
 
-        vfBtn.addEventListener('click', function () {
-          if (!window.KVoiceFirst) return;
+            vfBtn.addEventListener('click', function() {
+                if (!window.KVoiceFirst) return;
 
-          if (!vfActive) {
-            // Activate Voice-First
-            var avatar = window.KAvatar && KAvatar.getCurrentAvatar ? KAvatar.getCurrentAvatar() : 'kelion';
-            var lang = window.KVoice && KVoice.getLanguage ? KVoice.getLanguage() : 'ro';
-            KVoiceFirst.connect(avatar, lang);
-            vfActive = true;
-            vfBtn.style.borderColor = '#10B981';
-            vfBtn.style.color = '#10B981';
-            vfBtn.style.boxShadow = '0 0 10px rgba(16,185,129,0.4)';
-            vfBtn.title = 'Voice-First ACTIV — Click pentru a opri';
-            // Show CC toggle, hide classic mic
-            if (ccBtn) ccBtn.style.display = '';
-            if (micBtn) micBtn.style.display = 'none';
-          } else {
-            // Deactivate Voice-First
-            KVoiceFirst.disconnect();
-            vfActive = false;
-            vfBtn.style.borderColor = '#555';
-            vfBtn.style.color = '#888';
-            vfBtn.style.boxShadow = '';
-            vfBtn.title = 'Voice-First Mode';
-            // Hide CC toggle, show classic mic
-            if (ccBtn) ccBtn.style.display = 'none';
-            if (micBtn) micBtn.style.display = '';
-          }
-        });
+                if (!vfActive) {
+                    // Activate Voice-First
+                    var avatar = (window.KAvatar && KAvatar.getCurrentAvatar) ? KAvatar.getCurrentAvatar() : 'kelion';
+                    var lang = (window.KVoice && KVoice.getLanguage) ? KVoice.getLanguage() : 'ro';
+                    KVoiceFirst.connect(avatar, lang);
+                    vfActive = true;
+                    vfBtn.style.borderColor = '#10B981';
+                    vfBtn.style.color = '#10B981';
+                    vfBtn.style.boxShadow = '0 0 10px rgba(16,185,129,0.4)';
+                    vfBtn.title = 'Voice-First ACTIV — Click pentru a opri';
+                    // Show CC toggle, hide classic mic
+                    if (ccBtn) ccBtn.style.display = '';
+                    if (micBtn) micBtn.style.display = 'none';
+                } else {
+                    // Deactivate Voice-First
+                    KVoiceFirst.disconnect();
+                    vfActive = false;
+                    vfBtn.style.borderColor = '#555';
+                    vfBtn.style.color = '#888';
+                    vfBtn.style.boxShadow = '';
+                    vfBtn.title = 'Voice-First Mode';
+                    // Hide CC toggle, show classic mic
+                    if (ccBtn) ccBtn.style.display = 'none';
+                    if (micBtn) micBtn.style.display = '';
+                }
+            });
 
-        // CC toggle
-        if (ccBtn) {
-          ccBtn.addEventListener('click', function () {
-            if (!window.KVoiceFirst) return;
-            var enabled = !KVoiceFirst.isCCEnabled();
-            KVoiceFirst.setCCEnabled(enabled);
-            if (enabled) {
-              ccBtn.style.borderColor = '#06B6D4';
-              ccBtn.style.color = '#06B6D4';
-              ccBtn.style.boxShadow = '0 0 10px rgba(6,182,212,0.4)';
-              ccBtn.title = 'CC Subtitles ON';
-            } else {
-              ccBtn.style.borderColor = '#555';
-              ccBtn.style.color = '#888';
-              ccBtn.style.boxShadow = '';
-              ccBtn.title = 'CC Subtitles OFF';
+            // CC toggle
+            if (ccBtn) {
+                ccBtn.addEventListener('click', function() {
+                    if (!window.KVoiceFirst) return;
+                    var enabled = !KVoiceFirst.isCCEnabled();
+                    KVoiceFirst.setCCEnabled(enabled);
+                    if (enabled) {
+                        ccBtn.style.borderColor = '#06B6D4';
+                        ccBtn.style.color = '#06B6D4';
+                        ccBtn.style.boxShadow = '0 0 10px rgba(6,182,212,0.4)';
+                        ccBtn.title = 'CC Subtitles ON';
+                    } else {
+                        ccBtn.style.borderColor = '#555';
+                        ccBtn.style.color = '#888';
+                        ccBtn.style.boxShadow = '';
+                        ccBtn.title = 'CC Subtitles OFF';
+                    }
+                });
             }
-          });
-        }
-      })();
+        })();
     </script>
-  </body>
+</body>
+
 </html>
