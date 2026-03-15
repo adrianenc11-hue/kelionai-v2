@@ -1,21 +1,47 @@
 <<<<
-  clientWs.on('close', () => {
-    logger.info({ component: 'VoiceStream', duration: Date.now() - startTime }, 'Client disconnected');
-    clientWs.off('message', handleClientMessage);
-    if (sttHandler) sttHandler.close();
-    if (ttsHandler) ttsHandler.close();
-  });
+  // Method 2: Supabase JWT — verify admin email
+  const authHeader = req.headers['authorization'];
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const _token = authHeader.slice(7);
+    try {
+      const { getUserFromToken } = req.app.locals;
+      if (getUserFromToken) {
+        getUserFromToken(req)
+          .then((user) => {
+            const adminEmail = (process.env.ADMIN_EMAIL || 'adrianenc11@gmail.com').toLowerCase();
+            if (user && user.email && user.email.toLowerCase() === adminEmail) {
+              return next(); // Admin user authenticated via JWT
+            }
+            res.status(401).json({ error: 'Unauthorized' });
+          })
+          .catch(() => res.status(401).json({ error: 'Unauthorized' }));
+        return; // async — don't fall through
+      }
+    } catch {
+      /* fall through */
+    }
+  }
 ====
-  clientWs.on('close', () => {
-    logger.info({ component: 'VoiceStream', duration: Date.now() - startTime }, 'Client disconnected');
-    clientWs.off('message', handleClientMessage);
-    if (sttHandler) {
-      sttHandler.ws.off('message');
-      sttHandler.close();
+  // Method 2: Supabase JWT — verify admin email
+  const authHeader = req.headers['authorization'];
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const _token = authHeader.slice(7);
+    try {
+      const { getUserFromToken } = req.app.locals;
+      if (getUserFromToken) {
+        getUserFromToken(req)
+          .then((user) => {
+            const adminEmail = (process.env.ADMIN_EMAIL || 'adrianenc11@gmail.com').toLowerCase();
+            if (user && user.email && user.email.toLowerCase() === adminEmail && authHeader === `Bearer ${process.env.BEARER_TOKEN}`) {
+              return next(); // Admin user authenticated via JWT
+            }
+            res.status(401).json({ error: 'Unauthorized' });
+          })
+          .catch(() => res.status(401).json({ error: 'Unauthorized' }));
+        return; // async — don't fall through
+      }
+    } catch {
+      /* fall through */
     }
-    if (ttsHandler) {
-      if (ttsHandler.ws) ttsHandler.ws.off('message');
-      ttsHandler.close();
-    }
-  });
+  }
 >>>>

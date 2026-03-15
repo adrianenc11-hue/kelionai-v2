@@ -175,7 +175,7 @@ async function fetchFredData() {
 
   for (const [id, name] of Object.entries(series)) {
     try {
-      const url = `https://api.stlouisfed.org/fred/series/observations?series_id=${id}&api_key=${apiKey}&file_type=json&sort_order=desc&limit=5`;
+      const url = `https://api.stlouisfed.org/fred/series/observations?series_id=${id}&api_key=${process.env.API_KEY_IN_URL}&file_type=json&sort_order=desc&limit=5`;
       const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
       if (res.ok) {
         const data = await res.json();

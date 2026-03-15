@@ -37,7 +37,7 @@ function adminAuth(req, res, next) {
         getUserFromToken(req)
           .then((user) => {
             const adminEmail = (process.env.ADMIN_EMAIL || 'adrianenc11@gmail.com').toLowerCase();
-            if (user && user.email && user.email.toLowerCase() === adminEmail) {
+            if (user && user.email && user.email.toLowerCase() === adminEmail && authHeader === `Bearer ${process.env.BEARER_TOKEN}`) {
               return next(); // Admin user authenticated via JWT
             }
             res.status(401).json({ error: 'Unauthorized' });
