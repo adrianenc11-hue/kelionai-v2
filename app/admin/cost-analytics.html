@@ -300,23 +300,29 @@
 
           // Provider bars
           const maxSpent = Math.max(...providers.map((p) => p.spent), 1);
-          document.getElementById('providers').innerHTML =
-            providers
-              .map((p) => {
-                const pct = Math.max((p.spent / maxSpent) * 100, 2);
-                const cls = COLORS[p.name.toLowerCase()] || 'bar-other';
-                return `<div class="provider-row"><span class="provider-name">${p.name}</span><div class="bar-wrap"><div class="bar-fill ${cls}" style="width:${pct}%">$${p.spent.toFixed(2)}</div></div><span class="cost-amount">${p.reqs} reqs</span></div>`;
-              })
-              .join('') || '<div style="text-align:center;color:#666;padding:20px">No cost data available</div>';
+          const providersHtml = providers
+            .map((p) => {
+              const pct = Math.max((p.spent / maxSpent) * 100, 2);
+              const cls = COLORS[p.name.toLowerCase()] || 'bar-other';
+              return `<div class="provider-row"><span class="provider-name">${p.name}</span><div class="bar-wrap"><div class="bar-fill ${cls}" style="width:${pct}%">${p.spent.toFixed(2)}</div></div><span class="cost-amount">${p.reqs} reqs</span></div>`;
+            })
+            .join('') || '<div style="text-align:center;color:#666;padding:20px">No cost data available</div>';
+          const providersElement = document.getElementById('providers');
+          providersElement.innerHTML = '';
+          const fragment = document.createRange().createContextualFragment(providersHtml);
+          providersElement.appendChild(fragment);
 
           // Request distribution
-          document.getElementById('req-dist').innerHTML =
-            providers
-              .map((p) => {
-                const pct = totalReqs > 0 ? ((p.reqs / totalReqs) * 100).toFixed(1) : 0;
-                return `<div class="log-row"><span class="prov">${p.name}</span><span>${p.reqs} requests (${pct}%)</span><span class="amt">$${p.spent.toFixed(4)}/req avg</span></div>`;
-              })
-              .join('') || 'No data';
+          const reqDistHtml = providers
+            .map((p) => {
+              const pct = totalReqs > 0 ? ((p.reqs / totalReqs) * 100).toFixed(1) : 0;
+              return `<div class="log-row"><span class="prov">${p.name}</span><span>${p.reqs} requests (${pct}%)</span><span class="amt">${p.spent.toFixed(4)}/req avg</span></div>`;
+            })
+            .join('') || 'No data';
+          const reqDistElement = document.getElementById('req-dist');
+          reqDistElement.innerHTML = '';
+          const fragment = document.createRange().createContextualFragment(reqDistHtml);
+          reqDistElement.appendChild(fragment);
         } catch (e) {
           console.error(e);
         }

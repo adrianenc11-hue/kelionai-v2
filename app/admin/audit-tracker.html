@@ -564,7 +564,7 @@ Be honest. If a suite cannot be truly executed without repo or internal access, 
 
       function renderTable() {
         const tbody = $('issuesTable').querySelector('tbody');
-          tbody.textContent = '';
+        tbody.textContent = '';
         state.issues.forEach((issue, i) => {
           const tr = document.createElement('tr');
           tr.innerHTML = `

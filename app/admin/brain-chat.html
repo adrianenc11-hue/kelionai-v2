@@ -418,7 +418,7 @@
         }
 
         const text = document.createElement('div');
-        text.textContent = content;
+        text.textContent = DOMPurify.sanitize(content);
         div.appendChild(text);
 
         chatContainer.appendChild(div);
