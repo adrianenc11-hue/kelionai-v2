@@ -327,6 +327,28 @@
     let currentSessionId = localStorage.getItem('k1_session_id') || 'session_' + Date.now();
     localStorage.setItem('k1_session_id', currentSessionId);
 
+    // Auto-detect Supabase JWT from logged-in user
+    function getSupabaseToken() {
+      try {
+        for (const key of Object.keys(localStorage)) {
+          if (key.startsWith('sb-') && key.endsWith('-auth-token')) {
+            const data = JSON.parse(localStorage.getItem(key));
+            if (data && data.access_token) return data.access_token;
+          }
+        }
+      } catch(e) {}
+      return null;
+    }
+    const SUPABASE_TOKEN = getSupabaseToken();
+    const IS_AUTHENTICATED = !!(ADMIN_SECRET || SUPABASE_TOKEN);
+
+    function getAuthHeaders() {
+      const h = { 'Content-Type': 'application/json' };
+      if (ADMIN_SECRET) h['x-admin-secret'] = ADMIN_SECRET;
+      else if (SUPABASE_TOKEN) h['Authorization'] = 'Bearer ' + SUPABASE_TOKEN;
+      return h;
+    }
+
     const chatContainer = document.getElementById('chat-container');
     const inputEl = document.getElementById('input');
     const btnSend = document.getElementById('btn-send');
@@ -336,7 +358,7 @@
     async function loadSession() {
       try {
         const res = await fetch(`/api/admin/brain-chat/session/${currentSessionId}`, {
-          headers: { 'x-admin-secret': ADMIN_SECRET }
+          headers: getAuthHeaders()
         });
         if (!res.ok) return;
         const data = await res.json();
@@ -365,10 +387,7 @@
       try {
         const res = await fetch('/api/admin/brain-chat', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-admin-secret': ADMIN_SECRET,
-          },
+          headers: getAuthHeaders(),
           body: JSON.stringify({ message: msg, sessionId: currentSessionId }),
         });
 
@@ -455,10 +474,7 @@
       try {
         const res = await fetch(endpoint, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-admin-secret': ADMIN_SECRET,
-          },
+          headers: getAuthHeaders(),
           body: JSON.stringify({ opId }),
         });
 
@@ -524,10 +540,11 @@
     }
 
     // ═══ INIT ═══
-    if (!ADMIN_SECRET) {
+    if (!IS_AUTHENTICATED) {
       const loginDiv = document.createElement('div');
       loginDiv.style.cssText = 'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:60px 20px;';
       loginDiv.innerHTML = '<div style="font-size:1.1rem;color:#a78bfa;font-weight:600;">🔐 Admin Login</div>'
+        + '<p style="color:#888;font-size:0.8rem;">Loghează-te pe site sau introdu admin secret</p>'
         + '<input id="admin-pw" type="password" placeholder="Admin secret..." style="padding:12px 18px;border-radius:10px;border:1px solid rgba(139,92,246,0.3);background:rgba(255,255,255,0.04);color:#e0e0e0;font-size:0.95rem;outline:none;width:280px;text-align:center;">'
         + '<button onclick="var v=document.getElementById(\'admin-pw\').value;if(v){sessionStorage.setItem(\'kelion_admin_secret\',v);location.reload();}" style="padding:10px 28px;border:none;border-radius:10px;background:linear-gradient(135deg,#7c3aed,#a78bfa);color:#fff;font-weight:600;cursor:pointer;font-size:0.9rem;">Conectare</button>';
       chatContainer.appendChild(loginDiv);
