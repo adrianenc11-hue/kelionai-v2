@@ -338,10 +338,6 @@
 
     <!-- CHAT -->
     <div class="chat-container" id="chat-container">
-      <div class="msg system">
-        K1 — Canal direct cu creierul. Memoria nu se șterge niciodată.<br />
-        Scrie o comandă sau o întrebare. K1 execută DOAR la comanda ta.
-      </div>
     </div>
 
     <!-- THINKING -->
@@ -575,10 +571,11 @@
 
       // ═══ INIT ═══
       if (!ADMIN_SECRET) {
-        addMessage(
-          'system',
-          '⚠️ Nu ai setat parola de admin.\nDeschide Console → sessionStorage.setItem("kelion_admin_secret", "PAROLA_TA")'
-        );
+        // Prompt inline pentru admin secret
+        const pwDiv = document.createElement('div');
+        pwDiv.style.cssText = 'display:flex;gap:10px;align-items:center;justify-content:center;padding:40px 20px;';
+        pwDiv.innerHTML = DOMPurify.sanitize('<input id="admin-pw" type="password" placeholder="Admin secret..." style="padding:10px 16px;border-radius:8px;border:1px solid rgba(139,92,246,0.3);background:rgba(255,255,255,0.04);color:#e0e0e0;font-size:0.9rem;outline:none;width:250px;"><button onclick="const v=document.getElementById(\'admin-pw\').value;if(v){sessionStorage.setItem(\'kelion_admin_secret\',v);location.reload();}" style="padding:10px 20px;border:none;border-radius:8px;background:linear-gradient(135deg,#7c3aed,#a78bfa);color:#fff;font-weight:600;cursor:pointer;">Conectare</button>');
+        chatContainer.appendChild(pwDiv);
       } else {
         loadSession();
       }
