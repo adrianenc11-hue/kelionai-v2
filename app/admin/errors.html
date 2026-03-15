@@ -180,26 +180,30 @@
           document.getElementById('s-24h').textContent = d.last24h || 0;
           if (d.total === 0) document.getElementById('s-total').classList.add('ok');
           const topList = document.getElementById('top-list');
-          const topErrorsHtml = (d.topErrors || [])
-            .map((e) => `<div class="top-err"><span>${e.message}</span><span class="cnt">×${e.count}</span></div>`)
-            .join('') || '<div style="text-align:center;color:#666;padding:12px">No errors 🎉</div>';
+          const topErrorsHtml =
+            (d.topErrors || [])
+              .map((e) => `<div class="top-err"><span>${e.message}</span><span class="cnt">×${e.count}</span></div>`)
+              .join('') || '<div style="text-align:center;color:#666;padding:12px">No errors 🎉</div>';
           topList.textContent = '';
           topList.insertAdjacentHTML('afterbegin', topErrorsHtml);
           const src = d.bySource || {};
           const sourceList = document.getElementById('source-list');
-          const sourceHtml = Object.entries(src)
-            .map(([k, v]) => `<span class="source-tag">${k}: <strong>${v}</strong></span>`)
-            .join('') || 'None';
+          const sourceHtml =
+            Object.entries(src)
+              .map(([k, v]) => `<span class="source-tag">${k}: <strong>${v}</strong></span>`)
+              .join('') || 'None';
           sourceList.textContent = '';
           sourceList.insertAdjacentHTML('afterbegin', sourceHtml);
           const errList = document.getElementById('err-list');
-          const errHtml = (d.recent || [])
-            .slice(0, 20)
-            .map(
-              (e) =>
-                `<div class="err-row"><div class="msg">${e.message}</div><div class="meta">${e.source} · ${e.route || '-'} · ${new Date(e.timestamp).toLocaleTimeString()}</div>${e.stack ? `<pre style="color:#666;font-size:.7rem;margin-top:4px;white-space:pre-wrap;max-height:60px;overflow:hidden">${e.stack.slice(0, 200)}</pre>` : ''}</div>`
-            )
-            .join('') || '<div style="text-align:center;color:#22c55e;padding:20px">No errors! System healthy 🎉</div>';
+          const errHtml =
+            (d.recent || [])
+              .slice(0, 20)
+              .map(
+                (e) =>
+                  `<div class="err-row"><div class="msg">${e.message}</div><div class="meta">${e.source} · ${e.route || '-'} · ${new Date(e.timestamp).toLocaleTimeString()}</div>${e.stack ? `<pre style="color:#666;font-size:.7rem;margin-top:4px;white-space:pre-wrap;max-height:60px;overflow:hidden">${e.stack.slice(0, 200)}</pre>` : ''}</div>`
+              )
+              .join('') ||
+            '<div style="text-align:center;color:#22c55e;padding:20px">No errors! System healthy 🎉</div>';
           errList.textContent = '';
           errList.insertAdjacentHTML('afterbegin', errHtml);
         } catch (e) {
