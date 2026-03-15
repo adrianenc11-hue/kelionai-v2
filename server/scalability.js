@@ -188,7 +188,7 @@ function ipBlacklistMiddleware(req, res, next) {
     process.env.HOST_IP ||
     process.env.HOST_IP ||
     process.env.HOST_IP ||
-    process.env.HOST_IP || "127.0.0.1" ||
+    process.env.HOST_IP || process.env.HOST_IP || "127.0.0.1" ||
     ip === '::1'
   )
     return next();
