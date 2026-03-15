@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>K1 — Brain Direct Chat</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.2.4/purify.min.js"></script>
     <link
       href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Inter:wght@400;500;600&display=swap"
       rel="stylesheet"
@@ -285,6 +286,35 @@
         background: rgba(139, 92, 246, 0.3);
         border-radius: 3px;
       }
+
+      /* PROGRESS BAR */
+      .progress-bar {
+        display: none;
+        padding: 8px 20px;
+        background: #0f0f1a;
+        border-bottom: 1px solid rgba(139, 92, 246, 0.15);
+      }
+      .progress-bar.active { display: block; }
+      .progress-track {
+        height: 4px;
+        background: rgba(139, 92, 246, 0.1);
+        border-radius: 2px;
+        overflow: hidden;
+      }
+      .progress-fill {
+        height: 100%;
+        width: 0%;
+        background: linear-gradient(90deg, #7c3aed, #a78bfa);
+        border-radius: 2px;
+        transition: width 0.3s ease;
+      }
+      .progress-info {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.7rem;
+        color: #a78bfa;
+        margin-top: 4px;
+      }
     </style>
   </head>
 
@@ -298,6 +328,12 @@
       <div>
         <a href="/admin/">← Admin Panel</a>
       </div>
+    </div>
+
+    <!-- PROGRESS BAR -->
+    <div class="progress-bar" id="progress-bar">
+      <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+      <div class="progress-info"><span id="progress-task"></span><span id="progress-pct">0%</span></div>
     </div>
 
     <!-- CHAT -->
@@ -418,7 +454,7 @@
         }
 
         const text = document.createElement('div');
-        text.textContent = DOMPurify.sanitize(content);
+        text.innerHTML = DOMPurify.sanitize(content);
         div.appendChild(text);
 
         chatContainer.appendChild(div);

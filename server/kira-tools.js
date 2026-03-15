@@ -15,6 +15,25 @@ const path = require('path');
 const fetch = require('node-fetch');
 const logger = require('./logger');
 
+// Helper: check if hostname is private/internal
+function isPrivateHost(host) {
+  return (
+    host === 'localhost' ||
+    host === '127.0.0.1' ||
+    host === '::1' ||
+    host === (process.env.HOST_IP || '') ||
+    host.startsWith('192.168.') ||
+    host.startsWith('10.') ||
+    host.startsWith('172.16.') ||
+    host.startsWith('172.17.') ||
+    host.startsWith('172.18.') ||
+    host.startsWith('172.19.') ||
+    host.startsWith('172.2') ||
+    host.startsWith('172.3') ||
+    host.endsWith('.local')
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════
 // 1. JS SANDBOX — Safe code execution with Node's vm module
 // ═══════════════════════════════════════════════════════════════
@@ -133,74 +152,8 @@ async function scrapeUrl(url) {
     if (!['http:', 'https:'].includes(parsed.protocol)) {
       return { success: false, error: 'Only HTTP/HTTPS URLs are supported' };
     }
-    // Block internal/private IPs
-    const host = parsed.hostname;
-    if (
-      host === 'localhost' ||
-      host === process.env.HOST_IP ||
-      process.env.HOST_IP ||
-      process.env.HOST_IP ||
-      process.env.HOST_IP ||
-      process.env.HOST_IP ||
-      process.env.HOST_IP ||
-      process.env.HOST_IP ||
-      process.env.HOST_IP ||
-      process.env.HOST_IP ||
-      process.env.HOST_IP ||
-      process.env.HOST_IP ||
-      process.env.HOST_IP ||
-      process.env.HOST_IP ||
-      process.env.HOST_IP ||
-      process.env.HOST_IP ||
-      process.env.HOST_IP ||
-      process.env.HOST_IP ||
-      process.env.HOST_IP ||
-      process.env.HOST_IP ||
-      process.env.HOST_IP ||
-      process.env.HOST_IP ||
-      process.env.HOST_IP ||
-      process.env.HOST_IP ||
-      process.env.HOST_IP ||
-      process.env.HOST_IP ||
-      process.env.HOST_IP ||
-      process.env.HOST_IP ||
-      process.env.HOST_IP ||
-      process.env.HOST_IP ||
-      process.env.HOST_IP ||
-      process.env.HOST_IP ||
-      process.env.HOST_IP ||
-      process.env.HOST_IP ||
-      process.env.HOST_IP ||
-      process.env.HOST_IP ||
-      process.env.HOST_IP ||
-      process.env.HOST_IP ||
-      process.env.HOST_IP ||
-      process.env.HOST_IP ||
-      process.env.HOST_IP ||
-      process.env.HOST_IP ||
-      process.env.HOST_IP ||
-      process.env.HOST_IP ||
-      process.env.HOST_IP ||
-      process.env.HOST_IP ||
-      process.env.HOST_IP ||
-      process.env.HOST_IP ||
-      process.env.HOST_IP ||
-      process.env.HOST_IP ||
-      process.env.HOST_IP ||
-      process.env.HOST_IP ||
-      process.env.HOST_IP ||
-      process.env.HOST_IP ||
-      process.env.HOST_IP ||
-      process.env.HOST_IP ||
-      process.env.HOST_IP ||
-      process.env.HOST_IP ||
-      process.env.HOST_IP ||
-      process.env.HOST_IP ||
-      '127.0.0.1' ||
-      host.startsWith('192.168.') ||
-      host.startsWith('10.') ||
-      host.startsWith('172.')
-    ) {
+    // Block internal/private IPs — uses isPrivateHost() helper (L19-35)
+    if (isPrivateHost(parsed.hostname)) {
       return { success: false, error: 'Cannot access internal/private URLs' };
     }
   } catch {
@@ -471,73 +424,8 @@ async function deepBrowse(url, options = {}) {
     if (!['http:', 'https:'].includes(parsed.protocol)) {
       return { success: false, error: 'Only HTTP/HTTPS URLs' };
     }
-    if (
-      [
-        'localhost',
-        process.env.HOST_IP ||
-          process.env.HOST_IP ||
-          process.env.HOST_IP ||
-          process.env.HOST_IP ||
-          process.env.HOST_IP ||
-          process.env.HOST_IP ||
-          process.env.HOST_IP ||
-          process.env.HOST_IP ||
-          process.env.HOST_IP ||
-          process.env.HOST_IP ||
-          process.env.HOST_IP ||
-          process.env.HOST_IP ||
-          process.env.HOST_IP ||
-          process.env.HOST_IP ||
-          process.env.HOST_IP ||
-          process.env.HOST_IP ||
-          process.env.HOST_IP ||
-          process.env.HOST_IP ||
-          process.env.HOST_IP ||
-          process.env.HOST_IP ||
-          process.env.HOST_IP ||
-          process.env.HOST_IP ||
-          process.env.HOST_IP ||
-          process.env.HOST_IP ||
-          process.env.HOST_IP ||
-          process.env.HOST_IP ||
-          process.env.HOST_IP ||
-          process.env.HOST_IP ||
-          process.env.HOST_IP ||
-          process.env.HOST_IP ||
-          process.env.HOST_IP ||
-          process.env.HOST_IP ||
-          process.env.HOST_IP ||
-          process.env.HOST_IP ||
-          process.env.HOST_IP ||
-          process.env.HOST_IP ||
-          process.env.HOST_IP ||
-          process.env.HOST_IP ||
-          process.env.HOST_IP ||
-          process.env.HOST_IP ||
-          process.env.HOST_IP ||
-          process.env.HOST_IP ||
-          process.env.HOST_IP ||
-          process.env.HOST_IP ||
-          process.env.HOST_IP ||
-          process.env.HOST_IP ||
-          process.env.HOST_IP ||
-          process.env.HOST_IP ||
-          process.env.HOST_IP ||
-          process.env.HOST_IP ||
-          process.env.HOST_IP ||
-          process.env.HOST_IP ||
-          process.env.HOST_IP ||
-          process.env.HOST_IP ||
-          process.env.HOST_IP ||
-          process.env.HOST_IP ||
-          process.env.HOST_IP ||
-          process.env.HOST_IP ||
-          process.env.HOST_IP ||
-          '127.0.0.1',
-      ].includes(parsed.hostname) ||
-      parsed.hostname.startsWith('192.168.') ||
-      parsed.hostname.startsWith('10.')
-    ) {
+    // Block internal/private IPs — uses isPrivateHost() helper (L19-35)
+    if (isPrivateHost(parsed.hostname)) {
       return { success: false, error: 'Cannot access internal URLs' };
     }
   } catch {
