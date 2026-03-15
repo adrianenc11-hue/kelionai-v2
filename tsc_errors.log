@@ -1,0 +1,773 @@
+node_modules/crypto-js/index.js(4,57): error TS2554: Expected 0-1 arguments, but got 35.
+node_modules/crypto-js/index.js(6,18): error TS2304: Cannot find name 'define'.
+node_modules/crypto-js/index.js(6,43): error TS2304: Cannot find name 'define'.
+node_modules/crypto-js/index.js(8,3): error TS2304: Cannot find name 'define'.
+node_modules/express/lib/express.js(39,9): error TS2339: Property 'handle' does not exist on type '{ (req: any, res: any, next: any): void; request: any; response: any; }'.
+node_modules/express/lib/express.js(55,7): error TS2339: Property 'init' does not exist on type '{ (req: any, res: any, next: any): void; request: any; response: any; }'.
+node_modules/fontkit/dist/main.cjs(846,24): error TS2532: Object is possibly 'undefined'.
+node_modules/fontkit/dist/main.cjs(849,38): error TS2339: Property 'langTags' does not exist on type 'process'.
+node_modules/fontkit/dist/main.cjs(849,103): error TS2339: Property 'langTags' does not exist on type 'process'.
+node_modules/fontkit/dist/main.cjs(864,20): error TS2407: The right-hand side of a 'for...in' statement must be of type 'any', an object type or a type parameter, but here has type 'never'.
+node_modules/fontkit/dist/main.cjs(872,69): error TS2339: Property 'en' does not exist on type 'never'.
+node_modules/fontkit/dist/main.cjs(873,25): error TS2339: Property 'en' does not exist on type 'never'.
+node_modules/fontkit/dist/main.cjs(880,25): error TS2339: Property 'en' does not exist on type 'never'.
+node_modules/fontkit/dist/main.cjs(881,25): error TS2339: Property 'en' does not exist on type 'never'.
+node_modules/fontkit/dist/main.cjs(1231,25): error TS2403: Subsequent variable declarations must have the same type.  Variable 'n2' must be of type 'number', but here has type 'any'.
+node_modules/fontkit/dist/main.cjs(3226,9): error TS1117: An object literal cannot have multiple properties with the same name.
+node_modules/fontkit/dist/main.cjs(3336,54): error TS2554: Expected 0 arguments, but got 2.
+node_modules/fontkit/dist/main.cjs(3340,54): error TS2554: Expected 0 arguments, but got 2.
+node_modules/fontkit/dist/main.cjs(3819,18): error TS2339: Property 'version' does not exist on type '$af4e76a81d73e13e$var$CFFFont'.
+node_modules/fontkit/dist/main.cjs(3820,22): error TS2339: Property 'topDictIndex' does not exist on type '$af4e76a81d73e13e$var$CFFFont'.
+node_modules/fontkit/dist/main.cjs(3821,33): error TS2339: Property 'topDictIndex' does not exist on type '$af4e76a81d73e13e$var$CFFFont'.
+node_modules/fontkit/dist/main.cjs(3827,18): error TS2339: Property 'version' does not exist on type '$af4e76a81d73e13e$var$CFFFont'.
+node_modules/fontkit/dist/main.cjs(3829,21): error TS2339: Property 'stringIndex' does not exist on type '$af4e76a81d73e13e$var$CFFFont'.
+node_modules/fontkit/dist/main.cjs(3832,18): error TS2339: Property 'version' does not exist on type '$af4e76a81d73e13e$var$CFFFont'.
+node_modules/fontkit/dist/main.cjs(3832,43): error TS2339: Property 'nameIndex' does not exist on type '$af4e76a81d73e13e$var$CFFFont'.
+node_modules/fontkit/dist/main.cjs(3847,18): error TS2339: Property 'version' does not exist on type '$af4e76a81d73e13e$var$CFFFont'.
+node_modules/fontkit/dist/main.cjs(3893,18): error TS2339: Property 'version' does not exist on type '$af4e76a81d73e13e$var$CFFFont'.
+node_modules/fontkit/dist/main.cjs(4453,131): error TS2350: Only a void function can be called with the 'new' keyword.
+node_modules/fontkit/dist/main.cjs(4527,131): error TS2350: Only a void function can be called with the 'new' keyword.
+node_modules/fontkit/dist/main.cjs(4545,133): error TS2350: Only a void function can be called with the 'new' keyword.
+node_modules/fontkit/dist/main.cjs(4550,133): error TS2350: Only a void function can be called with the 'new' keyword.
+node_modules/fontkit/dist/main.cjs(4999,131): error TS2350: Only a void function can be called with the 'new' keyword.
+node_modules/fontkit/dist/main.cjs(5039,22): error TS2350: Only a void function can be called with the 'new' keyword.
+node_modules/fontkit/dist/main.cjs(5048,22): error TS2350: Only a void function can be called with the 'new' keyword.
+node_modules/fontkit/dist/main.cjs(5162,17): error TS2350: Only a void function can be called with the 'new' keyword.
+node_modules/fontkit/dist/main.cjs(5211,18): error TS2350: Only a void function can be called with the 'new' keyword.
+node_modules/fontkit/dist/main.cjs(5221,25): error TS2350: Only a void function can be called with the 'new' keyword.
+node_modules/fontkit/dist/main.cjs(5248,168): error TS2350: Only a void function can be called with the 'new' keyword.
+node_modules/fontkit/dist/main.cjs(5252,21): error TS2350: Only a void function can be called with the 'new' keyword.
+node_modules/fontkit/dist/main.cjs(5255,21): error TS2350: Only a void function can be called with the 'new' keyword.
+node_modules/fontkit/dist/main.cjs(5259,21): error TS2350: Only a void function can be called with the 'new' keyword.
+node_modules/fontkit/dist/main.cjs(5265,22): error TS2350: Only a void function can be called with the 'new' keyword.
+node_modules/fontkit/dist/main.cjs(5268,21): error TS2350: Only a void function can be called with the 'new' keyword.
+node_modules/fontkit/dist/main.cjs(5314,18): error TS2350: Only a void function can be called with the 'new' keyword.
+node_modules/fontkit/dist/main.cjs(5384,23): error TS2532: Object is possibly 'undefined'.
+node_modules/fontkit/dist/main.cjs(5390,21): error TS2532: Object is possibly 'undefined'.
+node_modules/fontkit/dist/main.cjs(6215,12): error TS2304: Cannot find name 'BBox'.
+node_modules/fontkit/dist/main.cjs(6234,15): error TS2304: Cannot find name 'Glyph'.
+node_modules/fontkit/dist/main.cjs(6238,15): error TS2304: Cannot find name 'GlyphPosition'.
+node_modules/fontkit/dist/main.cjs(8032,25): error TS1345: An expression of type 'void' cannot be tested for truthiness.
+node_modules/fontkit/dist/main.cjs(8053,21): error TS1345: An expression of type 'void' cannot be tested for truthiness.
+node_modules/fontkit/dist/main.cjs(10145,40): error TS2339: Property 'setup' does not exist on type '$7cff22d3cf7aa55a$export$2e2bcd8739ae039 | $2ec9b66dcab54746$export$2e2bcd8739ae039'.
+  Property 'setup' does not exist on type '$7cff22d3cf7aa55a$export$2e2bcd8739ae039'.
+node_modules/fontkit/dist/main.cjs(10145,59): error TS2339: Property 'setup' does not exist on type '$7cff22d3cf7aa55a$export$2e2bcd8739ae039 | $2ec9b66dcab54746$export$2e2bcd8739ae039'.
+  Property 'setup' does not exist on type '$7cff22d3cf7aa55a$export$2e2bcd8739ae039'.
+node_modules/fontkit/dist/main.cjs(10151,40): error TS2339: Property 'cleanup' does not exist on type '$7cff22d3cf7aa55a$export$2e2bcd8739ae039 | $2ec9b66dcab54746$export$2e2bcd8739ae039'.
+  Property 'cleanup' does not exist on type '$7cff22d3cf7aa55a$export$2e2bcd8739ae039'.
+node_modules/fontkit/dist/main.cjs(10151,61): error TS2339: Property 'cleanup' does not exist on type '$7cff22d3cf7aa55a$export$2e2bcd8739ae039 | $2ec9b66dcab54746$export$2e2bcd8739ae039'.
+  Property 'cleanup' does not exist on type '$7cff22d3cf7aa55a$export$2e2bcd8739ae039'.
+node_modules/fontkit/dist/main.cjs(10164,40): error TS2339: Property 'position' does not exist on type '$7cff22d3cf7aa55a$export$2e2bcd8739ae039 | $2ec9b66dcab54746$export$2e2bcd8739ae039'.
+  Property 'position' does not exist on type '$7cff22d3cf7aa55a$export$2e2bcd8739ae039'.
+node_modules/fontkit/dist/main.cjs(10164,75): error TS2339: Property 'position' does not exist on type '$7cff22d3cf7aa55a$export$2e2bcd8739ae039 | $2ec9b66dcab54746$export$2e2bcd8739ae039'.
+  Property 'position' does not exist on type '$7cff22d3cf7aa55a$export$2e2bcd8739ae039'.
+node_modules/fontkit/dist/main.cjs(10231,40): error TS2339: Property 'stringsForGlyph' does not exist on type '$7cff22d3cf7aa55a$export$2e2bcd8739ae039 | $2ec9b66dcab54746$export$2e2bcd8739ae039'.
+  Property 'stringsForGlyph' does not exist on type '$2ec9b66dcab54746$export$2e2bcd8739ae039'.
+node_modules/fontkit/dist/main.cjs(10231,88): error TS2339: Property 'stringsForGlyph' does not exist on type '$7cff22d3cf7aa55a$export$2e2bcd8739ae039 | $2ec9b66dcab54746$export$2e2bcd8739ae039'.
+  Property 'stringsForGlyph' does not exist on type '$2ec9b66dcab54746$export$2e2bcd8739ae039'.
+node_modules/fontkit/dist/main.cjs(10263,9): error TS2322: Type '(ctx: any) => void' is not assignable to type 'string'.
+node_modules/fontkit/dist/main.cjs(10285,13): error TS2304: Cannot find name 'BBox'.
+node_modules/fontkit/dist/main.cjs(10297,13): error TS2304: Cannot find name 'BBox'.
+node_modules/fontkit/dist/main.cjs(10321,29): error TS2403: Subsequent variable declarations must have the same type.  Variable 'cp1x' must be of type 'number', but here has type 'any'.
+node_modules/fontkit/dist/main.cjs(10321,35): error TS2403: Subsequent variable declarations must have the same type.  Variable 'cp1y' must be of type 'number', but here has type 'any'.
+node_modules/fontkit/dist/main.cjs(10375,15): error TS2304: Cannot find name 'Path'.
+node_modules/fontkit/dist/main.cjs(10731,21): error TS2403: Subsequent variable declarations must have the same type.  Variable 'advanceHeight' must be of type 'any', but here has type 'number'.
+node_modules/fontkit/dist/main.cjs(10732,21): error TS2403: Subsequent variable declarations must have the same type.  Variable 'topBearing' must be of type 'any', but here has type 'number'.
+node_modules/fontkit/dist/main.cjs(10735,21): error TS2403: Subsequent variable declarations must have the same type.  Variable 'advanceHeight' must be of type 'any', but here has type 'number'.
+node_modules/fontkit/dist/main.cjs(10736,21): error TS2403: Subsequent variable declarations must have the same type.  Variable 'topBearing' must be of type 'any', but here has type 'number'.
+node_modules/fontkit/dist/main.cjs(10756,13): error TS2304: Cannot find name 'BBox'.
+node_modules/fontkit/dist/main.cjs(10763,13): error TS2304: Cannot find name 'BBox'.
+node_modules/fontkit/dist/main.cjs(10769,13): error TS2304: Cannot find name 'Path'.
+node_modules/fontkit/dist/main.cjs(10778,15): error TS2304: Cannot find name 'Path'.
+node_modules/fontkit/dist/main.cjs(10795,9): error TS2378: A 'get' accessor must return a value.
+node_modules/fontkit/dist/main.cjs(10820,14): error TS2304: Cannot find name 'CanvasRenderingContext2d'.
+node_modules/fontkit/dist/main.cjs(11026,21): error TS2403: Subsequent variable declarations must have the same type.  Variable 'component' must be of type '$f71300a5bebbfea9$var$Component', but here has type 'any'.
+node_modules/fontkit/dist/main.cjs(11117,18): error TS2339: Property 'moveTo' does not exist on type '$77603c74293666bc$export$2e2bcd8739ae039'.
+node_modules/fontkit/dist/main.cjs(11121,56): error TS2339: Property 'lineTo' does not exist on type '$77603c74293666bc$export$2e2bcd8739ae039'.
+node_modules/fontkit/dist/main.cjs(11126,26): error TS2339: Property 'quadraticCurveTo' does not exist on type '$77603c74293666bc$export$2e2bcd8739ae039'.
+node_modules/fontkit/dist/main.cjs(11129,26): error TS2339: Property 'quadraticCurveTo' does not exist on type '$77603c74293666bc$export$2e2bcd8739ae039'.
+node_modules/fontkit/dist/main.cjs(11134,31): error TS2339: Property 'quadraticCurveTo' does not exist on type '$77603c74293666bc$export$2e2bcd8739ae039'.
+node_modules/fontkit/dist/main.cjs(11135,18): error TS2339: Property 'closePath' does not exist on type '$77603c74293666bc$export$2e2bcd8739ae039'.
+node_modules/fontkit/dist/main.cjs(11193,28): error TS2339: Property 'closePath' does not exist on type '$77603c74293666bc$export$2e2bcd8739ae039'.
+node_modules/fontkit/dist/main.cjs(11194,18): error TS2339: Property 'moveTo' does not exist on type '$77603c74293666bc$export$2e2bcd8739ae039'.
+node_modules/fontkit/dist/main.cjs(11218,38): error TS2339: Property 'lineTo' does not exist on type '$77603c74293666bc$export$2e2bcd8739ae039'.
+node_modules/fontkit/dist/main.cjs(11227,38): error TS2339: Property 'lineTo' does not exist on type '$77603c74293666bc$export$2e2bcd8739ae039'.
+node_modules/fontkit/dist/main.cjs(11239,38): error TS2339: Property 'bezierCurveTo' does not exist on type '$77603c74293666bc$export$2e2bcd8739ae039'.
+node_modules/fontkit/dist/main.cjs(11263,38): error TS2339: Property 'closePath' does not exist on type '$77603c74293666bc$export$2e2bcd8739ae039'.
+node_modules/fontkit/dist/main.cjs(11312,38): error TS2339: Property 'bezierCurveTo' does not exist on type '$77603c74293666bc$export$2e2bcd8739ae039'.
+node_modules/fontkit/dist/main.cjs(11316,34): error TS2339: Property 'lineTo' does not exist on type '$77603c74293666bc$export$2e2bcd8739ae039'.
+node_modules/fontkit/dist/main.cjs(11322,38): error TS2339: Property 'lineTo' does not exist on type '$77603c74293666bc$export$2e2bcd8739ae039'.
+node_modules/fontkit/dist/main.cjs(11330,34): error TS2339: Property 'bezierCurveTo' does not exist on type '$77603c74293666bc$export$2e2bcd8739ae039'.
+node_modules/fontkit/dist/main.cjs(11341,38): error TS2339: Property 'bezierCurveTo' does not exist on type '$77603c74293666bc$export$2e2bcd8739ae039'.
+node_modules/fontkit/dist/main.cjs(11353,38): error TS2339: Property 'bezierCurveTo' does not exist on type '$77603c74293666bc$export$2e2bcd8739ae039'.
+node_modules/fontkit/dist/main.cjs(11392,38): error TS2339: Property 'bezierCurveTo' does not exist on type '$77603c74293666bc$export$2e2bcd8739ae039'.
+node_modules/fontkit/dist/main.cjs(11518,42): error TS2339: Property 'bezierCurveTo' does not exist on type '$77603c74293666bc$export$2e2bcd8739ae039'.
+node_modules/fontkit/dist/main.cjs(11519,42): error TS2339: Property 'bezierCurveTo' does not exist on type '$77603c74293666bc$export$2e2bcd8739ae039'.
+node_modules/fontkit/dist/main.cjs(11528,42): error TS2339: Property 'bezierCurveTo' does not exist on type '$77603c74293666bc$export$2e2bcd8739ae039'.
+node_modules/fontkit/dist/main.cjs(11529,42): error TS2339: Property 'bezierCurveTo' does not exist on type '$77603c74293666bc$export$2e2bcd8739ae039'.
+node_modules/fontkit/dist/main.cjs(11547,42): error TS2339: Property 'bezierCurveTo' does not exist on type '$77603c74293666bc$export$2e2bcd8739ae039'.
+node_modules/fontkit/dist/main.cjs(11548,42): error TS2339: Property 'bezierCurveTo' does not exist on type '$77603c74293666bc$export$2e2bcd8739ae039'.
+node_modules/fontkit/dist/main.cjs(11567,42): error TS2339: Property 'bezierCurveTo' does not exist on type '$77603c74293666bc$export$2e2bcd8739ae039'.
+node_modules/fontkit/dist/main.cjs(11568,42): error TS2339: Property 'bezierCurveTo' does not exist on type '$77603c74293666bc$export$2e2bcd8739ae039'.
+node_modules/fontkit/dist/main.cjs(11588,24): error TS2339: Property 'closePath' does not exist on type '$77603c74293666bc$export$2e2bcd8739ae039'.
+node_modules/fontkit/dist/main.cjs(11706,17): error TS2403: Subsequent variable declarations must have the same type.  Variable 'color' must be of type '{ red: number; green: number; blue: number; alpha: number; }', but here has type 'any'.
+node_modules/fontkit/dist/main.cjs(11796,21): error TS2403: Subsequent variable declarations must have the same type.  Variable 'tupleCoords' must be of type 'any[]', but here has type 'any'.
+node_modules/fontkit/dist/main.cjs(12057,18): error TS2339: Property 'encode' does not exist on type '$ce4b1bce7aca5902$export$2e2bcd8739ae039'.
+node_modules/fontkit/dist/main.cjs(12491,27): error TS2339: Property 'name' does not exist on type '$4eebb3cdbf303bc9$export$2e2bcd8739ae039'.
+node_modules/fontkit/dist/main.cjs(12491,40): error TS2339: Property 'name' does not exist on type '$4eebb3cdbf303bc9$export$2e2bcd8739ae039'.
+node_modules/fontkit/dist/main.cjs(12537,21): error TS2339: Property 'hhea' does not exist on type '$4eebb3cdbf303bc9$export$2e2bcd8739ae039'.
+node_modules/fontkit/dist/main.cjs(12543,21): error TS2339: Property 'hhea' does not exist on type '$4eebb3cdbf303bc9$export$2e2bcd8739ae039'.
+node_modules/fontkit/dist/main.cjs(12549,21): error TS2339: Property 'hhea' does not exist on type '$4eebb3cdbf303bc9$export$2e2bcd8739ae039'.
+node_modules/fontkit/dist/main.cjs(12555,21): error TS2339: Property 'post' does not exist on type '$4eebb3cdbf303bc9$export$2e2bcd8739ae039'.
+node_modules/fontkit/dist/main.cjs(12561,21): error TS2339: Property 'post' does not exist on type '$4eebb3cdbf303bc9$export$2e2bcd8739ae039'.
+node_modules/fontkit/dist/main.cjs(12567,21): error TS2339: Property 'post' does not exist on type '$4eebb3cdbf303bc9$export$2e2bcd8739ae039'.
+node_modules/fontkit/dist/main.cjs(12589,21): error TS2339: Property 'maxp' does not exist on type '$4eebb3cdbf303bc9$export$2e2bcd8739ae039'.
+node_modules/fontkit/dist/main.cjs(12595,21): error TS2339: Property 'head' does not exist on type '$4eebb3cdbf303bc9$export$2e2bcd8739ae039'.
+node_modules/fontkit/dist/main.cjs(12599,13): error TS2304: Cannot find name 'BBox'.
+node_modules/fontkit/dist/main.cjs(12601,80): error TS2339: Property 'head' does not exist on type '$4eebb3cdbf303bc9$export$2e2bcd8739ae039'.
+node_modules/fontkit/dist/main.cjs(12601,96): error TS2339: Property 'head' does not exist on type '$4eebb3cdbf303bc9$export$2e2bcd8739ae039'.
+node_modules/fontkit/dist/main.cjs(12601,112): error TS2339: Property 'head' does not exist on type '$4eebb3cdbf303bc9$export$2e2bcd8739ae039'.
+node_modules/fontkit/dist/main.cjs(12601,128): error TS2339: Property 'head' does not exist on type '$4eebb3cdbf303bc9$export$2e2bcd8739ae039'.
+node_modules/fontkit/dist/main.cjs(12604,66): error TS2339: Property 'cmap' does not exist on type '$4eebb3cdbf303bc9$export$2e2bcd8739ae039'.
+node_modules/fontkit/dist/main.cjs(12625,15): error TS2304: Cannot find name 'Glyph'.
+node_modules/fontkit/dist/main.cjs(12638,15): error TS2304: Cannot find name 'Glyph'.
+node_modules/fontkit/dist/main.cjs(12684,15): error TS2304: Cannot find name 'GlyphRun'.
+node_modules/fontkit/dist/main.cjs(12721,15): error TS2304: Cannot find name 'Glyph'.
+node_modules/fontkit/dist/main.cjs(12732,15): error TS2304: Cannot find name 'Subset'.
+node_modules/fontkit/dist/main.cjs(12745,19): error TS2339: Property 'fvar' does not exist on type '$4eebb3cdbf303bc9$export$2e2bcd8739ae039'.
+node_modules/fontkit/dist/main.cjs(12746,31): error TS2339: Property 'fvar' does not exist on type '$4eebb3cdbf303bc9$export$2e2bcd8739ae039'.
+node_modules/fontkit/dist/main.cjs(12762,19): error TS2339: Property 'fvar' does not exist on type '$4eebb3cdbf303bc9$export$2e2bcd8739ae039'.
+node_modules/fontkit/dist/main.cjs(12763,35): error TS2339: Property 'fvar' does not exist on type '$4eebb3cdbf303bc9$export$2e2bcd8739ae039'.
+node_modules/fontkit/dist/main.cjs(12765,37): error TS2339: Property 'fvar' does not exist on type '$4eebb3cdbf303bc9$export$2e2bcd8739ae039'.
+node_modules/fontkit/dist/main.cjs(12766,33): error TS2339: Property 'fvar' does not exist on type '$4eebb3cdbf303bc9$export$2e2bcd8739ae039'.
+node_modules/fontkit/dist/main.cjs(12779,15): error TS2304: Cannot find name 'TTFFont'.
+node_modules/fontkit/dist/main.cjs(12785,27): error TS2339: Property 'fvar' does not exist on type '$4eebb3cdbf303bc9$export$2e2bcd8739ae039'.
+node_modules/fontkit/dist/main.cjs(12797,19): error TS2339: Property 'fvar' does not exist on type '$4eebb3cdbf303bc9$export$2e2bcd8739ae039'.
+node_modules/fontkit/dist/main.cjs(12800,39): error TS2339: Property 'CFF2' does not exist on type '$4eebb3cdbf303bc9$export$2e2bcd8739ae039'.
+node_modules/fontkit/dist/main.cjs(12801,54): error TS2339: Property 'fvar' does not exist on type '$4eebb3cdbf303bc9$export$2e2bcd8739ae039'.
+node_modules/fontkit/dist/main.cjs(12874,23): error TS2532: Object is possibly 'undefined'.
+node_modules/fontkit/dist/main.cjs(13056,24): error TS2532: Object is possibly 'undefined'.
+node_modules/fontkit/dist/main.cjs(13057,21): error TS2532: Object is possibly 'undefined'.
+node_modules/jpeg-exif/lib/index.js(9,20): error TS2732: Cannot find module './tags.json'. Consider using '--resolveJsonModule' to import module with '.json' extension.
+node_modules/jpeg-exif/lib/index.js(75,56): error TS2322: Type 'boolean' is not assignable to type 'number'.
+node_modules/jpeg-exif/lib/index.js(261,7): error TS2367: This comparison appears to be unintentional because the types 'number' and 'boolean' have no overlap.
+node_modules/jpeg-exif/lib/index.js(364,6): error TS2554: Expected 1 arguments, but got 2.
+node_modules/node-fetch/lib/index.js(3,1): error TS2323: Cannot redeclare exported variable '__esModule'.
+node_modules/node-fetch/lib/index.js(163,20): error TS2307: Cannot find module 'encoding' or its corresponding type declarations.
+node_modules/node-fetch/lib/index.js(196,27): error TS1313: The body of an 'if' statement cannot be the empty statement.
+node_modules/node-fetch/lib/index.js(196,61): error TS1313: The body of an 'if' statement cannot be the empty statement.
+node_modules/node-fetch/lib/index.js(202,37): error TS1313: The body of an 'if' statement cannot be the empty statement.
+node_modules/node-fetch/lib/index.js(217,120): error TS2339: Property 'url' does not exist on type 'Body'.
+node_modules/node-fetch/lib/index.js(249,17): error TS2339: Property 'headers' does not exist on type 'Body'.
+node_modules/node-fetch/lib/index.js(249,33): error TS2339: Property 'headers' does not exist on type 'Body'.
+node_modules/node-fetch/lib/index.js(273,87): error TS2339: Property 'url' does not exist on type 'Body'.
+node_modules/node-fetch/lib/index.js(308,38): error TS2339: Property 'headers' does not exist on type 'Body'.
+node_modules/node-fetch/lib/index.js(734,21): error TS1313: The body of an 'if' statement cannot be the empty statement.
+node_modules/node-fetch/lib/index.js(1460,16): error TS2339: Property 'body' does not exist on type 'Request'.
+node_modules/node-fetch/lib/index.js(1460,32): error TS2339: Property 'body' does not exist on type 'Request'.
+node_modules/node-fetch/lib/index.js(1461,27): error TS2339: Property 'body' does not exist on type 'Request'.
+node_modules/node-fetch/lib/index.js(1491,15): error TS2339: Property 'timeout' does not exist on type 'Request'.
+node_modules/node-fetch/lib/index.js(1496,16): error TS2339: Property 'timeout' does not exist on type 'Request'.
+node_modules/node-fetch/lib/index.js(1532,11): error TS2339: Property 'code' does not exist on type 'Error'.
+node_modules/node-fetch/lib/index.js(1604,22): error TS2339: Property 'body' does not exist on type 'Request'.
+node_modules/node-fetch/lib/index.js(1606,25): error TS2339: Property 'timeout' does not exist on type 'Request'.
+node_modules/node-fetch/lib/index.js(1607,22): error TS2339: Property 'size' does not exist on type 'Request'.
+node_modules/node-fetch/lib/index.js(1617,45): error TS2339: Property 'body' does not exist on type 'Request'.
+node_modules/node-fetch/lib/index.js(1648,19): error TS2339: Property 'size' does not exist on type 'Request'.
+node_modules/node-fetch/lib/index.js(1649,22): error TS2339: Property 'timeout' does not exist on type 'Request'.
+node_modules/node-fetch/lib/index.js(1749,10): error TS2339: Property 'code' does not exist on type 'Error'.
+node_modules/node-fetch/lib/index.js(1781,1): error TS2323: Cannot redeclare exported variable '__esModule'.
+node_modules/nodemailer/lib/fetch/index.js(9,29): error TS2732: Cannot find module '../../package.json'. Consider using '--resolveJsonModule' to import module with '.json' extension.
+node_modules/nodemailer/lib/fetch/index.js(80,35): error TS2339: Property 'EFETCH' does not exist on type '{ ERROR_CODES: { ECONNECTION: string; ETIMEDOUT: string; ESOCKET: string; EDNS: string; ETLS: string; EREQUIRETLS: string; EPROTOCOL: string; EENVELOPE: string; EMESSAGE: string; ESTREAM: string; ... 10 more ...; EFETCH: string; }; }'.
+node_modules/nodemailer/lib/fetch/index.js(103,37): error TS2339: Property 'EFETCH' does not exist on type '{ ERROR_CODES: { ECONNECTION: string; ETIMEDOUT: string; ESOCKET: string; EDNS: string; ETLS: string; EREQUIRETLS: string; EPROTOCOL: string; EENVELOPE: string; EMESSAGE: string; ESTREAM: string; ... 10 more ...; EFETCH: string; }; }'.
+node_modules/nodemailer/lib/fetch/index.js(151,29): error TS2339: Property 'EFETCH' does not exist on type '{ ERROR_CODES: { ECONNECTION: string; ETIMEDOUT: string; ESOCKET: string; EDNS: string; ETLS: string; EREQUIRETLS: string; EPROTOCOL: string; EENVELOPE: string; EMESSAGE: string; ESTREAM: string; ... 10 more ...; EFETCH: string; }; }'.
+node_modules/nodemailer/lib/fetch/index.js(166,17): error TS2339: Property 'code' does not exist on type 'Error'.
+node_modules/nodemailer/lib/fetch/index.js(166,31): error TS2339: Property 'EFETCH' does not exist on type '{ ERROR_CODES: { ECONNECTION: string; ETIMEDOUT: string; ESOCKET: string; EDNS: string; ETLS: string; EREQUIRETLS: string; EPROTOCOL: string; EENVELOPE: string; EMESSAGE: string; ESTREAM: string; ... 10 more ...; EFETCH: string; }; }'.
+node_modules/nodemailer/lib/fetch/index.js(167,17): error TS2339: Property 'sourceUrl' does not exist on type 'Error'.
+node_modules/nodemailer/lib/fetch/index.js(177,13): error TS2339: Property 'code' does not exist on type 'Error'.
+node_modules/nodemailer/lib/fetch/index.js(177,27): error TS2339: Property 'EFETCH' does not exist on type '{ ERROR_CODES: { ECONNECTION: string; ETIMEDOUT: string; ESOCKET: string; EDNS: string; ETLS: string; EREQUIRETLS: string; EPROTOCOL: string; EENVELOPE: string; EMESSAGE: string; ESTREAM: string; ... 10 more ...; EFETCH: string; }; }'.
+node_modules/nodemailer/lib/fetch/index.js(178,13): error TS2339: Property 'sourceUrl' does not exist on type 'Error'.
+node_modules/nodemailer/lib/fetch/index.js(208,21): error TS2339: Property 'code' does not exist on type 'Error'.
+node_modules/nodemailer/lib/fetch/index.js(208,35): error TS2339: Property 'EFETCH' does not exist on type '{ ERROR_CODES: { ECONNECTION: string; ETIMEDOUT: string; ESOCKET: string; EDNS: string; ETLS: string; EREQUIRETLS: string; EPROTOCOL: string; EENVELOPE: string; EMESSAGE: string; ESTREAM: string; ... 10 more ...; EFETCH: string; }; }'.
+node_modules/nodemailer/lib/fetch/index.js(209,21): error TS2339: Property 'sourceUrl' does not exist on type 'Error'.
+node_modules/nodemailer/lib/fetch/index.js(226,17): error TS2339: Property 'code' does not exist on type 'Error'.
+node_modules/nodemailer/lib/fetch/index.js(226,31): error TS2339: Property 'EFETCH' does not exist on type '{ ERROR_CODES: { ECONNECTION: string; ETIMEDOUT: string; ESOCKET: string; EDNS: string; ETLS: string; EREQUIRETLS: string; EPROTOCOL: string; EENVELOPE: string; EMESSAGE: string; ESTREAM: string; ... 10 more ...; EFETCH: string; }; }'.
+node_modules/nodemailer/lib/fetch/index.js(227,17): error TS2339: Property 'sourceUrl' does not exist on type 'Error'.
+node_modules/nodemailer/lib/fetch/index.js(238,17): error TS2339: Property 'code' does not exist on type 'Error'.
+node_modules/nodemailer/lib/fetch/index.js(238,31): error TS2339: Property 'EFETCH' does not exist on type '{ ERROR_CODES: { ECONNECTION: string; ETIMEDOUT: string; ESOCKET: string; EDNS: string; ETLS: string; EREQUIRETLS: string; EPROTOCOL: string; EENVELOPE: string; EMESSAGE: string; ESTREAM: string; ... 10 more ...; EFETCH: string; }; }'.
+node_modules/nodemailer/lib/fetch/index.js(239,17): error TS2339: Property 'sourceUrl' does not exist on type 'Error'.
+node_modules/nodemailer/lib/fetch/index.js(251,21): error TS2339: Property 'code' does not exist on type 'Error'.
+node_modules/nodemailer/lib/fetch/index.js(251,35): error TS2339: Property 'EFETCH' does not exist on type '{ ERROR_CODES: { ECONNECTION: string; ETIMEDOUT: string; ESOCKET: string; EDNS: string; ETLS: string; EREQUIRETLS: string; EPROTOCOL: string; EENVELOPE: string; EMESSAGE: string; ESTREAM: string; ... 10 more ...; EFETCH: string; }; }'.
+node_modules/nodemailer/lib/fetch/index.js(252,21): error TS2339: Property 'sourceUrl' does not exist on type 'Error'.
+node_modules/nodemailer/lib/fetch/index.js(271,35): error TS2339: Property 'EFETCH' does not exist on type '{ ERROR_CODES: { ECONNECTION: string; ETIMEDOUT: string; ESOCKET: string; EDNS: string; ETLS: string; EREQUIRETLS: string; EPROTOCOL: string; EENVELOPE: string; EMESSAGE: string; ESTREAM: string; ... 10 more ...; EFETCH: string; }; }'.
+node_modules/nodemailer/lib/json-transport/index.js(3,29): error TS2732: Cannot find module '../../package.json'. Consider using '--resolveJsonModule' to import module with '.json' extension.
+node_modules/nodemailer/lib/json-transport/index.js(29,24): error TS8024: JSDoc '@param' tag has name 'emailMessage', but there is no parameter with that name.
+node_modules/nodemailer/lib/json-transport/index.js(30,26): error TS8024: JSDoc '@param' tag has name 'callback', but there is no parameter with that name.
+node_modules/nodemailer/lib/mailer/index.js(12,29): error TS2732: Cannot find module '../../package.json'. Consider using '--resolveJsonModule' to import module with '.json' extension.
+node_modules/nodemailer/lib/mailer/index.js(316,9): error TS2322: Type '(options: any, callback: any) => any' is not assignable to type 'boolean'.
+node_modules/nodemailer/lib/mailer/index.js(342,29): error TS2339: Property 'code' does not exist on type 'Error'.
+node_modules/nodemailer/lib/mailer/index.js(342,43): error TS2339: Property 'EPROXY' does not exist on type '{ ERROR_CODES: { ECONNECTION: string; ETIMEDOUT: string; ESOCKET: string; EDNS: string; ETLS: string; EREQUIRETLS: string; EPROTOCOL: string; EENVELOPE: string; EMESSAGE: string; ESTREAM: string; ... 10 more ...; EFETCH: string; }; }'.
+node_modules/nodemailer/lib/mailer/index.js(372,37): error TS2353: Object literal may only specify known properties, and 'username' does not exist in type '{ ipaddress: any; port: number; type: number; host?: undefined; } | { host: any; port: any; ipaddress?: undefined; type?: undefined; }'.
+node_modules/nodemailer/lib/mailer/index.js(401,17): error TS2339: Property 'code' does not exist on type 'Error'.
+node_modules/nodemailer/lib/mailer/index.js(401,31): error TS2339: Property 'EPROXY' does not exist on type '{ ERROR_CODES: { ECONNECTION: string; ETIMEDOUT: string; ESOCKET: string; EDNS: string; ETLS: string; EREQUIRETLS: string; EPROTOCOL: string; EENVELOPE: string; EMESSAGE: string; ESTREAM: string; ... 10 more ...; EFETCH: string; }; }'.
+node_modules/nodemailer/lib/nodemailer.js(13,29): error TS2732: Cannot find module '../package.json'. Consider using '--resolveJsonModule' to import module with '.json' extension.
+node_modules/nodemailer/lib/nodemailer.js(53,23): error TS2339: Property 'code' does not exist on type 'Error'.
+node_modules/nodemailer/lib/nodemailer.js(53,37): error TS2339: Property 'ECONFIG' does not exist on type '{ ERROR_CODES: { ECONNECTION: string; ETIMEDOUT: string; ESOCKET: string; EDNS: string; ETLS: string; EREQUIRETLS: string; EPROTOCOL: string; EENVELOPE: string; EMESSAGE: string; ESTREAM: string; ... 10 more ...; EFETCH: string; }; }'.
+node_modules/nodemailer/lib/nodemailer.js(154,29): error TS2339: Property 'web' does not exist on type 'boolean'.
+node_modules/nodemailer/lib/sendmail-transport/index.js(4,29): error TS2732: Cannot find module '../../package.json'. Consider using '--resolveJsonModule' to import module with '.json' extension.
+node_modules/nodemailer/lib/sendmail-transport/index.js(58,24): error TS8024: JSDoc '@param' tag has name 'emailMessage', but there is no parameter with that name.
+node_modules/nodemailer/lib/sendmail-transport/index.js(59,26): error TS8024: JSDoc '@param' tag has name 'callback', but there is no parameter with that name.
+node_modules/nodemailer/lib/sendmail-transport/index.js(77,17): error TS2339: Property 'code' does not exist on type 'Error'.
+node_modules/nodemailer/lib/sendmail-transport/index.js(77,31): error TS2339: Property 'ESENDMAIL' does not exist on type '{ ERROR_CODES: { ECONNECTION: string; ETIMEDOUT: string; ESOCKET: string; EDNS: string; ETLS: string; EREQUIRETLS: string; EPROTOCOL: string; EENVELOPE: string; EMESSAGE: string; ESTREAM: string; ... 10 more ...; EFETCH: string; }; }'.
+node_modules/nodemailer/lib/sendmail-transport/index.js(147,21): error TS2339: Property 'code' does not exist on type 'Error'.
+node_modules/nodemailer/lib/sendmail-transport/index.js(147,35): error TS2339: Property 'ESENDMAIL' does not exist on type '{ ERROR_CODES: { ECONNECTION: string; ETIMEDOUT: string; ESOCKET: string; EDNS: string; ETLS: string; EREQUIRETLS: string; EPROTOCOL: string; EENVELOPE: string; EMESSAGE: string; ESTREAM: string; ... 10 more ...; EFETCH: string; }; }'.
+node_modules/nodemailer/lib/sendmail-transport/index.js(210,17): error TS2339: Property 'code' does not exist on type 'Error'.
+node_modules/nodemailer/lib/sendmail-transport/index.js(210,31): error TS2339: Property 'ESENDMAIL' does not exist on type '{ ERROR_CODES: { ECONNECTION: string; ETIMEDOUT: string; ESOCKET: string; EDNS: string; ETLS: string; EREQUIRETLS: string; EPROTOCOL: string; EENVELOPE: string; EMESSAGE: string; ESTREAM: string; ... 10 more ...; EFETCH: string; }; }'.
+node_modules/nodemailer/lib/ses-transport/index.js(4,29): error TS2732: Cannot find module '../../package.json'. Consider using '--resolveJsonModule' to import module with '.json' extension.
+node_modules/nodemailer/lib/ses-transport/index.js(45,24): error TS8024: JSDoc '@param' tag has name 'emailMessage', but there is no parameter with that name.
+node_modules/nodemailer/lib/ses-transport/index.js(227,47): error TS2554: Expected 0-1 arguments, but got 2.
+node_modules/nodemailer/lib/shared/index.js(324,20): error TS2345: Argument of type 'string' is not assignable to parameter of type 'number'.
+node_modules/nodemailer/lib/shared/index.js(348,24): error TS2345: Argument of type 'string | string[]' is not assignable to parameter of type 'number'.
+  Type 'string' is not assignable to type 'number'.
+node_modules/nodemailer/lib/shared/index.js(349,17): error TS2322: Type 'number' is not assignable to type 'string | string[]'.
+node_modules/nodemailer/lib/shared/index.js(354,21): error TS2322: Type 'boolean' is not assignable to type 'string | string[]'.
+node_modules/nodemailer/lib/shared/index.js(357,21): error TS2322: Type 'boolean' is not assignable to type 'string | string[]'.
+node_modules/nodemailer/lib/shared/index.js(407,38): error TS1016: A required parameter cannot follow an optional parameter.
+node_modules/nodemailer/lib/shared/index.js(581,51): error TS2769: No overload matches this call.
+  The last overload gave the following error.
+    Argument of type 'number' is not assignable to parameter of type 'WithImplicitCoercion<string> | { [Symbol.toPrimitive](hint: "string"): string; }'.
+node_modules/nodemailer/lib/smtp-pool/index.js(9,29): error TS2732: Cannot find module '../../package.json'. Consider using '--resolveJsonModule' to import module with '.json' extension.
+node_modules/nodemailer/lib/smtp-pool/index.js(267,17): error TS2322: Type 'number' is not assignable to type 'boolean'.
+node_modules/nodemailer/lib/smtp-pool/index.js(512,13): error TS2365: Operator '<=' cannot be applied to types 'boolean' and 'number'.
+node_modules/nodemailer/lib/smtp-pool/index.js(515,111): error TS2363: The right-hand side of an arithmetic operation must be of type 'any', 'number', 'bigint' or an enum type.
+node_modules/nodemailer/lib/smtp-pool/index.js(516,13): error TS2322: Type 'number' is not assignable to type 'boolean'.
+node_modules/nodemailer/lib/smtp-pool/index.js(637,25): error TS2339: Property 'code' does not exist on type 'Error'.
+node_modules/nodemailer/lib/smtp-pool/index.js(637,39): error TS2339: Property 'ENOAUTH' does not exist on type '{ ERROR_CODES: { ECONNECTION: string; ETIMEDOUT: string; ESOCKET: string; EDNS: string; ETLS: string; EREQUIRETLS: string; EPROTOCOL: string; EENVELOPE: string; EMESSAGE: string; ESTREAM: string; ... 10 more ...; EFETCH: string; }; }'.
+node_modules/nodemailer/lib/smtp-transport/index.js(9,29): error TS2732: Cannot find module '../../package.json'. Consider using '--resolveJsonModule' to import module with '.json' extension.
+node_modules/nodemailer/lib/smtp-transport/index.js(107,50): error TS2339: Property 'mailer' does not exist on type 'SMTPTransport'.
+node_modules/nodemailer/lib/smtp-transport/index.js(107,65): error TS2339: Property 'mailer' does not exist on type 'SMTPTransport'.
+node_modules/nodemailer/lib/smtp-transport/index.js(108,50): error TS2339: Property 'mailer' does not exist on type 'SMTPTransport'.
+node_modules/nodemailer/lib/smtp-transport/index.js(194,29): error TS2339: Property 'code' does not exist on type 'Error'.
+node_modules/nodemailer/lib/smtp-transport/index.js(194,43): error TS2339: Property 'ETLS' does not exist on type '{ ERROR_CODES: { ECONNECTION: string; ETIMEDOUT: string; ESOCKET: string; EDNS: string; ETLS: string; EREQUIRETLS: string; EPROTOCOL: string; EENVELOPE: string; EMESSAGE: string; ESTREAM: string; ... 10 more ...; EFETCH: string; }; }'.
+node_modules/nodemailer/lib/smtp-transport/index.js(396,25): error TS2339: Property 'code' does not exist on type 'Error'.
+node_modules/nodemailer/lib/smtp-transport/index.js(396,39): error TS2339: Property 'ENOAUTH' does not exist on type '{ ERROR_CODES: { ECONNECTION: string; ETIMEDOUT: string; ESOCKET: string; EDNS: string; ETLS: string; EREQUIRETLS: string; EPROTOCOL: string; EENVELOPE: string; EMESSAGE: string; ESTREAM: string; ... 10 more ...; EFETCH: string; }; }'.
+node_modules/nodemailer/lib/stream-transport/index.js(3,29): error TS2732: Cannot find module '../../package.json'. Consider using '--resolveJsonModule' to import module with '.json' extension.
+node_modules/nodemailer/lib/stream-transport/index.js(36,24): error TS8024: JSDoc '@param' tag has name 'emailMessage', but there is no parameter with that name.
+node_modules/nodemailer/lib/stream-transport/index.js(37,26): error TS8024: JSDoc '@param' tag has name 'callback', but there is no parameter with that name.
+node_modules/pdfkit/js/pdfkit.js(40,64): error TS2322: Type 'void' is not assignable to type 'number'.
+node_modules/pdfkit/js/pdfkit.js(40,82): error TS2554: Expected 0 arguments, but got 2.
+node_modules/pdfkit/js/pdfkit.js(45,65): error TS2554: Expected 0 arguments, but got 1.
+node_modules/pdfkit/js/pdfkit.js(45,90): error TS2554: Expected 0 arguments, but got 1.
+node_modules/pdfkit/js/pdfkit.js(49,58): error TS2554: Expected 0 arguments, but got 1.
+node_modules/pdfkit/js/pdfkit.js(216,7): error TS2740: Type 'Buffer' is missing the following properties from type 'any[]': pop, push, concat, shift, and 5 more.
+node_modules/pdfkit/js/pdfkit.js(218,9): error TS2740: Type 'Buffer' is missing the following properties from type 'any[]': pop, push, concat, shift, and 5 more.
+node_modules/pdfkit/js/pdfkit.js(218,40): error TS2345: Argument of type 'any[]' is not assignable to parameter of type 'InputType'.
+  Type 'any[]' is missing the following properties from type 'Float64Array<ArrayBufferLike>': BYTES_PER_ELEMENT, buffer, byteLength, byteOffset, and 3 more.
+node_modules/pdfkit/js/pdfkit.js(598,26): error TS2741: Property 'allowUnassigned' is missing in type '{}' but required in type '{ allowUnassigned: boolean; }'.
+node_modules/pdfkit/js/pdfkit.js(1078,25): error TS2339: Property 'shader' does not exist on type 'PDFGradient'.
+node_modules/pdfkit/js/pdfkit.js(1088,23): error TS2339: Property 'opacityGradient' does not exist on type 'PDFGradient'.
+node_modules/pdfkit/js/pdfkit.js(1419,20): error TS2339: Property 'ca' does not exist on type '{ Type: string; }'.
+node_modules/pdfkit/js/pdfkit.js(1422,20): error TS2339: Property 'CA' does not exist on type '{ Type: string; }'.
+node_modules/pdfkit/js/pdfkit.js(2445,79): error TS2339: Property 'document' does not exist on type 'PDFFont'.
+node_modules/pdfkit/js/pdfkit.js(2461,35): error TS2339: Property 'lineGap' does not exist on type 'PDFFont'.
+node_modules/pdfkit/js/pdfkit.js(2462,18): error TS2339: Property 'ascender' does not exist on type 'PDFFont'.
+node_modules/pdfkit/js/pdfkit.js(2462,40): error TS2339: Property 'descender' does not exist on type 'PDFFont'.
+node_modules/pdfkit/js/pdfkit.js(2519,22): error TS2339: Property 'ascender' does not exist on type 'StandardFont'.
+node_modules/pdfkit/js/pdfkit.js(2520,23): error TS2339: Property 'descender' does not exist on type 'StandardFont'.
+node_modules/pdfkit/js/pdfkit.js(2521,18): error TS2339: Property 'bbox' does not exist on type 'StandardFont'.
+node_modules/pdfkit/js/pdfkit.js(2522,21): error TS2339: Property 'lineGap' does not exist on type 'StandardFont'.
+node_modules/pdfkit/js/pdfkit.js(2523,21): error TS2339: Property 'xHeight' does not exist on type 'StandardFont'.
+node_modules/pdfkit/js/pdfkit.js(2524,23): error TS2339: Property 'capHeight' does not exist on type 'StandardFont'.
+node_modules/pdfkit/js/pdfkit.js(2822,22): error TS2339: Property 'create' does not exist on type 'typeof import("C:/Users/adria/.gemini/antigravity/scratch/kelionai-v2/node_modules/fontkit/dist/main")'.
+node_modules/pdfkit/js/pdfkit.js(2824,22): error TS2339: Property 'create' does not exist on type 'typeof import("C:/Users/adria/.gemini/antigravity/scratch/kelionai-v2/node_modules/fontkit/dist/main")'.
+node_modules/pdfkit/js/pdfkit.js(2826,22): error TS2339: Property 'create' does not exist on type 'typeof import("C:/Users/adria/.gemini/antigravity/scratch/kelionai-v2/node_modules/fontkit/dist/main")'.
+node_modules/pdfkit/js/pdfkit.js(3043,11): error TS2741: Property 'position' is missing in type '{ required: false; }' but required in type '$f898ea50f3b38ab8$var$Break'.
+node_modules/pdfkit/js/pdfkit.js(3094,39): error TS2362: The left-hand side of an arithmetic operation must be of type 'any', 'number', 'bigint' or an enum type.
+node_modules/pdfkit/js/pdfkit.js(3454,16): error TS2339: Property 'lineBreak' does not exist on type '{}'.
+node_modules/pdfkit/js/pdfkit.js(3455,18): error TS2339: Property 'width' does not exist on type '{}'.
+node_modules/pdfkit/js/pdfkit.js(3456,16): error TS2339: Property 'width' does not exist on type '{}'.
+node_modules/pdfkit/js/pdfkit.js(3458,14): error TS2339: Property 'width' does not exist on type '{}'.
+node_modules/pdfkit/js/pdfkit.js(3458,38): error TS2339: Property 'width' does not exist on type '{}'.
+node_modules/pdfkit/js/pdfkit.js(3460,17): error TS2339: Property 'columns' does not exist on type '{}'.
+node_modules/pdfkit/js/pdfkit.js(3461,14): error TS2339: Property 'columns' does not exist on type '{}'.
+node_modules/pdfkit/js/pdfkit.js(3463,16): error TS2339: Property 'columnGap' does not exist on type '{}'.
+node_modules/pdfkit/js/pdfkit.js(3464,14): error TS2339: Property 'columnGap' does not exist on type '{}'.
+node_modules/pdfkit/js/pdfkit.js(4862,15): error TS2339: Property 'Subtype' does not exist on type '{}'.
+node_modules/pdfkit/js/pdfkit.js(4863,19): error TS2339: Property 'F' does not exist on type '{}'.
+node_modules/pdfkit/js/pdfkit.js(4864,17): error TS2339: Property 'F' does not exist on type '{}'.
+node_modules/pdfkit/js/pdfkit.js(4916,10): error TS2339: Property 'T' does not exist on type '{}'.
+node_modules/pdfkit/js/pdfkit.js(4917,14): error TS2339: Property 'parent' does not exist on type '{}'.
+node_modules/pdfkit/js/pdfkit.js(4918,12): error TS2339: Property 'Parent' does not exist on type '{}'.
+node_modules/pdfkit/js/pdfkit.js(4918,26): error TS2339: Property 'parent' does not exist on type '{}'.
+node_modules/pdfkit/js/pdfkit.js(4919,19): error TS2339: Property 'parent' does not exist on type '{}'.
+node_modules/pdfkit/js/pdfkit.js(5477,10): error TS2339: Property 'initMetadata' does not exist on type 'PDFDocument'.
+node_modules/pdfkit/js/pdfkit.js(5478,10): error TS2339: Property 'initColor' does not exist on type 'PDFDocument'.
+node_modules/pdfkit/js/pdfkit.js(5479,10): error TS2339: Property 'initVector' does not exist on type 'PDFDocument'.
+node_modules/pdfkit/js/pdfkit.js(5480,10): error TS2339: Property 'initFonts' does not exist on type 'PDFDocument'.
+node_modules/pdfkit/js/pdfkit.js(5481,10): error TS2339: Property 'initText' does not exist on type 'PDFDocument'.
+node_modules/pdfkit/js/pdfkit.js(5482,10): error TS2339: Property 'initImages' does not exist on type 'PDFDocument'.
+node_modules/pdfkit/js/pdfkit.js(5483,10): error TS2339: Property 'initOutline' does not exist on type 'PDFDocument'.
+node_modules/pdfkit/js/pdfkit.js(5484,10): error TS2339: Property 'initMarkings' does not exist on type 'PDFDocument'.
+node_modules/pdfkit/js/pdfkit.js(5485,10): error TS2339: Property 'initSubset' does not exist on type 'PDFDocument'.
+node_modules/pdfkit/js/pdfkit.js(5551,10): error TS2339: Property 'transform' does not exist on type 'PDFDocument'.
+node_modules/pdfkit/js/pdfkit.js(5556,31): error TS2339: Property 'endPageMarkings' does not exist on type 'PDFDocument'.
+node_modules/pdfkit/js/pdfkit.js(5558,10): error TS2339: Property 'initPageMarkings' does not exist on type 'PDFDocument'.
+node_modules/pdfkit/js/pdfkit.js(5581,12): error TS2339: Property 'endPageMarkings' does not exist on type 'PDFDocument'.
+node_modules/pdfkit/js/pdfkit.js(5656,27): error TS2339: Property '_fontFamilies' does not exist on type 'PDFDocument'.
+node_modules/pdfkit/js/pdfkit.js(5657,25): error TS2339: Property '_fontFamilies' does not exist on type 'PDFDocument'.
+node_modules/pdfkit/js/pdfkit.js(5660,10): error TS2339: Property 'endOutline' does not exist on type 'PDFDocument'.
+node_modules/pdfkit/js/pdfkit.js(5661,10): error TS2339: Property 'endMarkings' does not exist on type 'PDFDocument'.
+node_modules/pdfkit/js/pdfkit.js(5662,14): error TS2339: Property 'subset' does not exist on type 'PDFDocument'.
+node_modules/pdfkit/js/pdfkit.js(5663,12): error TS2339: Property 'endSubset' does not exist on type 'PDFDocument'.
+node_modules/pdfkit/js/pdfkit.js(5665,10): error TS2339: Property 'endMetadata' does not exist on type 'PDFDocument'.
+node_modules/pdfkit/js/pdfkit.js(5669,10): error TS2339: Property 'endAcroForm' does not exist on type 'PDFDocument'.
+server/agent-marketplace.js(12,9): error TS2724: '"./config/models"' has no exported member named '_MODELS'. Did you mean 'MODELS'?
+server/ai-providers/ollama.js(69,14): error TS1064: The return type of an async function or method must be the global Promise<T> type. Did you mean to write 'Promise<{ success: boolean; response?: string; model?: string; error?: string; local: boolean; }>'?
+server/ai-providers/ollama.js(137,7): error TS2353: Object literal may only specify known properties, and 'provider' does not exist in type '{ success: boolean; response?: string; model?: string; error?: string; local: boolean; }'.
+server/autonomous-runner.js(27,14): error TS1064: The return type of an async function or method must be the global Promise<T> type. Did you mean to write 'Promise<any>'?
+server/autonomous-runner.js(294,15): error TS2300: Duplicate identifier 'kiraTools'.
+server/autonomous-runner.js(295,41): error TS2339: Property 'webSearch' does not exist on type 'typeof import("C:/Users/adria/.gemini/antigravity/scratch/kelionai-v2/server/kira-tools")'.
+server/autonomous-runner.js(299,15): error TS2300: Duplicate identifier 'kiraTools'.
+server/autonomous-runner.js(324,38): error TS2339: Property 'getPortfolioSummary' does not exist on type 'typeof import("C:/Users/adria/.gemini/antigravity/scratch/kelionai-v2/server/investment-simulator")'.
+server/autonomous-runner.js(378,35): error TS2362: The left-hand side of an arithmetic operation must be of type 'any', 'number', 'bigint' or an enum type.
+server/autonomous-runner.js(378,64): error TS2363: The right-hand side of an arithmetic operation must be of type 'any', 'number', 'bigint' or an enum type.
+server/autonomous-runner.js(449,21): error TS2362: The left-hand side of an arithmetic operation must be of type 'any', 'number', 'bigint' or an enum type.
+server/autonomous-runner.js(449,45): error TS2363: The right-hand side of an arithmetic operation must be of type 'any', 'number', 'bigint' or an enum type.
+server/brain-v4.js(1512,13): error TS2741: Property 'disclaimer' is missing in type '{ total_dose_Gy: number; BED_Gy: string; EQD2_Gy: string; fractions: any; dose_per_fraction_Gy: any; }' but required in type '{ disclaimer: string; }'.
+server/brain-v4.js(1523,13): error TS2741: Property 'disclaimer' is missing in type '{ remaining_activity: string; unit: any; decay_factor: string; }' but required in type '{ disclaimer: string; }'.
+server/brain-v4.js(1531,13): error TS2741: Property 'disclaimer' is missing in type '{ new_dose_rate: string; reduction_factor: string; }' but required in type '{ disclaimer: string; }'.
+server/brain-v4.js(1536,13): error TS2741: Property 'disclaimer' is missing in type '{ error: string; }' but required in type '{ disclaimer: string; }'.
+server/brain.js(857,3): error TS2393: Duplicate function implementation.
+server/brain.js(1277,16): error TS2551: Property 'complexityLevel' does not exist on type '{ language: any; needsSearch: boolean; searchQuery: string; needsWeather: boolean; weatherCity: string; needsImage: boolean; imagePrompt: string; needsMap: boolean; mapPlace: string; needsVision: boolean; ... 70 more ...; confidenceScore: number; }'. Did you mean 'complexity'?
+server/brain.js(1301,35): error TS2304: Cannot find name 'start'.
+server/brain.js(2558,27): error TS2339: Property 'test' does not exist on type 'never'.
+server/brain.js(2580,16): error TS2339: Property 'emotionResponseHint' does not exist on type '{ language: any; needsSearch: boolean; searchQuery: string; needsWeather: boolean; weatherCity: string; needsImage: boolean; imagePrompt: string; needsMap: boolean; mapPlace: string; needsVision: boolean; ... 70 more ...; confidenceScore: number; }'.
+server/brain.js(2588,14): error TS2339: Property 'frustrationLevel' does not exist on type '{ language: any; needsSearch: boolean; searchQuery: string; needsWeather: boolean; weatherCity: string; needsImage: boolean; imagePrompt: string; needsMap: boolean; mapPlace: string; needsVision: boolean; ... 70 more ...; confidenceScore: number; }'.
+server/brain.js(2591,16): error TS2339: Property 'emotionResponseHint' does not exist on type '{ language: any; needsSearch: boolean; searchQuery: string; needsWeather: boolean; weatherCity: string; needsImage: boolean; imagePrompt: string; needsMap: boolean; mapPlace: string; needsVision: boolean; ... 70 more ...; confidenceScore: number; }'.
+server/brain.js(2611,12): error TS2339: Property 'detectedMood' does not exist on type '{ language: any; needsSearch: boolean; searchQuery: string; needsWeather: boolean; weatherCity: string; needsImage: boolean; imagePrompt: string; needsMap: boolean; mapPlace: string; needsVision: boolean; ... 70 more ...; confidenceScore: number; }'.
+server/brain.js(2614,16): error TS2339: Property 'detectedMood' does not exist on type '{ language: any; needsSearch: boolean; searchQuery: string; needsWeather: boolean; weatherCity: string; needsImage: boolean; imagePrompt: string; needsMap: boolean; mapPlace: string; needsVision: boolean; ... 70 more ...; confidenceScore: number; }'.
+server/brain.js(2811,44): error TS2552: Cannot find name 'message'. Did you mean 'onmessage'?
+server/brain.js(2830,17): error TS2552: Cannot find name 'message'. Did you mean 'onmessage'?
+server/brain.js(2836,67): error TS2552: Cannot find name 'message'. Did you mean 'onmessage'?
+server/brain.js(2842,39): error TS2552: Cannot find name 'message'. Did you mean 'onmessage'?
+server/brain.js(2879,43): error TS2552: Cannot find name 'message'. Did you mean 'onmessage'?
+server/brain.js(2921,23): error TS2339: Property 'reason' does not exist on type 'PromiseSettledResult<any>'.
+  Property 'reason' does not exist on type 'PromiseFulfilledResult<any>'.
+server/brain.js(6056,3): error TS2393: Duplicate function implementation.
+server/brain.js(7072,25): error TS2339: Property 'getStats' does not exist on type 'PerformanceTracker'.
+server/brain.js(7072,69): error TS2339: Property 'getStats' does not exist on type 'PerformanceTracker'.
+server/brain.js(7080,31): error TS2339: Property 'isConnected' does not exist on type 'WSEngine'.
+server/brain.js(7080,54): error TS2339: Property 'isConnected' does not exist on type 'WSEngine'.
+server/brain.js(7081,36): error TS2339: Property 'getTrackedAssets' does not exist on type 'WSEngine'.
+server/brain.js(7081,64): error TS2339: Property 'getTrackedAssets' does not exist on type 'WSEngine'.
+server/brain.js(7756,15): error TS2300: Duplicate identifier 'FormData'.
+server/brain.js(7767,11): error TS2322: Type 'FormData' is not assignable to type 'BodyInit'.
+  Type 'FormData' is missing the following properties from type 'URLSearchParams': size, delete, get, getAll, and 8 more.
+server/brain.js(7804,15): error TS2300: Duplicate identifier 'FormData'.
+server/brain.js(7815,11): error TS2322: Type 'FormData' is not assignable to type 'BodyInit'.
+  Type 'FormData' is missing the following properties from type 'URLSearchParams': size, delete, get, getAll, and 8 more.
+server/brain.js(8113,11): error TS2322: Type 'FormData' is not assignable to type 'BodyInit'.
+  Type 'FormData' is missing the following properties from type 'URLSearchParams': size, delete, get, getAll, and 8 more.
+server/brain.js(8410,44): error TS2339: Property 'CORRECTION_PATTERNS' does not exist on type 'Function'.
+server/brain.js(9025,31): error TS2339: Property 'recordOutcome' does not exist on type 'MarketLearner'.
+server/browser-agent.js(119,13): error TS2339: Property 'querySelectorAll' does not exist on type 'Node'.
+server/browser-agent.js(120,20): error TS2339: Property 'innerText' does not exist on type 'Node'.
+server/browser-agent.js(139,19): error TS2339: Property 'innerText' does not exist on type 'Element'.
+server/browser-agent.js(140,19): error TS2339: Property 'href' does not exist on type 'Element'.
+server/browser-agent.js(155,25): error TS2339: Property 'type' does not exist on type 'Element'.
+server/browser-agent.js(156,25): error TS2339: Property 'name' does not exist on type 'Element'.
+server/browser-agent.js(157,32): error TS2339: Property 'placeholder' does not exist on type 'Element'.
+server/browser-agent.js(217,13): error TS2339: Property 'querySelectorAll' does not exist on type 'Node'.
+server/browser-agent.js(218,20): error TS2339: Property 'innerText' does not exist on type 'Node'.
+server/cluster.js(15,13): error TS2339: Property 'isPrimary' does not exist on type 'typeof import("cluster")'.
+server/collaboration.js(19,12): error TS2503: Cannot find namespace 'http'.
+server/collaboration.js(192,14): error TS2339: Property 'isAlive' does not exist on type 'WebSocket'.
+server/collaboration.js(193,10): error TS2339: Property 'isAlive' does not exist on type 'WebSocket'.
+server/collaboration.js(199,8): error TS2339: Property 'isAlive' does not exist on type 'WebSocket'.
+server/collaboration.js(201,10): error TS2339: Property 'isAlive' does not exist on type 'WebSocket'.
+server/historical-data-loader.js(325,14): error TS1064: The return type of an async function or method must be the global Promise<T> type. Did you mean to write 'Promise<any[]>'?
+server/index.js(51,3): error TS2724: '"./scalability"' has no exported member named '_compressionMiddleware'. Did you mean 'compressionMiddleware'?
+server/index.js(93,5): error TS2339: Property 'set' does not exist on type 'Function'.
+server/index.js(96,5): error TS2339: Property 'use' does not exist on type 'Function'.
+server/index.js(97,5): error TS2339: Property 'use' does not exist on type 'Function'.
+server/index.js(98,5): error TS2339: Property 'use' does not exist on type 'Function'.
+server/index.js(101,5): error TS2339: Property 'use' does not exist on type 'Function'.
+server/index.js(109,5): error TS2339: Property 'use' does not exist on type 'Function'.
+server/index.js(114,5): error TS2339: Property 'use' does not exist on type 'Function'.
+server/index.js(117,3): error TS2349: This expression is not callable.
+  Type 'typeof import("C:/Users/adria/.gemini/antigravity/scratch/kelionai-v2/node_modules/helmet/index")' has no call signatures.
+server/index.js(177,5): error TS2339: Property 'use' does not exist on type 'Function'.
+server/index.js(194,5): error TS2339: Property 'use' does not exist on type 'Function'.
+server/index.js(196,5): error TS2339: Property 'use' does not exist on type 'Function'.
+server/index.js(197,5): error TS2339: Property 'use' does not exist on type 'Function'.
+server/index.js(200,5): error TS2339: Property 'use' does not exist on type 'Function'.
+server/index.js(239,25): error TS2339: Property '_geoCache' does not exist on type 'Global & typeof globalThis'.
+server/index.js(239,43): error TS2339: Property '_geoCache' does not exist on type 'Global & typeof globalThis'.
+server/index.js(240,24): error TS2339: Property '_geoCache' does not exist on type 'Global & typeof globalThis'.
+server/index.js(241,32): error TS2339: Property '_geoCache' does not exist on type 'Global & typeof globalThis'.
+server/index.js(251,39): error TS2339: Property '_geoCache' does not exist on type 'Global & typeof globalThis'.
+server/index.js(253,51): error TS2339: Property '_geoCache' does not exist on type 'Global & typeof globalThis'.
+server/index.js(255,65): error TS2339: Property '_geoCache' does not exist on type 'Global & typeof globalThis'.
+server/index.js(283,23): error TS2349: This expression is not callable.
+  Type 'typeof import("C:/Users/adria/.gemini/antigravity/scratch/kelionai-v2/node_modules/express-rate-limit/dist/index")' has no call signatures.
+server/index.js(297,5): error TS2339: Property 'use' does not exist on type 'Function'.
+server/index.js(307,5): error TS2339: Property 'use' does not exist on type 'Function'.
+server/index.js(313,5): error TS2339: Property 'get' does not exist on type 'Function'.
+server/index.js(321,5): error TS2339: Property 'get' does not exist on type 'Function'.
+server/index.js(347,5): error TS2339: Property 'get' does not exist on type 'Function'.
+server/index.js(364,5): error TS2339: Property 'get' does not exist on type 'Function'.
+server/index.js(372,5): error TS2339: Property 'get' does not exist on type 'Function'.
+server/index.js(381,5): error TS2339: Property 'get' does not exist on type 'Function'.
+server/index.js(390,5): error TS2339: Property 'get' does not exist on type 'Function'.
+server/index.js(403,5): error TS2339: Property 'get' does not exist on type 'Function'.
+server/index.js(421,5): error TS2339: Property 'use' does not exist on type 'Function'.
+server/index.js(429,5): error TS2339: Property 'use' does not exist on type 'Function'.
+server/index.js(430,5): error TS2339: Property 'use' does not exist on type 'Function'.
+server/index.js(431,5): error TS2339: Property 'use' does not exist on type 'Function'.
+server/index.js(564,5): error TS2339: Property 'locals' does not exist on type 'Function'.
+server/index.js(565,5): error TS2339: Property 'locals' does not exist on type 'Function'.
+server/index.js(566,5): error TS2339: Property 'locals' does not exist on type 'Function'.
+server/index.js(567,5): error TS2339: Property 'locals' does not exist on type 'Function'.
+server/index.js(576,5): error TS2339: Property 'locals' does not exist on type 'Function'.
+server/index.js(579,5): error TS2339: Property 'use' does not exist on type 'Function'.
+server/index.js(580,5): error TS2339: Property 'use' does not exist on type 'Function'.
+server/index.js(581,5): error TS2339: Property 'use' does not exist on type 'Function'.
+server/index.js(582,5): error TS2339: Property 'use' does not exist on type 'Function'.
+server/index.js(583,5): error TS2339: Property 'use' does not exist on type 'Function'.
+server/index.js(584,5): error TS2339: Property 'use' does not exist on type 'Function'.
+server/index.js(585,5): error TS2339: Property 'use' does not exist on type 'Function'.
+server/index.js(586,5): error TS2339: Property 'use' does not exist on type 'Function'.
+server/index.js(587,5): error TS2339: Property 'use' does not exist on type 'Function'.
+server/index.js(588,5): error TS2339: Property 'use' does not exist on type 'Function'.
+server/index.js(589,5): error TS2339: Property 'use' does not exist on type 'Function'.
+server/index.js(590,5): error TS2339: Property 'use' does not exist on type 'Function'.
+server/index.js(591,5): error TS2339: Property 'use' does not exist on type 'Function'.
+server/index.js(592,5): error TS2339: Property 'use' does not exist on type 'Function'.
+server/index.js(593,5): error TS2339: Property 'use' does not exist on type 'Function'.
+server/index.js(596,5): error TS2339: Property 'use' does not exist on type 'Function'.
+server/index.js(597,5): error TS2339: Property 'use' does not exist on type 'Function'.
+server/index.js(598,5): error TS2339: Property 'use' does not exist on type 'Function'.
+server/index.js(599,5): error TS2339: Property 'use' does not exist on type 'Function'.
+server/index.js(600,5): error TS2339: Property 'use' does not exist on type 'Function'.
+server/index.js(601,5): error TS2339: Property 'use' does not exist on type 'Function'.
+server/index.js(604,5): error TS2339: Property 'use' does not exist on type 'Function'.
+server/index.js(607,5): error TS2339: Property 'get' does not exist on type 'Function'.
+server/index.js(612,5): error TS2339: Property 'post' does not exist on type 'Function'.
+server/index.js(616,5): error TS2339: Property 'post' does not exist on type 'Function'.
+server/index.js(620,5): error TS2339: Property 'post' does not exist on type 'Function'.
+server/index.js(624,5): error TS2339: Property 'get' does not exist on type 'Function'.
+server/index.js(640,5): error TS2339: Property 'get' does not exist on type 'Function'.
+server/index.js(644,5): error TS2339: Property 'post' does not exist on type 'Function'.
+server/index.js(648,5): error TS2339: Property 'delete' does not exist on type 'Function'.
+server/index.js(654,5): error TS2339: Property 'get' does not exist on type 'Function'.
+server/index.js(655,5): error TS2339: Property 'get' does not exist on type 'Function'.
+server/index.js(659,5): error TS2339: Property 'post' does not exist on type 'Function'.
+server/index.js(662,5): error TS2339: Property 'delete' does not exist on type 'Function'.
+server/index.js(666,5): error TS2339: Property 'get' does not exist on type 'Function'.
+server/index.js(667,5): error TS2339: Property 'post' does not exist on type 'Function'.
+server/index.js(670,5): error TS2339: Property 'delete' does not exist on type 'Function'.
+server/index.js(674,5): error TS2339: Property 'get' does not exist on type 'Function'.
+server/index.js(677,5): error TS2339: Property 'post' does not exist on type 'Function'.
+server/index.js(687,5): error TS2339: Property 'get' does not exist on type 'Function'.
+server/index.js(692,5): error TS2339: Property 'post' does not exist on type 'Function'.
+server/index.js(697,5): error TS2339: Property 'get' does not exist on type 'Function'.
+server/index.js(703,5): error TS2339: Property 'post' does not exist on type 'Function'.
+server/index.js(711,5): error TS2339: Property 'post' does not exist on type 'Function'.
+server/index.js(715,5): error TS2339: Property 'post' does not exist on type 'Function'.
+server/index.js(719,5): error TS2339: Property 'post' does not exist on type 'Function'.
+server/index.js(723,5): error TS2339: Property 'get' does not exist on type 'Function'.
+server/index.js(727,5): error TS2339: Property 'post' does not exist on type 'Function'.
+server/index.js(731,5): error TS2339: Property 'get' does not exist on type 'Function'.
+server/index.js(739,5): error TS2339: Property 'post' does not exist on type 'Function'.
+server/index.js(744,5): error TS2339: Property 'post' does not exist on type 'Function'.
+server/index.js(749,5): error TS2339: Property 'post' does not exist on type 'Function'.
+server/index.js(754,5): error TS2339: Property 'post' does not exist on type 'Function'.
+server/index.js(764,5): error TS2339: Property 'get' does not exist on type 'Function'.
+server/index.js(769,5): error TS2339: Property 'get' does not exist on type 'Function'.
+server/index.js(778,5): error TS2339: Property 'use' does not exist on type 'Function'.
+server/index.js(781,5): error TS2339: Property 'get' does not exist on type 'Function'.
+server/index.js(804,5): error TS2339: Property 'post' does not exist on type 'Function'.
+server/index.js(849,5): error TS2339: Property 'get' does not exist on type 'Function'.
+server/index.js(863,5): error TS2339: Property 'get' does not exist on type 'Function'.
+server/index.js(1041,5): error TS2339: Property 'use' does not exist on type 'Function'.
+server/index.js(1042,5): error TS2339: Property 'use' does not exist on type 'Function'.
+server/index.js(1045,5): error TS2339: Property 'get' does not exist on type 'Function'.
+server/index.js(1067,5): error TS2339: Property 'post' does not exist on type 'Function'.
+server/index.js(1084,5): error TS2339: Property 'post' does not exist on type 'Function'.
+server/index.js(1107,5): error TS2339: Property 'use' does not exist on type 'Function'.
+server/index.js(1108,5): error TS2339: Property 'use' does not exist on type 'Function'.
+server/index.js(1109,5): error TS2339: Property 'use' does not exist on type 'Function'.
+server/index.js(1110,5): error TS2339: Property 'use' does not exist on type 'Function'.
+server/index.js(1111,5): error TS2339: Property 'use' does not exist on type 'Function'.
+server/index.js(1112,5): error TS2339: Property 'use' does not exist on type 'Function'.
+server/index.js(1115,5): error TS2339: Property 'get' does not exist on type 'Function'.
+server/index.js(1120,5): error TS2339: Property 'get' does not exist on type 'Function'.
+server/index.js(1123,5): error TS2339: Property 'get' does not exist on type 'Function'.
+server/index.js(1127,5): error TS2339: Property 'get' does not exist on type 'Function'.
+server/index.js(1201,5): error TS2339: Property 'get' does not exist on type 'Function'.
+server/index.js(1222,5): error TS2339: Property 'post' does not exist on type 'Function'.
+server/index.js(1233,39): error TS2339: Property 'publish' does not exist on type 'typeof import("C:/Users/adria/.gemini/antigravity/scratch/kelionai-v2/server/facebook-page")'.
+server/index.js(1245,42): error TS2339: Property 'publish' does not exist on type 'typeof import("C:/Users/adria/.gemini/antigravity/scratch/kelionai-v2/server/instagram")'.
+server/index.js(1262,5): error TS2339: Property 'get' does not exist on type 'Function'.
+server/index.js(1289,5): error TS2339: Property 'get' does not exist on type 'Function'.
+server/index.js(1315,5): error TS2339: Property 'post' does not exist on type 'Function'.
+server/index.js(1343,5): error TS2339: Property 'post' does not exist on type 'Function'.
+server/index.js(1360,5): error TS2339: Property 'post' does not exist on type 'Function'.
+server/index.js(1377,5): error TS2339: Property 'get' does not exist on type 'Function'.
+server/index.js(1387,5): error TS2339: Property 'use' does not exist on type 'Function'.
+server/index.js(1429,5): error TS2339: Property 'locals' does not exist on type 'Function'.
+server/index.js(1432,5): error TS2339: Property 'use' does not exist on type 'Function'.
+server/index.js(1435,5): error TS2339: Property 'use' does not exist on type 'Function'.
+server/index.js(1443,9): error TS2339: Property 'locals' does not exist on type 'Function'.
+server/index.js(1444,28): error TS2339: Property 'locals' does not exist on type 'Function'.
+server/index.js(1446,15): error TS2339: Property 'locals' does not exist on type 'Function'.
+server/index.js(1449,24): error TS2339: Property 'locals' does not exist on type 'Function'.
+server/index.js(1452,5): error TS2339: Property 'locals' does not exist on type 'Function'.
+server/index.js(1453,5): error TS2339: Property 'locals' does not exist on type 'Function'.
+server/index.js(1454,5): error TS2339: Property 'locals' does not exist on type 'Function'.
+server/index.js(1457,5): error TS2339: Property 'get' does not exist on type 'Function'.
+server/index.js(1460,5): error TS2339: Property 'get' does not exist on type 'Function'.
+server/index.js(1466,5): error TS2339: Property 'post' does not exist on type 'Function'.
+server/index.js(1470,5): error TS2339: Property 'post' does not exist on type 'Function'.
+server/index.js(1474,5): error TS2339: Property 'get' does not exist on type 'Function'.
+server/index.js(1479,5): error TS2339: Property 'get' does not exist on type 'Function'.
+server/index.js(1482,5): error TS2339: Property 'get' does not exist on type 'Function'.
+server/index.js(1485,5): error TS2339: Property 'get' does not exist on type 'Function'.
+server/index.js(1496,5): error TS2339: Property 'get' does not exist on type 'Function'.
+server/index.js(1499,5): error TS2339: Property 'get' does not exist on type 'Function'.
+server/index.js(1502,5): error TS2339: Property 'post' does not exist on type 'Function'.
+server/index.js(1510,5): error TS2339: Property 'get' does not exist on type 'Function'.
+server/index.js(1527,5): error TS2339: Property 'get' does not exist on type 'Function'.
+server/index.js(1533,5): error TS2339: Property 'use' does not exist on type 'Function'.
+server/index.js(1540,5): error TS2339: Property 'get' does not exist on type 'Function'.
+server/index.js(1541,5): error TS2339: Property 'get' does not exist on type 'Function'.
+server/index.js(1542,5): error TS2339: Property 'get' does not exist on type 'Function'.
+server/index.js(1543,5): error TS2339: Property 'get' does not exist on type 'Function'.
+server/index.js(1544,5): error TS2339: Property 'get' does not exist on type 'Function'.
+server/index.js(1545,5): error TS2339: Property 'get' does not exist on type 'Function'.
+server/index.js(1557,5): error TS2339: Property 'get' does not exist on type 'Function'.
+server/index.js(1561,5): error TS2339: Property 'get' does not exist on type 'Function'.
+server/index.js(1565,5): error TS2339: Property 'get' does not exist on type 'Function'.
+server/index.js(1569,5): error TS2339: Property 'get' does not exist on type 'Function'.
+server/index.js(1573,5): error TS2339: Property 'get' does not exist on type 'Function'.
+server/index.js(1593,5): error TS2339: Property 'get' does not exist on type 'Function'.
+server/index.js(1604,61): error TS2345: Argument of type 'Function' is not assignable to parameter of type '{ use: (middleware: ExpressMiddleware | ExpressErrorMiddleware) => unknown; }'.
+  Property 'use' is missing in type 'Function' but required in type '{ use: (middleware: ExpressMiddleware | ExpressErrorMiddleware) => unknown; }'.
+server/index.js(1608,5): error TS2339: Property 'use' does not exist on type 'Function'.
+server/index.js(1718,36): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(requestListener?: RequestListener<typeof IncomingMessage, typeof ServerResponse>): Server<typeof IncomingMessage, typeof ServerResponse>', gave the following error.
+    Argument of type 'Function' is not assignable to parameter of type 'RequestListener<typeof IncomingMessage, typeof ServerResponse>'.
+      Type 'Function' provides no match for the signature '(req: IncomingMessage, res: ServerResponse): void'.
+  Overload 2 of 2, '(options: ServerOptions<typeof IncomingMessage, typeof ServerResponse>, requestListener?: RequestListener<typeof IncomingMessage, typeof ServerResponse>): Server<...>', gave the following error.
+    Type 'Function' has no properties in common with type 'ServerOptions<typeof IncomingMessage, typeof ServerResponse>'.
+server/index.js(1731,32): error TS2339: Property 'locals' does not exist on type 'Function'.
+server/index.js(1736,30): error TS2339: Property 'locals' does not exist on type 'Function'.
+server/index.js(1750,11): error TS2339: Property 'locals' does not exist on type 'Function'.
+server/index.js(1751,11): error TS2339: Property 'locals' does not exist on type 'Function'.
+server/index.js(1752,11): error TS2339: Property 'locals' does not exist on type 'Function'.
+server/index.js(1754,11): error TS2339: Property 'locals' does not exist on type 'Function'.
+server/index.js(1755,11): error TS2339: Property 'locals' does not exist on type 'Function'.
+server/index.js(1756,11): error TS2339: Property 'locals' does not exist on type 'Function'.
+server/index.js(1757,11): error TS2339: Property 'locals' does not exist on type 'Function'.
+server/index.js(1758,11): error TS2339: Property 'locals' does not exist on type 'Function'.
+server/index.js(1759,11): error TS2339: Property 'locals' does not exist on type 'Function'.
+server/index.js(1760,11): error TS2339: Property 'locals' does not exist on type 'Function'.
+server/index.js(1761,11): error TS2339: Property 'locals' does not exist on type 'Function'.
+server/index.js(1765,27): error TS2769: No overload matches this call.
+  The last overload gave the following error.
+    Argument of type 'string' is not assignable to parameter of type 'number'.
+server/index.js(1813,27): error TS2769: No overload matches this call.
+  The last overload gave the following error.
+    Argument of type 'string' is not assignable to parameter of type 'number'.
+server/k1-truth.js(161,7): error TS2322: Type '{ status: string; reason: string; emoji?: undefined; claimed?: undefined; actual?: undefined; diff?: undefined; } | { status: string; emoji: string; claimed: any; actual: any; diff: string; reason?: undefined; }' is not assignable to type '{ status: string; emoji: string; }'.
+  Type '{ status: string; reason: string; emoji?: undefined; claimed?: undefined; actual?: undefined; diff?: undefined; }' is not assignable to type '{ status: string; emoji: string; }'.
+    Property 'emoji' is optional in type '{ status: string; reason: string; emoji?: undefined; claimed?: undefined; actual?: undefined; diff?: undefined; }' but required in type '{ status: string; emoji: string; }'.
+server/kira-tools.js(817,9): error TS2322: Type '"new"' is not assignable to type 'boolean | "shell"'.
+server/kira-tools.js(837,17): error TS2339: Property 'href' does not exist on type 'Element'.
+server/kira-tools.js(843,76): error TS2339: Property 'content' does not exist on type 'Element'.
+server/legal.js(236,24): error TS2349: This expression is not callable.
+  Type 'typeof import("stripe")' has no call signatures.
+server/messenger.js(1273,13): error TS2367: This comparison appears to be unintentional because the types 'void' and 'number' have no overlap.
+server/messenger.js(1328,15): error TS2367: This comparison appears to be unintentional because the types 'void' and 'number' have no overlap.
+server/messenger.js(1350,13): error TS2367: This comparison appears to be unintentional because the types 'void' and 'number' have no overlap.
+server/middleware/checkSubscription.js(9,22): error TS2724: '"../payments"' has no exported member named '_PLAN_LIMITS'. Did you mean 'PLAN_LIMITS'?
+server/news.js(116,22): error TS2349: This expression is not callable.
+  Type 'typeof import("C:/Users/adria/.gemini/antigravity/scratch/kelionai-v2/node_modules/express-rate-limit/dist/index")' has no call signatures.
+server/news.js(314,17): error TS2304: Cannot find name 'https'.
+server/news.js(588,52): error TS2362: The left-hand side of an arithmetic operation must be of type 'any', 'number', 'bigint' or an enum type.
+server/news.js(588,78): error TS2363: The right-hand side of an arithmetic operation must be of type 'any', 'number', 'bigint' or an enum type.
+server/paper-trading.js(595,16): error TS2362: The left-hand side of an arithmetic operation must be of type 'any', 'number', 'bigint' or an enum type.
+server/paper-trading.js(595,32): error TS2363: The right-hand side of an arithmetic operation must be of type 'any', 'number', 'bigint' or an enum type.
+server/payments.js(18,14): error TS2349: This expression is not callable.
+  Type 'typeof import("stripe")' has no call signatures.
+server/plugin-system.js(170,14): error TS1064: The return type of an async function or method must be the global Promise<T> type. Did you mean to write 'Promise<any>'?
+server/plugin-system.js(191,14): error TS1064: The return type of an async function or method must be the global Promise<T> type. Did you mean to write 'Promise<any>'?
+server/plugins/auto-translator.js(29,14): error TS1064: The return type of an async function or method must be the global Promise<T> type. Did you mean to write 'Promise<any>'?
+server/plugins/auto-translator.js(59,14): error TS1064: The return type of an async function or method must be the global Promise<T> type. Did you mean to write 'Promise<any>'?
+server/referral.js(23,25): error TS2349: This expression is not callable.
+  Type 'typeof import("C:/Users/adria/.gemini/antigravity/scratch/kelionai-v2/node_modules/express-rate-limit/dist/index")' has no call signatures.
+server/referral.js(31,23): error TS2349: This expression is not callable.
+  Type 'typeof import("C:/Users/adria/.gemini/antigravity/scratch/kelionai-v2/node_modules/express-rate-limit/dist/index")' has no call signatures.
+server/referral.js(300,16): error TS2304: Cannot find name 'appUrl'.
+server/referral.js(715,22): error TS2362: The left-hand side of an arithmetic operation must be of type 'any', 'number', 'bigint' or an enum type.
+server/referral.js(715,41): error TS2363: The right-hand side of an arithmetic operation must be of type 'any', 'number', 'bigint' or an enum type.
+server/routes/admin.js(228,45): error TS2304: Cannot find name 'e'.
+server/routes/admin.js(229,35): error TS2304: Cannot find name 'e'.
+server/routes/admin.js(377,45): error TS2304: Cannot find name 'e'.
+server/routes/admin.js(474,45): error TS2304: Cannot find name 'e'.
+server/routes/admin.js(497,35): error TS2304: Cannot find name 'e'.
+server/routes/admin.js(542,45): error TS2304: Cannot find name 'e'.
+server/routes/admin.js(596,45): error TS2304: Cannot find name 'e'.
+server/routes/admin.js(597,35): error TS2304: Cannot find name 'e'.
+server/routes/admin.js(636,45): error TS2304: Cannot find name 'e'.
+server/routes/admin.js(817,45): error TS2304: Cannot find name 'e'.
+server/routes/admin.js(849,35): error TS2304: Cannot find name 'e'.
+server/routes/admin.js(894,35): error TS2304: Cannot find name 'e'.
+server/routes/admin.js(906,35): error TS2304: Cannot find name 'e'.
+server/routes/admin.js(936,40): error TS2362: The left-hand side of an arithmetic operation must be of type 'any', 'number', 'bigint' or an enum type.
+server/routes/admin.js(936,46): error TS2363: The right-hand side of an arithmetic operation must be of type 'any', 'number', 'bigint' or an enum type.
+server/routes/admin.js(996,24): error TS2349: This expression is not callable.
+  Type 'typeof import("stripe")' has no call signatures.
+server/routes/admin.js(1030,45): error TS2304: Cannot find name 'e'.
+server/routes/admin.js(1031,35): error TS2304: Cannot find name 'e'.
+server/routes/admin.js(1092,35): error TS2304: Cannot find name 'e'.
+server/routes/admin.js(1102,52): error TS2349: This expression is not callable.
+  Type 'typeof import("stripe")' has no call signatures.
+server/routes/admin.js(1153,45): error TS2304: Cannot find name 'e'.
+server/routes/admin.js(1154,35): error TS2304: Cannot find name 'e'.
+server/routes/admin.js(1229,16): error TS2304: Cannot find name 'e'.
+server/routes/admin.js(1297,33): error TS2304: Cannot find name 'e'.
+server/routes/admin.js(1331,33): error TS2304: Cannot find name 'e'.
+server/routes/admin.js(1596,42): error TS2304: Cannot find name 'e'.
+server/routes/admin.js(1613,46): error TS2304: Cannot find name 'e'.
+server/routes/admin.js(1624,35): error TS2304: Cannot find name 'e'.
+server/routes/admin.js(1638,45): error TS2304: Cannot find name 'e'.
+server/routes/admin.js(1639,35): error TS2304: Cannot find name 'e'.
+server/routes/admin.js(1691,35): error TS2304: Cannot find name 'e'.
+server/routes/admin.js(1754,45): error TS2304: Cannot find name 'e'.
+server/routes/admin.js(1807,45): error TS2304: Cannot find name 'e'.
+server/routes/admin.js(1845,45): error TS2304: Cannot find name 'e'.
+server/routes/admin.js(1920,48): error TS2304: Cannot find name 'e'.
+server/routes/admin.js(1980,26): error TS2732: Cannot find module '../../package.json'. Consider using '--resolveJsonModule' to import module with '.json' extension.
+server/routes/admin.js(2007,45): error TS2304: Cannot find name 'e'.
+server/routes/admin.js(2008,35): error TS2304: Cannot find name 'e'.
+server/routes/admin.js(2134,46): error TS2304: Cannot find name 'e'.
+server/routes/admin.js(2264,34): error TS2304: Cannot find name 'e'.
+server/routes/admin.js(2282,47): error TS2304: Cannot find name 'e'.
+server/routes/admin.js(2283,35): error TS2304: Cannot find name 'e'.
+server/routes/admin.js(2312,35): error TS2304: Cannot find name 'e'.
+server/routes/admin.js(2377,45): error TS2304: Cannot find name 'e'.
+server/routes/admin.js(2383,14): error TS2304: Cannot find name 'e'.
+server/routes/admin.js(2401,35): error TS2304: Cannot find name 'e'.
+server/routes/admin.js(2459,52): error TS2304: Cannot find name 'e'.
+server/routes/admin.js(2460,35): error TS2304: Cannot find name 'e'.
+server/routes/admin.js(2480,35): error TS2304: Cannot find name 'e'.
+server/routes/admin.js(2535,45): error TS2304: Cannot find name 'e'.
+server/routes/admin.js(2536,35): error TS2304: Cannot find name 'e'.
+server/routes/admin.js(2553,35): error TS2304: Cannot find name 'e'.
+server/routes/auth.js(22,21): error TS2349: This expression is not callable.
+  Type 'typeof import("C:/Users/adria/.gemini/antigravity/scratch/kelionai-v2/node_modules/express-rate-limit/dist/index")' has no call signatures.
+server/routes/brain-chat.js(341,15): error TS2322: Type '"new"' is not assignable to type 'boolean | "shell"'.
+server/routes/brain-chat.js(362,32): error TS2339: Property 'waitForTimeout' does not exist on type 'Page'.
+server/routes/brain-chat.js(365,32): error TS2339: Property 'waitForTimeout' does not exist on type 'Page'.
+server/routes/brain-chat.js(626,151): error TS2339: Property 'result' does not exist on type 'never'.
+server/routes/chat.js(13,9): error TS2724: '"../brain"' has no exported member named '_KelionBrain'. Did you mean 'KelionBrain'?
+server/routes/chat.js(40,21): error TS2349: This expression is not callable.
+  Type 'typeof import("C:/Users/adria/.gemini/antigravity/scratch/kelionai-v2/node_modules/express-rate-limit/dist/index")' has no call signatures.
+server/routes/chat.js(48,23): error TS2349: This expression is not callable.
+  Type 'typeof import("C:/Users/adria/.gemini/antigravity/scratch/kelionai-v2/node_modules/express-rate-limit/dist/index")' has no call signatures.
+server/routes/chat.js(55,21): error TS2349: This expression is not callable.
+  Type 'typeof import("C:/Users/adria/.gemini/antigravity/scratch/kelionai-v2/node_modules/express-rate-limit/dist/index")' has no call signatures.
+server/routes/chat.js(166,54): error TS2554: Expected 0-2 arguments, but got 3.
+server/routes/chat.js(364,54): error TS2554: Expected 0-2 arguments, but got 3.
+server/routes/chat.js(462,44): error TS2339: Property 'on' does not exist on type 'ReadableStream<Uint8Array<ArrayBuffer>>'.
+server/routes/chat.js(462,82): error TS2339: Property 'fromWeb' does not exist on type 'typeof Readable'.
+server/routes/developer.js(18,21): error TS2349: This expression is not callable.
+  Type 'typeof import("C:/Users/adria/.gemini/antigravity/scratch/kelionai-v2/node_modules/express-rate-limit/dist/index")' has no call signatures.
+server/routes/developer.js(26,19): error TS2349: This expression is not callable.
+  Type 'typeof import("C:/Users/adria/.gemini/antigravity/scratch/kelionai-v2/node_modules/express-rate-limit/dist/index")' has no call signatures.
+server/routes/export.js(40,8): error TS2339: Property 'fontSize' does not exist on type 'PDFDocument'.
+server/routes/export.js(43,9): error TS2339: Property 'moveDown' does not exist on type 'PDFDocument'.
+server/routes/export.js(45,8): error TS2339: Property 'fontSize' does not exist on type 'PDFDocument'.
+server/routes/export.js(49,9): error TS2339: Property 'moveDown' does not exist on type 'PDFDocument'.
+server/routes/export.js(50,9): error TS2339: Property 'moveTo' does not exist on type 'PDFDocument'.
+server/routes/export.js(51,9): error TS2339: Property 'moveDown' does not exist on type 'PDFDocument'.
+server/routes/export.js(54,9): error TS2339: Property 'fontSize' does not exist on type 'PDFDocument'.
+server/routes/export.js(59,13): error TS2339: Property 'fontSize' does not exist on type 'PDFDocument'.
+server/routes/export.js(60,13): error TS2339: Property 'moveDown' does not exist on type 'PDFDocument'.
+server/routes/export.js(64,15): error TS2339: Property 'fontSize' does not exist on type 'PDFDocument'.
+server/routes/export.js(65,15): error TS2339: Property 'moveDown' does not exist on type 'PDFDocument'.
+server/routes/export.js(67,13): error TS2339: Property 'moveDown' does not exist on type 'PDFDocument'.
+server/routes/export.js(70,11): error TS2339: Property 'text' does not exist on type 'PDFDocument'.
+server/routes/export.js(74,9): error TS2339: Property 'moveDown' does not exist on type 'PDFDocument'.
+server/routes/export.js(75,9): error TS2339: Property 'fontSize' does not exist on type 'PDFDocument'.
+server/routes/health.js(8,29): error TS2732: Cannot find module '../../package.json'. Consider using '--resolveJsonModule' to import module with '.json' extension.
+server/routes/identity.js(14,25): error TS2349: This expression is not callable.
+  Type 'typeof import("C:/Users/adria/.gemini/antigravity/scratch/kelionai-v2/node_modules/express-rate-limit/dist/index")' has no call signatures.
+server/routes/images.js(23,22): error TS2349: This expression is not callable.
+  Type 'typeof import("C:/Users/adria/.gemini/antigravity/scratch/kelionai-v2/node_modules/express-rate-limit/dist/index")' has no call signatures.
+server/routes/images.js(40,55): error TS2554: Expected 0-2 arguments, but got 3.
+server/routes/search.js(15,23): error TS2349: This expression is not callable.
+  Type 'typeof import("C:/Users/adria/.gemini/antigravity/scratch/kelionai-v2/node_modules/express-rate-limit/dist/index")' has no call signatures.
+server/routes/search.js(31,56): error TS2554: Expected 0-2 arguments, but got 3.
+server/routes/search.js(210,25): error TS2724: '"../payments"' has no exported member named '_incrementUsage'. Did you mean 'incrementUsage'?
+server/routes/search.js(211,56): error TS2554: Expected 0-2 arguments, but got 3.
+server/routes/translate.js(10,26): error TS2349: This expression is not callable.
+  Type 'typeof import("C:/Users/adria/.gemini/antigravity/scratch/kelionai-v2/node_modules/express-rate-limit/dist/index")' has no call signatures.
+server/routes/translate.js(32,26): error TS2339: Property 'GEMINI_CHAT' does not exist on type 'typeof import("C:/Users/adria/.gemini/antigravity/scratch/kelionai-v2/server/config/models")'.
+server/routes/vision.js(23,20): error TS2349: This expression is not callable.
+  Type 'typeof import("C:/Users/adria/.gemini/antigravity/scratch/kelionai-v2/node_modules/express-rate-limit/dist/index")' has no call signatures.
+server/routes/vision.js(39,56): error TS2554: Expected 0-2 arguments, but got 3.
+server/routes/voice-clone.js(81,7): error TS2322: Type 'FormData' is not assignable to type 'BodyInit'.
+  Type 'FormData' is missing the following properties from type 'URLSearchParams': size, delete, get, getAll, and 8 more.
+server/routes/voice-stream.js(24,30): error TS2345: Argument of type 'RawData' is not assignable to parameter of type 'string'.
+  Type 'ArrayBuffer' is not assignable to type 'string'.
+server/routes/voice-stream.js(142,30): error TS2345: Argument of type 'RawData' is not assignable to parameter of type 'string'.
+  Type 'ArrayBuffer' is not assignable to type 'string'.
+server/routes/voice-stream.js(223,30): error TS2345: Argument of type 'RawData' is not assignable to parameter of type 'string'.
+  Type 'ArrayBuffer' is not assignable to type 'string'.
+server/routes/voice.js(17,20): error TS2349: This expression is not callable.
+  Type 'typeof import("C:/Users/adria/.gemini/antigravity/scratch/kelionai-v2/node_modules/express-rate-limit/dist/index")' has no call signatures.
+server/routes/voice.js(24,20): error TS2349: This expression is not callable.
+  Type 'typeof import("C:/Users/adria/.gemini/antigravity/scratch/kelionai-v2/node_modules/express-rate-limit/dist/index")' has no call signatures.
+server/routes/voice.js(97,53): error TS2554: Expected 0-2 arguments, but got 3.
+server/routes/voice.js(250,53): error TS2554: Expected 0-2 arguments, but got 3.
+server/routes/voice.js(271,9): error TS2322: Type 'FormData' is not assignable to type 'BodyInit'.
+  Type 'FormData' is missing the following properties from type 'URLSearchParams': size, delete, get, getAll, and 8 more.
+server/routes/voice.js(331,52): error TS2345: Argument of type 'Buffer' is not assignable to parameter of type 'Int16Array<ArrayBufferLike>'.
+  The types of 'filter(...)[Symbol.toStringTag]' are incompatible between these types.
+    Type '"Uint8Array"' is not assignable to type '"Int16Array"'.
+server/routes/weather.js(12,24): error TS2349: This expression is not callable.
+  Type 'typeof import("C:/Users/adria/.gemini/antigravity/scratch/kelionai-v2/node_modules/express-rate-limit/dist/index")' has no call signatures.
+server/trade-intelligence.js(107,20): error TS8024: JSDoc '@param' tag has name 'open', but there is no parameter with that name.
+server/trading-learner.js(655,17): error TS2365: Operator '+' cannot be applied to types 'number' and 'string | number'.
+server/trading-learner.js(656,41): error TS2365: Operator '+' cannot be applied to types 'number' and 'string | number'.
+server/trading.js(116,22): error TS2339: Property 'momentum' does not exist on type '{ value: number; signal: "BUY" | "SELL" | "HOLD"; }'.
+server/trading.js(195,16): error TS2551: Property 'catch' does not exist on type 'PostgrestFilterBuilder<any, any, any, any[], "trading_brain_rules", unknown, "GET">'. Did you mean 'match'?
+server/trading.js(218,16): error TS2551: Property 'catch' does not exist on type 'PostgrestFilterBuilder<any, any, any, null, "trading_brain_rules", unknown, "POST">'. Did you mean 'match'?
+server/trading.js(252,24): error TS2349: This expression is not callable.
+  Type 'typeof import("C:/Users/adria/.gemini/antigravity/scratch/kelionai-v2/node_modules/express-rate-limit/dist/index")' has no call signatures.
+server/trading.js(290,41): error TS2353: Object literal may only specify known properties, and 'momentum' does not exist in type '{ value: number; signal: "BUY" | "SELL" | "HOLD"; }'.
+server/trading.js(317,59): error TS2353: Object literal may only specify known properties, and 'momentum' does not exist in type '{ value: number; signal: "BUY" | "SELL" | "HOLD"; }'.
+server/trading.js(343,50): error TS2322: Type 'string' is not assignable to type '"BUY" | "SELL" | "HOLD"'.
+server/trading.js(378,5): error TS2322: Type 'string' is not assignable to type '"BUY" | "SELL" | "HOLD"'.
+server/trading.js(410,5): error TS2322: Type 'string' is not assignable to type '"BUY" | "SELL" | "HOLD"'.
+server/trading.js(440,5): error TS2322: Type 'string' is not assignable to type '"BUY" | "SELL" | "HOLD"'.
+server/trading.js(498,48): error TS2322: Type 'string' is not assignable to type '"neutral" | "accumulation" | "distribution"'.
+server/trading.js(498,55): error TS2322: Type 'string' is not assignable to type '"BUY" | "SELL" | "HOLD"'.
+server/trading.js(564,19): error TS2322: Type 'string' is not assignable to type '"neutral" | "bullish" | "bearish"'.
+server/trading.js(579,24): error TS2339: Property 'BollingerBands' does not exist on type '{ RSI: number; MACD: number; Bollinger: number; EMA: number; Fibonacci: number; Volume: number; Sentiment: number; Stochastic: number; ADX: number; Ichimoku: number; CCI: number; MFI: number; ParabolicSAR: number; }'.
+server/trading.js(580,18): error TS2339: Property 'EMACrossover' does not exist on type '{ RSI: number; MACD: number; Bollinger: number; EMA: number; Fibonacci: number; Volume: number; Sentiment: number; Stochastic: number; ADX: number; Ichimoku: number; CCI: number; MFI: number; ParabolicSAR: number; }'.
+server/trading.js(582,21): error TS2339: Property 'VolumeProfile' does not exist on type '{ RSI: number; MACD: number; Bollinger: number; EMA: number; Fibonacci: number; Volume: number; Sentiment: number; Stochastic: number; ADX: number; Ichimoku: number; CCI: number; MFI: number; ParabolicSAR: number; }'.
+server/trading.js(631,66): error TS2353: Object literal may only specify known properties, and 'weightsUsed' does not exist in type '{ signal: "BUY" | "SELL" | "HOLD" | "STRONG BUY" | "STRONG SELL"; confidence: number; }'.
+server/trading.js(646,12): error TS2322: Type 'string' is not assignable to type '"BUY" | "SELL" | "HOLD" | "STRONG BUY" | "STRONG SELL"'.
+server/trading.js(1651,13): error TS2339: Property 'geoAdjusted' does not exist on type '{ asset: string; symbol: string; signal: "BUY" | "SELL" | "HOLD" | "STRONG BUY" | "STRONG SELL"; confidence: number; entry: number; target: number; stopLoss: number; takeProfit: number; riskReward: number; timeframe: string; rsi: number; generatedAt: string; timestamp: string; }'.
+server/trading.js(1652,13): error TS2339: Property 'geoReason' does not exist on type '{ asset: string; symbol: string; signal: "BUY" | "SELL" | "HOLD" | "STRONG BUY" | "STRONG SELL"; confidence: number; entry: number; target: number; stopLoss: number; takeProfit: number; riskReward: number; timeframe: string; rsi: number; generatedAt: string; timestamp: string; }'.
+server/trading.js(2554,9): error TS2322: Type '{ executed: boolean; reason: string; trade?: undefined; } | { executed: boolean; trade: { id: string; symbol: any; action: any; price: any; size: number; stopLoss: number; takeProfit: number; cost: number; ... 4 more ...; status: string; }; reason?: undefined; }' is not assignable to type '{ executed: boolean; reason: string; }'.
+  Type '{ executed: boolean; trade: { id: string; symbol: any; action: any; price: any; size: number; stopLoss: number; takeProfit: number; cost: number; confluence: any; signal: any; time: string; mode: string; status: string; }; reason?: undefined; }' is not assignable to type '{ executed: boolean; reason: string; }'.
+    Property 'reason' is optional in type '{ executed: boolean; trade: { id: string; symbol: any; action: any; price: any; size: number; stopLoss: number; takeProfit: number; cost: number; confluence: any; signal: any; time: string; mode: string; status: string; }; reason?: undefined; }' but required in type '{ executed: boolean; reason: string; }'.
+server/trading.js(3230,21): error TS2345: Argument of type '{ action: string; to: any; at: string; }' is not assignable to parameter of type '{ action: string; at: string; by: any; }'.
+  Property 'by' is missing in type '{ action: string; to: any; at: string; }' but required in type '{ action: string; at: string; by: any; }'.
+server/trading.js(3710,83): error TS2339: Property 'priority' does not exist on type '{ text: string; type: any; alertId: any; }'.
+server/ws-engine.js(139,32): error TS2345: Argument of type 'RawData' is not assignable to parameter of type 'string'.
+  Type 'ArrayBuffer' is not assignable to type 'string'.
