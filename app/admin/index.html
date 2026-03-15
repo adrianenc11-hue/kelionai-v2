@@ -34,22 +34,7 @@
           <span id="admin-uptime" class="admin-uptime">—</span>
           <a href="/admin/brain-chat.html" class="admin-btn admin-btn-k1">🧠 K1 Chat</a>
           <a href="/admin/intelligence.html" class="admin-btn admin-btn-intel">🔬 Intelligence</a>
-          <a href="/admin/ab-testing.html" class="admin-btn admin-btn-ab">🧪 A/B Test</a>
-          <a href="/admin/live-users.html" class="admin-btn admin-btn-live">👥 Live</a>
-          <a href="/admin/errors.html" class="admin-btn admin-btn-errors">🚨 Errors</a>
-          <a href="/admin/cost-analytics.html" class="admin-btn admin-btn-export">💰 Costs</a>
-          <a href="/admin/sessions.html" class="admin-btn admin-btn-k1">🔐 Sessions</a>
-          <a href="/admin/templates.html" class="admin-btn admin-btn-intel">📝 Templates</a>
-          <a href="/admin/webhooks.html" class="admin-btn admin-btn-live">🔗 Webhooks</a>
-          <a href="/admin/plugins.html" class="admin-btn admin-btn-ab">🔌 Plugins</a>
           <a href="/admin/models.html" class="admin-btn admin-btn-k1">🏠 Models</a>
-          <button
-            type="button"
-            class="admin-btn admin-btn-export"
-            onclick="window.open('/api/admin/conversations/export', '_blank')"
-          >
-            📥 Export
-          </button>
           <div class="notif-wrapper" id="notif-wrapper">
             <button type="button" class="admin-btn notif-bell" onclick="toggleNotifications()" id="notif-bell">
               🔔
@@ -63,7 +48,7 @@
               <div id="notif-list" class="notif-list"></div>
             </div>
           </div>
-          <button type="button" class="admin-btn" onclick="location.reload()">🔄 Refresh</button>
+
           <button type="button" class="admin-btn" id="theme-toggle" onclick="toggleTheme()">🌙</button>
         </div>
       </header>
@@ -95,26 +80,7 @@
           <div class="stat-value" id="val-conversations">—</div>
           <div class="stat-label">Conversații</div>
         </div>
-        <div class="stat-card">
-          <div class="stat-icon">👁️</div>
-          <div class="stat-value" id="val-views-today">—</div>
-          <div class="stat-label">Vizite (total)</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon">💰</div>
-          <div class="stat-value" id="val-cost-today">—</div>
-          <div class="stat-label">Cost Azi ($)</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon">💳</div>
-          <div class="stat-value" id="val-cost-month">—</div>
-          <div class="stat-label">Cost Luna ($)</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon">⭐</div>
-          <div class="stat-value" id="val-subs">—</div>
-          <div class="stat-label">Abonați</div>
-        </div>
+
       </div>
 
       <!-- COLLAPSIBLE SECTIONS -->
@@ -164,30 +130,7 @@
           </div>
         </div>
 
-        <!-- TRAFFIC -->
-        <div class="section-panel" id="sec-traffic">
-          <button type="button" class="section-toggle" onclick="toggleSection('sec-traffic')">
-            <span>🌐 Trafic (ultimele 7 zile)</span>
-            <span class="toggle-arrow">▶</span>
-          </button>
-          <div class="section-body">
-            <div id="traffic-chart" class="traffic-chart"></div>
-            <div class="traffic-details">
-              <div>
-                <span class="label">Unici azi:</span>
-                <span id="traffic-unique">—</span>
-              </div>
-              <div>
-                <span class="label">Total azi:</span>
-                <span id="traffic-total">—</span>
-              </div>
-              <div>
-                <span class="label">Conexiuni active:</span>
-                <span id="traffic-active">—</span>
-              </div>
-            </div>
-          </div>
-        </div>
+
 
         <!-- CREDIT REPORT -->
         <div class="section-panel" id="sec-credit">
