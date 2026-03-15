@@ -265,10 +265,10 @@
       function renderExperiments(list) {
         const el = document.getElementById('experiments-list');
         if (!list.length) {
-          el.innerHTML = '<div style="text-align:center;color:#666;padding:40px">No experiments yet</div>';
+          el.textContent = 'No experiments yet';
           return;
         }
-        el.innerHTML = list
+        const experimentsHtml = list
           .map((exp) => {
             const variants = Object.entries(exp.variants || {})
               .map(([name, data]) => {
@@ -303,6 +303,10 @@
                 </div>`;
           })
           .join('');
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(experimentsHtml, 'text/html');
+        el.textContent = '';
+        el.appendChild(doc.body);
       }
 
       async function createExperiment() {

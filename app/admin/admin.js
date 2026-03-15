@@ -34,8 +34,9 @@
         return d.user || { id: 'admin-bypass', role: 'admin' };
       }
     } catch (e) {
-      console.error(e);
-    }
+    console.error(e);
+    throw e;
+  }
     // Trial period: allow access even without auth
     return { id: 'admin-bypass', role: 'admin' };
   }
@@ -198,8 +199,9 @@
       if (d.totalMonth !== undefined)
         document.getElementById('val-cost-month').textContent = '$' + d.totalMonth.toFixed(2);
     } catch (e) {
-      console.warn('[Admin] Costs error:', e.message);
-    }
+    console.warn('[Admin] Costs error:', e.message);
+    throw e;
+  }
   }
 
   // ══════════════════════════════════════════════════════════
@@ -239,8 +241,9 @@
 
       if (d.totalToday !== undefined) document.getElementById('val-requests').textContent = d.totalToday;
     } catch (e) {
-      console.warn('[Admin] Traffic error:', e.message);
-    }
+    console.warn('[Admin] Traffic error:', e.message);
+    throw e;
+  }
   }
 
   // ══════════════════════════════════════════════════════════
@@ -274,8 +277,9 @@
       document.querySelector('#users-table tbody').textContent = tbody || '<tr><td colspan="6">No users</td></tr>';
       document.getElementById('val-users').textContent = (d.users || []).length;
     } catch (e) {
-      console.warn('[Admin] Users error:', e.message);
-    }
+    console.warn('[Admin] Users error:', e.message);
+    throw e;
+  }
   }
 
   // ══════════════════════════════════════════════════════════
@@ -304,8 +308,9 @@
       });
       document.getElementById('rev-payments').textContent = phtml || 'No payments yet';
     } catch (e) {
-      console.warn('[Admin] Revenue error:', e.message);
-    }
+    console.warn('[Admin] Revenue error:', e.message);
+    throw e;
+  }
   }
 
   // ══════════════════════════════════════════════════════════
@@ -325,8 +330,9 @@
       document.getElementById('trade-pnl').textContent = d.pnl || 'No data';
       document.getElementById('trade-signals').textContent = d.signals || 'No signals';
     } catch (e) {
-      console.warn('[Admin] Trading error:', e.message);
-    }
+    console.warn('[Admin] Trading error:', e.message);
+    throw e;
+  }
   }
 
   // ══════════════════════════════════════════════════════════
@@ -348,8 +354,9 @@
         document.getElementById('deploy-status').textContent = html;
       }
     } catch (e) {
-      document.getElementById('deploy-status').textContent = '🔴 Offline: ' + e.message;
-    }
+    document.getElementById('deploy-status').textContent = '🔴 Offline: ' + e.message;
+    throw e;
+  }
   }
 
   // ══════════════════════════════════════════════════════════

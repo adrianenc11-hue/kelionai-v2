@@ -34,16 +34,18 @@ function hdrs() {
               break;
             }
           }
-        } catch (_e2) {
-          /* ignored */
+        } catch (e2) {
+          console.error(e2);
+          throw e2;
         }
       }
     }
     // Priority 3: direct token fallback
     if (!token) token = localStorage.getItem('sb-access-token');
     if (token) headers['Authorization'] = 'Bearer ' + token;
-  } catch (_e) {
-    /* ignored */
+  } catch (e) {
+    console.error(e);
+    throw e;
   }
   return headers;
 }
@@ -277,8 +279,9 @@ async function loadTraffic() {
         })
         .join('');
     }
-  } catch (_e) {
-    /* ignored */
+  } catch (e) {
+    console.error(e);
+    throw e;
   }
 }
 
@@ -538,8 +541,9 @@ async function loadCodes() {
         );
       })
       .join('');
-  } catch (_e) {
-    /* ignored */
+  } catch (e) {
+    console.error(e);
+    throw e;
   }
 }
 /**
@@ -558,8 +562,9 @@ async function _generateCode() {
     const d = await r.json();
     alert('Cod generat: ' + (d.code || '?'));
     loadCodes();
-  } catch (_e) {
-    console.error(_e);
+  } catch (e) {
+    console.error(e);
+    throw e;
   }
 }
 /**
@@ -604,8 +609,9 @@ async function loadUptime() {
     const m = Math.round(d.uptime / 60),
       h = Math.floor(m / 60);
     document.getElementById('admin-uptime').textContent = '⏱ ' + (h > 0 ? h + 'h ' : '') + (m % 60) + 'm';
-  } catch (_e) {
-    /* ignored */
+  } catch (e) {
+    console.error(e);
+    throw e;
   }
 }
 

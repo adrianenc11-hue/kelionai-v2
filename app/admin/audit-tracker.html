@@ -564,12 +564,12 @@ Be honest. If a suite cannot be truly executed without repo or internal access, 
 
       function renderTable() {
         const tbody = $('issuesTable').querySelector('tbody');
-        tbody.innerHTML = '';
+          tbody.textContent = '';
         state.issues.forEach((issue, i) => {
           const tr = document.createElement('tr');
           tr.innerHTML = `
           <td>${i + 1}</td>
-          <td><span class="chip sev-${issue.severity}">${issue.severity}</span></td>
+          <td><span class="chip sev-${issue.severity}">${escapeHtml(issue.severity)}</span></td>
           <td>${escapeHtml(issue.area || '')}</td>
           <td>${escapeHtml(issue.route || '')}</td>
           <td>${escapeHtml(issue.test || '')}</td>

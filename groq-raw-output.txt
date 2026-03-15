@@ -1,67 +1,45 @@
 <<<<
-          // POST /api/auth/login
-          router.post('/login', validate(loginSchema), async (req, res) => {
-              try {
-                  const { supabase } = req.app.locals;
-                  const { email, password } = req.body;
-                  if (!email || !password) return res.status(400).json({ error: 'Email and password are required' });
-                  if (!supabase) return res.status(503).json({ error: 'Auth service unavailable' });
-                  const { data, error } = await supabase.auth.signInWithPassword({
-                      email,
-                      password,
-                  });
-                  if (error) return res.status(401).json({ error: error.message });
-                  if (!data.user.email_confirmed_at) {
-                      return res.status(403).json({
-                          error: 'Email not verified. Please check your inbox and verify your email before signing in.',
-                      });
-                  }
-                  const adminEmail = (process.env.ADMIN_EMAIL || 'adrianenc11@gmail.com').toLowerCase();
-                  const isAdmin = data.user.email?.toLowerCase() === adminEmail;
-                  res.json({
-                      user: {
-                          id: data.user.id,
-                          email: data.user.email,
-                          name: data.user.user_metadata?.full_name,
-                          role: isAdmin ? 'admin' : data.user.role || 'user',
-                      },
-                      session: data.session,
-                  });
-              } catch {
-                  res.status(500).json({ error: 'Login error' });
-              }
-          });
+          tr.innerHTML = `
+          <td>${i + 1}</td>
+          <td><span class="chip sev-${issue.severity}">${issue.severity}</span></td>
+          <td>${escapeHtml(issue.area || '')}</td>
+          <td>${escapeHtml(issue.route || '')}</td>
+          <td>${escapeHtml(issue.test || '')}</td>
+          <td>${escapeHtml(issue.status || '')}</td>
+          <td>${escapeHtml(issue.title || '')}</td>
+          <td>${escapeHtml(issue.evidence || '')}</td>
+          <td>${escapeHtml(issue.fix || '')}</td>
+        `;
 ====
-          // POST /api/auth/login
-          router.post('/login', authLimiter, validate(loginSchema), async (req, res) => {
-              try {
-                  const { supabase } = req.app.locals;
-                  const { email, password } = req.body;
-                  if (!email || !password) return res.status(400).json({ error: 'Email and password are required' });
-                  if (!supabase) return res.status(503).json({ error: 'Auth service unavailable' });
-                  const { data, error } = await supabase.auth.signInWithPassword({
-                      email,
-                      password,
-                  });
-                  if (error) return res.status(401).json({ error: error.message });
-                  if (!data.user.email_confirmed_at) {
-                      return res.status(403).json({
-                          error: 'Email not verified. Please check your inbox and verify your email before signing in.',
-                      });
-                  }
-                  const adminEmail = (process.env.ADMIN_EMAIL || 'adrianenc11@gmail.com').toLowerCase();
-                  const isAdmin = data.user.email?.toLowerCase() === adminEmail;
-                  res.json({
-                      user: {
-                          id: data.user.id,
-                          email: data.user.email,
-                          name: data.user.user_metadata?.full_name,
-                          role: isAdmin ? 'admin' : data.user.role || 'user',
-                      },
-                      session: data.session,
-                  });
-              } catch {
-                  res.status(500).json({ error: 'Login error' });
-              }
-          });
+          tr.innerHTML = `
+          <td>${i + 1}</td>
+          <td><span class="chip sev-${issue.severity}">${escapeHtml(issue.severity)}</span></td>
+          <td>${escapeHtml(issue.area || '')}</td>
+          <td>${escapeHtml(issue.route || '')}</td>
+          <td>${escapeHtml(issue.test || '')}</td>
+          <td>${escapeHtml(issue.status || '')}</td>
+          <td>${escapeHtml(issue.title || '')}</td>
+          <td>${escapeHtml(issue.evidence || '')}</td>
+          <td>${escapeHtml(issue.fix || '')}</td>
+        `;
+>>>> 
+
+<<<<
+          const tbody = $('issuesTable').querySelector('tbody');
+          tbody.innerHTML = '';
+====
+          const tbody = $('issuesTable').querySelector('tbody');
+          tbody.textContent = '';
+>>>> 
+
+<<<<
+          $('totalCount').innerHTML = String(total);
+          $('criticalCount').innerHTML = String(critical);
+          $('routeCount').innerHTML = String(routeCount);
+          $('testCount').innerHTML = String(testCount);
+====
+          $('totalCount').textContent = String(total);
+          $('criticalCount').textContent = String(critical);
+          $('routeCount').textContent = String(routeCount);
+          $('testCount').textContent = String(testCount);
 >>>>
