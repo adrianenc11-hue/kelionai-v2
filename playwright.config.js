@@ -2,10 +2,6 @@
 // baseURL defaults to the live site but can be overridden via BASE_URL env var
 const { defineConfig, devices } = require('@playwright/test');
 
-/**
- * undefined
- * @returns {*}
- */
 module.exports = defineConfig({
   testDir: './tests',
   timeout: 180000,
@@ -13,7 +9,11 @@ module.exports = defineConfig({
   fullyParallel: true,
   retries: 1,
   workers: 5,
-  reporter: [['html', { open: 'never' }], ['list'], ['json', { outputFile: 'test-results/results.json' }]],
+  reporter: [
+    ['html', { open: 'never' }],
+    ['list'],
+    ['json', { outputFile: 'test-results/results.json' }],
+  ],
   outputDir: 'test-results/',
   use: {
     baseURL: process.env.BASE_URL || process.env.APP_URL,
@@ -29,7 +29,11 @@ module.exports = defineConfig({
       use: {
         ...devices['Desktop Chrome'],
         launchOptions: {
-          args: ['--use-gl=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist'],
+          args: [
+            '--use-gl=swiftshader',
+            '--enable-webgl',
+            '--ignore-gpu-blocklist',
+          ],
         },
         permissions: ['microphone'],
       },

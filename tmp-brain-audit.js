@@ -94,6 +94,7 @@ Acum te rog:
 
 Răspunde detaliat, sincer, fără lingușeli. Vreau adevărul.`;
 
+    console.log('Sending', prompt.length, 'chars to brain...');
 
     const r = await fetch('https://kelionai.app/api/chat', {
         method: 'POST',
@@ -105,6 +106,12 @@ Răspunde detaliat, sincer, fără lingușeli. Vreau adevărul.`;
     });
 
     const j = await r.json();
+    console.log('\n=== BRAIN RESPONSE ===\n');
+    console.log('Agent:', j.reasoning?.agent);
+    console.log('Model:', j.reasoning?.modelRoute);
+    console.log('Confidence:', j.reasoning?.confidence);
+    console.log('\n--- REPLY ---\n');
+    console.log(j.reply);
 }
 
 sendToBrain().catch(e => console.error('ERROR:', e.message));

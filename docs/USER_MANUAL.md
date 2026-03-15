@@ -49,20 +49,16 @@ KelionAI IS: Your super-intelligent personal assistant. A companion that remembe
 ## 2. Getting Started
 
 ### First Visit (No Account)
-
 When you first open KelionAI, the camera will silently detect your face. Kelion will greet you: "Hello! I'm Kelion. I don't think we've met. What's your name?" You get 5 free messages to try. No account needed.
 
 ### Creating an Account
-
 Say: "Kelion, I want an account" or type it. Kelion asks: email, password, verify via email code.
 
 ### Logging In
-
 Face Login (automatic): Camera recognises you and logs you in. No email, no password needed.
 Voice/Text Login: Say "I have an account" and provide credentials.
 
 ### Logging Out
-
 Say: "Kelion, log out" or Profile then Log Out. Confirmation required.
 
 ---
@@ -70,15 +66,12 @@ Say: "Kelion, log out" or Profile then Log Out. Confirmation required.
 ## 3. Meet Your Avatars
 
 ### Kelion
-
 Personality: Calm, wise, thoughtful, dry humour. Best for: deep conversations, analysis, research, learning, business. Voice: Native male in your language.
 
 ### Kira
-
 Personality: Energetic, creative, playful, enthusiastic. Best for: creative tasks, cooking, art, casual chat, fun. Voice: Native female in your language.
 
 ### Switching
-
 Say the other avatar's name: "Kira, come here" or "Kelion, your turn". Both share your memory.
 
 ---
@@ -206,18 +199,15 @@ Upgrade: "Kelion, upgrade my plan" or Profile then Billing. Stripe secure. Cance
 ## 23. Referral Programme
 
 **How it works:**
-
 - Go to Settings → Referral tab and generate your personal referral code (format: `KEL-xxxx-xxxxxx-XXXXXXXXXX`)
 - Share the code or send an email invitation directly from the app
 - Your friend opens the invite link or enters the code when registering
 
 **Bonuses:**
-
 - **Your friend (receiver):** +5 free days added to their first paid subscription
 - **You (sender):** +10 free days added to your subscription when your friend's first payment succeeds
 
 **Rules:**
-
 - Maximum 5 active codes per calendar month
 - Codes expire after 14 days
 - You cannot use your own code

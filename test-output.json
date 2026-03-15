@@ -1,6 +1,6 @@
 {
   "config": {
-    "configFile": "/tmp",
+    "configFile": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\playwright.config.js",
     "rootDir": "C:/Users/adria/.gemini/antigravity/scratch/kelionai-v2/tests",
     "forbidOnly": false,
     "fullyParallel": true,
@@ -26,12 +26,18 @@
         "name": "chromium",
         "testDir": "C:/Users/adria/.gemini/antigravity/scratch/kelionai-v2/tests",
         "testIgnore": [],
-        "testMatch": ["**/*.@(spec|test).?(c|m)[jt]s?(x)"],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
         "timeout": 180000
       }
     ],
     "quiet": false,
-    "reporter": [["json"]],
+    "reporter": [
+      [
+        "json"
+      ]
+    ],
     "reportSlowTests": {
       "max": 5,
       "threshold": 300000
@@ -86,12 +92,12 @@
                         {
                           "name": "screenshot",
                           "contentType": "image/png",
-                          "path": "/tmp"
+                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-New-Pages-13--89f50-ssword-html-loads-with-form-chromium\\test-finished-1.png"
                         },
                         {
                           "name": "video",
                           "contentType": "video/webm",
-                          "path": "/tmp"
+                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-New-Pages-13--89f50-ssword-html-loads-with-form-chromium\\video.webm"
                         }
                       ]
                     }
@@ -131,12 +137,12 @@
                         {
                           "name": "screenshot",
                           "contentType": "image/png",
-                          "path": "/tmp"
+                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-New-Pages-14-direct-404-html-loads-chromium\\test-finished-1.png"
                         },
                         {
                           "name": "video",
                           "contentType": "video/webm",
-                          "path": "/tmp"
+                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-New-Pages-14-direct-404-html-loads-chromium\\video.webm"
                         }
                       ]
                     }
@@ -176,12 +182,12 @@
                         {
                           "name": "screenshot",
                           "contentType": "image/png",
-                          "path": "/tmp"
+                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-New-Pages-15-error-html-loads-chromium\\test-finished-1.png"
                         },
                         {
                           "name": "video",
                           "contentType": "video/webm",
-                          "path": "/tmp"
+                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-New-Pages-15-error-html-loads-chromium\\video.webm"
                         }
                       ]
                     }
@@ -221,12 +227,12 @@
                         {
                           "name": "screenshot",
                           "contentType": "image/png",
-                          "path": "/tmp"
+                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-New-Pages-16-dashboard-billing-html-loads-chromium\\test-finished-1.png"
                         },
                         {
                           "name": "video",
                           "contentType": "video/webm",
-                          "path": "/tmp"
+                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-New-Pages-16-dashboard-billing-html-loads-chromium\\video.webm"
                         }
                       ]
                     }
@@ -266,12 +272,12 @@
                         {
                           "name": "screenshot",
                           "contentType": "image/png",
-                          "path": "/tmp"
+                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-New-Pages-17-dashboard-trading-html-loads-chromium\\test-finished-1.png"
                         },
                         {
                           "name": "video",
                           "contentType": "video/webm",
-                          "path": "/tmp"
+                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-New-Pages-17-dashboard-trading-html-loads-chromium\\video.webm"
                         }
                       ]
                     }
@@ -311,12 +317,12 @@
                         {
                           "name": "screenshot",
                           "contentType": "image/png",
-                          "path": "/tmp"
+                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-New-Pages-18-dashboard-news-html-loads-chromium\\test-finished-1.png"
                         },
                         {
                           "name": "video",
                           "contentType": "video/webm",
-                          "path": "/tmp"
+                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-New-Pages-18-dashboard-news-html-loads-chromium\\video.webm"
                         }
                       ]
                     }
@@ -356,12 +362,12 @@
                         {
                           "name": "screenshot",
                           "contentType": "image/png",
-                          "path": "/tmp"
+                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-New-Pages-19-dashboard-sports-html-loads-chromium\\test-finished-1.png"
                         },
                         {
                           "name": "video",
                           "contentType": "video/webm",
-                          "path": "/tmp"
+                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-New-Pages-19-dashboard-sports-html-loads-chromium\\video.webm"
                         }
                       ]
                     }
@@ -401,12 +407,12 @@
                         {
                           "name": "screenshot",
                           "contentType": "image/png",
-                          "path": "/tmp"
+                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-New-Pages-20-dashboard-health-html-loads-chromium\\test-finished-1.png"
                         },
                         {
                           "name": "video",
                           "contentType": "video/webm",
-                          "path": "/tmp"
+                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-New-Pages-20-dashboard-health-html-loads-chromium\\video.webm"
                         }
                       ]
                     }
@@ -488,12 +494,12 @@
                         {
                           "name": "screenshot",
                           "contentType": "image/png",
-                          "path": "/tmp"
+                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-Buttons-Extended-27-back-buttons-work-chromium\\test-finished-1.png"
                         },
                         {
                           "name": "video",
                           "contentType": "video/webm",
-                          "path": "/tmp"
+                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-Buttons-Extended-27-back-buttons-work-chromium\\video.webm"
                         }
                       ]
                     }
@@ -517,7 +523,7 @@
                     {
                       "type": "skip",
                       "location": {
-                        "file": "/tmp",
+                        "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
                         "line": 122,
                         "column": 23
                       }
@@ -541,7 +547,7 @@
                         {
                           "type": "skip",
                           "location": {
-                            "file": "/tmp",
+                            "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
                             "line": 122,
                             "column": 23
                           }
@@ -551,12 +557,12 @@
                         {
                           "name": "screenshot",
                           "contentType": "image/png",
-                          "path": "/tmp"
+                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-Buttons-Extended-28-subscription-modal-opens-chromium\\test-finished-1.png"
                         },
                         {
                           "name": "video",
                           "contentType": "video/webm",
-                          "path": "/tmp"
+                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-Buttons-Extended-28-subscription-modal-opens-chromium\\video.webm"
                         }
                       ]
                     }
@@ -756,12 +762,12 @@
                         {
                           "name": "screenshot",
                           "contentType": "image/png",
-                          "path": "/tmp"
+                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-Avatar-Kira-52-Kira-avatar-loads-chromium\\test-finished-1.png"
                         },
                         {
                           "name": "video",
                           "contentType": "video/webm",
-                          "path": "/tmp"
+                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-Avatar-Kira-52-Kira-avatar-loads-chromium\\video.webm"
                         }
                       ]
                     }
@@ -801,12 +807,12 @@
                         {
                           "name": "screenshot",
                           "contentType": "image/png",
-                          "path": "/tmp"
+                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-Avatar-Kira-55-Kira-TTS-has-different-voice-chromium\\test-finished-1.png"
                         },
                         {
                           "name": "video",
                           "contentType": "video/webm",
-                          "path": "/tmp"
+                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-Avatar-Kira-55-Kira-TTS-has-different-voice-chromium\\video.webm"
                         }
                       ]
                     }
@@ -846,12 +852,12 @@
                         {
                           "name": "screenshot",
                           "contentType": "image/png",
-                          "path": "/tmp"
+                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-Avatar-Kira-5-0e5ff-t-has-different-personality-chromium\\test-finished-1.png"
                         },
                         {
                           "name": "video",
                           "contentType": "video/webm",
-                          "path": "/tmp"
+                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-Avatar-Kira-5-0e5ff-t-has-different-personality-chromium\\video.webm"
                         }
                       ]
                     }
@@ -1037,7 +1043,7 @@
                         "message": "TimeoutError: page.waitForSelector: Timeout 60000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('#btn-mic') to be visible\u001b[22m\n",
                         "stack": "TimeoutError: page.waitForSelector: Timeout 60000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('#btn-mic') to be visible\u001b[22m\n\n    at C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js:274:20",
                         "location": {
-                          "file": "/tmp",
+                          "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
                           "column": 20,
                           "line": 274
                         },
@@ -1046,7 +1052,7 @@
                       "errors": [
                         {
                           "location": {
-                            "file": "/tmp",
+                            "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
                             "column": 20,
                             "line": 274
                           },
@@ -1062,21 +1068,21 @@
                         {
                           "name": "screenshot",
                           "contentType": "image/png",
-                          "path": "/tmp"
+                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-Microphone-Ca-9cbb5-button-toggles-recording-UI-chromium\\test-failed-1.png"
                         },
                         {
                           "name": "video",
                           "contentType": "video/webm",
-                          "path": "/tmp"
+                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-Microphone-Ca-9cbb5-button-toggles-recording-UI-chromium\\video.webm"
                         },
                         {
                           "name": "error-context",
                           "contentType": "text/markdown",
-                          "path": "/tmp"
+                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-Microphone-Ca-9cbb5-button-toggles-recording-UI-chromium\\error-context.md"
                         }
                       ],
                       "errorLocation": {
-                        "file": "/tmp",
+                        "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
                         "column": 20,
                         "line": 274
                       }
@@ -1090,7 +1096,7 @@
                         "message": "TimeoutError: page.waitForSelector: Timeout 60000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('#btn-mic') to be visible\u001b[22m\n",
                         "stack": "TimeoutError: page.waitForSelector: Timeout 60000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('#btn-mic') to be visible\u001b[22m\n\n    at C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js:274:20",
                         "location": {
-                          "file": "/tmp",
+                          "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
                           "column": 20,
                           "line": 274
                         },
@@ -1099,7 +1105,7 @@
                       "errors": [
                         {
                           "location": {
-                            "file": "/tmp",
+                            "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
                             "column": 20,
                             "line": 274
                           },
@@ -1115,26 +1121,26 @@
                         {
                           "name": "screenshot",
                           "contentType": "image/png",
-                          "path": "/tmp"
+                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-Microphone-Ca-9cbb5-button-toggles-recording-UI-chromium-retry1\\test-failed-1.png"
                         },
                         {
                           "name": "video",
                           "contentType": "video/webm",
-                          "path": "/tmp"
+                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-Microphone-Ca-9cbb5-button-toggles-recording-UI-chromium-retry1\\video.webm"
                         },
                         {
                           "name": "error-context",
                           "contentType": "text/markdown",
-                          "path": "/tmp"
+                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-Microphone-Ca-9cbb5-button-toggles-recording-UI-chromium-retry1\\error-context.md"
                         },
                         {
                           "name": "trace",
                           "contentType": "application/zip",
-                          "path": "/tmp"
+                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-Microphone-Ca-9cbb5-button-toggles-recording-UI-chromium-retry1\\trace.zip"
                         }
                       ],
                       "errorLocation": {
-                        "file": "/tmp",
+                        "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
                         "column": 20,
                         "line": 274
                       }
@@ -1337,7 +1343,7 @@
                     {
                       "type": "skip",
                       "location": {
-                        "file": "/tmp",
+                        "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
                         "line": 338,
                         "column": 23
                       }
@@ -1361,7 +1367,7 @@
                         {
                           "type": "skip",
                           "location": {
-                            "file": "/tmp",
+                            "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
                             "line": 338,
                             "column": 23
                           }
@@ -1599,12 +1605,12 @@
                         {
                           "name": "screenshot",
                           "contentType": "image/png",
-                          "path": "/tmp"
+                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-Geolocation-1-d0736-ission-requested-at-startup-chromium\\test-finished-1.png"
                         },
                         {
                           "name": "video",
                           "contentType": "video/webm",
-                          "path": "/tmp"
+                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-Geolocation-1-d0736-ission-requested-at-startup-chromium\\video.webm"
                         }
                       ]
                     }
@@ -1798,7 +1804,7 @@
                         "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m404\u001b[39m\nReceived: \u001b[31m401\u001b[39m",
                         "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m404\u001b[39m\nReceived: \u001b[31m401\u001b[39m\n    at C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js:464:28",
                         "location": {
-                          "file": "/tmp",
+                          "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
                           "column": 28,
                           "line": 464
                         },
@@ -1807,7 +1813,7 @@
                       "errors": [
                         {
                           "location": {
-                            "file": "/tmp",
+                            "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
                             "column": 28,
                             "line": 464
                           },
@@ -1821,7 +1827,7 @@
                       "annotations": [],
                       "attachments": [],
                       "errorLocation": {
-                        "file": "/tmp",
+                        "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
                         "column": 28,
                         "line": 464
                       }
@@ -1835,7 +1841,7 @@
                         "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m404\u001b[39m\nReceived: \u001b[31m401\u001b[39m",
                         "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m404\u001b[39m\nReceived: \u001b[31m401\u001b[39m\n    at C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js:464:28",
                         "location": {
-                          "file": "/tmp",
+                          "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
                           "column": 28,
                           "line": 464
                         },
@@ -1844,7 +1850,7 @@
                       "errors": [
                         {
                           "location": {
-                            "file": "/tmp",
+                            "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
                             "column": 28,
                             "line": 464
                           },
@@ -1860,11 +1866,11 @@
                         {
                           "name": "trace",
                           "contentType": "application/zip",
-                          "path": "/tmp"
+                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-Admin-Extende-4766b-ut-admin-secret-returns-404-chromium-retry1\\trace.zip"
                         }
                       ],
                       "errorLocation": {
-                        "file": "/tmp",
+                        "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
                         "column": 28,
                         "line": 464
                       }
@@ -1872,3 +1878,1673 @@
                   ],
                   "status": "unexpected"
                 }
+              ],
+              "id": "59e329b57562eb85d818-26d6be452926d2ec504f",
+              "file": "e2e-complete.spec.js",
+              "line": 460,
+              "column": 5
+            }
+          ]
+        },
+        {
+          "title": "Ticker",
+          "file": "e2e-complete.spec.js",
+          "line": 471,
+          "column": 6,
+          "specs": [
+            {
+              "title": "#160 POST /api/ticker/disable without auth returns 401",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 180000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 31,
+                      "parallelIndex": 12,
+                      "status": "passed",
+                      "duration": 118,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-03T13:41:35.292Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "59e329b57562eb85d818-4e67f07778da5acf36c4",
+              "file": "e2e-complete.spec.js",
+              "line": 472,
+              "column": 5
+            }
+          ]
+        },
+        {
+          "title": "i18n",
+          "file": "e2e-complete.spec.js",
+          "line": 482,
+          "column": 6,
+          "specs": [
+            {
+              "title": "#161 language switch EN updates UI",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 180000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 14,
+                      "parallelIndex": 14,
+                      "status": "passed",
+                      "duration": 129060,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-03T13:39:32.907Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-i18n-161-language-switch-EN-updates-UI-chromium\\test-finished-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-i18n-161-language-switch-EN-updates-UI-chromium\\video.webm"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "59e329b57562eb85d818-cfd02dd24c1f8a523d8f",
+              "file": "e2e-complete.spec.js",
+              "line": 483,
+              "column": 5
+            },
+            {
+              "title": "#162 language switch RO updates UI",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 180000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 14,
+                      "parallelIndex": 14,
+                      "status": "passed",
+                      "duration": 62112,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-03T13:41:42.934Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-i18n-162-language-switch-RO-updates-UI-chromium\\test-finished-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-i18n-162-language-switch-RO-updates-UI-chromium\\video.webm"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "59e329b57562eb85d818-5c17aad4dfbceadb0d9a",
+              "file": "e2e-complete.spec.js",
+              "line": 495,
+              "column": 5
+            },
+            {
+              "title": "#163 chat responds in selected language",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 180000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 14,
+                      "parallelIndex": 14,
+                      "status": "passed",
+                      "duration": 13405,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-03T13:42:45.074Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "59e329b57562eb85d818-9f2968cff4cc7889843e",
+              "file": "e2e-complete.spec.js",
+              "line": 507,
+              "column": 5
+            },
+            {
+              "title": "#164 language persists after reload",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 180000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 15,
+                      "parallelIndex": 15,
+                      "status": "passed",
+                      "duration": 135279,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-03T13:39:33.120Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-i18n-164-language-persists-after-reload-chromium\\test-finished-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-i18n-164-language-persists-after-reload-chromium\\video.webm"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "59e329b57562eb85d818-0e61e59f2d6ee0692ba5",
+              "file": "e2e-complete.spec.js",
+              "line": 520,
+              "column": 5
+            }
+          ]
+        },
+        {
+          "title": "Conversation History",
+          "file": "e2e-complete.spec.js",
+          "line": 540,
+          "column": 6,
+          "specs": [
+            {
+              "title": "#165 message appears in history sidebar",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 180000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 15,
+                      "parallelIndex": 15,
+                      "status": "passed",
+                      "duration": 55739,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-03T13:41:49.645Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-Conversation--a1e4d--appears-in-history-sidebar-chromium\\test-finished-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-Conversation--a1e4d--appears-in-history-sidebar-chromium\\video.webm"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "59e329b57562eb85d818-644a189e25d691c16499",
+              "file": "e2e-complete.spec.js",
+              "line": 541,
+              "column": 5
+            }
+          ]
+        },
+        {
+          "title": "Referral Extended",
+          "file": "e2e-complete.spec.js",
+          "line": 562,
+          "column": 6,
+          "specs": [
+            {
+              "title": "#168 GET /api/referral/code with auth returns code",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 180000,
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "location": {
+                        "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                        "line": 569,
+                        "column": 45
+                      }
+                    }
+                  ],
+                  "expectedStatus": "skipped",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 15,
+                      "parallelIndex": 15,
+                      "status": "skipped",
+                      "duration": 320,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-03T13:42:45.412Z",
+                      "annotations": [
+                        {
+                          "type": "skip",
+                          "location": {
+                            "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                            "line": 569,
+                            "column": 45
+                          }
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "59e329b57562eb85d818-c07c478e68600b20b538",
+              "file": "e2e-complete.spec.js",
+              "line": 563,
+              "column": 5
+            },
+            {
+              "title": "#169 GET /api/referral/code without auth",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 180000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 16,
+                      "parallelIndex": 16,
+                      "status": "passed",
+                      "duration": 128,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-03T13:39:33.052Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "59e329b57562eb85d818-c88819654ef52eb3a23b",
+              "file": "e2e-complete.spec.js",
+              "line": 576,
+              "column": 5
+            }
+          ]
+        },
+        {
+          "title": "UI Layout",
+          "file": "e2e-complete.spec.js",
+          "line": 586,
+          "column": 6,
+          "specs": [
+            {
+              "title": "#170 chat area has minimum height",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 180000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 16,
+                      "parallelIndex": 16,
+                      "status": "passed",
+                      "duration": 135429,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-03T13:39:33.954Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-UI-Layout-170-chat-area-has-minimum-height-chromium\\test-finished-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-UI-Layout-170-chat-area-has-minimum-height-chromium\\video.webm"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "59e329b57562eb85d818-ee43e21632fed92c72a6",
+              "file": "e2e-complete.spec.js",
+              "line": 587,
+              "column": 5
+            },
+            {
+              "title": "#171 POST /api/vision without image returns error",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 180000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 16,
+                      "parallelIndex": 16,
+                      "status": "passed",
+                      "duration": 75,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-03T13:41:50.071Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "59e329b57562eb85d818-daa0ae8ff902982cf567",
+              "file": "e2e-complete.spec.js",
+              "line": 600,
+              "column": 5
+            }
+          ]
+        },
+        {
+          "title": "E2E Flows",
+          "file": "e2e-complete.spec.js",
+          "line": 610,
+          "column": 15,
+          "specs": [
+            {
+              "title": "#173 full auth: register ÔåÆ login ÔåÆ chat ÔåÆ logout",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 180000,
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "location": {
+                        "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                        "line": 619,
+                        "column": 45
+                      }
+                    }
+                  ],
+                  "expectedStatus": "skipped",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "skipped",
+                      "duration": 585,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-03T13:39:32.264Z",
+                      "annotations": [
+                        {
+                          "type": "skip",
+                          "location": {
+                            "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                            "line": 619,
+                            "column": 45
+                          }
+                        }
+                      ],
+                      "attachments": []
+                    },
+                    {
+                      "workerIndex": 24,
+                      "parallelIndex": 0,
+                      "status": "skipped",
+                      "duration": 656,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 1,
+                      "startTime": "2026-03-03T13:40:45.189Z",
+                      "annotations": [
+                        {
+                          "type": "skip",
+                          "location": {
+                            "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                            "line": 619,
+                            "column": 45
+                          }
+                        }
+                      ],
+                      "attachments": [
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-E2E-Flows-173-badb8-ter-ÔåÆ-login-ÔåÆ-chat-ÔåÆ-logout-chromium-retry1\\trace.zip"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "59e329b57562eb85d818-c49d4fb3b29b0ec671b0",
+              "file": "e2e-complete.spec.js",
+              "line": 611,
+              "column": 5
+            },
+            {
+              "title": "#174 voice round-trip: TTS returns audio",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 180000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 1081,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-03T13:39:33.750Z",
+                      "annotations": [],
+                      "attachments": []
+                    },
+                    {
+                      "workerIndex": 24,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1243,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 1,
+                      "startTime": "2026-03-03T13:40:50.380Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-E2E-Flows-174-9579f-ound-trip-TTS-returns-audio-chromium-retry1\\trace.zip"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "59e329b57562eb85d818-cd36910c626ca9548cb3",
+              "file": "e2e-complete.spec.js",
+              "line": 636,
+              "column": 5
+            },
+            {
+              "title": "#175 search + chat follow-up",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 180000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "failed",
+                      "duration": 11515,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: < \u001b[32m500\u001b[39m\nReceived:   \u001b[31m503\u001b[39m",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: < \u001b[32m500\u001b[39m\nReceived:   \u001b[31m503\u001b[39m\n    at C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js:656:32",
+                        "location": {
+                          "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                          "column": 32,
+                          "line": 656
+                        },
+                        "snippet": "\u001b[0m \u001b[90m 654 |\u001b[39m             data\u001b[33m:\u001b[39m { message\u001b[33m:\u001b[39m \u001b[32m'Tell me the latest AI news'\u001b[39m\u001b[33m,\u001b[39m avatar\u001b[33m:\u001b[39m \u001b[32m'kelion'\u001b[39m\u001b[33m,\u001b[39m language\u001b[33m:\u001b[39m \u001b[32m'en'\u001b[39m }\n \u001b[90m 655 |\u001b[39m         })\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 656 |\u001b[39m         expect(chatR\u001b[33m.\u001b[39mstatus())\u001b[33m.\u001b[39mtoBeLessThan(\u001b[35m500\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m                                \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 657 |\u001b[39m         \u001b[36mif\u001b[39m (chatR\u001b[33m.\u001b[39mstatus() \u001b[33m===\u001b[39m \u001b[35m200\u001b[39m) {\n \u001b[90m 658 |\u001b[39m             \u001b[36mconst\u001b[39m d \u001b[33m=\u001b[39m \u001b[36mawait\u001b[39m chatR\u001b[33m.\u001b[39mjson()\u001b[33m;\u001b[39m\n \u001b[90m 659 |\u001b[39m             expect(d\u001b[33m.\u001b[39mreply\u001b[33m.\u001b[39mlength)\u001b[33m.\u001b[39mtoBeGreaterThan(\u001b[35m20\u001b[39m)\u001b[33m;\u001b[39m\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                            "column": 32,
+                            "line": 656
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: < \u001b[32m500\u001b[39m\nReceived:   \u001b[31m503\u001b[39m\n\n  654 |             data: { message: 'Tell me the latest AI news', avatar: 'kelion', language: 'en' }\n  655 |         });\n> 656 |         expect(chatR.status()).toBeLessThan(500);\n      |                                ^\n  657 |         if (chatR.status() === 200) {\n  658 |             const d = await chatR.json();\n  659 |             expect(d.reply.length).toBeGreaterThan(20);\n    at C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js:656:32"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-03T13:39:34.844Z",
+                      "annotations": [],
+                      "attachments": [],
+                      "errorLocation": {
+                        "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                        "column": 32,
+                        "line": 656
+                      }
+                    },
+                    {
+                      "workerIndex": 24,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 23608,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 1,
+                      "startTime": "2026-03-03T13:40:51.755Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-E2E-Flows-175-search-chat-follow-up-chromium-retry1\\trace.zip"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "flaky"
+                }
+              ],
+              "id": "59e329b57562eb85d818-a4dcef52465116c81035",
+              "file": "e2e-complete.spec.js",
+              "line": 649,
+              "column": 5
+            }
+          ]
+        },
+        {
+          "title": "AI Simulations ÔÇö Role-Based",
+          "file": "e2e-complete.spec.js",
+          "line": 667,
+          "column": 6,
+          "specs": [
+            {
+              "title": "#176 Professor: structured lesson",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 180000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 17,
+                      "parallelIndex": 17,
+                      "status": "passed",
+                      "duration": 12746,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-03T13:39:33.149Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "59e329b57562eb85d818-b52ee0e2486856ef4b05",
+              "file": "e2e-complete.spec.js",
+              "line": 668,
+              "column": 5
+            },
+            {
+              "title": "#177 Presenter: presentation outline",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 180000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 17,
+                      "parallelIndex": 17,
+                      "status": "failed",
+                      "duration": 2571,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: < \u001b[32m500\u001b[39m\nReceived:   \u001b[31m503\u001b[39m",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: < \u001b[32m500\u001b[39m\nReceived:   \u001b[31m503\u001b[39m\n    at C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js:685:28",
+                        "location": {
+                          "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                          "column": 28,
+                          "line": 685
+                        },
+                        "snippet": "\u001b[0m \u001b[90m 683 |\u001b[39m             data\u001b[33m:\u001b[39m { message\u001b[33m:\u001b[39m \u001b[32m'Create a presentation outline about solar energy with slides'\u001b[39m\u001b[33m,\u001b[39m avatar\u001b[33m:\u001b[39m \u001b[32m'kelion'\u001b[39m\u001b[33m,\u001b[39m language\u001b[33m:\u001b[39m \u001b[32m'en'\u001b[39m }\n \u001b[90m 684 |\u001b[39m         })\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 685 |\u001b[39m         expect(r\u001b[33m.\u001b[39mstatus())\u001b[33m.\u001b[39mtoBeLessThan(\u001b[35m500\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m                            \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 686 |\u001b[39m         \u001b[36mif\u001b[39m (r\u001b[33m.\u001b[39mstatus() \u001b[33m===\u001b[39m \u001b[35m200\u001b[39m) {\n \u001b[90m 687 |\u001b[39m             \u001b[36mconst\u001b[39m d \u001b[33m=\u001b[39m \u001b[36mawait\u001b[39m r\u001b[33m.\u001b[39mjson()\u001b[33m;\u001b[39m\n \u001b[90m 688 |\u001b[39m             expect(d\u001b[33m.\u001b[39mreply\u001b[33m.\u001b[39mlength)\u001b[33m.\u001b[39mtoBeGreaterThan(\u001b[35m50\u001b[39m)\u001b[33m;\u001b[39m\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                            "column": 28,
+                            "line": 685
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: < \u001b[32m500\u001b[39m\nReceived:   \u001b[31m503\u001b[39m\n\n  683 |             data: { message: 'Create a presentation outline about solar energy with slides', avatar: 'kelion', language: 'en' }\n  684 |         });\n> 685 |         expect(r.status()).toBeLessThan(500);\n      |                            ^\n  686 |         if (r.status() === 200) {\n  687 |             const d = await r.json();\n  688 |             expect(d.reply.length).toBeGreaterThan(50);\n    at C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js:685:28"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-03T13:39:46.376Z",
+                      "annotations": [],
+                      "attachments": [],
+                      "errorLocation": {
+                        "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                        "column": 28,
+                        "line": 685
+                      }
+                    },
+                    {
+                      "workerIndex": 29,
+                      "parallelIndex": 8,
+                      "status": "passed",
+                      "duration": 14395,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 1,
+                      "startTime": "2026-03-03T13:40:47.195Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-AI-Simulation-41e65-senter-presentation-outline-chromium-retry1\\trace.zip"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "flaky"
+                }
+              ],
+              "id": "59e329b57562eb85d818-0f1ab297f136a4be89cc",
+              "file": "e2e-complete.spec.js",
+              "line": 680,
+              "column": 5
+            },
+            {
+              "title": "#178 Sales agent: structured pitch",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 180000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 29,
+                      "parallelIndex": 8,
+                      "status": "passed",
+                      "duration": 11274,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-03T13:41:08.502Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "59e329b57562eb85d818-20199c65fcb2f98a0701",
+              "file": "e2e-complete.spec.js",
+              "line": 692,
+              "column": 5
+            },
+            {
+              "title": "#179 Consultant: business plan structure",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 180000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 18,
+                      "parallelIndex": 18,
+                      "status": "failed",
+                      "duration": 20018,
+                      "error": {
+                        "message": "TimeoutError: apiRequestContext.post: Timeout 20000ms exceeded.\nCall log:\n\u001b[2m  - ÔåÆ POST https://kelionai.app/api/chat\u001b[22m\n\u001b[2m    - user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.7632.6 Safari/537.36\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 107\u001b[22m\n",
+                        "stack": "TimeoutError: apiRequestContext.post: Timeout 20000ms exceeded.\nCall log:\n\u001b[2m  - ÔåÆ POST https://kelionai.app/api/chat\u001b[22m\n\u001b[2m    - user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.7632.6 Safari/537.36\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 107\u001b[22m\n\n    at C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js:706:33",
+                        "location": {
+                          "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                          "column": 33,
+                          "line": 706
+                        },
+                        "snippet": "\u001b[0m \u001b[90m 704 |\u001b[39m     test(\u001b[32m'#179 Consultant: business plan structure'\u001b[39m\u001b[33m,\u001b[39m \u001b[36masync\u001b[39m ({ request }) \u001b[33m=>\u001b[39m {\n \u001b[90m 705 |\u001b[39m         test\u001b[33m.\u001b[39mskip(\u001b[33m!\u001b[39msiteIsUp)\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 706 |\u001b[39m         \u001b[36mconst\u001b[39m r \u001b[33m=\u001b[39m \u001b[36mawait\u001b[39m request\u001b[33m.\u001b[39mpost(\u001b[32m'/api/chat'\u001b[39m\u001b[33m,\u001b[39m {\n \u001b[90m     |\u001b[39m                                 \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 707 |\u001b[39m             data\u001b[33m:\u001b[39m { message\u001b[33m:\u001b[39m \u001b[32m'What is the structure of a good business plan? Be specific.'\u001b[39m\u001b[33m,\u001b[39m avatar\u001b[33m:\u001b[39m \u001b[32m'kelion'\u001b[39m\u001b[33m,\u001b[39m language\u001b[33m:\u001b[39m \u001b[32m'en'\u001b[39m }\n \u001b[90m 708 |\u001b[39m         })\u001b[33m;\u001b[39m\n \u001b[90m 709 |\u001b[39m         expect(r\u001b[33m.\u001b[39mstatus())\u001b[33m.\u001b[39mtoBeLessThan(\u001b[35m500\u001b[39m)\u001b[33m;\u001b[39m\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                            "column": 33,
+                            "line": 706
+                          },
+                          "message": "TimeoutError: apiRequestContext.post: Timeout 20000ms exceeded.\nCall log:\n\u001b[2m  - ÔåÆ POST https://kelionai.app/api/chat\u001b[22m\n\u001b[2m    - user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.7632.6 Safari/537.36\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 107\u001b[22m\n\n\n  704 |     test('#179 Consultant: business plan structure', async ({ request }) => {\n  705 |         test.skip(!siteIsUp);\n> 706 |         const r = await request.post('/api/chat', {\n      |                                 ^\n  707 |             data: { message: 'What is the structure of a good business plan? Be specific.', avatar: 'kelion', language: 'en' }\n  708 |         });\n  709 |         expect(r.status()).toBeLessThan(500);\n    at C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js:706:33"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-03T13:39:32.860Z",
+                      "annotations": [],
+                      "attachments": [],
+                      "errorLocation": {
+                        "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                        "column": 33,
+                        "line": 706
+                      }
+                    },
+                    {
+                      "workerIndex": 30,
+                      "parallelIndex": 17,
+                      "status": "passed",
+                      "duration": 15230,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 1,
+                      "startTime": "2026-03-03T13:40:46.632Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-AI-Simulation-fca8f-ant-business-plan-structure-chromium-retry1\\trace.zip"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "flaky"
+                }
+              ],
+              "id": "59e329b57562eb85d818-f1cf96b728ac4dd29a30",
+              "file": "e2e-complete.spec.js",
+              "line": 704,
+              "column": 5
+            },
+            {
+              "title": "#180 Researcher: cites sources",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 180000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 30,
+                      "parallelIndex": 17,
+                      "status": "failed",
+                      "duration": 2638,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: < \u001b[32m500\u001b[39m\nReceived:   \u001b[31m503\u001b[39m",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: < \u001b[32m500\u001b[39m\nReceived:   \u001b[31m503\u001b[39m\n    at C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js:721:28",
+                        "location": {
+                          "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                          "column": 28,
+                          "line": 721
+                        },
+                        "snippet": "\u001b[0m \u001b[90m 719 |\u001b[39m             data\u001b[33m:\u001b[39m { message\u001b[33m:\u001b[39m \u001b[32m'Research the impact of AI on education. Cite your sources.'\u001b[39m\u001b[33m,\u001b[39m avatar\u001b[33m:\u001b[39m \u001b[32m'kelion'\u001b[39m\u001b[33m,\u001b[39m language\u001b[33m:\u001b[39m \u001b[32m'en'\u001b[39m }\n \u001b[90m 720 |\u001b[39m         })\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 721 |\u001b[39m         expect(r\u001b[33m.\u001b[39mstatus())\u001b[33m.\u001b[39mtoBeLessThan(\u001b[35m500\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m                            \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 722 |\u001b[39m         \u001b[36mif\u001b[39m (r\u001b[33m.\u001b[39mstatus() \u001b[33m===\u001b[39m \u001b[35m200\u001b[39m) {\n \u001b[90m 723 |\u001b[39m             \u001b[36mconst\u001b[39m d \u001b[33m=\u001b[39m \u001b[36mawait\u001b[39m r\u001b[33m.\u001b[39mjson()\u001b[33m;\u001b[39m\n \u001b[90m 724 |\u001b[39m             expect(d\u001b[33m.\u001b[39mreply\u001b[33m.\u001b[39mlength)\u001b[33m.\u001b[39mtoBeGreaterThan(\u001b[35m100\u001b[39m)\u001b[33m;\u001b[39m\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                            "column": 28,
+                            "line": 721
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: < \u001b[32m500\u001b[39m\nReceived:   \u001b[31m503\u001b[39m\n\n  719 |             data: { message: 'Research the impact of AI on education. Cite your sources.', avatar: 'kelion', language: 'en' }\n  720 |         });\n> 721 |         expect(r.status()).toBeLessThan(500);\n      |                            ^\n  722 |         if (r.status() === 200) {\n  723 |             const d = await r.json();\n  724 |             expect(d.reply.length).toBeGreaterThan(100);\n    at C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js:721:28"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-03T13:41:16.608Z",
+                      "annotations": [],
+                      "attachments": [],
+                      "errorLocation": {
+                        "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                        "column": 28,
+                        "line": 721
+                      }
+                    },
+                    {
+                      "workerIndex": 32,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 13329,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 1,
+                      "startTime": "2026-03-03T13:41:41.798Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-AI-Simulation-2a811-80-Researcher-cites-sources-chromium-retry1\\trace.zip"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "flaky"
+                }
+              ],
+              "id": "59e329b57562eb85d818-1344344dcc14e585c48e",
+              "file": "e2e-complete.spec.js",
+              "line": 716,
+              "column": 5
+            },
+            {
+              "title": "#182 Planner: real data vacation plan",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 180000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 32,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 12992,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-03T13:41:56.634Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "59e329b57562eb85d818-446da585786e37f62368",
+              "file": "e2e-complete.spec.js",
+              "line": 728,
+              "column": 5
+            },
+            {
+              "title": "#184 Search-first: thinkTime > 0 on role request",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 180000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 19,
+                      "parallelIndex": 19,
+                      "status": "failed",
+                      "duration": 20028,
+                      "error": {
+                        "message": "TimeoutError: apiRequestContext.post: Timeout 20000ms exceeded.\nCall log:\n\u001b[2m  - ÔåÆ POST https://kelionai.app/api/chat\u001b[22m\n\u001b[2m    - user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.7632.6 Safari/537.36\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 108\u001b[22m\n",
+                        "stack": "TimeoutError: apiRequestContext.post: Timeout 20000ms exceeded.\nCall log:\n\u001b[2m  - ÔåÆ POST https://kelionai.app/api/chat\u001b[22m\n\u001b[2m    - user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.7632.6 Safari/537.36\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 108\u001b[22m\n\n    at C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js:742:33",
+                        "location": {
+                          "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                          "column": 33,
+                          "line": 742
+                        },
+                        "snippet": "\u001b[0m \u001b[90m 740 |\u001b[39m     test(\u001b[32m'#184 Search-first: thinkTime > 0 on role request'\u001b[39m\u001b[33m,\u001b[39m \u001b[36masync\u001b[39m ({ request }) \u001b[33m=>\u001b[39m {\n \u001b[90m 741 |\u001b[39m         test\u001b[33m.\u001b[39mskip(\u001b[33m!\u001b[39msiteIsUp)\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 742 |\u001b[39m         \u001b[36mconst\u001b[39m r \u001b[33m=\u001b[39m \u001b[36mawait\u001b[39m request\u001b[33m.\u001b[39mpost(\u001b[32m'/api/chat'\u001b[39m\u001b[33m,\u001b[39m {\n \u001b[90m     |\u001b[39m                                 \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 743 |\u001b[39m             data\u001b[33m:\u001b[39m { message\u001b[33m:\u001b[39m \u001b[32m'Be a financial advisor and tell me how to invest 10000 euros'\u001b[39m\u001b[33m,\u001b[39m avatar\u001b[33m:\u001b[39m \u001b[32m'kelion'\u001b[39m\u001b[33m,\u001b[39m language\u001b[33m:\u001b[39m \u001b[32m'en'\u001b[39m }\n \u001b[90m 744 |\u001b[39m         })\u001b[33m;\u001b[39m\n \u001b[90m 745 |\u001b[39m         expect(r\u001b[33m.\u001b[39mstatus())\u001b[33m.\u001b[39mtoBeLessThan(\u001b[35m500\u001b[39m)\u001b[33m;\u001b[39m\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                            "column": 33,
+                            "line": 742
+                          },
+                          "message": "TimeoutError: apiRequestContext.post: Timeout 20000ms exceeded.\nCall log:\n\u001b[2m  - ÔåÆ POST https://kelionai.app/api/chat\u001b[22m\n\u001b[2m    - user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.7632.6 Safari/537.36\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 108\u001b[22m\n\n\n  740 |     test('#184 Search-first: thinkTime > 0 on role request', async ({ request }) => {\n  741 |         test.skip(!siteIsUp);\n> 742 |         const r = await request.post('/api/chat', {\n      |                                 ^\n  743 |             data: { message: 'Be a financial advisor and tell me how to invest 10000 euros', avatar: 'kelion', language: 'en' }\n  744 |         });\n  745 |         expect(r.status()).toBeLessThan(500);\n    at C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js:742:33"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-03T13:39:32.925Z",
+                      "annotations": [],
+                      "attachments": [],
+                      "errorLocation": {
+                        "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                        "column": 33,
+                        "line": 742
+                      }
+                    },
+                    {
+                      "workerIndex": 26,
+                      "parallelIndex": 13,
+                      "status": "passed",
+                      "duration": 18794,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 1,
+                      "startTime": "2026-03-03T13:40:48.242Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-AI-Simulation-c00f4-thinkTime-0-on-role-request-chromium-retry1\\trace.zip"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "flaky"
+                }
+              ],
+              "id": "59e329b57562eb85d818-d19315a7364e5e3ef954",
+              "file": "e2e-complete.spec.js",
+              "line": 740,
+              "column": 5
+            }
+          ]
+        },
+        {
+          "title": "Brain Intelligence",
+          "file": "e2e-complete.spec.js",
+          "line": 760,
+          "column": 6,
+          "specs": [
+            {
+              "title": "#185 chain-of-thought: thinkTime on complex request",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 180000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 26,
+                      "parallelIndex": 13,
+                      "status": "failed",
+                      "duration": 20239,
+                      "error": {
+                        "message": "TimeoutError: apiRequestContext.post: Timeout 20000ms exceeded.\nCall log:\n\u001b[2m  - ÔåÆ POST https://kelionai.app/api/chat\u001b[22m\n\u001b[2m    - user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.7632.6 Safari/537.36\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 115\u001b[22m\n",
+                        "stack": "TimeoutError: apiRequestContext.post: Timeout 20000ms exceeded.\nCall log:\n\u001b[2m  - ÔåÆ POST https://kelionai.app/api/chat\u001b[22m\n\u001b[2m    - user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.7632.6 Safari/537.36\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 115\u001b[22m\n\n    at C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js:763:33",
+                        "location": {
+                          "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                          "column": 33,
+                          "line": 763
+                        },
+                        "snippet": "\u001b[0m \u001b[90m 761 |\u001b[39m     test(\u001b[32m'#185 chain-of-thought: thinkTime on complex request'\u001b[39m\u001b[33m,\u001b[39m \u001b[36masync\u001b[39m ({ request }) \u001b[33m=>\u001b[39m {\n \u001b[90m 762 |\u001b[39m         test\u001b[33m.\u001b[39mskip(\u001b[33m!\u001b[39msiteIsUp)\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 763 |\u001b[39m         \u001b[36mconst\u001b[39m r \u001b[33m=\u001b[39m \u001b[36mawait\u001b[39m request\u001b[33m.\u001b[39mpost(\u001b[32m'/api/chat'\u001b[39m\u001b[33m,\u001b[39m {\n \u001b[90m     |\u001b[39m                                 \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 764 |\u001b[39m             data\u001b[33m:\u001b[39m { message\u001b[33m:\u001b[39m \u001b[32m'What is the weather in Bucharest and what are the latest tech news?'\u001b[39m\u001b[33m,\u001b[39m avatar\u001b[33m:\u001b[39m \u001b[32m'kelion'\u001b[39m\u001b[33m,\u001b[39m language\u001b[33m:\u001b[39m \u001b[32m'en'\u001b[39m }\n \u001b[90m 765 |\u001b[39m         })\u001b[33m;\u001b[39m\n \u001b[90m 766 |\u001b[39m         expect(r\u001b[33m.\u001b[39mstatus())\u001b[33m.\u001b[39mtoBeLessThan(\u001b[35m500\u001b[39m)\u001b[33m;\u001b[39m\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                            "column": 33,
+                            "line": 763
+                          },
+                          "message": "TimeoutError: apiRequestContext.post: Timeout 20000ms exceeded.\nCall log:\n\u001b[2m  - ÔåÆ POST https://kelionai.app/api/chat\u001b[22m\n\u001b[2m    - user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.7632.6 Safari/537.36\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 115\u001b[22m\n\n\n  761 |     test('#185 chain-of-thought: thinkTime on complex request', async ({ request }) => {\n  762 |         test.skip(!siteIsUp);\n> 763 |         const r = await request.post('/api/chat', {\n      |                                 ^\n  764 |             data: { message: 'What is the weather in Bucharest and what are the latest tech news?', avatar: 'kelion', language: 'en' }\n  765 |         });\n  766 |         expect(r.status()).toBeLessThan(500);\n    at C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js:763:33"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-03T13:41:17.230Z",
+                      "annotations": [],
+                      "attachments": [],
+                      "errorLocation": {
+                        "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                        "column": 33,
+                        "line": 763
+                      }
+                    },
+                    {
+                      "workerIndex": 33,
+                      "parallelIndex": 1,
+                      "status": "failed",
+                      "duration": 17047,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: < \u001b[32m500\u001b[39m\nReceived:   \u001b[31m503\u001b[39m",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: < \u001b[32m500\u001b[39m\nReceived:   \u001b[31m503\u001b[39m\n    at C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js:766:28",
+                        "location": {
+                          "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                          "column": 28,
+                          "line": 766
+                        },
+                        "snippet": "\u001b[0m \u001b[90m 764 |\u001b[39m             data\u001b[33m:\u001b[39m { message\u001b[33m:\u001b[39m \u001b[32m'What is the weather in Bucharest and what are the latest tech news?'\u001b[39m\u001b[33m,\u001b[39m avatar\u001b[33m:\u001b[39m \u001b[32m'kelion'\u001b[39m\u001b[33m,\u001b[39m language\u001b[33m:\u001b[39m \u001b[32m'en'\u001b[39m }\n \u001b[90m 765 |\u001b[39m         })\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 766 |\u001b[39m         expect(r\u001b[33m.\u001b[39mstatus())\u001b[33m.\u001b[39mtoBeLessThan(\u001b[35m500\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m                            \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 767 |\u001b[39m         \u001b[36mif\u001b[39m (r\u001b[33m.\u001b[39mstatus() \u001b[33m===\u001b[39m \u001b[35m200\u001b[39m) {\n \u001b[90m 768 |\u001b[39m             \u001b[36mconst\u001b[39m d \u001b[33m=\u001b[39m \u001b[36mawait\u001b[39m r\u001b[33m.\u001b[39mjson()\u001b[33m;\u001b[39m\n \u001b[90m 769 |\u001b[39m             expect(d\u001b[33m.\u001b[39mreply\u001b[33m.\u001b[39mlength)\u001b[33m.\u001b[39mtoBeGreaterThan(\u001b[35m20\u001b[39m)\u001b[33m;\u001b[39m\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                            "column": 28,
+                            "line": 766
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: < \u001b[32m500\u001b[39m\nReceived:   \u001b[31m503\u001b[39m\n\n  764 |             data: { message: 'What is the weather in Bucharest and what are the latest tech news?', avatar: 'kelion', language: 'en' }\n  765 |         });\n> 766 |         expect(r.status()).toBeLessThan(500);\n      |                            ^\n  767 |         if (r.status() === 200) {\n  768 |             const d = await r.json();\n  769 |             expect(d.reply.length).toBeGreaterThan(20);\n    at C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js:766:28"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 1,
+                      "startTime": "2026-03-03T13:41:45.365Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-Brain-Intelli-c8163-hinkTime-on-complex-request-chromium-retry1\\trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                        "column": 28,
+                        "line": 766
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "59e329b57562eb85d818-5ff7f9b566a29b67585e",
+              "file": "e2e-complete.spec.js",
+              "line": 761,
+              "column": 5
+            },
+            {
+              "title": "#191 multi-tool: weather + search in one query",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 180000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 35,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 9049,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-03T13:42:43.425Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "59e329b57562eb85d818-34c84484c4a1a734b6cb",
+              "file": "e2e-complete.spec.js",
+              "line": 774,
+              "column": 5
+            },
+            {
+              "title": "#192 GET /api/brain diagnostics (admin blocked)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 180000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 20,
+                      "parallelIndex": 20,
+                      "status": "passed",
+                      "duration": 171,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-03T13:39:33.219Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "59e329b57562eb85d818-fddf26892dcc490e89ca",
+              "file": "e2e-complete.spec.js",
+              "line": 786,
+              "column": 5
+            }
+          ]
+        },
+        {
+          "title": "Persona & Emotions",
+          "file": "e2e-complete.spec.js",
+          "line": 797,
+          "column": 6,
+          "specs": [
+            {
+              "title": "#193 Truth Engine: admits not knowing",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 180000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 20,
+                      "parallelIndex": 20,
+                      "status": "passed",
+                      "duration": 8367,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-03T13:39:33.892Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "59e329b57562eb85d818-29d6de495861aaa14aea",
+              "file": "e2e-complete.spec.js",
+              "line": 798,
+              "column": 5
+            },
+            {
+              "title": "#194 EQ sadness: emotional validation",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 180000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 20,
+                      "parallelIndex": 20,
+                      "status": "failed",
+                      "duration": 4561,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: < \u001b[32m500\u001b[39m\nReceived:   \u001b[31m503\u001b[39m",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: < \u001b[32m500\u001b[39m\nReceived:   \u001b[31m503\u001b[39m\n    at C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js:816:28",
+                        "location": {
+                          "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                          "column": 28,
+                          "line": 816
+                        },
+                        "snippet": "\u001b[0m \u001b[90m 814 |\u001b[39m             data\u001b[33m:\u001b[39m { message\u001b[33m:\u001b[39m \u001b[32m'I am feeling very sad today'\u001b[39m\u001b[33m,\u001b[39m avatar\u001b[33m:\u001b[39m \u001b[32m'kelion'\u001b[39m\u001b[33m,\u001b[39m language\u001b[33m:\u001b[39m \u001b[32m'en'\u001b[39m }\n \u001b[90m 815 |\u001b[39m         })\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 816 |\u001b[39m         expect(r\u001b[33m.\u001b[39mstatus())\u001b[33m.\u001b[39mtoBeLessThan(\u001b[35m500\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m                            \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 817 |\u001b[39m         \u001b[36mif\u001b[39m (r\u001b[33m.\u001b[39mstatus() \u001b[33m===\u001b[39m \u001b[35m200\u001b[39m) {\n \u001b[90m 818 |\u001b[39m             \u001b[36mconst\u001b[39m d \u001b[33m=\u001b[39m \u001b[36mawait\u001b[39m r\u001b[33m.\u001b[39mjson()\u001b[33m;\u001b[39m\n \u001b[90m 819 |\u001b[39m             expect(d\u001b[33m.\u001b[39mreply\u001b[33m.\u001b[39mlength)\u001b[33m.\u001b[39mtoBeGreaterThan(\u001b[35m20\u001b[39m)\u001b[33m;\u001b[39m\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                            "column": 28,
+                            "line": 816
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: < \u001b[32m500\u001b[39m\nReceived:   \u001b[31m503\u001b[39m\n\n  814 |             data: { message: 'I am feeling very sad today', avatar: 'kelion', language: 'en' }\n  815 |         });\n> 816 |         expect(r.status()).toBeLessThan(500);\n      |                            ^\n  817 |         if (r.status() === 200) {\n  818 |             const d = await r.json();\n  819 |             expect(d.reply.length).toBeGreaterThan(20);\n    at C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js:816:28"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-03T13:39:42.298Z",
+                      "annotations": [],
+                      "attachments": [],
+                      "errorLocation": {
+                        "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                        "column": 28,
+                        "line": 816
+                      }
+                    },
+                    {
+                      "workerIndex": 27,
+                      "parallelIndex": 10,
+                      "status": "passed",
+                      "duration": 6942,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 1,
+                      "startTime": "2026-03-03T13:40:49.447Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-Persona-Emoti-3d7ba-adness-emotional-validation-chromium-retry1\\trace.zip"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "flaky"
+                }
+              ],
+              "id": "59e329b57562eb85d818-b4e2f994607b2d1bfbb6",
+              "file": "e2e-complete.spec.js",
+              "line": 811,
+              "column": 5
+            },
+            {
+              "title": "#195 EQ joy: celebrates with user",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 180000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 21,
+                      "parallelIndex": 21,
+                      "status": "passed",
+                      "duration": 7016,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-03T13:39:33.256Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "59e329b57562eb85d818-b823ebe1ac2f73d8ff53",
+              "file": "e2e-complete.spec.js",
+              "line": 824,
+              "column": 5
+            },
+            {
+              "title": "#199 Proactive: \"going outside\" triggers weather suggestion",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 180000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 21,
+                      "parallelIndex": 21,
+                      "status": "failed",
+                      "duration": 1613,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: < \u001b[32m500\u001b[39m\nReceived:   \u001b[31m503\u001b[39m",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: < \u001b[32m500\u001b[39m\nReceived:   \u001b[31m503\u001b[39m\n    at C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js:841:28",
+                        "location": {
+                          "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                          "column": 28,
+                          "line": 841
+                        },
+                        "snippet": "\u001b[0m \u001b[90m 839 |\u001b[39m             data\u001b[33m:\u001b[39m { message\u001b[33m:\u001b[39m \u001b[32m'I am going outside now'\u001b[39m\u001b[33m,\u001b[39m avatar\u001b[33m:\u001b[39m \u001b[32m'kelion'\u001b[39m\u001b[33m,\u001b[39m language\u001b[33m:\u001b[39m \u001b[32m'en'\u001b[39m }\n \u001b[90m 840 |\u001b[39m         })\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 841 |\u001b[39m         expect(r\u001b[33m.\u001b[39mstatus())\u001b[33m.\u001b[39mtoBeLessThan(\u001b[35m500\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m                            \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 842 |\u001b[39m         \u001b[36mif\u001b[39m (r\u001b[33m.\u001b[39mstatus() \u001b[33m===\u001b[39m \u001b[35m200\u001b[39m) {\n \u001b[90m 843 |\u001b[39m             \u001b[36mconst\u001b[39m d \u001b[33m=\u001b[39m \u001b[36mawait\u001b[39m r\u001b[33m.\u001b[39mjson()\u001b[33m;\u001b[39m\n \u001b[90m 844 |\u001b[39m             expect(d\u001b[33m.\u001b[39mreply\u001b[33m.\u001b[39mlength)\u001b[33m.\u001b[39mtoBeGreaterThan(\u001b[35m10\u001b[39m)\u001b[33m;\u001b[39m\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                            "column": 28,
+                            "line": 841
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: < \u001b[32m500\u001b[39m\nReceived:   \u001b[31m503\u001b[39m\n\n  839 |             data: { message: 'I am going outside now', avatar: 'kelion', language: 'en' }\n  840 |         });\n> 841 |         expect(r.status()).toBeLessThan(500);\n      |                            ^\n  842 |         if (r.status() === 200) {\n  843 |             const d = await r.json();\n  844 |             expect(d.reply.length).toBeGreaterThan(10);\n    at C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js:841:28"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-03T13:39:40.761Z",
+                      "annotations": [],
+                      "attachments": [],
+                      "errorLocation": {
+                        "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                        "column": 28,
+                        "line": 841
+                      }
+                    },
+                    {
+                      "workerIndex": 28,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 4357,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 1,
+                      "startTime": "2026-03-03T13:40:47.282Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-Persona-Emoti-7dc07-triggers-weather-suggestion-chromium-retry1\\trace.zip"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "flaky"
+                }
+              ],
+              "id": "59e329b57562eb85d818-a6007da1fda5c63c2e5b",
+              "file": "e2e-complete.spec.js",
+              "line": 836,
+              "column": 5
+            },
+            {
+              "title": "#202 Kelion vs Kira personality differs",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 180000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 28,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 8001,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-03T13:40:58.233Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "59e329b57562eb85d818-1ca5b78b186b324658fa",
+              "file": "e2e-complete.spec.js",
+              "line": 848,
+              "column": 5
+            }
+          ]
+        },
+        {
+          "title": "Persistent Memory",
+          "file": "e2e-complete.spec.js",
+          "line": 867,
+          "column": 6,
+          "specs": [
+            {
+              "title": "#203 memory save via chat",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 180000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 22,
+                      "parallelIndex": 22,
+                      "status": "passed",
+                      "duration": 6305,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-03T13:39:32.904Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "59e329b57562eb85d818-c1b62fd508c509205c8e",
+              "file": "e2e-complete.spec.js",
+              "line": 868,
+              "column": 5
+            },
+            {
+              "title": "#206 memory isolation: no auth user has no memory",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 180000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 22,
+                      "parallelIndex": 22,
+                      "status": "failed",
+                      "duration": 6821,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: < \u001b[32m500\u001b[39m\nReceived:   \u001b[31m503\u001b[39m",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: < \u001b[32m500\u001b[39m\nReceived:   \u001b[31m503\u001b[39m\n    at C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js:885:28",
+                        "location": {
+                          "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                          "column": 28,
+                          "line": 885
+                        },
+                        "snippet": "\u001b[0m \u001b[90m 883 |\u001b[39m             data\u001b[33m:\u001b[39m { message\u001b[33m:\u001b[39m \u001b[32m'What do you remember about me?'\u001b[39m\u001b[33m,\u001b[39m avatar\u001b[33m:\u001b[39m \u001b[32m'kelion'\u001b[39m\u001b[33m,\u001b[39m language\u001b[33m:\u001b[39m \u001b[32m'en'\u001b[39m }\n \u001b[90m 884 |\u001b[39m         })\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 885 |\u001b[39m         expect(r\u001b[33m.\u001b[39mstatus())\u001b[33m.\u001b[39mtoBeLessThan(\u001b[35m500\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m                            \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 886 |\u001b[39m         \u001b[90m// Without auth, should not have memory\u001b[39m\n \u001b[90m 887 |\u001b[39m     })\u001b[33m;\u001b[39m\n \u001b[90m 888 |\u001b[39m })\u001b[33m;\u001b[39m\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                            "column": 28,
+                            "line": 885
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: < \u001b[32m500\u001b[39m\nReceived:   \u001b[31m503\u001b[39m\n\n  883 |             data: { message: 'What do you remember about me?', avatar: 'kelion', language: 'en' }\n  884 |         });\n> 885 |         expect(r.status()).toBeLessThan(500);\n      |                            ^\n  886 |         // Without auth, should not have memory\n  887 |     });\n  888 | });\n    at C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js:885:28"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-03T13:39:40.250Z",
+                      "annotations": [],
+                      "attachments": [],
+                      "errorLocation": {
+                        "file": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\tests\\e2e-complete.spec.js",
+                        "column": 28,
+                        "line": 885
+                      }
+                    },
+                    {
+                      "workerIndex": 25,
+                      "parallelIndex": 6,
+                      "status": "passed",
+                      "duration": 3519,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 1,
+                      "startTime": "2026-03-03T13:40:47.292Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\test-results\\e2e-complete-Persistent-Me-5343e--no-auth-user-has-no-memory-chromium-retry1\\trace.zip"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "flaky"
+                }
+              ],
+              "id": "59e329b57562eb85d818-c0371879ed757b6581d3",
+              "file": "e2e-complete.spec.js",
+              "line": 880,
+              "column": 5
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-03-03T13:39:27.387Z",
+    "duration": 262086.422,
+    "expected": 55,
+    "skipped": 4,
+    "unexpected": 3,
+    "flaky": 8
+  }
+}

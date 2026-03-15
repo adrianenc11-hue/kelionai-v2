@@ -3,27 +3,37 @@
 // KelionAI — Enable pgvector for semantic memory
 // Run once: node scripts/enable-pgvector.js
 // ═══════════════════════════════════════════════════════════════
-'use strict';
+"use strict";
 
-require('dotenv').config();
-const { createClient } = require('@supabase/supabase-js');
+require("dotenv").config();
+const { createClient } = require("@supabase/supabase-js");
 
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY,
+);
 
-/**
- * migrate
- * @returns {*}
- */
 async function migrate() {
+  console.log("🧠 Enabling pgvector for semantic memory...\n");
+
   // Step 1: Enable pgvector extension
-  const { error: extErr } = await supabase.rpc('exec_sql', {
-    sql: 'CREATE EXTENSION IF NOT EXISTS vector;',
+  console.log("1. Enabling pgvector extension...");
+  const { error: extErr } = await supabase.rpc("exec_sql", {
+    sql: "CREATE EXTENSION IF NOT EXISTS vector;",
   });
   // If RPC doesn't exist, user needs to run it manually in Supabase SQL Editor
   if (extErr) {
     console.log(
-      '   CREATE INDEX IF NOT EXISTS brain_memory_embedding_idx ON brain_memory USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);'
+      "⚠️  Cannot run SQL via RPC. Please run this in Supabase SQL Editor:\n",
     );
+    console.log("   CREATE EXTENSION IF NOT EXISTS vector;");
+    console.log(
+      "   ALTER TABLE brain_memory ADD COLUMN IF NOT EXISTS embedding vector(1536);",
+    );
+    console.log(
+      "   CREATE INDEX IF NOT EXISTS brain_memory_embedding_idx ON brain_memory USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);",
+    );
+    console.log("\n   -- Function for similarity search:");
     console.log(`   CREATE OR REPLACE FUNCTION match_memories(
      query_embedding vector(1536),
      match_user_id uuid,
@@ -56,21 +66,29 @@ async function migrate() {
      LIMIT match_count;
    END;
    $$;`);
+    console.log("\n\nThen run this script again to verify.");
     return;
   }
 
+  console.log("   ✅ pgvector extension enabled");
+
   // Step 2: Add embedding column
-  await supabase.rpc('exec_sql', {
-    sql: 'ALTER TABLE brain_memory ADD COLUMN IF NOT EXISTS embedding vector(1536);',
+  console.log("2. Adding embedding column to brain_memory...");
+  await supabase.rpc("exec_sql", {
+    sql: "ALTER TABLE brain_memory ADD COLUMN IF NOT EXISTS embedding vector(1536);",
   });
+  console.log("   ✅ embedding column added");
 
   // Step 3: Create index
-  await supabase.rpc('exec_sql', {
-    sql: 'CREATE INDEX IF NOT EXISTS brain_memory_embedding_idx ON brain_memory USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);',
+  console.log("3. Creating IVFFlat index...");
+  await supabase.rpc("exec_sql", {
+    sql: "CREATE INDEX IF NOT EXISTS brain_memory_embedding_idx ON brain_memory USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);",
   });
+  console.log("   ✅ index created");
 
   // Step 4: Create similarity search function
-  await supabase.rpc('exec_sql', {
+  console.log("4. Creating match_memories function...");
+  await supabase.rpc("exec_sql", {
     sql: `CREATE OR REPLACE FUNCTION match_memories(
       query_embedding vector(1536),
       match_user_id uuid,
@@ -89,6 +107,12 @@ async function migrate() {
       ORDER BY bm.embedding <=> query_embedding LIMIT match_count;
     END; $$;`,
   });
+  console.log("   ✅ match_memories function created");
+
+  console.log("\n🎉 pgvector enabled! Semantic memory is ready.");
+  console.log(
+    '   Brain will now use embeddings for "understanding" memories.\n',
+  );
 }
 
 migrate().catch(console.error);

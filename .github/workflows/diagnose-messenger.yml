@@ -37,7 +37,7 @@ jobs:
 
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Graph API Check" >> $GITHUB_STEP_SUMMARY
-          API_CODE=$(curl -s -o /dev/null -w "%{http_code}" "https://graph.facebook.com/v21.0/me?access_token=${process.env.API_KEY_IN_URL}")
+          API_CODE=$(curl -s -o /dev/null -w "%{http_code}" "https://graph.facebook.com/v21.0/me?access_token=${{ secrets.FB_PAGE_ACCESS_TOKEN }}")
           if [ "$API_CODE" = "200" ]; then
             echo "✅ FB Page Token: **VALID** (HTTP $API_CODE)" >> $GITHUB_STEP_SUMMARY
           else

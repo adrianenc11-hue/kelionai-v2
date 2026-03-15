@@ -38,6 +38,7 @@ Raspunde EXACT asa:
 2. COD CORECTAT: arata valorile noi pentru fiecare parametru
 3. CE SOFT EXTERN ar imbunatati dramatic calitatea (NVIDIA Audio2Face, Azure Viseme, Rhubarb etc)`;
 
+console.log('Sending', prompt.length, 'chars to brain...');
 
 fetch('https://kelionai.app/api/chat', {
     method: 'POST',
@@ -50,5 +51,10 @@ fetch('https://kelionai.app/api/chat', {
     .then(r => r.json())
     .then(j => {
         fs.writeFileSync('C:/tmp/brain-lipsync-fix.txt', j.reply || 'NO REPLY');
+        console.log('Agent:', j.reasoning?.agent);
+        console.log('Confidence:', j.reasoning?.confidence);
+        console.log('Reply:', (j.reply || '').length, 'chars');
+        console.log('\n===REPLY===\n');
+        console.log(j.reply);
     })
-    .catch(e => /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* console.log('ERR:', e.message) (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */);
+    .catch(e => console.log('ERR:', e.message));
