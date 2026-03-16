@@ -721,7 +721,7 @@
 
       // Speak the reply
       const _thisGen = ++_speakGeneration;
-      if (window.KVoice) {
+      if (window.KVoice && !window._translateModeActive) {
         KVoice.speak(fullReply, KAvatar.getCurrentAvatar());
       }
     } catch (_e) {

@@ -989,7 +989,26 @@
         >
           CC
         </button>
-
+        <button
+          id="btn-translate-toggle"
+          title="Translate Mode: OFF"
+          aria-label="Toggle live translation"
+          style="
+            background: none;
+            border: 2px solid #555;
+            border-radius: 50%;
+            width: 36px;
+            height: 36px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: #888;
+            transition: all 0.3s;
+            font-family: var(--kelion-font);
+          "
+        >
+          T
+        </button>
         <div id="mic-level" title="Mic level" style="display: none">
           <span></span><span></span><span></span><span></span><span></span>
         </div>
@@ -1481,6 +1500,29 @@
             }
           });
         }
+      })();
+    </script>
+    <script src="js/translate-mode.js"></script>
+    <script>
+      // ── T Button handler (Translate Mode) ─────────────────
+      (function () {
+        var tBtn = document.getElementById('btn-translate-toggle');
+        if (!tBtn) return;
+        tBtn.addEventListener('click', function () {
+          if (!window.KTranslate) return;
+          var active = KTranslate.toggle();
+          if (active) {
+            tBtn.style.borderColor = '#6366f1';
+            tBtn.style.color = '#6366f1';
+            tBtn.style.boxShadow = '0 0 10px rgba(99,102,241,0.4)';
+            tBtn.title = 'Translate Mode: ON';
+          } else {
+            tBtn.style.borderColor = '#555';
+            tBtn.style.color = '#888';
+            tBtn.style.boxShadow = '';
+            tBtn.title = 'Translate Mode: OFF';
+          }
+        });
       })();
     </script>
   </body>
