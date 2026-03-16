@@ -122,6 +122,7 @@
     init: init,
     getCached: getCached,
     getCurrentPosition: getCurrentPosition,
+    getLocation: getCurrentPosition, // alias — compatible with geolocation.js API
     startWatching: startWatching,
     stopWatching: stopWatching,
     hasPosition: function () {

@@ -1,0 +1,134 @@
+TOTAL: 154 | Passed: 117 | Failed: 15 | Skipped: 22
+---NON-SKIPPED---
+failed|Onboarding Flow|/ redirects to /onboarding.html on first visit|TimeoutError: page.waitForURL: Timeout 15000ms exceeded.
+passed|Onboarding Flow|onboarding page loads with title and content|
+passed|Onboarding Flow|onboarding step 1 ÔåÆ step 2 via "Get Started" button|
+passed|Onboarding Flow|onboarding step 2 has plan selection|
+passed|Onboarding Flow|onboarding navigate prev (back) from step 2 to step 1|
+passed|Onboarding Flow|"Finish" finishes onboarding and redirects to /|
+passed|Onboarding Flow|after onboarding, / does NOT redirect to onboarding|
+passed|Main Pages Navigation|homepage / loads with visible content|
+passed|Main Pages Navigation|/pricing/ page loads|
+passed|Main Pages Navigation|/settings page loads|
+passed|Main Pages Navigation|/developer page loads|
+passed|Main Pages Navigation|navigate back to homepage from developer page|
+passed|Main Pages Navigation|static assets load (CSS/JS)|
+passed|Buttons and Links|navbar links are all reachable (no 404)|
+passed|Buttons and Links|avatar switcher buttons are clickable|
+passed|Responsive Mobile (375├ù812)|homepage loads on mobile viewport|
+passed|Responsive Mobile (375├ù812)|send button is accessible on mobile|
+passed|Responsive Mobile (375├ù812)|onboarding page is usable on mobile|
+passed|API Health|GET /api/health returns 200|
+passed|API Health|GET / returns 200|
+passed|API Health|GET /health returns 200 (catch-all serves app)|
+passed|API Health|static assets return 200 (no 5xx)|
+passed|API Health|unknown API endpoint returns 404 (not 5xx)|
+passed|Error Handling|unknown page returns app (not crash)|
+passed|Error Handling|error.html page loads correctly|
+failed|Error Handling|no uncaught JS errors on homepage|Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoHaveLength[2m([22m[32mexpected[39m[2m)[2
+passed|Error Handling|no uncaught JS errors on pricing page|
+passed|PWA|manifest.json is present and valid|
+passed|PWA|service worker registration attempted|
+failed|Quality ÔÇö JS Errors|no critical JS errors on page|Error: JS errors found: KGeo.getLocation is not a function
+passed|Deep ÔÇö Chat Quality|AI reply contains actual words|
+failed|Deep ÔÇö Chat Quality|AI reply to math is correct|Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoContain[2m([22m[32mexpected[39m[2m) // in
+passed|Deep ÔÇö Chat Quality|Kira replies in Romanian|
+passed|Deep ÔÇö UI Interactions|pricing modal opens and has grid|
+passed|Deep ÔÇö UI Interactions|pricing modal closes|
+passed|Deep ÔÇö UI Interactions|conversation history sidebar opens|
+failed|Deep ÔÇö UI Interactions|microphone button visible|Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+failed|Deep ÔÇö UI Interactions|monitor panel default state|Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+passed|Deep ÔÇö UI Interactions|navbar shows avatar name Kelion|
+passed|Deep ÔÇö UI Interactions|user badge shows Guest|
+passed|Deep ÔÇö UI Interactions|full chat: send + AI replies|
+passed|Deep ÔÇö API Data Quality|search returns real data|
+passed|Deep ÔÇö API Data Quality|legal terms has real content|
+passed|Deep ÔÇö API Data Quality|privacy policy has real content|
+passed|Deep ÔÇö API Data Quality|developer v1/status returns real data|
+passed|Real User ÔÇö Full Auth Flow|register new account|
+failed|Real User ÔÇö Full Auth Flow|login with new account|Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoBe[2m([22m[32mexpected[39m[2m) // Object.
+passed|API ÔÇö Trading|GET /api/trading/status|
+passed|API ÔÇö Trading|GET /api/trading/analysis|
+passed|API ÔÇö Trading|GET /api/trading/signals|
+passed|API ÔÇö Trading|GET /api/trading/portfolio|
+passed|API ÔÇö Trading|POST /api/trading/backtest|
+passed|API ÔÇö Trading|GET /api/trading/alerts|
+passed|API ÔÇö Trading|GET /api/trading/correlation|
+passed|API ÔÇö Trading|GET /api/trading/risk|
+passed|API ÔÇö Trading|GET /api/trading/history|
+failed|API ÔÇö Trading|POST /api/trading/execute ÔåÆ needs auth|Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoBeGreaterThanOrEqual[2m([22m[32mexpected[3
+passed|API ÔÇö Trading|GET /api/trading/full-analysis|
+passed|API ÔÇö Trading|GET /api/trading/calendar|
+passed|API ÔÇö Trading|GET /api/trading/positions|
+passed|API ÔÇö Trading|POST /api/trading/close|
+passed|API ÔÇö Trading|POST /api/trading/kill-switch|
+passed|API ÔÇö Trading|GET /api/trading/paper-balance|
+passed|API ÔÇö Trading|GET /api/trading/risk-profile|
+passed|API ÔÇö Trading|POST /api/trading/risk-profile|
+passed|API ÔÇö Trading|GET /api/trading/projections|
+passed|API ÔÇö Developer|GET /api/developer/keys|
+passed|API ÔÇö Developer|POST /api/developer/keys|
+passed|API ÔÇö Developer|GET /api/developer/stats|
+passed|API ÔÇö Developer|GET /api/developer/webhooks|
+passed|API ÔÇö Developer|POST /api/developer/webhooks|
+passed|API ÔÇö Developer|GET /api/developer/v1/status|
+passed|API ÔÇö Developer|GET /api/developer/v1/models|
+passed|API ÔÇö Developer|GET /api/developer/v1/user/profile|
+passed|API ÔÇö Developer|POST /api/developer/v1/chat|
+passed|API ÔÇö Developer|DELETE /api/developer/keys/test|
+passed|API ÔÇö Legal & GDPR|GET /api/legal/terms|
+passed|API ÔÇö Legal & GDPR|GET /api/legal/privacy|
+passed|API ÔÇö Legal & GDPR|POST /api/gdpr/export ÔåÆ needs auth|
+passed|API ÔÇö Legal & GDPR|DELETE /api/gdpr/delete ÔåÆ needs auth|
+passed|API ÔÇö Legal & GDPR|GET /api/gdpr/consent|
+passed|API ÔÇö Legal & GDPR|POST /api/gdpr/consent|
+passed|API ÔÇö AI Services|POST /api/search|
+passed|API ÔÇö AI Services|GET /api/weather|
+passed|API ÔÇö AI Services|POST /api/vision|
+passed|API ÔÇö AI Services|POST /api/voice/speak|
+passed|API ÔÇö AI Services|POST /api/voice/listen|
+failed|API ÔÇö AI Services|POST /api/imagine|Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoBeLessThan[2m([22m[32mexpected[39m[2m)[2
+passed|API ÔÇö Identity|POST /api/identity/register-face|
+passed|API ÔÇö Identity|POST /api/identity/check|
+passed|API ÔÇö Payments|GET /api/payments/plans|
+passed|API ÔÇö Payments|POST /api/payments/checkout ÔåÆ needs auth|
+passed|API ÔÇö News|GET /api/news|
+passed|API ÔÇö News|POST /api/news ÔåÆ needs admin|
+passed|API ÔÇö Media|GET /api/media/facebook/health|
+passed|API ÔÇö Media|GET /api/media/instagram/health|
+passed|API ÔÇö Media|GET /api/media/status ÔåÆ needs admin|
+passed|API ÔÇö Media|POST /api/media/publish ÔåÆ needs admin|
+passed|API ÔÇö Messaging|GET /api/messenger/webhook|
+passed|API ÔÇö Messaging|POST /api/telegram/webhook|
+passed|API ÔÇö Messaging|GET /api/telegram/health|
+passed|API ÔÇö Messaging|GET /api/whatsapp/webhook|
+passed|API ÔÇö Messaging|POST /api/whatsapp/webhook|
+passed|API ÔÇö Messaging|POST /api/whatsapp/send (joke)|
+passed|API ÔÇö Messaging|GET /api/whatsapp/health|
+failed|API ÔÇö Admin|GET /api/admin/brain ÔåÆ needs admin|Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoBeGreaterThanOrEqual[2m([22m[32mexpected[3
+failed|API ÔÇö Admin|POST /api/admin/brain/reset ÔåÆ needs admin|Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoBeGreaterThanOrEqual[2m([22m[32mexpected[3
+failed|API ÔÇö Admin|GET /api/admin/health-check ÔåÆ needs admin|Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoBeGreaterThanOrEqual[2m([22m[32mexpected[3
+passed|API ÔÇö Ticker & Metrics|POST /api/ticker/disable|
+passed|API ÔÇö Ticker & Metrics|GET /api/metrics ÔåÆ needs admin|
+passed|API ÔÇö Referral|GET /api/referral/code|
+passed|API ÔÇö Auth Complete|POST /api/auth/login bad ÔåÆ 401|
+passed|API ÔÇö Auth Complete|GET /api/auth/me no token ÔåÆ 401|
+passed|API ÔÇö Auth Complete|POST /api/auth/refresh no token|
+passed|API ÔÇö Auth Complete|POST /api/auth/forgot-password no email|
+passed|API ÔÇö Auth Complete|POST /api/auth/change-email no auth|
+passed|API ÔÇö Brain & Chat|POST /api/chat empty message|
+passed|API ÔÇö Brain & Chat|GET /api/chat/stream SSE|
+passed|API ÔÇö Brain & Chat|GET /api/conversations|
+passed|API ÔÇö Brain & Chat|GET /api/memory|
+failed|API ÔÇö Brain & Chat|GET /api/admin/payments/stats ÔåÆ admin|Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoBeGreaterThanOrEqual[2m([22m[32mexpected[3
+passed|API ÔÇö Messenger Stats|GET /api/messenger/stats ÔåÆ admin|
+passed|Security|XSS in chat message is sanitized|
+passed|Security|SQL injection in login is blocked|
+passed|Security|path traversal blocked|
+passed|Security|HTTPS enforced|
+passed|Security|auth endpoints reject invalid tokens|
+failed|Security|admin routes blocked without admin token|Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoBeGreaterThanOrEqual[2m([22m[32mexpected[3
+failed|Security|XSS in search query is sanitized|Error: [2mexpect([22m[31mreceived[39m[2m).[22mnot[2m.[22mtoContain[2m([22m[32mexpected[3
+passed|Security|oversized payload rejected|
+passed|Security|no server version header exposed|
+passed|Security|CORS headers present|

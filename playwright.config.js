@@ -9,14 +9,10 @@ module.exports = defineConfig({
   fullyParallel: true,
   retries: 1,
   workers: 5,
-  reporter: [
-    ['html', { open: 'never' }],
-    ['list'],
-    ['json', { outputFile: 'test-results/results.json' }],
-  ],
+  reporter: [['html', { open: 'never' }], ['list'], ['json', { outputFile: 'test-results/results.json' }]],
   outputDir: 'test-results/',
   use: {
-    baseURL: process.env.BASE_URL || process.env.APP_URL,
+    baseURL: process.env.BASE_URL || process.env.APP_URL || 'https://kelionai.app',
     actionTimeout: 20000,
     navigationTimeout: 120000,
     screenshot: 'on',
@@ -29,11 +25,7 @@ module.exports = defineConfig({
       use: {
         ...devices['Desktop Chrome'],
         launchOptions: {
-          args: [
-            '--use-gl=swiftshader',
-            '--enable-webgl',
-            '--ignore-gpu-blocklist',
-          ],
+          args: ['--use-gl=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist'],
         },
         permissions: ['microphone'],
       },
