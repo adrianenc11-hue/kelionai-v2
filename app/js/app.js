@@ -1236,196 +1236,25 @@
       });
     });
 
-    // Mic toggle button — explicit permission request
+    // Mic toggle button — mute / unmute microphone
     const micToggle = document.getElementById('btn-mic-toggle');
-    let micOn = false;
-    let _micRetryCount = 0;
-    let _micNoSpeechTimer = null;
+    let micOn = true; // mic starts ON (wake word always active)
     if (micToggle) {
-      micToggle.addEventListener('click', async function () {
-        if (!micOn) {
-          micToggle.style.borderColor = '#ffaa00';
-          micToggle.style.color = '#ffaa00';
-          micToggle.title = 'Requesting mic permission...';
-          try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            stream.getTracks().forEach(function (t) {
-              t.stop();
-            });
-            micOn = true;
-            _micRetryCount = 0;
-            if (window.KVoice) {
-              KVoice.ensureAudioUnlocked();
-              if (KVoice.stopWakeWordDetection) KVoice.stopWakeWordDetection();
-            }
-            // Start DIRECT speech recognition — no wake word needed
-            const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-            if (SR) {
-              window._directSpeech = new SR();
-              window._directSpeech.continuous = true;
-              window._directSpeech.interimResults = true;
-              // DEFAULT: Romanian (ro-RO) — primary user language
-              // Falls back to i18n language if explicitly set to something else
-              const i18nLang = (window.i18n && i18n.getLanguage && i18n.getLanguage()) || null;
-              let micLang = 'ro-RO'; // DEFAULT Romanian
-              if (i18nLang && i18nLang !== 'en') {
-                // Only override if user explicitly chose a non-English language
-                micLang = i18nLang;
-              }
-              // Ensure full locale format for better recognition
-              if (micLang === 'ro') micLang = 'ro-RO';
-              if (micLang === 'en') micLang = 'en-US';
-              if (micLang === 'de') micLang = 'de-DE';
-              if (micLang === 'fr') micLang = 'fr-FR';
-              if (micLang === 'es') micLang = 'es-ES';
-              window._directSpeech.lang = micLang;
-              console.log('[Mic] ✅ SpeechRecognition language:', micLang);
-              window._directSpeech.onresult = function (ev) {
-                _micRetryCount = 0; // reset on successful result
-                // Clear no-speech warning timer
-                if (_micNoSpeechTimer) {
-                  clearTimeout(_micNoSpeechTimer);
-                  _micNoSpeechTimer = null;
-                }
-                for (let i = ev.resultIndex; i < ev.results.length; i++) {
-                  if (ev.results[i].isFinal) {
-                    const text = ev.results[i][0].transcript.trim();
-                    const confidence = ev.results[i][0].confidence;
-                    console.log('[Mic] ✅ Final result:', text, 'confidence:', confidence.toFixed(2));
-                    if (text && text.length > 1) {
-                      // Auto-detect language from transcript
-                      if (window.KVoice && KVoice.setLanguage) {
-                        const detLang = /[ăîâșț]/i.test(text) ? 'ro' : 'en';
-                        KVoice.setLanguage(detLang);
-                      }
-                      hideWelcome();
-                      addMessage('user', '🎙️ ' + text);
-                      showThinking(true);
-                      KAvatar.setAttentive(true);
-                      _voiceInitiated = true; // voice input — auto-speak response
-                      sendToAI(text, micLang.split('-')[0]);
-                    }
-                  } else {
-                    // Interim result — show user that mic is hearing
-                    const interim = ev.results[i][0].transcript.trim();
-                    if (interim.length > 2) {
-                      console.log('[Mic] 🔄 Hearing:', interim);
-                    }
-                  }
-                }
-              };
-              window._directSpeech.onaudiostart = function () {
-                console.log('[Mic] 🎤 Audio capture started');
-                // Start no-speech warning timer (8s)
-                _micNoSpeechTimer = setTimeout(function () {
-                  console.warn('[Mic] ⚠️ No speech detected for 8 seconds — mic may not be picking up audio');
-                }, 8000);
-              };
-              window._directSpeech.onspeechstart = function () {
-                console.log('[Mic] 🗣️ Speech detected');
-                if (_micNoSpeechTimer) {
-                  clearTimeout(_micNoSpeechTimer);
-                  _micNoSpeechTimer = null;
-                }
-              };
-              window._directSpeech.onsoundstart = function () {
-                console.log('[Mic] 🔊 Sound detected');
-              };
-              window._directSpeech.onnomatch = function () {
-                console.warn('[Mic] ⚠️ No match — speech not recognized (try speaking louder or clearer)');
-              };
-              window._directSpeech.onend = function () {
-                console.log('[Mic] Recognition ended, micOn:', micOn, 'retries:', _micRetryCount);
-                if (micOn && _micRetryCount < 50) {
-                  // Don't restart while AI is speaking — wait for it to finish
-                  if (window.KVoice && KVoice.isSpeaking && KVoice.isSpeaking()) {
-                    console.log('[Mic] ⏸️ AI is speaking, waiting to restart...');
-                    const waitForSpeech = setInterval(function () {
-                      if (!KVoice.isSpeaking()) {
-                        clearInterval(waitForSpeech);
-                        if (micOn) {
-                          try {
-                            window._directSpeech.start();
-                            console.log('[Mic] ▶️ Restarted after AI speech');
-                          } catch (e) {
-                            console.warn('[Mic] Restart failed:', e.message);
-                          }
-                        }
-                      }
-                    }, 500);
-                    return;
-                  }
-                  _micRetryCount++;
-                  try {
-                    window._directSpeech.start();
-                  } catch (e) {
-                    console.warn('[Mic] Restart failed:', e.message);
-                  }
-                } else if (_micRetryCount >= 50) {
-                  console.error('[Mic] ❌ Too many restarts, stopping mic');
-                  micOn = false;
-                  micToggle.style.borderColor = '#ff4444';
-                  micToggle.style.color = '#ff4444';
-                  micToggle.title = '🔴 Mic crashed — click to retry';
-                }
-              };
-              window._directSpeech.onerror = function (e) {
-                console.warn('[Mic] Error:', e.error, e.message || '');
-                if (e.error === 'no-speech') {
-                  console.log('[Mic] ℹ️ No speech detected — this is normal, will auto-restart');
-                }
-                if (e.error === 'not-allowed') {
-                  micOn = false;
-                  micToggle.style.borderColor = '#ff4444';
-                  micToggle.style.color = '#ff4444';
-                  micToggle.title = '🔴 Mic permission denied — check browser settings';
-                  console.error('[Mic] ❌ Permission denied by browser');
-                  return;
-                }
-                if (micOn && _micRetryCount < 50) {
-                  _micRetryCount++;
-                  setTimeout(function () {
-                    try {
-                      window._directSpeech.start();
-                    } catch (_e) {
-                      /* ignored */
-                    }
-                  }, 1000);
-                }
-              };
-              window._directSpeech.start();
-              console.log('[Mic] ▶️ SpeechRecognition started successfully');
-            } else {
-              console.error('[Mic] ❌ SpeechRecognition API not available in this browser');
-              micToggle.style.borderColor = '#ff4444';
-              micToggle.style.color = '#ff4444';
-              micToggle.title = '🔴 Browser does not support speech recognition';
-              micOn = false;
-              return;
-            }
-            micToggle.style.borderColor = '#00ff88';
-            micToggle.style.color = '#00ff88';
-            micToggle.style.boxShadow = '0 0 12px rgba(0,255,136,0.4)';
-            micToggle.title = '🟢 Mic ON — vorbește liber! (ro-RO)';
-            console.log('[App] ✅ Mic ON — direct speech mode, lang:', micLang);
-            // Start mic monitor for visual feedback
-            if (window.KVoice && KVoice.startMicMonitor) KVoice.startMicMonitor();
-            // Show bargraph indicator
-            const micLevelEl = document.getElementById('mic-level');
-            if (micLevelEl) micLevelEl.style.display = 'flex';
-          } catch (e) {
-            micToggle.style.borderColor = '#ff4444';
-            micToggle.style.color = '#ff4444';
-            micToggle.style.boxShadow = 'none';
-            micToggle.title = '🔴 Mic blocked — check browser permissions';
-            console.error('[App] Mic permission denied:', e.message);
-          }
-        } else {
+      // Visual: show mic as ON by default (wake word is always active)
+      micToggle.style.borderColor = '#00ff88';
+      micToggle.style.color = '#00ff88';
+      micToggle.style.boxShadow = '0 0 12px rgba(0,255,136,0.4)';
+      micToggle.title = 'Mic ON — click to mute';
+
+      micToggle.addEventListener('click', function () {
+        if (micOn) {
+          // MUTE — stop wake word detection + mic monitor
           micOn = false;
-          if (_micNoSpeechTimer) {
-            clearTimeout(_micNoSpeechTimer);
-            _micNoSpeechTimer = null;
+          if (window.KVoice) {
+            if (KVoice.stopWakeWordDetection) KVoice.stopWakeWordDetection();
+            if (KVoice.stopMicMonitor) KVoice.stopMicMonitor();
           }
+          // Stop any direct speech if running
           if (window._directSpeech) {
             try {
               window._directSpeech.stop();
@@ -1434,15 +1263,28 @@
             }
             window._directSpeech = null;
           }
-          if (window.KVoice && KVoice.startWakeWordDetection) KVoice.startWakeWordDetection();
           micToggle.style.borderColor = '#555';
           micToggle.style.color = '#888';
           micToggle.style.boxShadow = 'none';
-          micToggle.title = 'Microphone OFF — click to turn on';
-          // Hide bargraph indicator
+          micToggle.title = 'Mic OFF — click to unmute';
           const micLevelEl = document.getElementById('mic-level');
           if (micLevelEl) micLevelEl.style.display = 'none';
-          console.log('[App] Mic OFF');
+          console.log('[App] Mic MUTED');
+        } else {
+          // UNMUTE — restart wake word detection
+          micOn = true;
+          if (window.KVoice) {
+            KVoice.ensureAudioUnlocked();
+            if (KVoice.startWakeWordDetection) KVoice.startWakeWordDetection();
+            if (KVoice.startMicMonitor) KVoice.startMicMonitor();
+          }
+          micToggle.style.borderColor = '#00ff88';
+          micToggle.style.color = '#00ff88';
+          micToggle.style.boxShadow = '0 0 12px rgba(0,255,136,0.4)';
+          micToggle.title = 'Mic ON — click to mute';
+          const micLevelEl = document.getElementById('mic-level');
+          if (micLevelEl) micLevelEl.style.display = 'flex';
+          console.log('[App] Mic UNMUTED');
         }
       });
     }
