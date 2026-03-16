@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="apple-touch-icon" href="/models/kelion-reference.png" />
     <meta name="sentry-dsn" content="" />
-    <meta name="theme-color" content="#050510" />
+
     <meta
       name="description"
       content="KelionAI — Your intelligent AI assistant with real-time voice, 3D avatar, and powerful brain."
@@ -535,141 +535,18 @@
             📋
           </button>
           <input type="file" id="file-input-hidden" class="hidden-panel" accept="*/*" title="Upload file" />
-          <button
-            class="btn-secondary"
-            id="btn-admin"
-            title="Admin Panel — Locked"
-            data-locked="true"
-            style="
-              display: none;
-              padding: 8px 14px;
-              font-size: 0.85rem;
-              background: rgba(239, 68, 68, 0.12);
-              border: 1px solid rgba(239, 68, 68, 0.3);
-              border-radius: 8px;
-              color: #fca5a5;
-              cursor: not-allowed;
-              font-family: var(--kelion-font);
-              transition: all 0.4s;
-              opacity: 0.7;
-            "
-          >
-            🔒 Admin
-          </button>
-          <button
-            class="btn-secondary"
-            id="btn-subscriptions"
-            title="Plans"
-            style="
-              padding: 8px 14px;
-              font-size: 0.85rem;
-              background: rgba(99, 102, 241, 0.12);
-              border: 1px solid rgba(99, 102, 241, 0.3);
-              border-radius: 8px;
-              color: #a5b4fc;
-              cursor: pointer;
-              font-family: var(--kelion-font);
-              transition: all 0.2s;
-            "
-          >
-            ⭐ Plans
-          </button>
-          <button
-            class="btn-secondary"
-            id="btn-invite"
-            title="Invite friends"
-            style="
-              display: none;
-              padding: 8px 14px;
-              font-size: 0.85rem;
-              background: rgba(16, 185, 129, 0.12);
-              border: 1px solid rgba(16, 185, 129, 0.3);
-              border-radius: 8px;
-              color: #6ee7b7;
-              cursor: pointer;
-              font-family: var(--kelion-font);
-              transition: all 0.2s;
-            "
-          >
-            🎁 Invite
-          </button>
-          <button
-            id="navbar-get-started"
-            class="btn-primary"
-            title="Get Started"
-            style="
-              padding: 8px 18px;
-              font-size: 0.85rem;
-              background: linear-gradient(135deg, #6366f1, #06b6d4);
-              border: none;
-              border-radius: 8px;
-              color: #fff;
-              cursor: pointer;
-              font-family: var(--kelion-font);
-              font-weight: 600;
-              transition: all 0.2s;
-              display: none;
-            "
-          >
-            🚀 Get Started
-          </button>
-          <button class="btn-primary" id="btn-auth" title="Sign in" style="padding: 8px 18px; font-size: 0.85rem">
-            🔑 Login
-          </button>
-          <button
-            id="navbar-hamburger"
-            class="ctrl-btn-sm"
-            title="Menu"
-            aria-label="Mobile menu"
-            style="
-              display: none;
-              background: none;
-              border: none;
-              cursor: pointer;
-              font-size: 1.4rem;
-              padding: 4px 8px;
-              color: var(--kelion-text-secondary);
-            "
-          >
-            ☰
-          </button>
+          <button class="btn-secondary" id="btn-admin" title="Admin Panel — Locked" data-locked="true">🔒 Admin</button>
+          <button class="btn-secondary" id="btn-subscriptions" title="Plans">⭐ Plans</button>
+          <button class="btn-secondary" id="btn-invite" title="Invite friends">🎁 Invite</button>
+          <button id="navbar-get-started" class="btn-primary" title="Get Started">🚀 Get Started</button>
+          <button class="btn-primary" id="btn-auth" title="Sign in">🔑 Login</button>
+          <button id="navbar-hamburger" class="ctrl-btn-sm" title="Menu" aria-label="Mobile menu">☰</button>
         </div>
         <!-- Mobile nav menu (hidden by default) -->
-        <div
-          id="navbar-mobile-menu"
-          class="hidden"
-          style="
-            position: absolute;
-            top: 100%;
-            right: 0;
-            width: 220px;
-            background: rgba(5, 5, 16, 0.95);
-            backdrop-filter: blur(20px);
-            border: 1px solid rgba(99, 102, 241, 0.15);
-            border-radius: 12px;
-            padding: 12px;
-            z-index: 100;
-            display: none;
-            flex-direction: column;
-            gap: 8px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-          "
-        >
-          <a
-            href="/pricing"
-            style="color: #a5b4fc; text-decoration: none; padding: 10px; border-radius: 8px; font-size: 0.9rem"
-            >💎 Pricing</a
-          >
-          <a
-            href="/settings"
-            style="color: #a5b4fc; text-decoration: none; padding: 10px; border-radius: 8px; font-size: 0.9rem"
-            >⚙️ Settings</a
-          >
-          <a
-            href="/developer"
-            style="color: #a5b4fc; text-decoration: none; padding: 10px; border-radius: 8px; font-size: 0.9rem"
-            >👨‍💻 Developer</a
-          >
+        <div id="navbar-mobile-menu" class="hidden">
+          <a href="/pricing" class="mobile-nav-link">💎 Pricing</a>
+          <a href="/settings" class="mobile-nav-link">⚙️ Settings</a>
+          <a href="/developer" class="mobile-nav-link">👨‍💻 Developer</a>
         </div>
       </nav>
 
@@ -689,15 +566,15 @@
           <div id="avatar-area">
             <canvas id="avatar-canvas"></canvas>
             <div id="avatar-label">
-              <span id="avatar-name" style="display: none">Kelion</span>
+              <span id="avatar-name" class="hidden-panel">Kelion</span>
             </div>
             <div id="avatar-switcher">
               <button class="avatar-pill active" data-avatar="kelion">Kelion</button>
               <button class="avatar-pill" data-avatar="kira">Kira</button>
             </div>
             <!-- Live subtitle bar (inside avatar) -->
-            <div id="live-subtitle" style="display: none !important">
-              <span id="subtitle-speaker" style="color: #00ffff; font-weight: 600; margin-right: 8px"></span>
+            <div id="live-subtitle" class="hidden-important">
+              <span id="subtitle-speaker" class="text-cyan-bold"></span>
               <span id="subtitle-text"></span>
             </div>
           </div>
@@ -754,44 +631,44 @@
             </div>
           </div>
           <!-- Chat messages (main zone) -->
-          <div id="chat-messages" style="flex: 1; overflow-y: auto; padding: 8px 16px; scroll-behavior: smooth"></div>
+          <div id="chat-messages"></div>
           <div id="chat-overlay"></div>
           <div id="display-content">
             <!-- Monitor panels (used inline in chat) -->
-            <div id="monitor-image" style="display: none"></div>
-            <div id="monitor-map" style="display: none"></div>
-            <div id="monitor-text" style="display: none"></div>
-            <div id="monitor-search" style="display: none"></div>
-            <div id="monitor-weather" style="display: none"></div>
-            <div id="monitor-iframe" style="display: none">
+            <div id="monitor-image"></div>
+            <div id="monitor-map"></div>
+            <div id="monitor-text"></div>
+            <div id="monitor-search"></div>
+            <div id="monitor-weather"></div>
+            <div id="monitor-iframe">
               <iframe
                 id="monitor-iframe-src"
                 src=""
                 allow="autoplay; encrypted-media"
                 allowfullscreen
-                style="width: 100%; height: 100%; border: none; border-radius: 8px"
+                title="Content frame"
               ></iframe>
             </div>
-            <div id="monitor-audio" style="display: none">
-              <div id="radio-info" style="text-align: center; padding: 20px">
-                <div style="font-size: 3rem" id="radio-logo">📻</div>
-                <div id="radio-name" style="font-size: 1.3rem; font-weight: 600; margin: 10px 0; color: #fff"></div>
-                <audio id="radio-player" controls autoplay style="width: 100%; margin-top: 10px"></audio>
+            <div id="monitor-audio">
+              <div id="radio-info">
+                <div id="radio-logo">📻</div>
+                <div id="radio-name"></div>
+                <audio id="radio-player" controls autoplay></audio>
               </div>
             </div>
-            <div id="monitor-video" style="display: none">
+            <div id="monitor-video">
               <iframe
                 id="monitor-video-src"
                 src=""
                 allow="autoplay; encrypted-media; picture-in-picture"
                 allowfullscreen
-                style="width: 100%; height: 100%; border: none; border-radius: 8px"
+                title="Video frame"
               ></iframe>
             </div>
             <div id="monitor-default"></div>
           </div>
           <!-- Thinking indicator -->
-          <div id="thinking" style="display: none; padding: 8px 16px">
+          <div id="thinking">
             <div class="thinking-dots"><span></span><span></span><span></span></div>
             <span data-i18n="thinking.text">Thinking...</span>
           </div>
@@ -800,193 +677,46 @@
       <!-- /#main-content -->
 
       <!-- Input row — FULL WIDTH at page bottom -->
-      <div id="input-row" style="padding: 8px 16px; border-top: 1px solid rgba(99, 102, 241, 0.1)">
-        <button
-          id="btn-mic-toggle"
-          title="Microphone ON/OFF"
-          aria-label="Toggle microphone"
-          style="
-            display: inline-flex;
-            background: none;
-            border: 2px solid #555;
-            border-radius: 50%;
-            width: 36px;
-            height: 36px;
-            cursor: pointer;
-            font-size: 1.1rem;
-            color: #888;
-            transition: all 0.3s;
-          "
-        >
+      <div id="input-row">
+        <button id="btn-mic-toggle" title="Microphone ON/OFF" aria-label="Toggle microphone" class="ctrl-circle">
           🎙️
         </button>
-        <button
-          id="btn-camera-inline"
-          title="Camera ON/OFF"
-          aria-label="Toggle camera"
-          style="
-            background: none;
-            border: 2px solid #555;
-            border-radius: 50%;
-            width: 36px;
-            height: 36px;
-            cursor: pointer;
-            font-size: 1.1rem;
-            color: #888;
-            transition: all 0.3s;
-          "
-        >
-          📷
-        </button>
-        <button
-          id="btn-voicefirst"
-          title="Voice-First Mode"
-          aria-label="Toggle Voice-First mode"
-          style="
-            background: none;
-            border: 2px solid #555;
-            border-radius: 50%;
-            width: 36px;
-            height: 36px;
-            cursor: pointer;
-            font-size: 1.1rem;
-            color: #888;
-            transition: all 0.3s;
-          "
-        >
+        <button id="btn-camera-inline" title="Camera ON/OFF" aria-label="Toggle camera" class="ctrl-circle">📷</button>
+        <button id="btn-voicefirst" title="Voice-First Mode" aria-label="Toggle Voice-First mode" class="ctrl-circle">
           🗣️
         </button>
 
-        <div id="mic-level" title="Mic level" style="display: none">
-          <span></span><span></span><span></span><span></span><span></span>
-        </div>
+        <div id="mic-level" title="Mic level"><span></span><span></span><span></span><span></span><span></span></div>
         <input
           type="text"
           id="text-input"
           data-i18n-placeholder="input.placeholder"
           placeholder="Type or speak..."
           autocomplete="off"
-          style="max-width: 45%; font-size: 0.85rem"
         />
-        <button
-          id="btn-send"
-          title="Send"
-          aria-label="Send message"
-          style="
-            background: none;
-            border: none;
-            cursor: pointer;
-            font-size: 1.3rem;
-            color: var(--kelion-text-secondary);
-            padding: 0 6px;
-            transition: color 0.2s;
-          "
-        >
-          ➤
-        </button>
-        <button
-          id="btn-plus"
-          title="Import / Export"
-          aria-label="Files"
-          style="
-            background: none;
-            border: none;
-            cursor: pointer;
-            font-size: 1.3rem;
-            color: var(--kelion-text-secondary);
-            padding: 0 4px;
-          "
-        >
-          +
-        </button>
-        <button
-          id="btn-copy-last"
-          title="Copiază ultimul răspuns"
-          aria-label="Copy last response"
-          style="
-            background: none;
-            border: none;
-            cursor: pointer;
-            font-size: 1rem;
-            color: var(--kelion-text-secondary);
-            padding: 0 4px;
-            transition: color 0.2s;
-          "
-        >
+        <button id="btn-send" title="Send" aria-label="Send message" class="ctrl-action">➤</button>
+        <button id="btn-plus" title="Import / Export" aria-label="Files" class="ctrl-action">+</button>
+        <button id="btn-copy-last" title="Copiază ultimul răspuns" aria-label="Copy last response" class="ctrl-action">
           📋
         </button>
         <button
           id="btn-save-last"
           title="Salvează ultimul răspuns ca fișier"
           aria-label="Save last response"
-          style="
-            background: none;
-            border: none;
-            cursor: pointer;
-            font-size: 1rem;
-            color: var(--kelion-text-secondary);
-            padding: 0 4px;
-            transition: color 0.2s;
-          "
+          class="ctrl-action"
         >
           💾
         </button>
-        <button
-          id="btn-cc-toggle"
-          title="CC Subtitles"
-          aria-label="Toggle CC subtitles"
-          style="
-            background: none;
-            border: 2px solid #555;
-            border-radius: 50%;
-            width: 36px;
-            height: 36px;
-            cursor: pointer;
-            font-size: 0.75rem;
-            font-weight: 700;
-            color: #888;
-            transition: all 0.3s;
-            font-family: var(--kelion-font);
-          "
-        >
-          CC
-        </button>
+        <button id="btn-cc-toggle" title="CC Subtitles" aria-label="Toggle CC subtitles" class="ctrl-circle">CC</button>
         <button
           id="btn-translate-toggle"
           title="Translate Mode: OFF"
           aria-label="Toggle live translation"
-          style="
-            background: none;
-            border: 2px solid #555;
-            border-radius: 50%;
-            width: 36px;
-            height: 36px;
-            cursor: pointer;
-            font-size: 0.85rem;
-            font-weight: 700;
-            color: #888;
-            transition: all 0.3s;
-            font-family: var(--kelion-font);
-          "
+          class="ctrl-circle"
         >
           T
         </button>
-        <button
-          id="btn-scan-toggle"
-          title="Product Scanner"
-          aria-label="Scan product barcode"
-          style="
-            background: none;
-            border: 2px solid #555;
-            border-radius: 50%;
-            width: 36px;
-            height: 36px;
-            cursor: pointer;
-            font-size: 1rem;
-            color: #888;
-            transition: all 0.3s;
-          "
-        >
+        <button id="btn-scan-toggle" title="Product Scanner" aria-label="Scan product barcode" class="ctrl-circle">
           🛒
         </button>
       </div>
@@ -1053,118 +783,30 @@
 
     <!-- REFERRAL/INVITE MODAL -->
     <div id="referral-modal" class="modal-overlay hidden">
-      <div class="modal-content" style="max-width: 480px; padding: 32px">
+      <div class="modal-content">
         <button class="modal-close" id="referral-close">&times;</button>
-        <h2 style="font-size: 1.4rem; font-weight: 700; margin-bottom: 8px">🎁 Invite Friends</h2>
-        <p style="color: #8888aa; font-size: 0.85rem; margin-bottom: 20px">
-          Generate an invite code and share it with a friend. You both get bonus days!
-        </p>
+        <h2 class="referral-title">🎁 Invite Friends</h2>
+        <p class="referral-desc">Generate an invite code and share it with a friend. You both get bonus days!</p>
 
-        <div id="referral-code-section" style="margin-bottom: 20px">
-          <label
-            style="color: #a5b4fc; font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1px"
-            >Your invite code</label
-          >
-          <div style="display: flex; gap: 8px; margin-top: 8px">
-            <input
-              type="text"
-              id="referral-code-display"
-              readonly
-              style="
-                flex: 1;
-                padding: 12px 16px;
-                background: rgba(10, 10, 30, 0.8);
-                border: 1px solid rgba(99, 102, 241, 0.3);
-                border-radius: 10px;
-                color: #6ee7b7;
-                font-family: 'JetBrains Mono', monospace;
-                font-size: 1rem;
-                letter-spacing: 1px;
-                text-align: center;
-              "
-              placeholder="Click Generate..."
-            />
-            <button
-              id="btn-copy-code"
-              style="
-                padding: 8px 14px;
-                background: rgba(99, 102, 241, 0.15);
-                border: 1px solid rgba(99, 102, 241, 0.3);
-                border-radius: 10px;
-                color: #a5b4fc;
-                cursor: pointer;
-                font-size: 1rem;
-              "
-              title="Copy"
-            >
-              📋
-            </button>
+        <div id="referral-code-section">
+          <label class="referral-label">Your invite code</label>
+          <div class="referral-row">
+            <input type="text" id="referral-code-display" readonly placeholder="Click Generate..." />
+            <button id="btn-copy-code" title="Copy">📋</button>
           </div>
-          <div id="referral-expiry" style="color: #555577; font-size: 0.75rem; margin-top: 6px"></div>
-          <div id="referral-remaining" style="color: #555577; font-size: 0.75rem; margin-top: 2px"></div>
+          <div id="referral-expiry"></div>
+          <div id="referral-remaining"></div>
         </div>
 
-        <button
-          id="btn-generate-code"
-          style="
-            width: 100%;
-            padding: 12px;
-            background: linear-gradient(135deg, #10b981, #06b6d4);
-            border: none;
-            border-radius: 10px;
-            color: #fff;
-            font-size: 0.95rem;
-            font-weight: 600;
-            cursor: pointer;
-            font-family: var(--kelion-font);
-            margin-bottom: 20px;
-            transition: all 0.2s;
-          "
-        >
-          ✨ Generate invite code
-        </button>
+        <button id="btn-generate-code">✨ Generate invite code</button>
 
-        <div style="border-top: 1px solid rgba(99, 102, 241, 0.12); padding-top: 20px">
-          <label
-            style="color: #a5b4fc; font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1px"
-            >Send invite via email</label
-          >
-          <div style="display: flex; gap: 8px; margin-top: 8px">
-            <input
-              type="email"
-              id="referral-email"
-              placeholder="friend@email.com"
-              style="
-                flex: 1;
-                padding: 12px 16px;
-                background: rgba(10, 10, 30, 0.6);
-                border: 1px solid rgba(99, 102, 241, 0.2);
-                border-radius: 10px;
-                color: #f0f0ff;
-                font-family: var(--kelion-font);
-                font-size: 0.9rem;
-                outline: none;
-              "
-            />
-            <button
-              id="btn-send-invite"
-              style="
-                padding: 8px 18px;
-                background: linear-gradient(135deg, #6366f1, #06b6d4);
-                border: none;
-                border-radius: 10px;
-                color: #fff;
-                font-size: 0.9rem;
-                font-weight: 600;
-                cursor: pointer;
-                font-family: var(--kelion-font);
-                white-space: nowrap;
-              "
-            >
-              📧 Send
-            </button>
+        <div class="referral-divider">
+          <label class="referral-label">Send invite via email</label>
+          <div class="referral-row">
+            <input type="email" id="referral-email" placeholder="friend@email.com" placeholder="friend@email.com" />
+            <button id="btn-send-invite">📧 Send</button>
           </div>
-          <p id="referral-status" style="font-size: 0.8rem; margin-top: 8px; min-height: 20px"></p>
+          <p id="referral-status"></p>
         </div>
       </div>
     </div>
@@ -1233,10 +875,10 @@
       }
     </script>
 
-    <a href="/" id="home-btn-fixed" class="home-btn-fixed" title="Home" style="display: none">🏠</a>
+    <a href="/" id="home-btn-fixed" class="home-btn-fixed" title="Home">🏠</a>
 
     <!-- PWA INSTALL BANNER -->
-    <div id="pwa-install-banner" class="pwa-banner" style="display: none">
+    <div id="pwa-install-banner" class="pwa-banner">
       <div class="pwa-banner-content">
         <span>📱</span>
         <div>
@@ -1288,13 +930,7 @@
       }
     </script>
     <!-- Theme Toggle (hidden — replaced by camera) -->
-    <button
-      class="theme-toggle"
-      id="theme-toggle"
-      style="display: none !important"
-      title="Toggle dark/light theme"
-      aria-hidden="true"
-    >
+    <button class="theme-toggle" id="theme-toggle" title="Toggle dark/light theme" aria-hidden="true">
       <span id="theme-icon">☀️</span>
     </button>
     <!-- Camera Toggle — now inline in input row (btn-camera-inline) -->
