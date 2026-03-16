@@ -7,274 +7,287 @@
 
 ## Etapa 1 — Core Infrastructure
 
-| # | Funcționalitate | Status | Endpoint / Fișier | Notă |
-|---|---|---|---|---|
-| 1 | Server Express + CORS + Helmet | [x] | `server/index.js` | Live 200 OK, uptime 757s |
-| 2 | Supabase DB connection | [x] | `server/index.js` | services.database=true |
-| 3 | Rate limiting global | [x] | `server/index.js` (globalLimiter) | Cod prezent, funcțional |
-| 4 | Static file serving | [x] | `server/index.js` → `/app` | CSS/JS/images servite corect |
-| 5 | Health check endpoint | [x] | `GET /api/health` | 200 OK, JSON valid |
-| 6 | Error handling middleware | [x] | `server/index.js` | 401/404 JSON responses corecte |
-| 7 | Sentry error tracking | [x] | `server/index.js` | services.sentry=true, erori vizibile |
-| 8 | Metrics middleware | [x] | `server/metrics.js` | Modul intern, nu rută API |
-| 9 | Cache system (LRU) | [x] | `server/cache.js` | Modul intern, nu rută API |
-| 10 | Environment variables validation | [x] | `server/index.js` | Validare la startup |
+| #   | Funcționalitate                  | Status | Endpoint / Fișier                 | Notă                                 |
+| --- | -------------------------------- | ------ | --------------------------------- | ------------------------------------ |
+| 1   | Server Express + CORS + Helmet   | [x]    | `server/index.js`                 | Live 200 OK, uptime 757s             |
+| 2   | Supabase DB connection           | [x]    | `server/index.js`                 | services.database=true               |
+| 3   | Rate limiting global             | [x]    | `server/index.js` (globalLimiter) | Cod prezent, funcțional              |
+| 4   | Static file serving              | [x]    | `server/index.js` → `/app`        | CSS/JS/images servite corect         |
+| 5   | Health check endpoint            | [x]    | `GET /api/health`                 | 200 OK, JSON valid                   |
+| 6   | Error handling middleware        | [x]    | `server/index.js`                 | 401/404 JSON responses corecte       |
+| 7   | Sentry error tracking            | [x]    | `server/index.js`                 | services.sentry=true, erori vizibile |
+| 8   | Metrics middleware               | [x]    | `server/metrics.js`               | Modul intern, nu rută API            |
+| 9   | Cache system (LRU)               | [x]    | `server/cache.js`                 | Modul intern, nu rută API            |
+| 10  | Environment variables validation | [x]    | `server/index.js`                 | Validare la startup                  |
 
 ---
 
 ## Etapa 2 — Authentication & User Management
 
-| # | Funcționalitate | Status | Endpoint / Fișier | Notă |
-|---|---|---|---|---|
-| 11 | Register (email + password) | [x] | `POST /api/auth/register` | Formular funcțional, Supabase rate limit |
-| 12 | Login | [x] | `POST /api/auth/login` | Testat live cu contact@kelionai.app |
-| 13 | Logout | [x] | `POST /api/auth/logout` | POST only, funcțional |
-| 14 | Get user profile | [x] | `GET /api/auth/me` | 401 fără token (corect) |
-| 15 | Refresh token | [x] | `POST /api/auth/refresh` | Cod valid |
-| 16 | Forgot password | [x] | `POST /api/auth/forgot-password` | 200 OK, trimite reset link |
-| 17 | Reset password | [x] | `POST /api/auth/reset-password` | Cod valid |
-| 18 | Change password | [x] | `POST /api/auth/change-password` | Cod valid |
-| 19 | Change email | [x] | `POST /api/auth/change-email` | Cod valid |
-| 20 | Admin verify code | [x] | `POST /api/admin/verify-code` | 403 — cod invalid (corect) |
-| 21 | Admin health check | [x] | `GET /api/admin/health-check` | 401 — Admin Only (by design) |
-| 22 | Admin brain status | [x] | `GET /api/brain` | 401 — Admin Only (by design) |
-| 23 | Admin brain reset | [x] | `POST /api/brain/reset` | 401 — Admin Only (by design) |
-| 24 | Admin payments stats | [x] | `GET /api/payments/admin/stats` | 401 — Admin Only (by design) |
+| #   | Funcționalitate             | Status | Endpoint / Fișier                | Notă                                     |
+| --- | --------------------------- | ------ | -------------------------------- | ---------------------------------------- |
+| 11  | Register (email + password) | [x]    | `POST /api/auth/register`        | Formular funcțional, Supabase rate limit |
+| 12  | Login                       | [x]    | `POST /api/auth/login`           | Testat live cu contact@kelionai.app      |
+| 13  | Logout                      | [x]    | `POST /api/auth/logout`          | POST only, funcțional                    |
+| 14  | Get user profile            | [x]    | `GET /api/auth/me`               | 401 fără token (corect)                  |
+| 15  | Refresh token               | [x]    | `POST /api/auth/refresh`         | Cod valid                                |
+| 16  | Forgot password             | [x]    | `POST /api/auth/forgot-password` | 200 OK, trimite reset link               |
+| 17  | Reset password              | [x]    | `POST /api/auth/reset-password`  | Cod valid                                |
+| 18  | Change password             | [x]    | `POST /api/auth/change-password` | Cod valid                                |
+| 19  | Change email                | [x]    | `POST /api/auth/change-email`    | Cod valid                                |
+| 20  | Admin verify code           | [x]    | `POST /api/admin/verify-code`    | 403 — cod invalid (corect)               |
+| 21  | Admin health check          | [x]    | `GET /api/admin/health-check`    | 401 — Admin Only (by design)             |
+| 22  | Admin brain status          | [x]    | `GET /api/brain`                 | 401 — Admin Only (by design)             |
+| 23  | Admin brain reset           | [x]    | `POST /api/brain/reset`          | 401 — Admin Only (by design)             |
+| 24  | Admin payments stats        | [x]    | `GET /api/payments/admin/stats`  | 401 — Admin Only (by design)             |
 
 ---
 
 ## Etapa 3 — AI Brain & Chat
 
-| # | Funcționalitate | Status | Endpoint / Fișier | Notă |
-|---|---|---|---|---|
-| 25 | Chat (text → AI reply) | [x] | `POST /api/chat` | Testat live: "5+3=8" răspuns corect |
-| 26 | Chat streaming (SSE) | [x] | `POST /api/chat/stream` | 200, Claude streaming funcțional |
-| 27 | Conversations list | [x] | `GET /api/conversations` | 200 OK, listă goală (user nou) |
-| 28 | Conversation messages | [x] | `GET /api/conversations/:id/messages` | Cod valid, testat la resume |
-| 29 | Memory / context | [x] | `POST /api/memory` | 200, {keys:[], items:[]} |
-| 30 | Brain cognitive system | [x] | `server/brain.js` | services.brain=healthy |
-| 31 | Persona system (Kelion/Kira) | [x] | `server/persona.js` | Testat live: switch funcțional |
-| 32 | Vision (image analysis) | [x] | `POST /api/vision` | 200, Claude răspunde corect, 10 modes |
-| 33 | Image generation (FLUX) | [x] | `POST /api/imagine` | 200, Base64 generat |
-| 34 | Voice TTS (speak) | [x] | `POST /api/voice/speak` | services.tts=true |
-| 35 | Voice STT (listen) | [x] | `POST /api/voice/listen` | services.stt_openai=true |
-| 36 | Voice clone upload | [x] | `POST /api/voice/clone` | 400 — cere audio file (corect) |
-| 37 | Voice clone status | [x] | `GET /api/voice/clone` | 200, {hasClone: false} |
-| 38 | Voice clone delete | [x] | `DELETE /api/voice/clone` | Endpoint montat |
-| 39 | Web search | [x] | `POST /api/search` | Monitor afișează rezultate live |
-| 40 | Weather | [x] | `POST /api/weather` | services.weather=true |
-| 112 | Voice clone list | [x] | `GET /api/voice-clone/list` | Rută prezentă în index.js |
+| #   | Funcționalitate              | Status | Endpoint / Fișier                     | Notă                                  |
+| --- | ---------------------------- | ------ | ------------------------------------- | ------------------------------------- |
+| 25  | Chat (text → AI reply)       | [x]    | `POST /api/chat`                      | Testat live: "5+3=8" răspuns corect   |
+| 26  | Chat streaming (SSE)         | [x]    | `POST /api/chat/stream`               | 200, Claude streaming funcțional      |
+| 27  | Conversations list           | [x]    | `GET /api/conversations`              | 200 OK, listă goală (user nou)        |
+| 28  | Conversation messages        | [x]    | `GET /api/conversations/:id/messages` | Cod valid, testat la resume           |
+| 29  | Memory / context             | [x]    | `POST /api/memory`                    | 200, {keys:[], items:[]}              |
+| 30  | Brain cognitive system       | [x]    | `server/brain.js`                     | services.brain=healthy                |
+| 31  | Persona system (Kelion/Kira) | [x]    | `server/persona.js`                   | Testat live: switch funcțional        |
+| 32  | Vision (image analysis)      | [x]    | `POST /api/vision`                    | 200, Claude răspunde corect, 10 modes |
+| 33  | Image generation (FLUX)      | [x]    | `POST /api/imagine`                   | 200, Base64 generat                   |
+| 34  | Voice TTS (speak)            | [x]    | `POST /api/voice/speak`               | services.tts=true                     |
+| 35  | Voice STT (listen)           | [x]    | `POST /api/voice/listen`              | services.stt_openai=true              |
+| 36  | Voice clone upload           | [x]    | `POST /api/voice/clone`               | 400 — cere audio file (corect)        |
+| 37  | Voice clone status           | [x]    | `GET /api/voice/clone`                | 200, {hasClone: false}                |
+| 38  | Voice clone delete           | [x]    | `DELETE /api/voice/clone`             | Endpoint montat                       |
+| 39  | Web search                   | [x]    | `POST /api/search`                    | Monitor afișează rezultate live       |
+| 40  | Weather                      | [x]    | `POST /api/weather`                   | services.weather=true                 |
+| 112 | Voice clone list             | [x]    | `GET /api/voice-clone/list`           | Rută prezentă în index.js             |
 
 ---
 
 ## Etapa 4 — Omnichannel Bots
 
-| # | Funcționalitate | Status | Endpoint / Fișier | Notă |
-|---|---|---|---|---|
-| 41 | Messenger webhook verify | [x] | `GET /api/messenger/webhook` | 403 fără token (corect) |
-| 42 | Messenger webhook receive | ⚠️ | `POST /api/messenger/webhook` | Cod OK, dar Meta webhook NESUBSCRIS — nu primește mesaje |
-| 43 | Messenger stats | [x] | `GET /api/messenger/stats` | 401 — Admin Only (messagesReceived: 0) |
-| 44 | Messenger conversation history → DB | [x] | `server/messenger.js` → `messenger_messages` | Cod prezent |
-| 45 | Messenger user tracking → DB | [x] | `server/messenger.js` → `messenger_users` | Cod prezent |
-| 46 | Messenger character selection → DB | [x] | `server/messenger.js` → `messenger_users.character` | Cod prezent |
-| 47 | Messenger message count → DB | [x] | `server/messenger.js` → `messenger_users.message_count` | Cod prezent |
-| 48 | Telegram webhook | [x] | `POST /api/telegram/webhook` | 200 OK |
-| 49 | Telegram health | [x] | `GET /api/telegram/health` | 200, status=configured |
-| 50 | Telegram conversation history → DB | [x] | `server/telegram.js` → `telegram_messages` | Cod prezent |
-| 51 | Telegram user tracking → DB | [x] | `server/telegram.js` → `telegram_users` | Cod prezent |
-| 52 | Telegram message count → DB | [x] | `server/telegram.js` → `telegram_users.message_count` | Cod prezent |
-| 53 | WhatsApp webhook verify | [x] | `GET /api/whatsapp/webhook` | 403 fără token (corect) |
-| 54 | WhatsApp webhook receive | ⚠️ | `POST /api/whatsapp/webhook` | Cod OK, dar Meta Cloud API webhook NESUBSCRIS |
-| 55 | WhatsApp health | [x] | `GET /api/whatsapp/health` | 200 OK, configured (dar messagesReceived: 0) |
-| 56 | WhatsApp send message | [x] | `POST /api/whatsapp/send` | Rută prezentă în whatsapp.js |
-| 57 | WhatsApp conversation history → DB | [x] | `server/whatsapp.js` → `whatsapp_messages` | Cod prezent |
-| 58 | WhatsApp user tracking → DB | [x] | `server/whatsapp.js` → `whatsapp_users` | Cod prezent |
-| 59 | WhatsApp character selection → DB | [x] | `server/whatsapp.js` → `whatsapp_users.character` | Cod prezent |
-| 60 | WhatsApp message count → DB | [x] | `server/whatsapp.js` → `whatsapp_users.message_count` | Cod prezent |
-| 61 | Instagram health | [x] | `GET /api/media/instagram/health` | 200 OK |
-| 62 | Facebook health | [x] | `GET /api/media/facebook/health` | 200 OK |
-| 63 | Media status | [x] | `GET /api/media/status` | 401 — Admin Only (by design) |
-| 64 | Media publish | [x] | `POST /api/media/publish` | Rută prezentă în index.js |
-| 65 | News broadcast to bots | [x] | `server/index.js` → `broadcastNews` | Cod prezent |
+| #   | Funcționalitate                     | Status | Endpoint / Fișier                                       | Notă                                                     |
+| --- | ----------------------------------- | ------ | ------------------------------------------------------- | -------------------------------------------------------- |
+| 41  | Messenger webhook verify            | [x]    | `GET /api/messenger/webhook`                            | 403 fără token (corect)                                  |
+| 42  | Messenger webhook receive           | ⚠️     | `POST /api/messenger/webhook`                           | Cod OK, dar Meta webhook NESUBSCRIS — nu primește mesaje |
+| 43  | Messenger stats                     | [x]    | `GET /api/messenger/stats`                              | 401 — Admin Only (messagesReceived: 0)                   |
+| 44  | Messenger conversation history → DB | [x]    | `server/messenger.js` → `messenger_messages`            | Cod prezent                                              |
+| 45  | Messenger user tracking → DB        | [x]    | `server/messenger.js` → `messenger_users`               | Cod prezent                                              |
+| 46  | Messenger character selection → DB  | [x]    | `server/messenger.js` → `messenger_users.character`     | Cod prezent                                              |
+| 47  | Messenger message count → DB        | [x]    | `server/messenger.js` → `messenger_users.message_count` | Cod prezent                                              |
+| 48  | Telegram webhook                    | [x]    | `POST /api/telegram/webhook`                            | 200 OK                                                   |
+| 49  | Telegram health                     | [x]    | `GET /api/telegram/health`                              | 200, status=configured                                   |
+| 50  | Telegram conversation history → DB  | [x]    | `server/telegram.js` → `telegram_messages`              | Cod prezent                                              |
+| 51  | Telegram user tracking → DB         | [x]    | `server/telegram.js` → `telegram_users`                 | Cod prezent                                              |
+| 52  | Telegram message count → DB         | [x]    | `server/telegram.js` → `telegram_users.message_count`   | Cod prezent                                              |
+| 53  | WhatsApp webhook verify             | [x]    | `GET /api/whatsapp/webhook`                             | 403 fără token (corect)                                  |
+| 54  | WhatsApp webhook receive            | ⚠️     | `POST /api/whatsapp/webhook`                            | Cod OK, dar Meta Cloud API webhook NESUBSCRIS            |
+| 55  | WhatsApp health                     | [x]    | `GET /api/whatsapp/health`                              | 200 OK, configured (dar messagesReceived: 0)             |
+| 56  | WhatsApp send message               | [x]    | `POST /api/whatsapp/send`                               | Rută prezentă în whatsapp.js                             |
+| 57  | WhatsApp conversation history → DB  | [x]    | `server/whatsapp.js` → `whatsapp_messages`              | Cod prezent                                              |
+| 58  | WhatsApp user tracking → DB         | [x]    | `server/whatsapp.js` → `whatsapp_users`                 | Cod prezent                                              |
+| 59  | WhatsApp character selection → DB   | [x]    | `server/whatsapp.js` → `whatsapp_users.character`       | Cod prezent                                              |
+| 60  | WhatsApp message count → DB         | [x]    | `server/whatsapp.js` → `whatsapp_users.message_count`   | Cod prezent                                              |
+| 61  | Instagram health                    | [x]    | `GET /api/media/instagram/health`                       | 200 OK                                                   |
+| 62  | Facebook health                     | [x]    | `GET /api/media/facebook/health`                        | 200 OK                                                   |
+| 63  | Media status                        | [x]    | `GET /api/media/status`                                 | 401 — Admin Only (by design)                             |
+| 64  | Media publish                       | [x]    | `POST /api/media/publish`                               | Rută prezentă în index.js                                |
+| 65  | News broadcast to bots              | [x]    | `server/index.js` → `broadcastNews`                     | Cod prezent                                              |
 
 ---
 
 ## Etapa 5 — Trading & Finance
 
-| # | Funcționalitate | Status | Endpoint / Fișier | Notă |
-|---|---|---|---|---|
-| 66 | Trading status | [x] | `GET /api/trading/status` | 401 fără auth (corect) |
-| 67 | Trading analysis | [x] | `GET /api/trading/analysis` | 401 fără auth (corect) |
-| 68 | Trading signals | [x] | `GET /api/trading/signals` | 401 fără auth (corect) |
-| 69 | Trading portfolio | [x] | `GET /api/trading/portfolio` | 401 fără auth (corect) |
-| 70 | Trading backtest | [x] | `POST /api/trading/backtest` | 401 — Admin Only (by design) |
-| 71 | Trading alerts | [x] | `GET /api/trading/alerts` | 401 fără auth (corect) |
-| 72 | Trading correlation | [x] | `GET /api/trading/correlation` | 401 fără auth (corect) |
-| 73 | Trading risk | [x] | `GET /api/trading/risk` | 401 fără auth (corect) |
-| 74 | Trading history | [x] | `GET /api/trading/history` | 401 fără auth (corect) |
-| 75 | Trading execute | [x] | `POST /api/trading/execute` | 401 — Admin Only (by design) |
-| 76 | Trading full analysis | [x] | `GET /api/trading/full-analysis/:asset?` | 401 fără auth (corect) |
-| 77 | Trading calendar | [x] | `GET /api/trading/calendar` | 401 fără auth (corect) |
-| 78 | Trading positions | [x] | `GET /api/trading/positions` | 401 fără auth (corect) |
-| 79 | Trading close position | [x] | `POST /api/trading/close/:tradeId` | 401 — Admin Only (by design) |
-| 80 | Trading kill switch | [x] | `POST /api/trading/kill-switch` | 401 fără auth (corect) |
-| 81 | Trading paper balance | [x] | `GET /api/trading/paper-balance` | 401 fără auth (corect) |
-| 82 | Trading risk profile (GET) | [x] | `GET /api/trading/risk-profile` | 401 fără auth (corect) |
-| 83 | Trading risk profile (SET) | [x] | `POST /api/trading/risk-profile` | 401 — Admin Only (by design) |
-| 84 | Trading projections | [x] | `GET /api/trading/projections` | 401 fără auth (corect) |
-| 85 | Payments plans list | [x] | `GET /api/payments/plans` | Free/Pro/Premium JSON |
-| 86 | Payments status | [x] | `GET /api/payments/status` | 401 fără auth (corect) |
-| 87 | Payments checkout | [x] | `POST /api/payments/checkout` | 200 OK, Stripe EUR €9.99/lună |
-| 88 | Payments portal | [x] | `POST /api/payments/portal` | 404 — no active subscription (corect) |
-| 89 | Payments webhook | [x] | `POST /api/payments/webhook` | 400 — signature missing (corect) |
-| 90 | Payments referral apply | [x] | `POST /api/payments/referral` | 200, cod generat |
-| 91 | Payments redeem | [x] | `POST /api/payments/redeem` | 404 — cod invalid (corect) |
+| #   | Funcționalitate            | Status | Endpoint / Fișier                        | Notă                                  |
+| --- | -------------------------- | ------ | ---------------------------------------- | ------------------------------------- |
+| 66  | Trading status             | [x]    | `GET /api/trading/status`                | 401 fără auth (corect)                |
+| 67  | Trading analysis           | [x]    | `GET /api/trading/analysis`              | 401 fără auth (corect)                |
+| 68  | Trading signals            | [x]    | `GET /api/trading/signals`               | 401 fără auth (corect)                |
+| 69  | Trading portfolio          | [x]    | `GET /api/trading/portfolio`             | 401 fără auth (corect)                |
+| 70  | Trading backtest           | [x]    | `POST /api/trading/backtest`             | 401 — Admin Only (by design)          |
+| 71  | Trading alerts             | [x]    | `GET /api/trading/alerts`                | 401 fără auth (corect)                |
+| 72  | Trading correlation        | [x]    | `GET /api/trading/correlation`           | 401 fără auth (corect)                |
+| 73  | Trading risk               | [x]    | `GET /api/trading/risk`                  | 401 fără auth (corect)                |
+| 74  | Trading history            | [x]    | `GET /api/trading/history`               | 401 fără auth (corect)                |
+| 75  | Trading execute            | [x]    | `POST /api/trading/execute`              | 401 — Admin Only (by design)          |
+| 76  | Trading full analysis      | [x]    | `GET /api/trading/full-analysis/:asset?` | 401 fără auth (corect)                |
+| 77  | Trading calendar           | [x]    | `GET /api/trading/calendar`              | 401 fără auth (corect)                |
+| 78  | Trading positions          | [x]    | `GET /api/trading/positions`             | 401 fără auth (corect)                |
+| 79  | Trading close position     | [x]    | `POST /api/trading/close/:tradeId`       | 401 — Admin Only (by design)          |
+| 80  | Trading kill switch        | [x]    | `POST /api/trading/kill-switch`          | 401 fără auth (corect)                |
+| 81  | Trading paper balance      | [x]    | `GET /api/trading/paper-balance`         | 401 fără auth (corect)                |
+| 82  | Trading risk profile (GET) | [x]    | `GET /api/trading/risk-profile`          | 401 fără auth (corect)                |
+| 83  | Trading risk profile (SET) | [x]    | `POST /api/trading/risk-profile`         | 401 — Admin Only (by design)          |
+| 84  | Trading projections        | [x]    | `GET /api/trading/projections`           | 401 fără auth (corect)                |
+| 85  | Payments plans list        | [x]    | `GET /api/payments/plans`                | Free/Pro/Premium JSON                 |
+| 86  | Payments status            | [x]    | `GET /api/payments/status`               | 401 fără auth (corect)                |
+| 87  | Payments checkout          | [x]    | `POST /api/payments/checkout`            | 200 OK, Stripe EUR €9.99/lună         |
+| 88  | Payments portal            | [x]    | `POST /api/payments/portal`              | 404 — no active subscription (corect) |
+| 89  | Payments webhook           | [x]    | `POST /api/payments/webhook`             | 400 — signature missing (corect)      |
+| 90  | Payments referral apply    | [x]    | `POST /api/payments/referral`            | 200, cod generat                      |
+| 91  | Payments redeem            | [x]    | `POST /api/payments/redeem`              | 404 — cod invalid (corect)            |
 
 ---
 
 ## Etapa 6 — Platform Features
 
-| # | Funcționalitate | Status | Endpoint / Fișier | Notă |
-|---|---|---|---|---|
-| 92 | Referral generate | [x] | `POST /api/referral/generate` | 200, cod KEL-ee94-a9c7c7 generat |
-| 93 | Referral verify | [x] | `POST /api/referral/verify` | 200, valid=false (cod test) |
-| 94 | Referral redeem | [x] | `POST /api/referral/redeem` | Funcțional |
-| 95 | Referral my codes | [x] | `GET /api/referral/my-codes` | 200 OK |
-| 96 | Referral my bonuses | [x] | `GET /api/referral/my-bonuses` | 200, 0 bonus days |
-| 97 | Referral revoke | [x] | `DELETE /api/referral/revoke/:codeId` | 404 — code not found (corect) |
-| 98 | Legal terms | [x] | `GET /api/legal/terms` | Text complet |
-| 99 | Legal privacy | [x] | `GET /api/legal/privacy` | Text complet |
-| 100 | GDPR export | [x] | `GET /api/legal/gdpr/export` | 200 OK, export generat |
-| 101 | GDPR delete | [x] | `DELETE /api/legal/gdpr/delete` | 400 — cere confirm (corect) |
-| 102 | GDPR consent GET | [x] | `GET /api/legal/gdpr/consent` | 200 OK, {"consents":{}} |
-| 103 | GDPR consent POST | [x] | `POST /api/legal/gdpr/consent` | Funcțional (cere analytics/marketing/memory) |
-| 104 | Identity register face | [x] | `POST /api/identity/register-face` | Endpoint montat |
-| 105 | Identity check | [x] | `POST /api/identity/check` | 200, recunoaște userul |
-| 106 | Developer API keys CRUD | [x] | `GET/POST/DELETE /api/developer/keys` | 200, listă goală |
-| 107 | Developer stats | [x] | `GET /api/developer/stats` | 200, 0 requests |
-| 108 | Developer webhooks | [x] | `GET/POST /api/developer/webhooks` | 200, stare: null |
-| 109 | Developer v1 status | [x] | `GET /api/developer/v1/status` | online, v2.5.0 |
-| 110 | Developer v1 models | [x] | `GET /api/developer/v1/models` | 401 — cere X-API-Key (corect) |
-| 111 | Developer v1 user profile | [x] | `GET /api/developer/v1/user/profile` | 401 — cere X-API-Key (corect) |
-| 112 | Developer v1 chat | [x] | `POST /api/developer/v1/chat` | 401 — cere X-API-Key (corect) |
-| 113 | News latest | [x] | `GET /api/news/latest` | Articole reale |
-| 114 | News breaking | [x] | `GET /api/news/breaking` | 401 — Admin Only (by design) |
-| 115 | News schedule | [x] | `GET /api/news/schedule` | 401 — Admin Only (by design) |
-| 116 | News fetch | [x] | `GET /api/news/fetch` | 401 — Admin Only (by design) |
-| 117 | News config | [x] | `POST /api/news/config` | 401 — Admin Only (by design) |
-| 118 | News public | [x] | `GET /api/news/public` | Feed activ |
+| #   | Funcționalitate           | Status | Endpoint / Fișier                     | Notă                                         |
+| --- | ------------------------- | ------ | ------------------------------------- | -------------------------------------------- |
+| 92  | Referral generate         | [x]    | `POST /api/referral/generate`         | 200, cod KEL-ee94-a9c7c7 generat             |
+| 93  | Referral verify           | [x]    | `POST /api/referral/verify`           | 200, valid=false (cod test)                  |
+| 94  | Referral redeem           | [x]    | `POST /api/referral/redeem`           | Funcțional                                   |
+| 95  | Referral my codes         | [x]    | `GET /api/referral/my-codes`          | 200 OK                                       |
+| 96  | Referral my bonuses       | [x]    | `GET /api/referral/my-bonuses`        | 200, 0 bonus days                            |
+| 97  | Referral revoke           | [x]    | `DELETE /api/referral/revoke/:codeId` | 404 — code not found (corect)                |
+| 98  | Legal terms               | [x]    | `GET /api/legal/terms`                | Text complet                                 |
+| 99  | Legal privacy             | [x]    | `GET /api/legal/privacy`              | Text complet                                 |
+| 100 | GDPR export               | [x]    | `GET /api/legal/gdpr/export`          | 200 OK, export generat                       |
+| 101 | GDPR delete               | [x]    | `DELETE /api/legal/gdpr/delete`       | 400 — cere confirm (corect)                  |
+| 102 | GDPR consent GET          | [x]    | `GET /api/legal/gdpr/consent`         | 200 OK, {"consents":{}}                      |
+| 103 | GDPR consent POST         | [x]    | `POST /api/legal/gdpr/consent`        | Funcțional (cere analytics/marketing/memory) |
+| 104 | Identity register face    | [x]    | `POST /api/identity/register-face`    | Endpoint montat                              |
+| 105 | Identity check            | [x]    | `POST /api/identity/check`            | 200, recunoaște userul                       |
+| 106 | Developer API keys CRUD   | [x]    | `GET/POST/DELETE /api/developer/keys` | 200, listă goală                             |
+| 107 | Developer stats           | [x]    | `GET /api/developer/stats`            | 200, 0 requests                              |
+| 108 | Developer webhooks        | [x]    | `GET/POST /api/developer/webhooks`    | 200, stare: null                             |
+| 109 | Developer v1 status       | [x]    | `GET /api/developer/v1/status`        | online, v2.5.0                               |
+| 110 | Developer v1 models       | [x]    | `GET /api/developer/v1/models`        | 401 — cere X-API-Key (corect)                |
+| 111 | Developer v1 user profile | [x]    | `GET /api/developer/v1/user/profile`  | 401 — cere X-API-Key (corect)                |
+| 112 | Developer v1 chat         | [x]    | `POST /api/developer/v1/chat`         | 401 — cere X-API-Key (corect)                |
+| 113 | News latest               | [x]    | `GET /api/news/latest`                | Articole reale                               |
+| 114 | News breaking             | [x]    | `GET /api/news/breaking`              | 401 — Admin Only (by design)                 |
+| 115 | News schedule             | [x]    | `GET /api/news/schedule`              | 401 — Admin Only (by design)                 |
+| 116 | News fetch                | [x]    | `GET /api/news/fetch`                 | 401 — Admin Only (by design)                 |
+| 117 | News config               | [x]    | `POST /api/news/config`               | 401 — Admin Only (by design)                 |
+| 118 | News public               | [x]    | `GET /api/news/public`                | Feed activ                                   |
 
 ---
 
 ## Frontend (UI)
 
-| # | Funcționalitate | Status | Fișier | Notă |
-|---|---|---|---|---|
-| 119 | Onboarding flow (3 steps) | [x] | `onboarding.html` | Pagina se încarcă corect |
-| 120 | Homepage + WebGL Avatar | [x] | `index.html` + `app.js` | Avatar 3D funcțional |
-| 121 | Chat interface | [x] | `app.js` | Testat live: mesaj trimis + răspuns AI |
-| 122 | Voice sync with avatar | [x] | `avatar.js` + `app.js` | Canvas prezent, msPerChar cod valid |
-| 123 | Pricing modal | [x] | `app.js` → `#pricing-modal` | |
-| 124 | Settings page | [x] | `/settings` | Language, Theme, Notifications |
-| 125 | Developer page | [x] | `/developer` | Auth form + portal |
-| 126 | Pricing page | [x] | `/pricing/` | Renders corect |
-| 127 | Auth screen (login/register) | [x] | `#auth-screen` | Formular vizibil, funcțional |
-| 128 | Avatar switcher (Kelion/Kira) | [x] | `#avatar-switcher` | Switch live confirmat |
-| 129 | Conversation history sidebar | [x] | `#history-drawer` | Deschide corect, "No conversations yet" |
-| 130 | Microphone button | [x] | `#btn-mic-toggle` | Vizibil pe homepage |
-| 131 | Monitor panel | [x] | `#monitor-default` | Afișează rezultate search |
-| 132 | PWA manifest | [x] | `manifest.json` | 200 OK |
-| 133 | Service worker | [x] | `sw.js` | Fișier prezent în app/ |
-| 134 | Mobile responsive | [x] | CSS | Testat la 375x667, UI responsive |
-| 135 | Reset password page | [x] | `reset-password.html` | Form vizibil |
-| 136 | Error page | [x] | `error.html` | Custom 500 UI |
+| #   | Funcționalitate               | Status | Fișier                      | Notă                                    |
+| --- | ----------------------------- | ------ | --------------------------- | --------------------------------------- |
+| 119 | Onboarding flow (3 steps)     | [x]    | `onboarding.html`           | Pagina se încarcă corect                |
+| 120 | Homepage + WebGL Avatar       | [x]    | `index.html` + `app.js`     | Avatar 3D funcțional                    |
+| 121 | Chat interface                | [x]    | `app.js`                    | Testat live: mesaj trimis + răspuns AI  |
+| 122 | Voice sync with avatar        | [x]    | `avatar.js` + `app.js`      | Canvas prezent, msPerChar cod valid     |
+| 123 | Pricing modal                 | [x]    | `app.js` → `#pricing-modal` |                                         |
+| 124 | Settings page                 | [x]    | `/settings`                 | Language, Theme, Notifications          |
+| 125 | Developer page                | [x]    | `/developer`                | Auth form + portal                      |
+| 126 | Pricing page                  | [x]    | `/pricing/`                 | Renders corect                          |
+| 127 | Auth screen (login/register)  | [x]    | `#auth-screen`              | Formular vizibil, funcțional            |
+| 128 | Avatar switcher (Kelion/Kira) | [x]    | `#avatar-switcher`          | Switch live confirmat                   |
+| 129 | Conversation history sidebar  | [x]    | `#history-drawer`           | Deschide corect, "No conversations yet" |
+| 130 | Microphone button             | [x]    | `#btn-mic-toggle`           | Vizibil pe homepage                     |
+| 131 | Monitor panel                 | [x]    | `#monitor-default`          | Afișează rezultate search               |
+| 132 | PWA manifest                  | [x]    | `manifest.json`             | 200 OK                                  |
+| 133 | Service worker                | [x]    | `sw.js`                     | Fișier prezent în app/                  |
+| 134 | Mobile responsive             | [x]    | CSS                         | Testat la 375x667, UI responsive        |
+| 135 | Reset password page           | [x]    | `reset-password.html`       | Form vizibil                            |
+| 136 | Error page                    | [x]    | `error.html`                | Custom 500 UI                           |
 
 ---
 
 ## Testing & Quality
 
-| # | Funcționalitate | Status | Fișier | Notă |
-|---|---|---|---|---|
-| 137 | Jest unit tests (239) | [x] | `__tests__/*.test.js` | 11 suites, cod prezent |
-| 138 | Playwright E2E tests (154) | [x] | `tests/e2e-full.spec.js` | 107 passed anterior |
-| 139 | ESLint / Prettier | [x] | `.eslintrc` / `.prettierrc` | 100% Prettier enforced |
-| 140 | Truth Guard CI | [x] | `scripts/gate.js` | 7/8 quality gates PASS |
+| #   | Funcționalitate            | Status | Fișier                      | Notă                   |
+| --- | -------------------------- | ------ | --------------------------- | ---------------------- |
+| 137 | Jest unit tests (239)      | [x]    | `__tests__/*.test.js`       | 11 suites, cod prezent |
+| 138 | Playwright E2E tests (154) | [x]    | `tests/e2e-full.spec.js`    | 107 passed anterior    |
+| 139 | ESLint / Prettier          | [x]    | `.eslintrc` / `.prettierrc` | 100% Prettier enforced |
+| 140 | Truth Guard CI             | [x]    | `scripts/gate.js`           | 7/8 quality gates PASS |
 
 ---
 
 ## Etapa 7 — Brain v3.0 Intelligence
 
-| # | Funcționalitate | Status | Endpoint / Fișier | Notă |
-|---|---|---|---|---|
-| 141 | User Profiling (per-user learning) | [x] | `server/brain-profile.js` → `UserProfile` | Profil: limbă, profesie, interese, stil |
-| 142 | Learning Store (pattern detection) | [x] | `server/brain-profile.js` → `LearningStore` | Înregistrează ce tools merg bine per task |
-| 143 | Circuit Breaker (self-healing) | [x] | `server/brain-profile.js` → `LearningStore` | Tool eșuează 3x → skipuit 5 min |
-| 144 | Autonomous Monitor (health loop) | [x] | `server/brain-profile.js` → `AutonomousMonitor` | Health check la 30 min automat |
-| 145 | Multi-Agent System | [x] | `server/brain.js` → `_selectAgent()` | 6 agenți: General, Code, Creative, Research, Trading, Tutor |
-| 146 | Confidence Scoring | [x] | `server/brain.js` → `_scoreConfidence()` | Scor 0.1-1.0 per răspuns |
-| 147 | Brain Health API | [x] | `GET /api/admin/brain-health` | Stats: uptime, tools, circuit breakers, patterns |
-| 148 | Brain tables auto-migration | [x] | `server/migrate.js` | brain_profiles, brain_learnings, brain_metrics |
+| #   | Funcționalitate                    | Status | Endpoint / Fișier                               | Notă                                                        |
+| --- | ---------------------------------- | ------ | ----------------------------------------------- | ----------------------------------------------------------- |
+| 141 | User Profiling (per-user learning) | [x]    | `server/brain-profile.js` → `UserProfile`       | Profil: limbă, profesie, interese, stil                     |
+| 142 | Learning Store (pattern detection) | [x]    | `server/brain-profile.js` → `LearningStore`     | Înregistrează ce tools merg bine per task                   |
+| 143 | Circuit Breaker (self-healing)     | [x]    | `server/brain-profile.js` → `LearningStore`     | Tool eșuează 3x → skipuit 5 min                             |
+| 144 | Autonomous Monitor (health loop)   | [x]    | `server/brain-profile.js` → `AutonomousMonitor` | Health check la 30 min automat                              |
+| 145 | Multi-Agent System                 | [x]    | `server/brain.js` → `_selectAgent()`            | 6 agenți: General, Code, Creative, Research, Trading, Tutor |
+| 146 | Confidence Scoring                 | [x]    | `server/brain.js` → `_scoreConfidence()`        | Scor 0.1-1.0 per răspuns                                    |
+| 147 | Brain Health API                   | [x]    | `GET /api/admin/brain-health`                   | Stats: uptime, tools, circuit breakers, patterns            |
+| 148 | Brain tables auto-migration        | [x]    | `server/migrate.js`                             | brain_profiles, brain_learnings, brain_metrics              |
 
 ---
 
 ## Etapa 8 — Deploy Safety & Verification
 
-| # | Funcționalitate | Status | Endpoint / Fișier | Notă |
-|---|---|---|---|---|
-| 149 | Zero hardcoded values audit | [x] | `scripts/pre-start-audit.js` | Deploy gate — blochează dacă apar hardcoded |
-| 150 | Env validation at startup | [x] | `server/startup-checks.js` | 15+ variabile verificate pe grupuri |
-| 151 | Graceful shutdown (SIGTERM) | [x] | `server/startup-checks.js` | Conexiuni închise curat, timeout 10s |
-| 152 | Post-deploy smoke test | [x] | `server/startup-checks.js` | Ping /health + /api/health după listen |
-| 153 | Table health verification | [x] | `server/migrate.js` | SELECT pe toate 31 tabele, raport OK/BROKEN |
+| #   | Funcționalitate             | Status | Endpoint / Fișier            | Notă                                        |
+| --- | --------------------------- | ------ | ---------------------------- | ------------------------------------------- |
+| 149 | Zero hardcoded values audit | [x]    | `scripts/pre-start-audit.js` | Deploy gate — blochează dacă apar hardcoded |
+| 150 | Env validation at startup   | [x]    | `server/startup-checks.js`   | 15+ variabile verificate pe grupuri         |
+| 151 | Graceful shutdown (SIGTERM) | [x]    | `server/startup-checks.js`   | Conexiuni închise curat, timeout 10s        |
+| 152 | Post-deploy smoke test      | [x]    | `server/startup-checks.js`   | Ping /health + /api/health după listen      |
+| 153 | Table health verification   | [x]    | `server/migrate.js`          | SELECT pe toate 31 tabele, raport OK/BROKEN |
 
 ---
 
 ## Etapa 7 — TODO (Viitor)
 
-| # | Funcționalitate | Status | Detalii |
-|---|---|---|---|
-| 154 | Self-Healing Brain — auto-diagnostic + fix via GitHub Issues | [x] | `POST /api/admin/self-heal` — detectează erori recurente → AI analiză → GitHub issue creat automat. Necesită `GITHUB_TOKEN` |
-| 155 | Frontend error capture → Brain | [x] | `app.js` L27 → `window.onerror` → POST `/api/brain/errors` → brain analizează pattern-uri |
-| 156 | Fix admin panel 403 flood | [x] | `admin-app.js` — auth guard la INIT + setInterval gated |
-| 157 | Fix SW cache errors | [x] | `sw.js` — `cache.add(url).catch()` per URL (fault-tolerant, nu addAll) |
-| 158 | Investigat + fix avatar | [/] | 12 GLB modele prezente, avatar.js 1230 linii complet. Probabil issue WebGL/mobile — necesită testare live |
-| 159 | Integrat multiAIConsensus în think() | [x] | Apelat la Step 6.5b: complex + confidence < 0.6 → consensus Gemini+Groq |
-| 160 | Integrat frustrationLevel în prompt AI | [x] | `buildEnrichedContext` injectează nivel frustare (3 nivele) + instrucțiuni empatice |
+| #   | Funcționalitate                                              | Status | Detalii                                                                                                                     |
+| --- | ------------------------------------------------------------ | ------ | --------------------------------------------------------------------------------------------------------------------------- |
+| 154 | Self-Healing Brain — auto-diagnostic + fix via GitHub Issues | [x]    | `POST /api/admin/self-heal` — detectează erori recurente → AI analiză → GitHub issue creat automat. Necesită `GITHUB_TOKEN` |
+| 155 | Frontend error capture → Brain                               | [x]    | `app.js` L27 → `window.onerror` → POST `/api/brain/errors` → brain analizează pattern-uri                                   |
+| 156 | Fix admin panel 403 flood                                    | [x]    | `admin-app.js` — auth guard la INIT + setInterval gated                                                                     |
+| 157 | Fix SW cache errors                                          | [x]    | `sw.js` — `cache.add(url).catch()` per URL (fault-tolerant, nu addAll)                                                      |
+| 158 | Investigat + fix avatar                                      | [/]    | 12 GLB modele prezente, avatar.js 1230 linii complet. Probabil issue WebGL/mobile — necesită testare live                   |
+| 159 | Integrat multiAIConsensus în think()                         | [x]    | Apelat la Step 6.5b: complex + confidence < 0.6 → consensus Gemini+Groq                                                     |
+| 160 | Integrat frustrationLevel în prompt AI                       | [x]    | `buildEnrichedContext` injectează nivel frustare (3 nivele) + instrucțiuni empatice                                         |
 
 ---
 
 ## Etapa 10 — IDE Parity + Lip Sync (10 Mar 2026)
 
-| # | Funcționalitate | Status | Endpoint / Fișier | Notă |
-|---|---|---|---|---|
-| 171 | Puppeteer headless browser | [x] | `server/kira-tools.js` → `renderPage()` | Chrome headless cu fallback la deepBrowse |
-| 172 | Git operations (status/log/diff) | [x] | `server/kira-tools.js` → `gitStatus/gitLog/gitDiff` | Admin-only, wired în brain.js |
-| 173 | Code search (grep recursiv) | [x] | `server/kira-tools.js` → `projectSearch()` | Sanitizare input, max 30 rezultate |
-| 174 | Project file reader | [x] | `server/kira-tools.js` → `readProjectFile()` | Security: blochează .env, node_modules |
-| 175 | Test runner (Jest/Playwright) | [x] | `server/kira-tools.js` → `runTests()` | Timeout 30s, admin-only |
-| 176 | Lip Sync API (Rhubarb + NVIDIA + Text) | [x] | `POST /api/voice/lipsync` | 3 engines cascade: NVIDIA A2F → Rhubarb WASM → text |
-| 177 | News full article posting | [x] | `server/news.js` + `server/facebook-page.js` | Scraping URL complet, postare 1800 chars |
+| #   | Funcționalitate                        | Status | Endpoint / Fișier                                   | Notă                                                |
+| --- | -------------------------------------- | ------ | --------------------------------------------------- | --------------------------------------------------- |
+| 171 | Puppeteer headless browser             | [x]    | `server/kira-tools.js` → `renderPage()`             | Chrome headless cu fallback la deepBrowse           |
+| 172 | Git operations (status/log/diff)       | [x]    | `server/kira-tools.js` → `gitStatus/gitLog/gitDiff` | Admin-only, wired în brain.js                       |
+| 173 | Code search (grep recursiv)            | [x]    | `server/kira-tools.js` → `projectSearch()`          | Sanitizare input, max 30 rezultate                  |
+| 174 | Project file reader                    | [x]    | `server/kira-tools.js` → `readProjectFile()`        | Security: blochează .env, node_modules              |
+| 175 | Test runner (Jest/Playwright)          | [x]    | `server/kira-tools.js` → `runTests()`               | Timeout 30s, admin-only                             |
+| 176 | Lip Sync API (Rhubarb + NVIDIA + Text) | [x]    | `POST /api/voice/lipsync`                           | 3 engines cascade: NVIDIA A2F → Rhubarb WASM → text |
+| 177 | News full article posting              | [x]    | `server/news.js` + `server/facebook-page.js`        | Scraping URL complet, postare 1800 chars            |
 
 ---
 
 ## Etapa 9 — K1 KELION AGI v2
 
-| # | Funcționalitate | Status | Endpoint / Fișier | Notă |
-|---|---|---|---|---|
-| 161 | K1 Cognitive Core (reasoning loop, monologue, confidence) | [x] | `server/k1-cognitive.js` | Perceive→Reflect→Hypothesize→Plan→Act→Observe→Learn |
-| 162 | K1 Deep Memory (hot/warm + attention retrieval) | [x] | `server/k1-memory.js` | Hot RAM + Warm Supabase + forgetting engine |
-| 163 | K1 World State (markets, environment, proactive alerts) | [x] | `server/k1-world-state.js` | BTC/ETH/SOL/GOLD/NASDAQ + Fear&Greed live |
-| 164 | K1 Agent Mesh (spawn, debate, ensemble, adversarial) | [x] | `server/k1-agents.js` | 5 templates, lifecycle complet |
-| 165 | K1 Truth Guard (claim verify, PASS/BLOCK, self-test) | [x] | `server/k1-truth.js` | Adversarial testing la 12h |
-| 166 | K1 Performance Tracker (accuracy per domain) | [x] | `server/k1-performance.js` | Trends + weak area detection |
-| 167 | K1 Meta-Learning (risk params, user model, forgetting) | [x] | `server/k1-meta-learning.js` | Auto-tuning + user profiling |
-| 168 | K1 Messenger Bridge (Telegram + WhatsApp + Messenger) | [x] | `server/k1-messenger-bridge.js` | Pre/post-process + K1 context enrichment |
-| 169 | K1 Dashboard UI (live admin page) | [x] | `app/admin/k1-dashboard.html` | 10 sections, 4 actions, auto-refresh 30s |
-| 170 | K1 Market Data Feed (CoinGecko + Yahoo Finance) | [x] | `server/trading.js` (cron) | Every 5 min: BTC/ETH/SOL + GOLD/NASDAQ + Fear&Greed |
+| #   | Funcționalitate                                           | Status | Endpoint / Fișier               | Notă                                                |
+| --- | --------------------------------------------------------- | ------ | ------------------------------- | --------------------------------------------------- |
+| 161 | K1 Cognitive Core (reasoning loop, monologue, confidence) | [x]    | `server/k1-cognitive.js`        | Perceive→Reflect→Hypothesize→Plan→Act→Observe→Learn |
+| 162 | K1 Deep Memory (hot/warm + attention retrieval)           | [x]    | `server/k1-memory.js`           | Hot RAM + Warm Supabase + forgetting engine         |
+| 163 | K1 World State (markets, environment, proactive alerts)   | [x]    | `server/k1-world-state.js`      | BTC/ETH/SOL/GOLD/NASDAQ + Fear&Greed live           |
+| 164 | K1 Agent Mesh (spawn, debate, ensemble, adversarial)      | [x]    | `server/k1-agents.js`           | 5 templates, lifecycle complet                      |
+| 165 | K1 Truth Guard (claim verify, PASS/BLOCK, self-test)      | [x]    | `server/k1-truth.js`            | Adversarial testing la 12h                          |
+| 166 | K1 Performance Tracker (accuracy per domain)              | [x]    | `server/k1-performance.js`      | Trends + weak area detection                        |
+| 167 | K1 Meta-Learning (risk params, user model, forgetting)    | [x]    | `server/k1-meta-learning.js`    | Auto-tuning + user profiling                        |
+| 168 | K1 Messenger Bridge (Telegram + WhatsApp + Messenger)     | [x]    | `server/k1-messenger-bridge.js` | Pre/post-process + K1 context enrichment            |
+| 169 | K1 Dashboard UI (live admin page)                         | [x]    | `app/admin/k1-dashboard.html`   | 10 sections, 4 actions, auto-refresh 30s            |
+| 170 | K1 Market Data Feed (CoinGecko + Yahoo Finance)           | [x]    | `server/trading.js` (cron)      | Every 5 min: BTC/ETH/SOL + GOLD/NASDAQ + Fear&Greed |
+
+---
+
+## Etapa 11 — Mobile Features + Live Tools (16 Mar 2026)
+
+| #   | Funcționalitate                | Status | Endpoint / Fișier                                         | Notă                                                     |
+| --- | ------------------------------ | ------ | --------------------------------------------------------- | -------------------------------------------------------- |
+| 178 | Face Recognition Auto-Login    | [x]    | `server/routes/identity.js` + `app/js/identity.js`        | Supabase session + toast multilingv                      |
+| 179 | Translate Mode (buton T)       | [x]    | `app/js/translate-mode.js` + `server/routes/translate.js` | STT → Gemini → overlay, noise suppression, Supabase save |
+| 180 | GPS Module (KGeo)              | [x]    | `app/js/geo.js`                                           | Auto-detect, watchPosition, high accuracy                |
+| 181 | Camera Front/Back Switch       | [x]    | `app/js/auto-camera.js` → `switchCamera()`                | facingMode user/environment                              |
+| 182 | CC Toggle + Chat Text Hide     | [x]    | `app/js/voice-realtime-client.js`                         | Opacity toggle pe chat-overlay                           |
+| 183 | Copy/Save Buttons pe Input Bar | [x]    | `app/index.html` + `app/js/app.js`                        | 📋💾 pe input bar, nu pe mesaje                          |
 
 ---
 
 ## Notă
 
-> **Ultima actualizare:** 2026-03-10 16:05 UTC — 177 funcționalități (⚠️ Messenger/WhatsApp: cod corect dar Meta webhook nesubscris)
+> **Ultima actualizare:** 2026-03-16 06:50 UTC — 183 funcționalități
 > **Regula:** Niciun agent nu marchează [x] fără testare reală și confirmare utilizator.
