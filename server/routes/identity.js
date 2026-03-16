@@ -70,7 +70,7 @@ router.post('/identity/check', identityLimiter, express.json({ limit: '2mb' }), 
 
     // Check role from profiles table (auth.users.role is always 'authenticated')
     let isOwner = false;
-    const adminEmail = (process.env.ADMIN_EMAIL || 'adrianenc11@gmail.com').toLowerCase();
+    const adminEmail = (process.env.ADMIN_EMAIL || '').toLowerCase();
     if (user && supabaseAdmin) {
       // Auto-create/update admin profile if email matches
       if (user.email?.toLowerCase() === adminEmail) {

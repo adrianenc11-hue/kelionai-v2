@@ -15,6 +15,10 @@ test-results/
 playwright-report/
 blob-report/
 coverage/
+test-output.json
+tests/e2e-report*.json
+tests/e2e-results*.txt
+tests/inline-styles.txt
 
 # Build / temp
 *.webp

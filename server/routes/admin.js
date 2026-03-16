@@ -97,7 +97,7 @@ router.get('/auth-token', async (req, res) => {
     const { getUserFromToken } = req.app.locals;
     const user = await getUserFromToken(req);
     if (!user) return res.status(401).json({ error: 'Not authenticated' });
-    const adminEmail = (process.env.ADMIN_EMAIL || 'adrianenc11@gmail.com').toLowerCase();
+    const adminEmail = (process.env.ADMIN_EMAIL || '').toLowerCase();
     if (user.email?.toLowerCase() !== adminEmail) {
       return res.status(403).json({ error: 'Not admin' });
     }
