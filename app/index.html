@@ -1009,6 +1009,24 @@
         >
           T
         </button>
+        <button
+          id="btn-scan-toggle"
+          title="Product Scanner"
+          aria-label="Scan product barcode"
+          style="
+            background: none;
+            border: 2px solid #555;
+            border-radius: 50%;
+            width: 36px;
+            height: 36px;
+            cursor: pointer;
+            font-size: 1rem;
+            color: #888;
+            transition: all 0.3s;
+          "
+        >
+          🛒
+        </button>
         <div id="mic-level" title="Mic level" style="display: none">
           <span></span><span></span><span></span><span></span><span></span>
         </div>
@@ -1524,6 +1542,85 @@
             tBtn.title = 'Translate Mode: OFF';
           }
         });
+      })();
+    </script>
+    <script src="js/product-scanner.js"></script>
+    <script>
+      // ── 🛒 Scanner Button handler ─────────────────────────
+      (function () {
+        var scanBtn = document.getElementById('btn-scan-toggle');
+        if (!scanBtn) return;
+        scanBtn.addEventListener('click', function () {
+          if (!window.KScanner) return;
+          var active = KScanner.toggle();
+          if (active) {
+            scanBtn.style.borderColor = '#10b981';
+            scanBtn.style.color = '#10b981';
+            scanBtn.style.boxShadow = '0 0 10px rgba(16,185,129,0.4)';
+            scanBtn.title = 'Scanner: ON';
+          } else {
+            scanBtn.style.borderColor = '#555';
+            scanBtn.style.color = '#888';
+            scanBtn.style.boxShadow = '';
+            scanBtn.title = 'Product Scanner';
+          }
+        });
+      })();
+
+      // ── Chat command interceptor: start/stop scan produse ──
+      (function () {
+        var origSubmit = null;
+        var input = document.getElementById('text-input') || document.getElementById('msg-input');
+        if (!input) return;
+        input.addEventListener(
+          'keydown',
+          function (e) {
+            if (e.key !== 'Enter') return;
+            var val = (input.value || '').trim().toLowerCase();
+            if (!val) return;
+            // Start scan
+            if (
+              val.match(
+                /^(start|porneste|deschide|activeaza)\s*(scan|scanner|scaneaz[aă])\s*(produse|produs|barcode)?$/i
+              )
+            ) {
+              e.preventDefault();
+              e.stopPropagation();
+              input.value = '';
+              if (window.KScanner) {
+                KScanner.start();
+                var scanBtn = document.getElementById('btn-scan-toggle');
+                if (scanBtn) {
+                  scanBtn.style.borderColor = '#10b981';
+                  scanBtn.style.color = '#10b981';
+                  scanBtn.style.boxShadow = '0 0 10px rgba(16,185,129,0.4)';
+                }
+              }
+              return false;
+            }
+            // Stop scan
+            if (
+              val.match(
+                /^(stop|opreste|inchide|dezactiveaz[aă])\s*(scan|scanner|scaneaz[aă])\s*(produse|produs|barcode)?$/i
+              )
+            ) {
+              e.preventDefault();
+              e.stopPropagation();
+              input.value = '';
+              if (window.KScanner) {
+                KScanner.stop();
+                var scanBtn2 = document.getElementById('btn-scan-toggle');
+                if (scanBtn2) {
+                  scanBtn2.style.borderColor = '#555';
+                  scanBtn2.style.color = '#888';
+                  scanBtn2.style.boxShadow = '';
+                }
+              }
+              return false;
+            }
+          },
+          true
+        );
       })();
     </script>
   </body>
