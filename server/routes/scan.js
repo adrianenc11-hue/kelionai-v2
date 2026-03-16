@@ -8,8 +8,8 @@ const express = require('express');
 const router = express.Router();
 const rateLimit = require('express-rate-limit');
 
-const { getUserFromToken, supabaseAdmin } = require('./supabase');
-const logger = require('./logger');
+const { getUserFromToken, supabaseAdmin } = require('../supabase');
+const logger = require('../logger');
 
 const scanLimiter = rateLimit({
   windowMs: 60_000,
