@@ -276,18 +276,24 @@
 
 ## Etapa 11 — Mobile Features + Live Tools (16 Mar 2026)
 
-| #   | Funcționalitate                | Status | Endpoint / Fișier                                         | Notă                                                     |
-| --- | ------------------------------ | ------ | --------------------------------------------------------- | -------------------------------------------------------- |
-| 178 | Face Recognition Auto-Login    | [x]    | `server/routes/identity.js` + `app/js/identity.js`        | Supabase session + toast multilingv                      |
-| 179 | Translate Mode (buton T)       | [x]    | `app/js/translate-mode.js` + `server/routes/translate.js` | STT → Gemini → overlay, noise suppression, Supabase save |
-| 180 | GPS Module (KGeo)              | [x]    | `app/js/geo.js`                                           | Auto-detect, watchPosition, high accuracy                |
-| 181 | Camera Front/Back Switch       | [x]    | `app/js/auto-camera.js` → `switchCamera()`                | facingMode user/environment                              |
-| 182 | CC Toggle + Chat Text Hide     | [x]    | `app/js/voice-realtime-client.js`                         | Opacity toggle pe chat-overlay                           |
-| 183 | Copy/Save Buttons pe Input Bar | [x]    | `app/index.html` + `app/js/app.js`                        | 📋💾 pe input bar, nu pe mesaje                          |
+| #   | Funcționalitate                           | Status | Endpoint / Fișier                                         | Notă                                                        |
+| --- | ----------------------------------------- | ------ | --------------------------------------------------------- | ----------------------------------------------------------- |
+| 178 | Face Recognition Auto-Login               | [x]    | `server/routes/identity.js` + `app/js/identity.js`        | Supabase session + toast multilingv                         |
+| 179 | Translate Mode (buton T)                  | [x]    | `app/js/translate-mode.js` + `server/routes/translate.js` | STT → Gemini → overlay, noise suppression, Supabase save    |
+| 180 | GPS Module (KGeo)                         | [x]    | `app/js/geo.js`                                           | Auto-detect, watchPosition, high accuracy                   |
+| 181 | Camera Front/Back Switch                  | [x]    | `app/js/auto-camera.js` → `switchCamera()`                | facingMode user/environment                                 |
+| 182 | CC Toggle + Chat Text Hide                | [x]    | `app/js/voice-realtime-client.js`                         | Opacity toggle pe chat-overlay                              |
+| 183 | Copy/Save Buttons pe Input Bar            | [x]    | `app/index.html` + `app/js/app.js`                        | 📋💾 pe input bar, nu pe mesaje                             |
+| 184 | Product Scanner (Barcode → Nutriție)      | [x]    | `app/js/product-scanner.js` + `server/routes/scan.js`     | BarcodeDetector + Open Food Facts + daily totals + Supabase |
+| 185 | Navigation "Cum ajung la X"               | [x]    | `app/js/mobile-features.js`                               | GPS → Google Maps direcții, apelabil din chat               |
+| 186 | SOS Emergency (protecție anti-accidental) | [x]    | `app/js/mobile-features.js`                               | Confirm dialog + SMS/WhatsApp/Share GPS + 112 + Supabase    |
+| 187 | Receipt Scanner (Bon fiscal → AI)         | [x]    | `app/js/mobile-features.js`                               | Cameră spate → OCR → AI analiză produse + calorii           |
+| 188 | Mood Detection (Expresie facială)         | [x]    | `app/js/mobile-features.js`                               | Cameră față → AI detectare emoție + sfat                    |
+| 189 | Buton 🛒 Scanner + Chat Commands          | [x]    | `app/index.html`                                          | start/stop scan produse din chat, buton pe bară dreapta     |
 
 ---
 
 ## Notă
 
-> **Ultima actualizare:** 2026-03-16 06:50 UTC — 183 funcționalități
+> **Ultima actualizare:** 2026-03-16 07:25 UTC — 189 funcționalități
 > **Regula:** Niciun agent nu marchează [x] fără testare reală și confirmare utilizator.
