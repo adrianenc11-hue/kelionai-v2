@@ -42,18 +42,7 @@ router.get("/", (req, res) => {
       sentry: !!process.env.SENTRY_DSN,
       auth: !!supabase,
       database: !!supabaseAdmin,
-      whatsapp: !!(
-        process.env.WA_ACCESS_TOKEN ||
-        process.env.WHATSAPP_TOKEN ||
-        process.env.WHATSAPP_ACCESS_TOKEN
-      ),
-      whatsapp_phone: !!(
-        process.env.WA_PHONE_NUMBER_ID || process.env.WHATSAPP_PHONE_NUMBER_ID
-      ),
       telegram: !!process.env.TELEGRAM_BOT_TOKEN,
-      messenger: !!process.env.MESSENGER_PAGE_TOKEN,
-      facebook_page: !!process.env.FACEBOOK_PAGE_TOKEN,
-      instagram: !!process.env.INSTAGRAM_TOKEN,
       trading_binance: !!process.env.BINANCE_API_KEY,
       trading_mode: process.env.BINANCE_API_KEY
         ? process.env.BINANCE_TESTNET === "true"
@@ -80,8 +69,6 @@ router.get("/test-tables", async (req, res) => {
     "profiles",
     "media_history",
     "telegram_users",
-    "whatsapp_users",
-    "whatsapp_messages",
     "trade_intelligence",
     "cookie_consents",
     "metrics_snapshots",
@@ -92,9 +79,6 @@ router.get("/test-tables", async (req, res) => {
     "admin_codes",
     "brain_memory",
     "learned_facts",
-    "messenger_users",
-    "messenger_messages",
-    "messenger_subscribers",
     "telegram_messages",
     "market_candles",
     "market_learnings",
