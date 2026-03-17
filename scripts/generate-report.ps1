@@ -235,8 +235,7 @@ $html = "<!DOCTYPE html><html lang='ro'><head><meta charset='UTF-8'/><title>Keli
     "</tbody></table></div>" +
     "<footer>KelionAI Test Report &mdash; $dateDisplay | Analiza automata: fake = asertari slabe; hard-coded = valori literale specifice detectate in test</footer></body></html>"
 
-$html | Out-File -FilePath $ReportPath   -Encoding UTF8
-$html | Out-File -FilePath $LatestReport -Encoding UTF8
+$html | Out-File -FilePath $LatestReport -Encoding UTF8 -Force
 
-Write-Host "Raport: kelionai-test-report-LATEST.html"
+Write-Host "Raport actualizat: kelionai-test-report-LATEST.html"
 Write-Host "Total: $totalTests | Trecute: $passed | Esecuri: $failed | Omise: $skipped | Durata: ${duration}s"
