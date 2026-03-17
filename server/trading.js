@@ -2709,6 +2709,13 @@ tradeEngine.initExchange();
 // POST /execute — FULL analysis + rules check + auto-trade
 router.post("/execute", async (req, res) => {
   try {
+    // Auth required — trading execution must not be anonymous
+    const { getUserFromToken } = req.app.locals;
+    const user = await getUserFromToken(req);
+    if (!user) {
+      return res.status(401).json({ error: "Authentication required for trade execution" });
+    }
+
     const { symbol = "BTC/USDT", action } = req.body || {};
     const asset = symbol.replace("/USDT", "");
     const { prices, volumes, source } = await fetchRealPrices(asset, 300);
