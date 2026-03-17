@@ -1529,21 +1529,6 @@ if (require.main === module) {
           },
           4 * 60 * 1000
         ).unref();
-        // Auto-register Telegram webhook
-        if (process.env.TELEGRAM_BOT_TOKEN && process.env.APP_URL) {
-          const webhookUrl = `${process.env.APP_URL}/api/telegram/webhook`;
-          fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/setWebhook`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url: webhookUrl }),
-          })
-            .then((r) => r.json())
-            .then((data) => {
-              if (data.ok) logger.info({ component: 'Telegram' }, `✅ Webhook registered: ${webhookUrl}`);
-              else logger.warn({ component: 'Telegram', error: data.description }, '❌ Webhook registration failed');
-            })
-            .catch((e) => logger.error({ component: 'Telegram', err: e.message }, 'Webhook registration error'));
-        }
       });
     })
     .catch(() => {
