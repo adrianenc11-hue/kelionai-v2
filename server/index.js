@@ -35,16 +35,8 @@ const logger = require('./logger');
 const { router: paymentsRouter } = require('./payments');
 const legalRouter = require('./legal');
 const { router: referralRouter } = require('./referral');
-const {
-  router: messengerRouter,
-  getStats: getMessengerStats,
-  notifySubscribersNews,
-  setSupabase: setMessengerSupabase,
-} = require('./messenger');
+// WhatsApp, Messenger, Instagram, Facebook — REMOVED
 const { router: telegramRouter, broadcastNews, setSupabase: setTelegramSupabase } = require('./telegram');
-const { router: whatsappRouter, setSupabase: setWhatsappSupabase } = require('./whatsapp');
-const fbPage = require('./facebook-page');
-const instagram = require('./instagram');
 const developerRouter = require('./routes/developer');
 const {
   ipBlacklistMiddleware,
@@ -77,8 +69,6 @@ const scanRouter = require('./routes/scan');
 const exportRouter = require('./routes/export');
 const identityRouter = require('./routes/identity');
 const voiceCloneRouter = require('./routes/voice-clone');
-const messengerBot = require('./messenger');
-const instagramBot = require('./instagram');
 const tradingRouter = require('./trading');
 const { router: marketplaceRouter } = require('./agent-marketplace');
 const { router: pluginRouter, restorePlugins: _restorePlugins } = require('./plugin-system');
@@ -574,11 +564,7 @@ app.locals.supabase = supabase;
 app.locals.supabaseAdmin = supabaseAdmin;
 app.locals.brain = brain;
 
-// ═══ MESSENGER + INSTAGRAM + WHATSAPP + TELEGRAM INTEGRATION ═══
-messengerBot.setSupabase(supabaseAdmin || supabase);
-instagramBot.setBrain(brain);
-instagramBot.setSupabase(supabaseAdmin || supabase);
-setWhatsappSupabase(supabaseAdmin || supabase);
+// ═══ TELEGRAM INTEGRATION ═══
 setTelegramSupabase(supabaseAdmin || supabase);
 
 app.locals.memFallback = memFallback;
@@ -601,9 +587,7 @@ app.use('/api/export', exportRouter);
 app.use('/api', translateRouter);
 app.use('/api/scan', scanRouter);
 
-// ═══ MESSENGER + INSTAGRAM WEBHOOKS ═══
-app.use('/api/messenger', messengerBot.router);
-app.use('/api/instagram', instagramBot.router);
+// Messenger + Instagram — REMOVED
 app.use('/api/trading', tradingRouter);
 app.use('/api/marketplace', marketplaceRouter);
 app.use('/api/plugins', pluginRouter);
@@ -1120,18 +1104,7 @@ app.use('/api/instagram', instagram.router);
 app.use('/api/developer', developerRouter);
 app.use('/api', developerRouter); // mounts /api/v1/* endpoints
 
-// ═══ MESSENGER STATS (admin only) ═══
-app.get('/api/messenger/stats', adminAuth, (req, res) => {
-  res.json(getMessengerStats());
-});
 
-// ═══ MEDIA HEALTH ENDPOINTS ═══
-app.get('/api/media/facebook/health', (req, res) => {
-  res.json(fbPage.getHealth());
-});
-app.get('/api/media/instagram/health', (req, res) => {
-  res.json(instagram.getHealth());
-});
 // Auto-detect Instagram Business Account ID from Graph API
 app.get('/api/media/instagram/detect-account', async (req, res) => {
   const token = process.env.FB_PAGE_ACCESS_TOKEN;
@@ -1397,40 +1370,15 @@ app.use('/api/news', adminAuth, newsModule.router);
 newsModule.setSupabase(supabaseAdmin);
 newsModule.setBrain(brain);
 newsModule.restoreCache();
-setMessengerSupabase(supabaseAdmin);
+newsModule.restoreCache();
 setTelegramSupabase(supabaseAdmin);
-setWhatsappSupabase(supabaseAdmin);
-instagram.setSupabase(supabaseAdmin);
 
-// ═══ AUTO-PUBLISH: when news fetches, distribute to all media ═══
+// ═══ AUTO-PUBLISH: Telegram only ═══
 newsModule.onNewsFetched(async (articles) => {
-  logger.info({ component: 'MediaAutoPublish', count: articles.length }, '📢 Auto-publishing news...');
-  // Facebook Page (top 3 articles)
-  try {
-    await fbPage.publishNewsBatch(articles, 3);
-  } catch (e) {
-    logger.warn({ component: 'MediaAutoPublish', err: e.message }, 'FB Page publish failed');
-  }
-  // Telegram channel broadcast
   try {
     await broadcastNews(articles);
   } catch (e) {
     logger.warn({ component: 'MediaAutoPublish', err: e.message }, 'Telegram broadcast failed');
-  }
-  // Instagram auto-publish (top article with image)
-  try {
-    const topArticle = articles.find((a) => a.imageUrl || a.image_url) || articles[0];
-    if (topArticle && instagram.publishNewsBatch) {
-      await instagram.publishNewsBatch([topArticle], 1);
-    }
-  } catch (e) {
-    logger.warn({ component: 'MediaAutoPublish', err: e.message }, 'Instagram publish failed');
-  }
-  // Messenger subscribers notification
-  try {
-    await notifySubscribersNews(articles);
-  } catch (e) {
-    logger.warn({ component: 'MediaAutoPublish', err: e.message }, 'Messenger subscribers notification failed');
   }
 });
 
