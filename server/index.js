@@ -35,7 +35,7 @@ const logger = require('./logger');
 const { router: paymentsRouter } = require('./payments');
 const legalRouter = require('./legal');
 const { router: referralRouter } = require('./referral');
-const { router: telegramRouter, broadcastNews, setSupabase: setTelegramSupabase } = require('./telegram');
+
 const developerRouter = require('./routes/developer');
 const {
   ipBlacklistMiddleware,
@@ -68,7 +68,7 @@ const scanRouter = require('./routes/scan');
 const exportRouter = require('./routes/export');
 const identityRouter = require('./routes/identity');
 const voiceCloneRouter = require('./routes/voice-clone');
-const tradingRouter = require('./trading');
+
 const { router: marketplaceRouter } = require('./agent-marketplace');
 const { router: pluginRouter, restorePlugins: _restorePlugins } = require('./plugin-system');
 const autonomousRunner = require('./autonomous-runner');
@@ -561,8 +561,6 @@ app.locals.supabase = supabase;
 app.locals.supabaseAdmin = supabaseAdmin;
 app.locals.brain = brain;
 
-// ═══ TELEGRAM INTEGRATION ═══
-setTelegramSupabase(supabaseAdmin || supabase);
 
 app.locals.memFallback = memFallback;
 
@@ -584,7 +582,6 @@ app.use('/api/export', exportRouter);
 app.use('/api', translateRouter);
 app.use('/api/scan', scanRouter);
 
-app.use('/api/trading', tradingRouter);
 app.use('/api/marketplace', marketplaceRouter);
 app.use('/api/plugins', pluginRouter);
 app.use('/api/multimodal', multimodalRouter);
@@ -1093,7 +1090,7 @@ app.post('/api/gdpr/delete', express.json(), async (req, res) => {
     res.status(500).json({ error: 'Delete request error' });
   }
 });
-app.use('/api/telegram', express.json(), telegramRouter);
+
 app.use('/api/developer', developerRouter);
 app.use('/api', developerRouter); // mounts /api/v1/* endpoints
 
@@ -1170,63 +1167,6 @@ app.get('/api/media/instagram/detect-account', async (req, res) => {
     });
   } catch (e) {
     res.status(500).json({ error: e.message });
-  }
-});
-app.get('/api/media/status', adminAuth, (req, res) => {
-  res.json({
-    messenger: {
-      hasToken: !!process.env.FB_PAGE_ACCESS_TOKEN,
-      health: '/api/messenger/health',
-    },
-    telegram: {
-      hasToken: !!process.env.TELEGRAM_BOT_TOKEN,
-      health: '/api/telegram/health',
-    },
-    news: {
-      scheduler: 'active',
-      hours: [5, 12, 18],
-      endpoint: '/api/news/public',
-    },
-  });
-});
-
-// ═══ MEDIA PUBLISH ENDPOINT ═══
-app.post('/api/media/publish', adminAuth, async (req, res) => {
-  try {
-    const { platform, content, imageUrl, caption } = req.body;
-    if (!platform || !content) {
-      return res.status(400).json({ error: 'platform and content are required' });
-    }
-
-    const results = {};
-
-    if (platform === 'facebook' || platform === 'all') {
-      try {
-        const fbResult = await fbPage.publish({
-          message: content,
-          link: imageUrl,
-        });
-        results.facebook = { success: true, data: fbResult };
-      } catch (e) {
-        results.facebook = { success: false, error: e.message };
-      }
-    }
-
-    if (platform === 'instagram' || platform === 'all') {
-      try {
-        const igResult = await instagram.publish({
-          caption: caption || content,
-          imageUrl: imageUrl,
-        });
-        results.instagram = { success: true, data: igResult };
-      } catch (e) {
-        results.instagram = { success: false, error: e.message };
-      }
-    }
-
-    res.json({ published: true, platform, results });
-  } catch (e) {
-    res.status(500).json({ error: 'Publish failed: ' + e.message });
   }
 });
 
@@ -1311,21 +1251,6 @@ app.post(
   })
 );
 
-// ═══ PUBLISH NEWS TO ALL MEDIA (admin trigger) ═══
-app.post(
-  '/api/media/publish-news',
-  adminAuth,
-  express.json(),
-  asyncHandler(async (req, res) => {
-    const articles = req.body.articles || [];
-    const results = { telegram: null };
-    if (articles.length > 0) {
-      await broadcastNews(articles);
-      results.telegram = 'broadcasted';
-    }
-    res.json({ success: true, results });
-  })
-);
 
 // POST /api/ticker/disable — save ticker preference (Premium only)
 app.post(
@@ -1342,114 +1267,7 @@ app.post(
   })
 );
 
-// ═══ NEWS BOT ═══
-const newsModule = require('./news');
-// Public endpoint — no auth required (for frontend news widget)
-app.get('/api/news/public', (req, res) => {
-  const allReq = Object.assign({}, req, { url: '/latest', query: req.query });
-  newsModule.router.handle(allReq, res, () => {
-    res.json({
-      articles: [],
-      total: 0,
-      message: 'No articles cached yet. RSS fetches at 05:00, 12:00, 18:00 RO time.',
-    });
-  });
-});
-app.use('/api/news', adminAuth, newsModule.router);
-newsModule.setSupabase(supabaseAdmin);
-newsModule.setBrain(brain);
-newsModule.restoreCache();
-setTelegramSupabase(supabaseAdmin);
-
-// ═══ AUTO-PUBLISH: Telegram only ═══
-newsModule.onNewsFetched(async (articles) => {
-  try {
-    await broadcastNews(articles);
-  } catch (e) {
-    logger.warn({ component: 'MediaAutoPublish', err: e.message }, 'Telegram broadcast failed');
-  }
-});
-
-// ═══ STORE ARTICLES REF IN app.locals for Telegram bot ═══
-app.locals._getNewsArticles = newsModule.getArticlesArray;
-
-// ═══ TRADING BOT (admin only) ═══
-app.use('/api/trading', adminAuth, require('./trading'));
-
-// ═══ K1 BRAIN CHAT (admin only — direct brain access) ═══
-app.use('/api/admin/brain-chat', adminAuth, require('./routes/brain-chat'));
-
-// ═══ REAL-TIME ENGINE + MARKET LEARNER + FOREX ═══
-const wsEngine = require('./ws-engine');
-const marketLearner = require('./market-learner');
-const forexEngine = require('./forex-engine');
-
-// Initialize with Supabase
-if (app.locals.supabaseAdmin) {
-  wsEngine.setSupabase(app.locals.supabaseAdmin);
-  marketLearner
-    .init(app.locals.supabaseAdmin)
-    .catch((e) => logger.warn({ err: e.message }, 'MarketLearner init warning'));
-  const perfTracker = require('./performance-tracker');
-  perfTracker.init(app.locals.supabaseAdmin);
-}
-wsEngine.start();
-app.locals.wsEngine = wsEngine;
-app.locals.marketLearner = marketLearner;
-app.locals.forexEngine = forexEngine;
-
-// ── Forex routes ──
-app.get('/api/trading/forex/session', adminAuth, (req, res) => {
-  res.json(forexEngine.getCurrentSession());
-});
-app.get('/api/trading/forex/pairs', adminAuth, (req, res) => {
-  res.json({
-    pairs: forexEngine.getAllPairs(),
-    bestNow: forexEngine.getBestPairsNow(),
-  });
-});
-app.post('/api/trading/forex/lot-size', adminAuth, (req, res) => {
-  const { pair, balance, riskPct, slPips } = req.body || {};
-  res.json(forexEngine.calculateLotSize(pair, balance || 10000, riskPct || 1, slPips || 20));
-});
-app.post('/api/trading/forex/check', adminAuth, (req, res) => {
-  const { pair, direction, bid, ask } = req.body || {};
-  res.json(forexEngine.preTradeCheck(pair, direction, bid, ask));
-});
-app.get('/api/trading/forex/account', adminAuth, async (req, res) => {
-  res.json(await forexEngine.getAccountSummary());
-});
-
-// ── WS Engine stats ──
-app.get('/api/trading/ws-stats', adminAuth, (req, res) => {
-  res.json(wsEngine.getStats());
-});
-app.get('/api/trading/ws-prices', adminAuth, (req, res) => {
-  res.json(wsEngine.getAllPrices());
-});
-app.get('/api/trading/ws-candles/:asset/:tf?', adminAuth, (req, res) => {
-  const candles = wsEngine.getCandles(req.params.asset, req.params.tf || '1m', 100);
-  res.json({
-    asset: req.params.asset,
-    tf: req.params.tf || '1m',
-    candles,
-    count: candles.length,
-  });
-});
-
-// ── Learner routes ──
-app.get('/api/trading/learner', adminAuth, (req, res) => {
-  res.json(marketLearner.getReport());
-});
-app.get('/api/trading/learner/weights', adminAuth, (req, res) => {
-  res.json(marketLearner.getWeights());
-});
-app.post('/api/trading/learner/save', adminAuth, async (req, res) => {
-  await marketLearner.saveState();
-  res.json({ success: true, message: 'Learning state saved' });
-});
-
-// ═══ SPORTS BOT — REMOVED (no real utility without betting integration) ═══
+// ═══ SPORTS BOT — REMOVED ═══
 
 // GET /api/media/history — Media history from brain
 app.get('/api/media/history', async (req, res) => {
