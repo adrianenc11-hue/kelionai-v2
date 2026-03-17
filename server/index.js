@@ -341,9 +341,9 @@ app.get('/health', (req, res) => {
 const _rawHtml = fs.readFileSync(path.join(__dirname, '..', 'app', 'index.html'), 'utf8');
 const _indexHtml = process.env.SENTRY_DSN
   ? _rawHtml.replace(
-      '<meta name="sentry-dsn" content="">',
-      `<meta name="sentry-dsn" content="${process.env.SENTRY_DSN.replace(/&/g, '&amp;').replace(/"/g, '&quot;')}">`
-    )
+    '<meta name="sentry-dsn" content="">',
+    `<meta name="sentry-dsn" content="${process.env.SENTRY_DSN.replace(/&/g, '&amp;').replace(/"/g, '&quot;')}">`
+  )
   : _rawHtml;
 
 // Read 404.html once at startup (for admin stealth)
@@ -414,13 +414,13 @@ app.get('/admin/trading.html', (req, res) => {
   res.setHeader(
     'Content-Security-Policy',
     "default-src 'self'; " +
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://*.tradingview.com; " +
-      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://*.tradingview.com; " +
-      "font-src 'self' https://fonts.gstatic.com; " +
-      "img-src 'self' data: blob: https: http:; " +
-      "connect-src 'self' https:; " +
-      "frame-src 'self' https://*.tradingview.com blob:; " +
-      "child-src 'self' https://*.tradingview.com blob:;"
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://*.tradingview.com; " +
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://*.tradingview.com; " +
+    "font-src 'self' https://fonts.gstatic.com; " +
+    "img-src 'self' data: blob: https: http:; " +
+    "connect-src 'self' https:; " +
+    "frame-src 'self' https://*.tradingview.com blob:; " +
+    "child-src 'self' https://*.tradingview.com blob:;"
   );
   res.type('html').send(_rawTradingHtml);
 });
@@ -846,7 +846,7 @@ app.post('/api/brain/errors', express.json(), (req, res) => {
           importance: 9,
         })
         .then()
-        .catch(() => {});
+        .catch(() => { });
     }
   }
 
@@ -1790,13 +1790,13 @@ if (require.main === module) {
           'KelionAI v2.5 started on port ' + PORT + ' (with voice streaming)'
         );
         // Smoke test internal routes (async, non-blocking)
-        smokeTest(PORT).catch(() => {});
+        smokeTest(PORT).catch(() => { });
 
         // Self-ping keepalive — prevent Railway idle sleep (every 4 min)
         const APP_URL = process.env.APP_URL || `http://localhost:${PORT}`;
         setInterval(
           () => {
-            fetch(`${APP_URL}/api/health`).catch(() => {});
+            fetch(`${APP_URL}/api/health`).catch(() => { });
           },
           4 * 60 * 1000
         ).unref();
