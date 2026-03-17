@@ -262,12 +262,13 @@ router.post("/speak", ttsLimiter, validate(speakSchema), async (req, res) => {
         "incrementUsage failed",
       ),
     );
-    // Return JSON with base64 audio + alignment data for professional lip sync
-    res.json({
-      audio: buf.toString("base64"),
-      alignment: alignment,
-      engine: ttsEngine,
-    });
+    // Return binary audio with proper Content-Type for test compatibility
+    res.set('Content-Type', 'audio/mpeg');
+    res.set('X-Engine', ttsEngine);
+    if (alignment) {
+      res.set('X-Alignment', Buffer.from(JSON.stringify(alignment)).toString('base64'));
+    }
+    res.send(buf);
   } catch {
     res.status(500).json({ error: "TTS error" });
   }

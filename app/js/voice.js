@@ -311,24 +311,25 @@
       // ═══ PREFETCH PATTERN: fetch next chunk while current plays ═══
       // This eliminates the pause between chunks
       async function fetchChunkAudio(chunkText, avatar) {
-        const resp = await fetch(API_BASE + '/api/speak', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...(window.KAuth ? KAuth.getAuthHeaders() : {}) },
-          body: JSON.stringify({
-            text: chunkText,
-            avatar: avatar || KAvatar.getCurrentAvatar(),
-            language: detectedLanguage,
-          }),
-        });
-        if (!resp.ok) return null;
-        const data = await resp.json();
-        if (!data.audio) return null;
-        const binaryStr = atob(data.audio);
-        const arrayBuf = new ArrayBuffer(binaryStr.length);
-        const bytes = new Uint8Array(arrayBuf);
-        for (let bi = 0; bi < binaryStr.length; bi++) bytes[bi] = binaryStr.charCodeAt(bi);
-        return { arrayBuf, alignment: data.alignment || null };
-      }
+          const resp = await fetch(API_BASE + '/api/speak', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...(window.KAuth ? KAuth.getAuthHeaders() : {}) },
+            body: JSON.stringify({
+              text: chunkText,
+              avatar: avatar || KAvatar.getCurrentAvatar(),
+              language: detectedLanguage,
+            }),
+          });
+          if (!resp.ok) return null;
+          const arrayBuf = await resp.arrayBuffer();
+          if (!arrayBuf || arrayBuf.byteLength === 0) return null;
+          let alignment = null;
+          const alignHeader = resp.headers.get('x-alignment');
+          if (alignHeader) {
+            try { alignment = JSON.parse(atob(alignHeader)); } catch (_e) { /* ignore */ }
+          }
+          return { arrayBuf, alignment };
+        }
 
       // Start prefetching first chunk immediately
       let prefetchPromise = fetchChunkAudio(chunks[0], avatar);
