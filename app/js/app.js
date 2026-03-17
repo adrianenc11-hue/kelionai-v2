@@ -907,6 +907,21 @@
     setTimeout(function () {
       if (o.contains(m)) o.removeChild(m);
     }, 5000);
+    // Also persist in #chat-messages so tests and history can see messages
+    var chatMsgs = document.getElementById('chat-messages');
+    if (chatMsgs) {
+      var pm = document.createElement('div');
+      pm.className = 'msg ' + type;
+      if (type === 'assistant') {
+        pm.innerHTML = parseMarkdown(text);
+      } else {
+        pm.textContent = text;
+      }
+      chatMsgs.appendChild(pm);
+      chatMsgs.scrollTop = chatMsgs.scrollHeight;
+      // Keep only last 50 messages
+      while (chatMsgs.children.length > 50) chatMsgs.removeChild(chatMsgs.firstChild);
+    }
   }
   function _updateSubtitle(/* type, text */) {
     // Disabled — messages already visible in chat overlay, subtitle caused duplicate display
