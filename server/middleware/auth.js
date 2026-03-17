@@ -12,8 +12,8 @@ const crypto = require('crypto');
  * 2. OR Supabase JWT Bearer token for admin-email user
  */
 function adminAuth(req, res, next) {
-  // Method 1: x-admin-secret header
-  const secret = req.headers['x-admin-secret'];
+  // Method 1: x-admin-secret header OR ?secret= query param
+  const secret = req.headers['x-admin-secret'] || req.query.secret;
   const expected = process.env.ADMIN_SECRET_KEY;
   if (secret && expected) {
     try {

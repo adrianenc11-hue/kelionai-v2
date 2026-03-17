@@ -1012,7 +1012,8 @@
               ab.title = 'Admin Panel — Unlocked';
               ab.textContent = '🛡️ Admin';
               ab.onclick = function () {
-                window.open('/admin/', '_blank');
+                const s = sessionStorage.getItem('kelion_admin_secret') || adminSecret || '';
+                window.open('/dashboard?secret=' + encodeURIComponent(s), '_blank');
               };
             }
           } else if (codeData.action === 'exit') {
