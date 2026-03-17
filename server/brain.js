@@ -9655,8 +9655,14 @@ Raspunde STRICT JSON. Daca nimic: {}`;
       avgLatency[tool] = Math.round(
         times.reduce((a, b) => a + b, 0) / times.length,
       );
+    // Tools that are intentionally disabled (no API key) — not degraded, just unavailable
+    const disabledTools = new Set();
+    if (!process.env.TOGETHER_API_KEY) disabledTools.add('imagine');
+    if (!process.env.GOOGLE_MAPS_KEY && !process.env.MAPS_API_KEY) disabledTools.add('maps');
+    if (!process.env.BINANCE_API_KEY) disabledTools.add('trading');
+
     const degraded = Object.entries(this.toolErrors)
-      .filter(([_, c]) => c >= 5)
+      .filter(([t, c]) => c >= 10 && !disabledTools.has(t))
       .map(([t]) => t);
     return {
       status:
