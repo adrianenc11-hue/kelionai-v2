@@ -1093,10 +1093,7 @@ app.post('/api/gdpr/delete', express.json(), async (req, res) => {
     res.status(500).json({ error: 'Delete request error' });
   }
 });
-app.use('/api/messenger', messengerRouter);
 app.use('/api/telegram', express.json(), telegramRouter);
-app.use('/api/whatsapp', whatsappRouter);
-app.use('/api/instagram', instagram.router);
 app.use('/api/developer', developerRouter);
 app.use('/api', developerRouter); // mounts /api/v1/* endpoints
 
@@ -1185,8 +1182,6 @@ app.get('/api/media/status', adminAuth, (req, res) => {
       hasToken: !!process.env.TELEGRAM_BOT_TOKEN,
       health: '/api/telegram/health',
     },
-    facebook: fbPage.getHealth(),
-    instagram: instagram.getHealth(),
     news: {
       scheduler: 'active',
       hours: [5, 12, 18],
@@ -1323,9 +1318,8 @@ app.post(
   express.json(),
   asyncHandler(async (req, res) => {
     const articles = req.body.articles || [];
-    const results = { facebook: null, telegram: null };
+    const results = { telegram: null };
     if (articles.length > 0) {
-      results.facebook = await fbPage.publishNewsBatch(articles, req.body.maxPosts || 3);
       await broadcastNews(articles);
       results.telegram = 'broadcasted';
     }
