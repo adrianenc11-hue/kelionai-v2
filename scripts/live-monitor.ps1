@@ -1,52 +1,51 @@
-# Live Monitor — KelionAI Tests
-Add-Type -AssemblyName System.Windows.Forms
-Add-Type -AssemblyName System.Drawing
+$output = "C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2\test-results\live-output.txt"
+$host.UI.RawUI.WindowTitle = "KelionAI MONITOR"
+$host.UI.RawUI.BackgroundColor = "Black"
+Clear-Host
 
-$outputFile = "C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2\test-results\live-output.txt"
+while ($true) {
+    $ok = 0; $fail = 0; $skip = 0; $last = "Astept teste..."
 
-$form = New-Object System.Windows.Forms.Form
-$form.Text = "KelionAI Live Monitor"
-$form.Size = New-Object System.Drawing.Size(600, 320)
-$form.BackColor = [System.Drawing.Color]::FromArgb(15, 23, 42)
-$form.StartPosition = "CenterScreen"
-$form.TopMost = $true
-$form.FormBorderStyle = "FixedDialog"
+    if (Test-Path $output) {
+        # Read raw bytes to handle encoding correctly
+        $raw = [System.IO.File]::ReadAllText($output, [System.Text.Encoding]::UTF8)
+        $lines = $raw -split "`n"
 
-function MakeLabel($text, $x, $y, $size, $color) {
-    $l = New-Object System.Windows.Forms.Label
-    $l.Text = $text
-    $l.ForeColor = $color
-    $l.Font = New-Object System.Drawing.Font("Segoe UI", $size, [System.Drawing.FontStyle]::Bold)
-    $l.AutoSize = $true
-    $l.Location = New-Object System.Drawing.Point($x, $y)
-    $form.Controls.Add($l)
-    return $l
-}
-
-$titleLbl = MakeLabel "KelionAI Tests" 20 14 14 ([System.Drawing.Color]::FromArgb(148,163,184))
-$okLbl    = MakeLabel "✓ 0" 20 55 52 ([System.Drawing.Color]::FromArgb(34,197,94))
-$failLbl  = MakeLabel "✗ 0" 170 55 52 ([System.Drawing.Color]::FromArgb(239,68,68))
-$skipLbl  = MakeLabel "— 0" 310 55 52 ([System.Drawing.Color]::FromArgb(100,116,139))
-$curLbl   = MakeLabel "Astept..." 20 170 10 ([System.Drawing.Color]::FromArgb(148,163,184))
-$statusLbl= MakeLabel "IN CURS" 20 200 18 ([System.Drawing.Color]::FromArgb(251,191,36))
-
-$timer = New-Object System.Windows.Forms.Timer
-$timer.Interval = 500
-$timer.Add_Tick({
-    if (-not (Test-Path $outputFile)) { $curLbl.Text = "Astept fisier output..."; return }
-    $lines = @(Get-Content $outputFile -EA SilentlyContinue)
-    $ok   = ($lines | Where-Object { $_ -match "^\s*ok\s+\d+" }).Count
-    $fail = ($lines | Where-Object { $_ -match "^\s*(not ok|FAILED)\s" }).Count
-    $skip = ($lines | Where-Object { $_ -match "^\s*-\s+\[" }).Count
-    $okLbl.Text   = "✓ $ok"
-    $failLbl.Text = "✗ $fail"
-    $skipLbl.Text = "— $skip"
-    $last = $lines | Where-Object { $_ -match "tests?\|chrome\|firefox" } | Select-Object -Last 1
-    if ($last) { $curLbl.Text = ($last -replace '\x1b\[[0-9;]*m','').Trim() }
-    if ($lines | Where-Object { $_ -match "passed|failed|Tests:" }) {
-        $statusLbl.Text = if ($fail -eq 0) { "PASS" } else { "FAIL: $fail esecuri" }
-        $statusLbl.ForeColor = if ($fail -eq 0) { [System.Drawing.Color]::FromArgb(34,197,94) } else { [System.Drawing.Color]::FromArgb(239,68,68) }
+        # Count browser lines: format is "  X  NNN [chromium]"
+        # Skip: starts with spaces + "-" + spaces + digits + "[chromium"
+        $skip = ($lines | Where-Object { $_ -match "^\s+-\s+\d+\s+\[" }).Count
+        # All browser test lines
+        $all  = ($lines | Where-Object { $_ -match "\[chromium\]|\[firefox\]|\[webkit\]" -and $_ -match "^\s+.\s+\d+" }).Count
+        # Summary line (most accurate)
+        $sumLine = $lines | Where-Object { $_ -match "\d+\s+passed" } | Select-Object -Last 1
+        if ($sumLine) {
+            if ($sumLine -match "(\d+)\s+passed")  { $ok   = [int]$Matches[1] }
+            if ($sumLine -match "(\d+)\s+failed")  { $fail = [int]$Matches[1] }
+            if ($sumLine -match "(\d+)\s+skipped") { $skip = [int]$Matches[1] }
+        } else {
+            # During run: estimate from all lines
+            $ok   = $all - $skip
+            $fail = 0
+        }
+        $lastLine = $lines | Where-Object { $_ -match "\[chromium\]|\[firefox\]" } | Select-Object -Last 1
+        if ($lastLine) { $last = $lastLine.Trim() -replace "\x1b\[[0-9;]*m",'' }
+        if ($last.Length -gt 75) { $last = $last.Substring(0, 75) + "..." }
     }
-})
-$timer.Start()
-$form.ShowDialog()
+
+    [Console]::SetCursorPosition(0, 0)
+    Write-Host ""
+    Write-Host "  =======================================" -ForegroundColor DarkCyan
+    Write-Host "     KelionAI TEST MONITOR (live)       " -ForegroundColor Cyan
+    Write-Host "  =======================================" -ForegroundColor DarkCyan
+    Write-Host ""
+    Write-Host ("  TRECUTE:  " + ($ok.ToString()).PadLeft(4))   -ForegroundColor Green
+    Write-Host ""
+    Write-Host ("  ESECURI:  " + ($fail.ToString()).PadLeft(4)) -ForegroundColor Red
+    Write-Host ""
+    Write-Host ("  OMISE:    " + ($skip.ToString()).PadLeft(4)) -ForegroundColor DarkGray
+    Write-Host ""
+    Write-Host "  ---------------------------------------" -ForegroundColor DarkGray
+    Write-Host ("  " + $last)                              -ForegroundColor DarkYellow
+    Write-Host ""
+    Start-Sleep -Milliseconds 800
+}

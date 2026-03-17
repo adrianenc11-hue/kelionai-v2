@@ -678,13 +678,9 @@
 
       <!-- Input row — FULL WIDTH at page bottom -->
       <div id="input-row">
-        <button id="btn-mic-toggle" title="Microphone ON/OFF" aria-label="Toggle microphone" class="ctrl-circle">
-          🎙️
-        </button>
+
         <button id="btn-camera-inline" title="Camera ON/OFF" aria-label="Toggle camera" class="ctrl-circle">📷</button>
-        <button id="btn-voicefirst" title="Voice-First Mode" aria-label="Toggle Voice-First mode" class="ctrl-circle">
-          🗣️
-        </button>
+
 
         <div id="mic-level" title="Mic level"><span></span><span></span><span></span><span></span><span></span></div>
         <input
@@ -1046,6 +1042,22 @@
     </script>
     <script src="js/geo.js"></script>
     <script src="js/translate-mode.js"></script>
+    <script>
+      // ── Auto-start Voice-First permanent (fara buton) ─────────────
+      (function () {
+        function tryStartVoice(attempts) {
+          if (window.KVoiceFirst && window.KAvatar && window.KVoice) {
+            var avatar = KAvatar.getCurrentAvatar ? KAvatar.getCurrentAvatar() : 'kelion';
+            var lang = KVoice.getLanguage ? KVoice.getLanguage() : 'ro';
+            KVoiceFirst.connect(avatar, lang);
+          } else if (attempts > 0) {
+            setTimeout(function() { tryStartVoice(attempts - 1); }, 500);
+          }
+        }
+        // Porneste dupa 3 secunde ca sa se initializeze toate modulele
+        setTimeout(function() { tryStartVoice(20); }, 3000);
+      })();
+    </script>
     <script>
       // ── T Button handler (Translate Mode) ─────────────────
       (function () {
