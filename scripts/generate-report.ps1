@@ -9,6 +9,7 @@ $JsonResults  = "$ProjectDir\test-results\results.json"
 $SpecFile     = "$ProjectDir\tests\e2e-full.spec.js"
 $ReportPath   = "$DesktopDir\kelionai-test-report_$Timestamp.html"
 $LatestReport = "$DesktopDir\kelionai-test-report-LATEST.html"
+$HistoryFile = "$ProjectDir\test-results\test-history.json"
 
 if (Test-Path $LatestReport) { Remove-Item $LatestReport -Force }
 
@@ -223,8 +224,16 @@ $css = "*{box-sizing:border-box;margin:0;padding:0}" +
 ".hc-detail code{color:#fbbf24;font-family:monospace;font-size:10px}" +
 "footer{text-align:center;color:#475569;font-size:11px;padding:20px}"
 
+$js = "window.onload=function(){filterProblems()};var showAll=false;" +
+"function toggleView(){showAll=!showAll;" +
+"document.querySelectorAll('.row-pass,.suite-row').forEach(function(r){r.style.display=showAll?'':'none'});" +
+"document.getElementById('toggleBtn').textContent=showAll?'Arata doar probleme':'Arata toate ('+document.querySelectorAll('.row-pass').length+' trecute)';};" +
+"function filterProblems(){document.querySelectorAll('.row-pass,.suite-row').forEach(function(r){r.style.display='none';});" +
+"document.getElementById('toggleBtn').textContent='Arata toate ('+document.querySelectorAll('.row-pass').length+' trecute)';};"
+
 $html = "<!DOCTYPE html><html lang='ro'><head><meta charset='UTF-8'/><title>KelionAI Tests $dateDisplay</title><style>$css</style></head><body>" +
-    "<header><span style='font-size:26px'>&#x1F916;</span><div><h1>KelionAI E2E Tests <span class='badge'>$overallStatus</span></h1><small>$dateDisplay | Durata: ${duration}s | Total: $totalTests | Trecute: $passed | Esecuri: $failed | Omise: $skipped</small></div></header>" +
+    "<header><span style='font-size:26px'>&#x1F916;</span><div><h1>KelionAI E2E Tests <span class='badge'>$overallStatus</span></h1><small>$dateDisplay | Durata: ${duration}s | Total: $totalTests | Trecute: $passed | Esecuri: $failed | Omise: $skipped</small></div>" +
+    "<button id='toggleBtn' onclick='toggleView()' style='margin-left:auto;padding:8px 16px;background:#334155;color:#f1f5f9;border:none;border-radius:6px;cursor:pointer;font-size:12px'>Arata toate</button></header>" +
     "<div class='container'>" +
     "<table><thead><tr>" +
     "<th>#</th><th>Test</th><th>Status</th><th>Sectiune</th>" +
@@ -233,9 +242,45 @@ $html = "<!DOCTYPE html><html lang='ro'><head><meta charset='UTF-8'/><title>Keli
     "</tr></thead><tbody>" +
     $rows.ToString() +
     "</tbody></table></div>" +
-    "<footer>KelionAI Test Report &mdash; $dateDisplay | Analiza automata: fake = asertari slabe; hard-coded = valori literale specifice detectate in test</footer></body></html>"
+    "<footer>KelionAI Test Report &mdash; $dateDisplay | Implicit: doar esecuri si omisiuni vizibile</footer>" +
+    "<script>$js</script></body></html>"
+
+# ── Salveaza istoricul ───────────────────────────────────────────
+$history = @()
+if (Test-Path $HistoryFile) {
+    try { $history = @(Get-Content $HistoryFile -Raw | ConvertFrom-Json) } catch {}
+}
+$history += [PSCustomObject]@{
+    date    = $dateDisplay
+    total   = $totalTests
+    passed  = $passed
+    failed  = $failed
+    skipped = $skipped
+    status  = $overallStatus
+}
+$history | ConvertTo-Json -Depth 3 | Out-File -FilePath $HistoryFile -Encoding UTF8 -Force
+
+# ── Tabel evolutie ───────────────────────────────────────────────
+$evoRows = ""
+for ($hi = [Math]::Max(0, $history.Count - 10); $hi -lt $history.Count; $hi++) {
+    $h = $history[$hi]
+    $sc = if ($h.status -eq 'PASS') { '#22c55e' } else { '#ef4444' }
+    $diff = if ($hi -gt 0) {
+        $prev = $history[$hi - 1]
+        $d = [int]$h.passed - [int]$prev.passed
+        if ($d -gt 0) { "<span style='color:#22c55e'>+$d</span>" }
+        elseif ($d -lt 0) { "<span style='color:#ef4444'>$d</span>" }
+        else { "=" }
+    } else { "-" }
+    $evoRows += "<tr><td>$($h.date)</td><td>$($h.total)</td><td style='color:#22c55e'>$($h.passed)</td><td style='color:#ef4444'>$($h.failed)</td><td style='color:#94a3b8'>$($h.skipped)</td><td>$diff</td><td style='color:$sc;font-weight:700'>$($h.status)</td></tr>"
+}
+$evoTable = "<div class='container' style='margin-top:0;padding-top:0'><h3 style='color:#64748b;font-size:12px;letter-spacing:.05em;text-transform:uppercase;margin-bottom:8px'>Evolutie (ultimele rulari)</h3><table style='font-size:11px'><thead><tr><th>Data</th><th>Total</th><th>Trecute</th><th>Esecuri</th><th>Omise</th><th>Diff</th><th>Status</th></tr></thead><tbody>$evoRows</tbody></table></div>"
 
 $html | Out-File -FilePath $LatestReport -Encoding UTF8 -Force
+# Injecteaza tabelul evolutie inaintea footer-ului
+$content = Get-Content $LatestReport -Raw
+$content = $content -replace '<footer>', "$evoTable<footer>"
+$content | Out-File -FilePath $LatestReport -Encoding UTF8 -Force
 
 Write-Host "Raport actualizat: kelionai-test-report-LATEST.html"
 Write-Host "Total: $totalTests | Trecute: $passed | Esecuri: $failed | Omise: $skipped | Durata: ${duration}s"
