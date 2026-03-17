@@ -38,8 +38,9 @@ router.post("/", imageLimiter, validate(imagineSchema), async (req, res) => {
   try {
     const { getUserFromToken, supabaseAdmin, brain } = req.app.locals;
     const { prompt } = req.body;
-    if (!prompt || !process.env.TOGETHER_API_KEY)
-      return res.status(503).json({ error: "Image generation unavailable" });
+    if (!prompt) return res.status(400).json({ error: "Prompt is required" });
+    if (!process.env.TOGETHER_API_KEY)
+      return res.status(400).json({ error: "Image generation not configured" });
 
     const user = await getUserFromToken(req);
     const usage = await checkUsage(user?.id, "image", supabaseAdmin);

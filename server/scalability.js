@@ -86,8 +86,8 @@ function getCircuitStats() {
 const _ipCounts = new Map(); // ip → { count, firstSeen }
 const _blacklist = new Set();
 const IP_WINDOW = 60 * 1000; // 1 minute window
-const IP_MAX = 500; // max requests per window
-const BAN_DURATION = 60 * 60 * 1000; // 1 hour ban
+const IP_MAX = 2000; // max requests per window (raised for e2e / heavy usage)
+const BAN_DURATION = 10 * 60 * 1000; // 10 minute ban (was 1h — too aggressive)
 const _banExpiry = new Map(); // ip → unban timestamp
 
 // Cleanup every 5 minutes

@@ -12,6 +12,28 @@ const { MODELS } = require("../config/models");
 
 const router = express.Router();
 
+// ═══ XSS SANITIZATION — strip HTML tags from search results ═══
+function sanitize(str) {
+  if (typeof str !== "string") return str;
+  return str
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/onerror\s*=/gi, "")
+    .replace(/onload\s*=/gi, "")
+    .replace(/javascript:/gi, "");
+}
+function sanitizeResult(obj) {
+  if (!obj) return obj;
+  if (typeof obj === "string") return sanitize(obj);
+  if (Array.isArray(obj)) return obj.map(sanitizeResult);
+  if (typeof obj === "object") {
+    const out = {};
+    for (const [k, v] of Object.entries(obj)) out[k] = sanitizeResult(v);
+    return out;
+  }
+  return obj;
+}
+
 const searchLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 15,
@@ -82,7 +104,7 @@ router.post("/", searchLimiter, validate(searchSchema), async (req, res) => {
                 { engine: "Perplexity" },
               )
               .catch(() => {});
-          return res.json({ results, answer, engine: "Perplexity" });
+          return res.json(sanitizeResult({ results, answer, engine: "Perplexity" }));
         }
       } catch (e) {
         logger.warn(
@@ -138,7 +160,7 @@ router.post("/", searchLimiter, validate(searchSchema), async (req, res) => {
                 { engine: "Tavily" },
               )
               .catch(() => {});
-          return res.json({
+          return res.json(sanitizeResult({
             results: (td.results || []).map((x) => ({
               title: x.title,
               content: x.content,
@@ -146,7 +168,7 @@ router.post("/", searchLimiter, validate(searchSchema), async (req, res) => {
             })),
             answer: tavilyAnswer,
             engine: "Tavily",
-          });
+          }));
         }
       } catch (e) {
         logger.warn(
@@ -200,7 +222,7 @@ router.post("/", searchLimiter, validate(searchSchema), async (req, res) => {
                 { engine: "Serper" },
               )
               .catch(() => {});
-          return res.json({ results, answer, engine: "Serper" });
+          return res.json(sanitizeResult({ results, answer, engine: "Serper" }));
         }
       } catch (e) {
         logger.warn(
@@ -250,7 +272,7 @@ router.post("/", searchLimiter, validate(searchSchema), async (req, res) => {
           { engine: "DuckDuckGo" },
         )
         .catch(() => {});
-    res.json({ results, answer: d.Abstract || "", engine: "DuckDuckGo" });
+    res.json(sanitizeResult({ results, answer: d.Abstract || "", engine: "DuckDuckGo" }));
   } catch {
     res.status(500).json({ error: "Search error" });
   }
@@ -294,7 +316,7 @@ router.get("/", searchLimiter, async (req, res) => {
             content: t.Text,
             url: t.FirstURL,
           });
-    res.json({ results, answer: d.Abstract || "", engine: "DuckDuckGo" });
+    res.json(sanitizeResult({ results, answer: d.Abstract || "", engine: "DuckDuckGo" }));
   } catch {
     res.status(500).json({ error: "Search error" });
   }

@@ -286,11 +286,15 @@ app.use((req, res, next) => {
 // ═══ RATE LIMITING ═══
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 200,
+  max: 1000,
   message: { error: 'Too many requests. Please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
-  skip: (req) => req.path.startsWith('/admin/') || req.path.startsWith('/admin'),
+  skip: (req) =>
+    req.path.startsWith('/admin/') ||
+    req.path.startsWith('/admin') ||
+    req.path === '/health' ||
+    req.path.startsWith('/health'),
 });
 
 const asyncHandler = (fn) => (req, res, next) => {
