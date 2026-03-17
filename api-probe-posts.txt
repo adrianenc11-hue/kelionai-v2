@@ -1,0 +1,66 @@
+200 POST /api/chat => {"reply":"Hello!     Test primit! Sunt Kelion, gata de acțiune. Ce putem explora astăzi?","avatar":"kelion","engine":"v5-gemini-flash","language":"en","thinkTime":2827,"totalTime":3013,"conversationId":"6b87d2c8-a42a-42d0-9596-38d56160a6f8","emotion":"happy","gestures":["nod"],"pose":null,"bodyActio
+---
+200 POST /api/search => {"results":[{"title":"https://forecast.weather.gov/zipcity.php?inputstring=Mount+Airy%2CNC&Go2=Go","content":"","url":"https://forecast.weather.gov/zipcity.php?inputstring=Mount+Airy%2CNC&Go2=Go"},{"title":"https://www.timeanddate.com/weather/usa/mount-airy/ext","content":"","url":"https://www.timea
+---
+400 POST /api/vision => {"error":"Validation failed","details":[{"field":"image","message":"Required"}]}
+---
+200 POST /api/voice/speak => {"audio":"SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjYwLjE2LjEwMAAAAAAAAAAAAAAA//uQwAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAjAAA6xQAODhUVFRwcHCMjIyoqKjExMTg4Pz8/R0dHTk5OVVVVXFxcY2NjampxcXF4eHh/f3+Hh4eOjo6VlZWcnKOjo6qqqrGxsbi4uL+/v8fHx87O1dXV3Nzc4+Pj6urq8fHx+Pj4//8AAAAATGF2ZgAAAAAAAAAAAAAAAAAAAAAAJAOoAAAAAAAAOs
+---
+400 POST /api/voice/listen => {"error":"Validation failed","details":[{"field":"","message":"text sau audio obligatoriu"}]}
+---
+400 POST /api/imagine => {"error":"Image generation not configured"}
+---
+200 POST /api/trading/backtest => {"strategy":"RSI","asset":"BTC","period":90,"riskProfile":"MODERATE","stopLoss":"3%","takeProfit":"9%","trades":1,"wins":1,"losses":0,"winRate":100,"profitFactor":null,"totalReturn":0.04,"maxDrawdown":0,"finalEquity":100.04,"totalCommissions":147.79,"totalSlippage":73.89,"avgTradeDuration":"84 bars"
+---
+401 POST /api/trading/execute => {"error":"Authentication required for trade execution"}
+---
+401 POST /api/trading/close => {"error":"Unauthorized"}
+---
+200 POST /api/trading/kill-switch => {"killed":true,"closedPositions":[]}
+---
+200 POST /api/trading/risk-profile => {"success":true,"profile":"MODERATE","emoji":"⚖️","riskPct":2,"config":{"name":"MODERATE","emoji":"⚖️","riskPct":2,"MAX_RISK_PCT":0.02,"MIN_CONFLUENCE":75,"DEFAULT_STOP_LOSS_PCT":0.03,"DEFAULT_TAKE_PROFIT_PCT":0.09,"MAX_OPEN_POSITIONS":2,"MAX_DAILY_TRADES":5,"MAX_DAILY_LOSS_PCT":0.04,"MAX_WEEKLY_LOS
+---
+401 POST /api/identity/register-face => {"error":"Unauthorized"}
+---
+400 POST /api/identity/check => {"error":"face image required"}
+---
+401 POST /api/payments/checkout => {"error":"Authentication required"}
+---
+401 POST /api/gdpr/export => {"error":"Authentication required"}
+---
+401 POST /api/gdpr/delete => {"error":"Authentication required"}
+---
+404 POST /api/gdpr/consent => {"error":"API endpoint not found"}
+---
+401 POST /api/auth/login => {"error":"Invalid login credentials"}
+---
+400 POST /api/auth/refresh => {"error":"Validation failed","details":[{"field":"refresh_token","message":"Required"}]}
+---
+400 POST /api/auth/forgot-password => {"error":"Validation failed","details":[{"field":"email","message":"Required"}]}
+---
+401 POST /api/auth/change-email => {"error":"Not authenticated"}
+---
+401 POST /api/ticker/disable => {"error":"Auth required"}
+---
+401 POST /api/developer/keys => {"error":"Authentication required"}
+---
+401 POST /api/developer/webhooks => {"error":"Authentication required"}
+---
+401 POST /api/developer/v1/chat => {"error":"API key required. Add X-API-Key header."}
+---
+401 POST /api/news => {"error":"Unauthorized"}
+---
+401 POST /api/media/publish => {"error":"Unauthorized"}
+---
+401 POST /api/whatsapp/send => {"error":"Unauthorized"}
+---
+200 POST /api/telegram/webhook => OK
+---
+200 POST /api/whatsapp/webhook => OK
+---
+403 POST /api/admin/brain/reset => {"error":"Forbidden"}
+---
+401 DELETE /api/developer/keys/test => {"error":"Authentication required"}
+---
+404 DELETE /api/gdpr/delete => {"error":"API endpoint not found"}
+---

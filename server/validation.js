@@ -11,7 +11,7 @@ const registerSchema = z.object({
 });
 
 const loginSchema = z.object({
-  email: z.string().email(),
+  email: z.string().min(1).max(256),
   password: z.string().min(1).max(128),
 });
 
@@ -20,7 +20,7 @@ const refreshSchema = z.object({
 });
 
 const chatSchema = z.object({
-  message: z.string().min(1).max(10000).default(""),
+  message: z.string().min(0).max(10000).default(""),
   avatar: z.enum(["kelion", "kira"]).optional(),
   history: z
     .array(

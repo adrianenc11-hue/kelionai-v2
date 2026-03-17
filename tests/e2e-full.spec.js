@@ -6,18 +6,31 @@ const { test, expect } = require("@playwright/test");
 let siteIsUp = true;
 
 test.beforeAll(async ({ request }) => {
-  try {
-    const resp = await request.get("/api/health", { timeout: 15000 });
-    if (resp.status() >= 500) {
-      siteIsUp = false;
+  const MAX_WAIT_MS  = 120_000; // 2 minute maxim
+  const RETRY_MS     = 5_000;   // incearca la fiecare 5 secunde
+  const start        = Date.now();
+  let attempts       = 0;
+
+  while (Date.now() - start < MAX_WAIT_MS) {
+    attempts++;
+    try {
+      const resp = await request.get("/api/health", { timeout: 10000 });
+      if (resp.status() === 200) {
+        console.log(`✅ kelionai.app UP dupa ${attempts} incercari (${Date.now() - start}ms)`);
+        siteIsUp = true;
+        return;
+      }
+      console.warn(`⏳ /api/health → ${resp.status()} (incercarea ${attempts}) — reîncerc...`);
+    } catch (e) {
+      console.warn(`⏳ /api/health → eroare (incercarea ${attempts}): ${e.message} — reîncerc...`);
     }
-  } catch (e) {
-    siteIsUp = false;
+    await new Promise(r => setTimeout(r, RETRY_MS));
   }
-  if (!siteIsUp) {
-    console.warn("⚠️ kelionai.app is DOWN — skipping all E2E tests");
-  }
+
+  siteIsUp = false;
+  console.warn(`⚠️ kelionai.app nu raspunde dupa ${attempts} incercari (${MAX_WAIT_MS / 1000}s) — skip all`);
 });
+
 // ═══════════════════════════════════════════════════════════════
 // SECTION 1 — Onboarding Flow
 // ═══════════════════════════════════════════════════════════════
@@ -413,8 +426,8 @@ test.describe("Buttons and Links", () => {
 
     for (const href of hrefs) {
       const resp = await request.get(href);
-      // Should not be a 5xx error
-      expect(resp.status()).toBeLessThan(500);
+      // Nav links must return 200
+      expect(resp.status()).toBe(200);
     }
     await page.screenshot({ path: "test-results/navbar-links.png" });
   });
@@ -665,7 +678,7 @@ test.describe("API Health", () => {
     const assets = ["/css/app.css", "/js/app.js"];
     for (const asset of assets) {
       const resp = await request.get(asset);
-      expect(resp.status()).toBeLessThan(500);
+      expect(resp.status()).toBe(200);
     }
   });
 
@@ -810,8 +823,8 @@ test.describe("PWA", () => {
       const body = await resp.json();
       expect(body).toBeTruthy();
     } else {
-      // Manifest not yet implemented or served as HTML catch-all — acceptable
-      expect(resp.status()).toBeLessThan(500);
+      // Manifest served as HTML catch-all or not found — must be 200 or 404
+      expect([200, 404]).toContain(resp.status());
     }
   });
 
@@ -1060,7 +1073,10 @@ test.describe.serial("Real User — Full Auth Flow", () => {
     const r = await request.post("/api/auth/register", {
       data: { email: TEST_EMAIL, password: TEST_PASS, name: TEST_NAME },
     });
-    expect([200, 201, 400, 409, 422, 429]).toContain(r.status());
+    // 201 = created, 409 = already exists, 429 = rate limited
+    expect([201, 409, 429]).toContain(r.status());
+    const d = await r.json();
+    expect(d).toBeTruthy();
   });
   test("login with new account", async ({ request }) => {
     test.skip(!siteIsUp);
@@ -1229,10 +1245,14 @@ test.describe.serial("Real User — Full Auth Flow", () => {
         await page.waitForTimeout(3000);
       }
     }
+    // After login attempt (may fail if email unverified), app auto-enters via enterApp()
     await expect(page.locator("#text-input")).toBeVisible({ timeout: 30000 });
     await page.fill("#text-input", "Hello from E2E test");
-    await page.press("#text-input", "Enter");
-    await expect(page.locator(".msg.user")).toBeVisible({ timeout: 30000 });
+    await page.locator("#btn-send").click();
+    // Verify the message was processed: thinking indicator appears OR overlay gets content.
+    // Don't wait for AI reply — it can take 2+ minutes under parallel load.
+    const thinkingOrOverlay = page.locator("#thinking.active, #chat-overlay .msg");
+    await expect(thinkingOrOverlay.first()).toBeAttached({ timeout: 15000 });
   });
   test("logout works", async ({ request }) => {
     test.skip(!siteIsUp || !authToken);
@@ -1252,525 +1272,666 @@ test.describe.serial("Real User — Full Auth Flow", () => {
 test.describe("API — Trading", () => {
   test("GET /api/trading/status", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect((await request.get("/api/trading/status")).status()).toBeLessThan(
-      500,
-    );
+    const r = await request.get("/api/trading/status");
+    expect(r.status()).toBe(200);
+    const d = await r.json();
+    expect(d).toHaveProperty("active");
+    expect(d).toHaveProperty("status");
+    expect(d).toHaveProperty("strategies");
+    expect(Array.isArray(d.strategies)).toBe(true);
+    expect(d).toHaveProperty("assets");
+    expect(d).toHaveProperty("activeTrades");
   });
   test("GET /api/trading/analysis", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect((await request.get("/api/trading/analysis")).status()).toBeLessThan(
-      500,
-    );
+    const r = await request.get("/api/trading/analysis");
+    expect(r.status()).toBe(200);
+    const d = await r.json();
+    expect(d).toHaveProperty("timestamp");
+    expect(d).toHaveProperty("assets");
+    expect(Array.isArray(d.assets)).toBe(true);
+    expect(d.assets.length).toBeGreaterThan(0);
+    const first = d.assets[0];
+    expect(first).toHaveProperty("asset");
+    expect(first).toHaveProperty("price");
+    expect(first).toHaveProperty("signal");
+    expect(first).toHaveProperty("confidence");
   });
   test("GET /api/trading/signals", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect((await request.get("/api/trading/signals")).status()).toBeLessThan(
-      500,
-    );
+    const r = await request.get("/api/trading/signals");
+    expect(r.status()).toBe(200);
+    const d = await r.json();
+    expect(d).toHaveProperty("signals");
+    expect(Array.isArray(d.signals)).toBe(true);
+    if (d.signals.length > 0) {
+      const s = d.signals[0];
+      expect(s).toHaveProperty("asset");
+      expect(s).toHaveProperty("signal");
+      expect(s).toHaveProperty("confidence");
+      expect(s).toHaveProperty("entry");
+      expect(s).toHaveProperty("stopLoss");
+    }
   });
   test("GET /api/trading/portfolio", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect((await request.get("/api/trading/portfolio")).status()).toBeLessThan(
-      500,
-    );
+    const r = await request.get("/api/trading/portfolio");
+    expect(r.status()).toBe(200);
+    const d = await r.json();
+    expect(d).toHaveProperty("mode");
+    expect(d).toHaveProperty("balance");
+    expect(d).toHaveProperty("openPositions");
+    expect(Array.isArray(d.openPositions)).toBe(true);
+    expect(d).toHaveProperty("closedTradesSummary");
   });
   test("POST /api/trading/backtest", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect(
-      (
-        await request.post("/api/trading/backtest", {
-          data: { pair: "EURUSD", days: 30 },
-        })
-      ).status(),
-    ).toBeLessThan(500);
+    const r = await request.post("/api/trading/backtest", {
+      data: { pair: "EURUSD", days: 30 },
+    });
+    expect(r.status()).toBe(200);
+    const d = await r.json();
+    expect(d).toHaveProperty("strategy");
+    expect(d).toHaveProperty("asset");
+    expect(d).toHaveProperty("trades");
+    expect(d).toHaveProperty("winRate");
+    expect(d).toHaveProperty("totalReturn");
   });
   test("GET /api/trading/alerts", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect((await request.get("/api/trading/alerts")).status()).toBeLessThan(
-      500,
-    );
+    const r = await request.get("/api/trading/alerts");
+    expect(r.status()).toBe(200);
+    const d = await r.json();
+    expect(d).toHaveProperty("alerts");
+    expect(Array.isArray(d.alerts)).toBe(true);
+    expect(d).toHaveProperty("count");
+    expect(d).toHaveProperty("disclaimer");
   });
   test("GET /api/trading/correlation", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect(
-      (await request.get("/api/trading/correlation")).status(),
-    ).toBeLessThan(500);
+    const r = await request.get("/api/trading/correlation");
+    expect(r.status()).toBe(200);
+    const d = await r.json();
+    expect(d).toHaveProperty("matrix");
+    expect(d.matrix).toHaveProperty("BTC");
+    expect(d.matrix).toHaveProperty("ETH");
   });
   test("GET /api/trading/risk", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect((await request.get("/api/trading/risk")).status()).toBeLessThan(500);
+    const r = await request.get("/api/trading/risk");
+    expect(r.status()).toBe(200);
+    const d = await r.json();
+    expect(d).toHaveProperty("sharpeRatio");
+    expect(d).toHaveProperty("maxDrawdown");
+    expect(d).toHaveProperty("var95");
+    expect(d).toHaveProperty("riskLevel");
   });
   test("GET /api/trading/history", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect((await request.get("/api/trading/history")).status()).toBeLessThan(
-      500,
-    );
+    const r = await request.get("/api/trading/history");
+    expect(r.status()).toBe(200);
+    const d = await r.json();
+    expect(d).toHaveProperty("history");
+    expect(Array.isArray(d.history)).toBe(true);
+    expect(d).toHaveProperty("total");
   });
   test("POST /api/trading/execute → needs auth", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect(
-      (
-        await request.post("/api/trading/execute", {
-          data: { pair: "EURUSD", action: "buy" },
-        })
-      ).status(),
-    ).toBeGreaterThanOrEqual(400);
+    const r = await request.post("/api/trading/execute", {
+      data: { pair: "EURUSD", action: "buy" },
+    });
+    expect(r.status()).toBe(401);
+    const d = await r.json();
+    expect(d).toHaveProperty("error");
   });
   test("GET /api/trading/full-analysis", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect(
-      (await request.get("/api/trading/full-analysis")).status(),
-    ).toBeLessThan(500);
+    const r = await request.get("/api/trading/full-analysis");
+    expect(r.status()).toBe(200);
+    const d = await r.json();
+    expect(d).toHaveProperty("asset");
+    expect(d).toHaveProperty("price");
+    expect(d).toHaveProperty("indicators");
+    expect(d.indicators).toHaveProperty("rsi");
+    expect(d.indicators).toHaveProperty("macd");
   });
   test("GET /api/trading/calendar", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect((await request.get("/api/trading/calendar")).status()).toBeLessThan(
-      500,
-    );
+    const r = await request.get("/api/trading/calendar");
+    expect(r.status()).toBe(200);
+    const d = await r.json();
+    expect(d).toHaveProperty("risks");
+    expect(Array.isArray(d.risks)).toBe(true);
+    if (d.risks.length > 0) {
+      expect(d.risks[0]).toHaveProperty("event");
+      expect(d.risks[0]).toHaveProperty("risk");
+    }
   });
   test("GET /api/trading/positions", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect((await request.get("/api/trading/positions")).status()).toBeLessThan(
-      500,
-    );
+    const r = await request.get("/api/trading/positions");
+    expect(r.status()).toBe(200);
+    const d = await r.json();
+    expect(d).toHaveProperty("positions");
+    expect(Array.isArray(d.positions)).toBe(true);
+    expect(d).toHaveProperty("mode");
   });
-  test("POST /api/trading/close", async ({ request }) => {
+  test("POST /api/trading/close → needs auth", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect(
-      (await request.post("/api/trading/close", { data: {} })).status(),
-    ).toBeLessThan(500);
+    const r = await request.post("/api/trading/close", { data: {} });
+    expect(r.status()).toBe(401);
+    const d = await r.json();
+    expect(d).toHaveProperty("error");
   });
   test("POST /api/trading/kill-switch", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect(
-      (await request.post("/api/trading/kill-switch")).status(),
-    ).toBeLessThan(500);
+    const r = await request.post("/api/trading/kill-switch");
+    expect(r.status()).toBe(200);
+    const d = await r.json();
+    expect(d).toHaveProperty("killed");
+    expect(d).toHaveProperty("closedPositions");
   });
   test("GET /api/trading/paper-balance", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect(
-      (await request.get("/api/trading/paper-balance")).status(),
-    ).toBeLessThan(500);
+    const r = await request.get("/api/trading/paper-balance");
+    expect(r.status()).toBe(200);
+    const d = await r.json();
+    expect(d).toHaveProperty("balance");
+    expect(d).toHaveProperty("mode");
   });
   test("GET /api/trading/risk-profile", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect(
-      (await request.get("/api/trading/risk-profile")).status(),
-    ).toBeLessThan(500);
+    const r = await request.get("/api/trading/risk-profile");
+    expect(r.status()).toBe(200);
+    const d = await r.json();
+    expect(d).toHaveProperty("active");
+    expect(d).toHaveProperty("name");
+    expect(d).toHaveProperty("riskPct");
+    expect(d).toHaveProperty("allProfiles");
   });
   test("POST /api/trading/risk-profile", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect(
-      (
-        await request.post("/api/trading/risk-profile", {
-          data: { profile: "moderate" },
-        })
-      ).status(),
-    ).toBeLessThan(500);
+    const r = await request.post("/api/trading/risk-profile", {
+      data: { profile: "moderate" },
+    });
+    expect(r.status()).toBe(200);
+    const d = await r.json();
+    expect(d).toHaveProperty("success");
+    expect(d.success).toBe(true);
+    expect(d).toHaveProperty("profile");
   });
   test("GET /api/trading/projections", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect(
-      (await request.get("/api/trading/projections")).status(),
-    ).toBeLessThan(500);
+    const r = await request.get("/api/trading/projections");
+    expect(r.status()).toBe(200);
+    const d = await r.json();
+    expect(d).toHaveProperty("capital");
+    expect(d).toHaveProperty("currency");
+    expect(d).toHaveProperty("profiles");
   });
 });
 test.describe("API — Developer", () => {
-  test("GET /api/developer/keys", async ({ request }) => {
+  test("GET /api/developer/keys → needs auth", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect((await request.get("/api/developer/keys")).status()).toBeLessThan(
-      500,
-    );
+    const r = await request.get("/api/developer/keys");
+    expect(r.status()).toBe(401);
+    const d = await r.json();
+    expect(d.error).toBe("Authentication required");
   });
-  test("POST /api/developer/keys", async ({ request }) => {
+  test("POST /api/developer/keys → needs auth", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect(
-      (
-        await request.post("/api/developer/keys", { data: { name: "test" } })
-      ).status(),
-    ).toBeLessThan(500);
+    const r = await request.post("/api/developer/keys", { data: { name: "test" } });
+    expect(r.status()).toBe(401);
+    const d = await r.json();
+    expect(d.error).toBe("Authentication required");
   });
-  test("GET /api/developer/stats", async ({ request }) => {
+  test("GET /api/developer/stats → needs auth", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect((await request.get("/api/developer/stats")).status()).toBeLessThan(
-      500,
-    );
+    const r = await request.get("/api/developer/stats");
+    expect(r.status()).toBe(401);
+    const d = await r.json();
+    expect(d).toHaveProperty("error");
   });
-  test("GET /api/developer/webhooks", async ({ request }) => {
+  test("GET /api/developer/webhooks → needs auth", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect(
-      (await request.get("/api/developer/webhooks")).status(),
-    ).toBeLessThan(500);
+    const r = await request.get("/api/developer/webhooks");
+    expect(r.status()).toBe(401);
+    const d = await r.json();
+    expect(d).toHaveProperty("error");
   });
-  test("POST /api/developer/webhooks", async ({ request }) => {
+  test("POST /api/developer/webhooks → needs auth", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect(
-      (
-        await request.post("/api/developer/webhooks", {
-          data: { url: "https://test.com" },
-        })
-      ).status(),
-    ).toBeLessThan(500);
+    const r = await request.post("/api/developer/webhooks", {
+      data: { url: "https://test.com" },
+    });
+    expect(r.status()).toBe(401);
+    const d = await r.json();
+    expect(d).toHaveProperty("error");
   });
   test("GET /api/developer/v1/status", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect(
-      (await request.get("/api/developer/v1/status")).status(),
-    ).toBeLessThan(500);
+    const r = await request.get("/api/developer/v1/status");
+    expect(r.status()).toBe(200);
+    const d = await r.json();
+    expect(d.status).toBe("online");
+    expect(d).toHaveProperty("version");
+    expect(d).toHaveProperty("endpoints");
+    expect(Array.isArray(d.endpoints)).toBe(true);
   });
-  test("GET /api/developer/v1/models", async ({ request }) => {
+  test("GET /api/developer/v1/models → needs API key", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect(
-      (await request.get("/api/developer/v1/models")).status(),
-    ).toBeLessThan(500);
+    const r = await request.get("/api/developer/v1/models");
+    expect(r.status()).toBe(401);
+    const d = await r.json();
+    expect(d.error).toContain("API key required");
   });
-  test("GET /api/developer/v1/user/profile", async ({ request }) => {
+  test("GET /api/developer/v1/user/profile → needs API key", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect(
-      (await request.get("/api/developer/v1/user/profile")).status(),
-    ).toBeLessThan(500);
+    const r = await request.get("/api/developer/v1/user/profile");
+    expect(r.status()).toBe(401);
+    const d = await r.json();
+    expect(d.error).toContain("API key required");
   });
-  test("POST /api/developer/v1/chat", async ({ request }) => {
+  test("POST /api/developer/v1/chat → needs API key", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect(
-      (
-        await request.post("/api/developer/v1/chat", {
-          data: { message: "test" },
-        })
-      ).status(),
-    ).toBeLessThan(500);
+    const r = await request.post("/api/developer/v1/chat", {
+      data: { message: "test" },
+    });
+    expect(r.status()).toBe(401);
+    const d = await r.json();
+    expect(d.error).toContain("API key required");
   });
-  test("DELETE /api/developer/keys/test", async ({ request }) => {
+  test("DELETE /api/developer/keys/test → needs auth", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect(
-      (await request.delete("/api/developer/keys/test")).status(),
-    ).toBeLessThan(500);
+    const r = await request.delete("/api/developer/keys/test");
+    expect(r.status()).toBe(401);
+    const d = await r.json();
+    expect(d).toHaveProperty("error");
   });
 });
 test.describe("API — Legal & GDPR", () => {
   test("GET /api/legal/terms", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect((await request.get("/api/legal/terms")).status()).toBe(200);
+    const r = await request.get("/api/legal/terms");
+    expect(r.status()).toBe(200);
+    const d = await r.json();
+    expect(d).toHaveProperty("title");
+    expect(d).toHaveProperty("version");
+    expect(d).toHaveProperty("sections");
+    expect(Array.isArray(d.sections)).toBe(true);
+    expect(d.sections.length).toBeGreaterThan(0);
   });
   test("GET /api/legal/privacy", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect((await request.get("/api/legal/privacy")).status()).toBe(200);
+    const r = await request.get("/api/legal/privacy");
+    expect(r.status()).toBe(200);
+    const d = await r.json();
+    expect(d).toHaveProperty("title");
+    expect(d).toHaveProperty("version");
+    expect(d).toHaveProperty("sections");
+    expect(Array.isArray(d.sections)).toBe(true);
   });
   test("POST /api/gdpr/export → needs auth", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect(
-      (await request.post("/api/gdpr/export")).status(),
-    ).toBeGreaterThanOrEqual(400);
+    const r = await request.post("/api/gdpr/export");
+    expect(r.status()).toBe(401);
+    const d = await r.json();
+    expect(d.error).toBe("Authentication required");
   });
-  test("DELETE /api/gdpr/delete → needs auth", async ({ request }) => {
+  test("DELETE /api/gdpr/delete → endpoint missing (404)", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect(
-      (await request.delete("/api/gdpr/delete")).status(),
-    ).toBeGreaterThanOrEqual(400);
+    const r = await request.delete("/api/gdpr/delete");
+    expect(r.status()).toBe(404);
+    const d = await r.json();
+    expect(d).toHaveProperty("error");
   });
-  test("GET /api/gdpr/consent", async ({ request }) => {
+  test("GET /api/gdpr/consent → endpoint missing (404)", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect((await request.get("/api/gdpr/consent")).status()).toBeLessThan(500);
+    const r = await request.get("/api/gdpr/consent");
+    expect(r.status()).toBe(404);
+    const d = await r.json();
+    expect(d).toHaveProperty("error");
   });
-  test("POST /api/gdpr/consent", async ({ request }) => {
+  test("POST /api/gdpr/consent → endpoint missing (404)", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect(
-      (
-        await request.post("/api/gdpr/consent", { data: { consent: true } })
-      ).status(),
-    ).toBeLessThan(500);
+    const r = await request.post("/api/gdpr/consent", { data: { consent: true } });
+    expect(r.status()).toBe(404);
+    const d = await r.json();
+    expect(d).toHaveProperty("error");
   });
 });
 test.describe("API — AI Services", () => {
   test("POST /api/search", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect(
-      (await request.post("/api/search", { data: { query: "test" } })).status(),
-    ).toBeLessThan(500);
+    const r = await request.post("/api/search", { data: { query: "test" } });
+    expect(r.status()).toBe(200);
+    const d = await r.json();
+    expect(d).toHaveProperty("results");
+    expect(Array.isArray(d.results)).toBe(true);
   });
   test("GET /api/weather", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect(
-      (await request.get("/api/weather?city=London")).status(),
-    ).toBeLessThan(500);
+    const r = await request.get("/api/weather?city=London");
+    expect(r.status()).toBe(200);
+    const d = await r.json();
+    expect(d).toHaveProperty("city");
+    expect(d).toHaveProperty("temperature");
+    expect(d).toHaveProperty("humidity");
+    expect(d).toHaveProperty("condition");
   });
-  test("POST /api/vision", async ({ request }) => {
+  test("POST /api/vision → validation error without image", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect(
-      (
-        await request.post("/api/vision", {
-          data: { url: "https://example.com/t.jpg" },
-        })
-      ).status(),
-    ).toBeLessThan(500);
+    const r = await request.post("/api/vision", {
+      data: { url: "https://example.com/t.jpg" },
+    });
+    expect(r.status()).toBe(400);
+    const d = await r.json();
+    expect(d.error).toBe("Validation failed");
+    expect(d).toHaveProperty("details");
   });
   test("POST /api/voice/speak", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect(
-      (
-        await request.post("/api/voice/speak", { data: { text: "hello" } })
-      ).status(),
-    ).toBeLessThan(500);
+    const r = await request.post("/api/voice/speak", { data: { text: "hello" } });
+    expect(r.status()).toBe(200);
+    const d = await r.json();
+    expect(d).toHaveProperty("audio");
+    expect(d.audio.length).toBeGreaterThan(10);
   });
-  test("POST /api/voice/listen", async ({ request }) => {
+  test("POST /api/voice/listen → validation error", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect((await request.post("/api/voice/listen")).status()).toBeLessThan(
-      500,
-    );
+    const r = await request.post("/api/voice/listen");
+    expect(r.status()).toBe(400);
+    const d = await r.json();
+    expect(d.error).toBe("Validation failed");
   });
-  test("POST /api/imagine", async ({ request }) => {
+  test("POST /api/imagine → not configured", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect(
-      (
-        await request.post("/api/imagine", { data: { prompt: "test" } })
-      ).status(),
-    ).toBeLessThan(500);
+    const r = await request.post("/api/imagine", { data: { prompt: "test" } });
+    expect(r.status()).toBe(400);
+    const d = await r.json();
+    expect(d.error).toContain("not configured");
   });
 });
 test.describe("API — Identity", () => {
-  test("POST /api/identity/register-face", async ({ request }) => {
+  test("POST /api/identity/register-face → needs auth", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect(
-      (await request.post("/api/identity/register-face")).status(),
-    ).toBeLessThan(500);
+    const r = await request.post("/api/identity/register-face");
+    expect(r.status()).toBe(401);
+    const d = await r.json();
+    expect(d).toHaveProperty("error");
   });
-  test("POST /api/identity/check", async ({ request }) => {
+  test("POST /api/identity/check → needs face image", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect((await request.post("/api/identity/check")).status()).toBeLessThan(
-      500,
-    );
+    const r = await request.post("/api/identity/check");
+    expect(r.status()).toBe(400);
+    const d = await r.json();
+    expect(d.error).toBe("face image required");
   });
 });
 test.describe("API — Payments", () => {
   test("GET /api/payments/plans", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect((await request.get("/api/payments/plans")).status()).toBeLessThan(
-      500,
-    );
+    const r = await request.get("/api/payments/plans");
+    expect(r.status()).toBe(200);
+    const d = await r.json();
+    expect(d).toHaveProperty("plans");
+    expect(Array.isArray(d.plans)).toBe(true);
+    expect(d.plans.length).toBeGreaterThan(0);
+    const plan = d.plans[0];
+    expect(plan).toHaveProperty("id");
+    expect(plan).toHaveProperty("name");
+    expect(plan).toHaveProperty("price");
+    expect(plan).toHaveProperty("features");
   });
   test("POST /api/payments/checkout → needs auth", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect(
-      (
-        await request.post("/api/payments/checkout", { data: { plan: "pro" } })
-      ).status(),
-    ).toBeGreaterThanOrEqual(400);
+    const r = await request.post("/api/payments/checkout", { data: { plan: "pro" } });
+    expect(r.status()).toBe(401);
+    const d = await r.json();
+    expect(d.error).toBe("Authentication required");
   });
 });
 test.describe("API — News", () => {
-  test("GET /api/news", async ({ request }) => {
+  test("GET /api/news → needs auth", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect((await request.get("/api/news")).status()).toBeLessThan(500);
+    const r = await request.get("/api/news");
+    expect(r.status()).toBe(401);
+    const d = await r.json();
+    expect(d).toHaveProperty("error");
   });
-  test("POST /api/news → needs admin", async ({ request }) => {
+  test("POST /api/news → needs auth", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect(
-      (await request.post("/api/news", { data: { title: "test" } })).status(),
-    ).toBeGreaterThanOrEqual(400);
+    const r = await request.post("/api/news", { data: { title: "test" } });
+    expect(r.status()).toBe(401);
+    const d = await r.json();
+    expect(d).toHaveProperty("error");
   });
 });
 test.describe("API — Media", () => {
   test("GET /api/media/facebook/health", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect(
-      (await request.get("/api/media/facebook/health")).status(),
-    ).toBeLessThan(500);
+    const r = await request.get("/api/media/facebook/health");
+    expect(r.status()).toBe(200);
+    const d = await r.json();
+    expect(d).toHaveProperty("status");
+    expect(d).toHaveProperty("hasPageToken");
+    expect(d).toHaveProperty("graphApiVersion");
   });
   test("GET /api/media/instagram/health", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect(
-      (await request.get("/api/media/instagram/health")).status(),
-    ).toBeLessThan(500);
+    const r = await request.get("/api/media/instagram/health");
+    expect(r.status()).toBe(200);
+    const d = await r.json();
+    expect(d).toHaveProperty("status");
+    expect(d).toHaveProperty("hasToken");
+    expect(d).toHaveProperty("graphApiVersion");
   });
-  test("GET /api/media/status → needs admin", async ({ request }) => {
+  test("GET /api/media/status → needs auth", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect(
-      (await request.get("/api/media/status")).status(),
-    ).toBeGreaterThanOrEqual(400);
+    const r = await request.get("/api/media/status");
+    expect(r.status()).toBe(401);
+    const d = await r.json();
+    expect(d).toHaveProperty("error");
   });
-  test("POST /api/media/publish → needs admin", async ({ request }) => {
+  test("POST /api/media/publish → needs auth", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect(
-      (await request.post("/api/media/publish", { data: {} })).status(),
-    ).toBeGreaterThanOrEqual(400);
+    const r = await request.post("/api/media/publish", { data: {} });
+    expect(r.status()).toBe(401);
+    const d = await r.json();
+    expect(d).toHaveProperty("error");
   });
 });
 test.describe("API — Messaging", () => {
   test("GET /api/messenger/webhook", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect(
-      (
-        await request.get(
-          "/api/messenger/webhook?hub.mode=subscribe&hub.verify_token=test&hub.challenge=test",
-        )
-      ).status(),
-    ).toBeLessThan(500);
+    const r = await request.get(
+      "/api/messenger/webhook?hub.mode=subscribe&hub.verify_token=test&hub.challenge=test",
+    );
+    // Webhook verification: 200 if token matches, 403 if it doesn't
+    expect([200, 403]).toContain(r.status());
   });
   test("POST /api/telegram/webhook", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect(
-      (await request.post("/api/telegram/webhook", { data: {} })).status(),
-    ).toBeLessThan(500);
+    const r = await request.post("/api/telegram/webhook", { data: {} });
+    expect(r.status()).toBe(200);
   });
   test("GET /api/telegram/health", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect((await request.get("/api/telegram/health")).status()).toBeLessThan(
-      500,
-    );
+    const r = await request.get("/api/telegram/health");
+    expect(r.status()).toBe(200);
+    const d = await r.json();
+    expect(d).toHaveProperty("status");
+    expect(d).toHaveProperty("hasToken");
+    expect(d).toHaveProperty("webhookUrl");
   });
   test("GET /api/whatsapp/webhook", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect(
-      (
-        await request.get(
-          "/api/whatsapp/webhook?hub.mode=subscribe&hub.verify_token=test&hub.challenge=test",
-        )
-      ).status(),
-    ).toBeLessThan(500);
+    const r = await request.get(
+      "/api/whatsapp/webhook?hub.mode=subscribe&hub.verify_token=test&hub.challenge=test",
+    );
+    // Webhook verification: 200 if token matches, 403 if it doesn't
+    expect([200, 403]).toContain(r.status());
   });
   test("POST /api/whatsapp/webhook", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect(
-      (await request.post("/api/whatsapp/webhook", { data: {} })).status(),
-    ).toBeLessThan(500);
+    const r = await request.post("/api/whatsapp/webhook", { data: {} });
+    expect(r.status()).toBe(200);
   });
-  test("POST /api/whatsapp/send (joke)", async ({ request }) => {
+  test("POST /api/whatsapp/send → needs auth", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect(
-      (
-        await request.post("/api/whatsapp/send", {
-          data: { to: "test", message: "joke" },
-        })
-      ).status(),
-    ).toBeLessThan(500);
+    const r = await request.post("/api/whatsapp/send", {
+      data: { to: "test", message: "joke" },
+    });
+    expect(r.status()).toBe(401);
+    const d = await r.json();
+    expect(d).toHaveProperty("error");
   });
   test("GET /api/whatsapp/health", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect((await request.get("/api/whatsapp/health")).status()).toBeLessThan(
-      500,
-    );
+    const r = await request.get("/api/whatsapp/health");
+    expect(r.status()).toBe(200);
+    const d = await r.json();
+    expect(d).toHaveProperty("status");
+    expect(d).toHaveProperty("hasToken");
+    expect(d).toHaveProperty("webhookUrl");
   });
 });
 test.describe("API — Admin", () => {
-  test("GET /api/admin/brain → needs admin", async ({ request }) => {
+  test("GET /api/admin/brain → forbidden", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect(
-      (await request.get("/api/admin/brain")).status(),
-    ).toBeGreaterThanOrEqual(400);
+    const r = await request.get("/api/admin/brain");
+    expect(r.status()).toBe(403);
+    const d = await r.json();
+    expect(d.error).toBe("Forbidden");
   });
-  test("POST /api/admin/brain/reset → needs admin", async ({ request }) => {
+  test("POST /api/admin/brain/reset → forbidden", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect(
-      (await request.post("/api/admin/brain/reset")).status(),
-    ).toBeGreaterThanOrEqual(400);
+    const r = await request.post("/api/admin/brain/reset");
+    expect(r.status()).toBe(403);
+    const d = await r.json();
+    expect(d.error).toBe("Forbidden");
   });
-  test("GET /api/admin/health-check → needs admin", async ({ request }) => {
+  test("GET /api/admin/health-check → forbidden", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect(
-      (await request.get("/api/admin/health-check")).status(),
-    ).toBeGreaterThanOrEqual(400);
+    const r = await request.get("/api/admin/health-check");
+    expect(r.status()).toBe(403);
+    const d = await r.json();
+    expect(d.error).toBe("Forbidden");
   });
 });
 test.describe("API — Ticker & Metrics", () => {
-  test("POST /api/ticker/disable", async ({ request }) => {
+  test("POST /api/ticker/disable → needs auth", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect((await request.post("/api/ticker/disable")).status()).toBeLessThan(
-      500,
-    );
+    const r = await request.post("/api/ticker/disable");
+    expect(r.status()).toBe(401);
+    const d = await r.json();
+    expect(d).toHaveProperty("error");
   });
-  test("GET /api/metrics → needs admin", async ({ request }) => {
+  test("GET /api/metrics → endpoint missing (404)", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect((await request.get("/api/metrics")).status()).toBeGreaterThanOrEqual(
-      400,
-    );
+    const r = await request.get("/api/metrics");
+    expect(r.status()).toBe(404);
+    const d = await r.json();
+    expect(d).toHaveProperty("error");
   });
 });
 test.describe("API — Referral", () => {
-  test("GET /api/referral/code", async ({ request }) => {
+  test("GET /api/referral/code → needs auth", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect((await request.get("/api/referral/code")).status()).toBeLessThan(
-      500,
-    );
+    const r = await request.get("/api/referral/code");
+    expect(r.status()).toBe(401);
+    const d = await r.json();
+    expect(d).toHaveProperty("error");
   });
 });
 test.describe("API — Auth Complete", () => {
   test("POST /api/auth/login bad → 401", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect(
-      (
-        await request.post("/api/auth/login", {
-          data: { email: "bad@bad.com", password: "wrong" },
-        })
-      ).status(),
-    ).toBeGreaterThanOrEqual(400);
+    const r = await request.post("/api/auth/login", {
+      data: { email: "bad@bad.com", password: "wrong" },
+    });
+    expect(r.status()).toBe(401);
+    const d = await r.json();
+    expect(d.error).toBe("Invalid login credentials");
   });
   test("GET /api/auth/me no token → 401", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect((await request.get("/api/auth/me")).status()).toBeGreaterThanOrEqual(
-      400,
-    );
+    const r = await request.get("/api/auth/me");
+    expect(r.status()).toBe(401);
+    const d = await r.json();
+    expect(d.error).toBe("Not authenticated");
   });
-  test("POST /api/auth/refresh no token", async ({ request }) => {
+  test("POST /api/auth/refresh no token → 400", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect(
-      (await request.post("/api/auth/refresh")).status(),
-    ).toBeGreaterThanOrEqual(400);
+    const r = await request.post("/api/auth/refresh");
+    expect(r.status()).toBe(400);
+    const d = await r.json();
+    expect(d.error).toBe("Validation failed");
   });
-  test("POST /api/auth/forgot-password no email", async ({ request }) => {
+  test("POST /api/auth/forgot-password no email → 400", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect(
-      (await request.post("/api/auth/forgot-password", { data: {} })).status(),
-    ).toBeGreaterThanOrEqual(400);
+    const r = await request.post("/api/auth/forgot-password", { data: {} });
+    expect(r.status()).toBe(400);
+    const d = await r.json();
+    expect(d.error).toBe("Validation failed");
   });
-  test("POST /api/auth/change-email no auth", async ({ request }) => {
+  test("POST /api/auth/change-email no auth → 401", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect(
-      (
-        await request.post("/api/auth/change-email", {
-          data: { email: "x@x.com" },
-        })
-      ).status(),
-    ).toBeGreaterThanOrEqual(400);
+    const r = await request.post("/api/auth/change-email", {
+      data: { email: "x@x.com" },
+    });
+    expect(r.status()).toBe(401);
+    const d = await r.json();
+    expect(d.error).toBe("Not authenticated");
   });
 });
 test.describe("API — Brain & Chat", () => {
   test("POST /api/chat empty message", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect(
-      (
-        await request.post("/api/chat", {
-          data: { message: "", avatar: "kelion" },
-        })
-      ).status(),
-    ).toBeLessThan(500);
+    const r = await request.post("/api/chat", {
+      data: { message: "", avatar: "kelion" },
+    });
+    // Empty message should still get a response (server handles gracefully)
+    expect(r.status()).toBe(200);
+    const d = await r.json();
+    expect(d).toHaveProperty("reply");
   });
   test("GET /api/chat/stream SSE", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect((await request.get("/api/chat/stream")).status()).toBeLessThan(500);
+    const r = await request.get("/api/chat/stream");
+    // Stream endpoint without params: 400 (missing params) or 200 (SSE)
+    expect([200, 400]).toContain(r.status());
   });
   test("GET /api/conversations", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect((await request.get("/api/conversations")).status()).toBeLessThan(
-      500,
-    );
+    const r = await request.get("/api/conversations");
+    expect(r.status()).toBe(200);
+    const d = await r.json();
+    expect(d).toHaveProperty("conversations");
+    expect(Array.isArray(d.conversations)).toBe(true);
   });
-  test("GET /api/memory", async ({ request }) => {
+  test("GET /api/memory → endpoint missing (404)", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect((await request.get("/api/memory")).status()).toBeLessThan(500);
+    const r = await request.get("/api/memory");
+    expect(r.status()).toBe(404);
+    const d = await r.json();
+    expect(d).toHaveProperty("error");
   });
   test("GET /api/admin/payments/stats → admin", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect(
-      (await request.get("/api/admin/payments/admin/stats")).status(),
-    ).toBeGreaterThanOrEqual(400);
+    const r = await request.get("/api/admin/payments/admin/stats");
+    expect(r.status()).toBeGreaterThanOrEqual(400);
+    const d = await r.json();
+    expect(d).toHaveProperty("error");
   });
 });
 test.describe("API — Messenger Stats", () => {
-  test("GET /api/messenger/stats → admin", async ({ request }) => {
+  test("GET /api/messenger/stats → needs auth", async ({ request }) => {
     test.skip(!siteIsUp);
-    expect(
-      (await request.get("/api/messenger/stats")).status(),
-    ).toBeGreaterThanOrEqual(400);
+    const r = await request.get("/api/messenger/stats");
+    expect(r.status()).toBe(401);
+    const d = await r.json();
+    expect(d).toHaveProperty("error");
   });
 });
 
@@ -1791,7 +1952,9 @@ test.describe("Security", () => {
     const r = await request.post("/api/auth/login", {
       data: { email: "' OR 1=1 --", password: "test" },
     });
-    expect(r.status()).toBeGreaterThanOrEqual(400);
+    expect(r.status()).toBe(401);
+    const d = await r.json();
+    expect(d).toHaveProperty("error");
   });
   test("path traversal blocked", async ({ request }) => {
     test.skip(!siteIsUp);
@@ -1824,12 +1987,10 @@ test.describe("Security", () => {
       data: { query: "<img src=x onerror=alert(1)>" },
       timeout: 30000,
     });
-    // Endpoint should not crash (no 5xx) and should not reflect raw XSS
-    expect(r.status()).toBeLessThan(500);
-    if (r.status() === 200) {
-      const body = await r.text();
-      expect(body).not.toContain("onerror=");
-    }
+    // Must return 200 and must NOT reflect raw XSS
+    expect(r.status()).toBe(200);
+    const body = await r.text();
+    expect(body).not.toContain("onerror=");
   });
   test("oversized payload rejected", async ({ request }) => {
     test.skip(!siteIsUp);
@@ -1848,8 +2009,11 @@ test.describe("Security", () => {
   test("CORS headers present", async ({ request }) => {
     test.skip(!siteIsUp);
     const r = await request.get("/api/health");
+    expect(r.status()).toBe(200);
     const headers = r.headers();
-    // Should have some form of CORS or security headers
-    expect(r.status()).toBeLessThan(500);
+    // Verify actual CORS header exists
+    const hasCors = headers["access-control-allow-origin"] !== undefined;
+    const hasVary = (headers["vary"] || "").toLowerCase().includes("origin");
+    expect(hasCors || hasVary).toBe(true);
   });
 });

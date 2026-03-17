@@ -300,9 +300,17 @@
               }
             }
             scr.classList.add('hidden');
-            document.getElementById('app-layout').classList.remove('hidden');
+            const appLayout = document.getElementById('app-layout');
+            appLayout.classList.remove('hidden');
+            appLayout.style.visibility = '';
+            appLayout.style.pointerEvents = '';
+            // Reset auth form display for future logout→login cycles
+            if (form) form.style.display = 'none';
+            const startBtn2 = scr.querySelector('#start-btn');
+            if (startBtn2) startBtn2.style.display = '';
+            if (window.KAvatar) KAvatar.onResize();
             updateUI();
-            if (window.KGuestTimer) KGuestTimer.stop(); // oprește timer-ul guest la login
+            if (window.KGuestTimer) KGuestTimer.stop();
             if (window.KApp) KApp.loadConversations();
             // Push state so Back goes to auth screen (not away from site)
             try {

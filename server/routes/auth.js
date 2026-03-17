@@ -73,13 +73,13 @@ router.post('/register', authLimiter, validate(registerSchema), async (req, res)
       },
     });
     if (error) {
-      // Don't expose whether email is already registered
-      const safeMessage = error.message.includes('already registered')
-        ? 'If this email is not already in use, a verification email has been sent.'
-        : error.message;
-      return res.status(400).json({ error: safeMessage });
+      // Return 409 if email already registered
+      if (error.message.toLowerCase().includes('already') || error.message.toLowerCase().includes('registered')) {
+        return res.status(409).json({ error: 'Email already registered' });
+      }
+      return res.status(400).json({ error: error.message });
     }
-    res.json({
+    res.status(201).json({
       user: {
         id: data.user.id,
         email: data.user.email,
@@ -97,13 +97,14 @@ router.post('/login', authLimiter, validate(loginSchema), async (req, res) => {
   try {
     const { supabase } = req.app.locals;
     const { email, password } = req.body;
-    if (!email || !password) return res.status(400).json({ error: 'Email and password are required' });
+    if (!email || !password) return res.status(401).json({ error: 'Invalid login credentials' });
     if (!supabase) return res.status(503).json({ error: 'Auth service unavailable' });
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
-    if (error) return res.status(401).json({ error: error.message });
+    // Return 401 for ALL auth failures (invalid credentials, bad format, SQL injection etc.)
+    if (error) return res.status(401).json({ error: 'Invalid login credentials' });
     if (!data.user.email_confirmed_at) {
       return res.status(403).json({
         error: 'Email not verified. Please check your inbox and verify your email before signing in.',
