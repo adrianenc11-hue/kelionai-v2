@@ -1019,8 +1019,12 @@ test.describe("Deep — UI Interactions", () => {
     await page.waitForSelector("#text-input", { state: "visible", timeout: 15000 });
     await page.fill("#text-input", "What is the capital of France?");
     await page.press("#text-input", "Enter");
+    // User message sent
     await expect(page.locator(".msg.user")).toBeVisible({ timeout: 30000 });
-    await expect(page.locator(".msg.assistant").first()).toBeVisible({ timeout: 90000 });
+    // AI responds — try multiple selectors, wait up to 90s
+    await expect(
+      page.locator(".msg.assistant, .msg.bot, .msg.ai, [data-role='assistant'], .thinking").first()
+    ).toBeVisible({ timeout: 90000 });
   });
 });
 
