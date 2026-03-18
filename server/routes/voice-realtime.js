@@ -22,23 +22,34 @@ function setupRealtimeVoice(io, appLocals) {
   const brain = appLocals?.brain || null;
   const ns = io.of('/voice-realtime');
 
-  ns.on('connection', (socket) => {
+  ns.on('connection', async (socket) => {
     const avatar = socket.handshake.query.avatar || 'kelion';
     const language = socket.handshake.query.language || 'ro';
+    const token = socket.handshake.query.token || null;
     const startTime = Date.now();
 
     // ── Supabase for persisting transcripts ──
     const supabaseAdmin = appLocals?.supabaseAdmin || null;
 
+    // ── Resolve userId from token ──
+    let userId = null;
+    if (token && supabaseAdmin) {
+      try {
+        const { data: { user } } = await supabaseAdmin.auth.getUser(token);
+        if (user?.id) userId = user.id;
+      } catch (_e) { /* anonymous session */ }
+    }
+
     // ── Per-connection transcript accumulation ──
-    let voiceConvId = null; // Supabase conversation ID for this session
-    let pendingUserTranscript = ''; // Accumulates user speech per turn
-    let pendingAITranscript = ''; // Accumulates AI response per turn
+    let voiceConvId = null;
+    let pendingUserTranscript = '';
+    let pendingAITranscript = '';
 
     logger.info(
-      { component: 'VoiceRealtime', avatar, language, id: socket.id },
+      { component: 'VoiceRealtime', avatar, language, userId: userId || 'anon', id: socket.id },
       'Client connected to voice-realtime (Socket.io)'
     );
+
 
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
@@ -208,7 +219,7 @@ function setupRealtimeVoice(io, appLocals) {
                     const title = (pendingUserTranscript || 'Voice conversation').substring(0, 80);
                     const { data, error } = await supabaseAdmin
                       .from('conversations')
-                      .insert({ user_id: null, avatar, title })
+                      .insert({ user_id: userId || null, avatar, title })
                       .select('id')
                       .single();
                     if (!error && data) voiceConvId = data.id;

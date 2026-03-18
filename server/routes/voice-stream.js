@@ -290,14 +290,24 @@ function setupVoiceStream(server, appLocals) {
     }
   });
 
-  wss.on("connection", (clientWs, req) => {
+  wss.on("connection", async (clientWs, req) => {
     const url = new URL(req.url, `http://${req.headers.host}`);
     const avatar = url.searchParams.get("avatar") || "kelion";
     const language = url.searchParams.get("language") || "ro";
     const voiceId = getVoiceId(avatar, language);
+    const token = url.searchParams.get("token") || null;
+
+    // Resolve userId from token (non-blocking — auth optional)
+    let userId = null;
+    if (token && appLocals?.supabaseAdmin) {
+      try {
+        const { data: { user } } = await appLocals.supabaseAdmin.auth.getUser(token);
+        if (user?.id) userId = user.id;
+      } catch (_e) { /* token invalid — continue as anonymous */ }
+    }
 
     logger.info(
-      { component: "VoiceStream", avatar, language },
+      { component: "VoiceStream", avatar, language, userId: userId || "anon" },
       "Client connected to voice stream",
     );
 
@@ -432,7 +442,7 @@ function setupVoiceStream(server, appLocals) {
         if (brain) {
           brain
             .saveMemory(
-              null,
+              userId,
               "audio",
               "Voice: " +
                 userText.substring(0, 200) +

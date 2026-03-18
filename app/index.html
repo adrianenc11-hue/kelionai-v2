@@ -482,6 +482,13 @@
         </style>
         <div class="auth-links-col">
           <span id="auth-guest" class="auth-guest-link">Continue without account</span>
+          <span id="auth-admin-link" class="auth-guest-link" style="font-size:0.75rem;opacity:0.45;margin-top:4px;cursor:pointer;" onclick="
+            document.getElementById('auth-form').style.display='';
+            document.getElementById('start-btn').style.display='none';
+            document.getElementById('auth-guest').style.display='none';
+            document.getElementById('auth-back').style.display='';
+            document.getElementById('auth-admin-link').style.display='none';
+          ">🔒 Admin login</span>
         </div>
         <!-- Login form (hidden by default, toggled by btn-auth) -->
         <button
@@ -683,6 +690,7 @@
 
 
         <div id="mic-level" title="Mic level"><span></span><span></span><span></span><span></span><span></span></div>
+        <button id="btn-mic" title="Voice input — hold to speak" aria-label="Toggle microphone" class="ctrl-circle" style="font-size:1.1rem;transition:all 0.2s;">🎙️</button>
         <input
           type="text"
           id="text-input"

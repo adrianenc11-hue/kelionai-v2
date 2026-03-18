@@ -32,6 +32,7 @@
                 <a href="/admin/webhooks.html" class="admin-btn admin-btn-live">🔗 Webhooks</a>
                 <a href="/admin/plugins.html" class="admin-btn admin-btn-ab">🔌 Plugins</a>
                 <a href="/admin/models.html" class="admin-btn admin-btn-k1">🏠 Models</a>
+                <a href="/" class="admin-btn admin-btn-k1" style="text-decoration:none;">🏠 Main App</a>
                 <button class="admin-btn admin-btn-export" onclick="window.open('/api/admin/conversations/export','_blank')">📥 Export</button>
                 <div class="notif-wrapper" id="notif-wrapper">
                     <button class="admin-btn notif-bell" onclick="toggleNotifications()" id="notif-bell">🔔
@@ -291,7 +292,7 @@ if(localStorage.getItem('admin-theme') === 'light'){
                     <span>🎨 Media History</span>
                     <span class="toggle-arrow">▶</span>
                 </button>
-                <a href="/admin/news.html" class="section-live-link" title="News & Media Dashboard">🔗 Live</a>
+                <a href="/api/media/history" class="section-live-link" title="News & Media Dashboard">🔗 Live</a>
                 <div class="section-body">
                     <div class="mini-stats" id="media-stats">
                         <div class="mini-stat"><span class="label">Total generated:</span> <span
@@ -319,62 +320,7 @@ if(localStorage.getItem('admin-theme') === 'light'){
                 </div>
             </div>
 
-            <!-- TRADING -->
-            <div class="section-panel" id="sec-trading">
-                <button class="section-toggle" onclick="toggleSection('sec-trading')">
-                    <span>📈 Trading Intelligence</span>
-                    <span class="toggle-arrow">▶</span>
-                </button>
-                <a href="/admin/trading.html" class="section-live-link" title="Trading Dashboard">🔗 Live</a>
-                <div class="section-body">
-                    <div class="mini-stats" id="trading-stats">
-                        <div class="mini-stat"><span class="label">Total trades:</span> <span id="trade-total">—</span>
-                        </div>
-                        <div class="mini-stat"><span class="label">Active:</span> <span id="trade-active">—</span></div>
-                        <div class="mini-stat"><span class="label">P&amp;L:</span> <span id="trade-pnl">—</span></div>
-                        <div class="mini-stat"><span class="label">Win rate:</span> <span id="trade-winrate">—</span>
-                        </div>
-                        <div class="mini-stat"><span class="label">Binance:</span> <span id="trade-binance">—</span>
-                        </div>
-                    </div>
-                    <h4 style="margin:16px 0 8px;color:#a5b4fc;font-size:0.9rem">Recent Trades</h4>
-                    <table class="admin-table">
-                        <thead>
-                            <tr>
-                                <th>Date</th>
-                                <th>Symbol</th>
-                                <th>Side</th>
-                                <th>Qty</th>
-                                <th>Price</th>
-                                <th>Status</th>
-                                <th>P&amp;L</th>
-                            </tr>
-                        </thead>
-                        <tbody id="trading-tbody">
-                            <tr>
-                                <td colspan="7">Loading...</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                    <h4 style="margin:16px 0 8px;color:#a5b4fc;font-size:0.9rem">AI Trade Intelligence</h4>
-                    <table class="admin-table">
-                        <thead>
-                            <tr>
-                                <th>Date</th>
-                                <th>Symbol</th>
-                                <th>Signal</th>
-                                <th>Confidence</th>
-                                <th>Analysis</th>
-                            </tr>
-                        </thead>
-                        <tbody id="intel-tbody">
-                            <tr>
-                                <td colspan="5">Loading...</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+
 
             <!-- BRAIN MEMORIES -->
             <div class="section-panel" id="sec-memories">

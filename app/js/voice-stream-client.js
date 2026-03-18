@@ -62,23 +62,63 @@
             var ctx = getAudioContext();
             var source = ctx.createMediaStreamSource(mediaStream);
 
-            // Use ScriptProcessor for wide browser support
-            var processor = ctx.createScriptProcessor(4096, 1, 1);
-            processor.onaudioprocess = function (e) {
-                if (!isListening || !ws || ws.readyState !== WebSocket.OPEN) return;
-                var input = e.inputBuffer.getChannelData(0);
-                // Float32 → PCM16
-                var pcm = new Int16Array(input.length);
-                for (var i = 0; i < input.length; i++) {
-                    pcm[i] = Math.max(-1, Math.min(1, input[i])) * 0x7FFF;
-                }
-                ws.send(pcm.buffer);
-            };
+            // Try AudioWorklet first (modern), fallback to ScriptProcessor (legacy)
+            var usingWorklet = false;
+            if (ctx.audioWorklet) {
+                try {
+                    // Inline worklet as blob URL to avoid separate file dependency
+                    var workletCode = `
+                        class PCMSender extends AudioWorkletProcessor {
+                            process(inputs) {
+                                var ch = inputs[0][0];
+                                if (!ch) return true;
+                                var pcm = new Int16Array(ch.length);
+                                for (var i = 0; i < ch.length; i++) {
+                                    pcm[i] = Math.max(-1, Math.min(1, ch[i])) * 0x7FFF;
+                                }
+                                this.port.postMessage(pcm.buffer, [pcm.buffer]);
+                                return true;
+                            }
+                        }
+                        registerProcessor('pcm-sender', PCMSender);
+                    `;
+                    var blob = new Blob([workletCode], { type: 'application/javascript' });
+                    var url = URL.createObjectURL(blob);
+                    await ctx.audioWorklet.addModule(url);
+                    URL.revokeObjectURL(url);
 
-            source.connect(processor);
-            processor.connect(ctx.destination); // needed for ScriptProcessor to work
+                    audioWorklet = new AudioWorkletNode(ctx, 'pcm-sender');
+                    audioWorklet.port.onmessage = function(e) {
+                        if (!isListening || !ws || ws.readyState !== WebSocket.OPEN) return;
+                        ws.send(e.data);
+                    };
+                    source.connect(audioWorklet);
+                    audioWorklet.connect(ctx.destination);
+                    usingWorklet = true;
+                    console.log('[VoiceStream] 🎤 Mic capture started (AudioWorklet)');
+                } catch (workletErr) {
+                    console.warn('[VoiceStream] AudioWorklet failed, falling back to ScriptProcessor:', workletErr.message);
+                }
+            }
+
+            if (!usingWorklet) {
+                // ScriptProcessor fallback (deprecated but still works)
+                var processor = ctx.createScriptProcessor(4096, 1, 1);
+                processor.onaudioprocess = function (e) {
+                    if (!isListening || !ws || ws.readyState !== WebSocket.OPEN) return;
+                    var input = e.inputBuffer.getChannelData(0);
+                    var pcm = new Int16Array(input.length);
+                    for (var i = 0; i < input.length; i++) {
+                        pcm[i] = Math.max(-1, Math.min(1, input[i])) * 0x7FFF;
+                    }
+                    ws.send(pcm.buffer);
+                };
+                source.connect(processor);
+                processor.connect(ctx.destination);
+                console.log('[VoiceStream] 🎤 Mic capture started (ScriptProcessor fallback)');
+            }
+
             isListening = true;
-            console.log('[VoiceStream] 🎤 Mic capture started');
         } catch (e) {
             console.error('[VoiceStream] Mic error:', e.message);
             throw e;
@@ -100,7 +140,8 @@
         var avatar = opts.avatar || (window.KAvatar ? KAvatar.getCurrentAvatar() : 'kelion');
         var language = opts.language || 'ro';
 
-        var url = WS_BASE + '/api/voice-stream?avatar=' + avatar + '&language=' + language;
+        var token = (window.KAuth && KAuth.getToken) ? (KAuth.getToken() || '') : '';
+        var url = WS_BASE + '/api/voice-stream?avatar=' + avatar + '&language=' + language + (token ? '&token=' + encodeURIComponent(token) : '');
         console.log('[VoiceStream] Connecting to', url);
 
         ws = new WebSocket(url);

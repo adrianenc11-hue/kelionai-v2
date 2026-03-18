@@ -1562,6 +1562,39 @@
         });
     }
 
+    // ─── Mic button — toggle voice recording ────────────────────
+    (function () {
+      const micBtn = document.getElementById('btn-mic');
+      if (!micBtn) return;
+      let micActive = false;
+      micBtn.addEventListener('click', async function () {
+        if (!window.KVoice) return;
+        unlockAudio();
+        if (!micActive) {
+          micActive = true;
+          micBtn.textContent = '🔴';
+          micBtn.style.background = 'rgba(239,68,68,0.2)';
+          micBtn.style.borderColor = 'rgba(239,68,68,0.5)';
+          micBtn.title = 'Stop recording';
+          KVoice.startListening();
+        } else {
+          micActive = false;
+          micBtn.textContent = '🎙️';
+          micBtn.style.background = '';
+          micBtn.style.borderColor = '';
+          micBtn.title = 'Voice input';
+          KVoice.stopListening();
+        }
+      });
+      // Reset button when speaking starts (after stopListening auto-processes)
+      window.addEventListener('audio-start', function () {
+        micActive = false;
+        micBtn.textContent = '🎙️';
+        micBtn.style.background = '';
+        micBtn.style.borderColor = '';
+      });
+    })();
+
     // ─── Dismiss splash loading overlay ─────────────────────
     clearTimeout(splashTimer);
     dismissSplash();

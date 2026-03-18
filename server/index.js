@@ -391,26 +391,7 @@ app.get('/admin/', (req, res) => {
     res.status(404).send('Admin page not found');
   }
 });
-// Admin trading page — serve with relaxed CSP (before express.static)
-const _rawTradingHtml = fs.existsSync(path.join(__dirname, '..', 'app', 'admin', 'trading.html'))
-  ? fs.readFileSync(path.join(__dirname, '..', 'app', 'admin', 'trading.html'), 'utf8')
-  : null;
-app.get('/admin/trading.html', (req, res) => {
-  if (!_rawTradingHtml) return res.status(404).send('Trading page not found');
-  // Override CSP to allow inline scripts for admin pages
-  res.setHeader(
-    'Content-Security-Policy',
-    "default-src 'self'; " +
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://*.tradingview.com; " +
-    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://*.tradingview.com; " +
-    "font-src 'self' https://fonts.gstatic.com; " +
-    "img-src 'self' data: blob: https: http:; " +
-    "connect-src 'self' https:; " +
-    "frame-src 'self' https://*.tradingview.com blob:; " +
-    "child-src 'self' https://*.tradingview.com blob:;"
-  );
-  res.type('html').send(_rawTradingHtml);
-});
+
 // Force no-cache on JS/CSS/HTML so deploys take effect immediately
 // IMPORTANT: must be BEFORE express.static so headers are set
 app.use((req, res, next) => {
@@ -1094,81 +1075,8 @@ app.post('/api/gdpr/delete', express.json(), async (req, res) => {
 app.use('/api/developer', developerRouter);
 app.use('/api', developerRouter); // mounts /api/v1/* endpoints
 
-// Auto-detect Instagram Business Account ID from Graph API
-app.get('/api/media/instagram/detect-account', async (req, res) => {
-  const token = process.env.FB_PAGE_ACCESS_TOKEN;
-  if (!token) return res.status(400).json({ error: 'No FB_PAGE_ACCESS_TOKEN set' });
-  try {
-    const results = {};
-
-    // Method 1: Direct /me with Page Token → gets page info + IG account
-    const meRes = await fetch(
-      `https://graph.facebook.com/v21.0/me?fields=id,name,instagram_business_account&access_token=${token}`
-    );
-    const meData = await meRes.json();
-    results.method1_me = meData;
-
-    if (meData.instagram_business_account?.id) {
-      return res.json({
-        found: true,
-        instagramAccountId: meData.instagram_business_account.id,
-        pageName: meData.name,
-        pageId: meData.id,
-        instruction: `Set INSTAGRAM_ACCOUNT_ID=${meData.instagram_business_account.id} in Railway env vars`,
-      });
-    }
-
-    // Method 2: Try with explicit FB_PAGE_ID if set
-    const pageId = process.env.FB_PAGE_ID;
-    if (pageId) {
-      const pgRes = await fetch(
-        `https://graph.facebook.com/v21.0/${pageId}?fields=instagram_business_account,name&access_token=${token}`
-      );
-      const pgData = await pgRes.json();
-      results.method2_pageId = pgData;
-
-      if (pgData.instagram_business_account?.id) {
-        return res.json({
-          found: true,
-          instagramAccountId: pgData.instagram_business_account.id,
-          pageName: pgData.name,
-          pageId: pageId,
-          instruction: `Set INSTAGRAM_ACCOUNT_ID=${pgData.instagram_business_account.id} in Railway env vars`,
-        });
-      }
-    }
-
-    // Method 3: List accounts (works with User Token only)
-    const acctRes = await fetch(
-      `https://graph.facebook.com/v21.0/me/accounts?fields=id,name,instagram_business_account&access_token=${token}`
-    );
-    const acctData = await acctRes.json();
-    results.method3_accounts = acctData.error ? { error: acctData.error.message } : acctData;
-
-    if (acctData.data) {
-      for (const page of acctData.data) {
-        if (page.instagram_business_account?.id) {
-          return res.json({
-            found: true,
-            instagramAccountId: page.instagram_business_account.id,
-            pageName: page.name,
-            pageId: page.id,
-            instruction: `Set INSTAGRAM_ACCOUNT_ID=${page.instagram_business_account.id} in Railway env vars`,
-          });
-        }
-      }
-    }
-
-    res.json({
-      found: false,
-      instruction:
-        'Could not auto-detect. Check that your FB Page is connected to an Instagram Business Account in Meta Business Suite.',
-      debug: results,
-    });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
+// Social media integrations removed — endpoint disabled
+app.get('/api/media/instagram/detect-account', (_req, res) => res.status(410).json({ error: 'Removed' }));
 
 // ═══ VOICE CLONE LIST (alias for /api/voice/clone GET) ═══
 app.get('/api/voice-clone/list', async (req, res) => {
@@ -1387,11 +1295,7 @@ app.use((err, req, res, next) => {
 // ═══ STARTUP ═══
 function logConfigHealth() {
   const checks = [
-    {
-      name: 'TELEGRAM_BOT_TOKEN',
-      set: !!process.env.TELEGRAM_BOT_TOKEN,
-      for: 'Telegram Bot',
-    },
+
     {
       name: 'OPENAI_API_KEY',
       set: !!process.env.OPENAI_API_KEY,
