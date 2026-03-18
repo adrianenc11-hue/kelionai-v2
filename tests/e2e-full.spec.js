@@ -433,8 +433,7 @@ test.describe("Buttons and Links", () => {
   });
 
   test("send button is visible and enabled", async ({ page }) => {
-    await page.goto("/");
-    // Wait for canvas to load first (btn-send only renders after app init)
+    // beforeEach already navigated and dismissed auth screen
     await page
       .waitForSelector("#avatar-canvas", { state: "attached", timeout: 30000 })
       .catch(() => { });
@@ -446,20 +445,16 @@ test.describe("Buttons and Links", () => {
       test.skip();
       return;
     }
-    await page.screenshot({ path: "test-results/send-btn-before.png", timeout: 10000 }).catch(() => { });
-
     const btnSend = page.locator("#btn-send");
     await expect(btnSend).toBeVisible();
     await expect(btnSend).not.toBeDisabled();
-    await page.screenshot({ path: "test-results/send-btn-after.png" });
   });
 
   test("mic button is visible", async ({ page }) => {
-    await page.goto("/");
+    // beforeEach already navigated and dismissed auth screen
     await page
       .waitForLoadState("networkidle", { timeout: 10000 })
       .catch(() => { });
-
     const btnMic = page.locator("#btn-mic");
     const micExists = await btnMic.isVisible().catch(() => false);
     if (!micExists) {
@@ -467,7 +462,6 @@ test.describe("Buttons and Links", () => {
       return;
     }
     await expect(btnMic).toBeVisible();
-    await page.screenshot({ path: "test-results/mic-btn.png" });
   });
 
   test("avatar switcher buttons are clickable", async ({ page }) => {
