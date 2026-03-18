@@ -593,8 +593,33 @@ async function thinkV5(
         ];
       }
 
+      // ── Fallback: dacă Gemini nu a dat răspuns (ex: tool calling eșuat), apel final fără tools ──
+      if (!finalResponse) {
+        logger.warn({ component: 'BrainV5' }, '⚠️ Gemini returned empty response with tools, retrying without tools');
+        const fallbackBody = {
+          contents: geminiMessages,
+          systemInstruction: { parts: [{ text: systemPrompt }] },
+          generationConfig: { maxOutputTokens: 4096, temperature: 0.7 },
+        };
+        try {
+          const fr = await fetch(geminiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(fallbackBody),
+          });
+          if (fr.ok) {
+            const fd = await fr.json();
+            finalResponse = (fd.candidates?.[0]?.content?.parts || [])
+              .filter((p) => p.text).map((p) => p.text).join('\n');
+          }
+        } catch (fe) {
+          logger.warn({ component: 'BrainV5', err: fe.message }, 'Gemini no-tools fallback failed');
+        }
+      }
+
       engine = "Gemini-Flash";
     }
+
 
     // ── 8. Strip leaked tags from response ──
     finalResponse = stripLeakedTags(finalResponse);
