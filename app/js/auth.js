@@ -76,33 +76,38 @@
     return d;
   }
 
-  async function login(email, pw) {
-    async function _doLogin() {
-      const r = await fetch(API + '/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password: pw }),
-      });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error);
-      currentUser = d.user;
-      saveSession(d.session, d.user);
-      return d;
+  async function login(email, pw, _onRetry) {
+    const RETRY_DELAYS = [0, 2000, 4000]; // 0ms, 2s, 4s între încercări
+    let lastErr = null;
+    for (let attempt = 0; attempt < RETRY_DELAYS.length; attempt++) {
+      if (RETRY_DELAYS[attempt] > 0) {
+        if (_onRetry) _onRetry(attempt);
+        await new Promise((r) => setTimeout(r, RETRY_DELAYS[attempt]));
+      }
+      try {
+        const r = await fetch(API + '/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password: pw }),
+        });
+        const d = await r.json();
+        if (!r.ok) {
+          // Auth errors (wrong password) — nu mai retry
+          const isAuthError = d.error && (d.error.includes('Invalid') || d.error.includes('password') || d.error.includes('verified') || d.error.includes('confirm'));
+          if (isAuthError) throw new Error(d.error);
+          lastErr = new Error(d.error || 'Server error');
+          continue; // retry
+        }
+        currentUser = d.user;
+        saveSession(d.session, d.user);
+        return d;
+      } catch (e) {
+        // Auth errors nu se reîncearcă
+        if (e.message && (e.message.includes('Invalid') || e.message.includes('password') || e.message.includes('verified'))) throw e;
+        lastErr = e;
+      }
     }
-    try {
-      return await _doLogin();
-    } catch (firstErr) {
-      // Auto-retry once on network/cold-start failures (not wrong password)
-      const isAuthError =
-        firstErr.message &&
-        (firstErr.message.includes('Invalid') ||
-          firstErr.message.includes('password') ||
-          firstErr.message.includes('Email not verified'));
-      if (isAuthError) throw firstErr;
-      console.warn('[Auth] First login attempt failed, retrying...', firstErr.message);
-      await new Promise((r) => setTimeout(r, 800));
-      return await _doLogin();
-    }
+    throw lastErr || new Error('Login error');
   }
 
   async function logout() {
