@@ -906,26 +906,42 @@
   <script>
     (function () {
       var camBtn = document.getElementById('btn-camera-inline');
-      var camActive = false;
       if (!camBtn) return;
 
-      camBtn.addEventListener('click', async function () {
-        if (!window.KAutoCamera) return;
-        var active = await KAutoCamera.toggle();
-        camActive = active;
+      function setCamStyle(active) {
         if (active) {
-          camBtn.textContent = '📷';
           camBtn.style.borderColor = '#10B981';
           camBtn.style.color = '#10B981';
           camBtn.style.boxShadow = '0 0 10px rgba(16,185,129,0.4)';
           camBtn.title = 'Camera ACTIVĂ — Click pentru a opri';
         } else {
-          camBtn.textContent = '📷';
           camBtn.style.borderColor = '#555';
           camBtn.style.color = '#888';
           camBtn.style.boxShadow = '';
           camBtn.title = 'Camera ON/OFF';
         }
+      }
+
+      camBtn.addEventListener('click', async function () {
+        // Retry dacă KAutoCamera nu e încă inițializat
+        if (!window.KAutoCamera) {
+          camBtn.title = 'Se inițializează camera...';
+          var waited = 0;
+          var interval = setInterval(async function () {
+            waited += 200;
+            if (window.KAutoCamera) {
+              clearInterval(interval);
+              var active = await KAutoCamera.toggle();
+              setCamStyle(active);
+            } else if (waited > 3000) {
+              clearInterval(interval);
+              camBtn.title = 'Camera indisponibilă';
+            }
+          }, 200);
+          return;
+        }
+        var active = await KAutoCamera.toggle();
+        setCamStyle(active);
       });
     })();
   </script>
@@ -992,26 +1008,8 @@
           if (micBtn) micBtn.style.display = '';
         }
       });
-
-      // CC toggle
-      if (ccBtn) {
-        ccBtn.addEventListener('click', function () {
-          if (!window.KVoiceFirst) return;
-          var enabled = !KVoiceFirst.isCCEnabled();
-          KVoiceFirst.setCCEnabled(enabled);
-          if (enabled) {
-            ccBtn.style.borderColor = '#06B6D4';
-            ccBtn.style.color = '#06B6D4';
-            ccBtn.style.boxShadow = '0 0 10px rgba(6,182,212,0.4)';
-            ccBtn.title = 'CC Subtitles ON';
-          } else {
-            ccBtn.style.borderColor = '#555';
-            ccBtn.style.color = '#888';
-            ccBtn.style.boxShadow = '';
-            ccBtn.title = 'CC Subtitles OFF';
-          }
-        });
-      }
+      // NOTA: handler-ul CC este definit complet în voice-realtime-client.js
+      // Nu se adaugă un al doilea handler aici pentru a evita conflictele
     })();
   </script>
   <script src="js/geo.js"></script>
