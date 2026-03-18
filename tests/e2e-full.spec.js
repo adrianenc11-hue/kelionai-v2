@@ -1,4 +1,3 @@
-// @ts-check
 // LIVE-ONLY: All tests run against https://kelionai.app
 const { test, expect } = require("@playwright/test");
 
