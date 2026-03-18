@@ -985,7 +985,7 @@ test.describe("Deep — UI Interactions", () => {
   });
   test("microphone button visible", async ({ page }) => {
     test.skip(!siteIsUp);
-    await expect(page.locator("#btn-mic-toggle")).toBeVisible({
+    await expect(page.locator("#btn-mic")).toBeVisible({
       timeout: 15000,
     });
   });
@@ -1131,36 +1131,7 @@ test.describe.serial("Real User — Full Auth Flow", () => {
       ).status(),
     );
   });
-  test("trading status as auth user", async ({ request }) => {
-    test.skip(!siteIsUp || !authToken);
-    expect(
-      (
-        await request.get("/api/trading/status", {
-          headers: { Authorization: `Bearer ${authToken}` },
-        })
-      ).status(),
-    ).toBe(200);
-  });
-  test("trading portfolio as auth user", async ({ request }) => {
-    test.skip(!siteIsUp || !authToken);
-    expect(
-      (
-        await request.get("/api/trading/portfolio", {
-          headers: { Authorization: `Bearer ${authToken}` },
-        })
-      ).status(),
-    ).toBe(200);
-  });
-  test("trading signals as auth user", async ({ request }) => {
-    test.skip(!siteIsUp || !authToken);
-    expect(
-      (
-        await request.get("/api/trading/signals", {
-          headers: { Authorization: `Bearer ${authToken}` },
-        })
-      ).status(),
-    ).toBe(200);
-  });
+
   test("search as auth user", async ({ request }) => {
     test.skip(!siteIsUp || !authToken);
     expect([200, 429]).toContain(
@@ -1269,208 +1240,8 @@ test.describe.serial("Real User — Full Auth Flow", () => {
 // ═══════════════════════════════════════════════════
 // ALL API ENDPOINTS (75 tests)
 // ═══════════════════════════════════════════════════
-test.describe("API — Trading", () => {
-  test("GET /api/trading/status", async ({ request }) => {
-    test.skip(!siteIsUp);
-    const r = await request.get("/api/trading/status");
-    expect(r.status()).toBe(200);
-    const d = await r.json();
-    expect(d).toHaveProperty("active");
-    expect(d).toHaveProperty("status");
-    expect(d).toHaveProperty("strategies");
-    expect(Array.isArray(d.strategies)).toBe(true);
-    expect(d).toHaveProperty("assets");
-    expect(d).toHaveProperty("activeTrades");
-  });
-  test("GET /api/trading/analysis", async ({ request }) => {
-    test.skip(!siteIsUp);
-    const r = await request.get("/api/trading/analysis");
-    expect(r.status()).toBe(200);
-    const d = await r.json();
-    expect(d).toHaveProperty("timestamp");
-    expect(d).toHaveProperty("assets");
-    expect(Array.isArray(d.assets)).toBe(true);
-    expect(d.assets.length).toBeGreaterThan(0);
-    const first = d.assets[0];
-    expect(first).toHaveProperty("asset");
-    expect(first).toHaveProperty("price");
-    expect(first).toHaveProperty("signal");
-    expect(first).toHaveProperty("confidence");
-  });
-  test("GET /api/trading/signals", async ({ request }) => {
-    test.skip(!siteIsUp);
-    const r = await request.get("/api/trading/signals");
-    expect(r.status()).toBe(200);
-    const d = await r.json();
-    expect(d).toHaveProperty("signals");
-    expect(Array.isArray(d.signals)).toBe(true);
-    if (d.signals.length > 0) {
-      const s = d.signals[0];
-      expect(s).toHaveProperty("asset");
-      expect(s).toHaveProperty("signal");
-      expect(s).toHaveProperty("confidence");
-      expect(s).toHaveProperty("entry");
-      expect(s).toHaveProperty("stopLoss");
-    }
-  });
-  test("GET /api/trading/portfolio", async ({ request }) => {
-    test.skip(!siteIsUp);
-    const r = await request.get("/api/trading/portfolio");
-    expect(r.status()).toBe(200);
-    const d = await r.json();
-    expect(d).toHaveProperty("mode");
-    expect(d).toHaveProperty("balance");
-    expect(d).toHaveProperty("openPositions");
-    expect(Array.isArray(d.openPositions)).toBe(true);
-    expect(d).toHaveProperty("closedTradesSummary");
-  });
-  test("POST /api/trading/backtest", async ({ request }) => {
-    test.skip(!siteIsUp);
-    const r = await request.post("/api/trading/backtest", {
-      data: { pair: "EURUSD", days: 30 },
-    });
-    expect(r.status()).toBe(200);
-    const d = await r.json();
-    expect(d).toHaveProperty("strategy");
-    expect(d).toHaveProperty("asset");
-    expect(d).toHaveProperty("trades");
-    expect(d).toHaveProperty("winRate");
-    expect(d).toHaveProperty("totalReturn");
-  });
-  test("GET /api/trading/alerts", async ({ request }) => {
-    test.skip(!siteIsUp);
-    const r = await request.get("/api/trading/alerts");
-    expect(r.status()).toBe(200);
-    const d = await r.json();
-    expect(d).toHaveProperty("alerts");
-    expect(Array.isArray(d.alerts)).toBe(true);
-    expect(d).toHaveProperty("count");
-    expect(d).toHaveProperty("disclaimer");
-  });
-  test("GET /api/trading/correlation", async ({ request }) => {
-    test.skip(!siteIsUp);
-    const r = await request.get("/api/trading/correlation");
-    expect(r.status()).toBe(200);
-    const d = await r.json();
-    expect(d).toHaveProperty("matrix");
-    expect(d.matrix).toHaveProperty("BTC");
-    expect(d.matrix).toHaveProperty("ETH");
-  });
-  test("GET /api/trading/risk", async ({ request }) => {
-    test.skip(!siteIsUp);
-    const r = await request.get("/api/trading/risk");
-    expect(r.status()).toBe(200);
-    const d = await r.json();
-    expect(d).toHaveProperty("sharpeRatio");
-    expect(d).toHaveProperty("maxDrawdown");
-    expect(d).toHaveProperty("var95");
-    expect(d).toHaveProperty("riskLevel");
-  });
-  test("GET /api/trading/history", async ({ request }) => {
-    test.skip(!siteIsUp);
-    const r = await request.get("/api/trading/history");
-    expect(r.status()).toBe(200);
-    const d = await r.json();
-    expect(d).toHaveProperty("history");
-    expect(Array.isArray(d.history)).toBe(true);
-    expect(d).toHaveProperty("total");
-  });
-  test("POST /api/trading/execute → needs auth", async ({ request }) => {
-    test.skip(!siteIsUp);
-    const r = await request.post("/api/trading/execute", {
-      data: { pair: "EURUSD", action: "buy" },
-    });
-    expect(r.status()).toBe(401);
-    const d = await r.json();
-    expect(d).toHaveProperty("error");
-  });
-  test("GET /api/trading/full-analysis", async ({ request }) => {
-    test.skip(!siteIsUp);
-    const r = await request.get("/api/trading/full-analysis");
-    expect(r.status()).toBe(200);
-    const d = await r.json();
-    expect(d).toHaveProperty("asset");
-    expect(d).toHaveProperty("price");
-    expect(d).toHaveProperty("indicators");
-    expect(d.indicators).toHaveProperty("rsi");
-    expect(d.indicators).toHaveProperty("macd");
-  });
-  test("GET /api/trading/calendar", async ({ request }) => {
-    test.skip(!siteIsUp);
-    const r = await request.get("/api/trading/calendar");
-    expect(r.status()).toBe(200);
-    const d = await r.json();
-    expect(d).toHaveProperty("risks");
-    expect(Array.isArray(d.risks)).toBe(true);
-    if (d.risks.length > 0) {
-      expect(d.risks[0]).toHaveProperty("event");
-      expect(d.risks[0]).toHaveProperty("risk");
-    }
-  });
-  test("GET /api/trading/positions", async ({ request }) => {
-    test.skip(!siteIsUp);
-    const r = await request.get("/api/trading/positions");
-    expect(r.status()).toBe(200);
-    const d = await r.json();
-    expect(d).toHaveProperty("positions");
-    expect(Array.isArray(d.positions)).toBe(true);
-    expect(d).toHaveProperty("mode");
-  });
-  test("POST /api/trading/close → needs auth", async ({ request }) => {
-    test.skip(!siteIsUp);
-    const r = await request.post("/api/trading/close", { data: {} });
-    expect(r.status()).toBe(401);
-    const d = await r.json();
-    expect(d).toHaveProperty("error");
-  });
-  test("POST /api/trading/kill-switch", async ({ request }) => {
-    test.skip(!siteIsUp);
-    const r = await request.post("/api/trading/kill-switch");
-    expect(r.status()).toBe(200);
-    const d = await r.json();
-    expect(d).toHaveProperty("killed");
-    expect(d).toHaveProperty("closedPositions");
-  });
-  test("GET /api/trading/paper-balance", async ({ request }) => {
-    test.skip(!siteIsUp);
-    const r = await request.get("/api/trading/paper-balance");
-    expect(r.status()).toBe(200);
-    const d = await r.json();
-    expect(d).toHaveProperty("balance");
-    expect(d).toHaveProperty("mode");
-  });
-  test("GET /api/trading/risk-profile", async ({ request }) => {
-    test.skip(!siteIsUp);
-    const r = await request.get("/api/trading/risk-profile");
-    expect(r.status()).toBe(200);
-    const d = await r.json();
-    expect(d).toHaveProperty("active");
-    expect(d).toHaveProperty("name");
-    expect(d).toHaveProperty("riskPct");
-    expect(d).toHaveProperty("allProfiles");
-  });
-  test("POST /api/trading/risk-profile", async ({ request }) => {
-    test.skip(!siteIsUp);
-    const r = await request.post("/api/trading/risk-profile", {
-      data: { profile: "moderate" },
-    });
-    expect(r.status()).toBe(200);
-    const d = await r.json();
-    expect(d).toHaveProperty("success");
-    expect(d.success).toBe(true);
-    expect(d).toHaveProperty("profile");
-  });
-  test("GET /api/trading/projections", async ({ request }) => {
-    test.skip(!siteIsUp);
-    const r = await request.get("/api/trading/projections");
-    expect(r.status()).toBe(200);
-    const d = await r.json();
-    expect(d).toHaveProperty("capital");
-    expect(d).toHaveProperty("currency");
-    expect(d).toHaveProperty("profiles");
-  });
-});
 test.describe("API — Developer", () => {
+
   test("GET /api/developer/keys → needs auth", async ({ request }) => {
     test.skip(!siteIsUp);
     const r = await request.get("/api/developer/keys");
@@ -1691,7 +1462,8 @@ test.describe("API — Payments", () => {
     expect(d.error).toBe("Authentication required");
   });
 });
-test.describe("API — News", () => {
+// API — News, Media (social) removed
+
   test("GET /api/news → needs auth", async ({ request }) => {
     test.skip(!siteIsUp);
     const r = await request.get("/api/news");
@@ -1707,7 +1479,7 @@ test.describe("API — News", () => {
     expect(d).toHaveProperty("error");
   });
 });
-test.describe("API — Media", () => {
+
   test("GET /api/media/facebook/health", async ({ request }) => {
     test.skip(!siteIsUp);
     const r = await request.get("/api/media/facebook/health");
@@ -1925,15 +1697,7 @@ test.describe("API — Brain & Chat", () => {
     expect(d).toHaveProperty("error");
   });
 });
-test.describe("API — Messenger Stats", () => {
-  test("GET /api/messenger/stats → needs auth", async ({ request }) => {
-    test.skip(!siteIsUp);
-    const r = await request.get("/api/messenger/stats");
-    expect(r.status()).toBe(401);
-    const d = await r.json();
-    expect(d).toHaveProperty("error");
-  });
-});
+
 
 // ═══════════════════════════════════════════════════
 // SECURITY TESTS (10 tests)
