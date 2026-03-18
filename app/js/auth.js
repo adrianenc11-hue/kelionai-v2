@@ -585,8 +585,10 @@
     }
   }
   function initStub() {
-    const subBtn = document.getElementById('btn-subscriptions');
-    if (subBtn) subBtn.addEventListener('click', openSubscriptions);
+    ['btn-pricing', 'btn-subscriptions'].forEach(function(id) {
+      var btn = document.getElementById(id);
+      if (btn) btn.addEventListener('click', openSubscriptions);
+    });
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initStub);
   else initStub();
