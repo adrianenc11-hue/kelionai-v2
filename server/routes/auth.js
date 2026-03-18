@@ -109,12 +109,12 @@ router.post('/login', authLimiter, validate(loginSchema), async (req, res) => {
     });
 
     const { data, error } = await freshClient.auth.signInWithPassword({ email, password });
-    // Return 401 for ALL auth failures
-    if (error) return res.status(401).json({ error: 'Invalid login credentials' });
-    if (!data.user.email_confirmed_at) {
-      return res.status(403).json({
-        error: 'Email not verified. Please check your inbox and verify your email before signing in.',
-      });
+    if (error) {
+      // Return specific error for email not confirmed
+      if (error.code === 'email_not_confirmed') {
+        return res.status(403).json({ error: 'Email not verified. Please check your inbox and verify your email before signing in.' });
+      }
+      return res.status(401).json({ error: 'Invalid login credentials' });
     }
     const adminEmail = (process.env.ADMIN_EMAIL || '').toLowerCase();
     const isAdmin = data.user.email?.toLowerCase() === adminEmail;
