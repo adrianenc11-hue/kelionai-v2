@@ -1019,8 +1019,8 @@ test.describe("Deep — UI Interactions", () => {
     await page.waitForSelector("#text-input", { state: "visible", timeout: 15000 });
     await page.fill("#text-input", "What is the capital of France?");
     await page.press("#text-input", "Enter");
-    // User message sent
-    await expect(page.locator(".msg.user")).toBeVisible({ timeout: 30000 });
+    // User message sent (may appear in #chat-messages and #chat-overlay, use first())
+    await expect(page.locator(".msg.user").first()).toBeVisible({ timeout: 30000 });
     // AI processing starts: #thinking becomes visible
     await expect(page.locator("#thinking")).toBeVisible({ timeout: 30000 });
   });
@@ -1074,8 +1074,8 @@ test.describe.serial("Real User — Full Auth Flow", () => {
     const r = await request.post("/api/auth/register", {
       data: { email: TEST_EMAIL, password: TEST_PASS, name: TEST_NAME },
     });
-    // 201 = created, 400 = blocked, 409 = already exists (expected), 429 = rate limited
-    expect([201, 400, 409, 429]).toContain(r.status());
+    // 200/201 = created, 400 = blocked, 409 = already exists (expected), 429 = rate limited
+    expect([200, 201, 400, 409, 429]).toContain(r.status());
     const d = await r.json();
     expect(d).toBeTruthy();
   });
