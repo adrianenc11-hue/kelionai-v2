@@ -1,7 +1,7 @@
-// ═══════════════════════════════════════════════════════════════
-// KelionAI — Chat Routes (brain-powered + streaming)
-// Brain decides tools → executes in parallel → builds deep prompt → AI responds → learns
-// ═══════════════════════════════════════════════════════════════
+﻿// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// KelionAI â€” Chat Routes (brain-powered + streaming)
+// Brain decides tools â†’ executes in parallel â†’ builds deep prompt â†’ AI responds â†’ learns
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 'use strict';
 
 const express = require('express');
@@ -17,7 +17,7 @@ const { notify } = require('../notifications');
 
 const router = express.Router();
 
-// ── Sanitize internal markers from AI replies ──
+// â”€â”€ Sanitize internal markers from AI replies â”€â”€
 function sanitizeReply(text) {
   if (!text) return text;
   let r = text;
@@ -60,7 +60,7 @@ const convLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-// ═══ SAVE CONVERSATION HELPER ═══
+// â•â•â• SAVE CONVERSATION HELPER â•â•â•
 async function saveConv(supabaseAdmin, uid, avatar, userMsg, aiReply, convId, lang) {
   if (!supabaseAdmin) return;
   if (!convId) {
@@ -103,7 +103,7 @@ async function saveConv(supabaseAdmin, uid, avatar, userMsg, aiReply, convId, la
   return convId;
 }
 
-// ═══ ADMIN KEYWORD BLACKLIST ═══
+// â•â•â• ADMIN KEYWORD BLACKLIST â•â•â•
 
 // POST /api/chat
 router.post('/chat', chatLimiter, validate(chatSchema), async (req, res) => {
@@ -122,7 +122,7 @@ router.post('/chat', chatLimiter, validate(chatSchema), async (req, res) => {
     } = req.body;
     if (!message?.trim()) return res.status(400).json({ error: 'Message is required' });
 
-    // ═══ K1 MODE INTERCEPT — admin says "K1" to talk to brain directly ═══
+    // â•â•â• K1 MODE INTERCEPT â€” admin says "K1" to talk to brain directly â•â•â•
     const isK1Admin = req.headers['x-admin-secret'] === process.env.ADMIN_SECRET_KEY;
     const isK1 = isK1Admin && /^k1[\s:,]/i.test(message.trim());
     if (isK1) {
@@ -158,7 +158,7 @@ router.post('/chat', chatLimiter, validate(chatSchema), async (req, res) => {
     const user = await getUserFromToken(req);
 
     // Admin tool execution is gated in brain.buildPlan() via isAdmin parameter.
-    // Non-admin users can mention admin keywords freely — tools won't execute.
+    // Non-admin users can mention admin keywords freely â€” tools won't execute.
     const adminEmail = (process.env.ADMIN_EMAIL || '').toLowerCase();
     const isOwner = user?.email?.toLowerCase() === adminEmail;
     const isAdmin = isOwner && req.headers['x-admin-mode'] === 'true';
@@ -172,7 +172,7 @@ router.post('/chat', chatLimiter, validate(chatSchema), async (req, res) => {
         upgrade: true,
       });
 
-    // ═══ BRAIN V5: GPT-5.4 + Gemini hybrid with Quality Gate ═══
+    // â•â•â• BRAIN V5: GPT-5.4 + Gemini hybrid with Quality Gate â•â•â•
     const thought = await thinkV5(
       brain,
       message,
@@ -189,14 +189,14 @@ router.post('/chat', chatLimiter, validate(chatSchema), async (req, res) => {
     let reply = thought.enrichedMessage;
     const engine = thought.agent || 'V5';
 
-    // ── SANITIZE: Strip leaked system instructions from reply ──
+    // â”€â”€ SANITIZE: Strip leaked system instructions from reply â”€â”€
     if (reply) {
       reply = sanitizeReply(reply);
     }
 
-    // ── Push notification to admin ──
+    // â”€â”€ Push notification to admin â”€â”€
     try {
-      notify('info', `💬 ${user?.email || 'guest'}: ${(message || '').slice(0, 60)}`, {
+      notify('info', `ðŸ’¬ ${user?.email || 'guest'}: ${(message || '').slice(0, 60)}`, {
         userId: user?.id,
         avatar,
         engine: thought.agent,
@@ -204,7 +204,7 @@ router.post('/chat', chatLimiter, validate(chatSchema), async (req, res) => {
     } catch {
       /* non-blocking */
     }
-    // Agent logging removed — was hardcoded to localhost:7257 (non-functional on Railway)
+    // Agent logging removed â€” was hardcoded to localhost:7257 (non-functional on Railway)
 
     if (!reply) return res.status(503).json({ error: 'AI unavailable' });
 
@@ -285,17 +285,17 @@ router.post('/chat', chatLimiter, validate(chatSchema), async (req, res) => {
     } else {
       // FALLBACK: auto-detect emotion from reply text when AI doesn't emit tags
       const replyLow = reply.toLowerCase();
-      if (/😂|😄|😊|haha|:D|bravo|super|perfect|excelent|genial|fantastic/i.test(replyLow)) emotion = 'laughing';
-      else if (/❤|🥰|💕|te iubesc|love|drag|iubit/i.test(replyLow)) emotion = 'loving';
-      else if (/😢|😔|din păcate|unfortunately|îmi pare rău|sorry|scuze|regret/i.test(replyLow)) emotion = 'sad';
-      else if (/🤔|hmm|interesant|curios|interesting|oare|perhaps/i.test(replyLow)) emotion = 'thinking';
-      else if (/😮|wow|uau|incredibil|amazing|unbelievable|nu-mi vine/i.test(replyLow)) emotion = 'surprised';
-      else if (/😏|heh|glum|ironic|witty|😜/i.test(replyLow)) emotion = 'playful';
-      else if (/💪|determinat|going to|vom reuși|we will|hai să/i.test(replyLow)) emotion = 'determined';
-      else if (/😟|grijă|atenție|careful|warning|pericol|danger/i.test(replyLow)) emotion = 'concerned';
-      else if (/salut|bună|hello|hey|hi |welcome|👋/i.test(replyLow)) emotion = 'happy';
+      if (/ðŸ˜‚|ðŸ˜„|ðŸ˜Š|haha|:D|bravo|super|perfect|excelent|genial|fantastic/i.test(replyLow)) emotion = 'laughing';
+      else if (/â¤|ðŸ¥°|ðŸ’•|te iubesc|love|drag|iubit/i.test(replyLow)) emotion = 'loving';
+      else if (/ðŸ˜¢|ðŸ˜”|din pÄƒcate|unfortunately|Ã®mi pare rÄƒu|sorry|scuze|regret/i.test(replyLow)) emotion = 'sad';
+      else if (/ðŸ¤”|hmm|interesant|curios|interesting|oare|perhaps/i.test(replyLow)) emotion = 'thinking';
+      else if (/ðŸ˜®|wow|uau|incredibil|amazing|unbelievable|nu-mi vine/i.test(replyLow)) emotion = 'surprised';
+      else if (/ðŸ˜|heh|glum|ironic|witty|ðŸ˜œ/i.test(replyLow)) emotion = 'playful';
+      else if (/ðŸ’ª|determinat|going to|vom reuÈ™i|we will|hai sÄƒ/i.test(replyLow)) emotion = 'determined';
+      else if (/ðŸ˜Ÿ|grijÄƒ|atenÈ›ie|careful|warning|pericol|danger/i.test(replyLow)) emotion = 'concerned';
+      else if (/salut|bunÄƒ|hello|hey|hi |welcome|ðŸ‘‹/i.test(replyLow)) emotion = 'happy';
       else if (/\?$/.test(reply.trim())) emotion = 'thinking';
-      else emotion = 'happy'; // default to happy, not neutral — feels more alive
+      else emotion = 'happy'; // default to happy, not neutral â€” feels more alive
     }
     // Parse [GESTURE:xxx] tags from AI reply (brain controls body language)
     const gestures = [];
@@ -348,26 +348,27 @@ router.post('/chat', chatLimiter, validate(chatSchema), async (req, res) => {
   }
 });
 
-// POST /api/chat/stream — Server-Sent Events (word-by-word response)
+// POST /api/chat/stream â€” Server-Sent Events powered by thinkV5 (full brain)
 router.post('/chat/stream', chatLimiter, validate(chatSchema), async (req, res) => {
-  let heartbeat = null; // Must be let — reassigned in try block
+  let heartbeat = null;
   try {
     const { getUserFromToken, supabaseAdmin, brain } = req.app.locals;
-    const { message, avatar = 'kelion', history = [], language = 'ro', conversationId } = req.body;
+    const {
+      message, avatar = 'kelion', history = [], language = 'ro',
+      conversationId, imageBase64, audioBase64, geo,
+    } = req.body;
     if (!message) return res.status(400).json({ error: 'Message is required' });
-    const user = await getUserFromToken(req);
 
-    // Admin tool execution gated in brain.buildPlan() — no keyword filter needed
+    const user = await getUserFromToken(req);
     const adminEmailS = (process.env.ADMIN_EMAIL || '').toLowerCase();
     const isOwnerStream = user?.email?.toLowerCase() === adminEmailS;
+    const isAdminStream = isOwnerStream && req.headers['x-admin-mode'] === 'true';
 
     const usage = await checkUsage(user?.id, 'chat', supabaseAdmin);
     if (!usage.allowed)
       return res.status(429).json({
         error: 'Chat limit reached. Upgrade to Pro for more messages.',
-        plan: usage.plan,
-        limit: usage.limit,
-        upgrade: true,
+        plan: usage.plan, limit: usage.limit, upgrade: true,
       });
 
     res.writeHead(200, {
@@ -376,261 +377,138 @@ router.post('/chat/stream', chatLimiter, validate(chatSchema), async (req, res) 
       Connection: 'keep-alive',
       'X-Accel-Buffering': 'no',
     });
-    // SSE heartbeat to prevent proxy/LB timeout during AI thinking
     heartbeat = setInterval(() => res.write(':keepalive\n\n'), 15000);
-    // Send thinking indicator immediately so user sees activity
     res.write(`data: ${JSON.stringify({ type: 'thinking' })}\n\n`);
 
-    const isAdminStream = isOwnerStream && req.headers['x-admin-mode'] === 'true';
-    const thought = await brain.think(message, avatar, history, language, user?.id, conversationId, {}, isAdminStream);
-
-    if (thought.monitor.content) {
-      res.write(
-        `data: ${JSON.stringify({ type: 'monitor', content: thought.monitor.content, monitorType: thought.monitor.type })}\n\n`
-      );
-    }
-
-    let memoryContext = '';
-    if (user && supabaseAdmin) {
-      try {
-        const { data: prefs } = await supabaseAdmin
-          .from('user_preferences')
-          .select('key, value')
-          .eq('user_id', user.id)
-          .limit(30);
-        if (prefs?.length > 0) memoryContext = prefs.map((p) => `${p.key}: ${JSON.stringify(p.value)}`).join('; ');
-      } catch (e) {
-        logger.warn({ component: 'Stream', err: e.message }, 'user_preferences read failed');
-      }
-    }
-    const systemPrompt =
-      process.env.NEWBORN_MODE === 'true'
-        ? buildNewbornPrompt(memoryContext)
-        : buildSystemPrompt(
-            avatar,
-            language,
-            memoryContext,
-            { failedTools: thought.failedTools },
-            thought.chainOfThought
-          );
-    const compressedHist = thought.compressedHistory || history.slice(-10);
-    const msgs = compressedHist.map((h) => ({
-      role: h.role === 'ai' ? 'assistant' : h.role,
-      content: h.content,
-    }));
-    msgs.push({ role: 'user', content: sanitizeReply(thought.enrichedMessage) });
-
-    let fullReply = '';
-    const _heartbeat = setInterval(() => {
-      try {
-        res.write(':heartbeat\n\n');
-      } catch {
-        /* connection closed */
-      }
-    }, 15000);
-
-    // AI Chain: Gemini (streaming nativ) → GPT-5.4 fallback → DeepSeek (backup)
-    // NOTĂ: Chain-ul pe /chat/stream diferă INTENȚIONAT de /chat.
-    // /chat: Gemini V4 cu tool calling (prin brain-v4.js)
-    // /chat/stream: Gemini→GPT-5.4→DeepSeek (streaming word-by-word)
-    // Try Gemini streaming
-    const geminiKey = process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
-    if (geminiKey) {
-      try {
-        const geminiModel = MODELS.GEMINI_CHAT;
-        const r = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:streamGenerateContent?alt=sse&key=${geminiKey}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: msgs.map((m) => ({
-                role: m.role === 'assistant' ? 'model' : m.role,
-                parts: [{ text: m.content }],
-              })),
-              systemInstruction: { parts: [{ text: systemPrompt }] },
-              generationConfig: { maxOutputTokens: 4096, temperature: 0.7 },
-            }),
-          }
-        );
-
-        if (r.ok && r.body) {
-          res.write(`data: ${JSON.stringify({ type: 'start', engine: 'Gemini' })}\n\n`);
-          let buffer = '';
-
-          const { Readable } = require('stream');
-          const nodeStream = typeof r.body.on === 'function' ? r.body : Readable.fromWeb(r.body);
-
-          await new Promise((resolve, reject) => {
-            nodeStream.on('data', (chunk) => {
-              buffer += chunk.toString();
-              const lines = buffer.split('\n');
-              buffer = lines.pop() || '';
-
-              for (const line of lines) {
-                if (!line.startsWith('data: ')) continue;
-                const data = line.slice(6).trim();
-                if (data === '[DONE]') continue;
-                try {
-                  const parsed = JSON.parse(data);
-                  const text = parsed.candidates?.[0]?.content?.parts?.[0]?.text;
-                  if (text) {
-                    fullReply += text;
-                    res.write(`data: ${JSON.stringify({ type: 'chunk', text })}\n\n`);
-                  }
-                } catch (e) {
-                  logger.warn({ component: 'Chat', err: e.message }, 'skip parse errors');
-                }
-              }
-            });
-            nodeStream.on('end', resolve);
-            nodeStream.on('error', reject);
-          });
-        }
-      } catch (e) {
-        logger.warn({ component: 'Stream', err: e.message }, 'Gemini');
-      }
-    }
-    // Log Gemini streaming cost
-    if (fullReply) {
-      const estInputTok = Math.ceil(msgs.reduce((s, m) => s + (m.content || '').length, 0) / 4);
-      const estOutputTok = Math.ceil(fullReply.length / 4);
-      brain
-        ._logCost(
-          'Google',
-          'gemini-streaming',
-          estInputTok,
-          estOutputTok,
-          (estInputTok * 0.075 + estOutputTok * 0.3) / 1000000,
-          user?.id
-        )
-        .catch(() => {});
-    }
-
-    // Fallback: non-streaming GPT-5.4 (via OPENAI_FALLBACK) or DeepSeek
-    if (!fullReply) {
-      if (process.env.OPENAI_API_KEY) {
-        try {
-          const r = await fetch('https://api.openai.com/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: 'Bearer ' + process.env.OPENAI_API_KEY,
-            },
-            body: JSON.stringify({
-              model: MODELS.OPENAI_FALLBACK,
-              max_tokens: 4096,
-              messages: [{ role: 'system', content: systemPrompt }, ...msgs],
-            }),
-          });
-          const d = await r.json();
-          fullReply = d.choices?.[0]?.message?.content || '';
-          if (fullReply) {
-            res.write(`data: ${JSON.stringify({ type: 'start', engine: 'GPT-5.4' })}\n\n`);
-            res.write(`data: ${JSON.stringify({ type: 'chunk', text: fullReply })}\n\n`);
-          }
-        } catch (e) {
-          logger.warn({ component: 'Stream', err: e.message }, 'GPT-5.4 fallback failed');
-        }
-        // Log OpenAI cost
-        if (fullReply) {
-          const estInputTok = Math.ceil(msgs.reduce((s, m) => s + (m.content || '').length, 0) / 4);
-          const estOutputTok = Math.ceil(fullReply.length / 4);
-          brain
-            ._logCost(
-              'OpenAI',
-              'gpt-5.4-fallback',
-              estInputTok,
-              estOutputTok,
-              (estInputTok * 5 + estOutputTok * 15) / 1000000,
-              user?.id
-            )
-            .catch(() => {});
-        }
-      }
-    }
-    if (!fullReply && process.env.DEEPSEEK_API_KEY) {
-      try {
-        const r = await fetch('https://api.deepseek.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: 'Bearer ' + process.env.DEEPSEEK_API_KEY,
-          },
-          body: JSON.stringify({
-            model: MODELS.DEEPSEEK,
-            max_tokens: 4096,
-            messages: [{ role: 'system', content: systemPrompt }, ...msgs],
-          }),
-        });
-        const d = await r.json();
-        fullReply = d.choices?.[0]?.message?.content || '';
-        if (fullReply) {
-          res.write(`data: ${JSON.stringify({ type: 'start', engine: 'DeepSeek' })}\n\n`);
-          res.write(`data: ${JSON.stringify({ type: 'chunk', text: fullReply })}\n\n`);
-        }
-      } catch (e) {
-        logger.warn({ component: 'Stream', err: e.message }, 'DeepSeek fallback failed');
-      }
-      // Log DeepSeek cost
-      if (fullReply) {
-        const estInputTok = Math.ceil(msgs.reduce((s, m) => s + (m.content || '').length, 0) / 4);
-        const estOutputTok = Math.ceil(fullReply.length / 4);
-        brain
-          ._logCost(
-            'DeepSeek',
-            'deepseek',
-            estInputTok,
-            estOutputTok,
-            (estInputTok * 0.14 + estOutputTok * 0.28) / 1000000,
-            user?.id
-          )
-          .catch(() => {});
-      }
-    }
-
-    let savedConvId = conversationId;
-    if (fullReply && supabaseAdmin) {
-      try {
-        savedConvId = await saveConv(supabaseAdmin, user?.id, avatar, message, fullReply, conversationId, language);
-      } catch (e) {
-        logger.warn({ component: 'Stream', err: e.message }, 'saveConv');
-      }
-    }
-
-    const cleanReply = sanitizeReply(fullReply);
-    res.write(
-      `data: ${JSON.stringify({ type: 'done', reply: cleanReply, thinkTime: thought.thinkTime, conversationId: savedConvId })}\n\n`
+    // â”€â”€ USE thinkV5 â€” full brain with tool calling, memory, Supabase â”€â”€
+    const thought = await thinkV5(
+      brain, message, avatar, history, language,
+      user?.id, conversationId,
+      { imageBase64, audioBase64, geo, isAutoCamera: req.body.isAutoCamera || false },
+      isAdminStream
     );
+
+    let fullReply = thought.enrichedMessage || '';
+    if (!fullReply) {
+      res.write(`data: ${JSON.stringify({ type: 'done', reply: '', conversationId })}\n\n`);
+      res.end();
+      return;
+    }
+
+    // â”€â”€ Send monitor if brain produced one â”€â”€
+    if (thought.monitor?.content) {
+      res.write(`data: ${JSON.stringify({
+        type: 'monitor',
+        content: thought.monitor.content,
+        monitorType: thought.monitor.type,
+      })}\n\n`);
+    }
+
+    // â”€â”€ Extract and strip [MONITOR] from reply â”€â”€
+    let monitorFromReply = null;
+    const monitorMatch = fullReply.match(/\[MONITOR\]([\s\S]*?)\[\/MONITOR\]/i);
+    if (monitorMatch) {
+      monitorFromReply = { content: monitorMatch[1].trim(), type: 'html' };
+      fullReply = fullReply.replace(/\[MONITOR\][\s\S]*?\[\/MONITOR\]/gi, '').trim();
+      if (!thought.monitor?.content) {
+        res.write(`data: ${JSON.stringify({
+          type: 'monitor', content: monitorFromReply.content, monitorType: 'html',
+        })}\n\n`);
+      }
+    }
+
+    // â”€â”€ Extract [ACTION:xxx] tags and send them â”€â”€
+    const actionMatches = [...fullReply.matchAll(/\[ACTION:([^\]]+)\]/gi)];
+    if (actionMatches.length > 0) {
+      const actions = actionMatches.map(m => m[1].trim());
+      res.write(`data: ${JSON.stringify({ type: 'actions', actions })}\n\n`);
+      fullReply = fullReply.replace(/\[ACTION:[^\]]+\]/gi, '').trim();
+    }
+
+    // â”€â”€ Extract avatar tags â”€â”€
+    let emotion = 'neutral';
+    const emotionMatch = fullReply.match(/\[EMOTION:\s*(\w+)\]/i);
+    if (emotionMatch) emotion = emotionMatch[1].toLowerCase();
+    else {
+      const rl = fullReply.toLowerCase();
+      if (/ðŸ˜‚|bravo|super|perfect|genial/i.test(rl)) emotion = 'laughing';
+      else if (/ðŸ˜¢|Ã®mi pare rÄƒu|sorry/i.test(rl)) emotion = 'sad';
+      else if (/ðŸ¤”|hmm|interesant/i.test(rl)) emotion = 'thinking';
+      else if (/salut|bunÄƒ|hello|hey/i.test(rl)) emotion = 'happy';
+      else emotion = 'happy';
+    }
+
+    const gestures = [...fullReply.matchAll(/\[GESTURE:\s*(\w+)\]/gi)].map(m => m[1].toLowerCase());
+    const bodyActions = [...fullReply.matchAll(/\[BODY:\s*(\w+)\]/gi)].map(m => m[1]);
+    const poseMatch = fullReply.match(/\[POSE:\s*(\w+)\]/i);
+    const pose = poseMatch ? poseMatch[1].toLowerCase() : null;
+    const gazeMatch = fullReply.match(/\[GAZE:\s*([\w-]+)\]/i);
+    const gaze = gazeMatch ? gazeMatch[1].toLowerCase() : null;
+
+    // â”€â”€ Clean reply â”€â”€
+    let cleanReply = sanitizeReply(fullReply)
+      .replace(/\[EMOTION:\s*\w+\]/gi, '')
+      .replace(/\[GESTURE:\s*\w+\]/gi, '')
+      .replace(/\[BODY:\s*\w+\]/gi, '')
+      .replace(/\[GAZE:\s*[\w-]+\]/gi, '')
+      .replace(/\[POSE:\s*\w+\]/gi, '')
+      .replace(/\[ACTION:[^\]]+\]/gi, '')
+      .trim();
+
+    // â”€â”€ Stream reply word by word â”€â”€
+    res.write(`data: ${JSON.stringify({ type: 'start', engine: thought.agent || 'V5' })}\n\n`);
+    const words = cleanReply.split(/(\s+)/);
+    for (const word of words) {
+      if (word) res.write(`data: ${JSON.stringify({ type: 'chunk', text: word })}\n\n`);
+    }
+
+    // â”€â”€ Save to Supabase â”€â”€
+    let savedConvId = conversationId;
+    if (supabaseAdmin) {
+      try {
+        savedConvId = await saveConv(supabaseAdmin, user?.id, avatar, message, cleanReply, conversationId, language);
+      } catch (e) {
+        logger.warn({ component: 'Stream', err: e.message }, 'saveConv failed');
+      }
+    }
+
+    // â”€â”€ Save brain memory â”€â”€
+    if (user?.id) {
+      brain.saveMemory(user.id, 'text',
+        'User: ' + message.substring(0, 500) + ' | Kelion: ' + cleanReply.substring(0, 500),
+        { avatar, language }
+      ).catch(() => {});
+      brain.extractAndSaveFacts(user.id, message, cleanReply).catch(() => {});
+    }
+
+    // â”€â”€ Send done event WITH avatar metadata â”€â”€
+    res.write(`data: ${JSON.stringify({
+      type: 'done',
+      reply: cleanReply,
+      thinkTime: thought.thinkTime,
+      conversationId: savedConvId,
+      emotion,
+      gestures,
+      bodyActions,
+      pose,
+      gaze,
+      monitor: monitorFromReply || thought.monitor?.content ? (monitorFromReply || thought.monitor) : undefined,
+    })}\n\n`);
     res.end();
 
-    if (fullReply)
-      brain
-        .learnFromConversation(user?.id, message, fullReply)
-        .catch((e) => logger.warn({ component: 'Stream', err: e.message }, 'learnFromConversation failed'));
-    if (fullReply)
-      incrementUsage(user?.id, 'chat', supabaseAdmin).catch((e) =>
-        logger.warn({ component: 'Stream', err: e.message }, 'incrementUsage failed')
-      );
-    logger.info(
-      {
-        component: 'Stream',
-        avatar,
-        language,
-        replyLength: fullReply.length,
-      },
-      `${avatar} | ${language} | ${fullReply.length}c`
-    );
+    brain.learnFromConversation(user?.id, message, cleanReply).catch(() => {});
+    incrementUsage(user?.id, 'chat', supabaseAdmin).catch(() => {});
+    logger.info({ component: 'Stream-V5', avatar, language, tools: thought.toolsUsed, replyLength: cleanReply.length },
+      `V5 | ${avatar} | tools:[${(thought.toolsUsed || []).join(',')}] | ${cleanReply.length}c`);
+
   } catch (e) {
     logger.error({ component: 'Stream', err: e.message }, e.message);
     if (!res.headersSent) res.status(500).json({ error: 'Stream error' });
     else res.end();
   } finally {
-    clearInterval(heartbeat);
+    if (heartbeat) clearInterval(heartbeat);
   }
 });
-
-// GET /api/conversations
 router.get('/conversations', convLimiter, async (req, res) => {
   try {
     const { getUserFromToken, supabaseAdmin } = req.app.locals;
