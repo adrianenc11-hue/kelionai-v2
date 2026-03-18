@@ -821,11 +821,9 @@
   );
 
   // ─── Full-Duplex Voice Loop ───────────────────────────────────
-  // Press mic → listens continuously. When user stops speaking →
-  // dispatches 'voice-loop-message' → AI responds → resumes listening.
-  // Press mic again → stopVoiceLoop() kills everything.
   let _voiceLoopActive = false;
   let _voiceLoopRec = null;
+  let _waitingForAI = false; // true while AI is processing/speaking
 
   function _makeLoopRec() {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -838,23 +836,25 @@
       if (!_voiceLoopActive) return;
       const txt = ev.results[0][0].transcript.trim();
       if (txt.length < 2) { _loopListen(); return; }
+      _waitingForAI = true; // stop onend from restarting
       console.log('[Voice] Loop captured:', txt);
       window.dispatchEvent(new CustomEvent('voice-loop-message', { detail: { text: txt } }));
-      // app.js will call resumeVoiceLoop() after AI finishes speaking
     };
     rec.onend = function () {
-      if (_voiceLoopActive && !isSpeaking) setTimeout(_loopListen, 300);
+      if (_voiceLoopActive && !isSpeaking && !_waitingForAI) {
+        setTimeout(_loopListen, 300);
+      }
     };
     rec.onerror = function (e) {
       if (!_voiceLoopActive) return;
       if (e.error === 'not-allowed') { stopVoiceLoop(); return; }
-      setTimeout(_loopListen, 800);
+      if (!_waitingForAI) setTimeout(_loopListen, 800);
     };
     return rec;
   }
 
   function _loopListen() {
-    if (!_voiceLoopActive || isSpeaking) return;
+    if (!_voiceLoopActive || isSpeaking || _waitingForAI) return;
     try {
       if (_voiceLoopRec) { try { _voiceLoopRec.stop(); } catch (_e) {/* ok */} }
       _voiceLoopRec = _makeLoopRec();
@@ -863,9 +863,10 @@
   }
 
   function startVoiceLoop() {
-    if (!( window.SpeechRecognition || window.webkitSpeechRecognition)) return false;
+    if (!(window.SpeechRecognition || window.webkitSpeechRecognition)) return false;
     if (_voiceLoopActive) return true;
     _voiceLoopActive = true;
+    _waitingForAI = false;
     _loopListen();
     startMicMonitor();
     console.log('[Voice] Full-duplex loop STARTED');
@@ -874,6 +875,7 @@
 
   function stopVoiceLoop() {
     _voiceLoopActive = false;
+    _waitingForAI = false;
     if (_voiceLoopRec) { try { _voiceLoopRec.stop(); } catch (_e) {/* ok */} _voiceLoopRec = null; }
     console.log('[Voice] Full-duplex loop STOPPED');
     window.dispatchEvent(new CustomEvent('voice-loop-stopped'));
@@ -881,7 +883,7 @@
 
   function resumeVoiceLoop() {
     if (!_voiceLoopActive) return;
-    // Wait for AI to finish speaking, then restart listening
+    _waitingForAI = false;
     if (isSpeaking) {
       const check = setInterval(function () {
         if (!isSpeaking) { clearInterval(check); _loopListen(); }
