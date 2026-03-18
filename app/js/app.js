@@ -1563,11 +1563,13 @@
     }
 
     // ─── Mic button — full-duplex voice stream ────────────────────
-    // Uses KVoiceStream: Browser PCM → Server (Deepgram STT → Groq → Cartesia TTS) → Browser PCM
+    // PRIMARY: KVoiceStream WebSocket pipeline (Deepgram STT → Groq → Cartesia/ElevenLabs TTS)
+    // FALLBACK: Browser SpeechRecognition → WebSocket text_input → Groq → ElevenLabs TTS
     (function () {
       const micBtn = document.getElementById('btn-mic');
       if (!micBtn) return;
       let streamOn = false;
+      let _browserSTTRec = null; // fallback SpeechRecognition instance
 
       function setMicOn() {
         streamOn = true;
@@ -1582,6 +1584,43 @@
         micBtn.style.background = '';
         micBtn.style.borderColor = '';
         micBtn.title = 'Pornește microfonul';
+        // Stop browser STT fallback if running
+        if (_browserSTTRec) { try { _browserSTTRec.stop(); } catch (_e) {/* ok */} _browserSTTRec = null; }
+      }
+
+      // Browser SpeechRecognition loop fallback (when Deepgram not available)
+      function _startBrowserSTT() {
+        const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SR || !streamOn) return;
+        const rec = new SR();
+        rec.continuous = false;
+        rec.interimResults = false;
+        rec.lang = window.KVoice ? (KVoice.getLanguage() === 'ro' ? 'ro-RO' : 'en-US') : 'ro-RO';
+        rec.onresult = function (ev) {
+          if (!streamOn) return;
+          const txt = ev.results[0][0].transcript.trim();
+          if (!txt) return;
+          // Show user speech in chat
+          addMessage('user', txt);
+          chatHistory.push({ role: 'user', content: txt });
+          showThinking(true);
+          // Send transcript via WebSocket to Groq+TTS pipeline
+          if (window.KVoiceStream && KVoiceStream.isConnected()) {
+            KVoiceStream.sendText(txt);
+          } else {
+            // Last resort: standard AI chat
+            sendToAI(txt, window.KVoice ? KVoice.getLanguage() : 'ro');
+          }
+        };
+        rec.onend = function () {
+          if (streamOn) setTimeout(_startBrowserSTT, 400); // loop
+        };
+        rec.onerror = function (e) {
+          if (e.error === 'not-allowed') { setMicOff(); return; }
+          if (streamOn) setTimeout(_startBrowserSTT, 800);
+        };
+        _browserSTTRec = rec;
+        try { rec.start(); } catch (_e) { setTimeout(_startBrowserSTT, 500); }
       }
 
       micBtn.addEventListener('click', function () {
@@ -1604,19 +1643,30 @@
         }
       });
 
-      // Auto-start mic capture when server signals ready
-      window.addEventListener('voice-stream-ready', function () {
-        if (streamOn && window.KVoiceStream) {
+      // Server ready → choose mic mode based on available STT
+      window.addEventListener('voice-stream-ready', function (e) {
+        if (!streamOn || !window.KVoiceStream) return;
+        const stt = (e.detail && e.detail.stt) || 'browser';
+        if (stt === 'deepgram') {
+          // Server has Deepgram — stream raw PCM audio
           KVoiceStream.startMic();
-          console.log('[App] Voice stream ready — mic capture started');
+          console.log('[App] Voice stream: Deepgram STT — PCM streaming active');
+        } else {
+          // No server STT — use browser SpeechRecognition + send text
+          console.log('[App] Voice stream: browser STT fallback active');
+          _startBrowserSTT();
         }
       });
 
-      // Handle completed voice turns — save to chat history + avatar emotion
+      // Handle turn_complete → show thinking off + update history
       window.addEventListener('voice-stream-turn', function (e) {
         if (!e.detail) return;
+        showThinking(false);
         const { reply, emotion } = e.detail;
-        if (reply) chatHistory.push({ role: 'assistant', content: reply });
+        if (reply) {
+          addMessage('assistant', reply);
+          chatHistory.push({ role: 'assistant', content: reply });
+        }
         if (emotion && window.KAvatar) KAvatar.setExpression(emotion, 0.5);
       });
 
