@@ -1562,21 +1562,22 @@
         });
     }
 
-    // ─── Mic button — full-duplex voice loop ────────────────────
+    // ─── Mic button — full-duplex voice stream ────────────────────
+    // Uses KVoiceStream: Browser PCM → Server (Deepgram STT → Groq → Cartesia TTS) → Browser PCM
     (function () {
       const micBtn = document.getElementById('btn-mic');
       if (!micBtn) return;
-      let loopOn = false;
+      let streamOn = false;
 
       function setMicOn() {
-        loopOn = true;
+        streamOn = true;
         micBtn.textContent = '🔴';
         micBtn.style.background = 'rgba(239,68,68,0.2)';
         micBtn.style.borderColor = 'rgba(239,68,68,0.5)';
         micBtn.title = 'Oprește microfonul';
       }
       function setMicOff() {
-        loopOn = false;
+        streamOn = false;
         micBtn.textContent = '🎙️';
         micBtn.style.background = '';
         micBtn.style.borderColor = '';
@@ -1584,41 +1585,43 @@
       }
 
       micBtn.addEventListener('click', function () {
-        if (!window.KVoice) return;
         unlockAudio();
-        if (!loopOn) {
-          const started = KVoice.startVoiceLoop();
-          if (started) setMicOn();
+        if (!streamOn) {
+          if (window.KVoiceStream) {
+            KVoiceStream.connect({
+              avatar: window.KAvatar ? KAvatar.getCurrentAvatar() : 'kelion',
+              language: window.KVoice ? KVoice.getLanguage() : 'ro',
+            });
+            setMicOn();
+            hideWelcome();
+          }
         } else {
-          KVoice.stopVoiceLoop();
+          if (window.KVoiceStream) {
+            KVoiceStream.stopMic();
+            KVoiceStream.disconnect();
+          }
           setMicOff();
         }
       });
 
-      // Listen to transcribed speech from the voice loop
-      window.addEventListener('voice-loop-message', async function (e) {
-        if (!e.detail || !e.detail.text) return;
-        const text = e.detail.text.trim();
-        if (!text) return;
-        _voiceInitiated = true;
-        hideWelcome();
-        KAvatar.setAttentive(true);
-        addMessage('user', text);
-        showThinking(true);
-        await sendToAI(text, window.KVoice ? KVoice.getLanguage() : 'ro');
-        // After AI finishes speaking, resume loop
-        if (window.KVoice && KVoice.isVoiceLoopActive()) {
-          KVoice.resumeVoiceLoop();
+      // Auto-start mic capture when server signals ready
+      window.addEventListener('voice-stream-ready', function () {
+        if (streamOn && window.KVoiceStream) {
+          KVoiceStream.startMic();
+          console.log('[App] Voice stream ready — mic capture started');
         }
       });
 
-      // If loop was force-stopped internally (e.g. mic denied), reset button
-      window.addEventListener('voice-loop-stopped', setMicOff);
-
-      // When AI starts speaking, don't restart loop until it finishes
-      window.addEventListener('audio-start', function () {
-        // loop resume handled by resumeVoiceLoop() which polls isSpeaking
+      // Handle completed voice turns — save to chat history + avatar emotion
+      window.addEventListener('voice-stream-turn', function (e) {
+        if (!e.detail) return;
+        const { reply, emotion } = e.detail;
+        if (reply) chatHistory.push({ role: 'assistant', content: reply });
+        if (emotion && window.KAvatar) KAvatar.setExpression(emotion, 0.5);
       });
+
+      // Reset button if WebSocket disconnects unexpectedly
+      window.addEventListener('voice-stream-disconnect', setMicOff);
     })();
 
 
