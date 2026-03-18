@@ -1583,10 +1583,18 @@
           micBtn.style.background = '';
           micBtn.style.borderColor = '';
           micBtn.title = 'Voice input';
-          KVoice.stopListening();
+          const text = await KVoice.stopListening();
+          if (text && text.trim()) {
+            _voiceInitiated = true;
+            hideWelcome();
+            KAvatar.setAttentive(true);
+            addMessage('user', text);
+            showThinking(true);
+            await sendToAI(text, window.KVoice ? KVoice.getLanguage() : 'ro');
+          }
         }
       });
-      // Reset button when speaking starts (after stopListening auto-processes)
+      // Reset button when speaking starts
       window.addEventListener('audio-start', function () {
         micActive = false;
         micBtn.textContent = '🎙️';
