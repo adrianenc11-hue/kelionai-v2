@@ -1063,8 +1063,8 @@ test.describe("Deep — API Data Quality", () => {
 // ═══════════════════════════════════════════════════
 // REAL USER — Authenticated Tests (17 tests)
 // ═══════════════════════════════════════════════════
-const TEST_EMAIL = `e2e_test_${Date.now()}@keliontest.com`;
-const TEST_PASS = "TestK3li0n!2026";
+const TEST_EMAIL = "contact@kelionai.app";
+const TEST_PASS = "Andrada_1968!";
 const TEST_NAME = "E2E Tester";
 let authToken = null;
 
@@ -1074,7 +1074,7 @@ test.describe.serial("Real User — Full Auth Flow", () => {
     const r = await request.post("/api/auth/register", {
       data: { email: TEST_EMAIL, password: TEST_PASS, name: TEST_NAME },
     });
-    // 201 = created, 400 = validation/blocked domain, 409 = exists, 429 = rate limited
+    // 201 = created, 400 = blocked, 409 = already exists (expected), 429 = rate limited
     expect([201, 400, 409, 429]).toContain(r.status());
     const d = await r.json();
     expect(d).toBeTruthy();
