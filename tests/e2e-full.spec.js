@@ -1082,16 +1082,20 @@ test.describe.serial("Real User — Full Auth Flow", () => {
   });
   test("login with new account", async ({ request }) => {
     test.skip(!siteIsUp);
-    const r = await request.post("/api/auth/login", {
-      data: { email: TEST_EMAIL, password: TEST_PASS },
-    });
-    // Supabase may require email confirmation — any non-200 is acceptable for e2e test accounts
-    if (r.status() !== 200) {
-      test.skip();
-      return;
+    // Retry login up to 3 times — rate limit (429) resets quickly
+    let r, attempts = 0;
+    while (attempts < 3) {
+      r = await request.post("/api/auth/login", {
+        data: { email: TEST_EMAIL, password: TEST_PASS },
+      });
+      if (r.status() !== 429) break;
+      await new Promise(res => setTimeout(res, 5000));
+      attempts++;
     }
+    if (!r || r.status() !== 200) { test.skip(); return; }
     const d = await r.json();
-    authToken = d.token || d.accessToken || d.access_token;
+    // Server returns { user, session } — token is in session.access_token
+    authToken = d.session?.access_token || d.token || d.accessToken || d.access_token;
     expect(authToken).toBeTruthy();
   });
   test("GET /api/auth/me returns user profile", async ({ request }) => {

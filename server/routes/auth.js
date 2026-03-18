@@ -21,7 +21,7 @@ const router = express.Router();
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10,
+  max: 30,
   message: { error: 'Too many attempts. Please wait 15 minutes.' },
   skip: (req) => req.headers['x-admin-secret'] === process.env.ADMIN_SECRET_KEY,
 });
