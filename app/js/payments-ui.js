@@ -110,7 +110,7 @@
 
     // ═══ Init ═══
     function init() {
-        var pricingBtns = [document.getElementById('btn-pricing'), document.getElementById('btn-subscriptions')].filter(Boolean);
+        var pricingBtns = [document.getElementById('btn-pricing')].filter(Boolean);
         var modal = document.getElementById('pricing-modal');
         var closeBtn = document.getElementById('pricing-close');
 

@@ -585,10 +585,8 @@
     }
   }
   function initStub() {
-    ['btn-pricing', 'btn-subscriptions'].forEach(function(id) {
-      var btn = document.getElementById(id);
-      if (btn) btn.addEventListener('click', openSubscriptions);
-    });
+    var pricingBtn = document.getElementById('btn-pricing');
+    if (pricingBtn) pricingBtn.addEventListener('click', openSubscriptions);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initStub);
   else initStub();
