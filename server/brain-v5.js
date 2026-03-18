@@ -442,7 +442,8 @@ async function thinkV5(
             } catch {
               args = {};
             }
-            const result = await executeTool(brain, tc.function.name, args, userId);
+            const result = await executeTool(brain, tc.function.name, args, userId)
+              .catch((toolErr) => ({ error: toolErr.message, tool: tc.function.name }));
             toolsUsed.push(tc.function.name);
             toolResults.push({ name: tc.function.name, result });
             brain.toolStats[tc.function.name] = (brain.toolStats[tc.function.name] || 0) + 1;
@@ -571,7 +572,8 @@ async function thinkV5(
 
         // Execute tools
         const toolPromises = functionCalls.map(async (fc) => {
-          const result = await executeTool(brain, fc.functionCall.name, fc.functionCall.args || {}, userId);
+          const result = await executeTool(brain, fc.functionCall.name, fc.functionCall.args || {}, userId)
+            .catch((toolErr) => ({ error: toolErr.message, tool: fc.functionCall.name }));
           toolsUsed.push(fc.functionCall.name);
           toolResults.push({ name: fc.functionCall.name, result });
           brain.toolStats[fc.functionCall.name] = (brain.toolStats[fc.functionCall.name] || 0) + 1;
