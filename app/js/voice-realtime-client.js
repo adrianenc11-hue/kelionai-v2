@@ -443,23 +443,19 @@
 
     ccBtn.addEventListener('click', function () {
       ccActive = !ccActive;
-      var chatOverlay = document.getElementById('chat-overlay');
       if (ccActive) {
         ccBtn.style.borderColor = '#6366f1';
         ccBtn.style.color = '#6366f1';
         ccBtn.title = 'CC Subtitles: ON';
-        if (chatOverlay) chatOverlay.style.opacity = '1';
       } else {
         ccBtn.style.borderColor = '#555';
         ccBtn.style.color = '#888';
         ccBtn.title = 'CC Subtitles: OFF';
-        // Hide any visible subtitle
+        // Ascunde DOAR bara de subtitrare, NU chat-overlay-ul
         var sub = document.getElementById('speech-subtitle');
         if (sub) sub.classList.remove('visible');
         var ccSub = document.getElementById('voice-cc-subtitle');
         if (ccSub) ccSub.classList.remove('visible');
-        // Hide chat text
-        if (chatOverlay) chatOverlay.style.opacity = '0';
       }
       // Toggle in VoiceFirst (realtime)
       if (window.KVoiceFirst) KVoiceFirst.setCCEnabled(ccActive);
