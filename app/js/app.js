@@ -1562,116 +1562,57 @@
         });
     }
 
-    // ─── Mic button — full-duplex voice stream ────────────────────
-    // PRIMARY: KVoiceStream WebSocket pipeline (Deepgram STT → Groq → Cartesia/ElevenLabs TTS)
-    // FALLBACK: Browser SpeechRecognition → WebSocket text_input → Groq → ElevenLabs TTS
+    // ─── Mic button — conversație fluidă continuă ────────────────
+    // Apasă o dată → ascultă → vorbești → AI răspunde → ascultă din nou
+    // KVoice.startVoiceLoop() → voice-loop-message → sendToAI → KVoice.speak → resumeVoiceLoop
     (function () {
       const micBtn = document.getElementById('btn-mic');
       if (!micBtn) return;
-      let streamOn = false;
-      let _browserSTTRec = null; // fallback SpeechRecognition instance
 
       function setMicOn() {
-        streamOn = true;
         micBtn.textContent = '🔴';
         micBtn.style.background = 'rgba(239,68,68,0.2)';
         micBtn.style.borderColor = 'rgba(239,68,68,0.5)';
-        micBtn.title = 'Oprește microfonul';
+        micBtn.title = 'Oprește conversația';
       }
       function setMicOff() {
-        streamOn = false;
         micBtn.textContent = '🎙️';
         micBtn.style.background = '';
         micBtn.style.borderColor = '';
-        micBtn.title = 'Pornește microfonul';
-        // Stop browser STT fallback if running
-        if (_browserSTTRec) { try { _browserSTTRec.stop(); } catch (_e) {/* ok */} _browserSTTRec = null; }
-      }
-
-      // Browser SpeechRecognition loop fallback (when Deepgram not available)
-      function _startBrowserSTT() {
-        const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!SR || !streamOn) return;
-        const rec = new SR();
-        rec.continuous = false;
-        rec.interimResults = false;
-        rec.lang = window.KVoice ? (KVoice.getLanguage() === 'ro' ? 'ro-RO' : 'en-US') : 'ro-RO';
-        rec.onresult = function (ev) {
-          if (!streamOn) return;
-          const txt = ev.results[0][0].transcript.trim();
-          if (!txt) return;
-          // Show user speech in chat
-          addMessage('user', txt);
-          chatHistory.push({ role: 'user', content: txt });
-          showThinking(true);
-          // Send transcript via WebSocket to Groq+TTS pipeline
-          if (window.KVoiceStream && KVoiceStream.isConnected()) {
-            KVoiceStream.sendText(txt);
-          } else {
-            // Last resort: standard AI chat
-            sendToAI(txt, window.KVoice ? KVoice.getLanguage() : 'ro');
-          }
-        };
-        rec.onend = function () {
-          if (streamOn) setTimeout(_startBrowserSTT, 400); // loop
-        };
-        rec.onerror = function (e) {
-          if (e.error === 'not-allowed') { setMicOff(); return; }
-          if (streamOn) setTimeout(_startBrowserSTT, 800);
-        };
-        _browserSTTRec = rec;
-        try { rec.start(); } catch (_e) { setTimeout(_startBrowserSTT, 500); }
+        micBtn.title = 'Pornește conversația vocală';
       }
 
       micBtn.addEventListener('click', function () {
         unlockAudio();
-        if (!streamOn) {
-          if (window.KVoiceStream) {
-            KVoiceStream.connect({
-              avatar: window.KAvatar ? KAvatar.getCurrentAvatar() : 'kelion',
-              language: window.KVoice ? KVoice.getLanguage() : 'ro',
-            });
-            setMicOn();
-            hideWelcome();
-          }
+        if (!window.KVoice) return;
+        if (!KVoice.isVoiceLoopActive()) {
+          const started = KVoice.startVoiceLoop();
+          if (started) { setMicOn(); hideWelcome(); }
         } else {
-          if (window.KVoiceStream) {
-            KVoiceStream.stopMic();
-            KVoiceStream.disconnect();
-          }
+          KVoice.stopVoiceLoop();
           setMicOff();
         }
       });
 
-      // Server ready → choose mic mode based on available STT
-      window.addEventListener('voice-stream-ready', function (e) {
-        if (!streamOn || !window.KVoiceStream) return;
-        const stt = (e.detail && e.detail.stt) || 'browser';
-        if (stt === 'deepgram') {
-          // Server has Deepgram — stream raw PCM audio
-          KVoiceStream.startMic();
-          console.log('[App] Voice stream: Deepgram STT — PCM streaming active');
-        } else {
-          // No server STT — use browser SpeechRecognition + send text
-          console.log('[App] Voice stream: browser STT fallback active');
-          _startBrowserSTT();
+      // Când userul termină de vorbit → trimite la AI → AI răspunde → reia ascultarea
+      window.addEventListener('voice-loop-message', async function (e) {
+        if (!e.detail || !e.detail.text) return;
+        const text = e.detail.text.trim();
+        if (!text) return;
+        _voiceInitiated = true;
+        KAvatar.setAttentive && KAvatar.setAttentive(true);
+        addMessage('user', text);
+        chatHistory.push({ role: 'user', content: text });
+        showThinking(true);
+        await sendToAI(text, window.KVoice ? KVoice.getLanguage() : 'ro');
+        // Reia ascultarea după ce AI termină de vorbit
+        if (window.KVoice && KVoice.isVoiceLoopActive()) {
+          KVoice.resumeVoiceLoop();
         }
       });
 
-      // Handle turn_complete → show thinking off + update history
-      window.addEventListener('voice-stream-turn', function (e) {
-        if (!e.detail) return;
-        showThinking(false);
-        const { reply, emotion } = e.detail;
-        if (reply) {
-          addMessage('assistant', reply);
-          chatHistory.push({ role: 'assistant', content: reply });
-        }
-        if (emotion && window.KAvatar) KAvatar.setExpression(emotion, 0.5);
-      });
-
-      // Reset button if WebSocket disconnects unexpectedly
-      window.addEventListener('voice-stream-disconnect', setMicOff);
+      // Dacă loopul e oprit forțat (microfon refuzat etc.) → reset buton
+      window.addEventListener('voice-loop-stopped', setMicOff);
     })();
 
 
