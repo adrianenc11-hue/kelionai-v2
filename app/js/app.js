@@ -220,8 +220,8 @@
       try {
         await sendToAI_Regular(
           '[VISION_CONTEXT: ' +
-            desc +
-            '] Am văzut prin cameră. Confirmă scurt ce am văzut și întreabă dacă vrea detalii despre ceva anume. NU descrie din nou tot.',
+          desc +
+          '] Am văzut prin cameră. Confirmă scurt ce am văzut și întreabă dacă vrea detalii despre ceva anume. NU descrie din nou tot.',
           'ro'
         );
       } catch (_e) {
@@ -406,9 +406,9 @@
         addMessage(
           'user',
           message +
-            '\n<img src="' +
-            mediaToSend.previewUrl +
-            '" style="max-width:200px;max-height:150px;border-radius:8px;margin-top:6px;display:block">'
+          '\n<img src="' +
+          mediaToSend.previewUrl +
+          '" style="max-width:200px;max-height:150px;border-radius:8px;margin-top:6px;display:block">'
         );
       } else {
         addMessage('user', message + ' 📎 ' + mediaToSend.name);
@@ -538,8 +538,8 @@
             addMessage(
               'assistant',
               'You have reached the daily limit for the ' +
-                planName +
-                " plan. Say 'Kelion, upgrade' or click ⭐ Plans to see options."
+              planName +
+              " plan. Say 'Kelion, upgrade' or click ⭐ Plans to see options."
             );
           } else if (resp.status === 429) {
             addMessage('assistant', '⏳ Too many messages. Please wait a moment.');
@@ -1562,54 +1562,65 @@
         });
     }
 
-    // ─── Mic button — toggle voice recording ────────────────────
+    // ─── Mic button — full-duplex voice loop ────────────────────
     (function () {
       const micBtn = document.getElementById('btn-mic');
       if (!micBtn) return;
-      let micActive = false;
-      let micBusy = false; // prevent double-clicks
-      micBtn.addEventListener('click', async function () {
-        if (!window.KVoice || micBusy) return;
-        micBusy = true;
-        unlockAudio();
-        if (!micActive) {
-          // START recording
-          const started = await KVoice.startListening();
-          if (started) {
-            micActive = true;
-            micBtn.textContent = '🔴';
-            micBtn.style.background = 'rgba(239,68,68,0.2)';
-            micBtn.style.borderColor = 'rgba(239,68,68,0.5)';
-            micBtn.title = 'Stop recording';
-          }
-        } else {
-          // STOP recording
-          micActive = false;
-          micBtn.textContent = '🎙️';
-          micBtn.style.background = '';
-          micBtn.style.borderColor = '';
-          micBtn.title = 'Voice input';
-          const text = await KVoice.stopListening();
-          if (text && text.trim()) {
-            _voiceInitiated = true;
-            hideWelcome();
-            KAvatar.setAttentive(true);
-            addMessage('user', text);
-            showThinking(true);
-            await sendToAI(text, window.KVoice ? KVoice.getLanguage() : 'ro');
-          }
-        }
-        micBusy = false;
-      });
-      // Reset button when speaking starts (AI is responding)
-      window.addEventListener('audio-start', function () {
-        micActive = false;
-        micBusy = false;
+      let loopOn = false;
+
+      function setMicOn() {
+        loopOn = true;
+        micBtn.textContent = '🔴';
+        micBtn.style.background = 'rgba(239,68,68,0.2)';
+        micBtn.style.borderColor = 'rgba(239,68,68,0.5)';
+        micBtn.title = 'Oprește microfonul';
+      }
+      function setMicOff() {
+        loopOn = false;
         micBtn.textContent = '🎙️';
         micBtn.style.background = '';
         micBtn.style.borderColor = '';
+        micBtn.title = 'Pornește microfonul';
+      }
+
+      micBtn.addEventListener('click', function () {
+        if (!window.KVoice) return;
+        unlockAudio();
+        if (!loopOn) {
+          const started = KVoice.startVoiceLoop();
+          if (started) setMicOn();
+        } else {
+          KVoice.stopVoiceLoop();
+          setMicOff();
+        }
+      });
+
+      // Listen to transcribed speech from the voice loop
+      window.addEventListener('voice-loop-message', async function (e) {
+        if (!e.detail || !e.detail.text) return;
+        const text = e.detail.text.trim();
+        if (!text) return;
+        _voiceInitiated = true;
+        hideWelcome();
+        KAvatar.setAttentive(true);
+        addMessage('user', text);
+        showThinking(true);
+        await sendToAI(text, window.KVoice ? KVoice.getLanguage() : 'ro');
+        // After AI finishes speaking, resume loop
+        if (window.KVoice && KVoice.isVoiceLoopActive()) {
+          KVoice.resumeVoiceLoop();
+        }
+      });
+
+      // If loop was force-stopped internally (e.g. mic denied), reset button
+      window.addEventListener('voice-loop-stopped', setMicOff);
+
+      // When AI starts speaking, don't restart loop until it finishes
+      window.addEventListener('audio-start', function () {
+        // loop resume handled by resumeVoiceLoop() which polls isSpeaking
       });
     })();
+
 
     // ─── Dismiss splash loading overlay ─────────────────────
     clearTimeout(splashTimer);

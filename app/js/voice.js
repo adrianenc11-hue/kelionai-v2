@@ -820,6 +820,77 @@
     { once: true }
   );
 
+  // ─── Full-Duplex Voice Loop ───────────────────────────────────
+  // Press mic → listens continuously. When user stops speaking →
+  // dispatches 'voice-loop-message' → AI responds → resumes listening.
+  // Press mic again → stopVoiceLoop() kills everything.
+  let _voiceLoopActive = false;
+  let _voiceLoopRec = null;
+
+  function _makeLoopRec() {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) return null;
+    const rec = new SR();
+    rec.continuous = false;
+    rec.interimResults = false;
+    rec.lang = detectedLanguage === 'ro' ? 'ro-RO' : detectedLanguage === 'en' ? 'en-US' : detectedLanguage;
+    rec.onresult = function (ev) {
+      if (!_voiceLoopActive) return;
+      const txt = ev.results[0][0].transcript.trim();
+      if (txt.length < 2) { _loopListen(); return; }
+      console.log('[Voice] Loop captured:', txt);
+      window.dispatchEvent(new CustomEvent('voice-loop-message', { detail: { text: txt } }));
+      // app.js will call resumeVoiceLoop() after AI finishes speaking
+    };
+    rec.onend = function () {
+      if (_voiceLoopActive && !isSpeaking) setTimeout(_loopListen, 300);
+    };
+    rec.onerror = function (e) {
+      if (!_voiceLoopActive) return;
+      if (e.error === 'not-allowed') { stopVoiceLoop(); return; }
+      setTimeout(_loopListen, 800);
+    };
+    return rec;
+  }
+
+  function _loopListen() {
+    if (!_voiceLoopActive || isSpeaking) return;
+    try {
+      if (_voiceLoopRec) { try { _voiceLoopRec.stop(); } catch (_e) {/* ok */} }
+      _voiceLoopRec = _makeLoopRec();
+      if (_voiceLoopRec) _voiceLoopRec.start();
+    } catch (_e) { setTimeout(_loopListen, 500); }
+  }
+
+  function startVoiceLoop() {
+    if (!( window.SpeechRecognition || window.webkitSpeechRecognition)) return false;
+    if (_voiceLoopActive) return true;
+    _voiceLoopActive = true;
+    _loopListen();
+    startMicMonitor();
+    console.log('[Voice] Full-duplex loop STARTED');
+    return true;
+  }
+
+  function stopVoiceLoop() {
+    _voiceLoopActive = false;
+    if (_voiceLoopRec) { try { _voiceLoopRec.stop(); } catch (_e) {/* ok */} _voiceLoopRec = null; }
+    console.log('[Voice] Full-duplex loop STOPPED');
+    window.dispatchEvent(new CustomEvent('voice-loop-stopped'));
+  }
+
+  function resumeVoiceLoop() {
+    if (!_voiceLoopActive) return;
+    // Wait for AI to finish speaking, then restart listening
+    if (isSpeaking) {
+      const check = setInterval(function () {
+        if (!isSpeaking) { clearInterval(check); _loopListen(); }
+      }, 200);
+    } else {
+      setTimeout(_loopListen, 300);
+    }
+  }
+
   window.KVoice = {
     speak,
     stopSpeaking,
@@ -834,11 +905,13 @@
     unmute,
     getAudioContext,
     startMicMonitor,
+    startVoiceLoop,
+    stopVoiceLoop,
+    resumeVoiceLoop,
     isRecording: () => isRecording,
     isSpeaking: () => isSpeaking,
+    isVoiceLoopActive: () => _voiceLoopActive,
     getLanguage: () => (window.i18n ? i18n.getLanguage() : detectedLanguage),
-    setLanguage: (l) => {
-      detectedLanguage = l;
-    },
+    setLanguage: (l) => { detectedLanguage = l; },
   };
 })();

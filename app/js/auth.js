@@ -171,10 +171,17 @@
   function updateAdminButtonState() {
     const adminBtn = document.getElementById('btn-admin');
     if (!adminBtn) return;
-    const isLoggedIn = !!currentUser;
-    const isAdminRole = isLoggedIn && currentUser.role === 'admin';
-    // Auto-unlock for admin users — no password needed
-    if (!isAdminRole) {
+    if (!currentUser) {
+      adminBtn.style.display = 'none';
+      return;
+    }
+    // Check role OR email match (ADMIN_EMAIL set on server)
+    const isAdminRole = currentUser.role === 'admin';
+    const isAdminEmail =
+      currentUser.email &&
+      window._adminEmail &&
+      currentUser.email.toLowerCase() === window._adminEmail.toLowerCase();
+    if (!isAdminRole && !isAdminEmail) {
       adminBtn.style.display = 'none';
       return;
     }
