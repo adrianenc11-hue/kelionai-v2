@@ -6,10 +6,10 @@ const { test, expect } = require("@playwright/test");
 let siteIsUp = true;
 
 test.beforeAll(async ({ request }) => {
-  const MAX_WAIT_MS  = 120_000; // 2 minute maxim
-  const RETRY_MS     = 5_000;   // incearca la fiecare 5 secunde
-  const start        = Date.now();
-  let attempts       = 0;
+  const MAX_WAIT_MS = 120_000; // 2 minute maxim
+  const RETRY_MS = 5_000;   // incearca la fiecare 5 secunde
+  const start = Date.now();
+  let attempts = 0;
 
   while (Date.now() - start < MAX_WAIT_MS) {
     attempts++;
@@ -1198,7 +1198,7 @@ test.describe.serial("Real User — Full Auth Flow", () => {
       localStorage.setItem("kelion_onboarded", "true");
     });
     await page.goto("/");
-    await page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
+    await page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => { });
     // Enter app as guest (auth flow tested separately via API)
     const guestBtn = page.locator("#auth-guest");
     if (await guestBtn.isVisible({ timeout: 10000 }).catch(() => false)) {
