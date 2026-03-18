@@ -7,7 +7,6 @@
     document.addEventListener('DOMContentLoaded', function () {
         var hamburger = document.getElementById('navbar-hamburger');
         var mobileMenu = document.getElementById('navbar-mobile-menu');
-        var getStartedBtn = document.getElementById('navbar-get-started');
         var langOptions = document.querySelectorAll('.lang-option');
         var langLabel = document.getElementById('navbar-lang-label');
 
@@ -20,18 +19,6 @@
             document.addEventListener('click', function (e) {
                 if (!hamburger.contains(e.target) && !mobileMenu.contains(e.target)) {
                     mobileMenu.classList.remove('open');
-                }
-            });
-        }
-
-        // Get Started button — shows auth screen
-        if (getStartedBtn) {
-            getStartedBtn.addEventListener('click', function () {
-                var authScreen = document.getElementById('auth-screen');
-                var appLayout = document.getElementById('app-layout');
-                if (authScreen && appLayout) {
-                    authScreen.classList.remove('hidden');
-                    appLayout.classList.add('hidden');
                 }
             });
         }
