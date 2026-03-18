@@ -317,3 +317,10 @@ const _MonitorManager = (function () {
         downloadAsZip: downloadAsZip
     };
 })();
+
+// ── Expune global pentru ca orice modul sa poata controla monitorul ──
+window.MonitorManager = _MonitorManager;
+window.showOnMonitor = function (content, type) {
+    if (_MonitorManager) _MonitorManager.show(content, type);
+};
+
