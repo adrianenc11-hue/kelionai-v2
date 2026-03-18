@@ -110,16 +110,18 @@
 
     // ═══ Init ═══
     function init() {
-        var pricingBtn = document.getElementById('btn-pricing') || document.getElementById('btn-subscriptions');
+        var pricingBtns = [document.getElementById('btn-pricing'), document.getElementById('btn-subscriptions')].filter(Boolean);
         var modal = document.getElementById('pricing-modal');
         var closeBtn = document.getElementById('pricing-close');
 
-        if (pricingBtn && modal) {
-            pricingBtn.addEventListener('click', function () {
-                modal.classList.remove('hidden');
-                renderPricing();
-            });
-        }
+        pricingBtns.forEach(function (btn) {
+            if (btn && modal) {
+                btn.addEventListener('click', function () {
+                    modal.classList.remove('hidden');
+                    renderPricing();
+                });
+            }
+        });
 
         if (closeBtn && modal) {
             closeBtn.addEventListener('click', function () {

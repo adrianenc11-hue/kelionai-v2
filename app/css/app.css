@@ -2075,7 +2075,6 @@ body {
   font-family: var(--kelion-font);
   font-weight: 600;
   transition: all 0.2s;
-  display: none;
 }
 
 #btn-auth {
