@@ -636,6 +636,49 @@
             }
           }, 3000);
         }
+        // ── [ACTION:xxx] — AI controlează funcțiile aplicației ──
+        const actionMatches = [...fullReply.matchAll(/\[ACTION:([^\]]+)\]/gi)];
+        actionMatches.forEach(function (am) {
+          const action = am[1].trim().toLowerCase();
+          if (action === 'camera_on') {
+            if (window.KAutoCamera && !KAutoCamera.isActive()) KAutoCamera.toggle();
+            const camBtn = document.getElementById('btn-camera-inline');
+            if (camBtn) { camBtn.style.borderColor = '#10B981'; camBtn.style.color = '#10B981'; camBtn.title = 'Camera ACTIVĂ'; }
+          } else if (action === 'camera_off') {
+            if (window.KAutoCamera && KAutoCamera.isActive()) KAutoCamera.stop();
+            const camBtn = document.getElementById('btn-camera-inline');
+            if (camBtn) { camBtn.style.borderColor = '#555'; camBtn.style.color = '#888'; camBtn.title = 'Camera ON/OFF'; }
+          } else if (action === 'translate_on') {
+            if (window.KTranslate && !KTranslate.isActive()) KTranslate.start();
+            const tBtn = document.getElementById('btn-translate-toggle');
+            if (tBtn) { tBtn.style.borderColor = '#6366f1'; tBtn.style.color = '#6366f1'; }
+          } else if (action === 'translate_off') {
+            if (window.KTranslate && KTranslate.isActive()) KTranslate.stop();
+            const tBtn = document.getElementById('btn-translate-toggle');
+            if (tBtn) { tBtn.style.borderColor = '#555'; tBtn.style.color = '#888'; }
+          } else if (action === 'scan_on') {
+            if (window.KScanner && !KScanner.isActive()) KScanner.start();
+          } else if (action === 'scan_off') {
+            if (window.KScanner && KScanner.isActive()) KScanner.stop();
+          } else if (action === 'monitor_clear') {
+            if (window.MonitorManager) MonitorManager.clear();
+          } else if (action === 'save_file') {
+            // Salvează ultimul răspuns AI ca fişier text
+            var saveBtn = document.getElementById('btn-save-last');
+            if (saveBtn) saveBtn.click();
+          } else if (action === 'copy_response') {
+            // Copiază ultimul răspuns AI
+            var copyBtn2 = document.getElementById('btn-copy-last');
+            if (copyBtn2) copyBtn2.click();
+          } else if (action === 'upload_file') {
+            // Deschide dialogul de upload fişier
+            var fi = document.getElementById('file-input-hidden');
+            if (fi) fi.click();
+          } else if (action.startsWith('navigate:')) {
+            const dest = am[1].replace(/^navigate:/i, '').trim();
+            if (dest && window.KMobile) KMobile.navigate(dest);
+          }
+        });
         // Strip all tags from display
         fullReply = fullReply
           .replace(/\[EMOTION:\s*\w+\]/gi, '')
@@ -643,6 +686,7 @@
           .replace(/\[BODY:\s*\w+\]/gi, '')
           .replace(/\[GAZE:\s*[\w-]+\]/gi, '')
           .replace(/\[POSE:\s*\w+\]/gi, '')
+          .replace(/\[ACTION:[^\]]+\]/gi, '')
           .replace(/\[MONITOR\][\s\S]*?\[\/MONITOR\]/gi, '')
           .trim();
       }
