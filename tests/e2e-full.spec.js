@@ -1199,6 +1199,8 @@ test.describe.serial("Real User — Full Auth Flow", () => {
   test("login in browser and chat as real user", async ({ page }) => {
     test.skip(!siteIsUp);
     await page.addInitScript(() => {
+      // Clear all storage to avoid stale Supabase sessions from previous runs
+      localStorage.clear();
       localStorage.setItem("kelion_onboarded", "true");
     });
     await page.goto("/");

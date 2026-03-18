@@ -95,15 +95,21 @@ router.post('/register', authLimiter, validate(registerSchema), async (req, res)
 // POST /api/auth/login
 router.post('/login', authLimiter, validate(loginSchema), async (req, res) => {
   try {
-    const { supabase } = req.app.locals;
     const { email, password } = req.body;
     if (!email || !password) return res.status(401).json({ error: 'Invalid login credentials' });
-    if (!supabase) return res.status(503).json({ error: 'Auth service unavailable' });
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
+
+    // Create a fresh Supabase client per request to avoid shared session state conflicts
+    const { createClient } = require('@supabase/supabase-js');
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
+    if (!supabaseUrl || !supabaseAnonKey) return res.status(503).json({ error: 'Auth service unavailable' });
+
+    const freshClient = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
     });
-    // Return 401 for ALL auth failures (invalid credentials, bad format, SQL injection etc.)
+
+    const { data, error } = await freshClient.auth.signInWithPassword({ email, password });
+    // Return 401 for ALL auth failures
     if (error) return res.status(401).json({ error: 'Invalid login credentials' });
     if (!data.user.email_confirmed_at) {
       return res.status(403).json({
