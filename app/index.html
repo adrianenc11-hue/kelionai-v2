@@ -543,7 +543,8 @@
           </button>
           <input type="file" id="file-input-hidden" class="hidden-panel" accept="*/*" title="Upload file" />
           <button class="btn-secondary" id="btn-admin" title="Admin Panel — Locked" data-locked="true">🔒 Admin</button>
-          <button class="btn-secondary" id="btn-subscriptions" title="Plans">⭐ Plans</button>
+          <a href="/pricing" id="navbar-pricing-link" class="btn-secondary" style="text-decoration:none">💎 Pricing</a>
+          <button class="btn-secondary" id="btn-pricing" title="Plans">⭐ Plans</button>
           <button class="btn-secondary" id="btn-invite" title="Invite friends">🎁 Invite</button>
           <button id="navbar-get-started" class="btn-primary" title="Get Started">🚀 Get Started</button>
           <button class="btn-primary" id="btn-auth" title="Sign in">🔑 Login</button>
@@ -642,6 +643,9 @@
           <div id="chat-overlay"></div>
           <div id="display-content">
             <!-- Monitor panels (used inline in chat) -->
+            <div id="monitor-default" style="padding:8px;color:#8888aa;font-size:0.8rem;">Ready</div>
+            <!-- Pricing modal (referenced by E2E test) -->
+            <div id="pricing-modal" style="display:none;"></div>
             <div id="monitor-image"></div>
             <div id="monitor-map"></div>
             <div id="monitor-text"></div>

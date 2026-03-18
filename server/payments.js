@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════════
 // KelionAI v2.3 — PAYMENTS (Stripe Subscriptions)
-// Plans: Free €0, Pro €9.99/mo, Premium €19.99/mo
+// Plans: Free €0, Pro €29/mo (€250/year), Premium €19.99/mo
 // ═══════════════════════════════════════════════════════════════
 const express = require("express");
 const logger = require("./logger");
@@ -253,7 +253,7 @@ router.get("/plans", (req, res) => {
     {
       id: "pro",
       name: "Pro",
-      price: 9.99,
+      price: 29,
       currency: "EUR",
       billing: "monthly",
       limits: PLAN_LIMITS.pro,
@@ -273,9 +273,9 @@ router.get("/plans", (req, res) => {
     {
       id: "pro_annual",
       name: "Pro",
-      price: 99.9,
-      monthlyEquivalent: 8.33,
-      savings: "Save €19.98/year",
+      price: 250,
+      monthlyEquivalent: 20.83,
+      savings: "Save €98/year",
       currency: "EUR",
       billing: "annual",
       limits: PLAN_LIMITS.pro,

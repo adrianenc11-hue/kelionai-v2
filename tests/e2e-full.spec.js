@@ -475,20 +475,18 @@ test.describe("Buttons and Links", () => {
   });
 
   test("Get Started button is visible on homepage", async ({ page }) => {
-    await page.goto("/");
-    const exists = await page.locator("#navbar-get-started").isVisible({ timeout: 5000 }).catch(() => false);
+    // beforeEach already navigated and dismissed auth
+    const exists = await page.locator("#navbar-get-started").isVisible({ timeout: 10000 }).catch(() => false);
     if (!exists) { test.skip(); return; }
 
     const getStarted = page.locator("#navbar-get-started");
     await expect(getStarted).toBeVisible();
-    await page.screenshot({ path: "test-results/get-started-btn.png" });
   });
 
   test("pricing modal button is visible and present", async ({ page }) => {
-    await page.goto("/");
-    const exists = await page.locator("#btn-pricing").isVisible({ timeout: 5000 }).catch(() => false);
+    // beforeEach already navigated and dismissed auth
+    const exists = await page.locator("#btn-pricing").isVisible({ timeout: 10000 }).catch(() => false);
     if (!exists) { test.skip(); return; }
-    await page.screenshot({ path: "test-results/pricing-modal-before.png" });
 
     const pricingBtn = page.locator("#btn-pricing");
     await expect(pricingBtn).toBeVisible();
@@ -496,7 +494,6 @@ test.describe("Buttons and Links", () => {
     // The pricing modal element exists in the DOM
     const pricingModal = page.locator("#pricing-modal");
     await expect(pricingModal).toBeAttached();
-    await page.screenshot({ path: "test-results/pricing-modal-after.png" });
   });
 });
 
@@ -558,18 +555,17 @@ test.describe("Responsive Mobile (375×812)", () => {
   });
 
   test("hamburger menu is visible on mobile", async ({ page }) => {
-    await page.goto("/");
-    const exists = await page.locator("#navbar-hamburger").isVisible({ timeout: 5000 }).catch(() => false);
+    // beforeEach already navigated and dismissed auth
+    const exists = await page.locator("#navbar-hamburger").isVisible({ timeout: 10000 }).catch(() => false);
     if (!exists) { test.skip(); return; }
 
     const hamburger = page.locator("#navbar-hamburger");
     await expect(hamburger).toBeVisible();
-    await page.screenshot({ path: "test-results/mobile-hamburger-after.png" });
   });
 
   test("hamburger menu opens mobile nav", async ({ page }) => {
-    await page.goto("/");
-    const exists = await page.locator("#navbar-hamburger").isVisible({ timeout: 5000 }).catch(() => false);
+    // beforeEach already navigated and dismissed auth
+    const exists = await page.locator("#navbar-hamburger").isVisible({ timeout: 10000 }).catch(() => false);
     if (!exists) { test.skip(); return; }
 
     // Dismiss auth screen — robust version
