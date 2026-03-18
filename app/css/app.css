@@ -723,8 +723,7 @@ body {
 }
 
 #display-content {
-  display: none;
-  /* Monitor panels hidden — content shows inline in chat */
+  display: flex;
   flex: 1;
   overflow-y: auto;
   padding: 24px;
@@ -733,6 +732,7 @@ body {
   justify-content: center;
   position: relative;
 }
+
 
 /* ── Monitor default/welcome ── */
 #monitor-default {

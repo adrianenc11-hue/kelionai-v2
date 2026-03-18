@@ -471,6 +471,15 @@
   async function init() {
     initUI();
 
+    // ── Fetch admin email from server (for admin button visibility) ──
+    try {
+      const cfgR = await fetch(API + '/api/config');
+      if (cfgR.ok) {
+        const cfg = await cfgR.json();
+        if (cfg.adminEmail) window._adminEmail = cfg.adminEmail;
+      }
+    } catch (_e) { /* non-blocking */ }
+
     // ── Handle Supabase email confirmation callback ──
     // When user clicks email link, Supabase redirects to: https://kelionai.app/#access_token=...&refresh_token=...&type=signup
     const hash = window.location.hash;

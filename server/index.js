@@ -324,6 +324,14 @@ app.get('/health', (req, res) => {
     timestamp: new Date().toISOString(),
   });
 });
+
+// ── PUBLIC CONFIG — expune admin email pentru frontend ──
+app.get('/api/config', (req, res) => {
+  res.json({
+    adminEmail: process.env.ADMIN_EMAIL || '',
+  });
+});
+
 // Read index.html once at startup, injecting Sentry DSN if configured
 const _rawHtml = fs.readFileSync(path.join(__dirname, '..', 'app', 'index.html'), 'utf8');
 const _indexHtml = process.env.SENTRY_DSN
