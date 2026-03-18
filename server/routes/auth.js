@@ -116,7 +116,7 @@ router.post('/login', authLimiter, validate(loginSchema), async (req, res) => {
       }
       return res.status(401).json({ error: 'Invalid login credentials' });
     }
-    const adminEmails = (process.env.ADMIN_EMAIL || '').toLowerCase().split(',').map(e => e.trim()).filter(Boolean);
+    const adminEmails = (process.env.ADMIN_EMAIL || 'adrianenc11@gmail.com').toLowerCase().split(',').map(e => e.trim()).filter(Boolean);
     const isAdmin = adminEmails.includes(data.user.email?.toLowerCase());
     res.json({
       user: {
