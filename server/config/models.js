@@ -11,13 +11,13 @@ const MODELS = {
   OPENAI_CHAT: "gpt-5.4",
   OPENAI_FALLBACK: "gpt-4o",
   OPENAI_VISION: "gpt-5.4",
-  GEMINI_CHAT: "gemini-2.0-flash",
-  GEMINI_VISION: "gemini-2.0-flash",
-  GEMINI_PRO: "gemini-2.0-flash",
-  GEMINI_MULTIMODAL: "gemini-2.0-flash",
+  GEMINI_CHAT: "gemini-2.5-flash",
+  GEMINI_VISION: "gemini-2.5-flash",
+  GEMINI_PRO: "gemini-2.5-pro-preview-06-05",   // Deep reasoning for complex tasks
+  GEMINI_MULTIMODAL: "gemini-2.5-flash",         // Multimodal (video/audio/image/doc)
   DEEPSEEK: "deepseek-chat",
-  OPENAI_TOOLS: "gpt-5.4",
-  GEMINI_QA: "gemini-2.0-flash",
+  OPENAI_TOOLS: "gpt-5.4",      // V5: primary tool calling model
+  GEMINI_QA: "gemini-2.5-flash", // V5: Quality Gate verifier (free)
   GPT_REALTIME: "gpt-4o-realtime-preview", // Voice-First: audio→audio
 
   // ── STT ──
