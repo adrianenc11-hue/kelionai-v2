@@ -1382,10 +1382,6 @@ if (require.main === module) {
   const { setupCollaboration } = require('./collaboration');
   setupCollaboration(server);
 
-  // ── Attach Voice Stream WebSocket (/api/voice-stream) ──
-  const { setupVoiceStream } = require('./routes/voice-stream');
-  setupVoiceStream(server, app.locals);
-
   setupGracefulShutdown(server);
 
   runMigration()
