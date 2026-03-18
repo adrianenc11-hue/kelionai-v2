@@ -1567,17 +1567,23 @@
       const micBtn = document.getElementById('btn-mic');
       if (!micBtn) return;
       let micActive = false;
+      let micBusy = false; // prevent double-clicks
       micBtn.addEventListener('click', async function () {
-        if (!window.KVoice) return;
+        if (!window.KVoice || micBusy) return;
+        micBusy = true;
         unlockAudio();
         if (!micActive) {
-          micActive = true;
-          micBtn.textContent = '🔴';
-          micBtn.style.background = 'rgba(239,68,68,0.2)';
-          micBtn.style.borderColor = 'rgba(239,68,68,0.5)';
-          micBtn.title = 'Stop recording';
-          KVoice.startListening();
+          // START recording
+          const started = await KVoice.startListening();
+          if (started) {
+            micActive = true;
+            micBtn.textContent = '🔴';
+            micBtn.style.background = 'rgba(239,68,68,0.2)';
+            micBtn.style.borderColor = 'rgba(239,68,68,0.5)';
+            micBtn.title = 'Stop recording';
+          }
         } else {
+          // STOP recording
           micActive = false;
           micBtn.textContent = '🎙️';
           micBtn.style.background = '';
@@ -1593,10 +1599,12 @@
             await sendToAI(text, window.KVoice ? KVoice.getLanguage() : 'ro');
           }
         }
+        micBusy = false;
       });
-      // Reset button when speaking starts
+      // Reset button when speaking starts (AI is responding)
       window.addEventListener('audio-start', function () {
         micActive = false;
+        micBusy = false;
         micBtn.textContent = '🎙️';
         micBtn.style.background = '';
         micBtn.style.borderColor = '';
