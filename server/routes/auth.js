@@ -149,12 +149,14 @@ router.get('/me', async (req, res) => {
     const { getUserFromToken } = req.app.locals;
     const u = await getUserFromToken(req);
     if (!u) return res.status(401).json({ error: 'Not authenticated' });
+    const adminEmails = (process.env.ADMIN_EMAIL || 'adrianenc11@gmail.com').toLowerCase().split(',').map(e => e.trim()).filter(Boolean);
+    const isAdmin = adminEmails.includes(u.email?.toLowerCase());
     res.json({
       user: {
         id: u.id,
         email: u.email,
         name: u.user_metadata?.full_name,
-        role: u.role || 'user',
+        role: isAdmin ? 'admin' : u.role || 'user',
       },
     });
   } catch {
