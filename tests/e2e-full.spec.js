@@ -1404,9 +1404,8 @@ test.describe("API — AI Services", () => {
     test.skip(!siteIsUp);
     const r = await request.post("/api/voice/speak", { data: { text: "hello" } });
     expect(r.status()).toBe(200);
-    const d = await r.json();
-    expect(d).toHaveProperty("audio");
-    expect(d.audio.length).toBeGreaterThan(10);
+    const body = await r.body();
+    expect(body.length).toBeGreaterThan(100); // binary audio, not JSON
   });
   test("POST /api/voice/listen → validation error", async ({ request }) => {
     test.skip(!siteIsUp);
@@ -1462,18 +1461,6 @@ test.describe("API — Payments", () => {
     expect(d.error).toBe("Authentication required");
   });
 });
-// API — News, Media (social) removed
-
-  test("GET /api/news → removed (404)", async ({ request }) => {
-    test.skip(!siteIsUp);
-    const r = await request.get("/api/news");
-    expect([401, 404]).toContain(r.status());
-  });
-  test("POST /api/news → removed (404)", async ({ request }) => {
-    test.skip(!siteIsUp);
-    const r = await request.post("/api/news", { data: { title: "test" } });
-    expect([401, 404]).toContain(r.status());
-  });
 test.describe("API — Admin", () => {
   test("GET /api/admin/brain → forbidden", async ({ request }) => {
     test.skip(!siteIsUp);

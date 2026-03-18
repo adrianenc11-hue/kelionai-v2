@@ -138,15 +138,18 @@ router.post("/speak", ttsLimiter, validate(speakSchema), async (req, res) => {
     let alignment = null;
     let ttsEngine = "ElevenLabs";
 
-    // ── TRY 1: ElevenLabs with timestamps (premium quality + lip sync alignment) ──
+    // ── TRY 1: ElevenLabs with timestamps (timeout 10s → fallback to OpenAI) ──
     if (process.env.ELEVENLABS_API_KEY) {
       try {
+        const el11Ctrl = new AbortController();
+        const el11Timer = setTimeout(() => el11Ctrl.abort(), 10000);
         const r = await fetch(
           "https://api.elevenlabs.io/v1/text-to-speech/" +
             vid +
             "/with-timestamps",
           {
             method: "POST",
+            signal: el11Ctrl.signal,
             headers: {
               "Content-Type": "application/json",
               "xi-api-key": process.env.ELEVENLABS_API_KEY,
@@ -158,49 +161,42 @@ router.post("/speak", ttsLimiter, validate(speakSchema), async (req, res) => {
             }),
           },
         );
+        clearTimeout(el11Timer);
         if (r.ok) {
           const data = await r.json();
-          // data = { audio_base64, alignment, normalized_alignment }
           if (data.audio_base64) {
             buf = Buffer.from(data.audio_base64, "base64");
             alignment = data.alignment || null;
             logger.info(
-              {
-                component: "Speak",
-                alignmentChars: alignment?.characters?.length || 0,
-              },
-              "ElevenLabs alignment received: " +
-                (alignment?.characters?.length || 0) +
-                " chars",
+              { component: "Speak", alignmentChars: alignment?.characters?.length || 0 },
+              "ElevenLabs OK: " + (alignment?.characters?.length || 0) + " chars",
             );
           }
         } else {
           const errBody = await r.text().catch(() => "");
           logger.warn(
-            {
-              component: "Speak",
-              status: r.status,
-              voiceId: vid,
-              error: errBody.substring(0, 200),
-            },
+            { component: "Speak", status: r.status, error: errBody.substring(0, 200) },
             "ElevenLabs TTS failed: " + r.status + " — trying OpenAI fallback",
           );
         }
       } catch (e) {
         logger.warn(
           { component: "Speak", err: e.message },
-          "ElevenLabs TTS error — trying OpenAI fallback",
+          "ElevenLabs TTS error (timeout?) — trying OpenAI fallback",
         );
       }
     }
 
-    // ── TRY 2: OpenAI TTS (fallback — no alignment available) ──
+    // ── TRY 2: OpenAI TTS fallback (timeout 12s) ──
     let openaiErr = "no OPENAI_API_KEY";
     if (!buf && process.env.OPENAI_API_KEY) {
       try {
+        const oaiCtrl = new AbortController();
+        const oaiTimer = setTimeout(() => oaiCtrl.abort(), 12000);
         const openaiVoice = avatar === "kira" ? "nova" : "onyx";
         const r2 = await fetch("https://api.openai.com/v1/audio/speech", {
           method: "POST",
+          signal: oaiCtrl.signal,
           headers: {
             "Content-Type": "application/json",
             Authorization: "Bearer " + process.env.OPENAI_API_KEY,
@@ -212,26 +208,18 @@ router.post("/speak", ttsLimiter, validate(speakSchema), async (req, res) => {
             response_format: "mp3",
           }),
         });
+        clearTimeout(oaiTimer);
         if (r2.ok) {
           buf = Buffer.from(await r2.arrayBuffer());
           ttsEngine = "OpenAI";
-          alignment = null; // OpenAI has no alignment data
+          alignment = null;
         } else {
-          openaiErr =
-            r2.status +
-            ": " +
-            (await r2.text().catch(() => "")).substring(0, 200);
-          logger.error(
-            { component: "Speak", status: r2.status, error: openaiErr },
-            "OpenAI TTS also failed: " + r2.status,
-          );
+          openaiErr = r2.status + ": " + (await r2.text().catch(() => "")).substring(0, 200);
+          logger.error({ component: "Speak", status: r2.status, error: openaiErr }, "OpenAI TTS failed: " + r2.status);
         }
       } catch (e) {
         openaiErr = e.message;
-        logger.error(
-          { component: "Speak", err: e.message },
-          "OpenAI TTS error",
-        );
+        logger.error({ component: "Speak", err: e.message }, "OpenAI TTS error");
       }
     }
 
