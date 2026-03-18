@@ -1544,8 +1544,8 @@ test.describe("API — Brain & Chat", () => {
     const r = await request.post("/api/chat", {
       data: { message: "", avatar: "kelion" },
     });
-    // Empty message should return 200 (server handles gracefully)
-    expect(r.status()).toBe(200);
+    // Empty message → 400 validation error (server requires message)
+    expect(r.status()).toBe(400);
   });
   test("GET /api/chat/stream SSE", async ({ request }) => {
     test.skip(!siteIsUp);
