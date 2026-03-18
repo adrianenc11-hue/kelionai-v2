@@ -504,10 +504,42 @@
                     showOnMonitor(evt.content, evt.monitorType || 'html');
                   } else if (evt.type === 'thinking') {
                     msgEl.innerHTML = '<span style="color:#6366f1;opacity:0.6">🧠 Thinking...</span>';
+                  } else if (evt.type === 'actions' && evt.actions) {
+                    // AI controlează funcțiile aplicației
+                    evt.actions.forEach(function(action) {
+                      const a = action.toLowerCase();
+                      if (a === 'camera_on' && window.KAutoCamera && !KAutoCamera.isActive()) KAutoCamera.toggle();
+                      else if (a === 'camera_off' && window.KAutoCamera && KAutoCamera.isActive()) KAutoCamera.stop();
+                      else if (a === 'translate_on' && window.KTranslate && !KTranslate.isActive()) KTranslate.start();
+                      else if (a === 'translate_off' && window.KTranslate && KTranslate.isActive()) KTranslate.stop();
+                      else if (a === 'scan_on' && window.KScanner && !KScanner.isActive()) KScanner.start();
+                      else if (a === 'monitor_clear' && window.MonitorManager) MonitorManager.show('default');
+                      else if (a.startsWith('navigate:')) { const dest = a.split(':')[1]; if (dest && window.KMobile) KMobile.navigate(dest); }
+                    });
                   } else if (evt.type === 'done') {
                     if (evt.conversationId) persistConvId(evt.conversationId);
+                    // ── Emotion ──
                     if (evt.emotion) KAvatar.setExpression(evt.emotion, 0.5);
-                  }
+                    // ── Gestures ──
+                    if (evt.gestures && evt.gestures.length > 0) {
+                      evt.gestures.forEach(function(g, i) { setTimeout(function() { KAvatar.playGesture(g); }, i * 800); });
+                    }
+                    // ── Body Actions ──
+                    if (evt.bodyActions && evt.bodyActions.length > 0 && KAvatar.playBodyAction) {
+                      evt.bodyActions.forEach(function(ba, i) { setTimeout(function() { KAvatar.playBodyAction(ba); }, i * 1500); });
+                    }
+                    // ── Pose ──
+                    if (evt.pose && KAvatar.setPose) KAvatar.setPose(evt.pose);
+                    // ── Gaze ──
+                    if (evt.gaze && KAvatar.setEyeGaze) {
+                      KAvatar.setEyeGaze(evt.gaze);
+                      setTimeout(function() { try { KAvatar.setEyeGaze('center'); } catch(_e){} }, 3000);
+                    }
+                    // ── Monitor ──
+                    if (evt.monitor && evt.monitor.content && window.showOnMonitor) {
+                      showOnMonitor(evt.monitor.content, evt.monitor.type || 'url');
+                    }
+                  } // end done
                 } catch (_pe) {
                   /* skip bad JSON */
                 }
