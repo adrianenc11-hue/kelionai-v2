@@ -120,7 +120,16 @@ router.post('/chat', chatLimiter, validate(chatSchema), async (req, res) => {
       audioBase64,
       geo,
     } = req.body;
-    if (!message) return res.status(400).json({ error: 'Message is required' });
+    if (!message?.trim()) {
+      return res.json({
+        reply: 'Bună! Cu ce te pot ajuta astăzi?',
+        emotion: 'happy',
+        engine: 'local',
+        language: req.body.language || 'ro',
+        thinkTime: 0,
+        totalTime: 0,
+      });
+    }
 
     // ═══ K1 MODE INTERCEPT — admin says "K1" to talk to brain directly ═══
     const isK1Admin = req.headers['x-admin-secret'] === process.env.ADMIN_SECRET_KEY;
