@@ -3,20 +3,21 @@
 const { defineConfig, devices } = require('@playwright/test');
 
 module.exports = defineConfig({
+  globalSetup: './tests/global-setup.js',
   testDir: './tests',
   timeout: 180000,
   expect: { timeout: 20000 },
-  fullyParallel: true,
+  fullyParallel: false,
   retries: 1,
-  workers: 5,
+  workers: 2,
   reporter: [['html', { open: 'never' }], ['list'], ['json', { outputFile: 'test-results/results.json' }]],
   outputDir: 'test-results/',
   use: {
     baseURL: process.env.BASE_URL || process.env.APP_URL || 'https://kelionai.app',
     actionTimeout: 20000,
     navigationTimeout: 120000,
-    screenshot: 'on',
-    video: 'on',
+    screenshot: 'only-on-failure',
+    video: 'retain-on-failure',
     trace: 'on-first-retry',
   },
   projects: [
@@ -25,7 +26,7 @@ module.exports = defineConfig({
       use: {
         ...devices['Desktop Chrome'],
         launchOptions: {
-          args: ['--use-gl=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist'],
+          args: ['--use-gl=swiftshader', '--disable-gpu'],
         },
         permissions: ['microphone'],
       },
