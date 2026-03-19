@@ -262,28 +262,31 @@ async function getRealtimeContext(message, brain, userId, geo) {
     } catch (_) { /* non-blocking */ }
   }
 
-  // ── Web Search (only if Serper key available) ──
-  const searchMatch = lower.match(/\b(?:caută|cauta|search|find|google|știri|stiri|news|ce\s+este|ce\s+e|cine\s+e|când\s+a|când\s+s-?a)\b/i);
-  if (searchMatch && process.env.SERPER_API_KEY) {
+  // ── Web Search (profesional — prin brain._search care are toate API-urile) ──
+  const searchMatch = lower.match(/\b(?:caută|cauta|search|find|google|știri|stiri|news|actualitate|ce\s+este|ce\s+e|cine\s+e|când\s+a|când\s+s-?a|istoricul|historia|def(?:in)?)\b/i);
+  if (searchMatch && brain && typeof brain._search === 'function') {
     try {
-      const sCtrl = new AbortController();
-      const sTimer = setTimeout(() => sCtrl.abort(), 5000);
-      const sR = await fetch('https://google.serper.dev/search', {
-        method: 'POST',
-        headers: { 'X-API-KEY': process.env.SERPER_API_KEY, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ q: message, num: 3, hl: 'ro', gl: 'ro' }),
-        signal: sCtrl.signal,
-      }).finally(() => clearTimeout(sTimer));
-      if (sR.ok) {
-        const sData = await sR.json();
-        const results = (sData.organic || []).slice(0, 3).map(r => `• ${r.title}: ${r.snippet}`).join('\n');
-        if (results) parts.push(`[REZULTATE CĂUTARE WEB REALE]\n${results}`);
+      // Extrage query relevant din mesaj (nu pasam mesajul intreg)
+      const searchQuery = message.replace(/^(?:caută|cauta|search|google)\s+/i, '').trim();
+      const searchResult = await Promise.race([
+        brain._search(searchQuery),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('search timeout')), 8000)),
+      ]);
+      if (searchResult && typeof searchResult === 'string' && searchResult.length > 20) {
+        parts.push(`[REZULTATE CĂUTARE WEB REALE]\n${searchResult.substring(0, 2000)}`);
+      } else if (searchResult && typeof searchResult === 'object') {
+        const txt = JSON.stringify(searchResult, null, 2).substring(0, 2000);
+        if (txt.length > 20) parts.push(`[REZULTATE CĂUTARE WEB REALE]\n${txt}`);
       }
-    } catch (_) { /* non-blocking */ }
+    } catch (_) {
+      // Search indisponibil — brain va informa userul
+      parts.push('[SEARCH INDISPONIBIL]\nNu pot accesa internetul în acest moment. Informează userul și oferă ce știi din cunoștințele proprii, marcând clar că nu sunt date actuale.');
+    }
   }
 
   return parts.length > 0 ? parts.join('\n\n') : null;
 }
+
 
 // ── Parse avatar commands from AI text response ──
 function parseAvatarCommands(text) {
