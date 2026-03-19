@@ -498,6 +498,7 @@
                     // Progressive display — show text as it arrives
                     msgEl.innerHTML = parseMarkdown(fullReply);
                     overlay.scrollTop = overlay.scrollHeight;
+                    _updateSubtitle('ai', fullReply);
                   } else if (evt.type === 'start') {
                     streamEngine = evt.engine || 'Gemini';
                   } else if (evt.type === 'monitor' && (evt.content || (evt.monitor && evt.monitor.content))) {
@@ -1016,9 +1017,20 @@
       while (chatMsgs.children.length > 50) chatMsgs.removeChild(chatMsgs.firstChild);
     }
   }
-  function _updateSubtitle(/* type, text */) {
-    // Disabled — messages already visible in chat overlay, subtitle caused duplicate display
-    return;
+  function _updateSubtitle(type, text) {
+    const el = document.getElementById('live-subtitle');
+    const speaker = document.getElementById('subtitle-speaker');
+    const txt = document.getElementById('subtitle-text');
+    if (!el || !speaker || !txt) return;
+    el.classList.remove('hidden-important');
+    el.style.display = '';
+    speaker.textContent = type === 'user' ? 'TU:' : 'KELION:';
+    const display = text.length > 120 ? '…' + text.slice(-120) : text;
+    txt.textContent = display;
+    if (window._subtitleTimer) clearTimeout(window._subtitleTimer);
+    window._subtitleTimer = setTimeout(function() {
+      el.classList.add('hidden-important');
+    }, 8000);
   }
   function showThinking(v) {
     document.getElementById('thinking').classList.toggle('active', v);
@@ -1154,6 +1166,7 @@
     hideWelcome();
     KAvatar.setAttentive(true);
     addMessage('user', text);
+    _updateSubtitle('user', text);
     showThinking(true);
     // Unlock AudioContext on text send — ensures voice plays without needing mic press
     if (window.KVoice && KVoice.ensureAudioUnlocked) KVoice.ensureAudioUnlocked();
