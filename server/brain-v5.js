@@ -239,12 +239,12 @@ async function callOpenAI(messages, systemPrompt, tools, model) {
 }
 
 
-// ── Claude (Anthropic) — fallback provider cu reasoning bun ──
+// ── Claude (Anthropic) — reasoning profund ──
 async function callClaude(prompt, systemPrompt, modelId) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured');
 
-  const model = modelId || MODELS.CLAUDE_FAST || 'claude-3-5-haiku-20241022';
+  const model = modelId || MODELS.CLAUDE || 'claude-opus-4-5';
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 20000);
 
@@ -276,6 +276,252 @@ async function callClaude(prompt, systemPrompt, modelId) {
     if (e.name === 'AbortError') throw new Error('Claude timeout (20s)');
     throw e;
   }
+}
+
+// ── DeepSeek — excelent la cod, matematică, logică ──
+async function callDeepSeek(prompt, systemPrompt) {
+  const apiKey = process.env.DEEPSEEK_API_KEY;
+  if (!apiKey) throw new Error('DEEPSEEK_API_KEY not configured');
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 20000);
+
+  try {
+    const r = await fetch('https://api.deepseek.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: MODELS.DEEPSEEK || 'deepseek-chat',
+        max_tokens: 2048,
+        temperature: 0.7,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: prompt },
+        ],
+      }),
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    if (!r.ok) {
+      const errText = await r.text().catch(() => 'unknown');
+      throw new Error(`DeepSeek ${r.status}: ${errText.substring(0, 200)}`);
+    }
+    const data = await r.json();
+    return data.choices?.[0]?.message?.content || '';
+  } catch (e) {
+    clearTimeout(timer);
+    if (e.name === 'AbortError') throw new Error('DeepSeek timeout (20s)');
+    throw e;
+  }
+}
+
+// ── Gemini Pro — raționament premium, documente lungi ──
+async function callGeminiPro(prompt, systemPrompt) {
+  const gKey = process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
+  if (!gKey) throw new Error('GOOGLE_AI_KEY not configured');
+
+  const model = MODELS.GEMINI_PRO || 'gemini-2.5-pro-preview-06-05';
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 30000);
+
+  try {
+    const r = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${gKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          systemInstruction: { parts: [{ text: systemPrompt }] },
+          generationConfig: { maxOutputTokens: 2048, temperature: 0.7 },
+        }),
+        signal: controller.signal,
+      }
+    );
+    clearTimeout(timer);
+    if (!r.ok) {
+      const errText = await r.text().catch(() => 'unknown');
+      throw new Error(`Gemini Pro ${r.status}: ${errText.substring(0, 200)}`);
+    }
+    const data = await r.json();
+    return (data.candidates?.[0]?.content?.parts || []).filter(p => p.text).map(p => p.text).join('') || '';
+  } catch (e) {
+    clearTimeout(timer);
+    if (e.name === 'AbortError') throw new Error('Gemini Pro timeout (30s)');
+    throw e;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SUPER THINK — AI Pipeline Colaborativ (Interconectare Reală)
+//
+// FLUX:
+// 1. GROQ (100ms) → Analizează cererea, face plan, identifică ce trebuie
+// 2. DeepSeek + Claude (paralel) → Fiecare vede planul Groq și adaugă
+//    - DeepSeek: calcule, cod, logică formală
+//    - Claude: raționament profund, nuanțe, analiză critică
+// 3. GPT-5.4 → Vede TOT (plan + contribuții) → Construiește răspunsul final
+//    cu tool calling dacă e nevoie (search, imagine, hartă)
+// 4. Gemini Pro → Verifică, corectează, validează răspunsul final
+// ═══════════════════════════════════════════════════════════════
+async function superThink(message, systemPrompt, history) {
+  logger.info({ component: 'SuperThink' }, '🧠🧠🧠 AI PIPELINE — Collaborative chain started');
+  const shortPrompt = systemPrompt.substring(0, 3000);
+  const pipeline = { steps: [], startTime: Date.now() };
+
+  // ═══ STEP 1: GROQ — Analiză ultra-rapidă (planificator) ═══
+  let groqPlan = null;
+  if (process.env.GROQ_API_KEY) {
+    try {
+      const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.GROQ_API_KEY}` },
+        body: JSON.stringify({
+          model: MODELS.GROQ_PRIMARY || 'llama-3.3-70b-versatile',
+          max_tokens: 500,
+          messages: [{ role: 'system', content: 'Ești un PLANIFICATOR AI. Analizezi cererea userului și faci un plan scurt.' },
+            { role: 'user', content: `Cerere user: "${message}"\n\nFă un plan SCURT (max 5 puncte):\n1. Ce tip de cerere e (informație, calcul, cod, analiză, creativitate)?\n2. Ce FAPTE concrete trebuie verificate?\n3. Ce CALCULE sau LOGICĂ trebuie aplicată?\n4. Ce NUANȚE sau PERSPECTIVE trebuie considerate?\n5. Ce FORMAT de răspuns ar fi ideal?\n\nRăspunde scurt, direct, în română.` }],
+        }),
+        signal: AbortSignal.timeout(5000),
+      });
+      if (r.ok) {
+        const d = await r.json();
+        groqPlan = d.choices?.[0]?.message?.content || null;
+        pipeline.steps.push({ ai: 'Groq', role: 'Planificator', ms: Date.now() - pipeline.startTime });
+      }
+    } catch (e) { logger.warn({ component: 'SuperThink' }, `Groq plan failed: ${e.message}`); }
+  }
+  if (!groqPlan) groqPlan = `Cerere: "${message}" — răspunde complet și precis.`;
+
+  logger.info({ component: 'SuperThink' }, `📋 Plan ready (${Date.now() - pipeline.startTime}ms)`);
+
+  // ═══ STEP 2: DeepSeek + Claude — lucrează ÎN PARALEL, fiecare vede planul ═══
+  const step2Start = Date.now();
+  const parallelTasks = [];
+  const parallelLabels = [];
+
+  // DeepSeek — specialist în calcule, cod, date
+  if (process.env.DEEPSEEK_API_KEY) {
+    parallelLabels.push('DeepSeek');
+    parallelTasks.push(
+      callDeepSeek(
+        `PLANUL ECHIPEI:\n${groqPlan}\n\nCEREREA ORIGINALĂ: "${message}"\n\nTu ești SPECIALIST în calcule, cod, date concrete și logică. Contribuie cu:\n- Calcule exacte dacă sunt necesare\n- Cod sau pseudocod dacă e relevant\n- Date verificabile, cifre concrete\n- Logica formală a problemei\nFii SCURT (max 300 cuvinte). Doar contribuția ta unică.`,
+        shortPrompt
+      ).catch(e => `[DeepSeek indisponibil: ${e.message}]`)
+    );
+  }
+
+  // Claude — specialist în raționament profund
+  if (process.env.ANTHROPIC_API_KEY) {
+    parallelLabels.push('Claude');
+    parallelTasks.push(
+      callClaude(
+        `PLANUL ECHIPEI:\n${groqPlan}\n\nCEREREA ORIGINALĂ: "${message}"\n\nTu ești SPECIALIST în raționament profund, nuanțe și analiză critică. Contribuie cu:\n- Perspectiva critică — ce ar putea fi greșit?\n- Nuanțe importante pe care alții le-ar rata\n- Context mai larg, implicații\n- Analogii și explicații clare\nFii SCURT (max 300 cuvinte). Doar contribuția ta unică.`,
+        shortPrompt,
+        MODELS.CLAUDE
+      ).catch(e => `[Claude indisponibil: ${e.message}]`)
+    );
+  }
+
+  const parallelResults = await Promise.allSettled(parallelTasks);
+  const contributions = {};
+  parallelResults.forEach((r, i) => {
+    contributions[parallelLabels[i]] = r.status === 'fulfilled'
+      ? (typeof r.value === 'string' ? r.value : String(r.value)).substring(0, 1500)
+      : `[${parallelLabels[i]} failed]`;
+  });
+  pipeline.steps.push({ ai: parallelLabels.join('+'), role: 'Specialiști', ms: Date.now() - step2Start });
+
+  logger.info({ component: 'SuperThink' }, `🔬 Specialists done (${Date.now() - step2Start}ms): ${parallelLabels.join(', ')}`);
+
+  // ═══ STEP 3: GPT-5.4 — Constructorul final (vede TOTUL) ═══
+  let finalResponse = null;
+  const step3Start = Date.now();
+
+  const contributionsText = Object.entries(contributions)
+    .map(([name, text]) => `\n[CONTRIBUȚIE ${name}]\n${text}`)
+    .join('\n');
+
+  if (process.env.OPENAI_API_KEY) {
+    try {
+      const r = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
+        body: JSON.stringify({
+          model: MODELS.OPENAI_CHAT || 'gpt-5.4',
+          max_tokens: 2048,
+          messages: [
+            { role: 'system', content: shortPrompt },
+            { role: 'user', content: `${message}\n\n---\n[CONTEXT INTERN — INVIZIBIL PENTRU USER]\nEchipa ta de AI a analizat deja cererea:\n\n[PLAN]\n${groqPlan}\n${contributionsText}\n\nCONSTRUIEȘTE răspunsul final bazat pe TOATE contribuțiile de mai sus.\n- Integrează ce e MAI BUN din fiecare contribuție\n- NU menționa că ai primit ajutor de la alte AI-uri\n- Răspunsul trebuie să pară natural, ca și cum ai gândit TU totul\n- Adaugă [EMOTION:xxx] [GESTURE:xxx] la final\n- Dacă trebuie tool-uri (search, imagine) — folosește-le normal` },
+          ],
+        }),
+        signal: AbortSignal.timeout(20000),
+      });
+      if (r.ok) {
+        const d = await r.json();
+        finalResponse = d.choices?.[0]?.message?.content || null;
+        pipeline.steps.push({ ai: 'GPT-5.4', role: 'Constructor', ms: Date.now() - step3Start });
+      }
+    } catch (e) { logger.warn({ component: 'SuperThink' }, `GPT final failed: ${e.message}`); }
+  }
+
+  // Fallback dacă GPT fail — Gemini Flash
+  if (!finalResponse) {
+    try {
+      finalResponse = await callGeminiWithSearch(
+        `${message}\n\n[CONTEXT INTERN]\n[PLAN] ${groqPlan}\n${contributionsText}\n\nConstruiește răspunsul final integrând contribuțiile. NU menționa sursa.`,
+        shortPrompt, history
+      ).then(r => r.text);
+    } catch (_) { /* will use contributions directly */ }
+  }
+
+  if (!finalResponse) {
+    // Last resort — combină contribuțiile direct
+    finalResponse = Object.values(contributions).filter(v => !v.startsWith('[')).join('\n\n') || groqPlan;
+  }
+
+  // ═══ STEP 4: Gemini Pro — Validare finală (opțional, rapid) ═══
+  const gKey = process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
+  if (gKey && finalResponse.length > 100) {
+    const step4Start = Date.now();
+    try {
+      const r = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${MODELS.GEMINI_PRO || 'gemini-2.5-pro-preview-06-05'}:generateContent?key=${gKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ role: 'user', parts: [{ text: `VERIFICĂ acest răspuns AI pentru erori factuale sau logice. Dacă e CORECT, returnează EXACT textul original fără modificări. Dacă găsești ERORI, corectează-le păstrând stilul.\n\nÎntrebarea: "${message}"\n\nRăspunsul de verificat:\n${finalResponse.substring(0, 3000)}` }] }],
+            generationConfig: { maxOutputTokens: 2048, temperature: 0.3 },
+          }),
+          signal: AbortSignal.timeout(15000),
+        }
+      );
+      if (r.ok) {
+        const d = await r.json();
+        const validated = (d.candidates?.[0]?.content?.parts || []).map(p => p.text).join('');
+        if (validated && validated.length > 50) {
+          finalResponse = validated;
+          pipeline.steps.push({ ai: 'Gemini Pro', role: 'Validator', ms: Date.now() - step4Start });
+        }
+      }
+    } catch (_) { /* keep original response */ }
+  }
+
+  const totalMs = Date.now() - pipeline.startTime;
+  logger.info({ component: 'SuperThink', totalMs, steps: pipeline.steps.length },
+    `🧠✅ PIPELINE COMPLETE (${totalMs}ms) — ${pipeline.steps.map(s => s.ai).join(' → ')}`);
+
+  return {
+    text: finalResponse,
+    engine: 'super-think-pipeline',
+    pipeline: pipeline.steps,
+    totalMs,
+    providers: pipeline.steps.map(s => s.ai),
+  };
 }
 
 
@@ -746,7 +992,38 @@ CRITICAL: NEVER write tool calls as text in your response (e.g. do NOT write [re
       return await thinkV4(brain, message, avatar, history || [], language, userId, conversationId, mediaData, isAdmin);
     }
 
-
+    // ═══ SUPER THINK — AI Council pentru cereri complexe ═══
+    // Activează pipeline-ul colaborativ: Groq→DeepSeek+Claude→GPT→Gemini Pro
+    const isDeepQuestion = intent === 'deep_reasoning' || (message.split(/\s+/).length > 20 && message.includes('?'));
+    if (isDeepQuestion) {
+      try {
+        logger.info({ component: 'BrainV5' }, '🧠 Routing to SUPER THINK pipeline');
+        const superResult = await superThink(message, systemPrompt, history);
+        if (superResult?.text) {
+          const parsed = parseAvatarCommands(superResult.text);
+          const cleanReply = stripLeakedTags(parsed.cleanText || superResult.text);
+          // Learn from conversation
+          if (brain.learnFromConversation) {
+            brain.learnFromConversation(userId, message, cleanReply).catch(() => {});
+          }
+          return {
+            reply: cleanReply,
+            engine: superResult.engine,
+            pipeline: superResult.pipeline,
+            providers: superResult.providers,
+            emotion: parsed.emotion,
+            gestures: parsed.gestures,
+            bodyActions: parsed.bodyActions,
+            gaze: parsed.gaze,
+            actions: parsed.actions,
+            monitor: parsed.monitor?.content ? parsed.monitor : null,
+          };
+        }
+      } catch (e) {
+        logger.warn({ component: 'BrainV5', err: e.message }, '⚠️ SuperThink failed, falling back to normal flow');
+        // Fall through to normal GPT flow
+      }
+    }
 
     // ── 7. Prepare state ──
     const recentHistory = (history || []).slice(-20);
