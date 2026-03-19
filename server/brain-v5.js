@@ -194,7 +194,47 @@ async function callOpenAI(messages, systemPrompt, tools, model) {
 }
 
 
+// ── Claude (Anthropic) — fallback provider cu reasoning bun ──
+async function callClaude(prompt, systemPrompt, modelId) {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured');
+
+  const model = modelId || MODELS.CLAUDE_FAST || 'claude-3-5-haiku-20241022';
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 20000);
+
+  try {
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: 2048,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    if (!r.ok) {
+      const errText = await r.text().catch(() => 'unknown');
+      throw new Error(`Claude API ${r.status}: ${errText.substring(0, 200)}`);
+    }
+    const data = await r.json();
+    return data.content?.filter(c => c.type === 'text').map(c => c.text).join('') || '';
+  } catch (e) {
+    clearTimeout(timeoutId);
+    if (e.name === 'AbortError') throw new Error('Claude timeout (20s)');
+    throw e;
+  }
+}
+
 // ── Quality Gate: Gemini Flash verifies critical GPT-5.4 responses ──
+
 
 // ═══════════════════════════════════════════════════════════════
 // PRE-FETCH Real-time data (weather/search) BEFORE calling AI
@@ -890,8 +930,40 @@ async function thinkV5(
       const { thinkV4 } = require("./brain-v4");
       return await thinkV4(brain, message, avatar, history, language, userId, conversationId, mediaData, isAdmin);
     } catch (e2) {
-      logger.info({ component: "BrainV5" }, "⚠️ V4 failed, falling back to V3");
+      logger.info({ component: "BrainV5" }, "⚠️ V4 failed, trying Claude...");
+      // Try Claude (Anthropic) before falling back to V3
       try {
+        const claudeReply = await callClaude(
+          message,
+          `You are ${avatar === 'kira' ? 'Kira' : 'Kelion'}, an AI assistant created by EA Studio. Respond in ${language}. Be helpful, natural and concise.`,
+        );
+        if (claudeReply) {
+          return {
+            enrichedMessage: claudeReply,
+            enrichedContext: claudeReply,
+            toolsUsed: [],
+            monitor: { content: null, type: null },
+            emotion: 'neutral',
+            gestures: [],
+            bodyActions: [],
+            gaze: null,
+            actions: [],
+            analysis: { complexity: 'simple', language: language || 'ro' },
+            chainOfThought: null,
+            compressedHistory: (history || []).slice(-10),
+            failedTools: [],
+            thinkTime: Date.now() - startTime,
+            confidence: 0.7,
+            sourceTags: ['ASSUMPTION'],
+            agent: 'v5-claude-fallback',
+            profileLoaded: false,
+          };
+        }
+      } catch (eClaude) {
+        logger.info({ component: "BrainV5", err: eClaude.message }, "⚠️ Claude failed, falling back to V3");
+      }
+      try {
+
         return await brain.think(message, avatar, history, language, userId, conversationId, mediaData, isAdmin);
       } catch (e3) {
         return {

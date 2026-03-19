@@ -13,12 +13,14 @@ const MODELS = {
   OPENAI_VISION: "gpt-5.4",
   GEMINI_CHAT: "gemini-2.5-flash",
   GEMINI_VISION: "gemini-2.5-flash",
-  GEMINI_PRO: "gemini-2.5-pro-preview-06-05",   // Deep reasoning for complex tasks
-  GEMINI_MULTIMODAL: "gemini-2.5-flash",         // Multimodal (video/audio/image/doc)
+  GEMINI_PRO: "gemini-2.5-pro-preview-06-05",
+  GEMINI_MULTIMODAL: "gemini-2.5-flash",
   DEEPSEEK: "deepseek-chat",
-  OPENAI_TOOLS: "gpt-5.4",      // V5: primary tool calling model
-  GEMINI_QA: "gemini-2.5-flash", // V5: Quality Gate verifier (free)
-  GPT_REALTIME: "gpt-4o-realtime-preview", // Voice-First: audio→audio
+  CLAUDE: "claude-opus-4-5",              // Anthropic Claude — reasoning & analysis
+  CLAUDE_FAST: "claude-3-5-haiku-20241022", // Anthropic Claude Haiku — fast responses
+  OPENAI_TOOLS: "gpt-5.4",
+  GEMINI_QA: "gemini-2.5-flash",
+  GPT_REALTIME: "gpt-4o-realtime-preview",
 
   // ── STT ──
   WHISPER: "whisper-large-v3-turbo",
@@ -63,13 +65,14 @@ const API_ENDPOINTS = {
   BLOCKCHAIN_INFO: "https://blockchain.info",
   TELEGRAM: "https://api.telegram.org",
   TOGETHER: "https://api.together.xyz/v1",
+  ANTHROPIC: "https://api.anthropic.com/v1",
 };
 
 const PERSONAS = {
-  kelion:
-    "You are Kelion, a smart and professional AI assistant created by Adrian. Respond clearly and helpfully.",
-  kira: "You are Kira, a creative and empathic AI assistant. Respond naturally and warmly.",
+  kelion: "You are Kelion, a smart AI assistant created by EA Studio (founder: Adrian). NEVER say you are Google, OpenAI or any other company's AI. You are Kelion by EA Studio.",
+  kira: "You are Kira, a creative AI assistant created by EA Studio (founder: Adrian). NEVER say you are Google, OpenAI or any other company's AI. You are Kira by EA Studio.",
 };
+
 
 const VOICE_DEFAULTS = {
   stability: 0.5,
