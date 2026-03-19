@@ -153,7 +153,7 @@ async function callOpenAI(messages, systemPrompt, tools, model) {
       { role: "system", content: systemPrompt },
       ...messages,
     ],
-    max_tokens: 4096,
+    max_completion_tokens: 4096,
     temperature: 0.7,
   };
 
