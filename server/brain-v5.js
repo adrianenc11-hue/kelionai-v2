@@ -258,10 +258,9 @@ async function callGeminiWithSearch(message, systemPrompt, history, opts = {}) {
   if (!gKey) throw new Error('GOOGLE_AI_KEY not configured');
 
   const enableSearch = opts.enableSearch === true;
-  // gemini-2.5-flash-preview suporta grounding; pentru chat fara search folosim modelul standard
-  const model = enableSearch
-    ? (MODELS.GEMINI_PRO || 'gemini-2.5-flash-preview-04-17')
-    : (MODELS.GEMINI_CHAT || 'gemini-2.5-flash');
+  // gemini-2.0-flash suporta search grounding; pentru chat fara search folosim gemini-2.5-flash
+  const model = enableSearch ? 'gemini-2.0-flash' : (MODELS.GEMINI_CHAT || 'gemini-2.5-flash');
+
 
   const contents = [
     ...(history || []).slice(-10).map(h => ({
@@ -977,9 +976,10 @@ async function thinkV5(
     const monitorFinal = avatarCmds.monitor?.content ? avatarCmds.monitor : monitorFromTools;
 
     logger.info(
-      { component: "BrainV5", engine, tools: toolsUsed, thinkTime, tokens: totalTokens, complexity },
-      `🧠 V5 Think: ${engine} | ${toolsUsed.length} tools | ${thinkTime}ms | ${totalTokens} tokens`,
+      { component: "BrainV5", engine, tools: toolsUsed, thinkTime, tokens: totalTokens, intent },
+      `🧠 V5 Think: ${engine} | intent:${intent} | ${toolsUsed.length} tools | ${thinkTime}ms | ${totalTokens} tokens`,
     );
+
 
     return {
       enrichedMessage: avatarCmds.cleanText || finalResponse,
@@ -1022,13 +1022,10 @@ async function thinkV5(
     // Re-run getRealtimeContext so V4 fallback also has current data (weather/search)
     let fallbackRealtimeCtx = null;
     try { fallbackRealtimeCtx = await getRealtimeContext(message, brain, userId, mediaData?.geo); } catch (_) {}
-    // Inject realtime context into history so V4 Gemini sees it as "known context"
-    const historyWithCtx = fallbackRealtimeCtx
-      ? [...(history || []), { role: 'model', parts: [{ text: `[DATE REALE DISPONIBILE]\n${fallbackRealtimeCtx}` }] }]
-      : (history || []);
+    // Paseaza history curat la V4 (historyWithCtx cu model turn cauzea Gemini 400)
     try {
       const { thinkV4 } = require("./brain-v4");
-      return await thinkV4(brain, message, avatar, historyWithCtx, language, userId, conversationId, mediaData, isAdmin);
+      return await thinkV4(brain, message, avatar, history || [], language, userId, conversationId, mediaData, isAdmin);
 
     } catch (e2) {
       logger.info({ component: "BrainV5" }, "⚠️ V4 failed, trying Claude...");
