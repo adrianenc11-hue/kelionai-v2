@@ -638,7 +638,7 @@ async function thinkV5(
     // Weather + Tool use: delegare directă la V4 cu tool calling
     // V4 generează monitor cards HTML (carduri vreme, hárți etc.)
     // V5 Gemini Search nu are acces la tools și nu poate genera monitor content
-    if (intent === 'tool_use' || intent === 'weather') {
+    if (intent === 'tool_use') {
       const { thinkV4 } = require('./brain-v4');
       return await thinkV4(brain, message, avatar, history || [], language, userId, conversationId, mediaData, isAdmin);
     }
@@ -659,6 +659,14 @@ async function thinkV5(
 
       // ═══ GPT-5.4 PATH — complex messages with tool calling ═══
       const openaiTools = toOpenAITools(TOOL_DEFINITIONS);
+
+      // Adauga instructiuni explicite pentru Tool Registry
+      const registryInstruction = `\n\n## TOOL REGISTRY — REGULA OBLIGATORIE
+Pentru ORICE cerere care necesita date in timp real, live, actuale (zbor, curs valutar, seism, stiri, trafic, sport LIVE, etc.):
+1. INTAI apeleaza recall_tool cu cuvinte cheie din cerere
+2. Daca gasesti un tool: apeleaza call_saved_tool cu parametrii necesari
+3. Daca recall_tool returneaza "not found": apeleaza discover_and_save_tool cu endpoint-ul API potrivit pe care il cunosti sau l-ai cautat
+Raspunde INTOTDEAUNA cu date reale din tool, nu din cunostinte proprii pentru date in timp real.`;
 
       // Build OpenAI message array
       const msgs = recentHistory.map((h) => ({
@@ -692,14 +700,16 @@ async function thinkV5(
 
       // Tool calling loop — MAX 2 rounds
       let currentMsgs = msgs;
+      const gptSystemPrompt = systemPrompt + registryInstruction;
 
       for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
         const response = await callOpenAI(
           currentMsgs,
-          systemPrompt,
+          gptSystemPrompt,
           round === 0 ? openaiTools : openaiTools, // Always provide tools
           mediaData.imageBase64 ? MODELS.OPENAI_VISION : MODELS.OPENAI_CHAT,
         );
+
 
         totalTokens += (response.usage?.total_tokens || 0);
         const choice = response.choices?.[0];
