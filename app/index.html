@@ -1119,6 +1119,86 @@
       );
     })();
   </script>
+
+  <!-- ═══ CONSOLIDATED BUTTON BINDING (SAFETY NET) ═══ -->
+  <script>
+    // Re-bind ALL buttons after everything is loaded — fixes timing issues
+    setTimeout(function () {
+      console.log('[ButtonBind] Binding all buttons...');
+
+      // ── Camera Button ──
+      var camBtn = document.getElementById('btn-camera-inline');
+      if (camBtn && window.KAutoCamera) {
+        // Remove old listeners by cloning
+        var newCam = camBtn.cloneNode(true);
+        camBtn.parentNode.replaceChild(newCam, camBtn);
+        newCam.addEventListener('click', async function () {
+          try {
+            var active = await KAutoCamera.toggle();
+            newCam.style.borderColor = active ? '#10B981' : '#555';
+            newCam.style.color = active ? '#10B981' : '#888';
+            newCam.style.boxShadow = active ? '0 0 10px rgba(16,185,129,0.4)' : '';
+            newCam.title = active ? 'Camera ACTIVĂ — Click pentru a opri' : 'Camera ON/OFF';
+          } catch (e) { console.warn('[ButtonBind] Camera error:', e); }
+        });
+        console.log('[ButtonBind] ✅ Camera bound');
+      }
+
+      // ── Translate Button ──
+      var tBtn = document.getElementById('btn-translate-toggle');
+      if (tBtn && window.KTranslate) {
+        var newT = tBtn.cloneNode(true);
+        tBtn.parentNode.replaceChild(newT, tBtn);
+        newT.addEventListener('click', function () {
+          try {
+            var active = KTranslate.toggle();
+            newT.style.borderColor = active ? '#6366F1' : '#555';
+            newT.style.color = active ? '#6366F1' : '#888';
+            newT.style.boxShadow = active ? '0 0 10px rgba(99,102,241,0.4)' : '';
+            newT.title = active ? 'Translate Mode: ON' : 'Translate Mode: OFF';
+          } catch (e) { console.warn('[ButtonBind] Translate error:', e); }
+        });
+        console.log('[ButtonBind] ✅ Translate bound');
+      }
+
+      // ── Scanner Button ──
+      var scanBtn = document.getElementById('btn-scan-toggle');
+      if (scanBtn && window.KScanner) {
+        var newScan = scanBtn.cloneNode(true);
+        scanBtn.parentNode.replaceChild(newScan, scanBtn);
+        newScan.addEventListener('click', function () {
+          try {
+            var active = KScanner.toggle();
+            newScan.style.borderColor = active ? '#F59E0B' : '#555';
+            newScan.style.color = active ? '#F59E0B' : '#888';
+            newScan.style.boxShadow = active ? '0 0 10px rgba(245,158,11,0.4)' : '';
+            newScan.title = active ? 'Scanner ON' : 'Product Scanner';
+          } catch (e) { console.warn('[ButtonBind] Scanner error:', e); }
+        });
+        console.log('[ButtonBind] ✅ Scanner bound');
+      }
+
+      // ── Admin Button (show for logged-in admin users) ──
+      var userBadge = document.getElementById('user-name');
+      if (userBadge && userBadge.textContent.trim() !== 'Guest') {
+        // User is logged in — check if admin
+        var navRight = userBadge.parentElement;
+        if (navRight && !document.getElementById('btn-admin-nav')) {
+          var adminBtn = document.createElement('button');
+          adminBtn.id = 'btn-admin-nav';
+          adminBtn.textContent = '⚙️ Admin';
+          adminBtn.style.cssText = 'cursor:pointer;border:1px solid rgba(99,102,241,0.5);background:rgba(99,102,241,0.15);border-radius:8px;padding:6px 12px;color:#c7d2fe;font-size:0.75rem;font-weight:600;transition:all 0.3s;';
+          adminBtn.addEventListener('click', function () {
+            window.location.href = '/admin';
+          });
+          navRight.insertBefore(adminBtn, userBadge);
+          console.log('[ButtonBind] ✅ Admin button created');
+        }
+      }
+
+      console.log('[ButtonBind] All buttons bound ✅');
+    }, 500);
+  </script>
 </body>
 
 </html>
