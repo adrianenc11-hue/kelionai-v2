@@ -1508,6 +1508,63 @@ const TOOL_DEFINITIONS = [
       required: ["filepath", "description", "original_code", "new_code"],
     },
   },
+  // ═══ HEADLESS BROWSER ═══════════════════════════════════════
+  {
+    name: "browse_page",
+    description: "Browse a real webpage with headless Puppeteer. Navigates to URL, can extract text content, take screenshots, or query CSS selectors. Use when you need to actually READ a web page, not just search.",
+    input_schema: {
+      type: "object",
+      properties: {
+        url: { type: "string", description: "Full URL to navigate to (https://...)" },
+        action: {
+          type: "string",
+          enum: ["extract_text", "screenshot", "query_selector", "extract_links"],
+          description: "What to do on the page",
+        },
+        selector: { type: "string", description: "CSS selector (only for query_selector action)" },
+        waitMs: { type: "number", description: "Wait time in ms after page load (default 2000, max 10000)" },
+      },
+      required: ["url", "action"],
+    },
+  },
+  // ═══ CODE SANDBOX ═══════════════════════════════════════════
+  {
+    name: "run_code_sandbox",
+    description: "Execute JavaScript code in a safe isolated sandbox. Use to test code, run calculations, validate logic, or demonstrate algorithms. Has access to Math, JSON, Date, Array, Object, String, Number, RegExp. No network, no filesystem, timeout 10s.",
+    input_schema: {
+      type: "object",
+      properties: {
+        code: { type: "string", description: "JavaScript code to execute" },
+        description: { type: "string", description: "What this code does (for logging)" },
+      },
+      required: ["code"],
+    },
+  },
+  // ═══ MULTI-TURN PLANNING ════════════════════════════════════
+  {
+    name: "task_plan",
+    description: "Manage persistent task plans that survive across messages. Use to break complex problems into steps, track progress, and maintain context across multi-turn conversations.",
+    input_schema: {
+      type: "object",
+      properties: {
+        action: {
+          type: "string",
+          enum: ["create", "update", "complete_step", "get_active", "list_all"],
+          description: "What to do with the task plan",
+        },
+        title: { type: "string", description: "Task title (for create)" },
+        steps: {
+          type: "array",
+          items: { type: "string" },
+          description: "List of steps (for create)",
+        },
+        plan_id: { type: "string", description: "Plan ID (for update/complete_step)" },
+        step_index: { type: "number", description: "Step index to mark complete (0-based)" },
+        notes: { type: "string", description: "Additional notes or context" },
+      },
+      required: ["action"],
+    },
+  },
 ];
 
 // ── Tool executor: maps tool names to brain methods ──
@@ -2878,6 +2935,189 @@ async function executeTool(brain, toolName, toolInput, userId) {
           message: `Proposed edit to ${filepath}: ${description}. Saved for admin review.`,
           proposal,
         };
+      }
+
+      // ═══ HEADLESS BROWSER (Puppeteer) ═══
+      case "browse_page": {
+        const puppeteer = require('puppeteer');
+        const pageUrl = (toolInput.url || '').trim();
+        if (!pageUrl.startsWith('http://') && !pageUrl.startsWith('https://')) {
+          return { error: 'URL must start with http:// or https://' };
+        }
+        // Block dangerous URLs
+        if (/localhost|127\.0\.0|192\.168|10\.\d|\.env|\.git/i.test(pageUrl)) {
+          return { error: 'Access denied: local/internal URLs not allowed' };
+        }
+        let browser;
+        try {
+          browser = await puppeteer.launch({
+            headless: 'new',
+            args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+            timeout: 15000,
+          });
+          const page = await browser.newPage();
+          await page.setUserAgent('KelionAI-Browser/1.0');
+          await page.setViewport({ width: 1280, height: 800 });
+          await page.goto(pageUrl, { waitUntil: 'domcontentloaded', timeout: 12000 });
+          const waitMs = Math.min(toolInput.waitMs || 2000, 10000);
+          await new Promise(r => setTimeout(r, waitMs));
+
+          let result = {};
+          const action = toolInput.action || 'extract_text';
+
+          if (action === 'extract_text') {
+            const text = await page.evaluate(() => {
+              // Remove scripts, styles, nav, footer
+              document.querySelectorAll('script,style,nav,footer,header,.cookie-banner').forEach(e => e.remove());
+              return document.body?.innerText || '';
+            });
+            result = { url: pageUrl, text: text.substring(0, 5000), chars: text.length };
+          } else if (action === 'screenshot') {
+            const buf = await page.screenshot({ type: 'jpeg', quality: 60, fullPage: false });
+            result = { url: pageUrl, screenshot_base64: buf.toString('base64').substring(0, 50000), format: 'jpeg' };
+          } else if (action === 'query_selector') {
+            const sel = toolInput.selector || 'body';
+            const elements = await page.evaluate((s) => {
+              const els = document.querySelectorAll(s);
+              return Array.from(els).slice(0, 20).map(e => ({
+                tag: e.tagName, text: (e.innerText || '').substring(0, 200),
+                href: e.href || null, src: e.src || null,
+              }));
+            }, sel);
+            result = { url: pageUrl, selector: sel, found: elements.length, elements };
+          } else if (action === 'extract_links') {
+            const links = await page.evaluate(() => {
+              return Array.from(document.querySelectorAll('a[href]')).slice(0, 50).map(a => ({
+                text: (a.innerText || '').trim().substring(0, 100), href: a.href,
+              }));
+            });
+            result = { url: pageUrl, links_count: links.length, links };
+          }
+
+          await browser.close();
+          logger.info({ component: 'Browse', url: pageUrl, action }, 'Page browsed successfully');
+          return result;
+        } catch (e) {
+          if (browser) try { await browser.close(); } catch (_) {}
+          return { error: `Browse failed: ${e.message}`, url: pageUrl };
+        }
+      }
+
+      // ═══ CODE SANDBOX (vm module) ═══
+      case "run_code_sandbox": {
+        const vm = require('vm');
+        const code = toolInput.code || '';
+        if (!code.trim()) return { error: 'No code provided' };
+        if (code.length > 10000) return { error: 'Code too long (max 10000 chars)' };
+
+        const logs = [];
+        const sandbox = {
+          console: { log: (...a) => logs.push(a.map(String).join(' ')), error: (...a) => logs.push('ERROR: ' + a.map(String).join(' ')), warn: (...a) => logs.push('WARN: ' + a.map(String).join(' ')) },
+          Math, JSON, Date, Array, Object, String, Number, RegExp, Boolean, Map, Set,
+          parseInt, parseFloat, isNaN, isFinite, encodeURIComponent, decodeURIComponent,
+          setTimeout: (fn, ms) => { if (ms > 5000) ms = 5000; return setTimeout(fn, ms); },
+          clearTimeout,
+          result: undefined,
+        };
+
+        try {
+          const script = new vm.Script(`result = (function() { ${code} })()`, { timeout: 10000 });
+          const ctx = vm.createContext(sandbox);
+          script.runInContext(ctx, { timeout: 10000 });
+
+          logger.info({ component: 'Sandbox', desc: toolInput.description }, 'Code executed');
+          return {
+            success: true,
+            result: sandbox.result !== undefined ? String(sandbox.result).substring(0, 5000) : null,
+            console_output: logs.slice(0, 100),
+            description: toolInput.description || 'Code execution',
+          };
+        } catch (e) {
+          return {
+            success: false,
+            error: e.message,
+            console_output: logs.slice(0, 50),
+          };
+        }
+      }
+
+      // ═══ MULTI-TURN TASK PLANNING ═══
+      case "task_plan": {
+        const action = toolInput.action;
+        if (!brain.supabase) return { error: 'Supabase not available for task planning' };
+
+        if (action === 'create') {
+          const steps = (toolInput.steps || []).map((s, i) => ({ index: i, text: s, done: false }));
+          const plan = {
+            title: toolInput.title || 'Untitled Plan',
+            steps,
+            status: 'active',
+            created_at: new Date().toISOString(),
+            notes: toolInput.notes || '',
+          };
+          const { data, error } = await brain.supabase.from('brain_memory').insert({
+            user_id: userId || null,
+            memory_type: 'task_plan',
+            content: `[PLAN] ${plan.title} (${steps.length} steps)`,
+            context: plan,
+            importance: 8,
+          }).select('id').single();
+          if (error) return { error: `Create failed: ${error.message}` };
+          return { success: true, plan_id: data?.id, plan };
+        }
+
+        if (action === 'complete_step') {
+          const { data, error } = await brain.supabase.from('brain_memory')
+            .select('id, context').eq('id', toolInput.plan_id).single();
+          if (error || !data) return { error: 'Plan not found' };
+          const plan = data.context;
+          const idx = toolInput.step_index;
+          if (plan.steps && plan.steps[idx]) {
+            plan.steps[idx].done = true;
+            plan.steps[idx].completed_at = new Date().toISOString();
+          }
+          if (toolInput.notes) plan.notes = (plan.notes || '') + '\n' + toolInput.notes;
+          const allDone = plan.steps?.every(s => s.done);
+          if (allDone) plan.status = 'completed';
+          await brain.supabase.from('brain_memory').update({ context: plan,
+            content: `[PLAN${allDone ? ' ✅' : ''}] ${plan.title} (${plan.steps.filter(s=>s.done).length}/${plan.steps.length} done)`,
+          }).eq('id', toolInput.plan_id);
+          return { success: true, plan, completed: allDone };
+        }
+
+        if (action === 'get_active') {
+          const { data } = await brain.supabase.from('brain_memory')
+            .select('id, content, context, created_at')
+            .eq('memory_type', 'task_plan')
+            .eq('user_id', userId || '')
+            .order('created_at', { ascending: false })
+            .limit(5);
+          const active = (data || []).filter(d => d.context?.status === 'active');
+          return { plans: active.map(p => ({ id: p.id, title: p.context?.title, steps: p.context?.steps, created: p.created_at })) };
+        }
+
+        if (action === 'list_all') {
+          const { data } = await brain.supabase.from('brain_memory')
+            .select('id, content, context, created_at')
+            .eq('memory_type', 'task_plan')
+            .order('created_at', { ascending: false })
+            .limit(20);
+          return { plans: (data || []).map(p => ({ id: p.id, title: p.context?.title, status: p.context?.status, steps_done: p.context?.steps?.filter(s=>s.done).length, steps_total: p.context?.steps?.length, created: p.created_at })) };
+        }
+
+        if (action === 'update') {
+          const { data, error } = await brain.supabase.from('brain_memory')
+            .select('id, context').eq('id', toolInput.plan_id).single();
+          if (error || !data) return { error: 'Plan not found' };
+          const plan = data.context;
+          if (toolInput.notes) plan.notes = (plan.notes || '') + '\n' + toolInput.notes;
+          if (toolInput.title) plan.title = toolInput.title;
+          if (toolInput.steps) plan.steps = toolInput.steps.map((s, i) => ({ index: i, text: s, done: plan.steps?.[i]?.done || false }));
+          await brain.supabase.from('brain_memory').update({ context: plan, content: `[PLAN] ${plan.title}` }).eq('id', toolInput.plan_id);
+          return { success: true, plan };
+        }
+
+        return { error: `Unknown task_plan action: ${action}` };
       }
 
       default:
