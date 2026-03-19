@@ -682,12 +682,12 @@ CRITICAL: NEVER write tool calls as text in your response (e.g. do NOT write [re
     logger.info({ component: "BrainV5", intent, domain }, `🧠 V5 intent: ${intent}`);
 
     // Weather + Tool use: delegare directă la V4 cu tool calling
-    // V4 generează monitor cards HTML (carduri vreme, hárți etc.)
-    // V5 Gemini Search nu are acces la tools și nu poate genera monitor content
-    if (intent === 'tool_use') {
+    // V4 doar pentru OBD/scanner/diagnostic specializat — restul (harta, ISS etc.) merge la GPT-5.4
+    if (intent === 'tool_use' && /\b(obd|diagnos|scanner|barcode|qr|osciloscop)\b/i.test(message)) {
       const { thinkV4 } = require('./brain-v4');
       return await thinkV4(brain, message, avatar, history || [], language, userId, conversationId, mediaData, isAdmin);
     }
+
 
 
     // ── 7. Prepare state ──
@@ -705,7 +705,8 @@ CRITICAL: NEVER write tool calls as text in your response (e.g. do NOT write [re
 
 
     // ── 8a. GPT-5.4 PRIMAR — pentru toate intentiile ──────────────────────────
-    const shouldTryGPT = process.env.OPENAI_API_KEY && intent !== 'weather' && intent !== 'tool_use';
+    const shouldTryGPT = process.env.OPENAI_API_KEY && intent !== 'tool_use';
+
     if (shouldTryGPT) {
 
       // ═══ Programatic Tool Registry check — inainte de GPT ═══
