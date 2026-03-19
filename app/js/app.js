@@ -796,14 +796,8 @@
           const lng2 = parseFloat(coordMatch2[3]);
           if (!isNaN(lat2) && !isNaN(lng2) && window.MonitorManager) MonitorManager.showMap(lat2, lng2);
         } else {
-          // Auto-display markdown DOAR dacă nu există deja conținut pe monitor (imagine/html)
-          const monitorImage = document.getElementById('monitor-image');
-          const monitorHasContent = monitorImage && monitorImage.style.display !== 'none';
-          if (!monitorHasContent && window.MonitorManager && fullReply) {
-            const hasStructure = /^[\-\*\d]\s|^#{1,3}\s|\*\*|```|\n\n/m.test(fullReply);
-            const isLong = fullReply.length > 80;
-            if (hasStructure || isLong) MonitorManager.showMarkdown(fullReply);
-          }
+          // NO text on monitor — text goes ONLY to subtitle under avatar
+          // Monitor is only for visual content (maps, images, charts)
         }
       }
 

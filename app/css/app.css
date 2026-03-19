@@ -271,7 +271,11 @@ body {
 }
 
 #chat-overlay {
-  display: none; /* Text scos de pe monitor — merge doar sub avatar */
+  display: none !important; /* Text scos de pe monitor — merge doar sub avatar */
+  height: 0 !important;
+  overflow: hidden !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
 }
 
 #thinking {
