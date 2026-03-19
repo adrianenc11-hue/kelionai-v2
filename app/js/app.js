@@ -1720,19 +1720,24 @@
     clearTimeout(splashTimer);
     dismissSplash();
 
-    // ─── Admin button — always clickable ─────────
+    // ─── Admin button — visible ONLY for admin ─────────
     (function() {
       var un = document.getElementById('user-name');
       if (!un) return;
       var savedSecret = sessionStorage.getItem('kelion_admin_secret');
       if (savedSecret) {
+        // Admin: show green styled clickable button
         un.style.cssText = 'cursor:pointer;border:1px solid rgba(16,185,129,0.5);background:linear-gradient(180deg,rgba(16,185,129,0.2),rgba(16,185,129,0.05));border-radius:8px;color:#34d399;padding:6px 14px;font:inherit;font-weight:600;transition:all 0.3s;box-shadow:0 2px 4px rgba(0,0,0,0.3),inset 0 1px 0 rgba(255,255,255,0.1);';
         un.title = 'Admin Dashboard — Unlocked';
+        un.onclick = function () {
+          window.open('/admin/k1-dashboard.html?secret=' + encodeURIComponent(savedSecret), '_blank');
+        };
+      } else {
+        // Guest: just show status text, no admin access, no click
+        un.style.cursor = 'default';
+        un.onclick = null;
+        un.title = 'Status';
       }
-      un.onclick = function () {
-        var s = sessionStorage.getItem('kelion_admin_secret') || '';
-        window.open('/admin/k1-dashboard.html' + (s ? '?secret=' + encodeURIComponent(s) : ''), '_blank');
-      };
     })();
 
     console.log('[App] ✅ KelionAI v2.3 — STREAMING + HISTORY');
