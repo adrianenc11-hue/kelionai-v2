@@ -19,10 +19,10 @@
     var COARTIC_BLEND = 0.15;    // 15% blend from previous shape
     var ASYMMETRY_OFFSET = 0.02; // left side leads slightly
 
-    // ── Clamp constants — REALISTIC visible mouth movement ──
-    var MAX_JAW = 0.35;
-    var MAX_VOWEL = 0.50;
-    var MAX_VISEME = 0.55;
+    // ── Clamp constants — SUBTLE mouth movement (matches FFT engine) ──
+    var MAX_JAW = 0.18;
+    var MAX_VOWEL = 0.25;
+    var MAX_VISEME = 0.28;
 
     // ── Character → Phoneme class mapping ──
     // Groups: V_OPEN, V_MID, V_CLOSE, V_ROUND, V_TIGHT, C_BILABIAL, C_LABIO,
