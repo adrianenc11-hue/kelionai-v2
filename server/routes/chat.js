@@ -650,7 +650,8 @@ router.post('/imagine', async (req, res) => {
     if (!prompt || prompt.trim().length < 2) return res.status(400).json({ error: 'Prompt required' });
     const encoded = encodeURIComponent(prompt.trim());
     const seed = Math.floor(Math.random() * 99999);
-    const pollinationsUrl = `https://image.pollinations.ai/prompt/${encoded}?width=1024&height=1024&model=flux&nologo=true&enhance=true&seed=${seed}`;
+    const pollinationsUrl = `https://image.pollinations.ai/prompt/${encoded}?width=1024&height=1024&nologo=true&seed=${seed}`;
+
 
     // Descarcam imaginea server-side ca sa evitam CORS/ORB in browser
     const imgResp = await fetch(pollinationsUrl, {
