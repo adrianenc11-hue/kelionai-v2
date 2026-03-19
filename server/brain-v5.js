@@ -483,6 +483,11 @@ async function thinkV5(
         }
       }
 
+      // Dacă GPT nu a produs niciun răspuns → activăm fallback chain (V4 → V3)
+      if (!finalResponse) {
+        throw new Error('GPT-5.4 tool execution loop produced no response — triggering fallback');
+      }
+
       engine = "GPT-5.4";
     } else {
       // ═══ GEMINI FLASH PATH — simple messages or GPT unavailable ═══
