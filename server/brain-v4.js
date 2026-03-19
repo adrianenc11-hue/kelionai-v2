@@ -25,6 +25,18 @@ function toGeminiTools(defs) {
 // ── Tool Definitions (shared format — converted at API call time) ──
 const TOOL_DEFINITIONS = [
   {
+    name: "show_in_monitor",
+    description: "Display any HTML content (Leaflet map with markers, data table, chart, flight tracker, etc.) in the monitor panel. Use this to create rich visual displays. Generate the complete self-contained HTML with inline JS/CSS.",
+    input_schema: {
+      type: "object",
+      properties: {
+        html: { type: "string", description: "Complete self-contained HTML to display in monitor (with inline styles and scripts)" },
+        title: { type: "string", description: "Optional title for the display" },
+      },
+      required: ["html"],
+    },
+  },
+  {
     name: "recall_tool",
     description: "Search the shared tool registry (Supabase) for a tool that can handle a specific task. Always try this FIRST before searching the web for a new API.",
     input_schema: {
@@ -2767,6 +2779,12 @@ async function executeTool(brain, toolName, toolInput, userId) {
         }
         const agriQuery = `${toolInput.action} ${toolInput.crop || ""} ${toolInput.location || "Romania"} ${toolInput.soil_type || ""} agriculture farming`;
         return await brain._search(agriQuery);
+      }
+      // ═══ MONITOR DISPLAY ═══
+      case "show_in_monitor": {
+        const html = toolInput.html || toolInput.content;
+        if (!html || html.length < 10) return { error: 'html content required' };
+        return { monitorHTML: html, type: 'html', success: true };
       }
       default:
         return { error: `Unknown tool: ${toolName}` };

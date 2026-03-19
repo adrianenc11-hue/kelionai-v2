@@ -651,7 +651,11 @@ async function thinkV5(
     let finalResponse = "";
     let totalTokens = 0;
     let engine = 'gemini-search-grounding';
+    let monitorFromTools = null; 
+    let gptMonitor = null; // Capturat din show_in_monitor apelat de GPT-5.4
     const MAX_TOOL_ROUNDS = 2;
+
+
 
     // ── 8a. GPT-5.4 PRIMAR — pentru toate intentiile ──────────────────────────
     const shouldTryGPT = process.env.OPENAI_API_KEY && intent !== 'weather' && intent !== 'tool_use';
@@ -752,6 +756,10 @@ async function thinkV5(
             toolsUsed.push(tc.function.name);
             toolResults.push({ name: tc.function.name, result });
             brain.toolStats[tc.function.name] = (brain.toolStats[tc.function.name] || 0) + 1;
+            // Capturare monitor output — GPT creaza orice vizualizare, framework-ul o afiseaza
+            if (result?.monitorHTML) gptMonitor = { content: result.monitorHTML, type: result.type || 'html' };
+
+
             return {
               role: "tool",
               tool_call_id: tc.id,
@@ -794,6 +802,8 @@ async function thinkV5(
       }
 
       engine = "GPT-5.4";
+      if (gptMonitor) monitorFromTools = gptMonitor;
+
     } else if (!finalResponse) {
       // ═══ GEMINI FLASH PATH — doar dacă nu există deja un răspuns ═══
       const geminiToolDefs = toGeminiTools(TOOL_DEFINITIONS);
@@ -979,8 +989,8 @@ async function thinkV5(
 
     // ── Parse avatar commands from AI response ──
     const avatarCmds = parseAvatarCommands(finalResponse);
-    const monitorFromTools = extractMonitor(toolResults);
-    const monitorFinal = avatarCmds.monitor?.content ? avatarCmds.monitor : monitorFromTools;
+    const monitorFinal = avatarCmds.monitor?.content ? avatarCmds.monitor : (monitorFromTools || extractMonitor(toolResults));
+
 
     logger.info(
       { component: "BrainV5", engine, tools: toolsUsed, thinkTime, tokens: totalTokens, intent },
