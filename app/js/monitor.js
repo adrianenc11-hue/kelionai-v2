@@ -7,6 +7,7 @@ const _MonitorManager = (function () {
 
     const PANELS = ['monitor-image', 'monitor-map', 'monitor-text', 'monitor-search', 'monitor-weather', 'monitor-iframe', 'monitor-audio', 'monitor-video', 'monitor-default'];
     let _lastContentHash = ''; // Dedup: prevent same content showing twice
+    let _lastContentTime = 0;  // Timestamp for dedup window
 
     // Display type per panel — match what CSS expects
     const PANEL_DISPLAY = {
