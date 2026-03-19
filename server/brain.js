@@ -9276,35 +9276,16 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
 
   async _imagine(prompt) {
     this.toolStats.imagine++;
-    const gKey = process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
-    if (!gKey) throw new Error('GOOGLE_AI_KEY not configured');
-
-    // Google Imagen 3 API
-    const r = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-001:generateImages?key=${gKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt: { text: prompt },
-          safetyFilterLevel: 'BLOCK_ONLY_HIGH',
-          personGeneration: 'ALLOW_ADULT',
-          imageCount: 1,
-          aspectRatio: '1:1',
-        }),
-      }
-    );
-
-    if (!r.ok) {
-      const errText = await r.text().catch(() => r.status);
-      throw new Error(`Imagen API ${r.status}: ${errText}`);
+    // Pollinations.ai — gratuit, fara API key, genereaza imagini AI de calitate
+    const encoded = encodeURIComponent(prompt);
+    const imageUrl = `https://image.pollinations.ai/prompt/${encoded}?width=1024&height=1024&model=flux&nologo=true&enhance=true&seed=${Math.floor(Math.random()*99999)}`;
+    // Verificam ca URL-ul e accesibil (HEAD request)
+    try {
+      const check = await fetch(imageUrl, { method: 'HEAD', signal: AbortSignal.timeout(15000) });
+      if (!check.ok) throw new Error(`Pollinations ${check.status}`);
+    } catch (e) {
+      throw new Error(`Image generation failed: ${e.message}`);
     }
-
-    const d = await r.json();
-    const b64 = d.generatedImages?.[0]?.image?.bytesBase64Encoded;
-    if (!b64) throw new Error('No image data from Imagen');
-
-    const imageUrl = `data:image/png;base64,${b64}`;
     return { imageUrl, prompt }; // extractMonitor cauta r.result.imageUrl
   }
 
