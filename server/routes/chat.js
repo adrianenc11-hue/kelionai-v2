@@ -172,18 +172,42 @@ router.post('/chat', chatLimiter, validate(chatSchema), async (req, res) => {
         upgrade: true,
       });
 
-    // ═══ BRAIN V5: GPT-5.4 + Gemini hybrid with Quality Gate ═══
-    const thought = await thinkV5(
-      brain,
-      message,
-      avatar,
-      history,
-      language,
-      user?.id,
-      conversationId,
-      { imageBase64, audioBase64, geo, isAutoCamera: req.body.isAutoCamera || false },
-      isAdmin
-    );
+    // ═══ BRAIN V5: GPT-5.4 + Gemini hybrid — timeout global 30s ═══
+    const BRAIN_TIMEOUT_MS = 30000;
+    let thought;
+    try {
+      thought = await Promise.race([
+        thinkV5(brain, message, avatar, history, language, user?.id, conversationId,
+          { imageBase64, audioBase64, geo, isAutoCamera: req.body.isAutoCamera || false }, isAdmin),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('brain_timeout_30s')), BRAIN_TIMEOUT_MS)),
+      ]);
+    } catch (brainErr) {
+      // ── Fallback garantat: Gemini Flash direct, fără tools, fără timeout ──
+      logger.warn({ component: 'Chat', err: brainErr.message }, '⚠️ Brain timeout/error — Gemini direct fallback');
+      const gKey = process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
+      let emergencyReply = null;
+      if (gKey) {
+        try {
+          const { buildSystemPrompt } = require('../persona');
+          const emergencySys = buildSystemPrompt(avatar, language, '', '', null);
+          const gResp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${gKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ role: 'user', parts: [{ text: message }] }],
+              systemInstruction: { parts: [{ text: emergencySys }] },
+              generationConfig: { maxOutputTokens: 1024, temperature: 0.7 },
+            }),
+          });
+          if (gResp.ok) {
+            const gData = await gResp.json();
+            emergencyReply = (gData.candidates?.[0]?.content?.parts || []).filter(p => p.text).map(p => p.text).join('');
+          }
+        } catch (_) { /* last resort failed */ }
+      }
+      if (!emergencyReply) emergencyReply = language === 'ro' ? 'Îmi pare rău, am o problemă tehnică temporară. Încearcă din nou. 🔧' : 'Sorry, I have a temporary technical issue. Please try again. 🔧';
+      return res.json({ reply: emergencyReply, avatar, engine: 'gemini-emergency', language, emotion: 'concerned', gestures: [], thinkTime: BRAIN_TIMEOUT_MS, totalTime: Date.now() - _chatStart, conversationId });
+    }
 
     // V5 returns the final reply from GPT-5.4 or Gemini Flash
     let reply = thought.enrichedMessage;
