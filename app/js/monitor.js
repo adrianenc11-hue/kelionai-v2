@@ -17,9 +17,10 @@ const _MonitorManager = (function () {
     };
 
     function showPanel(id) {
+        console.log('[MonitorManager] showPanel called for:', id);
         PANELS.forEach(function (pid) {
             const el = document.getElementById(pid);
-            if (el) el.style.display = 'none';
+            if (el) el.style.setProperty('display', 'none', 'important');
         });
         // Pe mobile, display-panel e ascuns cu transform:translateY(100%) — il aratam
         const displayPanel = document.getElementById('display-panel');
@@ -40,17 +41,26 @@ const _MonitorManager = (function () {
             if (av) av.style.display = '';
         }
         const el = document.getElementById(id);
-        if (el) el.style.display = PANEL_DISPLAY[id] || 'block';
+        if (el) {
+            const displayVal = PANEL_DISPLAY[id] || 'block';
+            el.style.setProperty('display', displayVal, 'important');
+            console.log('[MonitorManager] Set', id, 'display to:', displayVal, 'actual:', el.style.display);
+        }
     }
 
     function showImage(url, caption) {
+        console.log('[MonitorManager] showImage called with:', url?.substring(0, 80));
         const el = document.getElementById('monitor-image');
-        if (!el) return;
+        if (!el) { console.warn('[MonitorManager] #monitor-image not found!'); return; }
         const safeUrl = String(url).replace(/"/g, '&quot;');
         const safeCaption = caption ? String(caption).replace(/</g, '&lt;').replace(/>/g, '&gt;') : '';
         el.innerHTML = '<img src="' + safeUrl + '" alt="' + safeCaption + '">' +
             (safeCaption ? '<p class="monitor-caption">' + safeCaption + '</p>' : '');
+        // Nuclear fix: do ALL visibility directly, don't rely only on showPanel
         showPanel('monitor-image');
+        // Force display:flex explicitly (CSS has display:none rule that may override)
+        el.style.setProperty('display', 'flex', 'important');
+        console.log('[MonitorManager] monitor-image display set to:', el.style.display);
         if (window.KAvatar) KAvatar.setPresenting(true);
     }
 
@@ -180,9 +190,13 @@ const _MonitorManager = (function () {
     }
 
     function show(content, type) {
+        console.log('[MonitorManager] show() called with type:', type, 'content length:', String(content).length, 'content start:', String(content).substring(0, 60));
         // Dedup: skip if same content already displayed
         const hash = String(content).substring(0, 200) + '|' + (type || '');
-        if (hash === _lastContentHash) return;
+        if (hash === _lastContentHash) {
+            console.log('[MonitorManager] DEDUP: skipping, same content already displayed');
+            return;
+        }
         _lastContentHash = hash;
 
         if (type === 'image') {
