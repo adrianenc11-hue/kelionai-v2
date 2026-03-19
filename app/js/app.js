@@ -986,22 +986,11 @@
       .replace(/\[AGENT ACTIV[^\]]*\]\s*/gi, '')
       .trim();
     if (!text) return; // Don't show empty messages
-    const o = document.getElementById('chat-overlay');
-    o.innerHTML = ''; // Clear previous — max 1 phrase on screen at a time
-    const m = document.createElement('div');
-    m.className = 'msg ' + type;
-    if (type === 'assistant') {
-      m.innerHTML = parseMarkdown(text);
-    } else {
-      m.textContent = text;
-    }
-    o.appendChild(m);
-    o.scrollTop = o.scrollHeight;
-    // Auto-clear text after 5 seconds
-    setTimeout(function () {
-      if (o.contains(m)) o.removeChild(m);
-    }, 5000);
-    // Also persist in #chat-messages so tests and history can see messages
+
+    // ALL text goes ONLY to subtitle under avatar
+    _updateSubtitle(type === 'assistant' ? 'ai' : 'user', text);
+
+    // Persist in hidden #chat-messages for E2E tests and history export only
     var chatMsgs = document.getElementById('chat-messages');
     if (chatMsgs) {
       var pm = document.createElement('div');
@@ -1012,8 +1001,6 @@
         pm.textContent = text;
       }
       chatMsgs.appendChild(pm);
-      chatMsgs.scrollTop = chatMsgs.scrollHeight;
-      // Keep only last 50 messages
       while (chatMsgs.children.length > 50) chatMsgs.removeChild(chatMsgs.firstChild);
     }
   }

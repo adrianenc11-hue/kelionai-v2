@@ -271,25 +271,14 @@ body {
 }
 
 #chat-overlay {
-  display: flex;
+  display: none; /* Text scos de pe monitor — merge doar sub avatar */
 }
 
 #thinking {
   display: none;
 }
 
-#chat-overlay {
-  flex: 1;
-  overflow-y: auto;
-  padding: 20px 24px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-
-  -webkit-user-select: text;
-  user-select: text;
-  position: relative;
-}
+/* chat-overlay hidden — all text goes to subtitle under avatar */
 
 #chat-overlay::-webkit-scrollbar {
   width: 4px;
