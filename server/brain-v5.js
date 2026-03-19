@@ -829,8 +829,9 @@ async function thinkV5(
       const geminiModel = MODELS.GEMINI_CHAT || "gemini-2.5-flash";
       const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiApiKey}`;
 
-      // For simple messages, don't include tools — faster response
-      const includeTools = complexity === "complex";
+      // Include tools only for tool_use intent (maps, images etc)
+      const includeTools = intent === 'tool_use' || intent === 'deep_reasoning';
+
 
       for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
         const geminiBody = {
@@ -992,13 +993,14 @@ async function thinkV5(
       gaze: avatarCmds.gaze || null,
       actions: avatarCmds.actions || [],
       analysis: {
-        complexity,
+        complexity: intent,
         emotionalTone,
         language: language || "ro",
         topics: [],
         isEmotional: emotionalTone !== "neutral",
         frustrationLevel: frustration,
       },
+
       chainOfThought: null,
       compressedHistory: recentHistory,
       failedTools: toolResults.filter((r) => r.result?.error).map((r) => r.name),
