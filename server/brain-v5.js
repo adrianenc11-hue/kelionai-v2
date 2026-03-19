@@ -653,26 +653,9 @@ async function thinkV5(
     let engine = 'gemini-search-grounding';
     const MAX_TOOL_ROUNDS = 2;
 
-    // ── 8a. Gemini Search Grounding — pentru web_search, chat, weather ──
-    // (GPT folosit doar pentru vision si deep_reasoning)
-    if (intent !== 'vision' && intent !== 'deep_reasoning') {
-      try {
-        const gr = await callGeminiWithSearch(message, systemPrompt, recentHistory, {
-          enableSearch: intent === 'web_search',
-        });
-        if (gr.text) {
-          finalResponse = gr.text;
-          engine = gr.engine;
-          if (gr.sources) finalResponse += `\n\n📍 Surse: ${gr.sources}`;
-        }
-      } catch (eGS) {
-        logger.warn({ component: "BrainV5", err: eGS.message }, "Gemini Search Grounding failed, trying GPT");
-      }
-    }
-
-    // ── 8b. GPT-5.4 — pentru vision și deep reasoning (sau fallback dacă Gemini a eșuat) ──
-    const shouldTryGPT = !finalResponse || intent === 'vision' || intent === 'deep_reasoning';
-    if (shouldTryGPT && process.env.OPENAI_API_KEY) {
+    // ── 8a. GPT-5.4 PRIMAR — pentru toate intentiile ──────────────────────────
+    const shouldTryGPT = process.env.OPENAI_API_KEY && intent !== 'weather' && intent !== 'tool_use';
+    if (shouldTryGPT) {
 
       // ═══ GPT-5.4 PATH — complex messages with tool calling ═══
       const openaiTools = toOpenAITools(TOOL_DEFINITIONS);
