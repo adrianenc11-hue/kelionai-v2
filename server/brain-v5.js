@@ -924,11 +924,19 @@ async function thinkV5(
     brain.recordError("thinkV5", e.message);
     logger.error({ component: "BrainV5", err: e.message, thinkTime }, `🧠 V5 Think failed: ${e.message}`);
 
-    // FALLBACK CHAIN: V5 fails → try V4 → try V3 → error message
+    // FALLBACK CHAIN: V5 fails → try V4 → Claude → V3 → error
     logger.info({ component: "BrainV5" }, "⚠️ Falling back to V4 (Gemini tool calling)");
+    // Re-run getRealtimeContext so V4 fallback also has current data (weather/search)
+    let fallbackRealtimeCtx = null;
+    try { fallbackRealtimeCtx = await getRealtimeContext(message, brain, userId, mediaData?.geo); } catch (_) {}
+    // Inject realtime context into history so V4 Gemini sees it as "known context"
+    const historyWithCtx = fallbackRealtimeCtx
+      ? [...(history || []), { role: 'model', parts: [{ text: `[DATE REALE DISPONIBILE]\n${fallbackRealtimeCtx}` }] }]
+      : (history || []);
     try {
       const { thinkV4 } = require("./brain-v4");
-      return await thinkV4(brain, message, avatar, history, language, userId, conversationId, mediaData, isAdmin);
+      return await thinkV4(brain, message, avatar, historyWithCtx, language, userId, conversationId, mediaData, isAdmin);
+
     } catch (e2) {
       logger.info({ component: "BrainV5" }, "⚠️ V4 failed, trying Claude...");
       // Try Claude (Anthropic) before falling back to V3
