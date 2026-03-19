@@ -31,15 +31,7 @@ const _MonitorManager = (function () {
                 displayPanel.classList.remove('mobile-visible');
             }
         }
-        // Ascunde avatarul cand afisam continut
-        if (id !== 'monitor-default') {
-            const av = document.getElementById('avatar-area');
-            if (av) av.style.display = 'none';
-        } else {
-            // Restaureaza avatarul cand revenim la default
-            const av = document.getElementById('avatar-area');
-            if (av) av.style.display = '';
-        }
+        // Avatarul rămâne vizibil — e în left-panel, monitorul e în display-panel
         const el = document.getElementById(id);
         if (el) {
             const displayVal = PANEL_DISPLAY[id] || 'block';
@@ -209,17 +201,19 @@ const _MonitorManager = (function () {
             showPanel('monitor-map');
             if (window.KAvatar) KAvatar.setPresenting(true);
         } else if (type === 'html') {
-            // HTML (harti, grafice) se afiseaza in left-panel, inlocuind avatarul
-            var av = document.getElementById('avatar-area');
-            var lp = document.getElementById('left-panel');
-            if (!lp) return;
-            if (av) av.style.display = 'none';
+            // HTML (harti, grafice) — afisam in display-panel (monitor)
+            var dp = document.getElementById('display-content') || document.getElementById('display-panel');
+            if (!dp) return;
+            PANELS.forEach(function (pid) {
+                var pel = document.getElementById(pid);
+                if (pel) pel.style.setProperty('display', 'none', 'important');
+            });
             var box = document.getElementById('_kelion_html_box');
             if (!box) {
                 box = document.createElement('div');
                 box.id = '_kelion_html_box';
                 box.style.cssText = 'width:100%;height:100%;position:relative;';
-                lp.appendChild(box);
+                dp.appendChild(box);
             }
             box.style.display = 'block';
             var iframe = document.createElement('iframe');
@@ -283,11 +277,9 @@ const _MonitorManager = (function () {
     }
 
     function clear() {
-        // Restaureaza avatarul si ascunde HTML box
+        // Ascunde HTML box si reseteaza monitorul
         var box = document.getElementById('_kelion_html_box');
         if (box) box.style.display = 'none';
-        var av = document.getElementById('avatar-area');
-        if (av) av.style.display = '';
         PANELS.forEach(function (pid) {
             var el = document.getElementById(pid);
             if (el) el.style.display = 'none';
