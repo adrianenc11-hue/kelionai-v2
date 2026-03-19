@@ -8,6 +8,14 @@ const _MonitorManager = (function () {
     const PANELS = ['monitor-image', 'monitor-map', 'monitor-text', 'monitor-search', 'monitor-weather', 'monitor-iframe', 'monitor-audio', 'monitor-video', 'monitor-default'];
     let _lastContentHash = ''; // Dedup: prevent same content showing twice
 
+    // Display type per panel — match what CSS expects
+    const PANEL_DISPLAY = {
+        'monitor-image': 'flex',
+        'monitor-map': 'flex',
+        'monitor-text': 'flex',
+        'monitor-default': 'flex',
+    };
+
     function showPanel(id) {
         PANELS.forEach(function (pid) {
             const el = document.getElementById(pid);
@@ -17,9 +25,13 @@ const _MonitorManager = (function () {
         if (id !== 'monitor-default') {
             const av = document.getElementById('avatar-area');
             if (av) av.style.display = 'none';
+        } else {
+            // Restaureaza avatarul cand revenim la default
+            const av = document.getElementById('avatar-area');
+            if (av) av.style.display = '';
         }
         const el = document.getElementById(id);
-        if (el) el.style.display = 'block';
+        if (el) el.style.display = PANEL_DISPLAY[id] || 'block';
     }
 
     function showImage(url, caption) {
