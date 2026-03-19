@@ -9276,18 +9276,13 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
 
   async _imagine(prompt) {
     this.toolStats.imagine++;
-    // Pollinations.ai — gratuit, fara API key, genereaza imagini AI de calitate
+    // Pollinations.ai — gratuit, fara API key, genereaza imagini AI FLUX
     const encoded = encodeURIComponent(prompt);
-    const imageUrl = `https://image.pollinations.ai/prompt/${encoded}?width=1024&height=1024&model=flux&nologo=true&enhance=true&seed=${Math.floor(Math.random()*99999)}`;
-    // Verificam ca URL-ul e accesibil (HEAD request)
-    try {
-      const check = await fetch(imageUrl, { method: 'HEAD', signal: AbortSignal.timeout(15000) });
-      if (!check.ok) throw new Error(`Pollinations ${check.status}`);
-    } catch (e) {
-      throw new Error(`Image generation failed: ${e.message}`);
-    }
-    return { imageUrl, prompt }; // extractMonitor cauta r.result.imageUrl
+    const seed = Math.floor(Math.random() * 99999);
+    const imageUrl = `https://image.pollinations.ai/prompt/${encoded}?width=1024&height=1024&model=flux&nologo=true&enhance=true&seed=${seed}`;
+    return { imageUrl, prompt }; // extractMonitor cauta r.result.imageUrl → afiseaza in monitor
   }
+
 
 
   async _memory(userId) {
