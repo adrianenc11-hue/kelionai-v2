@@ -242,7 +242,7 @@ async function callClaude(prompt, systemPrompt, modelId) {
 function detectIntent(message, mediaData) {
   if (mediaData?.imageBase64) return 'vision';          // imagine → GPT vision
   const m = message.toLowerCase();
-  if (/\b(vrem[ea]|meteo|weather|temperatur|ploaie|soare|frig|cald)\b/i.test(m)) return 'weather';
+  if (/\b(vrem[ea]|meteo|weather|temperatur[ăa]?|ploaie|soare|frig|cald|grad[e]?|gradele|afar[aă]|nivelul\s+temperatur|cum\s+e\s+afar)\b/i.test(m)) return 'weather';
   if (/ultima\s+(versiune|noutate|stire)|ce\s+(mai)?\s+nou|știri|stiri|news|azi\s+a|lansat\s+(acum|azi)|apărut|aparut|pret.*actual|cum\s+sta|rezultat\s+final|scor\s+final|clasament|cine\s+a\s+(câștigat|castigat|câştigat)|ce\s+(s-?a|e)\s+(întâmplat|intamplat)|recent\s+a|din\s+\d{4}/i.test(m)) return 'web_search';
   if (/harta|navigheaz|rut[ăa]|genereaz[ăa]\s+(imagine|pict|foto)|arată.*pe\s+hartă|arat[ăa].*pe\s+harta/i.test(m)) return 'tool_use';
   if (/calculeaz[ăa]\s+integral|integr[ăa]l[ăa]|rezolv[ăa]\s+ecuaţia|demonstreaz[ăa]\s+teorema|analiz[ăa].*complet[ăa]|scrie\s+cod\s+complet\s+pentru|arhitectur[ăa]\s+sistem|documentaţie\s+tehnic|full.?stack/i.test(m)) return 'deep_reasoning';
