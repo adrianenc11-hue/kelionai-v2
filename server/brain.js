@@ -9302,6 +9302,87 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
       .join("; ");
   }
 
+  // ── Self-Learning Tool Registry ────────────────────────────────────────────
+
+  async _recallTool(query) {
+    if (!this.supabaseAdmin) return { found: false, message: 'Supabase not configured' };
+    const { data } = await this.supabaseAdmin
+      .from('brain_tools')
+      .select('name, description, endpoint, method, headers_template, body_template, params_schema, usage_count')
+      .or(`name.ilike.%${query}%,description.ilike.%${query}%`)
+      .order('usage_count', { ascending: false })
+      .limit(3);
+    if (!data?.length) return { found: false, message: `No tool found for: ${query}. Use discover_and_save_tool to find and save a new one.` };
+    return { found: true, tools: data };
+  }
+
+  async _discoverAndSaveTool({ task_description, api_endpoint, method = 'GET', params_schema = {}, tool_name }) {
+    if (!this.supabaseAdmin) return { success: false, error: 'Supabase not configured' };
+    // Test the endpoint
+    let testResult = null;
+    try {
+      const testUrl = api_endpoint.includes('?') ? api_endpoint : `${api_endpoint}`;
+      const r = await fetch(testUrl, { method: 'GET', signal: AbortSignal.timeout(10000) });
+      testResult = r.ok ? 'ok' : `HTTP ${r.status}`;
+    } catch (e) {
+      testResult = `error: ${e.message}`;
+    }
+    // Save to Supabase brain_tools
+    const { error } = await this.supabaseAdmin
+      .from('brain_tools')
+      .upsert({
+        name: tool_name,
+        description: task_description,
+        endpoint: api_endpoint,
+        method: method.toUpperCase(),
+        params_schema: params_schema,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'name' });
+    if (error) return { success: false, error: error.message };
+    return { success: true, tool_name, endpoint: api_endpoint, test_result: testResult, message: `Tool '${tool_name}' saved to shared registry. Now use call_saved_tool to execute it.` };
+  }
+
+  async _callSavedTool(toolName, params = {}) {
+    if (!this.supabaseAdmin) return { error: 'Supabase not configured' };
+    const { data } = await this.supabaseAdmin
+      .from('brain_tools')
+      .select('*')
+      .eq('name', toolName)
+      .single();
+    if (!data) return { error: `Tool '${toolName}' not found in registry` };
+
+    // Build URL with params
+    let url = data.endpoint;
+    const method = (data.method || 'GET').toUpperCase();
+    if (method === 'GET' && Object.keys(params).length) {
+      const qs = new URLSearchParams(params).toString();
+      url = url.includes('?') ? `${url}&${qs}` : `${url}?${qs}`;
+    }
+
+    const fetchOptions = {
+      method,
+      headers: { 'User-Agent': 'KelionAI/2.0', ...(data.headers_template || {}) },
+      signal: AbortSignal.timeout(15000),
+    };
+    if (method === 'POST' && Object.keys(params).length) {
+      fetchOptions.headers['Content-Type'] = 'application/json';
+      fetchOptions.body = JSON.stringify(params);
+    }
+
+    const r = await fetch(url, fetchOptions);
+    if (!r.ok) return { error: `Tool call failed: HTTP ${r.status}`, url };
+    const result = await r.json().catch(() => r.text());
+
+    // Update usage stats
+    this.supabaseAdmin.from('brain_tools').update({
+      usage_count: (data.usage_count || 0) + 1,
+      success_count: (data.success_count || 0) + 1,
+    }).eq('name', toolName).then(() => {});
+
+    return { success: true, data: result, tool: toolName, url };
+  }
+
+
   _map(place) {
     this.toolStats.map++;
     const mapsKey = process.env.GOOGLE_MAPS_KEY;

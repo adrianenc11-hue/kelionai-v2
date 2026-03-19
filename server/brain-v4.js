@@ -25,6 +25,45 @@ function toGeminiTools(defs) {
 // ── Tool Definitions (shared format — converted at API call time) ──
 const TOOL_DEFINITIONS = [
   {
+    name: "recall_tool",
+    description: "Search the shared tool registry (Supabase) for a tool that can handle a specific task. Always try this FIRST before searching the web for a new API.",
+    input_schema: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Keywords describing the task (e.g. 'flight tracking', 'currency exchange', 'earthquake data')" },
+      },
+      required: ["query"],
+    },
+  },
+  {
+    name: "discover_and_save_tool",
+    description: "When no existing tool can handle a task: search the web for a free public API, test it, and save it permanently to the shared tool registry so all users benefit. Use this when recall_tool returns nothing.",
+    input_schema: {
+      type: "object",
+      properties: {
+        task_description: { type: "string", description: "What the tool needs to do (e.g. 'get real-time flight positions')" },
+        api_endpoint: { type: "string", description: "The discovered API endpoint URL" },
+        method: { type: "string", enum: ["GET", "POST"], description: "HTTP method" },
+        params_schema: { type: "object", description: "Parameters the tool accepts" },
+        tool_name: { type: "string", description: "Short snake_case name for the tool" },
+      },
+      required: ["task_description", "api_endpoint", "tool_name"],
+    },
+  },
+  {
+    name: "call_saved_tool",
+    description: "Execute a tool from the shared registry with specific parameters to get real live data.",
+    input_schema: {
+      type: "object",
+      properties: {
+        tool_name: { type: "string", description: "Name of the saved tool to call" },
+        params: { type: "object", description: "Parameters to pass to the tool endpoint" },
+      },
+      required: ["tool_name"],
+    },
+  },
+  {
+
     name: "search_web",
     description:
       "Search the internet for current, real-time information. Use for news, facts, prices, events, people, anything requiring up-to-date data.",
@@ -1433,8 +1472,15 @@ async function executeTool(brain, toolName, toolInput, userId) {
     switch (toolName) {
       case "search_web":
         return await brain._search(toolInput.query);
+      case "recall_tool":
+        return await brain._recallTool(toolInput.query);
+      case "discover_and_save_tool":
+        return await brain._discoverAndSaveTool(toolInput);
+      case "call_saved_tool":
+        return await brain._callSavedTool(toolInput.tool_name, toolInput.params || {});
       case "get_weather":
         return await brain._weather(toolInput.city);
+
       case "generate_image":
         return await brain._imagine(toolInput.prompt);
       case "play_radio":
@@ -2952,12 +2998,14 @@ async function thinkV4(
       const geminiBody = {
         contents: currentMessages,
         tools: geminiTools,
+        toolConfig: { functionCallingConfig: { mode: 'ANY' } }, // Forteaza tool calling — nu raspunde din memorie proprie
         systemInstruction: { parts: [{ text: systemPrompt }] },
         generationConfig: {
           maxOutputTokens: 2048,
           temperature: 0.7,
         },
       };
+
 
       const r = await fetch(geminiUrl, {
         method: "POST",
