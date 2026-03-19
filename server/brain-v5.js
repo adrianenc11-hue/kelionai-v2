@@ -263,7 +263,8 @@ async function getRealtimeContext(message, brain, userId, geo) {
   }
 
   // ── Web Search (profesional — prin brain._search care are toate API-urile) ──
-  const searchMatch = lower.match(/\b(?:caută|cauta|search|find|google|știri|stiri|news|actualitate|ce\s+este|ce\s+e|cine\s+e|când\s+a|când\s+s-?a|istoricul|historia|def(?:in)?)\b/i);
+  const searchMatch = lower.match(/\b(?:caută|cauta|search|find|google|știri|stiri|news|actualitate|ce\s+este|ce\s+e|cine\s+e|când\s+a|când\s+s-?a|istoricul|def(?:in)?|ultima\s+versiune|cel\s+mai\s+recen|cea\s+mai\s+recen|lansare|lansat|apărut|aparut|prețul|pretul|cat\s+costa|azi\s+a|ce\s+s-?a\s+int|cum\s+sta|rezultat|scor|clasament|record)\b/i);
+
   if (searchMatch && brain && typeof brain._search === 'function') {
     try {
       // Extrage query relevant din mesaj (nu pasam mesajul intreg)
