@@ -9306,15 +9306,22 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
 
   async _recallTool(query) {
     if (!this.supabaseAdmin) return { found: false, message: 'Supabase not configured' };
+    // Split query în termeni, truncate la root (6 chars) — funcționează cross-language
+    // Ex: "Romaniei"→"romani" matches "romania_live_flights"
+    const terms = query.toLowerCase().split(/\s+/).filter(w => w.length > 3).map(w => w.substring(0, 6));
+    const uniqueTerms = [...new Set(terms)];
+    const orParts = uniqueTerms.flatMap(t => [`name.ilike.%${t}%`, `description.ilike.%${t}%`]).join(',');
     const { data } = await this.supabaseAdmin
       .from('brain_tools')
       .select('name, description, endpoint, method, headers_template, body_template, params_schema, usage_count')
-      .or(`name.ilike.%${query}%,description.ilike.%${query}%`)
+      .or(orParts || 'name.ilike.%%')
+      .neq('status', 'broken')
       .order('usage_count', { ascending: false })
       .limit(3);
     if (!data?.length) return { found: false, message: `No tool found for: ${query}. Use discover_and_save_tool to find and save a new one.` };
     return { found: true, tools: data };
   }
+
 
   async _discoverAndSaveTool({ task_description, api_endpoint, method = 'GET', params_schema = {}, tool_name }) {
     if (!this.supabaseAdmin) return { success: false, error: 'Supabase not configured' };
