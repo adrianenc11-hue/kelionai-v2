@@ -76,6 +76,8 @@
     let _headBone = null;
     let _spineBone = null;
     let _neckBone = null;
+    let _hipsBone = null;
+    let _hipsDefaultY = 0;
     const _fingerBones = { left: {}, right: {} };
     document.addEventListener('mousemove', function (e) {
         if (_faceTrackingActive) return; // Camera overrides mouse
@@ -625,9 +627,13 @@
             if (nm === 'Head' || nm === 'head') _headBone = bone;
             if (nm === 'Neck' || nm === 'neck') _neckBone = bone;
             if (!_spineBone && (nm === 'Spine1' || nm === 'Spine2' || nm === 'Spine' || nm === 'spine')) _spineBone = bone;
+            if (!_hipsBone && (nm === 'Hips' || nm === 'hips' || nm === 'Pelvis' || nm === 'pelvis' || nm === 'mixamorigHips')) {
+                _hipsBone = bone;
+                _hipsDefaultY = bone.position.y;
+            }
         });
         console.log('[Avatar] Bones found — Head:', !!_headBone, 'Neck:', !!_neckBone,
-            'Spine:', !!_spineBone, 'LeftEye:', !!_eyeBones.left, 'RightEye:', !!_eyeBones.right);
+            'Spine:', !!_spineBone, 'Hips:', !!_hipsBone, 'LeftEye:', !!_eyeBones.left, 'RightEye:', !!_eyeBones.right);
     }
 
     // ══ Compute arms-down quaternions dynamically from A-pose rest ══
@@ -800,7 +806,99 @@
         bow:             { lx: 10, ly: 0, lz: 0, rx: 10, ry: 0, rz: 0, dur: 2.5 },
     };
 
+    // ══ Full-body actions — use Hips (Y translate) + Spine (rotation) ══
+    const _FULL_BODY_ACTIONS = {
+        jump: { dur: 1.5, type: 'jump' },
+        squat: { dur: 3.0, type: 'squat' },
+        dance: { dur: 4.0, type: 'dance' },
+        stretch: { dur: 3.5, type: 'stretch' },
+        sitDown: { dur: 2.5, type: 'squat' },
+        pushup: { dur: 3.0, type: 'pushup' },
+    };
+    let _fullBodyActive = false;
+    let _fullBodyTimer = 0;
+    let _fullBodyDuration = 2.0;
+    let _fullBodyType = null;
+
+    function _updateFullBody(dt) {
+        if (!_fullBodyActive || !_fullBodyType) return;
+        _fullBodyTimer += dt;
+        const t = _fullBodyTimer / _fullBodyDuration;
+
+        if (t >= 1.0) {
+            // Reset to default
+            if (_hipsBone) { _hipsBone.position.y = _hipsDefaultY; _hipsBone.rotation.x = 0; }
+            if (_spineBone) { _spineBone.rotation.x = 0; _spineBone.rotation.z = 0; }
+            _fullBodyActive = false;
+            _fullBodyTimer = 0;
+            _fullBodyType = null;
+            return;
+        }
+
+        if (_fullBodyType === 'jump') {
+            // Jump: sine curve up-down on Hips Y
+            const jumpHeight = 0.3;
+            const jumpBlend = Math.sin(t * Math.PI);
+            if (_hipsBone) _hipsBone.position.y = _hipsDefaultY + jumpHeight * jumpBlend;
+            // Slight arm raise during jump
+            if (armBones.leftArm) _armL.x = _armDefaultL.x + (-50 - _armDefaultL.x) * jumpBlend;
+            if (armBones.rightArm) _armR.x = _armDefaultR.x + (-50 - _armDefaultR.x) * jumpBlend;
+        } else if (_fullBodyType === 'squat') {
+            // Squat: lower Hips, bend spine forward
+            const sqBlend = Math.sin(t * Math.PI);
+            if (_hipsBone) _hipsBone.position.y = _hipsDefaultY - 0.25 * sqBlend;
+            if (_spineBone) _spineBone.rotation.x = 0.15 * sqBlend;
+        } else if (_fullBodyType === 'dance') {
+            // Dance: hips sway side-to-side + arm waves
+            const swayPhase = Math.sin(t * Math.PI * 4); // 4 sways
+            const bounce = Math.abs(Math.sin(t * Math.PI * 8)) * 0.08;
+            if (_hipsBone) {
+                _hipsBone.position.y = _hipsDefaultY + bounce;
+                _hipsBone.rotation.z = swayPhase * 0.08;
+            }
+            if (_spineBone) _spineBone.rotation.z = -swayPhase * 0.05;
+            // Arm waves
+            const armWave = Math.sin(t * Math.PI * 3);
+            _armL.x = _armDefaultL.x + (-40 * Math.abs(armWave));
+            _armR.x = _armDefaultR.x + (-40 * Math.abs(Math.cos(t * Math.PI * 3)));
+        } else if (_fullBodyType === 'stretch') {
+            // Stretch: arms up + slight back lean
+            const strBlend = Math.sin(t * Math.PI);
+            _armL.x = _armDefaultL.x + (-80 - _armDefaultL.x) * strBlend;
+            _armR.x = _armDefaultR.x + (-80 - _armDefaultR.x) * strBlend;
+            if (_spineBone) _spineBone.rotation.x = -0.1 * strBlend;
+        } else if (_fullBodyType === 'pushup') {
+            // Pushup simulation: spine down + up cycle
+            const pushBlend = Math.sin(t * Math.PI * 2);
+            if (_hipsBone) _hipsBone.position.y = _hipsDefaultY - 0.15 * Math.abs(pushBlend);
+            if (_spineBone) _spineBone.rotation.x = 0.2 * Math.abs(pushBlend);
+        }
+    }
+
     function playBodyAction(type) {
+        // STOP UNIVERSAL — oprește ORICE acțiune
+        if (type === 'stop') {
+            _bodyActionActive = false; _bodyActionTimer = 0; _bodyActionType = null;
+            _fullBodyActive = false; _fullBodyTimer = 0; _fullBodyType = null;
+            // Reset bones to default
+            if (_hipsBone) { _hipsBone.position.y = _hipsDefaultY; _hipsBone.rotation.x = 0; _hipsBone.rotation.z = 0; }
+            if (_spineBone) { _spineBone.rotation.x = 0; _spineBone.rotation.z = 0; }
+            _armL.x = _armDefaultL.x; _armL.y = _armDefaultL.y; _armL.z = _armDefaultL.z;
+            _armR.x = _armDefaultR.x; _armR.y = _armDefaultR.y; _armR.z = _armDefaultR.z;
+            console.log('[Avatar] ⏹️ ALL actions STOPPED — reset to idle');
+            return;
+        }
+        // Check full-body actions first (jump, squat, dance, stretch, pushup)
+        if (_FULL_BODY_ACTIONS[type]) {
+            const fb = _FULL_BODY_ACTIONS[type];
+            _fullBodyType = fb.type;
+            _fullBodyActive = true;
+            _fullBodyTimer = 0;
+            _fullBodyDuration = fb.dur || 2.0;
+            console.log('[Avatar] Full-body action:', type, '(' + _fullBodyDuration + 's)');
+            return;
+        }
+        // Euler arm-based actions
         const action = _BODY_EULER[type];
         if (!action) { console.warn('[Avatar] Unknown body action:', type); return; }
         _bodyActionType = type;
@@ -852,6 +950,7 @@
 
             updateGesture(dt);
             updateBodyAction(dt);
+            _updateFullBody(dt);
             updateMoodLighting();
 
             // ══ BRAIN-ONLY MOVEMENT — no hardcoded body animations ══
