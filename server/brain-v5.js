@@ -705,7 +705,8 @@ CRITICAL: NEVER write tool calls as text in your response (e.g. do NOT write [re
 
 
     // ── 8a. GPT-5.4 PRIMAR — pentru toate intentiile ──────────────────────────
-    const shouldTryGPT = process.env.OPENAI_API_KEY && intent !== 'tool_use';
+    const shouldTryGPT = !!process.env.OPENAI_API_KEY; // TOATE intentiile → GPT-5.4 cu procedura universala
+
 
     if (shouldTryGPT) {
 
