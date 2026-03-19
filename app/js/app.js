@@ -1022,14 +1022,15 @@
     const speaker = document.getElementById('subtitle-speaker');
     const txt = document.getElementById('subtitle-text');
     if (!el || !speaker || !txt) return;
-    el.classList.remove('hidden-important');
-    el.style.display = '';
-    speaker.textContent = type === 'user' ? 'TU:' : 'KELION:';
-    const display = text.length > 120 ? '…' + text.slice(-120) : text;
+    // Show subtitle with CSS fade-in
+    el.classList.add('visible');
+    speaker.textContent = type === 'user' ? '🗣️' : '🤖';
+    const display = text.length > 150 ? text.slice(0, 150) + '…' : text;
     txt.textContent = display;
+    // Auto-hide after 8 seconds
     if (window._subtitleTimer) clearTimeout(window._subtitleTimer);
     window._subtitleTimer = setTimeout(function() {
-      el.classList.add('hidden-important');
+      el.classList.remove('visible');
     }, 8000);
   }
   function showThinking(v) {

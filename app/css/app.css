@@ -185,13 +185,15 @@ body {
 
 #avatar-switcher {
   position: absolute;
-  bottom: 48px;
-  left: 50%;
-  transform: translateX(-50%);
+  top: 20px;
+  left: 0;
+  right: 0;
   display: flex;
-  gap: 6px;
+  justify-content: space-between;
+  padding: 0 16px;
   z-index: 5;
   align-items: center;
+  pointer-events: none;
 }
 
 .avatar-pill {
@@ -207,6 +209,7 @@ body {
   font-family: var(--kelion-font);
   cursor: pointer;
   transition: var(--kelion-transition);
+  pointer-events: auto;
 }
 
 .avatar-pill:hover {
@@ -220,6 +223,45 @@ body {
   border-color: transparent;
   box-shadow: 0 2px 12px rgba(99, 102, 241, 0.3);
   font-weight: 600;
+}
+
+/* ── AI response subtitle under avatar ── */
+#live-subtitle {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 92%;
+  width: auto;
+  padding: 10px 20px;
+  background: rgba(0, 0, 0, 0.7);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  border-radius: 12px;
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  color: #f0f0ff;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  text-align: center;
+  z-index: 10;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+}
+
+#live-subtitle.visible {
+  opacity: 1;
+}
+
+#subtitle-speaker {
+  font-weight: 700;
+  margin-right: 6px;
+}
+
+#live-subtitle.hidden-important {
+  display: block !important;
+  opacity: 0;
+  pointer-events: none;
 }
 
 /* ── Chat Area — minimal, just input row at bottom ── */
