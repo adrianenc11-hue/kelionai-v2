@@ -665,7 +665,7 @@ async function thinkV5(
       ? `\n[EMOTIONAL CONTEXT] User mood: ${emotionalTone}. ${emotionHint}`
       : "";
     const now = new Date();
-    const dateTimeBlock = `\n[CURRENT DATE & TIME] ${now.toLocaleDateString("ro-RO", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}, ora ${now.toLocaleTimeString("ro-RO", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Bucharest" })} (Romania). Folosește MEREU aceste date când userul întreabă de zi, dată sau oră.`;
+    const dateTimeBlock = `\n[IMPORTANT — CURRENT DATE & TIME] Astazi este ${now.toLocaleDateString("ro-RO", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}, ora ${now.toLocaleTimeString("ro-RO", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Bucharest" })} (Romania, Europe/Bucharest). ISO: ${now.toISOString()}. NU INVENTA alta data sau ora — foloseste EXACT ce scrie aici cand userul intreaba de timp, data, zi, ora.`;
     const patternsBlock = getPatternsText();
     const qualityHints = getQualityHints();
     const proactiveHint = getProactiveSuggestion();
