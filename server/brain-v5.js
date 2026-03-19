@@ -233,18 +233,82 @@ async function callClaude(prompt, systemPrompt, modelId) {
   }
 }
 
+
 // ── Quality Gate: Gemini Flash verifies critical GPT-5.4 responses ──
 
+// ═══════════════════════════════════════════════════════════════
+// INTENT DETECTION — Ce vrea userul? Fiecare intenție → tool potrivit
+// ═══════════════════════════════════════════════════════════════
+function detectIntent(message, mediaData) {
+  if (mediaData?.imageBase64) return 'vision';          // imagine → GPT vision
+  const m = message.toLowerCase();
+  if (/\b(vrem[ea]|meteo|weather|temperatur|ploaie|soare|frig|cald)\b/i.test(m)) return 'weather';
+  if (/ultima\s+(versiune|noutate|stire)|ce\s+(mai)?\s+nou|știri|stiri|news|azi\s+a|lansat\s+(acum|azi)|apărut|aparut|pret.*actual|cum\s+sta|rezultat\s+final|scor\s+final|clasament|cine\s+a\s+(câștigat|castigat|câştigat)|ce\s+(s-?a|e)\s+(întâmplat|intamplat)|recent\s+a|din\s+\d{4}/i.test(m)) return 'web_search';
+  if (/harta|navigheaz|rut[ăa]|genereaz[ăa]\s+(imagine|pict|foto)|arată.*pe\s+hartă|arat[ăa].*pe\s+harta/i.test(m)) return 'tool_use';
+  if (/calculeaz[ăa]\s+integral|integr[ăa]l[ăa]|rezolv[ăa]\s+ecuaţia|demonstreaz[ăa]\s+teorema|analiz[ăa].*complet[ăa]|scrie\s+cod\s+complet\s+pentru|arhitectur[ăa]\s+sistem|documentaţie\s+tehnic|full.?stack/i.test(m)) return 'deep_reasoning';
+  return 'chat';
+}
 
 // ═══════════════════════════════════════════════════════════════
-// PRE-FETCH Real-time data (weather/search) BEFORE calling AI
-// Eliminates tool-calling timeout issues — AI just formats the data
+// GEMINI WITH GOOGLE SEARCH GROUNDING — Date actuale fără API keys externe
+// Nativ în Gemini. Fără pre-fetch, fără fallback chain.
+// ═══════════════════════════════════════════════════════════════
+async function callGeminiWithSearch(message, systemPrompt, history, opts = {}) {
+  const gKey = process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
+  if (!gKey) throw new Error('GOOGLE_AI_KEY not configured');
+
+  const model = MODELS.GEMINI_CHAT || 'gemini-2.5-flash';
+  const enableSearch = opts.enableSearch !== false; // default: true
+
+  const contents = [
+    ...(history || []).slice(-15).map(h => ({
+      role: h.role === 'ai' || h.role === 'assistant' || h.role === 'model' ? 'model' : 'user',
+      parts: [{ text: typeof h.content === 'string' ? h.content : (h.parts?.[0]?.text || JSON.stringify(h.content)) }],
+    })),
+    { role: 'user', parts: [{ text: message }] },
+  ];
+
+  const body = {
+    contents,
+    systemInstruction: { parts: [{ text: systemPrompt }] },
+    generationConfig: { maxOutputTokens: 2048, temperature: 0.7, topP: 0.95 },
+  };
+
+  if (enableSearch) {
+    body.tools = [{ googleSearch: {} }]; // Google Search grounding nativ
+  }
+
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 20000);
+
+  const r = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${gKey}`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: ctrl.signal }
+  ).finally(() => clearTimeout(timer));
+
+  if (!r.ok) {
+    const errText = await r.text().catch(() => 'unknown');
+    throw new Error(`Gemini Search ${r.status}: ${errText.substring(0, 200)}`);
+  }
+
+  const data = await r.json();
+  const text = (data.candidates?.[0]?.content?.parts || []).filter(p => p.text).map(p => p.text).join('');
+  const sources = (data.candidates?.[0]?.groundingMetadata?.groundingChunks || [])
+    .slice(0, 3).map(c => c.web?.title ? `[${c.web.title}](${c.web.uri})` : '').filter(Boolean).join(' | ');
+
+  const engineName = enableSearch ? 'gemini-search-grounding' : 'gemini-flash';
+  return { text, sources, engine: engineName };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PRE-FETCH Real-time data (weather only — search e acum via Gemini Search Grounding)
 // ═══════════════════════════════════════════════════════════════
 async function getRealtimeContext(message, brain, userId, geo) {
   const lower = (message || '').toLowerCase();
   const parts = [];
 
-  // ── Weather ──
+  // ── Weather (GPS sau detectare oras din mesaj) ──
+
   const weatherKeyword = lower.match(/\b(?:vrem[ea]|meteo|weather|temperatura|grad[e]?|ploaie|soare|frig|cald)\b/i);
   if (weatherKeyword) {
     try {
@@ -562,29 +626,52 @@ async function thinkV5(
           null,
         );
 
-    // ── 5b. PRE-FETCH real-time data (weather/search) — BEFORE any AI call ──
-    const realtimeCtx = await getRealtimeContext(message, brain, userId, mediaData.geo);
-    if (realtimeCtx) systemPrompt += '\n\n' + realtimeCtx;
+    // ── 5b. Detect INTENT — fiecare tip de cerere → tool potrivit ──
+    const intent = detectIntent(message, mediaData);
+    logger.info({ component: "BrainV5", intent, domain }, `🧠 V5 intent: ${intent}`);
 
-    // ── 6. Classify message complexity ──
-    const complexity = classifyComplexity(message, history);
-    const useGPT = complexity === "complex" || !!mediaData.imageBase64;
+    // Weather: GPS + Open Meteo (rămâne pre-fetch pentru date precise)
+    if (intent === 'weather') {
+      const weatherCtx = await getRealtimeContext(message, brain, userId, mediaData.geo);
+      if (weatherCtx) systemPrompt += '\n\n' + weatherCtx;
+    }
 
-    logger.info(
-      { component: "BrainV5", complexity, useGPT, domain, hasImage: !!mediaData.imageBase64 },
-      `🧠 V5 routing: ${complexity} → ${useGPT ? "GPT-5.4" : "Gemini Flash"}`,
-    );
+    // Tool use (harta, imagini, cod): delegare directă la V4 cu tool calling
+    if (intent === 'tool_use') {
+      const { thinkV4 } = require('./brain-v4');
+      return await thinkV4(brain, message, avatar, history, language, userId, conversationId, mediaData, isAdmin);
+    }
 
-    // ── 7. Prepare messages ──
+    // ── 7. Prepare state ──
     const recentHistory = (history || []).slice(-20);
     const toolsUsed = [];
     const toolResults = [];
     let finalResponse = "";
     let totalTokens = 0;
-    let engine = useGPT ? "GPT-5.4" : "Gemini-Flash";
-    const MAX_TOOL_ROUNDS = 2; // Hard limit — prevents infinite loops
+    let engine = 'gemini-search-grounding';
+    const MAX_TOOL_ROUNDS = 2;
 
-    if (useGPT && process.env.OPENAI_API_KEY) {
+    // ── 8a. Gemini Search Grounding — pentru web_search, chat, weather ──
+    // (GPT folosit doar pentru vision si deep_reasoning)
+    if (intent !== 'vision' && intent !== 'deep_reasoning') {
+      try {
+        const gr = await callGeminiWithSearch(message, systemPrompt, recentHistory, {
+          enableSearch: intent === 'web_search',
+        });
+        if (gr.text) {
+          finalResponse = gr.text;
+          engine = gr.engine;
+          if (gr.sources) finalResponse += `\n\n📍 Surse: ${gr.sources}`;
+        }
+      } catch (eGS) {
+        logger.warn({ component: "BrainV5", err: eGS.message }, "Gemini Search Grounding failed, trying GPT");
+      }
+    }
+
+    // ── 8b. GPT-5.4 — pentru vision și deep reasoning (sau fallback dacă Gemini a eșuat) ──
+    const shouldTryGPT = !finalResponse || intent === 'vision' || intent === 'deep_reasoning';
+    if (shouldTryGPT && process.env.OPENAI_API_KEY) {
+
       // ═══ GPT-5.4 PATH — complex messages with tool calling ═══
       const openaiTools = toOpenAITools(TOOL_DEFINITIONS);
 
@@ -696,8 +783,8 @@ async function thinkV5(
       }
 
       engine = "GPT-5.4";
-    } else {
-      // ═══ GEMINI FLASH PATH — simple messages or GPT unavailable ═══
+    } else if (!finalResponse) {
+      // ═══ GEMINI FLASH PATH — doar dacă nu există deja un răspuns ═══
       const geminiToolDefs = toGeminiTools(TOOL_DEFINITIONS);
 
       // Build Gemini message array
