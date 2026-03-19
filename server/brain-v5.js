@@ -257,14 +257,17 @@ async function callGeminiWithSearch(message, systemPrompt, history, opts = {}) {
   const gKey = process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
   if (!gKey) throw new Error('GOOGLE_AI_KEY not configured');
 
-  const model = MODELS.GEMINI_CHAT || 'gemini-2.5-flash';
-  const enableSearch = opts.enableSearch !== false; // default: true
+  const enableSearch = opts.enableSearch === true;
+  // gemini-2.5-flash-preview suporta grounding; pentru chat fara search folosim modelul standard
+  const model = enableSearch
+    ? (MODELS.GEMINI_PRO || 'gemini-2.5-flash-preview-04-17')
+    : (MODELS.GEMINI_CHAT || 'gemini-2.5-flash');
 
   const contents = [
-    ...(history || []).slice(-15).map(h => ({
+    ...(history || []).slice(-10).map(h => ({
       role: h.role === 'ai' || h.role === 'assistant' || h.role === 'model' ? 'model' : 'user',
-      parts: [{ text: typeof h.content === 'string' ? h.content : (h.parts?.[0]?.text || JSON.stringify(h.content)) }],
-    })),
+      parts: [{ text: typeof h.content === 'string' ? h.content : (h.parts?.[0]?.text || '') }],
+    })).filter(h => h.parts[0].text), // elimina intrari goale
     { role: 'user', parts: [{ text: message }] },
   ];
 
@@ -275,11 +278,12 @@ async function callGeminiWithSearch(message, systemPrompt, history, opts = {}) {
   };
 
   if (enableSearch) {
-    body.tools = [{ googleSearch: {} }]; // Google Search grounding nativ
+    // google_search (snake_case) — format corect pentru Gemini Grounding API
+    body.tools = [{ google_search: {} }];
   }
 
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 20000);
+  const timer = setTimeout(() => ctrl.abort(), 25000);
 
   const r = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${gKey}`,
@@ -288,17 +292,19 @@ async function callGeminiWithSearch(message, systemPrompt, history, opts = {}) {
 
   if (!r.ok) {
     const errText = await r.text().catch(() => 'unknown');
-    throw new Error(`Gemini Search ${r.status}: ${errText.substring(0, 200)}`);
+    throw new Error(`Gemini ${model} ${r.status}: ${errText.substring(0, 300)}`);
   }
 
   const data = await r.json();
   const text = (data.candidates?.[0]?.content?.parts || []).filter(p => p.text).map(p => p.text).join('');
+  if (!text) throw new Error('Gemini returned empty response');
+
   const sources = (data.candidates?.[0]?.groundingMetadata?.groundingChunks || [])
     .slice(0, 3).map(c => c.web?.title ? `[${c.web.title}](${c.web.uri})` : '').filter(Boolean).join(' | ');
 
-  const engineName = enableSearch ? 'gemini-search-grounding' : 'gemini-flash';
-  return { text, sources, engine: engineName };
+  return { text, sources, engine: enableSearch ? 'gemini-search-grounding' : 'gemini-flash' };
 }
+
 
 // ═══════════════════════════════════════════════════════════════
 // PRE-FETCH Real-time data (weather only — search e acum via Gemini Search Grounding)
