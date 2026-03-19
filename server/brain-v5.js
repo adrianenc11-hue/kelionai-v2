@@ -398,31 +398,31 @@ async function superThink(message, systemPrompt, history) {
 
   logger.info({ component: 'SuperThink' }, `📋 Plan ready (${Date.now() - pipeline.startTime}ms)`);
 
-  // ═══ STEP 2: DeepSeek + Claude — lucrează ÎN PARALEL, fiecare vede planul ═══
+  // ═══ STEP 2: CLAUDE — LEAD REASONER (chain-of-thought) + DeepSeek paralel ═══
   const step2Start = Date.now();
   const parallelTasks = [];
   const parallelLabels = [];
 
-  // DeepSeek — specialist în calcule, cod, date
+  // Claude — LEAD REASONER: gândire profundă pas cu pas
+  if (process.env.ANTHROPIC_API_KEY) {
+    parallelLabels.push('Claude-Lead');
+    parallelTasks.push(
+      callClaude(
+        `PLANUL ECHIPEI:\n${groqPlan}\n\nCEREREA ORIGINALĂ: "${message}"\n\nTu ești LEAD REASONER — creierul principal. Gândește PAS CU PAS:\n\n1. ÎNȚELEGERE: Ce vrea userul exact? Ce context lipsește?\n2. ANALIZĂ: Care sunt faptele relevante? Ce e cert vs incert?\n3. RAȚIONAMENT: Aplică logica. Verifică-ți pașii. Ce ar putea fi greșit?\n4. PERSPECTIVE: Consideră alte unghiuri. Ce ar rata un răspuns superficial?\n5. CONCLUZIE: Formulează răspunsul final — clar, precis, complet.\n\nGândește PROFUND. Nu fi superficial. Verifică-ți fiecare afirmație.\nRăspunde în ROMÂNĂ, natural, max 500 cuvinte.`,
+        shortPrompt,
+        MODELS.CLAUDE
+      ).catch(e => `[Claude indisponibil: ${e.message}]`)
+    );
+  }
+
+  // DeepSeek — specialist calcule, cod, date (paralel cu Claude)
   if (process.env.DEEPSEEK_API_KEY) {
     parallelLabels.push('DeepSeek');
     parallelTasks.push(
       callDeepSeek(
-        `PLANUL ECHIPEI:\n${groqPlan}\n\nCEREREA ORIGINALĂ: "${message}"\n\nTu ești SPECIALIST în calcule, cod, date concrete și logică. Contribuie cu:\n- Calcule exacte dacă sunt necesare\n- Cod sau pseudocod dacă e relevant\n- Date verificabile, cifre concrete\n- Logica formală a problemei\nFii SCURT (max 300 cuvinte). Doar contribuția ta unică.`,
+        `PLANUL ECHIPEI:\n${groqPlan}\n\nCEREREA ORIGINALĂ: "${message}"\n\nTu ești SPECIALIST în calcule, cod, date. Contribuie DOAR cu:\n- Calcule exacte dacă sunt necesare\n- Cod sau pseudocod dacă e relevant\n- Date verificabile, cifre concrete\nFii SCURT (max 300 cuvinte). Doar contribuția ta unică.`,
         shortPrompt
       ).catch(e => `[DeepSeek indisponibil: ${e.message}]`)
-    );
-  }
-
-  // Claude — specialist în raționament profund
-  if (process.env.ANTHROPIC_API_KEY) {
-    parallelLabels.push('Claude');
-    parallelTasks.push(
-      callClaude(
-        `PLANUL ECHIPEI:\n${groqPlan}\n\nCEREREA ORIGINALĂ: "${message}"\n\nTu ești SPECIALIST în raționament profund, nuanțe și analiză critică. Contribuie cu:\n- Perspectiva critică — ce ar putea fi greșit?\n- Nuanțe importante pe care alții le-ar rata\n- Context mai larg, implicații\n- Analogii și explicații clare\nFii SCURT (max 300 cuvinte). Doar contribuția ta unică.`,
-        shortPrompt,
-        MODELS.CLAUDE
-      ).catch(e => `[Claude indisponibil: ${e.message}]`)
     );
   }
 
@@ -430,12 +430,12 @@ async function superThink(message, systemPrompt, history) {
   const contributions = {};
   parallelResults.forEach((r, i) => {
     contributions[parallelLabels[i]] = r.status === 'fulfilled'
-      ? (typeof r.value === 'string' ? r.value : String(r.value)).substring(0, 1500)
+      ? (typeof r.value === 'string' ? r.value : String(r.value)).substring(0, 2000)
       : `[${parallelLabels[i]} failed]`;
   });
-  pipeline.steps.push({ ai: parallelLabels.join('+'), role: 'Specialiști', ms: Date.now() - step2Start });
+  pipeline.steps.push({ ai: parallelLabels.join('+'), role: 'Claude Lead + Specialists', ms: Date.now() - step2Start });
 
-  logger.info({ component: 'SuperThink' }, `🔬 Specialists done (${Date.now() - step2Start}ms): ${parallelLabels.join(', ')}`);
+  logger.info({ component: 'SuperThink' }, `🔬 Lead + Specialists done (${Date.now() - step2Start}ms): ${parallelLabels.join(', ')}`);
 
   // ═══ STEP 3: GPT-5.4 — Constructorul final (vede TOTUL) ═══
   let finalResponse = null;

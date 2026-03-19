@@ -1476,6 +1476,38 @@ const TOOL_DEFINITIONS = [
       required: ["action"],
     },
   },
+  // ═══ SELF-INTROSPECTION TOOLS ═══════════════════════════════
+  {
+    name: "read_own_source",
+    description: "Read your own source code files. Use this when the user asks you to analyze, explain, or improve your own code. You can read server files, client JS, HTML, CSS. Returns file content (max 500 lines).",
+    input_schema: {
+      type: "object",
+      properties: {
+        filepath: {
+          type: "string",
+          description: "Relative path from project root, e.g. 'server/brain-v5.js', 'app/js/avatar.js', 'app/index.html', 'server/routes/translate.js'",
+        },
+        startLine: { type: "number", description: "Optional start line (1-indexed)" },
+        endLine: { type: "number", description: "Optional end line (1-indexed, max 500 lines range)" },
+      },
+      required: ["filepath"],
+    },
+  },
+  {
+    name: "propose_code_edit",
+    description: "Propose a code edit to your own source. The edit is NOT applied automatically — it's saved as a proposal for the admin to review and approve. Use this when the user asks you to fix a bug, add a feature, or improve your own code.",
+    input_schema: {
+      type: "object",
+      properties: {
+        filepath: { type: "string", description: "File to edit (relative path)" },
+        description: { type: "string", description: "What this edit does and why" },
+        original_code: { type: "string", description: "The exact code to replace (must match)" },
+        new_code: { type: "string", description: "The replacement code" },
+        priority: { type: "string", enum: ["low", "medium", "high", "critical"], description: "How urgent is this change" },
+      },
+      required: ["filepath", "description", "original_code", "new_code"],
+    },
+  },
 ];
 
 // ── Tool executor: maps tool names to brain methods ──
@@ -2786,6 +2818,68 @@ async function executeTool(brain, toolName, toolInput, userId) {
         if (!html || html.length < 10) return { error: 'html content required' };
         return { monitorHTML: html, type: 'html', success: true };
       }
+      // ═══ SELF-INTROSPECTION ═══
+      case "read_own_source": {
+        const fs = require('fs');
+        const pathMod = require('path');
+        const fp = (toolInput.filepath || '').replace(/\.\./g, '').replace(/\\/g, '/');
+        // Whitelist: only allow safe directories
+        const allowed = ['server/', 'app/', 'package.json', '.github/'];
+        const blocked = ['.env', 'node_modules', '.git/', 'secret'];
+        if (!allowed.some(a => fp.startsWith(a) || fp === a)) {
+          return { error: `Access denied: only server/, app/, .github/ files allowed` };
+        }
+        if (blocked.some(b => fp.includes(b))) {
+          return { error: `Access denied: ${fp} is a protected file` };
+        }
+        const fullPath = pathMod.resolve(__dirname, '..', fp);
+        if (!fs.existsSync(fullPath)) return { error: `File not found: ${fp}` };
+        const stat = fs.statSync(fullPath);
+        if (stat.size > 500000) return { error: `File too large: ${(stat.size/1024).toFixed(0)}KB` };
+        const content = fs.readFileSync(fullPath, 'utf8');
+        const lines = content.split('\n');
+        const start = Math.max(1, toolInput.startLine || 1);
+        const end = Math.min(lines.length, toolInput.endLine || start + 499);
+        if (end - start > 500) return { error: 'Max 500 lines per read' };
+        const slice = lines.slice(start - 1, end);
+        return {
+          filepath: fp,
+          totalLines: lines.length,
+          showing: `${start}-${end}`,
+          content: slice.map((l, i) => `${start + i}: ${l}`).join('\n'),
+        };
+      }
+
+      case "propose_code_edit": {
+        const { filepath, description, original_code, new_code, priority } = toolInput;
+        const proposal = {
+          filepath, description, original_code, new_code,
+          priority: priority || 'medium',
+          proposed_at: new Date().toISOString(),
+          status: 'pending',
+        };
+        // Save to Supabase
+        if (brain.supabase) {
+          try {
+            await brain.supabase.from('brain_memory').insert({
+              user_id: userId || null,
+              memory_type: 'code_proposal',
+              content: `[${priority || 'medium'}] ${filepath}: ${description}`,
+              context: proposal,
+              importance: priority === 'critical' ? 10 : priority === 'high' ? 8 : 5,
+            });
+          } catch (e) {
+            logger.warn({ component: 'SelfIntrospect' }, `Supabase save failed: ${e.message}`);
+          }
+        }
+        logger.info({ component: 'SelfIntrospect', filepath, priority }, 'Code edit proposed');
+        return {
+          success: true,
+          message: `Proposed edit to ${filepath}: ${description}. Saved for admin review.`,
+          proposal,
+        };
+      }
+
       default:
         return { error: `Unknown tool: ${toolName}` };
     }
