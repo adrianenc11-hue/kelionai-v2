@@ -653,7 +653,8 @@ async function thinkV5(
     let engine = 'gemini-search-grounding';
     let monitorFromTools = null; 
     let gptMonitor = null; // Capturat din show_in_monitor apelat de GPT-5.4
-    const MAX_TOOL_ROUNDS = 2;
+    const MAX_TOOL_ROUNDS = 4; // Lanț complet: recall → call_saved → show_in_monitor
+
 
 
 
