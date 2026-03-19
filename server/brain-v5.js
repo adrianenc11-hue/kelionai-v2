@@ -979,6 +979,8 @@ STEP 5 — REPLY: Answer in user's language with real tool data.
 RULE: NEVER say "I don't have access to real-time data" without executing steps 1-4 first.
 RULE: ALWAYS prefer free APIs without authentication (no API key needed).
 RULE: For ANY image request (generate, create, draw, imagine, arată, generează imagine, desenează) → ALWAYS call generate_image tool, NEVER just describe the image in text.
+RULE: For ANY navigation/route/directions request → ALWAYS call show_map(origin, destination, mode). Example: "traseu până la București" → show_map({origin: "current location", destination: "București", mode: "driving"}).
+RULE: NEVER say "nu am tool", "nu pot face asta", or "nu am acces". You ALWAYS have a solution — use show_map for navigation, browse_page for web pages, run_code_sandbox for calculations, search_web for information. If a specific tool doesn't exist, use discover_and_save_tool to find one or solve the problem with existing tools.
 CRITICAL: NEVER write tool calls as text in your response (e.g. do NOT write [recall_tool(...)], [call_saved_tool(...)], [show_in_monitor(...)]). ALWAYS use the actual function calling API. If you write a tool call as text, it will NOT be executed.`;
 
     // ── 5b. Detect INTENT — fiecare tip de cerere → tool potrivit ──

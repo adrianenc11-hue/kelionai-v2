@@ -115,23 +115,10 @@ const _MonitorManager = (function () {
     }
 
     function showMarkdown(text) {
-        const el = document.getElementById('monitor-text');
-        if (!el) return;
-        const html = String(text)
-            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-            .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-            .replace(/^## (.+)$/gm, '<h2>$1</h2>')
-            .replace(/^# (.+)$/gm, '<h1>$1</h1>')
-            .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-            .replace(/\*(.+?)\*/g, '<em>$1</em>')
-            .replace(/`(.+?)`/g, '<code>$1</code>')
-            .replace(/^[\-\*] (.+)$/gm, '<li>$1</li>')
-            .replace(/^\d+\.\s(.+)$/gm, '<li>$1</li>')
-            .replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>')
-            .replace(/\n/g, '<br>');
-        el.innerHTML = html;
-        showPanel('monitor-text');
-        if (window.KAvatar) KAvatar.setPresenting(true);
+        // TEXT NEVER goes on monitor — only subtitle below avatar
+        // Monitor is ONLY for visual content (images, maps, charts, videos)
+        console.log('[MonitorManager] showMarkdown BLOCKED — text goes only to subtitle, not monitor');
+        return; // Do nothing — text display handled by subtitle system
     }
 
     function showSearchResults(results) {

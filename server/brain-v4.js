@@ -191,13 +191,16 @@ const TOOL_DEFINITIONS = [
   },
   {
     name: "show_map",
-    description: "Show a location on Google Maps.",
+    description: "Show a location or navigation route on Google Maps. For navigation, provide origin and destination. For a simple location, provide just place.",
     input_schema: {
       type: "object",
       properties: {
-        place: { type: "string", description: "Place name or address" },
+        place: { type: "string", description: "Place name or address (for showing a location)" },
+        origin: { type: "string", description: "Starting point for navigation (e.g. 'my location', 'Constanta')" },
+        destination: { type: "string", description: "Destination for navigation (e.g. 'Bucharest')" },
+        mode: { type: "string", enum: ["driving", "walking", "bicycling", "transit"], description: "Travel mode (default: driving)" },
       },
-      required: ["place"],
+      required: [],
     },
   },
   {
@@ -946,10 +949,21 @@ async function executeTool(brain, toolName, toolInput, userId) {
         }
       }
 
-      // ═══ MAP ═══
-      case "show_map":
-        return { monitorHTML: `<iframe src="https://www.google.com/maps/embed/v1/place?key=${process.env.GOOGLE_MAPS_KEY || ''}&q=${encodeURIComponent(toolInput.place)}" style="width:100%;height:100%;border:0" allowfullscreen></iframe>`, type: 'html', success: true };
-
+      // ═══ MAP + NAVIGATION ═══
+      case "show_map": {
+        const key = process.env.GOOGLE_MAPS_KEY || '';
+        let mapUrl;
+        if (toolInput.origin && toolInput.destination) {
+          // Navigation mode — Google Maps Embed Directions
+          const mode = toolInput.mode || 'driving';
+          mapUrl = `https://www.google.com/maps/embed/v1/directions?key=${key}&origin=${encodeURIComponent(toolInput.origin)}&destination=${encodeURIComponent(toolInput.destination)}&mode=${mode}`;
+        } else {
+          // Simple place mode
+          const place = toolInput.place || toolInput.destination || 'Romania';
+          mapUrl = `https://www.google.com/maps/embed/v1/place?key=${key}&q=${encodeURIComponent(place)}`;
+        }
+        return { monitorHTML: `<iframe src="${mapUrl}" style="width:100%;height:100%;border:0" allowfullscreen></iframe>`, type: 'html', success: true };
+      }
       // ═══ MEMORY ═══
       case "recall_memory":
         return brain._memory ? await brain._memory() : { memories: [] };
