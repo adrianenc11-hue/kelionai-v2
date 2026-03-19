@@ -658,14 +658,31 @@ async function thinkV5(
 
     // ── 5. Build system prompt with FULL context ──
     const geoBlock = mediaData.geo
-      ? `\n[USER LOCATION] Lat: ${mediaData.geo.lat}, Lng: ${mediaData.geo.lng}${mediaData.geo.accuracy ? ` (accuracy: ${Math.round(mediaData.geo.accuracy)}m)` : ""}. Use this for weather, nearby places, and location-aware responses. DO NOT call any tool to get user location — you already have it.`
+      ? `\n[USER LOCATION] Lat: ${mediaData.geo.lat}, Lng: ${mediaData.geo.lng}${mediaData.geo.accuracy ? ` (accuracy: ${Math.round(mediaData.geo.accuracy)}m)` : ""}. Use this for weather, nearby places, and location-aware responses. DO NOT call any tool to get user location — you already have it. WHEN USER ASKS FOR WEATHER WITHOUT SPECIFYING A CITY → use THESE coordinates, DO NOT default to București.`
       : "";
     const memoryBlock = [profileContext, memoryContext].filter(Boolean).join(" || ");
     const emotionBlock = emotionHint
       ? `\n[EMOTIONAL CONTEXT] User mood: ${emotionalTone}. ${emotionHint}`
       : "";
     const now = new Date();
-    const dateTimeBlock = `\n[IMPORTANT — CURRENT DATE & TIME] Astazi este ${now.toLocaleDateString("ro-RO", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}, ora ${now.toLocaleTimeString("ro-RO", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Bucharest" })} (Romania, Europe/Bucharest). ISO: ${now.toISOString()}. NU INVENTA alta data sau ora — foloseste EXACT ce scrie aici cand userul intreaba de timp, data, zi, ora.`;
+    // Dynamic timezone from GPS
+    const userTZ = (() => {
+      if (!mediaData.geo || !mediaData.geo.lng) return 'Europe/Bucharest';
+      const lng = mediaData.geo.lng;
+      if (lng < -100) return 'America/Los_Angeles';
+      if (lng < -60) return 'America/New_York';
+      if (lng < -30) return 'America/Sao_Paulo';
+      if (lng < 0) return 'Europe/London';
+      if (lng < 15) return 'Europe/Paris';
+      if (lng < 30) return 'Europe/Bucharest';
+      if (lng < 45) return 'Europe/Moscow';
+      if (lng < 75) return 'Asia/Dubai';
+      if (lng < 105) return 'Asia/Kolkata';
+      if (lng < 120) return 'Asia/Shanghai';
+      if (lng < 135) return 'Asia/Tokyo';
+      return 'Pacific/Auckland';
+    })();
+    const dateTimeBlock = `\n[IMPORTANT — CURRENT DATE & TIME] Astazi este ${now.toLocaleDateString("ro-RO", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}, ora ${now.toLocaleTimeString("ro-RO", { hour: "2-digit", minute: "2-digit", timeZone: userTZ })} (${userTZ}). ISO: ${now.toISOString()}. NU INVENTA alta data sau ora — foloseste EXACT ce scrie aici cand userul intreaba de timp, data, zi, ora.\n\n[CONVERSAȚIE INTELIGENTĂ — OBLIGATORIU]\nFii MEREU politicos, cald și inițiator de conversație. Nu da răspunsuri seci de 2 cuvinte.\n- La orice salut → răspunde cald + pune O întrebare naturală despre interlocutor\n- Învață DISCRET despre persoana din fața ta: ce face, ce îi place, cum se simte\n- Fii ca un PRIETEN INTELIGENT care chiar vrea să te cunoască\n- Conversația trebuie să curgă NATURAL — nu interoga, ci fii curios\n- Dacă userul spune ceva despre el → arată interes REAL, pune follow-up\n- NICIODATĂ nu da răspunsuri monosilabice (da, nu, ok, bine) — adaugă MEREU valoare\n- Folosește numele userului dacă îl știi\n- Adaptează limba 100% la cea a interlocutorului — conversație fluentă ÎN ORICE LIMBĂ`;
     const patternsBlock = getPatternsText();
     const qualityHints = getQualityHints();
     const proactiveHint = getProactiveSuggestion();
