@@ -205,12 +205,18 @@ const _MonitorManager = (function () {
                 dp.appendChild(box);
             }
             box.style.display = 'block';
-            var iframe = document.createElement('iframe');
-            iframe.style.cssText = 'width:100%;height:100%;min-height:500px;border:none;border-radius:8px;display:block;background:#0a0a1e;';
-            iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-popups');
-            iframe.srcdoc = content;
-            box.innerHTML = '';
-            box.appendChild(iframe);
+            // If content is an iframe (Maps, etc.) — insert directly (no sandbox)
+            if (String(content).trim().startsWith('<iframe')) {
+                box.innerHTML = content.replace(/style="[^"]*"/, 'style="width:100%;height:100%;min-height:500px;border:none;border-radius:8px;"');
+            } else {
+                // Complex HTML (charts, tables) — use srcdoc with sandbox
+                var iframe = document.createElement('iframe');
+                iframe.style.cssText = 'width:100%;height:100%;min-height:500px;border:none;border-radius:8px;display:block;background:#0a0a1e;';
+                iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-popups');
+                iframe.srcdoc = content;
+                box.innerHTML = '';
+                box.appendChild(iframe);
+            }
             if (window.KAvatar) KAvatar.setPresenting(true);
         } else if (type === 'weather' && typeof content === 'object') {
             showWeather(content);
@@ -223,7 +229,8 @@ const _MonitorManager = (function () {
         } else if (type === 'video') {
             showVideo(content);
         } else {
-            showMarkdown(String(content));
+            // NEVER show text on monitor — text goes only to subtitle
+            console.log('[MonitorManager] BLOCKED text on monitor, type:', type);
         }
     }
 
