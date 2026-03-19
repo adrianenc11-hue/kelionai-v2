@@ -21,6 +21,15 @@ const _MonitorManager = (function () {
             const el = document.getElementById(pid);
             if (el) el.style.display = 'none';
         });
+        // Pe mobile, display-panel e ascuns cu transform:translateY(100%) — il aratam
+        const displayPanel = document.getElementById('display-panel');
+        if (displayPanel) {
+            if (id !== 'monitor-default') {
+                displayPanel.classList.add('mobile-visible');
+            } else {
+                displayPanel.classList.remove('mobile-visible');
+            }
+        }
         // Ascunde avatarul cand afisam continut
         if (id !== 'monitor-default') {
             const av = document.getElementById('avatar-area');
