@@ -663,28 +663,29 @@ async function thinkV5(
     if (shouldTryGPT) {
 
       // ═══ Programatic Tool Registry check — inainte de GPT ═══
-      // GPT uneori halucinează tool calls; codul apelează toolurile direct
+      // Cauta tool in registry folosind toate cuvintele relevante din mesaj (cross-language)
       let registryContext = '';
-      if (true) { // Universal: verificam registry pentru ORICE cerere
-        try {
-          // Extragem cuvinte cheie din mesaj (primele 3 cuvinte relevante)
-          const keywords = message.replace(/[?!.,]/g, '').split(/\s+/).filter(w => w.length > 3).slice(0, 4).join(' ');
-          const recallResult = await brain._recallTool(keywords);
-          if (recallResult?.found && recallResult.tools?.length > 0) {
-            const tool = recallResult.tools[0];
-            logger.info({ component: 'BrainV5', tool: tool.name }, '🔧 Registry tool found, calling it');
-            const toolData = await brain._callSavedTool(tool.name, {});
-            if (toolData?.success) {
-              const preview = JSON.stringify(toolData.data).substring(0, 2000);
-              registryContext = `\n\n[DATE LIVE din Tool Registry - tool: ${tool.name}]\n${preview}\n[Foloseste aceste date reale pentru raspuns]`;
-              toolResults.push({ name: tool.name, result: toolData.data });
-              toolsUsed.push(tool.name);
-            }
+      try {
+        // Trimite mesajul complet - _recallTool face root search (6 chars) cross-language
+        const recallResult = await brain._recallTool(message);
+        if (recallResult?.found && recallResult.tools?.length > 0) {
+          const tool = recallResult.tools[0];
+          logger.info({ component: 'BrainV5', tool: tool.name }, '🔧 Registry tool found, calling it programmatically');
+          const toolData = await brain._callSavedTool(tool.name, {});
+          if (toolData?.success) {
+            const preview = JSON.stringify(toolData.data).substring(0, 2000);
+            registryContext = `\n\n[LIVE DATA from Tool Registry - tool: ${tool.name}]\n${preview}\n[Use this real data in your response - translate to user's language if needed]`;
+            toolResults.push({ name: tool.name, result: toolData.data });
+            toolsUsed.push(tool.name);
+          } else {
+            logger.warn({ component: 'BrainV5', tool: tool.name, err: toolData?.error }, '⚠️ Registry tool found but call failed');
           }
-        } catch (regErr) {
-          logger.warn({ component: 'BrainV5', err: regErr.message }, 'Registry check failed');
         }
+      } catch (regErr) {
+        logger.warn({ component: 'BrainV5', err: regErr.message }, 'Registry check failed');
       }
+
+
 
       // ═══ GPT-5.4 PATH — complex messages with tool calling ═══
       const openaiTools = toOpenAITools(TOOL_DEFINITIONS);

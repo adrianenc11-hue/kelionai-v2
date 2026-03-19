@@ -9315,9 +9315,9 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
       .from('brain_tools')
       .select('name, description, endpoint, method, headers_template, body_template, params_schema, usage_count')
       .or(orParts || 'name.ilike.%%')
-      .neq('status', 'broken')
       .order('usage_count', { ascending: false })
       .limit(3);
+
     if (!data?.length) return { found: false, message: `No tool found for: ${query}. Use discover_and_save_tool to find and save a new one.` };
     return { found: true, tools: data };
   }
