@@ -174,16 +174,25 @@ const _MonitorManager = (function () {
             showPanel('monitor-map');
             if (window.KAvatar) KAvatar.setPresenting(true);
         } else if (type === 'html') {
-            const el = document.getElementById('monitor-text');
-            if (!el) return;
-            // Use iframe srcdoc so scripts (Leaflet.js, Chart.js etc.) actually execute
-            const iframe = document.createElement('iframe');
-            iframe.style.cssText = 'width:100%;height:100%;min-height:450px;border:none;border-radius:8px;background:#0a0a1e;display:block;';
+            // HTML (harti, grafice) se afiseaza in left-panel, inlocuind avatarul
+            var av = document.getElementById('avatar-area');
+            var lp = document.getElementById('left-panel');
+            if (!lp) return;
+            if (av) av.style.display = 'none';
+            var box = document.getElementById('_kelion_html_box');
+            if (!box) {
+                box = document.createElement('div');
+                box.id = '_kelion_html_box';
+                box.style.cssText = 'width:100%;height:100%;position:relative;';
+                lp.appendChild(box);
+            }
+            box.style.display = 'block';
+            var iframe = document.createElement('iframe');
+            iframe.style.cssText = 'width:100%;height:100%;min-height:500px;border:none;border-radius:8px;display:block;background:#0a0a1e;';
             iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-popups');
             iframe.srcdoc = content;
-            el.innerHTML = '';
-            el.appendChild(iframe);
-            showPanel('monitor-text');
+            box.innerHTML = '';
+            box.appendChild(iframe);
             if (window.KAvatar) KAvatar.setPresenting(true);
         } else if (type === 'weather' && typeof content === 'object') {
             showWeather(content);
@@ -239,14 +248,16 @@ const _MonitorManager = (function () {
     }
 
     function clear() {
+        // Restaureaza avatarul si ascunde HTML box
+        var box = document.getElementById('_kelion_html_box');
+        if (box) box.style.display = 'none';
+        var av = document.getElementById('avatar-area');
+        if (av) av.style.display = '';
         PANELS.forEach(function (pid) {
-            const el = document.getElementById(pid);
+            var el = document.getElementById(pid);
             if (el) el.style.display = 'none';
         });
-        // Restaureaza avatarul
-        const av = document.getElementById('avatar-area');
-        if (av) av.style.display = '';
-        const def = document.getElementById('monitor-default');
+        var def = document.getElementById('monitor-default');
         if (def) def.style.display = '';
         if (window.KAvatar) KAvatar.setPresenting(false);
     }
