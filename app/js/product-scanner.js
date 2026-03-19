@@ -372,9 +372,13 @@
       return _scanActive;
     },
     toggle: function () {
-      if (_scanActive) stopScan();
-      else startScan();
-      return _scanActive;
+      if (_scanActive) {
+        stopScan();
+        return false;
+      } else {
+        startScan();
+        return true;
+      }
     },
     getDailyScans: function () {
       return _dailyScans;

@@ -300,9 +300,13 @@
       return isActive;
     },
     toggle: function () {
-      if (isActive) stopTranslateMode();
-      else startTranslateMode();
-      return isActive;
+      if (isActive) {
+        stopTranslateMode();
+        return false;
+      } else {
+        startTranslateMode();
+        return true; // will be active (async but we know intent)
+      }
     },
   };
 })();
