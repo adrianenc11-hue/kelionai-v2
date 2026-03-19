@@ -171,7 +171,13 @@ const _MonitorManager = (function () {
         } else if (type === 'html') {
             const el = document.getElementById('monitor-text');
             if (!el) return;
-            el.innerHTML = content;
+            // Use iframe srcdoc so scripts (Leaflet.js, Chart.js etc.) actually execute
+            const iframe = document.createElement('iframe');
+            iframe.style.cssText = 'width:100%;height:100%;min-height:450px;border:none;border-radius:8px;background:#0a0a1e;display:block;';
+            iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-popups');
+            iframe.srcdoc = content;
+            el.innerHTML = '';
+            el.appendChild(iframe);
             showPanel('monitor-text');
             if (window.KAvatar) KAvatar.setPresenting(true);
         } else if (type === 'weather' && typeof content === 'object') {

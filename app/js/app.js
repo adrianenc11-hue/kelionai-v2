@@ -537,7 +537,8 @@
                     }
                     // ── Monitor ──
                     if (evt.monitor && evt.monitor.content && window.showOnMonitor) {
-                      showOnMonitor(evt.monitor.content, evt.monitor.type || 'url');
+                      showOnMonitor(evt.monitor.content, evt.monitor.type || 'html');
+
                     }
                   } // end done
                 } catch (_pe) {
@@ -619,7 +620,8 @@
 
         // Monitor content
         if (data.monitor && data.monitor.content) {
-          showOnMonitor(data.monitor.content, data.monitor.type);
+          showOnMonitor(data.monitor.content, data.monitor.type || 'html');
+
         } else if (data.monitor && data.monitor.search_results) {
           if (window.MonitorManager) MonitorManager.showSearchResults(data.monitor.search_results);
         } else if (data.monitor && data.monitor.weather) {
