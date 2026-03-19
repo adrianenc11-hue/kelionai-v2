@@ -411,212 +411,82 @@ router.post('/chat/stream', chatLimiter, validate(chatSchema), async (req, res) 
     res.write(`data: ${JSON.stringify({ type: 'thinking' })}\n\n`);
 
     const isAdminStream = isOwnerStream && req.headers['x-admin-mode'] === 'true';
-    const thought = await brain.think(message, avatar, history, language, user?.id, conversationId, {}, isAdminStream);
 
-    if (thought.monitor.content) {
-      res.write(
-        `data: ${JSON.stringify({ type: 'monitor', content: thought.monitor.content, monitorType: thought.monitor.type })}\n\n`
-      );
-    }
-
-    let memoryContext = '';
-    if (user && supabaseAdmin) {
-      try {
-        const { data: prefs } = await supabaseAdmin
-          .from('user_preferences')
-          .select('key, value')
-          .eq('user_id', user.id)
-          .limit(30);
-        if (prefs?.length > 0) memoryContext = prefs.map((p) => `${p.key}: ${JSON.stringify(p.value)}`).join('; ');
-      } catch (e) {
-        logger.warn({ component: 'Stream', err: e.message }, 'user_preferences read failed');
-      }
-    }
-    const systemPrompt =
-      process.env.NEWBORN_MODE === 'true'
-        ? buildNewbornPrompt(memoryContext)
-        : buildSystemPrompt(
-            avatar,
-            language,
-            memoryContext,
-            { failedTools: thought.failedTools },
-            thought.chainOfThought
-          );
-    const compressedHist = thought.compressedHistory || history.slice(-10);
-    const msgs = compressedHist.map((h) => ({
-      role: h.role === 'ai' ? 'assistant' : h.role,
-      content: h.content,
-    }));
-    msgs.push({ role: 'user', content: sanitizeReply(thought.enrichedMessage) });
+    // ── ThinkV5: acelasi brain ca /api/chat ─────────────────────────────────
+    const { thinkV5 } = require('../brain-v5');
+    const imageBase64 = req.body.imageBase64 || null;
+    const geo = req.body.geo || null;
 
     let fullReply = '';
-    const _heartbeat = setInterval(() => {
-      try {
-        res.write(':heartbeat\n\n');
-      } catch {
-        /* connection closed */
-      }
-    }, 15000);
+    let thought;
 
-    // AI Chain: Gemini (streaming nativ) → GPT-5.4 fallback → DeepSeek (backup)
-    // NOTĂ: Chain-ul pe /chat/stream diferă INTENȚIONAT de /chat.
-    // /chat: Gemini V4 cu tool calling (prin brain-v4.js)
-    // /chat/stream: Gemini→GPT-5.4→DeepSeek (streaming word-by-word)
-    // Try Gemini streaming
-    const geminiKey = process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
-    if (geminiKey) {
-      try {
-        const geminiModel = MODELS.GEMINI_CHAT;
-        const r = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:streamGenerateContent?alt=sse&key=${geminiKey}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: msgs.map((m) => ({
-                role: m.role === 'assistant' ? 'model' : m.role,
-                parts: [{ text: m.content }],
-              })),
-              systemInstruction: { parts: [{ text: systemPrompt }] },
-              generationConfig: { maxOutputTokens: 4096, temperature: 0.7 },
-            }),
-          }
-        );
-
-        if (r.ok && r.body) {
-          res.write(`data: ${JSON.stringify({ type: 'start', engine: 'Gemini' })}\n\n`);
-          let buffer = '';
-
-          const { Readable } = require('stream');
-          const nodeStream = typeof r.body.on === 'function' ? r.body : Readable.fromWeb(r.body);
-
-          await new Promise((resolve, reject) => {
-            nodeStream.on('data', (chunk) => {
-              buffer += chunk.toString();
-              const lines = buffer.split('\n');
-              buffer = lines.pop() || '';
-
-              for (const line of lines) {
-                if (!line.startsWith('data: ')) continue;
-                const data = line.slice(6).trim();
-                if (data === '[DONE]') continue;
-                try {
-                  const parsed = JSON.parse(data);
-                  const text = parsed.candidates?.[0]?.content?.parts?.[0]?.text;
-                  if (text) {
-                    fullReply += text;
-                    res.write(`data: ${JSON.stringify({ type: 'chunk', text })}\n\n`);
-                  }
-                } catch (e) {
-                  logger.warn({ component: 'Chat', err: e.message }, 'skip parse errors');
-                }
-              }
-            });
-            nodeStream.on('end', resolve);
-            nodeStream.on('error', reject);
-          });
-        }
-      } catch (e) {
-        logger.warn({ component: 'Stream', err: e.message }, 'Gemini');
-      }
-    }
-    // Log Gemini streaming cost
-    if (fullReply) {
-      const estInputTok = Math.ceil(msgs.reduce((s, m) => s + (m.content || '').length, 0) / 4);
-      const estOutputTok = Math.ceil(fullReply.length / 4);
-      brain
-        ._logCost(
-          'Google',
-          'gemini-streaming',
-          estInputTok,
-          estOutputTok,
-          (estInputTok * 0.075 + estOutputTok * 0.3) / 1000000,
-          user?.id
-        )
-        .catch(() => {});
-    }
-
-    // Fallback: non-streaming GPT-5.4 (via OPENAI_FALLBACK) or DeepSeek
-    if (!fullReply) {
-      if (process.env.OPENAI_API_KEY) {
+    try {
+      thought = await Promise.race([
+        thinkV5(brain, message, avatar, history, language, user?.id, conversationId,
+          { imageBase64, geo, isAutoCamera: req.body.isAutoCamera || false }, isAdminStream),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('brain_timeout_30s')), 30000)),
+      ]);
+    } catch (brainErr) {
+      logger.warn({ component: 'Stream', err: brainErr.message }, 'ThinkV5 failed — Gemini emergency');
+      const gKey = process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
+      let emergText = '';
+      if (gKey) {
         try {
-          const r = await fetch('https://api.openai.com/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: 'Bearer ' + process.env.OPENAI_API_KEY,
-            },
-            body: JSON.stringify({
-              model: MODELS.OPENAI_FALLBACK,
-              max_tokens: 4096,
-              messages: [{ role: 'system', content: systemPrompt }, ...msgs],
-            }),
-          });
-          const d = await r.json();
-          fullReply = d.choices?.[0]?.message?.content || '';
-          if (fullReply) {
-            res.write(`data: ${JSON.stringify({ type: 'start', engine: 'GPT-5.4' })}\n\n`);
-            res.write(`data: ${JSON.stringify({ type: 'chunk', text: fullReply })}\n\n`);
-          }
-        } catch (e) {
-          logger.warn({ component: 'Stream', err: e.message }, 'GPT-5.4 fallback failed');
-        }
-        // Log OpenAI cost
-        if (fullReply) {
-          const estInputTok = Math.ceil(msgs.reduce((s, m) => s + (m.content || '').length, 0) / 4);
-          const estOutputTok = Math.ceil(fullReply.length / 4);
-          brain
-            ._logCost(
-              'OpenAI',
-              'gpt-5.4-fallback',
-              estInputTok,
-              estOutputTok,
-              (estInputTok * 5 + estOutputTok * 15) / 1000000,
-              user?.id
-            )
-            .catch(() => {});
-        }
+          const { buildSystemPrompt } = require('../persona');
+          const eSys = buildSystemPrompt(avatar, language, '', '', null);
+          const eCtrl = new AbortController();
+          setTimeout(() => eCtrl.abort(), 12000);
+          const eR = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${gKey}`,
+            { method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: eCtrl.signal,
+              body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: message }] }], systemInstruction: { parts: [{ text: eSys }] }, generationConfig: { maxOutputTokens: 1024, temperature: 0.7 } }) }
+          ).catch(() => null);
+          if (eR?.ok) { const eD = await eR.json(); emergText = (eD.candidates?.[0]?.content?.parts || []).filter(p => p.text).map(p => p.text).join(''); }
+        } catch (_) {}
       }
+      emergText = emergText || (language === 'ro' ? 'Îmi pare rău, am o problemă tehnică temporară. Încearcă din nou. 🔧' : 'Sorry, temporary issue. Try again. 🔧');
+      res.write(`data: ${JSON.stringify({ type: 'start', engine: 'gemini-emergency' })}\n\n`);
+      res.write(`data: ${JSON.stringify({ type: 'chunk', text: emergText })}\n\n`);
+      fullReply = emergText;
+      // va cădea pe cleanup la liniile de mai jos
     }
-    if (!fullReply && process.env.DEEPSEEK_API_KEY) {
-      try {
-        const r = await fetch('https://api.deepseek.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: 'Bearer ' + process.env.DEEPSEEK_API_KEY,
-          },
-          body: JSON.stringify({
-            model: MODELS.DEEPSEEK,
-            max_tokens: 4096,
-            messages: [{ role: 'system', content: systemPrompt }, ...msgs],
-          }),
-        });
-        const d = await r.json();
-        fullReply = d.choices?.[0]?.message?.content || '';
-        if (fullReply) {
-          res.write(`data: ${JSON.stringify({ type: 'start', engine: 'DeepSeek' })}\n\n`);
-          res.write(`data: ${JSON.stringify({ type: 'chunk', text: fullReply })}\n\n`);
-        }
-      } catch (e) {
-        logger.warn({ component: 'Stream', err: e.message }, 'DeepSeek fallback failed');
+
+    if (thought) {
+      // ── Trimite monitor daca exista ──
+      if (thought.monitor?.content) {
+        res.write(`data: ${JSON.stringify({ type: 'monitor', content: thought.monitor.content, monitorType: thought.monitor.type })}\n\n`);
       }
-      // Log DeepSeek cost
+
+      // ── Trimite comenzi avatar (emotie, gesturi, pose, body, gaze) ──
+      res.write(`data: ${JSON.stringify({
+        type: 'avatar',
+        emotion: thought.emotion || 'neutral',
+        gestures: thought.gestures || [],
+        pose: thought.pose || null,
+        bodyActions: thought.bodyActions || [],
+        gaze: thought.gaze || null,
+      })}\n\n`);
+
+      // ── Trimite actiuni (camera_on, translate_on, etc.) ──
+      if (thought.actions?.length) {
+        res.write(`data: ${JSON.stringify({ type: 'actions', actions: thought.actions })}\n\n`);
+      }
+
+      // ── Stream word-by-word ──────────────────────────────────────────────
+      fullReply = sanitizeReply(thought.enrichedMessage || '');
+      res.write(`data: ${JSON.stringify({ type: 'start', engine: thought.agent || 'v5' })}\n\n`);
+
       if (fullReply) {
-        const estInputTok = Math.ceil(msgs.reduce((s, m) => s + (m.content || '').length, 0) / 4);
-        const estOutputTok = Math.ceil(fullReply.length / 4);
-        brain
-          ._logCost(
-            'DeepSeek',
-            'deepseek',
-            estInputTok,
-            estOutputTok,
-            (estInputTok * 0.14 + estOutputTok * 0.28) / 1000000,
-            user?.id
-          )
-          .catch(() => {});
+        // Split pe cuvinte pastrând spatiile
+        const tokens = fullReply.split(/(\s+)/);
+        for (const tok of tokens) {
+          if (!tok) continue;
+          res.write(`data: ${JSON.stringify({ type: 'chunk', text: tok })}\n\n`);
+          await new Promise(r => setTimeout(r, 2)); // 2ms delay for natural feel
+        }
       }
     }
+
 
     let savedConvId = conversationId;
     if (fullReply && supabaseAdmin) {
