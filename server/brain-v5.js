@@ -657,16 +657,32 @@ async function thinkV5(
     const shouldTryGPT = process.env.OPENAI_API_KEY && intent !== 'weather' && intent !== 'tool_use';
     if (shouldTryGPT) {
 
+      // ═══ Programatic Tool Registry check — inainte de GPT ═══
+      // GPT uneori halucinează tool calls; codul apelează toolurile direct
+      let registryContext = '';
+      if (true) { // Universal: verificam registry pentru ORICE cerere
+        try {
+          // Extragem cuvinte cheie din mesaj (primele 3 cuvinte relevante)
+          const keywords = message.replace(/[?!.,]/g, '').split(/\s+/).filter(w => w.length > 3).slice(0, 4).join(' ');
+          const recallResult = await brain._recallTool(keywords);
+          if (recallResult?.found && recallResult.tools?.length > 0) {
+            const tool = recallResult.tools[0];
+            logger.info({ component: 'BrainV5', tool: tool.name }, '🔧 Registry tool found, calling it');
+            const toolData = await brain._callSavedTool(tool.name, {});
+            if (toolData?.success) {
+              const preview = JSON.stringify(toolData.data).substring(0, 2000);
+              registryContext = `\n\n[DATE LIVE din Tool Registry - tool: ${tool.name}]\n${preview}\n[Foloseste aceste date reale pentru raspuns]`;
+              toolResults.push({ name: tool.name, result: toolData.data });
+              toolsUsed.push(tool.name);
+            }
+          }
+        } catch (regErr) {
+          logger.warn({ component: 'BrainV5', err: regErr.message }, 'Registry check failed');
+        }
+      }
+
       // ═══ GPT-5.4 PATH — complex messages with tool calling ═══
       const openaiTools = toOpenAITools(TOOL_DEFINITIONS);
-
-      // Adauga instructiuni explicite pentru Tool Registry
-      const registryInstruction = `\n\n## TOOL REGISTRY — REGULA OBLIGATORIE
-Pentru ORICE cerere care necesita date in timp real, live, actuale (zbor, curs valutar, seism, stiri, trafic, sport LIVE, etc.):
-1. INTAI apeleaza recall_tool cu cuvinte cheie din cerere
-2. Daca gasesti un tool: apeleaza call_saved_tool cu parametrii necesari
-3. Daca recall_tool returneaza "not found": apeleaza discover_and_save_tool cu endpoint-ul API potrivit pe care il cunosti sau l-ai cautat
-Raspunde INTOTDEAUNA cu date reale din tool, nu din cunostinte proprii pentru date in timp real.`;
 
       // Build OpenAI message array
       const msgs = recentHistory.map((h) => ({
@@ -695,12 +711,12 @@ Raspunde INTOTDEAUNA cu date reale din tool, nu din cunostinte proprii pentru da
         userContent.push({ type: "text", text: message });
         msgs.push({ role: "user", content: userContent });
       } else {
-        msgs.push({ role: "user", content: message });
+        msgs.push({ role: "user", content: registryContext ? message + registryContext : message });
       }
 
       // Tool calling loop — MAX 2 rounds
       let currentMsgs = msgs;
-      const gptSystemPrompt = systemPrompt + registryInstruction;
+      const gptSystemPrompt = systemPrompt;
 
       for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
         const response = await callOpenAI(
