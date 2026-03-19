@@ -13,8 +13,13 @@ const _MonitorManager = (function () {
             const el = document.getElementById(pid);
             if (el) el.style.display = 'none';
         });
+        // Ascunde avatarul cand afisam continut
+        if (id !== 'monitor-default') {
+            const av = document.getElementById('avatar-area');
+            if (av) av.style.display = 'none';
+        }
         const el = document.getElementById(id);
-        if (el) el.style.display = '';
+        if (el) el.style.display = 'block';
     }
 
     function showImage(url, caption) {
@@ -234,7 +239,15 @@ const _MonitorManager = (function () {
     }
 
     function clear() {
-        showPanel('monitor-default');
+        PANELS.forEach(function (pid) {
+            const el = document.getElementById(pid);
+            if (el) el.style.display = 'none';
+        });
+        // Restaureaza avatarul
+        const av = document.getElementById('avatar-area');
+        if (av) av.style.display = '';
+        const def = document.getElementById('monitor-default');
+        if (def) def.style.display = '';
         if (window.KAvatar) KAvatar.setPresenting(false);
     }
 
