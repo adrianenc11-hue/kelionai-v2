@@ -2739,9 +2739,12 @@ async function executeTool(brain, toolName, toolInput, userId) {
 function extractMonitor(toolResults) {
   for (const r of toolResults) {
     if (r.result && typeof r.result === "object") {
+      if (r.result.mapHTML)
+        return { content: r.result.mapHTML, type: 'html' }; // iframe embed direct
       if (r.result.monitorURL)
         return { content: r.result.monitorURL, type: "url" };
       if (r.result.mapURL) return { content: r.result.mapURL, type: "map" };
+
       if (r.result.imageUrl)
         return { content: r.result.imageUrl, type: "image" };
       if (r.result.radioURL || r.result.streamUrl)

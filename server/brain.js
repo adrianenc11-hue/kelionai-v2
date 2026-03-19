@@ -9320,11 +9320,14 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
   _map(place) {
     this.toolStats.map++;
     const mapsKey = process.env.GOOGLE_MAPS_KEY;
-    const url = mapsKey
-      ? `https://www.google.com/maps/embed/v1/place?key=${mapsKey}&q=${encodeURIComponent(place)}`
-      : `https://www.openstreetmap.org/search?query=${encodeURIComponent(place)}`;
-    return { place, url };
+    // URL embed pentru iframe (NU deschide Google Maps extern)
+    const mapURL = mapsKey
+      ? `https://www.google.com/maps/embed/v1/place?key=${mapsKey}&q=${encodeURIComponent(place)}&zoom=6`
+      : `https://www.openstreetmap.org/export/embed.html?bbox=-30,25,45,75&layer=mapnik&marker=52,10`;
+    const mapHTML = `<iframe width="100%" height="100%" frameborder="0" style="border:0;border-radius:12px;min-height:400px" src="${mapURL}" allowfullscreen loading="lazy"></iframe>`;
+    return { place, mapURL, mapHTML };
   }
+
 
   // ═══════════════════════════════════════════════════════════
   // 10. AUTO-LEARNING — Extract facts + learn from interaction
