@@ -173,7 +173,8 @@ router.post('/chat', chatLimiter, validate(chatSchema), async (req, res) => {
       });
 
     // ═══ BRAIN V5: GPT-5.4 + Gemini hybrid — timeout global 30s ═══
-    const BRAIN_TIMEOUT_MS = 30000;
+    const BRAIN_TIMEOUT_MS = 60000;
+
     let thought;
     try {
       thought = await Promise.race([
@@ -424,7 +425,8 @@ router.post('/chat/stream', chatLimiter, validate(chatSchema), async (req, res) 
       thought = await Promise.race([
         thinkV5(brain, message, avatar, history, language, user?.id, conversationId,
           { imageBase64, geo, isAutoCamera: req.body.isAutoCamera || false }, isAdminStream),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('brain_timeout_30s')), 30000)),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('brain_timeout_60s')), 60000)),
+
       ]);
     } catch (brainErr) {
       logger.warn({ component: 'Stream', err: brainErr.message }, 'ThinkV5 failed — Gemini emergency');

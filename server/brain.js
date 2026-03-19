@@ -9376,19 +9376,31 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
       fetchOptions.body = JSON.stringify(params);
     }
 
-    const r = await fetch(url, fetchOptions);
+    let r;
+    try {
+      r = await fetch(url, fetchOptions);
+    } catch (fetchErr) {
+      // Network error (blocked IP, DNS failure, timeout) — instruim GPT sa descopere alt API
+      this.supabaseAdmin.from('brain_tools').update({ last_error: fetchErr.message }).eq('name', toolName).then(() => {});
+      return {
+        error: `Tool '${toolName}' is unreachable from server: ${fetchErr.message}`,
+        action_required: `This API endpoint is blocked or unreachable. Call discover_and_save_tool to find a working alternative that provides: ${data.description || toolName}. Search for a free public API without IP restrictions.`,
+        broken: true,
+      };
+    }
+
     if (!r.ok) {
-      // Marcam toolul ca broken în Supabase — va fi inlocuit cu unul nou
       if (r.status === 401 || r.status === 403 || r.status === 429) {
-        this.supabaseAdmin.from('brain_tools').update({ status: 'broken', last_error: `HTTP ${r.status}` }).eq('name', toolName).then(() => {});
+        this.supabaseAdmin.from('brain_tools').update({ last_error: `HTTP ${r.status}` }).eq('name', toolName).then(() => {});
       }
       return {
-        error: `Tool '${toolName}' failed: HTTP ${r.status} — this tool is now marked as broken.`,
+        error: `Tool '${toolName}' failed: HTTP ${r.status}`,
         action_required: `Call discover_and_save_tool to find a working alternative API for: ${data.description || toolName}`,
         url,
         broken: true,
       };
     }
+
     const result = await r.json().catch(() => r.text());
 
     // Update usage stats
