@@ -1034,7 +1034,7 @@ CRITICAL: NEVER write tool calls as text in your response (e.g. do NOT write [re
     let engine = 'gemini-search-grounding';
     let monitorFromTools = null; 
     let gptMonitor = null; // Capturat din show_in_monitor apelat de GPT-5.4
-    const MAX_TOOL_ROUNDS = 4; // Lanț complet: recall → call_saved → show_in_monitor
+    const MAX_TOOL_ROUNDS = 10; // Agentic loop: up to 10 tool iterations for complex tasks
 
 
 

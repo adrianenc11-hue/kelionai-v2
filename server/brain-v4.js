@@ -1565,6 +1565,46 @@ const TOOL_DEFINITIONS = [
       required: ["action"],
     },
   },
+  // ═══ TERMINAL ACCESS ════════════════════════════════════════
+  {
+    name: "run_terminal",
+    description: "Execute a shell command on the server. Only whitelisted safe commands are allowed: git, npm, ls, cat, grep, find, wc, head, tail, echo, pwd, df, free, uptime. Use for checking git status, running tests, viewing files, searching code. Max 30s timeout.",
+    input_schema: {
+      type: "object",
+      properties: {
+        command: { type: "string", description: "Shell command to execute (must start with a whitelisted command)" },
+        cwd: { type: "string", description: "Working directory relative to project root (default: project root)" },
+      },
+      required: ["command"],
+    },
+  },
+  // ═══ MULTI-FILE AWARENESS ═══════════════════════════════════
+  {
+    name: "list_directory",
+    description: "List files and directories in your own project. Shows file names, sizes, and types. Use to understand project structure, find files, or see what files exist.",
+    input_schema: {
+      type: "object",
+      properties: {
+        path: { type: "string", description: "Relative path from project root (default: '.')" },
+        maxDepth: { type: "number", description: "Max depth for recursive listing (default: 2, max: 4)" },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "search_own_code",
+    description: "Search through your own source code using grep. Find functions, variables, patterns, bugs, or any text across all project files. Returns matching lines with file paths and line numbers.",
+    input_schema: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Text or regex pattern to search for" },
+        path: { type: "string", description: "Subdirectory to search in (default: whole project)" },
+        filePattern: { type: "string", description: "File pattern filter, e.g. '*.js' or '*.css'" },
+        caseSensitive: { type: "boolean", description: "Case sensitive search (default: false)" },
+      },
+      required: ["query"],
+    },
+  },
 ];
 
 // ── Tool executor: maps tool names to brain methods ──
@@ -3118,6 +3158,121 @@ async function executeTool(brain, toolName, toolInput, userId) {
         }
 
         return { error: `Unknown task_plan action: ${action}` };
+      }
+
+      // ═══ TERMINAL ACCESS ═══
+      case "run_terminal": {
+        const { execSync } = require('child_process');
+        const pathMod = require('path');
+        const cmd = (toolInput.command || '').trim();
+        if (!cmd) return { error: 'No command provided' };
+
+        // Whitelist first word
+        const firstWord = cmd.split(/\s+/)[0].replace(/[^a-zA-Z0-9_-]/g, '');
+        const allowed = ['git','npm','npx','ls','dir','cat','grep','find','wc','head','tail','echo','pwd','df','free','uptime','node','which','env'];
+        const blocked = ['rm','del','kill','reboot','shutdown','format','mkfs','dd','wget','curl','>','|','&&','||','sudo','chmod','chown'];
+
+        if (!allowed.includes(firstWord)) {
+          return { error: `Command '${firstWord}' not whitelisted. Allowed: ${allowed.join(', ')}` };
+        }
+        if (blocked.some(b => cmd.includes(b))) {
+          return { error: `Command contains blocked operator/keyword` };
+        }
+
+        const projectRoot = pathMod.resolve(__dirname, '..');
+        const cwd = toolInput.cwd ? pathMod.resolve(projectRoot, toolInput.cwd.replace(/\.\./g, '')) : projectRoot;
+
+        try {
+          const output = execSync(cmd, {
+            cwd,
+            timeout: 30000,
+            maxBuffer: 1024 * 1024,
+            encoding: 'utf8',
+            env: { ...process.env, PAGER: 'cat' },
+          });
+          logger.info({ component: 'Terminal', cmd: cmd.substring(0, 100) }, 'Command executed');
+          return { success: true, command: cmd, output: (output || '').substring(0, 5000) };
+        } catch (e) {
+          return { success: false, command: cmd, error: e.message.substring(0, 2000), stderr: (e.stderr || '').substring(0, 2000) };
+        }
+      }
+
+      // ═══ LIST DIRECTORY ═══
+      case "list_directory": {
+        const fs = require('fs');
+        const pathMod = require('path');
+        const projectRoot = pathMod.resolve(__dirname, '..');
+        const relPath = (toolInput.path || '.').replace(/\.\./g, '');
+        const fullPath = pathMod.resolve(projectRoot, relPath);
+        const maxDepth = Math.min(toolInput.maxDepth || 2, 4);
+
+        if (!fs.existsSync(fullPath)) return { error: `Path not found: ${relPath}` };
+
+        function listDir(dir, depth, prefix) {
+          if (depth > maxDepth) return [];
+          const items = [];
+          try {
+            const entries = fs.readdirSync(dir, { withFileTypes: true });
+            for (const e of entries) {
+              if (e.name.startsWith('.') || e.name === 'node_modules') continue;
+              const rel = pathMod.relative(projectRoot, pathMod.join(dir, e.name));
+              if (e.isDirectory()) {
+                items.push({ path: rel, type: 'dir' });
+                if (depth < maxDepth) items.push(...listDir(pathMod.join(dir, e.name), depth + 1, rel));
+              } else {
+                const stat = fs.statSync(pathMod.join(dir, e.name));
+                items.push({ path: rel, type: 'file', size: stat.size, ext: pathMod.extname(e.name) });
+              }
+            }
+          } catch (_) {}
+          return items;
+        }
+
+        const items = listDir(fullPath, 1, relPath);
+        return { path: relPath, total: items.length, items: items.slice(0, 200) };
+      }
+
+      // ═══ SEARCH OWN CODE ═══
+      case "search_own_code": {
+        const { execSync } = require('child_process');
+        const pathMod = require('path');
+        const query = (toolInput.query || '').trim();
+        if (!query) return { error: 'No search query' };
+        if (query.length > 200) return { error: 'Query too long (max 200 chars)' };
+
+        const projectRoot = pathMod.resolve(__dirname, '..');
+        const searchPath = toolInput.path ? pathMod.resolve(projectRoot, (toolInput.path || '').replace(/\.\./g, '')) : projectRoot;
+
+        const flags = toolInput.caseSensitive ? '-rn' : '-rin';
+        let includeFlag = '';
+        if (toolInput.filePattern) {
+          includeFlag = ` --include="${toolInput.filePattern.replace(/[^a-zA-Z0-9.*_-]/g, '')}"`;
+        }
+
+        try {
+          const cmd = `grep ${flags}${includeFlag} --exclude-dir=node_modules --exclude-dir=.git -l "${query.replace(/"/g, '\\"')}" .`;
+          const output = execSync(cmd, { cwd: searchPath, timeout: 10000, maxBuffer: 512 * 1024, encoding: 'utf8' });
+          const files = output.trim().split('\n').filter(Boolean).slice(0, 30);
+
+          // Get matching lines from top 10 files
+          const results = [];
+          for (const file of files.slice(0, 10)) {
+            try {
+              const lineCmd = `grep ${flags}${includeFlag} "${query.replace(/"/g, '\\"')}" "${file}"`;
+              const lines = execSync(lineCmd, { cwd: searchPath, timeout: 5000, encoding: 'utf8' });
+              const matches = lines.trim().split('\n').slice(0, 5).map(l => {
+                const m = l.match(/^(\d+):(.*)/);
+                return m ? { line: parseInt(m[1]), text: m[2].trim().substring(0, 150) } : { text: l.substring(0, 150) };
+              });
+              results.push({ file: file.replace('./', ''), matches });
+            } catch (_) {}
+          }
+
+          return { query, files_found: files.length, results };
+        } catch (e) {
+          if (e.status === 1) return { query, files_found: 0, results: [], message: 'No matches found' };
+          return { error: `Search failed: ${e.message.substring(0, 200)}` };
+        }
       }
 
       default:
