@@ -9370,17 +9370,30 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
     }
 
     const r = await fetch(url, fetchOptions);
-    if (!r.ok) return { error: `Tool call failed: HTTP ${r.status}`, url };
+    if (!r.ok) {
+      // Marcam toolul ca broken în Supabase — va fi inlocuit cu unul nou
+      if (r.status === 401 || r.status === 403 || r.status === 429) {
+        this.supabaseAdmin.from('brain_tools').update({ status: 'broken', last_error: `HTTP ${r.status}` }).eq('name', toolName).then(() => {});
+      }
+      return {
+        error: `Tool '${toolName}' failed: HTTP ${r.status} — this tool is now marked as broken.`,
+        action_required: `Call discover_and_save_tool to find a working alternative API for: ${data.description || toolName}`,
+        url,
+        broken: true,
+      };
+    }
     const result = await r.json().catch(() => r.text());
 
     // Update usage stats
     this.supabaseAdmin.from('brain_tools').update({
       usage_count: (data.usage_count || 0) + 1,
       success_count: (data.success_count || 0) + 1,
+      status: 'active',
     }).eq('name', toolName).then(() => {});
 
     return { success: true, data: result, tool: toolName, url };
   }
+
 
 
   _map(place) {
