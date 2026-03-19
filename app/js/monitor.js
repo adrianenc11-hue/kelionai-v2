@@ -183,13 +183,15 @@ const _MonitorManager = (function () {
 
     function show(content, type) {
         console.log('[MonitorManager] show() called with type:', type, 'content length:', String(content).length, 'content start:', String(content).substring(0, 60));
-        // Dedup: skip if same content already displayed
-        const hash = String(content).substring(0, 200) + '|' + (type || '');
-        if (hash === _lastContentHash) {
-            console.log('[MonitorManager] DEDUP: skipping, same content already displayed');
+        // Dedup: skip if EXACT same content in rapid succession (<500ms)
+        const hash = String(content).substring(0, 300) + '|' + (type || '');
+        const now = Date.now();
+        if (hash === _lastContentHash && (now - (_lastContentTime || 0)) < 500) {
+            console.log('[MonitorManager] DEDUP: skipping rapid duplicate');
             return;
         }
         _lastContentHash = hash;
+        _lastContentTime = now;
 
         if (type === 'image') {
             showImage(content);

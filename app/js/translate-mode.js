@@ -101,7 +101,8 @@
     return div.innerHTML;
   }
 
-  // ── Request high-quality mic with noise suppression ────────
+  // ── Advanced mic with AGC + Noise Filter via Web Audio API ──
+  let audioContext = null;
   async function requestCleanMic() {
     try {
       audioStream = await navigator.mediaDevices.getUserMedia({
@@ -113,7 +114,44 @@
           sampleRate: 48000,
         },
       });
-      console.log('[Translate] Clean mic acquired (noise suppression ON)');
+
+      // Web Audio API: compressor → highpass → gain normalization
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const source = audioContext.createMediaStreamSource(audioStream);
+
+      // 1. High-pass filter — eliminates low-frequency noise (hum, rumble)
+      const highpass = audioContext.createBiquadFilter();
+      highpass.type = 'highpass';
+      highpass.frequency.value = 85; // cuts below 85Hz
+      highpass.Q.value = 0.7;
+
+      // 2. Low-pass filter — eliminates high-frequency hiss
+      const lowpass = audioContext.createBiquadFilter();
+      lowpass.type = 'lowpass';
+      lowpass.frequency.value = 8000; // keeps voice band
+      lowpass.Q.value = 0.7;
+
+      // 3. Dynamic compressor — auto-levels volume (AGC)
+      //    TV distant = boost, close voice = compress
+      const compressor = audioContext.createDynamicsCompressor();
+      compressor.threshold.value = -40;  // start compressing at -40dB
+      compressor.knee.value = 12;
+      compressor.ratio.value = 8;        // strong compression ratio
+      compressor.attack.value = 0.003;   // fast react
+      compressor.release.value = 0.15;   // smooth release
+
+      // 4. Gain boost — raises signal after compression
+      const gainNode = audioContext.createGain();
+      gainNode.gain.value = 2.5; // +8dB boost for distant TV/film audio
+
+      // Chain: mic → highpass → lowpass → compressor → gain → destination
+      source.connect(highpass);
+      highpass.connect(lowpass);
+      lowpass.connect(compressor);
+      compressor.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+
+      console.log('[Translate] Advanced AGC pipeline active: highpass(85Hz) → lowpass(8kHz) → compressor → gain(+8dB)');
     } catch (e) {
       console.warn('[Translate] Mic request failed:', e.message);
     }
@@ -239,6 +277,12 @@
     if (audioStream) {
       audioStream.getTracks().forEach((t) => t.stop());
       audioStream = null;
+    }
+
+    // Release Web Audio AGC
+    if (audioContext) {
+      audioContext.close().catch(() => {});
+      audioContext = null;
     }
 
     // Remove overlay
