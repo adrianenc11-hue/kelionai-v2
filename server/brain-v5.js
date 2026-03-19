@@ -194,14 +194,99 @@ async function callOpenAI(messages, systemPrompt, tools, model) {
 }
 
 
-// ═══════════════════════════════════════════════════════════════
-// Call Gemini Flash (for simple messages and Quality Gate)
-// ═══════════════════════════════════════════════════════════════
-
+// ── Quality Gate: Gemini Flash verifies critical GPT-5.4 responses ──
 
 // ═══════════════════════════════════════════════════════════════
-// Quality Gate: Gemini Flash verifies critical GPT-5.4 responses
+// PRE-FETCH Real-time data (weather/search) BEFORE calling AI
+// Eliminates tool-calling timeout issues — AI just formats the data
 // ═══════════════════════════════════════════════════════════════
+async function getRealtimeContext(message, brain, userId) {
+  const lower = (message || '').toLowerCase();
+  const parts = [];
+
+  // ── Weather ──
+  const weatherMatch = lower.match(/\b(?:vrem[ea]|meteo|weather|temperatura|grad[e]?|ploaie|soare|frig|cald)\b/i);
+  const weatherCityMatch = message.match(/(?:în|in|la|at|for|pentru)\s+([A-ZĂÎÂȘȚ][a-zA-ZăîâșțĂÎÂȘȚ\s]{2,20})/);
+  if (weatherMatch) {
+    try {
+      const city = weatherCityMatch?.[1]?.trim() || 'Bucharest';
+      // Geocode city first
+      const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=ro`;
+      const geoCtrl = new AbortController();
+      const geoTimer = setTimeout(() => geoCtrl.abort(), 5000);
+      const geoR = await fetch(geoUrl, { signal: geoCtrl.signal }).finally(() => clearTimeout(geoTimer));
+      if (geoR.ok) {
+        const geoData = await geoR.json();
+        const loc = geoData.results?.[0];
+        if (loc) {
+          const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${loc.latitude}&longitude=${loc.longitude}&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,precipitation&wind_speed_unit=kmh&timezone=auto`;
+          const wCtrl = new AbortController();
+          const wTimer = setTimeout(() => wCtrl.abort(), 5000);
+          const wR = await fetch(weatherUrl, { signal: wCtrl.signal }).finally(() => clearTimeout(wTimer));
+          if (wR.ok) {
+            const wData = await wR.json();
+            const c = wData.current;
+            const codes = { 0:'Cer senin☀️', 1:'Parțial noros🌤️', 2:'Noros⛅', 3:'Acoperit☁️', 45:'Ceatos🌫️', 48:'Ceatos🌫️', 51:'Burniță🌦️', 61:'Ploaie🌧️', 63:'Ploaie moderată🌧️', 65:'Ploaie abundentă🌧️', 71:'Ninsoare🌨️', 80:'Averse🌦️', 95:'Furtună⛈️' };
+            const desc = codes[c?.weather_code] || 'Variabil';
+            parts.push(`[DATE METEO REALE — ${loc.name}, ${loc.country}]\nTemperatură: ${c?.temperature_2m}°C (resimțit ${c?.apparent_temperature}°C)\nCondiții: ${desc}\nUmiditate: ${c?.relative_humidity_2m}%\nVânt: ${c?.wind_speed_10m} km/h\nPrecipitații: ${c?.precipitation}mm`);
+          }
+        }
+      }
+    } catch (_) { /* non-blocking */ }
+  }
+
+  // ── Web Search (only if Serper key available) ──
+  const searchMatch = lower.match(/\b(?:caută|cauta|search|find|google|știri|stiri|news|ce\s+este|ce\s+e|cine\s+e|când\s+a|când\s+s-?a)\b/i);
+  if (searchMatch && process.env.SERPER_API_KEY) {
+    try {
+      const sCtrl = new AbortController();
+      const sTimer = setTimeout(() => sCtrl.abort(), 5000);
+      const sR = await fetch('https://google.serper.dev/search', {
+        method: 'POST',
+        headers: { 'X-API-KEY': process.env.SERPER_API_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ q: message, num: 3, hl: 'ro', gl: 'ro' }),
+        signal: sCtrl.signal,
+      }).finally(() => clearTimeout(sTimer));
+      if (sR.ok) {
+        const sData = await sR.json();
+        const results = (sData.organic || []).slice(0, 3).map(r => `• ${r.title}: ${r.snippet}`).join('\n');
+        if (results) parts.push(`[REZULTATE CĂUTARE WEB REALE]\n${results}`);
+      }
+    } catch (_) { /* non-blocking */ }
+  }
+
+  return parts.length > 0 ? parts.join('\n\n') : null;
+}
+
+// ── Parse avatar commands from AI text response ──
+function parseAvatarCommands(text) {
+  if (!text) return {};
+  const emotion = text.match(/\[EMOTION:([^\]]+)\]/i)?.[1]?.trim().toLowerCase() || null;
+  const gestures = [...text.matchAll(/\[GESTURE:([^\]]+)\]/gi)].map(m => m[1].trim().toLowerCase());
+  const bodyActions = [...text.matchAll(/\[BODY:([^\]]+)\]/gi)].map(m => m[1].trim());
+  const gaze = text.match(/\[GAZE:([^\]]+)\]/i)?.[1]?.trim().toLowerCase() || null;
+  const actions = [...text.matchAll(/\[ACTION:([^\]]+)\]/gi)].map(m => m[1].trim().toLowerCase());
+
+  // Parse [MONITOR]...[/MONITOR] HTML content
+  let monitor = { content: null, type: null };
+  const monitorMatch = text.match(/\[MONITOR\]([\s\S]*?)\[\/MONITOR\]/i);
+  if (monitorMatch) monitor = { content: monitorMatch[1].trim(), type: 'html' };
+
+  // Clean tags from user-visible text
+  const cleanText = text
+    .replace(/\[EMOTION:[^\]]+\]/gi, '')
+    .replace(/\[GESTURE:[^\]]+\]/gi, '')
+    .replace(/\[BODY:[^\]]+\]/gi, '')
+    .replace(/\[GAZE:[^\]]+\]/gi, '')
+    .replace(/\[ACTION:[^\]]+\]/gi, '')
+    .replace(/\[MONITOR\][\s\S]*?\[\/MONITOR\]/gi, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+  return { emotion, gestures, bodyActions, gaze, actions, monitor, cleanText };
+}
+
+
 async function qualityGate(question, answer, domain) {
   // Only QA critical domains
   const criticalDomains = ["trading", "medical", "legal", "financial"];
@@ -363,7 +448,7 @@ async function thinkV5(
     const patternsBlock = getPatternsText();
     const qualityHints = getQualityHints();
     const proactiveHint = getProactiveSuggestion();
-    const systemPrompt = process.env.NEWBORN_MODE === "true"
+    let systemPrompt = process.env.NEWBORN_MODE === "true"
       ? buildNewbornPrompt(memoryBlock + patternsBlock + qualityHints + contextSwitchHint + proactiveHint)
       : buildSystemPrompt(
           avatar,
@@ -372,6 +457,12 @@ async function thinkV5(
           "",
           null,
         );
+
+    // ── 5b. PRE-FETCH real-time data (weather/search) — BEFORE any AI call ──
+    // Injectăm datele reale în systemPrompt → AI nu mai trebuie să cheme tools
+    // Elimina complet 503 pentru queries cu date externe
+    const realtimeCtx = await getRealtimeContext(message, brain, userId);
+    if (realtimeCtx) systemPrompt += '\n\n' + realtimeCtx;
 
     // ── 6. Classify message complexity ──
     const complexity = classifyComplexity(message, history);
@@ -685,16 +776,26 @@ async function thinkV5(
       recordUserInteraction({ domain: evalDomain, userMessage: message });
     } catch (_) { /* non-blocking */ }
 
+    // ── Parse avatar commands from AI response ──
+    const avatarCmds = parseAvatarCommands(finalResponse);
+    const monitorFromTools = extractMonitor(toolResults);
+    const monitorFinal = avatarCmds.monitor?.content ? avatarCmds.monitor : monitorFromTools;
+
     logger.info(
       { component: "BrainV5", engine, tools: toolsUsed, thinkTime, tokens: totalTokens, complexity },
       `🧠 V5 Think: ${engine} | ${toolsUsed.length} tools | ${thinkTime}ms | ${totalTokens} tokens`,
     );
 
     return {
-      enrichedMessage: finalResponse,
+      enrichedMessage: avatarCmds.cleanText || finalResponse,
       enrichedContext: finalResponse,
       toolsUsed,
-      monitor: extractMonitor(toolResults),
+      monitor: monitorFinal,
+      emotion: avatarCmds.emotion || emotionalTone,
+      gestures: avatarCmds.gestures || [],
+      bodyActions: avatarCmds.bodyActions || [],
+      gaze: avatarCmds.gaze || null,
+      actions: avatarCmds.actions || [],
       analysis: {
         complexity,
         emotionalTone,
@@ -715,6 +816,7 @@ async function thinkV5(
       agent: `v5-${engine.toLowerCase()}`,
       profileLoaded: !!profile,
     };
+
   } catch (e) {
     const thinkTime = Date.now() - startTime;
     brain.recordError("thinkV5", e.message);
