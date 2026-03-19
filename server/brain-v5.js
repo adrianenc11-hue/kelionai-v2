@@ -134,17 +134,52 @@ function stripLeakedTags(text) {
   return r.trim();
 }
 
-// ── Extract monitor data from tool results ──
+// ── Extract monitor data from tool results — GENERIC, detectează orice conținut vizual ──
+const IMAGE_URL_PATTERN = /https?:\/\/[^\s"'<>]+(?:\.(?:jpg|jpeg|png|gif|webp|svg|bmp)|(?:pollinations\.ai|dalle\.com|oaidalleapiprodscus\.blob\.core\.windows\.net|cdn\.openai\.com|midjourney\.com|stability\.ai|ideogram\.ai|firefly\.adobe\.com)[^\s"'<>]*)/i;
+const VIDEO_URL_PATTERN = /https?:\/\/(?:www\.)?(?:youtube\.com\/embed|youtu\.be|vimeo\.com\/video|player\.vimeo\.com)[^\s"'<>]*/i;
+const MAP_URL_PATTERN = /https?:\/\/[^\s"'<>]*(?:openstreetmap\.org|maps\.google\.com|leaflet)[^\s"'<>]*/i;
+const AUDIO_URL_PATTERN = /https?:\/\/[^\s"'<>]*\.(?:mp3|ogg|aac|m3u8|stream)[^\s"'<>]*/i;
+
+function _scanForVisual(obj, depth) {
+  if (depth > 4 || !obj || typeof obj !== 'object') return null;
+  // Check known property names first (fast path)
+  const knownMap = {
+    imageUrl: 'image', image_url: 'image', imageURL: 'image', img: 'image', url: null,
+    monitorHTML: 'html', html: 'html', monitorContent: 'html',
+    monitorURL: 'url', mapURL: 'map', videoURL: 'video', youtubeURL: 'video',
+    radioURL: 'audio', streamUrl: 'audio', audioUrl: 'audio',
+  };
+  for (const [key, type] of Object.entries(knownMap)) {
+    const val = obj[key];
+    if (typeof val !== 'string' || !val) continue;
+    if (type === 'html' && val.includes('<')) return { content: val, type: 'html' };
+    if (type === 'image' || (type === null && IMAGE_URL_PATTERN.test(val))) return { content: val, type: 'image' };
+    if (type === 'video') return { content: val, type: 'video' };
+    if (type === 'audio') return { content: val, type: 'audio' };
+    if (type === 'map') return { content: val, type: 'map' };
+    if (type === 'url') return { content: val, type: 'url' };
+  }
+  // Generic scan: check ALL string values for visual patterns
+  for (const val of Object.values(obj)) {
+    if (typeof val === 'string' && val.length > 10) {
+      if (IMAGE_URL_PATTERN.test(val)) return { content: val, type: 'image' };
+      if (VIDEO_URL_PATTERN.test(val)) return { content: val, type: 'video' };
+      if (MAP_URL_PATTERN.test(val)) return { content: val, type: 'map' };
+      if (AUDIO_URL_PATTERN.test(val)) return { content: val, type: 'audio' };
+      if (val.includes('<!DOCTYPE') || (val.includes('<html') && val.includes('</html>'))) return { content: val, type: 'html' };
+    } else if (val && typeof val === 'object') {
+      const nested = _scanForVisual(val, depth + 1);
+      if (nested) return nested;
+    }
+  }
+  return null;
+}
+
 function extractMonitor(toolResults) {
   for (const r of toolResults) {
-    if (r.result && typeof r.result === "object") {
-      if (r.result.monitorURL) return { content: r.result.monitorURL, type: "url" };
-      if (r.result.mapURL) return { content: r.result.mapURL, type: "map" };
-      if (r.result.imageUrl) return { content: r.result.imageUrl, type: "image" };
-      if (r.result.radioURL || r.result.streamUrl)
-        return { content: r.result.radioURL || r.result.streamUrl, type: "radio" };
-      if (r.result.videoURL || r.result.youtubeURL)
-        return { content: r.result.videoURL || r.result.youtubeURL, type: "video" };
+    if (r.result && typeof r.result === 'object') {
+      const found = _scanForVisual(r.result, 0);
+      if (found) return found;
     }
   }
   return { content: null, type: null };
@@ -450,10 +485,13 @@ function parseAvatarCommands(text) {
   const gaze = text.match(/\[GAZE:([^\]]+)\]/i)?.[1]?.trim().toLowerCase() || null;
   const actions = [...text.matchAll(/\[ACTION:([^\]]+)\]/gi)].map(m => m[1].trim().toLowerCase());
 
-  // Parse [MONITOR]...[/MONITOR] HTML content
+  // Parse [MONITOR:type]...[/MONITOR] or [MONITOR]...[/MONITOR] HTML/image content
   let monitor = { content: null, type: null };
-  const monitorMatch = text.match(/\[MONITOR\]([\s\S]*?)\[\/MONITOR\]/i);
-  if (monitorMatch) monitor = { content: monitorMatch[1].trim(), type: 'html' };
+  const monitorMatch = text.match(/\[MONITOR(?::([\w]+))?\]([\s\S]*?)\[\/MONITOR\]/i);
+  if (monitorMatch) {
+    const monType = monitorMatch[1]?.toLowerCase() || 'html';
+    monitor = { content: monitorMatch[2].trim(), type: monType };
+  }
 
   // Clean tags from user-visible text
   const cleanText = text
@@ -462,7 +500,7 @@ function parseAvatarCommands(text) {
     .replace(/\[BODY:[^\]]+\]/gi, '')
     .replace(/\[GAZE:[^\]]+\]/gi, '')
     .replace(/\[ACTION:[^\]]+\]/gi, '')
-    .replace(/\[MONITOR\][\s\S]*?\[\/MONITOR\]/gi, '')
+    .replace(/\[MONITOR(?::[\w]+)?\][\s\S]*?\[\/MONITOR\]/gi, '')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 
@@ -666,15 +704,18 @@ STEP 3 — IF TOOL FAILS (broken=true, action_required message, or API key requi
   - Call discover_and_save_tool with the new free endpoint
   - Do NOT retry the same failing tool
 
-STEP 4 — VISUALIZE IF USEFUL:
-  - Coordinates/positions data → Leaflet.js HTML map with markers → show_in_monitor(html)
-  - Numbers/statistics → Chart.js HTML chart → show_in_monitor(html)
-  - List data → HTML table → show_in_monitor(html)
+STEP 4 — VISUALIZE IF USEFUL (AUTOMATIC — result appears instantly on avatar monitor):
+  - Image request → generate_image(prompt) → image appears on monitor automatically
+  - Coordinates/positions data → show_in_monitor(html) with Leaflet.js map with markers
+  - Numbers/statistics → show_in_monitor(html) with Chart.js chart
+  - List data → show_in_monitor(html) with styled HTML table
+  - You can also embed monitor content in your reply using: [MONITOR:image]URL[/MONITOR] or [MONITOR:html]HTML[/MONITOR]
 
 STEP 5 — REPLY: Answer in user's language with real tool data.
 
 RULE: NEVER say "I don't have access to real-time data" without executing steps 1-4 first.
 RULE: ALWAYS prefer free APIs without authentication (no API key needed).
+RULE: For ANY image request (generate, create, draw, imagine, arată, generează imagine, desenează) → ALWAYS call generate_image tool, NEVER just describe the image in text.
 CRITICAL: NEVER write tool calls as text in your response (e.g. do NOT write [recall_tool(...)], [call_saved_tool(...)], [show_in_monitor(...)]). ALWAYS use the actual function calling API. If you write a tool call as text, it will NOT be executed.`;
 
     // ── 5b. Detect INTENT — fiecare tip de cerere → tool potrivit ──

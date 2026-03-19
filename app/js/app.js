@@ -500,8 +500,10 @@
                     overlay.scrollTop = overlay.scrollHeight;
                   } else if (evt.type === 'start') {
                     streamEngine = evt.engine || 'Gemini';
-                  } else if (evt.type === 'monitor' && evt.content) {
-                    showOnMonitor(evt.content, evt.monitorType || 'html');
+                  } else if (evt.type === 'monitor' && (evt.content || (evt.monitor && evt.monitor.content))) {
+                    const mc = evt.content || evt.monitor.content;
+                    const mt = evt.monitorType || (evt.monitor && evt.monitor.type) || 'html';
+                    showOnMonitor(mc, mt);
                   } else if (evt.type === 'thinking') {
                     msgEl.innerHTML = '<span style="color:#6366f1;opacity:0.6">🧠 Thinking...</span>';
                   } else if (evt.type === 'actions' && evt.actions) {
@@ -713,6 +715,13 @@
             if (dest && window.KMobile) KMobile.navigate(dest);
           }
         });
+        // Process [MONITOR]...[/MONITOR] tags BEFORE stripping
+        const monitorTagMatch = fullReply.match(/\[MONITOR(?::([\w]+))?\]([\s\S]*?)\[\/MONITOR\]/i);
+        if (monitorTagMatch && window.MonitorManager) {
+          const monType = monitorTagMatch[1] || 'html';
+          const monContent = monitorTagMatch[2].trim();
+          if (monContent) showOnMonitor(monContent, monType);
+        }
         // Strip all tags from display
         fullReply = fullReply
           .replace(/\[EMOTION:\s*\w+\]/gi, '')
@@ -721,7 +730,7 @@
           .replace(/\[GAZE:\s*[\w-]+\]/gi, '')
           .replace(/\[POSE:\s*\w+\]/gi, '')
           .replace(/\[ACTION:[^\]]+\]/gi, '')
-          .replace(/\[MONITOR\][\s\S]*?\[\/MONITOR\]/gi, '')
+          .replace(/\[MONITOR(?::[\w]+)?\][\s\S]*?\[\/MONITOR\]/gi, '')
           .trim();
       }
 
@@ -774,21 +783,27 @@
           URL.revokeObjectURL(a.href);
         };
 
-      // Auto-display on monitor if structured
-      if (window.MonitorManager && fullReply) {
-        const hasStructure = /^[\-\*\d]\s|^#{1,3}\s|\*\*|```|\n\n/m.test(fullReply);
-        const isLong = fullReply.length > 80;
-        if (hasStructure || isLong) MonitorManager.showMarkdown(fullReply);
-      }
-
-      // Image/map detection
-      const imgMatch = fullReply.match(/https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp)/i);
-      if (imgMatch) showOnMonitor(imgMatch[0], 'image');
-      const coordMatch2 = fullReply.match(/(-?\d+\.?\d*)[°\s,]+([NS])?\s*,?\s*(-?\d+\.?\d*)[°\s,]+([EW])?/i);
-      if (!imgMatch && coordMatch2) {
-        const lat2 = parseFloat(coordMatch2[1]);
-        const lng2 = parseFloat(coordMatch2[3]);
-        if (!isNaN(lat2) && !isNaN(lng2) && window.MonitorManager) MonitorManager.showMap(lat2, lng2);
+      // Image/map detection — PRIORITATE MAXIMĂ, înainte de auto-display
+      const IMG_DETECT = /https?:\/\/[^\s<>"']+(?:\.(?:jpg|jpeg|png|gif|webp|svg|bmp)|(?:pollinations\.ai|oaidalleapiprodscus\.blob\.core\.windows\.net|cdn\.openai\.com|dalle\.com|midjourney\.com|stability\.ai|ideogram\.ai)[^\s<>"']*)/i;
+      const imgMatch = fullReply.match(IMG_DETECT);
+      if (imgMatch) {
+        showOnMonitor(imgMatch[0], 'image');
+      } else {
+        const coordMatch2 = fullReply.match(/(-?\d+\.?\d*)[°\s,]+([NS])?\s*,?\s*(-?\d+\.?\d*)[°\s,]+([EW])?/i);
+        if (coordMatch2) {
+          const lat2 = parseFloat(coordMatch2[1]);
+          const lng2 = parseFloat(coordMatch2[3]);
+          if (!isNaN(lat2) && !isNaN(lng2) && window.MonitorManager) MonitorManager.showMap(lat2, lng2);
+        } else {
+          // Auto-display markdown DOAR dacă nu există deja conținut pe monitor (imagine/html)
+          const monitorImage = document.getElementById('monitor-image');
+          const monitorHasContent = monitorImage && monitorImage.style.display !== 'none';
+          if (!monitorHasContent && window.MonitorManager && fullReply) {
+            const hasStructure = /^[\-\*\d]\s|^#{1,3}\s|\*\*|```|\n\n/m.test(fullReply);
+            const isLong = fullReply.length > 80;
+            if (hasStructure || isLong) MonitorManager.showMarkdown(fullReply);
+          }
+        }
       }
 
       // Brain map
