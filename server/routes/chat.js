@@ -650,8 +650,20 @@ router.post('/imagine', async (req, res) => {
     if (!prompt || prompt.trim().length < 2) return res.status(400).json({ error: 'Prompt required' });
     const encoded = encodeURIComponent(prompt.trim());
     const seed = Math.floor(Math.random() * 99999);
-    const imageUrl = `https://image.pollinations.ai/prompt/${encoded}?width=1024&height=1024&model=flux&nologo=true&enhance=true&seed=${seed}`;
-    return res.json({ image: imageUrl, prompt: prompt.trim() });
+    const pollinationsUrl = `https://image.pollinations.ai/prompt/${encoded}?width=1024&height=1024&model=flux&nologo=true&enhance=true&seed=${seed}`;
+
+    // Descarcam imaginea server-side ca sa evitam CORS/ORB in browser
+    const imgResp = await fetch(pollinationsUrl, {
+      signal: AbortSignal.timeout(45000),
+      headers: { 'User-Agent': 'KelionAI/2.0' },
+    });
+    if (!imgResp.ok) throw new Error(`Pollinations ${imgResp.status}`);
+    const contentType = imgResp.headers.get('content-type') || 'image/jpeg';
+    const arrayBuf = await imgResp.arrayBuffer();
+    const b64 = Buffer.from(arrayBuf).toString('base64');
+    const dataUrl = `data:${contentType};base64,${b64}`;
+
+    return res.json({ image: dataUrl, prompt: prompt.trim() });
   } catch (e) {
     logger.error({ component: 'Imagine', err: e.message }, 'imagine error');
     res.status(500).json({ error: e.message });
