@@ -521,14 +521,17 @@
         <div id="status-dot" class="status-dot"></div>
         <span id="status-text">Online</span>
       </div>
+      <button class="btn-secondary" id="btn-admin" title="Admin Panel" data-locked="true">🔒 Admin</button>
       <span id="user-name" class="user-badge ml-12">Guest</span>
       <div class="navbar-right">
+        <button class="ctrl-btn-sm btn-history-style" id="btn-copy-last" title="Copiază ultimul răspuns" aria-label="Copy last response">📋</button>
+        <button class="ctrl-btn-sm btn-history-style" id="btn-translate-toggle" title="Translate Mode: OFF" aria-label="Toggle live translation">T</button>
+        <button class="ctrl-btn-sm btn-history-style" id="btn-scan-toggle" title="Product Scanner" aria-label="Scan product barcode">🛒</button>
         <button class="ctrl-btn-sm btn-history-style" id="btn-history" title="Conversation history"
           aria-label="Conversation history">
-          📋
+          📜
         </button>
         <input type="file" id="file-input-hidden" class="hidden-panel" accept="*/*" title="Upload file" />
-        <button class="btn-secondary" id="btn-admin" title="Admin Panel — Locked" data-locked="true">🔒 Admin</button>
         <button class="btn-secondary" id="btn-pricing" title="Plans">⭐ Plans</button>
         <button class="btn-secondary" id="btn-invite" title="Invite friends">🎁 Invite</button>
         <button class="btn-primary" id="btn-auth" title="Sign in">🔑 Login</button>
@@ -673,21 +676,6 @@
         autocomplete="off" />
       <button id="btn-send" title="Send" aria-label="Send message" class="ctrl-action">➤</button>
       <button id="btn-plus" title="Import / Export" aria-label="Files" class="ctrl-action">+</button>
-      <button id="btn-copy-last" title="Copiază ultimul răspuns" aria-label="Copy last response" class="ctrl-action">
-        📋
-      </button>
-      <button id="btn-save-last" title="Salvează ultimul răspuns ca fișier" aria-label="Save last response"
-        class="ctrl-action">
-        💾
-      </button>
-      <button id="btn-cc-toggle" title="CC Subtitles" aria-label="Toggle CC subtitles" class="ctrl-circle">CC</button>
-      <button id="btn-translate-toggle" title="Translate Mode: OFF" aria-label="Toggle live translation"
-        class="ctrl-circle">
-        T
-      </button>
-      <button id="btn-scan-toggle" title="Product Scanner" aria-label="Scan product barcode" class="ctrl-circle">
-        🛒
-      </button>
     </div>
   </div>
   <!-- /#app-layout -->
