@@ -107,7 +107,7 @@ jobs:
             git config user.name "KelionAI Auto-Updater"
             git config user.email "bot@kelionai.app"
             git add server/config/models.js
-            git commit -m "chore: auto-update AI models [Gemini:${{ env.GEMINI_FLASH }} OpenAI:${{ env.OPENAI_LATEST }} Claude:${{ env.CLAUDE_LATEST }}]"
+            git commit -m "chore: auto-update AI models [Gemini:${GEMINI_FLASH} OpenAI:${OPENAI_LATEST} Claude:${CLAUDE_LATEST}]"
             git push
             echo "changed=true" >> $GITHUB_OUTPUT
             echo "Committed and pushed new model versions"
