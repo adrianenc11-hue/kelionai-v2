@@ -88,8 +88,18 @@ function classifyComplexity(message, _history) {
     /\b(rețetă|recipe|gătit|cooking)\b/i,
     /\b(medical|mri|ct|xray|doză|dose)\b/i,
     /\b(osciloscop|spectro|pcb|circuit|thermal)\b/i,
+    // Date live — INTOTDEAUNA la GPT-5.4 cu function calling, NU la Gemini
+    /\b(acum|azi|live|real.?time|current|latest|recent)\b/i,
+    /\b(temperatura|temperature|temp)\b/i,
+    /\b(pret|price|curs|exchange|rate)\b/i,
+    /\b(cutremur|earthquake|seism)\b/i,
+    /\b(avion|zbor|flight|trafic|traffic|tren|train)\b/i,
+    /\b(aer|air|quality|pollution|iss|satellite|spatiu|space)\b/i,
+    /\b(bitcoin|ethereum|crypto|stock|actiune|burs)\b/i,
+    /\b(sport|fotbal|meci|score|rezultat)\b/i,
   ];
   if (toolTriggers.some((p) => p.test(lower))) return "complex";
+
 
   // Medium-length questions → complex (might need search)
   if (lower.includes("?") && wordCount > 5) return "complex";
@@ -649,21 +659,22 @@ STEP 2 — USE OR DISCOVER:
   - Tool FOUND → call_saved_tool(tool_name, params) → get real data
   - Tool NOT FOUND → call discover_and_save_tool(task, api_endpoint, tool_name) → save it → call it
 
-STEP 3 — IF TOOL FAILS (broken=true, action_required message):
-  - Immediately call discover_and_save_tool with a DIFFERENT free public API
+STEP 3 — IF TOOL FAILS (broken=true, action_required message, or API key required):
+  - Search for a DIFFERENT free public API that works WITHOUT authentication or API key
+  - Free APIs: exchangerate-api.com (currency), openaq.org (air quality), wheretheiss.at (ISS),
+    open-meteo.com (weather), usgs.gov (earthquakes), api.open-meteo.com, wttr.in, etc.
+  - Call discover_and_save_tool with the new free endpoint
   - Do NOT retry the same failing tool
 
 STEP 4 — VISUALIZE IF USEFUL:
-  - You have coordinates/positions data → generate Leaflet.js HTML map with markers
-  - You have numbers/statistics → generate Chart.js HTML chart
-  - You have list data → generate HTML table
-  - Call show_in_monitor(html) to display it in the monitor panel
+  - Coordinates/positions data → Leaflet.js HTML map with markers → show_in_monitor(html)
+  - Numbers/statistics → Chart.js HTML chart → show_in_monitor(html)
+  - List data → HTML table → show_in_monitor(html)
 
 STEP 5 — REPLY: Answer in user's language with real tool data.
 
-RULE: NEVER say "I don't have access to real-time data" without executing steps 1-4 first.`;
-
-
+RULE: NEVER say "I don't have access to real-time data" without executing steps 1-4 first.
+RULE: ALWAYS prefer free APIs without authentication (no API key needed).`;
 
     // ── 5b. Detect INTENT — fiecare tip de cerere → tool potrivit ──
     const intent = detectIntent(message, mediaData);

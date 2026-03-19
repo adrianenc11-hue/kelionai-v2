@@ -9369,7 +9369,8 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
     const fetchOptions = {
       method,
       headers: { 'User-Agent': 'KelionAI/2.0', ...(data.headers_template || {}) },
-      signal: AbortSignal.timeout(15000),
+      signal: AbortSignal.timeout(8000),
+
     };
     if (method === 'POST' && Object.keys(params).length) {
       fetchOptions.headers['Content-Type'] = 'application/json';
