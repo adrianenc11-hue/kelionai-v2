@@ -499,8 +499,22 @@ router.post('/chat/stream', chatLimiter, validate(chatSchema), async (req, res) 
 
     const cleanReply = sanitizeReply(fullReply);
     res.write(
-      `data: ${JSON.stringify({ type: 'done', reply: cleanReply, thinkTime: thought.thinkTime, conversationId: savedConvId })}\n\n`
+      `data: ${JSON.stringify({
+        type: 'done',
+        reply: cleanReply,
+        thinkTime: thought?.thinkTime || 0,
+        conversationId: savedConvId,
+        emotion: thought?.emotion || 'neutral',
+        gestures: thought?.gestures || [],
+        bodyActions: thought?.bodyActions || [],
+        pose: thought?.pose || null,
+        gaze: thought?.gaze || null,
+        monitor: (thought?.monitor?.content)
+          ? { content: thought.monitor.content, type: thought.monitor.type }
+          : null,
+      })}\n\n`
     );
+
     res.end();
 
     if (fullReply)
