@@ -1178,11 +1178,9 @@
         console.log('[ButtonBind] ✅ Scanner bound');
       }
 
-      // ── Admin Button (show for logged-in admin users) ──
-      var userBadge = document.getElementById('user-name');
-      if (userBadge && userBadge.textContent.trim() !== 'Guest') {
-        // User is logged in — check if admin
-        var navRight = userBadge.parentElement;
+      // ── Admin Button (ONLY for adrianenc11@gmail.com) ──
+      if (window.KAuth && KAuth.isAdmin && KAuth.isAdmin()) {
+        var navRight = document.querySelector('.navbar-right');
         if (navRight && !document.getElementById('btn-admin-nav')) {
           var adminBtn = document.createElement('button');
           adminBtn.id = 'btn-admin-nav';
@@ -1191,8 +1189,9 @@
           adminBtn.addEventListener('click', function () {
             window.location.href = '/admin';
           });
-          navRight.insertBefore(adminBtn, userBadge);
-          console.log('[ButtonBind] ✅ Admin button created');
+          navRight.insertBefore(adminBtn, navRight.firstChild);
+          console.log('[ButtonBind] ✅ Admin button created (admin verified)');
+        }
         }
       }
 
