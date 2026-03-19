@@ -1720,6 +1720,21 @@
     clearTimeout(splashTimer);
     dismissSplash();
 
+    // ─── Restore admin button if previously unlocked ─────────
+    (function() {
+      var savedSecret = sessionStorage.getItem('kelion_admin_secret');
+      if (savedSecret) {
+        var un = document.getElementById('user-name');
+        if (un) {
+          un.style.cssText = 'cursor:pointer;border:1px solid rgba(16,185,129,0.5);background:rgba(16,185,129,0.15);border-radius:8px;color:#34d399;padding:6px 12px;font-family:var(--kelion-font);transition:all 0.4s;';
+          un.title = 'Click to open Admin Dashboard';
+          un.onclick = function () {
+            window.open('/dashboard?secret=' + encodeURIComponent(savedSecret), '_blank');
+          };
+        }
+      }
+    })();
+
     console.log('[App] ✅ KelionAI v2.3 — STREAMING + HISTORY');
   }
 
