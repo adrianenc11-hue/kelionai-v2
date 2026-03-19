@@ -635,17 +635,14 @@ async function thinkV5(
     const intent = detectIntent(message, mediaData);
     logger.info({ component: "BrainV5", intent, domain }, `🧠 V5 intent: ${intent}`);
 
-    // Weather: GPS + Open Meteo (rămâne pre-fetch pentru date precise)
-    if (intent === 'weather') {
-      const weatherCtx = await getRealtimeContext(message, brain, userId, mediaData.geo);
-      if (weatherCtx) systemPrompt += '\n\n' + weatherCtx;
+    // Weather + Tool use: delegare directă la V4 cu tool calling
+    // V4 generează monitor cards HTML (carduri vreme, hárți etc.)
+    // V5 Gemini Search nu are acces la tools și nu poate genera monitor content
+    if (intent === 'tool_use' || intent === 'weather') {
+      const { thinkV4 } = require('./brain-v4');
+      return await thinkV4(brain, message, avatar, history || [], language, userId, conversationId, mediaData, isAdmin);
     }
 
-    // Tool use (harta, imagini, cod): delegare directă la V4 cu tool calling
-    if (intent === 'tool_use') {
-      const { thinkV4 } = require('./brain-v4');
-      return await thinkV4(brain, message, avatar, history, language, userId, conversationId, mediaData, isAdmin);
-    }
 
     // ── 7. Prepare state ──
     const recentHistory = (history || []).slice(-20);
