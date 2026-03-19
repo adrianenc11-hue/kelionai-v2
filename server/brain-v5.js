@@ -364,7 +364,7 @@ async function getRealtimeContext(message, brain, userId, geo) {
       if (wR.ok) {
         const wData = await wR.json();
         const c = wData.current;
-        const codes = { 0:'Cer senin☀️', 1:'Parțial noros🌤️', 2:'Noros⛅', 3:'Acoperit☁️', 45:'Ceatos🌫️', 48:'Ceatos🌫️', 51:'Burniță🌦️', 61:'Ploaie🌧️', 63:'Ploaie moderată🌧️', 65:'Ploaie abundentă🌧️', 71:'Ninsoare🌨️', 80:'Averse🌦️', 95:'Furtună⛈️' };
+        const codes = { 0: 'Cer senin☀️', 1: 'Parțial noros🌤️', 2: 'Noros⛅', 3: 'Acoperit☁️', 45: 'Ceatos🌫️', 48: 'Ceatos🌫️', 51: 'Burniță🌦️', 61: 'Ploaie🌧️', 63: 'Ploaie moderată🌧️', 65: 'Ploaie abundentă🌧️', 71: 'Ninsoare🌨️', 80: 'Averse🌦️', 95: 'Furtună⛈️' };
         const desc = codes[c?.weather_code] || 'Variabil';
         parts.push(`[DATE METEO REALE — ${locationName}]\nTemperatură: ${c?.temperature_2m}°C (resimțit ${c?.apparent_temperature}°C)\nCondiții: ${desc}\nUmiditate: ${c?.relative_humidity_2m}%\nVânt: ${c?.wind_speed_10m} km/h\nPrecipitații: ${c?.precipitation}mm`);
       }
@@ -388,8 +388,8 @@ async function getRealtimeContext(message, brain, userId, geo) {
       ]);
 
       // ── Fallback: Gemini Search Grounding (Google Search built-in, fara cheie externa) ──
-      if ((!searchResult || (typeof searchResult === 'string' && searchResult.length < 20)) && 
-          (process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY)) {
+      if ((!searchResult || (typeof searchResult === 'string' && searchResult.length < 20)) &&
+        (process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY)) {
         const gKey = process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
         const gModel = 'gemini-2.5-flash-preview-04-17';
         const gCtrl = new AbortController();
@@ -624,12 +624,12 @@ async function thinkV5(
     let systemPrompt = process.env.NEWBORN_MODE === "true"
       ? buildNewbornPrompt(memoryBlock + patternsBlock + qualityHints + contextSwitchHint + proactiveHint)
       : buildSystemPrompt(
-          avatar,
-          language,
-          memoryBlock + emotionBlock + geoBlock + dateTimeBlock + patternsBlock + qualityHints + contextSwitchHint + proactiveHint,
-          "",
-          null,
-        );
+        avatar,
+        language,
+        memoryBlock + emotionBlock + geoBlock + dateTimeBlock + patternsBlock + qualityHints + contextSwitchHint + proactiveHint,
+        "",
+        null,
+      );
 
     // ── 5b. Detect INTENT — fiecare tip de cerere → tool potrivit ──
     const intent = detectIntent(message, mediaData);
@@ -696,9 +696,9 @@ async function thinkV5(
           userContent.push({
             type: "text",
             text: "[AUTO-CAMERA] Aceasta e imagine automată de la camera utilizatorului. " +
-                  "Regulă: NU descrie toată camera/scena. Fii SCURT (1-2 propoziții). " +
-                  "Menționează DOAR: persoane (culori exacte de haine), pericole, text vizibil. " +
-                  "Dacă nu e nimic nou de spus, nu comenta imaginea deloc — răspunde normal la mesaj.",
+              "Regulă: NU descrie toată camera/scena. Fii SCURT (1-2 propoziții). " +
+              "Menționează DOAR: persoane (culori exacte de haine), pericole, text vizibil. " +
+              "Dacă nu e nimic nou de spus, nu comenta imaginea deloc — răspunde normal la mesaj.",
           });
         }
         userContent.push({ type: "text", text: message });
@@ -801,7 +801,7 @@ async function thinkV5(
         if (mediaData.isAutoCamera) {
           userParts.push({
             text: "[AUTO-CAMERA] Aceasta e imagine automată de la camera utilizatorului. " +
-                  "Regulă: NU descrie toată camera/scena. Fii SCURT (1-2 propoziții).",
+              "Regulă: NU descrie toată camera/scena. Fii SCURT (1-2 propoziții).",
           });
         }
       }
@@ -941,15 +941,15 @@ async function thinkV5(
     const thinkTime = Date.now() - startTime;
 
     // Save memory (async, non-blocking)
-    brain.saveMemory(userId, "text", message, { response: finalResponse.substring(0, 200) }, 5).catch(() => {});
-    brain.learnFromConversation(userId, message, finalResponse).catch(() => {});
+    brain.saveMemory(userId, "text", message, { response: finalResponse.substring(0, 200) }, 5).catch(() => { });
+    brain.learnFromConversation(userId, message, finalResponse).catch(() => { });
     if (profile) {
       profile.updateFromConversation(message, language, { emotionalTone, topics: [] });
-      profile.save(brain.supabaseAdmin).catch(() => {});
+      profile.save(brain.supabaseAdmin).catch(() => { });
     }
 
     // Track usage
-    brain.incrementUsage(userId, toolsUsed.length, totalTokens).catch(() => {});
+    brain.incrementUsage(userId, toolsUsed.length, totalTokens).catch(() => { });
 
     // Confidence scoring
     let confidence = 0.7;
@@ -962,8 +962,8 @@ async function thinkV5(
     try {
       const evalDomain = toolsUsed.includes("get_trading_intelligence") ? "trading"
         : toolsUsed.includes("search_web") ? "research"
-        : toolsUsed.includes("execute_javascript") ? "coding"
-        : "general";
+          : toolsUsed.includes("execute_javascript") ? "coding"
+            : "general";
       selfEvaluate(message, finalResponse, evalDomain);
       recordUserInteraction({ domain: evalDomain, userMessage: message });
     } catch (_) { /* non-blocking */ }
@@ -1020,7 +1020,7 @@ async function thinkV5(
     logger.info({ component: "BrainV5" }, "⚠️ Falling back to V4 (Gemini tool calling)");
     // Re-run getRealtimeContext so V4 fallback also has current data (weather/search)
     let fallbackRealtimeCtx = null;
-    try { fallbackRealtimeCtx = await getRealtimeContext(message, brain, userId, mediaData?.geo); } catch (_) {}
+    try { fallbackRealtimeCtx = await getRealtimeContext(message, brain, userId, mediaData?.geo); } catch (_) { }
     // Paseaza history curat la V4 (historyWithCtx cu model turn cauzea Gemini 400)
     try {
       const { thinkV4 } = require("./brain-v4");

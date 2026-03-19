@@ -9275,30 +9275,39 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
   }
 
   async _imagine(prompt) {
-    if (!this.togetherKey) throw new Error("No key");
     this.toolStats.imagine++;
-    const r = await fetch("https://api.together.xyz/v1/images/generations", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${this.togetherKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "black-forest-labs/FLUX.1-schnell",
-        prompt,
-        width: 1024,
-        height: 1024,
-        steps: 4,
-        n: 1,
-        response_format: "b64_json",
-      }),
-    });
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const gKey = process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
+    if (!gKey) throw new Error('GOOGLE_AI_KEY not configured');
+
+    // Google Imagen 3 API
+    const r = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-001:generateImages?key=${gKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: { text: prompt },
+          safetyFilterLevel: 'BLOCK_ONLY_HIGH',
+          personGeneration: 'ALLOW_ADULT',
+          imageCount: 1,
+          aspectRatio: '1:1',
+        }),
+      }
+    );
+
+    if (!r.ok) {
+      const errText = await r.text().catch(() => r.status);
+      throw new Error(`Imagen API ${r.status}: ${errText}`);
+    }
+
     const d = await r.json();
-    const b64 = d.data?.[0]?.b64_json;
-    if (!b64) throw new Error("No image data");
-    return `data:image/png;base64,${b64}`;
+    const b64 = d.generatedImages?.[0]?.image?.bytesBase64Encoded;
+    if (!b64) throw new Error('No image data from Imagen');
+
+    const imageUrl = `data:image/png;base64,${b64}`;
+    return { imageUrl, prompt }; // extractMonitor cauta r.result.imageUrl
   }
+
 
   async _memory(userId) {
     if (!this.supabaseAdmin || !userId) return null;
