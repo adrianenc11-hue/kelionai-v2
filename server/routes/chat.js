@@ -643,28 +643,54 @@ router.post('/memory', memoryLimiter, validate(memorySchema), async (req, res) =
   }
 });
 
-// POST /api/imagine — Generare imagini AI cu Pollinations (fara API key)
+// POST /api/imagine — Generare imagini AI (Pollinations + HuggingFace fallback)
 router.post('/imagine', async (req, res) => {
   try {
     const { prompt } = req.body;
     if (!prompt || prompt.trim().length < 2) return res.status(400).json({ error: 'Prompt required' });
-    const encoded = encodeURIComponent(prompt.trim());
-    const seed = Math.floor(Math.random() * 99999);
-    const pollinationsUrl = `https://image.pollinations.ai/prompt/${encoded}?width=1024&height=1024&nologo=true&seed=${seed}`;
+    const cleanPrompt = prompt.trim();
 
+    // 1. Incercam Pollinations (gratuit, fara cheie)
+    let imageDataUrl = null;
+    const pollinationsUrls = [
+      `https://image.pollinations.ai/prompt/${encodeURIComponent(cleanPrompt)}?width=1024&height=1024&nologo=true&seed=${Math.floor(Math.random()*99999)}`,
+      `https://image.pollinations.ai/prompt/${encodeURIComponent(cleanPrompt)}?width=512&height=512&nologo=true`,
+    ];
 
-    // Descarcam imaginea server-side ca sa evitam CORS/ORB in browser
-    const imgResp = await fetch(pollinationsUrl, {
-      signal: AbortSignal.timeout(45000),
-      headers: { 'User-Agent': 'KelionAI/2.0' },
-    });
-    if (!imgResp.ok) throw new Error(`Pollinations ${imgResp.status}`);
-    const contentType = imgResp.headers.get('content-type') || 'image/jpeg';
-    const arrayBuf = await imgResp.arrayBuffer();
-    const b64 = Buffer.from(arrayBuf).toString('base64');
-    const dataUrl = `data:${contentType};base64,${b64}`;
+    for (const url of pollinationsUrls) {
+      try {
+        const r = await fetch(url, { signal: AbortSignal.timeout(25000), headers: { 'User-Agent': 'Mozilla/5.0' } });
+        if (r.ok) {
+          const ct = r.headers.get('content-type') || 'image/jpeg';
+          if (ct.startsWith('image/')) {
+            const buf = await r.arrayBuffer();
+            imageDataUrl = `data:${ct};base64,${Buffer.from(buf).toString('base64')}`;
+            break;
+          }
+        }
+      } catch (_) { /* continua cu urmatorul */ }
+    }
 
-    return res.json({ image: dataUrl, prompt: prompt.trim() });
+    // 2. Fallback: HuggingFace FLUX.1-schnell
+    if (!imageDataUrl) {
+      const hfKey = process.env.HUGGINGFACE_KEY;
+      const hfHeaders = { 'Content-Type': 'application/json' };
+      if (hfKey) hfHeaders['Authorization'] = `Bearer ${hfKey}`;
+      const hfResp = await fetch('https://router.huggingface.co/fal-ai/fal-ai/flux/schnell', {
+        method: 'POST',
+        headers: hfHeaders,
+        body: JSON.stringify({ inputs: cleanPrompt }),
+        signal: AbortSignal.timeout(30000),
+      });
+      if (hfResp.ok) {
+        const ct = hfResp.headers.get('content-type') || 'image/jpeg';
+        const buf = await hfResp.arrayBuffer();
+        imageDataUrl = `data:${ct};base64,${Buffer.from(buf).toString('base64')}`;
+      }
+    }
+
+    if (!imageDataUrl) throw new Error('All image providers failed');
+    return res.json({ image: imageDataUrl, prompt: cleanPrompt });
   } catch (e) {
     logger.error({ component: 'Imagine', err: e.message }, 'imagine error');
     res.status(500).json({ error: e.message });
