@@ -200,37 +200,64 @@ async function callOpenAI(messages, systemPrompt, tools, model) {
 // PRE-FETCH Real-time data (weather/search) BEFORE calling AI
 // Eliminates tool-calling timeout issues — AI just formats the data
 // ═══════════════════════════════════════════════════════════════
-async function getRealtimeContext(message, brain, userId) {
+async function getRealtimeContext(message, brain, userId, geo) {
   const lower = (message || '').toLowerCase();
   const parts = [];
 
   // ── Weather ──
-  const weatherMatch = lower.match(/\b(?:vrem[ea]|meteo|weather|temperatura|grad[e]?|ploaie|soare|frig|cald)\b/i);
-  const weatherCityMatch = message.match(/(?:în|in|la|at|for|pentru)\s+([A-ZĂÎÂȘȚ][a-zA-ZăîâșțĂÎÂȘȚ\s]{2,20})/);
-  if (weatherMatch) {
+  const weatherKeyword = lower.match(/\b(?:vrem[ea]|meteo|weather|temperatura|grad[e]?|ploaie|soare|frig|cald)\b/i);
+  if (weatherKeyword) {
     try {
-      const city = weatherCityMatch?.[1]?.trim() || 'Bucharest';
-      // Geocode city first
-      const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=ro`;
-      const geoCtrl = new AbortController();
-      const geoTimer = setTimeout(() => geoCtrl.abort(), 5000);
-      const geoR = await fetch(geoUrl, { signal: geoCtrl.signal }).finally(() => clearTimeout(geoTimer));
-      if (geoR.ok) {
+      let lat, lng, locationName;
+
+      if (geo?.lat && geo?.lng) {
+        // 1. Prioritate: coordonate GPS reale din request
+        lat = geo.lat;
+        lng = geo.lng;
+        // Reverse geocode pentru a afla numele locatiei
+        const rgUrl = `https://geocoding-api.open-meteo.com/v1/reverse?latitude=${lat}&longitude=${lng}`;
+        const rgCtrl = new AbortController();
+        const rgTimer = setTimeout(() => rgCtrl.abort(), 4000);
+        const rgR = await fetch(rgUrl, { signal: rgCtrl.signal }).finally(() => clearTimeout(rgTimer));
+        if (rgR.ok) {
+          const rgData = await rgR.json().catch(() => ({}));
+          locationName = rgData.results?.[0]?.name || `${lat.toFixed(2)},${lng.toFixed(2)}`;
+        } else {
+          locationName = `${lat.toFixed(2)},${lng.toFixed(2)}`;
+        }
+      } else {
+        // 2. Detectare oras din mesaj
+        const cityMatch = message.match(/(?:în|in|la|at|for|pentru|din)\s+([A-ZĂÎÂȘȚ][a-zA-ZăîâșțĂÎÂȘȚ\s-]{2,25}?)(?=[.,?!]|\s+(?:e|este|acum|azi|mâine)|$)/i);
+        if (!cityMatch) {
+          // Nu stim locatia — brain CERE informatia, nu skip
+          parts.push('[LOCATIE NECUNOSCUTA]\nUserul a cerut date meteo dar nu ai putut determina locatia.\nCere-i direct: "În ce oraș ești?" sau "Activează GPS-ul din browser pentru a-ți da vremea exactă." NU genera date meteo inventate.');
+          return parts.join('\n\n');
+        }
+        const city = cityMatch[1].trim();
+        const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=ro`;
+        const geoCtrl = new AbortController();
+        const geoTimer = setTimeout(() => geoCtrl.abort(), 4000);
+        const geoR = await fetch(geoUrl, { signal: geoCtrl.signal }).finally(() => clearTimeout(geoTimer));
+        if (!geoR.ok) return parts.length > 0 ? parts.join('\n\n') : null;
         const geoData = await geoR.json();
         const loc = geoData.results?.[0];
-        if (loc) {
-          const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${loc.latitude}&longitude=${loc.longitude}&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,precipitation&wind_speed_unit=kmh&timezone=auto`;
-          const wCtrl = new AbortController();
-          const wTimer = setTimeout(() => wCtrl.abort(), 5000);
-          const wR = await fetch(weatherUrl, { signal: wCtrl.signal }).finally(() => clearTimeout(wTimer));
-          if (wR.ok) {
-            const wData = await wR.json();
-            const c = wData.current;
-            const codes = { 0:'Cer senin☀️', 1:'Parțial noros🌤️', 2:'Noros⛅', 3:'Acoperit☁️', 45:'Ceatos🌫️', 48:'Ceatos🌫️', 51:'Burniță🌦️', 61:'Ploaie🌧️', 63:'Ploaie moderată🌧️', 65:'Ploaie abundentă🌧️', 71:'Ninsoare🌨️', 80:'Averse🌦️', 95:'Furtună⛈️' };
-            const desc = codes[c?.weather_code] || 'Variabil';
-            parts.push(`[DATE METEO REALE — ${loc.name}, ${loc.country}]\nTemperatură: ${c?.temperature_2m}°C (resimțit ${c?.apparent_temperature}°C)\nCondiții: ${desc}\nUmiditate: ${c?.relative_humidity_2m}%\nVânt: ${c?.wind_speed_10m} km/h\nPrecipitații: ${c?.precipitation}mm`);
-          }
-        }
+        if (!loc) return parts.length > 0 ? parts.join('\n\n') : null;
+        lat = loc.latitude;
+        lng = loc.longitude;
+        locationName = `${loc.name}, ${loc.country}`;
+      }
+
+      // Apel meteo cu coordonatele finale
+      const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,precipitation&wind_speed_unit=kmh&timezone=auto`;
+      const wCtrl = new AbortController();
+      const wTimer = setTimeout(() => wCtrl.abort(), 5000);
+      const wR = await fetch(weatherUrl, { signal: wCtrl.signal }).finally(() => clearTimeout(wTimer));
+      if (wR.ok) {
+        const wData = await wR.json();
+        const c = wData.current;
+        const codes = { 0:'Cer senin☀️', 1:'Parțial noros🌤️', 2:'Noros⛅', 3:'Acoperit☁️', 45:'Ceatos🌫️', 48:'Ceatos🌫️', 51:'Burniță🌦️', 61:'Ploaie🌧️', 63:'Ploaie moderată🌧️', 65:'Ploaie abundentă🌧️', 71:'Ninsoare🌨️', 80:'Averse🌦️', 95:'Furtună⛈️' };
+        const desc = codes[c?.weather_code] || 'Variabil';
+        parts.push(`[DATE METEO REALE — ${locationName}]\nTemperatură: ${c?.temperature_2m}°C (resimțit ${c?.apparent_temperature}°C)\nCondiții: ${desc}\nUmiditate: ${c?.relative_humidity_2m}%\nVânt: ${c?.wind_speed_10m} km/h\nPrecipitații: ${c?.precipitation}mm`);
       }
     } catch (_) { /* non-blocking */ }
   }
@@ -459,9 +486,7 @@ async function thinkV5(
         );
 
     // ── 5b. PRE-FETCH real-time data (weather/search) — BEFORE any AI call ──
-    // Injectăm datele reale în systemPrompt → AI nu mai trebuie să cheme tools
-    // Elimina complet 503 pentru queries cu date externe
-    const realtimeCtx = await getRealtimeContext(message, brain, userId);
+    const realtimeCtx = await getRealtimeContext(message, brain, userId, mediaData.geo);
     if (realtimeCtx) systemPrompt += '\n\n' + realtimeCtx;
 
     // ── 6. Classify message complexity ──
