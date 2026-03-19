@@ -631,6 +631,40 @@ async function thinkV5(
         null,
       );
 
+    // ═══ PROCEDURA UNIVERSALA — OBLIGATORIE PENTRU ORICE CERERE ═══
+    // Userul poate cere in orice limba — tu intelegi si raspunzi in limba lui
+    // Pentru ORICE cerere care necesita date din lumea reala (live, actuale):
+    systemPrompt += `
+
+## MANDATORY UNIVERSAL TOOL PROCEDURE
+For ANY request needing real-world data (flights, prices, news, sports, traffic, weather, stocks, earthquakes, exchange rates, schedules, statistics, ANY live info):
+
+STEP 1 — SEARCH REGISTRY: Call recall_tool with English keywords for what you need
+  - "ce avioane zboara" → recall_tool(query: "flight tracking aircraft positions")
+  - "cursul euro" → recall_tool(query: "currency exchange rate EUR")
+  - "cutremur recent" → recall_tool(query: "earthquake seismic data")
+  - ANY topic → translate to English → recall_tool
+
+STEP 2 — USE OR DISCOVER:
+  - Tool FOUND → call_saved_tool(tool_name, params) → get real data
+  - Tool NOT FOUND → call discover_and_save_tool(task, api_endpoint, tool_name) → save it → call it
+
+STEP 3 — IF TOOL FAILS (broken=true, action_required message):
+  - Immediately call discover_and_save_tool with a DIFFERENT free public API
+  - Do NOT retry the same failing tool
+
+STEP 4 — VISUALIZE IF USEFUL:
+  - You have coordinates/positions data → generate Leaflet.js HTML map with markers
+  - You have numbers/statistics → generate Chart.js HTML chart
+  - You have list data → generate HTML table
+  - Call show_in_monitor(html) to display it in the monitor panel
+
+STEP 5 — REPLY: Answer in user's language with real tool data.
+
+RULE: NEVER say "I don't have access to real-time data" without executing steps 1-4 first.`;
+
+
+
     // ── 5b. Detect INTENT — fiecare tip de cerere → tool potrivit ──
     const intent = detectIntent(message, mediaData);
     logger.info({ component: "BrainV5", intent, domain }, `🧠 V5 intent: ${intent}`);
