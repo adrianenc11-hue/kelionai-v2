@@ -1108,15 +1108,12 @@
           if (codeData.action === 'enter') {
             adminSecret = codeData.secret;
             sessionStorage.setItem('kelion_admin_secret', codeData.secret);
-            // Unlock admin button
-            const ab = document.getElementById('btn-admin');
-            if (ab) {
-              ab.dataset.locked = 'false';
-              ab.style.cssText =
-                'padding:8px 14px;font-size:0.85rem;background:rgba(16,185,129,0.2);border:1px solid rgba(16,185,129,0.5);border-radius:8px;color:#34d399;cursor:pointer;font-family:var(--kelion-font);transition:all 0.4s;opacity:1;';
-              ab.title = 'Admin Panel — Unlocked';
-              ab.textContent = '🛡️ Admin';
-              ab.onclick = function () {
+            // Unlock — user-name becomes admin button
+            const un = document.getElementById('user-name');
+            if (un) {
+              un.style.cssText = 'cursor:pointer;border:1px solid rgba(16,185,129,0.5);background:rgba(16,185,129,0.15);border-radius:8px;color:#34d399;padding:6px 12px;font-family:var(--kelion-font);transition:all 0.4s;';
+              un.title = 'Click to open Admin Dashboard';
+              un.onclick = function () {
                 const s = sessionStorage.getItem('kelion_admin_secret') || adminSecret || '';
                 window.open('/dashboard?secret=' + encodeURIComponent(s), '_blank');
               };
@@ -1124,15 +1121,12 @@
           } else if (codeData.action === 'exit') {
             adminSecret = null;
             sessionStorage.removeItem('kelion_admin_secret');
-            // Re-lock admin button
-            const ab2 = document.getElementById('btn-admin');
-            if (ab2) {
-              ab2.dataset.locked = 'true';
-              ab2.style.cssText =
-                'padding:8px 14px;font-size:0.85rem;background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);border-radius:8px;color:#fca5a5;cursor:not-allowed;font-family:var(--kelion-font);transition:all 0.4s;opacity:0.7;';
-              ab2.title = 'Admin Panel — Locked';
-              ab2.textContent = '🔒 Admin';
-              ab2.onclick = null;
+            // Re-lock — user-name returns to normal
+            const un2 = document.getElementById('user-name');
+            if (un2) {
+              un2.style.cssText = 'cursor:default;border:none;background:transparent;';
+              un2.title = '';
+              un2.onclick = null;
             }
           }
           return;
