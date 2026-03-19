@@ -643,58 +643,42 @@ router.post('/memory', memoryLimiter, validate(memorySchema), async (req, res) =
   }
 });
 
-// POST /api/imagine — Generare imagini AI (Pollinations + HuggingFace fallback)
+// POST /api/imagine — Generare imagini cu DALL-E 3 (OpenAI)
 router.post('/imagine', async (req, res) => {
   try {
     const { prompt } = req.body;
     if (!prompt || prompt.trim().length < 2) return res.status(400).json({ error: 'Prompt required' });
-    const cleanPrompt = prompt.trim();
+    const openaiKey = process.env.OPENAI_API_KEY;
+    if (!openaiKey) return res.status(503).json({ error: 'OPENAI_API_KEY not configured' });
 
-    // 1. Incercam Pollinations (gratuit, fara cheie)
-    let imageDataUrl = null;
-    const pollinationsUrls = [
-      `https://image.pollinations.ai/prompt/${encodeURIComponent(cleanPrompt)}?width=1024&height=1024&nologo=true&seed=${Math.floor(Math.random()*99999)}`,
-      `https://image.pollinations.ai/prompt/${encodeURIComponent(cleanPrompt)}?width=512&height=512&nologo=true`,
-    ];
+    const r = await fetch('https://api.openai.com/v1/images/generations', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'dall-e-3',
+        prompt: prompt.trim(),
+        n: 1,
+        size: '1024x1024',
+        response_format: 'b64_json',
+      }),
+      signal: AbortSignal.timeout(60000),
+    });
 
-    for (const url of pollinationsUrls) {
-      try {
-        const r = await fetch(url, { signal: AbortSignal.timeout(25000), headers: { 'User-Agent': 'Mozilla/5.0' } });
-        if (r.ok) {
-          const ct = r.headers.get('content-type') || 'image/jpeg';
-          if (ct.startsWith('image/')) {
-            const buf = await r.arrayBuffer();
-            imageDataUrl = `data:${ct};base64,${Buffer.from(buf).toString('base64')}`;
-            break;
-          }
-        }
-      } catch (_) { /* continua cu urmatorul */ }
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      throw new Error(err?.error?.message || `OpenAI ${r.status}`);
     }
 
-    // 2. Fallback: HuggingFace FLUX.1-schnell
-    if (!imageDataUrl) {
-      const hfKey = process.env.HUGGINGFACE_KEY;
-      const hfHeaders = { 'Content-Type': 'application/json' };
-      if (hfKey) hfHeaders['Authorization'] = `Bearer ${hfKey}`;
-      const hfResp = await fetch('https://router.huggingface.co/fal-ai/fal-ai/flux/schnell', {
-        method: 'POST',
-        headers: hfHeaders,
-        body: JSON.stringify({ inputs: cleanPrompt }),
-        signal: AbortSignal.timeout(30000),
-      });
-      if (hfResp.ok) {
-        const ct = hfResp.headers.get('content-type') || 'image/jpeg';
-        const buf = await hfResp.arrayBuffer();
-        imageDataUrl = `data:${ct};base64,${Buffer.from(buf).toString('base64')}`;
-      }
-    }
+    const data = await r.json();
+    const b64 = data.data?.[0]?.b64_json;
+    if (!b64) throw new Error('No image data from DALL-E');
 
-    if (!imageDataUrl) throw new Error('All image providers failed');
-    return res.json({ image: imageDataUrl, prompt: cleanPrompt });
+    return res.json({ image: `data:image/png;base64,${b64}`, prompt: prompt.trim() });
   } catch (e) {
     logger.error({ component: 'Imagine', err: e.message }, 'imagine error');
     res.status(500).json({ error: e.message });
   }
 });
+
 
 module.exports = router;
