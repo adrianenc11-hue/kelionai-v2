@@ -1,0 +1,145 @@
+name: Weekly AI Version Auto-Update
+
+on:
+  schedule:
+    # Rulează în fiecare luni la 06:00 UTC
+    - cron: '0 6 * * 1'
+  workflow_dispatch: # Permite și rulare manuală din GitHub UI
+
+jobs:
+  check-and-update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Check latest Gemini models
+        id: gemini
+        run: |
+          GEMINI_KEY="${{ secrets.GOOGLE_AI_KEY }}"
+          if [ -z "$GEMINI_KEY" ]; then
+            echo "GEMINI_LATEST=gemini-2.5-flash" >> $GITHUB_ENV
+            echo "No Gemini key, using default"
+            exit 0
+          fi
+          
+          MODELS=$(curl -s "https://generativelanguage.googleapis.com/v1beta/models?key=${GEMINI_KEY}" \
+            -H "Content-Type: application/json")
+          
+          # Extrage cel mai recent model flash și pro
+          FLASH=$(echo "$MODELS" | node -e "
+            const d = require('fs').readFileSync('/dev/stdin', 'utf8');
+            try {
+              const models = JSON.parse(d).models || [];
+              const flash = models
+                .filter(m => m.name.includes('flash') && !m.name.includes('thinking') && !m.name.includes('lite'))
+                .map(m => m.name.split('/').pop())
+                .sort().pop();
+              console.log(flash || 'gemini-2.5-flash');
+            } catch(e) { console.log('gemini-2.5-flash'); }
+          ")
+          
+          PRO=$(echo "$MODELS" | node -e "
+            const d = require('fs').readFileSync('/dev/stdin', 'utf8');
+            try {
+              const models = JSON.parse(d).models || [];
+              const pro = models
+                .filter(m => m.name.includes('-pro') && !m.name.includes('vision'))
+                .map(m => m.name.split('/').pop())
+                .sort().pop();
+              console.log(pro || 'gemini-2.5-pro');
+            } catch(e) { console.log('gemini-2.5-pro'); }
+          ")
+          
+          echo "GEMINI_FLASH=$FLASH" >> $GITHUB_ENV
+          echo "GEMINI_PRO=$PRO" >> $GITHUB_ENV
+          echo "Latest Gemini Flash: $FLASH | Pro: $PRO"
+
+      - name: Check latest OpenAI models
+        id: openai
+        run: |
+          OPENAI_KEY="${{ secrets.OPENAI_API_KEY }}"
+          if [ -z "$OPENAI_KEY" ]; then
+            echo "No OpenAI key"
+            echo "OPENAI_LATEST=gpt-4o" >> $GITHUB_ENV
+            exit 0
+          fi
+          
+          MODELS=$(curl -s "https://api.openai.com/v1/models" \
+            -H "Authorization: Bearer ${OPENAI_KEY}")
+          
+          LATEST=$(echo "$MODELS" | node -e "
+            const d = require('fs').readFileSync('/dev/stdin', 'utf8');
+            try {
+              const models = JSON.parse(d).data || [];
+              const gpt = models
+                .filter(m => m.id.startsWith('gpt-') && !m.id.includes('instruct') && !m.id.includes('audio'))
+                .map(m => m.id)
+                .sort().pop();
+              console.log(gpt || 'gpt-4o');
+            } catch(e) { console.log('gpt-4o'); }
+          ")
+          
+          echo "OPENAI_LATEST=$LATEST" >> $GITHUB_ENV
+          echo "Latest OpenAI: $LATEST"
+
+      - name: Update models.js if new versions found
+        run: |
+          node -e "
+            const fs = require('fs');
+            const path = 'server/config/models.js';
+            let content = fs.readFileSync(path, 'utf8');
+            const original = content;
+            
+            const flash = process.env.GEMINI_FLASH || 'gemini-2.5-flash';
+            const pro = process.env.GEMINI_PRO || 'gemini-2.5-pro';
+            const openai = process.env.OPENAI_LATEST || 'gpt-4o';
+            
+            // Update model IDs in config
+            content = content.replace(/GEMINI_CHAT:\s*['\"]gemini-[\w.-]+['\"]/g, \`GEMINI_CHAT: '\${flash}'\`);
+            content = content.replace(/GEMINI_PRO:\s*['\"]gemini-[\w.-]+['\"]/g, \`GEMINI_PRO: '\${pro}'\`);
+            content = content.replace(/OPENAI_CHAT:\s*['\"]gpt-[\w.-]+['\"]/g, \`OPENAI_CHAT: '\${openai}'\`);
+            
+            if (content !== original) {
+              fs.writeFileSync(path, content);
+              console.log('UPDATED: models.js modified with new versions');
+              process.exit(0);
+            } else {
+              console.log('NO_CHANGE: models already up to date');
+              process.exit(0);
+            }
+          "
+
+      - name: Check if models.js changed
+        id: check_diff
+        run: |
+          if git diff --quiet server/config/models.js; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+            git diff server/config/models.js
+          fi
+
+      - name: Commit and push updated models
+        if: steps.check_diff.outputs.changed == 'true'
+        run: |
+          git config user.name "KelionAI Auto-Updater"
+          git config user.email "bot@kelionai.app"
+          git add server/config/models.js
+          git commit -m "chore(ai-versions): auto-update AI models - Gemini: ${{ env.GEMINI_FLASH }} | OpenAI: ${{ env.OPENAI_LATEST }}"
+          git push
+          echo "✅ Deployed! Railway will auto-deploy from this push."
+
+      - name: No update needed
+        if: steps.check_diff.outputs.changed == 'false'
+        run: echo "✅ All AI models are already up to date. No action needed."

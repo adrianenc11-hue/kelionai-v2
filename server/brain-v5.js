@@ -272,12 +272,40 @@ async function getRealtimeContext(message, brain, userId, geo) {
 
   if (shouldSearch && brain && typeof brain._search === 'function') {
     try {
-      // Extrage query relevant din mesaj (nu pasam mesajul intreg)
       const searchQuery = message.replace(/^(?:caută|cauta|search|google)\s+/i, '').trim();
-      const searchResult = await Promise.race([
+      let searchResult = await Promise.race([
         brain._search(searchQuery),
         new Promise((_, reject) => setTimeout(() => reject(new Error('search timeout')), 8000)),
       ]);
+
+      // ── Fallback: Gemini Search Grounding (Google Search built-in, fara cheie externa) ──
+      if ((!searchResult || (typeof searchResult === 'string' && searchResult.length < 20)) && 
+          (process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY)) {
+        const gKey = process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
+        const gModel = 'gemini-2.5-flash-preview-04-17';
+        const gCtrl = new AbortController();
+        const gTimer = setTimeout(() => gCtrl.abort(), 8000);
+        try {
+          const gR = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${gModel}:generateContent?key=${gKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ role: 'user', parts: [{ text: searchQuery }] }],
+              tools: [{ googleSearch: {} }],
+              generationConfig: { maxOutputTokens: 800, temperature: 0.3 },
+            }),
+            signal: gCtrl.signal,
+          }).finally(() => clearTimeout(gTimer));
+          if (gR.ok) {
+            const gData = await gR.json();
+            const groundedText = (gData.candidates?.[0]?.content?.parts || []).filter(p => p.text).map(p => p.text).join('');
+            const sources = (gData.candidates?.[0]?.groundingMetadata?.groundingChunks || [])
+              .slice(0, 3).map(c => `- ${c.web?.title}: ${c.web?.uri}`).join('\n');
+            if (groundedText) searchResult = groundedText + (sources ? `\n\nSurse:\n${sources}` : '');
+          }
+        } catch (_) { /* grounding unavailable */ }
+      }
+
       if (searchResult && typeof searchResult === 'string' && searchResult.length > 20) {
         parts.push(`[REZULTATE CĂUTARE WEB REALE]\n${searchResult.substring(0, 2000)}`);
       } else if (searchResult && typeof searchResult === 'object') {
@@ -285,13 +313,13 @@ async function getRealtimeContext(message, brain, userId, geo) {
         if (txt.length > 20) parts.push(`[REZULTATE CĂUTARE WEB REALE]\n${txt}`);
       }
     } catch (_) {
-      // Search indisponibil — brain va informa userul
-      parts.push('[SEARCH INDISPONIBIL]\nNu pot accesa internetul în acest moment. Informează userul și oferă ce știi din cunoștințele proprii, marcând clar că nu sunt date actuale.');
+      parts.push('[SEARCH INDISPONIBIL]\nNu pot accesa internetul în acest moment. Oferă ce știi, marcând clar că nu sunt date actuale.');
     }
   }
 
   return parts.length > 0 ? parts.join('\n\n') : null;
 }
+
 
 
 // ── Parse avatar commands from AI text response ──
