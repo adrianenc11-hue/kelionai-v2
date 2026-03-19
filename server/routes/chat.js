@@ -643,4 +643,19 @@ router.post('/memory', memoryLimiter, validate(memorySchema), async (req, res) =
   }
 });
 
+// POST /api/imagine — Generare imagini AI cu Pollinations (fara API key)
+router.post('/imagine', async (req, res) => {
+  try {
+    const { prompt } = req.body;
+    if (!prompt || prompt.trim().length < 2) return res.status(400).json({ error: 'Prompt required' });
+    const encoded = encodeURIComponent(prompt.trim());
+    const seed = Math.floor(Math.random() * 99999);
+    const imageUrl = `https://image.pollinations.ai/prompt/${encoded}?width=1024&height=1024&model=flux&nologo=true&enhance=true&seed=${seed}`;
+    return res.json({ image: imageUrl, prompt: prompt.trim() });
+  } catch (e) {
+    logger.error({ component: 'Imagine', err: e.message }, 'imagine error');
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;
