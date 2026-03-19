@@ -163,22 +163,36 @@ async function callOpenAI(messages, systemPrompt, tools, model) {
     body.tool_choice = "auto";
   }
 
-  const r = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify(body),
-  });
+  // ── Timeout 25s — previne agățarea indefinită a request-ului ──
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 25000);
 
-  if (!r.ok) {
-    const errText = await r.text().catch(() => "unknown");
-    throw new Error(`OpenAI API ${r.status}: ${errText.substring(0, 300)}`);
+  try {
+    const r = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!r.ok) {
+      const errText = await r.text().catch(() => "unknown");
+      throw new Error(`OpenAI API ${r.status}: ${errText.substring(0, 300)}`);
+    }
+
+    return await r.json();
+  } catch (e) {
+    clearTimeout(timeoutId);
+    if (e.name === "AbortError") throw new Error("OpenAI timeout (25s) — falling back to Gemini");
+    throw e;
   }
-
-  return await r.json();
 }
+
 
 // ═══════════════════════════════════════════════════════════════
 // Call Gemini Flash (for simple messages and Quality Gate)
