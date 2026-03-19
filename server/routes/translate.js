@@ -41,8 +41,8 @@ router.post('/translate', translateLimiter, async (req, res) => {
     const model = MODELS.GEMINI_CHAT;
 
     const prompt = sourceLang
-      ? `Translate the following text from ${sourceLang} to ${targetLang}. Return ONLY the translated text, nothing else. No explanations, no quotes, no formatting.\n\nText: ${text}`
-      : `Detect the language of the following text and translate it to ${targetLang}. Return ONLY a JSON object like {"translated":"...","detectedLang":"xx"} where xx is the ISO 639-1 language code. No markdown, no code blocks, just raw JSON.\n\nText: ${text}`;
+      ? `Translate from ${sourceLang} to ${targetLang}. ONLY the translation, nothing else:\n${text}`
+      : `Translate to ${targetLang}. Return ONLY "LANG:xx|translation text" where xx=detected ISO language code. Nothing else:\n${text}`;
 
     const r = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`,
@@ -52,11 +52,11 @@ router.post('/translate', translateLimiter, async (req, res) => {
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {
-            maxOutputTokens: 1024,
-            temperature: 0.1, // Low temp for accurate translation
+            maxOutputTokens: 256,
+            temperature: 0.05,
           },
         }),
-        signal: AbortSignal.timeout(10000),
+        signal: AbortSignal.timeout(5000),
       }
     );
 
@@ -73,28 +73,27 @@ router.post('/translate', translateLimiter, async (req, res) => {
       return res.status(502).json({ error: 'Empty translation result' });
     }
 
-    // If we asked for JSON (auto-detect), parse it
+    // If we asked for auto-detect format: LANG:xx|text
     if (!sourceLang) {
-      try {
-        // Clean markdown code block if present
-        const cleaned = raw
-          .replace(/^```json\s*/i, '')
-          .replace(/```\s*$/, '')
-          .trim();
-        const parsed = JSON.parse(cleaned);
-        return res.json({
-          translated: parsed.translated || raw,
-          detectedLang: parsed.detectedLang || 'unknown',
-          targetLang,
-        });
-      } catch (_e) {
-        // Gemini didn't return JSON — use raw text
-        return res.json({
-          translated: raw,
-          detectedLang: 'unknown',
-          targetLang,
-        });
+      const pipeIdx = raw.indexOf('|');
+      let detectedLang = 'unknown';
+      let translated = raw;
+      if (pipeIdx > 0 && pipeIdx < 8 && raw.startsWith('LANG:')) {
+        detectedLang = raw.substring(5, pipeIdx).trim().toLowerCase();
+        translated = raw.substring(pipeIdx + 1).trim();
       }
+
+      // Save to Supabase
+      if (supabaseAdmin && user?.id) {
+        supabaseAdmin.from('brain_memory').insert({
+          user_id: user.id, memory_type: 'translation',
+          content: `[${detectedLang}→${targetLang}] ${translated}`,
+          context: { original: text, target: targetLang, detected: detectedLang },
+          importance: 2,
+        }).then(() => {}).catch(() => {});
+      }
+
+      return res.json({ translated, detectedLang, targetLang });
     }
 
     // Direct translation (sourceLang provided)

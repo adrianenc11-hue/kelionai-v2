@@ -60,7 +60,7 @@
         method: 'POST',
         headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders),
         body: JSON.stringify({ text, targetLang }),
-        signal: AbortSignal.timeout(8000),
+        signal: AbortSignal.timeout(5000), // ultrarapid timeout
       });
       if (!r.ok) return text;
       const d = await r.json();
@@ -207,28 +207,32 @@
     let lastFinal = '';
 
     recognition.onresult = async function (ev) {
+      const content = getContentArea();
       for (let i = ev.resultIndex; i < ev.results.length; i++) {
-        if (ev.results[i].isFinal) {
-          const text = ev.results[i][0].transcript.trim();
-          if (text && text.length > 1 && text !== lastFinal) {
-            lastFinal = text;
-            console.log('[Translate] Heard:', text);
+        const text = ev.results[i][0].transcript.trim();
+        if (!text || text.length < 2) continue;
 
-            // Show placeholder
-            const content = getContentArea();
-            const placeholder = document.createElement('div');
-            placeholder.style.cssText = 'opacity:0.4;padding:8px 12px;color:#aaa;font-size:0.9rem;';
-            placeholder.textContent = '⏳ ' + text;
-            if (content) {
-              content.appendChild(placeholder);
-              content.scrollTop = content.scrollHeight;
-            }
-
-            // Translate
-            const translated = await translateText(text, targetLang);
-            if (placeholder.parentNode) placeholder.remove();
-            showTranslation(text, translated);
+        if (!ev.results[i].isFinal) {
+          // INTERIM: show live text as user speaks (grey, updating)
+          let interim = document.getElementById('translate-interim');
+          if (!interim) {
+            interim = document.createElement('div');
+            interim.id = 'translate-interim';
+            interim.style.cssText = 'opacity:0.5;padding:8px 12px;color:#aaa;font-size:0.95rem;border-left:2px solid #444;margin:4px 0;';
+            if (content) content.appendChild(interim);
           }
+          interim.textContent = '🎙️ ' + text + '...';
+          if (content) content.scrollTop = content.scrollHeight;
+        } else {
+          // FINAL: remove interim, translate
+          if (text === lastFinal) continue;
+          lastFinal = text;
+          const interim = document.getElementById('translate-interim');
+          if (interim) interim.remove();
+
+          console.log('[Translate] Heard:', text);
+          const translated = await translateText(text, targetLang);
+          showTranslation(text, translated);
         }
       }
     };
