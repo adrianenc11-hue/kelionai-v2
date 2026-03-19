@@ -263,9 +263,14 @@ async function getRealtimeContext(message, brain, userId, geo) {
   }
 
   // ── Web Search (profesional — prin brain._search care are toate API-urile) ──
-  const searchMatch = lower.match(/\b(?:caută|cauta|search|find|google|știri|stiri|news|actualitate|ce\s+este|ce\s+e|cine\s+e|când\s+a|când\s+s-?a|istoricul|def(?:in)?|ultima\s+versiune|cel\s+mai\s+recen|cea\s+mai\s+recen|lansare|lansat|apărut|aparut|prețul|pretul|cat\s+costa|azi\s+a|ce\s+s-?a\s+int|cum\s+sta|rezultat|scor|clasament|record)\b/i);
+  // ── Web Search — IMPLICIT MEREU (nu condiționat de keywords) ──
+  // Skip doar pentru conversații simple fără conținut factual
+  const isSimpleChat = lower.match(/^(?:salut|buna|bună|hello|hi\b|hey\b|ok\b|da\b|nu\b|bine|super|mulțumesc|multumesc|mersi|merci|thanks|thx|bye|pa|la\s+revedere|cum\s+ești|cum\s+esti|ce\s+mai\s+faci|cine\s+ești|cine\s+esti|te\s+rog\s+(?:fa|scrie|calcul|explic|tradu)|execut|calculez|scrie|genereaz|explicat|traduc|analiz)\b/i);
+  const isShort = message.trim().split(/\s+/).length < 5; // mesaje sub 5 cuvinte - probabil conversationale
+  const shouldSearch = !isSimpleChat && !isShort;
 
-  if (searchMatch && brain && typeof brain._search === 'function') {
+
+  if (shouldSearch && brain && typeof brain._search === 'function') {
     try {
       // Extrage query relevant din mesaj (nu pasam mesajul intreg)
       const searchQuery = message.replace(/^(?:caută|cauta|search|google)\s+/i, '').trim();
