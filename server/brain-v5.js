@@ -674,7 +674,8 @@ STEP 4 — VISUALIZE IF USEFUL:
 STEP 5 — REPLY: Answer in user's language with real tool data.
 
 RULE: NEVER say "I don't have access to real-time data" without executing steps 1-4 first.
-RULE: ALWAYS prefer free APIs without authentication (no API key needed).`;
+RULE: ALWAYS prefer free APIs without authentication (no API key needed).
+CRITICAL: NEVER write tool calls as text in your response (e.g. do NOT write [recall_tool(...)], [call_saved_tool(...)], [show_in_monitor(...)]). ALWAYS use the actual function calling API. If you write a tool call as text, it will NOT be executed.`;
 
     // ── 5b. Detect INTENT — fiecare tip de cerere → tool potrivit ──
     const intent = detectIntent(message, mediaData);
