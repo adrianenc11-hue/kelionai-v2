@@ -190,6 +190,8 @@ router.post('/chat', chatLimiter, validate(chatSchema), async (req, res) => {
         try {
           const { buildSystemPrompt } = require('../persona');
           const emergencySys = buildSystemPrompt(avatar, language, '', '', null);
+          const emergCtrl = new AbortController();
+          const emergTimer = setTimeout(() => emergCtrl.abort(), 12000);
           const gResp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${gKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -198,7 +200,9 @@ router.post('/chat', chatLimiter, validate(chatSchema), async (req, res) => {
               systemInstruction: { parts: [{ text: emergencySys }] },
               generationConfig: { maxOutputTokens: 1024, temperature: 0.7 },
             }),
-          });
+            signal: emergCtrl.signal,
+          }).finally(() => clearTimeout(emergTimer));
+
           if (gResp.ok) {
             const gData = await gResp.json();
             emergencyReply = (gData.candidates?.[0]?.content?.parts || []).filter(p => p.text).map(p => p.text).join('');
@@ -206,7 +210,8 @@ router.post('/chat', chatLimiter, validate(chatSchema), async (req, res) => {
         } catch (_) { /* last resort failed */ }
       }
       if (!emergencyReply) emergencyReply = language === 'ro' ? 'Îmi pare rău, am o problemă tehnică temporară. Încearcă din nou. 🔧' : 'Sorry, I have a temporary technical issue. Please try again. 🔧';
-      return res.json({ reply: emergencyReply, avatar, engine: 'gemini-emergency', language, emotion: 'concerned', gestures: [], thinkTime: BRAIN_TIMEOUT_MS, totalTime: Date.now() - _chatStart, conversationId });
+      return res.json({ reply: emergencyReply, avatar, engine: 'gemini-emergency', language, emotion: 'concerned', gestures: [], thinkTime: BRAIN_TIMEOUT_MS, totalTime: BRAIN_TIMEOUT_MS, conversationId });
+
     }
 
     // V5 returns the final reply from GPT-5.4 or Gemini Flash
