@@ -967,12 +967,12 @@ STEP 3 — IF TOOL FAILS (broken=true, action_required message, or API key requi
   - Call discover_and_save_tool with the new free endpoint
   - Do NOT retry the same failing tool
 
-STEP 4 — VISUALIZE IF USEFUL (AUTOMATIC — result appears instantly on avatar monitor):
+STEP 4 — VISUALIZE IF USEFUL (monitor shows ONLY visual content, NEVER text):
   - Image request → generate_image(prompt) → image appears on monitor automatically
   - Coordinates/positions data → show_in_monitor(html) with Leaflet.js map with markers
   - Numbers/statistics → show_in_monitor(html) with Chart.js chart
-  - List data → show_in_monitor(html) with styled HTML table
-  - You can also embed monitor content in your reply using: [MONITOR:image]URL[/MONITOR] or [MONITOR:html]HTML[/MONITOR]
+  - NEVER put plain text, explanations, or answers on the monitor. Text goes ONLY in your spoken reply (subtitle below avatar).
+  - Monitor is ONLY for: images, maps, charts, tables, diagrams, videos. If there is no visual content, do NOT use show_in_monitor.
 
 STEP 5 — REPLY: Answer in user's language with real tool data.
 
