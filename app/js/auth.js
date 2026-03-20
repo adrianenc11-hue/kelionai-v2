@@ -174,31 +174,61 @@
   }
 
   function updateAdminButtonState() {
-    const adminBtn = document.getElementById('btn-admin');
-    if (!adminBtn) return;
     if (!currentUser) {
-      adminBtn.style.display = 'none';
+      // Remove admin buttons if logged out
+      var existing = document.getElementById('btn-admin-nav');
+      if (existing) existing.remove();
+      var adminBtn = document.getElementById('btn-admin');
+      if (adminBtn) adminBtn.style.display = 'none';
       return;
     }
-    // Check role OR email match (ADMIN_EMAIL set on server)
+    // Check role OR email match
     const isAdminRole = currentUser.role === 'admin';
     const isAdminEmail =
       currentUser.email &&
       window._adminEmail &&
       currentUser.email.toLowerCase() === window._adminEmail.toLowerCase();
-    if (!isAdminRole && !isAdminEmail) {
-      adminBtn.style.display = 'none';
-      return;
+    const isAdmin = isAdminRole || isAdminEmail;
+
+    // Handle static btn-admin (if exists in HTML)
+    var adminBtn = document.getElementById('btn-admin');
+    if (adminBtn) {
+      if (!isAdmin) {
+        adminBtn.style.display = 'none';
+        return;
+      }
+      adminBtn.style.display = '';
+      adminBtn.dataset.locked = 'false';
+      adminBtn.style.background = 'rgba(16,185,129,0.15)';
+      adminBtn.style.borderColor = 'rgba(16,185,129,0.4)';
+      adminBtn.style.color = '#6ee7b7';
+      adminBtn.style.cursor = 'pointer';
+      adminBtn.style.opacity = '1';
+      adminBtn.innerHTML = '🛡️ Admin';
+      adminBtn.title = 'Admin Panel';
     }
-    adminBtn.style.display = '';
-    adminBtn.dataset.locked = 'false';
-    adminBtn.style.background = 'rgba(16,185,129,0.15)';
-    adminBtn.style.borderColor = 'rgba(16,185,129,0.4)';
-    adminBtn.style.color = '#6ee7b7';
-    adminBtn.style.cursor = 'pointer';
-    adminBtn.style.opacity = '1';
-    adminBtn.innerHTML = '🛡️ Admin';
-    adminBtn.title = 'Admin Panel';
+
+    // Create/update nav admin button (btn-admin-nav)
+    if (isAdmin) {
+      var navBtn = document.getElementById('btn-admin-nav');
+      if (!navBtn) {
+        var navRight = document.querySelector('.nav-right');
+        if (navRight) {
+          navBtn = document.createElement('button');
+          navBtn.id = 'btn-admin-nav';
+          navBtn.textContent = '🛡️ Admin';
+          navBtn.style.cssText = 'cursor:pointer;border:1px solid rgba(16,185,129,0.4);background:rgba(16,185,129,0.15);border-radius:8px;padding:6px 12px;color:#6ee7b7;font-size:0.75rem;font-weight:600;transition:all 0.3s;';
+          navBtn.addEventListener('click', function () {
+            window.location.href = '/admin';
+          });
+          navRight.insertBefore(navBtn, navRight.firstChild);
+          console.log('[Auth] ✅ Admin button created on login');
+        }
+      }
+    } else {
+      var navBtn = document.getElementById('btn-admin-nav');
+      if (navBtn) navBtn.remove();
+    }
   }
 
   function updateUI() {
@@ -584,6 +614,13 @@
     getAuthHeaders,
     getUser: () => currentUser,
     isLoggedIn: () => !!currentUser,
+    isAdmin: () => {
+      if (!currentUser) return false;
+      const isAdminRole = currentUser.role === 'admin';
+      const isAdminEmail = currentUser.email && window._adminEmail &&
+        currentUser.email.toLowerCase() === window._adminEmail.toLowerCase();
+      return isAdminRole || isAdminEmail;
+    },
     forgotPassword,
     changePassword,
     changeEmail,
