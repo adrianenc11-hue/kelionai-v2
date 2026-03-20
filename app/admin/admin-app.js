@@ -331,10 +331,14 @@ async function loadLiveSection() {
     var html = '<div class="mini-stat"><span class="label">Sesiuni active:</span> ' + sessions.length + '</div>';
 
     if (sessions.length > 0) {
-      html += '<table class="admin-table"><thead><tr><th>User</th><th>Pagina</th><th>Durată</th><th>Ultima activitate</th></tr></thead><tbody>';
+      html += '<table class="admin-table"><thead><tr><th>IP</th><th>Pagina</th><th>🌍 Țara</th><th>🖥 Browser</th><th>Durată</th><th>Ultima activitate</th></tr></thead><tbody>';
       sessions.forEach(function (s) {
-        html += '<tr><td>' + esc(s.email || s.userId || 'Anonim') + '</td>'
+        var loc = (s.country || '—') + (s.city ? ' · ' + s.city : '');
+        var device = (s.browser || '—') + ' / ' + (s.os || '—');
+        html += '<tr><td>' + esc(s.ip || s.userId || 'Anonim') + '</td>'
           + '<td>' + esc(s.currentPage || s.page || '/') + '</td>'
+          + '<td>' + esc(loc) + '</td>'
+          + '<td>' + esc(device) + '</td>'
           + '<td>' + esc(s.duration || '—') + '</td>'
           + '<td>' + esc(s.lastActivity || '—') + '</td></tr>';
       });

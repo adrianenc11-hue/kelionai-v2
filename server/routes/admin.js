@@ -539,21 +539,63 @@ router.delete('/memories/:id', async (req, res) => {
 // ══════════════════════════════════════════════════════════
 // GET /api/admin/live-users — Who's on site right now (IN-MEMORY, real-time)
 // ══════════════════════════════════════════════════════════
-router.get('/live-users', (req, res) => {
+const _geoCache = {}; // IP → { country, city }
+function parseUA(ua) {
+  if (!ua) return { browser: '—', os: '—' };
+  let browser = '—', os = '—';
+  if (/Chrome\//.test(ua) && !/Edg/.test(ua)) browser = 'Chrome';
+  else if (/Edg\//.test(ua)) browser = 'Edge';
+  else if (/Firefox\//.test(ua)) browser = 'Firefox';
+  else if (/Safari\//.test(ua) && !/Chrome/.test(ua)) browser = 'Safari';
+  else if (/bot|crawl|spider/i.test(ua)) browser = 'Bot';
+  if (/Windows/.test(ua)) os = 'Windows';
+  else if (/Mac OS/.test(ua)) os = 'macOS';
+  else if (/Android/.test(ua)) os = 'Android';
+  else if (/iPhone|iPad/.test(ua)) os = 'iOS';
+  else if (/Linux/.test(ua)) os = 'Linux';
+  return { browser, os };
+}
+router.get('/live-users', async (req, res) => {
   const liveVisitors = req.app.locals.liveVisitors || new Map();
   const sessions = [];
+  const geoPromises = [];
+
   for (const [ip, data] of liveVisitors) {
     const secsAgo = Math.round((Date.now() - data.lastSeen) / 1000);
-    sessions.push({
+    const { browser, os } = parseUA(data.ua);
+    const totalSecs = Math.round((Date.now() - (data.firstSeen || data.lastSeen)) / 1000);
+    const entry = {
       userId: ip,
-      email: ip,
+      ip: ip,
       currentPage: data.path,
       page: data.path,
-      country: data.country || '—',
+      browser, os,
+      country: data.country || _geoCache[ip]?.country || '—',
+      city: _geoCache[ip]?.city || '',
+      totalTime: totalSecs < 60 ? totalSecs + 's' : Math.round(totalSecs / 60) + 'min',
+      pages: data.pages || [],
       duration: secsAgo < 60 ? secsAgo + 's ago' : Math.round(secsAgo / 60) + 'min ago',
       lastActivity: new Date(data.lastSeen).toLocaleTimeString('ro-RO'),
-    });
+      firstSeen: data.firstSeen ? new Date(data.firstSeen).toLocaleTimeString('ro-RO') : '—',
+    };
+    sessions.push(entry);
+    // Async geo lookup if not cached
+    if (entry.country === '—' && ip !== 'unknown') {
+      geoPromises.push(
+        fetch(`http://ip-api.com/json/${ip}?fields=countryCode,city`, { signal: AbortSignal.timeout(2000) })
+          .then(r => r.json())
+          .then(d => {
+            if (d.countryCode) {
+              _geoCache[ip] = { country: d.countryCode, city: d.city || '' };
+              entry.country = d.countryCode;
+              entry.city = d.city || '';
+            }
+          })
+          .catch(() => {})
+      );
+    }
   }
+  if (geoPromises.length) await Promise.allSettled(geoPromises);
   res.json({ sessions, activeConnections: sessions.length, count: sessions.length });
 });
 

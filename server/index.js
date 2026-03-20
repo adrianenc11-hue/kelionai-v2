@@ -234,12 +234,30 @@ app.use((req, res, next) => {
     const isBot = /bot|crawl|spider|node-fetch|uptimerobot|healthcheck|pingdom|monitoring|curl|wget/i.test(ua);
     if (!isBot) {
       const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || 'unknown';
-      liveVisitors.set(ip, {
-        path: req.path,
-        ua: req.get('user-agent') || '',
-        country: req.headers['cf-ipcountry'] || req.headers['x-vercel-ip-country'] || null,
-        lastSeen: Date.now(),
-      });
+      const existing = liveVisitors.get(ip);
+      const now = Date.now();
+      if (existing) {
+        // Update existing: add page to history if different
+        existing.lastSeen = now;
+        existing.ua = req.get('user-agent') || '';
+        if (!existing.pages) existing.pages = [];
+        const lastPage = existing.pages[existing.pages.length - 1];
+        if (!lastPage || lastPage.path !== req.path) {
+          existing.pages.push({ path: req.path, time: new Date(now).toLocaleTimeString('ro-RO') });
+          if (existing.pages.length > 50) existing.pages = existing.pages.slice(-50);
+        }
+        existing.path = req.path;
+      } else {
+        // New visitor
+        liveVisitors.set(ip, {
+          path: req.path,
+          ua: req.get('user-agent') || '',
+          country: req.headers['cf-ipcountry'] || req.headers['x-vercel-ip-country'] || null,
+          firstSeen: now,
+          lastSeen: now,
+          pages: [{ path: req.path, time: new Date(now).toLocaleTimeString('ro-RO') }],
+        });
+      }
     }
   }
 
