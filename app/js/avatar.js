@@ -787,8 +787,8 @@
     const _BODY_EULER = {
         raiseLeftHand:   { lx: -40, ly: 0, lz: 0, rx: null, ry: null, rz: null, dur: 2.5 },
         raiseRightHand:  { lx: null, ly: null, lz: null, rx: -40, ry: 0, rz: 0, dur: 2.5 },
-        wavLeft:         { lx: -50, ly: 0, lz: 15, rx: null, ry: null, rz: null, dur: 2.0 },
-        wavRight:        { lx: null, ly: null, lz: null, rx: -50, ry: 0, rz: -15, dur: 2.0 },
+        wavLeft:         { lx: -50, ly: 0, lz: -15, rx: null, ry: null, rz: null, dur: 2.0 },
+        wavRight:        { lx: null, ly: null, lz: null, rx: -50, ry: 0, rz: 15, dur: 2.0 },
         pointLeft:       { lx: -20, ly: 0, lz: 30, rx: null, ry: null, rz: null, dur: 2.0 },
         pointRight:      { lx: null, ly: null, lz: null, rx: -20, ry: 0, rz: -30, dur: 2.0 },
         thinkPose:       { lx: null, ly: null, lz: null, rx: -55, ry: 20, rz: -15, dur: 3.0 },
