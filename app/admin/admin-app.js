@@ -328,19 +328,42 @@ async function loadLiveSection() {
     var d = await r.json();
     var sessions = d.sessions || d.activeSessions || [];
 
-    var html = '<div class="mini-stat"><span class="label">Sesiuni active:</span> ' + sessions.length + '</div>';
+    var html = '<div class="mini-stat"><span class="label">Sesiuni active:</span> <strong>' + sessions.length + '</strong></div>';
 
     if (sessions.length > 0) {
-      html += '<table class="admin-table"><thead><tr><th>IP</th><th>Pagina</th><th>🌍 Țara</th><th>🖥 Browser</th><th>Durată</th><th>Ultima activitate</th></tr></thead><tbody>';
-      sessions.forEach(function (s) {
+      html += '<table class="admin-table"><thead><tr>'
+        + '<th>Tip</th><th>IP / User</th><th>Pagina</th>'
+        + '<th>🌍 Locație</th><th>🖥 Browser</th><th>⏱ Timp total</th><th>Ultima</th>'
+        + '</tr></thead><tbody>';
+      sessions.forEach(function (s, idx) {
+        var typeBadge = s.userType === 'User'
+          ? '<span style="background:#10b981;color:#fff;padding:2px 8px;border-radius:4px;font-size:0.7rem">👤 User</span>'
+          : '<span style="background:#6b7280;color:#fff;padding:2px 8px;border-radius:4px;font-size:0.7rem">👻 Guest</span>';
+        var newBadge = s.isReturning
+          ? '<span style="color:#f59e0b;font-size:0.7rem"> 🔄</span>'
+          : '<span style="color:#10b981;font-size:0.7rem"> 🆕</span>';
         var loc = (s.country || '—') + (s.city ? ' · ' + s.city : '');
         var device = (s.browser || '—') + ' / ' + (s.os || '—');
-        html += '<tr><td>' + esc(s.ip || s.userId || 'Anonim') + '</td>'
-          + '<td>' + esc(s.currentPage || s.page || '/') + '</td>'
+        var identity = s.userName ? esc(s.userName) : '<code>' + esc(s.ip) + '</code>';
+        html += '<tr style="cursor:pointer" onclick="togglePages(' + idx + ')">'
+          + '<td>' + typeBadge + newBadge + '</td>'
+          + '<td>' + identity + '</td>'
+          + '<td>' + esc(s.currentPage || '/') + '</td>'
           + '<td>' + esc(loc) + '</td>'
           + '<td>' + esc(device) + '</td>'
-          + '<td>' + esc(s.duration || '—') + '</td>'
-          + '<td>' + esc(s.lastActivity || '—') + '</td></tr>';
+          + '<td>' + esc(s.totalTime || '—') + '</td>'
+          + '<td>' + esc(s.lastActivity || '—') + '</td>'
+          + '</tr>';
+        // Expandable page history
+        if (s.pages && s.pages.length > 0) {
+          html += '<tr id="pages-' + idx + '" style="display:none;background:rgba(16,185,129,0.05)">'
+            + '<td colspan="7" style="padding:8px 16px">'
+            + '<strong>📄 Pagini vizitate (' + s.pages.length + '):</strong><br>';
+          s.pages.forEach(function (p) {
+            html += '<span style="color:#6ee7b7;margin-right:12px">' + esc(p.time) + '</span> → ' + esc(p.path) + '<br>';
+          });
+          html += '</td></tr>';
+        }
       });
       html += '</tbody></table>';
     } else {
@@ -351,6 +374,10 @@ async function loadLiveSection() {
   } catch (e) {
     el.innerHTML = '<div class="error-msg">❌ ' + e.message + '</div>';
   }
+}
+function togglePages(idx) {
+  var row = document.getElementById('pages-' + idx);
+  if (row) row.style.display = row.style.display === 'none' ? '' : 'none';
 }
 
 // ═══════════════════════════════════════════════════════════════

@@ -237,9 +237,35 @@ app.use((req, res, next) => {
       const existing = liveVisitors.get(ip);
       const now = Date.now();
       const rawUA = req.get('user-agent') || '';
+
+      // Detect logged-in user from JWT
+      let userType = 'Guest';
+      let userName = null;
+      try {
+        const auth = req.headers['authorization'] || '';
+        if (auth.startsWith('Bearer ')) {
+          const payload = JSON.parse(Buffer.from(auth.split('.')[1], 'base64').toString());
+          if (payload.email) {
+            userType = 'User';
+            userName = payload.email;
+          }
+        }
+      } catch (_) {}
+
+      // New vs returning
+      if (!global._seenIPs) global._seenIPs = new Set();
+      const isReturning = global._seenIPs.has(ip);
+      global._seenIPs.add(ip);
+      // Keep set manageable
+      if (global._seenIPs.size > 10000) {
+        const arr = [...global._seenIPs];
+        global._seenIPs = new Set(arr.slice(-5000));
+      }
+
       if (existing) {
         existing.lastSeen = now;
         existing.ua = rawUA;
+        if (userName) { existing.userType = userType; existing.userName = userName; }
         if (!existing.pages) existing.pages = [];
         const lastPage = existing.pages[existing.pages.length - 1];
         if (!lastPage || lastPage.path !== req.path) {
@@ -254,6 +280,9 @@ app.use((req, res, next) => {
           country: req.headers['cf-ipcountry'] || req.headers['x-vercel-ip-country'] || null,
           firstSeen: now,
           lastSeen: now,
+          userType,
+          userName,
+          isReturning,
           pages: [{ path: req.path, time: new Date(now).toLocaleTimeString('ro-RO') }],
         });
       }
