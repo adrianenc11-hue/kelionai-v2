@@ -184,18 +184,41 @@ app.use(
 app.use('/api/payments/webhook', express.raw({ type: 'application/json' }));
 app.use(express.json({ limit: '25mb' }));
 
-// ═══ STATIC FILES — serve app/ directory ═══
-app.use(express.static(path.join(__dirname, '..', 'app')));
-
 // ═══ REAL-TIME VISITOR TRACKER (in-memory, no DB) ═══
+// MUST be BEFORE express.static — static files bypass all later middleware!
 const liveVisitors = new Map(); // IP → { path, ua, country, lastSeen }
 setInterval(() => {
   const cutoff = Date.now() - 5 * 60 * 1000;
   for (const [ip, data] of liveVisitors) {
     if (data.lastSeen < cutoff) liveVisitors.delete(ip);
   }
-}, 30000); // cleanup every 30s
+}, 30000);
 app.locals.liveVisitors = liveVisitors;
+
+// Track every page load (before static serves the file)
+app.use((req, res, next) => {
+  if (
+    req.method === 'GET' &&
+    !req.path.startsWith('/api/') &&
+    !req.path.match(/\.(js|css|png|jpg|svg|ico|woff2?|map|json|webmanifest)$/i)
+  ) {
+    const ua = (req.get('user-agent') || '').toLowerCase();
+    const isBot = /bot|crawl|spider|node-fetch|uptimerobot|healthcheck|pingdom|monitoring|curl|wget/i.test(ua);
+    if (!isBot) {
+      const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || 'unknown';
+      liveVisitors.set(ip, {
+        path: req.path,
+        ua: req.get('user-agent') || '',
+        country: req.headers['cf-ipcountry'] || req.headers['x-vercel-ip-country'] || null,
+        lastSeen: Date.now(),
+      });
+    }
+  }
+  next();
+});
+
+// ═══ STATIC FILES — serve app/ directory ═══
+app.use(express.static(path.join(__dirname, '..', 'app')));
 
 // ═══ HTTP REQUEST LOGGING + TRAFFIC TRACKING ═══
 app.use((req, res, next) => {
