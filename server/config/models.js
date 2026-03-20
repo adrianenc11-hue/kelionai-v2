@@ -7,7 +7,7 @@
 
 const MODELS = {
   // ── LLM ──
-  GROQ_PRIMARY: "llama-3.3-70b-versatile",
+  GROQ_PRIMARY: "meta-llama/llama-4-scout-17b-16e-instruct", // Llama 4 Scout — 460 tok/s, 131K context
   OPENAI_CHAT: "gpt-5.4",
   OPENAI_FALLBACK: "gpt-4o",
   OPENAI_VISION: "gpt-5.4",
@@ -15,11 +15,11 @@ const MODELS = {
   GEMINI_VISION: "gemini-2.5-flash",
   GEMINI_PRO: "gemini-2.5-pro-preview-06-05",
   GEMINI_MULTIMODAL: "gemini-2.5-flash",
-  DEEPSEEK: "deepseek-chat",
-  CLAUDE: "claude-opus-4-5",              // Anthropic Claude — reasoning & analysis
-  CLAUDE_FAST: "claude-3-5-haiku-20241022", // Anthropic Claude Haiku — fast responses
+  DEEPSEEK: "deepseek-reasoner",           // DeepSeek R1 — 10x better reasoning & math
+  CLAUDE: "claude-sonnet-4-20250514",      // Claude Sonnet 4 — best price/performance
+  CLAUDE_FAST: "claude-sonnet-4-20250514", // Claude Sonnet 4 — replaces Haiku (2x smarter, similar cost)
   OPENAI_TOOLS: "gpt-5.4",
-  GEMINI_QA: "gemini-2.5-flash",
+  GEMINI_QA: "gemini-2.5-pro-preview-06-05", // Pro for Quality Gate — better verification
   GPT_REALTIME: "gpt-4o-realtime-preview",
 
   // ── STT ──

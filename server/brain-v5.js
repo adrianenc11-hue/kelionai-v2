@@ -367,10 +367,11 @@ async function callGeminiPro(prompt, systemPrompt) {
 //    cu tool calling dacă e nevoie (search, imagine, hartă)
 // 4. Gemini Pro → Verifică, corectează, validează răspunsul final
 // ═══════════════════════════════════════════════════════════════
-async function superThink(message, systemPrompt, history) {
+async function superThink(message, systemPrompt, history, onProgress = null) {
   logger.info({ component: 'SuperThink' }, '🧠🧠🧠 AI PIPELINE — Collaborative chain started');
   const shortPrompt = systemPrompt.substring(0, 3000);
   const pipeline = { steps: [], startTime: Date.now() };
+  const progress = (step, detail) => { if (onProgress) try { onProgress(step, detail); } catch (_) {} };
 
   // ═══ STEP 1: GROQ — Analiză ultra-rapidă (planificator) ═══
   let groqPlan = null;
@@ -390,6 +391,7 @@ async function superThink(message, systemPrompt, history) {
       if (r.ok) {
         const d = await r.json();
         groqPlan = d.choices?.[0]?.message?.content || null;
+        progress('planning', 'Groq a creat planul de analiză');
         pipeline.steps.push({ ai: 'Groq', role: 'Planificator', ms: Date.now() - pipeline.startTime });
       }
     } catch (e) { logger.warn({ component: 'SuperThink' }, `Groq plan failed: ${e.message}`); }
@@ -432,6 +434,7 @@ async function superThink(message, systemPrompt, history) {
       : `[${parallelLabels[i]} failed]`;
   });
   pipeline.steps.push({ ai: parallelLabels.join('+'), role: 'Specialists', ms: Date.now() - step2Start });
+  progress('analyzing', `${parallelLabels.join(' + ')} au terminat analiza`);
 
   // ═══ STEP 3: GPT-5.4 — Constructor final (vede TOTUL) ═══
   let finalResponse = null;
@@ -458,6 +461,7 @@ async function superThink(message, systemPrompt, history) {
         const d = await r.json();
         finalResponse = d.choices?.[0]?.message?.content || null;
         pipeline.steps.push({ ai: 'GPT-5.4', role: 'Constructor', ms: Date.now() - step3Start });
+        progress('constructing', 'GPT-5.4 a construit răspunsul final');
       }
     } catch (e) { logger.warn({ component: 'SuperThink' }, `GPT final failed: ${e.message}`); }
   }
@@ -785,6 +789,7 @@ async function thinkV5(
   conversationId,
   mediaData = {},
   isAdmin = false,
+  onProgress = null,
 ) {
   brain.conversationCount++;
   const startTime = Date.now();
@@ -807,6 +812,17 @@ async function thinkV5(
         thinkTime: Date.now() - startTime,
         confidence: 1.0,
         agent: "v5-quota-block",
+      };
+    }
+
+    // ── 1b. Semantic cache check (instant response for similar queries) ──
+    const cachedResponse = await brain.checkSemanticCache(message, userId);
+    if (cachedResponse) {
+      brain.conversationCount++;
+      return {
+        ...cachedResponse,
+        thinkTime: Date.now() - startTime,
+        agent: `v5-semantic-cache`,
       };
     }
 
@@ -938,7 +954,7 @@ async function thinkV5(
     if (isDeepQuestion) {
       try {
         logger.info({ component: 'BrainV5' }, '🧠 Routing to SUPER THINK pipeline');
-        const superResult = await superThink(message, systemPrompt, history);
+        const superResult = await superThink(message, systemPrompt, history, onProgress);
         if (superResult?.text) {
           const parsed = parseAvatarCommands(superResult.text);
           const cleanReply = stripLeakedTags(parsed.cleanText || superResult.text);
@@ -1304,7 +1320,7 @@ async function thinkV5(
     );
 
 
-    return {
+    const result = {
       enrichedMessage: avatarCmds.cleanText || finalResponse,
       enrichedContext: finalResponse,
       toolsUsed,
@@ -1335,6 +1351,12 @@ async function thinkV5(
       agent: `v5-${engine.toLowerCase()}`,
       profileLoaded: !!profile,
     };
+
+    // ── Save to semantic cache (async, non-blocking) ──
+    const isPersonal = /\b(eu|meu|mea|mine|viața|familie)\b/i.test(message);
+    brain.saveToSemanticCache(message, result, userId, isPersonal).catch(() => {});
+
+    return result;
 
   } catch (e) {
     const thinkTime = Date.now() - startTime;

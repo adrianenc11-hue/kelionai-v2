@@ -424,7 +424,11 @@ router.post('/chat/stream', chatLimiter, validate(chatSchema), async (req, res) 
     try {
       thought = await Promise.race([
         thinkV5(brain, message, avatar, history, language, user?.id, conversationId,
-          { imageBase64, geo, isAutoCamera: req.body.isAutoCamera || false }, isAdminStream),
+          { imageBase64, geo, isAutoCamera: req.body.isAutoCamera || false }, isAdminStream,
+          // onProgress callback — stream SuperThink steps to user via SSE
+          (step, detail) => {
+            try { res.write(`data: ${JSON.stringify({ type: 'progress', step, detail })}\n\n`); } catch (_) {}
+          }),
         new Promise((_, reject) => setTimeout(() => reject(new Error('brain_timeout_60s')), 60000)),
 
       ]);
@@ -679,6 +683,46 @@ router.post('/imagine', async (req, res) => {
   } catch (e) {
     logger.error({ component: 'Imagine', err: e.message }, 'imagine error');
     res.status(500).json({ error: e.message });
+  }
+});
+
+
+// POST /api/chat/feedback — 👍/👎 on AI responses
+router.post('/chat/feedback', async (req, res) => {
+  try {
+    const { getUserFromToken, supabaseAdmin } = req.app.locals;
+    const { conversationId, messageIndex, rating, comment } = req.body;
+    if (!rating || !['positive', 'negative'].includes(rating)) {
+      return res.status(400).json({ error: 'Rating must be "positive" or "negative"' });
+    }
+    const user = await getUserFromToken(req);
+    if (!supabaseAdmin) return res.json({ success: false, error: 'No database' });
+
+    // Save feedback
+    const { error } = await supabaseAdmin.from('chat_feedback').insert({
+      user_id: user?.id || null,
+      conversation_id: conversationId || null,
+      message_index: messageIndex || 0,
+      rating,
+      comment: (comment || '').substring(0, 500),
+      created_at: new Date().toISOString(),
+    });
+
+    if (error) {
+      // Table might not exist yet — create it
+      if (error.code === '42P01' || error.message?.includes('does not exist')) {
+        logger.info({ component: 'Feedback' }, 'chat_feedback table not found, feedback logged to console only');
+        logger.info({ component: 'Feedback', rating, userId: user?.id, conversationId }, `👍 Feedback: ${rating}`);
+        return res.json({ success: true, stored: 'log' });
+      }
+      throw error;
+    }
+
+    logger.info({ component: 'Feedback', rating, userId: user?.id }, `👍 Feedback: ${rating}`);
+    res.json({ success: true });
+  } catch (e) {
+    logger.error({ component: 'Feedback', err: e.message }, 'feedback error');
+    res.status(500).json({ error: 'Feedback save failed' });
   }
 });
 

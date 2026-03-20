@@ -100,6 +100,11 @@ class KelionBrain {
     this._memoryCache = new Map(); // "userId:type" → { data, loadedAt }
     this._memoryCacheTTL = 60 * 1000; // cache memories for 60s
 
+    // ── Semantic Response Cache (instant replies for similar queries) ──
+    this._semanticCache = new Map(); // cacheKey → { embedding, response, metadata, createdAt }
+    this._semanticCacheMaxSize = 500;
+    this._semanticCacheTTL = 30 * 60 * 1000; // 30 min TTL
+
     // ── Multi-Agent Profiles (references AGENTS static getter) ──
     this.agents = KelionBrain.AGENTS;
 
@@ -660,8 +665,7 @@ When asked "what can you do?" list these real capabilities. Use them proactively
   }
 
   // ═══════════════════════════════════════════════════════════
-  // ═══════════════════════════════════════════════════════════
-  // EMBEDDING HELPER — OpenAI text-embedding-3-small (1536 dims)
+  // EMBEDDING HELPER — OpenAI text-embedding-3-large (3072 dims)
   // ═══════════════════════════════════════════════════════════
   async getEmbedding(text) {
     if (!process.env.OPENAI_API_KEY || !text) return null;
@@ -673,7 +677,7 @@ When asked "what can you do?" list these real capabilities. Use them proactively
           Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
         },
         body: JSON.stringify({
-          model: "text-embedding-3-small",
+          model: "text-embedding-3-large",
           input: text.substring(0, 500),
         }),
       });
@@ -683,6 +687,87 @@ When asked "what can you do?" list these real capabilities. Use them proactively
     } catch (_e) {
       return null;
     }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // SEMANTIC CACHE — Instant responses for similar queries
+  // ═══════════════════════════════════════════════════════════
+  _cosineSimilarity(a, b) {
+    if (!a || !b || a.length !== b.length) return 0;
+    let dot = 0, magA = 0, magB = 0;
+    for (let i = 0; i < a.length; i++) {
+      dot += a[i] * b[i];
+      magA += a[i] * a[i];
+      magB += b[i] * b[i];
+    }
+    const denom = Math.sqrt(magA) * Math.sqrt(magB);
+    return denom === 0 ? 0 : dot / denom;
+  }
+
+  async checkSemanticCache(query, userId) {
+    if (!query || query.length < 10) return null; // skip very short queries
+    // Skip queries that need real-time data
+    if (/\b(acum|live|azi|current|now|today|vremea?|meteo|pret|pre\u021b|curs)\b/i.test(query)) return null;
+    try {
+      const queryEmbedding = await this.getEmbedding(query);
+      if (!queryEmbedding) return null;
+
+      let bestMatch = null;
+      let bestScore = 0;
+      const now = Date.now();
+
+      for (const [key, entry] of this._semanticCache) {
+        // Skip expired entries
+        if (now - entry.createdAt > this._semanticCacheTTL) {
+          this._semanticCache.delete(key);
+          continue;
+        }
+        // Skip different users' personal queries
+        if (entry.userId && entry.userId !== userId && entry.isPersonal) continue;
+
+        const sim = this._cosineSimilarity(queryEmbedding, entry.embedding);
+        if (sim > 0.95 && sim > bestScore) {
+          bestScore = sim;
+          bestMatch = entry;
+        }
+      }
+
+      if (bestMatch) {
+        logger.info({ component: 'SemanticCache', similarity: bestScore.toFixed(3) },
+          `⚡ Cache HIT (${(bestScore * 100).toFixed(1)}% similar)`);
+        return { ...bestMatch.response, cached: true, similarity: bestScore };
+      }
+      return null;
+    } catch (e) {
+      logger.warn({ component: 'SemanticCache', err: e.message }, 'Cache check failed');
+      return null;
+    }
+  }
+
+  async saveToSemanticCache(query, response, userId, isPersonal = false) {
+    if (!query || query.length < 10) return;
+    // Don't cache error responses
+    if (response?.confidence === 0 || response?.agent?.includes('error')) return;
+    try {
+      const embedding = await this.getEmbedding(query);
+      if (!embedding) return;
+
+      const key = `${Date.now()}-${query.substring(0, 30)}`;
+      this._semanticCache.set(key, {
+        embedding,
+        response,
+        userId,
+        isPersonal,
+        query: query.substring(0, 200),
+        createdAt: Date.now(),
+      });
+
+      // LRU eviction: remove oldest if over limit
+      if (this._semanticCache.size > this._semanticCacheMaxSize) {
+        const oldest = this._semanticCache.keys().next().value;
+        this._semanticCache.delete(oldest);
+      }
+    } catch (_) { /* non-blocking */ }
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -739,7 +824,7 @@ When asked "what can you do?" list these real capabilities. Use them proactively
         }
       }
 
-      // ── FALLBACK: keyword-based relevance scoring ──
+      // ── FALLBACK: hybrid relevance scoring (keyword + embedding reranking) ──
       const fetchLimit = Math.min(limit * 3, 50);
       const { data, error } = await this.supabaseAdmin
         .from("brain_memory")
@@ -757,7 +842,7 @@ When asked "what can you do?" list these real capabilities. Use them proactively
       }
       if (!data || data.length === 0) return [];
 
-      // Relevance scoring: boost memories that share keywords with current context
+      // Phase 1: Keyword + temporal scoring
       const hintWords = contextHint
         .toLowerCase()
         .split(/\s+/)
@@ -778,6 +863,44 @@ When asked "what can you do?" list these real capabilities. Use them proactively
         }
         return { ...m, _relevanceScore: score };
       });
+
+      // Phase 2: Embedding-based reranking (if contextHint exists)
+      // Computes cosine similarity between query and each memory for much better recall
+      if (contextHint && contextHint.length > 10 && scored.length > 3) {
+        try {
+          const queryEmb = await this.getEmbedding(contextHint);
+          if (queryEmb) {
+            // Get embeddings for top candidates (batch to save API calls)
+            const topCandidates = scored.slice(0, Math.min(20, scored.length));
+            const reranked = await Promise.all(
+              topCandidates.map(async (m) => {
+                try {
+                  const memEmb = await this.getEmbedding((m.content || '').substring(0, 300));
+                  if (memEmb) {
+                    const sim = this._cosineSimilarity(queryEmb, memEmb);
+                    // Blend: 60% semantic similarity + 40% keyword/temporal score
+                    m._relevanceScore = sim * 0.6 + m._relevanceScore * 0.4;
+                  }
+                } catch (_) { /* keep keyword score */ }
+                return m;
+              })
+            );
+            reranked.sort((a, b) => b._relevanceScore - a._relevanceScore);
+            const result = reranked.slice(0, limit);
+            this._memoryCache.set(cacheKey, { data: reranked, loadedAt: Date.now() });
+            if (this._memoryCache.size > 200) {
+              const now = Date.now();
+              for (const [k, v] of this._memoryCache) {
+                if (now - v.loadedAt > this._memoryCacheTTL) this._memoryCache.delete(k);
+              }
+            }
+            logger.info({ component: 'Brain', type, reranked: result.length }, '🔄 Memory reranked with embeddings');
+            return result;
+          }
+        } catch (rerankErr) {
+          logger.warn({ component: 'Brain', err: rerankErr.message }, 'Reranking failed, using keyword scores');
+        }
+      }
 
       scored.sort((a, b) => b._relevanceScore - a._relevanceScore);
       const result = scored.slice(0, limit);
