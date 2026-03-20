@@ -963,16 +963,22 @@ async function thinkV5(
             brain.learnFromConversation(userId, message, cleanReply).catch(() => {});
           }
           return {
-            reply: cleanReply,
+            enrichedMessage: cleanReply,
+            enrichedContext: cleanReply,
+            toolsUsed: [],
             engine: superResult.engine,
             pipeline: superResult.pipeline,
             providers: superResult.providers,
-            emotion: parsed.emotion,
-            gestures: parsed.gestures,
-            bodyActions: parsed.bodyActions,
-            gaze: parsed.gaze,
-            actions: parsed.actions,
-            monitor: parsed.monitor?.content ? parsed.monitor : null,
+            emotion: parsed.emotion || 'neutral',
+            gestures: parsed.gestures || [],
+            bodyActions: parsed.bodyActions || [],
+            gaze: parsed.gaze || null,
+            actions: parsed.actions || [],
+            monitor: parsed.monitor?.content ? parsed.monitor : { content: null, type: null },
+            analysis: { complexity: 'deep_reasoning', language: language || 'ro' },
+            thinkTime: Date.now() - startTime,
+            confidence: 0.9,
+            agent: `v5-${superResult.engine}`,
           };
         }
       } catch (e) {
