@@ -953,7 +953,11 @@ async function executeTool(brain, toolName, toolInput, userId) {
       case "show_map": {
         const key = process.env.GOOGLE_MAPS_KEY || '';
         let mapUrl;
-        if (toolInput.origin && toolInput.destination) {
+        if (!key) {
+          // No key — fallback to OpenStreetMap
+          const place = toolInput.place || toolInput.destination || 'Romania';
+          mapUrl = `https://www.openstreetmap.org/export/embed.html?bbox=-30,25,45,75&layer=mapnik`;
+        } else if (toolInput.origin && toolInput.destination) {
           // Navigation mode — Google Maps Embed Directions
           const mode = toolInput.mode || 'driving';
           mapUrl = `https://www.google.com/maps/embed/v1/directions?key=${key}&origin=${encodeURIComponent(toolInput.origin)}&destination=${encodeURIComponent(toolInput.destination)}&mode=${mode}`;

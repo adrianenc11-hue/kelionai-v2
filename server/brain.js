@@ -9658,7 +9658,7 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
   _map(place) {
     this.toolStats.map++;
     const mapsKey = process.env.GOOGLE_MAPS_KEY;
-    // URL embed pentru iframe (NU deschide Google Maps extern)
+    // Google Maps when key present, OpenStreetMap fallback when not
     const mapURL = mapsKey
       ? `https://www.google.com/maps/embed/v1/place?key=${mapsKey}&q=${encodeURIComponent(place)}&zoom=6`
       : `https://www.openstreetmap.org/export/embed.html?bbox=-30,25,45,75&layer=mapnik&marker=52,10`;
