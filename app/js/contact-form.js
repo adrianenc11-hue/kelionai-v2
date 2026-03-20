@@ -50,11 +50,15 @@ function quillWrite(element, text, speed = 35) {
 
 // ─── Open Contact Form on Monitor ───
 window.openContactForm = function () {
-  const chatMessages = document.getElementById('chat-messages');
-  if (!chatMessages) return;
+  const overlay = document.getElementById('chat-overlay');
+  const displayPanel = document.getElementById('display-panel');
+  if (!overlay) return;
 
-  // Clear monitor first
-  chatMessages.innerHTML = '';
+  // Make sure display panel is visible
+  if (displayPanel) displayPanel.style.display = '';
+  
+  // Clear and inject into visible overlay
+  overlay.innerHTML = '';
 
   const letterHTML = `
     <div class="contact-letter" id="contact-letter">
@@ -303,8 +307,8 @@ window.openContactForm = function () {
     </div>
   `;
 
-  chatMessages.innerHTML = letterHTML;
-  chatMessages.scrollTop = 0;
+  overlay.innerHTML = letterHTML;
+  overlay.scrollTop = 0;
 
   // Cinematic quill writing for intro
   const intro = document.getElementById('letter-intro');
