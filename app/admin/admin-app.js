@@ -471,7 +471,7 @@ async function initAdmin() {
     return;
   }
 
-  // Step 2: If we don't have admin secret yet, auto-fetch it via JWT
+  // Step 2: Try to get admin secret (optional — JWT alone works too)
   if (!_adminSecret && testH['Authorization']) {
     try {
       var r = await fetch('/api/admin/auth-token', { headers: testH });
@@ -488,21 +488,20 @@ async function initAdmin() {
       } else if (r.status === 401) {
         showAuthError('Token JWT expirat. Re-logheaza-te pe kelionai.app.');
         return;
-      } else if (r.status === 500) {
-        var errData = await r.json().catch(function() { return {}; });
-        showAuthError('Server: ' + (errData.error || 'ADMIN_SECRET_KEY nu e configurat pe Railway.'));
-        return;
+      } else {
+        // 500 = ADMIN_SECRET_KEY not set — OK, JWT auth still works
+        console.log('[Admin] Secret nu e configurat, dar JWT funcționează direct');
       }
     } catch (e) {
-      console.error('[Admin] Auth-token fetch failed:', e);
+      console.log('[Admin] auth-token skip, using JWT direct');
     }
   }
 
-  // Step 3: Verify we have access by calling a simple admin endpoint
+  // Step 3: Verify access with a real admin endpoint
   try {
     var check = await fetch('/api/admin/brain', { headers: hdrs() });
     if (!check.ok) {
-      showAuthError('Acces refuzat (403). Verifică pe Railway:\n• ADMIN_EMAIL = emailul tău\n• ADMIN_SECRET_KEY = orice string secret');
+      showAuthError('Acces refuzat (' + check.status + ').\nEști logat ca adrianenc11@gmail.com?\nAltfel, re-logheaza-te pe kelionai.app.');
       return;
     }
   } catch (e) {
