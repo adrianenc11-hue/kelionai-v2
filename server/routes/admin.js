@@ -2734,4 +2734,100 @@ router.delete('/webhooks/:id', (req, res) => {
 });
 router.get('/rate-limits', (_req, res) => res.json(qw.getRateLimitStats()));
 
+// ══════════════════════════════════════════════════════════
+// TRAFFIC DELETE ENDPOINTS
+// ══════════════════════════════════════════════════════════
+router.delete('/traffic/:id', async (req, res) => {
+  try {
+    const { supabaseAdmin } = req.app.locals;
+    if (!supabaseAdmin) return res.status(500).json({ error: 'No DB' });
+    const { error } = await supabaseAdmin.from('page_views').delete().eq('id', req.params.id);
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.post('/traffic/bulk-delete', async (req, res) => {
+  try {
+    const { supabaseAdmin } = req.app.locals;
+    if (!supabaseAdmin) return res.status(500).json({ error: 'No DB' });
+    const { ids } = req.body;
+    if (!ids || !Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: 'No IDs' });
+    const { error } = await supabaseAdmin.from('page_views').delete().in('id', ids);
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ ok: true, deleted: ids.length });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.post('/traffic/clear-all', async (req, res) => {
+  try {
+    const { supabaseAdmin } = req.app.locals;
+    if (!supabaseAdmin) return res.status(500).json({ error: 'No DB' });
+    // Delete all page_views
+    const { error } = await supabaseAdmin.from('page_views').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ ok: true, message: 'All traffic cleared' });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ══════════════════════════════════════════════════════════
+// BRAIN-CHAT ENDPOINTS (K1 direct chat)
+// ══════════════════════════════════════════════════════════
+const brainChatSessions = {};
+
+router.get('/brain-chat/session/:sessionId', async (req, res) => {
+  try {
+    const session = brainChatSessions[req.params.sessionId];
+    res.json({ messages: session ? session.messages : [] });
+  } catch (e) { res.json({ messages: [] }); }
+});
+
+router.post('/brain-chat', async (req, res) => {
+  try {
+    const { message, sessionId } = req.body;
+    if (!message) return res.status(400).json({ error: 'No message' });
+
+    const sid = sessionId || 'default';
+    if (!brainChatSessions[sid]) brainChatSessions[sid] = { messages: [] };
+    brainChatSessions[sid].messages.push({ role: 'user', content: message });
+
+    // Use the brain to generate a response
+    const brain = req.app.locals.brain;
+    if (!brain) return res.status(500).json({ error: 'Brain not initialized' });
+
+    let reply, provider;
+    try {
+      const result = await brain.think(message, {
+        userId: 'admin-k1',
+        userName: 'Admin',
+        isAdmin: true,
+        sessionId: sid,
+      });
+      reply = result.reply || result.text || result.message || 'No response';
+      provider = result.provider || result.model || 'unknown';
+    } catch (e) {
+      reply = '❌ Brain error: ' + e.message;
+      provider = 'error';
+    }
+
+    brainChatSessions[sid].messages.push({ role: 'assistant', content: reply });
+    // Keep only last 50 messages per session
+    if (brainChatSessions[sid].messages.length > 50) {
+      brainChatSessions[sid].messages = brainChatSessions[sid].messages.slice(-50);
+    }
+
+    res.json({ reply, provider });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.post('/brain-chat/approve', async (req, res) => {
+  res.json({ ok: true, type: 'approve', result: 'Operation approved (no-op for now)' });
+});
+
+router.post('/brain-chat/reject', async (req, res) => {
+  res.json({ ok: true, type: 'reject', result: 'Operation rejected' });
+});
+
 module.exports = router;

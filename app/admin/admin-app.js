@@ -237,15 +237,21 @@ async function loadTrafficSection() {
       html += '</div>';
     }
 
-    // Full table with ALL data
-    html += '<h3>📋 Vizite recente (toate detaliile)</h3>';
+    // Full table with checkboxes for bulk delete
+    html += '<h3>📋 Vizite recente</h3>';
+    html += '<div style="margin-bottom:10px;display:flex;gap:10px">'
+      + '<button class="btn-sm btn-danger" onclick="deleteSelectedVisits()">🗑️ Șterge selectate</button>'
+      + '<button class="btn-sm btn-danger" onclick="clearAllTraffic()">🧹 Golește tot traficul</button>'
+      + '</div>';
     html += '<table class="admin-table"><thead><tr>'
-      + '<th>Ora</th><th>Pagina</th><th>IP</th><th>Țara</th><th>Browser</th><th>Device</th><th>Referrer</th><th>🗑️</th>'
+      + '<th><input type="checkbox" id="select-all-visits" onchange="toggleAllVisits(this)"></th>'
+      + '<th>Ora</th><th>Pagina</th><th>IP</th><th>Țara</th><th>Browser</th><th>Device</th><th>Referrer</th>'
       + '</tr></thead><tbody>';
     if (d.recent && d.recent.length > 0) {
       d.recent.forEach(function (v) {
         var time = new Date(v.created_at).toLocaleString('ro-RO', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
         html += '<tr>'
+          + '<td><input type="checkbox" class="visit-cb" value="' + v.id + '"></td>'
           + '<td>' + time + '</td>'
           + '<td>' + esc(v.path) + '</td>'
           + '<td><code>' + esc(v.ip) + '</code></td>'
@@ -253,7 +259,6 @@ async function loadTrafficSection() {
           + '<td>' + parseBrowser(v.user_agent) + '</td>'
           + '<td>' + parseDevice(v.user_agent) + '</td>'
           + '<td style="max-width:150px;overflow:hidden;text-overflow:ellipsis">' + esc(v.referrer || '—') + '</td>'
-          + '<td><button class="btn-sm btn-danger" onclick="deleteVisit(\'' + v.id + '\')">🗑️</button></td>'
           + '</tr>';
       });
     } else {
@@ -267,11 +272,28 @@ async function loadTrafficSection() {
   }
 }
 
-async function deleteVisit(id) {
-  if (!confirm('Ștergi această vizită?')) return;
+function toggleAllVisits(master) {
+  document.querySelectorAll('.visit-cb').forEach(function (cb) { cb.checked = master.checked; });
+}
+
+async function deleteSelectedVisits() {
+  var ids = [];
+  document.querySelectorAll('.visit-cb:checked').forEach(function (cb) { ids.push(cb.value); });
+  if (ids.length === 0) return alert('Selectează cel puțin o vizită.');
+  if (!confirm('Ștergi ' + ids.length + ' vizite selectate?')) return;
   try {
-    await fetch('/api/admin/traffic/' + id, { method: 'DELETE', headers: hdrs() });
-    loadTrafficSection(); // refresh
+    await fetch('/api/admin/traffic/bulk-delete', {
+      method: 'POST', headers: hdrs(), body: JSON.stringify({ ids: ids })
+    });
+    loadTrafficSection();
+  } catch (e) { alert('Eroare: ' + e.message); }
+}
+
+async function clearAllTraffic() {
+  if (!confirm('ATENȚIE: Ștergi TOT traficul? Această acțiune e ireversibilă!')) return;
+  try {
+    await fetch('/api/admin/traffic/clear-all', { method: 'POST', headers: hdrs() });
+    loadTrafficSection();
   } catch (e) { alert('Eroare: ' + e.message); }
 }
 
