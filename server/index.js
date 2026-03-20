@@ -296,8 +296,11 @@ app.use((req, res, next) => {
             path: req.path,
             user_agent: rawUA.substring(0, 300),
             country: req.headers['cf-ipcountry'] || req.headers['x-vercel-ip-country'] || null,
-            referrer: (req.get('referer') || '').substring(0, 500) || null,
-          }).then(() => {}).catch(() => {});
+          }).then(({ error }) => {
+            if (error) logger.warn({ component: 'PageViews', err: error.message, code: error.code }, 'page_views insert failed');
+          }).catch((e) => {
+            logger.warn({ component: 'PageViews', err: e.message }, 'page_views insert exception');
+          });
         }
       }
     }
