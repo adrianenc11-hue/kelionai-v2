@@ -324,6 +324,21 @@
   <script>
     // ═══ CONFIG ═══
     const ADMIN_SECRET = sessionStorage.getItem('kelion_admin_secret') || '';
+    function k1Headers() {
+      const h = { 'Content-Type': 'application/json' };
+      if (ADMIN_SECRET) h['x-admin-secret'] = ADMIN_SECRET;
+      // Also send JWT Bearer token (same as admin-app.js hdrs())
+      let t = localStorage.getItem('kelion_token');
+      if (!t) {
+        const keys = Object.keys(localStorage).filter(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
+        for (const k of keys) {
+          try { const p = JSON.parse(localStorage.getItem(k)); if (p?.access_token) { t = p.access_token; break; } } catch(e) {}
+        }
+      }
+      if (!t) t = localStorage.getItem('sb-access-token');
+      if (t) h['Authorization'] = 'Bearer ' + t;
+      return h;
+    }
     let currentSessionId = localStorage.getItem('k1_session_id') || 'session_' + Date.now();
     localStorage.setItem('k1_session_id', currentSessionId);
 
@@ -336,7 +351,7 @@
     async function loadSession() {
       try {
         const res = await fetch(`/api/admin/brain-chat/session/${currentSessionId}`, {
-          headers: { 'x-admin-secret': ADMIN_SECRET }
+          headers: k1Headers()
         });
         if (!res.ok) return;
         const data = await res.json();
@@ -524,8 +539,15 @@
     }
 
     // ═══ INIT ═══
-    if (!ADMIN_SECRET) {
-      addMessage('system', '⚠️ Nu ai setat parola de admin.\nDeschide Console → sessionStorage.setItem("kelion_admin_secret", "PAROLA_TA")');
+    if (!ADMIN_SECRET && !localStorage.getItem('kelion_token')) {
+      // Check Supabase tokens too
+      const sbKeys = Object.keys(localStorage).filter(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
+      const hasToken = sbKeys.some(k => { try { return !!JSON.parse(localStorage.getItem(k))?.access_token; } catch(e) { return false; } });
+      if (!hasToken) {
+        addMessage('system', '⚠️ Nu ești autentificat. Loghează-te pe kelionai.app și redeschide pagina.');
+      } else {
+        loadSession();
+      }
     } else {
       loadSession();
     }

@@ -217,7 +217,7 @@ async function loadTraffic() {
         .join('');
     }
     const tbody = document.querySelector('#visits-table tbody');
-    if (d.recent && d.recent.length > 0) {
+    if (tbody && d.recent && d.recent.length > 0) {
       tbody.innerHTML = d.recent
         .slice(0, 30)
         .map(function (v) {
@@ -548,6 +548,8 @@ function _toggleSection(id) {
   const arrow = panel.querySelector('.toggle-arrow');
   if (arrow) arrow.textContent = isOpen ? '▶' : '▼';
 }
+// Global alias — HTML onclick calls toggleSection()
+window.toggleSection = _toggleSection;
 
 // ── CODE AUDIT ──
 async function loadAudit() {
@@ -1055,6 +1057,7 @@ async function initAdmin() {
   loadBrain();
   loadTraffic();
   loadCredit();
+  loadClients();
   loadUptime();
   _adminIntervals.push(
     setInterval(function () {
