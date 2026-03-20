@@ -130,9 +130,9 @@
       transports: ['polling', 'websocket'], // polling first — Railway proxy breaks raw WS
       upgrade: true, // try WS upgrade after polling connects
       reconnection: true,
-      reconnectionAttempts: 3,
-      reconnectionDelay: 2000,
-      timeout: 10000,
+      reconnectionAttempts: Infinity, // never give up reconnecting
+      reconnectionDelay: 1000,
+      timeout: 120000, // 2 minutes — keep mic alive
     });
 
     socket.on('connect', function () {
@@ -203,9 +203,12 @@
     socket.on('disconnect', function (reason) {
       console.log('[VoiceFirst] Socket.io disconnected:', reason);
       isConnected = false;
-      stopMic();
-      if (reason !== 'io client disconnect') {
-        _activateFallback('Disconnected: ' + reason);
+      // Don't stop mic or activate fallback — socket.io will auto-reconnect
+      // Only stop on intentional client disconnect
+      if (reason === 'io client disconnect') {
+        stopMic();
+      } else {
+        console.log('[VoiceFirst] Will auto-reconnect, keeping mic alive...');
       }
       window.dispatchEvent(new CustomEvent('voicefirst-disconnected'));
     });
