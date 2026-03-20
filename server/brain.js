@@ -10247,7 +10247,7 @@ Raspunde STRICT JSON. Daca nimic: {}`;
         });
         result.plans = plans;
         // Revenue estimate
-        const prices = { pro: 9.99, premium: 19.99, enterprise: 49.99 };
+        const prices = { pro: 29, premium: 29, enterprise: 29 };
         result.revenue = Object.entries(plans).reduce(
           (sum, [plan, count]) => sum + (prices[plan] || 0) * count,
           0,

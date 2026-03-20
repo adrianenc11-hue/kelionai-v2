@@ -273,9 +273,9 @@ router.get("/plans", (req, res) => {
     {
       id: "pro_annual",
       name: "Pro",
-      price: 250,
-      monthlyEquivalent: 20.83,
-      savings: "Save €98/year",
+      price: 200,
+      monthlyEquivalent: 16.67,
+      savings: "Save €148/year",
       currency: "EUR",
       billing: "annual",
       limits: PLAN_LIMITS.pro,

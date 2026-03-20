@@ -1138,7 +1138,7 @@ router.post('/upgrade', async (req, res) => {
             user_id: userId,
             plan,
             status: 'active',
-            amount: plan === 'premium' ? 29.99 : plan === 'pro' ? 9.99 : 0,
+            amount: plan === 'pro' ? 29 : 0,
             created_at: new Date().toISOString(),
           },
           { onConflict: 'user_id' }
