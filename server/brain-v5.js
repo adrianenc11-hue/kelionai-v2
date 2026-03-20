@@ -933,7 +933,8 @@ async function thinkV5(
 - PREFERĂ API-uri gratuite fără autentificare.
 - Pentru imagini → ÎNTOTDEAUNA generate_image(), nu descrii în text.
 - Ai 10 iterații de tool calling — folosește-le.
-- Răspunde MEREU în limba userului, natural și conversațional.`;
+- Răspunde MEREU în limba userului, natural și conversațional.
+- La saluturi simple (salut, buna, hey, hello) — NU folosi [BODY:] tags. Mâinile rămân lângă corp. Body actions doar pentru acțiuni speciale (explicații, celebrări, dance etc).`;
 
 
     // ── 5b. Detect INTENT — fiecare tip de cerere → tool potrivit ──
