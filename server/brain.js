@@ -9323,7 +9323,7 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
       engine = null;
 
     // Helper: fetch with timeout (prevents hanging on a slow provider)
-    const fetchT = (url, opts, timeoutMs = 4000) => {
+    const fetchT = (url, opts, timeoutMs = 8000) => {
       const ctrl = new AbortController();
       const timer = setTimeout(() => ctrl.abort(), timeoutMs);
       return fetch(url, { ...opts, signal: ctrl.signal }).finally(() =>
@@ -9920,15 +9920,30 @@ Raspunde STRICT JSON. Daca nimic: {}`;
           );
           continue;
         }
-        await this.supabaseAdmin.from("user_preferences").upsert(
-          {
-            user_id: userId,
-            key: safeKey,
-            value: typeof v === "object" ? v : { data: v },
-          },
-          { onConflict: "user_id,key" },
-        );
-        savedCount++;
+        try {
+          await this.supabaseAdmin.from("user_preferences").upsert(
+            {
+              user_id: userId,
+              key: safeKey,
+              value: typeof v === "object" ? v : { data: v },
+            },
+            { onConflict: "user_id,key" },
+          );
+          savedCount++;
+        } catch (upsertErr) {
+          // Fallback: save to brain_memory if user_preferences table doesn't exist
+          try {
+            await this.supabaseAdmin.from("brain_memory").insert({
+              content: `${safeKey}: ${typeof v === "object" ? JSON.stringify(v) : String(v)}`,
+              memory_type: 'preference',
+              importance: 5,
+              user_id: userId,
+            });
+            savedCount++;
+          } catch (_) {
+            logger.debug({ component: 'Brain', key: safeKey }, 'Preference save failed (both tables)');
+          }
+        }
       }
       this.learningsExtracted += savedCount;
       logger.info(
@@ -9945,17 +9960,15 @@ Raspunde STRICT JSON. Daca nimic: {}`;
       this._extractKnowledgeGraph(userId, userMessage, aiReply, facts).catch(() => {});
 
     } catch (e) {
-      logger.warn(
+      // Don't accumulate memory errors for non-critical learning failures
+      logger.debug(
         {
           component: "Brain",
           event: "learn_failed",
           err: e.message,
-          userId: userId ? userId.substring(0, 8) + "..." : "null",
         },
-        "⚠️ Learning extraction failed (non-critical)",
+        "Learning extraction failed (non-critical — suppressed)",
       );
-      this.toolErrors.memory = (this.toolErrors.memory || 0) + 1;
-      this.journalEntry("learn_error", e.message, { hasUserId: !!userId });
     }
   }
 

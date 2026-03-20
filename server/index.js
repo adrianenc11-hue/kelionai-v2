@@ -217,8 +217,8 @@ app.use((req, res, next) => {
         req.path === '/health' || req.path === '/sw.js' || req.path === '/manifest.json' || req.path === '/favicon.svg';
       if (!isBot && !isHealth) {
         const realIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || 'unknown';
-        // Skip internal IPs entirely
-        if (realIp === '127.0.0.1' || realIp === '::1' || realIp === '::ffff:127.0.0.1') return;
+        // Log for debugging — remove after confirming tracking works
+        logger.info({ component: 'PageViews', ip: realIp, path: req.path }, 'TRACKING: condition matched');
 
         // Country from CDN headers first, then IP geolocation
         let country = req.headers['cf-ipcountry'] || req.headers['x-vercel-ip-country'] || null;
