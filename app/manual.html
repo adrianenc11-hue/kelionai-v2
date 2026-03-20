@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>User Manual — KelionAI</title>
+  <link rel="stylesheet" href="/css/index.css">
+  <style>
+    body { background: #0a0f1a; color: #e2e8f0; font-family: 'Inter', sans-serif; margin: 0; padding: 0; }
+    .manual-container { max-width: 860px; margin: 0 auto; padding: 40px 24px 80px; }
+    .manual-header { text-align: center; margin-bottom: 40px; }
+    .manual-header h1 { font-size: 2rem; color: #10b981; margin-bottom: 8px; }
+    .manual-header p { color: #94a3b8; }
+    .section { background: rgba(16,185,129,0.05); border: 1px solid rgba(16,185,129,0.15); border-radius: 12px; padding: 24px; margin-bottom: 20px; }
+    .section h2 { color: #10b981; font-size: 1.3rem; margin: 0 0 16px 0; display: flex; align-items: center; gap: 10px; }
+    .section h3 { color: #6ee7b7; font-size: 1rem; margin: 16px 0 8px 0; }
+    .section p, .section li { color: #cbd5e1; line-height: 1.7; font-size: 0.9rem; }
+    .section ul { padding-left: 20px; }
+    .btn-explain { display: inline-flex; align-items: center; gap: 8px; background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.3); border-radius: 8px; padding: 12px 16px; margin: 8px 4px; color: #e2e8f0; }
+    .btn-explain .icon { font-size: 1.4rem; }
+    .btn-explain .desc { text-align: left; }
+    .btn-explain .desc strong { color: #10b981; display: block; font-size: 0.85rem; }
+    .btn-explain .desc span { font-size: 0.8rem; color: #94a3b8; }
+    .example-box { background: rgba(0,0,0,0.3); border-left: 3px solid #10b981; padding: 12px 16px; margin: 12px 0; border-radius: 0 8px 8px 0; }
+    .example-box .label { color: #10b981; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+    .example-box .text { color: #e2e8f0; font-size: 0.9rem; font-style: italic; }
+    .back-btn { position: fixed; top: 20px; left: 20px; background: rgba(16,185,129,0.2); border: 1px solid #10b981; color: #10b981; padding: 8px 20px; border-radius: 8px; cursor: pointer; font-size: 0.9rem; text-decoration: none; z-index: 100; }
+    .back-btn:hover { background: rgba(16,185,129,0.4); }
+    .feature-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; margin: 16px 0; }
+  </style>
+</head>
+<body>
+  <a href="/" class="back-btn">← Back to KelionAI</a>
+
+  <div class="manual-container">
+    <div class="manual-header">
+      <h1>📖 KelionAI User Manual</h1>
+      <p>Your intelligent AI companion — learn how to use all features</p>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>🌟 What is KelionAI?</h2>
+      <p>KelionAI is an advanced AI assistant with a 3D avatar that you can interact with through <strong>text</strong> or <strong>voice</strong>. Kelion learns about you over time, remembers your preferences, and can help with a wide range of tasks — from answering questions to generating images, searching the web, checking weather, and much more.</p>
+    </div>
+
+    <!-- Getting Started -->
+    <div class="section">
+      <h2>🚀 Getting Started</h2>
+      <ol style="color:#cbd5e1; line-height: 2;">
+        <li>Visit <a href="https://kelionai.app" style="color:#10b981">kelionai.app</a></li>
+        <li>Type or speak to Kelion — no account needed for basic use</li>
+        <li>Create a free account to unlock memory and conversation history</li>
+        <li>Upgrade to Pro for unlimited access and voice features</li>
+      </ol>
+    </div>
+
+    <!-- Chat Buttons -->
+    <div class="section">
+      <h2>🎛️ Chat Interface Buttons</h2>
+      <p>Here's what every button in the chat interface does:</p>
+
+      <div class="feature-grid">
+        <div class="btn-explain">
+          <span class="icon">🎤</span>
+          <div class="desc">
+            <strong>Microphone</strong>
+            <span>Press to start voice input. Press again to stop. Kelion will transcribe and respond.</span>
+          </div>
+        </div>
+
+        <div class="btn-explain">
+          <span class="icon">📎</span>
+          <div class="desc">
+            <strong>Attach File</strong>
+            <span>Upload images for AI vision analysis. Kelion can describe, analyze, or extract text.</span>
+          </div>
+        </div>
+
+        <div class="btn-explain">
+          <span class="icon">🔍</span>
+          <div class="desc">
+            <strong>Web Search</strong>
+            <span>Toggle real-time web search. When active, Kelion searches the internet for current info.</span>
+          </div>
+        </div>
+
+        <div class="btn-explain">
+          <span class="icon">🖼️</span>
+          <div class="desc">
+            <strong>Image Generation</strong>
+            <span>Toggle AI image creation. Describe what you want and Kelion generates it.</span>
+          </div>
+        </div>
+
+        <div class="btn-explain">
+          <span class="icon">🌐</span>
+          <div class="desc">
+            <strong>Translate</strong>
+            <span>Toggle translation mode. Kelion translates your messages to any language.</span>
+          </div>
+        </div>
+
+        <div class="btn-explain">
+          <span class="icon">📷</span>
+          <div class="desc">
+            <strong>Camera / Barcode</strong>
+            <span>Scan barcodes or take photos for AI analysis.</span>
+          </div>
+        </div>
+
+        <div class="btn-explain">
+          <span class="icon">🔊</span>
+          <div class="desc">
+            <strong>Voice Output</strong>
+            <span>Toggle Kelion's voice responses. When active, Kelion speaks the answers aloud.</span>
+          </div>
+        </div>
+
+        <div class="btn-explain">
+          <span class="icon">📤</span>
+          <div class="desc">
+            <strong>Send Message</strong>
+            <span>Send your typed message to Kelion. Also works with Enter key.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Features with Examples -->
+    <div class="section">
+      <h2>💡 Features & Usage Examples</h2>
+
+      <h3>💬 Chat Conversation</h3>
+      <p>Simply type or speak any question or request.</p>
+      <div class="example-box">
+        <div class="label">Example (type or say)</div>
+        <div class="text">"What are the best restaurants in Berlin?"</div>
+      </div>
+      <div class="example-box">
+        <div class="label">Example (type or say)</div>
+        <div class="text">"Explain quantum computing like I'm 10 years old"</div>
+      </div>
+
+      <h3>🔍 Web Search</h3>
+      <p>Enable the search toggle, then ask about current events or real-time data.</p>
+      <div class="example-box">
+        <div class="label">Example</div>
+        <div class="text">"What's the latest news about AI regulation in the EU?"</div>
+      </div>
+
+      <h3>🖼️ Image Generation</h3>
+      <p>Enable image mode, then describe what you want to create.</p>
+      <div class="example-box">
+        <div class="label">Example</div>
+        <div class="text">"Create a futuristic city with flying cars at sunset"</div>
+      </div>
+
+      <h3>🌤️ Weather</h3>
+      <p>Ask about weather anywhere in the world.</p>
+      <div class="example-box">
+        <div class="label">Example</div>
+        <div class="text">"What's the weather in Munich this weekend?"</div>
+      </div>
+
+      <h3>📈 Trading & Finance</h3>
+      <p>Get real-time stock and crypto information.</p>
+      <div class="example-box">
+        <div class="label">Example</div>
+        <div class="text">"What's the current Bitcoin price?"</div>
+      </div>
+
+      <h3>🌐 Translation</h3>
+      <p>Enable translate mode for instant multilingual communication.</p>
+      <div class="example-box">
+        <div class="label">Example</div>
+        <div class="text">"Translate 'Good morning, how can I help you?' to German"</div>
+      </div>
+
+      <h3>📷 Vision / Image Analysis</h3>
+      <p>Upload an image and ask Kelion to analyze it.</p>
+      <div class="example-box">
+        <div class="label">Example</div>
+        <div class="text">[Upload a photo] "What do you see in this image?"</div>
+      </div>
+
+      <h3>🧠 Memory</h3>
+      <p>Kelion remembers your preferences over time (Pro accounts).</p>
+      <div class="example-box">
+        <div class="label">Example</div>
+        <div class="text">"Remember that I prefer vegetarian food"</div>
+      </div>
+      <div class="example-box">
+        <div class="label">Example</div>
+        <div class="text">"What do you remember about me?"</div>
+      </div>
+    </div>
+
+    <!-- Voice -->
+    <div class="section">
+      <h2>🎤 Voice Interaction</h2>
+      <p>You can interact with Kelion entirely by voice:</p>
+      <ol style="color:#cbd5e1; line-height: 2;">
+        <li>Press the <strong>🎤 microphone</strong> button</li>
+        <li>Speak your question or command clearly</li>
+        <li>Press the microphone again to stop</li>
+        <li>Kelion will process your speech and respond</li>
+        <li>If <strong>🔊 voice output</strong> is enabled, Kelion will also speak the answer</li>
+      </ol>
+    </div>
+
+    <!-- Plans -->
+    <div class="section">
+      <h2>💎 Subscription Plans</h2>
+      <div class="feature-grid">
+        <div class="btn-explain">
+          <span class="icon">🆓</span>
+          <div class="desc">
+            <strong>Free</strong>
+            <span>10 chats/day, 5 searches, 2 images. Basic avatar, text only.</span>
+          </div>
+        </div>
+        <div class="btn-explain">
+          <span class="icon">⭐</span>
+          <div class="desc">
+            <strong>Pro — £25/month or £180/year</strong>
+            <span>100 chats, 50 searches, 20 images. Voice, memory, full history.</span>
+          </div>
+        </div>
+        <div class="btn-explain">
+          <span class="icon">🏢</span>
+          <div class="desc">
+            <strong>Developer — £800/year</strong>
+            <span>5 seats, unlimited everything, API access, webhooks, priority support.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Support -->
+    <div class="section">
+      <h2>📞 Need Help?</h2>
+      <p>Contact our team: <a href="mailto:contact@kelionai.app" style="color:#10b981">contact@kelionai.app</a></p>
+      <p>Or simply ask Kelion: <em>"I need to contact support"</em></p>
+    </div>
+  </div>
+</body>
+</html>
