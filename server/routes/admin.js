@@ -604,6 +604,37 @@ router.get('/live-users', async (req, res) => {
 });
 
 // ══════════════════════════════════════════════════════════
+// GET /api/admin/test-pageview — DIAGNOSTIC: test page_views INSERT
+// ══════════════════════════════════════════════════════════
+router.get('/test-pageview', async (req, res) => {
+  try {
+    const { supabaseAdmin } = req.app.locals;
+    if (!supabaseAdmin) return res.json({ error: 'No supabaseAdmin' });
+
+    const testData = {
+      ip: 'ADMIN-TEST',
+      path: '/admin/test-' + Date.now(),
+      user_agent: 'admin-diagnostic-test',
+      country: 'RO',
+    };
+
+    const { data, error } = await supabaseAdmin.from('page_views').insert(testData).select('id').single();
+    if (error) {
+      return res.json({ success: false, error: error.message, code: error.code, hint: error.hint, details: error.details });
+    }
+
+    // Clean up test row
+    if (data?.id) {
+      await supabaseAdmin.from('page_views').delete().eq('id', data.id);
+    }
+
+    res.json({ success: true, message: 'INSERT works! Row inserted and cleaned up.', id: data?.id });
+  } catch (e) {
+    res.json({ success: false, error: e.message });
+  }
+});
+
+// ══════════════════════════════════════════════════════════
 // GET /api/admin/users — User list
 // ══════════════════════════════════════════════════════════
 router.get('/users', async (req, res) => {
