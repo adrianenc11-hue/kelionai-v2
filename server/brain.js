@@ -996,7 +996,16 @@ When asked "what can you do?" list these real capabilities. Use them proactively
   async saveMemory(userId, type, content, context = {}, importance = 5) {
     if (!userId || !this.supabaseAdmin || !content) return;
     try {
-      // Generate embedding for semantic search (async, non-blocking)
+      // Dedup: skip if same content already exists for this user
+      const contentKey = content.substring(0, 200);
+      const { data: existing } = await this.supabaseAdmin
+        .from("brain_memory")
+        .select("id")
+        .eq("user_id", userId)
+        .ilike("content", contentKey + '%')
+        .limit(1);
+      if (existing && existing.length > 0) return; // already exists
+
       const embedding = await this.getEmbedding(content);
       const row = {
         user_id: userId,
@@ -9950,12 +9959,22 @@ Raspunde STRICT JSON. Daca nimic: {}`;
         } catch (upsertErr) {
           // Fallback: save to brain_memory if user_preferences table doesn't exist
           try {
-            await this.supabaseAdmin.from("brain_memory").insert({
-              content: `${safeKey}: ${typeof v === "object" ? JSON.stringify(v) : String(v)}`,
-              memory_type: 'preference',
-              importance: 5,
-              user_id: userId,
-            });
+            // Dedup: check if already saved
+            const checkKey = `${safeKey}: `;
+            const { data: memExists } = await this.supabaseAdmin
+              .from("brain_memory")
+              .select("id")
+              .eq("user_id", userId)
+              .ilike("content", checkKey + '%')
+              .limit(1);
+            if (!memExists || memExists.length === 0) {
+              await this.supabaseAdmin.from("brain_memory").insert({
+                content: `${safeKey}: ${typeof v === "object" ? JSON.stringify(v) : String(v)}`,
+                memory_type: 'preference',
+                importance: 5,
+                user_id: userId,
+              });
+            }
             savedCount++;
           } catch (_) {
             logger.debug({ component: 'Brain', key: safeKey }, 'Preference save failed (both tables)');
