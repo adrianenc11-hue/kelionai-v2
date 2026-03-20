@@ -136,12 +136,11 @@ router.post('/chat', chatLimiter, validate(chatSchema), async (req, res) => {
         };
         const proxyRes = {
           json: (data) => {
-            // Return as K1 response with different voice marker
+            // Return as K1 response — same ElevenLabs voice for consistent lip-sync
             res.json({
               reply: data.reply,
               emotion: 'neutral',
               k1Mode: true,
-              k1Voice: 'alloy', // Different from Kelion/Kira voice
               pendingApproval: data.pendingApproval || null,
             });
           },
@@ -527,10 +526,24 @@ router.post('/chat/stream', chatLimiter, validate(chatSchema), async (req, res) 
       brain
         .learnFromConversation(user?.id, message, fullReply)
         .catch((e) => logger.warn({ component: 'Stream', err: e.message }, 'learnFromConversation failed'));
-    if (fullReply)
+    if (fullReply) {
+      // Log AI cost (was missing — stream endpoint never tracked costs)
+      const estimatedTokens = Math.ceil((message.length + fullReply.length) / 4);
+      const engine = thought?.agent || 'v5';
+      brain
+        ._logCost(
+          engine === 'Gemini-V4' ? 'Google' : 'OpenAI',
+          engine,
+          Math.ceil(message.length / 4),
+          Math.ceil(fullReply.length / 4),
+          estimatedTokens * 0.000003,
+          user?.id
+        )
+        .catch(() => {});
       incrementUsage(user?.id, 'chat', supabaseAdmin).catch((e) =>
         logger.warn({ component: 'Stream', err: e.message }, 'incrementUsage failed')
       );
+    }
     logger.info(
       {
         component: 'Stream',
