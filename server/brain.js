@@ -96,6 +96,10 @@ class KelionBrain {
     this._profileCache = new Map(); // userId → { profile, loadedAt }
     this._profileTTL = 10 * 60 * 1000; // cache profiles for 10 min
 
+    // ── Memory Cache (reduces Supabase queries) ──
+    this._memoryCache = new Map(); // "userId:type" → { data, loadedAt }
+    this._memoryCacheTTL = 60 * 1000; // cache memories for 60s
+
     // ── Multi-Agent Profiles (references AGENTS static getter) ──
     this.agents = KelionBrain.AGENTS;
 
@@ -375,6 +379,13 @@ class KelionBrain {
 
         // ── Success: update stats + cache ──
         this._toolCache.set(cacheKey, { data, timestamp: Date.now() });
+        // Periodic cleanup: keep max 200 cached tool results
+        if (this._toolCache.size > 200) {
+          const now = Date.now();
+          for (const [k, v] of this._toolCache) {
+            if (now - v.timestamp > 15 * 60 * 1000) this._toolCache.delete(k);
+          }
+        }
         this._updateToolStats(tool.id, latency, true);
 
         // Log to memory
@@ -679,6 +690,28 @@ When asked "what can you do?" list these real capabilities. Use them proactively
   // ═══════════════════════════════════════════════════════════
   async loadMemory(userId, type, limit = 10, contextHint = "") {
     if (!userId || !this.supabaseAdmin) return [];
+
+    // ── Cache check (60s TTL) ──
+    const cacheKey = `${userId}:${type}`;
+    const cached = this._memoryCache.get(cacheKey);
+    if (cached && Date.now() - cached.loadedAt < this._memoryCacheTTL) {
+      // Re-rank cached results by relevance if contextHint changed
+      if (contextHint && contextHint.length > 5) {
+        const hintWords = contextHint.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+        if (hintWords.length > 0) {
+          const scored = cached.data.map(m => {
+            let score = (m.importance || 5) / 10;
+            const contentLow = (m.content || '').toLowerCase();
+            const matchCount = hintWords.filter(w => contentLow.includes(w)).length;
+            score += (matchCount / hintWords.length) * 0.4;
+            return { ...m, _relevanceScore: score };
+          });
+          scored.sort((a, b) => b._relevanceScore - a._relevanceScore);
+          return scored.slice(0, limit);
+        }
+      }
+      return cached.data.slice(0, limit);
+    }
     try {
       // ── TRY SEMANTIC SEARCH (pgvector) if contextHint provided ──
       if (contextHint && contextHint.length > 5) {
@@ -747,7 +780,17 @@ When asked "what can you do?" list these real capabilities. Use them proactively
       });
 
       scored.sort((a, b) => b._relevanceScore - a._relevanceScore);
-      return scored.slice(0, limit);
+      const result = scored.slice(0, limit);
+      // Store in cache for 60s
+      this._memoryCache.set(cacheKey, { data: scored, loadedAt: Date.now() });
+      // Periodic cleanup: keep max 200 entries
+      if (this._memoryCache.size > 200) {
+        const now = Date.now();
+        for (const [k, v] of this._memoryCache) {
+          if (now - v.loadedAt > this._memoryCacheTTL) this._memoryCache.delete(k);
+        }
+      }
+      return result;
     } catch (e) {
       logger.warn({ component: "Brain", err: e.message }, "loadMemory error");
       return [];

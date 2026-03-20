@@ -383,7 +383,7 @@ async function superThink(message, systemPrompt, history) {
           model: MODELS.GROQ_PRIMARY || 'llama-3.3-70b-versatile',
           max_tokens: 500,
           messages: [{ role: 'system', content: 'Ești un PLANIFICATOR AI. Analizezi cererea userului și faci un plan scurt.' },
-            { role: 'user', content: `Cerere user: "${message}"\n\nFă un plan SCURT (max 5 puncte):\n1. Ce tip de cerere e (informație, calcul, cod, analiză, creativitate)?\n2. Ce FAPTE concrete trebuie verificate?\n3. Ce CALCULE sau LOGICĂ trebuie aplicată?\n4. Ce NUANȚE sau PERSPECTIVE trebuie considerate?\n5. Ce FORMAT de răspuns ar fi ideal?\n\nRăspunde scurt, direct, în română.` }],
+            { role: 'user', content: `Cerere user: "${message}"\n\nFă un plan SCURT (max 5 puncte):\n1. Ce tip de cerere e?\n2. Ce FAPTE trebuie verificate?\n3. Ce CALCULE/LOGICĂ?\n4. Ce NUANȚE/PERSPECTIVE?\n5. Ce FORMAT ideal?\n\nRăspunde scurt, direct.` }],
         }),
         signal: AbortSignal.timeout(5000),
       });
@@ -396,31 +396,29 @@ async function superThink(message, systemPrompt, history) {
   }
   if (!groqPlan) groqPlan = `Cerere: "${message}" — răspunde complet și precis.`;
 
-  logger.info({ component: 'SuperThink' }, `📋 Plan ready (${Date.now() - pipeline.startTime}ms)`);
-
-  // ═══ STEP 2: CLAUDE — LEAD REASONER (chain-of-thought) + DeepSeek paralel ═══
+  // ═══ STEP 2: Claude Haiku (fast+cheap) + DeepSeek PARALEL ═══
   const step2Start = Date.now();
   const parallelTasks = [];
   const parallelLabels = [];
 
-  // Claude — LEAD REASONER: gândire profundă pas cu pas
+  // Claude Haiku (50x cheaper than Opus, 10x faster) — lead reasoner
   if (process.env.ANTHROPIC_API_KEY) {
-    parallelLabels.push('Claude-Lead');
+    parallelLabels.push('Claude-Haiku');
     parallelTasks.push(
       callClaude(
-        `PLANUL ECHIPEI:\n${groqPlan}\n\nCEREREA ORIGINALĂ: "${message}"\n\nTu ești LEAD REASONER — creierul principal. Gândește PAS CU PAS:\n\n1. ÎNȚELEGERE: Ce vrea userul exact? Ce context lipsește?\n2. ANALIZĂ: Care sunt faptele relevante? Ce e cert vs incert?\n3. RAȚIONAMENT: Aplică logica. Verifică-ți pașii. Ce ar putea fi greșit?\n4. PERSPECTIVE: Consideră alte unghiuri. Ce ar rata un răspuns superficial?\n5. CONCLUZIE: Formulează răspunsul final — clar, precis, complet.\n\nGândește PROFUND. Nu fi superficial. Verifică-ți fiecare afirmație.\nRăspunde în ROMÂNĂ, natural, max 500 cuvinte.`,
+        `PLAN:\n${groqPlan}\n\nCERERE: "${message}"\n\nGândește PAS CU PAS: Înțelege → Analizează → Raționează → Concluzionează.\nRăspunde natural, max 400 cuvinte.`,
         shortPrompt,
-        MODELS.CLAUDE
+        MODELS.CLAUDE_FAST || 'claude-3-5-haiku-20241022'
       ).catch(e => `[Claude indisponibil: ${e.message}]`)
     );
   }
 
-  // DeepSeek — specialist calcule, cod, date (paralel cu Claude)
+  // DeepSeek — specialist calcule, cod, date
   if (process.env.DEEPSEEK_API_KEY) {
     parallelLabels.push('DeepSeek');
     parallelTasks.push(
       callDeepSeek(
-        `PLANUL ECHIPEI:\n${groqPlan}\n\nCEREREA ORIGINALĂ: "${message}"\n\nTu ești SPECIALIST în calcule, cod, date. Contribuie DOAR cu:\n- Calcule exacte dacă sunt necesare\n- Cod sau pseudocod dacă e relevant\n- Date verificabile, cifre concrete\nFii SCURT (max 300 cuvinte). Doar contribuția ta unică.`,
+        `PLAN:\n${groqPlan}\n\nCERERE: "${message}"\n\nContribuie DOAR cu calcule exacte, cod, date verificabile. Max 300 cuvinte.`,
         shortPrompt
       ).catch(e => `[DeepSeek indisponibil: ${e.message}]`)
     );
@@ -433,17 +431,13 @@ async function superThink(message, systemPrompt, history) {
       ? (typeof r.value === 'string' ? r.value : String(r.value)).substring(0, 2000)
       : `[${parallelLabels[i]} failed]`;
   });
-  pipeline.steps.push({ ai: parallelLabels.join('+'), role: 'Claude Lead + Specialists', ms: Date.now() - step2Start });
+  pipeline.steps.push({ ai: parallelLabels.join('+'), role: 'Specialists', ms: Date.now() - step2Start });
 
-  logger.info({ component: 'SuperThink' }, `🔬 Lead + Specialists done (${Date.now() - step2Start}ms): ${parallelLabels.join(', ')}`);
-
-  // ═══ STEP 3: GPT-5.4 — Constructorul final (vede TOTUL) ═══
+  // ═══ STEP 3: GPT-5.4 — Constructor final (vede TOTUL) ═══
   let finalResponse = null;
   const step3Start = Date.now();
-
   const contributionsText = Object.entries(contributions)
-    .map(([name, text]) => `\n[CONTRIBUȚIE ${name}]\n${text}`)
-    .join('\n');
+    .map(([name, text]) => `\n[${name}]\n${text}`).join('\n');
 
   if (process.env.OPENAI_API_KEY) {
     try {
@@ -455,7 +449,7 @@ async function superThink(message, systemPrompt, history) {
           max_tokens: 2048,
           messages: [
             { role: 'system', content: shortPrompt },
-            { role: 'user', content: `${message}\n\n---\n[CONTEXT INTERN — INVIZIBIL PENTRU USER]\nEchipa ta de AI a analizat deja cererea:\n\n[PLAN]\n${groqPlan}\n${contributionsText}\n\nCONSTRUIEȘTE răspunsul final bazat pe TOATE contribuțiile de mai sus.\n- Integrează ce e MAI BUN din fiecare contribuție\n- NU menționa că ai primit ajutor de la alte AI-uri\n- Răspunsul trebuie să pară natural, ca și cum ai gândit TU totul\n- Adaugă [EMOTION:xxx] [GESTURE:xxx] la final\n- Dacă trebuie tool-uri (search, imagine) — folosește-le normal` },
+            { role: 'user', content: `${message}\n\n---\n[INTERN]\n[PLAN] ${groqPlan}\n${contributionsText}\n\nCONSTRUIEȘTE răspunsul final integrând contribuțiile. NU menționa alte AI-uri. Adaugă [EMOTION:xxx] [GESTURE:xxx] la final.` },
           ],
         }),
         signal: AbortSignal.timeout(20000),
@@ -468,48 +462,21 @@ async function superThink(message, systemPrompt, history) {
     } catch (e) { logger.warn({ component: 'SuperThink' }, `GPT final failed: ${e.message}`); }
   }
 
-  // Fallback dacă GPT fail — Gemini Flash
+  // Fallback: Gemini Flash
   if (!finalResponse) {
     try {
       finalResponse = await callGeminiWithSearch(
-        `${message}\n\n[CONTEXT INTERN]\n[PLAN] ${groqPlan}\n${contributionsText}\n\nConstruiește răspunsul final integrând contribuțiile. NU menționa sursa.`,
+        `${message}\n\n[INTERN]\n[PLAN] ${groqPlan}\n${contributionsText}\n\nConstruiește răspunsul final. NU menționa sursa.`,
         shortPrompt, history
       ).then(r => r.text);
-    } catch (_) { /* will use contributions directly */ }
+    } catch (_) { /* use contributions directly */ }
   }
 
   if (!finalResponse) {
-    // Last resort — combină contribuțiile direct
     finalResponse = Object.values(contributions).filter(v => !v.startsWith('[')).join('\n\n') || groqPlan;
   }
 
-  // ═══ STEP 4: Gemini Pro — Validare finală (opțional, rapid) ═══
-  const gKey = process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
-  if (gKey && finalResponse.length > 100) {
-    const step4Start = Date.now();
-    try {
-      const r = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${MODELS.GEMINI_PRO || 'gemini-2.5-pro-preview-06-05'}:generateContent?key=${gKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ role: 'user', parts: [{ text: `VERIFICĂ acest răspuns AI pentru erori factuale sau logice. Dacă e CORECT, returnează EXACT textul original fără modificări. Dacă găsești ERORI, corectează-le păstrând stilul.\n\nÎntrebarea: "${message}"\n\nRăspunsul de verificat:\n${finalResponse.substring(0, 3000)}` }] }],
-            generationConfig: { maxOutputTokens: 2048, temperature: 0.3 },
-          }),
-          signal: AbortSignal.timeout(15000),
-        }
-      );
-      if (r.ok) {
-        const d = await r.json();
-        const validated = (d.candidates?.[0]?.content?.parts || []).map(p => p.text).join('');
-        if (validated && validated.length > 50) {
-          finalResponse = validated;
-          pipeline.steps.push({ ai: 'Gemini Pro', role: 'Validator', ms: Date.now() - step4Start });
-        }
-      }
-    } catch (_) { /* keep original response */ }
-  }
+  // Step 4 (Gemini Pro validator) REMOVED — Quality Gate already handles verification
 
   const totalMs = Date.now() - pipeline.startTime;
   logger.info({ component: 'SuperThink', totalMs, steps: pipeline.steps.length },
@@ -755,8 +722,8 @@ function parseAvatarCommands(text) {
 
 
 async function qualityGate(question, answer, domain) {
-  // Only QA critical domains
-  const criticalDomains = ["trading", "medical", "legal", "financial"];
+  // QA for critical domains + any response with low confidence indicators
+  const criticalDomains = ["trading", "medical", "legal", "financial", "science", "education", "history"];
   if (!criticalDomains.includes(domain)) return { passed: true, corrected: null };
 
   try {
@@ -942,51 +909,16 @@ async function thinkV5(
         null,
       );
 
-    // ═══ PROCEDURA UNIVERSALA — OBLIGATORIE PENTRU ORICE CERERE ═══
-    // Userul poate cere in orice limba — tu intelegi si raspunzi in limba lui
-    // Pentru ORICE cerere care necesita date din lumea reala (live, actuale):
     systemPrompt += `
 
-## CADRU DE GÂNDIRE AUTONOM — OBLIGATORIU
-REGULA #0: NICIODATĂ NU RENUNȚA. Nu zici niciodată "nu pot", "nu am tool", "nu am acces". ÎNTOTDEAUNA găsești o soluție.
+## REGULI CHEIE
+- NICIODATĂ nu renunța. Nu zici "nu pot" — ÎNTOTDEAUNA găsești o soluție (recall_tool → search_web → browse_page → discover_and_save_tool).
+- Monitor: DOAR conținut vizual (imagini, hărți, charts, HTML). NICIODATĂ text pe monitor — text merge ca răspuns vorbit.
+- PREFERĂ API-uri gratuite fără autentificare.
+- Pentru imagini → ÎNTOTDEAUNA generate_image(), nu descrii în text.
+- Ai 10 iterații de tool calling — folosește-le.
+- Răspunde MEREU în limba userului, natural și conversațional.`;
 
-Când primești o cerere, gândești în 5 pași:
-
-PASUL 1 — ANALIZEAZĂ: Ce are nevoie userul exact?
-  - Ce tip de informație/acțiune e necesară?
-  - Ce resurse/date/API-uri ar putea rezolva asta?
-  - Traduce cererea în termeni tehnici (English keywords)
-
-PASUL 2 — CAUTĂ SOLUȚIA: Ai deja un tool potrivit?
-  - recall_tool(query) — caută în registry-ul salvat
-  - Dacă ai tool → call_saved_tool() → folosește-l
-  - Dacă NU ai tool → PASUL 3
-
-PASUL 3 — DESCOPERĂ + CREEAZĂ: Nu ai tool? Găsești unul.
-  - search_web() — caută API-uri gratuite, free endpoints
-  - discover_and_save_tool() — salvează endpoint-ul descoperit
-  - browse_page() — navighează pagini reale să extragi date
-  - run_code_sandbox() — calculează/generează date programatic
-  - Dacă un tool eșuează → caută ALTUL diferit, NU te opri
-  - Free APIs: exchangerate-api.com, open-meteo.com, wttr.in, usgs.gov, etc.
-
-PASUL 4 — EXECUTĂ + ADAPTEAZĂ:
-  - Folosește tool-ul găsit cu parametrii corecți
-  - Dacă eșuează → modifică parametrii sau caută alt API
-  - Dacă trebuie date combinate → apelează multiple tools în iterații
-  - Ai la dispoziție 10 iterații de tool calling — folosește-le
-
-PASUL 5 — PREZINTĂ REZULTATUL:
-  - Răspunde în limba userului cu date REALE
-  - Monitor: DOAR conținut vizual (imagini, hărți, charts, video). NICIODATĂ text pe monitor.
-  - Text: merge DOAR ca răspuns vorbit (subtitle sub avatar)
-
-REGULI ABSOLUTE:
-- NICIODATĂ nu zici "nu pot" fără să fi încercat minim 3 căi diferite
-- PREFERĂ API-uri gratuite fără autentificare
-- Pentru imagini → ÎNTOTDEAUNA generate_image(), nu descrii în text
-- NICIODATĂ nu scrii tool calls ca text — folosești function calling API
-- Dacă userul cere ceva și nu știi cum → search_web() + browse_page() → găsești soluția`;
 
     // ── 5b. Detect INTENT — fiecare tip de cerere → tool potrivit ──
     const intent = detectIntent(message, mediaData);
@@ -1001,7 +933,8 @@ REGULI ABSOLUTE:
 
     // ═══ SUPER THINK — AI Council pentru cereri complexe ═══
     // Activează pipeline-ul colaborativ: Groq→DeepSeek+Claude→GPT→Gemini Pro
-    const isDeepQuestion = intent === 'deep_reasoning' || (message.split(/\s+/).length > 20 && message.includes('?'));
+    // SuperThink only for truly complex questions (>30 words + ?) — not casual chat
+    const isDeepQuestion = intent === 'deep_reasoning' || (message.split(/\s+/).length > 30 && message.includes('?'));
     if (isDeepQuestion) {
       try {
         logger.info({ component: 'BrainV5' }, '🧠 Routing to SUPER THINK pipeline');
@@ -1052,28 +985,9 @@ REGULI ABSOLUTE:
 
     if (shouldTryGPT) {
 
-      // ═══ Programatic Tool Registry check — inainte de GPT ═══
-      // Cauta tool in registry folosind toate cuvintele relevante din mesaj (cross-language)
+      // ═══ Registry check SKIPPED — GPT has recall_tool via function calling ═══
+      // Removed: duplicate programmatic recall before GPT (GPT calls recall_tool itself)
       let registryContext = '';
-      try {
-        // Trimite mesajul complet - _recallTool face root search (6 chars) cross-language
-        const recallResult = await brain._recallTool(message);
-        if (recallResult?.found && recallResult.tools?.length > 0) {
-          const tool = recallResult.tools[0];
-          logger.info({ component: 'BrainV5', tool: tool.name }, '🔧 Registry tool found, calling it programmatically');
-          const toolData = await brain._callSavedTool(tool.name, {});
-          if (toolData?.success) {
-            const preview = JSON.stringify(toolData.data).substring(0, 2000);
-            registryContext = `\n\n[LIVE DATA from Tool Registry - tool: ${tool.name}]\n${preview}\n[Use this real data in your response - translate to user's language if needed]`;
-            toolResults.push({ name: tool.name, result: toolData.data });
-            toolsUsed.push(tool.name);
-          } else {
-            logger.warn({ component: 'BrainV5', tool: tool.name, err: toolData?.error }, '⚠️ Registry tool found but call failed');
-          }
-        }
-      } catch (regErr) {
-        logger.warn({ component: 'BrainV5', err: regErr.message }, 'Registry check failed');
-      }
 
 
 
