@@ -513,6 +513,9 @@
                     const mc = evt.content || evt.monitor.content;
                     const mt = evt.monitorType || (evt.monitor && evt.monitor.type) || 'html';
                     showOnMonitor(mc, mt);
+                  } else if (evt.type === 'progress' && evt.detail) {
+                    // SuperThink pipeline progress — show status to user
+                    msgEl.innerHTML = '<span style="color:#6366f1;opacity:0.7">🧠 ' + evt.detail + '</span>';
                   } else if (evt.type === 'thinking') {
                     msgEl.innerHTML = '<span style="color:#6366f1;opacity:0.6">🧠 Thinking...</span>';
                   } else if (evt.type === 'actions' && evt.actions) {
