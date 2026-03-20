@@ -208,34 +208,10 @@
       adminBtn.title = 'Admin Panel';
     }
 
-    // Create/update nav admin button (btn-admin-nav)
-    if (isAdmin) {
-      var navBtn = document.getElementById('btn-admin-nav');
-      if (!navBtn) {
-        var navRight = document.querySelector('.navbar-right');
-        if (navRight) {
-          navBtn = document.createElement('button');
-          navBtn.id = 'btn-admin-nav';
-          navBtn.textContent = '🛡️ Admin';
-          navBtn.style.cssText = 'cursor:pointer;border:1px solid rgba(16,185,129,0.4);background:rgba(16,185,129,0.15);border-radius:8px;padding:6px 12px;color:#6ee7b7;font-size:0.75rem;font-weight:600;transition:all 0.3s;';
-          navBtn.addEventListener('click', async function () {
-            try {
-              const r = await fetch(API + '/api/admin/auth-token', { headers: getAuthHeaders() });
-              if (r.ok) {
-                const d = await r.json();
-                if (d.secret) sessionStorage.setItem('kelion_admin_secret', d.secret);
-              }
-            } catch (_e) {}
-            window.location.href = '/admin';
-          });
-          navRight.insertBefore(navBtn, navRight.firstChild);
-          console.log('[Auth] ✅ Admin button created on login');
-        }
-      }
-    } else {
-      var navBtn = document.getElementById('btn-admin-nav');
-      if (navBtn) navBtn.remove();
-    }
+    // Admin button removed from navbar — admin access is via user badge (user-name) click only
+    // Clean up any existing nav admin button
+    var navBtn = document.getElementById('btn-admin-nav');
+    if (navBtn) navBtn.remove();
   }
 
   function updateUI() {
