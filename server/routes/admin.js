@@ -524,6 +524,42 @@ router.get('/live-users', async (req, res) => {
 });
 
 // ══════════════════════════════════════════════════════════
+// GET /api/admin/memories — Brain memories list (was MISSING)
+// ══════════════════════════════════════════════════════════
+router.get('/memories', async (req, res) => {
+  try {
+    const { supabaseAdmin } = req.app.locals;
+    if (!supabaseAdmin) return res.json({ memories: [] });
+    const { data, error } = await supabaseAdmin
+      .from('brain_memory')
+      .select('id, content, memory_type, importance, user_id, created_at')
+      .order('created_at', { ascending: false })
+      .limit(100);
+    if (error) {
+      logger.warn({ component: 'Admin', err: error.message }, 'memories query failed');
+      return res.json({ memories: [] });
+    }
+    res.json({ memories: data || [] });
+  } catch (e) {
+    logger.error({ component: 'Admin', err: e.message }, 'memories failed');
+    res.json({ memories: [] });
+  }
+});
+
+// DELETE /api/admin/memories/:id
+router.delete('/memories/:id', async (req, res) => {
+  try {
+    const { supabaseAdmin } = req.app.locals;
+    if (!supabaseAdmin) return res.status(500).json({ error: 'No DB' });
+    const { error } = await supabaseAdmin.from('brain_memory').delete().eq('id', req.params.id);
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ══════════════════════════════════════════════════════════
 // GET /api/admin/live-users — Live sessions (was MISSING)
 // ══════════════════════════════════════════════════════════
 router.get('/live-users', async (req, res) => {
