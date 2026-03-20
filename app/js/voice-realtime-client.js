@@ -203,12 +203,12 @@
     socket.on('disconnect', function (reason) {
       console.log('[VoiceFirst] Socket.io disconnected:', reason);
       isConnected = false;
-      // Don't stop mic or activate fallback — socket.io will auto-reconnect
-      // Only stop on intentional client disconnect
-      if (reason === 'io client disconnect') {
-        stopMic();
-      } else {
-        console.log('[VoiceFirst] Will auto-reconnect, keeping mic alive...');
+      stopMic(); // always stop mic on disconnect to prevent broken audio state
+      // Don't activate fallback — infinite reconnect will auto-reconnect
+      // and 'ready' event at line 148 will call startMic() again
+      if (reason === 'io server disconnect') {
+        // Server kicked us — force reconnect
+        socket.connect();
       }
       window.dispatchEvent(new CustomEvent('voicefirst-disconnected'));
     });
