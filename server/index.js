@@ -236,10 +236,10 @@ app.use((req, res, next) => {
       const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || 'unknown';
       const existing = liveVisitors.get(ip);
       const now = Date.now();
+      const rawUA = req.get('user-agent') || '';
       if (existing) {
-        // Update existing: add page to history if different
         existing.lastSeen = now;
-        existing.ua = req.get('user-agent') || '';
+        existing.ua = rawUA;
         if (!existing.pages) existing.pages = [];
         const lastPage = existing.pages[existing.pages.length - 1];
         if (!lastPage || lastPage.path !== req.path) {
@@ -248,15 +248,28 @@ app.use((req, res, next) => {
         }
         existing.path = req.path;
       } else {
-        // New visitor
         liveVisitors.set(ip, {
           path: req.path,
-          ua: req.get('user-agent') || '',
+          ua: rawUA,
           country: req.headers['cf-ipcountry'] || req.headers['x-vercel-ip-country'] || null,
           firstSeen: now,
           lastSeen: now,
           pages: [{ path: req.path, time: new Date(now).toLocaleTimeString('ro-RO') }],
         });
+      }
+
+      // Also record to DB for Traffic history (async, non-blocking)
+      if (supabaseAdmin) {
+        const isHealth = req.path === '/health' || req.path === '/sw.js' || req.path === '/manifest.json' || req.path === '/favicon.svg';
+        if (!isHealth) {
+          supabaseAdmin.from('page_views').insert({
+            ip,
+            path: req.path,
+            user_agent: rawUA.substring(0, 300),
+            country: req.headers['cf-ipcountry'] || req.headers['x-vercel-ip-country'] || null,
+            referrer: (req.get('referer') || '').substring(0, 500) || null,
+          }).then(() => {}).catch(() => {});
+        }
       }
     }
   }
