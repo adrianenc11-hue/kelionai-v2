@@ -533,7 +533,7 @@ async function loadStats() {
     fetch('/api/admin/costs', { headers: hdrs() }).then(function (r) {
       if (r.ok) return r.json(); throw new Error('403');
     }).then(function (d) {
-      document.getElementById('val-cost-today').textContent = '$' + (d.totalToday || 0).toFixed(2);
+      document.getElementById('val-cost-today').textContent = '$' + (d.totalToday || 0).toFixed(4);
       document.getElementById('val-cost-month').textContent = '$' + (d.totalMonth || 0).toFixed(2);
       document.getElementById('preview-ai').textContent = '$' + (d.totalMonth || 0).toFixed(2) + '/luna';
     }).catch(function () {
