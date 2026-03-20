@@ -68,6 +68,7 @@ const scanRouter = require('./routes/scan');
 const exportRouter = require('./routes/export');
 const identityRouter = require('./routes/identity');
 const voiceCloneRouter = require('./routes/voice-clone');
+const contactRouter = require('./routes/contact');
 
 const { router: marketplaceRouter } = require('./agent-marketplace');
 const { router: pluginRouter, restorePlugins: _restorePlugins } = require('./plugin-system');
@@ -761,6 +762,7 @@ app.use('/api/scan', scanRouter);
 
 app.use('/api/marketplace', marketplaceRouter);
 app.use('/api/plugins', pluginRouter);
+app.use('/api/contact', contactRouter);
 app.use('/api/multimodal', multimodalRouter);
 
 // ═══ v3.3 TENANT MIDDLEWARE ═══
