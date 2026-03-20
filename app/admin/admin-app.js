@@ -1050,18 +1050,12 @@ async function initAdmin() {
       '<a href="/" style="margin-top:16px;color:#a5b4fc;text-decoration:none;">← Înapoi la KelionAI</a></div>';
     return;
   }
-  // Auth OK — load all sections
+  // Auth OK — load only active sections
   loadAiStatus();
   loadBrain();
   loadTraffic();
   loadCredit();
-  loadClients();
-  loadCodes();
   loadUptime();
-  loadAudit();
-  loadMedia();
-  loadTrading();
-  loadMemories();
   _adminIntervals.push(
     setInterval(function () {
       loadTraffic();
@@ -1071,14 +1065,6 @@ async function initAdmin() {
   );
   _adminIntervals.push(setInterval(loadAiStatus, 60000));
   _adminIntervals.push(setInterval(loadBrain, 60000));
-  _adminIntervals.push(setInterval(loadAudit, 6 * 60 * 60 * 1000));
-  _adminIntervals.push(
-    setInterval(function () {
-      loadMedia();
-      loadTrading();
-    }, 60000)
-  );
-  _adminIntervals.push(setInterval(loadMemories, 120000)); // refresh memories every 2min
 }
 // ── EXIT ADMIN — preserve user session ──
 function _exitAdmin() {
