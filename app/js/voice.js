@@ -269,8 +269,15 @@
   async function speak(text, avatar) {
     if (isSpeaking) stopSpeaking();
     if (!text || !text.trim()) return;
-    const thisId = ++_speakId; // capture generation
+    const thisId = ++_speakId;
+    // Lock avatar voice at start — same voice for entire conversation
+    const lockedAvatar = avatar || (window.KAvatar ? KAvatar.getCurrentAvatar() : 'kelion');
     isSpeaking = true;
+    // Set expression BEFORE audio to not disturb lip sync
+    if (window.KAvatar) {
+      KAvatar.setExpression('happy', 0.3);
+      KAvatar.setPresenting(true);
+    }
     if (speakSafetyTimer) clearTimeout(speakSafetyTimer);
     speakSafetyTimer = setTimeout(function () {
       if (isSpeaking) {
@@ -310,13 +317,13 @@
 
       // ═══ PREFETCH PATTERN: fetch next chunk while current plays ═══
       // This eliminates the pause between chunks
-      async function fetchChunkAudio(chunkText, avatar) {
+      async function fetchChunkAudio(chunkText) {
           const resp = await fetch(API_BASE + '/api/speak', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', ...(window.KAuth ? KAuth.getAuthHeaders() : {}) },
             body: JSON.stringify({
               text: chunkText,
-              avatar: avatar || KAvatar.getCurrentAvatar(),
+              avatar: lockedAvatar,
               language: detectedLanguage,
             }),
           });
@@ -332,7 +339,7 @@
         }
 
       // Start prefetching first chunk immediately
-      let prefetchPromise = fetchChunkAudio(chunks[0], avatar);
+      let prefetchPromise = fetchChunkAudio(chunks[0]);
 
       for (let ci = 0; ci < chunks.length; ci++) {
         if (thisId !== _speakId) {
@@ -346,7 +353,7 @@
 
         // Start prefetching NEXT chunk immediately (while current plays)
         if (ci + 1 < chunks.length) {
-          prefetchPromise = fetchChunkAudio(chunks[ci + 1], avatar);
+          prefetchPromise = fetchChunkAudio(chunks[ci + 1]);
         }
 
         if (!chunkData) {
@@ -418,8 +425,8 @@
           }
         }
 
-        KAvatar.setExpression('happy', 0.3);
-        KAvatar.setPresenting(true);
+        // Expression already set at speak() start — don't change mid-audio
+        // This prevents disrupting lip sync animation
 
         currentSourceNode.onended = function () {
           if (usingAlignment && window.AlignmentLipSync) {
