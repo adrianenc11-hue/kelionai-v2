@@ -60,70 +60,70 @@
     // Each maps to multiple morph targets with calibrated weights
     var PHONEME_VISEMES = {
         'V_OPEN': {
-            viseme_aa: 0.45, aa: 0.45,
-            jawOpen: 0.30, mouthOpen: 0.25,
-            mouthLowerDownLeft: 0.12, mouthLowerDownRight: 0.12
+            viseme_aa: 0.22, aa: 0.22,
+            jawOpen: 0.15, mouthOpen: 0.12,
+            mouthLowerDownLeft: 0.06, mouthLowerDownRight: 0.06
         },
         'V_MID': {
-            viseme_E: 0.38, E: 0.38,
-            jawOpen: 0.20, mouthOpen: 0.15,
-            mouthStretchLeft: 0.14, mouthStretchRight: 0.14
+            viseme_E: 0.19, E: 0.19,
+            jawOpen: 0.10, mouthOpen: 0.08,
+            mouthStretchLeft: 0.07, mouthStretchRight: 0.07
         },
         'V_CLOSE': {
-            viseme_I: 0.40, ih: 0.40,
-            jawOpen: 0.15,
-            mouthStretchLeft: 0.22, mouthStretchRight: 0.22,
-            mouthSmileLeft: 0.10, mouthSmileRight: 0.10
+            viseme_I: 0.20, ih: 0.20,
+            jawOpen: 0.08,
+            mouthStretchLeft: 0.11, mouthStretchRight: 0.11,
+            mouthSmileLeft: 0.05, mouthSmileRight: 0.05
         },
         'V_ROUND': {
-            viseme_O: 0.38, oh: 0.38,
-            jawOpen: 0.22, mouthFunnel: 0.25,
-            mouthPucker: 0.15
+            viseme_O: 0.19, oh: 0.19,
+            jawOpen: 0.11, mouthFunnel: 0.12,
+            mouthPucker: 0.08
         },
         'V_TIGHT': {
-            viseme_U: 0.45, ou: 0.45,
-            mouthPucker: 0.35, mouthFunnel: 0.22,
-            jawOpen: 0.12
+            viseme_U: 0.22, ou: 0.22,
+            mouthPucker: 0.18, mouthFunnel: 0.11,
+            jawOpen: 0.06
         },
         'C_BILABIAL': {
-            viseme_PP: 0.50, PP: 0.50,
-            mouthClose: 0.30, mouthPressLeft: 0.18, mouthPressRight: 0.18
+            viseme_PP: 0.25, PP: 0.25,
+            mouthClose: 0.15, mouthPressLeft: 0.09, mouthPressRight: 0.09
         },
         'C_LABIO': {
-            viseme_FF: 0.45, FF: 0.45,
-            mouthUpperUpLeft: 0.15, mouthUpperUpRight: 0.15,
-            mouthRollLower: 0.18
+            viseme_FF: 0.22, FF: 0.22,
+            mouthUpperUpLeft: 0.08, mouthUpperUpRight: 0.08,
+            mouthRollLower: 0.09
         },
         'C_DENTAL': {
-            viseme_DD: 0.40, DD: 0.40,
-            jawOpen: 0.15,
-            mouthUpperUpLeft: 0.10, mouthUpperUpRight: 0.10
+            viseme_DD: 0.20, DD: 0.20,
+            jawOpen: 0.08,
+            mouthUpperUpLeft: 0.05, mouthUpperUpRight: 0.05
         },
         'C_ALVEOLAR': {
-            viseme_RR: 0.38, RR: 0.38,
-            jawOpen: 0.20,
-            mouthStretchLeft: 0.10, mouthStretchRight: 0.10
+            viseme_RR: 0.19, RR: 0.19,
+            jawOpen: 0.10,
+            mouthStretchLeft: 0.05, mouthStretchRight: 0.05
         },
         'C_SIBILANT': {
-            viseme_SS: 0.42, SS: 0.42,
-            mouthStretchLeft: 0.18, mouthStretchRight: 0.18,
-            jawOpen: 0.10
+            viseme_SS: 0.21, SS: 0.21,
+            mouthStretchLeft: 0.09, mouthStretchRight: 0.09,
+            jawOpen: 0.05
         },
         'C_PALATAL': {
-            viseme_CH: 0.40, CH: 0.40,
-            mouthFunnel: 0.15, jawOpen: 0.15
+            viseme_CH: 0.20, CH: 0.20,
+            mouthFunnel: 0.08, jawOpen: 0.08
         },
         'C_VELAR': {
-            viseme_kk: 0.38, kk: 0.38,
-            jawOpen: 0.20
+            viseme_kk: 0.19, kk: 0.19,
+            jawOpen: 0.10
         },
         'C_NASAL': {
-            viseme_nn: 0.40, nn: 0.40,
-            mouthClose: 0.18,
-            mouthPressLeft: 0.10, mouthPressRight: 0.10
+            viseme_nn: 0.20, nn: 0.20,
+            mouthClose: 0.09,
+            mouthPressLeft: 0.05, mouthPressRight: 0.05
         },
         'SILENCE': {
-            viseme_sil: 0.03, sil: 0.03
+            viseme_sil: 0.02, sil: 0.02
         }
     };
 
