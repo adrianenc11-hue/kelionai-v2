@@ -560,17 +560,43 @@ router.delete('/memories/:id', async (req, res) => {
 });
 
 // ══════════════════════════════════════════════════════════
-// GET /api/admin/live-users — Live sessions (was MISSING)
+// GET /api/admin/live-users — Who's on site right now
+// Uses page_views from last 5 min (sprint2.getLiveSessions didn't exist!)
 // ══════════════════════════════════════════════════════════
 router.get('/live-users', async (req, res) => {
   try {
-    const sessions = sprint2.getLiveSessions ? sprint2.getLiveSessions() : [];
-    let activeConnections = 0;
-    try {
-      const { activeConnections: ac } = require('../metrics');
-      activeConnections = (await ac.get()).values[0]?.value || 0;
-    } catch { /* ok */ }
-    res.json({ sessions, activeConnections, count: sessions.length });
+    const { supabaseAdmin } = req.app.locals;
+    const sessions = [];
+
+    if (supabaseAdmin) {
+      // Get page views from last 5 minutes = "live" users
+      const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+      const { data } = await supabaseAdmin
+        .from('page_views')
+        .select('ip, path, country, user_agent, created_at')
+        .gte('created_at', fiveMinAgo)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      // Group by IP to get unique visitors
+      const byIp = {};
+      (data || []).forEach(v => {
+        if (!byIp[v.ip]) {
+          byIp[v.ip] = {
+            userId: v.ip,
+            email: v.ip,
+            currentPage: v.path,
+            page: v.path,
+            country: v.country || '—',
+            duration: '< 5min',
+            lastActivity: v.created_at ? new Date(v.created_at).toLocaleTimeString('ro-RO') : '—',
+          };
+        }
+      });
+      sessions.push(...Object.values(byIp));
+    }
+
+    res.json({ sessions, activeConnections: sessions.length, count: sessions.length });
   } catch (e) {
     logger.error({ component: 'Admin', err: e.message }, 'live-users failed');
     res.json({ sessions: [], activeConnections: 0, count: 0 });
