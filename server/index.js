@@ -223,46 +223,51 @@ app.use((req, res, next) => {
         // Country from CDN headers first, then IP geolocation
         let country = req.headers['cf-ipcountry'] || req.headers['x-vercel-ip-country'] || null;
 
-        // Async insert — resolve country via ip-api.com if not from CDN
+        // Async insert — insert immediately, resolve country later
         const insertView = async () => {
-          if (!country && realIp !== 'unknown') {
-            // Check cache first
-            if (!global._geoCache) global._geoCache = {};
-            if (global._geoCache[realIp]) {
-              country = global._geoCache[realIp];
-            } else {
-              try {
+          // Insert FIRST — don't let geo lookup block tracking
+          const viewData = {
+            ip: realIp,
+            path: req.path,
+            user_agent: (req.get('user-agent') || '').substring(0, 300),
+            country: country, // may be null from CDN headers
+            referrer: (req.get('referer') || req.get('referrer') || '').substring(0, 500) || null,
+          };
+          const { data: inserted, error } = await supabaseAdmin.from('page_views').insert(viewData).select('id').single();
+          if (error) {
+            logger.error({ component: 'PageViews', err: error.message, code: error.code }, 'page_views INSERT FAILED');
+            return;
+          }
+          logger.info({ component: 'PageViews', ip: realIp, path: req.path }, 'page_view recorded');
+
+          // Try to resolve country async (non-blocking)
+          if (!country && realIp !== 'unknown' && inserted?.id) {
+            try {
+              if (!global._geoCache) global._geoCache = {};
+              let geo = global._geoCache[realIp];
+              if (!geo) {
                 const geoR = await fetch(
                   'http://ip-api.com/json/' + encodeURIComponent(realIp) + '?fields=countryCode',
                   { signal: AbortSignal.timeout(2000) }
                 );
                 if (geoR.ok) {
                   const geoD = await geoR.json();
-                  country = geoD.countryCode || null;
-                  if (country) global._geoCache[realIp] = country;
-                  // Keep cache small
+                  geo = geoD.countryCode || null;
+                  if (geo) global._geoCache[realIp] = geo;
                   const keys = Object.keys(global._geoCache);
                   if (keys.length > 500) {
                     for (let i = 0; i < 200; i++) delete global._geoCache[keys[i]];
                   }
                 }
-              } catch (_e) {
-                /* geo lookup failed — ok, insert without */
               }
-            }
+              if (geo) {
+                await supabaseAdmin.from('page_views').update({ country: geo }).eq('id', inserted.id);
+              }
+            } catch (_e) { /* geo failed — ok, visit already recorded */ }
           }
-          const { error } = await supabaseAdmin.from('page_views').insert({
-            ip: realIp,
-            path: req.path,
-            user_agent: (req.get('user-agent') || '').substring(0, 300),
-            country: country,
-            referrer: (req.get('referer') || req.get('referrer') || '').substring(0, 500) || null,
-          });
-          if (error)
-            logger.warn({ component: 'PageViews', err: error.message, code: error.code }, 'page_views insert failed');
         };
         insertView().catch((e) => {
-          logger.warn({ component: 'PageViews', err: e.message }, 'page_views insert exception');
+          logger.error({ component: 'PageViews', err: e.message }, 'page_views INSERT EXCEPTION');
         });
       }
     }
