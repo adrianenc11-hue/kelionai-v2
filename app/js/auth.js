@@ -218,7 +218,14 @@
           navBtn.id = 'btn-admin-nav';
           navBtn.textContent = '🛡️ Admin';
           navBtn.style.cssText = 'cursor:pointer;border:1px solid rgba(16,185,129,0.4);background:rgba(16,185,129,0.15);border-radius:8px;padding:6px 12px;color:#6ee7b7;font-size:0.75rem;font-weight:600;transition:all 0.3s;';
-          navBtn.addEventListener('click', function () {
+          navBtn.addEventListener('click', async function () {
+            try {
+              const r = await fetch(API + '/api/admin/auth-token', { headers: getAuthHeaders() });
+              if (r.ok) {
+                const d = await r.json();
+                if (d.secret) sessionStorage.setItem('kelion_admin_secret', d.secret);
+              }
+            } catch (_e) {}
             window.location.href = '/admin';
           });
           navRight.insertBefore(navBtn, navRight.firstChild);
