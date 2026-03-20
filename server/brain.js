@@ -8021,11 +8021,13 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
   // ── TRADE INTELLIGENCE — FULL integration with all trading modules ──
   async _tradeIntelligence() {
     try {
-      const ti = require("./trade-intelligence");
-      const wsEngine = require("./ws-engine");
-      const marketLearner = require("./market-learner");
-      const forexEngine = require("./forex-engine");
-      const perfTracker = require("./performance-tracker");
+      // Trading modules removed — safe stubs
+      const _stub = { getCandles: () => [], isConnected: () => false, getTrackedAssets: () => [], getWeights: () => ({}), getCurrentSession: () => null, getBestPairsNow: () => null, getStats: () => ({}) };
+      const ti = (() => { try { return require("./trade-intelligence"); } catch { return { fetchMarketNews: async () => [], calculateNewsSentiment: () => 0, getEconomicCalendarRisks: () => [] }; } })();
+      const wsEngine = _stub;
+      const marketLearner = _stub;
+      const forexEngine = _stub;
+      const perfTracker = _stub;
       const results = {};
 
       // 1. Market News Sentiment
