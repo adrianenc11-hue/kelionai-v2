@@ -43,12 +43,6 @@ router.get("/", (req, res) => {
       auth: !!supabase,
       database: !!supabaseAdmin,
       telegram: !!process.env.TELEGRAM_BOT_TOKEN,
-      trading_binance: !!process.env.BINANCE_API_KEY,
-      trading_mode: process.env.BINANCE_API_KEY
-        ? process.env.BINANCE_TESTNET === "true"
-          ? "TESTNET"
-          : "LIVE"
-        : "PAPER",
     },
   });
 });
@@ -65,11 +59,11 @@ router.get("/test-tables", async (req, res) => {
     "user_preferences",
     "api_keys",
     "admin_logs",
-    "trades",
+
     "profiles",
     "media_history",
     "telegram_users",
-    "trade_intelligence",
+
     "cookie_consents",
     "metrics_snapshots",
     "ai_costs",
@@ -80,9 +74,7 @@ router.get("/test-tables", async (req, res) => {
     "brain_memory",
     "learned_facts",
     "telegram_messages",
-    "market_candles",
-    "market_learnings",
-    "market_patterns",
+
   ];
 
   const results = [];
