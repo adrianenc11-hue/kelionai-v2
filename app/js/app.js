@@ -1721,20 +1721,43 @@
     clearTimeout(splashTimer);
     dismissSplash();
 
-    // ─── Admin button — visible ONLY for admin ─────────
-    (function() {
+    // ─── Admin button — auto-detect via JWT ─────────
+    (async function() {
       var un = document.getElementById('user-name');
       if (!un) return;
+
+      // Try to auto-fetch admin secret via JWT (matches ADMIN_EMAIL on server)
       var savedSecret = sessionStorage.getItem('kelion_admin_secret');
+      if (!savedSecret) {
+        try {
+          var t = localStorage.getItem('kelion_token');
+          if (!t) {
+            var keys = Object.keys(localStorage).filter(function(k) { return k.startsWith('sb-') && k.endsWith('-auth-token'); });
+            for (var i = 0; i < keys.length; i++) {
+              try { var p = JSON.parse(localStorage.getItem(keys[i])); if (p && p.access_token) { t = p.access_token; break; } } catch(e) {}
+            }
+          }
+          if (t) {
+            var r = await fetch(API_BASE + '/api/admin/auth-token', { headers: { 'Authorization': 'Bearer ' + t } });
+            if (r.ok) {
+              var d = await r.json();
+              if (d.secret) {
+                savedSecret = d.secret;
+                sessionStorage.setItem('kelion_admin_secret', d.secret);
+                adminSecret = d.secret;
+              }
+            }
+          }
+        } catch(e) { /* not admin */ }
+      }
+
       if (savedSecret) {
-        // Admin: show green styled clickable button
         un.style.cssText = 'cursor:pointer;border:1px solid rgba(16,185,129,0.5);background:linear-gradient(180deg,rgba(16,185,129,0.2),rgba(16,185,129,0.05));border-radius:8px;color:#34d399;padding:6px 14px;font:inherit;font-weight:600;transition:all 0.3s;box-shadow:0 2px 4px rgba(0,0,0,0.3),inset 0 1px 0 rgba(255,255,255,0.1);';
-        un.title = 'Admin Dashboard — Unlocked';
+        un.title = 'Admin Dashboard — Click to open';
         un.onclick = function () {
-          window.open('/admin/k1-dashboard.html?secret=' + encodeURIComponent(savedSecret), '_blank');
+          window.open('/admin/', '_blank');
         };
       } else {
-        // Guest: just show status text, no admin access, no click
         un.style.cursor = 'default';
         un.onclick = null;
         un.title = 'Status';
