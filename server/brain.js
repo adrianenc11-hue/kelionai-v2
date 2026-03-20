@@ -9515,11 +9515,16 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
 
   async _imagine(prompt) {
     this.toolStats.imagine++;
-    // Pollinations.ai — gratuit, fara API key, genereaza imagini AI FLUX
-    const encoded = encodeURIComponent(prompt);
-    const seed = Math.floor(Math.random() * 99999);
-    const imageUrl = `https://image.pollinations.ai/prompt/${encoded}?width=1024&height=1024&model=flux&nologo=true&enhance=true&seed=${seed}`;
-    return { imageUrl, prompt }; // extractMonitor cauta r.result.imageUrl → afiseaza in monitor
+    try {
+      // Pollinations.ai — gratuit, fara API key, genereaza imagini AI FLUX
+      const encoded = encodeURIComponent(prompt);
+      const seed = Math.floor(Math.random() * 99999);
+      const imageUrl = `https://image.pollinations.ai/prompt/${encoded}?width=1024&height=1024&model=flux&nologo=true&enhance=true&seed=${seed}`;
+      return { imageUrl, prompt };
+    } catch (e) {
+      this.logger.debug({ err: e.message }, '[imagine] error');
+      return { imageUrl: null, prompt, error: e.message };
+    }
   }
 
 
@@ -9527,18 +9532,30 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
   async _memory(userId) {
     if (!this.supabaseAdmin || !userId) return null;
     this.toolStats.memory++;
-    const { data } = await this.supabaseAdmin
-      .from("user_preferences")
-      .select("key, value")
-      .eq("user_id", userId)
-      .limit(30);
-    if (!data?.length) return null;
-    return data
-      .map(
-        (p) =>
-          `${p.key}: ${typeof p.value === "object" ? JSON.stringify(p.value) : p.value}`,
-      )
-      .join("; ");
+    try {
+      // Try user_preferences first
+      const { data, error } = await this.supabaseAdmin
+        .from("user_preferences")
+        .select("key, value")
+        .eq("user_id", userId)
+        .limit(30);
+      if (!error && data?.length) {
+        return data.map(p => `${p.key}: ${typeof p.value === "object" ? JSON.stringify(p.value) : p.value}`).join("; ");
+      }
+      // Fallback: brain_memory table
+      const { data: memData } = await this.supabaseAdmin
+        .from("brain_memory")
+        .select("key, value")
+        .eq("user_id", userId)
+        .limit(30);
+      if (memData?.length) {
+        return memData.map(p => `${p.key}: ${typeof p.value === "object" ? JSON.stringify(p.value) : p.value}`).join("; ");
+      }
+      return null;
+    } catch (e) {
+      this.logger.debug({ err: e.message }, '[memory] error — non-critical');
+      return null; // don't throw — prevents toolErrors accumulation
+    }
   }
 
   // ── Self-Learning Tool Registry ────────────────────────────────────────────
