@@ -1147,19 +1147,34 @@ async function thinkV4(
     const patternsBlock = getPatternsText();
     const qualityHints = getQualityHints();
     const proactiveHint = getProactiveSuggestion();
+    const focusBlock = `
+[MAXIMUM FOCUS DIRECTIVE]
+You MUST read and analyze EVERY SINGLE WORD of the user's message before responding.
+Rules:
+1. NEVER give generic answers. Every response must directly address what the user SPECIFICALLY asked.
+2. If the user asks multiple things, address EACH point individually.
+3. Provide PROFESSIONAL, EXPERT-LEVEL solutions — not surface-level advice.
+4. Be thorough and complete — do not cut answers short.
+5. If unsure, use your tools (web_search, code execution) to verify before answering.
+6. Stay 100% focused on the user's topic — do not drift to unrelated subjects.
+7. Think step by step for complex questions before answering.
+8. Cite sources when possible. Verify facts with tools.
+9. Give actionable, practical solutions — not theoretical fluff.
+10. Respond in the user's language with native fluency.
+`;
     const systemPrompt = process.env.NEWBORN_MODE === "true"
-      ? buildNewbornPrompt(memoryBlock + patternsBlock + qualityHints + contextSwitchHint + proactiveHint)
+      ? buildNewbornPrompt(memoryBlock + patternsBlock + qualityHints + contextSwitchHint + proactiveHint + focusBlock)
       : buildSystemPrompt(
           avatar,
           language,
-          memoryBlock + emotionBlock + geoBlock + dateTimeBlock + patternsBlock + qualityHints + contextSwitchHint + proactiveHint,
+          memoryBlock + emotionBlock + geoBlock + dateTimeBlock + patternsBlock + qualityHints + contextSwitchHint + proactiveHint + focusBlock,
           "",
           null,
         );
 
     // ── 5. Prepare messages for Gemini ──
-    // Compress history to last 20 messages max
-    const recentHistory = (history || []).slice(-20).map((h) => ({
+    // Full conversation context — 50 messages for maximum attention
+    const recentHistory = (history || []).slice(-50).map((h) => ({
       role: h.role === "user" ? "user" : "model",
       parts: [
         {
@@ -1230,8 +1245,8 @@ async function thinkV4(
         toolConfig: { functionCallingConfig: { mode: 'ANY' } }, // Forteaza tool calling — nu raspunde din memorie proprie
         systemInstruction: { parts: [{ text: systemPrompt }] },
         generationConfig: {
-          maxOutputTokens: 2048,
-          temperature: 0.7,
+          maxOutputTokens: 8192,
+          temperature: 0.6,
         },
       };
 
