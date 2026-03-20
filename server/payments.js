@@ -1,7 +1,7 @@
-// ═══════════════════════════════════════════════════════════════
-// KelionAI v2.3 — PAYMENTS (Stripe Subscriptions)
-// Plans: Free €0, Pro €29/mo (€250/year), Premium €19.99/mo
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// KelionAI v2.3 â€” PAYMENTS (Stripe Subscriptions)
+// Plans: Free â‚¬0, Pro â‚¬29/mo (â‚¬250/year), Premium â‚¬19.99/mo
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 const express = require("express");
 const logger = require("./logger");
 // Lazy-loaded to avoid potential circular dependency at module init time
@@ -24,7 +24,7 @@ try {
   );
 }
 
-// ═══ PLAN LIMITS ═══
+// â•â•â• PLAN LIMITS â•â•â•
 const PLAN_LIMITS = {
   guest: { chat: 5, search: 3, image: 1, vision: 2, tts: 5, name: "Guest" },
   free: { chat: 10, search: 5, image: 2, vision: 5, tts: 10, name: "Free" },
@@ -45,7 +45,7 @@ const PLAN_LIMITS = {
     tts: -1,
     name: "Premium",
   }, // legacy alias
-  // ── Business Plans ──
+  // â”€â”€ Business Plans â”€â”€
   business_small: {
     chat: 500,
     search: 200,
@@ -76,7 +76,7 @@ const PLAN_LIMITS = {
     seats: 100,
     apiAccess: true,
   },
-  // ── Developer Plans ──
+  // â”€â”€ Developer Plans â”€â”€
   developer_free: {
     chat: 50,
     search: 20,
@@ -109,7 +109,7 @@ const PLAN_LIMITS = {
   },
 };
 
-// ═══ CHECK USER PLAN & USAGE ═══
+// â•â•â• CHECK USER PLAN & USAGE â•â•â•
 async function getUserPlan(userId, supabaseAdmin) {
   if (!userId || !supabaseAdmin)
     return { plan: "guest", limits: PLAN_LIMITS.guest };
@@ -136,14 +136,14 @@ async function getUserPlan(userId, supabaseAdmin) {
   }
 }
 
-// ═══ CHECK USAGE LIMIT ═══
-// DISABLED — all users have unlimited access for now.
+// â•â•â• CHECK USAGE LIMIT â•â•â•
+// DISABLED â€” all users have unlimited access for now.
 // Re-enable later by uncommenting the original logic below.
 async function checkUsage(userId, _type /*, supabaseAdmin */) {
   const plan = userId ? "unlimited" : "guest";
   return { allowed: true, plan, remaining: -1 };
   /*
-  // ── Original limit logic (preserved for future re-activation) ──
+  // â”€â”€ Original limit logic (preserved for future re-activation) â”€â”€
   if (!userId)
     return {
       allowed: true,
@@ -181,7 +181,7 @@ async function checkUsage(userId, _type /*, supabaseAdmin */) {
   */
 }
 
-// ═══ INCREMENT USAGE ═══
+// â•â•â• INCREMENT USAGE â•â•â•
 async function incrementUsage(userId, type, supabaseAdmin) {
   if (!supabaseAdmin) return;
 
@@ -212,7 +212,7 @@ async function incrementUsage(userId, type, supabaseAdmin) {
   }
 }
 
-// ═══ REFERRAL CODE ═══
+// â•â•â• REFERRAL CODE â•â•â•
 function generateReferralCode() {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let code = "KEL-";
@@ -221,437 +221,48 @@ function generateReferralCode() {
   return code;
 }
 
-// ═══ STRIPE WEBHOOK IDEMPOTENCY ═══
+// â•â•â• STRIPE WEBHOOK IDEMPOTENCY â•â•â•
 const processedWebhookEvents = new Set();
 
-// ═══ ROUTES ═══
+// â•â•â• ROUTES â•â•â•
 
-// GET /api/payments/plans — list available plans (monthly + annual)
+// GET /api/payments/plans â€” list available plans
 router.get("/plans", (req, res) => {
-  const billing = req.query.billing || "all"; // "monthly" | "annual" | "all"
-
+  const billing = req.query.billing || "all";
   const allPlans = [
-    // ── FREE ──
     {
-      id: "free",
-      name: "Free",
-      price: 0,
-      annualPrice: 0,
-      currency: "EUR",
-      billing: "monthly",
+      id: "free", name: "Free", price: 0, currency: "GBP", billing: "monthly",
       limits: PLAN_LIMITS.free,
-      features: [
-        "10 AI conversations per day",
-        "5 web searches per day",
-        "2 AI-generated images per day",
-        "Basic 3D avatar interaction",
-        "Text chat only",
-        "Community support",
-      ],
+      features: ["10 AI conversations per day", "5 web searches per day", "2 AI-generated images per day", "Basic 3D avatar interaction", "Text chat only", "Community support"],
     },
-    // ── PRO Monthly ──
     {
-      id: "pro",
-      name: "Pro",
-      price: 29,
-      currency: "EUR",
-      billing: "monthly",
+      id: "pro", name: "Pro", price: 25, currency: "GBP", billing: "monthly",
+      stripePrice: process.env.STRIPE_PRO_PRICE_ID || "price_1T08tcE0lEIhKK8ivaVhtrhp",
       limits: PLAN_LIMITS.pro,
-      features: [
-        "100 AI conversations per day",
-        "50 web searches per day",
-        "20 AI-generated images per day",
-        "Voice conversations with avatar",
-        "Persistent memory — Kelion remembers you",
-        "Full conversation history",
-        "Weather, news & trading tools",
-        "Custom avatar personality",
-        "Priority email support",
-      ],
+      features: ["100 AI conversations per day", "50 web searches per day", "20 AI-generated images per day", "Voice conversations with avatar", "Persistent memory â€” Kelion remembers you", "Full conversation history", "Weather, news & trading tools", "Custom avatar personality", "Priority email support"],
     },
-    // ── PRO Annual (save 2 months) ──
     {
-      id: "pro_annual",
-      name: "Pro",
-      price: 200,
-      monthlyEquivalent: 16.67,
-      savings: "Save €148/year",
-      currency: "EUR",
-      billing: "annual",
+      id: "pro_annual", name: "Pro", price: 180, monthlyEquivalent: 15, savings: "Save Â£120/year",
+      currency: "GBP", billing: "annual",
+      stripePrice: process.env.STRIPE_PRO_ANNUAL_PRICE_ID || "price_1T08tcE0lEIhKK8iK6yekEx9",
       limits: PLAN_LIMITS.pro,
-      features: [
-        "100 AI conversations per day",
-        "50 web searches per day",
-        "20 AI-generated images per day",
-        "Voice conversations with avatar",
-        "Persistent memory — Kelion remembers you",
-        "Full conversation history",
-        "Weather, news & trading tools",
-        "Custom avatar personality",
-        "Priority email support",
-      ],
-    },
-    // ── PREMIUM Monthly ──
-    {
-      id: "premium",
-      name: "Premium",
-      price: 19.99,
-      currency: "EUR",
-      billing: "monthly",
-      limits: PLAN_LIMITS.premium,
-      features: [
-        "Unlimited AI conversations",
-        "Unlimited web searches",
-        "Unlimited AI-generated images",
-        "Voice & video avatar interaction",
-        "Advanced persistent memory & learning",
-        "Priority AI processing (faster responses)",
-        "Real-time trading intelligence",
-        "Custom voice cloning",
-        "API access for developers",
-        "Custom 3D avatar upload",
-        "Dedicated priority support",
-        "Early access to new features",
-      ],
-    },
-    // ── PREMIUM Annual (save 2 months) ──
-    {
-      id: "premium_annual",
-      name: "Premium",
-      price: 199.9,
-      monthlyEquivalent: 16.66,
-      savings: "Save €39.98/year",
-      currency: "EUR",
-      billing: "annual",
-      limits: PLAN_LIMITS.premium,
-      features: [
-        "Unlimited AI conversations",
-        "Unlimited web searches",
-        "Unlimited AI-generated images",
-        "Voice & video avatar interaction",
-        "Advanced persistent memory & learning",
-        "Priority AI processing (faster responses)",
-        "Real-time trading intelligence",
-        "Custom voice cloning",
-        "API access for developers",
-        "Custom 3D avatar upload",
-        "Dedicated priority support",
-        "Early access to new features",
-      ],
-    },
-    // ═══════════════════════════════════════════════════
-    // BUSINESS PLANS
-    // ═══════════════════════════════════════════════════
-    // ── Business Small ──
-    {
-      id: "business_small",
-      name: "Business Small",
-      price: 49.99,
-      currency: "EUR",
-      billing: "monthly",
-      category: "business",
-      limits: PLAN_LIMITS.business_small,
-      features: [
-        "Up to 5 team members",
-        "500 AI conversations per day",
-        "200 web searches per day",
-        "Full API access",
-        "Team management dashboard",
-        "Priority email support",
-        "Usage analytics & reporting",
-        "Custom AI personality per team",
-      ],
+      features: ["100 AI conversations per day", "50 web searches per day", "20 AI-generated images per day", "Voice conversations with avatar", "Persistent memory â€” Kelion remembers you", "Full conversation history", "Weather, news & trading tools", "Custom avatar personality", "Priority email support"],
     },
     {
-      id: "business_small_semi",
-      name: "Business Small",
-      price: 249.94,
-      monthlyEquivalent: 41.66,
-      savings: "Save €49.99 (2 months free)",
-      currency: "EUR",
-      billing: "semiannual",
-      category: "business",
-      limits: PLAN_LIMITS.business_small,
-      features: [
-        "Up to 5 team members",
-        "500 AI conversations per day",
-        "200 web searches per day",
-        "Full API access",
-        "Team management dashboard",
-        "Priority email support",
-        "Usage analytics & reporting",
-        "Custom AI personality per team",
-      ],
-    },
-    {
-      id: "business_small_annual",
-      name: "Business Small",
-      price: 499.9,
-      monthlyEquivalent: 41.66,
-      savings: "Save €99.98/year",
-      currency: "EUR",
-      billing: "annual",
-      category: "business",
-      limits: PLAN_LIMITS.business_small,
-      features: [
-        "Up to 5 team members",
-        "500 AI conversations per day",
-        "200 web searches per day",
-        "Full API access",
-        "Team management dashboard",
-        "Priority email support",
-        "Usage analytics & reporting",
-        "Custom AI personality per team",
-      ],
-    },
-    // ── Business Medium ──
-    {
-      id: "business_medium",
-      name: "Business Medium",
-      price: 149.99,
-      currency: "EUR",
-      billing: "monthly",
-      category: "business",
-      limits: PLAN_LIMITS.business_medium,
-      features: [
-        "Up to 25 team members",
-        "2,000 AI conversations per day",
-        "1,000 web searches per day",
-        "Full API access with higher rate limits",
-        "Advanced team management & roles",
-        "Priority phone & email support",
-        "Custom AI training on your data",
-        "Usage analytics & detailed reporting",
-        "Single Sign-On (SSO) integration",
-        "Dedicated account manager",
-      ],
-    },
-    {
-      id: "business_medium_semi",
-      name: "Business Medium",
-      price: 749.94,
-      monthlyEquivalent: 124.99,
-      savings: "Save €149.99 (2 months free)",
-      currency: "EUR",
-      billing: "semiannual",
-      category: "business",
-      limits: PLAN_LIMITS.business_medium,
-      features: [
-        "Up to 25 team members",
-        "2,000 AI conversations per day",
-        "1,000 web searches per day",
-        "Full API access with higher rate limits",
-        "Advanced team management & roles",
-        "Priority phone & email support",
-        "Custom AI training on your data",
-        "Usage analytics & detailed reporting",
-        "Single Sign-On (SSO) integration",
-        "Dedicated account manager",
-      ],
-    },
-    {
-      id: "business_medium_annual",
-      name: "Business Medium",
-      price: 1499.9,
-      monthlyEquivalent: 124.99,
-      savings: "Save €299.98/year",
-      currency: "EUR",
-      billing: "annual",
-      category: "business",
-      limits: PLAN_LIMITS.business_medium,
-      features: [
-        "Up to 25 team members",
-        "2,000 AI conversations per day",
-        "1,000 web searches per day",
-        "Full API access with higher rate limits",
-        "Advanced team management & roles",
-        "Priority phone & email support",
-        "Custom AI training on your data",
-        "Usage analytics & detailed reporting",
-        "Single Sign-On (SSO) integration",
-        "Dedicated account manager",
-      ],
-    },
-    // ── Business Large ──
-    {
-      id: "business_large",
-      name: "Business Large",
-      price: 499.99,
-      currency: "EUR",
-      billing: "monthly",
-      category: "business",
-      limits: PLAN_LIMITS.business_large,
-      features: [
-        "Up to 100 team members",
-        "Unlimited AI conversations",
-        "Unlimited web searches & images",
-        "Enterprise API with dedicated infrastructure",
-        "Full team management with RBAC",
-        "24/7 dedicated support with SLA",
-        "Custom AI model fine-tuning",
-        "On-premise deployment option",
-        "Advanced security & compliance (SOC2)",
-        "Custom integrations & webhooks",
-        "White-label option available",
-        "99.9% uptime SLA guaranteed",
-      ],
-    },
-    {
-      id: "business_large_semi",
-      name: "Business Large",
-      price: 2499.94,
-      monthlyEquivalent: 416.66,
-      savings: "Save €499.99 (2 months free)",
-      currency: "EUR",
-      billing: "semiannual",
-      category: "business",
-      limits: PLAN_LIMITS.business_large,
-      features: [
-        "Up to 100 team members",
-        "Unlimited AI conversations",
-        "Unlimited web searches & images",
-        "Enterprise API with dedicated infrastructure",
-        "Full team management with RBAC",
-        "24/7 dedicated support with SLA",
-        "Custom AI model fine-tuning",
-        "On-premise deployment option",
-        "Advanced security & compliance (SOC2)",
-        "Custom integrations & webhooks",
-        "White-label option available",
-        "99.9% uptime SLA guaranteed",
-      ],
-    },
-    {
-      id: "business_large_annual",
-      name: "Business Large",
-      price: 4999.9,
-      monthlyEquivalent: 416.66,
-      savings: "Save €999.98/year",
-      currency: "EUR",
-      billing: "annual",
-      category: "business",
-      limits: PLAN_LIMITS.business_large,
-      features: [
-        "Up to 100 team members",
-        "Unlimited AI conversations",
-        "Unlimited web searches & images",
-        "Enterprise API with dedicated infrastructure",
-        "Full team management with RBAC",
-        "24/7 dedicated support with SLA",
-        "Custom AI model fine-tuning",
-        "On-premise deployment option",
-        "Advanced security & compliance (SOC2)",
-        "Custom integrations & webhooks",
-        "White-label option available",
-        "99.9% uptime SLA guaranteed",
-      ],
-    },
-    // ═══════════════════════════════════════════════════
-    // DEVELOPER PLANS
-    // ═══════════════════════════════════════════════════
-    {
-      id: "developer_free",
-      name: "Developer Free",
-      price: 0,
-      currency: "EUR",
-      billing: "monthly",
-      category: "developer",
-      limits: PLAN_LIMITS.developer_free,
-      features: [
-        "1,000 API calls per month",
-        "10 requests per second rate limit",
-        "REST API access",
-        "API key management",
-        "Basic documentation & examples",
-        "Community support on Discord",
-      ],
-    },
-    {
-      id: "developer_pro",
-      name: "Developer Pro",
-      price: 29.99,
-      currency: "EUR",
-      billing: "monthly",
-      category: "developer",
-      limits: PLAN_LIMITS.developer_pro,
-      features: [
-        "50,000 API calls per month",
-        "100 requests per second rate limit",
-        "REST & WebSocket API access",
-        "Multiple API keys (up to 10)",
-        "Full SDK (JavaScript, Python, cURL)",
-        "Webhook notifications",
-        "Usage dashboard & analytics",
-        "Priority developer support",
-      ],
-    },
-    {
-      id: "developer_pro_annual",
-      name: "Developer Pro",
-      price: 299.9,
-      monthlyEquivalent: 24.99,
-      savings: "Save €59.98/year",
-      currency: "EUR",
-      billing: "annual",
-      category: "developer",
-      limits: PLAN_LIMITS.developer_pro,
-      features: [
-        "50,000 API calls per month",
-        "100 requests per second rate limit",
-        "REST & WebSocket API access",
-        "Multiple API keys (up to 10)",
-        "Full SDK (JavaScript, Python, cURL)",
-        "Webhook notifications",
-        "Usage dashboard & analytics",
-        "Priority developer support",
-      ],
-    },
-    {
-      id: "developer_enterprise",
-      name: "Developer Enterprise",
-      price: 199.99,
-      currency: "EUR",
-      billing: "monthly",
-      category: "developer",
-      limits: PLAN_LIMITS.developer_enterprise,
-      features: [
-        "Unlimited API calls",
-        "1,000 requests per second rate limit",
-        "REST, WebSocket & gRPC API access",
-        "Unlimited API keys",
-        "Full SDK with enterprise support",
-        "Custom model endpoints",
-        "Dedicated API infrastructure",
-        "24/7 developer support with SLA",
-        "Custom webhook integrations",
-        "IP whitelisting & advanced security",
-      ],
+      id: "developer", name: "Developer", price: 800, monthlyEquivalent: 66.67,
+      currency: "GBP", billing: "annual",
+      stripePrice: process.env.STRIPE_DEVELOPER_PRICE_ID || "price_1T08tdE0lEIhKK8ipQqEbv8c",
+      limits: { chat: -1, search: -1, image: -1, vision: -1, tts: -1, name: "Developer", seats: 5, apiAccess: true },
+      features: ["5 team member seats", "Unlimited AI conversations", "Unlimited web searches & images", "Full API access with SDK", "Voice & video avatar interaction", "Advanced persistent memory & learning", "Priority AI processing", "Team management dashboard", "Dedicated priority support", "Custom integrations & webhooks"],
     },
   ];
-
-  // Filter by category and billing period
-  const category = req.query.category || "all"; // "personal" | "business" | "developer" | "all"
   let plans = allPlans;
-
-  if (category === "personal") {
-    plans = plans.filter((p) => !p.category || p.category === "personal");
-  } else if (category === "business") {
-    plans = plans.filter((p) => p.category === "business");
-  } else if (category === "developer") {
-    plans = plans.filter((p) => p.category === "developer");
-  }
-
-  if (billing === "monthly") {
-    plans = plans.filter((p) => p.billing === "monthly");
-  } else if (billing === "annual") {
-    plans = plans.filter((p) => p.billing === "annual" || p.price === 0);
-  } else if (billing === "semiannual") {
-    plans = plans.filter((p) => p.billing === "semiannual" || p.price === 0);
-  }
-
+  if (billing === "monthly") plans = plans.filter(p => p.billing === "monthly");
+  else if (billing === "annual") plans = plans.filter(p => p.billing === "annual" || p.price === 0);
   res.json({ plans });
 });
-// GET /api/payments/stripe-prices — ADMIN: list all prices from Stripe account
+
+// GET /api/payments/stripe-prices â€” ADMIN: list all prices from Stripe account
 router.get("/stripe-prices", async (req, res) => {
   try {
     const adminSecret = req.headers["x-admin-secret"];
@@ -669,19 +280,19 @@ router.get("/stripe-prices", async (req, res) => {
       active: p.active,
     }));
     res.json({ prices: result, envVars: {
-      STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY ? "✅ set" : "❌ missing",
-      STRIPE_PRO_PRICE_ID: process.env.STRIPE_PRO_PRICE_ID || "❌ missing",
-      STRIPE_PRO_ANNUAL_PRICE_ID: process.env.STRIPE_PRO_ANNUAL_PRICE_ID || "❌ missing",
-      STRIPE_PREMIUM_PRICE_ID: process.env.STRIPE_PREMIUM_PRICE_ID || "❌ missing",
-      STRIPE_PREMIUM_ANNUAL_PRICE_ID: process.env.STRIPE_PREMIUM_ANNUAL_PRICE_ID || "❌ missing",
-      STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET ? "✅ set" : "❌ missing",
+      STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY ? "âœ… set" : "âŒ missing",
+      STRIPE_PRO_PRICE_ID: process.env.STRIPE_PRO_PRICE_ID || "âŒ missing",
+      STRIPE_PRO_ANNUAL_PRICE_ID: process.env.STRIPE_PRO_ANNUAL_PRICE_ID || "âŒ missing",
+      STRIPE_PREMIUM_PRICE_ID: process.env.STRIPE_PREMIUM_PRICE_ID || "âŒ missing",
+      STRIPE_PREMIUM_ANNUAL_PRICE_ID: process.env.STRIPE_PREMIUM_ANNUAL_PRICE_ID || "âŒ missing",
+      STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET ? "âœ… set" : "âŒ missing",
     }});
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
 
-// GET /api/payments/status — current user plan & usage
+// GET /api/payments/status â€” current user plan & usage
 router.get("/status", async (req, res) => {
   try {
     const { getUserFromToken, supabaseAdmin } = req.app.locals;
@@ -718,7 +329,7 @@ router.get("/status", async (req, res) => {
   }
 });
 
-// POST /api/payments/checkout — create Stripe checkout session
+// POST /api/payments/checkout â€” create Stripe checkout session
 router.post("/checkout", async (req, res) => {
   try {
     if (!stripe)
@@ -730,11 +341,11 @@ router.post("/checkout", async (req, res) => {
       return res.status(401).json({ error: "Authentication required" });
 
     const { plan, referral_code } = req.body;
-    // Normalize plan IDs: enterprise→premium, support annual variants
+    // Normalize plan IDs: enterpriseâ†’pro, support annual variants
     const isAnnual = plan?.endsWith("_annual");
     const basePlan = plan?.replace("_annual", "");
-    const normalizedPlan = basePlan === "enterprise" ? "premium" : basePlan;
-    if (!["pro", "premium"].includes(normalizedPlan))
+    const normalizedPlan = basePlan === "enterprise" ? "pro" : basePlan;
+    if (!["pro", "developer"].includes(normalizedPlan))
       return res.status(400).json({ error: "Invalid plan" });
 
     // Bug #5: Check if user already has an active subscription
@@ -765,19 +376,14 @@ router.post("/checkout", async (req, res) => {
       }
     }
 
-    // Select correct Stripe price ID (monthly vs annual)
+    // Select correct Stripe price ID with hardcoded fallbacks
     let priceId;
     if (normalizedPlan === "pro" && isAnnual) {
-      priceId = process.env.STRIPE_PRO_ANNUAL_PRICE_ID;
+      priceId = process.env.STRIPE_PRO_ANNUAL_PRICE_ID || "price_1T08tcE0lEIhKK8iK6yekEx9";
     } else if (normalizedPlan === "pro") {
-      priceId = process.env.STRIPE_PRO_PRICE_ID || process.env.STRIPE_PRICE_PRO;
-    } else if (normalizedPlan === "premium" && isAnnual) {
-      priceId = process.env.STRIPE_PREMIUM_ANNUAL_PRICE_ID;
-    } else {
-      priceId =
-        process.env.STRIPE_PREMIUM_PRICE_ID ||
-        process.env.STRIPE_ENTERPRISE_PRICE_ID ||
-        process.env.STRIPE_PRICE_PREMIUM;
+      priceId = process.env.STRIPE_PRO_PRICE_ID || "price_1T08tcE0lEIhKK8ivaVhtrhp";
+    } else if (normalizedPlan === "developer") {
+      priceId = process.env.STRIPE_DEVELOPER_PRICE_ID || "price_1T08tdE0lEIhKK8ipQqEbv8c";
     }
     if (!priceId)
       return res.status(503).json({ error: "Prices not configured" });
@@ -811,8 +417,8 @@ router.post("/checkout", async (req, res) => {
       subscription_data: {
         metadata: { user_id: user.id, plan: normalizedPlan },
       },
-      // Subscriptions auto-generate invoices — enable email receipts in Stripe Dashboard
-      // Settings → Emails → "Email customers for successful payments"
+      // Subscriptions auto-generate invoices â€” enable email receipts in Stripe Dashboard
+      // Settings â†’ Emails â†’ "Email customers for successful payments"
       allow_promotion_codes: true,
     };
 
@@ -836,7 +442,7 @@ router.post("/checkout", async (req, res) => {
   }
 });
 
-// POST /api/payments/portal — Stripe billing portal (manage subscription)
+// POST /api/payments/portal â€” Stripe billing portal (manage subscription)
 router.post("/portal", async (req, res) => {
   try {
     if (!stripe)
@@ -869,7 +475,7 @@ router.post("/portal", async (req, res) => {
   }
 });
 
-// POST /api/payments/webhook — Stripe webhook handler
+// POST /api/payments/webhook â€” Stripe webhook handler
 router.post(
   "/webhook",
   express.raw({ type: "application/json" }),
@@ -901,7 +507,7 @@ router.post(
       const { supabaseAdmin } = req.app.locals;
       if (!supabaseAdmin) return res.status(503).send("DB not available");
 
-      // Idempotency check — check DB first (survives restarts), then in-memory cache
+      // Idempotency check â€” check DB first (survives restarts), then in-memory cache
       if (processedWebhookEvents.has(event.id)) {
         logger.info(
           { component: "Payments", eventId: event.id },
@@ -979,7 +585,7 @@ router.post(
 
           logger.info(
             { component: "Payments", plan, userId },
-            `✅ ${plan} activated for ${userId}`,
+            `âœ… ${plan} activated for ${userId}`,
           );
 
           // Apply referral bonus if present
@@ -1018,7 +624,7 @@ router.post(
 
           logger.info(
             { component: "Payments", subId: sub.id, status: sub.status },
-            `Updated sub ${sub.id} → ${sub.status}`,
+            `Updated sub ${sub.id} â†’ ${sub.status}`,
           );
           break;
         }
@@ -1032,7 +638,7 @@ router.post(
 
           logger.info(
             { component: "Payments", subId: sub.id },
-            `❌ Sub cancelled: ${sub.id}`,
+            `âŒ Sub cancelled: ${sub.id}`,
           );
           break;
         }
@@ -1048,7 +654,7 @@ router.post(
           }
           logger.warn(
             { component: "Payments", subId },
-            `⚠️ Payment failed for sub: ${subId}`,
+            `âš ï¸ Payment failed for sub: ${subId}`,
           );
           break;
         }
@@ -1062,7 +668,7 @@ router.post(
   },
 );
 
-// POST /api/payments/referral — generate referral code
+// POST /api/payments/referral â€” generate referral code
 router.post("/referral", async (req, res) => {
   try {
     const { getUserFromToken, supabaseAdmin } = req.app.locals;
@@ -1089,7 +695,7 @@ router.post("/referral", async (req, res) => {
   }
 });
 
-// POST /api/payments/redeem — redeem referral code (7 days Pro for both)
+// POST /api/payments/redeem â€” redeem referral code (7 days Pro for both)
 router.post("/redeem", async (req, res) => {
   try {
     const { getUserFromToken, supabaseAdmin } = req.app.locals;
@@ -1161,9 +767,9 @@ router.post("/redeem", async (req, res) => {
   }
 });
 
-// ═══ DEVELOPER API KEY MANAGEMENT ═══
+// â•â•â• DEVELOPER API KEY MANAGEMENT â•â•â•
 
-// POST /api/payments/developer/keys — generate a new API key
+// POST /api/payments/developer/keys â€” generate a new API key
 router.post("/developer/keys", async (req, res) => {
   try {
     const { getUserFromToken, supabaseAdmin } = req.app.locals;
@@ -1237,7 +843,7 @@ router.post("/developer/keys", async (req, res) => {
 
     logger.info(
       { component: "Developer", userId: user.id },
-      `🔑 New API key created: ${name}`,
+      `ðŸ”‘ New API key created: ${name}`,
     );
   } catch (e) {
     logger.error(
@@ -1248,7 +854,7 @@ router.post("/developer/keys", async (req, res) => {
   }
 });
 
-// GET /api/payments/developer/keys — list user's API keys
+// GET /api/payments/developer/keys â€” list user's API keys
 router.get("/developer/keys", async (req, res) => {
   try {
     const { getUserFromToken, supabaseAdmin } = req.app.locals;
@@ -1272,7 +878,7 @@ router.get("/developer/keys", async (req, res) => {
   }
 });
 
-// DELETE /api/payments/developer/keys/:id — revoke an API key
+// DELETE /api/payments/developer/keys/:id â€” revoke an API key
 router.delete("/developer/keys/:id", async (req, res) => {
   try {
     const { getUserFromToken, supabaseAdmin } = req.app.locals;
@@ -1292,7 +898,7 @@ router.delete("/developer/keys/:id", async (req, res) => {
 
     logger.info(
       { component: "Developer", userId: user.id },
-      `🔑 API key revoked: ${req.params.id}`,
+      `ðŸ”‘ API key revoked: ${req.params.id}`,
     );
     res.json({ success: true, message: "API key revoked successfully" });
   } catch {
@@ -1300,7 +906,7 @@ router.delete("/developer/keys/:id", async (req, res) => {
   }
 });
 
-// GET /api/payments/usage — alias for /status (for frontend compatibility)
+// GET /api/payments/usage â€” alias for /status (for frontend compatibility)
 router.get("/usage", async (req, res) => {
   try {
     const { getUserFromToken, supabaseAdmin } = req.app.locals;
