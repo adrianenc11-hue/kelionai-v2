@@ -5,9 +5,14 @@
    ═══════════════════════════════════════════════════════════════ */
 'use strict';
 
-// ── AUTH: JWT token from localStorage ──
+// ── AUTH: JWT token + admin secret ──
+var _adminSecret = sessionStorage.getItem('kelion_admin_secret') || '';
+
 function hdrs() {
   var h = { 'Content-Type': 'application/json' };
+  // Send admin secret if we have it
+  if (_adminSecret) h['x-admin-secret'] = _adminSecret;
+  // Also send JWT Bearer token
   var t = localStorage.getItem('kelion_token');
   if (!t) {
     var keys = Object.keys(localStorage).filter(function (k) {
@@ -459,25 +464,65 @@ async function loadStats() {
 // AUTH CHECK + INIT
 // ═══════════════════════════════════════════════════════════════
 async function initAdmin() {
+  // Step 1: Check if we have a JWT token at all
+  var testH = hdrs();
+  if (!testH['Authorization'] && !_adminSecret) {
+    showAuthError('Nu ești logat. Loghează-te mai întâi pe kelionai.app, apoi revino aici.');
+    return;
+  }
+
+  // Step 2: If we don't have admin secret yet, auto-fetch it via JWT
+  if (!_adminSecret && testH['Authorization']) {
+    try {
+      var r = await fetch('/api/admin/auth-token', { headers: testH });
+      if (r.ok) {
+        var d = await r.json();
+        if (d.secret) {
+          _adminSecret = d.secret;
+          sessionStorage.setItem('kelion_admin_secret', _adminSecret);
+          console.log('[Admin] Secret obținut automat via JWT ✅');
+        }
+      } else if (r.status === 403) {
+        showAuthError('Emailul tău nu e setat ca admin pe server.\nVerifică ADMIN_EMAIL pe Railway.');
+        return;
+      } else if (r.status === 401) {
+        showAuthError('Token JWT expirat. Re-logheaza-te pe kelionai.app.');
+        return;
+      } else if (r.status === 500) {
+        var errData = await r.json().catch(function() { return {}; });
+        showAuthError('Server: ' + (errData.error || 'ADMIN_SECRET_KEY nu e configurat pe Railway.'));
+        return;
+      }
+    } catch (e) {
+      console.error('[Admin] Auth-token fetch failed:', e);
+    }
+  }
+
+  // Step 3: Verify we have access by calling a simple admin endpoint
   try {
-    var r = await fetch('/api/auth/me', { headers: hdrs() });
-    if (!r.ok) throw new Error('Not authenticated');
-    var d = await r.json();
-    if (!d.user || !d.user.email) throw new Error('No user');
+    var check = await fetch('/api/admin/brain', { headers: hdrs() });
+    if (!check.ok) {
+      showAuthError('Acces refuzat (403). Verifică pe Railway:\n• ADMIN_EMAIL = emailul tău\n• ADMIN_SECRET_KEY = orice string secret');
+      return;
+    }
   } catch (e) {
-    document.querySelector('.admin-container').innerHTML =
-      '<div style="display:flex;align-items:center;justify-content:center;height:80vh;flex-direction:column;color:#f66;font-size:1.5rem">'
-      + '<div>🔒 Admin — acces restricționat</div>'
-      + '<div style="font-size:0.9rem;color:#888;margin-top:8px">Doar contul admin are acces. Loghează-te mai întâi.</div>'
-      + '<a href="/" style="margin-top:16px;color:#a5b4fc;text-decoration:none;">← Înapoi la KelionAI</a></div>';
+    showAuthError('Server indisponibil: ' + e.message);
     return;
   }
 
   // Auth OK — load stats
+  console.log('[Admin] Autentificat cu succes ✅');
   loadStats();
-
-  // Auto-refresh every 60 seconds
   setInterval(loadStats, 60000);
+}
+
+function showAuthError(msg) {
+  document.querySelector('.admin-container').innerHTML =
+    '<div style="display:flex;align-items:center;justify-content:center;height:80vh;flex-direction:column;text-align:center;padding:20px">'
+    + '<div style="font-size:2rem;margin-bottom:16px">🔒</div>'
+    + '<div style="font-size:1.2rem;color:#f87171;margin-bottom:12px;font-weight:600">Admin — acces restricționat</div>'
+    + '<pre style="color:#888;font-size:0.85rem;white-space:pre-wrap;max-width:500px;margin-bottom:20px;font-family:inherit">' + msg + '</pre>'
+    + '<a href="/" style="color:#a5b4fc;text-decoration:none;padding:10px 20px;border:1px solid rgba(99,102,241,0.3);border-radius:8px">← Înapoi la KelionAI</a></div>';
 }
 
 // ── START ──
