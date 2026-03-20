@@ -1040,9 +1040,16 @@ async function initAdmin() {
   // Rebuild hdrs with potentially updated secret
   const currentSecret = window.adminSecret || sessionStorage.getItem('kelion_admin_secret') || '';
 
-  // Auth check removed — admin panel loads for any logged-in user
-  // JWT auto-auth above will set the secret if user email matches ADMIN_EMAIL
-  console.log('[Admin] Loading admin panel (no auth gate)...');
+  // Admin gate — only user whose email matches ADMIN_EMAIL can access
+  const gotSecret = window.adminSecret || sessionStorage.getItem('kelion_admin_secret') || '';
+  if (!gotSecret) {
+    document.body.innerHTML =
+      '<div style="display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;color:#f66;font-size:1.5rem;background:#0a0a14;">' +
+      '<div>🔒 Admin — acces restricționat</div>' +
+      '<div style="font-size:0.9rem;color:#888;margin-top:8px">Trebuie să fii logat cu contul de admin.</div>' +
+      '<a href="/" style="margin-top:16px;color:#a5b4fc;text-decoration:none;">← Înapoi la KelionAI</a></div>';
+    return;
+  }
   // Auth OK — load all sections
   loadAiStatus();
   loadBrain();

@@ -15,19 +15,26 @@
     return h;
   }
 
-  // ── Check admin access ──
-  // ═══ TEMPORARILY DISABLED (trial period) ═══
+  // ── Check admin access — only ADMIN_EMAIL user ──
   async function checkAccess() {
     try {
       const r = await fetch(API + '/api/auth/me', { headers: authHeaders() });
       if (r.ok) {
         const d = await r.json();
-        if (d.user?.email) document.getElementById('admin-user').textContent = d.user.email;
-        return d.user || { id: 'admin-bypass', role: 'admin' };
+        if (d.user?.email) {
+          document.getElementById('admin-user').textContent = d.user.email;
+          // Server-side /api/admin/* endpoints verify ADMIN_EMAIL
+          return d.user;
+        }
       }
     } catch (e) {}
-    // Trial period: allow access even without auth
-    return { id: 'admin-bypass', role: 'admin' };
+    // No valid auth — deny
+    document.body.innerHTML =
+      '<div style="display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;color:#f66;font-size:1.5rem;background:#0a0a14;">' +
+      '<div>🔒 Admin — acces restricționat</div>' +
+      '<div style="font-size:0.9rem;color:#888;margin-top:8px">Doar contul admin are acces.</div>' +
+      '<a href="/" style="margin-top:16px;color:#a5b4fc;text-decoration:none;">← Înapoi la KelionAI</a></div>';
+    return null;
   }
 
   // ── Tab switching ──
