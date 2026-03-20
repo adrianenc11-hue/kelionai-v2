@@ -250,7 +250,7 @@
     if (!file) return;
     // Max 20MB for direct base64 (Gemini limit ~20MB inline)
     if (file.size > 20 * 1024 * 1024) {
-      addMessage('assistant', '⚠️ Fișierul e prea mare (max 20MB). Încearcă un fișier mai mic.');
+      addMessage('assistant', '⚠️ File too large (max 20MB). Please try a smaller file.');
       return;
     }
     const reader = new FileReader();
@@ -295,7 +295,7 @@
       sizeStr +
       ')</span>';
     content +=
-      '<button onclick="window._clearPendingMedia()" style="background:none;border:none;color:#f87171;cursor:pointer;font-size:1rem;padding:2px 6px" title="Elimină">✕</button>';
+      '<button onclick="window._clearPendingMedia()" style="background:none;border:none;color:#f87171;cursor:pointer;font-size:1rem;padding:2px 6px" title="Remove">✕</button>';
     preview.innerHTML = content;
     const inputRow = document.getElementById('input-row');
     if (inputRow) inputRow.parentNode.insertBefore(preview, inputRow);
@@ -318,7 +318,7 @@
     const btnPlus = document.getElementById('btn-plus');
     const fileInput = document.getElementById('file-input-hidden');
     if (btnPlus && fileInput) {
-      btnPlus.title = 'Atașează fișier (imagine, PDF, audio, arhivă)';
+      btnPlus.title = 'Attach file (image, PDF, audio, archive)';
       btnPlus.textContent = '📎';
       btnPlus.addEventListener('click', function (e) {
         e.preventDefault();
@@ -399,7 +399,7 @@
       window._clearPendingMedia();
       // If no text message, add default
       if (!message || !message.trim()) {
-        message = 'Analizează această imagine';
+        message = 'Analyze this image';
       }
       // Show image preview in chat
       if (mediaToSend.previewUrl) {
@@ -449,8 +449,8 @@
       actionBar.className = 'msg-actions';
       actionBar.style.display = 'none'; // Moved to input bar
       actionBar.innerHTML =
-        '<button class="msg-action-btn" id="btn-copy-msg" title="Copiază text">📋</button>' +
-        '<button class="msg-action-btn" id="btn-save-msg" title="Salvează ca fișier">💾</button>';
+        '<button class="msg-action-btn" id="btn-copy-msg" title="Copy text">📋</button>' +
+        '<button class="msg-action-btn" id="btn-save-msg" title="Save as file">💾</button>';
       overlay.appendChild(actionBar);
       const msgEl = document.createElement('div');
       msgEl.className = 'msg assistant';
@@ -528,7 +528,7 @@
                       else if (a === 'translate_on' && window.KTranslate && !KTranslate.isActive()) KTranslate.start();
                       else if (a === 'translate_off' && window.KTranslate && KTranslate.isActive()) KTranslate.stop();
                       else if (a === 'scan_on' && window.KScanner && !KScanner.isActive()) KScanner.start();
-                      else if (a === 'monitor_clear' && window.MonitorManager) MonitorManager.show('default');
+                      else if (a === 'monitor_clear') { if (window.clearMonitor) clearMonitor(); else if (window.MonitorManager) MonitorManager.show('default'); }
                       else if (a.startsWith('navigate:')) { const dest = a.split(':')[1]; if (dest && window.KMobile) KMobile.navigate(dest); }
                     });
                   } else if (evt.type === 'done') {
@@ -716,7 +716,7 @@
           } else if (action === 'scan_off') {
             if (window.KScanner && KScanner.isActive()) KScanner.stop();
           } else if (action === 'monitor_clear') {
-            if (window.MonitorManager) MonitorManager.clear();
+            if (window.clearMonitor) clearMonitor(); else if (window.MonitorManager) MonitorManager.clear();
           } else if (action === 'save_file') {
             // Salvează ultimul răspuns AI ca fişier text
             var saveBtn = document.getElementById('btn-save-last');
