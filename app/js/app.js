@@ -506,6 +506,7 @@
                     // Progressive display — show text as it arrives
                     msgEl.innerHTML = parseMarkdown(fullReply);
                     overlay.scrollTop = overlay.scrollHeight;
+                    // Keep subtitle visible and updated during streaming
                     _updateSubtitle('ai', fullReply);
                   } else if (evt.type === 'start') {
                     streamEngine = evt.engine || 'Gemini';
@@ -1026,10 +1027,11 @@
     const display = text.length > 150 ? text.slice(0, 150) + '…' : text;
     txt.textContent = display;
     // Auto-hide after 8 seconds
+    // Auto-hide after 15 seconds (was 8s, extended for long AI responses)
     if (window._subtitleTimer) clearTimeout(window._subtitleTimer);
     window._subtitleTimer = setTimeout(function() {
       el.classList.remove('visible');
-    }, 8000);
+    }, 15000);
   }
   function showThinking(v) {
     document.getElementById('thinking').classList.toggle('active', v);
