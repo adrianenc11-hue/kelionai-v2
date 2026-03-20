@@ -567,6 +567,73 @@ app.use('/api/search', searchRouter);
 app.use('/api/weather', weatherRouter);
 app.use('/api/vision', visionRouter);
 app.use('/api/imagine', imagesRouter);
+
+// ═══ VISITOR TRACKING (public, no auth) ═══
+app.post('/api/track/visit', express.json(), async (req, res) => {
+  try {
+    if (!supabaseAdmin) return res.json({ ok: false });
+    const { fingerprint, path, referrer, browser, device, os, screen_width, screen_height, language, timezone, utm_source, utm_medium, utm_campaign } = req.body;
+    if (!fingerprint) return res.status(400).json({ ok: false });
+
+    const realIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || 'unknown';
+
+    // Check if visitor exists
+    const { data: existing } = await supabaseAdmin.from('visitors').select('id, total_visits, pages_visited').eq('fingerprint', fingerprint).single();
+
+    if (existing) {
+      // Update existing visitor
+      const pages = existing.pages_visited || [];
+      pages.push({ path, ts: new Date().toISOString() });
+      if (pages.length > 100) pages.splice(0, pages.length - 100); // keep last 100
+      const status = (existing.total_visits || 0) >= 3 ? 'returning' : 'potential';
+      await supabaseAdmin.from('visitors').update({
+        ip: realIp, last_seen: new Date().toISOString(), total_visits: (existing.total_visits || 0) + 1,
+        pages_visited: pages, status, browser, device, os, screen_width, screen_height,
+      }).eq('id', existing.id);
+    } else {
+      // Insert new visitor
+      let country = req.headers['cf-ipcountry'] || req.headers['x-vercel-ip-country'] || null;
+      try {
+        if (!country && realIp !== 'unknown') {
+          const geoR = await fetch('http://ip-api.com/json/' + encodeURIComponent(realIp) + '?fields=countryCode,city', { signal: AbortSignal.timeout(2000) });
+          if (geoR.ok) { const g = await geoR.json(); country = g.countryCode; }
+        }
+      } catch (_) {}
+      await supabaseAdmin.from('visitors').insert({
+        fingerprint, ip: realIp, country, browser, device, os,
+        screen_width, screen_height, language, timezone, referrer,
+        utm_source, utm_medium, utm_campaign,
+        pages_visited: [{ path, ts: new Date().toISOString() }],
+        total_visits: 1, status: 'potential',
+      });
+    }
+    res.json({ ok: true });
+  } catch (e) {
+    logger.error({ component: 'Visitors', err: e.message }, 'track/visit failed');
+    res.json({ ok: false });
+  }
+});
+
+app.post('/api/track/beacon', express.json(), async (req, res) => {
+  try {
+    if (!supabaseAdmin) return res.json({ ok: false });
+    const { fingerprint, duration } = req.body;
+    if (!fingerprint || !duration) return res.json({ ok: false });
+    await supabaseAdmin.from('visitors').update({
+      total_time_sec: supabaseAdmin.raw ? undefined : duration, // fallback
+      last_seen: new Date().toISOString(),
+    }).eq('fingerprint', fingerprint);
+    // Also increment total_time_sec via RPC if available
+    await supabaseAdmin.rpc('increment_visitor_time', { fp: fingerprint, secs: duration }).catch(() => {
+      // If RPC doesn't exist, just update with raw SQL workaround
+      supabaseAdmin.from('visitors').select('total_time_sec').eq('fingerprint', fingerprint).single().then(({ data }) => {
+        if (data) supabaseAdmin.from('visitors').update({ total_time_sec: (data.total_time_sec || 0) + duration }).eq('fingerprint', fingerprint);
+      });
+    });
+    res.json({ ok: true });
+  } catch (e) { res.json({ ok: false }); }
+});
+
 app.use('/api/admin', adminApiRouter);
 app.use('/api/health', healthRouter);
 app.use('/api/referral', referralRouter);

@@ -2830,4 +2830,85 @@ router.post('/brain-chat/reject', async (req, res) => {
   res.json({ ok: true, type: 'reject', result: 'Operation rejected' });
 });
 
+// ══════════════════════════════════════════════════════════
+// VISITORS — Anonymous visitor tracking (potential leads)
+// ══════════════════════════════════════════════════════════
+
+// Auto-create visitors table if needed
+async function ensureVisitorsTable(supabaseAdmin) {
+  if (!supabaseAdmin || ensureVisitorsTable._done) return;
+  try {
+    const { error } = await supabaseAdmin.from('visitors').select('id').limit(1);
+    if (error && error.code === '42P01') {
+      // Table doesn't exist — create it
+      await supabaseAdmin.rpc('exec_sql', { sql: `
+        CREATE TABLE IF NOT EXISTS visitors (
+          id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+          fingerprint TEXT NOT NULL,
+          ip TEXT, country TEXT, city TEXT,
+          device TEXT, browser TEXT, os TEXT,
+          screen_width INT, screen_height INT,
+          language TEXT, timezone TEXT, referrer TEXT,
+          utm_source TEXT, utm_medium TEXT, utm_campaign TEXT,
+          pages_visited JSONB DEFAULT '[]',
+          total_visits INT DEFAULT 1,
+          total_time_sec INT DEFAULT 0,
+          first_seen TIMESTAMPTZ DEFAULT now(),
+          last_seen TIMESTAMPTZ DEFAULT now(),
+          status TEXT DEFAULT 'potential',
+          converted_user_id UUID,
+          notes TEXT, tags TEXT[],
+          created_at TIMESTAMPTZ DEFAULT now()
+        );
+        CREATE INDEX IF NOT EXISTS idx_visitors_fingerprint ON visitors(fingerprint);
+        CREATE INDEX IF NOT EXISTS idx_visitors_status ON visitors(status);
+        CREATE INDEX IF NOT EXISTS idx_visitors_last_seen ON visitors(last_seen DESC);
+      ` }).catch(() => {
+        logger.warn({ component: 'Admin' }, 'Could not auto-create visitors table — create it manually in Supabase');
+      });
+    }
+    ensureVisitorsTable._done = true;
+  } catch (_) { ensureVisitorsTable._done = true; }
+}
+
+router.get('/visitors', async (req, res) => {
+  try {
+    const { supabaseAdmin } = req.app.locals;
+    if (!supabaseAdmin) return res.json({ visitors: [] });
+    await ensureVisitorsTable(supabaseAdmin);
+
+    const status = req.query.status || null;
+    let q = supabaseAdmin.from('visitors').select('*').order('last_seen', { ascending: false }).limit(200);
+    if (status) q = q.eq('status', status);
+    const { data, error } = await q;
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ visitors: data || [], total: (data || []).length });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.get('/visitors/:id', async (req, res) => {
+  try {
+    const { supabaseAdmin } = req.app.locals;
+    if (!supabaseAdmin) return res.status(500).json({ error: 'No DB' });
+    const { data, error } = await supabaseAdmin.from('visitors').select('*').eq('id', req.params.id).single();
+    if (error) return res.status(404).json({ error: 'Not found' });
+    res.json(data);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.put('/visitors/:id', async (req, res) => {
+  try {
+    const { supabaseAdmin } = req.app.locals;
+    if (!supabaseAdmin) return res.status(500).json({ error: 'No DB' });
+    const { notes, tags, status } = req.body;
+    const update = {};
+    if (notes !== undefined) update.notes = notes;
+    if (tags !== undefined) update.tags = tags;
+    if (status !== undefined) update.status = status;
+    const { error } = await supabaseAdmin.from('visitors').update(update).eq('id', req.params.id);
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 module.exports = router;

@@ -47,7 +47,8 @@ function openSection(id) {
     traffic: '🌐 Trafic — Vizite Complete',
     live: '👥 Live — Acum pe site',
     users: '👤 Users & Revenue',
-    memories: '💾 Memories — Ce a învățat K1'
+    memories: '💾 Memories — Ce a învățat K1',
+    visitors: '👁️ Vizitatori — Potențiali Leads'
   };
   document.getElementById('section-title').textContent = titles[id] || id;
   document.getElementById('section-content').innerHTML = '<div style="text-align:center;padding:40px;color:#888">Se încarcă...</div>';
@@ -60,6 +61,7 @@ function openSection(id) {
     case 'live': loadLiveSection(); break;
     case 'users': loadUsersSection(); break;
     case 'memories': loadMemoriesSection(); break;
+    case 'visitors': loadVisitorsSection(); break;
   }
 }
 
@@ -416,6 +418,64 @@ async function deleteMemory(id) {
     await fetch('/api/admin/memories/' + id, { method: 'DELETE', headers: hdrs() });
     loadMemoriesSection();
   } catch (e) { alert('Eroare: ' + e.message); }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SECTION: Visitors — Potential Leads
+// Endpoint: /api/admin/visitors
+// ═══════════════════════════════════════════════════════════════
+async function loadVisitorsSection() {
+  var el = document.getElementById('section-content');
+  try {
+    var r = await fetch('/api/admin/visitors', { headers: hdrs() });
+    if (!r.ok) { el.innerHTML = '<div class="error-msg">❌ ' + r.status + '</div>'; return; }
+    var d = await r.json();
+    var visitors = d.visitors || [];
+
+    var html = '<div class="traffic-summary">'
+      + '<div class="mini-stat"><span class="label">Total vizitatori:</span> ' + visitors.length + '</div>'
+      + '<div class="mini-stat"><span class="label">Potențiali:</span> ' + visitors.filter(function(v){return v.status==='potential'}).length + '</div>'
+      + '<div class="mini-stat"><span class="label">Revenitori:</span> ' + visitors.filter(function(v){return v.status==='returning'}).length + '</div>'
+      + '<div class="mini-stat"><span class="label">Convertiți:</span> ' + visitors.filter(function(v){return v.status==='converted'}).length + '</div>'
+      + '</div>';
+
+    if (visitors.length > 0) {
+      html += '<table class="admin-table"><thead><tr>'
+        + '<th>Status</th><th>IP</th><th>Țara</th><th>Device</th><th>Browser</th><th>OS</th>'
+        + '<th>Ecran</th><th>Vizite</th><th>Timp</th><th>Prima vizită</th><th>Ultima</th><th>Pagini</th>'
+        + '</tr></thead><tbody>';
+      visitors.forEach(function (v) {
+        var statusBadge = v.status === 'converted' ? '<span class="badge badge-ok">✅ Convertit</span>'
+          : v.status === 'returning' ? '<span class="badge badge-warn">🔵 Revine</span>'
+          : '<span class="badge">🟢 Potențial</span>';
+        var firstSeen = v.first_seen ? new Date(v.first_seen).toLocaleDateString('ro-RO') : '—';
+        var lastSeen = v.last_seen ? new Date(v.last_seen).toLocaleString('ro-RO', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }) : '—';
+        var pages = (v.pages_visited || []).slice(-3).map(function(p){ return p.path; }).join(', ') || '—';
+        var timeMins = Math.round((v.total_time_sec || 0) / 60);
+        html += '<tr>'
+          + '<td>' + statusBadge + '</td>'
+          + '<td><code>' + esc(v.ip || '—') + '</code></td>'
+          + '<td>' + esc(v.country || '—') + '</td>'
+          + '<td>' + esc(v.device || '—') + '</td>'
+          + '<td>' + esc(v.browser || '—') + '</td>'
+          + '<td>' + esc(v.os || '—') + '</td>'
+          + '<td>' + (v.screen_width || '?') + 'x' + (v.screen_height || '?') + '</td>'
+          + '<td>' + (v.total_visits || 0) + '</td>'
+          + '<td>' + timeMins + ' min</td>'
+          + '<td>' + firstSeen + '</td>'
+          + '<td>' + lastSeen + '</td>'
+          + '<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis">' + esc(pages) + '</td>'
+          + '</tr>';
+      });
+      html += '</tbody></table>';
+    } else {
+      html += '<div style="text-align:center;padding:40px;color:#888">Niciun vizitator înregistrat</div>';
+    }
+
+    el.innerHTML = html;
+  } catch (e) {
+    el.innerHTML = '<div class="error-msg">❌ ' + e.message + '</div>';
+  }
 }
 
 async function deleteUser(id, email) {
