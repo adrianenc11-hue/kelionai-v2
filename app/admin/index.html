@@ -1,205 +1,164 @@
 <!DOCTYPE html>
 <html lang="ro">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KelionAI — Admin Panel V2</title>
+    <title>KelionAI — Admin Panel</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/admin/admin.css">
 </head>
-
 <body>
     <div class="admin-container">
+
         <!-- HEADER -->
         <header class="admin-header">
             <div class="header-left">
-                <a href="#" onclick="exitAdmin(); return false;" class="back-link">← Back</a>
+                <a href="/" class="back-link" id="btn-back">← Back</a>
                 <span class="admin-logo">🛡️ KelionAI</span>
-                <span class="admin-badge">ADMIN V2</span>
+                <span class="admin-badge">ADMIN</span>
             </div>
             <div class="header-right">
                 <span id="admin-uptime" class="admin-uptime">—</span>
-                <a href="/admin/brain-chat.html" class="admin-btn admin-btn-k1">🧠 K1 Chat</a>
-                <a href="/admin/live-users.html" class="admin-btn admin-btn-live">👥 Live</a>
-                <div class="notif-wrapper" id="notif-wrapper">
-                    <button class="admin-btn notif-bell" onclick="toggleNotifications()" id="notif-bell">🔔
-                        <span id="notif-badge" class="notif-badge">0</span>
-                    </button>
-                    <div id="notif-dropdown" class="notif-dropdown">
-                        <div class="notif-hdr">
-                            <span class="notif-title">🔔 Notifications</span>
-                            <button onclick="clearNotifications()" class="notif-clear">Clear all</button>
-                        </div>
-                        <div id="notif-list" class="notif-list"></div>
-                    </div>
-
-                </div>
                 <button class="admin-btn" onclick="location.reload()">🔄 Refresh</button>
                 <button class="admin-btn" id="theme-toggle" onclick="toggleTheme()">🌙</button>
             </div>
         </header>
-<script>
-function toggleTheme(){
-    document.body.classList.toggle('light-theme');
-    const isLight = document.body.classList.contains('light-theme');
-    localStorage.setItem('admin-theme', isLight ? 'light' : 'dark');
-    document.getElementById('theme-toggle').textContent = isLight ? '☀️' : '🌙';
-}
-if(localStorage.getItem('admin-theme') === 'light'){
-    document.body.classList.add('light-theme');
-    document.addEventListener('DOMContentLoaded', () => { const t = document.getElementById('theme-toggle'); if(t) t.textContent = '☀️'; });
-}
-</script>
 
-        <!-- QUICK STATS -->
-        <div class="stats-bar">
+        <!-- STATS BAR (real data from API) -->
+        <div class="stats-bar" id="stats-bar">
             <div class="stat-card">
                 <div class="stat-icon">👥</div>
                 <div class="stat-value" id="val-users">—</div>
-                <div class="stat-label">Total Users</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon">💬</div>
-                <div class="stat-value" id="val-conversations">—</div>
-                <div class="stat-label">Conversații</div>
+                <div class="stat-label">Users</div>
             </div>
             <div class="stat-card">
                 <div class="stat-icon">👁️</div>
-                <div class="stat-value" id="val-views-today">—</div>
-                <div class="stat-label">Vizite (total)</div>
+                <div class="stat-value" id="val-views">—</div>
+                <div class="stat-label">Vizite Total</div>
             </div>
             <div class="stat-card">
                 <div class="stat-icon">💰</div>
                 <div class="stat-value" id="val-cost-today">—</div>
-                <div class="stat-label">Cost Azi ($)</div>
+                <div class="stat-label">Cost Azi</div>
             </div>
             <div class="stat-card">
                 <div class="stat-icon">💳</div>
                 <div class="stat-value" id="val-cost-month">—</div>
-                <div class="stat-label">Cost Luna ($)</div>
+                <div class="stat-label">Cost Lună</div>
             </div>
             <div class="stat-card">
-                <div class="stat-icon">⭐</div>
-                <div class="stat-value" id="val-subs">—</div>
-                <div class="stat-label">Abonați</div>
+                <div class="stat-icon">🟢</div>
+                <div class="stat-value" id="val-active">—</div>
+                <div class="stat-label">Acum Online</div>
             </div>
         </div>
 
-        <!-- COLLAPSIBLE SECTIONS -->
-        <div class="sections-list">
-
-            <!-- AI STATUS -->
-            <div class="section-panel open" id="sec-ai">
-                <button class="section-toggle" onclick="toggleSection('sec-ai')">
-                    <span>🤖 AI Providers — Status Live</span>
-                    <span class="toggle-arrow">▼</span>
-                </button>
-                <a href="/admin/health.html" class="section-live-link" title="Health Dashboard">🔗 Live</a>
-                <div class="section-body">
-                    <div id="ai-status-grid" class="ai-grid">
-                        <div class="ai-card loading">
-                            <div class="ai-name">Loading...</div>
-                        </div>
-                    </div>
+        <!-- MAIN VIEW: 7 BUTTONS -->
+        <div id="view-buttons" class="buttons-grid">
+            <button class="nav-banner" onclick="openSection('ai')" style="--accent: #7c3aed; --accent2: #a78bfa;">
+                <div class="banner-icon">🤖</div>
+                <div class="banner-text">
+                    <div class="banner-title">AI Credits & Costs</div>
+                    <div class="banner-sub">Providers, consum, credite</div>
                 </div>
-            </div>
+                <div class="banner-stat" id="preview-ai">—</div>
+                <div class="banner-arrow">›</div>
+            </button>
 
-            <!-- BRAIN STATUS -->
-            <div class="section-panel open" id="sec-brain">
-                <button class="section-toggle" onclick="toggleSection('sec-brain')">
-                    <span>🧠 Brain — Status Live</span>
-                    <span class="toggle-arrow">▼</span>
-                </button>
-                <a href="/admin/k1-dashboard.html" class="section-live-link" title="K1 Brain Dashboard">🔗 K1</a>
-                <div class="section-body">
-                    <div class="mini-stats" id="brain-stats">
-                        <div class="mini-stat"><span class="label">Uptime:</span> <span id="brain-uptime">—</span></div>
-                        <div class="mini-stat"><span class="label">Conversații:</span> <span id="brain-conversations">—</span></div>
-                        <div class="mini-stat"><span class="label">Providers activi:</span> <span id="brain-providers">—</span></div>
-                    </div>
-                    <h4 style="margin:12px 0 8px;color:#a78bfa;font-size:0.85rem">🔧 Tool Usage (sesiune curentă)</h4>
-                    <div id="brain-tools" style="display:flex;gap:8px;flex-wrap:wrap"></div>
-                    <h4 style="margin:12px 0 8px;color:#a78bfa;font-size:0.85rem">🌐 Provider Keys</h4>
-                    <div id="brain-provider-keys" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+            <button class="nav-banner" onclick="openSection('brain')" style="--accent: #10b981; --accent2: #34d399;">
+                <div class="banner-icon">🧠</div>
+                <div class="banner-text">
+                    <div class="banner-title">Brain & Health</div>
+                    <div class="banner-sub">Status, tools, providers, errors</div>
                 </div>
-            </div>
+                <div class="banner-stat" id="preview-brain">—</div>
+                <div class="banner-arrow">›</div>
+            </button>
 
-            <!-- TRAFFIC -->
-            <div class="section-panel" id="sec-traffic">
-                <button class="section-toggle" onclick="toggleSection('sec-traffic')">
-                    <span>🌐 Trafic (ultimele 7 zile)</span>
-                    <span class="toggle-arrow">▶</span>
-                </button>
-                <div class="section-body">
-                    <div id="traffic-chart" class="traffic-chart"></div>
-                    <div class="traffic-details">
-                        <div><span class="label">Unici azi:</span> <span id="traffic-unique">—</span></div>
-                        <div><span class="label">Total azi:</span> <span id="traffic-total">—</span></div>
-                        <div><span class="label">Conexiuni active:</span> <span id="traffic-active">—</span></div>
-                    </div>
+            <button class="nav-banner" onclick="openSection('traffic')" style="--accent: #06b6d4; --accent2: #22d3ee;">
+                <div class="banner-icon">🌐</div>
+                <div class="banner-text">
+                    <div class="banner-title">Trafic</div>
+                    <div class="banner-sub">Vizite, IP, browser, țară, referrer</div>
                 </div>
-            </div>
+                <div class="banner-stat" id="preview-traffic">—</div>
+                <div class="banner-arrow">›</div>
+            </button>
 
-            <!-- CREDIT REPORT -->
-            <div class="section-panel" id="sec-credit">
-                <button class="section-toggle" onclick="toggleSection('sec-credit')">
-                    <span>📊 Credit per AI Provider</span>
-                    <span class="toggle-arrow">▶</span>
-                </button>
-                <div class="section-body">
-                    <div style="text-align:right;margin-bottom:10px">
-                        <button class="recharge-btn" id="btn-recharge" onclick="recharge()">⚡ Reîncărcare</button>
-                    </div>
-                    <table class="admin-table" id="credit-table">
-                        <thead>
-                            <tr>
-                                <th>Provider</th>
-                                <th>Status</th>
-                                <th>Requests</th>
-                                <th>Cost Luna ($)</th>
-                                <th>Cost Azi ($)</th>
-                                <th>Alert</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td colspan="6">Loading...</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                    <div id="credit-distribution" class="credit-dist"></div>
+            <button class="nav-banner" onclick="openSection('live')" style="--accent: #22c55e; --accent2: #4ade80;">
+                <div class="banner-icon">👥</div>
+                <div class="banner-text">
+                    <div class="banner-title">Live — Acum pe site</div>
+                    <div class="banner-sub">Sesiuni active în timp real</div>
                 </div>
-            </div>
+                <div class="banner-stat" id="preview-live">—</div>
+                <div class="banner-arrow">›</div>
+            </button>
 
+            <button class="nav-banner" onclick="openSection('users')" style="--accent: #f59e0b; --accent2: #fbbf24;">
+                <div class="banner-icon">👤</div>
+                <div class="banner-text">
+                    <div class="banner-title">Users & Revenue</div>
+                    <div class="banner-sub">Useri, abonamente, plăți</div>
+                </div>
+                <div class="banner-stat" id="preview-users">—</div>
+                <div class="banner-arrow">›</div>
+            </button>
 
+            <button class="nav-banner" onclick="openSection('memories')" style="--accent: #ec4899; --accent2: #f472b6;">
+                <div class="banner-icon">💾</div>
+                <div class="banner-text">
+                    <div class="banner-title">Memories</div>
+                    <div class="banner-sub">Ce a învățat K1</div>
+                </div>
+                <div class="banner-stat" id="preview-memories">—</div>
+                <div class="banner-arrow">›</div>
+            </button>
+
+            <a href="/admin/brain-chat.html" class="nav-banner" style="--accent: #8b5cf6; --accent2: #c084fc; text-decoration: none;">
+                <div class="banner-icon">💬</div>
+                <div class="banner-text">
+                    <div class="banner-title">K1 Chat</div>
+                    <div class="banner-sub">Canal direct cu creierul</div>
+                </div>
+                <div class="banner-stat">→</div>
+                <div class="banner-arrow">›</div>
+            </a>
         </div>
+
+        <!-- SUB-PAGE CONTENT AREA (hidden by default) -->
+        <div id="view-section" class="section-view" style="display:none;">
+            <button class="back-section-btn" onclick="closeSection()">← Înapoi la meniu</button>
+            <h2 id="section-title"></h2>
+            <div id="section-content"></div>
+        </div>
+
     </div>
 
-    <!-- REFUND MODAL -->
-    <div id="refund-modal" class="modal hidden">
-        <div class="modal-box">
-            <h3>💸 Refund</h3>
-            <p>User: <strong id="refund-email">—</strong></p>
-            <p>Plan: <strong id="refund-plan">—</strong></p>
-            <div
-                style="margin:12px 0;padding:10px 14px;background:rgba(245,158,11,0.1);border-radius:8px;font-size:0.82rem;color:#f59e0b;border:1px solid rgba(245,158,11,0.2)">
-                <strong>⚠️ Politica refund:</strong><br>
-                • Lunar — doar anulare, fără rambursare<br>
-                • Anual — se oprește luna curentă, refund luni rămase<br>
-                • Max 15 zile de la activare
-            </div>
-            <label>Motiv:</label>
-            <input type="text" id="refund-reason" placeholder="Motiv refund..." class="modal-input">
-            <div class="modal-actions">
-                <button class="admin-btn danger" onclick="confirmRefund()">✅ Confirmă Refund</button>
-                <button class="admin-btn" onclick="closeModal('refund-modal')">❌ Anulează</button>
-            </div>
-        </div>
-    </div>
+    <script>
+    /* Theme Toggle */
+    function toggleTheme() {
+        document.body.classList.toggle('light-theme');
+        const isLight = document.body.classList.contains('light-theme');
+        localStorage.setItem('admin-theme', isLight ? 'light' : 'dark');
+        document.getElementById('theme-toggle').textContent = isLight ? '☀️' : '🌙';
+    }
+    if (localStorage.getItem('admin-theme') === 'light') {
+        document.body.classList.add('light-theme');
+        document.getElementById('theme-toggle').textContent = '☀️';
+    }
 
-    <script src="/admin/admin-app.js?v=20260311"></script>
+    /* Back button - go to previous page */
+    document.getElementById('btn-back').addEventListener('click', function(e) {
+        e.preventDefault();
+        if (document.referrer && document.referrer.includes(location.hostname)) {
+            history.back();
+        } else {
+            location.href = '/';
+        }
+    });
+    </script>
+    <script src="/admin/admin-app.js?v=20260320"></script>
 </body>
-
 </html>
