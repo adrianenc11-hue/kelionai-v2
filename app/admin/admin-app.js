@@ -106,14 +106,26 @@ async function loadAiSection() {
     (ai.providers || []).forEach(function (p) {
       var border = p.alertLevel === 'red' ? '#ef4444' : p.alertLevel === 'yellow' ? '#f59e0b' : '#10b981';
       var statusDot = p.live ? '🟢' : '⚫';
+      var creditStatus = '';
+      if (p.tier === 'free') {
+        creditStatus = '<div class="ai-detail" style="color:#22c55e;font-weight:600">🆓 GRATIS — ' + (p.freeQuota || 0).toLocaleString() + ' ' + (p.unit || 'req') + '</div>';
+      } else if (p.credit > 1) {
+        creditStatus = '<div class="ai-detail" style="color:#22c55e;font-weight:600">✅ Credit OK: $' + p.credit.toFixed(2) + '</div>';
+      } else if (p.credit > 0) {
+        creditStatus = '<div class="ai-detail" style="color:#f59e0b;font-weight:600">⚠️ Credit scăzut: $' + p.credit.toFixed(2) + '</div>';
+      } else {
+        creditStatus = '<div class="ai-detail" style="color:#ef4444;font-weight:600">🔴 FĂRĂ CREDIT!</div>';
+      }
       html += '<div class="ai-card" style="border-color:' + border + '">'
         + '<div class="ai-header">' + statusDot + ' <strong>' + esc(p.name) + '</strong> <span class="ai-tier">' + (p.tier || '') + '</span></div>'
-        + '<div class="ai-cost">$' + (p.costMonth || 0).toFixed(4) + '</div>'
-        + '<div class="ai-detail">' + (p.requests || 0) + ' req · ' + (p.alertMessage || '') + '</div>';
+        + '<div class="ai-cost">Cheltuieli luna: $' + (p.costMonth || 0).toFixed(4) + '</div>'
+        + creditStatus
+        + '<div class="ai-detail">' + (p.requests || 0) + ' requesturi</div>';
       if (p.creditLimit > 0) {
-        var pct = Math.round(((p.creditLimit - p.credit) / p.creditLimit) * 100);
-        html += '<div class="ai-credit">Credit: $' + (p.credit || 0).toFixed(2) + ' / $' + p.creditLimit.toFixed(2)
-          + '<div class="progress-bar"><div class="progress-fill" style="width:' + pct + '%;background:' + border + '"></div></div></div>';
+        var pctRemaining = Math.round((p.credit / p.creditLimit) * 100);
+        var barColor = pctRemaining > 50 ? '#22c55e' : pctRemaining > 20 ? '#f59e0b' : '#ef4444';
+        html += '<div class="ai-credit">Rămas: $' + (p.credit || 0).toFixed(2) + ' din $' + p.creditLimit.toFixed(2)
+          + '<div class="progress-bar"><div class="progress-fill" style="width:' + pctRemaining + '%;background:' + barColor + '"></div></div></div>';
       }
       html += '</div>';
     });
