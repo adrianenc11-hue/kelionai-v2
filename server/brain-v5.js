@@ -11,6 +11,12 @@ const { MODELS } = require("./config/models");
 const { buildSystemPrompt, buildNewbornPrompt } = require("./persona");
 const { getPatternsText, recordUserInteraction, getProactiveSuggestion } = require("./k1-meta-learning");
 const { selfEvaluate, getQualityHints } = require("./k1-performance");
+const fineTuneCollector = require("./fine-tune-collector");
+
+// ── A/B Model Testing ──
+// 10% of complex queries go to alternative model for comparison
+const AB_TEST_RATIO = 0.10; // 10% to variant
+let _abTestStats = { control: { count: 0, totalTime: 0 }, variant: { count: 0, totalTime: 0 } };
 
 // Reuse tool definitions and executor from V4 — no duplication
 const { TOOL_DEFINITIONS } = require("./brain-v4");
@@ -1140,6 +1146,12 @@ async function thinkV5(
 
 
     // ── 8a. GPT-5.4 PRIMAR — pentru toate intentiile ──────────────────────────
+    // A/B TEST: 10% of complex queries → Claude (variant)
+    const isABVariant = (mlIntent !== 'greeting' && mlIntent !== 'casual') && Math.random() < AB_TEST_RATIO;
+    const abGroup = isABVariant ? 'variant' : 'control';
+    if (isABVariant) {
+      logger.info({ component: 'ABTest', group: 'variant', mlIntent }, '🔀 A/B Test: routing to Claude (variant)');
+    }
     const shouldTryGPT = !!process.env.OPENAI_API_KEY; // TOATE intentiile → GPT-5.4 cu procedura universala
 
 
@@ -1464,9 +1476,23 @@ async function thinkV5(
     }
 
     logger.info(
-      { component: "BrainV5", engine, tools: toolsUsed, thinkTime, tokens: totalTokens, intent, mlIntent },
-      `🧠 V5 Think: ${engine} | intent:${intent} | ML:${mlIntent} | ${toolsUsed.length} tools | ${thinkTime}ms | ${totalTokens} tokens`,
+      { component: "BrainV5", engine, tools: toolsUsed, thinkTime, tokens: totalTokens, intent, mlIntent, abGroup },
+      `🧠 V5 Think: ${engine} | intent:${intent} | ML:${mlIntent} | AB:${abGroup} | ${toolsUsed.length} tools | ${thinkTime}ms | ${totalTokens} tokens`,
     );
+
+    // ── A/B Test metrics ──
+    _abTestStats[abGroup].count++;
+    _abTestStats[abGroup].totalTime += thinkTime;
+
+    // ── Fine-tune data collection ──
+    try {
+      fineTuneCollector.collectPair(
+        systemPrompt?.substring(0, 500),
+        message,
+        avatarCmds.cleanText || finalResponse,
+        { confidence, engine, intent: mlIntent, feedback: 'auto' }
+      );
+    } catch (_) { /* non-blocking */ }
 
 
     const result = {

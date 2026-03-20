@@ -9939,6 +9939,11 @@ Raspunde STRICT JSON. Daca nimic: {}`;
         },
         `🧠 Learned: ${savedCount} facts (${Object.keys(facts).length - savedCount} blocked)`,
       );
+
+      // ── KNOWLEDGE GRAPH — extract entity relationships ──
+      // Non-blocking, best-effort. Creates connections between user and topics.
+      this._extractKnowledgeGraph(userId, userMessage, aiReply, facts).catch(() => {});
+
     } catch (e) {
       logger.warn(
         {
@@ -9951,6 +9956,120 @@ Raspunde STRICT JSON. Daca nimic: {}`;
       );
       this.toolErrors.memory = (this.toolErrors.memory || 0) + 1;
       this.journalEntry("learn_error", e.message, { hasUserId: !!userId });
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // KNOWLEDGE GRAPH — Entity relationship extraction
+  // Stores user→entity and entity→entity connections
+  // ═══════════════════════════════════════════════════════════
+  async _extractKnowledgeGraph(userId, userMessage, aiReply, existingFacts) {
+    try {
+      if (!this.supabaseAdmin) return;
+
+      // Build relationships from already-extracted facts
+      const relationships = [];
+      const userName = existingFacts?.name || existingFacts?.nume || `user_${userId.substring(0, 8)}`;
+
+      for (const [key, value] of Object.entries(existingFacts || {})) {
+        if (!key || !value) continue;
+        const val = typeof value === 'object' ? JSON.stringify(value) : String(value);
+        let rel = 'has_attribute';
+        if (/city|oras|location|locatie|country|tara/.test(key)) rel = 'lives_in';
+        if (/job|profesie|occupation|work/.test(key)) rel = 'works_as';
+        if (/hobby|hobbies|interests|interese/.test(key)) rel = 'interested_in';
+        if (/family|familie|children|copii|partner|pet/.test(key)) rel = 'has_family';
+        if (/favorite/.test(key)) rel = 'prefers';
+        if (/education|school|university/.test(key)) rel = 'studied_at';
+
+        relationships.push({
+          user_id: userId,
+          entity_from: userName,
+          entity_to: val.substring(0, 200),
+          relationship: rel,
+          confidence: 0.85,
+        });
+      }
+
+      // Extract topic entities from conversation text
+      const topics = this._extractTopicEntities(userMessage + ' ' + aiReply);
+      for (const topic of topics) {
+        relationships.push({
+          user_id: userId,
+          entity_from: userName,
+          entity_to: topic,
+          relationship: 'discussed',
+          confidence: 0.6,
+        });
+      }
+
+      if (relationships.length === 0) return;
+
+      // Upsert to knowledge_graph table (create if not exists — silent fail)
+      const { error } = await this.supabaseAdmin
+        .from('knowledge_graph')
+        .upsert(relationships, { onConflict: 'user_id,entity_from,entity_to,relationship' })
+        .select();
+
+      if (error && !error.message?.includes('does not exist')) {
+        logger.debug({ component: 'KnowledgeGraph', err: error.message }, 'KG upsert issue');
+      } else if (!error) {
+        logger.info({ component: 'KnowledgeGraph', count: relationships.length },
+          `🕸️ Knowledge graph: ${relationships.length} relationships stored`);
+      }
+    } catch (e) {
+      logger.debug({ component: 'KnowledgeGraph', err: e.message }, 'KG extraction skipped');
+    }
+  }
+
+  // Extract topic entities from text (simple NER)
+  _extractTopicEntities(text) {
+    const topics = new Set();
+    const lower = text.toLowerCase();
+
+    // Extract capitalized words (likely proper nouns)
+    const properNouns = text.match(/\b[A-ZĂÎÂȘȚ][a-zA-ZăîâșțĂÎÂȘȚ]{2,}/g) || [];
+    const stopWords = new Set(['The', 'And', 'For', 'But', 'Not', 'This', 'That', 'With', 'Are', 'Was', 'Has',
+      'Asta', 'Este', 'Sunt', 'Dar', 'Pentru', 'Care', 'Cum', 'Daca', 'Poate', 'Foarte', 'Acum', 'Cand']);
+    for (const noun of properNouns) {
+      if (!stopWords.has(noun) && noun.length > 2) topics.add(noun);
+    }
+
+    // Extract domain topics via keywords
+    const domainPatterns = [
+      { pattern: /\b(python|javascript|react|node|typescript|java|c\+\+|sql|html|css)\b/gi, topic: 'programare' },
+      { pattern: /\b(fotbal|basketball|tenis|sport|meci|liga)\b/gi, topic: 'sport' },
+      { pattern: /\b(muzic[aă]|music|rock|pop|jazz|clasic[aă])\b/gi, topic: 'muzică' },
+      { pattern: /\b(film[e]?|movie|serial|netflix|cinema)\b/gi, topic: 'filme' },
+      { pattern: /\b(gătit|cooking|rețet[aă]|recipe|mâncare)\b/gi, topic: 'gătit' },
+      { pattern: /\b(călător|travel|vacanț[aă]|excursie)\b/gi, topic: 'călătorii' },
+      { pattern: /\b(sănătate|health|fitness|gym|sport)\b/gi, topic: 'sănătate' },
+      { pattern: /\b(business|afacer[ei]|startup|antreprenor)\b/gi, topic: 'business' },
+    ];
+    for (const { pattern, topic } of domainPatterns) {
+      if (pattern.test(lower)) topics.add(topic);
+    }
+
+    return [...topics].slice(0, 10); // max 10 topics per conversation
+  }
+
+  // Query knowledge graph for context about a user
+  async getKnowledgeContext(userId, limit = 15) {
+    try {
+      if (!this.supabaseAdmin) return '';
+      const { data, error } = await this.supabaseAdmin
+        .from('knowledge_graph')
+        .select('entity_from, entity_to, relationship, confidence')
+        .eq('user_id', userId)
+        .order('confidence', { ascending: false })
+        .limit(limit);
+
+      if (error || !data || data.length === 0) return '';
+
+      const lines = data.map(r => `${r.entity_from} —[${r.relationship}]→ ${r.entity_to}`);
+      return `[KNOWLEDGE GRAPH]\n${lines.join('\n')}`;
+    } catch (_) {
+      return '';
     }
   }
 
