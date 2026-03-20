@@ -212,7 +212,7 @@
     if (isAdmin) {
       var navBtn = document.getElementById('btn-admin-nav');
       if (!navBtn) {
-        var navRight = document.querySelector('.nav-right');
+        var navRight = document.querySelector('.navbar-right');
         if (navRight) {
           navBtn = document.createElement('button');
           navBtn.id = 'btn-admin-nav';
