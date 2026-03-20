@@ -498,30 +498,7 @@ router.delete('/traffic/:id', async (req, res) => {
 });
 
 // ══════════════════════════════════════════════════════════
-// GET /api/admin/live-users — Live sessions (was MISSING!)
-// ══════════════════════════════════════════════════════════
-router.get('/live-users', async (req, res) => {
-  try {
-    // Sprint2 session tracking
-    const sessions = sprint2.getLiveSessions ? sprint2.getLiveSessions() : [];
-
-    // Prometheus active connections
-    let activeConnections = 0;
-    try {
-      const { activeConnections: ac } = require('../metrics');
-      activeConnections = (await ac.get()).values[0]?.value || 0;
-    } catch { /* metrics not available */ }
-
-    res.json({
-      sessions: sessions,
-      activeConnections,
-      count: sessions.length,
-    });
-  } catch (e) {
-    logger.error({ component: 'Admin', err: e.message }, 'live-users query failed');
-    res.json({ sessions: [], activeConnections: 0, count: 0 });
-  }
-});
+// (live-users endpoint moved below — was duplicate here)
 
 // ══════════════════════════════════════════════════════════
 // GET /api/admin/memories — Brain memories list (was MISSING)
@@ -2707,7 +2684,7 @@ router.delete('/ab-tests/:id', (req, res) => {
 // SPRINT #2 ENDPOINTS
 // ══════════════════════════════════════════════════════════
 router.get('/feedback-stats', (_req, res) => res.json(sprint2.getFeedbackStats()));
-router.get('/live-users', (_req, res) => res.json(sprint2.getLiveSessions()));
+// (live-users duplicate removed — single implementation above)
 router.get('/errors', (_req, res) => res.json(sprint2.getErrorStats()));
 router.post('/errors', (req, res) => {
   sprint2.trackError(req.body);
