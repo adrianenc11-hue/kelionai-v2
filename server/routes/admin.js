@@ -16,8 +16,8 @@ const router = express.Router();
 // ── Config from environment variables ──
 const CONFIG = {
   planPrices: {
-    pro: parseFloat(process.env.PLAN_PRO_PRICE || '9.99'),
-    premium: parseFloat(process.env.PLAN_PREMIUM_PRICE || '29.99'),
+    monthly: parseFloat(process.env.PLAN_MONTHLY_PRICE || '29'),
+    yearly: parseFloat(process.env.PLAN_YEARLY_PRICE || '200'),
   },
   rechargeAmountPence: parseInt(process.env.RECHARGE_AMOUNT_PENCE || '5000', 10),
   creditLowThreshold: parseFloat(process.env.CREDIT_LOW_THRESHOLD || '5'),
