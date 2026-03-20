@@ -498,6 +498,50 @@ router.delete('/traffic/:id', async (req, res) => {
 });
 
 // ══════════════════════════════════════════════════════════
+// GET /api/admin/live-users — Live sessions (was MISSING!)
+// ══════════════════════════════════════════════════════════
+router.get('/live-users', async (req, res) => {
+  try {
+    // Sprint2 session tracking
+    const sessions = sprint2.getLiveSessions ? sprint2.getLiveSessions() : [];
+
+    // Prometheus active connections
+    let activeConnections = 0;
+    try {
+      const { activeConnections: ac } = require('../metrics');
+      activeConnections = (await ac.get()).values[0]?.value || 0;
+    } catch { /* metrics not available */ }
+
+    res.json({
+      sessions: sessions,
+      activeConnections,
+      count: sessions.length,
+    });
+  } catch (e) {
+    logger.error({ component: 'Admin', err: e.message }, 'live-users query failed');
+    res.json({ sessions: [], activeConnections: 0, count: 0 });
+  }
+});
+
+// ══════════════════════════════════════════════════════════
+// GET /api/admin/live-users — Live sessions (was MISSING)
+// ══════════════════════════════════════════════════════════
+router.get('/live-users', async (req, res) => {
+  try {
+    const sessions = sprint2.getLiveSessions ? sprint2.getLiveSessions() : [];
+    let activeConnections = 0;
+    try {
+      const { activeConnections: ac } = require('../metrics');
+      activeConnections = (await ac.get()).values[0]?.value || 0;
+    } catch { /* ok */ }
+    res.json({ sessions, activeConnections, count: sessions.length });
+  } catch (e) {
+    logger.error({ component: 'Admin', err: e.message }, 'live-users failed');
+    res.json({ sessions: [], activeConnections: 0, count: 0 });
+  }
+});
+
+// ══════════════════════════════════════════════════════════
 // GET /api/admin/users — User list
 // ══════════════════════════════════════════════════════════
 router.get('/users', async (req, res) => {

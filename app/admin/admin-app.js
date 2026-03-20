@@ -427,7 +427,6 @@ async function loadStats() {
       if (r.ok) return r.json(); throw new Error('403');
     }).then(function (d) {
       document.getElementById('val-views').textContent = d.totalAllTime || d.totalToday || 0;
-      document.getElementById('val-active').textContent = d.activeConnections || 0;
       document.getElementById('preview-traffic').textContent = (d.totalToday || 0) + ' azi';
     }).catch(function () { document.getElementById('val-views').textContent = '?'; });
 
@@ -454,13 +453,14 @@ async function loadStats() {
       document.getElementById('admin-uptime').textContent = '⏱ ' + Math.round((d.uptime || 0) / 60) + 'min';
     }).catch(function () { });
 
-    // Live preview
+    // Live preview + Acum Online stat
     fetch('/api/admin/live-users', { headers: hdrs() }).then(function (r) {
       if (r.ok) return r.json(); throw new Error('403');
     }).then(function (d) {
       var count = (d.sessions || d.activeSessions || []).length;
       document.getElementById('preview-live').textContent = count + ' online';
-    }).catch(function () { });
+      document.getElementById('val-active').textContent = count;
+    }).catch(function () { document.getElementById('val-active').textContent = '0'; });
 
     // Memories preview
     fetch('/api/admin/memories', { headers: hdrs() }).then(function (r) {
