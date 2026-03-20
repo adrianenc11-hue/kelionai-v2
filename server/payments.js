@@ -651,6 +651,35 @@ router.get("/plans", (req, res) => {
 
   res.json({ plans });
 });
+// GET /api/payments/stripe-prices — ADMIN: list all prices from Stripe account
+router.get("/stripe-prices", async (req, res) => {
+  try {
+    const adminSecret = req.headers["x-admin-secret"];
+    if (adminSecret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: "Forbidden" });
+    if (!stripe) return res.status(503).json({ error: "Stripe not configured" });
+
+    const prices = await stripe.prices.list({ limit: 50, expand: ["data.product"] });
+    const result = prices.data.map(p => ({
+      priceId: p.id,
+      product: p.product?.name || p.product,
+      amount: p.unit_amount / 100,
+      currency: p.currency,
+      interval: p.recurring?.interval || "one_time",
+      intervalCount: p.recurring?.interval_count || null,
+      active: p.active,
+    }));
+    res.json({ prices: result, envVars: {
+      STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY ? "✅ set" : "❌ missing",
+      STRIPE_PRO_PRICE_ID: process.env.STRIPE_PRO_PRICE_ID || "❌ missing",
+      STRIPE_PRO_ANNUAL_PRICE_ID: process.env.STRIPE_PRO_ANNUAL_PRICE_ID || "❌ missing",
+      STRIPE_PREMIUM_PRICE_ID: process.env.STRIPE_PREMIUM_PRICE_ID || "❌ missing",
+      STRIPE_PREMIUM_ANNUAL_PRICE_ID: process.env.STRIPE_PREMIUM_ANNUAL_PRICE_ID || "❌ missing",
+      STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET ? "✅ set" : "❌ missing",
+    }});
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
 
 // GET /api/payments/status — current user plan & usage
 router.get("/status", async (req, res) => {
