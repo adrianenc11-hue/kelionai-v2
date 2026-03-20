@@ -80,14 +80,70 @@
   // ══════════════════════════════════════════════════════════
   async function loadBrain() {
     try {
-      const r = await fetch(API + '/api/admin/brain', { headers: authHeaders() });
-      if (!r.ok) {
+      const [brainR, aiR] = await Promise.all([
+        fetch(API + '/api/admin/brain', { headers: authHeaders() }),
+        fetch(API + '/api/admin/ai-status', { headers: authHeaders() }).catch(() => null),
+      ]);
+      if (!brainR.ok) {
         document.getElementById('brain-tools').textContent = 'Error loading';
         return;
       }
-      const d = await r.json();
+      const d = await brainR.json();
+      const aiData = aiR && aiR.ok ? await aiR.json() : { providers: [] };
 
-      // Tool stats
+      // ── CREDIT ALERTS BANNER ──
+      var alerts = (aiData.providers || []).filter(function (p) {
+        return p.alertLevel === 'red' || p.alertLevel === 'yellow';
+      });
+      var alertHtml = '';
+      if (alerts.length > 0) {
+        alertHtml = '<div style="background:linear-gradient(135deg,#dc2626 0%,#991b1b 100%);border-radius:12px;padding:16px;margin-bottom:20px;border:1px solid #f87171">';
+        alertHtml += '<div style="font-size:1.1rem;font-weight:700;margin-bottom:8px">⚠️ Credit Alerts</div>';
+        alerts.forEach(function (a) {
+          var color = a.alertLevel === 'red' ? '#fca5a5' : '#fde68a';
+          alertHtml += '<div style="color:' + color + ';padding:4px 0">• <b>' + a.name + '</b>: ' + a.alertMessage + '</div>';
+        });
+        alertHtml += '</div>';
+      }
+
+      // ── AI PROVIDER CREDIT CARDS ──
+      var cardsHtml = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;margin-bottom:24px">';
+      (aiData.providers || []).forEach(function (p) {
+        var bg = p.live ? (p.alertLevel === 'red' ? 'linear-gradient(135deg,#7f1d1d,#991b1b)' : p.alertLevel === 'yellow' ? 'linear-gradient(135deg,#78350f,#92400e)' : 'linear-gradient(135deg,#1a1a2e,#16213e)') : 'linear-gradient(135deg,#1f1f1f,#2d2d2d)';
+        var border = p.alertLevel === 'red' ? '#ef4444' : p.alertLevel === 'yellow' ? '#f59e0b' : p.live ? '#6366f1' : '#444';
+        var statusDot = p.live ? '🟢' : '⚫';
+
+        cardsHtml += '<div class="ai-card" onclick="this.querySelector(\'.ai-details\').style.display=this.querySelector(\'.ai-details\').style.display===\'block\'?\'none\':\'block\'" style="background:' + bg + ';border:1px solid ' + border + ';border-radius:14px;padding:16px;cursor:pointer;transition:transform 0.2s,box-shadow 0.2s" onmouseover="this.style.transform=\'translateY(-2px)\';this.style.boxShadow=\'0 8px 25px rgba(0,0,0,0.3)\'" onmouseout="this.style.transform=\'none\';this.style.boxShadow=\'none\'">';
+        cardsHtml += '<div style="display:flex;justify-content:space-between;align-items:center">';
+        cardsHtml += '<div style="font-weight:700;font-size:1.05rem">' + statusDot + ' ' + p.name + '</div>';
+        cardsHtml += '<div style="font-size:0.8rem;opacity:0.7">' + p.tier + '</div>';
+        cardsHtml += '</div>';
+
+        // Cost this month
+        cardsHtml += '<div style="margin-top:10px;font-size:1.3rem;font-weight:700;color:#10b981">$' + (p.costMonth || 0).toFixed(4) + '</div>';
+        cardsHtml += '<div style="font-size:0.75rem;opacity:0.6">' + (p.requests || 0) + ' requests luna asta</div>';
+
+        // Alert message
+        cardsHtml += '<div style="margin-top:8px;font-size:0.8rem;padding:6px 10px;border-radius:8px;background:rgba(255,255,255,0.05)">' + (p.alertMessage || '') + '</div>';
+
+        // ── Expandable details (hidden by default) ──
+        cardsHtml += '<div class="ai-details" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.1)">';
+        if (p.creditLimit > 0) {
+          var usedPct = p.creditLimit > 0 ? Math.round(((p.creditLimit - p.credit) / p.creditLimit) * 100) : 0;
+          var barColor = usedPct > 90 ? '#ef4444' : usedPct > 70 ? '#f59e0b' : '#10b981';
+          cardsHtml += '<div style="margin-bottom:8px"><b>Credit:</b> $' + p.credit.toFixed(2) + ' / $' + p.creditLimit.toFixed(2) + '</div>';
+          cardsHtml += '<div style="background:#1a1a2e;border-radius:6px;height:8px;overflow:hidden"><div style="width:' + usedPct + '%;height:100%;background:' + barColor + ';border-radius:6px"></div></div>';
+        } else if (p.freeQuota > 0) {
+          cardsHtml += '<div style="margin-bottom:8px"><b>Free quota:</b> ' + p.freeQuota.toLocaleString() + ' ' + p.unit + '</div>';
+        }
+        cardsHtml += '<div style="margin-top:6px"><b>Proiectat luna:</b> $' + (p.projectedMonth || 0).toFixed(4) + '</div>';
+        cardsHtml += '<a href="' + (p.pricingUrl || '#') + '" target="_blank" rel="noopener" style="display:inline-block;margin-top:10px;padding:8px 16px;background:#6366f1;color:#fff;border-radius:8px;text-decoration:none;font-size:0.85rem;font-weight:600">💳 Reîncarcă / Billing</a>';
+        cardsHtml += '</div>'; // ai-details
+        cardsHtml += '</div>'; // ai-card
+      });
+      cardsHtml += '</div>';
+
+      // ── Tool stats table ──
       var html =
         '<table class="admin-table"><thead><tr><th>Tool</th><th>Calls</th><th>Errors</th><th>Status</th></tr></thead><tbody>';
       var tools = d.toolStats || {};
@@ -98,25 +154,29 @@
         html += '<tr><td>' + t + '</td><td>' + tools[t] + '</td><td>' + err + '</td><td>' + status + '</td></tr>';
       }
       html += '</tbody></table>';
-      document.getElementById('brain-tools').innerHTML = html;
 
-      // Providers
+      document.getElementById('brain-tools').innerHTML = alertHtml + cardsHtml + html;
+
+      // Providers summary (keep existing)
       var providers = d.providers || {};
       var phtml = '';
       for (var p in providers) {
         var ok = providers[p] ? '🟢 Active' : '⚫ Missing';
         phtml +=
           '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.05)"><span>' +
-          p +
-          '</span><span>' +
-          ok +
-          '</span></div>';
+          p + '</span><span>' + ok + '</span></div>';
       }
       document.getElementById('brain-providers').innerHTML = phtml || 'No data';
 
       // Uptime
       if (d.uptime)
         document.getElementById('admin-uptime').textContent = '⏱ ' + Math.round(d.uptime / 60) + 'min uptime';
+
+      // Conversations + messages
+      if (d.conversationCount !== undefined) {
+        var statsEl = document.getElementById('admin-uptime');
+        if (statsEl) statsEl.textContent += ' | 💬 ' + d.conversationCount + ' convos | ' + (d.totalMessages || 0) + ' msgs';
+      }
     } catch (e) {
       document.getElementById('brain-tools').textContent = 'Connection error: ' + e.message;
     }

@@ -1741,6 +1741,49 @@
       }
     })();
 
+    // ─── Admin credit alerts → avatar speaks them ─────────
+    (function() {
+      var secret = sessionStorage.getItem('kelion_admin_secret');
+      if (!secret) return; // Not admin → skip
+
+      // Check credit alerts after 5 seconds
+      setTimeout(function() {
+        fetch(API_BASE + '/api/admin/ai-status', {
+          headers: { 'Content-Type': 'application/json', 'x-admin-secret': secret }
+        })
+        .then(function(r) { return r.ok ? r.json() : null; })
+        .then(function(data) {
+          if (!data || !data.providers) return;
+          var alerts = data.providers.filter(function(p) {
+            return p.alertLevel === 'red' || p.alertLevel === 'yellow';
+          });
+          if (alerts.length === 0) return;
+
+          // Build alert message for avatar
+          var msg = '⚠️ Admin Alert: ';
+          alerts.forEach(function(a, i) {
+            msg += a.name + ' — ' + a.alertMessage;
+            if (i < alerts.length - 1) msg += '. ';
+          });
+
+          // Show via subtitle (like avatar speaking)
+          var sub = document.getElementById('subtitle-text');
+          if (sub) {
+            sub.textContent = msg;
+            sub.parentElement.style.display = 'block';
+            // Auto-hide after 15 seconds
+            setTimeout(function() {
+              if (sub.textContent === msg) {
+                sub.parentElement.style.display = 'none';
+              }
+            }, 15000);
+          }
+          console.log('[Admin] Credit alerts:', alerts.length, 'issues found');
+        })
+        .catch(function() { /* silent */ });
+      }, 5000);
+    })();
+
     console.log('[App] ✅ KelionAI v2.3 — STREAMING + HISTORY');
   }
 
