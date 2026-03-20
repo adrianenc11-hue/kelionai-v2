@@ -625,7 +625,7 @@ async function initAdmin() {
   // Auth OK — load stats
   console.log('[Admin] Autentificat cu succes ✅');
   loadStats();
-  setInterval(loadStats, 60000);
+  setInterval(loadStats, 30000); // refresh every 30s for real-time feel
 }
 
 function showAuthError(msg) {

@@ -537,47 +537,24 @@ router.delete('/memories/:id', async (req, res) => {
 });
 
 // ══════════════════════════════════════════════════════════
-// GET /api/admin/live-users — Who's on site right now
-// Uses page_views from last 5 min (sprint2.getLiveSessions didn't exist!)
+// GET /api/admin/live-users — Who's on site right now (IN-MEMORY, real-time)
 // ══════════════════════════════════════════════════════════
-router.get('/live-users', async (req, res) => {
-  try {
-    const { supabaseAdmin } = req.app.locals;
-    const sessions = [];
-
-    if (supabaseAdmin) {
-      // Get page views from last 5 minutes = "live" users
-      const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-      const { data } = await supabaseAdmin
-        .from('page_views')
-        .select('ip, path, country, user_agent, created_at')
-        .gte('created_at', fiveMinAgo)
-        .order('created_at', { ascending: false })
-        .limit(50);
-
-      // Group by IP to get unique visitors
-      const byIp = {};
-      (data || []).forEach(v => {
-        if (!byIp[v.ip]) {
-          byIp[v.ip] = {
-            userId: v.ip,
-            email: v.ip,
-            currentPage: v.path,
-            page: v.path,
-            country: v.country || '—',
-            duration: '< 5min',
-            lastActivity: v.created_at ? new Date(v.created_at).toLocaleTimeString('ro-RO') : '—',
-          };
-        }
-      });
-      sessions.push(...Object.values(byIp));
-    }
-
-    res.json({ sessions, activeConnections: sessions.length, count: sessions.length });
-  } catch (e) {
-    logger.error({ component: 'Admin', err: e.message }, 'live-users failed');
-    res.json({ sessions: [], activeConnections: 0, count: 0 });
+router.get('/live-users', (req, res) => {
+  const liveVisitors = req.app.locals.liveVisitors || new Map();
+  const sessions = [];
+  for (const [ip, data] of liveVisitors) {
+    const secsAgo = Math.round((Date.now() - data.lastSeen) / 1000);
+    sessions.push({
+      userId: ip,
+      email: ip,
+      currentPage: data.path,
+      page: data.path,
+      country: data.country || '—',
+      duration: secsAgo < 60 ? secsAgo + 's ago' : Math.round(secsAgo / 60) + 'min ago',
+      lastActivity: new Date(data.lastSeen).toLocaleTimeString('ro-RO'),
+    });
   }
+  res.json({ sessions, activeConnections: sessions.length, count: sessions.length });
 });
 
 // ══════════════════════════════════════════════════════════
