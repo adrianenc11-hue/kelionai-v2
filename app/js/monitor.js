@@ -132,10 +132,13 @@ const _MonitorManager = (function () {
             const title = String(r.title || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
             const url = String(r.url || r.link || '#').replace(/"/g, '&quot;');
             const snippet = String(r.snippet || r.description || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            // Extract short domain for display (avoid duplicating full URL)
+            var domain = '';
+            try { domain = new URL(url).hostname.replace(/^www\./, ''); } catch(_e) { domain = ''; }
             html += '<div class="monitor-search-item">' +
                 '<a href="' + url + '" target="_blank" rel="noopener">' +
                 '<div class="search-title">' + title + '</div>' +
-                '<div class="search-url">' + url + '</div>' +
+                (domain ? '<div class="search-url">' + domain + '</div>' : '') +
                 '<div class="search-snippet">' + snippet + '</div>' +
                 '</a></div>';
         }
@@ -192,6 +195,12 @@ const _MonitorManager = (function () {
             if (window.KAvatar) KAvatar.setPresenting(true);
         } else if (type === 'html') {
             // HTML (harti, grafice) — afisam in display-panel (monitor)
+            // BLOCK plain text — only actual HTML goes on monitor
+            var contentStr = String(content).trim();
+            if (!/<[a-z][\s\S]*>/i.test(contentStr)) {
+                console.log('[MonitorManager] BLOCKED plain text from monitor (type=html, no tags found)');
+                return;
+            }
             var dp = document.getElementById('display-content') || document.getElementById('display-panel');
             if (!dp) return;
             PANELS.forEach(function (pid) {

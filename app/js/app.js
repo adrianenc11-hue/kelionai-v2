@@ -467,11 +467,19 @@
         try {
           const hdrs = authHeaders();
           hdrs['Content-Type'] = 'application/json';
-          const resp = await fetch(API_BASE + '/api/chat/stream', {
-            method: 'POST',
-            headers: hdrs,
-            body: JSON.stringify(payload),
-          });
+          // Retry on 503 (brain degraded / server overloaded)
+          let resp = null;
+          for (let _retry = 0; _retry < 3; _retry++) {
+            resp = await fetch(API_BASE + '/api/chat/stream', {
+              method: 'POST',
+              headers: hdrs,
+              body: JSON.stringify(payload),
+            });
+            if (resp.status !== 503) break;
+            // Wait before retry: 1s, 2s
+            console.warn('[App] 503 — brain degraded, retry ' + (_retry + 1) + '/2');
+            if (_retry < 2) await new Promise(r => setTimeout(r, (_retry + 1) * 1000));
+          }
 
           if (resp.ok && resp.body) {
             showThinking(false);
@@ -560,11 +568,17 @@
       // FALLBACK: Regular fetch (for media uploads or stream failure)
       // ═══════════════════════════════════════════════════════
       if (!streamSuccess) {
-        const resp = await fetch(API_BASE + '/api/chat', {
-          method: 'POST',
-          headers: authHeaders(),
-          body: JSON.stringify(payload),
-        });
+        let resp = null;
+        for (let _retry = 0; _retry < 3; _retry++) {
+          resp = await fetch(API_BASE + '/api/chat', {
+            method: 'POST',
+            headers: authHeaders(),
+            body: JSON.stringify(payload),
+          });
+          if (resp.status !== 503) break;
+          console.warn('[App] 503 fallback — brain degraded, retry ' + (_retry + 1) + '/2');
+          if (_retry < 2) await new Promise(r => setTimeout(r, (_retry + 1) * 1000));
+        }
 
         showThinking(false);
         if (!resp.ok) {
