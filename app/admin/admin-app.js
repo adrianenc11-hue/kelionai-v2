@@ -334,7 +334,7 @@ async function loadUsersSection() {
 
     // Users table
     html += '<h3>👤 Utilizatori (' + (users.users || []).length + ')</h3>';
-    html += '<table class="admin-table"><thead><tr><th>Email</th><th>Nume</th><th>Plan</th><th>Înregistrat</th><th>Ultima logare</th><th>Mesaje</th></tr></thead><tbody>';
+    html += '<table class="admin-table"><thead><tr><th>Email</th><th>Nume</th><th>Plan</th><th>Înregistrat</th><th>Ultima logare</th><th>Mesaje</th><th>🗑️</th></tr></thead><tbody>';
     (users.users || []).forEach(function (u) {
       var created = u.created_at ? new Date(u.created_at).toLocaleDateString('ro-RO') : '—';
       var lastSign = u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleDateString('ro-RO') : '—';
@@ -342,7 +342,8 @@ async function loadUsersSection() {
         : u.plan === 'pro' ? '<span class="badge badge-warn">Pro</span>'
         : '<span class="badge">Free</span>';
       html += '<tr><td>' + esc(u.email) + '</td><td>' + esc(u.name) + '</td><td>' + planBadge + '</td>'
-        + '<td>' + created + '</td><td>' + lastSign + '</td><td>' + (u.message_count || 0) + '</td></tr>';
+        + '<td>' + created + '</td><td>' + lastSign + '</td><td>' + (u.message_count || 0) + '</td>'
+        + '<td><button class="btn-sm btn-danger" onclick="deleteUser(\'' + u.id + '\',\'' + esc(u.email) + '\')">🗑️</button></td></tr>';
     });
     html += '</tbody></table>';
 
@@ -392,6 +393,19 @@ async function deleteMemory(id) {
   try {
     await fetch('/api/admin/memories/' + id, { method: 'DELETE', headers: hdrs() });
     loadMemoriesSection();
+  } catch (e) { alert('Eroare: ' + e.message); }
+}
+
+async function deleteUser(id, email) {
+  if (!confirm('Ștergi userul ' + email + ' și tot istoricul lui?')) return;
+  try {
+    var r = await fetch('/api/admin/users/' + id, { method: 'DELETE', headers: hdrs() });
+    if (r.ok) {
+      alert('User ' + email + ' șters.');
+      loadUsersSection();
+    } else {
+      alert('Eroare: ' + r.status);
+    }
   } catch (e) { alert('Eroare: ' + e.message); }
 }
 

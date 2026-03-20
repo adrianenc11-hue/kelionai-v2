@@ -6,7 +6,7 @@
     <title>KelionAI — Admin Panel</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/admin/admin.css">
+    <link rel="stylesheet" href="/admin/admin.css?v=20260320b">
 </head>
 <body>
     <div class="admin-container">
@@ -149,16 +149,12 @@
         document.getElementById('theme-toggle').textContent = '☀️';
     }
 
-    /* Back button - go to previous page */
+    /* Back button - always go to main site */
     document.getElementById('btn-back').addEventListener('click', function(e) {
         e.preventDefault();
-        if (document.referrer && document.referrer.includes(location.hostname)) {
-            history.back();
-        } else {
-            location.href = '/';
-        }
+        location.href = '/';
     });
     </script>
-    <script src="/admin/admin-app.js?v=20260320"></script>
+    <script src="/admin/admin-app.js?v=20260320b"></script>
 </body>
 </html>
