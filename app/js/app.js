@@ -759,6 +759,12 @@
         return;
       }
 
+      // VOICE-FIRST: speak immediately, before text display
+      const _thisGen = ++_speakGeneration;
+      if (window.KVoice && !window._translateModeActive) {
+        KVoice.speak(fullReply, KAvatar.getCurrentAvatar());
+      }
+
       chatHistory.push({ role: 'user', content: message });
       chatHistory.push({ role: 'assistant', content: fullReply });
 
@@ -825,11 +831,7 @@
         addBrainNode('Response · ' + now, fullReply.substring(0, 80) + (fullReply.length > 80 ? '…' : ''));
       }
 
-      // Speak the reply
-      const _thisGen = ++_speakGeneration;
-      if (window.KVoice && !window._translateModeActive) {
-        KVoice.speak(fullReply, KAvatar.getCurrentAvatar());
-      }
+      // Voice-first: speak() already called above, before text display
     } catch (_e) {
       showThinking(false);
       addMessage('assistant', 'Connection error.');
@@ -862,6 +864,12 @@
   async function loadConversations() {
     const list = document.getElementById('history-list');
     if (!list) return;
+    // Guest users cannot access conversation history
+    const session = JSON.parse(localStorage.getItem('kelion_session') || '{}');
+    if (!session.access_token) {
+      list.innerHTML = '<div class="history-empty">🔒 Login to view conversation history.</div>';
+      return;
+    }
     list.innerHTML = '<div class="history-empty">Loading...</div>';
 
     try {

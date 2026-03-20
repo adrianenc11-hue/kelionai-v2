@@ -23,6 +23,18 @@ const _MonitorManager = (function () {
             const el = document.getElementById(pid);
             if (el) el.style.setProperty('display', 'none', 'important');
         });
+        // Hide chat layers when showing monitor content, show them for default
+        var chatMsg = document.getElementById('chat-messages');
+        var chatOvl = document.getElementById('chat-overlay');
+        var dispContent = document.getElementById('display-content');
+        if (id !== 'monitor-default') {
+            if (chatMsg) chatMsg.style.setProperty('display', 'none', 'important');
+            if (chatOvl) chatOvl.style.setProperty('display', 'none', 'important');
+            if (dispContent) dispContent.style.setProperty('display', 'flex', 'important');
+        } else {
+            if (chatMsg) chatMsg.style.display = '';
+            if (chatOvl) chatOvl.style.display = '';
+        }
         // Pe mobile, display-panel e ascuns cu transform:translateY(100%) — il aratam
         const displayPanel = document.getElementById('display-panel');
         if (displayPanel) {
@@ -32,12 +44,11 @@ const _MonitorManager = (function () {
                 displayPanel.classList.remove('mobile-visible');
             }
         }
-        // Avatarul rămâne vizibil — e în left-panel, monitorul e în display-panel
         const el = document.getElementById(id);
         if (el) {
             const displayVal = PANEL_DISPLAY[id] || 'block';
             el.style.setProperty('display', displayVal, 'important');
-            console.log('[MonitorManager] Set', id, 'display to:', displayVal, 'actual:', el.style.display);
+            console.log('[MonitorManager] Set', id, 'display to:', displayVal);
         }
     }
 
@@ -290,6 +301,11 @@ const _MonitorManager = (function () {
             var el = document.getElementById(pid);
             if (el) el.style.display = 'none';
         });
+        // Restore chat layers
+        var chatMsg = document.getElementById('chat-messages');
+        var chatOvl = document.getElementById('chat-overlay');
+        if (chatMsg) chatMsg.style.display = '';
+        if (chatOvl) chatOvl.style.display = '';
         var def = document.getElementById('monitor-default');
         if (def) def.style.display = '';
         if (window.KAvatar) KAvatar.setPresenting(false);

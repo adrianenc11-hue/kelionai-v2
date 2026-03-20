@@ -768,6 +768,15 @@ body {
   position: relative;
 }
 
+/* Chat permanently hidden — monitor is ONLY for visual content */
+#chat-messages,
+#chat-overlay {
+  display: none !important;
+  visibility: hidden !important;
+  height: 0 !important;
+  overflow: hidden !important;
+}
+
 
 /* ── Monitor default/welcome ── */
 #monitor-default {
