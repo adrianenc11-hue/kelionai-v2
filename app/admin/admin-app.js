@@ -101,9 +101,14 @@ async function loadAiSection() {
       + '<div class="cost-box"><div class="cost-label">Cost Lună</div><div class="cost-value">$' + (costs.totalMonth || 0).toFixed(4) + '</div></div>'
       + '</div>';
 
-    // Provider cards
+    // Provider cards — paid first, free last
     html += '<div class="ai-grid">';
-    (ai.providers || []).forEach(function (p) {
+    var sortedProviders = (ai.providers || []).slice().sort(function(a, b) {
+      if (a.tier === 'free' && b.tier !== 'free') return 1;
+      if (a.tier !== 'free' && b.tier === 'free') return -1;
+      return 0;
+    });
+    sortedProviders.forEach(function (p) {
       var border = p.alertLevel === 'red' ? '#ef4444' : p.alertLevel === 'yellow' ? '#f59e0b' : '#10b981';
       var statusDot = p.live ? '🟢' : '⚫';
       var creditStatus = '';
