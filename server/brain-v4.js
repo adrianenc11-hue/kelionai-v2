@@ -952,17 +952,30 @@ async function executeTool(brain, toolName, toolInput, userId) {
       // ═══ MAP + NAVIGATION ═══
       case "show_map": {
         const key = process.env.GOOGLE_MAPS_KEY || '';
+        const hasValidKey = key && key.startsWith('AIza'); // Real Google API keys start with AIza
         let mapUrl;
-        if (!key) {
-          // No key — fallback to OpenStreetMap
-          const place = toolInput.place || toolInput.destination || 'Romania';
-          mapUrl = `https://www.openstreetmap.org/export/embed.html?bbox=-30,25,45,75&layer=mapnik`;
+        if (!hasValidKey) {
+          // No valid key — use OpenStreetMap with geocoding
+          const place = toolInput.place || toolInput.destination || toolInput.origin || 'Romania';
+          try {
+            const geoR = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(place)}&limit=1`, {
+              headers: { 'User-Agent': 'KelionAI/1.0' }
+            });
+            if (geoR.ok) {
+              const geoData = await geoR.json();
+              if (geoData[0]) {
+                const lat = parseFloat(geoData[0].lat);
+                const lng = parseFloat(geoData[0].lon);
+                const bbox = `${lng-0.05},${lat-0.05},${lng+0.05},${lat+0.05}`;
+                mapUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat},${lng}`;
+              }
+            }
+          } catch (_) { /* fallback below */ }
+          if (!mapUrl) mapUrl = `https://www.openstreetmap.org/export/embed.html?bbox=-30,25,45,75&layer=mapnik`;
         } else if (toolInput.origin && toolInput.destination) {
-          // Navigation mode — Google Maps Embed Directions
           const mode = toolInput.mode || 'driving';
           mapUrl = `https://www.google.com/maps/embed/v1/directions?key=${key}&origin=${encodeURIComponent(toolInput.origin)}&destination=${encodeURIComponent(toolInput.destination)}&mode=${mode}`;
         } else {
-          // Simple place mode
           const place = toolInput.place || toolInput.destination || 'Romania';
           mapUrl = `https://www.google.com/maps/embed/v1/place?key=${key}&q=${encodeURIComponent(place)}`;
         }
