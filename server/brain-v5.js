@@ -50,63 +50,131 @@ function toGeminiTools(defs) {
   }));
 }
 
-// ── Complexity router: decides if a message is simple or complex ──
-function classifyComplexity(message, _history) {
-  const lower = (message || "").toLowerCase().trim();
+// ═══════════════════════════════════════════════════════════════
+// ML INTENT CLASSIFIER — embedding-based (replaces regex)
+// 8 intents: greeting, casual, search, creative, code, analysis, realtime, reasoning
+// ═══════════════════════════════════════════════════════════════
+const INTENT_CENTROIDS = {
+  greeting: [
+    'salut', 'buna ziua', 'hello', 'hey', 'hi', 'ciao', 'buna dimineata', 'buna seara',
+    'yo', 'hei', 'good morning', 'good evening'
+  ],
+  casual: [
+    'da', 'nu', 'ok', 'bine', 'mersi', 'multumesc', 'pa', 'la revedere', 'bye', 'super',
+    'mhm', 'aha', 'sigur', 'inteleg', 'perfect', 'cum esti', 'ce mai faci'
+  ],
+  search: [
+    'cauta informatii despre', 'ce stiri sunt', 'search for', 'find information about',
+    'ce se intampla cu', 'ultimele noutati despre', 'google', 'afla despre'
+  ],
+  creative: [
+    'genereaza o imagine', 'deseneaza', 'create an image', 'scrie o poveste',
+    'compune un poem', 'inventeaza', 'imagine cu', 'fa un desen', 'write a story'
+  ],
+  code: [
+    'scrie un cod', 'write a script', 'debug this', 'fix this code', 'python program',
+    'javascript function', 'cum fac in react', 'sql query', 'api endpoint', 'algoritm'
+  ],
+  analysis: [
+    'analizeaza acest document', 'explica acest grafic', 'compara', 'evaluate',
+    'ce inseamna', 'interpreteaza', 'rezuma acest text', 'sumarizeaza'
+  ],
+  realtime: [
+    'ce temperatura e acum', 'cat e ceasul', 'ce vreme e', 'weather', 'pret bitcoin',
+    'curs valutar', 'stiri de azi', 'scor meci', 'trafic acum', 'cutremur'
+  ],
+  reasoning: [
+    'explica teoria relativitatii', 'de ce exista universul', 'argumenteaza pro si contra',
+    'analiza profunda a', 'cum functioneaza fizica cuantica', 'dezbate', 'compara filosofic'
+  ],
+};
+
+let _centroidEmbeddings = null;
+let _centroidComputePromise = null;
+
+function _cosineSim(a, b) {
+  let dot = 0, normA = 0, normB = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i]; normA += a[i] * a[i]; normB += b[i] * b[i];
+  }
+  return dot / (Math.sqrt(normA) * Math.sqrt(normB) || 1);
+}
+
+async function _computeCentroids(brain) {
+  if (_centroidEmbeddings) return _centroidEmbeddings;
+  if (_centroidComputePromise) return _centroidComputePromise;
+  _centroidComputePromise = (async () => {
+    try {
+      const centroids = {};
+      for (const [intent, phrases] of Object.entries(INTENT_CENTROIDS)) {
+        const embeddings = await Promise.all(phrases.map(p => brain.getEmbedding(p).catch(() => null)));
+        const valid = embeddings.filter(e => e && e.length > 0);
+        if (valid.length === 0) continue;
+        const dim = valid[0].length;
+        const avg = new Float64Array(dim);
+        for (const emb of valid) { for (let i = 0; i < dim; i++) avg[i] += emb[i]; }
+        for (let i = 0; i < dim; i++) avg[i] /= valid.length;
+        centroids[intent] = avg;
+      }
+      _centroidEmbeddings = centroids;
+      logger.info({ component: 'IntentML', intents: Object.keys(centroids).length }, '🧠 ML centroids ready');
+      return centroids;
+    } catch (e) {
+      logger.warn({ component: 'IntentML', err: e.message }, '⚠️ Centroid computation failed');
+      return null;
+    } finally { _centroidComputePromise = null; }
+  })();
+  return _centroidComputePromise;
+}
+
+async function classifyIntentML(message, brain) {
+  const lower = (message || '').toLowerCase().trim();
   const wordCount = lower.split(/\s+/).length;
+  // Ultra-fast regex for trivial messages (saves API call)
+  if (/^(salut|bună|hey|hi|hello|hei|ciao|yo)\b/i.test(lower)) return 'greeting';
+  if (/^(ok|da|nu|mhm|sure|yes|no)$/i.test(lower)) return 'casual';
+  if (wordCount <= 2 && !lower.includes('?')) return 'casual';
 
-  // Simple messages → route to Gemini Flash (free)
-  const simplePatterns = [
-    /^(salut|bună|hey|hi|hello|hei|ciao|yo)\b/i,
-    /^(bine|ok|da|nu|mersi|mulțumesc|mulțam|thx|thanks)\b/i,
-    /^(ce faci|cum ești|ce mai faci|how are you)\??$/i,
-    /^(ok|da|nu|sure|yes|no|mhm|ahh|aaa)$/i,
-  ];
-  if (simplePatterns.some((p) => p.test(lower))) return "simple";
-  if (wordCount <= 3 && !lower.includes("?")) return "simple";
+  try {
+    const centroids = await _computeCentroids(brain);
+    if (!centroids || Object.keys(centroids).length === 0) return _regexFallback(lower, wordCount);
+    const msgEmb = await brain.getEmbedding(message);
+    if (!msgEmb || msgEmb.length === 0) return _regexFallback(lower, wordCount);
 
-  // Complex messages → route to GPT-5.4 (tool calling)
-  const toolTriggers = [
-    /\b(caută|search|find|google)\b/i,
-    /\b(vrem[ea]|meteo|weather|temperatură|grad)\b/i,
-    /\b(genere|creează|create|generate|desenează|draw)\b/i,
-    /\b(imagine|image|photo|foto|picture)\b/i,
-    /\b(traduce|translate|traducere)\b/i,
-    /\b(calculează|calculate|calcul)\b/i,
-    /\b(email|mail|trimite)\b/i,
-    /\b(calendar|programează|meeting|întâlnire)\b/i,
-    /\b(task|todo|sarcină|trebuie)\b/i,
-    /\b(cod|code|program|script|debug|fix)\b/i,
-    /\b(analiză|analyze|inspect|check)\b/i,
-    /\b(trading|crypto|btc|eth|piață|market)\b/i,
-    /\b(știri|news|noutăți)\b/i,
-    /\b(radio|muzică|music|play)\b/i,
-    /\b(hartă|map|locație|location)\b/i,
-    /\b(quiz|test|exercițiu|lecție)\b/i,
-    /\b(pdf|docx|xlsx|pptx|document|spreadsheet|presentation)\b/i,
-    /\b(diagnostic|obd|mașin[aă]|car)\b/i,
-    /\b(rețetă|recipe|gătit|cooking)\b/i,
-    /\b(medical|mri|ct|xray|doză|dose)\b/i,
-    /\b(osciloscop|spectro|pcb|circuit|thermal)\b/i,
-    // Date live — INTOTDEAUNA la GPT-5.4 cu function calling, NU la Gemini
-    /\b(acum|azi|live|real.?time|current|latest|recent)\b/i,
-    /\b(temperatura|temperature|temp)\b/i,
-    /\b(pret|price|curs|exchange|rate)\b/i,
-    /\b(cutremur|earthquake|seism)\b/i,
-    /\b(avion|zbor|flight|trafic|traffic|tren|train)\b/i,
-    /\b(aer|air|quality|pollution|iss|satellite|spatiu|space)\b/i,
-    /\b(bitcoin|ethereum|crypto|stock|actiune|burs)\b/i,
-    /\b(sport|fotbal|meci|score|rezultat)\b/i,
-  ];
-  if (toolTriggers.some((p) => p.test(lower))) return "complex";
+    let bestIntent = 'casual', bestScore = -1;
+    for (const [intent, centroid] of Object.entries(centroids)) {
+      const score = _cosineSim(msgEmb, centroid);
+      if (score > bestScore) { bestScore = score; bestIntent = intent; }
+    }
+    logger.info({ component: 'IntentML', intent: bestIntent, score: bestScore.toFixed(3) },
+      `🎯 ML intent: ${bestIntent} (${(bestScore * 100).toFixed(1)}%)`);
+    if (bestScore < 0.3) return 'casual';
+    return bestIntent;
+  } catch (e) {
+    logger.warn({ component: 'IntentML', err: e.message }, '⚠️ ML classify failed, regex fallback');
+    return _regexFallback(lower, wordCount);
+  }
+}
 
+function _regexFallback(lower, wordCount) {
+  if (/^(salut|bună|hey|hi|hello|hei|ciao|yo)\b/i.test(lower)) return 'greeting';
+  if (/^(bine|ok|da|nu|mersi|mulțumesc|thx|thanks)\b/i.test(lower)) return 'casual';
+  if (/\b(caută|search|find|google|știri|news)\b/i.test(lower)) return 'search';
+  if (/\b(genere|creează|create|generate|desenează|draw|imagine|image)\b/i.test(lower)) return 'creative';
+  if (/\b(cod|code|program|script|debug|fix|python|javascript)\b/i.test(lower)) return 'code';
+  if (/\b(vrem[ea]|meteo|weather|temperatură|pret|price|curs|acum|azi|live)\b/i.test(lower)) return 'realtime';
+  if (/\b(analiză|analyze|explică|explain|compară|compare)\b/i.test(lower)) return 'analysis';
+  if (lower.includes('?') && wordCount > 30) return 'reasoning';
+  if (lower.includes('?') && wordCount > 5) return 'search';
+  if (wordCount > 15) return 'analysis';
+  return wordCount <= 8 ? 'casual' : 'search';
+}
 
-  // Medium-length questions → complex (might need search)
-  if (lower.includes("?") && wordCount > 5) return "complex";
-  if (wordCount > 15) return "complex";
-
-  // Default: simple for short messages
-  return wordCount <= 8 ? "simple" : "complex";
+// Backward compat — old code calls classifyComplexity
+function classifyComplexity(message) {
+  const lower = (message || '').toLowerCase().trim();
+  const intent = _regexFallback(lower, lower.split(/\s+/).length);
+  return (intent === 'greeting' || intent === 'casual') ? 'simple' : 'complex';
 }
 
 // ── Strip leaked internal tags from AI responses ──
@@ -777,6 +845,57 @@ Be concise. Only correct factual errors, not style.`;
 }
 
 // ═══════════════════════════════════════════════════════════════
+// FACT CHECKER — async verification via Gemini Pro QA
+// Non-blocking: runs after response is sent, logs issues
+// ═══════════════════════════════════════════════════════════════
+async function factCheckAsync(responseText, brain) {
+  try {
+    const gKey = process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
+    if (!gKey) return;
+
+    // Extract first 500 chars of response for fact checking (cost optimization)
+    const snippet = responseText.substring(0, 500);
+    const prompt = `Analizează acest text și verifică acuratețea faptelor menționate. 
+Răspunde DOAR cu un JSON: {"confidence": 0-100, "issues": ["problema1", "problema2"]}
+Dacă totul pare corect, confidence=95+ și issues=[].
+
+Text de verificat: "${snippet}"`;
+
+    const model = MODELS.GEMINI_QA || 'gemini-2.5-pro-preview-06-05';
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 10000);
+
+    const r = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${gKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          generationConfig: { maxOutputTokens: 200, temperature: 0.1 },
+        }),
+        signal: ctrl.signal,
+      }
+    ).finally(() => clearTimeout(timer));
+
+    if (!r.ok) return;
+    const data = await r.json();
+    const text = (data.candidates?.[0]?.content?.parts || []).map(p => p.text).join('');
+
+    // Parse JSON from response
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const result = JSON.parse(jsonMatch[0]);
+      logger.info({ component: 'FactCheck', confidence: result.confidence, issues: result.issues?.length || 0 },
+        `🔍 Fact check: ${result.confidence}% confidence, ${result.issues?.length || 0} issues`);
+    }
+  } catch (e) {
+    // Non-blocking — silently fail
+    logger.debug({ component: 'FactCheck', err: e.message }, 'Fact check skipped');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
 // MAIN: thinkV5 — Hybrid routing + GPT-5.4 Tool Calling
 // ═══════════════════════════════════════════════════════════════
 async function thinkV5(
@@ -937,9 +1056,27 @@ async function thinkV5(
 - La saluturi simple (salut, buna, hey, hello) — NU folosi [BODY:] tags. Mâinile rămân lângă corp. Body actions doar pentru acțiuni speciale (explicații, celebrări, dance etc).`;
 
 
-    // ── 5b. Detect INTENT — fiecare tip de cerere → tool potrivit ──
+    // ── 5b. Detect INTENT — ML classifier + legacy detectIntent ──
     const intent = detectIntent(message, mediaData);
-    logger.info({ component: "BrainV5", intent, domain }, `🧠 V5 intent: ${intent}`);
+    // ML intent (async, embedding-based) — runs in parallel with legacy
+    let mlIntent = 'casual';
+    try {
+      mlIntent = await classifyIntentML(message, brain);
+    } catch (_) { /* fallback to regex */ }
+    logger.info({ component: "BrainV5", intent, mlIntent, domain }, `🧠 V5 intent: ${intent} | ML: ${mlIntent}`);
+
+    // ── Specialist system prompt based on ML intent ──
+    const SPECIALIST_HINTS = {
+      search: '\n[SPECIALIST: SEARCH AGENT] Ești expert în căutare și verificare de informații. Prioritizează search_web și browse_page. Citează surse.',
+      creative: '\n[SPECIALIST: CREATIVE AGENT] Ești expert în creație vizuală și scris. Folosește generate_image() pentru imagini. Fii artistic și inspirat.',
+      code: '\n[SPECIALIST: CODE AGENT] Ești expert în programare. Scrie cod curat, testat, documentat. Folosește execute_javascript pentru demo-uri.',
+      analysis: '\n[SPECIALIST: ANALYSIS AGENT] Ești expert în analiză profundă. Structurează răspunsul cu bullet points. Compară pro/contra.',
+      realtime: '\n[SPECIALIST: REALTIME AGENT] Ești expert în date live. OBLIGATORIU folosește search_web sau API-uri pentru date actuale. NU inventa date.',
+      reasoning: '\n[SPECIALIST: REASONING AGENT] Ești expert în raționament profund. Gândește pas cu pas. Explică logica din spatele concluziilor.',
+    };
+    if (SPECIALIST_HINTS[mlIntent]) {
+      systemPrompt += SPECIALIST_HINTS[mlIntent];
+    }
 
     // Weather + Tool use: delegare directă la V4 cu tool calling
     // V4 doar pentru OBD/scanner/diagnostic specializat — restul (harta, ISS etc.) merge la GPT-5.4
@@ -1321,9 +1458,14 @@ async function thinkV5(
     const monitorFinal = avatarCmds.monitor?.content ? avatarCmds.monitor : (monitorFromTools || extractMonitor(toolResults));
 
 
+    // ── Fact Check (async, non-blocking) — only for search/reasoning ──
+    if ((mlIntent === 'search' || mlIntent === 'reasoning' || mlIntent === 'realtime') && finalResponse.length > 100) {
+      factCheckAsync(finalResponse, brain).catch(() => {});
+    }
+
     logger.info(
-      { component: "BrainV5", engine, tools: toolsUsed, thinkTime, tokens: totalTokens, intent },
-      `🧠 V5 Think: ${engine} | intent:${intent} | ${toolsUsed.length} tools | ${thinkTime}ms | ${totalTokens} tokens`,
+      { component: "BrainV5", engine, tools: toolsUsed, thinkTime, tokens: totalTokens, intent, mlIntent },
+      `🧠 V5 Think: ${engine} | intent:${intent} | ML:${mlIntent} | ${toolsUsed.length} tools | ${thinkTime}ms | ${totalTokens} tokens`,
     );
 
 
@@ -1438,4 +1580,4 @@ async function thinkV5(
   }
 }
 
-module.exports = { thinkV5, TOOL_DEFINITIONS, classifyComplexity, stripLeakedTags, qualityGate };
+module.exports = { thinkV5, TOOL_DEFINITIONS, classifyComplexity, classifyIntentML, stripLeakedTags, qualityGate };

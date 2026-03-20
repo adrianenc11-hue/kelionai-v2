@@ -100,6 +100,25 @@ class KelionBrain {
     this._memoryCache = new Map(); // "userId:type" → { data, loadedAt }
     this._memoryCacheTTL = 60 * 1000; // cache memories for 60s
 
+    // ── 3-TIER MEMORY: Hot / Warm / Cold ──
+    // Hot: <24h, accessed 3+ times, kept in JS Map (instant access, no DB call)
+    // Warm: 1-7 days, loaded from Supabase on demand
+    // Cold: >7 days, only loaded for deep reasoning intent
+    this._hotMemory = new Map(); // userId → Map<memoryId, { content, accessCount, lastAccess, createdAt }>
+    this._hotMemoryMaxPerUser = 50;
+    this._hotMemoryTTL = 24 * 60 * 60 * 1000; // 24h
+
+    // Cleanup stale hot memories every hour
+    setInterval(() => {
+      const now = Date.now();
+      for (const [userId, memories] of this._hotMemory) {
+        for (const [memId, mem] of memories) {
+          if (now - mem.lastAccess > this._hotMemoryTTL) memories.delete(memId);
+        }
+        if (memories.size === 0) this._hotMemory.delete(userId);
+      }
+    }, 60 * 60 * 1000);
+
     // ── Semantic Response Cache (instant replies for similar queries) ──
     this._semanticCache = new Map(); // cacheKey → { embedding, response, metadata, createdAt }
     this._semanticCacheMaxSize = 500;
@@ -773,9 +792,29 @@ When asked "what can you do?" list these real capabilities. Use them proactively
   // ═══════════════════════════════════════════════════════════
   // MEMORY SYSTEM — Load/Save to Supabase (Enhanced with pgvector semantic search)
   // ═══════════════════════════════════════════════════════════
-  async loadMemory(userId, type, limit = 10, contextHint = "") {
+  async loadMemory(userId, type, limit = 10, contextHint = "", intentTier = "warm") {
     if (!userId || !this.supabaseAdmin) return [];
 
+    // ── HOT MEMORY (Tier 1) — instant, in-process Map ──
+    const userHot = this._hotMemory.get(userId);
+    if (userHot && userHot.size > 0 && intentTier !== 'cold') {
+      const hotResults = [];
+      for (const [memId, mem] of userHot) {
+        if (type && mem.type !== type) continue;
+        mem.accessCount++;
+        mem.lastAccess = Date.now();
+        hotResults.push({ ...mem.content, _source: 'hot', _accessCount: mem.accessCount });
+      }
+      if (hotResults.length >= limit) {
+        logger.info({ component: 'Memory', tier: 'hot', count: hotResults.length, userId: userId.substring(0, 8) },
+          `🔥 Hot memory hit: ${hotResults.length} items`);
+        return hotResults.slice(0, limit);
+      }
+      // Not enough hot results — fall through to warm/cold
+    }
+
+    // ── WARM MEMORY (Tier 2) — Supabase with 7-day window (default) ──
+    // ── COLD MEMORY (Tier 3) — Supabase with no time limit (for deep reasoning) ──
     // ── Cache check (60s TTL) ──
     const cacheKey = `${userId}:${type}`;
     const cached = this._memoryCache.get(cacheKey);
@@ -918,6 +957,40 @@ When asked "what can you do?" list these real capabilities. Use them proactively
       logger.warn({ component: "Brain", err: e.message }, "loadMemory error");
       return [];
     }
+  }
+
+  // ── Promote memory to hot tier (called on frequent access) ──
+  promoteToHot(userId, memoryItem) {
+    if (!userId || !memoryItem) return;
+    if (!this._hotMemory.has(userId)) this._hotMemory.set(userId, new Map());
+    const userHot = this._hotMemory.get(userId);
+
+    const memId = memoryItem.id || `${memoryItem.type}_${Date.now()}`;
+    if (userHot.has(memId)) {
+      const existing = userHot.get(memId);
+      existing.accessCount++;
+      existing.lastAccess = Date.now();
+      return;
+    }
+
+    // Evict oldest if over limit
+    if (userHot.size >= this._hotMemoryMaxPerUser) {
+      let oldestKey = null, oldestTime = Infinity;
+      for (const [k, v] of userHot) {
+        if (v.lastAccess < oldestTime) { oldestTime = v.lastAccess; oldestKey = k; }
+      }
+      if (oldestKey) userHot.delete(oldestKey);
+    }
+
+    userHot.set(memId, {
+      content: memoryItem,
+      type: memoryItem.type || 'general',
+      accessCount: 1,
+      lastAccess: Date.now(),
+      createdAt: Date.now(),
+    });
+    logger.info({ component: 'Memory', tier: 'hot', userId: userId.substring(0, 8), memId },
+      `🔥 Promoted to hot memory`);
   }
 
   async saveMemory(userId, type, content, context = {}, importance = 5) {
