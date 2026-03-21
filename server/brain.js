@@ -2266,6 +2266,10 @@ Reply STRICTLY with JSON:
       fileAction: '',
       fileName: '',
       fileContent: '',
+      needsProjectTree: false,
+      projectTreePath: '',
+      needsProjectFile: false,
+      projectFilePath: '',
       isQuestion: false,
       isCommand: false,
       isEmotional: false,
@@ -2743,6 +2747,35 @@ Reply STRICTLY with JSON:
           };
         },
       },
+      // ── ADMIN: PROJECT TREE (Inception) ──
+      {
+        flag: 'needsProjectTree',
+        triggers: [
+          /\b(list[ea]z[aă]|arat[aă]|vezi|see|list|show|afiseaz[aă])\s*(fisier|foldere?|directoare?|structur[aă]|files?|folders?|directories?|tree|arbore)/i,
+          /\b(ce\s*(fisiere|foldere|directoare))/i,
+          /\b(structur[aă]\s*(de\s*)?fisiere|file\s*structure|project\s*tree)/i,
+          /\b(ls|dir|scanez|scaneaz[aă])\s*(server|app|fisiere|cod|code|src)/i,
+          /\bADMIN_LIST_DIR\b/i,
+        ],
+        extract: (text) => {
+          const m = text.match(/(?:din|in|la|for|path|cale|folder|director)\s+["']?([\w.\-\/\\]+)["']?/i);
+          return { projectTreePath: m ? m[1] : 'server/' };
+        },
+      },
+      // ── ADMIN: PROJECT FILE READ (Inception) ──
+      {
+        flag: 'needsProjectFile',
+        triggers: [
+          /\b(citeste|citește|deschide|arat[aă]|vezi|read|open|show|cat|view)\s*(fisier|fișier|file|codul?|sursa|source|script)/i,
+          /\b(ce\s*(e|scrie|contine|conține)\s*(in|în))\s*(fisier|fișier|file)/i,
+          /\b(codul\s*(din|de\s*la|sursa))\b/i,
+          /\bADMIN_READ_FILE\b/i,
+        ],
+        extract: (text) => {
+          const m = text.match(/(?:fisier|fișier|file|sursa|codul?|din|read|open)\s+["']?([\w.\-\/\\]+\.[a-zA-Z]{1,5})["']?/i);
+          return { projectFilePath: m ? m[1] : '' };
+        },
+      },
     ];
   }
 
@@ -3103,6 +3136,15 @@ Reply STRICTLY with JSON:
         if (analysis.needsTradeIntelligence && !seen.has('tradeIntelligence')) {
           plan.push({ tool: 'tradeIntelligence' });
           seen.add('tradeIntelligence');
+        }
+        // ═══ INCEPTION: Filesystem Autonomy ═══
+        if (analysis.needsProjectTree && !seen.has('projectTree')) {
+          plan.push({ tool: 'projectTree', path: analysis.projectTreePath || 'server/', depth: 3 });
+          seen.add('projectTree');
+        }
+        if (analysis.needsProjectFile && !seen.has('projectFile')) {
+          plan.push({ tool: 'projectFile', path: analysis.projectFilePath || '' });
+          seen.add('projectFile');
         }
       }
       // Table 3: Non-AI function tools
