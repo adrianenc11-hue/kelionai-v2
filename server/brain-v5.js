@@ -22,7 +22,7 @@ const AB_TEST_RATIO = 0.1; // 10% to variant
 let _abTestStats = { control: { count: 0, totalTime: 0 }, variant: { count: 0, totalTime: 0 } };
 
 // Reuse tool definitions and executor from V4 — no duplication
-const { TOOL_DEFINITIONS } = require('./brain-v4');
+const { TOOL_DEFINITIONS, ADMIN_TOOL_DEFINITIONS } = require('./brain-v4');
 
 // Lazy-load executeTool to avoid circular issues
 let _executeTool = null;
@@ -1364,7 +1364,8 @@ async function thinkV5(
       let registryContext = '';
 
       // ═══ GPT-5.4 PATH — complex messages with tool calling ═══
-      const openaiTools = toOpenAITools(TOOL_DEFINITIONS);
+      const allToolDefs = isAdmin ? [...TOOL_DEFINITIONS, ...ADMIN_TOOL_DEFINITIONS] : TOOL_DEFINITIONS;
+      const openaiTools = toOpenAITools(allToolDefs);
 
       // Build OpenAI message array
       const msgs = recentHistory.map((h) => ({

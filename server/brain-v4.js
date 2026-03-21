@@ -1767,4 +1767,4 @@ Rules:
   }
 }
 
-module.exports = { thinkV4, TOOL_DEFINITIONS, executeTool };
+module.exports = { thinkV4, TOOL_DEFINITIONS, ADMIN_TOOL_DEFINITIONS, executeTool };
