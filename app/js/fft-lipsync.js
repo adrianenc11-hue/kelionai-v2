@@ -50,7 +50,7 @@
     var MAX_VISEME = 0.083;     // 17% further reduced
 
     // ── TEMP SLIDER: global mouth amplitude multiplier ──
-    var _mouthMultiplier = parseFloat(localStorage.getItem('kelion_mouth_mult') || '1.0');
+    var _mouthMultiplier = parseFloat(localStorage.getItem('kelion_mouth_mult') || '0.75');
     (function _createSlider() {
         if (typeof document === 'undefined') return;
         var wrap = document.createElement('div');
