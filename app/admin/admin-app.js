@@ -53,19 +53,31 @@ function openSection(id) {
   document.getElementById('section-title').textContent = titles[id] || id;
   document.getElementById('section-content').innerHTML = '<div style="text-align:center;padding:40px;color:#888">Se încarcă...</div>';
 
-  // Load data
+  // Clear previous auto-refresh
+  if (window._adminRefresh) { clearInterval(window._adminRefresh); window._adminRefresh = null; }
+
+  // Get loader function
+  var loaderFn = null;
   switch (id) {
     case 'ai': loadAiSection(); break;
-    case 'brain': loadBrainSection(); break;
-    case 'traffic': loadTrafficSection(); break;
-    case 'live': loadLiveSection(); break;
+    case 'brain': loaderFn = loadBrainSection; break;
+    case 'traffic': loaderFn = loadTrafficSection; break;
+    case 'live': loaderFn = loadLiveSection; break;
     case 'users': loadUsersSection(); break;
     case 'memories': loadMemoriesSection(); break;
-    case 'visitors': loadVisitorsSection(); break;
+    case 'visitors': loaderFn = loadVisitorsSection; break;
+  }
+  // First load
+  if (loaderFn) loaderFn();
+
+  // Auto-refresh for real-time sections (every 15s)
+  if (loaderFn) {
+    window._adminRefresh = setInterval(loaderFn, 15000);
   }
 }
 
 function closeSection() {
+  if (window._adminRefresh) { clearInterval(window._adminRefresh); window._adminRefresh = null; }
   document.getElementById('view-section').style.display = 'none';
   document.getElementById('view-buttons').style.display = 'flex';
   document.getElementById('stats-bar').style.display = 'grid';
