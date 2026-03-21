@@ -138,8 +138,58 @@ router.post("/speak", ttsLimiter, validate(speakSchema), async (req, res) => {
     let alignment = null;
     let ttsEngine = "ElevenLabs";
 
-    // ── TRY 1: ElevenLabs with timestamps (timeout 10s → fallback to OpenAI) ──
-    if (process.env.ELEVENLABS_API_KEY) {
+    // ── TRY 0: Microsoft Azure (Top Tier Enterprise TTS) ──
+    if (process.env.AZURE_TTS_API_KEY && process.env.AZURE_TTS_REGION) {
+      try {
+        const azureCtrl = new AbortController();
+        const azureTimer = setTimeout(() => azureCtrl.abort(), 12000);
+        
+        // Map Avatar + Lang to Azure Neural Voices
+        const azureVoices = {
+          'ro': { kelion: 'ro-RO-EmilNeural', kira: 'ro-RO-AlinaNeural' },
+          'en': { kelion: 'en-US-GuyNeural', kira: 'en-US-AriaNeural' },
+          'es': { kelion: 'es-ES-AlvaroNeural', kira: 'es-ES-ElviraNeural' },
+          'fr': { kelion: 'fr-FR-HenriNeural', kira: 'fr-FR-DeniseNeural' },
+          'de': { kelion: 'de-DE-ConradNeural', kira: 'de-DE-KatjaNeural' },
+          'it': { kelion: 'it-IT-DiegoNeural', kira: 'it-IT-ElsaNeural' },
+          'zh': { kelion: 'zh-CN-YunxiNeural', kira: 'zh-CN-XiaoxiaoNeural' },
+          'ja': { kelion: 'ja-JP-KeitaNeural', kira: 'ja-JP-NanamiNeural' }
+        };
+        const langBase = (language || 'ro').toLowerCase().split('-')[0];
+        const aVoice = (azureVoices[langBase] && azureVoices[langBase][avatar]) 
+                       || (avatar === 'kira' ? 'en-US-AriaNeural' : 'en-US-GuyNeural');
+        const langCode = aVoice.split('-').slice(0, 2).join('-'); // e.g. ro-RO
+        
+        const ssml = `<speak version='1.0' xml:lang='${langCode}'><voice xml:lang='${langCode}' name='${aVoice}'><prosody rate="fast">${text}</prosody></voice></speak>`;
+
+        const azureRes = await fetch(`https://${process.env.AZURE_TTS_REGION}.tts.speech.microsoft.com/cognitiveservices/v1`, {
+          method: 'POST',
+          signal: azureCtrl.signal,
+          headers: {
+            'Ocp-Apim-Subscription-Key': process.env.AZURE_TTS_API_KEY,
+            'Content-Type': 'application/ssml+xml',
+            'X-Microsoft-OutputFormat': 'audio-16khz-128kbitrate-mono-mp3',
+            'User-Agent': 'KelionAI'
+          },
+          body: ssml
+        });
+        clearTimeout(azureTimer);
+
+        if (azureRes.ok) {
+           buf = Buffer.from(await azureRes.arrayBuffer());
+           ttsEngine = "Azure";
+           alignment = null; // Backend Rhubarb will kick in to calculate lip-sync locally!
+           logger.info({ component: "Speak" }, "Azure TTS OK (Neural Voice)");
+        } else {
+           logger.warn({ component: "Speak", status: azureRes.status }, "Azure TTS failed, falling back to ElevenLabs");
+        }
+      } catch (e) {
+         logger.warn({ component: "Speak", err: e.message }, "Azure TTS error, falling back to ElevenLabs");
+      }
+    }
+
+    // ── TRY 1: ElevenLabs with timestamps (timeout 30s → fallback to OpenAI) ──
+    if (!buf && process.env.ELEVENLABS_API_KEY) {
       try {
         const el11Ctrl = new AbortController();
         const el11Timer = setTimeout(() => el11Ctrl.abort(), 30000); // 🚩 30 secunde: lăsăm ElevenLabs să genereze liniștit, fără grabă
