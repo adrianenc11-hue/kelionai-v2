@@ -2872,14 +2872,19 @@ router.post('/brain-chat', async (req, res) => {
 
     let reply, provider;
     try {
-      const result = await brain.think(message, {
-        userId: 'admin-k1',
-        userName: 'Admin',
-        isAdmin: true,
-        sessionId: sid,
-      });
-      reply = result.reply || result.text || result.message || 'No response';
-      provider = result.provider || result.model || 'unknown';
+      const history = brainChatSessions[sid].messages.slice(-20);
+      const result = await brain.think(
+        message,        // message
+        'kira',         // avatar
+        history,        // history
+        'ro',           // language
+        'admin-k1',     // userId
+        sid,            // conversationId
+        {},             // mediaData
+        true            // isAdmin
+      );
+      reply = result.enrichedMessage || result.reply || result.text || result.message || 'No response';
+      provider = result.modelRoute?.provider || result.provider || result.model || 'unknown';
     } catch (e) {
       reply = '❌ Brain error: ' + e.message;
       provider = 'error';
