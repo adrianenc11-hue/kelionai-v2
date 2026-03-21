@@ -532,6 +532,57 @@ const ADMIN_TOOL_DEFINITIONS = [
       required: ['files'],
     },
   },
+  // ═══ INCEPTION Faza 3: Autonomie ═══
+  {
+    name: 'admin_read_logs',
+    description:
+      'Read recent server logs, errors, alerts, and system health status. Returns RAW data — error log entries, tool stats, active alerts, memory usage. Use this to monitor the server and diagnose issues.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        category: {
+          type: 'string',
+          enum: ['all', 'errors', 'alerts', 'health', 'versions'],
+          description: "What to read: 'all' for everything, 'errors' for error log, 'alerts' for active alerts, 'health' for system status, 'versions' for deploy history",
+        },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'admin_run_tests',
+    description:
+      'Run Jest test suite. Returns COMPLETE stdout + stderr output, exit code, and parsed pass/fail counts. Available suites: brain, server, validation, payments, persona, cache, legal, messenger, referral, newborn-mode, or empty for all.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        suite: {
+          type: 'string',
+          description: "Test file name without extension (e.g. 'brain', 'server', 'validation') or empty for all tests",
+        },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'admin_diagnose',
+    description:
+      'Diagnose a specific error or issue. Reads relevant source code, analyzes the error, and proposes a fix. Does NOT apply the fix automatically — returns the analysis and proposed code change for admin review.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        error_message: {
+          type: 'string',
+          description: 'The error message or symptom to diagnose',
+        },
+        file_hint: {
+          type: 'string',
+          description: 'Optional file path hint where the error might be (e.g. server/brain.js)',
+        },
+      },
+      required: ['error_message'],
+    },
+  },
 ];
 
 // ── Tool executor: maps tool names to brain methods ──
@@ -694,6 +745,13 @@ async function executeTool(brain, toolName, toolInput, userId) {
         return brain._writeProjectFile(toolInput.filepath, toolInput.content);
       case 'admin_auto_deploy':
         return await brain._adminAutoDeploy(toolInput.commit_message || 'Auto-deploy by Kelion AI', toolInput.files || []);
+      // ═══ INCEPTION Faza 3: Autonomie ═══
+      case 'admin_read_logs':
+        return brain._readLogs(toolInput.category || 'all');
+      case 'admin_run_tests':
+        return await brain._runTestSuite(toolInput.suite || '');
+      case 'admin_diagnose':
+        return await brain._diagnoseError(toolInput.error_message, toolInput.file_hint);
       // ═══ SELF-INTROSPECTION ═══
       case 'read_own_source': {
         const fs = require('fs');

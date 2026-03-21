@@ -6519,6 +6519,7 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
 
       if (healthy) {
         logger.info({ component: 'Inception' }, '✅ MISSION COMPLETE!');
+        await this._logVersion('deploy', { message: commitMessage, files: filesToDeploy, healthy: true });
         return { success: true, missionComplete: true, message: `✅ MISSION COMPLETE! ${results.length} fișiere • Verified pe GitHub • Health OK`, files: results };
       } else {
         logger.warn({ component: 'Inception' }, '❌ MISSION FAILED!');
@@ -6528,6 +6529,254 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
       logger.error({ component: 'Inception', err: e.message }, `💥 Deploy eroare: ${e.message}`);
       return { error: e.message };
     }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // INCEPTION FAZA 3: CITIRE LOGURI — date RAW, anti-falsificare
+  // ═══════════════════════════════════════════════════════════
+  _readLogs(category = 'all') {
+    const result = {};
+
+    if (category === 'all' || category === 'errors') {
+      // Ultimele 50 erori RAW
+      result.errors = (this.errorLog || []).slice(-50).map(e => ({
+        tool: e.tool,
+        message: e.msg,
+        time: new Date(e.time).toISOString(),
+        ago: `${Math.round((Date.now() - e.time) / 60000)}min`,
+      }));
+      result.totalErrors = (this.errorLog || []).length;
+    }
+
+    if (category === 'all' || category === 'alerts') {
+      const monitor = this.autonomousMonitor;
+      result.alerts = monitor ? monitor.alerts.filter(a => !a.resolved).map(a => ({
+        type: a.type, message: a.message, timestamp: a.timestamp,
+      })) : [];
+    }
+
+    if (category === 'all' || category === 'health') {
+      const monitor = this.autonomousMonitor;
+      const healthReport = monitor ? monitor.healthCheck() : {};
+      const mem = process.memoryUsage();
+      result.health = {
+        status: healthReport.status || (healthReport.errorRate > 0.3 ? 'degraded' : 'healthy'),
+        uptimeMin: Math.round((Date.now() - this.startTime) / 60000),
+        memoryMB: Math.round(mem.rss / 1024 / 1024),
+        heapMB: Math.round(mem.heapUsed / 1024 / 1024),
+        conversations: this.conversationCount || 0,
+        errorRate: healthReport.errorRate || 0,
+        toolStats: { ...this.toolStats },
+        toolErrors: { ...this.toolErrors },
+        circuitBreakers: healthReport.circuitBreakers || [],
+      };
+    }
+
+    if (category === 'all' || category === 'versions') {
+      // Returnează ultimele versiuni din Supabase (async — cache dacă disponibil)
+      result.versions = this._inceptionVersionCache || [];
+      result.versionsNote = 'Istoric versiuni din Supabase. Folosește admin_read_logs cu category=versions pentru refresh.';
+      // Refresh async
+      this._refreshVersionCache();
+    }
+
+    result.timestamp = new Date().toISOString();
+    result.rawData = true; // marcaj anti-falsificare
+    return result;
+  }
+
+  async _refreshVersionCache() {
+    if (!this.supabase) return;
+    try {
+      const { data } = await this.supabase
+        .from('brain_memory')
+        .select('content, context, created_at')
+        .eq('memory_type', 'inception_audit')
+        .order('created_at', { ascending: false })
+        .limit(30);
+      this._inceptionVersionCache = (data || []).map(d => ({
+        action: d.context?.action || 'unknown',
+        summary: d.content,
+        timestamp: d.created_at,
+        details: d.context,
+      }));
+    } catch { /* non-blocking */ }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // INCEPTION FAZA 3: RUN TESTS — Jest output COMPLET
+  // ═══════════════════════════════════════════════════════════
+  async _runTestSuite(suite = '') {
+    const { execSync } = require('child_process');
+    try {
+      const testPath = suite ? `__tests__/${suite}.test.js` : '__tests__/';
+      const cmd = `npx jest ${testPath} --no-color --forceExit 2>&1`;
+
+      logger.info({ component: 'Inception', suite: suite || 'ALL' }, '🧪 Running tests...');
+
+      let stdout = '';
+      let exitCode = 0;
+      try {
+        stdout = execSync(cmd, { cwd: process.cwd(), encoding: 'utf8', timeout: 60000 });
+      } catch (e) {
+        stdout = e.stdout || e.message || '';
+        exitCode = e.status || 1;
+      }
+
+      // Parse results din Jest output
+      const passMatch = stdout.match(/Tests:\s+(\d+)\s+passed/);
+      const failMatch = stdout.match(/Tests:\s+(\d+)\s+failed/);
+      const totalMatch = stdout.match(/Tests:\s+.*?(\d+)\s+total/);
+      const passed = passMatch ? parseInt(passMatch[1]) : 0;
+      const failed = failMatch ? parseInt(failMatch[1]) : 0;
+      const total = totalMatch ? parseInt(totalMatch[1]) : passed + failed;
+
+      const result = {
+        rawOutput: stdout.substring(0, 5000), // primele 5000 chars
+        exitCode,
+        passed,
+        failed,
+        total,
+        allPassed: failed === 0 && passed > 0,
+        suite: suite || 'ALL',
+        timestamp: new Date().toISOString(),
+      };
+
+      // AUDIT log Supabase
+      if (this.supabase) {
+        try {
+          await this.supabase.from('brain_memory').insert({
+            user_id: null,
+            memory_type: 'inception_audit',
+            content: `[TEST] ${suite || 'ALL'} | ${passed}/${total} passed | exit:${exitCode}`,
+            context: { action: 'test', suite, passed, failed, total, exitCode, timestamp: new Date().toISOString() },
+            importance: failed > 0 ? 9 : 5,
+          });
+        } catch { /* non-blocking */ }
+      }
+
+      logger.info({ component: 'Inception', passed, failed, total }, `🧪 Tests: ${passed}/${total} passed`);
+      return result;
+    } catch (e) {
+      return { error: e.message, rawOutput: e.message };
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // INCEPTION FAZA 3: DIAGNOSE — analiză erori, propune fix
+  // ═══════════════════════════════════════════════════════════
+  async _diagnoseError(errorMessage, fileHint) {
+    const fs = require('fs');
+    const nodePath = require('path');
+
+    if (!errorMessage) return { error: 'Specifică mesajul de eroare!' };
+
+    const diagnosis = {
+      error: errorMessage,
+      timestamp: new Date().toISOString(),
+      analysis: [],
+      relevantCode: null,
+      proposedFix: null,
+    };
+
+    // 1. Caută eroarea în errorLog
+    const matchingErrors = (this.errorLog || []).filter(e =>
+      (e.msg || '').toLowerCase().includes(errorMessage.toLowerCase())
+    ).slice(-5);
+    diagnosis.matchingLogs = matchingErrors.map(e => ({
+      tool: e.tool, message: e.msg, time: new Date(e.time).toISOString(),
+    }));
+    diagnosis.analysis.push(`Găsite ${matchingErrors.length} erori similare în log.`);
+
+    // 2. Citește codul relevant dacă avem file hint
+    if (fileHint) {
+      try {
+        const fullPath = nodePath.resolve(process.cwd(), fileHint);
+        if (fullPath.startsWith(process.cwd()) && fs.existsSync(fullPath)) {
+          const content = fs.readFileSync(fullPath, 'utf8');
+          const lines = content.split('\n');
+
+          // Caută linia cu eroarea
+          const errorLower = errorMessage.toLowerCase();
+          const matchLines = [];
+          lines.forEach((line, i) => {
+            if (line.toLowerCase().includes(errorLower) ||
+                (errorMessage.includes(':') && line.includes(errorMessage.split(':')[0]))) {
+              matchLines.push({ line: i + 1, content: line.trim() });
+            }
+          });
+
+          diagnosis.relevantCode = {
+            file: fileHint,
+            totalLines: lines.length,
+            matchingLines: matchLines.slice(0, 10),
+            // Context: 5 linii înainte/după primul match
+            context: matchLines.length > 0 ? lines.slice(
+              Math.max(0, matchLines[0].line - 6),
+              Math.min(lines.length, matchLines[0].line + 5)
+            ).join('\n') : null,
+          };
+          diagnosis.analysis.push(`Fișierul ${fileHint} are ${lines.length} linii. ${matchLines.length} linii potrivite.`);
+        }
+      } catch { /* non-blocking */ }
+    }
+
+    // 3. Check tool errors
+    const toolWithErrors = Object.entries(this.toolErrors || {})
+      .filter(([, count]) => count > 0)
+      .sort(([, a], [, b]) => b - a);
+    if (toolWithErrors.length > 0) {
+      diagnosis.toolErrors = toolWithErrors.slice(0, 5).map(([tool, count]) => ({ tool, errors: count }));
+      diagnosis.analysis.push(`Tool-uri cu erori: ${toolWithErrors.map(([t, c]) => `${t}(${c})`).join(', ')}`);
+    }
+
+    // 4. Alertele active
+    if (this.autonomousMonitor) {
+      diagnosis.activeAlerts = this.autonomousMonitor.alerts
+        .filter(a => !a.resolved)
+        .map(a => ({ type: a.type, message: a.message }));
+    }
+
+    diagnosis.analysis.push('⚠️ Fix-ul NU a fost aplicat automat. Revizuiește analiza și confirmă dacă vrei să scriu fix-ul.');
+    diagnosis.rawData = true;
+
+    // AUDIT log
+    if (this.supabase) {
+      try {
+        await this.supabase.from('brain_memory').insert({
+          user_id: null,
+          memory_type: 'inception_audit',
+          content: `[DIAGNOSE] ${errorMessage.substring(0, 100)} | ${diagnosis.analysis.length} findings`,
+          context: { action: 'diagnose', error: errorMessage, fileHint, findings: diagnosis.analysis.length, timestamp: new Date().toISOString() },
+          importance: 8,
+        });
+      } catch { /* non-blocking */ }
+    }
+
+    return diagnosis;
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // INCEPTION: CONTOR VERSIUNI — persistent în Supabase
+  // ═══════════════════════════════════════════════════════════
+  async _logVersion(action, details) {
+    if (!this.supabase) return;
+    try {
+      const version = {
+        id: `v${new Date().toISOString().replace(/[-:T]/g, '').substring(0, 14)}`,
+        action,
+        timestamp: new Date().toISOString(),
+        ...details,
+      };
+      await this.supabase.from('brain_memory').insert({
+        user_id: null,
+        memory_type: 'inception_audit',
+        content: `[VERSION] ${version.id} | ${action} | ${details.message || ''}`,
+        context: { action: 'version', version },
+        importance: 8,
+      });
+      return version;
+    } catch { return null; }
   }
 
   // ═══════════════════════════════════════════════════════════
