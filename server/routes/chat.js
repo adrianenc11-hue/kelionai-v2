@@ -160,7 +160,7 @@ router.post('/chat', chatLimiter, validate(chatSchema), async (req, res) => {
     // Non-admin users can mention admin keywords freely — tools won't execute.
     const adminEmail = (process.env.ADMIN_EMAIL || '').toLowerCase();
     const isOwner = user?.email?.toLowerCase() === adminEmail;
-    const isAdmin = isOwner && req.headers['x-admin-mode'] === 'true';
+    const isAdmin = isOwner; // Inception: ownerul e admin automat pe toate paginile
 
     const usage = await checkUsage(user?.id, 'chat', supabaseAdmin);
     if (!usage.allowed)
@@ -440,7 +440,7 @@ router.post('/chat/stream', chatLimiter, validate(chatSchema), async (req, res) 
     // Send thinking indicator immediately so user sees activity
     res.write(`data: ${JSON.stringify({ type: 'thinking' })}\n\n`);
 
-    const isAdminStream = isOwnerStream && req.headers['x-admin-mode'] === 'true';
+    const isAdminStream = isOwnerStream; // Inception: ownerul e admin automat pe toate paginile
 
     // ── ThinkV5: acelasi brain ca /api/chat ─────────────────────────────────
     const { thinkV5 } = require('../brain-v5');
