@@ -460,7 +460,7 @@
         }
         
         const originalText = startBtn.innerHTML;
-        startBtn.innerHTML = '<span style="opacity:0.8">⏳ Verificare securitate...</span>';
+        startBtn.innerHTML = '<span style="opacity:0.8">⏳ Security Check...</span>';
         startBtn.style.pointerEvents = 'none';
         
         try {
@@ -472,9 +472,8 @@
           startBtn.style.pointerEvents = '';
           enterApp();
         } catch (e) {
-          startBtn.innerHTML = originalText;
-          startBtn.style.pointerEvents = '';
-          alert('⚠️ Acces Refuzat (Cameră și Microfon)\n\nKelionAI are nevoie de microfon pentru a te auzi și de cameră pentru ca AI-ul să interacționeze vizual cu tine.\n\n🔒 PROTECȚIE GDPR: Fața și vocea ta sunt procesate în timp real STRICT pentru experiența live și NU sunt stocate/partajate fără acordul tău expres.\n\nDacă ai blocat din greșeală accesul, apasă pe iconița "Lacăt" 🔒 din bara de sus a browser-ului (lângă kelionai.app) și dă "Permite" (Allow) la Cameră și Microfon, apoi reîncearcă.');
+          alert('⚠️ Access Denied (Camera & Microphone Required)\n\nKelionAI requires microphone access to hear you and camera access for the AI to interact visually with you.\n\n🔒 GDPR PROTECTION: Your face and voice are processed in real-time STRICTLY for the live experience and are NEVER stored or shared without your explicit consent.\n\nSince you denied the required permissions, you cannot enter the Application.');
+          window.location.href = 'https://google.com';
         }
       });
     }
