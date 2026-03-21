@@ -509,7 +509,7 @@ router.get('/traffic', async (req, res) => {
         .sort((a, b) => a[0].localeCompare(b[0]))
         .map(([hour, count]) => ({ hour: hour + ':00', count })),
     });
-  } catch {
+  } catch (e) {
     logger.error({ component: 'Admin', err: e.message }, 'Traffic query failed');
     res.json({
       recent: [],

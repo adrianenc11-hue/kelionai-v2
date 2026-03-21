@@ -10161,7 +10161,7 @@ Raspunde STRICT JSON. Daca nimic: {}`;
     if (this.toolErrors[tool] > 0) this.toolErrors[tool]--;
   }
   isToolDegraded(tool) {
-    return (this.toolErrors[tool] || 0) >= 5;
+    return (this.toolErrors[tool] || 0) > 1;
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -10191,7 +10191,7 @@ Raspunde STRICT JSON. Daca nimic: {}`;
     if (!process.env.BINANCE_API_KEY) disabledTools.add('trading');
 
     const degraded = Object.entries(this.toolErrors)
-      .filter(([t, c]) => c >= 10 && !disabledTools.has(t))
+      .filter(([t, c]) => c > 1 && !disabledTools.has(t))
       .map(([t]) => t);
     return {
       status:
