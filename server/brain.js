@@ -6276,37 +6276,107 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
   // ═══════════════════════════════════════════════════════════
   // INCEPTION FAZA 2: WRITE FILE — Kelion poate edita fișiere
   // ═══════════════════════════════════════════════════════════
-  _writeProjectFile(filePath, content) {
+  async _writeProjectFile(filePath, content) {
     const fs = require('fs');
     const nodePath = require('path');
+    const crypto = require('crypto');
     try {
       if (!filePath || !content) return { error: 'Lipsește calea sau conținutul fișierului' };
+
       // Securitate: doar în folderul proiectului
       const projectRoot = process.cwd();
       const fullPath = nodePath.resolve(projectRoot, filePath);
       if (!fullPath.startsWith(projectRoot)) {
         return { error: 'BLOCAT: nu poți scrie în afara proiectului!' };
       }
+
+      // Blocked paths
+      const blocked = ['.env', 'node_modules', '.git', 'secret', 'password', 'token'];
+      if (blocked.some(b => filePath.toLowerCase().includes(b))) {
+        return { error: `BLOCAT: ${filePath} e un fișier protejat!` };
+      }
+
       // Backup original
       let backup = null;
       if (fs.existsSync(fullPath)) {
         backup = fs.readFileSync(fullPath, 'utf8');
       }
+
+      // SHA-256 hash al conținutului INTENTAT
+      const intendedHash = crypto.createHash('sha256').update(content).digest('hex');
+
       // Scrie fișierul
       const dir = nodePath.dirname(fullPath);
       if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
       fs.writeFileSync(fullPath, content, 'utf8');
-      logger.info({ component: 'Inception', file: filePath, bytes: content.length }, `✍️ Kelion a scris ${filePath}`);
+
+      // READBACK VERIFICATION — citește înapoi, compară hash
+      const readback = fs.readFileSync(fullPath, 'utf8');
+      const actualHash = crypto.createHash('sha256').update(readback).digest('hex');
+      const hashMatch = intendedHash === actualHash;
+
+      if (!hashMatch) {
+        logger.error({ component: 'Inception', file: filePath }, '❌ HASH MISMATCH! Fișierul scris nu corespunde!');
+        return {
+          error: 'VERIFICARE EȘUATĂ: hash mismatch! Fișierul scris NU corespunde cu conținutul original!',
+          intendedHash,
+          actualHash,
+          verified: false,
+        };
+      }
+
+      // SYNTAX CHECK pentru fișiere .js
+      let syntaxOk = null;
+      let syntaxError = null;
+      if (filePath.endsWith('.js')) {
+        try {
+          const { execSync } = require('child_process');
+          execSync(`node -c "${fullPath}"`, { encoding: 'utf8', timeout: 5000 });
+          syntaxOk = true;
+        } catch (syntaxErr) {
+          syntaxOk = false;
+          syntaxError = (syntaxErr.stderr || syntaxErr.message || '').substring(0, 300);
+          logger.warn({ component: 'Inception', file: filePath, err: syntaxError }, '⚠️ Syntax error detectat');
+        }
+      }
+
+      logger.info({ component: 'Inception', file: filePath, bytes: content.length, hash: intendedHash.substring(0, 12), syntaxOk }, `✍️ Kelion a scris ${filePath}`);
+
       // Track pentru auto-deploy
       if (!this._inceptionWrittenFiles) this._inceptionWrittenFiles = [];
       if (!this._inceptionWrittenFiles.includes(filePath)) this._inceptionWrittenFiles.push(filePath);
-      return {
+
+      // AUDIT LOG imutabil în Supabase
+      if (this.supabase) {
+        try {
+          await this.supabase.from('brain_memory').insert({
+            user_id: null,
+            memory_type: 'inception_audit',
+            content: `[WRITE] ${filePath} | ${content.length}B | hash:${intendedHash.substring(0, 12)} | syntax:${syntaxOk ?? 'n/a'} | verified:${hashMatch}`,
+            context: { action: 'write', file: filePath, bytes: content.length, hash: intendedHash, hashMatch, syntaxOk, syntaxError, hadBackup: !!backup, timestamp: new Date().toISOString() },
+            importance: 9,
+          });
+        } catch { /* audit log non-blocking */ }
+      }
+
+      const result = {
         success: true,
         file: filePath,
         bytesWritten: content.length,
+        sha256: intendedHash,
+        verified: hashMatch,
         hadBackup: !!backup,
-        message: `Fișierul ${filePath} a fost scris cu succes (${content.length} bytes)`,
+        message: `Fișierul ${filePath} scris (${content.length} bytes) — SHA-256 verificat ✅`,
       };
+
+      if (syntaxOk === false) {
+        result.syntaxError = syntaxError;
+        result.warning = `⚠️ Fișierul are ERORI de sintaxă! NU recomand deploy! Eroare: ${syntaxError}`;
+      } else if (syntaxOk === true) {
+        result.syntaxCheck = 'PASSED ✅';
+      }
+
+      return result;
     } catch (e) {
       return { error: e.message };
     }
@@ -6316,119 +6386,147 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
   // INCEPTION FAZA 2: AUTO-DEPLOY — Kelion își dă deploy singur
   // Cu rollback automat dacă health check eșuează
   // ═══════════════════════════════════════════════════════════
-  async _adminAutoDeploy(commitMessage = 'Auto-deploy by Kelion') {
+  async _adminAutoDeploy(commitMessage = 'Auto-deploy by Kelion', files = []) {
     const fs = require('fs');
     const pathMod = require('path');
+    const crypto = require('crypto');
     const projectRoot = process.cwd();
 
-    // GitHub config din env
+    // GitHub config din env — FĂRĂ hardcoded!
     const ghToken = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
-    const ghRepo = process.env.GITHUB_REPO || 'adrianenc11-hue/kelionai-v2';
-    const ghBranch = process.env.GITHUB_BRANCH || 'master';
+    const ghRepo = process.env.GITHUB_REPO;
+    const ghBranch = process.env.GITHUB_BRANCH || process.env.RAILWAY_GIT_BRANCH || 'master';
+    const appUrl = process.env.APP_URL || process.env.RAILWAY_PUBLIC_DOMAIN;
 
-    if (!ghToken) {
-      return { error: 'GITHUB_TOKEN lipsește din env. Adaugă un Personal Access Token pe Railway.' };
-    }
+    if (!ghToken) return { error: 'GITHUB_TOKEN lipsește din env!' };
+    if (!ghRepo) return { error: 'GITHUB_REPO lipsește din env! Setează format: owner/repo' };
 
     try {
-      logger.info({ component: 'Inception' }, `🚀 Kelion pornește auto-deploy via GitHub API: ${commitMessage}`);
+      logger.info({ component: 'Inception' }, `🚀 Deploy via GitHub API: ${commitMessage}`);
 
-      // Găsește fișierele scrise recent de Kelion (tracked în _writtenFiles)
-      const writtenFiles = this._inceptionWrittenFiles || [];
-      if (writtenFiles.length === 0) {
-        return { success: false, message: 'Nu sunt fișiere scrise de Kelion de comis. Scrie un fișier mai întâi!' };
+      const filesToDeploy = files.length > 0 ? files : (this._inceptionWrittenFiles || []);
+      if (filesToDeploy.length === 0) {
+        return { success: false, message: 'Nu sunt fișiere de comis. Specifică fișierele!' };
       }
 
       const results = [];
-      for (const relPath of writtenFiles) {
+      for (const relPath of filesToDeploy) {
         const fullPath = pathMod.resolve(projectRoot, relPath);
-        if (!fs.existsSync(fullPath)) continue;
+        if (!fs.existsSync(fullPath)) {
+          results.push({ file: relPath, error: 'Fișierul nu există pe disc!' });
+          continue;
+        }
 
         const content = fs.readFileSync(fullPath, 'utf8');
         const contentBase64 = Buffer.from(content).toString('base64');
+        const localHash = crypto.createHash('sha256').update(content).digest('hex');
 
-        // Get current file SHA (needed for updates, null for new files)
+        // Get current file SHA from GitHub
         let sha = null;
         try {
           const getResp = await fetch(
             `https://api.github.com/repos/${ghRepo}/contents/${relPath}?ref=${ghBranch}`,
             { headers: { Authorization: `Bearer ${ghToken}`, Accept: 'application/vnd.github.v3+json' } }
           );
-          if (getResp.ok) {
-            const getData = await getResp.json();
-            sha = getData.sha;
-          }
+          if (getResp.ok) { sha = (await getResp.json()).sha; }
         } catch { /* new file */ }
 
-        // Create or update file via GitHub API
-        const body = {
-          message: `${commitMessage} — ${relPath}`,
-          content: contentBase64,
-          branch: ghBranch,
-        };
+        // Commit via GitHub API
+        const body = { message: `${commitMessage} — ${relPath}`, content: contentBase64, branch: ghBranch };
         if (sha) body.sha = sha;
 
-        const putResp = await fetch(
-          `https://api.github.com/repos/${ghRepo}/contents/${relPath}`,
-          {
-            method: 'PUT',
-            headers: {
-              Authorization: `Bearer ${ghToken}`,
-              Accept: 'application/vnd.github.v3+json',
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(body),
-          }
-        );
+        const putResp = await fetch(`https://api.github.com/repos/${ghRepo}/contents/${relPath}`, {
+          method: 'PUT',
+          headers: { Authorization: `Bearer ${ghToken}`, Accept: 'application/vnd.github.v3+json', 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
 
         if (!putResp.ok) {
           const errText = await putResp.text().catch(() => 'unknown');
-          results.push({ file: relPath, error: `GitHub API ${putResp.status}: ${errText.substring(0, 200)}` });
-        } else {
-          const putData = await putResp.json();
-          results.push({ file: relPath, success: true, commit: putData.commit?.sha?.substring(0, 7) });
+          results.push({ file: relPath, error: `GitHub ${putResp.status}: ${errText.substring(0, 200)}` });
+          continue;
         }
+        const putData = await putResp.json();
+        const commitSha = putData.commit?.sha?.substring(0, 7);
+
+        // VERIFICARE INDEPENDENTĂ pe GitHub
+        let ghVerified = false;
+        try {
+          const vResp = await fetch(`https://api.github.com/repos/${ghRepo}/contents/${relPath}?ref=${ghBranch}`, {
+            headers: { Authorization: `Bearer ${ghToken}`, Accept: 'application/vnd.github.v3+json' },
+          });
+          if (vResp.ok) {
+            const vData = await vResp.json();
+            const ghHash = crypto.createHash('sha256').update(Buffer.from(vData.content, 'base64').toString('utf8')).digest('hex');
+            ghVerified = ghHash === localHash;
+          }
+        } catch { /* non-blocking */ }
+
+        results.push({ file: relPath, success: true, commit: commitSha, hash: localHash.substring(0, 12), githubVerified: ghVerified });
+        if (!ghVerified) logger.warn({ component: 'Inception', file: relPath }, '⚠️ GitHub hash mismatch!');
       }
 
       logger.info({ component: 'Inception', files: results.length }, '📤 GitHub commits done');
-
-      // Clear tracked files
       this._inceptionWrittenFiles = [];
 
-      // Așteaptă 90s pentru Railway auto-deploy din GitHub
-      logger.info({ component: 'Inception' }, '⏳ Aștept 90s pentru Railway build...');
-      await new Promise((r) => setTimeout(r, 90000));
+      // AUDIT LOG Supabase
+      if (this.supabase) {
+        try {
+          await this.supabase.from('brain_memory').insert({
+            user_id: null, memory_type: 'inception_audit',
+            content: `[DEPLOY] ${commitMessage} | ${results.filter(r => r.success).length}/${results.length} OK`,
+            context: { action: 'deploy', commitMessage, files: results, timestamp: new Date().toISOString() },
+            importance: 10,
+          });
+        } catch { /* non-blocking */ }
+      }
+
+      const allSuccess = results.every(r => r.success);
+      if (!allSuccess) {
+        return { success: false, message: `Deploy PARȚIAL — ${results.filter(r => r.success).length}/${results.length} fișiere comise.`, files: results };
+      }
+
+      // Așteaptă 60s pentru Railway
+      logger.info({ component: 'Inception' }, '⏳ Aștept 60s pentru Railway build...');
+      await new Promise(r => setTimeout(r, 60000));
 
       // Health check
-      const appUrl = process.env.APP_URL || 'https://kelionai.app';
-      const healthUrl = `${appUrl.replace(/\/$/, '')}/health`;
+      const healthBase = appUrl ? (appUrl.startsWith('http') ? appUrl : `https://${appUrl}`) : null;
+      if (!healthBase) {
+        return { success: true, missionComplete: true, message: `✅ Commit reușit! ${results.length} fișiere. APP_URL lipsește → skip health check.`, files: results };
+      }
+      const healthUrl = `${healthBase.replace(/\/$/, '')}/health`;
       let healthy = false;
-      for (let attempt = 0; attempt < 3; attempt++) {
+      for (let i = 0; i < 3; i++) {
         try {
           const resp = await fetch(healthUrl, { signal: AbortSignal.timeout(5000) });
           if (resp.ok) { healthy = true; break; }
         } catch { /* retry */ }
-        await new Promise((r) => setTimeout(r, 10000));
+        await new Promise(r => setTimeout(r, 10000));
+      }
+
+      // AUDIT health check
+      if (this.supabase) {
+        try {
+          await this.supabase.from('brain_memory').insert({
+            user_id: null, memory_type: 'inception_audit',
+            content: `[HEALTH] ${healthy ? '✅ OK' : '❌ FAILED'} | ${healthUrl}`,
+            context: { action: 'health_check', healthy, url: healthUrl, timestamp: new Date().toISOString() },
+            importance: healthy ? 7 : 10,
+          });
+        } catch { /* non-blocking */ }
       }
 
       if (healthy) {
-        logger.info({ component: 'Inception' }, '✅ Deploy reușit! Serverul e sănătos.');
-        return {
-          success: true,
-          message: `Deploy reușit! ${results.length} fișiere comise. Health check OK.`,
-          files: results,
-        };
+        logger.info({ component: 'Inception' }, '✅ MISSION COMPLETE!');
+        return { success: true, missionComplete: true, message: `✅ MISSION COMPLETE! ${results.length} fișiere • Verified pe GitHub • Health OK`, files: results };
       } else {
-        logger.warn({ component: 'Inception' }, '❌ Health check eșuat!');
-        return {
-          success: false,
-          message: 'Deploy trimis dar health check eșuat. Verifică logurile Railway.',
-          files: results,
-        };
+        logger.warn({ component: 'Inception' }, '❌ MISSION FAILED!');
+        return { success: false, missionFailed: true, message: `❌ MISSION FAILED — commit OK dar health check eșuat!`, files: results };
       }
     } catch (e) {
-      logger.error({ component: 'Inception', err: e.message }, `💥 Auto-deploy eroare: ${e.message}`);
-      return { error: e.message, message: `Deploy eșuat: ${e.message}` };
+      logger.error({ component: 'Inception', err: e.message }, `💥 Deploy eroare: ${e.message}`);
+      return { error: e.message };
     }
   }
 

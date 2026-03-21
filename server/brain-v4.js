@@ -515,7 +515,7 @@ const ADMIN_TOOL_DEFINITIONS = [
   {
     name: 'admin_auto_deploy',
     description:
-      'Trigger auto-deploy: git add + commit + push to GitHub. Railway will auto-deploy from GitHub. Includes health check after deploy and automatic rollback if the server crashes.',
+      'Trigger auto-deploy: commits files to GitHub via API, Railway auto-deploys. Includes health check. You MUST specify which files to deploy (the ones you recently wrote with write_project_file).',
     input_schema: {
       type: 'object',
       properties: {
@@ -523,8 +523,13 @@ const ADMIN_TOOL_DEFINITIONS = [
           type: 'string',
           description: "Git commit message (default: 'Auto-deploy by Kelion AI')",
         },
+        files: {
+          type: 'array',
+          items: { type: 'string' },
+          description: "Array of relative file paths to deploy, e.g. ['server/inception-proof.js']",
+        },
       },
-      required: [],
+      required: ['files'],
     },
   },
 ];
@@ -688,7 +693,7 @@ async function executeTool(brain, toolName, toolInput, userId) {
       case 'write_project_file':
         return brain._writeProjectFile(toolInput.filepath, toolInput.content);
       case 'admin_auto_deploy':
-        return await brain._adminAutoDeploy(toolInput.commit_message || 'Auto-deploy by Kelion AI');
+        return await brain._adminAutoDeploy(toolInput.commit_message || 'Auto-deploy by Kelion AI', toolInput.files || []);
       // ═══ SELF-INTROSPECTION ═══
       case 'read_own_source': {
         const fs = require('fs');
