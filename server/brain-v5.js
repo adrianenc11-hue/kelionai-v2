@@ -13,6 +13,9 @@ const { getPatternsText, recordUserInteraction, getProactiveSuggestion } = requi
 const { selfEvaluate, getQualityHints } = require("./k1-performance");
 const fineTuneCollector = require("./fine-tune-collector");
 
+// ── GEMINI PAUSE FLAG — pune true ca să oprești Gemini, false ca să-l repornești ──
+const GEMINI_PAUSED = true; // 🚩 FLAG: Gemini oprit, Groq răspunde
+
 // ── A/B Model Testing ──
 // 10% of complex queries go to alternative model for comparison
 const AB_TEST_RATIO = 0.10; // 10% to variant
@@ -1282,8 +1285,8 @@ async function thinkV5(
       engine = "GPT-5.4";
       if (gptMonitor) monitorFromTools = gptMonitor;
 
-    } else if (!finalResponse) {
-      // ═══ GEMINI FLASH PATH — doar dacă nu există deja un răspuns ═══
+    } else if (!finalResponse && !GEMINI_PAUSED) {
+      // ═══ GEMINI FLASH PATH — doar dacă nu există deja un răspuns și Gemini NU e pe pauză ═══
       const geminiToolDefs = toGeminiTools(TOOL_DEFINITIONS);
 
       // Build Gemini message array
@@ -1419,6 +1422,34 @@ async function thinkV5(
       }
 
       engine = "Gemini-Flash";
+    } else if (!finalResponse && GEMINI_PAUSED && process.env.GROQ_API_KEY) {
+      // ═══ GROQ FALLBACK — Gemini e pe pauză, Groq răspunde ═══
+      try {
+        const groqHistory = recentHistory.map(h => ({
+          role: h.role === 'ai' ? 'assistant' : h.role,
+          content: typeof h.content === 'string' ? h.content : JSON.stringify(h.content),
+        }));
+        groqHistory.push({ role: 'user', content: message });
+        const groqR = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.GROQ_API_KEY}` },
+          body: JSON.stringify({
+            model: MODELS.GROQ_PRIMARY || 'llama-3.3-70b-versatile',
+            max_tokens: 2048,
+            temperature: 0.7,
+            messages: [{ role: 'system', content: systemPrompt }, ...groqHistory],
+          }),
+          signal: AbortSignal.timeout(15000),
+        });
+        if (groqR.ok) {
+          const groqData = await groqR.json();
+          finalResponse = groqData.choices?.[0]?.message?.content || '';
+          totalTokens += groqData.usage?.total_tokens || 0;
+        }
+      } catch (ge) {
+        logger.warn({ component: 'BrainV5', err: ge.message }, 'Groq fallback failed');
+      }
+      engine = 'Groq';
     }
 
 
