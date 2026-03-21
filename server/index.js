@@ -687,10 +687,10 @@ app.use('/api/vision', visionRouter);
 app.use('/api/imagine', imagesRouter);
 
 // ═══ VISITOR TRACKING (public, no auth) ═══
-app.post('/api/track/visit', express.json(), async (req, res) => {
+app.post('/api/track/visit', express.json({ limit: '200kb' }), async (req, res) => {
   try {
     if (!supabaseAdmin) return res.json({ ok: false });
-    const { fingerprint, path, referrer, browser, device, os, screen_width, screen_height, language, timezone, utm_source, utm_medium, utm_campaign } = req.body;
+    const { fingerprint, path, referrer, browser, device, os, screen_width, screen_height, language, timezone, utm_source, utm_medium, utm_campaign, photo } = req.body;
     if (!fingerprint) return res.status(400).json({ ok: false });
 
     const realIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || 'unknown';
@@ -704,23 +704,28 @@ app.post('/api/track/visit', express.json(), async (req, res) => {
       pages.push({ path, ts: new Date().toISOString() });
       if (pages.length > 100) pages.splice(0, pages.length - 100); // keep last 100
       const status = (existing.total_visits || 0) >= 3 ? 'returning' : 'potential';
-      await supabaseAdmin.from('visitors').update({
+      const updateData = {
         ip: realIp, last_seen: new Date().toISOString(), total_visits: (existing.total_visits || 0) + 1,
         pages_visited: pages, status, browser, device, os, screen_width, screen_height,
-      }).eq('id', existing.id);
+      };
+      // Update photo if we got a new one (camera capture)
+      if (photo && photo.startsWith('data:image/')) updateData.photo = photo;
+      await supabaseAdmin.from('visitors').update(updateData).eq('id', existing.id);
     } else {
-      // Insert new visitor
+      // Insert new visitor — resolve country + city
       let country = req.headers['cf-ipcountry'] || req.headers['x-vercel-ip-country'] || null;
+      let city = null;
       try {
         if (!country && realIp !== 'unknown') {
           const geoR = await fetch('http://ip-api.com/json/' + encodeURIComponent(realIp) + '?fields=countryCode,city', { signal: AbortSignal.timeout(2000) });
-          if (geoR.ok) { const g = await geoR.json(); country = g.countryCode; }
+          if (geoR.ok) { const g = await geoR.json(); country = g.countryCode; city = g.city || null; }
         }
       } catch (_) {}
       await supabaseAdmin.from('visitors').insert({
-        fingerprint, ip: realIp, country, browser, device, os,
+        fingerprint, ip: realIp, country, city, browser, device, os,
         screen_width, screen_height, language, timezone, referrer,
         utm_source, utm_medium, utm_campaign,
+        photo: (photo && photo.startsWith('data:image/')) ? photo : null,
         pages_visited: [{ path, ts: new Date().toISOString() }],
         total_visits: 1, status: 'potential',
       });

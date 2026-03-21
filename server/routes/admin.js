@@ -537,7 +537,26 @@ router.delete('/traffic/:id', async (req, res) => {
     const { error } = await supabaseAdmin.from('page_views').delete().eq('id', req.params.id);
     if (error) return res.status(500).json({ error: error.message });
     res.json({ ok: true });
-  } catch {
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ══════════════════════════════════════════════════════════
+// GET /api/admin/visitors — Full visitor profiles with photo
+// ══════════════════════════════════════════════════════════
+router.get('/visitors', async (req, res) => {
+  try {
+    const { supabaseAdmin } = req.app.locals;
+    if (!supabaseAdmin) return res.json({ visitors: [] });
+    const { data, error } = await supabaseAdmin
+      .from('visitors')
+      .select('*')
+      .order('last_seen', { ascending: false })
+      .limit(100);
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ visitors: data || [] });
+  } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });

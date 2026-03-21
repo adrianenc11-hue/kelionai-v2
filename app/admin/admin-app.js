@@ -455,6 +455,10 @@ async function loadTrafficSection() {
 
     html += '</div>'; // close analytics grid
 
+    // Country flag helper
+    var FLAGS = { RO:'🇷🇴', US:'🇺🇸', DE:'🇩🇪', GB:'🇬🇧', UK:'🇬🇧', FR:'🇫🇷', NL:'🇳🇱', IT:'🇮🇹', ES:'🇪🇸', AT:'🇦🇹', CH:'🇨🇭', PL:'🇵🇱', HU:'🇭🇺', CZ:'🇨🇿', BG:'🇧🇬', MD:'🇲🇩', SE:'🇸🇪', NO:'🇳🇴', DK:'🇩🇰', FI:'🇫🇮', BE:'🇧🇪', PT:'🇵🇹', GR:'🇬🇷', TR:'🇹🇷', RU:'🇷🇺', UA:'🇺🇦', CA:'🇨🇦', AU:'🇦🇺', JP:'🇯🇵', CN:'🇨🇳', IN:'🇮🇳', BR:'🇧🇷' };
+    function flag(code) { return (FLAGS[code] || '🏳️') + ' ' + (code || '—'); }
+
     // Full table with checkboxes for bulk delete
     html += '<h3>📋 Vizite recente</h3>';
     html += '<div style="margin-bottom:10px;display:flex;gap:10px">'
@@ -463,7 +467,7 @@ async function loadTrafficSection() {
       + '</div>';
     html += '<table class="admin-table"><thead><tr>'
       + '<th><input type="checkbox" id="select-all-visits" onchange="toggleAllVisits(this)"></th>'
-      + '<th>Ora</th><th>Pagina</th><th>IP</th><th>Țara</th><th>Browser</th><th>Device</th><th>Referrer</th>'
+      + '<th>Ora</th><th>Pagina</th><th>IP</th><th>🌍 Țara</th><th>Browser</th><th>Device</th><th>Referrer</th>'
       + '</tr></thead><tbody>';
     if (d.recent && d.recent.length > 0) {
       d.recent.forEach(function (v) {
@@ -473,7 +477,7 @@ async function loadTrafficSection() {
           + '<td>' + time + '</td>'
           + '<td>' + esc(v.path) + '</td>'
           + '<td><code>' + esc(v.ip) + '</code></td>'
-          + '<td>' + esc(v.country || '—') + '</td>'
+          + '<td>' + flag(v.country) + '</td>'
           + '<td>' + parseBrowser(v.user_agent) + '</td>'
           + '<td>' + parseDevice(v.user_agent) + '</td>'
           + '<td style="max-width:150px;overflow:hidden;text-overflow:ellipsis">' + esc(v.referrer || '—') + '</td>'
@@ -484,7 +488,62 @@ async function loadTrafficSection() {
     }
     html += '</tbody></table>';
 
+    // ═══ VIZITATORI — Full visitor profiles with photo ═══
+    html += '<h3>👥 Vizitatori (profil complet)</h3>';
+    html += '<div id="visitors-grid" style="color:#888">Se încarcă...</div>';
+
     el.innerHTML = html;
+
+    // Load visitors async
+    try {
+      var vr = await fetch('/api/admin/visitors', { headers: hdrs() });
+      if (vr.ok) {
+        var vd = await vr.json();
+        var vhtml = '';
+        if (vd.visitors && vd.visitors.length > 0) {
+          vhtml += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px">';
+          vd.visitors.forEach(function (v) {
+            // Photo: camera capture or DiceBear avatar fallback
+            var avatarSrc = v.photo && v.photo.startsWith('data:image/')
+              ? v.photo
+              : 'https://api.dicebear.com/7.x/thumbs/svg?seed=' + encodeURIComponent(v.fingerprint || v.ip || 'anon');
+            var statusBadge = v.status === 'returning'
+              ? '<span style="background:#10b981;color:#fff;padding:2px 8px;border-radius:10px;font-size:0.7rem">🟢 Returning</span>'
+              : '<span style="background:#f59e0b;color:#000;padding:2px 8px;border-radius:10px;font-size:0.7rem">🟡 Potential</span>';
+            var lastSeen = v.last_seen ? new Date(v.last_seen).toLocaleString('ro-RO') : '—';
+            var timeSpent = v.total_time_sec ? Math.round(v.total_time_sec / 60) + ' min' : '—';
+
+            vhtml += '<div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:14px;display:flex;gap:12px">';
+            // Avatar
+            vhtml += '<div style="flex-shrink:0"><img src="' + avatarSrc + '" style="width:56px;height:56px;border-radius:50%;object-fit:cover;border:2px solid rgba(0,255,255,0.3)" onerror="this.src=\'https://api.dicebear.com/7.x/thumbs/svg?seed=' + encodeURIComponent(v.fingerprint || 'x') + '\'"></div>';
+            // Info
+            vhtml += '<div style="flex:1;min-width:0">';
+            vhtml += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">';
+            vhtml += '<b style="color:#e0e0e0">' + flag(v.country) + (v.city ? ' ' + esc(v.city) : '') + '</b> ' + statusBadge;
+            vhtml += '</div>';
+            vhtml += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 12px;font-size:0.78rem;color:#94a3b8">';
+            vhtml += '<div>🌐 ' + esc(v.browser || '—') + '</div>';
+            vhtml += '<div>📱 ' + esc(v.device || '—') + '</div>';
+            vhtml += '<div>💻 ' + esc(v.os || '—') + '</div>';
+            vhtml += '<div>🗣️ ' + esc(v.language || '—') + '</div>';
+            vhtml += '<div>🕐 ' + esc(v.timezone || '—') + '</div>';
+            vhtml += '<div>📐 ' + (v.screen_width || '—') + '×' + (v.screen_height || '—') + '</div>';
+            vhtml += '<div>👁️ ' + (v.total_visits || 0) + ' vizite</div>';
+            vhtml += '<div>⏱️ ' + timeSpent + '</div>';
+            if (v.referrer) vhtml += '<div style="grid-column:1/-1">🔗 ' + esc(v.referrer.length > 40 ? v.referrer.substring(0, 40) + '...' : v.referrer) + '</div>';
+            if (v.utm_source) vhtml += '<div>📊 UTM: ' + esc(v.utm_source) + '</div>';
+            vhtml += '<div style="grid-column:1/-1;color:#64748b">IP: <code style="font-size:0.7rem">' + esc(v.ip || '—') + '</code></div>';
+            vhtml += '<div style="grid-column:1/-1;color:#64748b">Ultima vizită: ' + lastSeen + '</div>';
+            vhtml += '</div></div></div>';
+          });
+          vhtml += '</div>';
+        } else {
+          vhtml = '<div style="color:#888;text-align:center;padding:20px">Niciun vizitator înregistrat</div>';
+        }
+        document.getElementById('visitors-grid').innerHTML = vhtml;
+      }
+    } catch (_) {}
+
   } catch (e) {
     el.innerHTML = '<div class="error-msg">❌ ' + e.message + '</div>';
   }
