@@ -3,8 +3,8 @@
 // Runs on server startup — creates tables if they don't exist
 // Uses direct PostgreSQL connection (node-postgres)
 // ═══════════════════════════════════════════════════════════════
-const { Pool } = require("pg");
-const logger = require("./logger");
+const { Pool } = require('pg');
+const logger = require('./logger');
 
 const MIGRATION_SQL = `
 CREATE TABLE IF NOT EXISTS conversations (
@@ -626,18 +626,12 @@ async function runMigration() {
 
   if (!connectionString && process.env.SUPABASE_URL) {
     // Extract project ref from Supabase URL
-    const match = process.env.SUPABASE_URL.match(
-      /https:\/\/([^.]+)\.supabase\.co/,
-    );
+    const match = process.env.SUPABASE_URL.match(/https:\/\/([^.]+)\.supabase\.co/);
     if (match) {
       const ref = match[1];
-      const password =
-        process.env.SUPABASE_DB_PASSWORD || process.env.DB_PASSWORD;
+      const password = process.env.SUPABASE_DB_PASSWORD || process.env.DB_PASSWORD;
       if (!password) {
-        logger.warn(
-          { component: "Migration" },
-          "⚠️ No DB password configured — skipping migration",
-        );
+        logger.warn({ component: 'Migration' }, '⚠️ No DB password configured — skipping migration');
         return false;
       }
       connectionString = `postgresql://postgres:${encodeURIComponent(password)}@db.${ref}.supabase.co:5432/postgres`;
@@ -645,10 +639,7 @@ async function runMigration() {
   }
 
   if (!connectionString) {
-    logger.warn(
-      { component: "Migration" },
-      "⚠️ No database connection — skipping migration",
-    );
+    logger.warn({ component: 'Migration' }, '⚠️ No database connection — skipping migration');
     return false;
   }
 
@@ -659,56 +650,53 @@ async function runMigration() {
   });
 
   try {
-    logger.info({ component: "Migration" }, "🔄 Running database migration...");
+    logger.info({ component: 'Migration' }, '🔄 Running database migration...');
     await pool.query(MIGRATION_SQL);
-    logger.info(
-      { component: "Migration" },
-      "✅ CREATE TABLE IF NOT EXISTS — all 35+ tables processed",
-    );
+    logger.info({ component: 'Migration' }, '✅ CREATE TABLE IF NOT EXISTS — all 35+ tables processed');
 
     // ── POST-MIGRATION: Verify every table actually works ──
     const ALL_TABLES = [
-      "conversations",
-      "messages",
-      "user_preferences",
-      "api_keys",
-      "admin_logs",
-      "trades",
-      "profiles",
-      "media_history",
-      "telegram_users",
-      "whatsapp_users",
-      "whatsapp_messages",
-      "trade_intelligence",
-      "cookie_consents",
-      "metrics_snapshots",
-      "ai_costs",
-      "page_views",
-      "subscriptions",
-      "referrals",
-      "admin_codes",
-      "brain_memory",
-      "learned_facts",
-      "messenger_users",
-      "messenger_messages",
-      "messenger_subscribers",
-      "telegram_messages",
-      "market_candles",
-      "market_learnings",
-      "market_patterns",
-      "brain_profiles",
-      "brain_learnings",
-      "brain_metrics",
-      "brain_tools",
-      "brain_usage",
-      "brain_projects",
-      "brain_procedures",
-      "marketplace_agents",
-      "user_installed_agents",
-      "brain_plugins",
-      "autonomous_tasks",
-      "tenants",
-      "brain_admin_sessions",
+      'conversations',
+      'messages',
+      'user_preferences',
+      'api_keys',
+      'admin_logs',
+      'trades',
+      'profiles',
+      'media_history',
+      'telegram_users',
+      'whatsapp_users',
+      'whatsapp_messages',
+      'trade_intelligence',
+      'cookie_consents',
+      'metrics_snapshots',
+      'ai_costs',
+      'page_views',
+      'subscriptions',
+      'referrals',
+      'admin_codes',
+      'brain_memory',
+      'learned_facts',
+      'messenger_users',
+      'messenger_messages',
+      'messenger_subscribers',
+      'telegram_messages',
+      'market_candles',
+      'market_learnings',
+      'market_patterns',
+      'brain_profiles',
+      'brain_learnings',
+      'brain_metrics',
+      'brain_tools',
+      'brain_usage',
+      'brain_projects',
+      'brain_procedures',
+      'marketplace_agents',
+      'user_installed_agents',
+      'brain_plugins',
+      'autonomous_tasks',
+      'tenants',
+      'brain_admin_sessions',
     ];
 
     const healthy = [];
@@ -716,10 +704,8 @@ async function runMigration() {
 
     for (const table of ALL_TABLES) {
       try {
-        const result = await pool.query(
-          `SELECT COUNT(*) AS cnt FROM ${table} LIMIT 1`,
-        );
-        const count = parseInt(result.rows[0]?.cnt || "0", 10);
+        const result = await pool.query(`SELECT COUNT(*) AS cnt FROM ${table} LIMIT 1`);
+        const count = parseInt(result.rows[0]?.cnt || '0', 10);
         healthy.push({ table, rows: count });
       } catch (e) {
         broken.push({ table, error: e.message.substring(0, 100) });
@@ -728,29 +714,23 @@ async function runMigration() {
 
     if (broken.length > 0) {
       logger.warn(
-        { component: "Migration", broken },
-        `⚠️ ${broken.length} tables BROKEN: ${broken.map((b) => b.table).join(", ")}`,
+        { component: 'Migration', broken },
+        `⚠️ ${broken.length} tables BROKEN: ${broken.map((b) => b.table).join(', ')}`
       );
     }
     logger.info(
       {
-        component: "Migration",
+        component: 'Migration',
         healthy: healthy.length,
         broken: broken.length,
       },
-      `✅ Health check: ${healthy.length} OK, ${broken.length} broken out of ${ALL_TABLES.length} tables`,
+      `✅ Health check: ${healthy.length} OK, ${broken.length} broken out of ${ALL_TABLES.length} tables`
     );
 
     return true;
   } catch (e) {
-    logger.error(
-      { component: "Migration", err: e.message },
-      "❌ Migration failed",
-    );
-    logger.warn(
-      { component: "Migration" },
-      "⚠️ Server will continue without persistent storage",
-    );
+    logger.error({ component: 'Migration', err: e.message }, '❌ Migration failed');
+    logger.warn({ component: 'Migration' }, '⚠️ Server will continue without persistent storage');
     return false;
   } finally {
     await pool.end();

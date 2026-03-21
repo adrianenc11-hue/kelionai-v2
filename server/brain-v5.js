@@ -4,25 +4,25 @@
 // Hybrid routing: simple → Gemini (free), complex → GPT-5.4
 // Max 2 tool rounds — prevents infinite loops
 // ═══════════════════════════════════════════════════════════════
-"use strict";
+'use strict';
 
-const logger = require("./logger");
-const { MODELS } = require("./config/models");
-const { buildSystemPrompt, buildNewbornPrompt } = require("./persona");
-const { getPatternsText, recordUserInteraction, getProactiveSuggestion } = require("./k1-meta-learning");
-const { selfEvaluate, getQualityHints } = require("./k1-performance");
-const fineTuneCollector = require("./fine-tune-collector");
+const logger = require('./logger');
+const { MODELS } = require('./config/models');
+const { buildSystemPrompt, buildNewbornPrompt } = require('./persona');
+const { getPatternsText, recordUserInteraction, getProactiveSuggestion } = require('./k1-meta-learning');
+const { selfEvaluate, getQualityHints } = require('./k1-performance');
+const fineTuneCollector = require('./fine-tune-collector');
 
 // ── GEMINI PAUSE FLAG — pune true ca să oprești Gemini, false ca să-l repornești ──
 const GEMINI_PAUSED = true; // 🚩 FLAG: Gemini oprit, Groq răspunde
 
 // ── A/B Model Testing ──
 // 10% of complex queries go to alternative model for comparison
-const AB_TEST_RATIO = 0.10; // 10% to variant
+const AB_TEST_RATIO = 0.1; // 10% to variant
 let _abTestStats = { control: { count: 0, totalTime: 0 }, variant: { count: 0, totalTime: 0 } };
 
 // Reuse tool definitions and executor from V4 — no duplication
-const { TOOL_DEFINITIONS } = require("./brain-v4");
+const { TOOL_DEFINITIONS } = require('./brain-v4');
 
 // Lazy-load executeTool to avoid circular issues
 let _executeTool = null;
@@ -32,7 +32,7 @@ function getExecuteTool() {
     // Actually, we need to export it. For now, we re-require and extract thinkV4 module.
     // The executeTool in brain-v4 is module-scoped. We'll export it from brain-v4.
     // WORKAROUND: We need to make brain-v4 export executeTool. See the modification below.
-    const brainV4 = require("./brain-v4");
+    const brainV4 = require('./brain-v4');
     _executeTool = brainV4.executeTool;
   }
   return _executeTool;
@@ -41,7 +41,7 @@ function getExecuteTool() {
 // ── Convert tool definitions to OpenAI format ──
 function toOpenAITools(defs) {
   return defs.map((d) => ({
-    type: "function",
+    type: 'function',
     function: {
       name: d.name,
       description: d.description,
@@ -65,36 +65,101 @@ function toGeminiTools(defs) {
 // ═══════════════════════════════════════════════════════════════
 const INTENT_CENTROIDS = {
   greeting: [
-    'salut', 'buna ziua', 'hello', 'hey', 'hi', 'ciao', 'buna dimineata', 'buna seara',
-    'yo', 'hei', 'good morning', 'good evening'
+    'salut',
+    'buna ziua',
+    'hello',
+    'hey',
+    'hi',
+    'ciao',
+    'buna dimineata',
+    'buna seara',
+    'yo',
+    'hei',
+    'good morning',
+    'good evening',
   ],
   casual: [
-    'da', 'nu', 'ok', 'bine', 'mersi', 'multumesc', 'pa', 'la revedere', 'bye', 'super',
-    'mhm', 'aha', 'sigur', 'inteleg', 'perfect', 'cum esti', 'ce mai faci'
+    'da',
+    'nu',
+    'ok',
+    'bine',
+    'mersi',
+    'multumesc',
+    'pa',
+    'la revedere',
+    'bye',
+    'super',
+    'mhm',
+    'aha',
+    'sigur',
+    'inteleg',
+    'perfect',
+    'cum esti',
+    'ce mai faci',
   ],
   search: [
-    'cauta informatii despre', 'ce stiri sunt', 'search for', 'find information about',
-    'ce se intampla cu', 'ultimele noutati despre', 'google', 'afla despre'
+    'cauta informatii despre',
+    'ce stiri sunt',
+    'search for',
+    'find information about',
+    'ce se intampla cu',
+    'ultimele noutati despre',
+    'google',
+    'afla despre',
   ],
   creative: [
-    'genereaza o imagine', 'deseneaza', 'create an image', 'scrie o poveste',
-    'compune un poem', 'inventeaza', 'imagine cu', 'fa un desen', 'write a story'
+    'genereaza o imagine',
+    'deseneaza',
+    'create an image',
+    'scrie o poveste',
+    'compune un poem',
+    'inventeaza',
+    'imagine cu',
+    'fa un desen',
+    'write a story',
   ],
   code: [
-    'scrie un cod', 'write a script', 'debug this', 'fix this code', 'python program',
-    'javascript function', 'cum fac in react', 'sql query', 'api endpoint', 'algoritm'
+    'scrie un cod',
+    'write a script',
+    'debug this',
+    'fix this code',
+    'python program',
+    'javascript function',
+    'cum fac in react',
+    'sql query',
+    'api endpoint',
+    'algoritm',
   ],
   analysis: [
-    'analizeaza acest document', 'explica acest grafic', 'compara', 'evaluate',
-    'ce inseamna', 'interpreteaza', 'rezuma acest text', 'sumarizeaza'
+    'analizeaza acest document',
+    'explica acest grafic',
+    'compara',
+    'evaluate',
+    'ce inseamna',
+    'interpreteaza',
+    'rezuma acest text',
+    'sumarizeaza',
   ],
   realtime: [
-    'ce temperatura e acum', 'cat e ceasul', 'ce vreme e', 'weather', 'pret bitcoin',
-    'curs valutar', 'stiri de azi', 'scor meci', 'trafic acum', 'cutremur'
+    'ce temperatura e acum',
+    'cat e ceasul',
+    'ce vreme e',
+    'weather',
+    'pret bitcoin',
+    'curs valutar',
+    'stiri de azi',
+    'scor meci',
+    'trafic acum',
+    'cutremur',
   ],
   reasoning: [
-    'explica teoria relativitatii', 'de ce exista universul', 'argumenteaza pro si contra',
-    'analiza profunda a', 'cum functioneaza fizica cuantica', 'dezbate', 'compara filosofic'
+    'explica teoria relativitatii',
+    'de ce exista universul',
+    'argumenteaza pro si contra',
+    'analiza profunda a',
+    'cum functioneaza fizica cuantica',
+    'dezbate',
+    'compara filosofic',
   ],
 };
 
@@ -102,9 +167,13 @@ let _centroidEmbeddings = null;
 let _centroidComputePromise = null;
 
 function _cosineSim(a, b) {
-  let dot = 0, normA = 0, normB = 0;
+  let dot = 0,
+    normA = 0,
+    normB = 0;
   for (let i = 0; i < a.length; i++) {
-    dot += a[i] * b[i]; normA += a[i] * a[i]; normB += b[i] * b[i];
+    dot += a[i] * b[i];
+    normA += a[i] * a[i];
+    normB += b[i] * b[i];
   }
   return dot / (Math.sqrt(normA) * Math.sqrt(normB) || 1);
 }
@@ -116,12 +185,14 @@ async function _computeCentroids(brain) {
     try {
       const centroids = {};
       for (const [intent, phrases] of Object.entries(INTENT_CENTROIDS)) {
-        const embeddings = await Promise.all(phrases.map(p => brain.getEmbedding(p).catch(() => null)));
-        const valid = embeddings.filter(e => e && e.length > 0);
+        const embeddings = await Promise.all(phrases.map((p) => brain.getEmbedding(p).catch(() => null)));
+        const valid = embeddings.filter((e) => e && e.length > 0);
         if (valid.length === 0) continue;
         const dim = valid[0].length;
         const avg = new Float64Array(dim);
-        for (const emb of valid) { for (let i = 0; i < dim; i++) avg[i] += emb[i]; }
+        for (const emb of valid) {
+          for (let i = 0; i < dim; i++) avg[i] += emb[i];
+        }
         for (let i = 0; i < dim; i++) avg[i] /= valid.length;
         centroids[intent] = avg;
       }
@@ -131,7 +202,9 @@ async function _computeCentroids(brain) {
     } catch (e) {
       logger.warn({ component: 'IntentML', err: e.message }, '⚠️ Centroid computation failed');
       return null;
-    } finally { _centroidComputePromise = null; }
+    } finally {
+      _centroidComputePromise = null;
+    }
   })();
   return _centroidComputePromise;
 }
@@ -150,13 +223,19 @@ async function classifyIntentML(message, brain) {
     const msgEmb = await brain.getEmbedding(message);
     if (!msgEmb || msgEmb.length === 0) return _regexFallback(lower, wordCount);
 
-    let bestIntent = 'casual', bestScore = -1;
+    let bestIntent = 'casual',
+      bestScore = -1;
     for (const [intent, centroid] of Object.entries(centroids)) {
       const score = _cosineSim(msgEmb, centroid);
-      if (score > bestScore) { bestScore = score; bestIntent = intent; }
+      if (score > bestScore) {
+        bestScore = score;
+        bestIntent = intent;
+      }
     }
-    logger.info({ component: 'IntentML', intent: bestIntent, score: bestScore.toFixed(3) },
-      `🎯 ML intent: ${bestIntent} (${(bestScore * 100).toFixed(1)}%)`);
+    logger.info(
+      { component: 'IntentML', intent: bestIntent, score: bestScore.toFixed(3) },
+      `🎯 ML intent: ${bestIntent} (${(bestScore * 100).toFixed(1)}%)`
+    );
     if (bestScore < 0.3) return 'casual';
     return bestIntent;
   } catch (e) {
@@ -183,7 +262,7 @@ function _regexFallback(lower, wordCount) {
 function classifyComplexity(message) {
   const lower = (message || '').toLowerCase().trim();
   const intent = _regexFallback(lower, lower.split(/\s+/).length);
-  return (intent === 'greeting' || intent === 'casual') ? 'simple' : 'complex';
+  return intent === 'greeting' || intent === 'casual' ? 'simple' : 'complex';
 }
 
 // ── Strip leaked internal tags from AI responses ──
@@ -191,29 +270,31 @@ function stripLeakedTags(text) {
   if (!text) return text;
   let r = text;
   // Tool code blocks that leak
-  r = r.replace(/<tool_code>[\s\S]*?<\/tool_code>/gi, "");
-  r = r.replace(/<tool_call>[\s\S]*?<\/tool_call>/gi, "");
-  r = r.replace(/<function_call>[\s\S]*?<\/function_call>/gi, "");
+  r = r.replace(/<tool_code>[\s\S]*?<\/tool_code>/gi, '');
+  r = r.replace(/<tool_call>[\s\S]*?<\/tool_call>/gi, '');
+  r = r.replace(/<function_call>[\s\S]*?<\/function_call>/gi, '');
   // System instruction blocks
-  r = r.replace(/\[SYSTEM INSTRUCTION[^\]]*\][\s\S]*?\[END SYSTEM INSTRUCTION\]\s*/gi, "");
-  r = r.replace(/\[LEARNED PATTERNS\][\s\S]*?\[\/LEARNED PATTERNS\]\s*/gi, "");
-  r = r.replace(/\[SELF-EVAL HINTS\][\s\S]*?\[\/SELF-EVAL HINTS\]\s*/gi, "");
-  r = r.replace(/\[CONTEXT SWITCH\][^\n]*\n?/gi, "");
-  r = r.replace(/\[PROACTIVE\][\s\S]*?\[\/PROACTIVE\]\s*/gi, "");
-  r = r.replace(/\[EMOTIONAL CONTEXT\][^\n]*\n?/gi, "");
-  r = r.replace(/\[CURRENT DATE & TIME\][^\n]*\n?/gi, "");
-  r = r.replace(/\[USER LOCATION\][^\n]*\n?/gi, "");
-  r = r.replace(/\[REZULTATE CAUTARE WEB REALE\][\s\S]*?Citeaza sursele\.\s*/gi, "");
-  r = r.replace(/\[DATE METEO REALE\][^\n]*\n?/gi, "");
-  r = r.replace(/\[CONTEXT DIN MEMORIE\][^\n]*\n?/gi, "");
+  r = r.replace(/\[SYSTEM INSTRUCTION[^\]]*\][\s\S]*?\[END SYSTEM INSTRUCTION\]\s*/gi, '');
+  r = r.replace(/\[LEARNED PATTERNS\][\s\S]*?\[\/LEARNED PATTERNS\]\s*/gi, '');
+  r = r.replace(/\[SELF-EVAL HINTS\][\s\S]*?\[\/SELF-EVAL HINTS\]\s*/gi, '');
+  r = r.replace(/\[CONTEXT SWITCH\][^\n]*\n?/gi, '');
+  r = r.replace(/\[PROACTIVE\][\s\S]*?\[\/PROACTIVE\]\s*/gi, '');
+  r = r.replace(/\[EMOTIONAL CONTEXT\][^\n]*\n?/gi, '');
+  r = r.replace(/\[CURRENT DATE & TIME\][^\n]*\n?/gi, '');
+  r = r.replace(/\[USER LOCATION\][^\n]*\n?/gi, '');
+  r = r.replace(/\[REZULTATE CAUTARE WEB REALE\][\s\S]*?Citeaza sursele\.\s*/gi, '');
+  r = r.replace(/\[DATE METEO REALE\][^\n]*\n?/gi, '');
+  r = r.replace(/\[CONTEXT DIN MEMORIE\][^\n]*\n?/gi, '');
   // Raw JSON tool results that leak
-  r = r.replace(/```json\s*\{[^}]*"functionCall"[\s\S]*?```/gi, "");
+  r = r.replace(/```json\s*\{[^}]*"functionCall"[\s\S]*?```/gi, '');
   return r.trim();
 }
 
 // ── Extract monitor data from tool results — GENERIC, detectează orice conținut vizual ──
-const IMAGE_URL_PATTERN = /https?:\/\/[^\s"'<>]+(?:\.(?:jpg|jpeg|png|gif|webp|svg|bmp)|(?:pollinations\.ai|dalle\.com|oaidalleapiprodscus\.blob\.core\.windows\.net|cdn\.openai\.com|midjourney\.com|stability\.ai|ideogram\.ai|firefly\.adobe\.com)[^\s"'<>]*)/i;
-const VIDEO_URL_PATTERN = /https?:\/\/(?:www\.)?(?:youtube\.com\/embed|youtu\.be|vimeo\.com\/video|player\.vimeo\.com)[^\s"'<>]*/i;
+const IMAGE_URL_PATTERN =
+  /https?:\/\/[^\s"'<>]+(?:\.(?:jpg|jpeg|png|gif|webp|svg|bmp)|(?:pollinations\.ai|dalle\.com|oaidalleapiprodscus\.blob\.core\.windows\.net|cdn\.openai\.com|midjourney\.com|stability\.ai|ideogram\.ai|firefly\.adobe\.com)[^\s"'<>]*)/i;
+const VIDEO_URL_PATTERN =
+  /https?:\/\/(?:www\.)?(?:youtube\.com\/embed|youtu\.be|vimeo\.com\/video|player\.vimeo\.com)[^\s"'<>]*/i;
 const MAP_URL_PATTERN = /https?:\/\/[^\s"'<>]*(?:openstreetmap\.org|maps\.google\.com|leaflet)[^\s"'<>]*/i;
 const AUDIO_URL_PATTERN = /https?:\/\/[^\s"'<>]*\.(?:mp3|ogg|aac|m3u8|stream)[^\s"'<>]*/i;
 
@@ -221,10 +302,21 @@ function _scanForVisual(obj, depth) {
   if (depth > 4 || !obj || typeof obj !== 'object') return null;
   // Check known property names first (fast path)
   const knownMap = {
-    imageUrl: 'image', image_url: 'image', imageURL: 'image', img: 'image', url: null,
-    monitorHTML: 'html', html: 'html', monitorContent: 'html',
-    monitorURL: 'url', mapURL: 'map', videoURL: 'video', youtubeURL: 'video',
-    radioURL: 'audio', streamUrl: 'audio', audioUrl: 'audio',
+    imageUrl: 'image',
+    image_url: 'image',
+    imageURL: 'image',
+    img: 'image',
+    url: null,
+    monitorHTML: 'html',
+    html: 'html',
+    monitorContent: 'html',
+    monitorURL: 'url',
+    mapURL: 'map',
+    videoURL: 'video',
+    youtubeURL: 'video',
+    radioURL: 'audio',
+    streamUrl: 'audio',
+    audioUrl: 'audio',
   };
   for (const [key, type] of Object.entries(knownMap)) {
     const val = obj[key];
@@ -243,7 +335,8 @@ function _scanForVisual(obj, depth) {
       if (VIDEO_URL_PATTERN.test(val)) return { content: val, type: 'video' };
       if (MAP_URL_PATTERN.test(val)) return { content: val, type: 'map' };
       if (AUDIO_URL_PATTERN.test(val)) return { content: val, type: 'audio' };
-      if (val.includes('<!DOCTYPE') || (val.includes('<html') && val.includes('</html>'))) return { content: val, type: 'html' };
+      if (val.includes('<!DOCTYPE') || (val.includes('<html') && val.includes('</html>')))
+        return { content: val, type: 'html' };
     } else if (val && typeof val === 'object') {
       const nested = _scanForVisual(val, depth + 1);
       if (nested) return nested;
@@ -267,14 +360,11 @@ function extractMonitor(toolResults) {
 // ═══════════════════════════════════════════════════════════════
 async function callOpenAI(messages, systemPrompt, tools, model) {
   const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) throw new Error("OPENAI_API_KEY not configured");
+  if (!apiKey) throw new Error('OPENAI_API_KEY not configured');
 
   const body = {
     model: model || MODELS.OPENAI_CHAT,
-    messages: [
-      { role: "system", content: systemPrompt },
-      ...messages,
-    ],
+    messages: [{ role: 'system', content: systemPrompt }, ...messages],
     max_completion_tokens: 4096,
     temperature: 0.7,
   };
@@ -282,7 +372,7 @@ async function callOpenAI(messages, systemPrompt, tools, model) {
   // Only include tools if provided and non-empty
   if (tools && tools.length > 0) {
     body.tools = tools;
-    body.tool_choice = "auto";
+    body.tool_choice = 'auto';
   }
 
   // ── Timeout 25s — previne agățarea indefinită a request-ului ──
@@ -290,10 +380,10 @@ async function callOpenAI(messages, systemPrompt, tools, model) {
   const timeoutId = setTimeout(() => controller.abort(), 25000);
 
   try {
-    const r = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
+    const r = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
       headers: {
-        "Content-Type": "application/json",
+        'Content-Type': 'application/json',
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify(body),
@@ -303,18 +393,17 @@ async function callOpenAI(messages, systemPrompt, tools, model) {
     clearTimeout(timeoutId);
 
     if (!r.ok) {
-      const errText = await r.text().catch(() => "unknown");
+      const errText = await r.text().catch(() => 'unknown');
       throw new Error(`OpenAI API ${r.status}: ${errText.substring(0, 300)}`);
     }
 
     return await r.json();
   } catch (e) {
     clearTimeout(timeoutId);
-    if (e.name === "AbortError") throw new Error("OpenAI timeout (25s) — falling back to Gemini");
+    if (e.name === 'AbortError') throw new Error('OpenAI timeout (25s) — falling back to Gemini');
     throw e;
   }
 }
-
 
 // ── Claude (Anthropic) — reasoning profund ──
 async function callClaude(prompt, systemPrompt, modelId) {
@@ -347,7 +436,12 @@ async function callClaude(prompt, systemPrompt, modelId) {
       throw new Error(`Claude API ${r.status}: ${errText.substring(0, 200)}`);
     }
     const data = await r.json();
-    return data.content?.filter(c => c.type === 'text').map(c => c.text).join('') || '';
+    return (
+      data.content
+        ?.filter((c) => c.type === 'text')
+        .map((c) => c.text)
+        .join('') || ''
+    );
   } catch (e) {
     clearTimeout(timeoutId);
     if (e.name === 'AbortError') throw new Error('Claude timeout (20s)');
@@ -368,7 +462,7 @@ async function callDeepSeek(prompt, systemPrompt) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
+        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
         model: MODELS.DEEPSEEK || 'deepseek-chat',
@@ -424,7 +518,12 @@ async function callGeminiPro(prompt, systemPrompt) {
       throw new Error(`Gemini Pro ${r.status}: ${errText.substring(0, 200)}`);
     }
     const data = await r.json();
-    return (data.candidates?.[0]?.content?.parts || []).filter(p => p.text).map(p => p.text).join('') || '';
+    return (
+      (data.candidates?.[0]?.content?.parts || [])
+        .filter((p) => p.text)
+        .map((p) => p.text)
+        .join('') || ''
+    );
   } catch (e) {
     clearTimeout(timer);
     if (e.name === 'AbortError') throw new Error('Gemini Pro timeout (30s)');
@@ -448,7 +547,12 @@ async function superThink(message, systemPrompt, history, onProgress = null) {
   logger.info({ component: 'SuperThink' }, '🧠🧠🧠 AI PIPELINE — Collaborative chain started');
   const shortPrompt = systemPrompt.substring(0, 3000);
   const pipeline = { steps: [], startTime: Date.now() };
-  const progress = (step, detail) => { if (onProgress) try { onProgress(step, detail); } catch (_) {} };
+  const progress = (step, detail) => {
+    if (onProgress)
+      try {
+        onProgress(step, detail);
+      } catch (_) {}
+  };
 
   // ═══ STEP 1: GROQ — Analiză ultra-rapidă (planificator) ═══
   let groqPlan = null;
@@ -456,12 +560,17 @@ async function superThink(message, systemPrompt, history, onProgress = null) {
     try {
       const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.GROQ_API_KEY}` },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
         body: JSON.stringify({
           model: MODELS.GROQ_PRIMARY || 'llama-3.3-70b-versatile',
           max_tokens: 500,
-          messages: [{ role: 'system', content: 'Ești un PLANIFICATOR AI. Analizezi cererea userului și faci un plan scurt.' },
-            { role: 'user', content: `Cerere user: "${message}"\n\nFă un plan SCURT (max 5 puncte):\n1. Ce tip de cerere e?\n2. Ce FAPTE trebuie verificate?\n3. Ce CALCULE/LOGICĂ?\n4. Ce NUANȚE/PERSPECTIVE?\n5. Ce FORMAT ideal?\n\nRăspunde scurt, direct.` }],
+          messages: [
+            { role: 'system', content: 'Ești un PLANIFICATOR AI. Analizezi cererea userului și faci un plan scurt.' },
+            {
+              role: 'user',
+              content: `Cerere user: "${message}"\n\nFă un plan SCURT (max 5 puncte):\n1. Ce tip de cerere e?\n2. Ce FAPTE trebuie verificate?\n3. Ce CALCULE/LOGICĂ?\n4. Ce NUANȚE/PERSPECTIVE?\n5. Ce FORMAT ideal?\n\nRăspunde scurt, direct.`,
+            },
+          ],
         }),
         signal: AbortSignal.timeout(5000),
       });
@@ -471,7 +580,9 @@ async function superThink(message, systemPrompt, history, onProgress = null) {
         progress('planning', 'Groq a creat planul de analiză');
         pipeline.steps.push({ ai: 'Groq', role: 'Planificator', ms: Date.now() - pipeline.startTime });
       }
-    } catch (e) { logger.warn({ component: 'SuperThink' }, `Groq plan failed: ${e.message}`); }
+    } catch (e) {
+      logger.warn({ component: 'SuperThink' }, `Groq plan failed: ${e.message}`);
+    }
   }
   if (!groqPlan) groqPlan = `Cerere: "${message}" — răspunde complet și precis.`;
 
@@ -488,7 +599,7 @@ async function superThink(message, systemPrompt, history, onProgress = null) {
         `PLAN:\n${groqPlan}\n\nCERERE: "${message}"\n\nGândește PAS CU PAS: Înțelege → Analizează → Raționează → Concluzionează.\nRăspunde natural, max 400 cuvinte.`,
         shortPrompt,
         MODELS.CLAUDE_FAST || 'claude-3-5-haiku-20241022'
-      ).catch(e => `[Claude indisponibil: ${e.message}]`)
+      ).catch((e) => `[Claude indisponibil: ${e.message}]`)
     );
   }
 
@@ -499,16 +610,17 @@ async function superThink(message, systemPrompt, history, onProgress = null) {
       callDeepSeek(
         `PLAN:\n${groqPlan}\n\nCERERE: "${message}"\n\nContribuie DOAR cu calcule exacte, cod, date verificabile. Max 300 cuvinte.`,
         shortPrompt
-      ).catch(e => `[DeepSeek indisponibil: ${e.message}]`)
+      ).catch((e) => `[DeepSeek indisponibil: ${e.message}]`)
     );
   }
 
   const parallelResults = await Promise.allSettled(parallelTasks);
   const contributions = {};
   parallelResults.forEach((r, i) => {
-    contributions[parallelLabels[i]] = r.status === 'fulfilled'
-      ? (typeof r.value === 'string' ? r.value : String(r.value)).substring(0, 2000)
-      : `[${parallelLabels[i]} failed]`;
+    contributions[parallelLabels[i]] =
+      r.status === 'fulfilled'
+        ? (typeof r.value === 'string' ? r.value : String(r.value)).substring(0, 2000)
+        : `[${parallelLabels[i]} failed]`;
   });
   pipeline.steps.push({ ai: parallelLabels.join('+'), role: 'Specialists', ms: Date.now() - step2Start });
   progress('analyzing', `${parallelLabels.join(' + ')} au terminat analiza`);
@@ -517,19 +629,23 @@ async function superThink(message, systemPrompt, history, onProgress = null) {
   let finalResponse = null;
   const step3Start = Date.now();
   const contributionsText = Object.entries(contributions)
-    .map(([name, text]) => `\n[${name}]\n${text}`).join('\n');
+    .map(([name, text]) => `\n[${name}]\n${text}`)
+    .join('\n');
 
   if (process.env.OPENAI_API_KEY) {
     try {
       const r = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
         body: JSON.stringify({
           model: MODELS.OPENAI_CHAT || 'gpt-5.4',
           max_tokens: 2048,
           messages: [
             { role: 'system', content: shortPrompt },
-            { role: 'user', content: `${message}\n\n---\n[INTERN]\n[PLAN] ${groqPlan}\n${contributionsText}\n\nCONSTRUIEȘTE răspunsul final integrând contribuțiile. NU menționa alte AI-uri. Adaugă [EMOTION:xxx] [GESTURE:xxx] la final.` },
+            {
+              role: 'user',
+              content: `${message}\n\n---\n[INTERN]\n[PLAN] ${groqPlan}\n${contributionsText}\n\nCONSTRUIEȘTE răspunsul final integrând contribuțiile. NU menționa alte AI-uri. Adaugă [EMOTION:xxx] [GESTURE:xxx] la final.`,
+            },
           ],
         }),
         signal: AbortSignal.timeout(20000),
@@ -540,7 +656,9 @@ async function superThink(message, systemPrompt, history, onProgress = null) {
         pipeline.steps.push({ ai: 'GPT-5.4', role: 'Constructor', ms: Date.now() - step3Start });
         progress('constructing', 'GPT-5.4 a construit răspunsul final');
       }
-    } catch (e) { logger.warn({ component: 'SuperThink' }, `GPT final failed: ${e.message}`); }
+    } catch (e) {
+      logger.warn({ component: 'SuperThink' }, `GPT final failed: ${e.message}`);
+    }
   }
 
   // Fallback: Gemini Flash
@@ -548,30 +666,37 @@ async function superThink(message, systemPrompt, history, onProgress = null) {
     try {
       finalResponse = await callGeminiWithSearch(
         `${message}\n\n[INTERN]\n[PLAN] ${groqPlan}\n${contributionsText}\n\nConstruiește răspunsul final. NU menționa sursa.`,
-        shortPrompt, history
-      ).then(r => r.text);
-    } catch (_) { /* use contributions directly */ }
+        shortPrompt,
+        history
+      ).then((r) => r.text);
+    } catch (_) {
+      /* use contributions directly */
+    }
   }
 
   if (!finalResponse) {
-    finalResponse = Object.values(contributions).filter(v => !v.startsWith('[')).join('\n\n') || groqPlan;
+    finalResponse =
+      Object.values(contributions)
+        .filter((v) => !v.startsWith('['))
+        .join('\n\n') || groqPlan;
   }
 
   // Step 4 (Gemini Pro validator) REMOVED — Quality Gate already handles verification
 
   const totalMs = Date.now() - pipeline.startTime;
-  logger.info({ component: 'SuperThink', totalMs, steps: pipeline.steps.length },
-    `🧠✅ PIPELINE COMPLETE (${totalMs}ms) — ${pipeline.steps.map(s => s.ai).join(' → ')}`);
+  logger.info(
+    { component: 'SuperThink', totalMs, steps: pipeline.steps.length },
+    `🧠✅ PIPELINE COMPLETE (${totalMs}ms) — ${pipeline.steps.map((s) => s.ai).join(' → ')}`
+  );
 
   return {
     text: finalResponse,
     engine: 'super-think-pipeline',
     pipeline: pipeline.steps,
     totalMs,
-    providers: pipeline.steps.map(s => s.ai),
+    providers: pipeline.steps.map((s) => s.ai),
   };
 }
-
 
 // ── Quality Gate: Gemini Flash verifies critical GPT-5.4 responses ──
 
@@ -579,12 +704,28 @@ async function superThink(message, systemPrompt, history, onProgress = null) {
 // INTENT DETECTION — Ce vrea userul? Fiecare intenție → tool potrivit
 // ═══════════════════════════════════════════════════════════════
 function detectIntent(message, mediaData) {
-  if (mediaData?.imageBase64) return 'vision';          // imagine → GPT vision
+  if (mediaData?.imageBase64) return 'vision'; // imagine → GPT vision
   const m = message.toLowerCase();
-  if (/\b(vrem[ea]|meteo|weather|temperatur[ăa]?|ploaie|soare|frig|cald|grad[e]?|gradele|afar[aă]|nivelul\s+temperatur|cum\s+e\s+afar)\b/i.test(m)) return 'weather';
-  if (/ultima\s+(versiune|noutate|stire)|ce\s+(mai)?\s+nou|știri|stiri|news|azi\s+a|lansat\s+(acum|azi)|apărut|aparut|pret.*actual|cum\s+sta|rezultat\s+final|scor\s+final|clasament|cine\s+a\s+(câștigat|castigat|câştigat)|ce\s+(s-?a|e)\s+(întâmplat|intamplat)|recent\s+a|din\s+\d{4}/i.test(m)) return 'web_search';
-  if (/harta|navigheaz|rut[ăa]|genereaz[ăa]\s+(imagine|pict|foto)|arată.*pe\s+hartă|arat[ăa].*pe\s+harta/i.test(m)) return 'tool_use';
-  if (/calculeaz[ăa]\s+integral|integr[ăa]l[ăa]|rezolv[ăa]\s+ecuaţia|demonstreaz[ăa]\s+teorema|analiz[ăa].*complet[ăa]|scrie\s+cod\s+complet\s+pentru|arhitectur[ăa]\s+sistem|documentaţie\s+tehnic|full.?stack/i.test(m)) return 'deep_reasoning';
+  if (
+    /\b(vrem[ea]|meteo|weather|temperatur[ăa]?|ploaie|soare|frig|cald|grad[e]?|gradele|afar[aă]|nivelul\s+temperatur|cum\s+e\s+afar)\b/i.test(
+      m
+    )
+  )
+    return 'weather';
+  if (
+    /ultima\s+(versiune|noutate|stire)|ce\s+(mai)?\s+nou|știri|stiri|news|azi\s+a|lansat\s+(acum|azi)|apărut|aparut|pret.*actual|cum\s+sta|rezultat\s+final|scor\s+final|clasament|cine\s+a\s+(câștigat|castigat|câştigat)|ce\s+(s-?a|e)\s+(întâmplat|intamplat)|recent\s+a|din\s+\d{4}/i.test(
+      m
+    )
+  )
+    return 'web_search';
+  if (/harta|navigheaz|rut[ăa]|genereaz[ăa]\s+(imagine|pict|foto)|arată.*pe\s+hartă|arat[ăa].*pe\s+harta/i.test(m))
+    return 'tool_use';
+  if (
+    /calculeaz[ăa]\s+integral|integr[ăa]l[ăa]|rezolv[ăa]\s+ecuaţia|demonstreaz[ăa]\s+teorema|analiz[ăa].*complet[ăa]|scrie\s+cod\s+complet\s+pentru|arhitectur[ăa]\s+sistem|documentaţie\s+tehnic|full.?stack/i.test(
+      m
+    )
+  )
+    return 'deep_reasoning';
   return 'chat';
 }
 
@@ -598,14 +739,16 @@ async function callGeminiWithSearch(message, systemPrompt, history, opts = {}) {
 
   const enableSearch = opts.enableSearch === true;
   // gemini-2.0-flash suporta search grounding; pentru chat fara search folosim gemini-2.5-flash
-  const model = enableSearch ? 'gemini-2.0-flash' : (MODELS.GEMINI_CHAT || 'gemini-2.5-flash');
-
+  const model = enableSearch ? 'gemini-2.0-flash' : MODELS.GEMINI_CHAT || 'gemini-2.5-flash';
 
   const contents = [
-    ...(history || []).slice(-10).map(h => ({
-      role: h.role === 'ai' || h.role === 'assistant' || h.role === 'model' ? 'model' : 'user',
-      parts: [{ text: typeof h.content === 'string' ? h.content : (h.parts?.[0]?.text || '') }],
-    })).filter(h => h.parts[0].text), // elimina intrari goale
+    ...(history || [])
+      .slice(-10)
+      .map((h) => ({
+        role: h.role === 'ai' || h.role === 'assistant' || h.role === 'model' ? 'model' : 'user',
+        parts: [{ text: typeof h.content === 'string' ? h.content : h.parts?.[0]?.text || '' }],
+      }))
+      .filter((h) => h.parts[0].text), // elimina intrari goale
     { role: 'user', parts: [{ text: message }] },
   ];
 
@@ -634,15 +777,20 @@ async function callGeminiWithSearch(message, systemPrompt, history, opts = {}) {
   }
 
   const data = await r.json();
-  const text = (data.candidates?.[0]?.content?.parts || []).filter(p => p.text).map(p => p.text).join('');
+  const text = (data.candidates?.[0]?.content?.parts || [])
+    .filter((p) => p.text)
+    .map((p) => p.text)
+    .join('');
   if (!text) throw new Error('Gemini returned empty response');
 
   const sources = (data.candidates?.[0]?.groundingMetadata?.groundingChunks || [])
-    .slice(0, 3).map(c => c.web?.title ? `[${c.web.title}](${c.web.uri})` : '').filter(Boolean).join(' | ');
+    .slice(0, 3)
+    .map((c) => (c.web?.title ? `[${c.web.title}](${c.web.uri})` : ''))
+    .filter(Boolean)
+    .join(' | ');
 
   return { text, sources, engine: enableSearch ? 'gemini-search-grounding' : 'gemini-flash' };
 }
-
 
 // ═══════════════════════════════════════════════════════════════
 // PRE-FETCH Real-time data (weather only — search e acum via Gemini Search Grounding)
@@ -675,10 +823,14 @@ async function getRealtimeContext(message, brain, userId, geo) {
         }
       } else {
         // 2. Detectare oras din mesaj
-        const cityMatch = message.match(/(?:în|in|la|at|for|pentru|din)\s+([A-ZĂÎÂȘȚ][a-zA-ZăîâșțĂÎÂȘȚ\s-]{2,25}?)(?=[.,?!]|\s+(?:e|este|acum|azi|mâine)|$)/i);
+        const cityMatch = message.match(
+          /(?:în|in|la|at|for|pentru|din)\s+([A-ZĂÎÂȘȚ][a-zA-ZăîâșțĂÎÂȘȚ\s-]{2,25}?)(?=[.,?!]|\s+(?:e|este|acum|azi|mâine)|$)/i
+        );
         if (!cityMatch) {
           // Nu stim locatia — brain CERE informatia, nu skip
-          parts.push('[LOCATIE NECUNOSCUTA]\nUserul a cerut date meteo dar nu ai putut determina locatia.\nCere-i direct: "În ce oraș ești?" sau "Activează GPS-ul din browser pentru a-ți da vremea exactă." NU genera date meteo inventate.');
+          parts.push(
+            '[LOCATIE NECUNOSCUTA]\nUserul a cerut date meteo dar nu ai putut determina locatia.\nCere-i direct: "În ce oraș ești?" sau "Activează GPS-ul din browser pentru a-ți da vremea exactă." NU genera date meteo inventate.'
+          );
           return parts.join('\n\n');
         }
         const city = cityMatch[1].trim();
@@ -703,20 +855,39 @@ async function getRealtimeContext(message, brain, userId, geo) {
       if (wR.ok) {
         const wData = await wR.json();
         const c = wData.current;
-        const codes = { 0: 'Cer senin☀️', 1: 'Parțial noros🌤️', 2: 'Noros⛅', 3: 'Acoperit☁️', 45: 'Ceatos🌫️', 48: 'Ceatos🌫️', 51: 'Burniță🌦️', 61: 'Ploaie🌧️', 63: 'Ploaie moderată🌧️', 65: 'Ploaie abundentă🌧️', 71: 'Ninsoare🌨️', 80: 'Averse🌦️', 95: 'Furtună⛈️' };
+        const codes = {
+          0: 'Cer senin☀️',
+          1: 'Parțial noros🌤️',
+          2: 'Noros⛅',
+          3: 'Acoperit☁️',
+          45: 'Ceatos🌫️',
+          48: 'Ceatos🌫️',
+          51: 'Burniță🌦️',
+          61: 'Ploaie🌧️',
+          63: 'Ploaie moderată🌧️',
+          65: 'Ploaie abundentă🌧️',
+          71: 'Ninsoare🌨️',
+          80: 'Averse🌦️',
+          95: 'Furtună⛈️',
+        };
         const desc = codes[c?.weather_code] || 'Variabil';
-        parts.push(`[DATE METEO REALE — ${locationName}]\nTemperatură: ${c?.temperature_2m}°C (resimțit ${c?.apparent_temperature}°C)\nCondiții: ${desc}\nUmiditate: ${c?.relative_humidity_2m}%\nVânt: ${c?.wind_speed_10m} km/h\nPrecipitații: ${c?.precipitation}mm`);
+        parts.push(
+          `[DATE METEO REALE — ${locationName}]\nTemperatură: ${c?.temperature_2m}°C (resimțit ${c?.apparent_temperature}°C)\nCondiții: ${desc}\nUmiditate: ${c?.relative_humidity_2m}%\nVânt: ${c?.wind_speed_10m} km/h\nPrecipitații: ${c?.precipitation}mm`
+        );
       }
-    } catch (_) { /* non-blocking */ }
+    } catch (_) {
+      /* non-blocking */
+    }
   }
 
   // ── Web Search (profesional — prin brain._search care are toate API-urile) ──
   // ── Web Search — IMPLICIT MEREU (nu condiționat de keywords) ──
   // Skip doar pentru conversații simple fără conținut factual
-  const isSimpleChat = lower.match(/^(?:salut|buna|bună|hello|hi\b|hey\b|ok\b|da\b|nu\b|bine|super|mulțumesc|multumesc|mersi|merci|thanks|thx|bye|pa|la\s+revedere|cum\s+ești|cum\s+esti|ce\s+mai\s+faci|cine\s+ești|cine\s+esti|te\s+rog\s+(?:fa|scrie|calcul|explic|tradu)|execut|calculez|scrie|genereaz|explicat|traduc|analiz)\b/i);
+  const isSimpleChat = lower.match(
+    /^(?:salut|buna|bună|hello|hi\b|hey\b|ok\b|da\b|nu\b|bine|super|mulțumesc|multumesc|mersi|merci|thanks|thx|bye|pa|la\s+revedere|cum\s+ești|cum\s+esti|ce\s+mai\s+faci|cine\s+ești|cine\s+esti|te\s+rog\s+(?:fa|scrie|calcul|explic|tradu)|execut|calculez|scrie|genereaz|explicat|traduc|analiz)\b/i
+  );
   const isShort = message.trim().split(/\s+/).length < 5; // mesaje sub 5 cuvinte - probabil conversationale
   const shouldSearch = !isSimpleChat && !isShort;
-
 
   if (shouldSearch && brain && typeof brain._search === 'function') {
     try {
@@ -727,31 +898,43 @@ async function getRealtimeContext(message, brain, userId, geo) {
       ]);
 
       // ── Fallback: Gemini Search Grounding (Google Search built-in, fara cheie externa) ──
-      if ((!searchResult || (typeof searchResult === 'string' && searchResult.length < 20)) &&
-        (process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY)) {
+      if (
+        (!searchResult || (typeof searchResult === 'string' && searchResult.length < 20)) &&
+        (process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY)
+      ) {
         const gKey = process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
         const gModel = 'gemini-2.5-flash-preview-04-17';
         const gCtrl = new AbortController();
         const gTimer = setTimeout(() => gCtrl.abort(), 8000);
         try {
-          const gR = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${gModel}:generateContent?key=${gKey}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{ role: 'user', parts: [{ text: searchQuery }] }],
-              tools: [{ googleSearch: {} }],
-              generationConfig: { maxOutputTokens: 800, temperature: 0.3 },
-            }),
-            signal: gCtrl.signal,
-          }).finally(() => clearTimeout(gTimer));
+          const gR = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${gModel}:generateContent?key=${gKey}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: [{ role: 'user', parts: [{ text: searchQuery }] }],
+                tools: [{ googleSearch: {} }],
+                generationConfig: { maxOutputTokens: 800, temperature: 0.3 },
+              }),
+              signal: gCtrl.signal,
+            }
+          ).finally(() => clearTimeout(gTimer));
           if (gR.ok) {
             const gData = await gR.json();
-            const groundedText = (gData.candidates?.[0]?.content?.parts || []).filter(p => p.text).map(p => p.text).join('');
+            const groundedText = (gData.candidates?.[0]?.content?.parts || [])
+              .filter((p) => p.text)
+              .map((p) => p.text)
+              .join('');
             const sources = (gData.candidates?.[0]?.groundingMetadata?.groundingChunks || [])
-              .slice(0, 3).map(c => `- ${c.web?.title}: ${c.web?.uri}`).join('\n');
+              .slice(0, 3)
+              .map((c) => `- ${c.web?.title}: ${c.web?.uri}`)
+              .join('\n');
             if (groundedText) searchResult = groundedText + (sources ? `\n\nSurse:\n${sources}` : '');
           }
-        } catch (_) { /* grounding unavailable */ }
+        } catch (_) {
+          /* grounding unavailable */
+        }
       }
 
       if (searchResult && typeof searchResult === 'string' && searchResult.length > 20) {
@@ -761,23 +944,31 @@ async function getRealtimeContext(message, brain, userId, geo) {
         if (txt.length > 20) parts.push(`[REZULTATE CĂUTARE WEB REALE]\n${txt}`);
       }
     } catch (_) {
-      parts.push('[SEARCH INDISPONIBIL]\nNu pot accesa internetul în acest moment. Oferă ce știi, marcând clar că nu sunt date actuale.');
+      parts.push(
+        '[SEARCH INDISPONIBIL]\nNu pot accesa internetul în acest moment. Oferă ce știi, marcând clar că nu sunt date actuale.'
+      );
     }
   }
 
   return parts.length > 0 ? parts.join('\n\n') : null;
 }
 
-
-
 // ── Parse avatar commands from AI text response ──
 function parseAvatarCommands(text) {
   if (!text) return {};
-  const emotion = text.match(/\[EMOTION:([^\]]+)\]/i)?.[1]?.trim().toLowerCase() || null;
-  const gestures = [...text.matchAll(/\[GESTURE:([^\]]+)\]/gi)].map(m => m[1].trim().toLowerCase());
-  const bodyActions = [...text.matchAll(/\[BODY:([^\]]+)\]/gi)].map(m => m[1].trim());
-  const gaze = text.match(/\[GAZE:([^\]]+)\]/i)?.[1]?.trim().toLowerCase() || null;
-  const actions = [...text.matchAll(/\[ACTION:([^\]]+)\]/gi)].map(m => m[1].trim().toLowerCase());
+  const emotion =
+    text
+      .match(/\[EMOTION:([^\]]+)\]/i)?.[1]
+      ?.trim()
+      .toLowerCase() || null;
+  const gestures = [...text.matchAll(/\[GESTURE:([^\]]+)\]/gi)].map((m) => m[1].trim().toLowerCase());
+  const bodyActions = [...text.matchAll(/\[BODY:([^\]]+)\]/gi)].map((m) => m[1].trim());
+  const gaze =
+    text
+      .match(/\[GAZE:([^\]]+)\]/i)?.[1]
+      ?.trim()
+      .toLowerCase() || null;
+  const actions = [...text.matchAll(/\[ACTION:([^\]]+)\]/gi)].map((m) => m[1].trim().toLowerCase());
 
   // Parse [MONITOR:type]...[/MONITOR] or [MONITOR]...[/MONITOR] HTML/image content
   let monitor = { content: null, type: null };
@@ -801,17 +992,16 @@ function parseAvatarCommands(text) {
   return { emotion, gestures, bodyActions, gaze, actions, monitor, cleanText };
 }
 
-
 async function qualityGate(question, answer, domain) {
   // QA for critical domains + any response with low confidence indicators
-  const criticalDomains = ["trading", "medical", "legal", "financial", "science", "education", "history"];
+  const criticalDomains = ['trading', 'medical', 'legal', 'financial', 'science', 'education', 'history'];
   if (!criticalDomains.includes(domain)) return { passed: true, corrected: null };
 
   try {
     const apiKey = process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
     if (!apiKey) return { passed: true, corrected: null }; // Skip if no key
 
-    const model = MODELS.GEMINI_QA || MODELS.GEMINI_CHAT || "gemini-2.5-flash";
+    const model = MODELS.GEMINI_QA || MODELS.GEMINI_CHAT || 'gemini-2.5-flash';
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
     const verifyPrompt = `You are a fact-checking Quality Gate. Verify this AI response for accuracy.
@@ -823,10 +1013,10 @@ If the answer contains errors or could be improved significantly, respond with a
 Be concise. Only correct factual errors, not style.`;
 
     const r = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: verifyPrompt }] }],
+        contents: [{ role: 'user', parts: [{ text: verifyPrompt }] }],
         generationConfig: { maxOutputTokens: 1024, temperature: 0.1 },
       }),
     });
@@ -834,21 +1024,21 @@ Be concise. Only correct factual errors, not style.`;
     if (!r.ok) return { passed: true, corrected: null };
 
     const response = await r.json();
-    const qaText = response.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    const qaText = response.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
-    if (qaText.includes("QA_PASS")) {
+    if (qaText.includes('QA_PASS')) {
       return { passed: true, corrected: null };
     }
 
     // QA suggests correction — use it if substantially different
     if (qaText.length > 20 && qaText.length < answer.length * 2) {
-      logger.info({ component: "BrainV5" }, "🔍 Quality Gate: correction applied");
+      logger.info({ component: 'BrainV5' }, '🔍 Quality Gate: correction applied');
       return { passed: false, corrected: qaText };
     }
 
     return { passed: true, corrected: null };
   } catch (e) {
-    logger.warn({ component: "BrainV5", err: e.message }, "Quality Gate failed (non-blocking)");
+    logger.warn({ component: 'BrainV5', err: e.message }, 'Quality Gate failed (non-blocking)');
     return { passed: true, corrected: null };
   }
 }
@@ -889,14 +1079,16 @@ Text de verificat: "${snippet}"`;
 
     if (!r.ok) return;
     const data = await r.json();
-    const text = (data.candidates?.[0]?.content?.parts || []).map(p => p.text).join('');
+    const text = (data.candidates?.[0]?.content?.parts || []).map((p) => p.text).join('');
 
     // Parse JSON from response
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       const result = JSON.parse(jsonMatch[0]);
-      logger.info({ component: 'FactCheck', confidence: result.confidence, issues: result.issues?.length || 0 },
-        `🔍 Fact check: ${result.confidence}% confidence, ${result.issues?.length || 0} issues`);
+      logger.info(
+        { component: 'FactCheck', confidence: result.confidence, issues: result.issues?.length || 0 },
+        `🔍 Fact check: ${result.confidence}% confidence, ${result.issues?.length || 0} issues`
+      );
     }
   } catch (e) {
     // Non-blocking — silently fail
@@ -917,7 +1109,7 @@ async function thinkV5(
   conversationId,
   mediaData = {},
   isAdmin = false,
-  onProgress = null,
+  onProgress = null
 ) {
   brain.conversationCount++;
   const startTime = Date.now();
@@ -929,17 +1121,17 @@ async function thinkV5(
     const quota = await brain.checkQuota(userId);
     if (!quota.allowed) {
       const upgradeMsg =
-        language === "ro"
+        language === 'ro'
           ? `Ai atins limita de ${quota.limit} mesaje/lună pe planul ${quota.plan.toUpperCase()}. Upgradeează pentru mai multe mesaje! 🚀`
           : `You've reached your ${quota.limit} messages/month limit on ${quota.plan.toUpperCase()}. Upgrade for more! 🚀`;
       return {
         enrichedMessage: upgradeMsg,
         toolsUsed: [],
         monitor: { content: null, type: null },
-        analysis: { complexity: "simple", language },
+        analysis: { complexity: 'simple', language },
         thinkTime: Date.now() - startTime,
         confidence: 1.0,
-        agent: "v5-quota-block",
+        agent: 'v5-quota-block',
       };
     }
 
@@ -956,71 +1148,68 @@ async function thinkV5(
 
     // ── 2. Load memory + profile (parallel) ──
     const [memories, visualMem, audioMem, facts, profile] = await Promise.all([
-      brain.loadMemory(userId, "text", 20, message),
-      brain.loadMemory(userId, "visual", 5, message),
-      brain.loadMemory(userId, "audio", 5, message),
+      brain.loadMemory(userId, 'text', 20, message),
+      brain.loadMemory(userId, 'visual', 5, message),
+      brain.loadMemory(userId, 'audio', 5, message),
       brain.loadFacts(userId, 20),
       brain._loadProfileCached(userId),
     ]);
     const memoryContext = brain.buildMemoryContext(memories, visualMem, audioMem, facts);
-    const profileContext = profile ? profile.toContextString() : "";
+    const profileContext = profile ? profile.toContextString() : '';
 
     // ── 3. Emotion detection (fast, no AI needed) ──
     const lower = message.toLowerCase();
-    let emotionalTone = "neutral";
-    let emotionHint = "";
-    for (const [emo, { pattern, responseHint }] of Object.entries(
-      brain.constructor.EMOTION_MAP || {},
-    )) {
+    let emotionalTone = 'neutral';
+    let emotionHint = '';
+    for (const [emo, { pattern, responseHint }] of Object.entries(brain.constructor.EMOTION_MAP || {})) {
       if (pattern.test(lower)) {
         emotionalTone = emo;
-        emotionHint = responseHint || "";
+        emotionHint = responseHint || '';
         break;
       }
     }
-    const frustration = brain.constructor.detectFrustration
-      ? brain.constructor.detectFrustration(message)
-      : 0;
+    const frustration = brain.constructor.detectFrustration ? brain.constructor.detectFrustration(message) : 0;
     if (frustration > 0.6) {
-      emotionHint =
-        "User is very frustrated. Be patient, acknowledge the issue, provide solutions quickly.";
+      emotionHint = 'User is very frustrated. Be patient, acknowledge the issue, provide solutions quickly.';
     }
 
     // ── 3b. Context switch detection ──
     const topicKeywords = {
-      trading: /\b(trade|trading|buy|sell|BTC|ETH|crypto|piață|preț|analiză|signal|RSI|MACD|invest|portofoliu|acțiuni|bursă|forex)\b/i,
+      trading:
+        /\b(trade|trading|buy|sell|BTC|ETH|crypto|piață|preț|analiză|signal|RSI|MACD|invest|portofoliu|acțiuni|bursă|forex)\b/i,
       coding: /\b(code|coding|bug|error|function|deploy|API|server|git|commit|script|database|program)\b/i,
       news: /\b(news|știri|știre|politic|război|eveniment|actual|azi|ieri|breaking)\b/i,
       weather: /\b(vreme|meteo|weather|ploaie|soare|temperatură|grad|frig|cald)\b/i,
       music: /\b(muzică|music|song|cântec|artist|album|concert|playlist)\b/i,
       personal: /\b(eu|mine|viața|familie|sănătate|hobby|plan|sentiment|gândesc|simt)\b/i,
     };
-    let currentTopic = "general";
+    let currentTopic = 'general';
     for (const [topic, pattern] of Object.entries(topicKeywords)) {
-      if (pattern.test(message)) { currentTopic = topic; break; }
+      if (pattern.test(message)) {
+        currentTopic = topic;
+        break;
+      }
     }
-    if (!brain._lastTopic) brain._lastTopic = "general";
-    let contextSwitchHint = "";
-    if (brain._lastTopic !== currentTopic && brain._lastTopic !== "general" && currentTopic !== "general") {
+    if (!brain._lastTopic) brain._lastTopic = 'general';
+    let contextSwitchHint = '';
+    if (brain._lastTopic !== currentTopic && brain._lastTopic !== 'general' && currentTopic !== 'general') {
       contextSwitchHint = `\n[CONTEXT SWITCH] Userul a trecut de la ${brain._lastTopic} la ${currentTopic}. Ajustează-ți tonul și cunoștințele.`;
     }
     brain._lastTopic = currentTopic;
 
     // ── 4. Determine domain for Quality Gate ──
-    let domain = "general";
-    if (/trading|crypto|btc|eth|invest|piață/i.test(message)) domain = "trading";
-    else if (/medical|mri|ct|doză|cancer|diagnostic/i.test(message)) domain = "medical";
-    else if (/legal|lege|contract|gdpr|drept/i.test(message)) domain = "legal";
-    else if (/financ|credit|impozit|salariu|roi|npv/i.test(message)) domain = "financial";
+    let domain = 'general';
+    if (/trading|crypto|btc|eth|invest|piață/i.test(message)) domain = 'trading';
+    else if (/medical|mri|ct|doză|cancer|diagnostic/i.test(message)) domain = 'medical';
+    else if (/legal|lege|contract|gdpr|drept/i.test(message)) domain = 'legal';
+    else if (/financ|credit|impozit|salariu|roi|npv/i.test(message)) domain = 'financial';
 
     // ── 5. Build system prompt with FULL context ──
     const geoBlock = mediaData.geo
-      ? `\n[USER LOCATION] Lat: ${mediaData.geo.lat}, Lng: ${mediaData.geo.lng}${mediaData.geo.accuracy ? ` (accuracy: ${Math.round(mediaData.geo.accuracy)}m)` : ""}. Use this for weather, nearby places, and location-aware responses. DO NOT call any tool to get user location — you already have it. WHEN USER ASKS FOR WEATHER WITHOUT SPECIFYING A CITY → use THESE coordinates, DO NOT default to București.`
-      : "";
-    const memoryBlock = [profileContext, memoryContext].filter(Boolean).join(" || ");
-    const emotionBlock = emotionHint
-      ? `\n[EMOTIONAL CONTEXT] User mood: ${emotionalTone}. ${emotionHint}`
-      : "";
+      ? `\n[USER LOCATION] Lat: ${mediaData.geo.lat}, Lng: ${mediaData.geo.lng}${mediaData.geo.accuracy ? ` (accuracy: ${Math.round(mediaData.geo.accuracy)}m)` : ''}. Use this for weather, nearby places, and location-aware responses. DO NOT call any tool to get user location — you already have it. WHEN USER ASKS FOR WEATHER WITHOUT SPECIFYING A CITY → use THESE coordinates, DO NOT default to București.`
+      : '';
+    const memoryBlock = [profileContext, memoryContext].filter(Boolean).join(' || ');
+    const emotionBlock = emotionHint ? `\n[EMOTIONAL CONTEXT] User mood: ${emotionalTone}. ${emotionHint}` : '';
     const now = new Date();
     // Dynamic timezone from GPS
     const userTZ = (() => {
@@ -1039,19 +1228,27 @@ async function thinkV5(
       if (lng < 135) return 'Asia/Tokyo';
       return 'Pacific/Auckland';
     })();
-    const dateTimeBlock = `\n[IMPORTANT — CURRENT DATE & TIME] Astazi este ${now.toLocaleDateString("ro-RO", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}, ora ${now.toLocaleTimeString("ro-RO", { hour: "2-digit", minute: "2-digit", timeZone: userTZ })} (${userTZ}). ISO: ${now.toISOString()}. NU INVENTA alta data sau ora — foloseste EXACT ce scrie aici cand userul intreaba de timp, data, zi, ora.\n\n[CONVERSAȚIE INTELIGENTĂ — OBLIGATORIU]\nFii MEREU politicos, cald și inițiator de conversație. Nu da răspunsuri seci de 2 cuvinte.\n- La orice salut → răspunde cald + pune O întrebare naturală despre interlocutor\n- Învață DISCRET despre persoana din fața ta: ce face, ce îi place, cum se simte\n- Fii ca un PRIETEN INTELIGENT care chiar vrea să te cunoască\n- Conversația trebuie să curgă NATURAL — nu interoga, ci fii curios\n- Dacă userul spune ceva despre el → arată interes REAL, pune follow-up\n- NICIODATĂ nu da răspunsuri monosilabice (da, nu, ok, bine) — adaugă MEREU valoare\n- Folosește numele userului dacă îl știi\n- Adaptează limba 100% la cea a interlocutorului — conversație fluentă ÎN ORICE LIMBĂ`;
+    const dateTimeBlock = `\n[IMPORTANT — CURRENT DATE & TIME] Astazi este ${now.toLocaleDateString('ro-RO', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}, ora ${now.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit', timeZone: userTZ })} (${userTZ}). ISO: ${now.toISOString()}. NU INVENTA alta data sau ora — foloseste EXACT ce scrie aici cand userul intreaba de timp, data, zi, ora.\n\n[CONVERSAȚIE INTELIGENTĂ — OBLIGATORIU]\nFii MEREU politicos, cald și inițiator de conversație. Nu da răspunsuri seci de 2 cuvinte.\n- La orice salut → răspunde cald + pune O întrebare naturală despre interlocutor\n- Învață DISCRET despre persoana din fața ta: ce face, ce îi place, cum se simte\n- Fii ca un PRIETEN INTELIGENT care chiar vrea să te cunoască\n- Conversația trebuie să curgă NATURAL — nu interoga, ci fii curios\n- Dacă userul spune ceva despre el → arată interes REAL, pune follow-up\n- NICIODATĂ nu da răspunsuri monosilabice (da, nu, ok, bine) — adaugă MEREU valoare\n- Folosește numele userului dacă îl știi\n- Adaptează limba 100% la cea a interlocutorului — conversație fluentă ÎN ORICE LIMBĂ`;
     const patternsBlock = getPatternsText();
     const qualityHints = getQualityHints();
     const proactiveHint = getProactiveSuggestion();
-    let systemPrompt = process.env.NEWBORN_MODE === "true"
-      ? buildNewbornPrompt(memoryBlock + patternsBlock + qualityHints + contextSwitchHint + proactiveHint)
-      : buildSystemPrompt(
-        avatar,
-        language,
-        memoryBlock + emotionBlock + geoBlock + dateTimeBlock + patternsBlock + qualityHints + contextSwitchHint + proactiveHint,
-        "",
-        null,
-      );
+    let systemPrompt =
+      process.env.NEWBORN_MODE === 'true'
+        ? buildNewbornPrompt(memoryBlock + patternsBlock + qualityHints + contextSwitchHint + proactiveHint)
+        : buildSystemPrompt(
+            avatar,
+            language,
+            memoryBlock +
+              emotionBlock +
+              geoBlock +
+              dateTimeBlock +
+              patternsBlock +
+              qualityHints +
+              contextSwitchHint +
+              proactiveHint,
+            '',
+            null
+          );
 
     systemPrompt += `
 
@@ -1065,24 +1262,30 @@ async function thinkV5(
 - Când enumeri multe cifre sau liste lungi de numere, MEREU adaugă cuvinte sau context în limba română (ex: "apoi 41", "numărul 42") ca să nu se piardă accentul vocal.
 - La saluturi simple (salut, buna, hey, hello) — NU folosi [BODY:] tags. Mâinile rămân lângă corp. Body actions doar pentru acțiuni speciale (explicații, celebrări, dance etc).`;
 
-
     // ── 5b. Detect INTENT — ML classifier + legacy detectIntent ──
     const intent = detectIntent(message, mediaData);
     // ML intent (async, embedding-based) — runs in parallel with legacy
     let mlIntent = 'casual';
     try {
       mlIntent = await classifyIntentML(message, brain);
-    } catch (_) { /* fallback to regex */ }
-    logger.info({ component: "BrainV5", intent, mlIntent, domain }, `🧠 V5 intent: ${intent} | ML: ${mlIntent}`);
+    } catch (_) {
+      /* fallback to regex */
+    }
+    logger.info({ component: 'BrainV5', intent, mlIntent, domain }, `🧠 V5 intent: ${intent} | ML: ${mlIntent}`);
 
     // ── Specialist system prompt based on ML intent ──
     const SPECIALIST_HINTS = {
-      search: '\n[SPECIALIST: SEARCH AGENT] Ești expert în căutare și verificare de informații. Prioritizează search_web și browse_page. Citează surse.',
-      creative: '\n[SPECIALIST: CREATIVE AGENT] Ești expert în creație vizuală și scris. Folosește generate_image() pentru imagini. Fii artistic și inspirat.',
+      search:
+        '\n[SPECIALIST: SEARCH AGENT] Ești expert în căutare și verificare de informații. Prioritizează search_web și browse_page. Citează surse.',
+      creative:
+        '\n[SPECIALIST: CREATIVE AGENT] Ești expert în creație vizuală și scris. Folosește generate_image() pentru imagini. Fii artistic și inspirat.',
       code: '\n[SPECIALIST: CODE AGENT] Ești expert în programare. Scrie cod curat, testat, documentat. Folosește execute_javascript pentru demo-uri.',
-      analysis: '\n[SPECIALIST: ANALYSIS AGENT] Ești expert în analiză profundă. Structurează răspunsul cu bullet points. Compară pro/contra.',
-      realtime: '\n[SPECIALIST: REALTIME AGENT] Ești expert în date live. OBLIGATORIU folosește search_web sau API-uri pentru date actuale. NU inventa date.',
-      reasoning: '\n[SPECIALIST: REASONING AGENT] Ești expert în raționament profund. Gândește pas cu pas. Explică logica din spatele concluziilor.',
+      analysis:
+        '\n[SPECIALIST: ANALYSIS AGENT] Ești expert în analiză profundă. Structurează răspunsul cu bullet points. Compară pro/contra.',
+      realtime:
+        '\n[SPECIALIST: REALTIME AGENT] Ești expert în date live. OBLIGATORIU folosește search_web sau API-uri pentru date actuale. NU inventa date.',
+      reasoning:
+        '\n[SPECIALIST: REASONING AGENT] Ești expert în raționament profund. Gândește pas cu pas. Explică logica din spatele concluziilor.',
     };
     if (SPECIALIST_HINTS[mlIntent]) {
       systemPrompt += SPECIALIST_HINTS[mlIntent];
@@ -1139,65 +1342,59 @@ async function thinkV5(
     const recentHistory = (history || []).slice(-20);
     const toolsUsed = [];
     const toolResults = [];
-    let finalResponse = "";
+    let finalResponse = '';
     let totalTokens = 0;
     let engine = 'gemini-search-grounding';
-    let monitorFromTools = null; 
+    let monitorFromTools = null;
     let gptMonitor = null; // Capturat din show_in_monitor apelat de GPT-5.4
     const MAX_TOOL_ROUNDS = 10; // Agentic loop: up to 10 tool iterations for complex tasks
 
-
-
-
     // ── 8a. GPT-5.4 PRIMAR — pentru toate intentiile ──────────────────────────
     // A/B TEST: 10% of complex queries → Claude (variant)
-    const isABVariant = (mlIntent !== 'greeting' && mlIntent !== 'casual') && Math.random() < AB_TEST_RATIO;
+    const isABVariant = mlIntent !== 'greeting' && mlIntent !== 'casual' && Math.random() < AB_TEST_RATIO;
     const abGroup = isABVariant ? 'variant' : 'control';
     if (isABVariant) {
       logger.info({ component: 'ABTest', group: 'variant', mlIntent }, '🔀 A/B Test: routing to Claude (variant)');
     }
     const shouldTryGPT = !!process.env.OPENAI_API_KEY; // TOATE intentiile → GPT-5.4 cu procedura universala
 
-
     if (shouldTryGPT) {
-
       // ═══ Registry check SKIPPED — GPT has recall_tool via function calling ═══
       // Removed: duplicate programmatic recall before GPT (GPT calls recall_tool itself)
       let registryContext = '';
-
-
 
       // ═══ GPT-5.4 PATH — complex messages with tool calling ═══
       const openaiTools = toOpenAITools(TOOL_DEFINITIONS);
 
       // Build OpenAI message array
       const msgs = recentHistory.map((h) => ({
-        role: h.role === "ai" ? "assistant" : h.role,
-        content: typeof h.content === "string" ? h.content : JSON.stringify(h.content),
+        role: h.role === 'ai' ? 'assistant' : h.role,
+        content: typeof h.content === 'string' ? h.content : JSON.stringify(h.content),
       }));
 
       // Handle vision: if image provided, use content array format
       if (mediaData.imageBase64) {
         const userContent = [];
         userContent.push({
-          type: "image_url",
+          type: 'image_url',
           image_url: {
-            url: `data:${mediaData.imageMimeType || "image/jpeg"};base64,${mediaData.imageBase64}`,
+            url: `data:${mediaData.imageMimeType || 'image/jpeg'};base64,${mediaData.imageBase64}`,
           },
         });
         if (mediaData.isAutoCamera) {
           userContent.push({
-            type: "text",
-            text: "[AUTO-CAMERA] Aceasta e imagine automată de la camera utilizatorului. " +
-              "Regulă: NU descrie toată camera/scena. Fii SCURT (1-2 propoziții). " +
-              "Menționează DOAR: persoane (culori exacte de haine), pericole, text vizibil. " +
-              "Dacă nu e nimic nou de spus, nu comenta imaginea deloc — răspunde normal la mesaj.",
+            type: 'text',
+            text:
+              '[AUTO-CAMERA] Aceasta e imagine automată de la camera utilizatorului. ' +
+              'Regulă: NU descrie toată camera/scena. Fii SCURT (1-2 propoziții). ' +
+              'Menționează DOAR: persoane (culori exacte de haine), pericole, text vizibil. ' +
+              'Dacă nu e nimic nou de spus, nu comenta imaginea deloc — răspunde normal la mesaj.',
           });
         }
-        userContent.push({ type: "text", text: message });
-        msgs.push({ role: "user", content: userContent });
+        userContent.push({ type: 'text', text: message });
+        msgs.push({ role: 'user', content: userContent });
       } else {
-        msgs.push({ role: "user", content: registryContext ? message + registryContext : message });
+        msgs.push({ role: 'user', content: registryContext ? message + registryContext : message });
       }
 
       // Tool calling loop — MAX 2 rounds
@@ -1209,15 +1406,14 @@ async function thinkV5(
           currentMsgs,
           gptSystemPrompt,
           round === 0 ? openaiTools : openaiTools, // Always provide tools
-          mediaData.imageBase64 ? MODELS.OPENAI_VISION : MODELS.OPENAI_CHAT,
+          mediaData.imageBase64 ? MODELS.OPENAI_VISION : MODELS.OPENAI_CHAT
         );
 
-
-        totalTokens += (response.usage?.total_tokens || 0);
+        totalTokens += response.usage?.total_tokens || 0;
         const choice = response.choices?.[0];
 
         if (!choice?.message) {
-          logger.warn({ component: "BrainV5" }, "No choice in OpenAI response");
+          logger.warn({ component: 'BrainV5' }, 'No choice in OpenAI response');
           break;
         }
 
@@ -1229,25 +1425,27 @@ async function thinkV5(
           const toolPromises = msg.tool_calls.map(async (tc) => {
             let args = {};
             try {
-              args = JSON.parse(tc.function.arguments || "{}");
+              args = JSON.parse(tc.function.arguments || '{}');
             } catch {
               args = {};
             }
-            const result = await executeTool(brain, tc.function.name, args, userId)
-              .catch((toolErr) => ({ error: toolErr.message, tool: tc.function.name }));
+            const result = await executeTool(brain, tc.function.name, args, userId).catch((toolErr) => ({
+              error: toolErr.message,
+              tool: tc.function.name,
+            }));
             toolsUsed.push(tc.function.name);
             toolResults.push({ name: tc.function.name, result });
             brain.toolStats[tc.function.name] = (brain.toolStats[tc.function.name] || 0) + 1;
             // Capturare monitor output — GPT creaza orice vizualizare, framework-ul o afiseaza
             if (result?.monitorHTML) gptMonitor = { content: result.monitorHTML, type: result.type || 'html' };
 
-
             return {
-              role: "tool",
+              role: 'tool',
               tool_call_id: tc.id,
-              content: typeof result === "string"
-                ? result
-                : JSON.stringify(result, (_, v) => typeof v === "string" ? v.substring(0, 4000) : v),
+              content:
+                typeof result === 'string'
+                  ? result
+                  : JSON.stringify(result, (_, v) => (typeof v === 'string' ? v.substring(0, 4000) : v)),
             };
           });
 
@@ -1256,12 +1454,12 @@ async function thinkV5(
           // Add assistant message (with tool_calls) + tool responses
           currentMsgs = [
             ...currentMsgs,
-            { role: "assistant", content: null, tool_calls: msg.tool_calls },
+            { role: 'assistant', content: null, tool_calls: msg.tool_calls },
             ...toolResponseMsgs,
           ];
         } else {
           // No tool calls — extract text response
-          finalResponse = msg.content || "";
+          finalResponse = msg.content || '';
           break;
         }
 
@@ -1271,10 +1469,10 @@ async function thinkV5(
             currentMsgs,
             systemPrompt,
             [], // No tools — force text response
-            MODELS.OPENAI_CHAT,
+            MODELS.OPENAI_CHAT
           );
-          totalTokens += (finalCall.usage?.total_tokens || 0);
-          finalResponse = finalCall.choices?.[0]?.message?.content || "";
+          totalTokens += finalCall.usage?.total_tokens || 0;
+          finalResponse = finalCall.choices?.[0]?.message?.content || '';
         }
       }
 
@@ -1283,9 +1481,8 @@ async function thinkV5(
         throw new Error('GPT-5.4 tool execution loop produced no response — triggering fallback');
       }
 
-      engine = "GPT-5.4";
+      engine = 'GPT-5.4';
       if (gptMonitor) monitorFromTools = gptMonitor;
-
     } else if (!finalResponse && !GEMINI_PAUSED) {
       // ═══ GEMINI FLASH PATH — doar dacă nu există deja un răspuns și Gemini NU e pe pauză ═══
       const geminiToolDefs = toGeminiTools(TOOL_DEFINITIONS);
@@ -1295,14 +1492,15 @@ async function thinkV5(
       if (mediaData.imageBase64) {
         userParts.push({
           inlineData: {
-            mimeType: mediaData.imageMimeType || "image/jpeg",
+            mimeType: mediaData.imageMimeType || 'image/jpeg',
             data: mediaData.imageBase64,
           },
         });
         if (mediaData.isAutoCamera) {
           userParts.push({
-            text: "[AUTO-CAMERA] Aceasta e imagine automată de la camera utilizatorului. " +
-              "Regulă: NU descrie toată camera/scena. Fii SCURT (1-2 propoziții).",
+            text:
+              '[AUTO-CAMERA] Aceasta e imagine automată de la camera utilizatorului. ' +
+              'Regulă: NU descrie toată camera/scena. Fii SCURT (1-2 propoziții).',
           });
         }
       }
@@ -1310,10 +1508,10 @@ async function thinkV5(
 
       const geminiMessages = [
         ...recentHistory.map((h) => ({
-          role: h.role === "user" ? "user" : "model",
-          parts: [{ text: typeof h.content === "string" ? h.content : JSON.stringify(h.content) }],
+          role: h.role === 'user' ? 'user' : 'model',
+          parts: [{ text: typeof h.content === 'string' ? h.content : JSON.stringify(h.content) }],
         })),
-        { role: "user", parts: userParts },
+        { role: 'user', parts: userParts },
       ];
 
       // Gemini tool calling loop — MAX 2 rounds
@@ -1321,15 +1519,14 @@ async function thinkV5(
       const geminiApiKey = process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
 
       if (!geminiApiKey) {
-        throw new Error("No AI API key configured (OPENAI_API_KEY or GOOGLE_AI_KEY required)");
+        throw new Error('No AI API key configured (OPENAI_API_KEY or GOOGLE_AI_KEY required)');
       }
 
-      const geminiModel = MODELS.GEMINI_CHAT || "gemini-2.5-flash";
+      const geminiModel = MODELS.GEMINI_CHAT || 'gemini-2.5-flash';
       const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiApiKey}`;
 
       // Include tools only for tool_use intent (maps, images etc)
       const includeTools = intent === 'tool_use' || intent === 'deep_reasoning';
-
 
       for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
         const geminiBody = {
@@ -1343,25 +1540,24 @@ async function thinkV5(
         }
 
         const r = await fetch(geminiUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(geminiBody),
         });
 
         if (!r.ok) {
-          const errText = await r.text().catch(() => "unknown");
+          const errText = await r.text().catch(() => 'unknown');
           throw new Error(`Gemini API ${r.status}: ${errText.substring(0, 200)}`);
         }
 
         const response = await r.json();
         totalTokens +=
-          (response.usageMetadata?.promptTokenCount || 0) +
-          (response.usageMetadata?.candidatesTokenCount || 0);
+          (response.usageMetadata?.promptTokenCount || 0) + (response.usageMetadata?.candidatesTokenCount || 0);
 
         const candidate = response.candidates?.[0];
         if (!candidate?.content?.parts) {
           const blockReason = candidate?.finishReason || response.promptFeedback?.blockReason;
-          if (blockReason) logger.warn({ component: "BrainV5", blockReason }, "Gemini blocked");
+          if (blockReason) logger.warn({ component: 'BrainV5', blockReason }, 'Gemini blocked');
           break;
         }
 
@@ -1369,23 +1565,28 @@ async function thinkV5(
         const functionCalls = parts.filter((p) => p.functionCall);
 
         if (functionCalls.length === 0) {
-          finalResponse = parts.filter((p) => p.text).map((p) => p.text).join("\n");
+          finalResponse = parts
+            .filter((p) => p.text)
+            .map((p) => p.text)
+            .join('\n');
           break;
         }
 
         // Execute tools
         const toolPromises = functionCalls.map(async (fc) => {
-          const result = await executeTool(brain, fc.functionCall.name, fc.functionCall.args || {}, userId)
-            .catch((toolErr) => ({ error: toolErr.message, tool: fc.functionCall.name }));
+          const result = await executeTool(brain, fc.functionCall.name, fc.functionCall.args || {}, userId).catch(
+            (toolErr) => ({ error: toolErr.message, tool: fc.functionCall.name })
+          );
           toolsUsed.push(fc.functionCall.name);
           toolResults.push({ name: fc.functionCall.name, result });
           brain.toolStats[fc.functionCall.name] = (brain.toolStats[fc.functionCall.name] || 0) + 1;
           return {
             functionResponse: {
               name: fc.functionCall.name,
-              response: typeof result === "string"
-                ? { result }
-                : JSON.parse(JSON.stringify(result, (_, v) => typeof v === "string" ? v.substring(0, 4000) : v)),
+              response:
+                typeof result === 'string'
+                  ? { result }
+                  : JSON.parse(JSON.stringify(result, (_, v) => (typeof v === 'string' ? v.substring(0, 4000) : v))),
             },
           };
         });
@@ -1393,8 +1594,8 @@ async function thinkV5(
         const toolResponseParts = await Promise.all(toolPromises);
         currentMessages = [
           ...currentMessages,
-          { role: "model", parts: candidate.content.parts },
-          { role: "user", parts: toolResponseParts },
+          { role: 'model', parts: candidate.content.parts },
+          { role: 'user', parts: toolResponseParts },
         ];
       }
 
@@ -1415,25 +1616,27 @@ async function thinkV5(
           if (fr.ok) {
             const fd = await fr.json();
             finalResponse = (fd.candidates?.[0]?.content?.parts || [])
-              .filter((p) => p.text).map((p) => p.text).join('\n');
+              .filter((p) => p.text)
+              .map((p) => p.text)
+              .join('\n');
           }
         } catch (fe) {
           logger.warn({ component: 'BrainV5', err: fe.message }, 'Gemini no-tools fallback failed');
         }
       }
 
-      engine = "Gemini-Flash";
+      engine = 'Gemini-Flash';
     } else if (!finalResponse && GEMINI_PAUSED && process.env.GROQ_API_KEY) {
       // ═══ GROQ FALLBACK — Gemini e pe pauză, Groq răspunde ═══
       try {
-        const groqHistory = recentHistory.map(h => ({
+        const groqHistory = recentHistory.map((h) => ({
           role: h.role === 'ai' ? 'assistant' : h.role,
           content: typeof h.content === 'string' ? h.content : JSON.stringify(h.content),
         }));
         groqHistory.push({ role: 'user', content: message });
         const groqR = await fetch('https://api.groq.com/openai/v1/chat/completions', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.GROQ_API_KEY}` },
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
           body: JSON.stringify({
             model: MODELS.GROQ_PRIMARY || 'llama-3.3-70b-versatile',
             max_tokens: 2048,
@@ -1453,16 +1656,15 @@ async function thinkV5(
       engine = 'Groq';
     }
 
-
     // ── 8. Strip leaked tags from response ──
     finalResponse = stripLeakedTags(finalResponse);
 
     // ── 9. Quality Gate (Gemini verifies critical GPT responses) ──
-    if (engine === "GPT-5.4" && finalResponse) {
+    if (engine === 'GPT-5.4' && finalResponse) {
       const qa = await qualityGate(message, finalResponse, domain);
       if (!qa.passed && qa.corrected) {
         finalResponse = qa.corrected;
-        engine = "GPT-5.4+QA";
+        engine = 'GPT-5.4+QA';
       }
     }
 
@@ -1470,37 +1672,43 @@ async function thinkV5(
     const thinkTime = Date.now() - startTime;
 
     // Save memory (async, non-blocking)
-    brain.saveMemory(userId, "text", message, { response: finalResponse.substring(0, 200) }, 5).catch(() => { });
-    brain.learnFromConversation(userId, message, finalResponse).catch(() => { });
+    brain.saveMemory(userId, 'text', message, { response: finalResponse.substring(0, 200) }, 5).catch(() => {});
+    brain.learnFromConversation(userId, message, finalResponse).catch(() => {});
     if (profile) {
       profile.updateFromConversation(message, language, { emotionalTone, topics: [] });
-      profile.save(brain.supabaseAdmin).catch(() => { });
+      profile.save(brain.supabaseAdmin).catch(() => {});
     }
 
     // Track usage
-    brain.incrementUsage(userId, toolsUsed.length, totalTokens).catch(() => { });
+    brain.incrementUsage(userId, toolsUsed.length, totalTokens).catch(() => {});
 
     // Confidence scoring
     let confidence = 0.7;
     if (toolsUsed.length > 0) confidence += 0.15;
     if (toolsUsed.length > 2) confidence += 0.1;
-    if (engine.includes("QA")) confidence += 0.05; // QA-verified = higher confidence
+    if (engine.includes('QA')) confidence += 0.05; // QA-verified = higher confidence
     confidence = Math.min(1.0, confidence);
 
     // Self-evaluate
     try {
-      const evalDomain = toolsUsed.includes("get_trading_intelligence") ? "trading"
-        : toolsUsed.includes("search_web") ? "research"
-          : toolsUsed.includes("execute_javascript") ? "coding"
-            : "general";
+      const evalDomain = toolsUsed.includes('get_trading_intelligence')
+        ? 'trading'
+        : toolsUsed.includes('search_web')
+          ? 'research'
+          : toolsUsed.includes('execute_javascript')
+            ? 'coding'
+            : 'general';
       selfEvaluate(message, finalResponse, evalDomain);
       recordUserInteraction({ domain: evalDomain, userMessage: message });
-    } catch (_) { /* non-blocking */ }
+    } catch (_) {
+      /* non-blocking */
+    }
 
     // ── Parse avatar commands from AI response ──
     const avatarCmds = parseAvatarCommands(finalResponse);
-    const monitorFinal = avatarCmds.monitor?.content ? avatarCmds.monitor : (monitorFromTools || extractMonitor(toolResults));
-
+    const monitorFinal = avatarCmds.monitor?.content
+      ? avatarCmds.monitor
+      : monitorFromTools || extractMonitor(toolResults);
 
     // ── Fact Check (async, non-blocking) — only for search/reasoning ──
     if ((mlIntent === 'search' || mlIntent === 'reasoning' || mlIntent === 'realtime') && finalResponse.length > 100) {
@@ -1508,8 +1716,8 @@ async function thinkV5(
     }
 
     logger.info(
-      { component: "BrainV5", engine, tools: toolsUsed, thinkTime, tokens: totalTokens, intent, mlIntent, abGroup },
-      `🧠 V5 Think: ${engine} | intent:${intent} | ML:${mlIntent} | AB:${abGroup} | ${toolsUsed.length} tools | ${thinkTime}ms | ${totalTokens} tokens`,
+      { component: 'BrainV5', engine, tools: toolsUsed, thinkTime, tokens: totalTokens, intent, mlIntent, abGroup },
+      `🧠 V5 Think: ${engine} | intent:${intent} | ML:${mlIntent} | AB:${abGroup} | ${toolsUsed.length} tools | ${thinkTime}ms | ${totalTokens} tokens`
     );
 
     // ── A/B Test metrics ──
@@ -1518,14 +1726,15 @@ async function thinkV5(
 
     // ── Fine-tune data collection ──
     try {
-      fineTuneCollector.collectPair(
-        systemPrompt?.substring(0, 500),
-        message,
-        avatarCmds.cleanText || finalResponse,
-        { confidence, engine, intent: mlIntent, feedback: 'auto' }
-      );
-    } catch (_) { /* non-blocking */ }
-
+      fineTuneCollector.collectPair(systemPrompt?.substring(0, 500), message, avatarCmds.cleanText || finalResponse, {
+        confidence,
+        engine,
+        intent: mlIntent,
+        feedback: 'auto',
+      });
+    } catch (_) {
+      /* non-blocking */
+    }
 
     const result = {
       enrichedMessage: avatarCmds.cleanText || finalResponse,
@@ -1540,9 +1749,9 @@ async function thinkV5(
       analysis: {
         complexity: intent,
         emotionalTone,
-        language: language || "ro",
+        language: language || 'ro',
         topics: [],
-        isEmotional: emotionalTone !== "neutral",
+        isEmotional: emotionalTone !== 'neutral',
         frustrationLevel: frustration,
       },
 
@@ -1551,10 +1760,7 @@ async function thinkV5(
       failedTools: toolResults.filter((r) => r.result?.error).map((r) => r.name),
       thinkTime,
       confidence,
-      sourceTags:
-        toolsUsed.length > 0
-          ? ["VERIFIED", ...toolsUsed.map((t) => `SOURCE:${t}`)]
-          : ["ASSUMPTION"],
+      sourceTags: toolsUsed.length > 0 ? ['VERIFIED', ...toolsUsed.map((t) => `SOURCE:${t}`)] : ['ASSUMPTION'],
       agent: `v5-${engine.toLowerCase()}`,
       profileLoaded: !!profile,
     };
@@ -1564,29 +1770,29 @@ async function thinkV5(
     brain.saveToSemanticCache(message, result, userId, isPersonal).catch(() => {});
 
     return result;
-
   } catch (e) {
     const thinkTime = Date.now() - startTime;
-    brain.recordError("thinkV5", e.message);
-    logger.error({ component: "BrainV5", err: e.message, thinkTime }, `🧠 V5 Think failed: ${e.message}`);
+    brain.recordError('thinkV5', e.message);
+    logger.error({ component: 'BrainV5', err: e.message, thinkTime }, `🧠 V5 Think failed: ${e.message}`);
 
     // FALLBACK CHAIN: V5 fails → try V4 → Claude → V3 → error
-    logger.info({ component: "BrainV5" }, "⚠️ Falling back to V4 (Gemini tool calling)");
+    logger.info({ component: 'BrainV5' }, '⚠️ Falling back to V4 (Gemini tool calling)');
     // Re-run getRealtimeContext so V4 fallback also has current data (weather/search)
     let fallbackRealtimeCtx = null;
-    try { fallbackRealtimeCtx = await getRealtimeContext(message, brain, userId, mediaData?.geo); } catch (_) { }
+    try {
+      fallbackRealtimeCtx = await getRealtimeContext(message, brain, userId, mediaData?.geo);
+    } catch (_) {}
     // Paseaza history curat la V4 (historyWithCtx cu model turn cauzea Gemini 400)
     try {
-      const { thinkV4 } = require("./brain-v4");
+      const { thinkV4 } = require('./brain-v4');
       return await thinkV4(brain, message, avatar, history || [], language, userId, conversationId, mediaData, isAdmin);
-
     } catch (e2) {
-      logger.info({ component: "BrainV5" }, "⚠️ V4 failed, trying Claude...");
+      logger.info({ component: 'BrainV5' }, '⚠️ V4 failed, trying Claude...');
       // Try Claude (Anthropic) before falling back to V3
       try {
         const claudeReply = await callClaude(
           message,
-          `You are ${avatar === 'kira' ? 'Kira' : 'Kelion'}, an AI assistant created by EA Studio. Respond in ${language}. Be helpful, natural and concise.`,
+          `You are ${avatar === 'kira' ? 'Kira' : 'Kelion'}, an AI assistant created by EA Studio. Respond in ${language}. Be helpful, natural and concise.`
         );
         if (claudeReply) {
           return {
@@ -1611,26 +1817,25 @@ async function thinkV5(
           };
         }
       } catch (eClaude) {
-        logger.info({ component: "BrainV5", err: eClaude.message }, "⚠️ Claude failed, falling back to V3");
+        logger.info({ component: 'BrainV5', err: eClaude.message }, '⚠️ Claude failed, falling back to V3');
       }
       try {
-
         return await brain.think(message, avatar, history, language, userId, conversationId, mediaData, isAdmin);
       } catch (e3) {
         return {
           enrichedMessage:
-            language === "ro"
-              ? "Îmi pare rău, am întâmpinat o problemă tehnică și nu pot răspunde acum. Te rog să încerci din nou. 🔧"
+            language === 'ro'
+              ? 'Îmi pare rău, am întâmpinat o problemă tehnică și nu pot răspunde acum. Te rog să încerci din nou. 🔧'
               : "I'm sorry, I encountered a technical issue and can't respond right now. Please try again. 🔧",
           toolsUsed: [],
           monitor: { content: null, type: null },
-          analysis: { complexity: "simple", language: language || "ro", emotionalTone: "neutral", topics: [] },
+          analysis: { complexity: 'simple', language: language || 'ro', emotionalTone: 'neutral', topics: [] },
           chainOfThought: null,
           compressedHistory: history || [],
           failedTools: [],
           thinkTime,
           confidence: 0,
-          agent: "v5-error-fallback",
+          agent: 'v5-error-fallback',
           error: `V5: ${e.message} | V4: ${e2.message} | V3: ${e3.message}`,
         };
       }

@@ -11,7 +11,8 @@ const logger = require('../logger');
 
 async function getGmailTokens(userId, supabase) {
   if (!supabase || !userId) return null;
-  const { data } = await supabase.from('brain_memory')
+  const { data } = await supabase
+    .from('brain_memory')
     .select('context')
     .eq('user_id', userId)
     .eq('memory_type', 'gmail_tokens')
@@ -21,7 +22,7 @@ async function getGmailTokens(userId, supabase) {
 
 async function callGmail(endpoint, tokens) {
   const r = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/${endpoint}`, {
-    headers: { 'Authorization': `Bearer ${tokens.access_token}` },
+    headers: { Authorization: `Bearer ${tokens.access_token}` },
     signal: AbortSignal.timeout(10000),
   });
   if (r.status === 401) throw new Error('Gmail token expired. User must re-authenticate.');
@@ -43,20 +44,27 @@ async function list_emails(input, userId, supabase) {
     if (!list.messages || list.messages.length === 0) return { emails: [], message: 'No emails found' };
 
     // Fetch headers for each message
-    const emails = await Promise.all(list.messages.slice(0, max).map(async (msg) => {
-      try {
-        const detail = await callGmail(`messages/${msg.id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`, tokens);
-        const headers = detail.payload?.headers || [];
-        return {
-          id: msg.id,
-          from: headers.find(h => h.name === 'From')?.value || 'unknown',
-          subject: headers.find(h => h.name === 'Subject')?.value || '(no subject)',
-          date: headers.find(h => h.name === 'Date')?.value || '',
-          snippet: detail.snippet || '',
-          unread: (detail.labelIds || []).includes('UNREAD'),
-        };
-      } catch (_) { return { id: msg.id, error: 'Could not fetch' }; }
-    }));
+    const emails = await Promise.all(
+      list.messages.slice(0, max).map(async (msg) => {
+        try {
+          const detail = await callGmail(
+            `messages/${msg.id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`,
+            tokens
+          );
+          const headers = detail.payload?.headers || [];
+          return {
+            id: msg.id,
+            from: headers.find((h) => h.name === 'From')?.value || 'unknown',
+            subject: headers.find((h) => h.name === 'Subject')?.value || '(no subject)',
+            date: headers.find((h) => h.name === 'Date')?.value || '',
+            snippet: detail.snippet || '',
+            unread: (detail.labelIds || []).includes('UNREAD'),
+          };
+        } catch (_) {
+          return { id: msg.id, error: 'Could not fetch' };
+        }
+      })
+    );
 
     return { emails, count: emails.length };
   } catch (e) {
@@ -85,12 +93,14 @@ async function read_email(input, userId, supabase) {
 
     return {
       id: msg.id,
-      from: headers.find(h => h.name === 'From')?.value || '',
-      to: headers.find(h => h.name === 'To')?.value || '',
-      subject: headers.find(h => h.name === 'Subject')?.value || '',
-      date: headers.find(h => h.name === 'Date')?.value || '',
+      from: headers.find((h) => h.name === 'From')?.value || '',
+      to: headers.find((h) => h.name === 'To')?.value || '',
+      subject: headers.find((h) => h.name === 'Subject')?.value || '',
+      date: headers.find((h) => h.name === 'Date')?.value || '',
       body: body.substring(0, 5000),
-      attachments: (msg.payload?.parts || []).filter(p => p.filename).map(p => ({ name: p.filename, size: p.body?.size })),
+      attachments: (msg.payload?.parts || [])
+        .filter((p) => p.filename)
+        .map((p) => ({ name: p.filename, size: p.body?.size })),
     };
   } catch (e) {
     return { error: `Gmail error: ${e.message}` };
@@ -104,11 +114,14 @@ async function draft_reply(input, userId, supabase) {
 
   try {
     // Get original message for thread ID and reply headers
-    const orig = await callGmail(`messages/${input.emailId}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Message-ID`, tokens);
+    const orig = await callGmail(
+      `messages/${input.emailId}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Message-ID`,
+      tokens
+    );
     const headers = orig.payload?.headers || [];
-    const from = headers.find(h => h.name === 'From')?.value || '';
-    const subject = headers.find(h => h.name === 'Subject')?.value || '';
-    const messageId = headers.find(h => h.name === 'Message-ID')?.value || '';
+    const from = headers.find((h) => h.name === 'From')?.value || '';
+    const subject = headers.find((h) => h.name === 'Subject')?.value || '';
+    const messageId = headers.find((h) => h.name === 'Message-ID')?.value || '';
 
     const replySubject = subject.startsWith('Re:') ? subject : `Re: ${subject}`;
     const rawEmail = [
@@ -126,7 +139,7 @@ async function draft_reply(input, userId, supabase) {
     // Create draft (NOT send)
     const r = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/drafts', {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${tokens.access_token}`, 'Content-Type': 'application/json' },
+      headers: { Authorization: `Bearer ${tokens.access_token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ message: { raw: encoded, threadId: orig.threadId } }),
     });
 

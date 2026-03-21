@@ -1,4 +1,4 @@
-"use strict";
+'use strict';
 
 /**
  * K1 PERFORMANCE TRACKER — Scor accuracy per domeniu + evoluție
@@ -11,7 +11,7 @@
  * - Trends (improving/declining)
  */
 
-const logger = require("pino")({ name: "k1-performance" });
+const logger = require('pino')({ name: 'k1-performance' });
 
 // ═══════════════════════════════════════════════════════════════
 // PERFORMANCE DATA
@@ -69,18 +69,15 @@ function recordTask(domain, responseTimeMs) {
 function recordCorrect(domain) {
   const m = metrics[domain] || metrics.general;
   m.correct++;
-  addHistory(domain, "correct");
+  addHistory(domain, 'correct');
 }
 
-function recordCorrection(domain, errorType = "unknown") {
+function recordCorrection(domain, errorType = 'unknown') {
   const m = metrics[domain] || metrics.general;
   m.corrections++;
   m.errors[errorType] = (m.errors[errorType] || 0) + 1;
-  addHistory(domain, "correction", errorType);
-  logger.warn(
-    { domain, errorType, totalCorrections: m.corrections },
-    "[K1-Perf] Corectat!",
-  );
+  addHistory(domain, 'correction', errorType);
+  logger.warn({ domain, errorType, totalCorrections: m.corrections }, '[K1-Perf] Corectat!');
 }
 
 function addHistory(domain, type, detail = null) {
@@ -99,29 +96,21 @@ function addHistory(domain, type, detail = null) {
 
 function getReport() {
   const domains = Object.entries(metrics).map(([domain, m]) => {
-    const accuracy =
-      m.tasks > 0 ? Math.round((m.correct / m.tasks) * 100) : null;
+    const accuracy = m.tasks > 0 ? Math.round((m.correct / m.tasks) * 100) : null;
     const avgTime =
       m.responseTimes.length > 0
-        ? Math.round(
-            m.responseTimes.reduce((a, b) => a + b, 0) / m.responseTimes.length,
-          )
+        ? Math.round(m.responseTimes.reduce((a, b) => a + b, 0) / m.responseTimes.length)
         : null;
 
     // Trend: compară ultimele 10 vs anterioarele 10
     const recentHistory = history.filter((h) => h.domain === domain).slice(-20);
     const recent10 = recentHistory.slice(-10);
     const prev10 = recentHistory.slice(0, 10);
-    const recentCorrect = recent10.filter((h) => h.type === "correct").length;
-    const prevCorrect = prev10.filter((h) => h.type === "correct").length;
-    let trend = "stable";
+    const recentCorrect = recent10.filter((h) => h.type === 'correct').length;
+    const prevCorrect = prev10.filter((h) => h.type === 'correct').length;
+    let trend = 'stable';
     if (recent10.length >= 5 && prev10.length >= 5) {
-      trend =
-        recentCorrect > prevCorrect
-          ? "improving"
-          : recentCorrect < prevCorrect
-            ? "declining"
-            : "stable";
+      trend = recentCorrect > prevCorrect ? 'improving' : recentCorrect < prevCorrect ? 'declining' : 'stable';
     }
 
     // Top erori
@@ -138,24 +127,15 @@ function getReport() {
       accuracy,
       avgResponseTimeMs: avgTime,
       trend,
-      trendEmoji:
-        trend === "improving" ? "📈" : trend === "declining" ? "📉" : "➡️",
+      trendEmoji: trend === 'improving' ? '📈' : trend === 'declining' ? '📉' : '➡️',
       topErrors,
-      status:
-        accuracy === null
-          ? "no_data"
-          : accuracy >= 80
-            ? "strong"
-            : accuracy >= 60
-              ? "moderate"
-              : "weak",
+      status: accuracy === null ? 'no_data' : accuracy >= 80 ? 'strong' : accuracy >= 60 ? 'moderate' : 'weak',
     };
   });
 
   const totalTasks = domains.reduce((s, d) => s + d.tasks, 0);
   const totalCorrect = domains.reduce((s, d) => s + d.correct, 0);
-  const overallAccuracy =
-    totalTasks > 0 ? Math.round((totalCorrect / totalTasks) * 100) : null;
+  const overallAccuracy = totalTasks > 0 ? Math.round((totalCorrect / totalTasks) * 100) : null;
 
   return {
     overall: {
@@ -165,18 +145,16 @@ function getReport() {
       accuracy: overallAccuracy,
       status:
         overallAccuracy === null
-          ? "no_data"
+          ? 'no_data'
           : overallAccuracy >= 80
-            ? "🟢 Solid"
+            ? '🟢 Solid'
             : overallAccuracy >= 60
-              ? "🟡 Moderate"
-              : "🔴 Slab — necesită îmbunătățire",
+              ? '🟡 Moderate'
+              : '🔴 Slab — necesită îmbunătățire',
     },
     domains,
-    weakAreas: domains.filter((d) => d.status === "weak").map((d) => d.domain),
-    strongAreas: domains
-      .filter((d) => d.status === "strong")
-      .map((d) => d.domain),
+    weakAreas: domains.filter((d) => d.status === 'weak').map((d) => d.domain),
+    strongAreas: domains.filter((d) => d.status === 'strong').map((d) => d.domain),
     recentHistory: history.slice(-20),
   };
 }
@@ -189,17 +167,17 @@ function getRecommendations() {
   const recs = [];
 
   report.domains.forEach((d) => {
-    if (d.status === "weak" && d.tasks > 5) {
+    if (d.status === 'weak' && d.tasks > 5) {
       recs.push({
-        priority: "high",
+        priority: 'high',
         domain: d.domain,
-        message: `Accuracy pe ${d.domain} e ${d.accuracy}% — sub 60%. Top eroare: ${d.topErrors[0]?.type || "necunoscut"}`,
+        message: `Accuracy pe ${d.domain} e ${d.accuracy}% — sub 60%. Top eroare: ${d.topErrors[0]?.type || 'necunoscut'}`,
         action: `Revizuiește prompt templates și logica pentru ${d.domain}`,
       });
     }
-    if (d.trend === "declining" && d.tasks > 10) {
+    if (d.trend === 'declining' && d.tasks > 10) {
       recs.push({
-        priority: "medium",
+        priority: 'medium',
         domain: d.domain,
         message: `Trend descendent pe ${d.domain} — performanța scade`,
         action: `Analizează ultimele 10 corecții pe ${d.domain}`,
@@ -207,10 +185,10 @@ function getRecommendations() {
     }
     if (d.avgResponseTimeMs && d.avgResponseTimeMs > 5000) {
       recs.push({
-        priority: "low",
+        priority: 'low',
         domain: d.domain,
         message: `Răspuns lent pe ${d.domain}: ${d.avgResponseTimeMs}ms mediu`,
-        action: "Optimizează prompt-ul sau reduce context-ul",
+        action: 'Optimizează prompt-ul sau reduce context-ul',
       });
     }
   });
@@ -233,7 +211,7 @@ const MAX_EVALS = 20;
  * Called after each response in brain-v4.js.
  * Returns quality score 0-100.
  */
-function selfEvaluate(userMessage, aiResponse, domain = "general") {
+function selfEvaluate(userMessage, aiResponse, domain = 'general') {
   if (!userMessage || !aiResponse) return null;
 
   const uMsg = userMessage.toLowerCase().trim();
@@ -244,14 +222,14 @@ function selfEvaluate(userMessage, aiResponse, domain = "general") {
   // 1. LENGTH CHECK — too short or too long
   if (aResp.length < 20) {
     score -= 25;
-    issues.push("too_short");
+    issues.push('too_short');
   } else if (aResp.length < 50 && uMsg.length > 30) {
     score -= 15;
-    issues.push("brief_for_complex_q");
+    issues.push('brief_for_complex_q');
   }
   if (aResp.length > 3000 && uMsg.length < 50) {
     score -= 10;
-    issues.push("verbose");
+    issues.push('verbose');
   }
 
   // 2. LANGUAGE MATCH — response should match user's language
@@ -259,51 +237,58 @@ function selfEvaluate(userMessage, aiResponse, domain = "general") {
   const respRo = /[ăîâșțĂÎÂȘȚ]/.test(aResp);
   if (userRo && !respRo && aResp.length > 100) {
     score -= 15;
-    issues.push("language_mismatch");
+    issues.push('language_mismatch');
   }
 
   // 3. GENERIC RESPONSE DETECTION — penalize filler phrases
   const genericPatterns = [
-    "as an ai", "i cannot", "i don't have access",
-    "nu am acces", "ca model de limbaj", "nu pot să",
-    "sigur, pot", "desigur!", "bineînțeles!",
+    'as an ai',
+    'i cannot',
+    "i don't have access",
+    'nu am acces',
+    'ca model de limbaj',
+    'nu pot să',
+    'sigur, pot',
+    'desigur!',
+    'bineînțeles!',
   ];
-  const genericCount = genericPatterns.filter(p => aResp.toLowerCase().includes(p)).length;
+  const genericCount = genericPatterns.filter((p) => aResp.toLowerCase().includes(p)).length;
   if (genericCount >= 2) {
     score -= 20;
-    issues.push("generic_filler");
+    issues.push('generic_filler');
   }
 
   // 4. REPETITION — response repeating user's question verbatim
   if (uMsg.length > 20 && aResp.toLowerCase().includes(uMsg.slice(0, Math.min(50, uMsg.length)))) {
     score -= 5;
-    issues.push("echoes_question");
+    issues.push('echoes_question');
   }
 
   // 5. QUESTION ANSWERING — if user asks a question, response should have substance
-  const isQuestion = uMsg.includes("?") || /^(ce|cine|când|cum|unde|de ce|cât|care|what|who|when|how|where|why)/i.test(uMsg);
+  const isQuestion =
+    uMsg.includes('?') || /^(ce|cine|când|cum|unde|de ce|cât|care|what|who|when|how|where|why)/i.test(uMsg);
   if (isQuestion && aResp.length < 80) {
     score -= 10;
-    issues.push("shallow_answer");
+    issues.push('shallow_answer');
   }
 
   // 6. ERROR INDICATORS — response contains error messages
   if (/error|eroare|failed|eșuat|undefined|null|NaN/i.test(aResp) && !/```/.test(aResp)) {
     score -= 15;
-    issues.push("error_in_response");
+    issues.push('error_in_response');
   }
 
-  // 7. POSITIVE SIGNALS — boost score  
-  if (aResp.includes("```")) score += 5; // code blocks = structured
-  if (/\d+/.test(aResp) && domain === "trading") score += 5; // numbers in trading = good
-  if (aResp.split("\n").length > 3) score += 3; // multi-line = structured
+  // 7. POSITIVE SIGNALS — boost score
+  if (aResp.includes('```')) score += 5; // code blocks = structured
+  if (/\d+/.test(aResp) && domain === 'trading') score += 5; // numbers in trading = good
+  if (aResp.split('\n').length > 3) score += 3; // multi-line = structured
 
   // Clamp score
   score = Math.max(0, Math.min(100, score));
 
   const evaluation = {
     score,
-    quality: score >= 80 ? "good" : score >= 60 ? "ok" : score >= 40 ? "weak" : "poor",
+    quality: score >= 80 ? 'good' : score >= 60 ? 'ok' : score >= 40 ? 'weak' : 'poor',
     issues,
     domain,
     timestamp: new Date().toISOString(),
@@ -321,7 +306,7 @@ function selfEvaluate(userMessage, aiResponse, domain = "general") {
 
   // Log warnings for poor quality
   if (score < 50) {
-    logger.warn({ score, issues, domain }, "[K1-Perf] ⚠️ Low quality response detected");
+    logger.warn({ score, issues, domain }, '[K1-Perf] ⚠️ Low quality response detected');
   }
 
   return evaluation;
@@ -332,7 +317,7 @@ function selfEvaluate(userMessage, aiResponse, domain = "general") {
  * Based on recent self-evaluations, returns improvement suggestions.
  */
 function getQualityHints() {
-  if (recentEvals.length < 3) return ""; // not enough data
+  if (recentEvals.length < 3) return ''; // not enough data
 
   const recent = recentEvals.slice(-10);
   const avgScore = Math.round(recent.reduce((s, e) => s + e.score, 0) / recent.length);
@@ -340,18 +325,22 @@ function getQualityHints() {
 
   // Count issues across recent evaluations
   const issueCounts = {};
-  recent.forEach(e => e.issues.forEach(i => { issueCounts[i] = (issueCounts[i] || 0) + 1; }));
+  recent.forEach((e) =>
+    e.issues.forEach((i) => {
+      issueCounts[i] = (issueCounts[i] || 0) + 1;
+    })
+  );
 
   // Only emit hints for recurring issues (2+ occurrences)
-  if (issueCounts.too_short >= 2) hints.push("Răspunsurile recente sunt prea scurte. Oferă mai mult detaliu.");
-  if (issueCounts.verbose >= 2) hints.push("Răspunsurile recente sunt prea lungi. Fii mai concis.");
+  if (issueCounts.too_short >= 2) hints.push('Răspunsurile recente sunt prea scurte. Oferă mai mult detaliu.');
+  if (issueCounts.verbose >= 2) hints.push('Răspunsurile recente sunt prea lungi. Fii mai concis.');
   if (issueCounts.generic_filler >= 2) hints.push("Evită frazele generice ('ca model AI', 'nu pot'). Răspunde direct.");
-  if (issueCounts.language_mismatch >= 2) hints.push("Răspunde în aceeași limbă ca userul.");
-  if (issueCounts.shallow_answer >= 2) hints.push("La întrebări, oferă răspunsuri mai substanțiale.");
-  if (issueCounts.error_in_response >= 2) hints.push("Verifică răspunsurile pentru erori înainte de a le trimite.");
+  if (issueCounts.language_mismatch >= 2) hints.push('Răspunde în aceeași limbă ca userul.');
+  if (issueCounts.shallow_answer >= 2) hints.push('La întrebări, oferă răspunsuri mai substanțiale.');
+  if (issueCounts.error_in_response >= 2) hints.push('Verifică răspunsurile pentru erori înainte de a le trimite.');
 
-  if (hints.length === 0) return "";
-  return "\n[SELF-EVAL HINTS] Avg quality: " + avgScore + "%. " + hints.join(" ") + " [/SELF-EVAL HINTS]";
+  if (hints.length === 0) return '';
+  return '\n[SELF-EVAL HINTS] Avg quality: ' + avgScore + '%. ' + hints.join(' ') + ' [/SELF-EVAL HINTS]';
 }
 
 module.exports = {

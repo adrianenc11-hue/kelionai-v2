@@ -1,299 +1,324 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ro">
-
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>KelionAI — Plugin Manager</title>
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/admin/admin.css">
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/admin/admin.css" />
     <style>
-        .plugin-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-            gap: 16px;
-            margin-top: 16px;
-        }
+      .plugin-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: 16px;
+        margin-top: 16px;
+      }
 
-        .plugin-card {
-            background: rgba(255, 255, 255, 0.04);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: 14px;
-            padding: 20px;
-            -webkit-backdrop-filter: blur(10px);
-            backdrop-filter: blur(10px);
-            transition: border-color 0.3s, transform 0.2s;
-        }
+      .plugin-card {
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 14px;
+        padding: 20px;
+        -webkit-backdrop-filter: blur(10px);
+        backdrop-filter: blur(10px);
+        transition:
+          border-color 0.3s,
+          transform 0.2s;
+      }
 
-        .plugin-card:hover {
-            border-color: rgba(99, 102, 241, 0.3);
-            transform: translateY(-2px);
-        }
+      .plugin-card:hover {
+        border-color: rgba(99, 102, 241, 0.3);
+        transform: translateY(-2px);
+      }
 
-        .plugin-card.disabled {
-            opacity: 0.5;
-        }
+      .plugin-card.disabled {
+        opacity: 0.5;
+      }
 
-        .plugin-header {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 12px;
-        }
+      .plugin-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 12px;
+      }
 
-        .plugin-icon {
-            font-size: 2rem;
-            width: 48px;
-            height: 48px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: rgba(99, 102, 241, 0.15);
-            border-radius: 12px;
-        }
+      .plugin-icon {
+        font-size: 2rem;
+        width: 48px;
+        height: 48px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(99, 102, 241, 0.15);
+        border-radius: 12px;
+      }
 
-        .plugin-info h3 {
-            margin: 0;
-            font-size: 1rem;
-            color: #e0e0e0;
-        }
+      .plugin-info h3 {
+        margin: 0;
+        font-size: 1rem;
+        color: #e0e0e0;
+      }
 
-        .plugin-info .version {
-            font-size: 0.75rem;
-            color: #888;
-        }
+      .plugin-info .version {
+        font-size: 0.75rem;
+        color: #888;
+      }
 
-        .plugin-desc {
-            font-size: 0.85rem;
-            color: #999;
-            margin-bottom: 14px;
-            line-height: 1.4;
-        }
+      .plugin-desc {
+        font-size: 0.85rem;
+        color: #999;
+        margin-bottom: 14px;
+        line-height: 1.4;
+      }
 
-        .plugin-meta {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-            margin-bottom: 14px;
-        }
+      .plugin-meta {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-bottom: 14px;
+      }
 
-        .plugin-tag {
-            padding: 3px 10px;
-            border-radius: 20px;
-            font-size: 0.72rem;
-            font-weight: 500;
-        }
+      .plugin-tag {
+        padding: 3px 10px;
+        border-radius: 20px;
+        font-size: 0.72rem;
+        font-weight: 500;
+      }
 
-        .tag-builtin {
-            background: rgba(99, 102, 241, 0.2);
-            color: #a5b4fc;
-        }
+      .tag-builtin {
+        background: rgba(99, 102, 241, 0.2);
+        color: #a5b4fc;
+      }
 
-        .tag-local {
-            background: rgba(16, 185, 129, 0.2);
-            color: #6ee7b7;
-        }
+      .tag-local {
+        background: rgba(16, 185, 129, 0.2);
+        color: #6ee7b7;
+      }
 
-        .tag-custom {
-            background: rgba(245, 158, 11, 0.2);
-            color: #fbbf24;
-        }
+      .tag-custom {
+        background: rgba(245, 158, 11, 0.2);
+        color: #fbbf24;
+      }
 
-        .tag-active {
-            background: rgba(16, 185, 129, 0.15);
-            color: #34d399;
-        }
+      .tag-active {
+        background: rgba(16, 185, 129, 0.15);
+        color: #34d399;
+      }
 
-        .tag-disabled {
-            background: rgba(239, 68, 68, 0.15);
-            color: #f87171;
-        }
+      .tag-disabled {
+        background: rgba(239, 68, 68, 0.15);
+        color: #f87171;
+      }
 
-        .tag-category {
-            background: rgba(139, 92, 246, 0.15);
-            color: #c4b5fd;
-        }
+      .tag-category {
+        background: rgba(139, 92, 246, 0.15);
+        color: #c4b5fd;
+      }
 
-        .plugin-actions {
-            display: flex;
-            gap: 8px;
-            margin-top: 12px;
-        }
+      .plugin-actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 12px;
+      }
 
-        .btn-toggle {
-            padding: 6px 14px;
-            border-radius: 8px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            background: rgba(255, 255, 255, 0.05);
-            color: #e0e0e0;
-            font-size: 0.8rem;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
+      .btn-toggle {
+        padding: 6px 14px;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.05);
+        color: #e0e0e0;
+        font-size: 0.8rem;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
 
-        .btn-toggle:hover {
-            background: rgba(99, 102, 241, 0.2);
-            border-color: rgba(99, 102, 241, 0.4);
-        }
+      .btn-toggle:hover {
+        background: rgba(99, 102, 241, 0.2);
+        border-color: rgba(99, 102, 241, 0.4);
+      }
 
-        .btn-delete {
-            padding: 6px 14px;
-            border-radius: 8px;
-            border: 1px solid rgba(239, 68, 68, 0.3);
-            background: rgba(239, 68, 68, 0.1);
-            color: #f87171;
-            font-size: 0.8rem;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
+      .btn-delete {
+        padding: 6px 14px;
+        border-radius: 8px;
+        border: 1px solid rgba(239, 68, 68, 0.3);
+        background: rgba(239, 68, 68, 0.1);
+        color: #f87171;
+        font-size: 0.8rem;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
 
-        .btn-delete:hover {
-            background: rgba(239, 68, 68, 0.25);
-        }
+      .btn-delete:hover {
+        background: rgba(239, 68, 68, 0.25);
+      }
 
-        .stats-row {
-            display: flex;
-            gap: 16px;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
-        }
+      .stats-row {
+        display: flex;
+        gap: 16px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+      }
 
-        .stat-mini {
-            background: rgba(255, 255, 255, 0.04);
-            border: 1px solid rgba(255, 255, 255, 0.06);
-            border-radius: 12px;
-            padding: 14px 20px;
-            min-width: 120px;
-            text-align: center;
-        }
+      .stat-mini {
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        border-radius: 12px;
+        padding: 14px 20px;
+        min-width: 120px;
+        text-align: center;
+      }
 
-        .stat-mini .val {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: #a5b4fc;
-        }
+      .stat-mini .val {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #a5b4fc;
+      }
 
-        .stat-mini .lab {
-            font-size: 0.75rem;
-            color: #888;
-            margin-top: 4px;
-        }
+      .stat-mini .lab {
+        font-size: 0.75rem;
+        color: #888;
+        margin-top: 4px;
+      }
 
-        .install-section {
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid rgba(255, 255, 255, 0.06);
-            border-radius: 14px;
-            padding: 20px;
-            margin-top: 20px;
-        }
+      .install-section {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        border-radius: 14px;
+        padding: 20px;
+        margin-top: 20px;
+      }
 
-        .install-section h3 {
-            margin: 0 0 12px;
-            font-size: 0.95rem;
-            color: #a5b4fc;
-        }
+      .install-section h3 {
+        margin: 0 0 12px;
+        font-size: 0.95rem;
+        color: #a5b4fc;
+      }
 
-        .install-textarea {
-            width: 100%;
-            min-height: 120px;
-            background: rgba(0, 0, 0, 0.3);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 8px;
-            padding: 12px;
-            color: #e0e0e0;
-            font-family: 'Fira Code', monospace;
-            font-size: 0.82rem;
-            resize: vertical;
-        }
+      .install-textarea {
+        width: 100%;
+        min-height: 120px;
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        padding: 12px;
+        color: #e0e0e0;
+        font-family: 'Fira Code', monospace;
+        font-size: 0.82rem;
+        resize: vertical;
+      }
 
-        .install-btn {
-            margin-top: 10px;
-            padding: 8px 20px;
-            border-radius: 8px;
-            border: 1px solid rgba(99, 102, 241, 0.4);
-            background: rgba(99, 102, 241, 0.2);
-            color: #a5b4fc;
-            font-size: 0.85rem;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
+      .install-btn {
+        margin-top: 10px;
+        padding: 8px 20px;
+        border-radius: 8px;
+        border: 1px solid rgba(99, 102, 241, 0.4);
+        background: rgba(99, 102, 241, 0.2);
+        color: #a5b4fc;
+        font-size: 0.85rem;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
 
-        .install-btn:hover {
-            background: rgba(99, 102, 241, 0.35);
-        }
+      .install-btn:hover {
+        background: rgba(99, 102, 241, 0.35);
+      }
 
-        .filter-bar {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-            margin-bottom: 16px;
-        }
+      .filter-bar {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-bottom: 16px;
+      }
 
-        .filter-btn {
-            padding: 5px 14px;
-            border-radius: 20px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            background: rgba(255, 255, 255, 0.04);
-            color: #999;
-            font-size: 0.78rem;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
+      .filter-btn {
+        padding: 5px 14px;
+        border-radius: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.04);
+        color: #999;
+        font-size: 0.78rem;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
 
-        .filter-btn.active {
-            background: rgba(99, 102, 241, 0.2);
-            border-color: rgba(99, 102, 241, 0.4);
-            color: #a5b4fc;
-        }
+      .filter-btn.active {
+        background: rgba(99, 102, 241, 0.2);
+        border-color: rgba(99, 102, 241, 0.4);
+        color: #a5b4fc;
+      }
     </style>
-</head>
+  </head>
 
-<body>
+  <body>
     <div class="admin-container">
-        <header class="admin-header">
-            <div class="header-left">
-                <a href="/admin" class="back-link">← Admin</a>
-                <span class="admin-logo">🔌 Plugins</span>
-                <span class="admin-badge">v3.2</span>
-            </div>
-            <div class="header-right">
-                <button class="admin-btn" onclick="loadPlugins()">🔄 Refresh</button>
-                <button class="admin-btn" id="theme-toggle" onclick="toggleTheme()">🌙</button>
-            </div>
-        </header>
-
-        <!-- STATS -->
-        <div class="stats-row" id="stats-row">
-            <div class="stat-mini"><div class="val" id="s-total">—</div><div class="lab">Total</div></div>
-            <div class="stat-mini"><div class="val" id="s-active">—</div><div class="lab">Active</div></div>
-            <div class="stat-mini"><div class="val" id="s-disabled">—</div><div class="lab">Disabled</div></div>
-            <div class="stat-mini"><div class="val" id="s-builtin">—</div><div class="lab">Built-in</div></div>
-            <div class="stat-mini"><div class="val" id="s-local">—</div><div class="lab">Local</div></div>
-            <div class="stat-mini"><div class="val" id="s-custom">—</div><div class="lab">Custom</div></div>
+      <header class="admin-header">
+        <div class="header-left">
+          <a href="/admin" class="back-link">← Admin</a>
+          <span class="admin-logo">🔌 Plugins</span>
+          <span class="admin-badge">v3.2</span>
         </div>
-
-        <!-- FILTERS -->
-        <div class="filter-bar" id="filter-bar">
-            <button class="filter-btn active" onclick="filterPlugins('all')">All</button>
-            <button class="filter-btn" onclick="filterPlugins('active')">✅ Active</button>
-            <button class="filter-btn" onclick="filterPlugins('disabled')">⏸️ Disabled</button>
-            <button class="filter-btn" onclick="filterPlugins('builtin')">🏗️ Built-in</button>
-            <button class="filter-btn" onclick="filterPlugins('local')">📂 Local</button>
-            <button class="filter-btn" onclick="filterPlugins('command')">⌨️ Command</button>
-            <button class="filter-btn" onclick="filterPlugins('middleware')">🔗 Middleware</button>
+        <div class="header-right">
+          <button class="admin-btn" onclick="loadPlugins()">🔄 Refresh</button>
+          <button class="admin-btn" id="theme-toggle" onclick="toggleTheme()">🌙</button>
         </div>
+      </header>
 
-        <!-- PLUGIN GRID -->
-        <div class="plugin-grid" id="plugin-grid">
-            <div style="color:#888;text-align:center;padding:40px">Loading plugins...</div>
+      <!-- STATS -->
+      <div class="stats-row" id="stats-row">
+        <div class="stat-mini">
+          <div class="val" id="s-total">—</div>
+          <div class="lab">Total</div>
         </div>
+        <div class="stat-mini">
+          <div class="val" id="s-active">—</div>
+          <div class="lab">Active</div>
+        </div>
+        <div class="stat-mini">
+          <div class="val" id="s-disabled">—</div>
+          <div class="lab">Disabled</div>
+        </div>
+        <div class="stat-mini">
+          <div class="val" id="s-builtin">—</div>
+          <div class="lab">Built-in</div>
+        </div>
+        <div class="stat-mini">
+          <div class="val" id="s-local">—</div>
+          <div class="lab">Local</div>
+        </div>
+        <div class="stat-mini">
+          <div class="val" id="s-custom">—</div>
+          <div class="lab">Custom</div>
+        </div>
+      </div>
 
-        <!-- INSTALL SECTION -->
-        <div class="install-section">
-            <h3>➕ Install Custom Plugin</h3>
-            <p style="font-size:0.8rem;color:#888;margin-bottom:10px">Paste a plugin manifest (JSON) to install:</p>
-            <textarea class="install-textarea" id="install-manifest" placeholder='{
+      <!-- FILTERS -->
+      <div class="filter-bar" id="filter-bar">
+        <button class="filter-btn active" onclick="filterPlugins('all')">All</button>
+        <button class="filter-btn" onclick="filterPlugins('active')">✅ Active</button>
+        <button class="filter-btn" onclick="filterPlugins('disabled')">⏸️ Disabled</button>
+        <button class="filter-btn" onclick="filterPlugins('builtin')">🏗️ Built-in</button>
+        <button class="filter-btn" onclick="filterPlugins('local')">📂 Local</button>
+        <button class="filter-btn" onclick="filterPlugins('command')">⌨️ Command</button>
+        <button class="filter-btn" onclick="filterPlugins('middleware')">🔗 Middleware</button>
+      </div>
+
+      <!-- PLUGIN GRID -->
+      <div class="plugin-grid" id="plugin-grid">
+        <div style="color: #888; text-align: center; padding: 40px">Loading plugins...</div>
+      </div>
+
+      <!-- INSTALL SECTION -->
+      <div class="install-section">
+        <h3>➕ Install Custom Plugin</h3>
+        <p style="font-size: 0.8rem; color: #888; margin-bottom: 10px">Paste a plugin manifest (JSON) to install:</p>
+        <textarea
+          class="install-textarea"
+          id="install-manifest"
+          placeholder='{
   "id": "my-plugin",
   "name": "My Custom Plugin",
   "version": "1.0.0",
@@ -303,61 +328,64 @@
   "category": "utility",
   "type": "command",
   "endpoints": []
-}'></textarea>
-            <button class="install-btn" onclick="installPlugin()">🔌 Install Plugin</button>
-            <span id="install-status" style="margin-left:12px;font-size:0.82rem;color:#888"></span>
-        </div>
+}'
+        ></textarea>
+        <button class="install-btn" onclick="installPlugin()">🔌 Install Plugin</button>
+        <span id="install-status" style="margin-left: 12px; font-size: 0.82rem; color: #888"></span>
+      </div>
     </div>
 
     <script>
-    function toggleTheme(){
+      function toggleTheme() {
         document.body.classList.toggle('light-theme');
         const isLight = document.body.classList.contains('light-theme');
         localStorage.setItem('admin-theme', isLight ? 'light' : 'dark');
         document.getElementById('theme-toggle').textContent = isLight ? '☀️' : '🌙';
-    }
-    if(localStorage.getItem('admin-theme') === 'light'){
+      }
+      if (localStorage.getItem('admin-theme') === 'light') {
         document.body.classList.add('light-theme');
-        document.addEventListener('DOMContentLoaded', () => { const t = document.getElementById('theme-toggle'); if(t) t.textContent = '☀️'; });
-    }
+        document.addEventListener('DOMContentLoaded', () => {
+          const t = document.getElementById('theme-toggle');
+          if (t) t.textContent = '☀️';
+        });
+      }
 
-    let allPlugins = [];
-    let currentFilter = 'all';
+      let allPlugins = [];
+      let currentFilter = 'all';
 
-    async function loadPlugins() {
+      async function loadPlugins() {
         try {
-            const [pluginsRes, statsRes] = await Promise.all([
-                fetch('/api/plugins'),
-                fetch('/api/plugins/stats')
-            ]);
-            const pluginsData = await pluginsRes.json();
-            const statsData = await statsRes.json();
+          const [pluginsRes, statsRes] = await Promise.all([fetch('/api/plugins'), fetch('/api/plugins/stats')]);
+          const pluginsData = await pluginsRes.json();
+          const statsData = await statsRes.json();
 
-            allPlugins = pluginsData.plugins || [];
+          allPlugins = pluginsData.plugins || [];
 
-            // Update stats
-            document.getElementById('s-total').textContent = statsData.total || 0;
-            document.getElementById('s-active').textContent = statsData.active || 0;
-            document.getElementById('s-disabled').textContent = statsData.disabled || 0;
-            document.getElementById('s-builtin').textContent = statsData.builtin || 0;
-            document.getElementById('s-local').textContent = statsData.local || 0;
-            document.getElementById('s-custom').textContent = statsData.custom || 0;
+          // Update stats
+          document.getElementById('s-total').textContent = statsData.total || 0;
+          document.getElementById('s-active').textContent = statsData.active || 0;
+          document.getElementById('s-disabled').textContent = statsData.disabled || 0;
+          document.getElementById('s-builtin').textContent = statsData.builtin || 0;
+          document.getElementById('s-local').textContent = statsData.local || 0;
+          document.getElementById('s-custom').textContent = statsData.custom || 0;
 
-            renderPlugins(allPlugins);
+          renderPlugins(allPlugins);
         } catch (e) {
-            document.getElementById('plugin-grid').innerHTML =
-                `<div style="color:#f87171;padding:20px">Error loading plugins: ${e.message}</div>`;
+          document.getElementById('plugin-grid').innerHTML =
+            `<div style="color:#f87171;padding:20px">Error loading plugins: ${e.message}</div>`;
         }
-    }
+      }
 
-    function renderPlugins(plugins) {
+      function renderPlugins(plugins) {
         const grid = document.getElementById('plugin-grid');
         if (!plugins.length) {
-            grid.innerHTML = '<div style="color:#888;text-align:center;padding:40px">No plugins found</div>';
-            return;
+          grid.innerHTML = '<div style="color:#888;text-align:center;padding:40px">No plugins found</div>';
+          return;
         }
 
-        grid.innerHTML = plugins.map(p => `
+        grid.innerHTML = plugins
+          .map(
+            (p) => `
             <div class="plugin-card ${p.status === 'disabled' ? 'disabled' : ''}" data-id="${p.id}">
                 <div class="plugin-header">
                     <div class="plugin-icon">${p.icon || '🔌'}</div>
@@ -386,87 +414,100 @@
                     ${!p.builtin && !p.local ? `<button class="btn-delete" onclick="uninstallPlugin('${p.id}')">🗑️ Uninstall</button>` : ''}
                 </div>
             </div>
-        `).join('');
-    }
+        `
+          )
+          .join('');
+      }
 
-    function filterPlugins(filter) {
+      function filterPlugins(filter) {
         currentFilter = filter;
-        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.filter-btn').forEach((b) => b.classList.remove('active'));
         event.target.classList.add('active');
 
         let filtered = allPlugins;
         switch (filter) {
-            case 'active': filtered = allPlugins.filter(p => p.status === 'active'); break;
-            case 'disabled': filtered = allPlugins.filter(p => p.status === 'disabled'); break;
-            case 'builtin': filtered = allPlugins.filter(p => p.builtin); break;
-            case 'local': filtered = allPlugins.filter(p => p.local); break;
-            case 'command': filtered = allPlugins.filter(p => p.type === 'command'); break;
-            case 'middleware': filtered = allPlugins.filter(p => p.type === 'middleware'); break;
+          case 'active':
+            filtered = allPlugins.filter((p) => p.status === 'active');
+            break;
+          case 'disabled':
+            filtered = allPlugins.filter((p) => p.status === 'disabled');
+            break;
+          case 'builtin':
+            filtered = allPlugins.filter((p) => p.builtin);
+            break;
+          case 'local':
+            filtered = allPlugins.filter((p) => p.local);
+            break;
+          case 'command':
+            filtered = allPlugins.filter((p) => p.type === 'command');
+            break;
+          case 'middleware':
+            filtered = allPlugins.filter((p) => p.type === 'middleware');
+            break;
         }
         renderPlugins(filtered);
-    }
+      }
 
-    async function togglePlugin(id) {
+      async function togglePlugin(id) {
         try {
-            const res = await fetch(`/api/plugins/${id}/toggle`, { method: 'POST' });
-            const data = await res.json();
-            if (data.success) loadPlugins();
+          const res = await fetch(`/api/plugins/${id}/toggle`, { method: 'POST' });
+          const data = await res.json();
+          if (data.success) loadPlugins();
         } catch (e) {
-            alert('Toggle failed: ' + e.message);
+          alert('Toggle failed: ' + e.message);
         }
-    }
+      }
 
-    async function uninstallPlugin(id) {
+      async function uninstallPlugin(id) {
         if (!confirm(`Uninstall plugin "${id}"?`)) return;
         try {
-            const res = await fetch(`/api/plugins/${id}`, { method: 'DELETE' });
-            const data = await res.json();
-            if (data.success) loadPlugins();
-            else alert('Error: ' + (data.error || 'Unknown'));
+          const res = await fetch(`/api/plugins/${id}`, { method: 'DELETE' });
+          const data = await res.json();
+          if (data.success) loadPlugins();
+          else alert('Error: ' + (data.error || 'Unknown'));
         } catch (e) {
-            alert('Uninstall failed: ' + e.message);
+          alert('Uninstall failed: ' + e.message);
         }
-    }
+      }
 
-    async function installPlugin() {
+      async function installPlugin() {
         const textarea = document.getElementById('install-manifest');
         const status = document.getElementById('install-status');
         try {
-            const manifest = JSON.parse(textarea.value);
-            status.textContent = 'Installing...';
-            status.style.color = '#a5b4fc';
+          const manifest = JSON.parse(textarea.value);
+          status.textContent = 'Installing...';
+          status.style.color = '#a5b4fc';
 
-            const res = await fetch('/api/plugins/install', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ manifest })
-            });
-            const data = await res.json();
+          const res = await fetch('/api/plugins/install', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ manifest }),
+          });
+          const data = await res.json();
 
-            if (data.success) {
-                status.textContent = `✅ Installed: ${data.plugin.name}`;
-                status.style.color = '#34d399';
-                textarea.value = '';
-                loadPlugins();
-            } else {
-                status.textContent = `❌ ${data.error || 'Failed'}`;
-                status.style.color = '#f87171';
-            }
-        } catch (e) {
-            status.textContent = `❌ Invalid JSON: ${e.message}`;
+          if (data.success) {
+            status.textContent = `✅ Installed: ${data.plugin.name}`;
+            status.style.color = '#34d399';
+            textarea.value = '';
+            loadPlugins();
+          } else {
+            status.textContent = `❌ ${data.error || 'Failed'}`;
             status.style.color = '#f87171';
+          }
+        } catch (e) {
+          status.textContent = `❌ Invalid JSON: ${e.message}`;
+          status.style.color = '#f87171';
         }
-    }
+      }
 
-    function esc(str) {
+      function esc(str) {
         const d = document.createElement('div');
         d.textContent = str || '';
         return d.innerHTML;
-    }
+      }
 
-    // Load on start
-    loadPlugins();
+      // Load on start
+      loadPlugins();
     </script>
-</body>
-
+  </body>
 </html>

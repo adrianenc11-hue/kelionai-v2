@@ -29,7 +29,7 @@
     var str = components.join('|');
     var hash = 0;
     for (var i = 0; i < str.length; i++) {
-      hash = ((hash << 5) - hash) + str.charCodeAt(i);
+      hash = (hash << 5) - hash + str.charCodeAt(i);
       hash |= 0;
     }
     var fp = 'v_' + Math.abs(hash).toString(36) + '_' + Date.now().toString(36);
@@ -103,8 +103,12 @@
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(visitData),
       keepalive: true,
-    }).catch(function () { /* silent */ });
-  } catch (e) { /* silent */ }
+    }).catch(function () {
+      /* silent */
+    });
+  } catch (e) {
+    /* silent */
+  }
 
   // ── Send beacon on page leave with duration ──
   function sendBeacon() {

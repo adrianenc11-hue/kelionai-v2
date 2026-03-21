@@ -23,7 +23,11 @@
       console.warn('[Voice] WATCHDOG: isProcessing stuck, resetting');
       isProcessing = false;
       if (isListeningForWake && recognition) {
-        try { recognition.start(); } catch (_e) { /* ok */ }
+        try {
+          recognition.start();
+        } catch (_e) {
+          /* ok */
+        }
       }
     }
     // If isSpeaking stuck with no audio node, force reset
@@ -193,7 +197,11 @@
         const delay = isProcessing ? 3000 : 300; // wait longer if processing
         setTimeout(() => {
           if (isListeningForWake) {
-            try { recognition.start(); } catch (_e) { /* ok */ }
+            try {
+              recognition.start();
+            } catch (_e) {
+              /* ok */
+            }
           }
         }, delay);
       }
@@ -264,155 +272,36 @@
       .trim();
   }
 
-  let speakSafetyTimer = null;
-  let _speakId = 0; // atomic counter — prevents race condition overlap
-  const CHUNK_MAX = 450; // max chars per TTS chunk — ElevenLabs truncates at ~5000
-
-  // Split text into sentence chunks of ~CHUNK_MAX chars
-  function _chunkText(text) {
-    if (text.length <= CHUNK_MAX) return [text];
-    const chunks = [];
-    // Split on sentence boundaries, newlines, or commas as fallback
-    const sentences = text.split(/(?<=[.!?\n,])\s+/);
-    let current = '';
-    for (let i = 0; i < sentences.length; i++) {
-        const word = sentences[i];
-        if (!word.trim()) continue;
-
-        // If a single word/segment is somehow larger than CHUNK_MAX, we must hard-split it
-        if (word.length > CHUNK_MAX) {
-            if (current.trim()) {
-                chunks.push(current.trim());
-                current = '';
-            }
-            // Hard split the giant segment into CHUNK_MAX sized pieces
-            for (let j = 0; j < word.length; j += CHUNK_MAX) {
-                chunks.push(word.substring(j, j + CHUNK_MAX).trim());
-            }
-        } 
-        // If adding this word exceeds limits, push current and start new
-        else if (current.length + word.length > CHUNK_MAX && current.length > 0) {
-            chunks.push(current.trim());
-            current = word;
-        } 
-        // Otherwise, keep appending
-        else {
-            current += (current ? ' ' : '') + word;
-        }
-    }
-    if (current.trim()) chunks.push(current.trim());
-    return chunks;
-  }
-
   async function speak(text, avatar) {
     if (isSpeaking) stopSpeaking();
     if (!text || !text.trim()) return;
-    const thisId = ++_speakId;
-    // Lock avatar voice at start — same voice for entire conversation
-    const lockedAvatar = avatar || (window.KAvatar ? KAvatar.getCurrentAvatar() : 'kelion');
+
+    // In GPT 5.4 Live Audio, the AI speaks directly via Socket.io.
+    // This function is kept only as a fallback for local system messages or old flows.
+    console.log('[Voice] TTS Fallback triggered for:', text.substring(0, 50) + '...');
+
+    // Just trigger text subtitle and basic animations, no real audio synthesis
     isSpeaking = true;
-    // Set expression BEFORE audio to not disturb lip sync
     if (window.KAvatar) {
       KAvatar.setExpression('happy', 0.3);
       KAvatar.setPresenting(true);
     }
-    if (speakSafetyTimer) clearTimeout(speakSafetyTimer);
-    speakSafetyTimer = setTimeout(function () {
-      if (isSpeaking) {
-        console.warn('[Voice] Safety timeout');
-        stopSpeaking();
-      }
-    }, 60000); // increased from 30s for multi-chunk
 
-    try {
-      const ttsText = cleanTextForTTS(text);
-      if (!ttsText) {
-        isSpeaking = false;
-        resumeWakeDetection();
-        return;
-      }
+    showSubtitle(text);
+    fallbackTextLipSync(text);
 
-      // FORCE AudioContext running before fetching
-      let ctx = getAudioContext();
-      try {
-        await ctx.resume();
-      } catch (_e) {
-        /* ignored */
-      }
-      if (ctx.state !== 'running') {
-        sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        ctx = sharedAudioCtx;
-        try {
-          await ctx.resume();
-        } catch (_e) {
-          /* ignored */
-        }
-      }
-
-      // Chunk the text and play each chunk sequentially
-      const chunks = _chunkText(ttsText);
-      console.log('[Voice] TTS chunked into', chunks.length, 'parts');
-
-      // ═══ PREFETCH PATTERN: fetch next chunk while current plays ═══
-      // This eliminates the pause between chunks
-      async function fetchChunkAudio(chunkText) {
-          const resp = await fetch(API_BASE + '/api/speak', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', ...(window.KAuth ? KAuth.getAuthHeaders() : {}) },
-            body: JSON.stringify({
-              text: chunkText,
-              avatar: lockedAvatar,
-              language: detectedLanguage,
-            }),
-          });
-          if (!resp.ok) return null;
-          const arrayBuf = await resp.arrayBuffer();
-          if (!arrayBuf || arrayBuf.byteLength === 0) return null;
-          let alignment = null;
-          const alignHeader = resp.headers.get('x-alignment');
-          if (alignHeader) {
-            try { alignment = JSON.parse(atob(alignHeader)); } catch (_e) { /* ignore */ }
-          }
-          return { arrayBuf, alignment };
-        }
-
-      // Start prefetching first chunk immediately
-      let prefetchPromise = fetchChunkAudio(chunks[0]);
-
-      for (let ci = 0; ci < chunks.length; ci++) {
-        if (thisId !== _speakId) {
-          console.log('[Voice] Stale, aborting chunk', ci);
-          return;
-        }
-
-        // Wait for current chunk's audio (already prefetched)
-        const chunkData = await prefetchPromise;
-        if (thisId !== _speakId) return;
-
-        // Start prefetching NEXT chunk immediately (while current plays)
-        if (ci + 1 < chunks.length) {
-          prefetchPromise = fetchChunkAudio(chunks[ci + 1]);
-        }
-
-        if (!chunkData) {
-          console.warn('[Voice] TTS chunk', ci, 'failed');
-          continue;
-        }
-
-        console.log('[Voice] Playing chunk', ci + 1, '/', chunks.length);
-
-        // Play this chunk and wait for it to finish before next
-        await new Promise(function (resolve) {
-          playAudioChunk(chunkData.arrayBuf, chunks[ci], ci === chunks.length - 1, resolve, chunkData.alignment);
-        });
-      }
-    } catch (e) {
-      console.error('[Voice]', e);
+    // Auto-complete after estimated reading time
+    const readingTime = Math.max(2000, text.length * 60);
+    setTimeout(() => {
       stopAllLipSync();
       hideSubtitle();
       isSpeaking = false;
+      if (window.KAvatar) {
+        KAvatar.setExpression('neutral');
+        KAvatar.setPresenting(false);
+      }
       resumeWakeDetection();
-    }
+    }, readingTime);
   }
 
   // Play a single audio chunk — calls onDone when finished
@@ -880,7 +769,10 @@
     rec.onresult = function (ev) {
       if (!_voiceLoopActive) return;
       const txt = ev.results[0][0].transcript.trim();
-      if (txt.length < 2) { _loopListen(); return; }
+      if (txt.length < 2) {
+        _loopListen();
+        return;
+      }
       _waitingForAI = true;
       console.log('[Voice] Loop captured:', txt);
       window.dispatchEvent(new CustomEvent('voice-loop-message', { detail: { text: txt } }));
@@ -904,7 +796,10 @@
     };
     rec.onerror = function (e) {
       if (!_voiceLoopActive) return;
-      if (e.error === 'not-allowed') { stopVoiceLoop(); return; }
+      if (e.error === 'not-allowed') {
+        stopVoiceLoop();
+        return;
+      }
       setTimeout(_loopListen, 800);
     };
     return rec;
@@ -913,10 +808,18 @@
   function _loopListen() {
     if (!_voiceLoopActive || isSpeaking || _waitingForAI) return;
     try {
-      if (_voiceLoopRec) { try { _voiceLoopRec.stop(); } catch (_e) {/* ok */} }
+      if (_voiceLoopRec) {
+        try {
+          _voiceLoopRec.stop();
+        } catch (_e) {
+          /* ok */
+        }
+      }
       _voiceLoopRec = _makeLoopRec();
       if (_voiceLoopRec) _voiceLoopRec.start();
-    } catch (_e) { setTimeout(_loopListen, 500); }
+    } catch (_e) {
+      setTimeout(_loopListen, 500);
+    }
   }
 
   function startVoiceLoop() {
@@ -933,7 +836,14 @@
   function stopVoiceLoop() {
     _voiceLoopActive = false;
     _waitingForAI = false;
-    if (_voiceLoopRec) { try { _voiceLoopRec.stop(); } catch (_e) {/* ok */} _voiceLoopRec = null; }
+    if (_voiceLoopRec) {
+      try {
+        _voiceLoopRec.stop();
+      } catch (_e) {
+        /* ok */
+      }
+      _voiceLoopRec = null;
+    }
     console.log('[Voice] Full-duplex loop STOPPED');
     window.dispatchEvent(new CustomEvent('voice-loop-stopped'));
   }
@@ -943,7 +853,10 @@
     _waitingForAI = false;
     if (isSpeaking) {
       const check = setInterval(function () {
-        if (!isSpeaking) { clearInterval(check); _loopListen(); }
+        if (!isSpeaking) {
+          clearInterval(check);
+          _loopListen();
+        }
       }, 200);
     } else {
       setTimeout(_loopListen, 300);
@@ -971,6 +884,8 @@
     isSpeaking: () => isSpeaking,
     isVoiceLoopActive: () => _voiceLoopActive,
     getLanguage: () => (window.i18n ? i18n.getLanguage() : detectedLanguage),
-    setLanguage: (l) => { detectedLanguage = l; },
+    setLanguage: (l) => {
+      detectedLanguage = l;
+    },
   };
 })();

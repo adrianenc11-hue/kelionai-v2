@@ -112,11 +112,17 @@ router.post('/login', authLimiter, validate(loginSchema), async (req, res) => {
     if (error) {
       // Return specific error for email not confirmed
       if (error.code === 'email_not_confirmed') {
-        return res.status(403).json({ error: 'Email not verified. Please check your inbox and verify your email before signing in.' });
+        return res
+          .status(403)
+          .json({ error: 'Email not verified. Please check your inbox and verify your email before signing in.' });
       }
       return res.status(401).json({ error: 'Invalid login credentials' });
     }
-    const adminEmails = (process.env.ADMIN_EMAIL || 'adrianenc11@gmail.com').toLowerCase().split(',').map(e => e.trim()).filter(Boolean);
+    const adminEmails = (process.env.ADMIN_EMAIL || 'adrianenc11@gmail.com')
+      .toLowerCase()
+      .split(',')
+      .map((e) => e.trim())
+      .filter(Boolean);
     const isAdmin = adminEmails.includes(data.user.email?.toLowerCase());
     res.json({
       user: {
@@ -145,7 +151,11 @@ router.get('/me', async (req, res) => {
     const { getUserFromToken } = req.app.locals;
     const u = await getUserFromToken(req);
     if (!u) return res.status(401).json({ error: 'Not authenticated' });
-    const adminEmails = (process.env.ADMIN_EMAIL || 'adrianenc11@gmail.com').toLowerCase().split(',').map(e => e.trim()).filter(Boolean);
+    const adminEmails = (process.env.ADMIN_EMAIL || 'adrianenc11@gmail.com')
+      .toLowerCase()
+      .split(',')
+      .map((e) => e.trim())
+      .filter(Boolean);
     const isAdmin = adminEmails.includes(u.email?.toLowerCase());
     res.json({
       user: {
@@ -165,7 +175,7 @@ router.post('/refresh', validate(refreshSchema), async (req, res) => {
   try {
     const { refresh_token } = req.body;
     if (!refresh_token) return res.status(400).json({ error: 'Token missing' });
-    
+
     // Create a fresh client to avoid shared session state conflits
     const { createClient } = require('@supabase/supabase-js');
     const freshClient = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, {
@@ -193,7 +203,7 @@ router.post('/refresh', validate(refreshSchema), async (req, res) => {
 router.post('/forgot-password', authLimiter, validate(forgotPasswordSchema), async (req, res) => {
   try {
     const { email } = req.body;
-    
+
     // Create a fresh client to avoid shared state mutations
     const { createClient } = require('@supabase/supabase-js');
     const freshClient = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, {
@@ -217,7 +227,7 @@ router.post('/forgot-password', authLimiter, validate(forgotPasswordSchema), asy
 router.post('/reset-password', authLimiter, validate(resetPasswordSchema), async (req, res) => {
   try {
     const { access_token, password } = req.body;
-    
+
     // Create a fresh client to avoid shared state mutations
     const { createClient } = require('@supabase/supabase-js');
     const freshClient = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, {
@@ -245,7 +255,7 @@ router.post('/change-password', authLimiter, validate(changePasswordSchema), asy
     if (!u) return res.status(401).json({ error: 'Not authenticated' });
     if (!supabaseAdmin) return res.status(503).json({ error: 'Auth service unavailable' });
     const { password } = req.body;
-    
+
     // Use admin client to avoid shared session race conditions
     const { error } = await supabaseAdmin.auth.admin.updateUserById(u.id, { password });
     if (error) return res.status(400).json({ error: error.message });
@@ -263,7 +273,7 @@ router.post('/change-email', authLimiter, validate(changeEmailSchema), async (re
     if (!u) return res.status(401).json({ error: 'Not authenticated' });
     if (!supabaseAdmin) return res.status(503).json({ error: 'Auth service unavailable' });
     const { email } = req.body;
-    
+
     // Use admin client to avoid shared session race conditions
     const { error } = await supabaseAdmin.auth.admin.updateUserById(u.id, { email });
     if (error) return res.status(400).json({ error: error.message });

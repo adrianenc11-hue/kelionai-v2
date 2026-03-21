@@ -22,6 +22,7 @@ bash scripts/setup-secrets.sh
 ```
 
 Scriptul va:
+
 1. Verifica dacă `gh` CLI este instalat
 2. Verifica autentificarea GitHub
 3. Cere interactiv:
@@ -70,6 +71,7 @@ npm run railway:setup
 ```
 
 Scriptul va:
+
 1. Verifica dacă Railway CLI este instalat (și îl va instala dacă nu e)
 2. Verifica autentificarea și proiectul linked
 3. Citi cheile din `.env.example`
@@ -114,9 +116,9 @@ railway up
 
 ## Fișiere generate
 
-| Fișier | Descriere |
-|--------|-----------|
-| `.env` | Variabile locale (nu se commitează) |
+| Fișier       | Descriere                                  |
+| ------------ | ------------------------------------------ |
+| `.env`       | Variabile locale (nu se commitează)        |
 | `.env.local` | Valori generate automat (nu se commitează) |
 
 Ambele fișiere sunt în `.gitignore`.

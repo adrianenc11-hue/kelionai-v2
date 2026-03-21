@@ -1,20 +1,18 @@
 // ═══════════════════════════════════════════════════════════════
 // KelionAI — Health Routes
 // ═══════════════════════════════════════════════════════════════
-"use strict";
+'use strict';
 
-const express = require("express");
+const express = require('express');
 const router = express.Router();
-const { version } = require("../../package.json");
+const { version } = require('../../package.json');
 
 // GET /api/health
-router.get("/", (req, res) => {
+router.get('/', (req, res) => {
   const { brain, supabase, supabaseAdmin } = req.app.locals;
-  const diag = brain
-    ? brain.getDiagnostics()
-    : { status: "no-brain", conversations: 0 };
+  const diag = brain ? brain.getDiagnostics() : { status: 'no-brain', conversations: 0 };
   res.json({
-    status: "ok",
+    status: 'ok',
     version,
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
@@ -48,9 +46,9 @@ router.get("/", (req, res) => {
 });
 
 // GET /api/health/brain-debug — Raw brain error state (temporary diagnostic)
-router.get("/brain-debug", (req, res) => {
+router.get('/brain-debug', (req, res) => {
   const { brain } = req.app.locals;
-  if (!brain) return res.json({ error: "no brain" });
+  if (!brain) return res.json({ error: 'no brain' });
   const diag = brain.getDiagnostics();
   res.json({
     uptime: process.uptime(),
@@ -64,33 +62,31 @@ router.get("/brain-debug", (req, res) => {
 });
 
 // GET /api/health/test-tables — Test all 28 Supabase tables (read-only)
-router.get("/test-tables", async (req, res) => {
+router.get('/test-tables', async (req, res) => {
   const { supabaseAdmin } = req.app.locals;
-  if (!supabaseAdmin)
-    return res.status(503).json({ error: "No Supabase connection" });
+  if (!supabaseAdmin) return res.status(503).json({ error: 'No Supabase connection' });
 
   const TABLES = [
-    "conversations",
-    "messages",
-    "user_preferences",
-    "api_keys",
-    "admin_logs",
+    'conversations',
+    'messages',
+    'user_preferences',
+    'api_keys',
+    'admin_logs',
 
-    "profiles",
-    "media_history",
-    "telegram_users",
+    'profiles',
+    'media_history',
+    'telegram_users',
 
-    "cookie_consents",
-    "metrics_snapshots",
-    "ai_costs",
-    "page_views",
-    "subscriptions",
-    "referrals",
-    "admin_codes",
-    "brain_memory",
-    "learned_facts",
-    "telegram_messages",
-
+    'cookie_consents',
+    'metrics_snapshots',
+    'ai_costs',
+    'page_views',
+    'subscriptions',
+    'referrals',
+    'admin_codes',
+    'brain_memory',
+    'learned_facts',
+    'telegram_messages',
   ];
 
   const results = [];
@@ -99,26 +95,24 @@ router.get("/test-tables", async (req, res) => {
 
   for (const table of TABLES) {
     try {
-      const { error, count } = await supabaseAdmin
-        .from(table)
-        .select("*", { count: "exact", head: true });
+      const { error, count } = await supabaseAdmin.from(table).select('*', { count: 'exact', head: true });
 
       if (error) {
         failed++;
         results.push({
           table,
-          status: "ERROR",
+          status: 'ERROR',
           error: error.message,
           code: error.code,
           hint: error.hint || null,
         });
       } else {
         passed++;
-        results.push({ table, status: "OK", rowCount: count || 0 });
+        results.push({ table, status: 'OK', rowCount: count || 0 });
       }
     } catch (e) {
       failed++;
-      results.push({ table, status: "CRASH", error: e.message });
+      results.push({ table, status: 'CRASH', error: e.message });
     }
   }
 
@@ -131,7 +125,7 @@ router.get("/test-tables", async (req, res) => {
       testedAt: new Date().toISOString(),
     },
     results,
-    errors: results.filter((r) => r.status !== "OK"),
+    errors: results.filter((r) => r.status !== 'OK'),
   });
 });
 

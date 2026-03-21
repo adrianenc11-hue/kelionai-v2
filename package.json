@@ -9,7 +9,7 @@
     "start": "node scripts/pre-start-audit.js && node server/index.js",
     "gate": "node scripts/gate.js",
     "lint": "npx eslint server/",
-    "typecheck": "node -e \"/* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* /* console.log('typecheck: N/A (JS-only project) (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */ (removed) */')\"",
+    "typecheck": "node -e \"console.log('typecheck: N/A')\"",
     "build": "node -e \"const fs=require('fs'); const f='app/index.html'; if(!fs.existsSync(f)){console.error('BUILD FAIL: '+f+' not found');process.exit(1)}\"",
     "smoke": "node scripts/smoke.js",
     "security": "npm audit --audit-level=high",
@@ -68,6 +68,7 @@
     "multer": "^1.4.5-lts.1",
     "node-fetch": "^2.7.0",
     "nodemailer": "8.0.2",
+    "openai": "6.32.0",
     "pdf-parse": "^1.1.1",
     "pdfkit": "^0.15.0",
     "pg": "^8.13.0",
@@ -85,8 +86,12 @@
     "node": ">=20.0.0"
   },
   "devDependencies": {
+    "@eslint/js": "10.0.1",
     "@playwright/test": "^1.49.0",
+    "eslint-plugin-jest": "29.15.0",
+    "globals": "17.4.0",
     "jest": "^29.7.0",
+    "prettier": "3.8.1",
     "supertest": "^7.0.0"
   },
   "license": "MIT",

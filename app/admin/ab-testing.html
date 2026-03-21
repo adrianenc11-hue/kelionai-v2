@@ -1,162 +1,357 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>KelionAI — A/B Testing</title>
     <style>
-        * { margin:0; padding:0; box-sizing:border-box; }
-        body { font-family:'Inter','Segoe UI',sans-serif; background:#060614; color:#e0e0e0; min-height:100vh; }
-        .header { padding:16px 24px; background:rgba(0,0,0,0.4); border-bottom:1px solid rgba(255,255,255,0.06); display:flex; justify-content:space-between; align-items:center; }
-        .header h1 { font-size:1.3rem; background:linear-gradient(135deg,#f59e0b,#ef4444); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
-        .back-btn { background:rgba(255,255,255,0.1); border:none; color:#fff; padding:8px 16px; border-radius:8px; cursor:pointer; text-decoration:none; font-size:0.85rem; }
-        .container { max-width:1000px; margin:24px auto; padding:0 20px; }
-        .experiment { background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); border-radius:12px; padding:20px; margin-bottom:16px; }
-        .exp-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
-        .exp-name { font-size:1.1rem; font-weight:600; color:#fff; }
-        .exp-status { padding:3px 10px; border-radius:12px; font-size:0.75rem; font-weight:600; }
-        .exp-status.active { background:rgba(34,197,94,0.2); color:#22c55e; }
-        .exp-status.completed { background:rgba(99,102,241,0.2); color:#818cf8; }
-        .exp-status.paused { background:rgba(245,158,11,0.2); color:#f59e0b; }
-        .exp-desc { color:#888; font-size:0.85rem; margin-bottom:12px; }
-        .exp-meta { display:flex; gap:16px; font-size:0.78rem; color:#666; margin-bottom:16px; }
-        .variants-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px; }
-        .variant-card { background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:10px; padding:14px; }
-        .variant-card.winner { border-color:#22c55e; box-shadow:0 0 12px rgba(34,197,94,0.2); }
-        .variant-name { font-weight:600; font-size:0.95rem; margin-bottom:8px; color:#a78bfa; }
-        .variant-stat { display:flex; justify-content:space-between; font-size:0.8rem; padding:3px 0; border-bottom:1px solid rgba(255,255,255,0.04); }
-        .variant-stat .label { color:#888; }
-        .variant-stat .value { color:#e0e0e0; font-weight:500; }
-        .actions { display:flex; gap:8px; margin-top:12px; }
-        .btn { padding:6px 14px; border:none; border-radius:8px; cursor:pointer; font-size:0.8rem; font-weight:600; }
-        .btn-winner { background:linear-gradient(135deg,#22c55e,#16a34a); color:#fff; }
-        .btn-delete { background:rgba(239,68,68,0.2); color:#ef4444; }
-        .btn-delete:hover { background:rgba(239,68,68,0.4); }
-        .create-form { background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:20px; margin-bottom:24px; }
-        .create-form h3 { margin-bottom:12px; color:#a78bfa; }
-        .form-row { display:flex; gap:12px; margin-bottom:10px; }
-        .form-row input, .form-row select, .form-row textarea { flex:1; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:8px 12px; color:#fff; font-size:0.85rem; }
-        .form-row textarea { min-height:60px; resize:vertical; }
-        .btn-create { background:linear-gradient(135deg,#6366f1,#8b5cf6); color:#fff; padding:10px 24px; border:none; border-radius:8px; cursor:pointer; font-weight:600; }
-        .refresh-note { text-align:center; color:#444; font-size:0.75rem; margin-top:16px; }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        font-family: 'Inter', 'Segoe UI', sans-serif;
+        background: #060614;
+        color: #e0e0e0;
+        min-height: 100vh;
+      }
+      .header {
+        padding: 16px 24px;
+        background: rgba(0, 0, 0, 0.4);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .header h1 {
+        font-size: 1.3rem;
+        background: linear-gradient(135deg, #f59e0b, #ef4444);
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+      .back-btn {
+        background: rgba(255, 255, 255, 0.1);
+        border: none;
+        color: #fff;
+        padding: 8px 16px;
+        border-radius: 8px;
+        cursor: pointer;
+        text-decoration: none;
+        font-size: 0.85rem;
+      }
+      .container {
+        max-width: 1000px;
+        margin: 24px auto;
+        padding: 0 20px;
+      }
+      .experiment {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 16px;
+      }
+      .exp-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+      }
+      .exp-name {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #fff;
+      }
+      .exp-status {
+        padding: 3px 10px;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 600;
+      }
+      .exp-status.active {
+        background: rgba(34, 197, 94, 0.2);
+        color: #22c55e;
+      }
+      .exp-status.completed {
+        background: rgba(99, 102, 241, 0.2);
+        color: #818cf8;
+      }
+      .exp-status.paused {
+        background: rgba(245, 158, 11, 0.2);
+        color: #f59e0b;
+      }
+      .exp-desc {
+        color: #888;
+        font-size: 0.85rem;
+        margin-bottom: 12px;
+      }
+      .exp-meta {
+        display: flex;
+        gap: 16px;
+        font-size: 0.78rem;
+        color: #666;
+        margin-bottom: 16px;
+      }
+      .variants-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 12px;
+      }
+      .variant-card {
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 10px;
+        padding: 14px;
+      }
+      .variant-card.winner {
+        border-color: #22c55e;
+        box-shadow: 0 0 12px rgba(34, 197, 94, 0.2);
+      }
+      .variant-name {
+        font-weight: 600;
+        font-size: 0.95rem;
+        margin-bottom: 8px;
+        color: #a78bfa;
+      }
+      .variant-stat {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.8rem;
+        padding: 3px 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      }
+      .variant-stat .label {
+        color: #888;
+      }
+      .variant-stat .value {
+        color: #e0e0e0;
+        font-weight: 500;
+      }
+      .actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 12px;
+      }
+      .btn {
+        padding: 6px 14px;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 0.8rem;
+        font-weight: 600;
+      }
+      .btn-winner {
+        background: linear-gradient(135deg, #22c55e, #16a34a);
+        color: #fff;
+      }
+      .btn-delete {
+        background: rgba(239, 68, 68, 0.2);
+        color: #ef4444;
+      }
+      .btn-delete:hover {
+        background: rgba(239, 68, 68, 0.4);
+      }
+      .create-form {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 24px;
+      }
+      .create-form h3 {
+        margin-bottom: 12px;
+        color: #a78bfa;
+      }
+      .form-row {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 10px;
+      }
+      .form-row input,
+      .form-row select,
+      .form-row textarea {
+        flex: 1;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        padding: 8px 12px;
+        color: #fff;
+        font-size: 0.85rem;
+      }
+      .form-row textarea {
+        min-height: 60px;
+        resize: vertical;
+      }
+      .btn-create {
+        background: linear-gradient(135deg, #6366f1, #8b5cf6);
+        color: #fff;
+        padding: 10px 24px;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 600;
+      }
+      .refresh-note {
+        text-align: center;
+        color: #444;
+        font-size: 0.75rem;
+        margin-top: 16px;
+      }
     </style>
-</head>
-<body>
+  </head>
+  <body>
     <div class="header">
-        <h1>🧪 A/B Testing Lab</h1>
-        <a href="/admin/" class="back-btn">← Back to Admin</a>
+      <h1>🧪 A/B Testing Lab</h1>
+      <a href="/admin/" class="back-btn">← Back to Admin</a>
     </div>
     <div class="container">
-        <!-- Create New Experiment -->
-        <div class="create-form">
-            <h3>➕ New Experiment</h3>
-            <div class="form-row">
-                <input id="exp-id" placeholder="Experiment ID (e.g. emoji_test)">
-                <input id="exp-name" placeholder="Display Name">
-            </div>
-            <div class="form-row">
-                <input id="exp-desc" placeholder="Description" style="flex:2">
-                <select id="exp-target" aria-label="Experiment target type">
-                    <option value="system_instruction">System Instruction</option>
-                    <option value="prompt_section">Prompt Section</option>
-                    <option value="temperature">Temperature</option>
-                    <option value="model">Model</option>
-                    <option value="response_style">Response Style</option>
-                </select>
-            </div>
-            <div class="form-row">
-                <input id="exp-traffic" type="number" placeholder="Traffic %" value="50" min="1" max="100" style="max-width:100px">
-                <textarea id="exp-variants" placeholder='Variants JSON: {"A":"concise","B":"detailed"}'></textarea>
-            </div>
-            <button class="btn-create" onclick="createExperiment()">Create Experiment</button>
+      <!-- Create New Experiment -->
+      <div class="create-form">
+        <h3>➕ New Experiment</h3>
+        <div class="form-row">
+          <input id="exp-id" placeholder="Experiment ID (e.g. emoji_test)" />
+          <input id="exp-name" placeholder="Display Name" />
         </div>
+        <div class="form-row">
+          <input id="exp-desc" placeholder="Description" style="flex: 2" />
+          <select id="exp-target" aria-label="Experiment target type">
+            <option value="system_instruction">System Instruction</option>
+            <option value="prompt_section">Prompt Section</option>
+            <option value="temperature">Temperature</option>
+            <option value="model">Model</option>
+            <option value="response_style">Response Style</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <input
+            id="exp-traffic"
+            type="number"
+            placeholder="Traffic %"
+            value="50"
+            min="1"
+            max="100"
+            style="max-width: 100px"
+          />
+          <textarea id="exp-variants" placeholder='Variants JSON: {"A":"concise","B":"detailed"}'></textarea>
+        </div>
+        <button class="btn-create" onclick="createExperiment()">Create Experiment</button>
+      </div>
 
-        <!-- Experiments List -->
-        <div id="experiments-list"></div>
-        <div class="refresh-note">Auto-refreshes every 15s</div>
+      <!-- Experiments List -->
+      <div id="experiments-list"></div>
+      <div class="refresh-note">Auto-refreshes every 15s</div>
     </div>
 
     <script>
-        const TOKEN = localStorage.getItem('supabase_token') || localStorage.getItem('admin_token') || '';
-        const HEADERS = { 'Content-Type':'application/json', 'Authorization':'Bearer '+TOKEN };
+      const TOKEN = localStorage.getItem('supabase_token') || localStorage.getItem('admin_token') || '';
+      const HEADERS = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + TOKEN };
 
-        async function loadExperiments() {
-            try {
-                const r = await fetch('/api/admin/ab-tests', { headers: HEADERS });
-                const d = await r.json();
-                renderExperiments(d.experiments || []);
-            } catch(e) { console.error('Load failed:', e); }
+      async function loadExperiments() {
+        try {
+          const r = await fetch('/api/admin/ab-tests', { headers: HEADERS });
+          const d = await r.json();
+          renderExperiments(d.experiments || []);
+        } catch (e) {
+          console.error('Load failed:', e);
         }
+      }
 
-        function renderExperiments(list) {
-            const el = document.getElementById('experiments-list');
-            if (!list.length) { el.innerHTML='<div style="text-align:center;color:#666;padding:40px">No experiments yet</div>'; return; }
-            el.innerHTML = list.map(exp => {
-                const variants = Object.entries(exp.variants || {}).map(([name, data]) => {
-                    const isWinner = exp.winner === name;
-                    return `<div class="variant-card ${isWinner?'winner':''}">
-                        <div class="variant-name">${isWinner?'🏆 ':''}${name}</div>
-                        <div class="variant-stat"><span class="label">Impressions</span><span class="value">${data.impressions||0}</span></div>
-                        <div class="variant-stat"><span class="label">👍 Thumbs Up</span><span class="value">${data.thumbsUp||0}</span></div>
-                        <div class="variant-stat"><span class="label">👎 Thumbs Down</span><span class="value">${data.thumbsDown||0}</span></div>
-                        <div class="variant-stat"><span class="label">Satisfaction</span><span class="value">${data.satisfactionRate||'N/A'}</span></div>
-                        <div class="variant-stat"><span class="label">Corrections</span><span class="value">${data.correctionRate||'N/A'}</span></div>
-                        ${exp.status==='active'?`<div class="actions"><button class="btn btn-winner" onclick="declareWinner('${exp.id}','${name}')">🏆 Winner</button></div>`:''}
+      function renderExperiments(list) {
+        const el = document.getElementById('experiments-list');
+        if (!list.length) {
+          el.innerHTML = '<div style="text-align:center;color:#666;padding:40px">No experiments yet</div>';
+          return;
+        }
+        el.innerHTML = list
+          .map((exp) => {
+            const variants = Object.entries(exp.variants || {})
+              .map(([name, data]) => {
+                const isWinner = exp.winner === name;
+                return `<div class="variant-card ${isWinner ? 'winner' : ''}">
+                        <div class="variant-name">${isWinner ? '🏆 ' : ''}${name}</div>
+                        <div class="variant-stat"><span class="label">Impressions</span><span class="value">${data.impressions || 0}</span></div>
+                        <div class="variant-stat"><span class="label">👍 Thumbs Up</span><span class="value">${data.thumbsUp || 0}</span></div>
+                        <div class="variant-stat"><span class="label">👎 Thumbs Down</span><span class="value">${data.thumbsDown || 0}</span></div>
+                        <div class="variant-stat"><span class="label">Satisfaction</span><span class="value">${data.satisfactionRate || 'N/A'}</span></div>
+                        <div class="variant-stat"><span class="label">Corrections</span><span class="value">${data.correctionRate || 'N/A'}</span></div>
+                        ${exp.status === 'active' ? `<div class="actions"><button class="btn btn-winner" onclick="declareWinner('${exp.id}','${name}')">🏆 Winner</button></div>` : ''}
                     </div>`;
-                }).join('');
-                return `<div class="experiment">
+              })
+              .join('');
+            return `<div class="experiment">
                     <div class="exp-header">
-                        <span class="exp-name">${exp.name||exp.id}</span>
+                        <span class="exp-name">${exp.name || exp.id}</span>
                         <span class="exp-status ${exp.status}">${exp.status}</span>
                     </div>
-                    <div class="exp-desc">${exp.description||''}</div>
+                    <div class="exp-desc">${exp.description || ''}</div>
                     <div class="exp-meta">
                         <span>Target: ${exp.target}</span>
                         <span>Traffic: ${exp.trafficPercent}%</span>
                         <span>Created: ${new Date(exp.createdAt).toLocaleDateString()}</span>
-                        ${exp.winner?`<span>Winner: 🏆 ${exp.winner}</span>`:''}
+                        ${exp.winner ? `<span>Winner: 🏆 ${exp.winner}</span>` : ''}
                     </div>
                     <div class="variants-grid">${variants}</div>
                     <div class="actions" style="margin-top:12px">
                         <button class="btn btn-delete" onclick="deleteExperiment('${exp.id}')">🗑 Delete</button>
                     </div>
                 </div>`;
-            }).join('');
-        }
+          })
+          .join('');
+      }
 
-        async function createExperiment() {
-            const id = document.getElementById('exp-id').value.trim();
-            const name = document.getElementById('exp-name').value.trim();
-            const desc = document.getElementById('exp-desc').value.trim();
-            const target = document.getElementById('exp-target').value;
-            const traffic = parseInt(document.getElementById('exp-traffic').value) || 50;
-            let variants;
-            try { variants = JSON.parse(document.getElementById('exp-variants').value); } catch { alert('Invalid JSON for variants'); return; }
-            if (!id || !variants) { alert('ID and Variants required'); return; }
-            try {
-                await fetch('/api/admin/ab-tests', { method:'POST', headers:HEADERS, body:JSON.stringify({id,name,description:desc,target,trafficPercent:traffic,variants}) });
-                loadExperiments();
-                document.getElementById('exp-id').value='';
-                document.getElementById('exp-name').value='';
-                document.getElementById('exp-desc').value='';
-                document.getElementById('exp-variants').value='';
-            } catch(e) { alert('Error: '+e.message); }
+      async function createExperiment() {
+        const id = document.getElementById('exp-id').value.trim();
+        const name = document.getElementById('exp-name').value.trim();
+        const desc = document.getElementById('exp-desc').value.trim();
+        const target = document.getElementById('exp-target').value;
+        const traffic = parseInt(document.getElementById('exp-traffic').value) || 50;
+        let variants;
+        try {
+          variants = JSON.parse(document.getElementById('exp-variants').value);
+        } catch {
+          alert('Invalid JSON for variants');
+          return;
         }
-
-        async function declareWinner(expId, variant) {
-            if (!confirm('Declare '+variant+' as winner for '+expId+'?')) return;
-            await fetch('/api/admin/ab-tests/'+expId+'/winner', { method:'POST', headers:HEADERS, body:JSON.stringify({variant}) });
-            loadExperiments();
+        if (!id || !variants) {
+          alert('ID and Variants required');
+          return;
         }
-
-        async function deleteExperiment(expId) {
-            if (!confirm('Delete experiment '+expId+'?')) return;
-            await fetch('/api/admin/ab-tests/'+expId, { method:'DELETE', headers:HEADERS });
-            loadExperiments();
+        try {
+          await fetch('/api/admin/ab-tests', {
+            method: 'POST',
+            headers: HEADERS,
+            body: JSON.stringify({ id, name, description: desc, target, trafficPercent: traffic, variants }),
+          });
+          loadExperiments();
+          document.getElementById('exp-id').value = '';
+          document.getElementById('exp-name').value = '';
+          document.getElementById('exp-desc').value = '';
+          document.getElementById('exp-variants').value = '';
+        } catch (e) {
+          alert('Error: ' + e.message);
         }
+      }
 
+      async function declareWinner(expId, variant) {
+        if (!confirm('Declare ' + variant + ' as winner for ' + expId + '?')) return;
+        await fetch('/api/admin/ab-tests/' + expId + '/winner', {
+          method: 'POST',
+          headers: HEADERS,
+          body: JSON.stringify({ variant }),
+        });
         loadExperiments();
-        setInterval(loadExperiments, 15000);
+      }
+
+      async function deleteExperiment(expId) {
+        if (!confirm('Delete experiment ' + expId + '?')) return;
+        await fetch('/api/admin/ab-tests/' + expId, { method: 'DELETE', headers: HEADERS });
+        loadExperiments();
+      }
+
+      loadExperiments();
+      setInterval(loadExperiments, 15000);
     </script>
-</body>
+  </body>
 </html>

@@ -93,7 +93,12 @@
         const d = await r.json();
         if (!r.ok) {
           // Auth errors (wrong password) — nu mai retry
-          const isAuthError = d.error && (d.error.includes('Invalid') || d.error.includes('password') || d.error.includes('verified') || d.error.includes('confirm'));
+          const isAuthError =
+            d.error &&
+            (d.error.includes('Invalid') ||
+              d.error.includes('password') ||
+              d.error.includes('verified') ||
+              d.error.includes('confirm'));
           if (isAuthError) throw new Error(d.error);
           lastErr = new Error(d.error || 'Server error');
           continue; // retry
@@ -103,7 +108,11 @@
         return d;
       } catch (e) {
         // Auth errors nu se reîncearcă
-        if (e.message && (e.message.includes('Invalid') || e.message.includes('password') || e.message.includes('verified'))) throw e;
+        if (
+          e.message &&
+          (e.message.includes('Invalid') || e.message.includes('password') || e.message.includes('verified'))
+        )
+          throw e;
         lastErr = e;
       }
     }
@@ -191,15 +200,15 @@
           const cfg = await cfgR.json();
           if (cfg.adminEmail) window._adminEmail = cfg.adminEmail;
         }
-      } catch (_e) { /* non-blocking */ }
+      } catch (_e) {
+        /* non-blocking */
+      }
     }
 
     // Check role OR email match
     const isAdminRole = currentUser.role === 'admin';
     const isAdminEmail =
-      currentUser.email &&
-      window._adminEmail &&
-      currentUser.email.toLowerCase() === window._adminEmail.toLowerCase();
+      currentUser.email && window._adminEmail && currentUser.email.toLowerCase() === window._adminEmail.toLowerCase();
     const isAdmin = isAdminRole || isAdminEmail;
 
     // Handle static btn-admin (if exists in HTML)
@@ -228,7 +237,9 @@
           const sd = await sr.json();
           if (sd.secret) sessionStorage.setItem('kelion_admin_secret', sd.secret);
         }
-      } catch (_e) { /* non-blocking */ }
+      } catch (_e) {
+        /* non-blocking */
+      }
     }
 
     // Show admin button in navbar for admin users
@@ -240,7 +251,9 @@
           navBtn = document.createElement('button');
           navBtn.id = 'btn-admin-nav';
           navBtn.className = 'btn-secondary';
-          navBtn.onclick = function() { window.location.href = '/admin'; };
+          navBtn.onclick = function () {
+            window.location.href = '/admin';
+          };
           var logoutBtn = document.getElementById('btn-auth');
           if (logoutBtn) navRight.insertBefore(navBtn, logoutBtn);
           else navRight.appendChild(navBtn);
@@ -453,26 +466,28 @@
       }
     }
     if (startBtn) {
-      startBtn.addEventListener('click', async function() {
+      startBtn.addEventListener('click', async function () {
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
           alert('⚠️ Browserul tău nu suportă accesul securizat la microfon/cameră.');
           return;
         }
-        
+
         const originalText = startBtn.innerHTML;
         startBtn.innerHTML = '<span style="opacity:0.8">⏳ Security Check...</span>';
         startBtn.style.pointerEvents = 'none';
-        
+
         try {
           // Strict gate: Must allow audio and video to enter
           const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: { facingMode: 'user' } });
-          stream.getTracks().forEach(t => t.stop()); // Free hardware, trusted implicitly now
-          
+          stream.getTracks().forEach((t) => t.stop()); // Free hardware, trusted implicitly now
+
           startBtn.innerHTML = originalText;
           startBtn.style.pointerEvents = '';
           enterApp();
         } catch (e) {
-          alert('⚠️ Access Denied (Camera & Microphone Required)\n\nKelionAI requires microphone access to hear you and camera access for the AI to interact visually with you.\n\n🔒 GDPR PROTECTION: Your face and voice are processed in real-time STRICTLY for the live experience and are NEVER stored or shared without your explicit consent.\n\nSince you denied the required permissions, you cannot enter the Application.');
+          alert(
+            '⚠️ Access Denied (Camera & Microphone Required)\n\nKelionAI requires microphone access to hear you and camera access for the AI to interact visually with you.\n\n🔒 GDPR PROTECTION: Your face and voice are processed in real-time STRICTLY for the live experience and are NEVER stored or shared without your explicit consent.\n\nSince you denied the required permissions, you cannot enter the Application.'
+          );
           window.location.href = 'https://google.com';
         }
       });
@@ -576,7 +591,9 @@
         const cfg = await cfgR.json();
         if (cfg.adminEmail) window._adminEmail = cfg.adminEmail;
       }
-    } catch (_e) { /* non-blocking */ }
+    } catch (_e) {
+      /* non-blocking */
+    }
 
     // ── Handle Supabase email confirmation callback ──
     // When user clicks email link, Supabase redirects to: https://kelionai.app/#access_token=...&refresh_token=...&type=signup
@@ -680,8 +697,8 @@
     isAdmin: () => {
       if (!currentUser) return false;
       const isAdminRole = currentUser.role === 'admin';
-      const isAdminEmail = currentUser.email && window._adminEmail &&
-        currentUser.email.toLowerCase() === window._adminEmail.toLowerCase();
+      const isAdminEmail =
+        currentUser.email && window._adminEmail && currentUser.email.toLowerCase() === window._adminEmail.toLowerCase();
       return isAdminRole || isAdminEmail;
     },
     forgotPassword,

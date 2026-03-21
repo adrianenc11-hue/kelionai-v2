@@ -1,557 +1,581 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ro">
-
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>K1 — Brain Direct Chat</title>
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-  <link
-    href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Inter:wght@400;500;600&display=swap"
-    rel="stylesheet">
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
-    body {
-      font-family: 'Inter', sans-serif;
-      background: #0a0a0f;
-      color: #e0e0e0;
-      height: 100vh;
-      display: flex;
-      flex-direction: column;
-    }
-
-    /* HEADER */
-    .k1-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 12px 20px;
-      background: linear-gradient(135deg, #0f0f1a, #1a0a2e);
-      border-bottom: 1px solid rgba(139, 92, 246, 0.3);
-    }
-
-    .k1-header .left {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-
-    .k1-header .logo {
-      font-size: 1.4rem;
-      font-weight: 700;
-      background: linear-gradient(135deg, #a78bfa, #c084fc);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-
-    .k1-header .status {
-      font-size: 0.75rem;
-      padding: 3px 10px;
-      border-radius: 12px;
-      background: rgba(34, 197, 94, 0.15);
-      color: #22c55e;
-      border: 1px solid rgba(34, 197, 94, 0.3);
-    }
-
-    .k1-header a {
-      color: #a78bfa;
-      text-decoration: none;
-      font-size: 0.85rem;
-    }
-
-    .k1-header a:hover {
-      text-decoration: underline;
-    }
-
-    /* CHAT AREA */
-    .chat-container {
-      flex: 1;
-      overflow-y: auto;
-      padding: 20px;
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-    }
-
-    .msg {
-      max-width: 85%;
-      padding: 14px 18px;
-      border-radius: 16px;
-      font-size: 0.92rem;
-      line-height: 1.6;
-      white-space: pre-wrap;
-      word-break: break-word;
-    }
-
-    .msg.user {
-      align-self: flex-end;
-      background: linear-gradient(135deg, #4f46e5, #6366f1);
-      color: #fff;
-      border-bottom-right-radius: 4px;
-    }
-
-    .msg.brain {
-      align-self: flex-start;
-      background: rgba(139, 92, 246, 0.08);
-      border: 1px solid rgba(139, 92, 246, 0.2);
-      border-bottom-left-radius: 4px;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.85rem;
-    }
-
-    .msg.brain .provider-tag {
-      display: inline-block;
-      font-size: 0.65rem;
-      padding: 1px 6px;
-      border-radius: 4px;
-      background: rgba(139, 92, 246, 0.2);
-      color: #a78bfa;
-      margin-bottom: 6px;
-    }
-
-    .msg.system {
-      align-self: center;
-      background: rgba(245, 158, 11, 0.1);
-      border: 1px solid rgba(245, 158, 11, 0.3);
-      color: #f59e0b;
-      font-size: 0.8rem;
-      max-width: 70%;
-      text-align: center;
-    }
-
-    /* APPROVAL BUTTONS */
-    .approval-bar {
-      display: flex;
-      gap: 10px;
-      margin-top: 10px;
-    }
-
-    .btn-approve {
-      padding: 8px 20px;
-      border: none;
-      border-radius: 8px;
-      font-weight: 600;
-      cursor: pointer;
-      font-size: 0.85rem;
-      transition: all 0.2s;
-    }
-
-    .btn-approve.yes {
-      background: #22c55e;
-      color: #000;
-    }
-
-    .btn-approve.yes:hover {
-      background: #16a34a;
-    }
-
-    .btn-approve.no {
-      background: #ef4444;
-      color: #fff;
-    }
-
-    .btn-approve.no:hover {
-      background: #dc2626;
-    }
-
-    /* DIFF PREVIEW */
-    .diff-preview {
-      background: #0d0d14;
-      border: 1px solid rgba(139, 92, 246, 0.15);
-      border-radius: 8px;
-      padding: 12px;
-      margin-top: 8px;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.78rem;
-      max-height: 300px;
-      overflow-y: auto;
-      white-space: pre-wrap;
-    }
-
-    /* INPUT AREA */
-    .input-area {
-      display: flex;
-      gap: 10px;
-      padding: 16px 20px;
-      background: #0f0f1a;
-      border-top: 1px solid rgba(139, 92, 246, 0.2);
-    }
-
-    .input-area textarea {
-      flex: 1;
-      padding: 12px 16px;
-      border-radius: 12px;
-      border: 1px solid rgba(139, 92, 246, 0.3);
-      background: rgba(255, 255, 255, 0.04);
-      color: #e0e0e0;
-      font-family: 'Inter', sans-serif;
-      font-size: 0.92rem;
-      resize: none;
-      outline: none;
-      min-height: 48px;
-      max-height: 120px;
-    }
-
-    .input-area textarea:focus {
-      border-color: #a78bfa;
-      box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.15);
-    }
-
-    .input-area button {
-      padding: 12px 24px;
-      border: none;
-      border-radius: 12px;
-      background: linear-gradient(135deg, #7c3aed, #a78bfa);
-      color: #fff;
-      font-weight: 600;
-      font-size: 0.9rem;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-
-    .input-area button:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
-    }
-
-    .input-area button:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-      transform: none;
-    }
-
-    /* THINKING INDICATOR */
-    .thinking {
-      display: none;
-      align-self: flex-start;
-      padding: 10px 18px;
-      font-size: 0.8rem;
-      color: #a78bfa;
-    }
-
-    .thinking.active {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .thinking .dots span {
-      display: inline-block;
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: #a78bfa;
-      animation: dot-pulse 1.2s ease-in-out infinite;
-    }
-
-    .thinking .dots span:nth-child(2) {
-      animation-delay: 0.2s;
-    }
-
-    .thinking .dots span:nth-child(3) {
-      animation-delay: 0.4s;
-    }
-
-    @keyframes dot-pulse {
-
-      0%,
-      80%,
-      100% {
-        opacity: 0.2;
-        transform: scale(0.8);
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>K1 — Brain Direct Chat</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
       }
 
-      40% {
-        opacity: 1;
-        transform: scale(1.2);
+      body {
+        font-family: 'Inter', sans-serif;
+        background: #0a0a0f;
+        color: #e0e0e0;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
       }
-    }
 
-    /* SCROLLBAR */
-    ::-webkit-scrollbar {
-      width: 6px;
-    }
+      /* HEADER */
+      .k1-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 20px;
+        background: linear-gradient(135deg, #0f0f1a, #1a0a2e);
+        border-bottom: 1px solid rgba(139, 92, 246, 0.3);
+      }
 
-    ::-webkit-scrollbar-track {
-      background: transparent;
-    }
+      .k1-header .left {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
 
-    ::-webkit-scrollbar-thumb {
-      background: rgba(139, 92, 246, 0.3);
-      border-radius: 3px;
-    }
-  </style>
-</head>
+      .k1-header .logo {
+        font-size: 1.4rem;
+        font-weight: 700;
+        background: linear-gradient(135deg, #a78bfa, #c084fc);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
 
-<body>
-  <!-- HEADER -->
-  <div class="k1-header">
-    <div class="left">
-      <span class="logo">🧠 K1</span>
-      <span class="status" id="k1-status">Conectat</span>
-    </div>
-    <div>
-      <a href="/admin/">← Admin Panel</a>
-    </div>
-  </div>
+      .k1-header .status {
+        font-size: 0.75rem;
+        padding: 3px 10px;
+        border-radius: 12px;
+        background: rgba(34, 197, 94, 0.15);
+        color: #22c55e;
+        border: 1px solid rgba(34, 197, 94, 0.3);
+      }
 
-  <!-- CHAT -->
-  <div class="chat-container" id="chat-container">
-    <div class="msg system">
-      K1 — Canal direct cu creierul. Memoria nu se șterge niciodată.<br>
-      Scrie o comandă sau o întrebare. K1 execută DOAR la comanda ta.
-    </div>
-  </div>
+      .k1-header a {
+        color: #a78bfa;
+        text-decoration: none;
+        font-size: 0.85rem;
+      }
 
-  <!-- THINKING -->
-  <div class="thinking" id="thinking">
-    <span>K1 gândește</span>
-    <div class="dots"><span></span><span></span><span></span></div>
-  </div>
+      .k1-header a:hover {
+        text-decoration: underline;
+      }
 
-  <!-- INPUT -->
-  <div class="input-area">
-    <textarea id="input" placeholder="Scrie un mesaj către K1..." rows="1"
-      onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault();sendMessage()}"></textarea>
-    <button id="btn-send" onclick="sendMessage()">Trimite</button>
-  </div>
+      /* CHAT AREA */
+      .chat-container {
+        flex: 1;
+        overflow-y: auto;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
 
-  <script>
-    // ═══ CONFIG ═══
-    const ADMIN_SECRET = sessionStorage.getItem('kelion_admin_secret') || '';
-    function k1Headers() {
-      const h = { 'Content-Type': 'application/json' };
-      if (ADMIN_SECRET) h['x-admin-secret'] = ADMIN_SECRET;
-      // Also send JWT Bearer token (same as admin-app.js hdrs())
-      let t = localStorage.getItem('kelion_token');
-      if (!t) {
-        const keys = Object.keys(localStorage).filter(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
-        for (const k of keys) {
-          try { const p = JSON.parse(localStorage.getItem(k)); if (p?.access_token) { t = p.access_token; break; } } catch(e) {}
+      .msg {
+        max-width: 85%;
+        padding: 14px 18px;
+        border-radius: 16px;
+        font-size: 0.92rem;
+        line-height: 1.6;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+
+      .msg.user {
+        align-self: flex-end;
+        background: linear-gradient(135deg, #4f46e5, #6366f1);
+        color: #fff;
+        border-bottom-right-radius: 4px;
+      }
+
+      .msg.brain {
+        align-self: flex-start;
+        background: rgba(139, 92, 246, 0.08);
+        border: 1px solid rgba(139, 92, 246, 0.2);
+        border-bottom-left-radius: 4px;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.85rem;
+      }
+
+      .msg.brain .provider-tag {
+        display: inline-block;
+        font-size: 0.65rem;
+        padding: 1px 6px;
+        border-radius: 4px;
+        background: rgba(139, 92, 246, 0.2);
+        color: #a78bfa;
+        margin-bottom: 6px;
+      }
+
+      .msg.system {
+        align-self: center;
+        background: rgba(245, 158, 11, 0.1);
+        border: 1px solid rgba(245, 158, 11, 0.3);
+        color: #f59e0b;
+        font-size: 0.8rem;
+        max-width: 70%;
+        text-align: center;
+      }
+
+      /* APPROVAL BUTTONS */
+      .approval-bar {
+        display: flex;
+        gap: 10px;
+        margin-top: 10px;
+      }
+
+      .btn-approve {
+        padding: 8px 20px;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        font-size: 0.85rem;
+        transition: all 0.2s;
+      }
+
+      .btn-approve.yes {
+        background: #22c55e;
+        color: #000;
+      }
+
+      .btn-approve.yes:hover {
+        background: #16a34a;
+      }
+
+      .btn-approve.no {
+        background: #ef4444;
+        color: #fff;
+      }
+
+      .btn-approve.no:hover {
+        background: #dc2626;
+      }
+
+      /* DIFF PREVIEW */
+      .diff-preview {
+        background: #0d0d14;
+        border: 1px solid rgba(139, 92, 246, 0.15);
+        border-radius: 8px;
+        padding: 12px;
+        margin-top: 8px;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.78rem;
+        max-height: 300px;
+        overflow-y: auto;
+        white-space: pre-wrap;
+      }
+
+      /* INPUT AREA */
+      .input-area {
+        display: flex;
+        gap: 10px;
+        padding: 16px 20px;
+        background: #0f0f1a;
+        border-top: 1px solid rgba(139, 92, 246, 0.2);
+      }
+
+      .input-area textarea {
+        flex: 1;
+        padding: 12px 16px;
+        border-radius: 12px;
+        border: 1px solid rgba(139, 92, 246, 0.3);
+        background: rgba(255, 255, 255, 0.04);
+        color: #e0e0e0;
+        font-family: 'Inter', sans-serif;
+        font-size: 0.92rem;
+        resize: none;
+        outline: none;
+        min-height: 48px;
+        max-height: 120px;
+      }
+
+      .input-area textarea:focus {
+        border-color: #a78bfa;
+        box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.15);
+      }
+
+      .input-area button {
+        padding: 12px 24px;
+        border: none;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #7c3aed, #a78bfa);
+        color: #fff;
+        font-weight: 600;
+        font-size: 0.9rem;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+
+      .input-area button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
+      }
+
+      .input-area button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      /* THINKING INDICATOR */
+      .thinking {
+        display: none;
+        align-self: flex-start;
+        padding: 10px 18px;
+        font-size: 0.8rem;
+        color: #a78bfa;
+      }
+
+      .thinking.active {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .thinking .dots span {
+        display: inline-block;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #a78bfa;
+        animation: dot-pulse 1.2s ease-in-out infinite;
+      }
+
+      .thinking .dots span:nth-child(2) {
+        animation-delay: 0.2s;
+      }
+
+      .thinking .dots span:nth-child(3) {
+        animation-delay: 0.4s;
+      }
+
+      @keyframes dot-pulse {
+        0%,
+        80%,
+        100% {
+          opacity: 0.2;
+          transform: scale(0.8);
+        }
+
+        40% {
+          opacity: 1;
+          transform: scale(1.2);
         }
       }
-      if (!t) t = localStorage.getItem('sb-access-token');
-      if (t) h['Authorization'] = 'Bearer ' + t;
-      return h;
-    }
-    let currentSessionId = localStorage.getItem('k1_session_id') || 'session_' + Date.now();
-    localStorage.setItem('k1_session_id', currentSessionId);
 
-    const chatContainer = document.getElementById('chat-container');
-    const inputEl = document.getElementById('input');
-    const btnSend = document.getElementById('btn-send');
-    const thinkingEl = document.getElementById('thinking');
+      /* SCROLLBAR */
+      ::-webkit-scrollbar {
+        width: 6px;
+      }
 
-    // ═══ LOAD PREVIOUS SESSION ═══
-    async function loadSession() {
-      try {
-        const res = await fetch(`/api/admin/brain-chat/session/${currentSessionId}`, {
-          headers: k1Headers()
-        });
-        if (!res.ok) return;
-        const data = await res.json();
-        if (data.messages && data.messages.length > 0) {
-          data.messages.forEach(m => {
-            addMessage(m.role === 'user' ? 'user' : 'brain', m.content, null, false);
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+
+      ::-webkit-scrollbar-thumb {
+        background: rgba(139, 92, 246, 0.3);
+        border-radius: 3px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <!-- HEADER -->
+    <div class="k1-header">
+      <div class="left">
+        <span class="logo">🧠 K1</span>
+        <span class="status" id="k1-status">Conectat</span>
+      </div>
+      <div>
+        <a href="/admin/">← Admin Panel</a>
+      </div>
+    </div>
+
+    <!-- CHAT -->
+    <div class="chat-container" id="chat-container">
+      <div class="msg system">
+        K1 — Canal direct cu creierul. Memoria nu se șterge niciodată.<br />
+        Scrie o comandă sau o întrebare. K1 execută DOAR la comanda ta.
+      </div>
+    </div>
+
+    <!-- THINKING -->
+    <div class="thinking" id="thinking">
+      <span>K1 gândește</span>
+      <div class="dots"><span></span><span></span><span></span></div>
+    </div>
+
+    <!-- INPUT -->
+    <div class="input-area">
+      <textarea
+        id="input"
+        placeholder="Scrie un mesaj către K1..."
+        rows="1"
+        onkeydown="
+          if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault();
+            sendMessage();
+          }
+        "
+      ></textarea>
+      <button id="btn-send" onclick="sendMessage()">Trimite</button>
+    </div>
+
+    <script>
+      // ═══ CONFIG ═══
+      const ADMIN_SECRET = sessionStorage.getItem('kelion_admin_secret') || '';
+      function k1Headers() {
+        const h = { 'Content-Type': 'application/json' };
+        if (ADMIN_SECRET) h['x-admin-secret'] = ADMIN_SECRET;
+        // Also send JWT Bearer token (same as admin-app.js hdrs())
+        let t = localStorage.getItem('kelion_token');
+        if (!t) {
+          const keys = Object.keys(localStorage).filter((k) => k.startsWith('sb-') && k.endsWith('-auth-token'));
+          for (const k of keys) {
+            try {
+              const p = JSON.parse(localStorage.getItem(k));
+              if (p?.access_token) {
+                t = p.access_token;
+                break;
+              }
+            } catch (e) {}
+          }
+        }
+        if (!t) t = localStorage.getItem('sb-access-token');
+        if (t) h['Authorization'] = 'Bearer ' + t;
+        return h;
+      }
+      let currentSessionId = localStorage.getItem('k1_session_id') || 'session_' + Date.now();
+      localStorage.setItem('k1_session_id', currentSessionId);
+
+      const chatContainer = document.getElementById('chat-container');
+      const inputEl = document.getElementById('input');
+      const btnSend = document.getElementById('btn-send');
+      const thinkingEl = document.getElementById('thinking');
+
+      // ═══ LOAD PREVIOUS SESSION ═══
+      async function loadSession() {
+        try {
+          const res = await fetch(`/api/admin/brain-chat/session/${currentSessionId}`, {
+            headers: k1Headers(),
           });
+          if (!res.ok) return;
+          const data = await res.json();
+          if (data.messages && data.messages.length > 0) {
+            data.messages.forEach((m) => {
+              addMessage(m.role === 'user' ? 'user' : 'brain', m.content, null, false);
+            });
+            scrollToBottom();
+          }
+        } catch (e) {
+          console.error('Load session failed:', e);
+        }
+      }
+
+      // ═══ SEND MESSAGE ═══
+      async function sendMessage() {
+        const msg = inputEl.value.trim();
+        if (!msg) return;
+
+        inputEl.value = '';
+        inputEl.style.height = 'auto';
+        addMessage('user', msg);
+        btnSend.disabled = true;
+        thinkingEl.classList.add('active');
+
+        try {
+          const res = await fetch('/api/admin/brain-chat', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-admin-secret': ADMIN_SECRET,
+            },
+            body: JSON.stringify({ message: msg, sessionId: currentSessionId }),
+          });
+
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({ error: 'Eroare server' }));
+            addMessage('system', `❌ Eroare: ${err.error || res.status}`);
+            return;
+          }
+
+          const data = await res.json();
+
+          // Add brain response
+          addMessage('brain', data.reply, data.provider);
+
+          // Handle pending approval
+          if (data.pendingApproval) {
+            addApprovalButtons(data.pendingApproval.opId, data.pendingApproval.preview);
+          }
+        } catch (e) {
+          addMessage('system', `❌ Eroare: ${e.message}`);
+        } finally {
+          btnSend.disabled = false;
+          thinkingEl.classList.remove('active');
           scrollToBottom();
         }
-      } catch (e) {
-        console.error('Load session failed:', e);
       }
-    }
 
-    // ═══ SEND MESSAGE ═══
-    async function sendMessage() {
-      const msg = inputEl.value.trim();
-      if (!msg) return;
+      // ═══ ADD MESSAGE TO CHAT ═══
+      function addMessage(role, content, provider, scroll = true) {
+        const div = document.createElement('div');
+        div.className = `msg ${role}`;
 
-      inputEl.value = '';
-      inputEl.style.height = 'auto';
-      addMessage('user', msg);
-      btnSend.disabled = true;
-      thinkingEl.classList.add('active');
-
-      try {
-        const res = await fetch('/api/admin/brain-chat', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-admin-secret': ADMIN_SECRET,
-          },
-          body: JSON.stringify({ message: msg, sessionId: currentSessionId }),
-        });
-
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({ error: 'Eroare server' }));
-          addMessage('system', `❌ Eroare: ${err.error || res.status}`);
-          return;
+        if (role === 'brain' && provider) {
+          const tag = document.createElement('div');
+          tag.className = 'provider-tag';
+          tag.textContent = provider.toUpperCase();
+          div.appendChild(tag);
         }
 
-        const data = await res.json();
+        const text = document.createElement('div');
+        text.textContent = content;
+        div.appendChild(text);
 
-        // Add brain response
-        addMessage('brain', data.reply, data.provider);
+        chatContainer.appendChild(div);
+        if (scroll) scrollToBottom();
+      }
 
-        // Handle pending approval
-        if (data.pendingApproval) {
-          addApprovalButtons(data.pendingApproval.opId, data.pendingApproval.preview);
+      // ═══ APPROVAL BUTTONS ═══
+      function addApprovalButtons(opId, preview) {
+        const bar = document.createElement('div');
+        bar.className = 'approval-bar';
+        bar.id = `approval-${opId}`;
+
+        const approveBtn = document.createElement('button');
+        approveBtn.className = 'btn-approve yes';
+        approveBtn.textContent = '✅ APPROVE';
+        approveBtn.onclick = () => handleApproval(opId, true);
+
+        const rejectBtn = document.createElement('button');
+        rejectBtn.className = 'btn-approve no';
+        rejectBtn.textContent = '❌ REJECT';
+        rejectBtn.onclick = () => handleApproval(opId, false);
+
+        bar.appendChild(approveBtn);
+        bar.appendChild(rejectBtn);
+
+        // Show preview if available
+        if (preview) {
+          const diffDiv = document.createElement('div');
+          diffDiv.className = 'diff-preview';
+          diffDiv.textContent = JSON.stringify(preview, null, 2);
+          chatContainer.appendChild(diffDiv);
         }
 
-      } catch (e) {
-        addMessage('system', `❌ Eroare: ${e.message}`);
-      } finally {
-        btnSend.disabled = false;
-        thinkingEl.classList.remove('active');
+        chatContainer.appendChild(bar);
         scrollToBottom();
       }
-    }
 
-    // ═══ ADD MESSAGE TO CHAT ═══
-    function addMessage(role, content, provider, scroll = true) {
-      const div = document.createElement('div');
-      div.className = `msg ${role}`;
+      // ═══ HANDLE APPROVAL ═══
+      async function handleApproval(opId, approved) {
+        const endpoint = approved ? '/api/admin/brain-chat/approve' : '/api/admin/brain-chat/reject';
 
-      if (role === 'brain' && provider) {
-        const tag = document.createElement('div');
-        tag.className = 'provider-tag';
-        tag.textContent = provider.toUpperCase();
-        div.appendChild(tag);
-      }
+        try {
+          const res = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-admin-secret': ADMIN_SECRET,
+            },
+            body: JSON.stringify({ opId }),
+          });
 
-      const text = document.createElement('div');
-      text.textContent = content;
-      div.appendChild(text);
+          const data = await res.json();
 
-      chatContainer.appendChild(div);
-      if (scroll) scrollToBottom();
-    }
+          // Remove approval bar
+          const bar = document.getElementById(`approval-${opId}`);
+          if (bar) bar.remove();
 
-    // ═══ APPROVAL BUTTONS ═══
-    function addApprovalButtons(opId, preview) {
-      const bar = document.createElement('div');
-      bar.className = 'approval-bar';
-      bar.id = `approval-${opId}`;
-
-      const approveBtn = document.createElement('button');
-      approveBtn.className = 'btn-approve yes';
-      approveBtn.textContent = '✅ APPROVE';
-      approveBtn.onclick = () => handleApproval(opId, true);
-
-      const rejectBtn = document.createElement('button');
-      rejectBtn.className = 'btn-approve no';
-      rejectBtn.textContent = '❌ REJECT';
-      rejectBtn.onclick = () => handleApproval(opId, false);
-
-      bar.appendChild(approveBtn);
-      bar.appendChild(rejectBtn);
-
-      // Show preview if available
-      if (preview) {
-        const diffDiv = document.createElement('div');
-        diffDiv.className = 'diff-preview';
-        diffDiv.textContent = JSON.stringify(preview, null, 2);
-        chatContainer.appendChild(diffDiv);
-      }
-
-      chatContainer.appendChild(bar);
-      scrollToBottom();
-    }
-
-    // ═══ HANDLE APPROVAL ═══
-    async function handleApproval(opId, approved) {
-      const endpoint = approved ? '/api/admin/brain-chat/approve' : '/api/admin/brain-chat/reject';
-
-      try {
-        const res = await fetch(endpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-admin-secret': ADMIN_SECRET,
-          },
-          body: JSON.stringify({ opId }),
-        });
-
-        const data = await res.json();
-
-        // Remove approval bar
-        const bar = document.getElementById(`approval-${opId}`);
-        if (bar) bar.remove();
-
-        if (approved) {
-          addMessage('system', `✅ Operație aprobată: ${data.type}\n${JSON.stringify(data.result, null, 2).slice(0, 2000)}`);
-        } else {
-          addMessage('system', `❌ Operație refuzată: ${data.type}`);
+          if (approved) {
+            addMessage(
+              'system',
+              `✅ Operație aprobată: ${data.type}\n${JSON.stringify(data.result, null, 2).slice(0, 2000)}`
+            );
+          } else {
+            addMessage('system', `❌ Operație refuzată: ${data.type}`);
+          }
+        } catch (e) {
+          addMessage('system', `❌ Eroare: ${e.message}`);
         }
-      } catch (e) {
-        addMessage('system', `❌ Eroare: ${e.message}`);
       }
-    }
 
-    // ═══ HELPERS ═══
-    function scrollToBottom() {
-      setTimeout(() => { chatContainer.scrollTop = chatContainer.scrollHeight; }, 50);
-    }
-
-    // Auto-resize textarea
-    inputEl.addEventListener('input', () => {
-      inputEl.style.height = 'auto';
-      inputEl.style.height = Math.min(inputEl.scrollHeight, 120) + 'px';
-    });
-
-    // ═══ PROGRESS BAR ═══
-    const progressBar = document.getElementById('progress-bar');
-    const progressFill = document.getElementById('progress-fill');
-    const progressTask = document.getElementById('progress-task');
-    const progressPct = document.getElementById('progress-pct');
-
-    function setProgress(pct, task) {
-      progressBar.classList.add('active');
-      progressFill.style.width = pct + '%';
-      progressPct.textContent = pct + '%';
-      if (task) progressTask.textContent = task;
-      localStorage.setItem('k1_progress', JSON.stringify({ pct, task, time: Date.now() }));
-    }
-
-    function hideProgress() {
-      progressBar.classList.remove('active');
-      localStorage.removeItem('k1_progress');
-    }
-
-    // Restore progress on reload
-    try {
-      const saved = JSON.parse(localStorage.getItem('k1_progress') || 'null');
-      if (saved && Date.now() - saved.time < 30000) {
-        setProgress(saved.pct, saved.task);
+      // ═══ HELPERS ═══
+      function scrollToBottom() {
+        setTimeout(() => {
+          chatContainer.scrollTop = chatContainer.scrollHeight;
+        }, 50);
       }
-    } catch(e) {}
 
-    // ═══ NEW SESSION ═══
-    function newSession() {
-      currentSessionId = 'session_' + Date.now();
-      localStorage.setItem('k1_session_id', currentSessionId);
-      chatContainer.innerHTML = '<div class="msg system">Sesiune nouă K1. Memoria persistă din sesiunile anterioare.</div>';
-    }
+      // Auto-resize textarea
+      inputEl.addEventListener('input', () => {
+        inputEl.style.height = 'auto';
+        inputEl.style.height = Math.min(inputEl.scrollHeight, 120) + 'px';
+      });
 
-    // ═══ INIT ═══
-    if (!ADMIN_SECRET && !localStorage.getItem('kelion_token')) {
-      // Check Supabase tokens too
-      const sbKeys = Object.keys(localStorage).filter(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
-      const hasToken = sbKeys.some(k => { try { return !!JSON.parse(localStorage.getItem(k))?.access_token; } catch(e) { return false; } });
-      if (!hasToken) {
-        addMessage('system', '⚠️ Nu ești autentificat. Loghează-te pe kelionai.app și redeschide pagina.');
+      // ═══ PROGRESS BAR ═══
+      const progressBar = document.getElementById('progress-bar');
+      const progressFill = document.getElementById('progress-fill');
+      const progressTask = document.getElementById('progress-task');
+      const progressPct = document.getElementById('progress-pct');
+
+      function setProgress(pct, task) {
+        progressBar.classList.add('active');
+        progressFill.style.width = pct + '%';
+        progressPct.textContent = pct + '%';
+        if (task) progressTask.textContent = task;
+        localStorage.setItem('k1_progress', JSON.stringify({ pct, task, time: Date.now() }));
+      }
+
+      function hideProgress() {
+        progressBar.classList.remove('active');
+        localStorage.removeItem('k1_progress');
+      }
+
+      // Restore progress on reload
+      try {
+        const saved = JSON.parse(localStorage.getItem('k1_progress') || 'null');
+        if (saved && Date.now() - saved.time < 30000) {
+          setProgress(saved.pct, saved.task);
+        }
+      } catch (e) {}
+
+      // ═══ NEW SESSION ═══
+      function newSession() {
+        currentSessionId = 'session_' + Date.now();
+        localStorage.setItem('k1_session_id', currentSessionId);
+        chatContainer.innerHTML =
+          '<div class="msg system">Sesiune nouă K1. Memoria persistă din sesiunile anterioare.</div>';
+      }
+
+      // ═══ INIT ═══
+      if (!ADMIN_SECRET && !localStorage.getItem('kelion_token')) {
+        // Check Supabase tokens too
+        const sbKeys = Object.keys(localStorage).filter((k) => k.startsWith('sb-') && k.endsWith('-auth-token'));
+        const hasToken = sbKeys.some((k) => {
+          try {
+            return !!JSON.parse(localStorage.getItem(k))?.access_token;
+          } catch (e) {
+            return false;
+          }
+        });
+        if (!hasToken) {
+          addMessage('system', '⚠️ Nu ești autentificat. Loghează-te pe kelionai.app și redeschide pagina.');
+        } else {
+          loadSession();
+        }
       } else {
         loadSession();
       }
-    } else {
-      loadSession();
-    }
-  </script>
-</body>
-
+    </script>
+  </body>
 </html>

@@ -2,9 +2,9 @@
 // KelionAI — A/B Testing Framework for Prompt Variants
 // Test different prompt strategies & track which performs better
 // ═══════════════════════════════════════════════════════════════
-"use strict";
+'use strict';
 
-const logger = require("./logger");
+const logger = require('./logger');
 
 // ── Active experiments storage ──
 const experiments = new Map();
@@ -24,18 +24,18 @@ const variantMetrics = new Map(); // experimentId:variant → { ... }
  */
 function createExperiment(config) {
   if (!config.id || !config.variants) {
-    throw new Error("Experiment needs id and variants");
+    throw new Error('Experiment needs id and variants');
   }
 
   const experiment = {
     id: config.id,
     name: config.name || config.id,
-    description: config.description || "",
-    target: config.target || "prompt_section",
+    description: config.description || '',
+    target: config.target || 'prompt_section',
     variants: config.variants,
     variantNames: Object.keys(config.variants),
     trafficPercent: config.trafficPercent || 100,
-    status: config.status || "active",
+    status: config.status || 'active',
     createdAt: new Date().toISOString(),
     winner: null,
   };
@@ -58,7 +58,7 @@ function createExperiment(config) {
     }
   }
 
-  logger.info({ component: "ABTest", experiment: config.id }, `🧪 Experiment created: ${config.name}`);
+  logger.info({ component: 'ABTest', experiment: config.id }, `🧪 Experiment created: ${config.name}`);
   return experiment;
 }
 
@@ -68,11 +68,11 @@ function createExperiment(config) {
  */
 function getVariant(userId, experimentId) {
   const exp = experiments.get(experimentId);
-  if (!exp || exp.status !== "active") return null;
+  if (!exp || exp.status !== 'active') return null;
 
   // Check traffic allocation
-  const userHash = simpleHash(userId || "anonymous");
-  if ((userHash % 100) >= exp.trafficPercent) return null; // User not in experiment
+  const userHash = simpleHash(userId || 'anonymous');
+  if (userHash % 100 >= exp.trafficPercent) return null; // User not in experiment
 
   // Check if already assigned
   const userExps = userAssignments.get(userId) || {};
@@ -86,7 +86,7 @@ function getVariant(userId, experimentId) {
   userExps[experimentId] = variant;
   userAssignments.set(userId, userExps);
 
-  logger.info({ component: "ABTest", experiment: experimentId, user: userId, variant }, "User assigned to variant");
+  logger.info({ component: 'ABTest', experiment: experimentId, user: userId, variant }, 'User assigned to variant');
   return variant;
 }
 
@@ -98,7 +98,7 @@ function applyExperiments(userId, promptConfig) {
   const applied = [];
 
   for (const [id, exp] of experiments) {
-    if (exp.status !== "active") continue;
+    if (exp.status !== 'active') continue;
 
     const variant = getVariant(userId, id);
     if (!variant) continue;
@@ -113,23 +113,23 @@ function applyExperiments(userId, promptConfig) {
 
     // Apply based on target type
     switch (exp.target) {
-      case "prompt_section":
+      case 'prompt_section':
         // value = { section: 'RULES', content: '...' }
         if (value.section) {
           promptConfig.overrides = promptConfig.overrides || {};
           promptConfig.overrides[value.section] = value.content;
         }
         break;
-      case "temperature":
+      case 'temperature':
         promptConfig.temperature = value;
         break;
-      case "model":
+      case 'model':
         promptConfig.model = value;
         break;
-      case "system_instruction":
-        promptConfig.systemInstructionAppend = (promptConfig.systemInstructionAppend || "") + "\n" + value;
+      case 'system_instruction':
+        promptConfig.systemInstructionAppend = (promptConfig.systemInstructionAppend || '') + '\n' + value;
         break;
-      case "response_style":
+      case 'response_style':
         promptConfig.responseStyle = value;
         break;
     }
@@ -153,10 +153,18 @@ function recordFeedback(userId, type) {
     if (!m) continue;
 
     switch (type) {
-      case "thumbsUp": m.thumbsUp++; break;
-      case "thumbsDown": m.thumbsDown++; break;
-      case "correction": m.corrections++; break;
-      case "followUp": m.followUps++; break;
+      case 'thumbsUp':
+        m.thumbsUp++;
+        break;
+      case 'thumbsDown':
+        m.thumbsDown++;
+        break;
+      case 'correction':
+        m.corrections++;
+        break;
+      case 'followUp':
+        m.followUps++;
+        break;
     }
   }
 }
@@ -194,8 +202,8 @@ function getExperimentReport(experimentId) {
     report.variants[v] = {
       ...m,
       value: exp.variants[v],
-      satisfactionRate: total > 0 ? ((m.thumbsUp / total) * 100).toFixed(1) + "%" : "N/A",
-      correctionRate: m.impressions > 0 ? ((m.corrections / m.impressions) * 100).toFixed(1) + "%" : "N/A",
+      satisfactionRate: total > 0 ? ((m.thumbsUp / total) * 100).toFixed(1) + '%' : 'N/A',
+      correctionRate: m.impressions > 0 ? ((m.corrections / m.impressions) * 100).toFixed(1) + '%' : 'N/A',
     };
   }
 
@@ -219,10 +227,13 @@ function getAllExperiments() {
 function declareWinner(experimentId, winnerVariant) {
   const exp = experiments.get(experimentId);
   if (!exp) return null;
-  exp.status = "completed";
+  exp.status = 'completed';
   exp.winner = winnerVariant;
   exp.completedAt = new Date().toISOString();
-  logger.info({ component: "ABTest", experiment: experimentId, winner: winnerVariant }, `🏆 Winner declared: ${winnerVariant}`);
+  logger.info(
+    { component: 'ABTest', experiment: experimentId, winner: winnerVariant },
+    `🏆 Winner declared: ${winnerVariant}`
+  );
   return exp;
 }
 
@@ -251,7 +262,7 @@ function simpleHash(str) {
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
     const char = str.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
+    hash = (hash << 5) - hash + char;
     hash = hash & hash; // Convert to 32-bit int
   }
   return Math.abs(hash);
@@ -259,26 +270,26 @@ function simpleHash(str) {
 
 // ── Seed default experiments ──
 createExperiment({
-  id: "response_length",
-  name: "Response Length Test",
-  description: "Testing concise vs detailed responses",
-  target: "system_instruction",
+  id: 'response_length',
+  name: 'Response Length Test',
+  description: 'Testing concise vs detailed responses',
+  target: 'system_instruction',
   variants: {
-    concise: "CRITICAL: Keep ALL responses under 2 sentences. Be extremely brief.",
-    detailed: "Provide thorough, comprehensive responses with examples when helpful.",
-    balanced: "Be concise for simple questions, detailed for complex ones. Adapt naturally.",
+    concise: 'CRITICAL: Keep ALL responses under 2 sentences. Be extremely brief.',
+    detailed: 'Provide thorough, comprehensive responses with examples when helpful.',
+    balanced: 'Be concise for simple questions, detailed for complex ones. Adapt naturally.',
   },
   trafficPercent: 50,
 });
 
 createExperiment({
-  id: "tone_warmth",
-  name: "Tone Warmth Test",
-  description: "Testing warm vs professional tone",
-  target: "system_instruction",
+  id: 'tone_warmth',
+  name: 'Tone Warmth Test',
+  description: 'Testing warm vs professional tone',
+  target: 'system_instruction',
   variants: {
-    warm: "Be extra warm, use emojis occasionally, be like a close friend.",
-    professional: "Be professional and precise. No emojis. Direct and efficient.",
+    warm: 'Be extra warm, use emojis occasionally, be like a close friend.',
+    professional: 'Be professional and precise. No emojis. Direct and efficient.',
   },
   trafficPercent: 30,
 });

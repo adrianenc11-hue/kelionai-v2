@@ -1,111 +1,182 @@
-[2026-03-12T18:45:05.048Z] ═══ TRUTH GUARD — GATE RUNNER ═══
-[2026-03-12T18:45:05.052Z] Commit: local
-[2026-03-12T18:45:05.052Z] Node: v20.11.0
-[2026-03-12T18:45:05.052Z] CWD: C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2
-[2026-03-12T18:45:05.052Z] 
+[2026-03-21T19:08:26.121Z] ═══ TRUTH GUARD — GATE RUNNER ═══
+[2026-03-21T19:08:26.128Z] Commit: local
+[2026-03-21T19:08:26.128Z] Node: v24.14.0
+[2026-03-21T19:08:26.129Z] CWD: C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2
+[2026-03-21T19:08:26.129Z] 
 ════ GATE: Prettier (format check) ════
-[2026-03-12T18:45:05.052Z] Command: npx prettier --check "server/**/*.js"
-[2026-03-12T18:45:08.615Z] Checking formatting...
-All matched files use Prettier code style!
+[2026-03-21T19:08:26.129Z] Command: npx prettier --check "server/**/*.js"
+[2026-03-21T19:08:41.763Z] Checking formatting...
+[[33mwarn[39m] server/brain.js
+[[33mwarn[39m] Code style issues found in the above file. Run Prettier with --write to fix.
 Checking formatting...
-All matched files use Prettier code style!
-[2026-03-12T18:45:08.615Z] ✅ Prettier (format check) PASSED (3563ms)
-[2026-03-12T18:45:08.615Z] 
+[[33mwarn[39m] server/brain.js
+[[33mwarn[39m] Code style issues found in the above file. Run Prettier with --write to fix.
+[2026-03-21T19:08:41.764Z] ❌ Prettier (format check) FAILED (15634ms, exit 1)
+[2026-03-21T19:08:41.764Z] 
 ════ GATE: Lint (ESLint) ════
-[2026-03-12T18:45:08.615Z] Command: npx eslint server/
-[2026-03-12T18:45:10.819Z]       no-empty
-  4040:13  warning  Empty block statement                                                               no-empty
-  4068:13  warning  Empty block statement                                                               no-empty
-  4098:13  warning  Empty block statement                                                               no-empty
-  4109:13  warning  Empty block statement                                                               no-empty
+[2026-03-21T19:08:41.764Z] Command: npx eslint server/
+[2026-03-21T19:08:45.767Z] 10:10  warning  'generateReferralCode' is defined but never used. Allowed unused vars must match /^_/u  no-unused-vars
 
-C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2\server\whatsapp.js
-   203:7   warning  'knownUsers' is assigned a value but never used. Allowed unused vars must match /^_/u  no-unused-vars
-  1014:24  warning  'e' is defined but never used                                                          no-unused-vars
-  1044:26  warning  'e' is defined but never used                                                          no-unused-vars
-  1071:19  warning  Empty block statement                                                                  no-empty
-  1122:19  warning  Empty block statement                                                                  no-empty
-  1194:22  warning  'e' is defined but never used                                                          no-unused-vars
+C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2\server\routes\admin.js
+  2877:12  warning  'e' is defined but never used. Allowed unused caught errors must match /^_/u  no-unused-vars
 
-C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2\server\ws-engine.js
-  166:16  warning  'err' is defined but never used                                             no-unused-vars
-  296:20  warning  'e' is defined but never used                                               no-unused-vars
-  386:18  warning  'e' is defined but never used                                               no-unused-vars
-  445:18  warning  'asset' is defined but never used. Allowed unused args must match /^_/u     no-unused-vars
-  445:25  warning  'candle1m' is defined but never used. Allowed unused args must match /^_/u  no-unused-vars
+C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2\server\routes\auth.js
+  8:7  warning  'logger' is assigned a value but never used. Allowed unused vars must match /^_/u  no-unused-vars
 
-✖ 179 problems (0 errors, 179 warnings)
-  0 errors and 21 warnings potentially fixable with the `--fix` option.
-      no-empty
-  4040:13  warning  Empty block statement                                                               no-empty
-  4068:13  warning  Empty block statement                                                               no-empty
-  4098:13  warning  Empty block statement                                                               no-empty
-  4109:13  warning  Empty block statement                                                               no-empty
+C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2\server\routes\chat.js
+   12:9   warning  'buildSystemPrompt' is assigned a value but never used. Allowed unused vars must match /^_/u   no-unused-vars
+   12:28  warning  'buildNewbornPrompt' is assigned a value but never used. Allowed unused vars must match /^_/u  no-unused-vars
+   15:9   warning  'MODELS' is assigned a value but never used. Allowed unused vars must match /^_/u              no-unused-vars
+  469:25  warning  Empty block statement                                                                          no-empty
+  504:21  warning  Empty block statement                                                                          no-empty
 
-C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2\server\whatsapp.js
-   203:7   warning  'knownUsers' is assigned a value but never used. Allowed unused vars must match /^_/u  no-unused-vars
-  1014:24  warning  'e' is defined but never used                                                          no-unused-vars
-  1044:26  warning  'e' is defined but never used                                                          no-unused-vars
-  1071:19  warning  Empty block statement                                                                  no-empty
-  1122:19  warning  Empty block statement                                                                  no-empty
-  1194:22  warning  'e' is defined but never used                                                          no-unused-vars
+C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2\server\routes\gmail.js
+  7:7  warning  'logger' is assigned a value but never used. Allowed unused vars must match /^_/u  no-unused-vars
 
-C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2\server\ws-engine.js
-  166:16  warning  'err' is defined but never used                                             no-unused-vars
-  296:20  warning  'e' is defined but never used                                               no-unused-vars
-  386:18  warning  'e' is defined but never used                                               no-unused-vars
-  445:18  warning  'asset' is defined but never used. Allowed unused args must match /^_/u     no-unused-vars
-  445:25  warning  'candle1m' is defined but never used. Allowed unused args must match /^_/u  no-unused-vars
+C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2\server\routes\scan.js
+  152:12  warning  'e' is defined but never used. Allowed unused caught errors must match /^_/u  no-unused-vars
 
-✖ 179 problems (0 errors, 179 warnings)
-  0 errors and 21 warnings potentially fixable with the `--fix` option.
-[2026-03-12T18:45:10.819Z] ✅ Lint (ESLint) PASSED (2204ms)
-[2026-03-12T18:45:10.819Z] 
+C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2\server\self-heal.js
+  210:12  warning  'e' is defined but never used. Allowed unused caught errors must match /^_/u  no-unused-vars
+  312:17  warning  Empty block statement                                                         no-empty
+
+✖ 35 problems (0 errors, 35 warnings)
+  0 errors and 3 warnings potentially fixable with the `--fix` option.
+10:10  warning  'generateReferralCode' is defined but never used. Allowed unused vars must match /^_/u  no-unused-vars
+
+C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2\server\routes\admin.js
+  2877:12  warning  'e' is defined but never used. Allowed unused caught errors must match /^_/u  no-unused-vars
+
+C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2\server\routes\auth.js
+  8:7  warning  'logger' is assigned a value but never used. Allowed unused vars must match /^_/u  no-unused-vars
+
+C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2\server\routes\chat.js
+   12:9   warning  'buildSystemPrompt' is assigned a value but never used. Allowed unused vars must match /^_/u   no-unused-vars
+   12:28  warning  'buildNewbornPrompt' is assigned a value but never used. Allowed unused vars must match /^_/u  no-unused-vars
+   15:9   warning  'MODELS' is assigned a value but never used. Allowed unused vars must match /^_/u              no-unused-vars
+  469:25  warning  Empty block statement                                                                          no-empty
+  504:21  warning  Empty block statement                                                                          no-empty
+
+C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2\server\routes\gmail.js
+  7:7  warning  'logger' is assigned a value but never used. Allowed unused vars must match /^_/u  no-unused-vars
+
+C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2\server\routes\scan.js
+  152:12  warning  'e' is defined but never used. Allowed unused caught errors must match /^_/u  no-unused-vars
+
+C:\Users\adria\.gemini\antigravity\scratch\kelionai-v2\server\self-heal.js
+  210:12  warning  'e' is defined but never used. Allowed unused caught errors must match /^_/u  no-unused-vars
+  312:17  warning  Empty block statement                                                         no-empty
+
+✖ 35 problems (0 errors, 35 warnings)
+  0 errors and 3 warnings potentially fixable with the `--fix` option.
+[2026-03-21T19:08:45.767Z] ✅ Lint (ESLint) PASSED (4003ms)
+[2026-03-21T19:08:45.767Z] 
 ════ GATE: Typecheck ════
-[2026-03-12T18:45:10.820Z] Command: npm run typecheck --silent
-[2026-03-12T18:45:11.534Z] typecheck: N/A (JS-only project)
-typecheck: N/A (JS-only project)
-[2026-03-12T18:45:11.534Z] ✅ Typecheck PASSED (714ms)
-[2026-03-12T18:45:11.534Z] 
+[2026-03-21T19:08:45.767Z] Command: npm run typecheck --silent
+[2026-03-21T19:08:46.493Z] typecheck: N/A
+typecheck: N/A
+[2026-03-21T19:08:46.493Z] ✅ Typecheck PASSED (726ms)
+[2026-03-21T19:08:46.493Z] 
 ════ GATE: Unit Tests (Jest) ════
-[2026-03-12T18:45:11.534Z] Command: npx jest --forceExit --silent
-[2026-03-12T18:45:28.518Z]                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   
-----------------------------|---------|----------|---------|---------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+[2026-03-21T19:08:46.493Z] Command: npx jest --forceExit --silent
+[2026-03-21T19:09:20.444Z] ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 =============================== Coverage summary ===============================
-Statements   : 13.01% ( 2195/16866 )
-Branches     : 6.44% ( 838/13007 )
-Functions    : 8.18% ( 175/2138 )
-Lines        : 13.71% ( 2136/15572 )
+Statements   : 12.51% ( 2139/17090 )
+Branches     : 8.05% ( 1069/13271 )
+Functions    : 8.85% ( 191/2156 )
+Lines        : 13.42% ( 2054/15295 )
 ================================================================================
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  
-----------------------------|---------|----------|---------|---------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+PASS __tests__/newborn-mode.test.js
+PASS __tests__/payments.test.js
+PASS __tests__/persona.test.js
+PASS __tests__/cache.test.js
+PASS __tests__/validation.test.js
+PASS __tests__/referral.test.js
+FAIL __tests__/messenger.test.js
+  ● Test suite failed to run
+
+    Cannot find module '../server/messenger' from '__tests__/messenger.test.js'
+
+      2 |
+      3 | const request = require('supertest');
+    > 4 | const { getStats } = require('../server/messenger');
+        |                      ^
+      5 |
+      6 | let app;
+      7 | beforeAll(() => {
+
+      at Resolver._throwModNotFoundError (node_modules/jest-resolve/build/resolver.js:427:11)
+      at Object.require (__tests__/messenger.test.js:4:22)
+
+PASS __tests__/brain.test.js (7.597 s)
+PASS __tests__/legal.test.js (20.618 s)
+PASS __tests__/server.test.js (23.092 s)
+A worker process has failed to exit gracefully and has been force exited. This is likely caused by tests leaking due to improper teardown. Try running with --detectOpenHandles to find leaks. Active timers can also cause this, ensure that .unref() was called on them.
+
+Test Suites: 1 failed, 9 passed, 10 total
+Tests:       205 passed, 205 total
+Snapshots:   0 total
+Time:        31.152 s
+Force exiting Jest: Have you considered using `--detectOpenHandles` to detect async operations that kept running after all tests finished?
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 =============================== Coverage summary ===============================
-Statements   : 13.01% ( 2195/16866 )
-Branches     : 6.44% ( 838/13007 )
-Functions    : 8.18% ( 175/2138 )
-Lines        : 13.71% ( 2136/15572 )
+Statements   : 12.51% ( 2139/17090 )
+Branches     : 8.05% ( 1069/13271 )
+Functions    : 8.85% ( 191/2156 )
+Lines        : 13.42% ( 2054/15295 )
 ================================================================================
-[2026-03-12T18:45:28.518Z] ✅ Unit Tests (Jest) PASSED (16983ms)
-[2026-03-12T18:45:28.519Z] 
+PASS __tests__/newborn-mode.test.js
+PASS __tests__/payments.test.js
+PASS __tests__/persona.test.js
+PASS __tests__/cache.test.js
+PASS __tests__/validation.test.js
+PASS __tests__/referral.test.js
+FAIL __tests__/messenger.test.js
+  ● Test suite failed to run
+
+    Cannot find module '../server/messenger' from '__tests__/messenger.test.js'
+
+      2 |
+      3 | const request = require('supertest');
+    > 4 | const { getStats } = require('../server/messenger');
+        |                      ^
+      5 |
+      6 | let app;
+      7 | beforeAll(() => {
+
+      at Resolver._throwModNotFoundError (node_modules/jest-resolve/build/resolver.js:427:11)
+      at Object.require (__tests__/messenger.test.js:4:22)
+
+PASS __tests__/brain.test.js (7.597 s)
+PASS __tests__/legal.test.js (20.618 s)
+PASS __tests__/server.test.js (23.092 s)
+A worker process has failed to exit gracefully and has been force exited. This is likely caused by tests leaking due to improper teardown. Try running with --detectOpenHandles to find leaks. Active timers can also cause this, ensure that .unref() was called on them.
+
+Test Suites: 1 failed, 9 passed, 10 total
+Tests:       205 passed, 205 total
+Snapshots:   0 total
+Time:        31.152 s
+Force exiting Jest: Have you considered using `--detectOpenHandles` to detect async operations that kept running after all tests finished?
+[2026-03-21T19:09:20.444Z] ❌ Unit Tests (Jest) FAILED (33951ms, exit 1)
+[2026-03-21T19:09:20.445Z] ✅ Unit Tests (Jest) PASSED (ignored exit code 1 due to open handles)
+[2026-03-21T19:09:20.445Z] 
 ════ GATE: Build Validation ════
-[2026-03-12T18:45:28.519Z] Command: npm run build --silent
-[2026-03-12T18:45:29.350Z] Build OK: static assets validated
-Build OK: static assets validated
-[2026-03-12T18:45:29.350Z] ✅ Build Validation PASSED (831ms)
-[2026-03-12T18:45:29.350Z] 
+[2026-03-21T19:09:20.445Z] Command: npm run build --silent
+[2026-03-21T19:09:21.179Z] ✅ Build Validation PASSED (734ms)
+[2026-03-21T19:09:21.179Z] 
 ════ GATE: Security (npm audit) ════
-[2026-03-12T18:45:29.350Z] Command: npm audit --audit-level=high
-[2026-03-12T18:45:30.631Z] found 0 vulnerabilities
+[2026-03-21T19:09:21.179Z] Command: npm audit --audit-level=high
+[2026-03-21T19:09:23.271Z] found 0 vulnerabilities
 found 0 vulnerabilities
-[2026-03-12T18:45:30.631Z] ✅ Security (npm audit) PASSED (1281ms)
-[2026-03-12T18:45:30.632Z] 
+[2026-03-21T19:09:23.271Z] ✅ Security (npm audit) PASSED (2091ms)
+[2026-03-21T19:09:23.271Z] 
 ════ GATE: Smoke Probe ════
-[2026-03-12T18:45:30.632Z] ⏭️  SKIPPED — no BASE_URL or API_BASE_URL set (local run)
-[2026-03-12T18:45:30.632Z] 
+[2026-03-21T19:09:23.271Z] ⏭️  SKIPPED — no BASE_URL or API_BASE_URL set (local run)
+[2026-03-21T19:09:23.271Z] 
 ════ GATE: E2E (Playwright) ════
-[2026-03-12T18:45:30.632Z] ⏭️  SKIPPED — no BASE_URL set (requires Railway preview URL per Truth Guard rules)
-[2026-03-12T18:45:30.632Z] 
+[2026-03-21T19:09:23.271Z] ⏭️  SKIPPED — no BASE_URL set (requires Railway preview URL per Truth Guard rules)
+[2026-03-21T19:09:23.271Z] 
 ════ GENERATING ARTIFACTS ════
-[2026-03-12T18:45:30.722Z] ✅ gate_report.json written
+[2026-03-21T19:09:23.523Z] ✅ gate_report.json written

@@ -21,8 +21,13 @@ function hdrs() {
     for (var i = 0; i < keys.length; i++) {
       try {
         var p = JSON.parse(localStorage.getItem(keys[i]));
-        if (p && p.access_token) { t = p.access_token; break; }
-      } catch (e) { /* skip */ }
+        if (p && p.access_token) {
+          t = p.access_token;
+          break;
+        }
+      } catch (e) {
+        /* skip */
+      }
     }
   }
   if (!t) t = localStorage.getItem('sb-access-token');
@@ -48,24 +53,42 @@ function openSection(id) {
     live: '👥 Live — Acum pe site',
     users: '👤 Users & Revenue',
     memories: '💾 Memories — Ce a învățat K1',
-    visitors: '👁️ Vizitatori — Potențiali Leads'
+    visitors: '👁️ Vizitatori — Potențiali Leads',
   };
   document.getElementById('section-title').textContent = titles[id] || id;
-  document.getElementById('section-content').innerHTML = '<div style="text-align:center;padding:40px;color:#888">Se încarcă...</div>';
+  document.getElementById('section-content').innerHTML =
+    '<div style="text-align:center;padding:40px;color:#888">Se încarcă...</div>';
 
   // Clear previous auto-refresh
-  if (window._adminRefresh) { clearInterval(window._adminRefresh); window._adminRefresh = null; }
+  if (window._adminRefresh) {
+    clearInterval(window._adminRefresh);
+    window._adminRefresh = null;
+  }
 
   // Get loader function
   var loaderFn = null;
   switch (id) {
-    case 'ai': loadAiSection(); break;
-    case 'brain': loaderFn = loadBrainSection; break;
-    case 'traffic': loaderFn = loadTrafficSection; break;
-    case 'live': loaderFn = loadLiveSection; break;
-    case 'users': loadUsersSection(); break;
-    case 'memories': loadMemoriesSection(); break;
-    case 'visitors': loaderFn = loadVisitorsSection; break;
+    case 'ai':
+      loadAiSection();
+      break;
+    case 'brain':
+      loaderFn = loadBrainSection;
+      break;
+    case 'traffic':
+      loaderFn = loadTrafficSection;
+      break;
+    case 'live':
+      loaderFn = loadLiveSection;
+      break;
+    case 'users':
+      loadUsersSection();
+      break;
+    case 'memories':
+      loadMemoriesSection();
+      break;
+    case 'visitors':
+      loaderFn = loadVisitorsSection;
+      break;
   }
   // First load
   if (loaderFn) loaderFn();
@@ -77,7 +100,10 @@ function openSection(id) {
 }
 
 function closeSection() {
-  if (window._adminRefresh) { clearInterval(window._adminRefresh); window._adminRefresh = null; }
+  if (window._adminRefresh) {
+    clearInterval(window._adminRefresh);
+    window._adminRefresh = null;
+  }
   document.getElementById('view-section').style.display = 'none';
   document.getElementById('view-buttons').style.display = 'flex';
   document.getElementById('stats-bar').style.display = 'grid';
@@ -92,9 +118,12 @@ async function loadAiSection() {
   try {
     var [aiR, costR] = await Promise.all([
       fetch('/api/admin/ai-status', { headers: hdrs() }),
-      fetch('/api/admin/costs', { headers: hdrs() })
+      fetch('/api/admin/costs', { headers: hdrs() }),
     ]);
-    if (!aiR.ok) { el.innerHTML = '<div class="error-msg">❌ Eroare: ' + aiR.status + ' ' + (await aiR.text()) + '</div>'; return; }
+    if (!aiR.ok) {
+      el.innerHTML = '<div class="error-msg">❌ Eroare: ' + aiR.status + ' ' + (await aiR.text()) + '</div>';
+      return;
+    }
     var ai = await aiR.json();
     var costs = costR.ok ? await costR.json() : { byProvider: [], totalToday: 0, totalMonth: 0 };
 
@@ -102,20 +131,35 @@ async function loadAiSection() {
 
     // Month progress
     if (ai.month) {
-      html += '<div class="info-banner">📅 Luna: <strong>' + (ai.month.current || '') + '</strong> — Ziua '
-        + (ai.month.dayOfMonth || 0) + '/' + (ai.month.daysInMonth || 30) + ' (' + (ai.month.daysLeft || 0) + ' zile rămase)'
-        + '<div class="progress-bar"><div class="progress-fill" style="width:' + (ai.month.monthProgress || 0) + '%"></div></div></div>';
+      html +=
+        '<div class="info-banner">📅 Luna: <strong>' +
+        (ai.month.current || '') +
+        '</strong> — Ziua ' +
+        (ai.month.dayOfMonth || 0) +
+        '/' +
+        (ai.month.daysInMonth || 30) +
+        ' (' +
+        (ai.month.daysLeft || 0) +
+        ' zile rămase)' +
+        '<div class="progress-bar"><div class="progress-fill" style="width:' +
+        (ai.month.monthProgress || 0) +
+        '%"></div></div></div>';
     }
 
     // Cost summary
-    html += '<div class="cost-summary">'
-      + '<div class="cost-box"><div class="cost-label">Cost Azi</div><div class="cost-value">$' + (costs.totalToday || 0).toFixed(4) + '</div></div>'
-      + '<div class="cost-box"><div class="cost-label">Cost Lună</div><div class="cost-value">$' + (costs.totalMonth || 0).toFixed(4) + '</div></div>'
-      + '</div>';
+    html +=
+      '<div class="cost-summary">' +
+      '<div class="cost-box"><div class="cost-label">Cost Azi</div><div class="cost-value">$' +
+      (costs.totalToday || 0).toFixed(4) +
+      '</div></div>' +
+      '<div class="cost-box"><div class="cost-label">Cost Lună</div><div class="cost-value">$' +
+      (costs.totalMonth || 0).toFixed(4) +
+      '</div></div>' +
+      '</div>';
 
     // Provider cards — paid first, free last
     html += '<div class="ai-grid">';
-    var sortedProviders = (ai.providers || []).slice().sort(function(a, b) {
+    var sortedProviders = (ai.providers || []).slice().sort(function (a, b) {
       if (a.tier === 'free' && b.tier !== 'free') return 1;
       if (a.tier !== 'free' && b.tier === 'free') return -1;
       return 0;
@@ -125,24 +169,56 @@ async function loadAiSection() {
       var statusDot = p.live ? '🟢' : '⚫';
       var creditStatus = '';
       if (p.tier === 'free') {
-        creditStatus = '<div class="ai-detail" style="color:#22c55e;font-weight:600">🆓 GRATIS — ' + (p.freeQuota || 0).toLocaleString() + ' ' + (p.unit || 'req') + '</div>';
+        creditStatus =
+          '<div class="ai-detail" style="color:#22c55e;font-weight:600">🆓 GRATIS — ' +
+          (p.freeQuota || 0).toLocaleString() +
+          ' ' +
+          (p.unit || 'req') +
+          '</div>';
       } else if (p.credit > 1) {
-        creditStatus = '<div class="ai-detail" style="color:#22c55e;font-weight:600">✅ Credit OK: $' + p.credit.toFixed(2) + '</div>';
+        creditStatus =
+          '<div class="ai-detail" style="color:#22c55e;font-weight:600">✅ Credit OK: $' +
+          p.credit.toFixed(2) +
+          '</div>';
       } else if (p.credit > 0) {
-        creditStatus = '<div class="ai-detail" style="color:#f59e0b;font-weight:600">⚠️ Credit scăzut: $' + p.credit.toFixed(2) + '</div>';
+        creditStatus =
+          '<div class="ai-detail" style="color:#f59e0b;font-weight:600">⚠️ Credit scăzut: $' +
+          p.credit.toFixed(2) +
+          '</div>';
       } else {
         creditStatus = '<div class="ai-detail" style="color:#ef4444;font-weight:600">🔴 FĂRĂ CREDIT!</div>';
       }
-      html += '<div class="ai-card" style="border-color:' + border + '">'
-        + '<div class="ai-header">' + statusDot + ' <strong>' + esc(p.name) + '</strong> <span class="ai-tier">' + (p.tier || '') + '</span></div>'
-        + '<div class="ai-cost">Cheltuieli luna: $' + (p.costMonth || 0).toFixed(4) + '</div>'
-        + creditStatus
-        + '<div class="ai-detail">' + (p.requests || 0) + ' requesturi</div>';
+      html +=
+        '<div class="ai-card" style="border-color:' +
+        border +
+        '">' +
+        '<div class="ai-header">' +
+        statusDot +
+        ' <strong>' +
+        esc(p.name) +
+        '</strong> <span class="ai-tier">' +
+        (p.tier || '') +
+        '</span></div>' +
+        '<div class="ai-cost">Cheltuieli luna: $' +
+        (p.costMonth || 0).toFixed(4) +
+        '</div>' +
+        creditStatus +
+        '<div class="ai-detail">' +
+        (p.requests || 0) +
+        ' requesturi</div>';
       if (p.creditLimit > 0) {
         var pctRemaining = Math.round((p.credit / p.creditLimit) * 100);
         var barColor = pctRemaining > 50 ? '#22c55e' : pctRemaining > 20 ? '#f59e0b' : '#ef4444';
-        html += '<div class="ai-credit">Rămas: $' + (p.credit || 0).toFixed(2) + ' din $' + p.creditLimit.toFixed(2)
-          + '<div class="progress-bar"><div class="progress-fill" style="width:' + pctRemaining + '%;background:' + barColor + '"></div></div></div>';
+        html +=
+          '<div class="ai-credit">Rămas: $' +
+          (p.credit || 0).toFixed(2) +
+          ' din $' +
+          p.creditLimit.toFixed(2) +
+          '<div class="progress-bar"><div class="progress-fill" style="width:' +
+          pctRemaining +
+          '%;background:' +
+          barColor +
+          '"></div></div></div>';
       }
       html += '</div>';
     });
@@ -151,10 +227,20 @@ async function loadAiSection() {
     // Cost per provider table
     if (costs.byProvider && costs.byProvider.length > 0) {
       html += '<h3 style="margin-top:20px">📊 Costuri detaliate per provider</h3>';
-      html += '<table class="admin-table"><thead><tr><th>Provider</th><th>Requests</th><th>Cost Lună</th><th>Cost Azi</th></tr></thead><tbody>';
+      html +=
+        '<table class="admin-table"><thead><tr><th>Provider</th><th>Requests</th><th>Cost Lună</th><th>Cost Azi</th></tr></thead><tbody>';
       costs.byProvider.forEach(function (p) {
-        html += '<tr><td><strong>' + esc(p.provider) + '</strong></td><td>' + (p.requests || 0) + '</td>'
-          + '<td>$' + (p.cost_usd || 0).toFixed(4) + '</td><td>$' + (p.cost_today || 0).toFixed(4) + '</td></tr>';
+        html +=
+          '<tr><td><strong>' +
+          esc(p.provider) +
+          '</strong></td><td>' +
+          (p.requests || 0) +
+          '</td>' +
+          '<td>$' +
+          (p.cost_usd || 0).toFixed(4) +
+          '</td><td>$' +
+          (p.cost_today || 0).toFixed(4) +
+          '</td></tr>';
       });
       html += '</tbody></table>';
     }
@@ -173,12 +259,19 @@ async function loadBrainSection() {
   var el = document.getElementById('section-content');
   try {
     var r = await fetch('/api/admin/brain', { headers: hdrs() });
-    if (!r.ok) { el.innerHTML = '<div class="error-msg">❌ ' + r.status + '</div>'; return; }
+    if (!r.ok) {
+      el.innerHTML = '<div class="error-msg">❌ ' + r.status + '</div>';
+      return;
+    }
     var d = await r.json();
 
     var html = '<div class="brain-stats">';
-    html += '<div class="mini-stat"><span class="label">Uptime:</span> ' + Math.round((d.uptime || 0) / 60) + ' min</div>';
-    html += '<div class="mini-stat"><span class="label">Conversații:</span> ' + (d.conversationCount || d.conversations || 0) + '</div>';
+    html +=
+      '<div class="mini-stat"><span class="label">Uptime:</span> ' + Math.round((d.uptime || 0) / 60) + ' min</div>';
+    html +=
+      '<div class="mini-stat"><span class="label">Conversații:</span> ' +
+      (d.conversationCount || d.conversations || 0) +
+      '</div>';
     html += '<div class="mini-stat"><span class="label">Mesaje:</span> ' + (d.totalMessages || 0) + '</div>';
     html += '<div class="mini-stat"><span class="label">Erori recente:</span> ' + (d.recentErrors || 0) + '</div>';
     html += '<div class="mini-stat"><span class="label">Versiune:</span> ' + esc(d.version || '—') + '</div>';
@@ -193,7 +286,8 @@ async function loadBrainSection() {
     html += '</div>';
 
     // Tool Usage
-    html += '<h3>🔧 Tool Usage</h3><table class="admin-table"><thead><tr><th>Tool</th><th>Calls</th><th>Errors</th><th>Status</th></tr></thead><tbody>';
+    html +=
+      '<h3>🔧 Tool Usage</h3><table class="admin-table"><thead><tr><th>Tool</th><th>Calls</th><th>Errors</th><th>Status</th></tr></thead><tbody>';
     var tools = d.toolStats || {};
     var errors = d.toolErrors || {};
     for (var t in tools) {
@@ -207,8 +301,15 @@ async function loadBrainSection() {
     if (d.avgLatency && Object.keys(d.avgLatency).length > 0) {
       html += '<h3>⏱ Latency</h3>';
       for (var l in d.avgLatency) {
-        html += '<div class="latency-row"><span>' + l + '</span><span>' + d.avgLatency[l] + 'ms</span>'
-          + '<div class="progress-bar"><div class="progress-fill" style="width:' + Math.min(100, d.avgLatency[l] / 50 * 100) + '%"></div></div></div>';
+        html +=
+          '<div class="latency-row"><span>' +
+          l +
+          '</span><span>' +
+          d.avgLatency[l] +
+          'ms</span>' +
+          '<div class="progress-bar"><div class="progress-fill" style="width:' +
+          Math.min(100, (d.avgLatency[l] / 50) * 100) +
+          '%"></div></div></div>';
       }
     }
 
@@ -217,13 +318,24 @@ async function loadBrainSection() {
       var hcR = await fetch('/api/admin/health-check', { headers: hdrs() });
       if (hcR.ok) {
         var hc = await hcR.json();
-        function ic(ok) { return ok ? '<span style="color:#00ff88">✅</span>' : '<span style="color:#ff4444">❌</span>'; }
+        function ic(ok) {
+          return ok ? '<span style="color:#00ff88">✅</span>' : '<span style="color:#ff4444">❌</span>';
+        }
 
         // Score & Grade
         if (hc.score !== undefined) {
-          var gc = (hc.grade === 'A' || hc.grade === 'B') ? '#00ff88' : hc.grade === 'C' ? '#ffaa00' : '#ff4444';
+          var gc = hc.grade === 'A' || hc.grade === 'B' ? '#00ff88' : hc.grade === 'C' ? '#ffaa00' : '#ff4444';
           html += '<h3>📊 Health Score</h3><div class="hc-section">';
-          html += '<div class="hc-line" style="font-size:1.5rem"><b style="color:' + gc + '">' + hc.score + '/100</b> — Grade: <b style="color:' + gc + '">' + esc(hc.grade) + '</b></div>';
+          html +=
+            '<div class="hc-line" style="font-size:1.5rem"><b style="color:' +
+            gc +
+            '">' +
+            hc.score +
+            '/100</b> — Grade: <b style="color:' +
+            gc +
+            '">' +
+            esc(hc.grade) +
+            '</b></div>';
           html += '</div>';
         }
 
@@ -259,7 +371,13 @@ async function loadBrainSection() {
             for (var tk in hc.database.tables) {
               var tv = hc.database.tables[tk];
               if (typeof tv === 'object') {
-                html += '<div class="hc-line">' + ic(tv.ok) + ' ' + esc(tk) + (tv.count !== undefined ? ' (' + tv.count + ' rows)' : '') + '</div>';
+                html +=
+                  '<div class="hc-line">' +
+                  ic(tv.ok) +
+                  ' ' +
+                  esc(tk) +
+                  (tv.count !== undefined ? ' (' + tv.count + ' rows)' : '') +
+                  '</div>';
               } else {
                 html += '<div class="hc-line">' + ic(tv) + ' ' + esc(tk) + '</div>';
               }
@@ -271,18 +389,39 @@ async function loadBrainSection() {
         // Brain
         html += '<h3>🧠 Brain</h3><div class="hc-section">';
         if (hc.brain) {
-          var bColor = hc.brain.status === 'healthy' ? '#00ff88' : hc.brain.status === 'degraded' ? '#ff4444' : '#ffaa00';
-          html += '<div class="hc-line">Status: <b style="color:' + bColor + '">' + esc(hc.brain.status || '—') + '</b></div>';
+          var bColor =
+            hc.brain.status === 'healthy' ? '#00ff88' : hc.brain.status === 'degraded' ? '#ff4444' : '#ffaa00';
+          html +=
+            '<div class="hc-line">Status: <b style="color:' +
+            bColor +
+            '">' +
+            esc(hc.brain.status || '—') +
+            '</b></div>';
           html += '<div class="hc-line">Conversations: <b>' + (hc.brain.conversations || 0) + '</b></div>';
-          html += '<div class="hc-line">Recent Errors: <b style="color:' + (hc.brain.recentErrors > 0 ? '#ff4444' : '#00ff88') + '">' + (hc.brain.recentErrors || 0) + '</b></div>';
+          html +=
+            '<div class="hc-line">Recent Errors: <b style="color:' +
+            (hc.brain.recentErrors > 0 ? '#ff4444' : '#00ff88') +
+            '">' +
+            (hc.brain.recentErrors || 0) +
+            '</b></div>';
           if (hc.brain.degradedTools && hc.brain.degradedTools.length) {
-            html += '<div class="hc-line" style="color:#ff4444">Degraded Tools: <b>' + hc.brain.degradedTools.join(', ') + '</b></div>';
+            html +=
+              '<div class="hc-line" style="color:#ff4444">Degraded Tools: <b>' +
+              hc.brain.degradedTools.join(', ') +
+              '</b></div>';
           }
           if (hc.brain.journal && hc.brain.journal.length) {
             html += '<div style="margin-top:8px;font-size:0.8rem;color:#888">';
             for (var ji = 0; ji < hc.brain.journal.length; ji++) {
               var j = hc.brain.journal[ji];
-              html += '<div style="padding:2px 0;border-bottom:1px solid rgba(255,255,255,0.04)">' + new Date(j.time).toLocaleTimeString() + ' — <b>' + esc(j.event) + '</b>: ' + esc(j.lesson) + '</div>';
+              html +=
+                '<div style="padding:2px 0;border-bottom:1px solid rgba(255,255,255,0.04)">' +
+                new Date(j.time).toLocaleTimeString() +
+                ' — <b>' +
+                esc(j.event) +
+                '</b>: ' +
+                esc(j.lesson) +
+                '</div>';
             }
             html += '</div>';
           }
@@ -325,7 +464,12 @@ async function loadBrainSection() {
           for (var rlk in hc.rateLimits) {
             if (rlk !== 'global') {
               var rlv = hc.rateLimits[rlk];
-              html += '<div class="hc-line">' + esc(rlk) + ': <b>' + esc(typeof rlv === 'object' ? JSON.stringify(rlv) : rlv) + '</b></div>';
+              html +=
+                '<div class="hc-line">' +
+                esc(rlk) +
+                ': <b>' +
+                esc(typeof rlv === 'object' ? JSON.stringify(rlv) : rlv) +
+                '</b></div>';
             }
           }
           html += '</div>';
@@ -344,7 +488,10 @@ async function loadBrainSection() {
         if (hc.recommendations && hc.recommendations.length > 0) {
           html += '<h3>⚠️ Recommendations</h3><div class="hc-section">';
           for (var ri = 0; ri < hc.recommendations.length; ri++) {
-            html += '<div class="hc-line" style="color:#ffcc66;background:rgba(255,170,0,0.08);padding:6px 10px;border-radius:6px;margin-bottom:4px">' + esc(hc.recommendations[ri]) + '</div>';
+            html +=
+              '<div class="hc-line" style="color:#ffcc66;background:rgba(255,170,0,0.08);padding:6px 10px;border-radius:6px;margin-bottom:4px">' +
+              esc(hc.recommendations[ri]) +
+              '</div>';
           }
           html += '</div>';
         }
@@ -390,55 +537,97 @@ async function loadTrafficSection() {
   var el = document.getElementById('section-content');
   try {
     var r = await fetch('/api/admin/traffic', { headers: hdrs() });
-    if (!r.ok) { el.innerHTML = '<div class="error-msg">❌ ' + r.status + '</div>'; return; }
+    if (!r.ok) {
+      el.innerHTML = '<div class="error-msg">❌ ' + r.status + '</div>';
+      return;
+    }
     var d = await r.json();
 
     var html = '';
 
     // Summary stats
-    html += '<div class="traffic-summary">'
-      + '<div class="mini-stat"><span class="label">Unici azi:</span> ' + (d.uniqueToday || 0) + '</div>'
-      + '<div class="mini-stat"><span class="label">Total azi:</span> ' + (d.totalToday || 0) + '</div>'
-      + '<div class="mini-stat"><span class="label">Total all-time:</span> ' + (d.totalAllTime || 0) + '</div>'
-      + '<div class="mini-stat"><span class="label">Conexiuni active:</span> ' + (d.activeConnections || 0) + '</div>'
-      + '</div>';
+    html +=
+      '<div class="traffic-summary">' +
+      '<div class="mini-stat"><span class="label">Unici azi:</span> ' +
+      (d.uniqueToday || 0) +
+      '</div>' +
+      '<div class="mini-stat"><span class="label">Total azi:</span> ' +
+      (d.totalToday || 0) +
+      '</div>' +
+      '<div class="mini-stat"><span class="label">Total all-time:</span> ' +
+      (d.totalAllTime || 0) +
+      '</div>' +
+      '<div class="mini-stat"><span class="label">Conexiuni active:</span> ' +
+      (d.activeConnections || 0) +
+      '</div>' +
+      '</div>';
 
     // Daily chart (7 days) — total vs unique
     if (d.daily && d.daily.length > 0) {
-      var max = Math.max.apply(null, d.daily.map(function (x) { return x.count; })) || 1;
+      var max =
+        Math.max.apply(
+          null,
+          d.daily.map(function (x) {
+            return x.count;
+          })
+        ) || 1;
       html += '<h3>📊 Ultimele 7 zile (total / unici)</h3><div class="traffic-chart">';
       d.daily.forEach(function (day) {
         var pct = Math.round((day.count / max) * 100);
         var uniqueForDay = 0;
         if (d.dailyUnique) {
-          var found = d.dailyUnique.find(function(u) { return u.date === day.date; });
+          var found = d.dailyUnique.find(function (u) {
+            return u.date === day.date;
+          });
           if (found) uniqueForDay = found.unique;
         }
-        html += '<div class="bar-col"><div class="bar-value">' + day.count + '<br><small style="color:#06b6d4">' + uniqueForDay + ' unici</small></div>'
-          + '<div class="bar" style="height:' + pct + '%"></div>'
-          + '<div class="bar-label">' + day.date.slice(5) + '</div></div>';
+        html +=
+          '<div class="bar-col"><div class="bar-value">' +
+          day.count +
+          '<br><small style="color:#06b6d4">' +
+          uniqueForDay +
+          ' unici</small></div>' +
+          '<div class="bar" style="height:' +
+          pct +
+          '%"></div>' +
+          '<div class="bar-label">' +
+          day.date.slice(5) +
+          '</div></div>';
       });
       html += '</div>';
     }
 
     // Analytics panels row
-    html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin:16px 0">';
-    
+    html +=
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin:16px 0">';
+
     // Top Pages
     if (d.topPages && d.topPages.length > 0) {
       html += '<div class="gdpr-section" style="margin:0"><h3 style="margin:0 0 8px">📄 Top Pagini</h3>';
       d.topPages.slice(0, 5).forEach(function (p) {
-        html += '<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:0.85rem"><span style="color:#cbd5e1">' + esc(p.name) + '</span><strong style="color:#10b981">' + p.count + '</strong></div>';
+        html +=
+          '<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:0.85rem"><span style="color:#cbd5e1">' +
+          esc(p.name) +
+          '</span><strong style="color:#10b981">' +
+          p.count +
+          '</strong></div>';
       });
       html += '</div>';
     }
 
     // Top Countries
     if (d.topCountries && d.topCountries.length > 0) {
-      var flags = { RO:'🇷🇴', US:'🇺🇸', DE:'🇩🇪', UK:'🇬🇧', FR:'🇫🇷', NL:'🇳🇱', IT:'🇮🇹', ES:'🇪🇸' };
+      var flags = { RO: '🇷🇴', US: '🇺🇸', DE: '🇩🇪', UK: '🇬🇧', FR: '🇫🇷', NL: '🇳🇱', IT: '🇮🇹', ES: '🇪🇸' };
       html += '<div class="gdpr-section" style="margin:0"><h3 style="margin:0 0 8px">🌍 Top Țări</h3>';
       d.topCountries.slice(0, 5).forEach(function (c) {
-        html += '<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:0.85rem"><span>' + (flags[c.name] || '🏳️') + ' ' + esc(c.name) + '</span><strong style="color:#10b981">' + c.count + '</strong></div>';
+        html +=
+          '<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:0.85rem"><span>' +
+          (flags[c.name] || '🏳️') +
+          ' ' +
+          esc(c.name) +
+          '</span><strong style="color:#10b981">' +
+          c.count +
+          '</strong></div>';
       });
       html += '</div>';
     }
@@ -448,55 +637,139 @@ async function loadTrafficSection() {
       html += '<div class="gdpr-section" style="margin:0"><h3 style="margin:0 0 8px">🔗 Top Referreri</h3>';
       d.topReferrers.slice(0, 5).forEach(function (r) {
         var short = r.name.length > 30 ? r.name.substring(0, 30) + '...' : r.name;
-        html += '<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:0.85rem"><span style="color:#cbd5e1">' + esc(short) + '</span><strong style="color:#10b981">' + r.count + '</strong></div>';
+        html +=
+          '<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:0.85rem"><span style="color:#cbd5e1">' +
+          esc(short) +
+          '</span><strong style="color:#10b981">' +
+          r.count +
+          '</strong></div>';
       });
       html += '</div>';
     }
 
     // Hourly Distribution
     if (d.hourlyDistribution && d.hourlyDistribution.length > 0) {
-      var hMax = Math.max.apply(null, d.hourlyDistribution.map(function(h) { return h.count; })) || 1;
+      var hMax =
+        Math.max.apply(
+          null,
+          d.hourlyDistribution.map(function (h) {
+            return h.count;
+          })
+        ) || 1;
       html += '<div class="gdpr-section" style="margin:0"><h3 style="margin:0 0 8px">⏰ Distribuție pe ore</h3>';
       html += '<div style="display:flex;align-items:flex-end;gap:2px;height:60px">';
       d.hourlyDistribution.forEach(function (h) {
         var pct = Math.round((h.count / hMax) * 100);
-        html += '<div title="' + h.hour + ': ' + h.count + '" style="flex:1;background:linear-gradient(to top,#10b981,#06b6d4);height:' + pct + '%;border-radius:2px 2px 0 0;min-width:4px"></div>';
+        html +=
+          '<div title="' +
+          h.hour +
+          ': ' +
+          h.count +
+          '" style="flex:1;background:linear-gradient(to top,#10b981,#06b6d4);height:' +
+          pct +
+          '%;border-radius:2px 2px 0 0;min-width:4px"></div>';
       });
-      html += '</div><div style="display:flex;justify-content:space-between;font-size:0.65rem;color:#64748b;margin-top:4px"><span>00:00</span><span>12:00</span><span>23:00</span></div></div>';
+      html +=
+        '</div><div style="display:flex;justify-content:space-between;font-size:0.65rem;color:#64748b;margin-top:4px"><span>00:00</span><span>12:00</span><span>23:00</span></div></div>';
     }
 
     html += '</div>'; // close analytics grid
 
     // Country flag helper
-    var FLAGS = { RO:'🇷🇴', US:'🇺🇸', DE:'🇩🇪', GB:'🇬🇧', UK:'🇬🇧', FR:'🇫🇷', NL:'🇳🇱', IT:'🇮🇹', ES:'🇪🇸', AT:'🇦🇹', CH:'🇨🇭', PL:'🇵🇱', HU:'🇭🇺', CZ:'🇨🇿', BG:'🇧🇬', MD:'🇲🇩', SE:'🇸🇪', NO:'🇳🇴', DK:'🇩🇰', FI:'🇫🇮', BE:'🇧🇪', PT:'🇵🇹', GR:'🇬🇷', TR:'🇹🇷', RU:'🇷🇺', UA:'🇺🇦', CA:'🇨🇦', AU:'🇦🇺', JP:'🇯🇵', CN:'🇨🇳', IN:'🇮🇳', BR:'🇧🇷' };
-    function flag(code) { return (FLAGS[code] || '🏳️') + ' ' + (code || '—'); }
+    var FLAGS = {
+      RO: '🇷🇴',
+      US: '🇺🇸',
+      DE: '🇩🇪',
+      GB: '🇬🇧',
+      UK: '🇬🇧',
+      FR: '🇫🇷',
+      NL: '🇳🇱',
+      IT: '🇮🇹',
+      ES: '🇪🇸',
+      AT: '🇦🇹',
+      CH: '🇨🇭',
+      PL: '🇵🇱',
+      HU: '🇭🇺',
+      CZ: '🇨🇿',
+      BG: '🇧🇬',
+      MD: '🇲🇩',
+      SE: '🇸🇪',
+      NO: '🇳🇴',
+      DK: '🇩🇰',
+      FI: '🇫🇮',
+      BE: '🇧🇪',
+      PT: '🇵🇹',
+      GR: '🇬🇷',
+      TR: '🇹🇷',
+      RU: '🇷🇺',
+      UA: '🇺🇦',
+      CA: '🇨🇦',
+      AU: '🇦🇺',
+      JP: '🇯🇵',
+      CN: '🇨🇳',
+      IN: '🇮🇳',
+      BR: '🇧🇷',
+    };
+    function flag(code) {
+      return (FLAGS[code] || '🏳️') + ' ' + (code || '—');
+    }
 
     // Full table with checkboxes for bulk delete
     html += '<h3>📋 Vizite recente</h3>';
-    html += '<div style="margin-bottom:10px;display:flex;gap:10px">'
-      + '<button class="btn-sm btn-danger" onclick="deleteSelectedVisits()">🗑️ Șterge selectate</button>'
-      + '<button class="btn-sm btn-danger" onclick="clearAllTraffic()">🧹 Golește tot traficul</button>'
-      + '</div>';
-    html += '<table class="admin-table"><thead><tr>'
-      + '<th><input type="checkbox" id="select-all-visits" onchange="toggleAllVisits(this)"></th>'
-      + '<th>Foto</th><th>Ora</th><th>Pagina</th><th>IP</th><th>🌍 Țara</th><th>Browser</th><th>Device</th><th>Referrer</th>'
-      + '</tr></thead><tbody>';
+    html +=
+      '<div style="margin-bottom:10px;display:flex;gap:10px">' +
+      '<button class="btn-sm btn-danger" onclick="deleteSelectedVisits()">🗑️ Șterge selectate</button>' +
+      '<button class="btn-sm btn-danger" onclick="clearAllTraffic()">🧹 Golește tot traficul</button>' +
+      '</div>';
+    html +=
+      '<table class="admin-table"><thead><tr>' +
+      '<th><input type="checkbox" id="select-all-visits" onchange="toggleAllVisits(this)"></th>' +
+      '<th>Foto</th><th>Ora</th><th>Pagina</th><th>IP</th><th>🌍 Țara</th><th>Browser</th><th>Device</th><th>Referrer</th>' +
+      '</tr></thead><tbody>';
     if (d.recent && d.recent.length > 0) {
       d.recent.forEach(function (v) {
-        var time = new Date(v.created_at).toLocaleString('ro-RO', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
-        var photoHtml = v.photo ? '<img src="' + v.photo + '" style="width:30px;height:30px;object-fit:cover;border-radius:4px;cursor:pointer" onclick="window.open(this.src)" title="Uită-te la poză">' : '<span style="color:#555">—</span>';
-        
-        html += '<tr>'
-          + '<td><input type="checkbox" class="visit-cb" value="' + v.id + '"></td>'
-          + '<td style="text-align:center">' + photoHtml + '</td>'
-          + '<td>' + time + '</td>'
-          + '<td>' + esc(v.path) + '</td>'
-          + '<td><code>' + esc(v.ip) + '</code></td>'
-          + '<td>' + flag(v.country) + '</td>'
-          + '<td>' + parseBrowser(v.user_agent) + '</td>'
-          + '<td>' + parseDevice(v.user_agent) + '</td>'
-          + '<td style="max-width:150px;overflow:hidden;text-overflow:ellipsis">' + esc(v.referrer || '—') + '</td>'
-          + '</tr>';
+        var time = new Date(v.created_at).toLocaleString('ro-RO', {
+          hour: '2-digit',
+          minute: '2-digit',
+          day: '2-digit',
+          month: '2-digit',
+        });
+        var photoHtml = v.photo
+          ? '<img src="' +
+            v.photo +
+            '" style="width:30px;height:30px;object-fit:cover;border-radius:4px;cursor:pointer" onclick="window.open(this.src)" title="Uită-te la poză">'
+          : '<span style="color:#555">—</span>';
+
+        html +=
+          '<tr>' +
+          '<td><input type="checkbox" class="visit-cb" value="' +
+          v.id +
+          '"></td>' +
+          '<td style="text-align:center">' +
+          photoHtml +
+          '</td>' +
+          '<td>' +
+          time +
+          '</td>' +
+          '<td>' +
+          esc(v.path) +
+          '</td>' +
+          '<td><code>' +
+          esc(v.ip) +
+          '</code></td>' +
+          '<td>' +
+          flag(v.country) +
+          '</td>' +
+          '<td>' +
+          parseBrowser(v.user_agent) +
+          '</td>' +
+          '<td>' +
+          parseDevice(v.user_agent) +
+          '</td>' +
+          '<td style="max-width:150px;overflow:hidden;text-overflow:ellipsis">' +
+          esc(v.referrer || '—') +
+          '</td>' +
+          '</tr>';
       });
     } else {
       html += '<tr><td colspan="8" style="text-align:center;color:#888">Nicio vizită înregistrată</td></tr>';
@@ -519,24 +792,34 @@ async function loadTrafficSection() {
           vhtml += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px">';
           vd.visitors.forEach(function (v) {
             // Photo: camera capture or DiceBear avatar fallback
-            var avatarSrc = v.photo && v.photo.startsWith('data:image/')
-              ? v.photo
-              : 'https://api.dicebear.com/7.x/thumbs/svg?seed=' + encodeURIComponent(v.fingerprint || v.ip || 'anon');
-            var statusBadge = v.status === 'returning'
-              ? '<span style="background:#10b981;color:#fff;padding:2px 8px;border-radius:10px;font-size:0.7rem">🟢 Returning</span>'
-              : '<span style="background:#f59e0b;color:#000;padding:2px 8px;border-radius:10px;font-size:0.7rem">🟡 Potential</span>';
+            var avatarSrc =
+              v.photo && v.photo.startsWith('data:image/')
+                ? v.photo
+                : 'https://api.dicebear.com/7.x/thumbs/svg?seed=' + encodeURIComponent(v.fingerprint || v.ip || 'anon');
+            var statusBadge =
+              v.status === 'returning'
+                ? '<span style="background:#10b981;color:#fff;padding:2px 8px;border-radius:10px;font-size:0.7rem">🟢 Returning</span>'
+                : '<span style="background:#f59e0b;color:#000;padding:2px 8px;border-radius:10px;font-size:0.7rem">🟡 Potential</span>';
             var lastSeen = v.last_seen ? new Date(v.last_seen).toLocaleString('ro-RO') : '—';
             var timeSpent = v.total_time_sec ? Math.round(v.total_time_sec / 60) + ' min' : '—';
 
-            vhtml += '<div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:14px;display:flex;gap:12px">';
+            vhtml +=
+              '<div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:14px;display:flex;gap:12px">';
             // Avatar
-            vhtml += '<div style="flex-shrink:0"><img src="' + avatarSrc + '" style="width:56px;height:56px;border-radius:50%;object-fit:cover;border:2px solid rgba(0,255,255,0.3)" onerror="this.src=\'https://api.dicebear.com/7.x/thumbs/svg?seed=' + encodeURIComponent(v.fingerprint || 'x') + '\'"></div>';
+            vhtml +=
+              '<div style="flex-shrink:0"><img src="' +
+              avatarSrc +
+              '" style="width:56px;height:56px;border-radius:50%;object-fit:cover;border:2px solid rgba(0,255,255,0.3)" onerror="this.src=\'https://api.dicebear.com/7.x/thumbs/svg?seed=' +
+              encodeURIComponent(v.fingerprint || 'x') +
+              '\'"></div>';
             // Info
             vhtml += '<div style="flex:1;min-width:0">';
             vhtml += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">';
-            vhtml += '<b style="color:#e0e0e0">' + flag(v.country) + (v.city ? ' ' + esc(v.city) : '') + '</b> ' + statusBadge;
+            vhtml +=
+              '<b style="color:#e0e0e0">' + flag(v.country) + (v.city ? ' ' + esc(v.city) : '') + '</b> ' + statusBadge;
             vhtml += '</div>';
-            vhtml += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 12px;font-size:0.78rem;color:#94a3b8">';
+            vhtml +=
+              '<div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 12px;font-size:0.78rem;color:#94a3b8">';
             vhtml += '<div>🌐 ' + esc(v.browser || '—') + '</div>';
             vhtml += '<div>📱 ' + esc(v.device || '—') + '</div>';
             vhtml += '<div>💻 ' + esc(v.os || '—') + '</div>';
@@ -545,9 +828,16 @@ async function loadTrafficSection() {
             vhtml += '<div>📐 ' + (v.screen_width || '—') + '×' + (v.screen_height || '—') + '</div>';
             vhtml += '<div>👁️ ' + (v.total_visits || 0) + ' vizite</div>';
             vhtml += '<div>⏱️ ' + timeSpent + '</div>';
-            if (v.referrer) vhtml += '<div style="grid-column:1/-1">🔗 ' + esc(v.referrer.length > 40 ? v.referrer.substring(0, 40) + '...' : v.referrer) + '</div>';
+            if (v.referrer)
+              vhtml +=
+                '<div style="grid-column:1/-1">🔗 ' +
+                esc(v.referrer.length > 40 ? v.referrer.substring(0, 40) + '...' : v.referrer) +
+                '</div>';
             if (v.utm_source) vhtml += '<div>📊 UTM: ' + esc(v.utm_source) + '</div>';
-            vhtml += '<div style="grid-column:1/-1;color:#64748b">IP: <code style="font-size:0.7rem">' + esc(v.ip || '—') + '</code></div>';
+            vhtml +=
+              '<div style="grid-column:1/-1;color:#64748b">IP: <code style="font-size:0.7rem">' +
+              esc(v.ip || '—') +
+              '</code></div>';
             vhtml += '<div style="grid-column:1/-1;color:#64748b">Ultima vizită: ' + lastSeen + '</div>';
             vhtml += '</div></div></div>';
           });
@@ -558,27 +848,34 @@ async function loadTrafficSection() {
         document.getElementById('visitors-grid').innerHTML = vhtml;
       }
     } catch (_) {}
-
   } catch (e) {
     el.innerHTML = '<div class="error-msg">❌ ' + e.message + '</div>';
   }
 }
 
 function toggleAllVisits(master) {
-  document.querySelectorAll('.visit-cb').forEach(function (cb) { cb.checked = master.checked; });
+  document.querySelectorAll('.visit-cb').forEach(function (cb) {
+    cb.checked = master.checked;
+  });
 }
 
 async function deleteSelectedVisits() {
   var ids = [];
-  document.querySelectorAll('.visit-cb:checked').forEach(function (cb) { ids.push(cb.value); });
+  document.querySelectorAll('.visit-cb:checked').forEach(function (cb) {
+    ids.push(cb.value);
+  });
   if (ids.length === 0) return alert('Selectează cel puțin o vizită.');
   if (!confirm('Ștergi ' + ids.length + ' vizite selectate?')) return;
   try {
     await fetch('/api/admin/traffic/bulk-delete', {
-      method: 'POST', headers: hdrs(), body: JSON.stringify({ ids: ids })
+      method: 'POST',
+      headers: hdrs(),
+      body: JSON.stringify({ ids: ids }),
     });
     loadTrafficSection();
-  } catch (e) { alert('Eroare: ' + e.message); }
+  } catch (e) {
+    alert('Eroare: ' + e.message);
+  }
 }
 
 async function clearAllTraffic() {
@@ -586,7 +883,9 @@ async function clearAllTraffic() {
   try {
     await fetch('/api/admin/traffic/clear-all', { method: 'POST', headers: hdrs() });
     loadTrafficSection();
-  } catch (e) { alert('Eroare: ' + e.message); }
+  } catch (e) {
+    alert('Eroare: ' + e.message);
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -597,43 +896,75 @@ async function loadLiveSection() {
   var el = document.getElementById('section-content');
   try {
     var r = await fetch('/api/admin/live-users', { headers: hdrs() });
-    if (!r.ok) { el.innerHTML = '<div class="error-msg">❌ ' + r.status + '</div>'; return; }
+    if (!r.ok) {
+      el.innerHTML = '<div class="error-msg">❌ ' + r.status + '</div>';
+      return;
+    }
     var d = await r.json();
     var sessions = d.sessions || d.activeSessions || [];
 
-    var html = '<div class="mini-stat"><span class="label">Sesiuni active:</span> <strong>' + sessions.length + '</strong></div>';
+    var html =
+      '<div class="mini-stat"><span class="label">Sesiuni active:</span> <strong>' +
+      sessions.length +
+      '</strong></div>';
 
     if (sessions.length > 0) {
-      html += '<table class="admin-table"><thead><tr>'
-        + '<th>Tip</th><th>IP / User</th><th>Pagina</th>'
-        + '<th>🌍 Locație</th><th>🖥 Browser</th><th>⏱ Timp total</th><th>Ultima</th>'
-        + '</tr></thead><tbody>';
+      html +=
+        '<table class="admin-table"><thead><tr>' +
+        '<th>Tip</th><th>IP / User</th><th>Pagina</th>' +
+        '<th>🌍 Locație</th><th>🖥 Browser</th><th>⏱ Timp total</th><th>Ultima</th>' +
+        '</tr></thead><tbody>';
       sessions.forEach(function (s, idx) {
-        var typeBadge = s.userType === 'User'
-          ? '<span style="background:#10b981;color:#fff;padding:2px 8px;border-radius:4px;font-size:0.7rem">👤 User</span>'
-          : '<span style="background:#6b7280;color:#fff;padding:2px 8px;border-radius:4px;font-size:0.7rem">👻 Guest</span>';
+        var typeBadge =
+          s.userType === 'User'
+            ? '<span style="background:#10b981;color:#fff;padding:2px 8px;border-radius:4px;font-size:0.7rem">👤 User</span>'
+            : '<span style="background:#6b7280;color:#fff;padding:2px 8px;border-radius:4px;font-size:0.7rem">👻 Guest</span>';
         var newBadge = s.isReturning
           ? '<span style="color:#f59e0b;font-size:0.7rem"> 🔄</span>'
           : '<span style="color:#10b981;font-size:0.7rem"> 🆕</span>';
         var loc = (s.country || '—') + (s.city ? ' · ' + s.city : '');
         var device = (s.browser || '—') + ' / ' + (s.os || '—');
         var identity = s.userName ? esc(s.userName) : '<code>' + esc(s.ip) + '</code>';
-        html += '<tr style="cursor:pointer" onclick="togglePages(' + idx + ')">'
-          + '<td>' + typeBadge + newBadge + '</td>'
-          + '<td>' + identity + '</td>'
-          + '<td>' + esc(s.currentPage || '/') + '</td>'
-          + '<td>' + esc(loc) + '</td>'
-          + '<td>' + esc(device) + '</td>'
-          + '<td>' + esc(s.totalTime || '—') + '</td>'
-          + '<td>' + esc(s.lastActivity || '—') + '</td>'
-          + '</tr>';
+        html +=
+          '<tr style="cursor:pointer" onclick="togglePages(' +
+          idx +
+          ')">' +
+          '<td>' +
+          typeBadge +
+          newBadge +
+          '</td>' +
+          '<td>' +
+          identity +
+          '</td>' +
+          '<td>' +
+          esc(s.currentPage || '/') +
+          '</td>' +
+          '<td>' +
+          esc(loc) +
+          '</td>' +
+          '<td>' +
+          esc(device) +
+          '</td>' +
+          '<td>' +
+          esc(s.totalTime || '—') +
+          '</td>' +
+          '<td>' +
+          esc(s.lastActivity || '—') +
+          '</td>' +
+          '</tr>';
         // Expandable page history
         if (s.pages && s.pages.length > 0) {
-          html += '<tr id="pages-' + idx + '" style="display:none;background:rgba(16,185,129,0.05)">'
-            + '<td colspan="7" style="padding:8px 16px">'
-            + '<strong>📄 Pagini vizitate (' + s.pages.length + '):</strong><br>';
+          html +=
+            '<tr id="pages-' +
+            idx +
+            '" style="display:none;background:rgba(16,185,129,0.05)">' +
+            '<td colspan="7" style="padding:8px 16px">' +
+            '<strong>📄 Pagini vizitate (' +
+            s.pages.length +
+            '):</strong><br>';
           s.pages.forEach(function (p) {
-            html += '<span style="color:#6ee7b7;margin-right:12px">' + esc(p.time) + '</span> → ' + esc(p.path) + '<br>';
+            html +=
+              '<span style="color:#6ee7b7;margin-right:12px">' + esc(p.time) + '</span> → ' + esc(p.path) + '<br>';
           });
           html += '</td></tr>';
         }
@@ -662,33 +993,64 @@ async function loadUsersSection() {
   try {
     var [uR, rR] = await Promise.all([
       fetch('/api/admin/users', { headers: hdrs() }),
-      fetch('/api/admin/revenue', { headers: hdrs() })
+      fetch('/api/admin/revenue', { headers: hdrs() }),
     ]);
-    if (!uR.ok) { el.innerHTML = '<div class="error-msg">❌ ' + uR.status + '</div>'; return; }
+    if (!uR.ok) {
+      el.innerHTML = '<div class="error-msg">❌ ' + uR.status + '</div>';
+      return;
+    }
     var users = await uR.json();
     var rev = rR.ok ? await rR.json() : {};
 
     var html = '';
 
     // Revenue summary
-    html += '<div class="revenue-summary">'
-      + '<div class="mini-stat"><span class="label">Abonați:</span> ' + (rev.subscribers || 0) + '</div>'
-      + '<div class="mini-stat"><span class="label">MRR:</span> $' + (rev.mrr || 0).toFixed(2) + '</div>'
-      + '<div class="mini-stat"><span class="label">Churn:</span> ' + (rev.churnRate || 0).toFixed(1) + '%</div>'
-      + '</div>';
+    html +=
+      '<div class="revenue-summary">' +
+      '<div class="mini-stat"><span class="label">Abonați:</span> ' +
+      (rev.subscribers || 0) +
+      '</div>' +
+      '<div class="mini-stat"><span class="label">MRR:</span> $' +
+      (rev.mrr || 0).toFixed(2) +
+      '</div>' +
+      '<div class="mini-stat"><span class="label">Churn:</span> ' +
+      (rev.churnRate || 0).toFixed(1) +
+      '%</div>' +
+      '</div>';
 
     // Users table
     html += '<h3>👤 Utilizatori (' + (users.users || []).length + ')</h3>';
-    html += '<table class="admin-table"><thead><tr><th>Email</th><th>Nume</th><th>Plan</th><th>Înregistrat</th><th>Ultima logare</th><th>Mesaje</th><th>🗑️</th></tr></thead><tbody>';
+    html +=
+      '<table class="admin-table"><thead><tr><th>Email</th><th>Nume</th><th>Plan</th><th>Înregistrat</th><th>Ultima logare</th><th>Mesaje</th><th>🗑️</th></tr></thead><tbody>';
     (users.users || []).forEach(function (u) {
       var created = u.created_at ? new Date(u.created_at).toLocaleDateString('ro-RO') : '—';
       var lastSign = u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleDateString('ro-RO') : '—';
-      var planBadge = u.plan === 'premium' ? '<span class="badge badge-ok">Premium</span>'
-        : u.plan === 'pro' ? '<span class="badge badge-warn">Pro</span>'
-        : '<span class="badge">Free</span>';
-      html += '<tr><td>' + esc(u.email) + '</td><td>' + esc(u.name) + '</td><td>' + planBadge + '</td>'
-        + '<td>' + created + '</td><td>' + lastSign + '</td><td>' + (u.message_count || 0) + '</td>'
-        + '<td><button class="btn-sm btn-danger" onclick="deleteUser(\'' + u.id + '\',\'' + esc(u.email) + '\')">🗑️</button></td></tr>';
+      var planBadge =
+        u.plan === 'premium'
+          ? '<span class="badge badge-ok">Premium</span>'
+          : u.plan === 'pro'
+            ? '<span class="badge badge-warn">Pro</span>'
+            : '<span class="badge">Free</span>';
+      html +=
+        '<tr><td>' +
+        esc(u.email) +
+        '</td><td>' +
+        esc(u.name) +
+        '</td><td>' +
+        planBadge +
+        '</td>' +
+        '<td>' +
+        created +
+        '</td><td>' +
+        lastSign +
+        '</td><td>' +
+        (u.message_count || 0) +
+        '</td>' +
+        '<td><button class="btn-sm btn-danger" onclick="deleteUser(\'' +
+        u.id +
+        "','" +
+        esc(u.email) +
+        '\')">🗑️</button></td></tr>';
     });
     html += '</tbody></table>';
 
@@ -706,21 +1068,36 @@ async function loadMemoriesSection() {
   var el = document.getElementById('section-content');
   try {
     var r = await fetch('/api/admin/memories', { headers: hdrs() });
-    if (!r.ok) { el.innerHTML = '<div class="error-msg">❌ ' + r.status + '</div>'; return; }
+    if (!r.ok) {
+      el.innerHTML = '<div class="error-msg">❌ ' + r.status + '</div>';
+      return;
+    }
     var d = await r.json();
     var memories = d.memories || [];
 
     var html = '<div class="mini-stat"><span class="label">Total memories:</span> ' + memories.length + '</div>';
 
     if (memories.length > 0) {
-      html += '<table class="admin-table"><thead><tr><th>Tip</th><th>Conținut</th><th>Importanță</th><th>Data</th><th>🗑️</th></tr></thead><tbody>';
+      html +=
+        '<table class="admin-table"><thead><tr><th>Tip</th><th>Conținut</th><th>Importanță</th><th>Data</th><th>🗑️</th></tr></thead><tbody>';
       memories.forEach(function (m) {
         var date = m.created_at ? new Date(m.created_at).toLocaleDateString('ro-RO') : '—';
-        html += '<tr><td><span class="badge">' + esc(m.memory_type || '—') + '</span></td>'
-          + '<td style="max-width:400px;overflow:hidden;text-overflow:ellipsis">' + esc((m.content || '').substring(0, 200)) + '</td>'
-          + '<td>' + (m.importance || 0) + '/10</td>'
-          + '<td>' + date + '</td>'
-          + '<td><button class="btn-sm btn-danger" onclick="deleteMemory(\'' + m.id + '\')">🗑️</button></td></tr>';
+        html +=
+          '<tr><td><span class="badge">' +
+          esc(m.memory_type || '—') +
+          '</span></td>' +
+          '<td style="max-width:400px;overflow:hidden;text-overflow:ellipsis">' +
+          esc((m.content || '').substring(0, 200)) +
+          '</td>' +
+          '<td>' +
+          (m.importance || 0) +
+          '/10</td>' +
+          '<td>' +
+          date +
+          '</td>' +
+          '<td><button class="btn-sm btn-danger" onclick="deleteMemory(\'' +
+          m.id +
+          '\')">🗑️</button></td></tr>';
       });
       html += '</tbody></table>';
     } else {
@@ -738,7 +1115,9 @@ async function deleteMemory(id) {
   try {
     await fetch('/api/admin/memories/' + id, { method: 'DELETE', headers: hdrs() });
     loadMemoriesSection();
-  } catch (e) { alert('Eroare: ' + e.message); }
+  } catch (e) {
+    alert('Eroare: ' + e.message);
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -749,44 +1128,106 @@ async function loadVisitorsSection() {
   var el = document.getElementById('section-content');
   try {
     var r = await fetch('/api/admin/visitors', { headers: hdrs() });
-    if (!r.ok) { el.innerHTML = '<div class="error-msg">❌ ' + r.status + '</div>'; return; }
+    if (!r.ok) {
+      el.innerHTML = '<div class="error-msg">❌ ' + r.status + '</div>';
+      return;
+    }
     var d = await r.json();
     var visitors = d.visitors || [];
 
-    var html = '<div class="traffic-summary">'
-      + '<div class="mini-stat"><span class="label">Total vizitatori:</span> ' + visitors.length + '</div>'
-      + '<div class="mini-stat"><span class="label">Potențiali:</span> ' + visitors.filter(function(v){return v.status==='potential'}).length + '</div>'
-      + '<div class="mini-stat"><span class="label">Revenitori:</span> ' + visitors.filter(function(v){return v.status==='returning'}).length + '</div>'
-      + '<div class="mini-stat"><span class="label">Convertiți:</span> ' + visitors.filter(function(v){return v.status==='converted'}).length + '</div>'
-      + '</div>';
+    var html =
+      '<div class="traffic-summary">' +
+      '<div class="mini-stat"><span class="label">Total vizitatori:</span> ' +
+      visitors.length +
+      '</div>' +
+      '<div class="mini-stat"><span class="label">Potențiali:</span> ' +
+      visitors.filter(function (v) {
+        return v.status === 'potential';
+      }).length +
+      '</div>' +
+      '<div class="mini-stat"><span class="label">Revenitori:</span> ' +
+      visitors.filter(function (v) {
+        return v.status === 'returning';
+      }).length +
+      '</div>' +
+      '<div class="mini-stat"><span class="label">Convertiți:</span> ' +
+      visitors.filter(function (v) {
+        return v.status === 'converted';
+      }).length +
+      '</div>' +
+      '</div>';
 
     if (visitors.length > 0) {
-      html += '<table class="admin-table"><thead><tr>'
-        + '<th>Status</th><th>IP</th><th>Țara</th><th>Device</th><th>Browser</th><th>OS</th>'
-        + '<th>Ecran</th><th>Vizite</th><th>Timp</th><th>Prima vizită</th><th>Ultima</th><th>Pagini</th>'
-        + '</tr></thead><tbody>';
+      html +=
+        '<table class="admin-table"><thead><tr>' +
+        '<th>Status</th><th>IP</th><th>Țara</th><th>Device</th><th>Browser</th><th>OS</th>' +
+        '<th>Ecran</th><th>Vizite</th><th>Timp</th><th>Prima vizită</th><th>Ultima</th><th>Pagini</th>' +
+        '</tr></thead><tbody>';
       visitors.forEach(function (v) {
-        var statusBadge = v.status === 'converted' ? '<span class="badge badge-ok">✅ Convertit</span>'
-          : v.status === 'returning' ? '<span class="badge badge-warn">🔵 Revine</span>'
-          : '<span class="badge">🟢 Potențial</span>';
+        var statusBadge =
+          v.status === 'converted'
+            ? '<span class="badge badge-ok">✅ Convertit</span>'
+            : v.status === 'returning'
+              ? '<span class="badge badge-warn">🔵 Revine</span>'
+              : '<span class="badge">🟢 Potențial</span>';
         var firstSeen = v.first_seen ? new Date(v.first_seen).toLocaleDateString('ro-RO') : '—';
-        var lastSeen = v.last_seen ? new Date(v.last_seen).toLocaleString('ro-RO', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }) : '—';
-        var pages = (v.pages_visited || []).slice(-3).map(function(p){ return p.path; }).join(', ') || '—';
+        var lastSeen = v.last_seen
+          ? new Date(v.last_seen).toLocaleString('ro-RO', {
+              day: '2-digit',
+              month: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit',
+            })
+          : '—';
+        var pages =
+          (v.pages_visited || [])
+            .slice(-3)
+            .map(function (p) {
+              return p.path;
+            })
+            .join(', ') || '—';
         var timeMins = Math.round((v.total_time_sec || 0) / 60);
-        html += '<tr>'
-          + '<td>' + statusBadge + '</td>'
-          + '<td><code>' + esc(v.ip || '—') + '</code></td>'
-          + '<td>' + esc(v.country || '—') + '</td>'
-          + '<td>' + esc(v.device || '—') + '</td>'
-          + '<td>' + esc(v.browser || '—') + '</td>'
-          + '<td>' + esc(v.os || '—') + '</td>'
-          + '<td>' + (v.screen_width || '?') + 'x' + (v.screen_height || '?') + '</td>'
-          + '<td>' + (v.total_visits || 0) + '</td>'
-          + '<td>' + timeMins + ' min</td>'
-          + '<td>' + firstSeen + '</td>'
-          + '<td>' + lastSeen + '</td>'
-          + '<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis">' + esc(pages) + '</td>'
-          + '</tr>';
+        html +=
+          '<tr>' +
+          '<td>' +
+          statusBadge +
+          '</td>' +
+          '<td><code>' +
+          esc(v.ip || '—') +
+          '</code></td>' +
+          '<td>' +
+          esc(v.country || '—') +
+          '</td>' +
+          '<td>' +
+          esc(v.device || '—') +
+          '</td>' +
+          '<td>' +
+          esc(v.browser || '—') +
+          '</td>' +
+          '<td>' +
+          esc(v.os || '—') +
+          '</td>' +
+          '<td>' +
+          (v.screen_width || '?') +
+          'x' +
+          (v.screen_height || '?') +
+          '</td>' +
+          '<td>' +
+          (v.total_visits || 0) +
+          '</td>' +
+          '<td>' +
+          timeMins +
+          ' min</td>' +
+          '<td>' +
+          firstSeen +
+          '</td>' +
+          '<td>' +
+          lastSeen +
+          '</td>' +
+          '<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis">' +
+          esc(pages) +
+          '</td>' +
+          '</tr>';
       });
       html += '</tbody></table>';
     } else {
@@ -809,7 +1250,9 @@ async function deleteUser(id, email) {
     } else {
       alert('Eroare: ' + r.status);
     }
-  } catch (e) { alert('Eroare: ' + e.message); }
+  } catch (e) {
+    alert('Eroare: ' + e.message);
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -818,60 +1261,93 @@ async function deleteUser(id, email) {
 async function loadStats() {
   try {
     // Users count
-    fetch('/api/admin/users', { headers: hdrs() }).then(function (r) {
-      if (r.ok) return r.json(); throw new Error('403');
-    }).then(function (d) {
-      document.getElementById('val-users').textContent = (d.users || []).length;
-      document.getElementById('preview-users').textContent = (d.users || []).length + ' useri';
-    }).catch(function () { document.getElementById('val-users').textContent = '?'; });
+    fetch('/api/admin/users', { headers: hdrs() })
+      .then(function (r) {
+        if (r.ok) return r.json();
+        throw new Error('403');
+      })
+      .then(function (d) {
+        document.getElementById('val-users').textContent = (d.users || []).length;
+        document.getElementById('preview-users').textContent = (d.users || []).length + ' useri';
+      })
+      .catch(function () {
+        document.getElementById('val-users').textContent = '?';
+      });
 
     // Traffic
-    fetch('/api/admin/traffic', { headers: hdrs() }).then(function (r) {
-      if (r.ok) return r.json(); throw new Error('403');
-    }).then(function (d) {
-      document.getElementById('val-views').textContent = d.totalAllTime || d.totalToday || 0;
-      document.getElementById('preview-traffic').textContent = (d.totalToday || 0) + ' azi';
-    }).catch(function () { document.getElementById('val-views').textContent = '?'; });
+    fetch('/api/admin/traffic', { headers: hdrs() })
+      .then(function (r) {
+        if (r.ok) return r.json();
+        throw new Error('403');
+      })
+      .then(function (d) {
+        document.getElementById('val-views').textContent = d.totalAllTime || d.totalToday || 0;
+        document.getElementById('preview-traffic').textContent = (d.totalToday || 0) + ' azi';
+      })
+      .catch(function () {
+        document.getElementById('val-views').textContent = '?';
+      });
 
     // Costs
-    fetch('/api/admin/costs', { headers: hdrs() }).then(function (r) {
-      if (r.ok) return r.json(); throw new Error('403');
-    }).then(function (d) {
-      document.getElementById('val-cost-today').textContent = '$' + (d.totalToday || 0).toFixed(4);
-      document.getElementById('val-cost-month').textContent = '$' + (d.totalMonth || 0).toFixed(2);
-      document.getElementById('preview-ai').textContent = '$' + (d.totalMonth || 0).toFixed(2) + '/luna';
-    }).catch(function () {
-      document.getElementById('val-cost-today').textContent = '?';
-      document.getElementById('val-cost-month').textContent = '?';
-    });
+    fetch('/api/admin/costs', { headers: hdrs() })
+      .then(function (r) {
+        if (r.ok) return r.json();
+        throw new Error('403');
+      })
+      .then(function (d) {
+        document.getElementById('val-cost-today').textContent = '$' + (d.totalToday || 0).toFixed(4);
+        document.getElementById('val-cost-month').textContent = '$' + (d.totalMonth || 0).toFixed(2);
+        document.getElementById('preview-ai').textContent = '$' + (d.totalMonth || 0).toFixed(2) + '/luna';
+      })
+      .catch(function () {
+        document.getElementById('val-cost-today').textContent = '?';
+        document.getElementById('val-cost-month').textContent = '?';
+      });
 
     // Brain preview
-    fetch('/api/admin/brain', { headers: hdrs() }).then(function (r) {
-      if (r.ok) return r.json(); throw new Error('403');
-    }).then(function (d) {
-      var active = 0; var total = 0;
-      var providers = d.providers || {};
-      for (var p in providers) { total++; if (providers[p]) active++; }
-      document.getElementById('preview-brain').textContent = active + '/' + total + ' providers';
-      document.getElementById('admin-uptime').textContent = '⏱ ' + Math.round((d.uptime || 0) / 60) + 'min';
-    }).catch(function () { });
+    fetch('/api/admin/brain', { headers: hdrs() })
+      .then(function (r) {
+        if (r.ok) return r.json();
+        throw new Error('403');
+      })
+      .then(function (d) {
+        var active = 0;
+        var total = 0;
+        var providers = d.providers || {};
+        for (var p in providers) {
+          total++;
+          if (providers[p]) active++;
+        }
+        document.getElementById('preview-brain').textContent = active + '/' + total + ' providers';
+        document.getElementById('admin-uptime').textContent = '⏱ ' + Math.round((d.uptime || 0) / 60) + 'min';
+      })
+      .catch(function () {});
 
     // Live preview + Acum Online stat
-    fetch('/api/admin/live-users', { headers: hdrs() }).then(function (r) {
-      if (r.ok) return r.json(); throw new Error('403');
-    }).then(function (d) {
-      var count = (d.sessions || d.activeSessions || []).length;
-      document.getElementById('preview-live').textContent = count + ' online';
-      document.getElementById('val-active').textContent = count;
-    }).catch(function () { document.getElementById('val-active').textContent = '0'; });
+    fetch('/api/admin/live-users', { headers: hdrs() })
+      .then(function (r) {
+        if (r.ok) return r.json();
+        throw new Error('403');
+      })
+      .then(function (d) {
+        var count = (d.sessions || d.activeSessions || []).length;
+        document.getElementById('preview-live').textContent = count + ' online';
+        document.getElementById('val-active').textContent = count;
+      })
+      .catch(function () {
+        document.getElementById('val-active').textContent = '0';
+      });
 
     // Memories preview
-    fetch('/api/admin/memories', { headers: hdrs() }).then(function (r) {
-      if (r.ok) return r.json(); throw new Error('403');
-    }).then(function (d) {
-      document.getElementById('preview-memories').textContent = (d.memories || []).length + ' memorii';
-    }).catch(function () { });
-
+    fetch('/api/admin/memories', { headers: hdrs() })
+      .then(function (r) {
+        if (r.ok) return r.json();
+        throw new Error('403');
+      })
+      .then(function (d) {
+        document.getElementById('preview-memories').textContent = (d.memories || []).length + ' memorii';
+      })
+      .catch(function () {});
   } catch (e) {
     console.error('[Admin] Stats error:', e);
   }
@@ -884,7 +1360,7 @@ async function initAdmin() {
   // Step 1: Check if we have a JWT token at all
   var testH = hdrs();
   if (!testH['Authorization'] && !_adminSecret) {
-    showAuthError('Nu ești logat. Loghează-te mai întâi pe kelionai.app, apoi revino aici.');
+    showAuthError('Nu ești logat. Loghează-te mai întâi în aplicație, apoi revino aici.');
     return;
   }
 
@@ -903,7 +1379,7 @@ async function initAdmin() {
         showAuthError('Emailul tău nu e setat ca admin pe server.\nVerifică ADMIN_EMAIL pe Railway.');
         return;
       } else if (r.status === 401) {
-        showAuthError('Token JWT expirat. Re-logheaza-te pe kelionai.app.');
+        showAuthError('Tokenul JWT a expirat. Reautentifică-te în aplicație.');
         return;
       } else {
         // 500 = ADMIN_SECRET_KEY not set — OK, JWT auth still works
@@ -918,7 +1394,11 @@ async function initAdmin() {
   try {
     var check = await fetch('/api/admin/brain', { headers: hdrs() });
     if (!check.ok) {
-      showAuthError('Acces refuzat (' + check.status + ').\nEști logat ca adrianenc11@gmail.com?\nAltfel, re-logheaza-te pe kelionai.app.');
+      showAuthError(
+        'Acces refuzat (' +
+          check.status +
+          ').\nVerifică dacă ești autentificat cu un cont de admin, apoi încearcă din nou.'
+      );
       return;
     }
   } catch (e) {
@@ -934,11 +1414,13 @@ async function initAdmin() {
 
 function showAuthError(msg) {
   document.querySelector('.admin-container').innerHTML =
-    '<div style="display:flex;align-items:center;justify-content:center;height:80vh;flex-direction:column;text-align:center;padding:20px">'
-    + '<div style="font-size:2rem;margin-bottom:16px">🔒</div>'
-    + '<div style="font-size:1.2rem;color:#f87171;margin-bottom:12px;font-weight:600">Admin — acces restricționat</div>'
-    + '<pre style="color:#888;font-size:0.85rem;white-space:pre-wrap;max-width:500px;margin-bottom:20px;font-family:inherit">' + msg + '</pre>'
-    + '<a href="/" style="color:#a5b4fc;text-decoration:none;padding:10px 20px;border:1px solid rgba(99,102,241,0.3);border-radius:8px">← Înapoi la KelionAI</a></div>';
+    '<div style="display:flex;align-items:center;justify-content:center;height:80vh;flex-direction:column;text-align:center;padding:20px">' +
+    '<div style="font-size:2rem;margin-bottom:16px">🔒</div>' +
+    '<div style="font-size:1.2rem;color:#f87171;margin-bottom:12px;font-weight:600">Admin — acces restricționat</div>' +
+    '<pre style="color:#888;font-size:0.85rem;white-space:pre-wrap;max-width:500px;margin-bottom:20px;font-family:inherit">' +
+    msg +
+    '</pre>' +
+    '<a href="/" style="color:#a5b4fc;text-decoration:none;padding:10px 20px;border:1px solid rgba(99,102,241,0.3);border-radius:8px">← Înapoi la KelionAI</a></div>';
 }
 
 // ── START ──

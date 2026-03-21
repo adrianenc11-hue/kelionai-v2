@@ -246,7 +246,7 @@ body {
   z-index: 10;
   opacity: 0;
   transition: opacity 0.4s ease;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
 }
 
 #live-subtitle.visible {
@@ -777,7 +777,6 @@ body {
   height: 0 !important;
   overflow: hidden !important;
 }
-
 
 /* ── Monitor default/welcome ── */
 #monitor-default {

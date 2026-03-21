@@ -1,4 +1,4 @@
-"use strict";
+'use strict';
 
 /**
  * K1 COGNITIVE CORE — Motorul de gândire al Kelion AGI
@@ -9,7 +9,7 @@
  * Meta-Cognition: auto-evaluare performanță per domeniu
  */
 
-const logger = require("pino")({ name: "k1-cognitive" });
+const logger = require('pino')({ name: 'k1-cognitive' });
 
 // ═══════════════════════════════════════════════════════════════
 // INNER MONOLOGUE — Fluxul intern de gândire
@@ -22,17 +22,14 @@ function think(thought, context = {}) {
   const entry = {
     id: monologueLog.length + 1,
     thought,
-    phase: context.phase || "REFLECT", // PERCEIVE/REFLECT/HYPOTHESIZE/PLAN/ACT/OBSERVE/LEARN
-    domain: context.domain || "general",
+    phase: context.phase || 'REFLECT', // PERCEIVE/REFLECT/HYPOTHESIZE/PLAN/ACT/OBSERVE/LEARN
+    domain: context.domain || 'general',
     confidence: context.confidence || null,
     timestamp: new Date().toISOString(),
   };
   monologueLog.push(entry);
   if (monologueLog.length > MAX_MONOLOGUE) monologueLog.shift();
-  logger.info(
-    { phase: entry.phase, domain: entry.domain },
-    `[K1] 💭 ${thought}`,
-  );
+  logger.info({ phase: entry.phase, domain: entry.domain }, `[K1] 💭 ${thought}`);
   return entry;
 }
 
@@ -62,12 +59,12 @@ const performanceHistory = {
  */
 function calculateConfidence(params = {}) {
   const {
-    domain = "general",
+    domain = 'general',
     hasSources = false, // Are surse/evidențe?
     sourceCount = 0, // Câte surse?
     hasContradictions = false, // Există contradicții în context?
     _isFactual = false, // E o afirmație factuală verificabilă?
-    complexity = "medium", // low/medium/high
+    complexity = 'medium', // low/medium/high
     modelAgreement = null, // Dacă 2+ modele sunt de acord (0-1)
   } = params;
 
@@ -89,8 +86,8 @@ function calculateConfidence(params = {}) {
   if (hasContradictions) score -= 25;
 
   // Complexitate scade confidence-ul
-  if (complexity === "high") score -= 10;
-  if (complexity === "low") score += 10;
+  if (complexity === 'high') score -= 10;
+  if (complexity === 'low') score += 10;
 
   // Model agreement crește confidence-ul
   if (modelAgreement !== null) {
@@ -103,21 +100,21 @@ function calculateConfidence(params = {}) {
   // Generează mesaj de confidence
   let label, emoji;
   if (score >= 85) {
-    label = "Foarte sigur";
-    emoji = "🟢";
+    label = 'Foarte sigur';
+    emoji = '🟢';
   } else if (score >= 65) {
-    label = "Destul de sigur";
-    emoji = "🟡";
+    label = 'Destul de sigur';
+    emoji = '🟡';
   } else if (score >= 40) {
-    label = "Incert — necesită verificare";
-    emoji = "🟠";
+    label = 'Incert — necesită verificare';
+    emoji = '🟠';
   } else {
-    label = "Nu sunt sigur — tratează cu precauție";
-    emoji = "🔴";
+    label = 'Nu sunt sigur — tratează cu precauție';
+    emoji = '🔴';
   }
 
   think(`Confidence ${score}% (${label}) pe domeniul ${domain}`, {
-    phase: "REFLECT",
+    phase: 'REFLECT',
     domain,
     confidence: score,
   });
@@ -138,7 +135,7 @@ function recordFeedback(domain, wasCorrect) {
     wasCorrect
       ? `Confirmat corect pe ${domain} (${perf.correct}/${perf.total})`
       : `CORECTAT pe ${domain} — acuratețe: ${((perf.correct / perf.total) * 100).toFixed(0)}%`,
-    { phase: "LEARN", domain },
+    { phase: 'LEARN', domain }
   );
 }
 
@@ -155,24 +152,23 @@ function reason(input, context = {}) {
 
   // 1. PERCEIVE — Ce am primit?
   think(`Cerere primită: "${input.slice(0, 100)}..."`, {
-    phase: "PERCEIVE",
+    phase: 'PERCEIVE',
     domain: context.domain,
   });
 
   // 2. REFLECT — Am mai văzut asta?
   const domain = detectDomain(input);
   const perf = performanceHistory[domain];
-  const pastAccuracy =
-    perf.total > 0 ? ((perf.correct / perf.total) * 100).toFixed(0) : "N/A";
+  const pastAccuracy = perf.total > 0 ? ((perf.correct / perf.total) * 100).toFixed(0) : 'N/A';
   think(`Domeniu detectat: ${domain}. Accuracy istoric: ${pastAccuracy}%`, {
-    phase: "REFLECT",
+    phase: 'REFLECT',
     domain,
   });
 
   // 3. HYPOTHESIZE — Ce poate fi?
   const hypotheses = generateHypotheses(input, domain);
-  think(`Ipoteze: ${hypotheses.map((h) => h.label).join(" | ")}`, {
-    phase: "HYPOTHESIZE",
+  think(`Ipoteze: ${hypotheses.map((h) => h.label).join(' | ')}`, {
+    phase: 'HYPOTHESIZE',
     domain,
   });
 
@@ -180,16 +176,13 @@ function reason(input, context = {}) {
   const plan = {
     domain,
     complexity: estimateComplexity(input),
-    steps: hypotheses[0]?.steps || ["direct_answer"],
-    criteria: hypotheses[0]?.criteria || ["correct", "complete"],
-    needsTools:
-      domain === "trading" ||
-      input.includes("verifică") ||
-      input.includes("caută"),
-    needsMultiAgent: estimateComplexity(input) === "high",
+    steps: hypotheses[0]?.steps || ['direct_answer'],
+    criteria: hypotheses[0]?.criteria || ['correct', 'complete'],
+    needsTools: domain === 'trading' || input.includes('verifică') || input.includes('caută'),
+    needsMultiAgent: estimateComplexity(input) === 'high',
   };
-  think(`Plan: ${plan.steps.join(" → ")} (complexitate: ${plan.complexity})`, {
-    phase: "PLAN",
+  think(`Plan: ${plan.steps.join(' → ')} (complexitate: ${plan.complexity})`, {
+    phase: 'PLAN',
     domain,
   });
 
@@ -205,7 +198,7 @@ function reason(input, context = {}) {
       domain,
       complexity: plan.complexity,
       hypotheses: hypotheses.length,
-      bestHypothesis: hypotheses[0]?.label || "direct",
+      bestHypothesis: hypotheses[0]?.label || 'direct',
       plan: plan.steps,
       needsTools: plan.needsTools,
       needsMultiAgent: plan.needsMultiAgent,
@@ -221,12 +214,9 @@ function reason(input, context = {}) {
  */
 function observe(result, expected = null) {
   const delta = expected ? compareDelta(result, expected) : null;
-  think(
-    delta
-      ? `Rezultat vs așteptare: delta ${delta}%`
-      : `Rezultat obținut — aștept feedback utilizator`,
-    { phase: "OBSERVE" },
-  );
+  think(delta ? `Rezultat vs așteptare: delta ${delta}%` : `Rezultat obținut — aștept feedback utilizator`, {
+    phase: 'OBSERVE',
+  });
   return { observed: true, delta };
 }
 
@@ -238,29 +228,24 @@ function getMetaCognition() {
   const domains = Object.entries(performanceHistory).map(([domain, perf]) => ({
     domain,
     totalTasks: perf.total,
-    accuracy:
-      perf.total > 0 ? Math.round((perf.correct / perf.total) * 100) : null,
+    accuracy: perf.total > 0 ? Math.round((perf.correct / perf.total) * 100) : null,
     corrections: perf.corrections,
     status:
       perf.total === 0
-        ? "no_data"
+        ? 'no_data'
         : perf.correct / perf.total >= 0.8
-          ? "strong"
+          ? 'strong'
           : perf.correct / perf.total >= 0.6
-            ? "moderate"
-            : "weak",
+            ? 'moderate'
+            : 'weak',
   }));
 
-  const weakAreas = domains
-    .filter((d) => d.status === "weak")
-    .map((d) => d.domain);
-  const strongAreas = domains
-    .filter((d) => d.status === "strong")
-    .map((d) => d.domain);
+  const weakAreas = domains.filter((d) => d.status === 'weak').map((d) => d.domain);
+  const strongAreas = domains.filter((d) => d.status === 'strong').map((d) => d.domain);
 
   if (weakAreas.length > 0) {
-    think(`Zone slabe: ${weakAreas.join(", ")} — trebuie îmbunătățit`, {
-      phase: "REFLECT",
+    think(`Zone slabe: ${weakAreas.join(', ')} — trebuie îmbunătățit`, {
+      phase: 'REFLECT',
     });
   }
 
@@ -270,8 +255,7 @@ function getMetaCognition() {
     strongAreas,
     totalTasks: domains.reduce((sum, d) => sum + d.totalTasks, 0),
     overallAccuracy:
-      domains.reduce((sum, d) => sum + (d.accuracy || 0), 0) /
-        domains.filter((d) => d.accuracy !== null).length || 0,
+      domains.reduce((sum, d) => sum + (d.accuracy || 0), 0) / domains.filter((d) => d.accuracy !== null).length || 0,
     monologue: getMonologue(10),
   };
 }
@@ -282,61 +266,51 @@ function getMetaCognition() {
 
 function detectDomain(input) {
   const lower = input.toLowerCase();
-  if (
-    /btc|eth|trading|piață|market|invest|profit|buy|sell|rsi|macd/i.test(lower)
-  )
-    return "trading";
-  if (
-    /cod|functie|variabila|bug|eroare|javascript|python|html|css/i.test(lower)
-  )
-    return "coding";
-  if (/stir|news|articol|publicare/i.test(lower)) return "news";
-  if (/caut|cercete|analizeaz|research|compara/i.test(lower)) return "research";
-  return "general";
+  if (/btc|eth|trading|piață|market|invest|profit|buy|sell|rsi|macd/i.test(lower)) return 'trading';
+  if (/cod|functie|variabila|bug|eroare|javascript|python|html|css/i.test(lower)) return 'coding';
+  if (/stir|news|articol|publicare/i.test(lower)) return 'news';
+  if (/caut|cercete|analizeaz|research|compara/i.test(lower)) return 'research';
+  return 'general';
 }
 
 function estimateComplexity(input) {
   const words = input.split(/\s+/).length;
-  if (
-    words > 100 ||
-    /implementeaz|construi|creaz.*sistem|arhitectur/i.test(input)
-  )
-    return "high";
-  if (words > 30 || /compar|analizeaz|explic/i.test(input)) return "medium";
-  return "low";
+  if (words > 100 || /implementeaz|construi|creaz.*sistem|arhitectur/i.test(input)) return 'high';
+  if (words > 30 || /compar|analizeaz|explic/i.test(input)) return 'medium';
+  return 'low';
 }
 
 function generateHypotheses(input, domain) {
   const hypotheses = [];
 
-  if (domain === "trading") {
+  if (domain === 'trading') {
     hypotheses.push({
-      label: "Analiză piață cu indicatori",
+      label: 'Analiză piață cu indicatori',
       probability: 0.6,
-      steps: ["fetch_market_data", "calculate_indicators", "generate_signal"],
-      criteria: ["has_evidence", "confidence>60"],
+      steps: ['fetch_market_data', 'calculate_indicators', 'generate_signal'],
+      criteria: ['has_evidence', 'confidence>60'],
     });
   }
 
   hypotheses.push({
-    label: "Răspuns direct din cunoștințe",
+    label: 'Răspuns direct din cunoștințe',
     probability: 0.3,
-    steps: ["direct_answer"],
-    criteria: ["correct", "complete"],
+    steps: ['direct_answer'],
+    criteria: ['correct', 'complete'],
   });
 
   hypotheses.push({
-    label: "Necesită cercetare + validare",
+    label: 'Necesită cercetare + validare',
     probability: 0.1,
-    steps: ["research", "validate", "compose"],
-    criteria: ["has_sources", "verified"],
+    steps: ['research', 'validate', 'compose'],
+    criteria: ['has_sources', 'verified'],
   });
 
   return hypotheses.sort((a, b) => b.probability - a.probability);
 }
 
 function compareDelta(result, expected) {
-  if (typeof result === "number" && typeof expected === "number") {
+  if (typeof result === 'number' && typeof expected === 'number') {
     return Math.round((Math.abs(result - expected) / expected) * 100);
   }
   return null;
@@ -350,7 +324,7 @@ function resetAll() {
   for (const domain of Object.keys(performanceHistory)) {
     performanceHistory[domain] = { correct: 0, total: 0, corrections: 0 };
   }
-  think("🧒 Cognitive reset — newborn mode activated", { phase: "LEARN" });
+  think('🧒 Cognitive reset — newborn mode activated', { phase: 'LEARN' });
 }
 
 module.exports = {

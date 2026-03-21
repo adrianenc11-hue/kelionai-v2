@@ -85,12 +85,17 @@ router.post('/translate', translateLimiter, async (req, res) => {
 
       // Save to Supabase
       if (supabaseAdmin && user?.id) {
-        supabaseAdmin.from('brain_memory').insert({
-          user_id: user.id, memory_type: 'translation',
-          content: `[${detectedLang}→${targetLang}] ${translated}`,
-          context: { original: text, target: targetLang, detected: detectedLang },
-          importance: 2,
-        }).then(() => {}).catch(() => {});
+        supabaseAdmin
+          .from('brain_memory')
+          .insert({
+            user_id: user.id,
+            memory_type: 'translation',
+            content: `[${detectedLang}→${targetLang}] ${translated}`,
+            context: { original: text, target: targetLang, detected: detectedLang },
+            importance: 2,
+          })
+          .then(() => {})
+          .catch(() => {});
       }
 
       return res.json({ translated, detectedLang, targetLang });

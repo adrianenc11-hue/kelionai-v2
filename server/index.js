@@ -52,9 +52,9 @@ const {
   enqueueTask,
 } = require('./scalability');
 
-// ═══ EXTRACTED ROUTE MODULES ═══
 const chatRouter = require('./routes/chat');
 const voiceRouter = require('./routes/voice');
+const { setupLiveChat } = require('./routes/live');
 const searchRouter = require('./routes/search');
 const weatherRouter = require('./routes/weather');
 const visionRouter = require('./routes/vision');
@@ -83,6 +83,18 @@ const quickWins = require('./quick-wins');
 const sharedSessions = require('./shared-sessions');
 
 const app = express();
+const server = http.createServer(app);
+const { Server } = require('socket.io');
+
+const io = new Server(server, {
+  cors: { origin: '*', methods: ['GET', 'POST'], credentials: true },
+  transports: ['polling', 'websocket'],
+  pingTimeout: 60000,
+  pingInterval: 25000,
+});
+
+app.locals.io = io;
+
 app.set('trust proxy', 1);
 
 // ═══ LEVEL 2-4 SCALABILITY MIDDLEWARE ═══
@@ -268,7 +280,10 @@ app.use((req, res, next) => {
       if (existing) {
         existing.lastSeen = now;
         existing.ua = rawUA;
-        if (userName) { existing.userType = userType; existing.userName = userName; }
+        if (userName) {
+          existing.userType = userType;
+          existing.userName = userName;
+        }
         if (!existing.pages) existing.pages = [];
         const lastPage = existing.pages[existing.pages.length - 1];
         if (!lastPage || lastPage.path !== req.path) {
@@ -320,8 +335,11 @@ app.use((req, res, next) => {
       const isHealth =
         req.path === '/health' || req.path === '/sw.js' || req.path === '/manifest.json' || req.path === '/favicon.svg';
       // Block vulnerability scanners — .php, wp-*, common attack paths
-      const isAttack = /\.(php|asp|aspx|jsp|cgi|env|git|bak)$/i.test(req.path) ||
-        /wp-content|wp-admin|wp-login|xmlrpc|eval-stdin|shell|cgi-bin|phpmyadmin|\.well-known\/security/i.test(req.path);
+      const isAttack =
+        /\.(php|asp|aspx|jsp|cgi|env|git|bak)$/i.test(req.path) ||
+        /wp-content|wp-admin|wp-login|xmlrpc|eval-stdin|shell|cgi-bin|phpmyadmin|\.well-known\/security/i.test(
+          req.path
+        );
       if (!isBot && !isHealth && !isAttack) {
         const realIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || 'unknown';
 
@@ -338,7 +356,11 @@ app.use((req, res, next) => {
             country: country, // may be null from CDN headers
             referrer: (req.get('referer') || req.get('referrer') || '').substring(0, 500) || null,
           };
-          const { data: inserted, error } = await supabaseAdmin.from('page_views').insert(viewData).select('id').single();
+          const { data: inserted, error } = await supabaseAdmin
+            .from('page_views')
+            .insert(viewData)
+            .select('id')
+            .single();
           if (error) {
             logger.error({ component: 'PageViews', err: error.message, code: error.code }, 'page_views INSERT FAILED');
             return;
@@ -351,10 +373,9 @@ app.use((req, res, next) => {
               if (!global._geoCache) global._geoCache = {};
               let geo = global._geoCache[realIp];
               if (!geo) {
-                const geoR = await fetch(
-                  'https://api.country.is/' + encodeURIComponent(realIp),
-                  { signal: AbortSignal.timeout(2000) }
-                );
+                const geoR = await fetch('https://api.country.is/' + encodeURIComponent(realIp), {
+                  signal: AbortSignal.timeout(2000),
+                });
                 if (geoR.ok) {
                   const geoD = await geoR.json();
                   geo = geoD.country || null;
@@ -368,7 +389,9 @@ app.use((req, res, next) => {
               if (geo) {
                 await supabaseAdmin.from('page_views').update({ country: geo }).eq('id', inserted.id);
               }
-            } catch (_e) { /* geo failed — ok, visit already recorded */ }
+            } catch (_e) {
+              /* geo failed — ok, visit already recorded */
+            }
           }
         };
         insertView().catch((e) => {
@@ -446,9 +469,9 @@ app.get('/api/config', (req, res) => {
 const _rawHtml = fs.readFileSync(path.join(__dirname, '..', 'app', 'index.html'), 'utf8');
 const _indexHtml = process.env.SENTRY_DSN
   ? _rawHtml.replace(
-    '<meta name="sentry-dsn" content="">',
-    `<meta name="sentry-dsn" content="${process.env.SENTRY_DSN.replace(/&/g, '&amp;').replace(/"/g, '&quot;')}">`
-  )
+      '<meta name="sentry-dsn" content="">',
+      `<meta name="sentry-dsn" content="${process.env.SENTRY_DSN.replace(/&/g, '&amp;').replace(/"/g, '&quot;')}">`
+    )
   : _rawHtml;
 
 // Read 404.html once at startup (for admin stealth)
@@ -649,7 +672,7 @@ process.on('SIGINT', async () => {
 });
 
 // ═══ K1 SELF-HEAL ENGINE — autonomous error detection, diagnosis, repair & deploy ═══
-const { startSelfHealLoop } = require("./self-heal");
+const { startSelfHealLoop } = require('./self-heal');
 startSelfHealLoop(brain, supabaseAdmin);
 
 // ═══ AUTH HELPER ═══
@@ -675,8 +698,12 @@ app.locals.supabase = supabase;
 app.locals.supabaseAdmin = supabaseAdmin;
 app.locals.brain = brain;
 
+app.locals.brain = brain;
 
 app.locals.memFallback = memFallback;
+
+// Initialize Live Chat namespace
+setupLiveChat(io, app.locals);
 
 // ═══ ROUTE MODULES ═══
 app.use('/api/auth', authRouter);
@@ -693,13 +720,32 @@ app.use('/api/imagine', imagesRouter);
 app.post('/api/track/visit', express.json({ limit: '200kb' }), async (req, res) => {
   try {
     if (!supabaseAdmin) return res.json({ ok: false });
-    const { fingerprint, path, referrer, browser, device, os, screen_width, screen_height, language, timezone, utm_source, utm_medium, utm_campaign, photo } = req.body;
+    const {
+      fingerprint,
+      path,
+      referrer,
+      browser,
+      device,
+      os,
+      screen_width,
+      screen_height,
+      language,
+      timezone,
+      utm_source,
+      utm_medium,
+      utm_campaign,
+      photo,
+    } = req.body;
     if (!fingerprint) return res.status(400).json({ ok: false });
 
     const realIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || 'unknown';
 
     // Check if visitor exists
-    const { data: existing } = await supabaseAdmin.from('visitors').select('id, total_visits, pages_visited').eq('fingerprint', fingerprint).single();
+    const { data: existing } = await supabaseAdmin
+      .from('visitors')
+      .select('id, total_visits, pages_visited')
+      .eq('fingerprint', fingerprint)
+      .single();
 
     if (existing) {
       // Update existing visitor
@@ -708,8 +754,16 @@ app.post('/api/track/visit', express.json({ limit: '200kb' }), async (req, res) 
       if (pages.length > 100) pages.splice(0, pages.length - 100); // keep last 100
       const status = (existing.total_visits || 0) >= 3 ? 'returning' : 'potential';
       const updateData = {
-        ip: realIp, last_seen: new Date().toISOString(), total_visits: (existing.total_visits || 0) + 1,
-        pages_visited: pages, status, browser, device, os, screen_width, screen_height,
+        ip: realIp,
+        last_seen: new Date().toISOString(),
+        total_visits: (existing.total_visits || 0) + 1,
+        pages_visited: pages,
+        status,
+        browser,
+        device,
+        os,
+        screen_width,
+        screen_height,
       };
       // Update photo if we got a new one (camera capture)
       if (photo && photo.startsWith('data:image/')) updateData.photo = photo;
@@ -720,17 +774,36 @@ app.post('/api/track/visit', express.json({ limit: '200kb' }), async (req, res) 
       let city = null;
       try {
         if (!country && realIp !== 'unknown') {
-          const geoR = await fetch('https://api.country.is/' + encodeURIComponent(realIp), { signal: AbortSignal.timeout(2000) });
-          if (geoR.ok) { const g = await geoR.json(); country = g.country; city = null; }
+          const geoR = await fetch('https://api.country.is/' + encodeURIComponent(realIp), {
+            signal: AbortSignal.timeout(2000),
+          });
+          if (geoR.ok) {
+            const g = await geoR.json();
+            country = g.country;
+            city = null;
+          }
         }
       } catch (_) {}
       await supabaseAdmin.from('visitors').insert({
-        fingerprint, ip: realIp, country, city, browser, device, os,
-        screen_width, screen_height, language, timezone, referrer,
-        utm_source, utm_medium, utm_campaign,
-        photo: (photo && photo.startsWith('data:image/')) ? photo : null,
+        fingerprint,
+        ip: realIp,
+        country,
+        city,
+        browser,
+        device,
+        os,
+        screen_width,
+        screen_height,
+        language,
+        timezone,
+        referrer,
+        utm_source,
+        utm_medium,
+        utm_campaign,
+        photo: photo && photo.startsWith('data:image/') ? photo : null,
         pages_visited: [{ path, ts: new Date().toISOString() }],
-        total_visits: 1, status: 'potential',
+        total_visits: 1,
+        status: 'potential',
       });
     }
     res.json({ ok: true });
@@ -745,19 +818,33 @@ app.post('/api/track/beacon', express.json(), async (req, res) => {
     if (!supabaseAdmin) return res.json({ ok: false });
     const { fingerprint, duration } = req.body;
     if (!fingerprint || !duration) return res.json({ ok: false });
-    await supabaseAdmin.from('visitors').update({
-      total_time_sec: supabaseAdmin.raw ? undefined : duration, // fallback
-      last_seen: new Date().toISOString(),
-    }).eq('fingerprint', fingerprint);
+    await supabaseAdmin
+      .from('visitors')
+      .update({
+        total_time_sec: supabaseAdmin.raw ? undefined : duration, // fallback
+        last_seen: new Date().toISOString(),
+      })
+      .eq('fingerprint', fingerprint);
     // Also increment total_time_sec via RPC if available
     await supabaseAdmin.rpc('increment_visitor_time', { fp: fingerprint, secs: duration }).catch(() => {
       // If RPC doesn't exist, just update with raw SQL workaround
-      supabaseAdmin.from('visitors').select('total_time_sec').eq('fingerprint', fingerprint).single().then(({ data }) => {
-        if (data) supabaseAdmin.from('visitors').update({ total_time_sec: (data.total_time_sec || 0) + duration }).eq('fingerprint', fingerprint);
-      });
+      supabaseAdmin
+        .from('visitors')
+        .select('total_time_sec')
+        .eq('fingerprint', fingerprint)
+        .single()
+        .then(({ data }) => {
+          if (data)
+            supabaseAdmin
+              .from('visitors')
+              .update({ total_time_sec: (data.total_time_sec || 0) + duration })
+              .eq('fingerprint', fingerprint);
+        });
     });
     res.json({ ok: true });
-  } catch (e) { res.json({ ok: false }); }
+  } catch (e) {
+    res.json({ ok: false });
+  }
 });
 
 app.use('/api/admin', adminApiRouter);
@@ -1012,7 +1099,7 @@ app.post('/api/brain/errors', express.json(), (req, res) => {
           importance: 9,
         })
         .then()
-        .catch(() => { });
+        .catch(() => {});
     }
   }
 
@@ -1367,7 +1454,6 @@ app.post(
   })
 );
 
-
 // POST /api/ticker/disable — save ticker preference (Premium only)
 app.post(
   '/api/ticker/disable',
@@ -1503,7 +1589,6 @@ app.use((err, req, res, next) => {
 // ═══ STARTUP ═══
 function logConfigHealth() {
   const checks = [
-
     {
       name: 'OPENAI_API_KEY',
       set: !!process.env.OPENAI_API_KEY,
@@ -1586,6 +1671,11 @@ if (require.main === module) {
   setupRealtimeVoice(io, app.locals);
   logger.info({ component: 'VoiceRealtime' }, 'Socket.io voice-first mounted on /voice-realtime namespace');
 
+  // ── Attach Live Chat (GPT 5.4 Audio) via Socket.io ──
+  const { setupLiveChat } = require('./routes/live');
+  setupLiveChat(io, app.locals);
+  logger.info({ component: 'LiveChat' }, 'Socket.io live chat mounted on /live namespace');
+
   // ── Attach Collaboration WebSocket ──
   const { setupCollaboration } = require('./collaboration');
   setupCollaboration(server);
@@ -1631,13 +1721,13 @@ if (require.main === module) {
           'KelionAI v2.5 started on port ' + PORT + ' (with voice streaming)'
         );
         // Smoke test internal routes (async, non-blocking)
-        smokeTest(PORT).catch(() => { });
+        smokeTest(PORT).catch(() => {});
 
         // Self-ping keepalive — prevent Railway idle sleep (every 4 min)
         const APP_URL = process.env.APP_URL || `http://localhost:${PORT}`;
         setInterval(
           () => {
-            fetch(`${APP_URL}/api/health`).catch(() => { });
+            fetch(`${APP_URL}/api/health`).catch(() => {});
           },
           4 * 60 * 1000
         ).unref();

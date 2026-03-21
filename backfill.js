@@ -8,7 +8,9 @@ async function geoIp(ip) {
     if (!r.ok) return null;
     const d = await r.json();
     return d.country || null;
-  } catch (e) { return null; }
+  } catch (e) {
+    return null;
+  }
 }
 
 async function backfill() {

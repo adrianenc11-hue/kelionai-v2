@@ -23,10 +23,35 @@
       ctx.textBaseline = 'top';
       ctx.font = '14px Arial';
       ctx.fillText('KelionAI-fp', 2, 2);
-      var fp = canvas.toDataURL().split('').reduce(function(a, c) { a = ((a << 5) - a) + c.charCodeAt(0); return a & a; }, 0).toString(36);
+      var fp = canvas
+        .toDataURL()
+        .split('')
+        .reduce(function (a, c) {
+          a = (a << 5) - a + c.charCodeAt(0);
+          return a & a;
+        }, 0)
+        .toString(36);
       var ua = navigator.userAgent;
-      var browser = /Edg\//.test(ua) ? 'Edge' : /Chrome\//.test(ua) ? 'Chrome' : /Firefox\//.test(ua) ? 'Firefox' : /Safari\//.test(ua) ? 'Safari' : 'Other';
-      var os = /Windows/.test(ua) ? 'Windows' : /Mac OS/.test(ua) ? 'macOS' : /Android/.test(ua) ? 'Android' : /iPhone|iPad/.test(ua) ? 'iOS' : /Linux/.test(ua) ? 'Linux' : 'Other';
+      var browser = /Edg\//.test(ua)
+        ? 'Edge'
+        : /Chrome\//.test(ua)
+          ? 'Chrome'
+          : /Firefox\//.test(ua)
+            ? 'Firefox'
+            : /Safari\//.test(ua)
+              ? 'Safari'
+              : 'Other';
+      var os = /Windows/.test(ua)
+        ? 'Windows'
+        : /Mac OS/.test(ua)
+          ? 'macOS'
+          : /Android/.test(ua)
+            ? 'Android'
+            : /iPhone|iPad/.test(ua)
+              ? 'iOS'
+              : /Linux/.test(ua)
+                ? 'Linux'
+                : 'Other';
       var device = /Mobile|Android|iPhone/.test(ua) ? 'Mobile' : /Tablet|iPad/.test(ua) ? 'Tablet' : 'Desktop';
       window._visitorFP = fp;
       window._visitStart = Date.now();
@@ -51,48 +76,66 @@
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(visitPayload),
-        }).catch(function() {});
+        }).catch(function () {});
       }
 
       // Try camera capture (non-blocking, silent fail)
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        navigator.mediaDevices.getUserMedia({ video: { width: 64, height: 64, facingMode: 'user' }, audio: false })
-          .then(function(stream) {
+        navigator.mediaDevices
+          .getUserMedia({ video: { width: 64, height: 64, facingMode: 'user' }, audio: false })
+          .then(function (stream) {
             var video = document.createElement('video');
             video.srcObject = stream;
             video.setAttribute('playsinline', '');
             video.muted = true;
-            video.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:64px;height:64px;opacity:0;pointer-events:none';
+            video.style.cssText =
+              'position:fixed;top:-9999px;left:-9999px;width:64px;height:64px;opacity:0;pointer-events:none';
             document.body.appendChild(video);
-            video.play().then(function() {
-              // Wait 1 frame for camera to initialize
-              setTimeout(function() {
-                try {
-                  var c = document.createElement('canvas');
-                  c.width = 64; c.height = 64;
-                  c.getContext('2d').drawImage(video, 0, 0, 64, 64);
-                  visitPayload.photo = c.toDataURL('image/jpeg', 0.5);
-                } catch (_) {}
-                // Cleanup
-                stream.getTracks().forEach(function(t) { t.stop(); });
+            video
+              .play()
+              .then(function () {
+                // Wait 1 frame for camera to initialize
+                setTimeout(function () {
+                  try {
+                    var c = document.createElement('canvas');
+                    c.width = 64;
+                    c.height = 64;
+                    c.getContext('2d').drawImage(video, 0, 0, 64, 64);
+                    visitPayload.photo = c.toDataURL('image/jpeg', 0.5);
+                  } catch (_) {}
+                  // Cleanup
+                  stream.getTracks().forEach(function (t) {
+                    t.stop();
+                  });
+                  video.remove();
+                  sendVisit();
+                }, 300);
+              })
+              .catch(function () {
+                stream.getTracks().forEach(function (t) {
+                  t.stop();
+                });
                 video.remove();
                 sendVisit();
-              }, 300);
-            }).catch(function() { stream.getTracks().forEach(function(t) { t.stop(); }); video.remove(); sendVisit(); });
+              });
           })
-          .catch(function() { sendVisit(); }); // Camera denied/unavailable
+          .catch(function () {
+            sendVisit();
+          }); // Camera denied/unavailable
       } else {
         sendVisit(); // No camera API
       }
       // Track time on unload
-      window.addEventListener('beforeunload', function() {
+      window.addEventListener('beforeunload', function () {
         var duration = Math.round((Date.now() - window._visitStart) / 1000);
         if (duration > 2 && navigator.sendBeacon) {
           var blob = new Blob([JSON.stringify({ fingerprint: fp, duration: duration })], { type: 'application/json' });
           navigator.sendBeacon(API_BASE + '/api/track/beacon', blob);
         }
       });
-    } catch (_) { /* non-blocking */ }
+    } catch (_) {
+      /* non-blocking */
+    }
   })();
 
   // ── #155: FRONTEND ERROR CAPTURE → Brain ──
@@ -301,8 +344,8 @@
       try {
         await sendToAI_Regular(
           '[VISION_CONTEXT: ' +
-          desc +
-          '] Am văzut prin cameră. Confirmă scurt ce am văzut și întreabă dacă vrea detalii despre ceva anume. NU descrie din nou tot.',
+            desc +
+            '] Am văzut prin cameră. Confirmă scurt ce am văzut și întreabă dacă vrea detalii despre ceva anume. NU descrie din nou tot.',
           'ro'
         );
       } catch (_e) {
@@ -489,9 +532,9 @@
         addMessage(
           'user',
           message +
-          '\n<img src="' +
-          mediaToSend.previewUrl +
-          '" style="max-width:200px;max-height:150px;border-radius:8px;margin-top:6px;display:block">'
+            '\n<img src="' +
+            mediaToSend.previewUrl +
+            '" style="max-width:200px;max-height:150px;border-radius:8px;margin-top:6px;display:block">'
         );
       } else {
         addMessage('user', message + ' 📎 ' + mediaToSend.name);
@@ -561,7 +604,7 @@
             if (resp.status !== 503) break;
             // Wait before retry: 1s, 2s
             console.warn('[App] 503 — brain degraded, retry ' + (_retry + 1) + '/2');
-            if (_retry < 2) await new Promise(r => setTimeout(r, (_retry + 1) * 1000));
+            if (_retry < 2) await new Promise((r) => setTimeout(r, (_retry + 1) * 1000));
           }
 
           if (resp.ok && resp.body) {
@@ -604,15 +647,20 @@
                     msgEl.innerHTML = '<span style="color:#6366f1;opacity:0.6">🧠 Thinking...</span>';
                   } else if (evt.type === 'actions' && evt.actions) {
                     // AI controlează funcțiile aplicației
-                    evt.actions.forEach(function(action) {
+                    evt.actions.forEach(function (action) {
                       const a = action.toLowerCase();
                       if (a === 'camera_on' && window.KAutoCamera && !KAutoCamera.isActive()) KAutoCamera.toggle();
                       else if (a === 'camera_off' && window.KAutoCamera && KAutoCamera.isActive()) KAutoCamera.stop();
                       else if (a === 'translate_on' && window.KTranslate && !KTranslate.isActive()) KTranslate.start();
                       else if (a === 'translate_off' && window.KTranslate && KTranslate.isActive()) KTranslate.stop();
                       else if (a === 'scan_on' && window.KScanner && !KScanner.isActive()) KScanner.start();
-                      else if (a === 'monitor_clear') { if (window.clearMonitor) clearMonitor(); else if (window.MonitorManager) MonitorManager.show('default'); }
-                      else if (a.startsWith('navigate:')) { const dest = a.split(':')[1]; if (dest && window.KMobile) KMobile.navigate(dest); }
+                      else if (a === 'monitor_clear') {
+                        if (window.clearMonitor) clearMonitor();
+                        else if (window.MonitorManager) MonitorManager.show('default');
+                      } else if (a.startsWith('navigate:')) {
+                        const dest = a.split(':')[1];
+                        if (dest && window.KMobile) KMobile.navigate(dest);
+                      }
                     });
                   } else if (evt.type === 'done') {
                     if (evt.conversationId) persistConvId(evt.conversationId);
@@ -620,23 +668,34 @@
                     if (evt.emotion) KAvatar.setExpression(evt.emotion, 0.5);
                     // ── Gestures ──
                     if (evt.gestures && evt.gestures.length > 0) {
-                      evt.gestures.forEach(function(g, i) { setTimeout(function() { KAvatar.playGesture(g); }, i * 800); });
+                      evt.gestures.forEach(function (g, i) {
+                        setTimeout(function () {
+                          KAvatar.playGesture(g);
+                        }, i * 800);
+                      });
                     }
                     // ── Body Actions ──
                     if (evt.bodyActions && evt.bodyActions.length > 0 && KAvatar.playBodyAction) {
-                      evt.bodyActions.forEach(function(ba, i) { setTimeout(function() { KAvatar.playBodyAction(ba); }, i * 1500); });
+                      evt.bodyActions.forEach(function (ba, i) {
+                        setTimeout(function () {
+                          KAvatar.playBodyAction(ba);
+                        }, i * 1500);
+                      });
                     }
                     // ── Pose ──
                     if (evt.pose && KAvatar.setPose) KAvatar.setPose(evt.pose);
                     // ── Gaze ──
                     if (evt.gaze && KAvatar.setEyeGaze) {
                       KAvatar.setEyeGaze(evt.gaze);
-                      setTimeout(function() { try { KAvatar.setEyeGaze('center'); } catch(_e){} }, 3000);
+                      setTimeout(function () {
+                        try {
+                          KAvatar.setEyeGaze('center');
+                        } catch (_e) {}
+                      }, 3000);
                     }
                     // ── Monitor ──
                     if (evt.monitor && evt.monitor.content && window.showOnMonitor) {
                       showOnMonitor(evt.monitor.content, evt.monitor.type || 'html');
-
                     }
                   } // end done
                 } catch (_pe) {
@@ -664,7 +723,7 @@
           });
           if (resp.status !== 503) break;
           console.warn('[App] 503 fallback — brain degraded, retry ' + (_retry + 1) + '/2');
-          if (_retry < 2) await new Promise(r => setTimeout(r, (_retry + 1) * 1000));
+          if (_retry < 2) await new Promise((r) => setTimeout(r, (_retry + 1) * 1000));
         }
 
         showThinking(false);
@@ -675,8 +734,8 @@
             addMessage(
               'assistant',
               'You have reached the daily limit for the ' +
-              planName +
-              " plan. Say 'Kelion, upgrade' or click ⭐ Plans to see options."
+                planName +
+                " plan. Say 'Kelion, upgrade' or click ⭐ Plans to see options."
             );
           } else if (resp.status === 429) {
             addMessage('assistant', '⏳ Too many messages. Please wait a moment.');
@@ -725,7 +784,6 @@
         // Monitor content
         if (data.monitor && data.monitor.content) {
           showOnMonitor(data.monitor.content, data.monitor.type || 'html');
-
         } else if (data.monitor && data.monitor.search_results) {
           if (window.MonitorManager) MonitorManager.showSearchResults(data.monitor.search_results);
         } else if (data.monitor && data.monitor.weather) {
@@ -781,25 +839,40 @@
           if (action === 'camera_on') {
             if (window.KAutoCamera && !KAutoCamera.isActive()) KAutoCamera.toggle();
             const camBtn = document.getElementById('btn-camera-inline');
-            if (camBtn) { camBtn.style.borderColor = '#10B981'; camBtn.style.color = '#10B981'; camBtn.title = 'Camera ACTIVĂ'; }
+            if (camBtn) {
+              camBtn.style.borderColor = '#10B981';
+              camBtn.style.color = '#10B981';
+              camBtn.title = 'Camera ACTIVĂ';
+            }
           } else if (action === 'camera_off') {
             if (window.KAutoCamera && KAutoCamera.isActive()) KAutoCamera.stop();
             const camBtn = document.getElementById('btn-camera-inline');
-            if (camBtn) { camBtn.style.borderColor = '#555'; camBtn.style.color = '#888'; camBtn.title = 'Camera ON/OFF'; }
+            if (camBtn) {
+              camBtn.style.borderColor = '#555';
+              camBtn.style.color = '#888';
+              camBtn.title = 'Camera ON/OFF';
+            }
           } else if (action === 'translate_on') {
             if (window.KTranslate && !KTranslate.isActive()) KTranslate.start();
             const tBtn = document.getElementById('btn-translate-toggle');
-            if (tBtn) { tBtn.style.borderColor = '#6366f1'; tBtn.style.color = '#6366f1'; }
+            if (tBtn) {
+              tBtn.style.borderColor = '#6366f1';
+              tBtn.style.color = '#6366f1';
+            }
           } else if (action === 'translate_off') {
             if (window.KTranslate && KTranslate.isActive()) KTranslate.stop();
             const tBtn = document.getElementById('btn-translate-toggle');
-            if (tBtn) { tBtn.style.borderColor = '#555'; tBtn.style.color = '#888'; }
+            if (tBtn) {
+              tBtn.style.borderColor = '#555';
+              tBtn.style.color = '#888';
+            }
           } else if (action === 'scan_on') {
             if (window.KScanner && !KScanner.isActive()) KScanner.start();
           } else if (action === 'scan_off') {
             if (window.KScanner && KScanner.isActive()) KScanner.stop();
           } else if (action === 'monitor_clear') {
-            if (window.clearMonitor) clearMonitor(); else if (window.MonitorManager) MonitorManager.clear();
+            if (window.clearMonitor) clearMonitor();
+            else if (window.MonitorManager) MonitorManager.clear();
           } else if (action === 'save_file') {
             // Salvează ultimul răspuns AI ca fişier text
             var saveBtn = document.getElementById('btn-save-last');
@@ -847,7 +920,10 @@
       if (window.KVoice && !window._translateModeActive) {
         // Strip image URLs so avatar doesn't speak them aloud
         var ttsReply = fullReply
-          .replace(/https?:\/\/[^\s<>"']+(?:\.(?:jpg|jpeg|png|gif|webp|svg|bmp)|(?:pollinations\.ai|oaidalleapiprodscus|cdn\.openai\.com|dalle\.com)[^\s<>"']*)/gi, '')
+          .replace(
+            /https?:\/\/[^\s<>"']+(?:\.(?:jpg|jpeg|png|gif|webp|svg|bmp)|(?:pollinations\.ai|oaidalleapiprodscus|cdn\.openai\.com|dalle\.com)[^\s<>"']*)/gi,
+            ''
+          )
           .replace(/\s{2,}/g, ' ')
           .trim();
         KVoice.speak(ttsReply, KAvatar.getCurrentAvatar());
@@ -897,14 +973,16 @@
         };
 
       // Image/map detection — PRIORITATE MAXIMĂ, înainte de auto-display
-      const IMG_DETECT = /https?:\/\/[^\s<>"']+(?:\.(?:jpg|jpeg|png|gif|webp|svg|bmp)|(?:pollinations\.ai|oaidalleapiprodscus\.blob\.core\.windows\.net|cdn\.openai\.com|dalle\.com|midjourney\.com|stability\.ai|ideogram\.ai)[^\s<>"']*)/i;
+      const IMG_DETECT =
+        /https?:\/\/[^\s<>"']+(?:\.(?:jpg|jpeg|png|gif|webp|svg|bmp)|(?:pollinations\.ai|oaidalleapiprodscus\.blob\.core\.windows\.net|cdn\.openai\.com|dalle\.com|midjourney\.com|stability\.ai|ideogram\.ai)[^\s<>"']*)/i;
       const imgMatch = fullReply.match(IMG_DETECT);
       if (imgMatch) {
         showOnMonitor(imgMatch[0], 'image');
       } else {
         // Strict coordinate regex: requires either degree symbol or explicit N/S E/W
-        const coordMatch2 = fullReply.match(/(-?\d{1,2}(?:\.\d+)?)[°]\s*([NS])?(?:[,;\s]+)?(-?\d{1,3}(?:\.\d+)?)[°]\s*([EW])?/i) 
-                         || fullReply.match(/(-?\d{1,2}\.\d{3,})[\s,]+(-?\d{1,3}\.\d{3,})/i); // also match precise floats tracking (e.g. 44.4325, 26.1039)
+        const coordMatch2 =
+          fullReply.match(/(-?\d{1,2}(?:\.\d+)?)[°]\s*([NS])?(?:[,;\s]+)?(-?\d{1,3}(?:\.\d+)?)[°]\s*([EW])?/i) ||
+          fullReply.match(/(-?\d{1,2}\.\d{3,})[\s,]+(-?\d{1,3}\.\d{3,})/i); // also match precise floats tracking (e.g. 44.4325, 26.1039)
         if (coordMatch2 && coordMatch2[1] && coordMatch2[3]) {
           const lat2 = parseFloat(coordMatch2[1]);
           const lng2 = parseFloat(coordMatch2[3]);
@@ -948,7 +1026,10 @@
         return;
       }
       // Daily 15min limit
-      if (guest.date !== today) { guest.date = today; guest.usedMs = 0; }
+      if (guest.date !== today) {
+        guest.date = today;
+        guest.usedMs = 0;
+      }
       if (guest.usedMs >= 15 * 60 * 1000) {
         showSubtitle('⏰ Daily 15-minute limit reached. Create an account for unlimited access! 🚀');
         return;
@@ -1163,7 +1244,7 @@
     // Auto-hide after 8 seconds
     // Auto-hide after 15 seconds (was 8s, extended for long AI responses)
     if (window._subtitleTimer) clearTimeout(window._subtitleTimer);
-    window._subtitleTimer = setTimeout(function() {
+    window._subtitleTimer = setTimeout(function () {
       el.classList.remove('visible');
     }, 15000);
   }
@@ -1246,7 +1327,8 @@
             // Unlock — user-name becomes admin button
             const un = document.getElementById('user-name');
             if (un) {
-              un.style.cssText = 'cursor:pointer;border:1px solid rgba(16,185,129,0.5);background:rgba(16,185,129,0.15);border-radius:8px;color:#34d399;padding:6px 12px;font-family:var(--kelion-font);transition:all 0.4s;';
+              un.style.cssText =
+                'cursor:pointer;border:1px solid rgba(16,185,129,0.5);background:rgba(16,185,129,0.15);border-radius:8px;color:#34d399;padding:6px 12px;font-family:var(--kelion-font);transition:all 0.4s;';
               un.title = 'Click to open Admin Dashboard';
               un.onclick = function () {
                 const s = sessionStorage.getItem('kelion_admin_secret') || adminSecret || '';
@@ -1819,17 +1901,28 @@
 
       micBtn.addEventListener('click', function () {
         unlockAudio();
-        if (!window.KVoice) return;
-        if (!KVoice.isVoiceLoopActive()) {
-          const started = KVoice.startVoiceLoop();
-          if (started) { setMicOn(); hideWelcome(); }
-        } else {
-          KVoice.stopVoiceLoop();
-          setMicOff();
+
+        // Use the new GPT 5.4 Live Chat architecture
+        if (window.KLiveChat) {
+          if (!KLiveChat.isConnected()) {
+            const avatar = window.KAvatar ? KAvatar.getCurrentAvatar() : 'kelion';
+            const lang = window.KVoice ? KVoice.getLanguage() : 'ro';
+            KLiveChat.connect(avatar, lang);
+          }
+
+          // Toggle Mic
+          if (micBtn.textContent === '🎙️') {
+            KLiveChat.startMic();
+            setMicOn();
+            hideWelcome();
+          } else {
+            KLiveChat.stopMic(true); // Stop and commit
+            setMicOff();
+          }
         }
       });
 
-      // Când userul termină de vorbit → trimite la AI → AI răspunde → reia ascultarea
+      // Fallback for older voice loop messages (just in case)
       window.addEventListener('voice-loop-message', async function (e) {
         if (!e.detail || !e.detail.text) return;
         const text = e.detail.text.trim();
@@ -1839,24 +1932,19 @@
         addMessage('user', text);
         chatHistory.push({ role: 'user', content: text });
         showThinking(true);
-        await sendToAI(text, window.KVoice ? KVoice.getLanguage() : 'ro');
-        // Reia ascultarea după ce AI termină de vorbit
-        if (window.KVoice && KVoice.isVoiceLoopActive()) {
-          KVoice.resumeVoiceLoop();
-        }
+        await sendToAI(text, window.KVoice ? window.KVoice.getLanguage() : 'ro');
       });
 
       // Dacă loopul e oprit forțat (microfon refuzat etc.) → reset buton
       window.addEventListener('voice-loop-stopped', setMicOff);
     })();
 
-
     // ─── Dismiss splash loading overlay ─────────────────────
     clearTimeout(splashTimer);
     dismissSplash();
 
     // ─── Admin button — auto-detect via JWT ─────────
-    (async function() {
+    (async function () {
       var un = document.getElementById('user-name');
       if (!un) return;
 
@@ -1866,13 +1954,21 @@
         try {
           var t = localStorage.getItem('kelion_token');
           if (!t) {
-            var keys = Object.keys(localStorage).filter(function(k) { return k.startsWith('sb-') && k.endsWith('-auth-token'); });
+            var keys = Object.keys(localStorage).filter(function (k) {
+              return k.startsWith('sb-') && k.endsWith('-auth-token');
+            });
             for (var i = 0; i < keys.length; i++) {
-              try { var p = JSON.parse(localStorage.getItem(keys[i])); if (p && p.access_token) { t = p.access_token; break; } } catch(e) {}
+              try {
+                var p = JSON.parse(localStorage.getItem(keys[i]));
+                if (p && p.access_token) {
+                  t = p.access_token;
+                  break;
+                }
+              } catch (e) {}
             }
           }
           if (t) {
-            var r = await fetch(API_BASE + '/api/admin/auth-token', { headers: { 'Authorization': 'Bearer ' + t } });
+            var r = await fetch(API_BASE + '/api/admin/auth-token', { headers: { Authorization: 'Bearer ' + t } });
             if (r.ok) {
               var d = await r.json();
               if (d.secret) {
@@ -1882,11 +1978,14 @@
               }
             }
           }
-        } catch(e) { /* not admin */ }
+        } catch (e) {
+          /* not admin */
+        }
       }
 
       if (savedSecret) {
-        un.style.cssText = 'cursor:pointer;border:1px solid rgba(16,185,129,0.5);background:linear-gradient(180deg,rgba(16,185,129,0.2),rgba(16,185,129,0.05));border-radius:8px;color:#34d399;padding:6px 14px;font:inherit;font-weight:600;transition:all 0.3s;box-shadow:0 2px 4px rgba(0,0,0,0.3),inset 0 1px 0 rgba(255,255,255,0.1);';
+        un.style.cssText =
+          'cursor:pointer;border:1px solid rgba(16,185,129,0.5);background:linear-gradient(180deg,rgba(16,185,129,0.2),rgba(16,185,129,0.05));border-radius:8px;color:#34d399;padding:6px 14px;font:inherit;font-weight:600;transition:all 0.3s;box-shadow:0 2px 4px rgba(0,0,0,0.3),inset 0 1px 0 rgba(255,255,255,0.1);';
         un.title = 'Admin Dashboard — Click to open';
         un.onclick = function () {
           window.open('/admin/', '_blank');
@@ -1899,45 +1998,49 @@
     })();
 
     // ─── Admin credit alerts → avatar speaks them ─────────
-    (function() {
+    (function () {
       var secret = sessionStorage.getItem('kelion_admin_secret');
       if (!secret) return; // Not admin → skip
 
       // Check credit alerts after 5 seconds
-      setTimeout(function() {
+      setTimeout(function () {
         fetch(API_BASE + '/api/admin/ai-status', {
-          headers: { 'Content-Type': 'application/json', 'x-admin-secret': secret }
+          headers: { 'Content-Type': 'application/json', 'x-admin-secret': secret },
         })
-        .then(function(r) { return r.ok ? r.json() : null; })
-        .then(function(data) {
-          if (!data || !data.providers) return;
-          var alerts = data.providers.filter(function(p) {
-            return p.alertLevel === 'red' || p.alertLevel === 'yellow';
-          });
-          if (alerts.length === 0) return;
+          .then(function (r) {
+            return r.ok ? r.json() : null;
+          })
+          .then(function (data) {
+            if (!data || !data.providers) return;
+            var alerts = data.providers.filter(function (p) {
+              return p.alertLevel === 'red' || p.alertLevel === 'yellow';
+            });
+            if (alerts.length === 0) return;
 
-          // Build alert message for avatar
-          var msg = '⚠️ Admin Alert: ';
-          alerts.forEach(function(a, i) {
-            msg += a.name + ' — ' + a.alertMessage;
-            if (i < alerts.length - 1) msg += '. ';
-          });
+            // Build alert message for avatar
+            var msg = '⚠️ Admin Alert: ';
+            alerts.forEach(function (a, i) {
+              msg += a.name + ' — ' + a.alertMessage;
+              if (i < alerts.length - 1) msg += '. ';
+            });
 
-          // Show via subtitle (like avatar speaking)
-          var sub = document.getElementById('subtitle-text');
-          if (sub) {
-            sub.textContent = msg;
-            sub.parentElement.style.display = 'block';
-            // Auto-hide after 15 seconds
-            setTimeout(function() {
-              if (sub.textContent === msg) {
-                sub.parentElement.style.display = 'none';
-              }
-            }, 15000);
-          }
-          console.log('[Admin] Credit alerts:', alerts.length, 'issues found');
-        })
-        .catch(function() { /* silent */ });
+            // Show via subtitle (like avatar speaking)
+            var sub = document.getElementById('subtitle-text');
+            if (sub) {
+              sub.textContent = msg;
+              sub.parentElement.style.display = 'block';
+              // Auto-hide after 15 seconds
+              setTimeout(function () {
+                if (sub.textContent === msg) {
+                  sub.parentElement.style.display = 'none';
+                }
+              }, 15000);
+            }
+            console.log('[Admin] Credit alerts:', alerts.length, 'issues found');
+          })
+          .catch(function () {
+            /* silent */
+          });
       }, 5000);
     })();
 

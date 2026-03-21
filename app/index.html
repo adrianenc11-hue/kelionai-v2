@@ -1,1214 +1,1393 @@
 <!doctype html>
 <html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="apple-touch-icon" href="/models/kelion-reference.png" />
+    <meta name="sentry-dsn" content="" />
 
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <link rel="apple-touch-icon" href="/models/kelion-reference.png" />
-  <meta name="sentry-dsn" content="" />
-
-  <meta name="description"
-    content="KelionAI — Your intelligent AI assistant with real-time voice, 3D avatar, and powerful brain." />
-  <meta property="og:title" content="KelionAI" />
-  <meta property="og:description"
-    content="Your intelligent AI assistant with real-time voice, 3D avatar, and powerful brain." />
-  <meta property="og:image" content="https://kelionai.app/models/kelion-reference.png" />
-  <meta property="og:url" content="https://kelionai.app" />
-  <meta property="og:type" content="website" />
-  <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="KelionAI" />
-  <meta name="twitter:description"
-    content="Your intelligent AI assistant with real-time voice, 3D avatar, and powerful brain." />
-  <meta name="twitter:image" content="https://kelionai.app/models/kelion-reference.png" />
-  <link rel="manifest" href="/manifest.json" />
-  <title>KelionAI</title>
-  <script>
-    // ─── Onboarding redirect (first visit) ───────────────────
-    try {
-      if (!localStorage.getItem('kelion_onboarded')) {
-        window.location.replace('/onboarding.html');
-        throw new Error('redirect');
-      }
-    } catch (e) {
-      if (e.message === 'redirect') throw e;
-    }
-  </script>
-  <script>
-    // ─── Theme: apply before paint (anti-flash) ──────────────
-    try {
-      var savedTheme = localStorage.getItem('kelion_theme') || 'dark';
-      document.documentElement.setAttribute('data-theme', savedTheme);
-      if (savedTheme === 'light') document.querySelector('meta[name="theme-color"]').content = '#F8F9FC';
-    } catch (e) { }
-  </script>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link rel="stylesheet"
-    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" />
-  <link rel="stylesheet" href="/styles/design-system.css" />
-  <link rel="stylesheet" href="/styles/components.css" />
-  <link rel="stylesheet" href="/styles/animations.css" />
-  <link rel="stylesheet" href="/css/app.css" />
-  <link rel="stylesheet" href="/styles/mobile.css" />
-  <style>
-    /* ─── Splash Screen Premium ─── */
-    .splash {
-      position: fixed;
-      inset: 0;
-      background: #050510;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      z-index: 9999;
-      transition:
-        opacity 0.6s ease,
-        visibility 0.6s;
-    }
-
-    .splash.hidden {
-      opacity: 0;
-      visibility: hidden;
-      pointer-events: none;
-    }
-
-    .splash-logo {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-    }
-
-    .splash .animate-glow {
-      animation: splashGlow 2.5s ease-in-out infinite alternate;
-    }
-
-    @keyframes splashGlow {
-      from {
-        filter: drop-shadow(0 0 12px rgba(99, 102, 241, 0.4));
-      }
-
-      to {
-        filter: drop-shadow(0 0 32px rgba(6, 182, 212, 0.5));
-      }
-    }
-
-    .splash .typing-indicator {
-      margin-top: 28px;
-    }
-
-    .splash .typing-indicator span {
-      width: 8px;
-      height: 8px;
-      background: var(--kelion-primary, #6366f1);
-    }
-
-    /* ─── PWA Install Banner Premium ─── */
-    .pwa-banner {
-      position: fixed;
-      bottom: 24px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: var(--kelion-glass, rgba(10, 10, 30, 0.6));
-      -webkit-backdrop-filter: blur(20px);
-      backdrop-filter: blur(20px);
-      border: 1px solid var(--kelion-glass-border, rgba(99, 102, 241, 0.15));
-      border-radius: var(--kelion-radius-lg, 20px);
-      padding: 16px 20px;
-      display: flex;
-      align-items: center;
-      gap: 16px;
-      box-shadow: var(--kelion-shadow-lg, 0 8px 48px rgba(0, 0, 0, 0.6));
-      z-index: 1500;
-      max-width: 420px;
-      width: calc(100% - 48px);
-      animation: slideUp 0.4s ease;
-    }
-
-    .pwa-banner-content {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      flex: 1;
-    }
-
-    .pwa-banner-content>span {
-      font-size: 1.6rem;
-    }
-
-    .pwa-banner-content strong {
-      color: var(--kelion-text, #f0f0ff);
-      font-size: 0.9rem;
-    }
-
-    .pwa-banner-content p {
-      color: var(--kelion-text-secondary, #8888aa);
-      font-size: 0.78rem;
-      margin: 2px 0 0;
-    }
-
-    .pwa-banner-actions {
-      display: flex;
-      gap: 8px;
-      flex-shrink: 0;
-    }
-
-    .pwa-btn-primary {
-      padding: 8px 16px;
-      font-size: 13px;
-      font-weight: 600;
-      background: var(--kelion-gradient);
-      color: #fff;
-      border: none;
-      border-radius: var(--kelion-radius-sm, 8px);
-      cursor: pointer;
-      font-family: var(--kelion-font);
-      transition: var(--kelion-transition);
-    }
-
-    .pwa-btn-primary:hover {
-      opacity: 0.88;
-      transform: translateY(-1px);
-    }
-
-    .pwa-btn-secondary {
-      padding: 8px 14px;
-      font-size: 13px;
-      background: rgba(255, 255, 255, 0.05);
-      color: var(--kelion-text-secondary, #8888aa);
-      border: 1px solid var(--kelion-border, rgba(99, 102, 241, 0.12));
-      border-radius: var(--kelion-radius-sm, 8px);
-      cursor: pointer;
-      font-family: var(--kelion-font);
-      transition: var(--kelion-transition);
-    }
-
-    .pwa-btn-secondary:hover {
-      background: rgba(255, 255, 255, 0.08);
-      color: var(--kelion-text);
-    }
-
-    /* ─── Landing Page (Auth Screen) ─── */
-    .welcome-text {
-      font-size: 1.6rem;
-      font-weight: 700;
-      color: #f0f0ff;
-      margin-bottom: 4px;
-    }
-
-    .welcome-subtitle {
-      font-size: 0.9rem;
-      color: #8888aa;
-      margin-bottom: 28px;
-    }
-
-    .avatars-row {
-      display: flex;
-      justify-content: center;
-      gap: 40px;
-      margin-bottom: 28px;
-    }
-
-    .avatar-card {
-      text-align: center;
-      padding: 16px 24px;
-    }
-
-    .avatar-card .avatar-emoji {
-      font-size: 4rem;
-      display: block;
-      margin-bottom: 8px;
-    }
-
-    .avatar-card .avatar-label {
-      font-size: 0.9rem;
-      font-weight: 600;
-      color: #f0f0ff;
-    }
-
-    #start-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 10px;
-      padding: 18px 64px;
-      font-size: 1.3rem;
-      font-weight: 700;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      color: #fff;
-      background: linear-gradient(135deg, #6366f1, #06b6d4);
-      border: none;
-      border-radius: 50px;
-      cursor: pointer;
-      transition: all 0.25s;
-      box-shadow: 0 8px 32px rgba(99, 102, 241, 0.35);
-      font-family: Inter, sans-serif;
-    }
-
-    #start-btn:hover {
-      transform: translateY(-3px);
-      box-shadow:
-        0 0 30px rgba(99, 102, 241, 0.3),
-        0 0 30px rgba(6, 182, 212, 0.3);
-    }
-
-    /* ─── #65 Hourglass Premium Animation ─── */
-    @keyframes hourglassFlip {
-      0% {
-        transform: rotate(0deg);
-      }
-
-      25% {
-        transform: rotate(180deg);
-      }
-
-      50% {
-        transform: rotate(180deg);
-      }
-
-      75% {
-        transform: rotate(360deg);
-      }
-
-      100% {
-        transform: rotate(360deg);
-      }
-    }
-
-    #loading-icon {
-      animation: hourglassFlip 2s ease-in-out infinite !important;
-    }
-
-    /* ─── #64 Showcase Features ─── */
-    .showcase-grid {
-      display: none;
-      /* Hidden — AI brain controls visibility */
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-      padding: 12px;
-      max-height: 220px;
-      overflow-y: auto;
-    }
-
-    .showcase-card {
-      background: rgba(99, 102, 241, 0.06);
-      border: 1px solid rgba(99, 102, 241, 0.12);
-      border-radius: 12px;
-      padding: 12px 10px;
-      text-align: center;
-      transition: all 0.25s;
-      cursor: default;
-    }
-
-    .showcase-card:hover {
-      background: rgba(99, 102, 241, 0.12);
-      border-color: rgba(99, 102, 241, 0.25);
-      transform: translateY(-2px);
-    }
-
-    .showcase-card .sc-icon {
-      font-size: 1.4rem;
-      display: block;
-      margin-bottom: 4px;
-    }
-
-    .showcase-card .sc-label {
-      font-size: 0.7rem;
-      color: #a5b4fc;
-      font-weight: 600;
-    }
-
-    .showcase-card .sc-desc {
-      font-size: 0.6rem;
-      color: #555577;
-      margin-top: 2px;
-    }
-
-    /* ─── #53 Brain-map Tab ─── */
-    .brain-map-panel {
-      padding: 16px;
-      display: none;
-      flex-direction: column;
-      gap: 10px;
-      height: 100%;
-      overflow-y: auto;
-    }
-
-    .brain-map-panel.active {
-      display: flex;
-    }
-
-    .brain-node {
-      background: rgba(99, 102, 241, 0.08);
-      border: 1px solid rgba(99, 102, 241, 0.15);
-      border-radius: 10px;
-      padding: 10px 14px;
-      font-size: 0.8rem;
-      color: #c4b5fd;
-      animation: brainFadeIn 0.3s ease;
-    }
-
-    .brain-node .bn-label {
-      font-size: 0.65rem;
-      color: #6366f1;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      margin-bottom: 4px;
-    }
-
-    @keyframes brainFadeIn {
-      from {
-        opacity: 0;
-        transform: translateY(8px);
-      }
-
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-
-    .display-tabs {
-      display: flex;
-      gap: 0;
-      margin-left: 12px;
-    }
-
-    .display-tab {
-      padding: 6px 14px;
-      font-size: 0.75rem;
-      font-weight: 600;
-      color: #555577;
-      background: none;
-      border: none;
-      border-bottom: 2px solid transparent;
-      cursor: pointer;
-      transition: all 0.2s;
-      font-family: var(--kelion-font);
-    }
-
-    .display-tab:hover {
-      color: #a5b4fc;
-    }
-
-    .display-tab.active {
-      color: #a5b4fc;
-      border-bottom-color: #6366f1;
-    }
-  </style>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
-  <script src="https://browser.sentry-cdn.com/8.46.0/bundle.tracing.replay.min.js" crossorigin="anonymous"></script>
-  <script>
-    var _sentryDsn = (document.querySelector('meta[name="sentry-dsn"]') || {}).content;
-    if (window.Sentry && _sentryDsn)
-      Sentry.init({
-        dsn: _sentryDsn,
-        integrations: [Sentry.browserTracingIntegration(), Sentry.replayIntegration()],
-        tracesSampleRate: 1.0,
-        replaysOnErrorSampleRate: 1.0,
-      });
-  </script>
-
-  <script src="https://cdn.lr-in-prod.com/LogRocket.min.js"></script>
-  <script>
-    LogRocket.init('bdaej1/kelionai');
-  </script>
-</head>
-
-<body>
-  <!-- SPLASH SCREEN -->
-  <div id="splash-screen" class="splash">
-    <div class="splash-logo animate-glow">
-      <span class="splash-brand">Kelion</span>
-      <span class="gradient-text splash-brand-ai">AI</span>
-    </div>
-    <div class="typing-indicator splash-typing"><span></span><span></span><span></span></div>
-    <p class="splash-tagline">YOUR INTELLIGENT ASSISTANT</p>
-  </div>
-
-  <!-- AUTH SCREEN — Premium Landing -->
-  <div id="auth-screen">
-    <div id="auth-container" class="auth-container-landing">
-      <div id="auth-logo">
-        <div class="auth-avatar-icon animate-float auth-avatar-large">🤖</div>
-        <h1 class="auth-title-large">Kelion<span class="gradient-text">AI</span></h1>
-        <p class="auth-subtitle auth-subtitle-muted">Your intelligent AI assistant</p>
-      </div>
-      <div class="auth-features-row">
-        <div class="auth-feature-item">
-          <span class="auth-feature-icon">💬</span>
-          <span class="auth-feature-label">Smart Chat</span>
-        </div>
-        <div class="auth-feature-item">
-          <span class="auth-feature-icon">🎙️</span>
-          <span class="auth-feature-label">Voice</span>
-        </div>
-        <div class="auth-feature-item">
-          <span class="auth-feature-icon">🔍</span>
-          <span class="auth-feature-label">Search</span>
-        </div>
-        <div class="auth-feature-item">
-          <span class="auth-feature-icon">🖼️</span>
-          <span class="auth-feature-label">Images</span>
-        </div>
-      </div>
-      <p class="auth-tagline">Multilingual • 3D Avatars • Voice Chat • Web Search • AI-Powered</p>
-      <button id="start-btn">
-        <span id="loading-icon" class="loading-spinner">⏳</span>
-        Loading...
-      </button>
-      <style>
-        @keyframes spin {
-          0% {
-            transform: rotate(0deg);
-          }
-
-          50% {
-            transform: rotate(180deg);
-          }
-
-          100% {
-            transform: rotate(360deg);
-          }
+    <meta
+      name="description"
+      content="KelionAI — Your intelligent AI assistant with real-time voice, 3D avatar, and powerful brain."
+    />
+    <meta property="og:title" content="KelionAI" />
+    <meta
+      property="og:description"
+      content="Your intelligent AI assistant with real-time voice, 3D avatar, and powerful brain."
+    />
+    <meta property="og:image" content="https://kelionai.app/models/kelion-reference.png" />
+    <meta property="og:url" content="https://kelionai.app" />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="KelionAI" />
+    <meta
+      name="twitter:description"
+      content="Your intelligent AI assistant with real-time voice, 3D avatar, and powerful brain."
+    />
+    <meta name="twitter:image" content="https://kelionai.app/models/kelion-reference.png" />
+    <link rel="manifest" href="/manifest.json" />
+    <title>KelionAI</title>
+    <script>
+      // ─── Onboarding redirect (first visit) ───────────────────
+      try {
+        if (!localStorage.getItem('kelion_onboarded')) {
+          window.location.replace('/onboarding.html');
+          throw new Error('redirect');
         }
-      </style>
-      <div class="auth-links-col">
-        <span id="auth-guest" class="auth-guest-link">Continue without account</span>
-        <span id="auth-admin-link" class="auth-guest-link"
-          style="font-size:0.75rem;opacity:0.45;margin-top:4px;cursor:pointer;" onclick="
-            document.getElementById('auth-form').style.display='';
-            document.getElementById('start-btn').style.display='none';
-            document.getElementById('auth-guest').style.display='none';
-            document.getElementById('auth-back').style.display='';
-            document.getElementById('auth-admin-link').style.display='none';
-          ">🔒 Admin login</span>
+      } catch (e) {
+        if (e.message === 'redirect') throw e;
+      }
+    </script>
+    <script>
+      // ─── Theme: apply before paint (anti-flash) ──────────────
+      try {
+        var savedTheme = localStorage.getItem('kelion_theme') || 'dark';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+        if (savedTheme === 'light') document.querySelector('meta[name="theme-color"]').content = '#F8F9FC';
+      } catch (e) {}
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap"
+    />
+    <link rel="stylesheet" href="/styles/design-system.css" />
+    <link rel="stylesheet" href="/styles/components.css" />
+    <link rel="stylesheet" href="/styles/animations.css" />
+    <link rel="stylesheet" href="/css/app.css" />
+    <link rel="stylesheet" href="/styles/mobile.css" />
+    <style>
+      /* ─── Splash Screen Premium ─── */
+      .splash {
+        position: fixed;
+        inset: 0;
+        background: #050510;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        transition:
+          opacity 0.6s ease,
+          visibility 0.6s;
+      }
+
+      .splash.hidden {
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+      }
+
+      .splash-logo {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+
+      .splash .animate-glow {
+        animation: splashGlow 2.5s ease-in-out infinite alternate;
+      }
+
+      @keyframes splashGlow {
+        from {
+          filter: drop-shadow(0 0 12px rgba(99, 102, 241, 0.4));
+        }
+
+        to {
+          filter: drop-shadow(0 0 32px rgba(6, 182, 212, 0.5));
+        }
+      }
+
+      .splash .typing-indicator {
+        margin-top: 28px;
+      }
+
+      .splash .typing-indicator span {
+        width: 8px;
+        height: 8px;
+        background: var(--kelion-primary, #6366f1);
+      }
+
+      /* ─── PWA Install Banner Premium ─── */
+      .pwa-banner {
+        position: fixed;
+        bottom: 24px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: var(--kelion-glass, rgba(10, 10, 30, 0.6));
+        -webkit-backdrop-filter: blur(20px);
+        backdrop-filter: blur(20px);
+        border: 1px solid var(--kelion-glass-border, rgba(99, 102, 241, 0.15));
+        border-radius: var(--kelion-radius-lg, 20px);
+        padding: 16px 20px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        box-shadow: var(--kelion-shadow-lg, 0 8px 48px rgba(0, 0, 0, 0.6));
+        z-index: 1500;
+        max-width: 420px;
+        width: calc(100% - 48px);
+        animation: slideUp 0.4s ease;
+      }
+
+      .pwa-banner-content {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex: 1;
+      }
+
+      .pwa-banner-content > span {
+        font-size: 1.6rem;
+      }
+
+      .pwa-banner-content strong {
+        color: var(--kelion-text, #f0f0ff);
+        font-size: 0.9rem;
+      }
+
+      .pwa-banner-content p {
+        color: var(--kelion-text-secondary, #8888aa);
+        font-size: 0.78rem;
+        margin: 2px 0 0;
+      }
+
+      .pwa-banner-actions {
+        display: flex;
+        gap: 8px;
+        flex-shrink: 0;
+      }
+
+      .pwa-btn-primary {
+        padding: 8px 16px;
+        font-size: 13px;
+        font-weight: 600;
+        background: var(--kelion-gradient);
+        color: #fff;
+        border: none;
+        border-radius: var(--kelion-radius-sm, 8px);
+        cursor: pointer;
+        font-family: var(--kelion-font);
+        transition: var(--kelion-transition);
+      }
+
+      .pwa-btn-primary:hover {
+        opacity: 0.88;
+        transform: translateY(-1px);
+      }
+
+      .pwa-btn-secondary {
+        padding: 8px 14px;
+        font-size: 13px;
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--kelion-text-secondary, #8888aa);
+        border: 1px solid var(--kelion-border, rgba(99, 102, 241, 0.12));
+        border-radius: var(--kelion-radius-sm, 8px);
+        cursor: pointer;
+        font-family: var(--kelion-font);
+        transition: var(--kelion-transition);
+      }
+
+      .pwa-btn-secondary:hover {
+        background: rgba(255, 255, 255, 0.08);
+        color: var(--kelion-text);
+      }
+
+      /* ─── Landing Page (Auth Screen) ─── */
+      .welcome-text {
+        font-size: 1.6rem;
+        font-weight: 700;
+        color: #f0f0ff;
+        margin-bottom: 4px;
+      }
+
+      .welcome-subtitle {
+        font-size: 0.9rem;
+        color: #8888aa;
+        margin-bottom: 28px;
+      }
+
+      .avatars-row {
+        display: flex;
+        justify-content: center;
+        gap: 40px;
+        margin-bottom: 28px;
+      }
+
+      .avatar-card {
+        text-align: center;
+        padding: 16px 24px;
+      }
+
+      .avatar-card .avatar-emoji {
+        font-size: 4rem;
+        display: block;
+        margin-bottom: 8px;
+      }
+
+      .avatar-card .avatar-label {
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: #f0f0ff;
+      }
+
+      #start-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 18px 64px;
+        font-size: 1.3rem;
+        font-weight: 700;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        color: #fff;
+        background: linear-gradient(135deg, #6366f1, #06b6d4);
+        border: none;
+        border-radius: 50px;
+        cursor: pointer;
+        transition: all 0.25s;
+        box-shadow: 0 8px 32px rgba(99, 102, 241, 0.35);
+        font-family: Inter, sans-serif;
+      }
+
+      #start-btn:hover {
+        transform: translateY(-3px);
+        box-shadow:
+          0 0 30px rgba(99, 102, 241, 0.3),
+          0 0 30px rgba(6, 182, 212, 0.3);
+      }
+
+      /* ─── #65 Hourglass Premium Animation ─── */
+      @keyframes hourglassFlip {
+        0% {
+          transform: rotate(0deg);
+        }
+
+        25% {
+          transform: rotate(180deg);
+        }
+
+        50% {
+          transform: rotate(180deg);
+        }
+
+        75% {
+          transform: rotate(360deg);
+        }
+
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+
+      #loading-icon {
+        animation: hourglassFlip 2s ease-in-out infinite !important;
+      }
+
+      /* ─── #64 Showcase Features ─── */
+      .showcase-grid {
+        display: none;
+        /* Hidden — AI brain controls visibility */
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        padding: 12px;
+        max-height: 220px;
+        overflow-y: auto;
+      }
+
+      .showcase-card {
+        background: rgba(99, 102, 241, 0.06);
+        border: 1px solid rgba(99, 102, 241, 0.12);
+        border-radius: 12px;
+        padding: 12px 10px;
+        text-align: center;
+        transition: all 0.25s;
+        cursor: default;
+      }
+
+      .showcase-card:hover {
+        background: rgba(99, 102, 241, 0.12);
+        border-color: rgba(99, 102, 241, 0.25);
+        transform: translateY(-2px);
+      }
+
+      .showcase-card .sc-icon {
+        font-size: 1.4rem;
+        display: block;
+        margin-bottom: 4px;
+      }
+
+      .showcase-card .sc-label {
+        font-size: 0.7rem;
+        color: #a5b4fc;
+        font-weight: 600;
+      }
+
+      .showcase-card .sc-desc {
+        font-size: 0.6rem;
+        color: #555577;
+        margin-top: 2px;
+      }
+
+      /* ─── #53 Brain-map Tab ─── */
+      .brain-map-panel {
+        padding: 16px;
+        display: none;
+        flex-direction: column;
+        gap: 10px;
+        height: 100%;
+        overflow-y: auto;
+      }
+
+      .brain-map-panel.active {
+        display: flex;
+      }
+
+      .brain-node {
+        background: rgba(99, 102, 241, 0.08);
+        border: 1px solid rgba(99, 102, 241, 0.15);
+        border-radius: 10px;
+        padding: 10px 14px;
+        font-size: 0.8rem;
+        color: #c4b5fd;
+        animation: brainFadeIn 0.3s ease;
+      }
+
+      .brain-node .bn-label {
+        font-size: 0.65rem;
+        color: #6366f1;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 4px;
+      }
+
+      @keyframes brainFadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(8px);
+        }
+
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .display-tabs {
+        display: flex;
+        gap: 0;
+        margin-left: 12px;
+      }
+
+      .display-tab {
+        padding: 6px 14px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #555577;
+        background: none;
+        border: none;
+        border-bottom: 2px solid transparent;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-family: var(--kelion-font);
+      }
+
+      .display-tab:hover {
+        color: #a5b4fc;
+      }
+
+      .display-tab.active {
+        color: #a5b4fc;
+        border-bottom-color: #6366f1;
+      }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
+    <script src="https://browser.sentry-cdn.com/8.46.0/bundle.tracing.replay.min.js" crossorigin="anonymous"></script>
+    <script>
+      var _sentryDsn = (document.querySelector('meta[name="sentry-dsn"]') || {}).content;
+      if (window.Sentry && _sentryDsn)
+        Sentry.init({
+          dsn: _sentryDsn,
+          integrations: [Sentry.browserTracingIntegration(), Sentry.replayIntegration()],
+          tracesSampleRate: 1.0,
+          replaysOnErrorSampleRate: 1.0,
+        });
+    </script>
+
+    <script src="https://cdn.lr-in-prod.com/LogRocket.min.js"></script>
+    <script>
+      LogRocket.init('bdaej1/kelionai');
+    </script>
+  </head>
+
+  <body>
+    <!-- SPLASH SCREEN -->
+    <div id="splash-screen" class="splash">
+      <div class="splash-logo animate-glow">
+        <span class="splash-brand">Kelion</span>
+        <span class="gradient-text splash-brand-ai">AI</span>
       </div>
-      <!-- Login form (hidden by default, toggled by btn-auth) -->
-      <button id="auth-back" class="auth-back-btn" onclick="
+      <div class="typing-indicator splash-typing"><span></span><span></span><span></span></div>
+      <p class="splash-tagline">YOUR INTELLIGENT ASSISTANT</p>
+    </div>
+
+    <!-- AUTH SCREEN — Premium Landing -->
+    <div id="auth-screen">
+      <div id="auth-container" class="auth-container-landing">
+        <div id="auth-logo">
+          <div class="auth-avatar-icon animate-float auth-avatar-large">🤖</div>
+          <h1 class="auth-title-large">Kelion<span class="gradient-text">AI</span></h1>
+          <p class="auth-subtitle auth-subtitle-muted">Your intelligent AI assistant</p>
+        </div>
+        <div class="auth-features-row">
+          <div class="auth-feature-item">
+            <span class="auth-feature-icon">💬</span>
+            <span class="auth-feature-label">Smart Chat</span>
+          </div>
+          <div class="auth-feature-item">
+            <span class="auth-feature-icon">🎙️</span>
+            <span class="auth-feature-label">Voice</span>
+          </div>
+          <div class="auth-feature-item">
+            <span class="auth-feature-icon">🔍</span>
+            <span class="auth-feature-label">Search</span>
+          </div>
+          <div class="auth-feature-item">
+            <span class="auth-feature-icon">🖼️</span>
+            <span class="auth-feature-label">Images</span>
+          </div>
+        </div>
+        <p class="auth-tagline">Multilingual • 3D Avatars • Voice Chat • Web Search • AI-Powered</p>
+        <button id="start-btn">
+          <span id="loading-icon" class="loading-spinner">⏳</span>
+          Loading...
+        </button>
+        <style>
+          @keyframes spin {
+            0% {
+              transform: rotate(0deg);
+            }
+
+            50% {
+              transform: rotate(180deg);
+            }
+
+            100% {
+              transform: rotate(360deg);
+            }
+          }
+        </style>
+        <div class="auth-links-col">
+          <span id="auth-guest" class="auth-guest-link">Continue without account</span>
+          <span
+            id="auth-admin-link"
+            class="auth-guest-link"
+            style="font-size: 0.75rem; opacity: 0.45; margin-top: 4px; cursor: pointer"
+            onclick="
+              document.getElementById('auth-form').style.display = '';
+              document.getElementById('start-btn').style.display = 'none';
+              document.getElementById('auth-guest').style.display = 'none';
+              document.getElementById('auth-back').style.display = '';
+              document.getElementById('auth-admin-link').style.display = 'none';
+            "
+            >🔒 Admin login</span
+          >
+        </div>
+        <!-- Login form (hidden by default, toggled by btn-auth) -->
+        <button
+          id="auth-back"
+          class="auth-back-btn"
+          onclick="
             document.getElementById('auth-form').style.display = 'none';
             document.getElementById('auth-back').style.display = 'none';
             document.getElementById('start-btn').style.display = '';
             document.getElementById('auth-guest').style.display = '';
-          ">
-        ← Back
-      </button>
-      <form id="auth-form" class="hidden-mt24-left">
-        <div id="auth-name-group" class="hidden-mb12">
-          <input type="text" id="auth-name" placeholder="Name" />
-        </div>
-        <input type="email" id="auth-email" placeholder="Email" required />
-        <input type="password" id="auth-password" placeholder="Password" required autocomplete="current-password" />
-        <div id="auth-gdpr-group" class="hidden-mb12" style="display:none;margin:10px 0;">
-          <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;font-size:0.78rem;color:#8888aa;">
-            <input type="checkbox" id="auth-gdpr-check" style="margin-top:3px;accent-color:#6366f1;" />
-            <span>I have read and accept the <a href="/gdpr.html" target="_blank" style="color:#6366f1;">Privacy Policy & GDPR</a> terms.</span>
-          </label>
-        </div>
-        <button type="submit" id="auth-submit">Sign In</button>
-        <div id="auth-forgot" class="mt-8-center">
-          <a href="#" id="auth-forgot-link" class="form-toggle-link">Forgot password?</a>
-        </div>
-        <p id="auth-error" class="form-error"></p>
-        <div class="text-center-mt-12">
-          <a href="#" id="auth-toggle" class="form-subtext">No account → Create</a>
-        </div>
-        <h3 id="auth-title" class="hidden-panel">Sign In</h3>
-      </form>
-    </div>
-  </div>
-
-  <!-- MAIN APP -->
-  <div id="app-layout" class="hidden">
-    <!-- NAVBAR -->
-    <nav class="navbar" id="app-navbar">
-      <a href="/" class="navbar-logo"><span id="navbar-avatar-name">Kelion</span><span>AI</span></a>
-      <div id="status-indicator" class="status-indicator">
-        <div id="status-dot" class="status-dot"></div>
-        <span id="status-text">Online</span>
-      </div>
-      <button id="user-name" class="user-badge ml-12" title="Admin" style="cursor:pointer;border:1px solid rgba(99,102,241,0.5);background:linear-gradient(180deg,rgba(99,102,241,0.2),rgba(99,102,241,0.05));border-radius:8px;padding:6px 14px;color:#c7d2fe;font:inherit;font-weight:600;transition:all 0.3s;box-shadow:0 2px 4px rgba(0,0,0,0.3),inset 0 1px 0 rgba(255,255,255,0.1);text-shadow:0 1px 2px rgba(0,0,0,0.3);">Guest</button>
-      <button class="btn-secondary" id="btn-contact" title="Contact Us" style="font-size:0.8rem;padding:5px 10px;margin-left:6px;" onclick="window.openContactForm && openContactForm()">📩 Contact</button>
-      <a href="/gdpr.html" class="btn-secondary" id="btn-gdpr" title="Privacy Policy & GDPR" style="text-decoration:none;font-size:0.8rem;padding:5px 10px;">🔒 GDPR</a>
-      <button class="btn-secondary" id="btn-manual" title="User Manual" style="font-size:0.8rem;padding:5px 10px;cursor:pointer;" onclick="if(window.MonitorManager)MonitorManager.showWebContent('/manual.html');else window.open('/manual.html','_blank');">📖 Manual</button>
-      <div class="navbar-right">
-        <button class="ctrl-btn-sm btn-history-style" id="btn-copy-last" title="Copy last response" aria-label="Copy last response">📋</button>
-        <button class="ctrl-btn-sm btn-history-style" id="btn-translate-toggle" title="Translate Mode: OFF" aria-label="Toggle live translation" onclick="if(window.KTranslate){var a=KTranslate.toggle();this.style.borderColor=a?'#6366F1':'#555';this.style.color=a?'#6366F1':'#888';this.title=a?'Translate Mode: ON':'Translate Mode: OFF'}">T</button>
-        <button class="ctrl-btn-sm btn-history-style" id="btn-scan-toggle" title="Product Scanner" aria-label="Scan product barcode" onclick="if(window.KScanner){var a=KScanner.toggle();this.style.borderColor=a?'#F59E0B':'#555';this.style.color=a?'#F59E0B':'#888';this.title=a?'Scanner ON':'Product Scanner'}">🛒</button>
-        <button class="ctrl-btn-sm btn-history-style" id="btn-plus" title="Import / Export" aria-label="Files">📎</button>
-        <button class="ctrl-btn-sm btn-history-style" id="btn-history" title="Conversation history"
-          aria-label="Conversation history">
-          📜
+          "
+        >
+          ← Back
         </button>
-        <input type="file" id="file-input-hidden" class="hidden-panel" accept="*/*" title="Upload file" />
-        <button class="btn-secondary" id="btn-pricing" title="Plans">⭐ Plans</button>
-        <button class="btn-secondary" id="btn-invite" title="Invite friends">🎁 Invite</button>
-        <button class="btn-primary" id="btn-auth" title="Sign in">🔑 Login</button>
-        <button id="navbar-hamburger" class="ctrl-btn-sm" title="Menu" aria-label="Mobile menu">☰</button>
+        <form id="auth-form" class="hidden-mt24-left">
+          <div id="auth-name-group" class="hidden-mb12">
+            <input type="text" id="auth-name" placeholder="Name" />
+          </div>
+          <input type="email" id="auth-email" placeholder="Email" required />
+          <input type="password" id="auth-password" placeholder="Password" required autocomplete="current-password" />
+          <div id="auth-gdpr-group" class="hidden-mb12" style="display: none; margin: 10px 0">
+            <label
+              style="
+                display: flex;
+                align-items: flex-start;
+                gap: 8px;
+                cursor: pointer;
+                font-size: 0.78rem;
+                color: #8888aa;
+              "
+            >
+              <input type="checkbox" id="auth-gdpr-check" style="margin-top: 3px; accent-color: #6366f1" />
+              <span
+                >I have read and accept the
+                <a href="/gdpr.html" target="_blank" style="color: #6366f1">Privacy Policy & GDPR</a> terms.</span
+              >
+            </label>
+          </div>
+          <button type="submit" id="auth-submit">Sign In</button>
+          <div id="auth-forgot" class="mt-8-center">
+            <a href="#" id="auth-forgot-link" class="form-toggle-link">Forgot password?</a>
+          </div>
+          <p id="auth-error" class="form-error"></p>
+          <div class="text-center-mt-12">
+            <a href="#" id="auth-toggle" class="form-subtext">No account → Create</a>
+          </div>
+          <h3 id="auth-title" class="hidden-panel">Sign In</h3>
+        </form>
       </div>
-      <!-- Mobile nav menu (hidden by default) -->
-      <div id="navbar-mobile-menu" class="hidden">
+    </div>
 
-        <a href="/settings" class="mobile-nav-link">⚙️ Settings</a>
-        <a href="/developer" class="mobile-nav-link">👨‍💻 Developer</a>
-      </div>
-    </nav>
+    <!-- MAIN APP -->
+    <div id="app-layout" class="hidden">
+      <!-- NAVBAR -->
+      <nav class="navbar" id="app-navbar">
+        <a href="/" class="navbar-logo"><span id="navbar-avatar-name">Kelion</span><span>AI</span></a>
+        <div id="status-indicator" class="status-indicator">
+          <div id="status-dot" class="status-dot"></div>
+          <span id="status-text">Online</span>
+        </div>
+        <button
+          id="user-name"
+          class="user-badge ml-12"
+          title="Admin"
+          style="
+            cursor: pointer;
+            border: 1px solid rgba(99, 102, 241, 0.5);
+            background: linear-gradient(180deg, rgba(99, 102, 241, 0.2), rgba(99, 102, 241, 0.05));
+            border-radius: 8px;
+            padding: 6px 14px;
+            color: #c7d2fe;
+            font: inherit;
+            font-weight: 600;
+            transition: all 0.3s;
+            box-shadow:
+              0 2px 4px rgba(0, 0, 0, 0.3),
+              inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+          "
+        >
+          Guest
+        </button>
+        <button
+          class="btn-secondary"
+          id="btn-contact"
+          title="Contact Us"
+          style="font-size: 0.8rem; padding: 5px 10px; margin-left: 6px"
+          onclick="window.openContactForm && openContactForm()"
+        >
+          📩 Contact
+        </button>
+        <a
+          href="/gdpr.html"
+          class="btn-secondary"
+          id="btn-gdpr"
+          title="Privacy Policy & GDPR"
+          style="text-decoration: none; font-size: 0.8rem; padding: 5px 10px"
+          >🔒 GDPR</a
+        >
+        <button
+          class="btn-secondary"
+          id="btn-manual"
+          title="User Manual"
+          style="font-size: 0.8rem; padding: 5px 10px; cursor: pointer"
+          onclick="
+            if (window.MonitorManager) MonitorManager.showWebContent('/manual.html');
+            else window.open('/manual.html', '_blank');
+          "
+        >
+          📖 Manual
+        </button>
+        <div class="navbar-right">
+          <button
+            class="ctrl-btn-sm btn-history-style"
+            id="btn-copy-last"
+            title="Copy last response"
+            aria-label="Copy last response"
+          >
+            📋
+          </button>
+          <button
+            class="ctrl-btn-sm btn-history-style"
+            id="btn-translate-toggle"
+            title="Translate Mode: OFF"
+            aria-label="Toggle live translation"
+            onclick="
+              if (window.KTranslate) {
+                var a = KTranslate.toggle();
+                this.style.borderColor = a ? '#6366F1' : '#555';
+                this.style.color = a ? '#6366F1' : '#888';
+                this.title = a ? 'Translate Mode: ON' : 'Translate Mode: OFF';
+              }
+            "
+          >
+            T
+          </button>
+          <button
+            class="ctrl-btn-sm btn-history-style"
+            id="btn-scan-toggle"
+            title="Product Scanner"
+            aria-label="Scan product barcode"
+            onclick="
+              if (window.KScanner) {
+                var a = KScanner.toggle();
+                this.style.borderColor = a ? '#F59E0B' : '#555';
+                this.style.color = a ? '#F59E0B' : '#888';
+                this.title = a ? 'Scanner ON' : 'Product Scanner';
+              }
+            "
+          >
+            🛒
+          </button>
+          <button class="ctrl-btn-sm btn-history-style" id="btn-plus" title="Import / Export" aria-label="Files">
+            📎
+          </button>
+          <button
+            class="ctrl-btn-sm btn-history-style"
+            id="btn-history"
+            title="Conversation history"
+            aria-label="Conversation history"
+          >
+            📜
+          </button>
+          <input type="file" id="file-input-hidden" class="hidden-panel" accept="*/*" title="Upload file" />
+          <button class="btn-secondary" id="btn-pricing" title="Plans">⭐ Plans</button>
+          <button class="btn-secondary" id="btn-invite" title="Invite friends">🎁 Invite</button>
+          <button class="btn-primary" id="btn-auth" title="Sign in">🔑 Login</button>
+          <button id="navbar-hamburger" class="ctrl-btn-sm" title="Menu" aria-label="Mobile menu">☰</button>
+        </div>
+        <!-- Mobile nav menu (hidden by default) -->
+        <div id="navbar-mobile-menu" class="hidden">
+          <a href="/settings" class="mobile-nav-link">⚙️ Settings</a>
+          <a href="/developer" class="mobile-nav-link">👨‍💻 Developer</a>
+        </div>
+      </nav>
 
-    <!-- MAIN CONTENT -->
-    <div id="main-content">
-      <!-- CONVERSATION HISTORY SIDEBAR -->
-      <div id="history-sidebar" class="hidden">
-        <div id="history-header">
-          <h3 data-i18n="history.title">Conversations</h3>
-          <button id="btn-new-chat" title="New conversation">＋</button>
-          <button id="btn-close-history" title="Close">✕</button>
+      <!-- MAIN CONTENT -->
+      <div id="main-content">
+        <!-- CONVERSATION HISTORY SIDEBAR -->
+        <div id="history-sidebar" class="hidden">
+          <div id="history-header">
+            <h3 data-i18n="history.title">Conversations</h3>
+            <button id="btn-new-chat" title="New conversation">＋</button>
+            <button id="btn-close-history" title="Close">✕</button>
+          </div>
+          <div id="history-list"></div>
         </div>
-        <div id="history-list"></div>
-      </div>
 
-      <div id="left-panel">
-        <div id="avatar-area">
-          <canvas id="avatar-canvas"></canvas>
-          <div id="avatar-label">
-            <span id="avatar-name" class="hidden-panel">Kelion</span>
+        <div id="left-panel">
+          <div id="avatar-area">
+            <canvas id="avatar-canvas"></canvas>
+            <div id="avatar-label">
+              <span id="avatar-name" class="hidden-panel">Kelion</span>
+            </div>
+            <div id="avatar-switcher">
+              <button class="avatar-pill active" data-avatar="kelion">Kelion</button>
+              <button class="avatar-pill" data-avatar="kira">Kira</button>
+            </div>
+            <!-- Live subtitle bar (under avatar) -->
+            <div id="live-subtitle">
+              <span id="subtitle-speaker" class="text-cyan-bold"></span>
+              <span id="subtitle-text"></span>
+            </div>
+            <img
+              src="/assets/aestudio-logo.png"
+              alt="AEstudio"
+              id="aestudio-logo"
+              style="
+                position: absolute;
+                bottom: 8px;
+                right: 8px;
+                width: 80px;
+                height: auto;
+                opacity: 0.7;
+                pointer-events: none;
+                z-index: 5;
+              "
+            />
           </div>
-          <div id="avatar-switcher">
-            <button class="avatar-pill active" data-avatar="kelion">Kelion</button>
-            <button class="avatar-pill" data-avatar="kira">Kira</button>
-          </div>
-          <!-- Live subtitle bar (under avatar) -->
-          <div id="live-subtitle">
-            <span id="subtitle-speaker" class="text-cyan-bold"></span>
-            <span id="subtitle-text"></span>
-          </div>
-          <img src="/assets/aestudio-logo.png" alt="AEstudio" id="aestudio-logo" style="position:absolute;bottom:8px;right:8px;width:80px;height:auto;opacity:0.7;pointer-events:none;z-index:5;">
         </div>
-      </div>
 
-      <!-- #64 SHOWCASE — hidden by default, AI brain shows when relevant -->
-      <div id="showcase-panel" class="showcase-grid">
-        <div class="showcase-card">
-          <span class="sc-icon">🧠</span><span class="sc-label">AI Brain</span><span class="sc-desc">Multi-model
-            intelligence</span>
-        </div>
-        <div class="showcase-card">
-          <span class="sc-icon">🎙️</span><span class="sc-label">Voice</span><span class="sc-desc">Real-time
-            conversation</span>
-        </div>
-        <div class="showcase-card">
-          <span class="sc-icon">👁️</span><span class="sc-label">Vision</span><span class="sc-desc">Image
-            understanding</span>
-        </div>
-        <div class="showcase-card">
-          <span class="sc-icon">🔍</span><span class="sc-label">Search</span><span class="sc-desc">Live web
-            results</span>
-        </div>
-        <div class="showcase-card">
-          <span class="sc-icon">🖼️</span><span class="sc-label">Create</span><span class="sc-desc">AI image
-            generation</span>
-        </div>
-        <div class="showcase-card">
-          <span class="sc-icon">📊</span><span class="sc-label">Trading</span><span class="sc-desc">Market
-            analysis</span>
-        </div>
-        <div class="showcase-card">
-          <span class="sc-icon">🌐</span><span class="sc-label">i18n</span><span class="sc-desc">6 languages</span>
-        </div>
-        <div class="showcase-card">
-          <span class="sc-icon">🔐</span><span class="sc-label">Security</span><span class="sc-desc">GDPR
-            compliant</span>
-        </div>
-      </div>
-      <div id="display-panel">
-        <div id="display-header">
-          <span id="display-title" data-i18n="monitor.title">Monitor</span>
-          <!-- #53 BRAIN-MAP TAB -->
-          <div class="display-tabs">
-            <button class="display-tab active" data-tab="chat" onclick="switchDisplayTab('chat')">💬 Chat</button>
-            <button class="display-tab" data-tab="brain" onclick="switchDisplayTab('brain')">🧠 Brain</button>
+        <!-- #64 SHOWCASE — hidden by default, AI brain shows when relevant -->
+        <div id="showcase-panel" class="showcase-grid">
+          <div class="showcase-card">
+            <span class="sc-icon">🧠</span><span class="sc-label">AI Brain</span
+            ><span class="sc-desc">Multi-model intelligence</span>
+          </div>
+          <div class="showcase-card">
+            <span class="sc-icon">🎙️</span><span class="sc-label">Voice</span
+            ><span class="sc-desc">Real-time conversation</span>
+          </div>
+          <div class="showcase-card">
+            <span class="sc-icon">👁️</span><span class="sc-label">Vision</span
+            ><span class="sc-desc">Image understanding</span>
+          </div>
+          <div class="showcase-card">
+            <span class="sc-icon">🔍</span><span class="sc-label">Search</span
+            ><span class="sc-desc">Live web results</span>
+          </div>
+          <div class="showcase-card">
+            <span class="sc-icon">🖼️</span><span class="sc-label">Create</span
+            ><span class="sc-desc">AI image generation</span>
+          </div>
+          <div class="showcase-card">
+            <span class="sc-icon">📊</span><span class="sc-label">Trading</span
+            ><span class="sc-desc">Market analysis</span>
+          </div>
+          <div class="showcase-card">
+            <span class="sc-icon">🌐</span><span class="sc-label">i18n</span><span class="sc-desc">6 languages</span>
+          </div>
+          <div class="showcase-card">
+            <span class="sc-icon">🔐</span><span class="sc-label">Security</span
+            ><span class="sc-desc">GDPR compliant</span>
           </div>
         </div>
-        <!-- #53 BRAIN-MAP PANEL -->
-        <div id="brain-map" class="brain-map-panel">
-          <div class="brain-node">
-            <div class="bn-label">Status</div>
-            Waiting for conversation...
-          </div>
-        </div>
-        <!-- Chat messages (main zone) -->
-        <div id="chat-messages"></div>
-        <div id="chat-overlay"></div>
-        <div id="display-content">
-          <!-- Monitor panels (used inline in chat) -->
-          <div id="monitor-default" style="padding:8px;color:#8888aa;font-size:0.8rem;">Ready</div>
-          <!-- Pricing modal lives outside #app-layout (see line ~747) -->
-          <div id="monitor-image"></div>
-          <div id="monitor-map"></div>
-          <div id="monitor-text"></div>
-          <div id="monitor-search"></div>
-          <div id="monitor-weather"></div>
-          <div id="monitor-iframe">
-            <iframe id="monitor-iframe-src" src="" allow="autoplay; encrypted-media" allowfullscreen
-              title="Content frame"></iframe>
-          </div>
-          <div id="monitor-audio">
-            <div id="radio-info">
-              <div id="radio-logo">📻</div>
-              <div id="radio-name"></div>
-              <audio id="radio-player" controls autoplay></audio>
+        <div id="display-panel">
+          <div id="display-header">
+            <span id="display-title" data-i18n="monitor.title">Monitor</span>
+            <!-- #53 BRAIN-MAP TAB -->
+            <div class="display-tabs">
+              <button class="display-tab active" data-tab="chat" onclick="switchDisplayTab('chat')">💬 Chat</button>
+              <button class="display-tab" data-tab="brain" onclick="switchDisplayTab('brain')">🧠 Brain</button>
             </div>
           </div>
-          <div id="monitor-video">
-            <iframe id="monitor-video-src" src="" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen
-              title="Video frame"></iframe>
+          <!-- #53 BRAIN-MAP PANEL -->
+          <div id="brain-map" class="brain-map-panel">
+            <div class="brain-node">
+              <div class="bn-label">Status</div>
+              Waiting for conversation...
+            </div>
           </div>
-          <div id="monitor-default"></div>
-        </div>
-        <!-- Thinking indicator -->
-        <div id="thinking">
-          <div class="thinking-dots"><span></span><span></span><span></span></div>
-          <span data-i18n="thinking.text">Thinking...</span>
+          <!-- Chat messages (main zone) -->
+          <div id="chat-messages"></div>
+          <div id="chat-overlay"></div>
+          <div id="display-content">
+            <!-- Monitor panels (used inline in chat) -->
+            <div id="monitor-default" style="padding: 8px; color: #8888aa; font-size: 0.8rem">Ready</div>
+            <!-- Pricing modal lives outside #app-layout (see line ~747) -->
+            <div id="monitor-image"></div>
+            <div id="monitor-map"></div>
+            <div id="monitor-text"></div>
+            <div id="monitor-search"></div>
+            <div id="monitor-weather"></div>
+            <div id="monitor-iframe">
+              <iframe
+                id="monitor-iframe-src"
+                src=""
+                allow="autoplay; encrypted-media"
+                allowfullscreen
+                title="Content frame"
+              ></iframe>
+            </div>
+            <div id="monitor-audio">
+              <div id="radio-info">
+                <div id="radio-logo">📻</div>
+                <div id="radio-name"></div>
+                <audio id="radio-player" controls autoplay></audio>
+              </div>
+            </div>
+            <div id="monitor-video">
+              <iframe
+                id="monitor-video-src"
+                src=""
+                allow="autoplay; encrypted-media; picture-in-picture"
+                allowfullscreen
+                title="Video frame"
+              ></iframe>
+            </div>
+            <div id="monitor-default"></div>
+          </div>
+          <!-- Thinking indicator -->
+          <div id="thinking">
+            <div class="thinking-dots"><span></span><span></span><span></span></div>
+            <span data-i18n="thinking.text">Thinking...</span>
+          </div>
         </div>
       </div>
+      <!-- /#main-content -->
+
+      <!-- Input row — FULL WIDTH at page bottom -->
+      <div id="input-row">
+        <button
+          id="btn-camera-inline"
+          title="Camera ON/OFF"
+          aria-label="Toggle camera"
+          class="ctrl-circle"
+          onclick="
+            (async function (btn) {
+              if (window.KAutoCamera) {
+                var a = await KAutoCamera.toggle();
+                btn.style.borderColor = a ? '#10B981' : '#555';
+                btn.style.color = a ? '#10B981' : '#888';
+                btn.title = a ? 'Camera ACTIVĂ' : 'Camera ON/OFF';
+              } else {
+                btn.title = 'Camera se inițializează...';
+              }
+            })(this)
+          "
+        >
+          📷
+        </button>
+
+        <div id="mic-level" title="Mic level"><span></span><span></span><span></span><span></span><span></span></div>
+        <button
+          id="btn-mic"
+          title="Voice input — hold to speak"
+          aria-label="Toggle microphone"
+          class="ctrl-circle"
+          style="font-size: 1.1rem; transition: all 0.2s"
+        >
+          🎙️
+        </button>
+        <input
+          type="text"
+          id="text-input"
+          data-i18n-placeholder="input.placeholder"
+          placeholder="Type or speak..."
+          autocomplete="off"
+        />
+        <button id="btn-send" title="Send" aria-label="Send message" class="ctrl-action">➤</button>
+      </div>
     </div>
-    <!-- /#main-content -->
-
-    <!-- Input row — FULL WIDTH at page bottom -->
-    <div id="input-row">
-
-      <button id="btn-camera-inline" title="Camera ON/OFF" aria-label="Toggle camera" class="ctrl-circle" onclick="(async function(btn){if(window.KAutoCamera){var a=await KAutoCamera.toggle();btn.style.borderColor=a?'#10B981':'#555';btn.style.color=a?'#10B981':'#888';btn.title=a?'Camera ACTIVĂ':'Camera ON/OFF'}else{btn.title='Camera se inițializează...'}})(this)">📷</button>
-
-
-      <div id="mic-level" title="Mic level"><span></span><span></span><span></span><span></span><span></span></div>
-      <button id="btn-mic" title="Voice input — hold to speak" aria-label="Toggle microphone" class="ctrl-circle"
-        style="font-size:1.1rem;transition:all 0.2s;">🎙️</button>
-      <input type="text" id="text-input" data-i18n-placeholder="input.placeholder" placeholder="Type or speak..."
-        autocomplete="off" />
-      <button id="btn-send" title="Send" aria-label="Send message" class="ctrl-action">➤</button>
-    </div>
-  </div>
-  <!-- /#app-layout -->
-  <script>
-    document.addEventListener('DOMContentLoaded', function () {
-      var copyBtn = document.getElementById('btn-copy-last');
-      var saveBtn = document.getElementById('btn-save-last');
-      function getLastAssistantText() {
-        var msgs = document.querySelectorAll('.msg.assistant');
-        if (!msgs.length) {
-          var overlay = document.getElementById('chat-overlay');
-          return overlay ? overlay.textContent.trim() : '';
+    <!-- /#app-layout -->
+    <script>
+      document.addEventListener('DOMContentLoaded', function () {
+        var copyBtn = document.getElementById('btn-copy-last');
+        var saveBtn = document.getElementById('btn-save-last');
+        function getLastAssistantText() {
+          var msgs = document.querySelectorAll('.msg.assistant');
+          if (!msgs.length) {
+            var overlay = document.getElementById('chat-overlay');
+            return overlay ? overlay.textContent.trim() : '';
+          }
+          return msgs[msgs.length - 1].textContent.trim();
         }
-        return msgs[msgs.length - 1].textContent.trim();
-      }
-      if (copyBtn)
-        copyBtn.addEventListener('click', function () {
-          var text = getLastAssistantText();
-          if (!text) return;
-          navigator.clipboard.writeText(text).then(function () {
-            copyBtn.textContent = '✅';
-            setTimeout(function () {
-              copyBtn.textContent = '📋';
-            }, 1500);
+        if (copyBtn)
+          copyBtn.addEventListener('click', function () {
+            var text = getLastAssistantText();
+            if (!text) return;
+            navigator.clipboard.writeText(text).then(function () {
+              copyBtn.textContent = '✅';
+              setTimeout(function () {
+                copyBtn.textContent = '📋';
+              }, 1500);
+            });
           });
-        });
-      if (saveBtn)
-        saveBtn.addEventListener('click', function () {
-          var text = getLastAssistantText();
-          if (!text) return;
-          var blob = new Blob([text], { type: 'text/plain' });
-          var a = document.createElement('a');
-          a.href = URL.createObjectURL(blob);
-          a.download = 'kelion-response-' + new Date().toISOString().slice(0, 19).replace(/:/g, '-') + '.txt';
-          a.click();
-          URL.revokeObjectURL(a.href);
-        });
-    });
-  </script>
-
-  <!-- GUEST TIMER BAR — removed (server-side limits apply) -->
-
-  <!-- GUEST EXPIRED OVERLAY — removed (server-side limits apply) -->
-
-  <div id="drop-zone" class="hidden">
-    <div class="drop-zone-content">
-      <div class="drop-icon animate-float">📂</div>
-      <p data-i18n="drop.text">Drop file here</p>
-    </div>
-  </div>
-
-  <!-- PRICING MODAL -->
-  <div id="pricing-modal" class="modal-overlay hidden">
-    <div class="modal-content pricing-modal">
-      <button class="modal-close" id="pricing-close">&times;</button>
-      <h2 class="pricing-title" data-i18n="pricing.modal.title">Choose your plan</h2>
-      <div id="current-plan-info" class="current-plan-info"></div>
-      <div class="pricing-grid" id="pricing-grid"></div>
-      <div id="pricing-referral" class="pricing-referral"></div>
-    </div>
-  </div>
-
-  <!-- REFERRAL/INVITE MODAL -->
-  <div id="referral-modal" class="modal-overlay hidden">
-    <div class="modal-content">
-      <button class="modal-close" id="referral-close">&times;</button>
-      <h2 class="referral-title">🎁 Invite Friends</h2>
-      <p class="referral-desc">Generate an invite code and share it with a friend. You both get bonus days!</p>
-
-      <div id="referral-code-section">
-        <label class="referral-label">Your invite code</label>
-        <div class="referral-row">
-          <input type="text" id="referral-code-display" readonly placeholder="Click Generate..." />
-          <button id="btn-copy-code" title="Copy">📋</button>
-        </div>
-        <div id="referral-expiry"></div>
-        <div id="referral-remaining"></div>
-      </div>
-
-      <button id="btn-generate-code">✨ Generate invite code</button>
-
-      <div class="referral-divider">
-        <label class="referral-label">Send invite via email</label>
-        <div class="referral-row">
-          <input type="email" id="referral-email" placeholder="friend@email.com" placeholder="friend@email.com" />
-          <button id="btn-send-invite">📧 Send</button>
-        </div>
-        <p id="referral-status"></p>
-      </div>
-    </div>
-  </div>
-
-  <!-- TICKER BAR -->
-  <div id="ticker-bar" class="ticker-bar hidden">
-    <span id="ticker-text"></span>
-    <button id="ticker-disable" class="ticker-disable hidden" title="Disable ticker">✕</button>
-  </div>
-
-  <script src="/lib/three.bundle.js"></script>
-  <script src="/js/i18n.js"></script>
-  <script src="/js/fft-lipsync.js?v=20260310e"></script>
-  <script src="/js/alignment-lipsync.js?v=20260308"></script>
-  <script src="/js/avatar.js?v=20260310e"></script>
-  <script src="/js/voice.js"></script>
-  <script src="/socket.io/socket.io.js"></script>
-  <script src="/js/voice-realtime-client.js"></script>
-  <script src="/js/realtime-vision.js?v=20260310e"></script>
-  <script src="/js/auth.js"></script>
-  <script src="/js/identity.js"></script>
-  <script src="/js/monitor.js"></script>
-  <script src="/js/tools.js"></script>
-  <script src="/js/shared.js"></script>
-  <script src="/js/payments-ui.js"></script>
-  <script src="/js/ticker.js"></script>
-  <script src="/js/geolocation.js"></script>
-  <script src="/js/voice-stream-client.js"></script>
-  <script src="/js/auto-camera.js"></script>
-
-  <script src="/js/app.js?v=20260313b"></script>
-  <script src="/js/navbar.js"></script>
-  <script src="/js/referral-ui.js"></script>
-  <script src="/js/contact-form.js"></script>
-
-  <!-- #53 Brain-map + #85 Visits refresh JS -->
-  <script>
-    // ─── #53 Brain-map tab switching ───
-    function switchDisplayTab(tab) {
-      document.querySelectorAll('.display-tab').forEach(function (t) {
-        t.classList.toggle('active', t.dataset.tab === tab);
+        if (saveBtn)
+          saveBtn.addEventListener('click', function () {
+            var text = getLastAssistantText();
+            if (!text) return;
+            var blob = new Blob([text], { type: 'text/plain' });
+            var a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'kelion-response-' + new Date().toISOString().slice(0, 19).replace(/:/g, '-') + '.txt';
+            a.click();
+            URL.revokeObjectURL(a.href);
+          });
       });
-      var brainMap = document.getElementById('brain-map');
-      var chatOverlay = document.getElementById('chat-overlay');
-      var displayContent = document.getElementById('display-content');
-      if (tab === 'brain') {
-        brainMap.classList.add('active');
-        if (chatOverlay) chatOverlay.style.display = 'none';
-        if (displayContent) displayContent.style.display = 'none';
-      } else {
-        brainMap.classList.remove('active');
-        if (chatOverlay) chatOverlay.style.display = '';
-        if (displayContent) displayContent.style.display = '';
-      }
-    }
+    </script>
 
-    // Add a node to brain-map (called from app.js on each AI response)
-    function addBrainNode(label, text) {
-      var panel = document.getElementById('brain-map');
-      if (!panel) return;
-      var node = document.createElement('div');
-      node.className = 'brain-node';
-      node.innerHTML = '<div class=\"bn-label\">' + label + '</div>' + text;
-      panel.prepend(node);
-      // Keep max 20 nodes
-      while (panel.children.length > 20) panel.removeChild(panel.lastChild);
-    }
-  </script>
+    <!-- GUEST TIMER BAR — removed (server-side limits apply) -->
 
-  <a href="/" id="home-btn-fixed" class="home-btn-fixed" title="Home">🏠</a>
+    <!-- GUEST EXPIRED OVERLAY — removed (server-side limits apply) -->
 
-  <!-- PWA INSTALL BANNER -->
-  <div id="pwa-install-banner" class="pwa-banner">
-    <div class="pwa-banner-content">
-      <span>📱</span>
-      <div>
-        <strong data-i18n="pwa.title">Install KelionAI</strong>
-        <p data-i18n="pwa.subtitle">Quick access from your screen</p>
+    <div id="drop-zone" class="hidden">
+      <div class="drop-zone-content">
+        <div class="drop-icon animate-float">📂</div>
+        <p data-i18n="drop.text">Drop file here</p>
       </div>
     </div>
-    <div class="pwa-banner-actions">
-      <button id="pwa-install-btn" class="pwa-btn-primary" data-i18n="pwa.install">Install</button>
-      <button id="pwa-dismiss-btn" class="pwa-btn-secondary" data-i18n="pwa.dismiss">Not now</button>
-    </div>
-  </div>
 
-  <script>
-    // ─── PWA Install banner ───────────────────────────────────────
-    var deferredInstallPrompt = null;
-    window.addEventListener('beforeinstallprompt', function (e) {
-      e.preventDefault();
-      deferredInstallPrompt = e;
-      try {
-        var dismissed = localStorage.getItem('pwa_dismissed');
-        if (dismissed && Date.now() - Number(dismissed) < 7 * 24 * 60 * 60 * 1000) return;
-      } catch (e2) { }
-      var banner = document.getElementById('pwa-install-banner');
-      if (banner) banner.style.display = 'flex';
-    });
-    var installBtn = document.getElementById('pwa-install-btn');
-    if (installBtn) {
-      installBtn.addEventListener('click', function () {
-        var banner = document.getElementById('pwa-install-banner');
-        if (banner) banner.style.display = 'none';
-        if (deferredInstallPrompt) {
-          deferredInstallPrompt.prompt();
-          deferredInstallPrompt.userChoice.then(function () {
-            deferredInstallPrompt = null;
-          });
+    <!-- PRICING MODAL -->
+    <div id="pricing-modal" class="modal-overlay hidden">
+      <div class="modal-content pricing-modal">
+        <button class="modal-close" id="pricing-close">&times;</button>
+        <h2 class="pricing-title" data-i18n="pricing.modal.title">Choose your plan</h2>
+        <div id="current-plan-info" class="current-plan-info"></div>
+        <div class="pricing-grid" id="pricing-grid"></div>
+        <div id="pricing-referral" class="pricing-referral"></div>
+      </div>
+    </div>
+
+    <!-- REFERRAL/INVITE MODAL -->
+    <div id="referral-modal" class="modal-overlay hidden">
+      <div class="modal-content">
+        <button class="modal-close" id="referral-close">&times;</button>
+        <h2 class="referral-title">🎁 Invite Friends</h2>
+        <p class="referral-desc">Generate an invite code and share it with a friend. You both get bonus days!</p>
+
+        <div id="referral-code-section">
+          <label class="referral-label">Your invite code</label>
+          <div class="referral-row">
+            <input type="text" id="referral-code-display" readonly placeholder="Click Generate..." />
+            <button id="btn-copy-code" title="Copy">📋</button>
+          </div>
+          <div id="referral-expiry"></div>
+          <div id="referral-remaining"></div>
+        </div>
+
+        <button id="btn-generate-code">✨ Generate invite code</button>
+
+        <div class="referral-divider">
+          <label class="referral-label">Send invite via email</label>
+          <div class="referral-row">
+            <input type="email" id="referral-email" placeholder="friend@email.com" placeholder="friend@email.com" />
+            <button id="btn-send-invite">📧 Send</button>
+          </div>
+          <p id="referral-status"></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- TICKER BAR -->
+    <div id="ticker-bar" class="ticker-bar hidden">
+      <span id="ticker-text"></span>
+      <button id="ticker-disable" class="ticker-disable hidden" title="Disable ticker">✕</button>
+    </div>
+
+    <script src="/lib/three.bundle.js"></script>
+    <script src="/js/i18n.js"></script>
+    <script src="/js/fft-lipsync.js?v=20260310e"></script>
+    <script src="/js/alignment-lipsync.js?v=20260308"></script>
+    <script src="/js/avatar.js?v=20260310e"></script>
+    <script src="/js/voice.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/js/live-chat.js"></script>
+    <script src="/js/realtime-vision.js?v=20260310e"></script>
+    <script src="/js/auth.js"></script>
+    <script src="/js/identity.js"></script>
+    <script src="/js/monitor.js"></script>
+    <script src="/js/tools.js"></script>
+    <script src="/js/shared.js"></script>
+    <script src="/js/payments-ui.js"></script>
+    <script src="/js/ticker.js"></script>
+    <script src="/js/geolocation.js"></script>
+    <script src="/js/auto-camera.js"></script>
+
+    <script src="/js/app.js?v=20260313b"></script>
+    <script src="/js/navbar.js"></script>
+    <script src="/js/referral-ui.js"></script>
+    <script src="/js/contact-form.js"></script>
+
+    <!-- #53 Brain-map + #85 Visits refresh JS -->
+    <script>
+      // ─── #53 Brain-map tab switching ───
+      function switchDisplayTab(tab) {
+        document.querySelectorAll('.display-tab').forEach(function (t) {
+          t.classList.toggle('active', t.dataset.tab === tab);
+        });
+        var brainMap = document.getElementById('brain-map');
+        var chatOverlay = document.getElementById('chat-overlay');
+        var displayContent = document.getElementById('display-content');
+        if (tab === 'brain') {
+          brainMap.classList.add('active');
+          if (chatOverlay) chatOverlay.style.display = 'none';
+          if (displayContent) displayContent.style.display = 'none';
+        } else {
+          brainMap.classList.remove('active');
+          if (chatOverlay) chatOverlay.style.display = '';
+          if (displayContent) displayContent.style.display = '';
         }
-      });
-    }
-    var dismissBtn = document.getElementById('pwa-dismiss-btn');
-    if (dismissBtn) {
-      dismissBtn.addEventListener('click', function () {
-        var banner = document.getElementById('pwa-install-banner');
-        if (banner) banner.style.display = 'none';
+      }
+
+      // Add a node to brain-map (called from app.js on each AI response)
+      function addBrainNode(label, text) {
+        var panel = document.getElementById('brain-map');
+        if (!panel) return;
+        var node = document.createElement('div');
+        node.className = 'brain-node';
+        node.innerHTML = '<div class=\"bn-label\">' + label + '</div>' + text;
+        panel.prepend(node);
+        // Keep max 20 nodes
+        while (panel.children.length > 20) panel.removeChild(panel.lastChild);
+      }
+    </script>
+
+    <a href="/" id="home-btn-fixed" class="home-btn-fixed" title="Home">🏠</a>
+
+    <!-- PWA INSTALL BANNER -->
+    <div id="pwa-install-banner" class="pwa-banner">
+      <div class="pwa-banner-content">
+        <span>📱</span>
+        <div>
+          <strong data-i18n="pwa.title">Install KelionAI</strong>
+          <p data-i18n="pwa.subtitle">Quick access from your screen</p>
+        </div>
+      </div>
+      <div class="pwa-banner-actions">
+        <button id="pwa-install-btn" class="pwa-btn-primary" data-i18n="pwa.install">Install</button>
+        <button id="pwa-dismiss-btn" class="pwa-btn-secondary" data-i18n="pwa.dismiss">Not now</button>
+      </div>
+    </div>
+
+    <script>
+      // ─── PWA Install banner ───────────────────────────────────────
+      var deferredInstallPrompt = null;
+      window.addEventListener('beforeinstallprompt', function (e) {
+        e.preventDefault();
+        deferredInstallPrompt = e;
         try {
-          localStorage.setItem('pwa_dismissed', Date.now());
-        } catch (e) { }
+          var dismissed = localStorage.getItem('pwa_dismissed');
+          if (dismissed && Date.now() - Number(dismissed) < 7 * 24 * 60 * 60 * 1000) return;
+        } catch (e2) {}
+        var banner = document.getElementById('pwa-install-banner');
+        if (banner) banner.style.display = 'flex';
       });
-    }
-  </script>
-  <!-- Theme Toggle (hidden — replaced by camera) -->
-  <button class="theme-toggle" id="theme-toggle" title="Toggle dark/light theme" aria-hidden="true">
-    <span id="theme-icon">☀️</span>
-  </button>
-  <!-- Camera Toggle — now inline in input row (btn-camera-inline) -->
-  <script>
-    (function () {
-      var camBtn = document.getElementById('btn-camera-inline');
-      if (!camBtn) return;
+      var installBtn = document.getElementById('pwa-install-btn');
+      if (installBtn) {
+        installBtn.addEventListener('click', function () {
+          var banner = document.getElementById('pwa-install-banner');
+          if (banner) banner.style.display = 'none';
+          if (deferredInstallPrompt) {
+            deferredInstallPrompt.prompt();
+            deferredInstallPrompt.userChoice.then(function () {
+              deferredInstallPrompt = null;
+            });
+          }
+        });
+      }
+      var dismissBtn = document.getElementById('pwa-dismiss-btn');
+      if (dismissBtn) {
+        dismissBtn.addEventListener('click', function () {
+          var banner = document.getElementById('pwa-install-banner');
+          if (banner) banner.style.display = 'none';
+          try {
+            localStorage.setItem('pwa_dismissed', Date.now());
+          } catch (e) {}
+        });
+      }
+    </script>
+    <!-- Theme Toggle (hidden — replaced by camera) -->
+    <button class="theme-toggle" id="theme-toggle" title="Toggle dark/light theme" aria-hidden="true">
+      <span id="theme-icon">☀️</span>
+    </button>
+    <!-- Camera Toggle — now inline in input row (btn-camera-inline) -->
+    <script>
+      (function () {
+        var camBtn = document.getElementById('btn-camera-inline');
+        if (!camBtn) return;
 
-      function setCamStyle(active) {
-        if (active) {
-          camBtn.style.borderColor = '#10B981';
-          camBtn.style.color = '#10B981';
-          camBtn.style.boxShadow = '0 0 10px rgba(16,185,129,0.4)';
-          camBtn.title = 'Camera ACTIVĂ — Click pentru a opri';
-        } else {
-          camBtn.style.borderColor = '#555';
-          camBtn.style.color = '#888';
-          camBtn.style.boxShadow = '';
-          camBtn.title = 'Camera ON/OFF';
+        function setCamStyle(active) {
+          if (active) {
+            camBtn.style.borderColor = '#10B981';
+            camBtn.style.color = '#10B981';
+            camBtn.style.boxShadow = '0 0 10px rgba(16,185,129,0.4)';
+            camBtn.title = 'Camera ACTIVĂ — Click pentru a opri';
+          } else {
+            camBtn.style.borderColor = '#555';
+            camBtn.style.color = '#888';
+            camBtn.style.boxShadow = '';
+            camBtn.title = 'Camera ON/OFF';
+          }
         }
+
+        camBtn.addEventListener('click', async function () {
+          // Retry dacă KAutoCamera nu e încă inițializat
+          if (!window.KAutoCamera) {
+            camBtn.title = 'Se inițializează camera...';
+            var waited = 0;
+            var interval = setInterval(async function () {
+              waited += 200;
+              if (window.KAutoCamera) {
+                clearInterval(interval);
+                var active = await KAutoCamera.toggle();
+                setCamStyle(active);
+              } else if (waited > 3000) {
+                clearInterval(interval);
+                camBtn.title = 'Camera indisponibilă';
+              }
+            }, 200);
+            return;
+          }
+          var active = await KAutoCamera.toggle();
+          setCamStyle(active);
+        });
+      })();
+    </script>
+    <!-- Voice-First Mode Toggle + CC Subtitle -->
+    <style>
+      .voice-cc-subtitle {
+        position: absolute;
+        bottom: 12px;
+        left: 50%;
+        transform: translateX(-50%);
+        max-width: 90%;
+        background: rgba(0, 0, 0, 0.75);
+        -webkit-backdrop-filter: blur(8px);
+        backdrop-filter: blur(8px);
+        color: #fff;
+        font-size: 0.85rem;
+        padding: 6px 16px;
+        border-radius: 8px;
+        text-align: center;
+        opacity: 0;
+        transition: opacity 0.3s;
+        pointer-events: none;
+        z-index: 50;
       }
 
-      camBtn.addEventListener('click', async function () {
-        // Retry dacă KAutoCamera nu e încă inițializat
-        if (!window.KAutoCamera) {
-          camBtn.title = 'Se inițializează camera...';
-          var waited = 0;
-          var interval = setInterval(async function () {
-            waited += 200;
-            if (window.KAutoCamera) {
-              clearInterval(interval);
+      .voice-cc-subtitle.visible {
+        opacity: 1;
+      }
+    </style>
+    <script>
+      (function () {
+        var vfBtn = document.getElementById('btn-voicefirst');
+        var ccBtn = document.getElementById('btn-cc-toggle');
+        var micBtn = document.getElementById('btn-mic-toggle');
+        var vfActive = false;
+        if (!vfBtn) return;
+
+        vfBtn.addEventListener('click', function () {
+          if (!window.KVoiceFirst) return;
+
+          if (!vfActive) {
+            // Activate Voice-First
+            var avatar = window.KAvatar && KAvatar.getCurrentAvatar ? KAvatar.getCurrentAvatar() : 'kelion';
+            var lang = window.KVoice && KVoice.getLanguage ? KVoice.getLanguage() : 'ro';
+            KVoiceFirst.connect(avatar, lang);
+            vfActive = true;
+            vfBtn.style.borderColor = '#10B981';
+            vfBtn.style.color = '#10B981';
+            vfBtn.style.boxShadow = '0 0 10px rgba(16,185,129,0.4)';
+            vfBtn.title = 'Voice-First ACTIV — Click pentru a opri';
+            // Show CC toggle, hide classic mic
+            if (ccBtn) ccBtn.style.display = '';
+            if (micBtn) micBtn.style.display = 'none';
+          } else {
+            // Deactivate Voice-First
+            KVoiceFirst.disconnect();
+            vfActive = false;
+            vfBtn.style.borderColor = '#555';
+            vfBtn.style.color = '#888';
+            vfBtn.style.boxShadow = '';
+            vfBtn.title = 'Voice-First Mode';
+            // Hide CC toggle, show classic mic
+            if (ccBtn) ccBtn.style.display = 'none';
+            if (micBtn) micBtn.style.display = '';
+          }
+        });
+        // NOTA: handler-ul CC este definit complet în voice-realtime-client.js
+        // Nu se adaugă un al doilea handler aici pentru a evita conflictele
+      })();
+    </script>
+    <script src="js/geo.js"></script>
+    <script src="js/translate-mode.js"></script>
+    <script>
+      // ── Auto-start Voice-First permanent (fara buton) ─────────────
+      (function () {
+        function tryStartVoice(attempts) {
+          if (window.KVoiceFirst && window.KAvatar && window.KVoice) {
+            var avatar = KAvatar.getCurrentAvatar ? KAvatar.getCurrentAvatar() : 'kelion';
+            var lang = KVoice.getLanguage ? KVoice.getLanguage() : 'ro';
+            KVoiceFirst.connect(avatar, lang);
+          } else if (attempts > 0) {
+            setTimeout(function () {
+              tryStartVoice(attempts - 1);
+            }, 500);
+          }
+        }
+        // Porneste dupa 3 secunde ca sa se initializeze toate modulele
+        setTimeout(function () {
+          tryStartVoice(20);
+        }, 3000);
+      })();
+    </script>
+    <script>
+      // ── T Button handler (Translate Mode) ─────────────────
+      (function () {
+        var tBtn = document.getElementById('btn-translate-toggle');
+        if (!tBtn) return;
+        tBtn.addEventListener('click', function () {
+          if (!window.KTranslate) return;
+          var active = KTranslate.toggle();
+          if (active) {
+            tBtn.style.borderColor = '#6366f1';
+            tBtn.style.color = '#6366f1';
+            tBtn.style.boxShadow = '0 0 10px rgba(99,102,241,0.4)';
+            tBtn.title = 'Translate Mode: ON';
+          } else {
+            tBtn.style.borderColor = '#555';
+            tBtn.style.color = '#888';
+            tBtn.style.boxShadow = '';
+            tBtn.title = 'Translate Mode: OFF';
+          }
+        });
+      })();
+    </script>
+    <script src="js/product-scanner.js"></script>
+    <script src="js/mobile-features.js"></script>
+    <script>
+      // ── 🛒 Scanner Button handler ─────────────────────────
+      (function () {
+        var scanBtn = document.getElementById('btn-scan-toggle');
+        if (!scanBtn) return;
+        scanBtn.addEventListener('click', function () {
+          if (!window.KScanner) return;
+          var active = KScanner.toggle();
+          if (active) {
+            scanBtn.style.borderColor = '#10b981';
+            scanBtn.style.color = '#10b981';
+            scanBtn.style.boxShadow = '0 0 10px rgba(16,185,129,0.4)';
+            scanBtn.title = 'Scanner: ON';
+          } else {
+            scanBtn.style.borderColor = '#555';
+            scanBtn.style.color = '#888';
+            scanBtn.style.boxShadow = '';
+            scanBtn.title = 'Product Scanner';
+          }
+        });
+      })();
+
+      // ── Chat command interceptor: start/stop scan produse ──
+      (function () {
+        var origSubmit = null;
+        var input = document.getElementById('text-input') || document.getElementById('msg-input');
+        if (!input) return;
+        input.addEventListener(
+          'keydown',
+          function (e) {
+            if (e.key !== 'Enter') return;
+            var val = (input.value || '').trim().toLowerCase();
+            if (!val) return;
+            // Start scan
+            if (
+              val.match(
+                /^(start|porneste|deschide|activeaza)\s*(scan|scanner|scaneaz[aă])\s*(produse|produs|barcode)?$/i
+              )
+            ) {
+              e.preventDefault();
+              e.stopPropagation();
+              input.value = '';
+              if (window.KScanner) {
+                KScanner.start();
+                var scanBtn = document.getElementById('btn-scan-toggle');
+                if (scanBtn) {
+                  scanBtn.style.borderColor = '#10b981';
+                  scanBtn.style.color = '#10b981';
+                  scanBtn.style.boxShadow = '0 0 10px rgba(16,185,129,0.4)';
+                }
+              }
+              return false;
+            }
+            // Stop scan
+            if (
+              val.match(
+                /^(stop|opreste|inchide|dezactiveaz[aă])\s*(scan|scanner|scaneaz[aă])\s*(produse|produs|barcode)?$/i
+              )
+            ) {
+              e.preventDefault();
+              e.stopPropagation();
+              input.value = '';
+              if (window.KScanner) {
+                KScanner.stop();
+                var scanBtn2 = document.getElementById('btn-scan-toggle');
+                if (scanBtn2) {
+                  scanBtn2.style.borderColor = '#555';
+                  scanBtn2.style.color = '#888';
+                  scanBtn2.style.boxShadow = '';
+                }
+              }
+              return false;
+            }
+          },
+          true
+        );
+      })();
+    </script>
+
+    <!-- ═══ CONSOLIDATED BUTTON BINDING (SAFETY NET) ═══ -->
+    <script>
+      // Re-bind ALL buttons after everything is loaded — fixes timing issues
+      setTimeout(function () {
+        console.log('[ButtonBind] Binding all buttons...');
+
+        // ── Camera Button ──
+        var camBtn = document.getElementById('btn-camera-inline');
+        if (camBtn && window.KAutoCamera) {
+          // Remove old listeners by cloning
+          var newCam = camBtn.cloneNode(true);
+          camBtn.parentNode.replaceChild(newCam, camBtn);
+          newCam.addEventListener('click', async function () {
+            try {
               var active = await KAutoCamera.toggle();
-              setCamStyle(active);
-            } else if (waited > 3000) {
-              clearInterval(interval);
-              camBtn.title = 'Camera indisponibilă';
+              newCam.style.borderColor = active ? '#10B981' : '#555';
+              newCam.style.color = active ? '#10B981' : '#888';
+              newCam.style.boxShadow = active ? '0 0 10px rgba(16,185,129,0.4)' : '';
+              newCam.title = active ? 'Camera ACTIVĂ — Click pentru a opri' : 'Camera ON/OFF';
+            } catch (e) {
+              console.warn('[ButtonBind] Camera error:', e);
             }
-          }, 200);
-          return;
-        }
-        var active = await KAutoCamera.toggle();
-        setCamStyle(active);
-      });
-    })();
-  </script>
-  <!-- Voice-First Mode Toggle + CC Subtitle -->
-  <style>
-    .voice-cc-subtitle {
-      position: absolute;
-      bottom: 12px;
-      left: 50%;
-      transform: translateX(-50%);
-      max-width: 90%;
-      background: rgba(0, 0, 0, 0.75);
-      -webkit-backdrop-filter: blur(8px);
-      backdrop-filter: blur(8px);
-      color: #fff;
-      font-size: 0.85rem;
-      padding: 6px 16px;
-      border-radius: 8px;
-      text-align: center;
-      opacity: 0;
-      transition: opacity 0.3s;
-      pointer-events: none;
-      z-index: 50;
-    }
-
-    .voice-cc-subtitle.visible {
-      opacity: 1;
-    }
-  </style>
-  <script>
-    (function () {
-      var vfBtn = document.getElementById('btn-voicefirst');
-      var ccBtn = document.getElementById('btn-cc-toggle');
-      var micBtn = document.getElementById('btn-mic-toggle');
-      var vfActive = false;
-      if (!vfBtn) return;
-
-      vfBtn.addEventListener('click', function () {
-        if (!window.KVoiceFirst) return;
-
-        if (!vfActive) {
-          // Activate Voice-First
-          var avatar = window.KAvatar && KAvatar.getCurrentAvatar ? KAvatar.getCurrentAvatar() : 'kelion';
-          var lang = window.KVoice && KVoice.getLanguage ? KVoice.getLanguage() : 'ro';
-          KVoiceFirst.connect(avatar, lang);
-          vfActive = true;
-          vfBtn.style.borderColor = '#10B981';
-          vfBtn.style.color = '#10B981';
-          vfBtn.style.boxShadow = '0 0 10px rgba(16,185,129,0.4)';
-          vfBtn.title = 'Voice-First ACTIV — Click pentru a opri';
-          // Show CC toggle, hide classic mic
-          if (ccBtn) ccBtn.style.display = '';
-          if (micBtn) micBtn.style.display = 'none';
-        } else {
-          // Deactivate Voice-First
-          KVoiceFirst.disconnect();
-          vfActive = false;
-          vfBtn.style.borderColor = '#555';
-          vfBtn.style.color = '#888';
-          vfBtn.style.boxShadow = '';
-          vfBtn.title = 'Voice-First Mode';
-          // Hide CC toggle, show classic mic
-          if (ccBtn) ccBtn.style.display = 'none';
-          if (micBtn) micBtn.style.display = '';
-        }
-      });
-      // NOTA: handler-ul CC este definit complet în voice-realtime-client.js
-      // Nu se adaugă un al doilea handler aici pentru a evita conflictele
-    })();
-  </script>
-  <script src="js/geo.js"></script>
-  <script src="js/translate-mode.js"></script>
-  <script>
-    // ── Auto-start Voice-First permanent (fara buton) ─────────────
-    (function () {
-      function tryStartVoice(attempts) {
-        if (window.KVoiceFirst && window.KAvatar && window.KVoice) {
-          var avatar = KAvatar.getCurrentAvatar ? KAvatar.getCurrentAvatar() : 'kelion';
-          var lang = KVoice.getLanguage ? KVoice.getLanguage() : 'ro';
-          KVoiceFirst.connect(avatar, lang);
-        } else if (attempts > 0) {
-          setTimeout(function () { tryStartVoice(attempts - 1); }, 500);
-        }
-      }
-      // Porneste dupa 3 secunde ca sa se initializeze toate modulele
-      setTimeout(function () { tryStartVoice(20); }, 3000);
-    })();
-  </script>
-  <script>
-    // ── T Button handler (Translate Mode) ─────────────────
-    (function () {
-      var tBtn = document.getElementById('btn-translate-toggle');
-      if (!tBtn) return;
-      tBtn.addEventListener('click', function () {
-        if (!window.KTranslate) return;
-        var active = KTranslate.toggle();
-        if (active) {
-          tBtn.style.borderColor = '#6366f1';
-          tBtn.style.color = '#6366f1';
-          tBtn.style.boxShadow = '0 0 10px rgba(99,102,241,0.4)';
-          tBtn.title = 'Translate Mode: ON';
-        } else {
-          tBtn.style.borderColor = '#555';
-          tBtn.style.color = '#888';
-          tBtn.style.boxShadow = '';
-          tBtn.title = 'Translate Mode: OFF';
-        }
-      });
-    })();
-  </script>
-  <script src="js/product-scanner.js"></script>
-  <script src="js/mobile-features.js"></script>
-  <script>
-    // ── 🛒 Scanner Button handler ─────────────────────────
-    (function () {
-      var scanBtn = document.getElementById('btn-scan-toggle');
-      if (!scanBtn) return;
-      scanBtn.addEventListener('click', function () {
-        if (!window.KScanner) return;
-        var active = KScanner.toggle();
-        if (active) {
-          scanBtn.style.borderColor = '#10b981';
-          scanBtn.style.color = '#10b981';
-          scanBtn.style.boxShadow = '0 0 10px rgba(16,185,129,0.4)';
-          scanBtn.title = 'Scanner: ON';
-        } else {
-          scanBtn.style.borderColor = '#555';
-          scanBtn.style.color = '#888';
-          scanBtn.style.boxShadow = '';
-          scanBtn.title = 'Product Scanner';
-        }
-      });
-    })();
-
-    // ── Chat command interceptor: start/stop scan produse ──
-    (function () {
-      var origSubmit = null;
-      var input = document.getElementById('text-input') || document.getElementById('msg-input');
-      if (!input) return;
-      input.addEventListener(
-        'keydown',
-        function (e) {
-          if (e.key !== 'Enter') return;
-          var val = (input.value || '').trim().toLowerCase();
-          if (!val) return;
-          // Start scan
-          if (
-            val.match(
-              /^(start|porneste|deschide|activeaza)\s*(scan|scanner|scaneaz[aă])\s*(produse|produs|barcode)?$/i
-            )
-          ) {
-            e.preventDefault();
-            e.stopPropagation();
-            input.value = '';
-            if (window.KScanner) {
-              KScanner.start();
-              var scanBtn = document.getElementById('btn-scan-toggle');
-              if (scanBtn) {
-                scanBtn.style.borderColor = '#10b981';
-                scanBtn.style.color = '#10b981';
-                scanBtn.style.boxShadow = '0 0 10px rgba(16,185,129,0.4)';
-              }
-            }
-            return false;
-          }
-          // Stop scan
-          if (
-            val.match(
-              /^(stop|opreste|inchide|dezactiveaz[aă])\s*(scan|scanner|scaneaz[aă])\s*(produse|produs|barcode)?$/i
-            )
-          ) {
-            e.preventDefault();
-            e.stopPropagation();
-            input.value = '';
-            if (window.KScanner) {
-              KScanner.stop();
-              var scanBtn2 = document.getElementById('btn-scan-toggle');
-              if (scanBtn2) {
-                scanBtn2.style.borderColor = '#555';
-                scanBtn2.style.color = '#888';
-                scanBtn2.style.boxShadow = '';
-              }
-            }
-            return false;
-          }
-        },
-        true
-      );
-    })();
-  </script>
-
-  <!-- ═══ CONSOLIDATED BUTTON BINDING (SAFETY NET) ═══ -->
-  <script>
-    // Re-bind ALL buttons after everything is loaded — fixes timing issues
-    setTimeout(function () {
-      console.log('[ButtonBind] Binding all buttons...');
-
-      // ── Camera Button ──
-      var camBtn = document.getElementById('btn-camera-inline');
-      if (camBtn && window.KAutoCamera) {
-        // Remove old listeners by cloning
-        var newCam = camBtn.cloneNode(true);
-        camBtn.parentNode.replaceChild(newCam, camBtn);
-        newCam.addEventListener('click', async function () {
-          try {
-            var active = await KAutoCamera.toggle();
-            newCam.style.borderColor = active ? '#10B981' : '#555';
-            newCam.style.color = active ? '#10B981' : '#888';
-            newCam.style.boxShadow = active ? '0 0 10px rgba(16,185,129,0.4)' : '';
-            newCam.title = active ? 'Camera ACTIVĂ — Click pentru a opri' : 'Camera ON/OFF';
-          } catch (e) { console.warn('[ButtonBind] Camera error:', e); }
-        });
-        console.log('[ButtonBind] ✅ Camera bound');
-      }
-
-      // ── Translate Button ──
-      var tBtn = document.getElementById('btn-translate-toggle');
-      if (tBtn && window.KTranslate) {
-        var newT = tBtn.cloneNode(true);
-        tBtn.parentNode.replaceChild(newT, tBtn);
-        newT.addEventListener('click', function () {
-          try {
-            var active = KTranslate.toggle();
-            newT.style.borderColor = active ? '#6366F1' : '#555';
-            newT.style.color = active ? '#6366F1' : '#888';
-            newT.style.boxShadow = active ? '0 0 10px rgba(99,102,241,0.4)' : '';
-            newT.title = active ? 'Translate Mode: ON' : 'Translate Mode: OFF';
-          } catch (e) { console.warn('[ButtonBind] Translate error:', e); }
-        });
-        console.log('[ButtonBind] ✅ Translate bound');
-      }
-
-      // ── Scanner Button ──
-      var scanBtn = document.getElementById('btn-scan-toggle');
-      if (scanBtn && window.KScanner) {
-        var newScan = scanBtn.cloneNode(true);
-        scanBtn.parentNode.replaceChild(newScan, scanBtn);
-        newScan.addEventListener('click', function () {
-          try {
-            var active = KScanner.toggle();
-            newScan.style.borderColor = active ? '#F59E0B' : '#555';
-            newScan.style.color = active ? '#F59E0B' : '#888';
-            newScan.style.boxShadow = active ? '0 0 10px rgba(245,158,11,0.4)' : '';
-            newScan.title = active ? 'Scanner ON' : 'Product Scanner';
-          } catch (e) { console.warn('[ButtonBind] Scanner error:', e); }
-        });
-        console.log('[ButtonBind] ✅ Scanner bound');
-      }
-
-      // ── Admin Button (ONLY for adrianenc11@gmail.com) ──
-      if (window.KAuth && KAuth.isAdmin && KAuth.isAdmin()) {
-        var navRight = document.querySelector('.navbar-right');
-        if (navRight && !document.getElementById('btn-admin-nav')) {
-          var adminBtn = document.createElement('button');
-          adminBtn.id = 'btn-admin-nav';
-          adminBtn.textContent = '⚙️ Admin';
-          adminBtn.style.cssText = 'cursor:pointer;border:1px solid rgba(99,102,241,0.5);background:rgba(99,102,241,0.15);border-radius:8px;padding:6px 12px;color:#c7d2fe;font-size:0.75rem;font-weight:600;transition:all 0.3s;';
-          adminBtn.addEventListener('click', function () {
-            window.location.href = '/admin';
           });
-          navRight.insertBefore(adminBtn, navRight.firstChild);
-          console.log('[ButtonBind] ✅ Admin button created (admin verified)');
+          console.log('[ButtonBind] ✅ Camera bound');
         }
-      }
 
-      console.log('[ButtonBind] All buttons bound ✅');
-    }, 500);
-  </script>
-<script src="/visitor-tracker.js" defer></script>
-</body>
+        // ── Translate Button ──
+        var tBtn = document.getElementById('btn-translate-toggle');
+        if (tBtn && window.KTranslate) {
+          var newT = tBtn.cloneNode(true);
+          tBtn.parentNode.replaceChild(newT, tBtn);
+          newT.addEventListener('click', function () {
+            try {
+              var active = KTranslate.toggle();
+              newT.style.borderColor = active ? '#6366F1' : '#555';
+              newT.style.color = active ? '#6366F1' : '#888';
+              newT.style.boxShadow = active ? '0 0 10px rgba(99,102,241,0.4)' : '';
+              newT.title = active ? 'Translate Mode: ON' : 'Translate Mode: OFF';
+            } catch (e) {
+              console.warn('[ButtonBind] Translate error:', e);
+            }
+          });
+          console.log('[ButtonBind] ✅ Translate bound');
+        }
 
+        // ── Scanner Button ──
+        var scanBtn = document.getElementById('btn-scan-toggle');
+        if (scanBtn && window.KScanner) {
+          var newScan = scanBtn.cloneNode(true);
+          scanBtn.parentNode.replaceChild(newScan, scanBtn);
+          newScan.addEventListener('click', function () {
+            try {
+              var active = KScanner.toggle();
+              newScan.style.borderColor = active ? '#F59E0B' : '#555';
+              newScan.style.color = active ? '#F59E0B' : '#888';
+              newScan.style.boxShadow = active ? '0 0 10px rgba(245,158,11,0.4)' : '';
+              newScan.title = active ? 'Scanner ON' : 'Product Scanner';
+            } catch (e) {
+              console.warn('[ButtonBind] Scanner error:', e);
+            }
+          });
+          console.log('[ButtonBind] ✅ Scanner bound');
+        }
+
+        // ── Admin Button (ONLY for adrianenc11@gmail.com) ──
+        if (window.KAuth && KAuth.isAdmin && KAuth.isAdmin()) {
+          var navRight = document.querySelector('.navbar-right');
+          if (navRight && !document.getElementById('btn-admin-nav')) {
+            var adminBtn = document.createElement('button');
+            adminBtn.id = 'btn-admin-nav';
+            adminBtn.textContent = '⚙️ Admin';
+            adminBtn.style.cssText =
+              'cursor:pointer;border:1px solid rgba(99,102,241,0.5);background:rgba(99,102,241,0.15);border-radius:8px;padding:6px 12px;color:#c7d2fe;font-size:0.75rem;font-weight:600;transition:all 0.3s;';
+            adminBtn.addEventListener('click', function () {
+              window.location.href = '/admin';
+            });
+            navRight.insertBefore(adminBtn, navRight.firstChild);
+            console.log('[ButtonBind] ✅ Admin button created (admin verified)');
+          }
+        }
+
+        console.log('[ButtonBind] All buttons bound ✅');
+      }, 500);
+    </script>
+    <script src="/visitor-tracker.js" defer></script>
+  </body>
 </html>

@@ -411,14 +411,19 @@ router.get('/traffic', async (req, res) => {
       .not('ip', 'in', '(' + INTERNAL_IPS.join(',') + ')')
       .order('created_at', { ascending: false })
       .limit(50);
-      
-    // Fetch photos from visitors table for these IPs 
+
+    // Fetch photos from visitors table for these IPs
     if (recent && recent.length > 0) {
-      const ips = [...new Set(recent.map(r => r.ip))];
+      const ips = [...new Set(recent.map((r) => r.ip))];
       const { data: vData } = await supabaseAdmin.from('visitors').select('ip, photo').in('ip', ips);
       const photoMap = {};
-      if (vData) vData.forEach(v => { if (v.photo) photoMap[v.ip] = v.photo; });
-      recent.forEach(r => { r.photo = photoMap[r.ip] || null; });
+      if (vData)
+        vData.forEach((v) => {
+          if (v.photo) photoMap[v.ip] = v.photo;
+        });
+      recent.forEach((r) => {
+        r.photo = photoMap[r.ip] || null;
+      });
     }
 
     // Today stats — REAL visitors only
@@ -494,10 +499,11 @@ router.get('/traffic', async (req, res) => {
       uniqueDaily[day].add(r.ip);
     });
 
-    const sortObj = (obj, limit) => Object.entries(obj)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, limit)
-      .map(([name, count]) => ({ name, count }));
+    const sortObj = (obj, limit) =>
+      Object.entries(obj)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, limit)
+        .map(([name, count]) => ({ name, count }));
 
     const dailyUnique = Object.entries(uniqueDaily)
       .map(([date, ips]) => ({ date, unique: ips.size }))
@@ -615,7 +621,8 @@ router.delete('/memories/:id', async (req, res) => {
 const _geoCache = {}; // IP → { country, city }
 function parseUA(ua) {
   if (!ua) return { browser: '—', os: '—' };
-  let browser = '—', os = '—';
+  let browser = '—',
+    os = '—';
   if (/Chrome\//.test(ua) && !/Edg/.test(ua)) browser = 'Chrome';
   else if (/Edg\//.test(ua)) browser = 'Edge';
   else if (/Firefox\//.test(ua)) browser = 'Firefox';
@@ -642,7 +649,8 @@ router.get('/live-users', async (req, res) => {
       ip: ip,
       currentPage: data.path,
       page: data.path,
-      browser, os,
+      browser,
+      os,
       country: data.country || _geoCache[ip]?.country || '—',
       city: _geoCache[ip]?.city || '',
       userType: data.userType || 'Guest',
@@ -662,8 +670,8 @@ router.get('/live-users', async (req, res) => {
     if (entry.country === '—' && ip !== 'unknown') {
       geoPromises.push(
         fetch(`http://ip-api.com/json/${ip}?fields=countryCode,city`, { signal: AbortSignal.timeout(2000) })
-          .then(r => r.json())
-          .then(d => {
+          .then((r) => r.json())
+          .then((d) => {
             if (d.countryCode) {
               _geoCache[ip] = { country: d.countryCode, city: d.city || '' };
               entry.country = d.countryCode;
@@ -695,7 +703,13 @@ router.get('/test-pageview', async (req, res) => {
 
     const { data, error } = await supabaseAdmin.from('page_views').insert(testData).select('id').single();
     if (error) {
-      return res.json({ success: false, error: error.message, code: error.code, hint: error.hint, details: error.details });
+      return res.json({
+        success: false,
+        error: error.message,
+        code: error.code,
+        hint: error.hint,
+        details: error.details,
+      });
     }
 
     // Clean up test row
@@ -2819,7 +2833,9 @@ router.delete('/traffic/:id', async (req, res) => {
     const { error } = await supabaseAdmin.from('page_views').delete().eq('id', req.params.id);
     if (error) return res.status(500).json({ error: error.message });
     res.json({ ok: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 router.post('/traffic/bulk-delete', async (req, res) => {
@@ -2831,7 +2847,9 @@ router.post('/traffic/bulk-delete', async (req, res) => {
     const { error } = await supabaseAdmin.from('page_views').delete().in('id', ids);
     if (error) return res.status(500).json({ error: error.message });
     res.json({ ok: true, deleted: ids.length });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 router.post('/traffic/clear-all', async (req, res) => {
@@ -2842,7 +2860,9 @@ router.post('/traffic/clear-all', async (req, res) => {
     const { error } = await supabaseAdmin.from('page_views').delete().neq('id', '00000000-0000-0000-0000-000000000000');
     if (error) return res.status(500).json({ error: error.message });
     res.json({ ok: true, message: 'All traffic cleared' });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // ══════════════════════════════════════════════════════════
@@ -2854,7 +2874,9 @@ router.get('/brain-chat/session/:sessionId', async (req, res) => {
   try {
     const session = brainChatSessions[req.params.sessionId];
     res.json({ messages: session ? session.messages : [] });
-  } catch (e) { res.json({ messages: [] }); }
+  } catch (e) {
+    res.json({ messages: [] });
+  }
 });
 
 router.post('/brain-chat', async (req, res) => {
@@ -2874,9 +2896,7 @@ router.post('/brain-chat', async (req, res) => {
     try {
       const { thinkV5 } = require('../brain-v5');
       const history = brainChatSessions[sid].messages.slice(-20);
-      const result = await thinkV5(
-        brain, message, 'kira', history, 'ro', 'admin-k1', sid, {}, true
-      );
+      const result = await thinkV5(brain, message, 'kira', history, 'ro', 'admin-k1', sid, {}, true);
       reply = result.enrichedMessage || 'No response';
       // Sanitize leaked system instructions
       reply = reply.replace(/\[SYSTEM INSTRUCTION[^\]]*\][\s\S]*?\[END SYSTEM INSTRUCTION\]\s*/gi, '');
@@ -2934,7 +2954,9 @@ async function ensureVisitorsTable(supabaseAdmin) {
     const { error } = await supabaseAdmin.from('visitors').select('id').limit(1);
     if (error && error.code === '42P01') {
       // Table doesn't exist — create it
-      await supabaseAdmin.rpc('exec_sql', { sql: `
+      await supabaseAdmin
+        .rpc('exec_sql', {
+          sql: `
         CREATE TABLE IF NOT EXISTS visitors (
           id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
           fingerprint TEXT NOT NULL,
@@ -2956,12 +2978,16 @@ async function ensureVisitorsTable(supabaseAdmin) {
         CREATE INDEX IF NOT EXISTS idx_visitors_fingerprint ON visitors(fingerprint);
         CREATE INDEX IF NOT EXISTS idx_visitors_status ON visitors(status);
         CREATE INDEX IF NOT EXISTS idx_visitors_last_seen ON visitors(last_seen DESC);
-      ` }).catch(() => {
-        logger.warn({ component: 'Admin' }, 'Could not auto-create visitors table — create it manually in Supabase');
-      });
+      `,
+        })
+        .catch(() => {
+          logger.warn({ component: 'Admin' }, 'Could not auto-create visitors table — create it manually in Supabase');
+        });
     }
     ensureVisitorsTable._done = true;
-  } catch (_) { ensureVisitorsTable._done = true; }
+  } catch (_) {
+    ensureVisitorsTable._done = true;
+  }
 }
 
 router.get('/visitors', async (req, res) => {
@@ -2976,7 +3002,9 @@ router.get('/visitors', async (req, res) => {
     const { data, error } = await q;
     if (error) return res.status(500).json({ error: error.message });
     res.json({ visitors: data || [], total: (data || []).length });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 router.get('/visitors/:id', async (req, res) => {
@@ -2986,7 +3014,9 @@ router.get('/visitors/:id', async (req, res) => {
     const { data, error } = await supabaseAdmin.from('visitors').select('*').eq('id', req.params.id).single();
     if (error) return res.status(404).json({ error: 'Not found' });
     res.json(data);
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 router.put('/visitors/:id', async (req, res) => {
@@ -3001,7 +3031,9 @@ router.put('/visitors/:id', async (req, res) => {
     const { error } = await supabaseAdmin.from('visitors').update(update).eq('id', req.params.id);
     if (error) return res.status(500).json({ error: error.message });
     res.json({ ok: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 module.exports = router;

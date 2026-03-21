@@ -177,8 +177,17 @@ router.post('/chat', chatLimiter, validate(chatSchema), async (req, res) => {
     let thought;
     try {
       thought = await Promise.race([
-        thinkV5(brain, message, avatar, history, language, user?.id, conversationId,
-          { imageBase64, audioBase64, geo, isAutoCamera: req.body.isAutoCamera || false }, isAdmin),
+        thinkV5(
+          brain,
+          message,
+          avatar,
+          history,
+          language,
+          user?.id,
+          conversationId,
+          { imageBase64, audioBase64, geo, isAutoCamera: req.body.isAutoCamera || false },
+          isAdmin
+        ),
         new Promise((_, reject) => setTimeout(() => reject(new Error('brain_timeout_30s')), BRAIN_TIMEOUT_MS)),
       ]);
     } catch (brainErr) {
@@ -192,26 +201,47 @@ router.post('/chat', chatLimiter, validate(chatSchema), async (req, res) => {
           const emergencySys = buildSystemPrompt(avatar, language, '', '', null);
           const emergCtrl = new AbortController();
           const emergTimer = setTimeout(() => emergCtrl.abort(), 12000);
-          const gResp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${gKey}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{ role: 'user', parts: [{ text: message }] }],
-              systemInstruction: { parts: [{ text: emergencySys }] },
-              generationConfig: { maxOutputTokens: 1024, temperature: 0.7 },
-            }),
-            signal: emergCtrl.signal,
-          }).finally(() => clearTimeout(emergTimer));
+          const gResp = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${gKey}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: [{ role: 'user', parts: [{ text: message }] }],
+                systemInstruction: { parts: [{ text: emergencySys }] },
+                generationConfig: { maxOutputTokens: 1024, temperature: 0.7 },
+              }),
+              signal: emergCtrl.signal,
+            }
+          ).finally(() => clearTimeout(emergTimer));
 
           if (gResp.ok) {
             const gData = await gResp.json();
-            emergencyReply = (gData.candidates?.[0]?.content?.parts || []).filter(p => p.text).map(p => p.text).join('');
+            emergencyReply = (gData.candidates?.[0]?.content?.parts || [])
+              .filter((p) => p.text)
+              .map((p) => p.text)
+              .join('');
           }
-        } catch (_) { /* last resort failed */ }
+        } catch (_) {
+          /* last resort failed */
+        }
       }
-      if (!emergencyReply) emergencyReply = language === 'ro' ? 'Îmi pare rău, am o problemă tehnică temporară. Încearcă din nou. 🔧' : 'Sorry, I have a temporary technical issue. Please try again. 🔧';
-      return res.json({ reply: emergencyReply, avatar, engine: 'gemini-emergency', language, emotion: 'concerned', gestures: [], thinkTime: BRAIN_TIMEOUT_MS, totalTime: BRAIN_TIMEOUT_MS, conversationId });
-
+      if (!emergencyReply)
+        emergencyReply =
+          language === 'ro'
+            ? 'Îmi pare rău, am o problemă tehnică temporară. Încearcă din nou. 🔧'
+            : 'Sorry, I have a temporary technical issue. Please try again. 🔧';
+      return res.json({
+        reply: emergencyReply,
+        avatar,
+        engine: 'gemini-emergency',
+        language,
+        emotion: 'concerned',
+        gestures: [],
+        thinkTime: BRAIN_TIMEOUT_MS,
+        totalTime: BRAIN_TIMEOUT_MS,
+        conversationId,
+      });
     }
 
     // V5 returns the final reply from GPT-5.4 or Gemini Flash
@@ -422,14 +452,24 @@ router.post('/chat/stream', chatLimiter, validate(chatSchema), async (req, res) 
 
     try {
       thought = await Promise.race([
-        thinkV5(brain, message, avatar, history, language, user?.id, conversationId,
-          { imageBase64, geo, isAutoCamera: req.body.isAutoCamera || false }, isAdminStream,
+        thinkV5(
+          brain,
+          message,
+          avatar,
+          history,
+          language,
+          user?.id,
+          conversationId,
+          { imageBase64, geo, isAutoCamera: req.body.isAutoCamera || false },
+          isAdminStream,
           // onProgress callback — stream SuperThink steps to user via SSE
           (step, detail) => {
-            try { res.write(`data: ${JSON.stringify({ type: 'progress', step, detail })}\n\n`); } catch (_) {}
-          }),
+            try {
+              res.write(`data: ${JSON.stringify({ type: 'progress', step, detail })}\n\n`);
+            } catch (_) {}
+          }
+        ),
         new Promise((_, reject) => setTimeout(() => reject(new Error('brain_timeout_60s')), 60000)),
-
       ]);
     } catch (brainErr) {
       logger.warn({ component: 'Stream', err: brainErr.message }, 'ThinkV5 failed — Gemini emergency');
@@ -443,13 +483,31 @@ router.post('/chat/stream', chatLimiter, validate(chatSchema), async (req, res) 
           setTimeout(() => eCtrl.abort(), 12000);
           const eR = await fetch(
             `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${gKey}`,
-            { method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: eCtrl.signal,
-              body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: message }] }], systemInstruction: { parts: [{ text: eSys }] }, generationConfig: { maxOutputTokens: 1024, temperature: 0.7 } }) }
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              signal: eCtrl.signal,
+              body: JSON.stringify({
+                contents: [{ role: 'user', parts: [{ text: message }] }],
+                systemInstruction: { parts: [{ text: eSys }] },
+                generationConfig: { maxOutputTokens: 1024, temperature: 0.7 },
+              }),
+            }
           ).catch(() => null);
-          if (eR?.ok) { const eD = await eR.json(); emergText = (eD.candidates?.[0]?.content?.parts || []).filter(p => p.text).map(p => p.text).join(''); }
+          if (eR?.ok) {
+            const eD = await eR.json();
+            emergText = (eD.candidates?.[0]?.content?.parts || [])
+              .filter((p) => p.text)
+              .map((p) => p.text)
+              .join('');
+          }
         } catch (_) {}
       }
-      emergText = emergText || (language === 'ro' ? 'Îmi pare rău, am o problemă tehnică temporară. Încearcă din nou. 🔧' : 'Sorry, temporary issue. Try again. 🔧');
+      emergText =
+        emergText ||
+        (language === 'ro'
+          ? 'Îmi pare rău, am o problemă tehnică temporară. Încearcă din nou. 🔧'
+          : 'Sorry, temporary issue. Try again. 🔧');
       res.write(`data: ${JSON.stringify({ type: 'start', engine: 'gemini-emergency' })}\n\n`);
       res.write(`data: ${JSON.stringify({ type: 'chunk', text: emergText })}\n\n`);
       fullReply = emergText;
@@ -459,18 +517,22 @@ router.post('/chat/stream', chatLimiter, validate(chatSchema), async (req, res) 
     if (thought) {
       // ── Trimite monitor daca exista ──
       if (thought.monitor?.content) {
-        res.write(`data: ${JSON.stringify({ type: 'monitor', content: thought.monitor.content, monitorType: thought.monitor.type })}\n\n`);
+        res.write(
+          `data: ${JSON.stringify({ type: 'monitor', content: thought.monitor.content, monitorType: thought.monitor.type })}\n\n`
+        );
       }
 
       // ── Trimite comenzi avatar (emotie, gesturi, pose, body, gaze) ──
-      res.write(`data: ${JSON.stringify({
-        type: 'avatar',
-        emotion: thought.emotion || 'neutral',
-        gestures: thought.gestures || [],
-        pose: thought.pose || null,
-        bodyActions: thought.bodyActions || [],
-        gaze: thought.gaze || null,
-      })}\n\n`);
+      res.write(
+        `data: ${JSON.stringify({
+          type: 'avatar',
+          emotion: thought.emotion || 'neutral',
+          gestures: thought.gestures || [],
+          pose: thought.pose || null,
+          bodyActions: thought.bodyActions || [],
+          gaze: thought.gaze || null,
+        })}\n\n`
+      );
 
       // ── Trimite actiuni (camera_on, translate_on, etc.) ──
       if (thought.actions?.length) {
@@ -487,11 +549,10 @@ router.post('/chat/stream', chatLimiter, validate(chatSchema), async (req, res) 
         for (const tok of tokens) {
           if (!tok) continue;
           res.write(`data: ${JSON.stringify({ type: 'chunk', text: tok })}\n\n`);
-          await new Promise(r => setTimeout(r, 2)); // 2ms delay for natural feel
+          await new Promise((r) => setTimeout(r, 2)); // 2ms delay for natural feel
         }
       }
     }
-
 
     let savedConvId = conversationId;
     if (fullReply && supabaseAdmin) {
@@ -514,9 +575,7 @@ router.post('/chat/stream', chatLimiter, validate(chatSchema), async (req, res) 
         bodyActions: thought?.bodyActions || [],
         pose: thought?.pose || null,
         gaze: thought?.gaze || null,
-        monitor: (thought?.monitor?.content)
-          ? { content: thought.monitor.content, type: thought.monitor.type }
-          : null,
+        monitor: thought?.monitor?.content ? { content: thought.monitor.content, type: thought.monitor.type } : null,
       })}\n\n`
     );
 
@@ -672,7 +731,7 @@ router.post('/imagine', async (req, res) => {
 
     const r = await fetch('https://api.openai.com/v1/images/generations', {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
+      headers: { Authorization: `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'dall-e-3',
         prompt: prompt.trim(),
@@ -698,7 +757,6 @@ router.post('/imagine', async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
-
 
 // POST /api/chat/feedback — 👍/👎 on AI responses
 router.post('/chat/feedback', async (req, res) => {
@@ -738,6 +796,5 @@ router.post('/chat/feedback', async (req, res) => {
     res.status(500).json({ error: 'Feedback save failed' });
   }
 });
-
 
 module.exports = router;

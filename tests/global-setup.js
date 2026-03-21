@@ -18,7 +18,10 @@ module.exports = async function globalSetup() {
           resolve(res.statusCode === 200);
         });
         req.on('error', () => resolve(false));
-        req.on('timeout', () => { req.destroy(); resolve(false); });
+        req.on('timeout', () => {
+          req.destroy();
+          resolve(false);
+        });
       });
 
       if (ok) {
@@ -26,7 +29,10 @@ module.exports = async function globalSetup() {
         await new Promise((resolve) => {
           const req2 = http.get(BASE, { timeout: 10000 }, () => resolve());
           req2.on('error', () => resolve());
-          req2.on('timeout', () => { req2.destroy(); resolve(); });
+          req2.on('timeout', () => {
+            req2.destroy();
+            resolve();
+          });
         });
 
         console.log(`✅ Server UP after ${attempts} attempts (${Date.now() - start}ms)`);
@@ -37,7 +43,7 @@ module.exports = async function globalSetup() {
     } catch {
       console.log(`   ⏳ Attempt ${attempts}: error, retrying...`);
     }
-    await new Promise(r => setTimeout(r, RETRY_MS));
+    await new Promise((r) => setTimeout(r, RETRY_MS));
   }
 
   console.warn(`⚠️ Server not responding after ${MAX_WAIT / 1000}s — tests may fail\n`);

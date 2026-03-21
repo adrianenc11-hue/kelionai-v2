@@ -26,7 +26,7 @@ jobs:
         run: |
           SITE_URL="${{ vars.SITE_URL || 'https://kelionai-v2-production.up.railway.app' }}"
           echo "Checking $SITE_URL ..."
-          
+
           # Try 3 times with 10s gap
           for i in 1 2 3; do
             HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "$SITE_URL" || echo "000")
@@ -38,7 +38,7 @@ jobs:
             fi
             sleep 10
           done
-          
+
           echo "status=down" >> $GITHUB_OUTPUT
           echo "❌ Site is DOWN after 3 attempts"
 

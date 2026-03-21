@@ -4,22 +4,22 @@
 // Runs BEFORE server starts. Blocks deploy if hardcoded values found.
 // This ensures the zero-hardcoded rule survives every deploy.
 // ═══════════════════════════════════════════════════════════════
-"use strict";
+'use strict';
 
-const fs = require("fs");
-const path = require("path");
+const fs = require('fs');
+const path = require('path');
 
-const ROOT = path.join(__dirname, "..");
-const SCAN_DIRS = ["server", "app/js", "app/admin"];
+const ROOT = path.join(__dirname, '..');
+const SCAN_DIRS = ['server', 'app/js', 'app/admin'];
 
 // Patterns that should NEVER appear in functional code
 const BLOCK_PATTERNS = [
   {
-    name: "Hardcoded kelionai.app URL",
+    name: 'Hardcoded kelionai.app URL',
     regex: /["'`]https:\/\/kelionai\.app/gi,
   },
   {
-    name: "Bare kelionai.app domain",
+    name: 'Bare kelionai.app domain',
     regex: /(?<!@)(?<!\.)(?<!\/\/)kelionai\.app(?!["'])/gi,
   },
 ];
@@ -46,14 +46,14 @@ function scan() {
     const walk = (d) => {
       for (const e of fs.readdirSync(d, { withFileTypes: true })) {
         const fp = path.join(d, e.name);
-        if (fp.includes("node_modules")) continue;
+        if (fp.includes('node_modules')) continue;
         if (e.isDirectory()) {
           walk(fp);
           continue;
         }
-        if (!e.name.endsWith(".js")) continue;
+        if (!e.name.endsWith('.js')) continue;
 
-        const lines = fs.readFileSync(fp, "utf8").split("\n");
+        const lines = fs.readFileSync(fp, 'utf8').split('\n');
         for (let i = 0; i < lines.length; i++) {
           const line = lines[i];
           if (WHITELIST.some((re) => re.test(line))) continue;
@@ -62,7 +62,7 @@ function scan() {
             p.regex.lastIndex = 0;
             if (p.regex.test(line)) {
               findings.push({
-                file: path.relative(ROOT, fp).replace(/\\/g, "/"),
+                file: path.relative(ROOT, fp).replace(/\\/g, '/'),
                 line: i + 1,
                 pattern: p.name,
                 code: line.trim().substring(0, 100),
@@ -79,20 +79,18 @@ function scan() {
 }
 
 // ── GATE CHECK ──
-console.log("🔍 Pre-start audit: scanning for hardcoded values...");
+console.log('🔍 Pre-start audit: scanning for hardcoded values...');
 const findings = scan();
 
 if (findings.length > 0) {
-  console.error("\n❌ DEPLOY BLOCKED — Hardcoded values detected!\n");
+  console.error('\n❌ DEPLOY BLOCKED — Hardcoded values detected!\n');
   for (const f of findings) {
     console.error(`  🔴 ${f.file}:${f.line} — ${f.pattern}`);
     console.error(`     ${f.code}\n`);
   }
   console.error(`Total: ${findings.length} violations.`);
-  console.error("Fix: Replace hardcoded URLs with process.env.APP_URL\n");
+  console.error('Fix: Replace hardcoded URLs with process.env.APP_URL\n');
   process.exit(1); // Block deploy
 } else {
-  console.log(
-    "✅ Pre-start audit: CLEAN — zero hardcoded values. Starting server...\n",
-  );
+  console.log('✅ Pre-start audit: CLEAN — zero hardcoded values. Starting server...\n');
 }

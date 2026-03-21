@@ -7,20 +7,19 @@
 
 // Plugin manifest (exported for auto-registration)
 const manifest = {
-  id: "auto-translator",
-  name: "Auto Translator",
-  version: "1.0.0",
-  description:
-    "Detects user language and auto-translates AI responses. Supports RO, EN, ES, FR, DE, IT.",
-  author: "KelionAI",
-  icon: "🌐",
-  category: "utility",
-  type: "middleware", // "middleware" | "command" | "widget"
-  pricing: "free",
+  id: 'auto-translator',
+  name: 'Auto Translator',
+  version: '1.0.0',
+  description: 'Detects user language and auto-translates AI responses. Supports RO, EN, ES, FR, DE, IT.',
+  author: 'KelionAI',
+  icon: '🌐',
+  category: 'utility',
+  type: 'middleware', // "middleware" | "command" | "widget"
+  pricing: 'free',
   endpoints: [],
   config: {
-    defaultLanguage: "ro",
-    supportedLanguages: ["ro", "en", "es", "fr", "de", "it"],
+    defaultLanguage: 'ro',
+    supportedLanguages: ['ro', 'en', 'es', 'fr', 'de', 'it'],
   },
 };
 
@@ -31,7 +30,7 @@ const manifest = {
  */
 async function afterResponse(ctx) {
   const { aiResponse, language } = ctx;
-  if (!language || language === "auto") return null; // skip
+  if (!language || language === 'auto') return null; // skip
 
   // If response is already in target language, skip
   // Simple heuristic: check for common language markers
@@ -48,7 +47,7 @@ async function afterResponse(ctx) {
 
   // Return instruction for brain to translate
   return {
-    action: "translate",
+    action: 'translate',
     targetLanguage: language,
     text: aiResponse,
   };
@@ -63,22 +62,21 @@ async function onCommand(ctx) {
   const { args } = ctx;
   if (!args || args.length < 2) {
     return {
-      response:
-        "Usage: /translate <language> <text>\nSupported: ro, en, es, fr, de, it",
+      response: 'Usage: /translate <language> <text>\nSupported: ro, en, es, fr, de, it',
     };
   }
 
   const targetLang = args[0].toLowerCase();
-  const text = args.slice(1).join(" ");
+  const text = args.slice(1).join(' ');
 
   if (!manifest.config.supportedLanguages.includes(targetLang)) {
     return {
-      response: `Unsupported language: ${targetLang}. Supported: ${manifest.config.supportedLanguages.join(", ")}`,
+      response: `Unsupported language: ${targetLang}. Supported: ${manifest.config.supportedLanguages.join(', ')}`,
     };
   }
 
   return {
-    action: "translate",
+    action: 'translate',
     targetLanguage: targetLang,
     text,
   };

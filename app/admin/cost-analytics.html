@@ -1,131 +1,328 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>KelionAI — Cost Analytics</title>
     <style>
-        *{margin:0;padding:0;box-sizing:border-box}
-        body{font-family:'Inter','Segoe UI',sans-serif;background:#060614;color:#e0e0e0;min-height:100vh}
-        .header{padding:16px 24px;background:rgba(0,0,0,0.4);border-bottom:1px solid rgba(255,255,255,0.06);display:flex;justify-content:space-between;align-items:center}
-        .header h1{font-size:1.3rem;background:linear-gradient(135deg,#f59e0b,#fbbf24);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
-        .back{background:rgba(255,255,255,0.1);border:none;color:#fff;padding:8px 16px;border-radius:8px;text-decoration:none;font-size:.85rem}
-        .container{max-width:1000px;margin:24px auto;padding:0 20px}
-        .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:20px}
-        .stat{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:16px;text-align:center}
-        .stat .num{font-size:2rem;font-weight:700;color:#f59e0b}
-        .stat .num.green{color:#22c55e}
-        .stat .lbl{font-size:.78rem;color:#888;margin-top:4px}
-        .section{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:16px;margin-bottom:16px}
-        .section h3{margin-bottom:16px;color:#fbbf24}
-        .provider-row{display:flex;align-items:center;gap:12px;margin-bottom:12px}
-        .provider-name{width:120px;font-weight:600;font-size:.9rem}
-        .bar-wrap{flex:1;height:24px;background:rgba(255,255,255,0.04);border-radius:6px;overflow:hidden;position:relative}
-        .bar-fill{height:100%;border-radius:6px;transition:width 0.5s ease;display:flex;align-items:center;justify-content:flex-end;padding-right:8px;font-size:.7rem;font-weight:600;color:#fff}
-        .bar-openai{background:linear-gradient(90deg,#10b981,#34d399)}
-        .bar-google{background:linear-gradient(90deg,#4285f4,#60a5fa)}
-        .bar-anthropic{background:linear-gradient(90deg,#f59e0b,#fbbf24)}
-        .bar-other{background:linear-gradient(90deg,#8b5cf6,#a78bfa)}
-        .cost-amount{width:100px;text-align:right;font-weight:600;font-size:.9rem;color:#e0e0e0}
-        .alert-box{background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:10px;padding:14px;margin-bottom:16px;display:none}
-        .alert-box.show{display:block}
-        .alert-box .title{color:#ef4444;font-weight:600;font-size:.9rem;margin-bottom:4px}
-        .alert-box .msg{color:#fca5a5;font-size:.82rem}
-        .budget-form{display:flex;gap:12px;align-items:center;margin-bottom:16px}
-        .budget-form input{background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:8px 12px;color:#fff;font-size:.85rem;width:120px}
-        .budget-form button{background:linear-gradient(135deg,#f59e0b,#ef4444);border:none;color:#fff;padding:8px 16px;border-radius:8px;cursor:pointer;font-weight:600;font-size:.85rem}
-        .log-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.04);font-size:.82rem}
-        .log-row .time{color:#666}
-        .log-row .prov{color:#a78bfa}
-        .log-row .amt{color:#f59e0b;font-weight:500}
-        .refresh{text-align:center;color:#444;font-size:.75rem;margin-top:16px}
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        font-family: 'Inter', 'Segoe UI', sans-serif;
+        background: #060614;
+        color: #e0e0e0;
+        min-height: 100vh;
+      }
+      .header {
+        padding: 16px 24px;
+        background: rgba(0, 0, 0, 0.4);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .header h1 {
+        font-size: 1.3rem;
+        background: linear-gradient(135deg, #f59e0b, #fbbf24);
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+      .back {
+        background: rgba(255, 255, 255, 0.1);
+        border: none;
+        color: #fff;
+        padding: 8px 16px;
+        border-radius: 8px;
+        text-decoration: none;
+        font-size: 0.85rem;
+      }
+      .container {
+        max-width: 1000px;
+        margin: 24px auto;
+        padding: 0 20px;
+      }
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 12px;
+        margin-bottom: 20px;
+      }
+      .stat {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        border-radius: 12px;
+        padding: 16px;
+        text-align: center;
+      }
+      .stat .num {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #f59e0b;
+      }
+      .stat .num.green {
+        color: #22c55e;
+      }
+      .stat .lbl {
+        font-size: 0.78rem;
+        color: #888;
+        margin-top: 4px;
+      }
+      .section {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 16px;
+      }
+      .section h3 {
+        margin-bottom: 16px;
+        color: #fbbf24;
+      }
+      .provider-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 12px;
+      }
+      .provider-name {
+        width: 120px;
+        font-weight: 600;
+        font-size: 0.9rem;
+      }
+      .bar-wrap {
+        flex: 1;
+        height: 24px;
+        background: rgba(255, 255, 255, 0.04);
+        border-radius: 6px;
+        overflow: hidden;
+        position: relative;
+      }
+      .bar-fill {
+        height: 100%;
+        border-radius: 6px;
+        transition: width 0.5s ease;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        padding-right: 8px;
+        font-size: 0.7rem;
+        font-weight: 600;
+        color: #fff;
+      }
+      .bar-openai {
+        background: linear-gradient(90deg, #10b981, #34d399);
+      }
+      .bar-google {
+        background: linear-gradient(90deg, #4285f4, #60a5fa);
+      }
+      .bar-anthropic {
+        background: linear-gradient(90deg, #f59e0b, #fbbf24);
+      }
+      .bar-other {
+        background: linear-gradient(90deg, #8b5cf6, #a78bfa);
+      }
+      .cost-amount {
+        width: 100px;
+        text-align: right;
+        font-weight: 600;
+        font-size: 0.9rem;
+        color: #e0e0e0;
+      }
+      .alert-box {
+        background: rgba(239, 68, 68, 0.1);
+        border: 1px solid rgba(239, 68, 68, 0.3);
+        border-radius: 10px;
+        padding: 14px;
+        margin-bottom: 16px;
+        display: none;
+      }
+      .alert-box.show {
+        display: block;
+      }
+      .alert-box .title {
+        color: #ef4444;
+        font-weight: 600;
+        font-size: 0.9rem;
+        margin-bottom: 4px;
+      }
+      .alert-box .msg {
+        color: #fca5a5;
+        font-size: 0.82rem;
+      }
+      .budget-form {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        margin-bottom: 16px;
+      }
+      .budget-form input {
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        padding: 8px 12px;
+        color: #fff;
+        font-size: 0.85rem;
+        width: 120px;
+      }
+      .budget-form button {
+        background: linear-gradient(135deg, #f59e0b, #ef4444);
+        border: none;
+        color: #fff;
+        padding: 8px 16px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 0.85rem;
+      }
+      .log-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 6px 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+        font-size: 0.82rem;
+      }
+      .log-row .time {
+        color: #666;
+      }
+      .log-row .prov {
+        color: #a78bfa;
+      }
+      .log-row .amt {
+        color: #f59e0b;
+        font-weight: 500;
+      }
+      .refresh {
+        text-align: center;
+        color: #444;
+        font-size: 0.75rem;
+        margin-top: 16px;
+      }
     </style>
-</head>
-<body>
-    <div class="header"><h1>💰 Cost Analytics</h1><a href="/admin/" class="back">← Admin</a></div>
+  </head>
+  <body>
+    <div class="header">
+      <h1>💰 Cost Analytics</h1>
+      <a href="/admin/" class="back">← Admin</a>
+    </div>
     <div class="container">
-        <div id="alert" class="alert-box"><div class="title">⚠️ Budget Alert</div><div class="msg" id="alert-msg">-</div></div>
-        <div class="stats">
-            <div class="stat"><div class="num" id="s-total">$0</div><div class="lbl">Total Spent</div></div>
-            <div class="stat"><div class="num" id="s-reqs">0</div><div class="lbl">Total Requests</div></div>
-            <div class="stat"><div class="num" id="s-avg">$0</div><div class="lbl">Avg per Request</div></div>
-            <div class="stat"><div class="num green" id="s-credit">$0</div><div class="lbl">Credit Remaining</div></div>
+      <div id="alert" class="alert-box">
+        <div class="title">⚠️ Budget Alert</div>
+        <div class="msg" id="alert-msg">-</div>
+      </div>
+      <div class="stats">
+        <div class="stat">
+          <div class="num" id="s-total">$0</div>
+          <div class="lbl">Total Spent</div>
         </div>
-        <div class="section">
-            <h3>📊 Spending by Provider</h3>
-            <div id="providers"></div>
+        <div class="stat">
+          <div class="num" id="s-reqs">0</div>
+          <div class="lbl">Total Requests</div>
         </div>
-        <div class="section">
-            <h3>⚙️ Budget Alert Threshold</h3>
-            <div class="budget-form">
-                <input type="number" id="budget" placeholder="$ limit" value="50">
-                <button onclick="setBudget()">Set Alert</button>
-                <span id="budget-status" style="color:#888;font-size:.82rem"></span>
-            </div>
+        <div class="stat">
+          <div class="num" id="s-avg">$0</div>
+          <div class="lbl">Avg per Request</div>
         </div>
-        <div class="section">
-            <h3>📋 Request Distribution</h3>
-            <div id="req-dist"></div>
+        <div class="stat">
+          <div class="num green" id="s-credit">$0</div>
+          <div class="lbl">Credit Remaining</div>
         </div>
-        <div class="refresh">Auto-refreshes every 30s · Data from admin/stats endpoint</div>
+      </div>
+      <div class="section">
+        <h3>📊 Spending by Provider</h3>
+        <div id="providers"></div>
+      </div>
+      <div class="section">
+        <h3>⚙️ Budget Alert Threshold</h3>
+        <div class="budget-form">
+          <input type="number" id="budget" placeholder="$ limit" value="50" />
+          <button onclick="setBudget()">Set Alert</button>
+          <span id="budget-status" style="color: #888; font-size: 0.82rem"></span>
+        </div>
+      </div>
+      <div class="section">
+        <h3>📋 Request Distribution</h3>
+        <div id="req-dist"></div>
+      </div>
+      <div class="refresh">Auto-refreshes every 30s · Data from admin/stats endpoint</div>
     </div>
     <script>
-        const T=localStorage.getItem('supabase_token')||'';
-        const H={'Content-Type':'application/json','Authorization':'Bearer '+T};
-        let budgetLimit=parseFloat(localStorage.getItem('budgetLimit'))||50;
-        document.getElementById('budget').value=budgetLimit;
+      const T = localStorage.getItem('supabase_token') || '';
+      const H = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + T };
+      let budgetLimit = parseFloat(localStorage.getItem('budgetLimit')) || 50;
+      document.getElementById('budget').value = budgetLimit;
 
-        const COLORS={openai:'bar-openai',google:'bar-google',anthropic:'bar-anthropic'};
+      const COLORS = { openai: 'bar-openai', google: 'bar-google', anthropic: 'bar-anthropic' };
 
-        async function load(){
-            try{
-                const r=await fetch('/api/admin/stats',{headers:H});
-                const d=await r.json();
-                const credits=d.credits||{};
-                let totalSpent=0,totalReqs=0,totalCredit=0;
-                const providers=[];
-                for(const[name,info]of Object.entries(credits)){
-                    const spent=parseFloat(info.used||0);
-                    const remaining=parseFloat(info.remaining||info.credit||0);
-                    const reqs=parseInt(info.requests||0);
-                    totalSpent+=spent;totalReqs+=reqs;totalCredit+=remaining;
-                    providers.push({name,spent,remaining,reqs});
-                }
-                document.getElementById('s-total').textContent='$'+totalSpent.toFixed(2);
-                document.getElementById('s-reqs').textContent=totalReqs;
-                document.getElementById('s-avg').textContent=totalReqs>0?'$'+(totalSpent/totalReqs).toFixed(4):'$0';
-                document.getElementById('s-credit').textContent='$'+totalCredit.toFixed(2);
+      async function load() {
+        try {
+          const r = await fetch('/api/admin/stats', { headers: H });
+          const d = await r.json();
+          const credits = d.credits || {};
+          let totalSpent = 0,
+            totalReqs = 0,
+            totalCredit = 0;
+          const providers = [];
+          for (const [name, info] of Object.entries(credits)) {
+            const spent = parseFloat(info.used || 0);
+            const remaining = parseFloat(info.remaining || info.credit || 0);
+            const reqs = parseInt(info.requests || 0);
+            totalSpent += spent;
+            totalReqs += reqs;
+            totalCredit += remaining;
+            providers.push({ name, spent, remaining, reqs });
+          }
+          document.getElementById('s-total').textContent = '$' + totalSpent.toFixed(2);
+          document.getElementById('s-reqs').textContent = totalReqs;
+          document.getElementById('s-avg').textContent =
+            totalReqs > 0 ? '$' + (totalSpent / totalReqs).toFixed(4) : '$0';
+          document.getElementById('s-credit').textContent = '$' + totalCredit.toFixed(2);
 
-                // Budget alert
-                if(totalSpent>budgetLimit){
-                    document.getElementById('alert').classList.add('show');
-                    document.getElementById('alert-msg').textContent=`Spending ($${totalSpent.toFixed(2)}) exceeds budget limit ($${budgetLimit})!`;
-                }else{document.getElementById('alert').classList.remove('show')}
+          // Budget alert
+          if (totalSpent > budgetLimit) {
+            document.getElementById('alert').classList.add('show');
+            document.getElementById('alert-msg').textContent =
+              `Spending ($${totalSpent.toFixed(2)}) exceeds budget limit ($${budgetLimit})!`;
+          } else {
+            document.getElementById('alert').classList.remove('show');
+          }
 
-                // Provider bars
-                const maxSpent=Math.max(...providers.map(p=>p.spent),1);
-                document.getElementById('providers').innerHTML=providers.map(p=>{
-                    const pct=Math.max((p.spent/maxSpent)*100,2);
-                    const cls=COLORS[p.name.toLowerCase()]||'bar-other';
-                    return `<div class="provider-row"><span class="provider-name">${p.name}</span><div class="bar-wrap"><div class="bar-fill ${cls}" style="width:${pct}%">$${p.spent.toFixed(2)}</div></div><span class="cost-amount">${p.reqs} reqs</span></div>`;
-                }).join('')||'<div style="text-align:center;color:#666;padding:20px">No cost data available</div>';
+          // Provider bars
+          const maxSpent = Math.max(...providers.map((p) => p.spent), 1);
+          document.getElementById('providers').innerHTML =
+            providers
+              .map((p) => {
+                const pct = Math.max((p.spent / maxSpent) * 100, 2);
+                const cls = COLORS[p.name.toLowerCase()] || 'bar-other';
+                return `<div class="provider-row"><span class="provider-name">${p.name}</span><div class="bar-wrap"><div class="bar-fill ${cls}" style="width:${pct}%">$${p.spent.toFixed(2)}</div></div><span class="cost-amount">${p.reqs} reqs</span></div>`;
+              })
+              .join('') || '<div style="text-align:center;color:#666;padding:20px">No cost data available</div>';
 
-                // Request distribution
-                document.getElementById('req-dist').innerHTML=providers.map(p=>{
-                    const pct=totalReqs>0?((p.reqs/totalReqs)*100).toFixed(1):0;
-                    return `<div class="log-row"><span class="prov">${p.name}</span><span>${p.reqs} requests (${pct}%)</span><span class="amt">$${p.spent.toFixed(4)}/req avg</span></div>`;
-                }).join('')||'No data';
-            }catch(e){console.error(e)}
+          // Request distribution
+          document.getElementById('req-dist').innerHTML =
+            providers
+              .map((p) => {
+                const pct = totalReqs > 0 ? ((p.reqs / totalReqs) * 100).toFixed(1) : 0;
+                return `<div class="log-row"><span class="prov">${p.name}</span><span>${p.reqs} requests (${pct}%)</span><span class="amt">$${p.spent.toFixed(4)}/req avg</span></div>`;
+              })
+              .join('') || 'No data';
+        } catch (e) {
+          console.error(e);
         }
+      }
 
-        function setBudget(){
-            budgetLimit=parseFloat(document.getElementById('budget').value)||50;
-            localStorage.setItem('budgetLimit',budgetLimit);
-            document.getElementById('budget-status').textContent='✅ Alert set at $'+budgetLimit;
-            load();
-        }
+      function setBudget() {
+        budgetLimit = parseFloat(document.getElementById('budget').value) || 50;
+        localStorage.setItem('budgetLimit', budgetLimit);
+        document.getElementById('budget-status').textContent = '✅ Alert set at $' + budgetLimit;
+        load();
+      }
 
-        load();setInterval(load,30000);
+      load();
+      setInterval(load, 30000);
     </script>
-</body>
+  </body>
 </html>

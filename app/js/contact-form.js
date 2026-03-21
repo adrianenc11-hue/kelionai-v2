@@ -14,7 +14,7 @@ window.clearMonitor = function () {
 
 // ─── Cinema Quill Writing Effect ───
 function quillWrite(element, text, speed = 35) {
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     element.textContent = '';
     let i = 0;
     const cursor = document.createElement('span');
@@ -148,7 +148,7 @@ function ensureContactModal() {
 </div>`;
   document.body.appendChild(modal);
   // Close on backdrop click
-  modal.addEventListener('click', function(e) {
+  modal.addEventListener('click', function (e) {
     if (e.target === modal) modal.classList.add('hidden');
   });
 }
@@ -159,10 +159,16 @@ window.openContactForm = function () {
   const modal = document.getElementById('contact-modal');
   modal.classList.remove('hidden');
   // Reset form
-  const fields = ['contact-dept','contact-subject','contact-email','contact-message','contact-signature'];
-  fields.forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  const fields = ['contact-dept', 'contact-subject', 'contact-email', 'contact-message', 'contact-signature'];
+  fields.forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
   const status = document.getElementById('contact-status');
-  if (status) { status.className = 'letter-status'; status.textContent = ''; }
+  if (status) {
+    status.className = 'letter-status';
+    status.textContent = '';
+  }
   // Auto-fill email
   try {
     const session = JSON.parse(localStorage.getItem('kelion_session') || '{}');
@@ -173,7 +179,12 @@ window.openContactForm = function () {
   } catch (e) {}
   // Quill intro
   const intro = document.getElementById('letter-intro');
-  if (intro) quillWrite(intro, 'Dear Valued Guest, we are honoured to receive your correspondence. Please complete the fields below and we shall attend to your matter with the utmost diligence.', 20);
+  if (intro)
+    quillWrite(
+      intro,
+      'Dear Valued Guest, we are honoured to receive your correspondence. Please complete the fields below and we shall attend to your matter with the utmost diligence.',
+      20
+    );
 };
 
 // ─── Send Contact Letter ───
@@ -196,17 +207,27 @@ window.sendContactLetter = async function () {
     const res = await fetch('/api/contact', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: signature || 'Anonymous', email, subject: '[' + dept + '] ' + (subject || 'No subject'), message }),
+      body: JSON.stringify({
+        name: signature || 'Anonymous',
+        email,
+        subject: '[' + dept + '] ' + (subject || 'No subject'),
+        message,
+      }),
     });
     const data = await res.json();
     if (data.success) {
       const autoReply = data.autoReply;
       const letter = document.getElementById('contact-letter');
       if (letter && autoReply) {
-        letter.innerHTML = '<div class="letter-header"><h2>✉ MESSAGE SENT</h2><p>Reference: ' + autoReply.refNumber + '</p></div>' +
+        letter.innerHTML =
+          '<div class="letter-header"><h2>✉ MESSAGE SENT</h2><p>Reference: ' +
+          autoReply.refNumber +
+          '</p></div>' +
           '<div class="letter-intro" id="reply-text"></div>' +
           '<div class="letter-actions"><button class="letter-btn-send" onclick="document.getElementById(\'contact-modal\').classList.add(\'hidden\')">✓ Close</button></div>' +
-          '<div class="letter-seal">❦ ' + autoReply.department + ' Department ❦</div>';
+          '<div class="letter-seal">❦ ' +
+          autoReply.department +
+          ' Department ❦</div>';
         const replyText = document.getElementById('reply-text');
         if (replyText) quillWrite(replyText, autoReply.body, 12);
       }

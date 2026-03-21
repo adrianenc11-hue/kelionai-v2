@@ -5,25 +5,24 @@
 // Requires BASE_URL or API_BASE_URL env var.
 // Exit 0 = all probes pass. Non-zero = at least one failed.
 // ═══════════════════════════════════════════════════════════════
-"use strict";
+'use strict';
 
-const BASE =
-  process.env.BASE_URL || process.env.API_BASE_URL || process.env.APP_URL;
+const BASE = process.env.BASE_URL || process.env.API_BASE_URL || process.env.APP_URL;
 
 const PROBES = [
   {
-    path: "/health",
+    path: '/health',
     expectStatus: 200,
     expectJson: true,
-    checkField: "status",
+    checkField: 'status',
   },
   {
-    path: "/api/payments/plans",
+    path: '/api/payments/plans',
     expectStatus: 200,
     expectJson: true,
-    checkField: "plans",
+    checkField: 'plans',
   },
-  { path: "/api/news/public", expectStatus: 200, expectJson: true },
+  { path: '/api/news/public', expectStatus: 200, expectJson: true },
 ];
 
 async function probe({ path, expectStatus, expectJson, checkField }) {
@@ -37,18 +36,14 @@ async function probe({ path, expectStatus, expectJson, checkField }) {
     const duration = Date.now() - start;
 
     if (res.status !== expectStatus) {
-      console.log(
-        `❌ ${path} → ${res.status} (expected ${expectStatus}) [${duration}ms]`,
-      );
+      console.log(`❌ ${path} → ${res.status} (expected ${expectStatus}) [${duration}ms]`);
       return false;
     }
 
     if (expectJson) {
       const data = await res.json();
       if (checkField && !(checkField in data)) {
-        console.log(
-          `❌ ${path} → 200 but missing "${checkField}" field [${duration}ms]`,
-        );
+        console.log(`❌ ${path} → 200 but missing "${checkField}" field [${duration}ms]`);
         return false;
       }
     }

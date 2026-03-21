@@ -1,4 +1,4 @@
-"use strict";
+'use strict';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // KelionAI — PERFORMANCE TRACKER
@@ -6,7 +6,7 @@
 // Persists to Supabase via trades + trade_intelligence tables
 // ═══════════════════════════════════════════════════════════════════════════
 
-const logger = require("./logger");
+const logger = require('./logger');
 
 class PerformanceTracker {
   constructor() {
@@ -32,19 +32,16 @@ class PerformanceTracker {
   init(supabase) {
     this.supabase = supabase;
     this._loadHistory();
-    logger.info(
-      { component: "PerfTracker" },
-      "Performance Tracker initialized",
-    );
+    logger.info({ component: 'PerfTracker' }, 'Performance Tracker initialized');
   }
 
   async _loadHistory() {
     if (!this.supabase) return;
     try {
       const { data } = await this.supabase
-        .from("trades")
-        .select("*")
-        .order("created_at", { ascending: true })
+        .from('trades')
+        .select('*')
+        .order('created_at', { ascending: true })
         .limit(1000);
 
       if (data && data.length > 0) {
@@ -62,16 +59,10 @@ class PerformanceTracker {
           this._updateStats(trade);
         }
         this._calculateDerivedStats();
-        logger.info(
-          { component: "PerfTracker", trades: data.length },
-          `Loaded ${data.length} historical trades`,
-        );
+        logger.info({ component: 'PerfTracker', trades: data.length }, `Loaded ${data.length} historical trades`);
       }
     } catch (e) {
-      logger.warn(
-        { component: "PerfTracker", err: e.message },
-        "Failed to load trade history",
-      );
+      logger.warn({ component: 'PerfTracker', err: e.message }, 'Failed to load trade history');
     }
   }
 
@@ -81,9 +72,7 @@ class PerformanceTracker {
   recordTrade(trade) {
     const pnl = parseFloat(trade.pnl) || 0;
     const lastEquity =
-      this.equityCurve.length > 0
-        ? this.equityCurve[this.equityCurve.length - 1].equity
-        : this.startingBalance;
+      this.equityCurve.length > 0 ? this.equityCurve[this.equityCurve.length - 1].equity : this.startingBalance;
 
     this.equityCurve.push({
       ts: new Date().toISOString(),
@@ -110,17 +99,11 @@ class PerformanceTracker {
     if (pnl > 0) {
       this.stats.wins++;
       this.stats.currentStreak = Math.max(1, this.stats.currentStreak + 1);
-      this.stats.longestWinStreak = Math.max(
-        this.stats.longestWinStreak,
-        this.stats.currentStreak,
-      );
+      this.stats.longestWinStreak = Math.max(this.stats.longestWinStreak, this.stats.currentStreak);
     } else if (pnl < 0) {
       this.stats.losses++;
       this.stats.currentStreak = Math.min(-1, this.stats.currentStreak - 1);
-      this.stats.longestLoseStreak = Math.max(
-        this.stats.longestLoseStreak,
-        Math.abs(this.stats.currentStreak),
-      );
+      this.stats.longestLoseStreak = Math.max(this.stats.longestLoseStreak, Math.abs(this.stats.currentStreak));
     } else {
       this.stats.breakEven++;
       this.stats.currentStreak = 0;
@@ -146,18 +129,9 @@ class PerformanceTracker {
     if (this.stats.totalTrades === 0) return;
 
     // Profit Factor
-    const grossProfit = this.equityCurve
-      .filter((e) => e.pnl > 0)
-      .reduce((s, e) => s + e.pnl, 0);
-    const grossLoss = Math.abs(
-      this.equityCurve.filter((e) => e.pnl < 0).reduce((s, e) => s + e.pnl, 0),
-    );
-    this.stats.profitFactor =
-      grossLoss > 0
-        ? +(grossProfit / grossLoss).toFixed(2)
-        : grossProfit > 0
-          ? 999
-          : 0;
+    const grossProfit = this.equityCurve.filter((e) => e.pnl > 0).reduce((s, e) => s + e.pnl, 0);
+    const grossLoss = Math.abs(this.equityCurve.filter((e) => e.pnl < 0).reduce((s, e) => s + e.pnl, 0));
+    this.stats.profitFactor = grossLoss > 0 ? +(grossProfit / grossLoss).toFixed(2) : grossProfit > 0 ? 999 : 0;
   }
 
   /**
@@ -173,9 +147,7 @@ class PerformanceTracker {
     if (returns.length < 2) return 0;
 
     const avgReturn = returns.reduce((s, r) => s + r, 0) / returns.length;
-    const variance =
-      returns.reduce((s, r) => s + Math.pow(r - avgReturn, 2), 0) /
-      (returns.length - 1);
+    const variance = returns.reduce((s, r) => s + Math.pow(r - avgReturn, 2), 0) / (returns.length - 1);
     const stdDev = Math.sqrt(variance);
 
     if (stdDev === 0) return 0;
@@ -239,7 +211,7 @@ class PerformanceTracker {
 
     for (const point of this.equityCurve) {
       if (new Date(point.ts) < cutoff) continue;
-      const day = point.ts.split("T")[0];
+      const day = point.ts.split('T')[0];
       if (!daily[day]) daily[day] = { date: day, pnl: 0, trades: 0 };
       daily[day].pnl += point.pnl;
       daily[day].trades++;
@@ -252,15 +224,10 @@ class PerformanceTracker {
    * Get full performance report
    */
   getReport() {
-    const winRate =
-      this.stats.totalTrades > 0
-        ? +((this.stats.wins / this.stats.totalTrades) * 100).toFixed(1)
-        : 0;
+    const winRate = this.stats.totalTrades > 0 ? +((this.stats.wins / this.stats.totalTrades) * 100).toFixed(1) : 0;
 
     const currentEquity =
-      this.equityCurve.length > 0
-        ? this.equityCurve[this.equityCurve.length - 1].equity
-        : this.startingBalance;
+      this.equityCurve.length > 0 ? this.equityCurve[this.equityCurve.length - 1].equity : this.startingBalance;
 
     return {
       summary: {
@@ -268,13 +235,9 @@ class PerformanceTracker {
         wins: this.stats.wins,
         losses: this.stats.losses,
         breakEven: this.stats.breakEven,
-        winRate: winRate + "%",
+        winRate: winRate + '%',
         totalPnl: +this.stats.totalPnl.toFixed(2),
-        totalReturn:
-          +(
-            ((currentEquity - this.startingBalance) / this.startingBalance) *
-            100
-          ).toFixed(2) + "%",
+        totalReturn: +(((currentEquity - this.startingBalance) / this.startingBalance) * 100).toFixed(2) + '%',
         currentEquity,
         startingBalance: this.startingBalance,
       },

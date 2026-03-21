@@ -134,11 +134,11 @@
       // 3. Dynamic compressor — auto-levels volume (AGC)
       //    TV distant = boost, close voice = compress
       const compressor = audioContext.createDynamicsCompressor();
-      compressor.threshold.value = -40;  // start compressing at -40dB
+      compressor.threshold.value = -40; // start compressing at -40dB
       compressor.knee.value = 12;
-      compressor.ratio.value = 8;        // strong compression ratio
-      compressor.attack.value = 0.003;   // fast react
-      compressor.release.value = 0.15;   // smooth release
+      compressor.ratio.value = 8; // strong compression ratio
+      compressor.attack.value = 0.003; // fast react
+      compressor.release.value = 0.15; // smooth release
 
       // 4. Gain boost — raises signal after compression
       const gainNode = audioContext.createGain();
@@ -218,7 +218,8 @@
           if (!interim) {
             interim = document.createElement('div');
             interim.id = 'translate-interim';
-            interim.style.cssText = 'opacity:0.5;padding:8px 12px;color:#aaa;font-size:0.95rem;border-left:2px solid #444;margin:4px 0;';
+            interim.style.cssText =
+              'opacity:0.5;padding:8px 12px;color:#aaa;font-size:0.95rem;border-left:2px solid #444;margin:4px 0;';
             if (content) content.appendChild(interim);
           }
           interim.textContent = '🎙️ ' + text + '...';

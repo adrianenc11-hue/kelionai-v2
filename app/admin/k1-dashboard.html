@@ -1,407 +1,412 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>KelionAI — K1 Brain Dashboard</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        background: #0a0a1a;
+        color: #e0e0e0;
+        font-family: system-ui, sans-serif;
+        padding: 16px;
+      }
+
+      h1 {
+        color: #00ffff;
+        margin-bottom: 4px;
+        font-size: 1.4rem;
+      }
+
+      h2 {
+        color: #ff6bff;
+        font-size: 1rem;
+        margin: 18px 0 8px;
+      }
+
+      .subtitle {
+        color: #888;
+        font-size: 0.82rem;
+        margin-bottom: 12px;
+      }
+
+      a {
+        color: #00ffff;
+        text-decoration: none;
+      }
+
+      .nav {
+        display: flex;
+        gap: 16px;
+        margin-bottom: 14px;
+        font-size: 0.85rem;
+      }
+
+      .nav a {
+        color: #aaa;
+      }
+
+      .nav a:hover,
+      .nav a.active {
+        color: #00ffff;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+        gap: 12px;
+      }
+
+      .card {
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 10px;
+        padding: 14px;
+      }
+
+      .card h3 {
+        font-size: 0.78rem;
+        color: #888;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 6px;
+      }
+
+      .big {
+        font-size: 1.5rem;
+        font-weight: bold;
+      }
+
+      .green {
+        color: #00ff88;
+      }
+
+      .yellow {
+        color: #ffcc00;
+      }
+
+      .red {
+        color: #ff4444;
+      }
+
+      .cyan {
+        color: #00ffff;
+      }
+
+      .pink {
+        color: #ff6bff;
+      }
+
+      .badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 6px;
+        font-size: 0.72rem;
+        font-weight: bold;
+      }
+
+      .badge.pass {
+        background: rgba(0, 255, 136, 0.15);
+        color: #00ff88;
+      }
+
+      .badge.block {
+        background: rgba(255, 68, 68, 0.15);
+        color: #ff4444;
+      }
+
+      .badge.active {
+        background: rgba(0, 255, 255, 0.15);
+        color: #00ffff;
+      }
+
+      .monologue {
+        font-family: monospace;
+        font-size: 0.75rem;
+        line-height: 1.5;
+        background: rgba(0, 0, 0, 0.4);
+        border-radius: 8px;
+        padding: 10px;
+        max-height: 200px;
+        overflow-y: auto;
+        white-space: pre-wrap;
+      }
+
+      .mini {
+        font-size: 0.72rem;
+        color: #777;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.82rem;
+      }
+
+      th {
+        text-align: left;
+        color: #888;
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        padding: 4px 8px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      td {
+        padding: 4px 8px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      }
+
+      .btn {
+        background: #00ffff;
+        color: #000;
+        border: none;
+        padding: 7px 14px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: bold;
+        font-size: 0.82rem;
+      }
+
+      .btn:hover {
+        background: #00dddd;
+      }
+
+      .btn.secondary {
+        background: rgba(255, 255, 255, 0.1);
+        color: #ccc;
+      }
+
+      .btn.secondary:hover {
+        background: rgba(255, 255, 255, 0.18);
+      }
+
+      .status-bar {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-bottom: 14px;
+      }
+
+      .status-pill {
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+      }
+
+      .progress-bar {
+        height: 6px;
+        background: rgba(255, 255, 255, 0.08);
+        border-radius: 3px;
+        overflow: hidden;
+      }
+
+      .progress-fill {
+        height: 100%;
+        border-radius: 3px;
+        transition: width 0.6s ease;
+      }
+
+      .section {
+        margin-bottom: 18px;
+      }
+
+      #loading {
+        text-align: center;
+        padding: 40px;
+        color: #666;
+      }
+
+      .alert-item {
+        background: rgba(255, 204, 0, 0.08);
+        border-left: 3px solid #ffcc00;
+        padding: 6px 10px;
+        margin-bottom: 4px;
+        border-radius: 0 6px 6px 0;
+        font-size: 0.78rem;
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
         }
 
-        body {
-            background: #0a0a1a;
-            color: #e0e0e0;
-            font-family: system-ui, sans-serif;
-            padding: 16px;
+        50% {
+          opacity: 0.5;
         }
+      }
 
-        h1 {
-            color: #00ffff;
-            margin-bottom: 4px;
-            font-size: 1.4rem;
-        }
-
-        h2 {
-            color: #ff6bff;
-            font-size: 1rem;
-            margin: 18px 0 8px;
-        }
-
-        .subtitle {
-            color: #888;
-            font-size: 0.82rem;
-            margin-bottom: 12px;
-        }
-
-        a {
-            color: #00ffff;
-            text-decoration: none;
-        }
-
-        .nav {
-            display: flex;
-            gap: 16px;
-            margin-bottom: 14px;
-            font-size: 0.85rem;
-        }
-
-        .nav a {
-            color: #aaa;
-        }
-
-        .nav a:hover,
-        .nav a.active {
-            color: #00ffff;
-        }
-
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-            gap: 12px;
-        }
-
-        .card {
-            background: rgba(255, 255, 255, 0.04);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: 10px;
-            padding: 14px;
-        }
-
-        .card h3 {
-            font-size: 0.78rem;
-            color: #888;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 6px;
-        }
-
-        .big {
-            font-size: 1.5rem;
-            font-weight: bold;
-        }
-
-        .green {
-            color: #00ff88;
-        }
-
-        .yellow {
-            color: #ffcc00;
-        }
-
-        .red {
-            color: #ff4444;
-        }
-
-        .cyan {
-            color: #00ffff;
-        }
-
-        .pink {
-            color: #ff6bff;
-        }
-
-        .badge {
-            display: inline-block;
-            padding: 2px 8px;
-            border-radius: 6px;
-            font-size: 0.72rem;
-            font-weight: bold;
-        }
-
-        .badge.pass {
-            background: rgba(0, 255, 136, 0.15);
-            color: #00ff88;
-        }
-
-        .badge.block {
-            background: rgba(255, 68, 68, 0.15);
-            color: #ff4444;
-        }
-
-        .badge.active {
-            background: rgba(0, 255, 255, 0.15);
-            color: #00ffff;
-        }
-
-        .monologue {
-            font-family: monospace;
-            font-size: 0.75rem;
-            line-height: 1.5;
-            background: rgba(0, 0, 0, 0.4);
-            border-radius: 8px;
-            padding: 10px;
-            max-height: 200px;
-            overflow-y: auto;
-            white-space: pre-wrap;
-        }
-
-        .mini {
-            font-size: 0.72rem;
-            color: #777;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 0.82rem;
-        }
-
-        th {
-            text-align: left;
-            color: #888;
-            font-size: 0.72rem;
-            text-transform: uppercase;
-            padding: 4px 8px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-        }
-
-        td {
-            padding: 4px 8px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-        }
-
-        .btn {
-            background: #00ffff;
-            color: #000;
-            border: none;
-            padding: 7px 14px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: bold;
-            font-size: 0.82rem;
-        }
-
-        .btn:hover {
-            background: #00dddd;
-        }
-
-        .btn.secondary {
-            background: rgba(255, 255, 255, 0.1);
-            color: #ccc;
-        }
-
-        .btn.secondary:hover {
-            background: rgba(255, 255, 255, 0.18);
-        }
-
-        .status-bar {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-            margin-bottom: 14px;
-        }
-
-        .status-pill {
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 0.75rem;
-            font-weight: 600;
-        }
-
-        .progress-bar {
-            height: 6px;
-            background: rgba(255, 255, 255, 0.08);
-            border-radius: 3px;
-            overflow: hidden;
-        }
-
-        .progress-fill {
-            height: 100%;
-            border-radius: 3px;
-            transition: width 0.6s ease;
-        }
-
-        .section {
-            margin-bottom: 18px;
-        }
-
-        #loading {
-            text-align: center;
-            padding: 40px;
-            color: #666;
-        }
-
-        .alert-item {
-            background: rgba(255, 204, 0, 0.08);
-            border-left: 3px solid #ffcc00;
-            padding: 6px 10px;
-            margin-bottom: 4px;
-            border-radius: 0 6px 6px 0;
-            font-size: 0.78rem;
-        }
-
-        @keyframes pulse {
-
-            0%,
-            100% {
-                opacity: 1;
-            }
-
-            50% {
-                opacity: 0.5;
-            }
-        }
-
-        .pulse {
-            animation: pulse 2s infinite;
-        }
+      .pulse {
+        animation: pulse 2s infinite;
+      }
     </style>
-</head>
+  </head>
 
-<body>
+  <body>
     <div class="nav">
-        <a href="/admin/">← KelionAI</a> |
-        <a href="/admin/health.html">Health</a>
-        <a href="/admin/news.html">News</a>
-        <a href="/admin/trading.html">Trading</a>
-        <a href="/admin/sports.html">Sports</a>
-        <a class="active" href="/admin/k1-dashboard.html">🧠 K1 Brain</a>
+      <a href="/admin/">← KelionAI</a> |
+      <a href="/admin/health.html">Health</a>
+      <a href="/admin/news.html">News</a>
+      <a href="/admin/trading.html">Trading</a>
+      <a href="/admin/sports.html">Sports</a>
+      <a class="active" href="/admin/k1-dashboard.html">🧠 K1 Brain</a>
     </div>
 
     <h1>🧠 KelionAI — K1 Brain Dashboard</h1>
     <p class="subtitle">Cognitive AI Engine — Live status</p>
 
     <div class="status-bar" id="statusBar">
-        <span class="status-pill pulse" style="background:rgba(0,255,255,0.15);color:#00ffff">⏳ Loading...</span>
+      <span class="status-pill pulse" style="background: rgba(0, 255, 255, 0.15); color: #00ffff">⏳ Loading...</span>
     </div>
 
     <div id="loading">Loading K1 state...</div>
-    <div id="dashboard" style="display:none">
+    <div id="dashboard" style="display: none">
+      <!-- ROW 1: Overview Cards -->
+      <div class="grid section" id="overviewGrid"></div>
 
-        <!-- ROW 1: Overview Cards -->
-        <div class="grid section" id="overviewGrid"></div>
+      <!-- ROW 2: Inner Monologue -->
+      <div class="section">
+        <h2>💭 Inner Monologue</h2>
+        <div class="monologue" id="monologue">Loading thoughts...</div>
+      </div>
 
-        <!-- ROW 2: Inner Monologue -->
-        <div class="section">
-            <h2>💭 Inner Monologue</h2>
-            <div class="monologue" id="monologue">Loading thoughts...</div>
+      <!-- ROW 3: Performance + Agents -->
+      <div class="grid section">
+        <div class="card" id="perfCard">
+          <h3>📊 Performance</h3>
+          <div id="perfContent">Loading...</div>
         </div>
-
-        <!-- ROW 3: Performance + Agents -->
-        <div class="grid section">
-            <div class="card" id="perfCard">
-                <h3>📊 Performance</h3>
-                <div id="perfContent">Loading...</div>
-            </div>
-            <div class="card" id="agentsCard">
-                <h3>🤖 Agent Mesh</h3>
-                <div id="agentsContent">Loading...</div>
-            </div>
-            <div class="card" id="truthCard">
-                <h3>🔍 Truth Guard</h3>
-                <div id="truthContent">Loading...</div>
-            </div>
+        <div class="card" id="agentsCard">
+          <h3>🤖 Agent Mesh</h3>
+          <div id="agentsContent">Loading...</div>
         </div>
-
-        <!-- ROW 4: World State + Alerts -->
-        <div class="grid section">
-            <div class="card" id="worldCard">
-                <h3>🌍 World State</h3>
-                <div id="worldContent">Loading...</div>
-            </div>
-            <div class="card" id="alertsCard">
-                <h3>🔔 Alerts</h3>
-                <div id="alertsContent">No alerts</div>
-            </div>
-            <div class="card" id="memoryCard">
-                <h3>💾 Memory</h3>
-                <div id="memoryContent">Loading...</div>
-            </div>
+        <div class="card" id="truthCard">
+          <h3>🔍 Truth Guard</h3>
+          <div id="truthContent">Loading...</div>
         </div>
+      </div>
 
-        <!-- ROW 5: Evolution + User Model -->
-        <div class="grid section">
-            <div class="card" id="evolutionCard">
-                <h3>🧬 Evolution</h3>
-                <div id="evolutionContent">Loading...</div>
-            </div>
-            <div class="card" id="userCard">
-                <h3>👤 User Model</h3>
-                <div id="userContent">Loading...</div>
-            </div>
+      <!-- ROW 4: World State + Alerts -->
+      <div class="grid section">
+        <div class="card" id="worldCard">
+          <h3>🌍 World State</h3>
+          <div id="worldContent">Loading...</div>
         </div>
-
-        <!-- Actions -->
-        <div class="section" style="display:flex;gap:8px;flex-wrap:wrap">
-            <button class="btn" onclick="loadDashboard()">🔄 Refresh</button>
-            <button class="btn secondary" onclick="runSelfTest()">🧪 Self-Test</button>
-            <button class="btn secondary" onclick="triggerForget()">🧹 Forgetting</button>
-            <button class="btn secondary" onclick="spawnDebate()">💬 Debate</button>
+        <div class="card" id="alertsCard">
+          <h3>🔔 Alerts</h3>
+          <div id="alertsContent">No alerts</div>
         </div>
+        <div class="card" id="memoryCard">
+          <h3>💾 Memory</h3>
+          <div id="memoryContent">Loading...</div>
+        </div>
+      </div>
 
-        <p class="mini" id="lastUpdate">Last update: —</p>
+      <!-- ROW 5: Evolution + User Model -->
+      <div class="grid section">
+        <div class="card" id="evolutionCard">
+          <h3>🧬 Evolution</h3>
+          <div id="evolutionContent">Loading...</div>
+        </div>
+        <div class="card" id="userCard">
+          <h3>👤 User Model</h3>
+          <div id="userContent">Loading...</div>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="section" style="display: flex; gap: 8px; flex-wrap: wrap">
+        <button class="btn" onclick="loadDashboard()">🔄 Refresh</button>
+        <button class="btn secondary" onclick="runSelfTest()">🧪 Self-Test</button>
+        <button class="btn secondary" onclick="triggerForget()">🧹 Forgetting</button>
+        <button class="btn secondary" onclick="spawnDebate()">💬 Debate</button>
+      </div>
+
+      <p class="mini" id="lastUpdate">Last update: —</p>
     </div>
 
     <script>
-        const H = { 'x-admin-secret': sessionStorage.getItem('kelion_admin_secret') || '', 'Content-Type': 'application/json' };
-        const API = '/api/trading';
+      const H = {
+        'x-admin-secret': sessionStorage.getItem('kelion_admin_secret') || '',
+        'Content-Type': 'application/json',
+      };
+      const API = '/api/trading';
 
-        async function loadDashboard() {
-            try {
-                const r = await fetch(`${API}/k1/dashboard`, { headers: H });
-                if (!r.ok) throw new Error(`HTTP ${r.status}`);
-                const d = await r.json();
-                document.getElementById('loading').style.display = 'none';
-                document.getElementById('dashboard').style.display = 'block';
-                renderDashboard(d);
-                document.getElementById('lastUpdate').textContent = `Last update: ${new Date().toLocaleTimeString()}`;
-            } catch (e) {
-                document.getElementById('loading').innerHTML = `<span class="red">❌ Error: ${e.message}</span>`;
-            }
+      async function loadDashboard() {
+        try {
+          const r = await fetch(`${API}/k1/dashboard`, { headers: H });
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          const d = await r.json();
+          document.getElementById('loading').style.display = 'none';
+          document.getElementById('dashboard').style.display = 'block';
+          renderDashboard(d);
+          document.getElementById('lastUpdate').textContent = `Last update: ${new Date().toLocaleTimeString()}`;
+        } catch (e) {
+          document.getElementById('loading').innerHTML = `<span class="red">❌ Error: ${e.message}</span>`;
         }
+      }
 
-        function renderDashboard(d) {
-            // Status bar
-            const pills = [];
-            pills.push(pill('🧠 Cognitive', 'cyan'));
-            pills.push(pill(`💾 Memory: ${d.memory?.hotCount || 0} hot`, 'green'));
-            pills.push(pill(`🤖 Agents: ${d.agents?.active || 0} active`, d.agents?.active > 0 ? 'pink' : 'dim'));
-            pills.push(pill(`📊 Tasks: ${d.performance?.overall?.totalTasks || 0}`, 'yellow'));
-            document.getElementById('statusBar').innerHTML = pills.join('');
+      function renderDashboard(d) {
+        // Status bar
+        const pills = [];
+        pills.push(pill('🧠 Cognitive', 'cyan'));
+        pills.push(pill(`💾 Memory: ${d.memory?.hotCount || 0} hot`, 'green'));
+        pills.push(pill(`🤖 Agents: ${d.agents?.active || 0} active`, d.agents?.active > 0 ? 'pink' : 'dim'));
+        pills.push(pill(`📊 Tasks: ${d.performance?.overall?.totalTasks || 0}`, 'yellow'));
+        document.getElementById('statusBar').innerHTML = pills.join('');
 
-            // Overview cards
-            const ov = d.performance?.overall || {};
-            const cog = d.cognitive || {};
-            document.getElementById('overviewGrid').innerHTML = `
+        // Overview cards
+        const ov = d.performance?.overall || {};
+        const cog = d.cognitive || {};
+        document.getElementById('overviewGrid').innerHTML = `
             ${oCard('🧠 Reasoning Loop', cog.monologue?.length || 0, 'thoughts logged', 'cyan')}
             ${oCard('📊 Accuracy', ov.accuracy !== null ? ov.accuracy + '%' : '—', ov.status || 'no data', ov.accuracy >= 80 ? 'green' : ov.accuracy >= 60 ? 'yellow' : 'red')}
             ${oCard('🤖 Agents', `${d.agents?.active || 0}/${d.agents?.total || 0}`, `${d.agents?.promoted || 0} promoted`, 'pink')}
             ${oCard('💾 Memory', d.memory?.hotCount || 0, 'in hot cache', 'cyan')}
         `;
 
-            // Monologue
-            const thoughts = (cog.monologue || []).map(t =>
-                `${t.phase || '?'} | ${t.thought || t.content || '...'}`
-            ).join('\n') || 'No thoughts yet...';
-            document.getElementById('monologue').textContent = thoughts;
+        // Monologue
+        const thoughts =
+          (cog.monologue || []).map((t) => `${t.phase || '?'} | ${t.thought || t.content || '...'}`).join('\n') ||
+          'No thoughts yet...';
+        document.getElementById('monologue').textContent = thoughts;
 
-            // Performance
-            const perf = d.performance || {};
-            const domains = (perf.domains || []).filter(dm => dm.tasks > 0);
-            if (domains.length > 0) {
-                document.getElementById('perfContent').innerHTML = `
+        // Performance
+        const perf = d.performance || {};
+        const domains = (perf.domains || []).filter((dm) => dm.tasks > 0);
+        if (domains.length > 0) {
+          document.getElementById('perfContent').innerHTML = `
                 <table>
                     <tr><th>Domain</th><th>Tasks</th><th>Accuracy</th><th>Trend</th></tr>
-                    ${domains.map(dm => `<tr>
+                    ${domains
+                      .map(
+                        (dm) => `<tr>
                         <td>${dm.domain}</td>
                         <td>${dm.tasks}</td>
                         <td><span class="${dm.accuracy >= 80 ? 'green' : dm.accuracy >= 60 ? 'yellow' : 'red'}">${dm.accuracy ?? '—'}%</span></td>
                         <td>${dm.trendEmoji || '➡️'}</td>
-                    </tr>`).join('')}
+                    </tr>`
+                      )
+                      .join('')}
                 </table>
                 ${perf.weakAreas?.length ? `<p class="mini red" style="margin-top:6px">⚠️ Weak: ${perf.weakAreas.join(', ')}</p>` : ''}
             `;
-            } else {
-                document.getElementById('perfContent').innerHTML = '<p class="mini">No performance data yet. Send messages to track.</p>';
-            }
+        } else {
+          document.getElementById('perfContent').innerHTML =
+            '<p class="mini">No performance data yet. Send messages to track.</p>';
+        }
 
-            // Agents
-            const ag = d.agents || {};
-            document.getElementById('agentsContent').innerHTML = `
+        // Agents
+        const ag = d.agents || {};
+        document.getElementById('agentsContent').innerHTML = `
             <div><span class="big cyan">${ag.active || 0}</span> <span class="mini">active</span></div>
             <div class="mini" style="margin-top:4px">
                 ${ag.completed || 0} completed · ${ag.promoted || 0} promoted · ${ag.killed || 0} killed
@@ -409,45 +414,52 @@
             <div class="mini">Templates: ${ag.templates || 0}</div>
         `;
 
-            // Truth
-            const truthTests = d.truth || [];
-            if (truthTests.length > 0) {
-                const last = truthTests[truthTests.length - 1];
-                document.getElementById('truthContent').innerHTML = `
+        // Truth
+        const truthTests = d.truth || [];
+        if (truthTests.length > 0) {
+          const last = truthTests[truthTests.length - 1];
+          document.getElementById('truthContent').innerHTML = `
                 <div><span class="big ${last.score >= 80 ? 'green' : last.score >= 50 ? 'yellow' : 'red'}">${last.score}%</span>
                 <span class="mini">last self-test</span></div>
-                <div class="mini" style="margin-top:4px">${last.tests?.filter(t => t.passed).length || 0}/${last.tests?.length || 0} passed · ${last.domain || 'trading'}</div>
+                <div class="mini" style="margin-top:4px">${last.tests?.filter((t) => t.passed).length || 0}/${last.tests?.length || 0} passed · ${last.domain || 'trading'}</div>
                 <div class="progress-bar" style="margin-top:6px"><div class="progress-fill" style="width:${last.score}%;background:${last.score >= 80 ? '#00ff88' : last.score >= 50 ? '#ffcc00' : '#ff4444'}"></div></div>
             `;
-            } else {
-                document.getElementById('truthContent').innerHTML = '<p class="mini">No self-tests run yet.</p>';
-            }
+        } else {
+          document.getElementById('truthContent').innerHTML = '<p class="mini">No self-tests run yet.</p>';
+        }
 
-            // World State
-            const world = d.world || {};
-            const mkts = world.markets || {};
-            const marketRows = Object.entries(mkts)
-                .filter(([k]) => k !== 'fearGreed')
-                .map(([k, v]) => {
-                    if (typeof v === 'object' && v !== null) {
-                        const rawPrice = v.price !== undefined ? v.price : null;
-                        const price = rawPrice !== null ? Number(rawPrice).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) : '—';
-                        const chg = v.change24h ? ` (${v.change24h > 0 ? '+' : ''}${Number(v.change24h).toFixed(2)}%)` : '';
-                        const sig = v.signal && v.signal !== 'HOLD' ? ` <span style="color:${v.signal === 'BUY' ? '#00ff88' : '#ff4444'}">${v.signal}</span>` : '';
-                        return `<tr><td>${k.toUpperCase()}</td><td>$${price}${chg}${sig}</td></tr>`;
-                    }
-                    return `<tr><td>${k.toUpperCase()}</td><td>$${v || '—'}</td></tr>`;
-                }).join('');
-            document.getElementById('worldContent').innerHTML = `
+        // World State
+        const world = d.world || {};
+        const mkts = world.markets || {};
+        const marketRows = Object.entries(mkts)
+          .filter(([k]) => k !== 'fearGreed')
+          .map(([k, v]) => {
+            if (typeof v === 'object' && v !== null) {
+              const rawPrice = v.price !== undefined ? v.price : null;
+              const price =
+                rawPrice !== null
+                  ? Number(rawPrice).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
+                  : '—';
+              const chg = v.change24h ? ` (${v.change24h > 0 ? '+' : ''}${Number(v.change24h).toFixed(2)}%)` : '';
+              const sig =
+                v.signal && v.signal !== 'HOLD'
+                  ? ` <span style="color:${v.signal === 'BUY' ? '#00ff88' : '#ff4444'}">${v.signal}</span>`
+                  : '';
+              return `<tr><td>${k.toUpperCase()}</td><td>$${price}${chg}${sig}</td></tr>`;
+            }
+            return `<tr><td>${k.toUpperCase()}</td><td>$${v || '—'}</td></tr>`;
+          })
+          .join('');
+        document.getElementById('worldContent').innerHTML = `
             <table>
                 <tr><th>Asset</th><th>Price</th></tr>
                 ${marketRows}
             </table>
             ${(() => {
-                    const fg = mkts.fearGreed || world.fearGreed;
-                    if (!fg) return '';
-                    const fgColor = fg.value <= 25 ? '#ff4444' : fg.value >= 75 ? '#00ff88' : '#ffcc00';
-                    return `<div style="margin-top:8px;padding:8px;background:rgba(255,255,255,0.03);border-radius:6px">
+              const fg = mkts.fearGreed || world.fearGreed;
+              if (!fg) return '';
+              const fgColor = fg.value <= 25 ? '#ff4444' : fg.value >= 75 ? '#00ff88' : '#ffcc00';
+              return `<div style="margin-top:8px;padding:8px;background:rgba(255,255,255,0.03);border-radius:6px">
                     <div class="mini">😱 Fear & Greed Index</div>
                     <div style="display:flex;align-items:center;gap:8px;margin-top:4px">
                         <span class="big" style="color:${fgColor}">${fg.value}</span>
@@ -455,93 +467,132 @@
                     </div>
                     <div class="progress-bar" style="margin-top:4px"><div class="progress-fill" style="width:${fg.value}%;background:${fgColor}"></div></div>
                 </div>`;
-                })()}
+            })()}
         `;
 
-            // Alerts
-            const alerts = d.alerts || [];
-            if (alerts.length > 0) {
-                document.getElementById('alertsContent').innerHTML = alerts.slice(0, 5).map(a =>
-                    `<div class="alert-item">${a.message || a.text || JSON.stringify(a)}</div>`
-                ).join('');
-            } else {
-                document.getElementById('alertsContent').innerHTML = '<p class="mini green">✅ No active alerts</p>';
-            }
+        // Alerts
+        const alerts = d.alerts || [];
+        if (alerts.length > 0) {
+          document.getElementById('alertsContent').innerHTML = alerts
+            .slice(0, 5)
+            .map((a) => `<div class="alert-item">${a.message || a.text || JSON.stringify(a)}</div>`)
+            .join('');
+        } else {
+          document.getElementById('alertsContent').innerHTML = '<p class="mini green">✅ No active alerts</p>';
+        }
 
-            // Memory
-            const mem = d.memory || {};
-            document.getElementById('memoryContent').innerHTML = `
+        // Memory
+        const mem = d.memory || {};
+        document.getElementById('memoryContent').innerHTML = `
             <div><span class="big cyan">${mem.hotCount || 0}</span> <span class="mini">hot entries</span></div>
             <div class="mini" style="margin-top:4px">Warm: ${mem.warmCount || '?'} · Cold: ${mem.coldCount || '?'}</div>
         `;
 
-            // Evolution
-            const evo = d.evolution || {};
-            const strats = evo.strategies || {};
-            const rp = strats.riskParams || [];
-            document.getElementById('evolutionContent').innerHTML = `
+        // Evolution
+        const evo = d.evolution || {};
+        const strats = evo.strategies || {};
+        const rp = strats.riskParams || [];
+        document.getElementById('evolutionContent').innerHTML = `
             <div class="mini" style="margin-bottom:6px"><strong class="pink">Meta-Learning</strong></div>
-            ${rp.map(p => `<div class="mini">${p.name}: <strong>${p.current}</strong> <span style="color:#555">(${p.range})</span></div>`).join('')}
+            ${rp.map((p) => `<div class="mini">${p.name}: <strong>${p.current}</strong> <span style="color:#555">(${p.range})</span></div>`).join('')}
             <div class="mini" style="margin-top:6px">Templates: ${strats.promptTemplates?.length || 0} · Tools: ${Object.keys(strats.toolPreferences || {}).length}</div>
         `;
 
-            // User model
-            const um = evo.userModel || {};
-            document.getElementById('userContent').innerHTML = `
+        // User model
+        const um = evo.userModel || {};
+        document.getElementById('userContent').innerHTML = `
             <div class="mini">Interactions: <strong>${um.totalInteractions || 0}</strong></div>
             <div class="mini">Corrections: <strong>${um.totalCorrections || 0}</strong> (${um.correctionRate || 0}%)</div>
             <div class="mini">Top domain: <strong class="cyan">${um.preferredDomain || '—'}</strong></div>
             <div class="mini">Peak hour: <strong>${um.peakHour !== undefined ? um.peakHour + ':00 UTC' : '—'}</strong></div>
             <div class="mini">Style: ${um.communication?.preferredStyle || '—'} · Lang: ${um.communication?.preferredLanguage || '—'}</div>
         `;
-        }
+      }
 
-        function pill(text, color) {
-            const colors = { cyan: '#00ffff', green: '#00ff88', pink: '#ff6bff', yellow: '#ffcc00', red: '#ff4444', dim: '#666' };
-            const c = colors[color] || '#888';
-            return `<span class="status-pill" style="background:${c}22;color:${c}">${text}</span>`;
-        }
+      function pill(text, color) {
+        const colors = {
+          cyan: '#00ffff',
+          green: '#00ff88',
+          pink: '#ff6bff',
+          yellow: '#ffcc00',
+          red: '#ff4444',
+          dim: '#666',
+        };
+        const c = colors[color] || '#888';
+        return `<span class="status-pill" style="background:${c}22;color:${c}">${text}</span>`;
+      }
 
-        function oCard(title, value, sub, color) {
-            const colors = { cyan: '#00ffff', green: '#00ff88', pink: '#ff6bff', yellow: '#ffcc00', red: '#ff4444' };
-            return `<div class="card"><h3>${title}</h3><div class="big" style="color:${colors[color] || '#fff'}">${value}</div><div class="mini">${sub}</div></div>`;
-        }
+      function oCard(title, value, sub, color) {
+        const colors = { cyan: '#00ffff', green: '#00ff88', pink: '#ff6bff', yellow: '#ffcc00', red: '#ff4444' };
+        return `<div class="card"><h3>${title}</h3><div class="big" style="color:${colors[color] || '#fff'}">${value}</div><div class="mini">${sub}</div></div>`;
+      }
 
-        async function runSelfTest() {
-            try {
-                const r = await fetch(`${API}/k1/truth/self-test`, { method: 'POST', headers: H, body: JSON.stringify({ domain: 'trading' }) });
-                const d = await r.json();
-                alert(`Self-test: ${d.score}% (${d.tests?.filter(t => t.passed).length}/${d.tests?.length} passed)`);
-                loadDashboard();
-            } catch (e) { alert('Error: ' + e.message); }
+      async function runSelfTest() {
+        try {
+          const r = await fetch(`${API}/k1/truth/self-test`, {
+            method: 'POST',
+            headers: H,
+            body: JSON.stringify({ domain: 'trading' }),
+          });
+          const d = await r.json();
+          alert(`Self-test: ${d.score}% (${d.tests?.filter((t) => t.passed).length}/${d.tests?.length} passed)`);
+          loadDashboard();
+        } catch (e) {
+          alert('Error: ' + e.message);
         }
+      }
 
-        async function triggerForget() {
-            try {
-                const r = await fetch(`${API}/k1/memory/forget`, { method: 'POST', headers: H, body: '{}' });
-                const d = await r.json();
-                alert(`Forgetting: ${d.deleted || 0} deleted, ${d.compressed || 0} compressed`);
-                loadDashboard();
-            } catch (e) { alert('Error: ' + e.message); }
+      async function triggerForget() {
+        try {
+          const r = await fetch(`${API}/k1/memory/forget`, { method: 'POST', headers: H, body: '{}' });
+          const d = await r.json();
+          alert(`Forgetting: ${d.deleted || 0} deleted, ${d.compressed || 0} compressed`);
+          loadDashboard();
+        } catch (e) {
+          alert('Error: ' + e.message);
         }
+      }
 
-        async function spawnDebate() {
-            const task = prompt('Debate topic:');
-            if (!task) return;
-            try {
-                const r = await fetch(`${API}/k1/agents/debate`, { method: 'POST', headers: H, body: JSON.stringify({ task }) });
-                const d = await r.json();
-                alert(`Debate set up! PRO=#${d.proAgent?.id}, CON=#${d.conAgent?.id}, Judge=#${d.judgeAgent?.id}`);
-                loadDashboard();
-            } catch (e) { alert('Error: ' + e.message); }
+      async function spawnDebate() {
+        const task = prompt('Debate topic:');
+        if (!task) return;
+        try {
+          const r = await fetch(`${API}/k1/agents/debate`, {
+            method: 'POST',
+            headers: H,
+            body: JSON.stringify({ task }),
+          });
+          const d = await r.json();
+          alert(`Debate set up! PRO=#${d.proAgent?.id}, CON=#${d.conAgent?.id}, Judge=#${d.judgeAgent?.id}`);
+          loadDashboard();
+        } catch (e) {
+          alert('Error: ' + e.message);
         }
+      }
 
-        // Auto-refresh every 30 seconds
-        loadDashboard();
-        setInterval(loadDashboard, 30000);
+      // Auto-refresh every 30 seconds
+      loadDashboard();
+      setInterval(loadDashboard, 30000);
     </script>
     <!-- Back button bottom-left -->
-    <a href="javascript:history.back()" style="position:fixed;bottom:16px;left:16px;background:#00ffff;color:#000;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-weight:bold;font-size:0.85rem;text-decoration:none;z-index:100;">← Back</a>
-</body>
-
+    <a
+      href="javascript:history.back()"
+      style="
+        position: fixed;
+        bottom: 16px;
+        left: 16px;
+        background: #00ffff;
+        color: #000;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: bold;
+        font-size: 0.85rem;
+        text-decoration: none;
+        z-index: 100;
+      "
+      >← Back</a
+    >
+  </body>
 </html>

@@ -1,4 +1,4 @@
-"use strict";
+'use strict';
 
 /**
  * BRAIN SESSION — Persistent admin-brain chat memory
@@ -7,7 +7,7 @@
  * from where it left off between sessions.
  */
 
-const logger = require("./logger");
+const logger = require('./logger');
 
 class BrainSession {
   constructor(supabase) {
@@ -39,17 +39,10 @@ class BrainSession {
     }
 
     try {
-      const { data, error } = await this._db
-        .from("brain_admin_sessions")
-        .select("*")
-        .eq("id", sessionId)
-        .single();
+      const { data, error } = await this._db.from('brain_admin_sessions').select('*').eq('id', sessionId).single();
 
-      if (error && error.code !== "PGRST116") {
-        logger.warn(
-          { component: "BrainSession", err: error.message },
-          "DB read error",
-        );
+      if (error && error.code !== 'PGRST116') {
+        logger.warn({ component: 'BrainSession', err: error.message }, 'DB read error');
       }
 
       if (data) {
@@ -73,10 +66,7 @@ class BrainSession {
       this._cache.set(sessionId, session);
       return session;
     } catch (e) {
-      logger.error(
-        { component: "BrainSession", err: e.message },
-        "getSession failed",
-      );
+      logger.error({ component: 'BrainSession', err: e.message }, 'getSession failed');
       const session = {
         id: sessionId,
         messages: [],
@@ -134,42 +124,33 @@ class BrainSession {
       return Array.from(this._cache.values()).map((s) => ({
         id: s.id,
         messageCount: s.messages.length,
-        lastMessage:
-          s.messages[s.messages.length - 1]?.content?.slice(0, 80) || "",
+        lastMessage: s.messages[s.messages.length - 1]?.content?.slice(0, 80) || '',
         created_at: s.created_at,
-        updated_at:
-          s.messages[s.messages.length - 1]?.timestamp || s.created_at,
+        updated_at: s.messages[s.messages.length - 1]?.timestamp || s.created_at,
       }));
     }
 
     try {
       const { data, error } = await this._db
-        .from("brain_admin_sessions")
-        .select("id, created_at, updated_at, messages")
-        .order("updated_at", { ascending: false })
+        .from('brain_admin_sessions')
+        .select('id, created_at, updated_at, messages')
+        .order('updated_at', { ascending: false })
         .limit(this._maxSessions);
 
       if (error) {
-        logger.warn(
-          { component: "BrainSession", err: error.message },
-          "listSessions error",
-        );
+        logger.warn({ component: 'BrainSession', err: error.message }, 'listSessions error');
         return [];
       }
 
       return (data || []).map((s) => ({
         id: s.id,
         messageCount: (s.messages || []).length,
-        lastMessage:
-          (s.messages || []).slice(-1)[0]?.content?.slice(0, 80) || "",
+        lastMessage: (s.messages || []).slice(-1)[0]?.content?.slice(0, 80) || '',
         created_at: s.created_at,
         updated_at: s.updated_at,
       }));
     } catch (e) {
-      logger.error(
-        { component: "BrainSession", err: e.message },
-        "listSessions failed",
-      );
+      logger.error({ component: 'BrainSession', err: e.message }, 'listSessions failed');
       return [];
     }
   }
@@ -181,7 +162,7 @@ class BrainSession {
     if (!this._db) return;
 
     try {
-      const { error } = await this._db.from("brain_admin_sessions").upsert(
+      const { error } = await this._db.from('brain_admin_sessions').upsert(
         {
           id: session.id,
           messages: session.messages,
@@ -189,20 +170,14 @@ class BrainSession {
           created_at: session.created_at,
           updated_at: new Date().toISOString(),
         },
-        { onConflict: "id" },
+        { onConflict: 'id' }
       );
 
       if (error) {
-        logger.warn(
-          { component: "BrainSession", err: error.message },
-          "Persist failed",
-        );
+        logger.warn({ component: 'BrainSession', err: error.message }, 'Persist failed');
       }
     } catch (e) {
-      logger.error(
-        { component: "BrainSession", err: e.message },
-        "Persist error",
-      );
+      logger.error({ component: 'BrainSession', err: e.message }, 'Persist error');
     }
   }
 
@@ -212,14 +187,14 @@ class BrainSession {
    */
   buildHistory(session, maxMessages = 20) {
     const recent = session.messages.slice(-maxMessages);
-    if (recent.length === 0) return "(Conversație nouă — prima interacțiune)";
+    if (recent.length === 0) return '(Conversație nouă — prima interacțiune)';
 
     return recent
       .map((m) => {
-        const role = m.role === "user" ? "ADRIAN" : "CREIER";
+        const role = m.role === 'user' ? 'ADRIAN' : 'CREIER';
         return `[${role}] ${m.content}`;
       })
-      .join("\n\n");
+      .join('\n\n');
   }
 }
 

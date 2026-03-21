@@ -22,7 +22,7 @@
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, rgba(255,255,255,0.15), transparent);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.15), transparent);
   opacity: 0;
   transition: opacity 0.3s;
 }
@@ -30,8 +30,12 @@
   transform: translateY(-2px);
   box-shadow: 0 4px 24px rgba(99, 102, 241, 0.4);
 }
-.btn-primary:hover::before { opacity: 1; }
-.btn-primary:active { transform: translateY(0); }
+.btn-primary:hover::before {
+  opacity: 1;
+}
+.btn-primary:active {
+  transform: translateY(0);
+}
 
 .btn-secondary {
   background: transparent;
@@ -125,7 +129,9 @@
   border-color: var(--kelion-primary);
   box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
 }
-.input-field::placeholder { color: var(--kelion-text-muted); }
+.input-field::placeholder {
+  color: var(--kelion-text-muted);
+}
 
 /* ── Navbar ── */
 .navbar {
@@ -217,7 +223,9 @@
   border-radius: var(--kelion-radius-sm);
   transition: var(--kelion-transition);
 }
-.navbar-hamburger:hover { background: rgba(99, 102, 241, 0.08); }
+.navbar-hamburger:hover {
+  background: rgba(99, 102, 241, 0.08);
+}
 .navbar-hamburger span {
   display: block;
   width: 22px;
@@ -226,7 +234,9 @@
   border-radius: 2px;
   transition: var(--kelion-transition);
 }
-.navbar-hamburger:hover span { background: var(--kelion-text); }
+.navbar-hamburger:hover span {
+  background: var(--kelion-text);
+}
 
 /* Mobile nav menu */
 .navbar-mobile-menu {
@@ -244,7 +254,9 @@
   gap: 4px;
   z-index: calc(var(--z-sticky) - 1);
 }
-.navbar-mobile-menu.open { display: flex; }
+.navbar-mobile-menu.open {
+  display: flex;
+}
 .navbar-mobile-menu a {
   color: var(--kelion-text-secondary);
   text-decoration: none;
@@ -254,30 +266,61 @@
   border-bottom: 1px solid rgba(99, 102, 241, 0.06);
   transition: var(--kelion-transition);
 }
-.navbar-mobile-menu a:hover { color: var(--kelion-text); }
-.navbar-mobile-menu a:last-child { border-bottom: none; }
+.navbar-mobile-menu a:hover {
+  color: var(--kelion-text);
+}
+.navbar-mobile-menu a:last-child {
+  border-bottom: none;
+}
 
 /* ── Animații ── */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 @keyframes fadeInScale {
-  from { opacity: 0; transform: scale(0.95); }
-  to { opacity: 1; transform: scale(1); }
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
 }
 @keyframes shimmer {
-  0% { background-position: -200% center; }
-  100% { background-position: 200% center; }
+  0% {
+    background-position: -200% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
 }
 
-.animate-fade-in { animation: fadeIn 0.4s ease forwards; }
-.animate-fade-in-scale { animation: fadeInScale 0.3s ease forwards; }
-.animate-pulse { animation: pulse 2s infinite; }
+.animate-fade-in {
+  animation: fadeIn 0.4s ease forwards;
+}
+.animate-fade-in-scale {
+  animation: fadeInScale 0.3s ease forwards;
+}
+.animate-pulse {
+  animation: pulse 2s infinite;
+}
 
 /* ── Responsive ── */
 @media (max-width: 768px) {

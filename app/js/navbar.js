@@ -2,49 +2,49 @@
    KelionAI Navbar — interactive behaviors
    ═══════════════════════════════════════════ */
 (function () {
-    'use strict';
+  'use strict';
 
-    document.addEventListener('DOMContentLoaded', function () {
-        var hamburger = document.getElementById('navbar-hamburger');
-        var mobileMenu = document.getElementById('navbar-mobile-menu');
-        var langOptions = document.querySelectorAll('.lang-option');
-        var langLabel = document.getElementById('navbar-lang-label');
+  document.addEventListener('DOMContentLoaded', function () {
+    var hamburger = document.getElementById('navbar-hamburger');
+    var mobileMenu = document.getElementById('navbar-mobile-menu');
+    var langOptions = document.querySelectorAll('.lang-option');
+    var langLabel = document.getElementById('navbar-lang-label');
 
-        // Hamburger toggle
-        if (hamburger && mobileMenu) {
-            hamburger.addEventListener('click', function () {
-                mobileMenu.classList.toggle('open');
-            });
-            // Close on outside click
-            document.addEventListener('click', function (e) {
-                if (!hamburger.contains(e.target) && !mobileMenu.contains(e.target)) {
-                    mobileMenu.classList.remove('open');
-                }
-            });
+    // Hamburger toggle
+    if (hamburger && mobileMenu) {
+      hamburger.addEventListener('click', function () {
+        mobileMenu.classList.toggle('open');
+      });
+      // Close on outside click
+      document.addEventListener('click', function (e) {
+        if (!hamburger.contains(e.target) && !mobileMenu.contains(e.target)) {
+          mobileMenu.classList.remove('open');
         }
+      });
+    }
 
-        // Language switcher — update label, switch UI language, close dropdown on selection
-        langOptions.forEach(function (btn) {
-            btn.addEventListener('click', function () {
-                var lang = btn.getAttribute('data-lang');
-                if (langLabel && lang) {
-                    langLabel.textContent = lang.toUpperCase();
-                }
-                // Apply i18n language switch
-                if (window.i18n && lang) i18n.setLanguage(lang);
-                var dropdown = btn.closest('.lang-switcher');
-                if (dropdown) dropdown.classList.remove('open');
-            });
-        });
-
-        // Sync label with stored language on load
-        if (langLabel && window.i18n) {
-            langLabel.textContent = i18n.getLanguage().toUpperCase();
+    // Language switcher — update label, switch UI language, close dropdown on selection
+    langOptions.forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var lang = btn.getAttribute('data-lang');
+        if (langLabel && lang) {
+          langLabel.textContent = lang.toUpperCase();
         }
-
-        // Keep label in sync when language changes via other means
-        window.addEventListener('kelion-lang-changed', function (e) {
-            if (langLabel && e.detail && e.detail.lang) langLabel.textContent = e.detail.lang.toUpperCase();
-        });
+        // Apply i18n language switch
+        if (window.i18n && lang) i18n.setLanguage(lang);
+        var dropdown = btn.closest('.lang-switcher');
+        if (dropdown) dropdown.classList.remove('open');
+      });
     });
-}());
+
+    // Sync label with stored language on load
+    if (langLabel && window.i18n) {
+      langLabel.textContent = i18n.getLanguage().toUpperCase();
+    }
+
+    // Keep label in sync when language changes via other means
+    window.addEventListener('kelion-lang-changed', function (e) {
+      if (langLabel && e.detail && e.detail.lang) langLabel.textContent = e.detail.lang.toUpperCase();
+    });
+  });
+})();

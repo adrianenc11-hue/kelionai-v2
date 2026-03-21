@@ -35,9 +35,13 @@ function setupRealtimeVoice(io, appLocals) {
     let userId = null;
     if (token && supabaseAdmin) {
       try {
-        const { data: { user } } = await supabaseAdmin.auth.getUser(token);
+        const {
+          data: { user },
+        } = await supabaseAdmin.auth.getUser(token);
         if (user?.id) userId = user.id;
-      } catch (_e) { /* anonymous session */ }
+      } catch (_e) {
+        /* anonymous session */
+      }
     }
 
     // ── Per-connection transcript accumulation ──
@@ -49,7 +53,6 @@ function setupRealtimeVoice(io, appLocals) {
       { component: 'VoiceRealtime', avatar, language, userId: userId || 'anon', id: socket.id },
       'Client connected to voice-realtime (Socket.io)'
     );
-
 
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {

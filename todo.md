@@ -1,4 +1,5 @@
 # TODO COMPLET VALID — KelionAI v2.5
+
 > Ultima actualizare: 10 Mar 2026 22:07 — Auditat + implementat
 
 ---
@@ -46,7 +47,7 @@
 - [x] Categorii știri — filter pe /api/news/latest?category=X
 - [x] Mutare GPT-5.4 — deja setat în models.js
 - [x] Comenzi avatar din chat — setPose/playGesture/setExpression
-- [x] Mâinile lângă corp — _computeArmDownQuaternions()
+- [x] Mâinile lângă corp — \_computeArmDownQuaternions()
 - [x] Mărire avatari — camera z=1.15, bust framing
 
 ---
@@ -55,7 +56,7 @@
 
 - [ ] Audio INSTANT sub 1s — voice-stream pipeline de testat latența
 - [ ] brain.think() binary data — chat.js flow image→brain
-- [ ] Mouth stays closed — _mouthMorphCache force-close
+- [ ] Mouth stays closed — \_mouthMorphCache force-close
 - [ ] Brain repostare fidelă știri — news.js de verificat
 - [ ] Lip sync realist — alignment-lipsync.js + fft-lipsync.js
 - [ ] Doar engleză traducere — i18n detectLanguage()
