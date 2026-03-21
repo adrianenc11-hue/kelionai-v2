@@ -40,6 +40,9 @@ ENV NODE_ENV=production
 ENV PORT=3000
 EXPOSE 3000
 
+# Inception: drepturi de scriere pe /app pentru auto-edit
+RUN chown -R kelion:kelion /app
+
 USER kelion
 ENTRYPOINT ["dumb-init", "--"]
 CMD ["node", "server/index.js"]
