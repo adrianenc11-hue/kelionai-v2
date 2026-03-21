@@ -1155,7 +1155,7 @@ async function thinkV5(
     if (isABVariant) {
       logger.info({ component: 'ABTest', group: 'variant', mlIntent }, '🔀 A/B Test: routing to Claude (variant)');
     }
-    const shouldTryGPT = !!process.env.OPENAI_API_KEY; // TOATE intentiile → GPT-5.4 cu procedura universala
+    const shouldTryGPT = false; // 🚩 FLAG: Temporar OPRIT ca să forțăm Groq pentru testare
 
 
     if (shouldTryGPT) {
