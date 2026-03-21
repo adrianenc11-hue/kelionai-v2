@@ -9466,13 +9466,14 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
       }
     }
 
-    if (!result) throw new Error("All search engines failed");
+    if (!result) return { error: "All search engines failed — no results available" };
     logger.info({ component: "Brain", engine }, `🔍 Search via ${engine}`);
     return result;
   }
 
   async _weather(city, lat, lon) {
     this.toolStats.weather++;
+    try {
     let latitude, longitude, name, country;
     
     // If GPS coordinates provided, use directly (skip geocoding)
@@ -9490,7 +9491,7 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
           `${geoUrl}?name=${encodeURIComponent(city)}&count=1&language=ro`,
         )
       ).json();
-      if (!geo.results?.[0]) throw new Error("City not found");
+      if (!geo.results?.[0]) return { error: `Orașul "${city}" nu a fost găsit. Verifică ortografia.` };
       ({ latitude, longitude, name, country } = geo.results[0]);
     }
     const forecastUrl =
@@ -9532,6 +9533,9 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
       description: desc + (forecast ? ". Prognoza: " + forecast : ""),
       html,
     };
+    } catch (e) {
+      return { error: `Weather failed: ${e.message}` };
+    }
   }
 
   async _imagine(prompt) {
@@ -9602,6 +9606,7 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
 
   async _discoverAndSaveTool({ task_description, api_endpoint, method = 'GET', params_schema = {}, tool_name }) {
     if (!this.supabaseAdmin) return { success: false, error: 'Supabase not configured' };
+    try {
     // Test the endpoint
     let testResult = null;
     try {
@@ -9624,6 +9629,9 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
       }, { onConflict: 'name' });
     if (error) return { success: false, error: error.message };
     return { success: true, tool_name, endpoint: api_endpoint, test_result: testResult, message: `Tool '${tool_name}' saved to shared registry. Now use call_saved_tool to execute it.` };
+    } catch (e) {
+      return { success: false, error: `discover_and_save failed: ${e.message}` };
+    }
   }
 
   async _callSavedTool(toolName, params = {}) {
