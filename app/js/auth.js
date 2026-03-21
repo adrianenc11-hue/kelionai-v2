@@ -173,7 +173,7 @@
     }
   }
 
-  function updateAdminButtonState() {
+  async function updateAdminButtonState() {
     if (!currentUser) {
       // Remove admin buttons if logged out
       var existing = document.getElementById('btn-admin-nav');
@@ -182,6 +182,18 @@
       if (adminBtn) adminBtn.style.display = 'none';
       return;
     }
+
+    // Ensure _adminEmail is loaded (may not be ready on first login)
+    if (!window._adminEmail) {
+      try {
+        const cfgR = await fetch(API + '/api/config');
+        if (cfgR.ok) {
+          const cfg = await cfgR.json();
+          if (cfg.adminEmail) window._adminEmail = cfg.adminEmail;
+        }
+      } catch (_e) { /* non-blocking */ }
+    }
+
     // Check role OR email match
     const isAdminRole = currentUser.role === 'admin';
     const isAdminEmail =
@@ -208,13 +220,24 @@
       adminBtn.title = 'Admin Panel';
     }
 
+    // Fetch admin secret for admin users (so K1 panel works immediately)
+    if (isAdmin && !sessionStorage.getItem('kelion_admin_secret')) {
+      try {
+        const sr = await fetch(API + '/api/admin-secret', { headers: getAuthHeaders() });
+        if (sr.ok) {
+          const sd = await sr.json();
+          if (sd.secret) sessionStorage.setItem('kelion_admin_secret', sd.secret);
+        }
+      } catch (_e) { /* non-blocking */ }
+    }
+
     // Admin button removed from navbar — admin access is via user badge (user-name) click only
     // Clean up any existing nav admin button
     var navBtn = document.getElementById('btn-admin-nav');
     if (navBtn) navBtn.remove();
   }
 
-  function updateUI() {
+  async function updateUI() {
     const n = document.getElementById('user-name'),
       b = document.getElementById('btn-auth');
     if (currentUser) {
@@ -230,7 +253,7 @@
         b.title = 'Login';
       }
     }
-    updateAdminButtonState();
+    await updateAdminButtonState();
   }
 
   function initUI() {
