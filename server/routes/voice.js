@@ -147,9 +147,9 @@ router.post("/speak", ttsLimiter, validate(speakSchema), async (req, res) => {
         const gCtrl = new AbortController();
         const gTimer = setTimeout(() => gCtrl.abort(), 15000);
 
-        // Language + voice mapping (Journey > Neural2 > Standard)
+        // Language + voice mapping (Chirp3-HD > Journey > Neural2 > Wavenet)
         const gVoices = {
-          'ro': { kelion: { name: 'ro-RO-Wavenet-A', lang: 'ro-RO' }, kira: { name: 'ro-RO-Wavenet-B', lang: 'ro-RO' } },
+          'ro': { kelion: { name: 'ro-RO-Chirp3-HD-Achird', lang: 'ro-RO' }, kira: { name: 'ro-RO-Chirp3-HD-Laomedeia', lang: 'ro-RO' } },
           'en': { kelion: { name: 'en-US-Journey-D', lang: 'en-US' }, kira: { name: 'en-US-Journey-F', lang: 'en-US' } },
           'es': { kelion: { name: 'es-ES-Neural2-B', lang: 'es-ES' }, kira: { name: 'es-ES-Neural2-A', lang: 'es-ES' } },
           'fr': { kelion: { name: 'fr-FR-Neural2-B', lang: 'fr-FR' }, kira: { name: 'fr-FR-Neural2-A', lang: 'fr-FR' } },
@@ -166,12 +166,11 @@ router.post("/speak", ttsLimiter, validate(speakSchema), async (req, res) => {
         const langBase = (language || 'en').toLowerCase().split('-')[0];
         const voiceEntry = (gVoices[langBase] && gVoices[langBase][avatar]) 
                           || (avatar === 'kira' ? { name: 'en-US-Journey-F', lang: 'en-US' } : { name: 'en-US-Journey-D', lang: 'en-US' });
-        const voicePitch = (avatar === 'kira') ? 0 : -5.0; // Kelion = deep male, Kira = natural female
 
         const gBody = {
           input: { text },
           voice: { languageCode: voiceEntry.lang, name: voiceEntry.name },
-          audioConfig: { audioEncoding: 'MP3', speakingRate: 1.05, pitch: voicePitch }
+          audioConfig: { audioEncoding: 'MP3', speakingRate: 1.05, pitch: 0 }
         };
 
         const gResp = await fetch(`https://texttospeech.googleapis.com/v1/text:synthesize?key=${GOOGLE_TTS_KEY}`, {
