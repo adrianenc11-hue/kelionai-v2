@@ -643,6 +643,23 @@ router.post(
           break;
         }
 
+        case "charge.refunded":
+        case "charge.dispute.created": {
+          const charge = event.data.object;
+          const customerId = charge.customer;
+          if (customerId) {
+            await supabaseAdmin
+              .from("subscriptions")
+              .update({ status: "cancelled", plan: "free" })
+              .eq("stripe_customer_id", customerId);
+            logger.info(
+              { component: "Payments", customerId, type: event.type },
+              "Sub cancelled due to refund or dispute"
+            );
+          }
+          break;
+        }
+
         case "invoice.payment_failed": {
           const invoice = event.data.object;
           const subId = invoice.subscription;
@@ -668,104 +685,6 @@ router.post(
   },
 );
 
-// POST /api/payments/referral â€” generate referral code
-router.post("/referral", async (req, res) => {
-  try {
-    const { getUserFromToken, supabaseAdmin } = req.app.locals;
-    const user = await getUserFromToken(req);
-    if (!user) return res.status(401).json({ error: "Not authenticated" });
-    if (!supabaseAdmin)
-      return res.status(503).json({ error: "Database unavailable" });
-
-    // Check if user already has a referral code
-    const { data: existing } = await supabaseAdmin
-      .from("referrals")
-      .select("code")
-      .eq("user_id", user.id)
-      .single();
-
-    if (existing) return res.json({ code: existing.code });
-
-    const code = generateReferralCode();
-    await supabaseAdmin.from("referrals").insert({ user_id: user.id, code });
-
-    res.json({ code });
-  } catch {
-    res.status(500).json({ error: "Referral error" });
-  }
-});
-
-// POST /api/payments/redeem â€” redeem referral code (7 days Pro for both)
-router.post("/redeem", async (req, res) => {
-  try {
-    const { getUserFromToken, supabaseAdmin } = req.app.locals;
-    const user = await getUserFromToken(req);
-    if (!user) return res.status(401).json({ error: "Not authenticated" });
-    if (!supabaseAdmin)
-      return res.status(503).json({ error: "Database unavailable" });
-
-    const { code } = req.body;
-    if (!code) return res.status(400).json({ error: "Code is required" });
-
-    const { data: referral } = await supabaseAdmin
-      .from("referrals")
-      .select("user_id, code, redeemed_by")
-      .eq("code", code.toUpperCase())
-      .single();
-
-    if (!referral) return res.status(404).json({ error: "Invalid code" });
-    if (referral.user_id === user.id)
-      return res
-        .status(400)
-        .json({ error: "You cannot use your own referral code" });
-    if (referral.redeemed_by && referral.redeemed_by.includes(user.id)) {
-      return res.status(400).json({ error: "Code already used" });
-    }
-
-    const proEnd = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-
-    // Give Pro to redeemer
-    await supabaseAdmin.from("subscriptions").upsert(
-      {
-        user_id: user.id,
-        plan: "pro",
-        status: "active",
-        current_period_start: new Date().toISOString(),
-        current_period_end: proEnd,
-        source: "referral",
-      },
-      { onConflict: "user_id" },
-    );
-
-    // Give Pro to referrer
-    await supabaseAdmin.from("subscriptions").upsert(
-      {
-        user_id: referral.user_id,
-        plan: "pro",
-        status: "active",
-        current_period_start: new Date().toISOString(),
-        current_period_end: proEnd,
-        source: "referral",
-      },
-      { onConflict: "user_id" },
-    );
-
-    // Track redemption
-    const redeemed = referral.redeemed_by || [];
-    redeemed.push(user.id);
-    await supabaseAdmin
-      .from("referrals")
-      .update({ redeemed_by: redeemed })
-      .eq("code", code.toUpperCase());
-
-    res.json({
-      success: true,
-      message: "7 days Pro activated for you and your friend!",
-    });
-  } catch {
-    res.status(500).json({ error: "Redeem error" });
-  }
-});
 
 // â•â•â• DEVELOPER API KEY MANAGEMENT â•â•â•
 

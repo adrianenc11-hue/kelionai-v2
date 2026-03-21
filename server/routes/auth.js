@@ -134,12 +134,8 @@ router.post('/login', authLimiter, validate(loginSchema), async (req, res) => {
 
 // POST /api/auth/logout
 router.post('/logout', async (req, res) => {
-  try {
-    const { supabase } = req.app.locals;
-    if (supabase) await supabase.auth.signOut();
-  } catch (e) {
-    logger.warn({ component: 'Auth', err: e.message }, 'logout failed (non-critical)');
-  }
+  // We no longer call supabase.auth.signOut() on the shared client to prevent accidentally logging out other users.
+  // The frontend handles clearing the token locally.
   res.json({ success: true });
 });
 
@@ -167,10 +163,16 @@ router.get('/me', async (req, res) => {
 // POST /api/auth/refresh
 router.post('/refresh', validate(refreshSchema), async (req, res) => {
   try {
-    const { supabase } = req.app.locals;
     const { refresh_token } = req.body;
-    if (!refresh_token || !supabase) return res.status(400).json({ error: 'Token missing' });
-    const { data, error } = await supabase.auth.refreshSession({
+    if (!refresh_token) return res.status(400).json({ error: 'Token missing' });
+    
+    // Create a fresh client to avoid shared session state conflits
+    const { createClient } = require('@supabase/supabase-js');
+    const freshClient = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+
+    const { data, error } = await freshClient.auth.refreshSession({
       refresh_token,
     });
     if (error) return res.status(401).json({ error: error.message });
@@ -190,11 +192,16 @@ router.post('/refresh', validate(refreshSchema), async (req, res) => {
 // POST /api/auth/forgot-password
 router.post('/forgot-password', authLimiter, validate(forgotPasswordSchema), async (req, res) => {
   try {
-    const { supabase } = req.app.locals;
     const { email } = req.body;
-    if (!supabase) return res.status(503).json({ error: 'Auth service unavailable' });
+    
+    // Create a fresh client to avoid shared state mutations
+    const { createClient } = require('@supabase/supabase-js');
+    const freshClient = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+
     const redirectTo = process.env.APP_URL + '/reset-password.html';
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    const { error } = await freshClient.auth.resetPasswordForEmail(email, {
       redirectTo,
     });
     if (error) return res.status(400).json({ error: error.message });
@@ -209,15 +216,20 @@ router.post('/forgot-password', authLimiter, validate(forgotPasswordSchema), asy
 // POST /api/auth/reset-password
 router.post('/reset-password', authLimiter, validate(resetPasswordSchema), async (req, res) => {
   try {
-    const { supabase } = req.app.locals;
     const { access_token, password } = req.body;
-    if (!supabase) return res.status(503).json({ error: 'Auth service unavailable' });
-    const { error: sessionError } = await supabase.auth.setSession({
+    
+    // Create a fresh client to avoid shared state mutations
+    const { createClient } = require('@supabase/supabase-js');
+    const freshClient = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+
+    const { error: sessionError } = await freshClient.auth.setSession({
       access_token,
       refresh_token: access_token,
     });
     if (sessionError) return res.status(401).json({ error: 'Invalid or expired reset token' });
-    const { error } = await supabase.auth.updateUser({ password });
+    const { error } = await freshClient.auth.updateUser({ password });
     if (error) return res.status(400).json({ error: error.message });
     res.json({ message: 'Password updated successfully.' });
   } catch {
@@ -228,12 +240,14 @@ router.post('/reset-password', authLimiter, validate(resetPasswordSchema), async
 // POST /api/auth/change-password
 router.post('/change-password', authLimiter, validate(changePasswordSchema), async (req, res) => {
   try {
-    const { getUserFromToken, supabase } = req.app.locals;
+    const { getUserFromToken, supabaseAdmin } = req.app.locals;
     const u = await getUserFromToken(req);
     if (!u) return res.status(401).json({ error: 'Not authenticated' });
-    if (!supabase) return res.status(503).json({ error: 'Auth service unavailable' });
+    if (!supabaseAdmin) return res.status(503).json({ error: 'Auth service unavailable' });
     const { password } = req.body;
-    const { error } = await supabase.auth.updateUser({ password });
+    
+    // Use admin client to avoid shared session race conditions
+    const { error } = await supabaseAdmin.auth.admin.updateUserById(u.id, { password });
     if (error) return res.status(400).json({ error: error.message });
     res.json({ message: 'Password updated successfully.' });
   } catch {
@@ -244,12 +258,14 @@ router.post('/change-password', authLimiter, validate(changePasswordSchema), asy
 // POST /api/auth/change-email
 router.post('/change-email', authLimiter, validate(changeEmailSchema), async (req, res) => {
   try {
-    const { getUserFromToken, supabase } = req.app.locals;
+    const { getUserFromToken, supabaseAdmin } = req.app.locals;
     const u = await getUserFromToken(req);
     if (!u) return res.status(401).json({ error: 'Not authenticated' });
-    if (!supabase) return res.status(503).json({ error: 'Auth service unavailable' });
+    if (!supabaseAdmin) return res.status(503).json({ error: 'Auth service unavailable' });
     const { email } = req.body;
-    const { error } = await supabase.auth.updateUser({ email });
+    
+    // Use admin client to avoid shared session race conditions
+    const { error } = await supabaseAdmin.auth.admin.updateUserById(u.id, { email });
     if (error) return res.status(400).json({ error: error.message });
     res.json({
       message: 'A confirmation email has been sent to the new address.',

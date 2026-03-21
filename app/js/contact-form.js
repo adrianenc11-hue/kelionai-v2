@@ -139,7 +139,7 @@ function ensureContactModal() {
       <input type="text" id="contact-signature" placeholder="Your name" />
     </div>
     <div class="letter-actions">
-      <button class="letter-btn-cancel" onclick="document.getElementById('contact-modal').classList.add('hidden')">✕ Cancel</button>
+      <button class="letter-btn-cancel" onclick="document.getElementById('contact-modal').classList.add('hidden')">← Back</button>
       <button class="letter-btn-send" id="contact-send-btn" onclick="sendContactLetter()">✉ Send Letter</button>
     </div>
     <div class="letter-status" id="contact-status"></div>

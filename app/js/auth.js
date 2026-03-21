@@ -231,10 +231,31 @@
       } catch (_e) { /* non-blocking */ }
     }
 
-    // Admin button removed from navbar — admin access is via user badge (user-name) click only
-    // Clean up any existing nav admin button
+    // Show admin button in navbar for admin users
     var navBtn = document.getElementById('btn-admin-nav');
-    if (navBtn) navBtn.remove();
+    if (isAdmin) {
+      if (!navBtn) {
+        var navRight = document.querySelector('.nav-right') || document.querySelector('nav');
+        if (navRight) {
+          navBtn = document.createElement('button');
+          navBtn.id = 'btn-admin-nav';
+          navBtn.className = 'btn-secondary';
+          navBtn.onclick = function() { window.location.href = '/admin'; };
+          var logoutBtn = document.getElementById('btn-auth');
+          if (logoutBtn) navRight.insertBefore(navBtn, logoutBtn);
+          else navRight.appendChild(navBtn);
+        }
+      }
+      if (navBtn) {
+        navBtn.innerHTML = '🛡️ Admin';
+        navBtn.style.background = 'rgba(16,185,129,0.25)';
+        navBtn.style.borderColor = 'rgba(16,185,129,0.5)';
+        navBtn.style.color = '#6ee7b7';
+        navBtn.style.display = '';
+      }
+    } else if (navBtn) {
+      navBtn.remove();
+    }
   }
 
   async function updateUI() {
@@ -342,9 +363,21 @@
                   body: JSON.stringify({ code: storedCode }),
                 });
                 const rd = await rr.json();
-                if (rd.success) localStorage.removeItem('kelion_referral_code');
+                if (rd.success) {
+                  localStorage.removeItem('kelion_referral_code');
+                } else {
+                  if (err) {
+                    err.style.color = '#ff4444';
+                    err.textContent = 'Referral error: ' + (rd.error || 'Failed to redeem');
+                  }
+                  localStorage.removeItem('kelion_referral_code');
+                }
               } catch (_e) {
-                /* ignored */
+                if (err) {
+                  err.style.color = '#ff4444';
+                  err.textContent = 'Referral error: ' + _e.message;
+                }
+                localStorage.removeItem('kelion_referral_code');
               }
             }
             scr.classList.add('hidden');

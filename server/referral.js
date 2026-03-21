@@ -941,7 +941,7 @@ router.get("/stats", async (req, res) => {
 });
 
 // GET /api/referral/code — get or generate user's referral code
-router.get("/code", async (req, res) => {
+router.get("/code", generateLimiter, async (req, res) => {
   try {
     const { getUserFromToken, supabaseAdmin } = req.app.locals;
     const user = await getUserFromToken(req);
@@ -1005,6 +1005,22 @@ router.get("/leaderboard", async (req, res) => {
     res.status(500).json({ error: "Leaderboard error" });
   }
 });
+
+// ═══ EXPIRED CODES CLEANUP ═══
+setInterval(async () => {
+  try {
+    const { supabaseAdmin } = require("./supabase");
+    if (supabaseAdmin) {
+      await supabaseAdmin
+        .from("referral_codes")
+        .update({ status: "expired" })
+        .eq("status", "active")
+        .lt("expires_at", new Date().toISOString());
+    }
+  } catch (e) {
+    logger.error({ component: "Referral", err: e.message }, "Cleanup error");
+  }
+}, 24 * 60 * 60 * 1000);
 
 module.exports = {
   router,
