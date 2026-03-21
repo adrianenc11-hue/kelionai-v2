@@ -207,6 +207,14 @@ async function loadBrainSection() {
         var hc = await hcR.json();
         function ic(ok) { return ok ? '<span style="color:#00ff88">✅</span>' : '<span style="color:#ff4444">❌</span>'; }
 
+        // Score & Grade
+        if (hc.score !== undefined) {
+          var gc = (hc.grade === 'A' || hc.grade === 'B') ? '#00ff88' : hc.grade === 'C' ? '#ffaa00' : '#ff4444';
+          html += '<h3>📊 Health Score</h3><div class="hc-section">';
+          html += '<div class="hc-line" style="font-size:1.5rem"><b style="color:' + gc + '">' + hc.score + '/100</b> — Grade: <b style="color:' + gc + '">' + esc(hc.grade) + '</b></div>';
+          html += '</div>';
+        }
+
         // Server info
         html += '<h3>🖥 Server</h3><div class="hc-section">';
         if (hc.server) {
@@ -220,12 +228,13 @@ async function loadBrainSection() {
         }
         html += '</div>';
 
-        // Services
+        // Services — use sv.active (not sv.configured)
         html += '<h3>🔌 Services</h3><div class="hc-section">';
         if (hc.services) {
           for (var sk in hc.services) {
             var sv = hc.services[sk];
-            html += '<div class="hc-line">' + ic(sv.configured) + ' ' + esc(sv.label || sk) + '</div>';
+            var isActive = sv.active !== undefined ? sv.active : sv.configured;
+            html += '<div class="hc-line">' + ic(isActive) + ' ' + esc(sv.label || sk) + '</div>';
           }
         }
         html += '</div>';
@@ -236,7 +245,12 @@ async function loadBrainSection() {
           html += '<div class="hc-line">' + ic(hc.database.connected) + ' Connected</div>';
           if (hc.database.tables) {
             for (var tk in hc.database.tables) {
-              html += '<div class="hc-line">' + ic(hc.database.tables[tk]) + ' ' + esc(tk) + '</div>';
+              var tv = hc.database.tables[tk];
+              if (typeof tv === 'object') {
+                html += '<div class="hc-line">' + ic(tv.ok) + ' ' + esc(tk) + (tv.count !== undefined ? ' (' + tv.count + ' rows)' : '') + '</div>';
+              } else {
+                html += '<div class="hc-line">' + ic(tv) + ' ' + esc(tk) + '</div>';
+              }
             }
           }
         }
@@ -251,6 +265,14 @@ async function loadBrainSection() {
           html += '<div class="hc-line">Recent Errors: <b style="color:' + (hc.brain.recentErrors > 0 ? '#ff4444' : '#00ff88') + '">' + (hc.brain.recentErrors || 0) + '</b></div>';
           if (hc.brain.degradedTools && hc.brain.degradedTools.length) {
             html += '<div class="hc-line" style="color:#ff4444">Degraded Tools: <b>' + hc.brain.degradedTools.join(', ') + '</b></div>';
+          }
+          if (hc.brain.journal && hc.brain.journal.length) {
+            html += '<div style="margin-top:8px;font-size:0.8rem;color:#888">';
+            for (var ji = 0; ji < hc.brain.journal.length; ji++) {
+              var j = hc.brain.journal[ji];
+              html += '<div style="padding:2px 0;border-bottom:1px solid rgba(255,255,255,0.04)">' + new Date(j.time).toLocaleTimeString() + ' — <b>' + esc(j.event) + '</b>: ' + esc(j.lesson) + '</div>';
+            }
+            html += '</div>';
           }
         }
         html += '</div>';
@@ -281,6 +303,39 @@ async function loadBrainSection() {
           }
         }
         html += '</div>';
+
+        // Rate Limits
+        if (hc.rateLimits) {
+          html += '<h3>⏱ Rate Limits</h3><div class="hc-section">';
+          if (hc.rateLimits.global) {
+            html += '<div class="hc-line">Global: <b>' + esc(hc.rateLimits.global) + '</b></div>';
+          }
+          for (var rlk in hc.rateLimits) {
+            if (rlk !== 'global') {
+              var rlv = hc.rateLimits[rlk];
+              html += '<div class="hc-line">' + esc(rlk) + ': <b>' + esc(typeof rlv === 'object' ? JSON.stringify(rlv) : rlv) + '</b></div>';
+            }
+          }
+          html += '</div>';
+        }
+
+        // Errors
+        if (hc.errors && hc.errors.length > 0) {
+          html += '<h3>🔴 Errors</h3><div class="hc-section">';
+          for (var ei = 0; ei < hc.errors.length; ei++) {
+            html += '<div class="hc-line" style="color:#ff4444">' + esc(hc.errors[ei]) + '</div>';
+          }
+          html += '</div>';
+        }
+
+        // Recommendations
+        if (hc.recommendations && hc.recommendations.length > 0) {
+          html += '<h3>⚠️ Recommendations</h3><div class="hc-section">';
+          for (var ri = 0; ri < hc.recommendations.length; ri++) {
+            html += '<div class="hc-line" style="color:#ffcc66;background:rgba(255,170,0,0.08);padding:6px 10px;border-radius:6px;margin-bottom:4px">' + esc(hc.recommendations[ri]) + '</div>';
+          }
+          html += '</div>';
+        }
 
         // Self-Heal
         html += '<h3>🩺 Self-Heal Engine</h3><div class="hc-section">';
