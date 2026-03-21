@@ -178,7 +178,7 @@
       // Remove admin buttons if logged out
       var existing = document.getElementById('btn-admin-nav');
       if (existing) existing.remove();
-      var adminBtn = document.getElementById('btn-admin');
+      var adminBtn = document.getElementById('user-name');
       if (adminBtn) adminBtn.style.display = 'none';
       return;
     }
@@ -203,7 +203,7 @@
     const isAdmin = isAdminRole || isAdminEmail;
 
     // Handle static btn-admin (if exists in HTML)
-    var adminBtn = document.getElementById('btn-admin');
+    var adminBtn = document.getElementById('user-name');
     if (adminBtn) {
       if (!isAdmin) {
         adminBtn.style.display = 'none';
