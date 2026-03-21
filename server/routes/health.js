@@ -47,6 +47,22 @@ router.get("/", (req, res) => {
   });
 });
 
+// GET /api/health/brain-debug — Raw brain error state (temporary diagnostic)
+router.get("/brain-debug", (req, res) => {
+  const { brain } = req.app.locals;
+  if (!brain) return res.json({ error: "no brain" });
+  const diag = brain.getDiagnostics();
+  res.json({
+    uptime: process.uptime(),
+    conversations: brain.conversationCount,
+    toolErrors: brain.toolErrors,
+    errorLog: brain.errorLog.slice(-10),
+    status: diag.status,
+    degradedTools: diag.degradedTools || diag.failedTools,
+    recentErrorCount: diag.recentErrors,
+  });
+});
+
 // GET /api/health/test-tables — Test all 28 Supabase tables (read-only)
 router.get("/test-tables", async (req, res) => {
   const { supabaseAdmin } = req.app.locals;
