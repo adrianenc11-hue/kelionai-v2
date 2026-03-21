@@ -138,53 +138,63 @@ router.post("/speak", ttsLimiter, validate(speakSchema), async (req, res) => {
     let alignment = null;
     let ttsEngine = "ElevenLabs";
 
-    // ── TRY 0: Microsoft Azure (Top Tier Enterprise TTS) ──
-    if (process.env.AZURE_TTS_API_KEY && process.env.AZURE_TTS_REGION) {
+    // ══════════════════════════════════════════════════════════
+    // TRY 0: Google Cloud TTS (PRIMARY — Journey/Neural2 voices)
+    // ══════════════════════════════════════════════════════════
+    const GOOGLE_TTS_KEY = process.env.GOOGLE_TTS_API_KEY || process.env.GOOGLE_AI_KEY;
+    if (GOOGLE_TTS_KEY) {
       try {
-        const azureCtrl = new AbortController();
-        const azureTimer = setTimeout(() => azureCtrl.abort(), 12000);
-        
-        // Map Avatar + Lang to Azure Neural Voices
-        const azureVoices = {
-          'ro': { kelion: 'ro-RO-EmilNeural', kira: 'ro-RO-AlinaNeural' },
-          'en': { kelion: 'en-US-GuyNeural', kira: 'en-US-AriaNeural' },
-          'es': { kelion: 'es-ES-AlvaroNeural', kira: 'es-ES-ElviraNeural' },
-          'fr': { kelion: 'fr-FR-HenriNeural', kira: 'fr-FR-DeniseNeural' },
-          'de': { kelion: 'de-DE-ConradNeural', kira: 'de-DE-KatjaNeural' },
-          'it': { kelion: 'it-IT-DiegoNeural', kira: 'it-IT-ElsaNeural' },
-          'zh': { kelion: 'zh-CN-YunxiNeural', kira: 'zh-CN-XiaoxiaoNeural' },
-          'ja': { kelion: 'ja-JP-KeitaNeural', kira: 'ja-JP-NanamiNeural' }
+        const gCtrl = new AbortController();
+        const gTimer = setTimeout(() => gCtrl.abort(), 15000);
+
+        // Language + voice mapping (Journey > Neural2 > Standard)
+        const gVoices = {
+          'ro': { kelion: { name: 'ro-RO-Wavenet-A', lang: 'ro-RO' }, kira: { name: 'ro-RO-Wavenet-B', lang: 'ro-RO' } },
+          'en': { kelion: { name: 'en-US-Journey-D', lang: 'en-US' }, kira: { name: 'en-US-Journey-F', lang: 'en-US' } },
+          'es': { kelion: { name: 'es-ES-Neural2-B', lang: 'es-ES' }, kira: { name: 'es-ES-Neural2-A', lang: 'es-ES' } },
+          'fr': { kelion: { name: 'fr-FR-Neural2-B', lang: 'fr-FR' }, kira: { name: 'fr-FR-Neural2-A', lang: 'fr-FR' } },
+          'de': { kelion: { name: 'de-DE-Neural2-B', lang: 'de-DE' }, kira: { name: 'de-DE-Neural2-A', lang: 'de-DE' } },
+          'it': { kelion: { name: 'it-IT-Neural2-C', lang: 'it-IT' }, kira: { name: 'it-IT-Neural2-A', lang: 'it-IT' } },
+          'zh': { kelion: { name: 'cmn-CN-Wavenet-B', lang: 'cmn-CN' }, kira: { name: 'cmn-CN-Wavenet-A', lang: 'cmn-CN' } },
+          'ja': { kelion: { name: 'ja-JP-Neural2-C', lang: 'ja-JP' }, kira: { name: 'ja-JP-Neural2-B', lang: 'ja-JP' } },
+          'ko': { kelion: { name: 'ko-KR-Neural2-C', lang: 'ko-KR' }, kira: { name: 'ko-KR-Neural2-A', lang: 'ko-KR' } },
+          'pt': { kelion: { name: 'pt-BR-Neural2-B', lang: 'pt-BR' }, kira: { name: 'pt-BR-Neural2-A', lang: 'pt-BR' } },
+          'hi': { kelion: { name: 'hi-IN-Neural2-B', lang: 'hi-IN' }, kira: { name: 'hi-IN-Neural2-A', lang: 'hi-IN' } },
+          'ar': { kelion: { name: 'ar-XA-Wavenet-B', lang: 'ar-XA' }, kira: { name: 'ar-XA-Wavenet-A', lang: 'ar-XA' } },
+          'tr': { kelion: { name: 'tr-TR-Wavenet-B', lang: 'tr-TR' }, kira: { name: 'tr-TR-Wavenet-A', lang: 'tr-TR' } },
         };
         const langBase = (language || 'ro').toLowerCase().split('-')[0];
-        const aVoice = (azureVoices[langBase] && azureVoices[langBase][avatar]) 
-                       || (avatar === 'kira' ? 'en-US-AriaNeural' : 'en-US-GuyNeural');
-        const langCode = aVoice.split('-').slice(0, 2).join('-'); // e.g. ro-RO
-        
-        const ssml = `<speak version='1.0' xml:lang='${langCode}'><voice xml:lang='${langCode}' name='${aVoice}'><prosody rate="fast">${text}</prosody></voice></speak>`;
+        const voiceEntry = (gVoices[langBase] && gVoices[langBase][avatar]) 
+                          || (avatar === 'kira' ? { name: 'en-US-Journey-F', lang: 'en-US' } : { name: 'en-US-Journey-D', lang: 'en-US' });
 
-        const azureRes = await fetch(`https://${process.env.AZURE_TTS_REGION}.tts.speech.microsoft.com/cognitiveservices/v1`, {
+        const gBody = {
+          input: { text },
+          voice: { languageCode: voiceEntry.lang, name: voiceEntry.name },
+          audioConfig: { audioEncoding: 'MP3', speakingRate: 1.05, pitch: 0 }
+        };
+
+        const gResp = await fetch(`https://texttospeech.googleapis.com/v1/text:synthesize?key=${GOOGLE_TTS_KEY}`, {
           method: 'POST',
-          signal: azureCtrl.signal,
-          headers: {
-            'Ocp-Apim-Subscription-Key': process.env.AZURE_TTS_API_KEY,
-            'Content-Type': 'application/ssml+xml',
-            'X-Microsoft-OutputFormat': 'audio-16khz-128kbitrate-mono-mp3',
-            'User-Agent': 'KelionAI'
-          },
-          body: ssml
+          signal: gCtrl.signal,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(gBody),
         });
-        clearTimeout(azureTimer);
+        clearTimeout(gTimer);
 
-        if (azureRes.ok) {
-           buf = Buffer.from(await azureRes.arrayBuffer());
-           ttsEngine = "Azure";
-           alignment = null; // Backend Rhubarb will kick in to calculate lip-sync locally!
-           logger.info({ component: "Speak" }, "Azure TTS OK (Neural Voice)");
+        if (gResp.ok) {
+          const gData = await gResp.json();
+          if (gData.audioContent) {
+            buf = Buffer.from(gData.audioContent, 'base64');
+            ttsEngine = "GoogleCloud";
+            alignment = null;
+            logger.info({ component: "Speak", voice: voiceEntry.name }, "Google Cloud TTS OK");
+          }
         } else {
-           logger.warn({ component: "Speak", status: azureRes.status }, "Azure TTS failed, falling back to ElevenLabs");
+          const errText = await gResp.text().catch(() => '');
+          logger.warn({ component: "Speak", status: gResp.status, err: errText }, "Google Cloud TTS failed, falling through");
         }
       } catch (e) {
-         logger.warn({ component: "Speak", err: e.message }, "Azure TTS error, falling back to ElevenLabs");
+        logger.warn({ component: "Speak", err: e.message }, "Google Cloud TTS error, falling through");
       }
     }
 
