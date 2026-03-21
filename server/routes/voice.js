@@ -142,7 +142,7 @@ router.post("/speak", ttsLimiter, validate(speakSchema), async (req, res) => {
     if (process.env.ELEVENLABS_API_KEY) {
       try {
         const el11Ctrl = new AbortController();
-        const el11Timer = setTimeout(() => el11Ctrl.abort(), 10000);
+        const el11Timer = setTimeout(() => el11Ctrl.abort(), 30000); // 🚩 30 secunde: lăsăm ElevenLabs să genereze liniștit, fără grabă
         const r = await fetch(
           "https://api.elevenlabs.io/v1/text-to-speech/" +
             vid +
