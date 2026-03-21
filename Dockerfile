@@ -22,7 +22,8 @@ RUN apk add --no-cache dumb-init curl && rm -rf /var/cache/apk/*
 # Copy deps
 COPY --from=deps /app/node_modules ./node_modules
 
-# Copy app
+# Copy app (ARG bust forces rebuild when code changes)
+ARG CACHE_BUST=1
 COPY package.json ./
 COPY server/ ./server/
 COPY app/ ./app/
