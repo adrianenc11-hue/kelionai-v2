@@ -166,11 +166,12 @@ router.post("/speak", ttsLimiter, validate(speakSchema), async (req, res) => {
         const langBase = (language || 'en').toLowerCase().split('-')[0];
         const voiceEntry = (gVoices[langBase] && gVoices[langBase][avatar]) 
                           || (avatar === 'kira' ? { name: 'en-US-Journey-F', lang: 'en-US' } : { name: 'en-US-Journey-D', lang: 'en-US' });
+        const voicePitch = (avatar === 'kira') ? 0 : -5.0; // Kelion = deep male, Kira = natural female
 
         const gBody = {
           input: { text },
           voice: { languageCode: voiceEntry.lang, name: voiceEntry.name },
-          audioConfig: { audioEncoding: 'MP3', speakingRate: 1.05, pitch: 0 }
+          audioConfig: { audioEncoding: 'MP3', speakingRate: 1.05, pitch: voicePitch }
         };
 
         const gResp = await fetch(`https://texttospeech.googleapis.com/v1/text:synthesize?key=${GOOGLE_TTS_KEY}`, {
