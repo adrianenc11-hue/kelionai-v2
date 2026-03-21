@@ -646,37 +646,9 @@ process.on('SIGINT', async () => {
   process.exit(0);
 });
 
-// ═══ SELF-HEAL LOOP — auto-detect and analyze tool errors ═══
-setInterval(async () => {
-  if (!brain) return;
-  const errored = Object.entries(brain.toolErrors).filter(([, c]) => c > 0);
-  if (errored.length === 0) return;
-  const recentErrors = brain.errorLog.filter(e => Date.now() - e.time < 300000); // last 5 min
-  for (const [tool, count] of errored) {
-    const recent = recentErrors.filter(e => e.tool === tool);
-    if (recent.length === 0 && count > 0) {
-      // No recent errors for this tool — it recovered, clear counter
-      logger.info({ component: 'SelfHeal', tool, clearedCount: count }, `🩺 Tool '${tool}' recovered — clearing ${count} old errors`);
-      brain.toolErrors[tool] = 0;
-    } else if (recent.length > 0) {
-      // Still failing — log analysis
-      const lastErr = recent[recent.length - 1];
-      logger.warn({ component: 'SelfHeal', tool, count, lastError: lastErr.msg }, `🔴 Tool '${tool}' still failing: ${lastErr.msg}`);
-      // Save analysis to brain_memory for K1 to read
-      if (supabaseAdmin) {
-        try {
-          await supabaseAdmin.from('brain_memory').upsert({
-            user_id: 'system',
-            memory_type: 'self_heal',
-            content: `[SELF-HEAL] Tool '${tool}' has ${count} errors. Last: ${lastErr.msg}`,
-            context: { tool, count, lastError: lastErr.msg, timestamp: new Date().toISOString() },
-            importance: 9,
-          }, { onConflict: 'user_id,memory_type' }).catch(() => {});
-        } catch (_) {}
-      }
-    }
-  }
-}, 60000); // Check every 60 seconds
+// ═══ K1 SELF-HEAL ENGINE — autonomous error detection, diagnosis, repair & deploy ═══
+const { startSelfHealLoop } = require("./self-heal");
+startSelfHealLoop(brain, supabaseAdmin);
 
 // ═══ AUTH HELPER ═══
 async function getUserFromToken(req) {
