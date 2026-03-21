@@ -352,12 +352,12 @@ app.use((req, res, next) => {
               let geo = global._geoCache[realIp];
               if (!geo) {
                 const geoR = await fetch(
-                  'http://ip-api.com/json/' + encodeURIComponent(realIp) + '?fields=countryCode',
+                  'https://api.country.is/' + encodeURIComponent(realIp),
                   { signal: AbortSignal.timeout(2000) }
                 );
                 if (geoR.ok) {
                   const geoD = await geoR.json();
-                  geo = geoD.countryCode || null;
+                  geo = geoD.country || null;
                   if (geo) global._geoCache[realIp] = geo;
                   const keys = Object.keys(global._geoCache);
                   if (keys.length > 500) {
@@ -720,8 +720,8 @@ app.post('/api/track/visit', express.json({ limit: '200kb' }), async (req, res) 
       let city = null;
       try {
         if (!country && realIp !== 'unknown') {
-          const geoR = await fetch('http://ip-api.com/json/' + encodeURIComponent(realIp) + '?fields=countryCode,city', { signal: AbortSignal.timeout(2000) });
-          if (geoR.ok) { const g = await geoR.json(); country = g.countryCode; city = g.city || null; }
+          const geoR = await fetch('https://api.country.is/' + encodeURIComponent(realIp), { signal: AbortSignal.timeout(2000) });
+          if (geoR.ok) { const g = await geoR.json(); country = g.country; city = null; }
         }
       } catch (_) {}
       await supabaseAdmin.from('visitors').insert({
