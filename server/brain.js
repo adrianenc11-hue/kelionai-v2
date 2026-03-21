@@ -7599,7 +7599,7 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
     );
     if (ytMatch) {
       const ytEmbed =
-        this.getToolUrl("youtube_embed") || "https://www.youtube.com/embed";
+        this.getToolUrl("youtube_embed") || "https://www.youtube-nocookie.com/embed";
       const embedUrl = `${ytEmbed}/${ytMatch[1]}?autoplay=1`;
       await this._logMedia("video", embedUrl, query);
       return {
@@ -9471,18 +9471,28 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
     return result;
   }
 
-  async _weather(city) {
+  async _weather(city, lat, lon) {
     this.toolStats.weather++;
-    const geoUrl =
-      this.getToolUrl("open_meteo_geo") ||
-      "https://geocoding-api.open-meteo.com/v1/search";
-    const geo = await (
-      await fetch(
-        `${geoUrl}?name=${encodeURIComponent(city)}&count=1&language=ro`,
-      )
-    ).json();
-    if (!geo.results?.[0]) throw new Error("City not found");
-    const { latitude, longitude, name, country } = geo.results[0];
+    let latitude, longitude, name, country;
+    
+    // If GPS coordinates provided, use directly (skip geocoding)
+    if (lat && lon) {
+      latitude = lat;
+      longitude = lon;
+      name = city || "Your location";
+      country = "";
+    } else {
+      const geoUrl =
+        this.getToolUrl("open_meteo_geo") ||
+        "https://geocoding-api.open-meteo.com/v1/search";
+      const geo = await (
+        await fetch(
+          `${geoUrl}?name=${encodeURIComponent(city)}&count=1&language=ro`,
+        )
+      ).json();
+      if (!geo.results?.[0]) throw new Error("City not found");
+      ({ latitude, longitude, name, country } = geo.results[0]);
+    }
     const forecastUrl =
       this.getToolUrl("open_meteo_forecast") ||
       "https://api.open-meteo.com/v1/forecast";

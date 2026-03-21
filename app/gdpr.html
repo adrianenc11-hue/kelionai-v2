@@ -132,7 +132,90 @@
       <p>We may update this policy. Significant changes will be notified via email or in-app notification.</p>
     </div>
 
-    <div class="last-updated">Last updated: March 20, 2026</div>
+    <div class="gdpr-section" id="consent-section">
+      <h2>🔐 Your Consent</h2>
+      <div style="margin-bottom:16px">
+        <label style="display:block;margin-bottom:6px;color:#94a3b8;font-size:0.85rem">Your country:</label>
+        <select id="gdpr-country" style="background:#1a1f2e;color:#e2e8f0;border:1px solid rgba(16,185,129,0.3);border-radius:8px;padding:8px 12px;width:100%;font-size:0.9rem">
+          <option value="">-- Select --</option>
+          <option value="RO">🇷🇴 România</option>
+          <option value="UK">🇬🇧 United Kingdom</option>
+          <option value="DE">🇩🇪 Deutschland</option>
+          <option value="FR">🇫🇷 France</option>
+          <option value="ES">🇪🇸 España</option>
+          <option value="IT">🇮🇹 Italia</option>
+          <option value="NL">🇳🇱 Nederland</option>
+          <option value="US">🇺🇸 United States</option>
+          <option value="OTHER">🌍 Other</option>
+        </select>
+      </div>
+      <div style="margin-bottom:12px">
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+          <input type="checkbox" id="consent-essential" checked disabled style="accent-color:#10b981;width:18px;height:18px">
+          <span style="color:#cbd5e1;font-size:0.9rem"><strong>Essential cookies</strong> — Required for login & security (always on)</span>
+        </label>
+      </div>
+      <div style="margin-bottom:12px">
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+          <input type="checkbox" id="consent-analytics" style="accent-color:#10b981;width:18px;height:18px">
+          <span style="color:#cbd5e1;font-size:0.9rem"><strong>Analytics</strong> — Anonymous usage data to improve service</span>
+        </label>
+      </div>
+      <div style="margin-bottom:16px">
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+          <input type="checkbox" id="consent-marketing" style="accent-color:#10b981;width:18px;height:18px">
+          <span style="color:#cbd5e1;font-size:0.9rem"><strong>Marketing</strong> — Product updates & offers (optional)</span>
+        </label>
+      </div>
+      <button id="btn-save-consent" onclick="saveGDPRConsent()" style="background:linear-gradient(135deg,#10b981,#059669);color:#fff;border:none;padding:12px 32px;border-radius:8px;font-size:1rem;cursor:pointer;font-weight:600;width:100%">✅ Save Preferences</button>
+      <div id="consent-status" style="text-align:center;margin-top:10px;color:#10b981;font-size:0.85rem;display:none"></div>
+    </div>
+
+    <div style="text-align:center;margin:20px 0">
+      <button onclick="setGDPRLang('en')" style="background:none;border:1px solid rgba(16,185,129,0.3);color:#10b981;padding:6px 16px;border-radius:6px;cursor:pointer;margin:0 4px;font-size:0.85rem">🇬🇧 English</button>
+      <button onclick="setGDPRLang('ro')" style="background:none;border:1px solid rgba(16,185,129,0.3);color:#10b981;padding:6px 16px;border-radius:6px;cursor:pointer;margin:0 4px;font-size:0.85rem">🇷🇴 Română</button>
+    </div>
+
+    <div class="last-updated">Last updated: March 21, 2026</div>
   </div>
+
+  <script>
+    function saveGDPRConsent() {
+      const consent = {
+        country: document.getElementById('gdpr-country').value,
+        essential: true,
+        analytics: document.getElementById('consent-analytics').checked,
+        marketing: document.getElementById('consent-marketing').checked,
+        savedAt: new Date().toISOString(),
+      };
+      localStorage.setItem('kelion_gdpr_consent', JSON.stringify(consent));
+      // Sync to server
+      try {
+        const session = JSON.parse(localStorage.getItem('kelion_session') || '{}');
+        if (session.access_token) {
+          fetch('/api/gdpr/consent', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + session.access_token },
+            body: JSON.stringify(consent),
+          }).catch(() => {});
+        }
+      } catch (_) {}
+      const el = document.getElementById('consent-status');
+      el.textContent = '✅ Preferences saved!';
+      el.style.display = 'block';
+      setTimeout(() => el.style.display = 'none', 3000);
+    }
+    function setGDPRLang(lang) {
+      // Simple language toggle — just reload with lang param
+      window.location.href = '/gdpr.html?lang=' + lang;
+    }
+    // Load existing consent
+    try {
+      const saved = JSON.parse(localStorage.getItem('kelion_gdpr_consent') || '{}');
+      if (saved.country) document.getElementById('gdpr-country').value = saved.country;
+      if (saved.analytics) document.getElementById('consent-analytics').checked = true;
+      if (saved.marketing) document.getElementById('consent-marketing').checked = true;
+    } catch (_) {}
+  </script>
 </body>
 </html>

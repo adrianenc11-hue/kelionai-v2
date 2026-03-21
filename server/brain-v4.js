@@ -92,13 +92,21 @@ const TOOL_DEFINITIONS = [
   },
   {
     name: "get_weather",
-    description: "Get current weather and forecast for a city.",
+    description: "Get current weather and forecast for a city or GPS coordinates.",
     input_schema: {
       type: "object",
       properties: {
         city: {
           type: "string",
           description: "City name, e.g. 'București', 'London'",
+        },
+        lat: {
+          type: "number",
+          description: "Latitude (optional, for GPS-based weather)",
+        },
+        lon: {
+          type: "number",
+          description: "Longitude (optional, for GPS-based weather)",
         },
       },
       required: ["city"],
@@ -431,7 +439,7 @@ async function executeTool(brain, toolName, toolInput, userId) {
       case "call_saved_tool":
         return await brain._callSavedTool(toolInput.tool_name, toolInput.params || {});
       case "get_weather":
-        return await brain._weather(toolInput.city);
+        return await brain._weather(toolInput.city, toolInput.lat, toolInput.lon);
 
       case "generate_image":
         return await brain._imagine(toolInput.prompt);

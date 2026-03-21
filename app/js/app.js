@@ -841,12 +841,37 @@
 
   // ─── Route to streaming or regular ─────────────────────
   async function sendToAI(message, language) {
+    // ═══ GUEST TIME LIMITS: 15min/day, 7-day trial ═══
+    const session = JSON.parse(localStorage.getItem('kelion_session') || '{}');
+    if (!session.access_token) {
+      const guestKey = 'kelion_guest_usage';
+      const guest = JSON.parse(localStorage.getItem(guestKey) || '{}');
+      const now = Date.now();
+      const today = new Date().toISOString().slice(0, 10);
+      // First visit — set trial start
+      if (!guest.trialStart) guest.trialStart = now;
+      // 7-day trial expired?
+      const trialDays = (now - guest.trialStart) / (1000 * 60 * 60 * 24);
+      if (trialDays > 7) {
+        showSubtitle('⏰ Your 7-day free trial has expired. Create an account to continue! 🚀');
+        localStorage.setItem(guestKey, JSON.stringify(guest));
+        return;
+      }
+      // Daily 15min limit
+      if (guest.date !== today) { guest.date = today; guest.usedMs = 0; }
+      if (guest.usedMs >= 15 * 60 * 1000) {
+        showSubtitle('⏰ Daily 15-minute limit reached. Create an account for unlimited access! 🚀');
+        return;
+      }
+      // Track start time for this message
+      guest._msgStart = now;
+      localStorage.setItem(guestKey, JSON.stringify(guest));
+    }
+
     let msg = message;
     if (window.KelionTools) {
       try {
         const ctx = await KelionTools.preprocessMessage(message);
-        // Strip base64 image data — it's already on monitor, don't send to chat API
-        // (sending 500KB+ base64 data exceeds chatSchema.message.max(10000) → "Validation failed")
         if (ctx) {
           const cleanCtx = ctx.replace(/!\[.*?\]\(data:[^)]+\)/g, '').trim();
           if (cleanCtx) msg = message + cleanCtx;
@@ -856,6 +881,17 @@
       }
     }
     await sendToAI_Regular(msg, language);
+
+    // Update guest usage time after response
+    if (!session.access_token) {
+      const guestKey = 'kelion_guest_usage';
+      const guest = JSON.parse(localStorage.getItem(guestKey) || '{}');
+      if (guest._msgStart) {
+        guest.usedMs = (guest.usedMs || 0) + (Date.now() - guest._msgStart);
+        delete guest._msgStart;
+        localStorage.setItem(guestKey, JSON.stringify(guest));
+      }
+    }
   }
 
   // ═══════════════════════════════════════════════════════════

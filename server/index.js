@@ -61,6 +61,7 @@ const visionRouter = require('./routes/vision');
 const imagesRouter = require('./routes/images');
 const authRouter = require('./routes/auth');
 const adminApiRouter = require('./routes/admin');
+const brainChatRouter = require('./routes/brain-chat');
 const { adminAuth } = require('./middleware/auth');
 const healthRouter = require('./routes/health');
 const translateRouter = require('./routes/translate');
@@ -752,6 +753,7 @@ app.post('/api/track/beacon', express.json(), async (req, res) => {
 });
 
 app.use('/api/admin', adminApiRouter);
+app.use('/api/admin/brain-chat', adminAuth, brainChatRouter);
 app.use('/api/health', healthRouter);
 app.use('/api/referral', referralRouter);
 app.use('/api', identityRouter);
