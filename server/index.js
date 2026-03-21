@@ -561,7 +561,7 @@ async function saveBrainState() {
   try {
     const state = {
       toolStats: brain.toolStats || {},
-      toolErrors: brain.toolErrors || {},
+      // toolErrors NOT saved — session-only, each deploy starts clean
       journal: (brain.journal || []).slice(-50),
       strategies: brain.strategies || {},
       savedAt: new Date().toISOString(),
@@ -598,11 +598,7 @@ async function restoreBrainState() {
           brain.toolStats[k] = (brain.toolStats[k] || 0) + (v || 0);
         });
       }
-      if (s.toolErrors) {
-        Object.entries(s.toolErrors).forEach(([k, v]) => {
-          brain.toolErrors[k] = (brain.toolErrors[k] || 0) + (v || 0);
-        });
-      }
+      // toolErrors NOT restored — each deploy starts clean, errors are session-only
       if (s.journal && Array.isArray(s.journal)) {
         brain.journal = [...s.journal, ...(brain.journal || [])];
       }
@@ -619,6 +615,21 @@ async function restoreBrainState() {
 // Restore state immediately
 restoreBrainState();
 
+// ONE-TIME CLEANUP: Delete ALL old brain_state snapshots that contain toolErrors
+(async function cleanOldBrainErrors() {
+  if (!supabaseAdmin) return;
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('metrics_snapshots')
+      .delete()
+      .eq('metric_type', 'brain_state')
+      .eq('metric_name', 'full_state_snapshot');
+    if (!error) {
+      logger.info({ component: 'SelfHeal' }, '🧹 Deleted ALL old brain_state snapshots with accumulated toolErrors');
+    }
+  } catch (_) {}
+})();
+
 // Periodic save every 5 minutes
 const _brainSaveInterval = setInterval(saveBrainState, 5 * 60 * 1000);
 _brainSaveInterval.unref();
@@ -634,6 +645,38 @@ process.on('SIGINT', async () => {
   await saveBrainState();
   process.exit(0);
 });
+
+// ═══ SELF-HEAL LOOP — auto-detect and analyze tool errors ═══
+setInterval(async () => {
+  if (!brain) return;
+  const errored = Object.entries(brain.toolErrors).filter(([, c]) => c > 0);
+  if (errored.length === 0) return;
+  const recentErrors = brain.errorLog.filter(e => Date.now() - e.time < 300000); // last 5 min
+  for (const [tool, count] of errored) {
+    const recent = recentErrors.filter(e => e.tool === tool);
+    if (recent.length === 0 && count > 0) {
+      // No recent errors for this tool — it recovered, clear counter
+      logger.info({ component: 'SelfHeal', tool, clearedCount: count }, `🩺 Tool '${tool}' recovered — clearing ${count} old errors`);
+      brain.toolErrors[tool] = 0;
+    } else if (recent.length > 0) {
+      // Still failing — log analysis
+      const lastErr = recent[recent.length - 1];
+      logger.warn({ component: 'SelfHeal', tool, count, lastError: lastErr.msg }, `🔴 Tool '${tool}' still failing: ${lastErr.msg}`);
+      // Save analysis to brain_memory for K1 to read
+      if (supabaseAdmin) {
+        try {
+          await supabaseAdmin.from('brain_memory').upsert({
+            user_id: 'system',
+            memory_type: 'self_heal',
+            content: `[SELF-HEAL] Tool '${tool}' has ${count} errors. Last: ${lastErr.msg}`,
+            context: { tool, count, lastError: lastErr.msg, timestamp: new Date().toISOString() },
+            importance: 9,
+          }, { onConflict: 'user_id,memory_type' }).catch(() => {});
+        } catch (_) {}
+      }
+    }
+  }
+}, 60000); // Check every 60 seconds
 
 // ═══ AUTH HELPER ═══
 async function getUserFromToken(req) {
