@@ -45,9 +45,9 @@
     var SMOOTH_RELEASE = 0.08;  // cinematic: very gentle release
 
     // ── Mouth opening clamp — REALISTIC values for visible movement ──
-    var MAX_MOUTH_OPEN = 0.10;  // reduced: tighter jaw movement
-    var MAX_VISEME_AA = 0.18;   // reduced: controlled vowel opening
-    var MAX_VISEME = 0.20;      // reduced: never gaping
+    var MAX_MOUTH_OPEN = 0.05;  // 50% reduced
+    var MAX_VISEME_AA = 0.09;   // 50% reduced
+    var MAX_VISEME = 0.10;      // 50% reduced
 
     // ── Coarticulation — blend previous viseme into current ──
     var _prevVisemes = {};
