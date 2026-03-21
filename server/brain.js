@@ -3636,6 +3636,11 @@ Reply STRICTLY with JSON:
     if (results.securityCheck) ctx += `\n[SECURITATE: ${results.securityCheck.summary}]`;
     if (results.devAPIInfo) ctx += `\n[DEVELOPER API: ${results.devAPIInfo.summary}]`;
     if (results.systemStatus) ctx += `\n[SYSTEM STATUS: ${results.systemStatus.summary}]`;
+    // ═══ INCEPTION: Filesystem + Deploy results ═══
+    if (results.projectTree) ctx += `\n[STRUCTURA FIȘIERE — Am executat listarea din sistemul de fișiere al serverului]:\n${typeof results.projectTree === 'string' ? results.projectTree : JSON.stringify(results.projectTree, null, 2)}\nPrezintă structura clar utilizatorului.`;
+    if (results.projectFile) ctx += `\n[COD SURSĂ CITIT — Am citit fișierul de pe disc]:\n${typeof results.projectFile === 'string' ? results.projectFile : JSON.stringify(results.projectFile, null, 2)}\nPrezintă codul utilizatorului cu syntax highlighting.`;
+    if (results.projectFileWrite) ctx += `\n[FIȘIER SCRIS PE DISC]: ${JSON.stringify(results.projectFileWrite)}\nConfirmă utilizatorului că fișierul a fost scris cu succes.`;
+    if (results.adminAutoDeploy) ctx += `\n[AUTO-DEPLOY REZULTAT]: ${JSON.stringify(results.adminAutoDeploy)}\nRaportează statusul deploy-ului.`;
 
     if (analysis.isEmotional && analysis.emotionalTone !== 'neutral') {
       ctx += `\n[Utilizatorul pare ${analysis.emotionalTone}. Adapteaza tonul empatic.]`;
@@ -6546,7 +6551,7 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
       general: {
         name: 'General Assistant',
         icon: '🧠',
-        systemPrompt: 'Ești Kelion, un asistent AI general. Răspunde clar, concis și prietenos.',
+        systemPrompt: 'Ești Kelion, un asistent AI general creat de Adrian. Răspunde clar, concis și prietenos. IMPORTANT: Ai capabilități avansate — poți lista fișiere (projectTree), citi cod sursă (projectFile), scrie/edita fișiere (projectFileWrite) și da deploy automat (adminAutoDeploy). Când adminul îți cere să listezi, citești, scrii fișiere sau să dai deploy — CONFIRMĂ că ai executat acțiunea, NU spune că nu poți!',
         strengths: ['conversație', 'întrebări generale', 'recomandări'],
       },
       code: {
