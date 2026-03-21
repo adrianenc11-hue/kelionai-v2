@@ -70,6 +70,7 @@ const exportRouter = require('./routes/export');
 const identityRouter = require('./routes/identity');
 const voiceCloneRouter = require('./routes/voice-clone');
 const contactRouter = require('./routes/contact');
+const mobileApiRouter = require('./routes/mobile-api');
 
 const { router: marketplaceRouter } = require('./agent-marketplace');
 const { router: pluginRouter, restorePlugins: _restorePlugins } = require('./plugin-system');
@@ -679,6 +680,7 @@ app.locals.memFallback = memFallback;
 
 // ═══ ROUTE MODULES ═══
 app.use('/api/auth', authRouter);
+app.use('/api/mobile/v1', mobileApiRouter);
 app.use('/api', chatRouter);
 app.use('/api', voiceRouter);
 app.use('/api/voice', voiceRouter); // alias: /api/voice/voices also works
