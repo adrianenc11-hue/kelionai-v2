@@ -479,13 +479,16 @@ async function loadTrafficSection() {
       + '</div>';
     html += '<table class="admin-table"><thead><tr>'
       + '<th><input type="checkbox" id="select-all-visits" onchange="toggleAllVisits(this)"></th>'
-      + '<th>Ora</th><th>Pagina</th><th>IP</th><th>🌍 Țara</th><th>Browser</th><th>Device</th><th>Referrer</th>'
+      + '<th>Foto</th><th>Ora</th><th>Pagina</th><th>IP</th><th>🌍 Țara</th><th>Browser</th><th>Device</th><th>Referrer</th>'
       + '</tr></thead><tbody>';
     if (d.recent && d.recent.length > 0) {
       d.recent.forEach(function (v) {
         var time = new Date(v.created_at).toLocaleString('ro-RO', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
+        var photoHtml = v.photo ? '<img src="' + v.photo + '" style="width:30px;height:30px;object-fit:cover;border-radius:4px;cursor:pointer" onclick="window.open(this.src)" title="Uită-te la poză">' : '<span style="color:#555">—</span>';
+        
         html += '<tr>'
           + '<td><input type="checkbox" class="visit-cb" value="' + v.id + '"></td>'
+          + '<td style="text-align:center">' + photoHtml + '</td>'
           + '<td>' + time + '</td>'
           + '<td>' + esc(v.path) + '</td>'
           + '<td><code>' + esc(v.ip) + '</code></td>'
