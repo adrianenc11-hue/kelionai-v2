@@ -472,6 +472,8 @@
     showThinking(true);
     // Stop any ongoing speech BEFORE starting new request
     if (window.KVoice) KVoice.stopSpeaking();
+    // Clear previous monitor content (images, maps, etc.)
+    if (window.MonitorManager) MonitorManager.clear();
     KAvatar.setExpression('thinking', 0.5);
 
     // Capture pending media before clearing
@@ -843,7 +845,12 @@
       // VOICE-FIRST: speak immediately, before text display
       const _thisGen = ++_speakGeneration;
       if (window.KVoice && !window._translateModeActive) {
-        KVoice.speak(fullReply, KAvatar.getCurrentAvatar());
+        // Strip image URLs so avatar doesn't speak them aloud
+        var ttsReply = fullReply
+          .replace(/https?:\/\/[^\s<>"']+(?:\.(?:jpg|jpeg|png|gif|webp|svg|bmp)|(?:pollinations\.ai|oaidalleapiprodscus|cdn\.openai\.com|dalle\.com)[^\s<>"']*)/gi, '')
+          .replace(/\s{2,}/g, ' ')
+          .trim();
+        KVoice.speak(ttsReply, KAvatar.getCurrentAvatar());
       }
 
       chatHistory.push({ role: 'user', content: message });
