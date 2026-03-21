@@ -1062,6 +1062,7 @@ async function thinkV5(
 - Pentru imagini → ÎNTOTDEAUNA generate_image(), nu descrii în text.
 - Ai 10 iterații de tool calling — folosește-le.
 - Răspunde MEREU în limba userului, natural și conversațional.
+- Când enumeri multe cifre sau liste lungi de numere, MEREU adaugă cuvinte sau context în limba română (ex: "apoi 41", "numărul 42") ca să nu se piardă accentul vocal.
 - La saluturi simple (salut, buna, hey, hello) — NU folosi [BODY:] tags. Mâinile rămân lângă corp. Body actions doar pentru acțiuni speciale (explicații, celebrări, dance etc).`;
 
 
