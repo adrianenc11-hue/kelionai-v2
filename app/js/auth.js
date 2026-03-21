@@ -454,7 +454,7 @@
     }
     if (startBtn) startBtn.addEventListener('click', enterApp);
     // Admin button → fetch admin secret via JWT, then navigate to admin panel
-    const adminBtn = document.getElementById('btn-admin');
+    const adminBtn = document.getElementById('user-name');
     if (adminBtn)
       adminBtn.addEventListener('click', async function () {
         // Admin auto-unlocked — fetch secret via JWT before navigating
