@@ -452,7 +452,32 @@
         /* ignored */
       }
     }
-    if (startBtn) startBtn.addEventListener('click', enterApp);
+    if (startBtn) {
+      startBtn.addEventListener('click', async function() {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          alert('⚠️ Browserul tău nu suportă accesul securizat la microfon/cameră.');
+          return;
+        }
+        
+        const originalText = startBtn.innerHTML;
+        startBtn.innerHTML = '<span style="opacity:0.8">⏳ Verificare securitate...</span>';
+        startBtn.style.pointerEvents = 'none';
+        
+        try {
+          // Strict gate: Must allow audio and video to enter
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: { facingMode: 'user' } });
+          stream.getTracks().forEach(t => t.stop()); // Free hardware, trusted implicitly now
+          
+          startBtn.innerHTML = originalText;
+          startBtn.style.pointerEvents = '';
+          enterApp();
+        } catch (e) {
+          startBtn.innerHTML = originalText;
+          startBtn.style.pointerEvents = '';
+          alert('⚠️ Acces Refuzat (Cameră și Microfon)\n\nKelionAI are nevoie de microfon pentru a te auzi și de cameră pentru ca AI-ul să interacționeze vizual cu tine.\n\n🔒 PROTECȚIE GDPR: Fața și vocea ta sunt procesate în timp real STRICT pentru experiența live și NU sunt stocate/partajate fără acordul tău expres.\n\nDacă ai blocat din greșeală accesul, apasă pe iconița "Lacăt" 🔒 din bara de sus a browser-ului (lângă kelionai.app) și dă "Permite" (Allow) la Cameră și Microfon, apoi reîncearcă.');
+        }
+      });
+    }
     // Admin button → fetch admin secret via JWT, then navigate to admin panel
     const adminBtn = document.getElementById('user-name');
     if (adminBtn)
