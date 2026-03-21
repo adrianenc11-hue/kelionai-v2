@@ -2270,6 +2270,11 @@ Reply STRICTLY with JSON:
       projectTreePath: '',
       needsProjectFile: false,
       projectFilePath: '',
+      needsProjectFileWrite: false,
+      writeFilePath: '',
+      writeFileContent: '',
+      needsAdminAutoDeploy: false,
+      deployMessage: '',
       isQuestion: false,
       isCommand: false,
       isEmotional: false,
@@ -2776,6 +2781,34 @@ Reply STRICTLY with JSON:
           return { projectFilePath: m ? m[1] : '' };
         },
       },
+      // ── ADMIN: WRITE FILE (Inception Faza 2) ──
+      {
+        flag: 'needsProjectFileWrite',
+        triggers: [
+          /\b(scrie|editeaz|modific|schimb|inlocui|write|edit|modify|change|replace|patch|update)\w*\s*(in|fisier|file|codul?|sursa|source|script)/i,
+          /\b(salveaz|save|overwrite|suprascri)\w*\s*(fisier|file|codul?)/i,
+          /\b(adaug|append|insert)\w*\s*(in|la)\s*(fisier|file|cod)/i,
+          /\bADMIN_WRITE_FILE\b/i,
+        ],
+        extract: (text) => {
+          const pathMatch = text.match(/(?:fisier|file|in|la)\s+["']?([\w.\-\/\\]+\.[a-zA-Z]{1,5})["']?/i);
+          return { writeFilePath: pathMatch ? pathMatch[1] : '' };
+        },
+      },
+      // ── ADMIN: AUTO-DEPLOY (Inception Faza 2) ──
+      {
+        flag: 'needsAdminAutoDeploy',
+        triggers: [
+          /\b(deploy|publica|lanseaz|upload)\w*\s*(codul?|server|app|live|productie|production)?/i,
+          /\b(da.i\s*drum|pune.l\s*live|trimite.l)/i,
+          /\b(git\s*push|railway\s*(up|deploy))/i,
+          /\bADMIN_DEPLOY\b/i,
+        ],
+        extract: (text) => {
+          const msgMatch = text.match(/(?:mesaj|message|commit)\s*[:=]?\s*["']?(.+?)["']?$/i);
+          return { deployMessage: msgMatch ? msgMatch[1] : 'Auto-deploy by Kelion AI' };
+        },
+      },
     ];
   }
 
@@ -3145,6 +3178,14 @@ Reply STRICTLY with JSON:
         if (analysis.needsProjectFile && !seen.has('projectFile')) {
           plan.push({ tool: 'projectFile', path: analysis.projectFilePath || '' });
           seen.add('projectFile');
+        }
+        if (analysis.needsProjectFileWrite && !seen.has('projectFileWrite')) {
+          plan.push({ tool: 'projectFileWrite', path: analysis.writeFilePath || '', content: analysis.writeFileContent || '' });
+          seen.add('projectFileWrite');
+        }
+        if (analysis.needsAdminAutoDeploy && !seen.has('adminAutoDeploy')) {
+          plan.push({ tool: 'adminAutoDeploy', message: analysis.deployMessage || 'Auto-deploy by Kelion' });
+          seen.add('adminAutoDeploy');
         }
       }
       // Table 3: Non-AI function tools
@@ -3536,6 +3577,11 @@ Reply STRICTLY with JSON:
         return this._runTests(step.suite || '');
       case 'scrapeArticle':
         return this._scrapeFullArticle(step.url || '');
+      // ═══ INCEPTION Faza 2: Write + Deploy ═══
+      case 'projectFileWrite':
+        return this._writeProjectFile(step.path || '', step.content || '');
+      case 'adminAutoDeploy':
+        return this._adminAutoDeploy(step.message || 'Auto-deploy by Kelion');
       default:
         return null;
     }
@@ -6219,6 +6265,105 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
       return kiraTools.readProjectFile(filePath);
     } catch (e) {
       return { error: e.message };
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // INCEPTION FAZA 2: WRITE FILE — Kelion poate edita fișiere
+  // ═══════════════════════════════════════════════════════════
+  _writeProjectFile(filePath, content) {
+    const fs = require('fs');
+    const nodePath = require('path');
+    try {
+      if (!filePath || !content) return { error: 'Lipsește calea sau conținutul fișierului' };
+      // Securitate: doar în folderul proiectului
+      const projectRoot = process.cwd();
+      const fullPath = nodePath.resolve(projectRoot, filePath);
+      if (!fullPath.startsWith(projectRoot)) {
+        return { error: 'BLOCAT: nu poți scrie în afara proiectului!' };
+      }
+      // Backup original
+      let backup = null;
+      if (fs.existsSync(fullPath)) {
+        backup = fs.readFileSync(fullPath, 'utf8');
+      }
+      // Scrie fișierul
+      const dir = nodePath.dirname(fullPath);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(fullPath, content, 'utf8');
+      logger.info({ component: 'Inception', file: filePath, bytes: content.length }, `✍️ Kelion a scris ${filePath}`);
+      return {
+        success: true,
+        file: filePath,
+        bytesWritten: content.length,
+        hadBackup: !!backup,
+        message: `Fișierul ${filePath} a fost scris cu succes (${content.length} bytes)`,
+      };
+    } catch (e) {
+      return { error: e.message };
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // INCEPTION FAZA 2: AUTO-DEPLOY — Kelion își dă deploy singur
+  // Cu rollback automat dacă health check eșuează
+  // ═══════════════════════════════════════════════════════════
+  async _adminAutoDeploy(commitMessage = 'Auto-deploy by Kelion') {
+    const { execSync } = require('child_process');
+    const projectRoot = process.cwd();
+    try {
+      logger.info({ component: 'Inception' }, `🚀 Kelion pornește auto-deploy: ${commitMessage}`);
+      const gitStatus = execSync('git status --porcelain', { cwd: projectRoot, encoding: 'utf8' }).trim();
+      if (!gitStatus) {
+        return { success: false, message: 'Nu sunt modificări de comis (git clean)' };
+      }
+      execSync('git add .', { cwd: projectRoot, encoding: 'utf8' });
+      execSync(`git commit -m "${commitMessage.replace(/"/g, "'")}"`, { cwd: projectRoot, encoding: 'utf8' });
+      const pushResult = execSync('git push origin master', { cwd: projectRoot, encoding: 'utf8', timeout: 30000 });
+      logger.info({ component: 'Inception' }, '📤 Git push reușit');
+
+      // Așteaptă 90s pentru Railway auto-deploy din GitHub
+      logger.info({ component: 'Inception' }, '⏳ Aștept 90s pentru Railway build...');
+      await new Promise((r) => setTimeout(r, 90000));
+
+      // Health check
+      const appUrl = process.env.APP_URL || 'https://kelionai.app';
+      const healthUrl = `${appUrl.replace(/\/$/, '')}/api/health`;
+      let healthy = false;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          const resp = await fetch(healthUrl, { signal: AbortSignal.timeout(5000) });
+          if (resp.ok) {
+            healthy = true;
+            break;
+          }
+        } catch {
+          /* retry */
+        }
+        await new Promise((r) => setTimeout(r, 10000));
+      }
+
+      if (healthy) {
+        logger.info({ component: 'Inception' }, '✅ Deploy reușit! Serverul e sănătos.');
+        return {
+          success: true,
+          message: `Deploy reușit! Commit: ${commitMessage}. Health check OK.`,
+          gitPush: (pushResult || '').trim(),
+        };
+      } else {
+        // ROLLBACK AUTOMAT
+        logger.warn({ component: 'Inception' }, '❌ Health check eșuat! Rollback automat...');
+        execSync('git revert HEAD --no-edit', { cwd: projectRoot, encoding: 'utf8' });
+        execSync('git push origin master', { cwd: projectRoot, encoding: 'utf8', timeout: 30000 });
+        return {
+          success: false,
+          rolledBack: true,
+          message: 'Deploy eșuat — health check KO. Am făcut ROLLBACK automat la versiunea anterioară.',
+        };
+      }
+    } catch (e) {
+      logger.error({ component: 'Inception', err: e.message }, `💥 Auto-deploy eroare: ${e.message}`);
+      return { error: e.message, message: `Deploy eșuat: ${e.message}` };
     }
   }
 
