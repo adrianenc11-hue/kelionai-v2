@@ -426,6 +426,30 @@ const TOOL_DEFINITIONS = [
   },
 ];
 
+// ── ADMIN-ONLY Tools (only available when isAdmin=true) ──
+const ADMIN_TOOL_DEFINITIONS = [
+  {
+    name: "admin_dashboard",
+    description: "Get admin dashboard overview: traffic stats, active users, AI costs, brain health. Admin only.",
+    input_schema: { type: "object", properties: {}, required: [] },
+  },
+  {
+    name: "admin_traffic",
+    description: "Get detailed traffic data: recent visits, top pages, top countries, top referrers, hourly distribution. Admin only.",
+    input_schema: { type: "object", properties: {}, required: [] },
+  },
+  {
+    name: "admin_users",
+    description: "Get list of all registered users with plan, last login, message count. Admin only.",
+    input_schema: { type: "object", properties: {}, required: [] },
+  },
+  {
+    name: "admin_costs",
+    description: "Get AI costs breakdown by provider, daily costs, total today/month. Admin only.",
+    input_schema: { type: "object", properties: {}, required: [] },
+  },
+];
+
 // ── Tool executor: maps tool names to brain methods ──
 async function executeTool(brain, toolName, toolInput, userId) {
   try {
@@ -1005,6 +1029,76 @@ async function executeTool(brain, toolName, toolInput, userId) {
         return await gmailRoute[toolName](toolInput, userId, brain.supabase);
       }
 
+      // ═══ ADMIN-ONLY TOOLS (chat-accessible dashboard) ═══
+      case "admin_dashboard": {
+        const sb = brain.supabase;
+        if (!sb) return { error: "Database not connected" };
+        const today = new Date().toISOString().split("T")[0];
+        const monthStart = today.substring(0, 7) + "-01";
+        const [pvRes, userRes, costRes] = await Promise.all([
+          sb.from("page_views").select("ip", { count: "exact", head: false }).gte("created_at", today + "T00:00:00Z").limit(10000),
+          sb.auth.admin.listUsers({ perPage: 100 }),
+          sb.from("ai_costs").select("cost_usd").gte("created_at", monthStart + "T00:00:00Z"),
+        ]);
+        const uniqueIps = new Set((pvRes.data || []).map(d => d.ip));
+        const totalUsers = (userRes.data?.users || []).length;
+        const totalCostMonth = (costRes.data || []).reduce((s, r) => s + (parseFloat(r.cost_usd) || 0), 0);
+        return {
+          traffic: { totalToday: pvRes.count || 0, uniqueToday: uniqueIps.size },
+          users: { total: totalUsers },
+          costs: { totalMonth: "$" + totalCostMonth.toFixed(4) },
+          brain: { uptime: Math.round((Date.now() - brain.startTime) / 60000) + " min", conversations: brain.conversationCount || 0 },
+        };
+      }
+      case "admin_traffic": {
+        const sb = brain.supabase;
+        if (!sb) return { error: "Database not connected" };
+        const { data: recent } = await sb.from("page_views").select("*").order("created_at", { ascending: false }).limit(20);
+        const topPages = {};
+        const topCountries = {};
+        (recent || []).forEach(r => {
+          topPages[r.path] = (topPages[r.path] || 0) + 1;
+          if (r.country) topCountries[r.country] = (topCountries[r.country] || 0) + 1;
+        });
+        return {
+          recentVisits: (recent || []).slice(0, 10).map(r => ({ time: r.created_at, path: r.path, ip: r.ip, country: r.country || "?" })),
+          topPages: Object.entries(topPages).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([p, c]) => p + ": " + c),
+          topCountries: Object.entries(topCountries).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([c, n]) => c + ": " + n),
+        };
+      }
+      case "admin_users": {
+        const sb = brain.supabase;
+        if (!sb) return { error: "Database not connected" };
+        const { data } = await sb.auth.admin.listUsers({ perPage: 100 });
+        return {
+          total: (data?.users || []).length,
+          users: (data?.users || []).map(u => ({
+            email: u.email, name: u.user_metadata?.full_name || "—",
+            plan: u.user_metadata?.plan || "free", lastLogin: u.last_sign_in_at,
+          })),
+        };
+      }
+      case "admin_costs": {
+        const sb = brain.supabase;
+        if (!sb) return { error: "Database not connected" };
+        const today = new Date().toISOString().split("T")[0];
+        const monthStart = today.substring(0, 7) + "-01";
+        const { data } = await sb.from("ai_costs").select("provider, cost_usd, created_at").gte("created_at", monthStart + "T00:00:00Z");
+        const byProvider = {};
+        let totalToday = 0, totalMonth = 0;
+        (data || []).forEach(r => {
+          const cost = parseFloat(r.cost_usd) || 0;
+          byProvider[r.provider] = (byProvider[r.provider] || 0) + cost;
+          totalMonth += cost;
+          if (r.created_at?.startsWith(today)) totalToday += cost;
+        });
+        return {
+          totalToday: "$" + totalToday.toFixed(4),
+          totalMonth: "$" + totalMonth.toFixed(4),
+          byProvider: Object.entries(byProvider).map(([p, c]) => p + ": $" + c.toFixed(4)),
+        };
+      }
+
       default:
         return { error: `Unknown tool: ${toolName}` };
     }
@@ -1242,8 +1336,9 @@ Rules:
 
     const geminiModel = MODELS.GEMINI_CHAT;
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiApiKey}`;
+    const allTools = isAdmin ? [...TOOL_DEFINITIONS, ...ADMIN_TOOL_DEFINITIONS] : TOOL_DEFINITIONS;
     const geminiTools = [
-      { functionDeclarations: toGeminiTools(TOOL_DEFINITIONS) },
+      { functionDeclarations: toGeminiTools(allTools) },
     ];
 
     for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
