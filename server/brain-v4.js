@@ -492,6 +492,41 @@ const ADMIN_TOOL_DEFINITIONS = [
     description: 'Get AI costs breakdown by provider, daily costs, total today/month. Admin only.',
     input_schema: { type: 'object', properties: {}, required: [] },
   },
+  // ═══ INCEPTION Faza 2: Write File + Auto-Deploy ═══
+  {
+    name: 'write_project_file',
+    description:
+      'Write or overwrite a file in the project directory. Use this when admin asks you to create or edit a file. The file is written to disk immediately. Only files inside the project root are allowed.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        filepath: {
+          type: 'string',
+          description: "Relative path from project root, e.g. 'server/inception-proof.js'",
+        },
+        content: {
+          type: 'string',
+          description: 'Full content to write to the file',
+        },
+      },
+      required: ['filepath', 'content'],
+    },
+  },
+  {
+    name: 'admin_auto_deploy',
+    description:
+      'Trigger auto-deploy: git add + commit + push to GitHub. Railway will auto-deploy from GitHub. Includes health check after deploy and automatic rollback if the server crashes.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        commit_message: {
+          type: 'string',
+          description: "Git commit message (default: 'Auto-deploy by Kelion AI')",
+        },
+      },
+      required: [],
+    },
+  },
 ];
 
 // ── Tool executor: maps tool names to brain methods ──
@@ -649,6 +684,11 @@ async function executeTool(brain, toolName, toolInput, userId) {
         if (!html || html.length < 10) return { error: 'html content required' };
         return { monitorHTML: html, type: 'html', success: true };
       }
+      // ═══ INCEPTION Faza 2: Write + Deploy ═══
+      case 'write_project_file':
+        return brain._writeProjectFile(toolInput.filepath, toolInput.content);
+      case 'admin_auto_deploy':
+        return await brain._adminAutoDeploy(toolInput.commit_message || 'Auto-deploy by Kelion AI');
       // ═══ SELF-INTROSPECTION ═══
       case 'read_own_source': {
         const fs = require('fs');
