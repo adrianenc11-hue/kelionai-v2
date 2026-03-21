@@ -45,9 +45,35 @@
     var SMOOTH_RELEASE = 0.08;  // cinematic: very gentle release
 
     // ── Mouth opening clamp — REALISTIC values for visible movement ──
-    var MAX_MOUTH_OPEN = 0.05;  // 50% reduced
-    var MAX_VISEME_AA = 0.09;   // 50% reduced
-    var MAX_VISEME = 0.10;      // 50% reduced
+    var MAX_MOUTH_OPEN = 0.04;  // 17% further reduced
+    var MAX_VISEME_AA = 0.075;  // 17% further reduced
+    var MAX_VISEME = 0.083;     // 17% further reduced
+
+    // ── TEMP SLIDER: global mouth amplitude multiplier ──
+    var _mouthMultiplier = parseFloat(localStorage.getItem('kelion_mouth_mult') || '1.0');
+    (function _createSlider() {
+        if (typeof document === 'undefined') return;
+        var wrap = document.createElement('div');
+        wrap.id = 'mouth-slider-wrap';
+        wrap.style.cssText = 'position:fixed;bottom:12px;right:12px;z-index:99999;background:rgba(0,0,0,0.75);padding:8px 14px;border-radius:10px;font-family:sans-serif;font-size:12px;color:#fff;display:flex;align-items:center;gap:8px;';
+        var label = document.createElement('span');
+        label.textContent = '👄 ';
+        var slider = document.createElement('input');
+        slider.type = 'range'; slider.min = '0'; slider.max = '3'; slider.step = '0.05';
+        slider.value = String(_mouthMultiplier);
+        slider.style.cssText = 'width:120px;cursor:pointer;';
+        var val = document.createElement('span');
+        val.textContent = _mouthMultiplier.toFixed(2);
+        val.style.minWidth = '32px';
+        slider.addEventListener('input', function() {
+            _mouthMultiplier = parseFloat(this.value);
+            val.textContent = _mouthMultiplier.toFixed(2);
+            localStorage.setItem('kelion_mouth_mult', String(_mouthMultiplier));
+        });
+        wrap.appendChild(label); wrap.appendChild(slider); wrap.appendChild(val);
+        if (document.body) document.body.appendChild(wrap);
+        else document.addEventListener('DOMContentLoaded', function() { document.body.appendChild(wrap); });
+    })();
 
     // ── Coarticulation — blend previous viseme into current ──
     var _prevVisemes = {};
@@ -139,7 +165,7 @@
         // Map frequency bands to visemes
         // Support BOTH Oculus (viseme_XX) AND MetaPerson (XX) naming
         // ── Clamp helper — enforces max mouth opening ──
-        function clamp(v, max) { return Math.min(v, max || MAX_VISEME); }
+        function clamp(v, max) { return Math.min(v * _mouthMultiplier, (max || MAX_VISEME) * _mouthMultiplier); }
 
         var visemes = {
             // Jaw open — driven by low freq (vowels)
