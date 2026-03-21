@@ -163,7 +163,7 @@ router.post("/speak", ttsLimiter, validate(speakSchema), async (req, res) => {
           'ar': { kelion: { name: 'ar-XA-Wavenet-B', lang: 'ar-XA' }, kira: { name: 'ar-XA-Wavenet-A', lang: 'ar-XA' } },
           'tr': { kelion: { name: 'tr-TR-Wavenet-B', lang: 'tr-TR' }, kira: { name: 'tr-TR-Wavenet-A', lang: 'tr-TR' } },
         };
-        const langBase = (language || 'ro').toLowerCase().split('-')[0];
+        const langBase = (language || 'en').toLowerCase().split('-')[0];
         const voiceEntry = (gVoices[langBase] && gVoices[langBase][avatar]) 
                           || (avatar === 'kira' ? { name: 'en-US-Journey-F', lang: 'en-US' } : { name: 'en-US-Journey-D', lang: 'en-US' });
 
