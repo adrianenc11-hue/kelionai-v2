@@ -289,22 +289,7 @@ app.use((req, res, next) => {
         });
       }
 
-      // Also record to DB for Traffic history (async, non-blocking)
-      if (supabaseAdmin) {
-        const isHealth = req.path === '/health' || req.path === '/sw.js' || req.path === '/manifest.json' || req.path === '/favicon.svg';
-        if (!isHealth) {
-          supabaseAdmin.from('page_views').insert({
-            ip,
-            path: req.path,
-            user_agent: rawUA.substring(0, 300),
-            country: req.headers['cf-ipcountry'] || req.headers['x-vercel-ip-country'] || null,
-          }).then(({ error }) => {
-            if (error) logger.warn({ component: 'PageViews', err: error.message, code: error.code }, 'page_views insert failed');
-          }).catch((e) => {
-            logger.warn({ component: 'PageViews', err: e.message }, 'page_views insert exception');
-          });
-        }
-      }
+      // (page_views INSERT moved to res.on('finish') below — single insert with geo+referrer)
     }
   }
 

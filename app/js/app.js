@@ -14,6 +14,49 @@
   const _useStreaming = true;
   let adminSecret = null; // stored when admin mode is active
 
+  // ── VISITOR TRACKING — fingerprint + device info ──
+  (function trackVisitor() {
+    try {
+      // Generate canvas fingerprint
+      var canvas = document.createElement('canvas');
+      var ctx = canvas.getContext('2d');
+      ctx.textBaseline = 'top';
+      ctx.font = '14px Arial';
+      ctx.fillText('KelionAI-fp', 2, 2);
+      var fp = canvas.toDataURL().split('').reduce(function(a, c) { a = ((a << 5) - a) + c.charCodeAt(0); return a & a; }, 0).toString(36);
+      var ua = navigator.userAgent;
+      var browser = /Edg\//.test(ua) ? 'Edge' : /Chrome\//.test(ua) ? 'Chrome' : /Firefox\//.test(ua) ? 'Firefox' : /Safari\//.test(ua) ? 'Safari' : 'Other';
+      var os = /Windows/.test(ua) ? 'Windows' : /Mac OS/.test(ua) ? 'macOS' : /Android/.test(ua) ? 'Android' : /iPhone|iPad/.test(ua) ? 'iOS' : /Linux/.test(ua) ? 'Linux' : 'Other';
+      var device = /Mobile|Android|iPhone/.test(ua) ? 'Mobile' : /Tablet|iPad/.test(ua) ? 'Tablet' : 'Desktop';
+      window._visitorFP = fp;
+      window._visitStart = Date.now();
+      fetch(API_BASE + '/api/track/visit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fingerprint: fp,
+          path: location.pathname,
+          referrer: document.referrer || null,
+          browser: browser,
+          device: device,
+          os: os,
+          screen_width: screen.width,
+          screen_height: screen.height,
+          language: navigator.language,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        }),
+      }).catch(function() {});
+      // Track time on unload
+      window.addEventListener('beforeunload', function() {
+        var duration = Math.round((Date.now() - window._visitStart) / 1000);
+        if (duration > 2 && navigator.sendBeacon) {
+          var blob = new Blob([JSON.stringify({ fingerprint: fp, duration: duration })], { type: 'application/json' });
+          navigator.sendBeacon(API_BASE + '/api/track/beacon', blob);
+        }
+      });
+    } catch (_) { /* non-blocking */ }
+  })();
+
   // ── #155: FRONTEND ERROR CAPTURE → Brain ──
   let _errCount = 0,
     _errResetTimer = null;

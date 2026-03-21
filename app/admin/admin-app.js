@@ -243,18 +243,69 @@ async function loadTrafficSection() {
       + '<div class="mini-stat"><span class="label">Conexiuni active:</span> ' + (d.activeConnections || 0) + '</div>'
       + '</div>';
 
-    // Daily chart (7 days)
+    // Daily chart (7 days) — total vs unique
     if (d.daily && d.daily.length > 0) {
       var max = Math.max.apply(null, d.daily.map(function (x) { return x.count; })) || 1;
-      html += '<h3>📊 Grafic ultimele 7 zile</h3><div class="traffic-chart">';
+      html += '<h3>📊 Ultimele 7 zile (total / unici)</h3><div class="traffic-chart">';
       d.daily.forEach(function (day) {
         var pct = Math.round((day.count / max) * 100);
-        html += '<div class="bar-col"><div class="bar-value">' + day.count + '</div>'
+        var uniqueForDay = 0;
+        if (d.dailyUnique) {
+          var found = d.dailyUnique.find(function(u) { return u.date === day.date; });
+          if (found) uniqueForDay = found.unique;
+        }
+        html += '<div class="bar-col"><div class="bar-value">' + day.count + '<br><small style="color:#06b6d4">' + uniqueForDay + ' unici</small></div>'
           + '<div class="bar" style="height:' + pct + '%"></div>'
           + '<div class="bar-label">' + day.date.slice(5) + '</div></div>';
       });
       html += '</div>';
     }
+
+    // Analytics panels row
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin:16px 0">';
+    
+    // Top Pages
+    if (d.topPages && d.topPages.length > 0) {
+      html += '<div class="gdpr-section" style="margin:0"><h3 style="margin:0 0 8px">📄 Top Pagini</h3>';
+      d.topPages.slice(0, 5).forEach(function (p) {
+        html += '<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:0.85rem"><span style="color:#cbd5e1">' + esc(p.name) + '</span><strong style="color:#10b981">' + p.count + '</strong></div>';
+      });
+      html += '</div>';
+    }
+
+    // Top Countries
+    if (d.topCountries && d.topCountries.length > 0) {
+      var flags = { RO:'🇷🇴', US:'🇺🇸', DE:'🇩🇪', UK:'🇬🇧', FR:'🇫🇷', NL:'🇳🇱', IT:'🇮🇹', ES:'🇪🇸' };
+      html += '<div class="gdpr-section" style="margin:0"><h3 style="margin:0 0 8px">🌍 Top Țări</h3>';
+      d.topCountries.slice(0, 5).forEach(function (c) {
+        html += '<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:0.85rem"><span>' + (flags[c.name] || '🏳️') + ' ' + esc(c.name) + '</span><strong style="color:#10b981">' + c.count + '</strong></div>';
+      });
+      html += '</div>';
+    }
+
+    // Top Referrers
+    if (d.topReferrers && d.topReferrers.length > 0) {
+      html += '<div class="gdpr-section" style="margin:0"><h3 style="margin:0 0 8px">🔗 Top Referreri</h3>';
+      d.topReferrers.slice(0, 5).forEach(function (r) {
+        var short = r.name.length > 30 ? r.name.substring(0, 30) + '...' : r.name;
+        html += '<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:0.85rem"><span style="color:#cbd5e1">' + esc(short) + '</span><strong style="color:#10b981">' + r.count + '</strong></div>';
+      });
+      html += '</div>';
+    }
+
+    // Hourly Distribution
+    if (d.hourlyDistribution && d.hourlyDistribution.length > 0) {
+      var hMax = Math.max.apply(null, d.hourlyDistribution.map(function(h) { return h.count; })) || 1;
+      html += '<div class="gdpr-section" style="margin:0"><h3 style="margin:0 0 8px">⏰ Distribuție pe ore</h3>';
+      html += '<div style="display:flex;align-items:flex-end;gap:2px;height:60px">';
+      d.hourlyDistribution.forEach(function (h) {
+        var pct = Math.round((h.count / hMax) * 100);
+        html += '<div title="' + h.hour + ': ' + h.count + '" style="flex:1;background:linear-gradient(to top,#10b981,#06b6d4);height:' + pct + '%;border-radius:2px 2px 0 0;min-width:4px"></div>';
+      });
+      html += '</div><div style="display:flex;justify-content:space-between;font-size:0.65rem;color:#64748b;margin-top:4px"><span>00:00</span><span>12:00</span><span>23:00</span></div></div>';
+    }
+
+    html += '</div>'; // close analytics grid
 
     // Full table with checkboxes for bulk delete
     html += '<h3>📋 Vizite recente</h3>';

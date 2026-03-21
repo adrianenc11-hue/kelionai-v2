@@ -461,6 +461,39 @@ router.get('/traffic', async (req, res) => {
       /* ok */
     }
 
+    // ── Analytics aggregations from recent data ──
+    const topPages = {};
+    const topReferrers = {};
+    const topCountries = {};
+    const hourly = {};
+    const uniqueDaily = {};
+    (recent || []).forEach((r) => {
+      // Top pages
+      topPages[r.path] = (topPages[r.path] || 0) + 1;
+      // Top referrers
+      if (r.referrer && r.referrer !== '—') topReferrers[r.referrer] = (topReferrers[r.referrer] || 0) + 1;
+      // Top countries
+      if (r.country) topCountries[r.country] = (topCountries[r.country] || 0) + 1;
+    });
+    (weekData || []).forEach((r) => {
+      // Hourly distribution
+      const hour = r.created_at ? r.created_at.substring(11, 13) : '00';
+      hourly[hour] = (hourly[hour] || 0) + 1;
+      // Unique per day
+      const day = r.created_at.split('T')[0];
+      if (!uniqueDaily[day]) uniqueDaily[day] = new Set();
+      uniqueDaily[day].add(r.ip);
+    });
+
+    const sortObj = (obj, limit) => Object.entries(obj)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, limit)
+      .map(([name, count]) => ({ name, count }));
+
+    const dailyUnique = Object.entries(uniqueDaily)
+      .map(([date, ips]) => ({ date, unique: ips.size }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
     res.json({
       recent: recent || [],
       uniqueToday: uniqueIps.size,
@@ -468,6 +501,13 @@ router.get('/traffic', async (req, res) => {
       totalAllTime,
       activeConnections,
       daily,
+      dailyUnique,
+      topPages: sortObj(topPages, 10),
+      topReferrers: sortObj(topReferrers, 10),
+      topCountries: sortObj(topCountries, 10),
+      hourlyDistribution: Object.entries(hourly)
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([hour, count]) => ({ hour: hour + ':00', count })),
     });
   } catch {
     logger.error({ component: 'Admin', err: e.message }, 'Traffic query failed');
@@ -478,6 +518,11 @@ router.get('/traffic', async (req, res) => {
       totalAllTime: 0,
       activeConnections: 0,
       daily: [],
+      dailyUnique: [],
+      topPages: [],
+      topReferrers: [],
+      topCountries: [],
+      hourlyDistribution: [],
     });
   }
 });
