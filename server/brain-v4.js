@@ -583,12 +583,49 @@ const ADMIN_TOOL_DEFINITIONS = [
       required: ['error_message'],
     },
   },
+  {
+    name: 'admin_read_knowledge',
+    description:
+      'Reads the Inception Knowledge Base containing project architecture, core files, safety rules, and available encrypted secrets. Use this when you are asked about the system structure or before performing potentially destructive actions.',
+    input_schema: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: 'admin_get_secret',
+    description:
+      'Retrieves an encrypted secret or environment variable value (e.g. API keys, tokens). ONLY USE THIS if explicitly requested by the admin or required to fix an integration issue. NEVER output the value directly to the user in chat.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        key: {
+          type: 'string',
+          description: 'The exact key name of the secret or env var to retrieve',
+        },
+      },
+      required: ['key'],
+    },
+  },
 ];
 
 // ── Tool executor: maps tool names to brain methods ──
 async function executeTool(brain, toolName, toolInput, userId) {
   try {
     switch (toolName) {
+      // ═══ INCEPTION FAZA 3 & 3.5 (ADMIN/AUTONOMY) ═══
+      case 'admin_read_logs':
+        return await brain._readLogs(toolInput.category);
+      case 'admin_run_tests':
+        return await brain._runTestSuite(toolInput.suite);
+      case 'admin_diagnose':
+        return await brain._diagnoseError(toolInput.error_message, toolInput.file_hint);
+      case 'admin_read_knowledge':
+        return brain._readKnowledge();
+      case 'admin_get_secret':
+        return brain._getSecret(toolInput.key);
+
       case 'search_web':
         return await brain._search(toolInput.query);
       case 'recall_tool':

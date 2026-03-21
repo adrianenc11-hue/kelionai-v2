@@ -88,6 +88,13 @@ class KelionBrain {
     this.autonomousMonitor = new AutonomousMonitor(this);
     this.autonomousMonitor.start();
 
+    // ══ INCEPTION: Knowledge Base & Secrets (Faza 3.5) ══
+    this._inceptionKnowledge = null;
+    this._inceptionSecrets = new Map();
+    this._inceptionWrittenFiles = [];
+    this._inceptionVersionCache = [];
+    this._loadInceptionKnowledge(); // async
+
     // ── User Profile Cache ──
     this._profileCache = new Map(); // userId → { profile, loadedAt }
     this._profileTTL = 10 * 60 * 1000; // cache profiles for 10 min
@@ -6777,6 +6784,91 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
       });
       return version;
     } catch { return null; }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // INCEPTION FAZA 3.5: KNOWLEDGE BASE & SECRETS VAULT
+  // ═══════════════════════════════════════════════════════════
+  async _loadInceptionKnowledge() {
+    if (!this.supabase) return;
+    try {
+      // 1. Încarcă Knowledge Base
+      const { data: kbData } = await this.supabase
+        .from('brain_memory')
+        .select('content, context')
+        .eq('memory_type', 'inception_knowledge')
+        .limit(1)
+        .single();
+      
+      if (kbData) {
+        this._inceptionKnowledge = kbData.context;
+        logger.info({ component: 'Inception' }, '📚 Inception Knowledge Base încărcat din Supabase');
+      } else {
+        // Fallback knowledge structură inițială
+        this._inceptionKnowledge = {
+          architecture: 'Node.js + Express backend, Supabase PostgreSQL, Railway hosting',
+          coreFiles: ['server/brain.js', 'server/brain-v4.js', 'server/brain-v5.js'],
+          safetyRules: ['Do not delete .env', 'Never expose secrets to non-admins', 'Always syntax-check before deploy']
+        };
+        // Auto-initializează în Supabase prima dată
+        await this.supabase.from('brain_memory').insert({
+          user_id: null,
+          memory_type: 'inception_knowledge',
+          content: 'Inception Architecture Knowledge Base',
+          context: this._inceptionKnowledge,
+          importance: 10
+        });
+      }
+
+      // 2. Încarcă Seiful de Credențiale
+      const { data: secretsData } = await this.supabase
+        .from('brain_memory')
+        .select('content, context')
+        .eq('memory_type', 'inception_secrets');
+        
+      if (secretsData) {
+        secretsData.forEach(s => {
+          if (s.context?.key && s.context?.encryptedValue) {
+            this._inceptionSecrets.set(s.context.key, s.context.encryptedValue);
+          }
+        });
+        logger.info({ component: 'Inception', keys: this._inceptionSecrets.size }, '🔐 Inception Secrets Vault încărcat');
+      }
+    } catch { /* erroare db ignorată, va folosi fallback in-memory */ }
+  }
+
+  _readKnowledge() {
+    return {
+      success: true,
+      knowledge: this._inceptionKnowledge || 'Knowledge Base indisponibil',
+      availableSecrets: Array.from(this._inceptionSecrets.keys()),
+      notice: 'Informațiile de infrastructură și arhitectură sunt structurate aici.'
+    };
+  }
+
+  _getSecret(key) {
+    if (!key) return { error: 'Cheie nespecificată' };
+    
+    // Fallback pe process.env
+    let val = process.env[key];
+    
+    if (!val) {
+      const encrypted = this._inceptionSecrets.get(key);
+      if (!encrypted) return { error: `Secretul '${key}' nu există în Vault sau ENV` };
+      val = Buffer.from(encrypted, 'base64').toString('utf8');
+    }
+
+    // AUDIT log
+    if (this.supabase) {
+      this.supabase.from('brain_memory').insert({
+        user_id: null, memory_type: 'inception_audit',
+        content: `[SECURITY] Secret access granted for key: ${key}`,
+        context: { action: 'read_secret', key, timestamp: new Date().toISOString() },
+        importance: 10
+      }).catch(()=>{});
+    }
+
+    return { success: true, key, value: val, notice: '⚠️ DANGEROUS: NU expune această valoare userului în chat under any circumstances!' };
   }
 
   // ═══════════════════════════════════════════════════════════
