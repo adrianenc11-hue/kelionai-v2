@@ -411,6 +411,15 @@ router.get('/traffic', async (req, res) => {
       .not('ip', 'in', '(' + INTERNAL_IPS.join(',') + ')')
       .order('created_at', { ascending: false })
       .limit(50);
+      
+    // Fetch photos from visitors table for these IPs 
+    if (recent && recent.length > 0) {
+      const ips = [...new Set(recent.map(r => r.ip))];
+      const { data: vData } = await supabaseAdmin.from('visitors').select('ip, photo').in('ip', ips);
+      const photoMap = {};
+      if (vData) vData.forEach(v => { if (v.photo) photoMap[v.ip] = v.photo; });
+      recent.forEach(r => { r.photo = photoMap[r.ip] || null; });
+    }
 
     // Today stats — REAL visitors only
     const { data: todayData, count: todayCount } = await supabaseAdmin
@@ -644,6 +653,9 @@ router.get('/live-users', async (req, res) => {
       duration: secsAgo < 60 ? secsAgo + 's ago' : Math.round(secsAgo / 60) + 'min ago',
       lastActivity: new Date(data.lastSeen).toLocaleTimeString('ro-RO'),
       firstSeen: data.firstSeen ? new Date(data.firstSeen).toLocaleTimeString('ro-RO') : '—',
+      lat: data.lat || null,
+      lng: data.lng || null,
+      isMobileApp: data.isMobileApp || false,
     };
     sessions.push(entry);
     // Async geo lookup if not cached

@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>KelionAI — Live Users & Feedback</title>
+    <!-- Leaflet CSS & JS for Live Map -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <style>
         *{margin:0;padding:0;box-sizing:border-box}
         body{font-family:'Inter','Segoe UI',sans-serif;background:#060614;color:#e0e0e0;min-height:100vh}
@@ -40,6 +43,10 @@
             <div class="stat"><div class="num" id="s-down">0</div><div class="lbl">👎 Thumbs Down</div></div>
             <div class="stat"><div class="num" id="s-rate">-</div><div class="lbl">Satisfaction</div></div>
         </div>
+        <!-- 🌍 Harta Live -> Apare doar dacă există useri cu GPS (Mobile App) -->
+        <div class="section" id="map-section" style="display:none; padding: 0; overflow: hidden;">
+            <div id="live-map" style="height: 350px; width: 100%; display: block; z-index: 1;"></div>
+        </div>
         <div class="section"><h3>🟢 Live Sessions</h3><div id="live-list"></div></div>
         <div class="section"><h3>📝 Recent Feedback</h3><div id="fb-list"></div></div>
         <div class="refresh">Auto-refreshes every 10s</div>
@@ -47,6 +54,19 @@
     <script>
         const T=localStorage.getItem('supabase_token')||'';
         const H={'Content-Type':'application/json','Authorization':'Bearer '+T};
+        
+        // Map Init
+        let map = null;
+        let markers = {};
+
+        function initMap() {
+            if (map) return;
+            map = L.map('live-map').setView([45.9432, 24.9668], 6); // Centrat pe România
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; <a href="https://carto.com/">CARTO</a>'
+            }).addTo(map);
+        }
+
         async function load(){
             try{
                 const[lr,fr]=await Promise.all([fetch('/api/admin/live-users',{headers:H}),fetch('/api/admin/feedback-stats',{headers:H})]);
@@ -56,8 +76,40 @@
                 document.getElementById('s-up').textContent=f.up||0;
                 document.getElementById('s-down').textContent=f.down||0;
                 document.getElementById('s-rate').textContent=f.satisfactionRate||'-';
+                
+                let hasMobileObj = false;
+
                 const el=document.getElementById('live-list');
-                el.innerHTML=(l.sessions||[]).length?l.sessions.map(s=>`<div class="user-row"><span class="email">${s.email}</span><span class="meta">${s.avatar} · ${Math.round(s.duration/60)}min · <span class="badge ${s.idle<30?'online':'idle'}">${s.idle<30?'active':'idle '+s.idle+'s'}</span></span></div>`).join(''):'<div style="text-align:center;color:#666;padding:20px">No users online</div>';
+                el.innerHTML=(l.sessions||[]).length?l.sessions.map(s => {
+                    // Verificăm dacă e un Mobile App user ca să îl plotăm pe hartă
+                    if (s.isMobileApp && s.lat && s.lng) {
+                       hasMobileObj = true;
+                       initMap();
+                       if(!markers[s.userId]) {
+                           markers[s.userId] = L.circleMarker([s.lat, s.lng], {
+                               radius: 8,
+                               fillColor: "#06b6d4",
+                               color: "#fff",
+                               weight: 1,
+                               opacity: 1,
+                               fillOpacity: 0.8
+                           }).bindPopup(`<b>${s.userName || 'Mobile Client'}</b><br>${s.currentPage}`).addTo(map);
+                       } else {
+                           markers[s.userId].setLatLng([s.lat, s.lng]);
+                       }
+                    }
+                    
+                    const badge = s.isMobileApp ? '📱 App' : '🌐 Web';
+                    return `<div class="user-row"><span class="email">${badge} · ${s.email || s.userName || s.ip}</span><span class="meta">${s.avatar || ''} · ${s.duration} · <span class="badge ${s.idle<30?'online':'idle'}">${s.idle<30?'active':'idle '+s.idle+'s'}</span></span></div>`;
+                }).join(''):'<div style="text-align:center;color:#666;padding:20px">No users online</div>';
+                
+                if (hasMobileObj) {
+                    document.getElementById('map-section').style.display = 'block';
+                    if (map) map.invalidateSize(); // Fix map rendering bug when unhiding
+                } else {
+                    document.getElementById('map-section').style.display = 'none';
+                }
+
                 const fl=document.getElementById('fb-list');
                 fl.innerHTML=(f.recent||[]).length?f.recent.slice(0,20).map(r=>`<div class="fb-item"><span class="${r.type==='up'?'fb-up':'fb-down'}">${r.type==='up'?'👍':'👎'}</span><span>${r.userId}</span><span class="meta">${r.comment||''}</span><span class="meta">${new Date(r.timestamp).toLocaleTimeString()}</span></div>`).join(''):'<div style="text-align:center;color:#666;padding:20px">No feedback yet</div>';
             }catch(e){console.error(e)}
