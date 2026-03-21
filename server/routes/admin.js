@@ -2872,19 +2872,32 @@ router.post('/brain-chat', async (req, res) => {
 
     let reply, provider;
     try {
+      const { thinkV5 } = require('../brain-v5');
       const history = brainChatSessions[sid].messages.slice(-20);
-      const result = await brain.think(
-        message,        // message
-        'kira',         // avatar
-        history,        // history
-        'ro',           // language
-        'admin-k1',     // userId
-        sid,            // conversationId
-        {},             // mediaData
-        true            // isAdmin
+      const result = await thinkV5(
+        brain, message, 'kira', history, 'ro', 'admin-k1', sid, {}, true
       );
-      reply = result.enrichedMessage || result.reply || result.text || result.message || 'No response';
-      provider = result.modelRoute?.provider || result.provider || result.model || 'unknown';
+      reply = result.enrichedMessage || 'No response';
+      // Sanitize leaked system instructions
+      reply = reply.replace(/\[SYSTEM INSTRUCTION[^\]]*\][\s\S]*?\[END SYSTEM INSTRUCTION\]\s*/gi, '');
+      reply = reply.replace(/\[LEARNED PATTERNS\][\s\S]*?\[\/LEARNED PATTERNS\]\s*/gi, '');
+      reply = reply.replace(/\[SELF-EVAL HINTS\][\s\S]*?\[\/SELF-EVAL HINTS\]\s*/gi, '');
+      reply = reply.replace(/\[CONTEXT SWITCH\][^\n]*\n?/gi, '');
+      reply = reply.replace(/\[PROACTIVE\][\s\S]*?\[\/PROACTIVE\]\s*/gi, '');
+      reply = reply.replace(/\[EMOTIONAL CONTEXT\][^\n]*\n?/gi, '');
+      reply = reply.replace(/\[CURRENT DATE & TIME\][^\n]*\n?/gi, '');
+      reply = reply.replace(/\[USER LOCATION\][^\n]*\n?/gi, '');
+      reply = reply.replace(/\[REZULTATE CAUTARE WEB REALE\][\s\S]*?Citeaza sursele\.\s*/gi, '');
+      reply = reply.replace(/\[DATE METEO REALE\][^\n]*\n?/gi, '');
+      reply = reply.replace(/\[CONTEXT DIN MEMORIE\][^\n]*\n?/gi, '');
+      reply = reply.replace(/\[EMOTION:\s*\w+\]/gi, '');
+      reply = reply.replace(/\[GESTURE:\s*\w+\]/gi, '');
+      reply = reply.replace(/\[POSE:\s*\w+\]/gi, '');
+      reply = reply.replace(/\[BODY:\s*\w+\]/gi, '');
+      reply = reply.replace(/\[GAZE:\s*[\w-]+\]/gi, '');
+      reply = reply.replace(/\[MONITOR\][\s\S]*?\[\/MONITOR\]/gi, '');
+      reply = reply.trim();
+      provider = result.agent || 'V5';
     } catch (e) {
       reply = '❌ Brain error: ' + e.message;
       provider = 'error';
