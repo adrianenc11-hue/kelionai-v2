@@ -251,19 +251,36 @@
   function _chunkText(text) {
     if (text.length <= CHUNK_MAX) return [text];
     const chunks = [];
-    // Split on sentence boundaries
-    const sentences = text.split(/(?<=[.!?])\s+/);
+    // Split on sentence boundaries, newlines, or commas as fallback
+    const sentences = text.split(/(?<=[.!?\n,])\s+/);
     let current = '';
     for (let i = 0; i < sentences.length; i++) {
-      if (current.length + sentences[i].length > CHUNK_MAX && current.length > 0) {
-        chunks.push(current.trim());
-        current = sentences[i];
-      } else {
-        current += (current ? ' ' : '') + sentences[i];
-      }
+        const word = sentences[i];
+        if (!word.trim()) continue;
+
+        // If a single word/segment is somehow larger than CHUNK_MAX, we must hard-split it
+        if (word.length > CHUNK_MAX) {
+            if (current.trim()) {
+                chunks.push(current.trim());
+                current = '';
+            }
+            // Hard split the giant segment into CHUNK_MAX sized pieces
+            for (let j = 0; j < word.length; j += CHUNK_MAX) {
+                chunks.push(word.substring(j, j + CHUNK_MAX).trim());
+            }
+        } 
+        // If adding this word exceeds limits, push current and start new
+        else if (current.length + word.length > CHUNK_MAX && current.length > 0) {
+            chunks.push(current.trim());
+            current = word;
+        } 
+        // Otherwise, keep appending
+        else {
+            current += (current ? ' ' : '') + word;
+        }
     }
     if (current.trim()) chunks.push(current.trim());
-    return chunks.length ? chunks : [text.substring(0, CHUNK_MAX)];
+    return chunks;
   }
 
   async function speak(text, avatar) {
