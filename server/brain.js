@@ -6297,6 +6297,9 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
       if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
       fs.writeFileSync(fullPath, content, 'utf8');
       logger.info({ component: 'Inception', file: filePath, bytes: content.length }, `✍️ Kelion a scris ${filePath}`);
+      // Track pentru auto-deploy
+      if (!this._inceptionWrittenFiles) this._inceptionWrittenFiles = [];
+      if (!this._inceptionWrittenFiles.includes(filePath)) this._inceptionWrittenFiles.push(filePath);
       return {
         success: true,
         file: filePath,
@@ -6314,18 +6317,83 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
   // Cu rollback automat dacă health check eșuează
   // ═══════════════════════════════════════════════════════════
   async _adminAutoDeploy(commitMessage = 'Auto-deploy by Kelion') {
-    const { execSync } = require('child_process');
+    const fs = require('fs');
+    const pathMod = require('path');
     const projectRoot = process.cwd();
+
+    // GitHub config din env
+    const ghToken = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
+    const ghRepo = process.env.GITHUB_REPO || 'adrianenc11-hue/kelionai-v2';
+    const ghBranch = process.env.GITHUB_BRANCH || 'master';
+
+    if (!ghToken) {
+      return { error: 'GITHUB_TOKEN lipsește din env. Adaugă un Personal Access Token pe Railway.' };
+    }
+
     try {
-      logger.info({ component: 'Inception' }, `🚀 Kelion pornește auto-deploy: ${commitMessage}`);
-      const gitStatus = execSync('git status --porcelain', { cwd: projectRoot, encoding: 'utf8' }).trim();
-      if (!gitStatus) {
-        return { success: false, message: 'Nu sunt modificări de comis (git clean)' };
+      logger.info({ component: 'Inception' }, `🚀 Kelion pornește auto-deploy via GitHub API: ${commitMessage}`);
+
+      // Găsește fișierele scrise recent de Kelion (tracked în _writtenFiles)
+      const writtenFiles = this._inceptionWrittenFiles || [];
+      if (writtenFiles.length === 0) {
+        return { success: false, message: 'Nu sunt fișiere scrise de Kelion de comis. Scrie un fișier mai întâi!' };
       }
-      execSync('git add .', { cwd: projectRoot, encoding: 'utf8' });
-      execSync(`git commit -m "${commitMessage.replace(/"/g, "'")}"`, { cwd: projectRoot, encoding: 'utf8' });
-      const pushResult = execSync('git push origin master', { cwd: projectRoot, encoding: 'utf8', timeout: 30000 });
-      logger.info({ component: 'Inception' }, '📤 Git push reușit');
+
+      const results = [];
+      for (const relPath of writtenFiles) {
+        const fullPath = pathMod.resolve(projectRoot, relPath);
+        if (!fs.existsSync(fullPath)) continue;
+
+        const content = fs.readFileSync(fullPath, 'utf8');
+        const contentBase64 = Buffer.from(content).toString('base64');
+
+        // Get current file SHA (needed for updates, null for new files)
+        let sha = null;
+        try {
+          const getResp = await fetch(
+            `https://api.github.com/repos/${ghRepo}/contents/${relPath}?ref=${ghBranch}`,
+            { headers: { Authorization: `Bearer ${ghToken}`, Accept: 'application/vnd.github.v3+json' } }
+          );
+          if (getResp.ok) {
+            const getData = await getResp.json();
+            sha = getData.sha;
+          }
+        } catch { /* new file */ }
+
+        // Create or update file via GitHub API
+        const body = {
+          message: `${commitMessage} — ${relPath}`,
+          content: contentBase64,
+          branch: ghBranch,
+        };
+        if (sha) body.sha = sha;
+
+        const putResp = await fetch(
+          `https://api.github.com/repos/${ghRepo}/contents/${relPath}`,
+          {
+            method: 'PUT',
+            headers: {
+              Authorization: `Bearer ${ghToken}`,
+              Accept: 'application/vnd.github.v3+json',
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(body),
+          }
+        );
+
+        if (!putResp.ok) {
+          const errText = await putResp.text().catch(() => 'unknown');
+          results.push({ file: relPath, error: `GitHub API ${putResp.status}: ${errText.substring(0, 200)}` });
+        } else {
+          const putData = await putResp.json();
+          results.push({ file: relPath, success: true, commit: putData.commit?.sha?.substring(0, 7) });
+        }
+      }
+
+      logger.info({ component: 'Inception', files: results.length }, '📤 GitHub commits done');
+
+      // Clear tracked files
+      this._inceptionWrittenFiles = [];
 
       // Așteaptă 90s pentru Railway auto-deploy din GitHub
       logger.info({ component: 'Inception' }, '⏳ Aștept 90s pentru Railway build...');
@@ -6333,18 +6401,13 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
 
       // Health check
       const appUrl = process.env.APP_URL || 'https://kelionai.app';
-      const healthUrl = `${appUrl.replace(/\/$/, '')}/api/health`;
+      const healthUrl = `${appUrl.replace(/\/$/, '')}/health`;
       let healthy = false;
       for (let attempt = 0; attempt < 3; attempt++) {
         try {
           const resp = await fetch(healthUrl, { signal: AbortSignal.timeout(5000) });
-          if (resp.ok) {
-            healthy = true;
-            break;
-          }
-        } catch {
-          /* retry */
-        }
+          if (resp.ok) { healthy = true; break; }
+        } catch { /* retry */ }
         await new Promise((r) => setTimeout(r, 10000));
       }
 
@@ -6352,18 +6415,15 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
         logger.info({ component: 'Inception' }, '✅ Deploy reușit! Serverul e sănătos.');
         return {
           success: true,
-          message: `Deploy reușit! Commit: ${commitMessage}. Health check OK.`,
-          gitPush: (pushResult || '').trim(),
+          message: `Deploy reușit! ${results.length} fișiere comise. Health check OK.`,
+          files: results,
         };
       } else {
-        // ROLLBACK AUTOMAT
-        logger.warn({ component: 'Inception' }, '❌ Health check eșuat! Rollback automat...');
-        execSync('git revert HEAD --no-edit', { cwd: projectRoot, encoding: 'utf8' });
-        execSync('git push origin master', { cwd: projectRoot, encoding: 'utf8', timeout: 30000 });
+        logger.warn({ component: 'Inception' }, '❌ Health check eșuat!');
         return {
           success: false,
-          rolledBack: true,
-          message: 'Deploy eșuat — health check KO. Am făcut ROLLBACK automat la versiunea anterioară.',
+          message: 'Deploy trimis dar health check eșuat. Verifică logurile Railway.',
+          files: results,
         };
       }
     } catch (e) {
