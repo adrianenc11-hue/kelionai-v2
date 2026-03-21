@@ -2751,10 +2751,10 @@ Reply STRICTLY with JSON:
       {
         flag: 'needsProjectTree',
         triggers: [
-          /\b(list[ea]z[aă]|arat[aă]|vezi|see|list|show|afiseaz[aă])\s*(fisier|foldere?|directoare?|structur[aă]|files?|folders?|directories?|tree|arbore)/i,
+          /\b(listeaz|listez|arat|vezi|see|list|show|afiseaz)\w*\s*(fisier|folder|director|structur|files?|folders?|directories?|tree|arbore)/i,
           /\b(ce\s*(fisiere|foldere|directoare))/i,
-          /\b(structur[aă]\s*(de\s*)?fisiere|file\s*structure|project\s*tree)/i,
-          /\b(ls|dir|scanez|scaneaz[aă])\s*(server|app|fisiere|cod|code|src)/i,
+          /\b(structur\w*\s*(de\s*)?fisiere|file\s*structure|project\s*tree)/i,
+          /\b(ls|dir|scanez|scaneaz)\w*\s*(server|app|fisiere|cod|code|src)/i,
           /\bADMIN_LIST_DIR\b/i,
         ],
         extract: (text) => {
@@ -2766,13 +2766,13 @@ Reply STRICTLY with JSON:
       {
         flag: 'needsProjectFile',
         triggers: [
-          /\b(citeste|citește|deschide|arat[aă]|vezi|read|open|show|cat|view)\s*(fisier|fișier|file|codul?|sursa|source|script)/i,
-          /\b(ce\s*(e|scrie|contine|conține)\s*(in|în))\s*(fisier|fișier|file)/i,
+          /\b(citeste|deschide|arat|vezi|read|open|show|cat|view)\w*\s*(fisier|file|codul?|sursa|source|script)/i,
+          /\b(ce\s*(e|scrie|contine)\s*in)\s*(fisier|file)/i,
           /\b(codul\s*(din|de\s*la|sursa))\b/i,
           /\bADMIN_READ_FILE\b/i,
         ],
         extract: (text) => {
-          const m = text.match(/(?:fisier|fișier|file|sursa|codul?|din|read|open)\s+["']?([\w.\-\/\\]+\.[a-zA-Z]{1,5})["']?/i);
+          const m = text.match(/(?:fisier|file|sursa|codul?|din|read|open)\s+["']?([\w.\-\/\\]+\.[a-zA-Z]{1,5})["']?/i);
           return { projectFilePath: m ? m[1] : '' };
         },
       },
