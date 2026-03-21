@@ -16,6 +16,24 @@
     isListeningForWake = false,
     isProcessing = false;
 
+  // ── WATCHDOG: reset stuck states every 10s ──
+  setInterval(function () {
+    // If isProcessing stuck for >15s, force reset
+    if (isProcessing && !isSpeaking) {
+      console.warn('[Voice] WATCHDOG: isProcessing stuck, resetting');
+      isProcessing = false;
+      if (isListeningForWake && recognition) {
+        try { recognition.start(); } catch (_e) { /* ok */ }
+      }
+    }
+    // If isSpeaking stuck with no audio node, force reset
+    if (isSpeaking && !currentSourceNode) {
+      console.warn('[Voice] WATCHDOG: isSpeaking stuck (no audio), resetting');
+      isSpeaking = false;
+      resumeWakeDetection();
+    }
+  }, 10000);
+
   // ─── Subtitle overlay ───────────────────────────────────
   let _subtitleEl = null;
   let _subtitleTimer = null;
@@ -170,12 +188,15 @@
       }
     };
     recognition.onend = () => {
-      if (isListeningForWake && !isProcessing)
-        try {
-          recognition.start();
-        } catch (_e) {
-          /* ignored */
-        }
+      // ALWAYS try to restart — even if isProcessing (it will be reset by watchdog)
+      if (isListeningForWake) {
+        const delay = isProcessing ? 3000 : 300; // wait longer if processing
+        setTimeout(() => {
+          if (isListeningForWake) {
+            try { recognition.start(); } catch (_e) { /* ok */ }
+          }
+        }, delay);
+      }
     };
     recognition.onerror = (e) => {
       if (e.error !== 'not-allowed' && isListeningForWake)
@@ -860,19 +881,31 @@
       if (!_voiceLoopActive) return;
       const txt = ev.results[0][0].transcript.trim();
       if (txt.length < 2) { _loopListen(); return; }
-      _waitingForAI = true; // stop onend from restarting
+      _waitingForAI = true;
       console.log('[Voice] Loop captured:', txt);
       window.dispatchEvent(new CustomEvent('voice-loop-message', { detail: { text: txt } }));
+      // SAFETY: force reset _waitingForAI after 15s max
+      setTimeout(function () {
+        if (_waitingForAI && _voiceLoopActive) {
+          console.warn('[Voice] WATCHDOG: _waitingForAI timeout, forcing resume');
+          _waitingForAI = false;
+          if (!isSpeaking) _loopListen();
+        }
+      }, 15000);
     };
     rec.onend = function () {
-      if (_voiceLoopActive && !isSpeaking && !_waitingForAI) {
-        setTimeout(_loopListen, 300);
+      // Always try to restart after a delay — even if waiting
+      if (_voiceLoopActive && !isSpeaking) {
+        const delay = _waitingForAI ? 2000 : 300;
+        setTimeout(function () {
+          if (_voiceLoopActive && !isSpeaking) _loopListen();
+        }, delay);
       }
     };
     rec.onerror = function (e) {
       if (!_voiceLoopActive) return;
       if (e.error === 'not-allowed') { stopVoiceLoop(); return; }
-      if (!_waitingForAI) setTimeout(_loopListen, 800);
+      setTimeout(_loopListen, 800);
     };
     return rec;
   }
