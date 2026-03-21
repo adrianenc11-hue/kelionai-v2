@@ -318,10 +318,11 @@ app.use((req, res, next) => {
       const isBot = /bot|crawl|spider|node-fetch|uptimerobot|healthcheck|pingdom|monitoring|curl|wget/i.test(ua);
       const isHealth =
         req.path === '/health' || req.path === '/sw.js' || req.path === '/manifest.json' || req.path === '/favicon.svg';
-      if (!isBot && !isHealth) {
+      // Block vulnerability scanners — .php, wp-*, common attack paths
+      const isAttack = /\.(php|asp|aspx|jsp|cgi|env|git|bak)$/i.test(req.path) ||
+        /wp-content|wp-admin|wp-login|xmlrpc|eval-stdin|shell|cgi-bin|phpmyadmin|\.well-known\/security/i.test(req.path);
+      if (!isBot && !isHealth && !isAttack) {
         const realIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || 'unknown';
-        // Log for debugging — remove after confirming tracking works
-        logger.info({ component: 'PageViews', ip: realIp, path: req.path }, 'TRACKING: condition matched');
 
         // Country from CDN headers first, then IP geolocation
         let country = req.headers['cf-ipcountry'] || req.headers['x-vercel-ip-country'] || null;
