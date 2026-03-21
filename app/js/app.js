@@ -902,8 +902,10 @@
       if (imgMatch) {
         showOnMonitor(imgMatch[0], 'image');
       } else {
-        const coordMatch2 = fullReply.match(/(-?\d+\.?\d*)[°\s,]+([NS])?\s*,?\s*(-?\d+\.?\d*)[°\s,]+([EW])?/i);
-        if (coordMatch2) {
+        // Strict coordinate regex: requires either degree symbol or explicit N/S E/W
+        const coordMatch2 = fullReply.match(/(-?\d{1,2}(?:\.\d+)?)[°]\s*([NS])?(?:[,;\s]+)?(-?\d{1,3}(?:\.\d+)?)[°]\s*([EW])?/i) 
+                         || fullReply.match(/(-?\d{1,2}\.\d{3,})[\s,]+(-?\d{1,3}\.\d{3,})/i); // also match precise floats tracking (e.g. 44.4325, 26.1039)
+        if (coordMatch2 && coordMatch2[1] && coordMatch2[3]) {
           const lat2 = parseFloat(coordMatch2[1]);
           const lng2 = parseFloat(coordMatch2[3]);
           if (!isNaN(lat2) && !isNaN(lng2) && window.MonitorManager) MonitorManager.showMap(lat2, lng2);
