@@ -223,7 +223,7 @@
     // Fetch admin secret for admin users (so K1 panel works immediately)
     if (isAdmin && !sessionStorage.getItem('kelion_admin_secret')) {
       try {
-        const sr = await fetch(API + '/api/admin-secret', { headers: getAuthHeaders() });
+        const sr = await fetch(API + '/api/admin/auth-token', { headers: getAuthHeaders() });
         if (sr.ok) {
           const sd = await sr.json();
           if (sd.secret) sessionStorage.setItem('kelion_admin_secret', sd.secret);
