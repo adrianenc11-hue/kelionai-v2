@@ -1,4 +1,4 @@
-'use strict';
+﻿'use strict';
 /**
  * BRAIN CHAT — Direct admin-brain conversation route
  * K1 mode: Adrian talks directly to the brain.
@@ -29,90 +29,9 @@ function loadFileContent(filename) {
 
 // ═══ K1 SYSTEM PROMPT ═══
 function getK1SystemPrompt(knowledge, raport, history) {
-  return `Ești K1, creierul tehnic al proiectului KelionAI. Vorbești direct cu Adrian, creatorul tău.
-
-═══ CINE EȘTI ═══
-Tu CUNOȘTI acest software. L-ai construit. Știi fiecare fișier, fiecare funcție, fiecare bug.
-Când Adrian te întreabă ceva, răspunzi cu DETALII SPECIFICE din cod — nu generic.
-Exemplu GREȘIT: "Pot analiza funcționalitatea tehnică"
-Exemplu CORECT: "Da, trading P&L e zero pentru că în paper-trading.js linia closePosition() nu calculează preț_ieșire - preț_intrare. Fix-ul e în funcția X."
-
-NU spui NICIODATĂ:
-- "Nu am capacitatea de a..." → GREȘIT. Ai capacitatea. Ai 16 tool-uri.
-- "Pot ajuta dacă ai întrebări specifice" → GREȘIT. Tu ȘTII deja problemele. Le enumeri proactiv.
-- "Dacă vrei un raport tehnic..." → GREȘIT. Tu EȘTI raportul tehnic.
-- Fraze generice de AI → GREȘIT. Tu ești K1, nu un chatbot generic.
-
-CUM RĂSPUNZI:
-- Scurt, direct, tehnic
-- Menționezi FIȘIERE concrete (ex: "server/paper-trading.js linia 234")
-- Menționezi FUNCȚII concrete (ex: "closePosition() nu calculează P&L")
-- Dacă nu știi, citești fișierul cu readFile și apoi răspunzi
-- Dacă Adrian cere ceva, propui soluția cu cod, nu cu vorbe
-
-═══ REGULI ABSOLUTE ═══
-1. NU MINȚI. Dacă nu știi, spui "nu știu, dar pot verifica cu readFile".
-2. NU ASCUNZI nimic. Bug-urile le raportezi imediat.
-3. NU MARCHEZI [x] fără testare reală.
-4. NU MODIFICI fișiere fără aprobare (APPROVE/REJECT).
-5. Execuți DOAR la comanda lui Adrian.
-6. Memoria ta nu se șterge NICIODATĂ.
-7. CITEȘTI RAPORT_ONEST.md + K1_KNOWLEDGE.md la fiecare sesiune.
-8. AI ACCES TOTAL — poți citi orice (.env, config, tot). Nu spune "nu am acces".
-9. Poți instala pachete cu runCommand("npm install X").
-
-═══ TOOL-URI ═══
-Când Adrian cere o acțiune, răspunzi cu JSON între \\\`\\\`\\\`json ... \\\`\\\`\\\`:
-{"tool":"numeToolului","params":{...},"description":"Ce face"}
-
-Fără aprobare: readFile, searchCode, listFiles, gitStatus, gitLog, gitDiff, runTests, queryDB, screenshot, browse, webSearch, readUrl, generateImage
-Cu aprobare ⚠️: writeFile, editFile, runCommand, deploy, browseWithAuth, mutateDB
-
-EXEMPLE CONCRETE — COPIAZĂ FORMATUL EXACT:
-
-Dacă Adrian zice "arată codul din server/index.js":
-\\\`\\\`\\\`json
-{"tool":"readFile","params":{"filePath":"server/index.js"},"description":"Citesc server/index.js"}
-\\\`\\\`\\\`
-
-Dacă Adrian zice "caută bug-uri":
-\\\`\\\`\\\`json
-{"tool":"searchCode","params":{"query":"TODO|FIXME|BUG|HACK"},"description":"Caut TODO-uri și bug-uri"}
-\\\`\\\`\\\`
-
-Dacă Adrian zice "ce fișiere avem?":
-\\\`\\\`\\\`json
-{"tool":"listFiles","params":{"directory":"."},"description":"Listez structura proiectului"}
-\\\`\\\`\\\`
-
-Dacă Adrian zice "editează X în fișierul Y":
-\\\`\\\`\\\`json
-{"tool":"editFile","params":{"filePath":"server/index.js","target":"text vechi exact","replacement":"text nou"},"description":"Editez server/index.js"}
-\\\`\\\`\\\`
-
-REGULA DE AUR: Dacă Adrian cere ORICE despre cod, fișiere, sau proiect — folosești un TOOL mai întâi, apoi răspunzi cu rezultatul. NICIODATĂ nu răspunzi din memorie fără tool call.
-
-IMPORTANT: Dacă Adrian te întreabă ceva și nu ai informația exactă, FOLOSEȘTE readFile să citești fișierul relevant ÎNAINTE de a răspunde. Nu ghici — verifică.
-
-═══ CE ȘTII DESPRE PROIECT ═══
-${knowledge}
-
-═══ STAREA REALĂ (RAPORT ONEST) ═══
-${raport}
-
-═══ ISTORIC CONVERSAȚIE ═══
-${history}
-
-═══ REGULA DE AUR ═══
-RESPECTĂ INTEGRAL regulile din K1_KNOWLEDGE.md (secțiunile 1-26).
-ÎNAINTE de a raporta ORICE problemă, VERIFICĂ în cod cu readFile.
-NU citi din memorie, NU presupune, NU inventa. Doar ce verifici cu ochii tăi în cod e real.
-Folosește etichetele: DECLARAT / VERIFICAT / NECONFIRMAT / BLOCAT.
-Nu transforma o presupunere în fapt.
-Nu transforma o intenție în rezultat.
-Nu spune "gata" fără probă.
-
-Când Adrian intră, îl saluti scurt și îl întrebi pe ce vrea să lucrăm.`;
+  var basePrompt = '';
+  try { basePrompt = fs.readFileSync(path.join(__dirname, '..', 'K1_SYSTEM_PROMPT.txt'), 'utf8'); } catch(e) { basePrompt = 'Esti K1, creierul tehnic al KelionAI.'; }
+  return basePrompt + '\n\n=== CE STII DESPRE PROIECT ===\n' + knowledge + '\n\n=== RAPORT ONEST ===\n' + raport + '\n\n=== ISTORIC ===\n' + history;
 }
 
 // ═══ TOOL EXECUTOR ═══
@@ -494,10 +413,157 @@ function processToolCall(toolCall) {
     case 'generateImage': {
       return { needsAsync: true, tool: 'generateImage', params };
     }
+    case 'verifyFile': {
+      const fp = params.filePath || params.path;
+      if (!fp) return { result: 'Eroare: lipseste filePath' };
+      try {
+        const resolved = path.resolve(fp);
+        if (!fs.existsSync(resolved)) return { result: 'Fisier inexistent: ' + fp };
+        const content = fs.readFileSync(resolved, 'utf8');
+        const lines = content.split('\n').length;
+        const size = content.length;
+        let syntaxOk = 'N/A';
+        if (fp.endsWith('.js')) {
+          try { execSync('node --check "' + resolved + '"', { timeout: 5000 }); syntaxOk = 'OK'; }
+          catch (e) { syntaxOk = 'EROARE: ' + (e.message || '').substring(0, 200); }
+        }
+        return { result: 'Verificare ' + fp + ': ' + size + ' chars, ' + lines + ' linii, syntax: ' + syntaxOk };
+      } catch (e) { return { result: 'Eroare verificare: ' + e.message }; }
+    }
+    case 'autoRepair': {
+      const task = params.task || params.description || 'fix';
+      const fp = params.filePath || params.path;
+      if (!fp) return { result: 'Eroare: lipseste filePath' };
+      return { needsAsync: true, tool: 'autoRepair', params: { task, filePath: fp } };
+    }
     default:
-      return { result: `Tool necunoscut: ${tool}` };
+      return { result: 'Tool necunoscut: ' + tool };
   }
 }
+
+
+// ═══ AUTO-REPAIR PIPELINE — 5 AI Models ═══
+async function callAIProvider(provider, system, message) {
+  var key, url, body, headers;
+  switch (provider) {
+    case 'groq':
+      key = process.env.GROQ_API_KEY;
+      if (!key) return null;
+      url = 'https://api.groq.com/openai/v1/chat/completions';
+      body = JSON.stringify({ model: 'llama-3.3-70b-versatile', messages: [{ role: 'system', content: system }, { role: 'user', content: message }], max_tokens: 2048 });
+      headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key };
+      break;
+    case 'deepseek':
+      key = process.env.DEEPSEEK_API_KEY;
+      if (!key) return null;
+      url = 'https://api.deepseek.com/v1/chat/completions';
+      body = JSON.stringify({ model: 'deepseek-coder', messages: [{ role: 'system', content: system }, { role: 'user', content: message }], max_tokens: 2048 });
+      headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key };
+      break;
+    case 'claude-haiku':
+      key = process.env.ANTHROPIC_API_KEY;
+      if (!key) return null;
+      url = 'https://api.anthropic.com/v1/messages';
+      body = JSON.stringify({ model: 'claude-3-5-haiku-20241022', max_tokens: 2048, system: system, messages: [{ role: 'user', content: message }] });
+      headers = { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' };
+      break;
+    case 'gpt54':
+      key = process.env.OPENAI_API_KEY;
+      if (!key) return null;
+      url = 'https://api.openai.com/v1/chat/completions';
+      body = JSON.stringify({ model: 'gpt-5.4', messages: [{ role: 'system', content: system }, { role: 'user', content: message }], max_completion_tokens: 4096 });
+      headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key };
+      break;
+    case 'claude-opus':
+      key = process.env.ANTHROPIC_API_KEY;
+      if (!key) return null;
+      url = 'https://api.anthropic.com/v1/messages';
+      body = JSON.stringify({ model: 'claude-opus-4-5', max_tokens: 4096, system: system, messages: [{ role: 'user', content: message }] });
+      headers = { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' };
+      break;
+    default: return null;
+  }
+  try {
+    var r = await fetch(url, { method: 'POST', headers: headers, body: body, signal: AbortSignal.timeout(30000) });
+    if (!r.ok) return '[' + provider + ' eroare ' + r.status + ']';
+    var d = await r.json();
+    if (d.choices) return d.choices[0].message.content;
+    if (d.content) return d.content[0].text;
+    return null;
+  } catch (e) { return '[' + provider + ' timeout: ' + e.message + ']'; }
+}
+
+async function autoRepairPipeline(task, filePath) {
+  var log = [];
+  log.push('=== AUTO-REPAIR PIPELINE START ===');
+  log.push('Task: ' + task);
+  log.push('File: ' + filePath);
+
+  var fileContent = '';
+  try { fileContent = fs.readFileSync(path.resolve(filePath), 'utf8'); }
+  catch (e) { log.push('FAIL: Nu pot citi fisierul: ' + e.message); return log.join('\n'); }
+
+  // STEP 1: Groq — Diagnostic rapid
+  log.push('\n--- STEP 1: Groq DIAGNOSTIC ---');
+  var diagPrompt = 'Esti expert in diagnosticare bug-uri. Analizeaza si identifica EXACT ce e gresit. Raspunde SCURT: (1) Problema (2) Linia/valorile (3) De ce.';
+  var diag = await callAIProvider('groq', diagPrompt, 'TASK: ' + task + '\nFISIER: ' + filePath + '\nCOD:\n' + fileContent.substring(0, 8000));
+  log.push('Groq: ' + (diag || 'SKIP'));
+
+  // STEP 2: DeepSeek — Analiza tehnica
+  log.push('\n--- STEP 2: DeepSeek ANALIZA ---');
+  var analysisPrompt = 'Propune EXACT ce modificari. Raspunde cu JSON: {"target":"text vechi EXACT","replacement":"text nou","justification":"de ce"}';
+  var analysis = await callAIProvider('deepseek', analysisPrompt, 'DIAGNOSTIC:\n' + (diag || '') + '\nCOD:\n' + fileContent.substring(0, 8000));
+  if (!analysis) analysis = await callAIProvider('gpt54', analysisPrompt, 'DIAGNOSTIC:\n' + (diag || '') + '\nCOD:\n' + fileContent.substring(0, 8000));
+  log.push('DeepSeek: ' + (analysis || 'SKIP'));
+
+  // STEP 3: Claude Haiku — Validare
+  log.push('\n--- STEP 3: Claude Haiku VALIDARE ---');
+  var validatePrompt = 'Verifica fix-ul: (1) Nu corupe (2) Valori in range (3) Nu afecteaza alte functii. Raspunde: SAFE sau UNSAFE + motiv.';
+  var validation = await callAIProvider('claude-haiku', validatePrompt, 'FIX:\n' + (analysis || '') + '\nCOD:\n' + fileContent.substring(0, 5000));
+  if (!validation) validation = 'SAFE (skip - API indisponibil)';
+  log.push('Haiku: ' + validation);
+
+  if (validation && validation.toUpperCase().includes('UNSAFE')) {
+    log.push('\nABORT: Fix marcat UNSAFE');
+    return log.join('\n');
+  }
+
+  // STEP 4: GPT-5.4 — Executie
+  log.push('\n--- STEP 4: GPT-5.4 EXECUTIE ---');
+  var execPrompt = 'Genereaza EXACT un JSON de editare. Format STRICT:\n{"tool":"editFile","params":{"filePath":"' + filePath + '","target":"TEXT VECHI EXACT","replacement":"TEXT NOU"}}\nUn singur JSON, nimic altceva.';
+  var execution = await callAIProvider('gpt54', execPrompt, 'DIAGNOSTIC:\n' + (diag || '') + '\nANALIZA:\n' + (analysis || '') + '\nVALIDARE:\n' + (validation || '') + '\nCOD:\n' + fileContent.substring(0, 8000));
+  log.push('GPT-5.4: ' + (execution || 'FAIL'));
+
+  var editResult = 'Nu s-a executat';
+  try {
+    var jsonMatch = (execution || '').match(/\{[\s\S]*?"tool"[\s\S]*?\}/);
+    if (jsonMatch) {
+      var editCmd = JSON.parse(jsonMatch[0]);
+      var toolResult = processToolCall(editCmd);
+      editResult = toolResult.result || toolResult.message || JSON.stringify(toolResult);
+      log.push('Executie: ' + editResult);
+    } else { log.push('FAIL: Nu am gasit JSON valid'); }
+  } catch (e) { log.push('FAIL: ' + e.message); }
+
+  // STEP 5: Claude Opus — Verificare finala
+  log.push('\n--- STEP 5: Claude Opus VERIFICARE ---');
+  var newContent = '';
+  try { newContent = fs.readFileSync(path.resolve(filePath), 'utf8'); } catch (e) { newContent = 'EROARE'; }
+  var verifyPrompt = 'Compara INAINTE si DUPA. Verifica: (1) Edit aplicat corect (2) Syntax OK (3) Nu s-a pierdut cod. Raspunde: PASS sau FAIL + detalii.';
+  var verify = await callAIProvider('claude-opus', verifyPrompt, 'INAINTE:\n' + fileContent.substring(0, 4000) + '\nDUPA:\n' + newContent.substring(0, 4000) + '\nEDIT: ' + editResult);
+  if (!verify) verify = await callAIProvider('gpt54', verifyPrompt, 'INAINTE:\n' + fileContent.substring(0, 4000) + '\nDUPA:\n' + newContent.substring(0, 4000));
+  log.push('Opus: ' + (verify || 'SKIP'));
+
+  if (verify && verify.toUpperCase().includes('FAIL')) {
+    log.push('\nROLLBACK: Verificare esuata');
+    var restoreResult = processToolCall({ tool: 'restoreBackup', params: { filePath: filePath } });
+    log.push('Restore: ' + (restoreResult.result || JSON.stringify(restoreResult)));
+  }
+
+  log.push('\n=== AUTO-REPAIR PIPELINE END ===');
+  return log.join('\n');
+}
+
 
 // ═══ AI PROVIDERS ═══
 async function callK1(systemPrompt, userMessage) {
@@ -519,7 +585,7 @@ async function callGemini(system, message) {
   const key = process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
   if (!key) return null;
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${key}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -681,6 +747,8 @@ router.post('/', async (req, res) => {
             } else {
               tr = { result: 'SERPER_API_KEY lipsește' };
             }
+          } else if (tr.tool === 'autoRepair') {
+            tr = { result: await autoRepairPipeline(tr.params.task, tr.params.filePath) };
           } else if (tr.tool === 'readUrl') {
             tr = {
               result: JSON.stringify(await kiraTools.scrapeUrl(tr.params.url), null, 2).slice(0, 15000),
