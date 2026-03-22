@@ -397,6 +397,7 @@
             headers: {
               'Content-Type': 'application/json',
               'x-admin-secret': ADMIN_SECRET,
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
             },
             body: JSON.stringify({ message: msg, sessionId: currentSessionId }),
           });
