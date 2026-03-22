@@ -81,9 +81,10 @@ async function scanAndHeal(brain, supabaseAdmin) {
 }
 
 async function attemptRepair(brain, supabaseAdmin, tool, errorCount, lastError) {
-  const geminiKey = process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
-  if (!geminiKey) {
-    logger.warn({ component: 'SelfHeal' }, 'No Gemini API key — cannot auto-repair');
+  const claudeKey = process.env.ANTHROPIC_API_KEY;
+  const groqKey = process.env.GROQ_API_KEY;
+  if (!claudeKey && !groqKey) {
+    logger.warn({ component: 'SelfHeal' }, 'No Claude or Groq API key — cannot auto-repair');
     return;
   }
 
@@ -143,9 +144,8 @@ async function attemptRepair(brain, supabaseAdmin, tool, errorCount, lastError) 
   const codeSnippet =
     relevantLines.length > 0 ? relevantLines.join('\n') : `[Could not find '${tool}' in ${sourceFile}]`;
 
-  // STEP 2: ANALYZE — Ask Gemini to diagnose and generate fix
-  logger.info({ component: 'SelfHeal', tool }, '🧠 Step 2: Asking Gemini to analyze and generate fix...');
-
+  // STEP 2: ANALYZE — Ask AI to diagnose and generate fix
+  // Priority: Claude Sonnet 4 (best at code) → Groq Llama 4 Scout (fastest, free)
   const prompt = `You are KelionAI's self-healing engine. A tool has errors that need fixing.
 
 TOOL: ${tool}
@@ -180,26 +180,78 @@ RESPONSE FORMAT (strict JSON, no markdown):
 If you cannot safely fix this, return:
 {"diagnosis": "...", "fix": null, "reason": "Why it cannot be auto-fixed", "confidence": 0}`;
 
-  const geminiModel = MODELS?.GEMINI_CHAT || 'gemini-2.0-flash';
-  const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiKey}`;
+  let rawText = '';
+  let usedProvider = 'none';
 
-  const geminiR = await fetch(geminiUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: { maxOutputTokens: 2048, temperature: 0.2 },
-    }),
-    signal: AbortSignal.timeout(30000),
-  });
-
-  if (!geminiR.ok) {
-    logger.error({ component: 'SelfHeal', status: geminiR.status }, 'Gemini API failed');
-    return;
+  // ── Try Claude Sonnet 4 first (best code quality) ──
+  if (claudeKey) {
+    logger.info({ component: 'SelfHeal', tool }, '🧠 Step 2: Asking Claude Sonnet 4 to analyze...');
+    try {
+      const claudeModel = MODELS?.CLAUDE || 'claude-sonnet-4-20250514';
+      const claudeR = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': claudeKey,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model: claudeModel,
+          max_tokens: 2048,
+          temperature: 0.2,
+          messages: [{ role: 'user', content: prompt }],
+        }),
+        signal: AbortSignal.timeout(30000),
+      });
+      if (claudeR.ok) {
+        const claudeData = await claudeR.json();
+        rawText = claudeData.content?.[0]?.text || '';
+        usedProvider = 'claude';
+        logger.info({ component: 'SelfHeal', tool }, '✅ Claude responded');
+      } else {
+        logger.warn({ component: 'SelfHeal', status: claudeR.status }, 'Claude API failed, trying Groq...');
+      }
+    } catch (e) {
+      logger.warn({ component: 'SelfHeal', err: e.message }, 'Claude timeout/error, trying Groq...');
+    }
   }
 
-  const geminiData = await geminiR.json();
-  const rawText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  // ── Fallback: Groq Llama 4 Scout (fastest, free) ──
+  if (!rawText && groqKey) {
+    logger.info({ component: 'SelfHeal', tool }, '🧠 Step 2: Asking Groq (Llama 4 Scout) to analyze...');
+    try {
+      const groqModel = MODELS?.GROQ_PRIMARY || 'meta-llama/llama-4-scout-17b-16e-instruct';
+      const groqR = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${groqKey}`,
+        },
+        body: JSON.stringify({
+          model: groqModel,
+          messages: [{ role: 'user', content: prompt }],
+          max_tokens: 2048,
+          temperature: 0.2,
+        }),
+        signal: AbortSignal.timeout(15000),
+      });
+      if (groqR.ok) {
+        const groqData = await groqR.json();
+        rawText = groqData.choices?.[0]?.message?.content || '';
+        usedProvider = 'groq';
+        logger.info({ component: 'SelfHeal', tool }, '✅ Groq responded');
+      } else {
+        logger.error({ component: 'SelfHeal', status: groqR.status }, 'Groq API also failed');
+      }
+    } catch (e) {
+      logger.error({ component: 'SelfHeal', err: e.message }, 'Groq timeout/error');
+    }
+  }
+
+  if (!rawText) {
+    logger.error({ component: 'SelfHeal', tool }, 'All AI providers failed — cannot auto-repair');
+    return;
+  }
 
   // Parse JSON from response
   let analysis;
@@ -208,7 +260,7 @@ If you cannot safely fix this, return:
     if (!jsonMatch) throw new Error('No JSON found');
     analysis = JSON.parse(jsonMatch[0]);
   } catch (e) {
-    logger.warn({ component: 'SelfHeal', raw: rawText.substring(0, 200) }, 'Cannot parse Gemini response');
+    logger.warn({ component: 'SelfHeal', provider: usedProvider, raw: rawText.substring(0, 200) }, 'Cannot parse AI response');
     logToMemory(supabaseAdmin, tool, 'analysis_unparseable', rawText.substring(0, 500));
     return;
   }
