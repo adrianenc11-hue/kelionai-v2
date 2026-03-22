@@ -296,6 +296,11 @@ CREATE INDEX IF NOT EXISTS idx_brain_memory_user ON brain_memory(user_id);
 CREATE INDEX IF NOT EXISTS idx_brain_memory_type ON brain_memory(memory_type);
 CREATE INDEX IF NOT EXISTS idx_brain_memory_date ON brain_memory(created_at DESC);
 
+-- Extend memory_type CHECK to include golden_knowledge, write_lesson, file_write
+ALTER TABLE brain_memory DROP CONSTRAINT IF EXISTS brain_memory_memory_type_check;
+ALTER TABLE brain_memory ADD CONSTRAINT brain_memory_memory_type_check
+  CHECK (memory_type IN ('general', 'conversation', 'fact', 'preference', 'skill', 'emotion', 'context', 'system', 'golden_knowledge', 'write_lesson', 'file_write'));
+
 -- ═══ LEARNED FACTS (AI knowledge base) ═══
 CREATE TABLE IF NOT EXISTS learned_facts (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -620,6 +625,9 @@ CREATE INDEX IF NOT EXISTS idx_brain_admin_sessions_updated ON brain_admin_sessi
 
 -- ═══ MISSING COLUMN: messages.source (used by saveConv in chat.js) ═══
 ALTER TABLE messages ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'web';
+
+-- ═══ MISSING COLUMN: brain_memory.metadata (used by safe write guards + knowledge seed) ═══
+ALTER TABLE brain_memory ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}';
 
 -- ═══ MISSING COLUMN: page_views.referrer (used by traffic tracking in index.js) ═══
 ALTER TABLE page_views ADD COLUMN IF NOT EXISTS referrer TEXT;
