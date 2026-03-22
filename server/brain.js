@@ -536,6 +536,249 @@ class KelionBrain {
   }
 
   // ═══════════════════════════════════════════════════════════
+  // WORKING MEMORY — Task Checkpoint System (persistă starea între interacțiuni)
+  // ═══════════════════════════════════════════════════════════
+
+  /**
+   * Începe un task nou — creează checkpoint inițial
+   * @param {string} userId - User ID
+   * @param {string} taskGoal - Ce încearcă K1 să facă
+   * @param {string[]} steps - Lista pașilor planificați
+   * @returns {string} taskId
+   */
+  async startTask(userId, taskGoal, steps = []) {
+    const taskId = `task_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+    const checkpoint = {
+      taskId,
+      goal: taskGoal,
+      steps: steps.map((s, i) => ({ step: i + 1, description: s, status: 'pending', result: null })),
+      currentStep: 0,
+      findings: [],
+      errors: [],
+      status: 'in_progress',
+      startedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    // Salvează în hot memory
+    if (!this._activeTask) this._activeTask = new Map();
+    this._activeTask.set(userId, checkpoint);
+
+    // Persistă în DB
+    if (this.supabaseAdmin) {
+      await this.supabaseAdmin.from('brain_memory').insert({
+        user_id: userId,
+        memory_type: 'context',
+        content: JSON.stringify(checkpoint),
+        importance: 0.8,
+        metadata: { type: 'task_checkpoint', taskId, goal: taskGoal, status: 'in_progress' }
+      }).catch(() => {});
+    }
+
+    logger.info({ component: 'WorkingMemory', taskId, goal: taskGoal, steps: steps.length },
+      `📋 Task started: ${taskGoal}`);
+    return taskId;
+  }
+
+  /**
+   * Actualizează checkpoint-ul — salvează progresul curent
+   * @param {string} userId - User ID  
+   * @param {object} update - { stepDone, finding, error, note }
+   */
+  async updateCheckpoint(userId, update = {}) {
+    if (!this._activeTask) this._activeTask = new Map();
+    const checkpoint = this._activeTask.get(userId);
+    if (!checkpoint) return;
+
+    // Marchează pasul curent ca terminat
+    if (update.stepDone !== undefined && checkpoint.steps[checkpoint.currentStep]) {
+      checkpoint.steps[checkpoint.currentStep].status = 'done';
+      checkpoint.steps[checkpoint.currentStep].result = update.finding || 'completed';
+      checkpoint.currentStep++;
+    }
+
+    // Adaugă finding
+    if (update.finding) {
+      checkpoint.findings.push({
+        step: checkpoint.currentStep,
+        finding: update.finding,
+        at: new Date().toISOString()
+      });
+    }
+
+    // Adaugă eroare
+    if (update.error) {
+      checkpoint.errors.push({
+        step: checkpoint.currentStep,
+        error: update.error,
+        at: new Date().toISOString()
+      });
+    }
+
+    // Notă liberă
+    if (update.note) {
+      checkpoint.findings.push({
+        step: checkpoint.currentStep,
+        finding: `[NOTE] ${update.note}`,
+        at: new Date().toISOString()
+      });
+    }
+
+    checkpoint.updatedAt = new Date().toISOString();
+    this._activeTask.set(userId, checkpoint);
+
+    // Persistă în DB (update existentul)
+    if (this.supabaseAdmin) {
+      await this.supabaseAdmin
+        .from('brain_memory')
+        .update({
+          content: JSON.stringify(checkpoint),
+          metadata: {
+            type: 'task_checkpoint',
+            taskId: checkpoint.taskId,
+            goal: checkpoint.goal,
+            status: 'in_progress',
+            currentStep: checkpoint.currentStep,
+            totalSteps: checkpoint.steps.length,
+            findings: checkpoint.findings.length
+          }
+        })
+        .eq('memory_type', 'context')
+        .like('content', `%${checkpoint.taskId}%`)
+        .catch(() => {});
+    }
+
+    const progress = checkpoint.steps.length > 0
+      ? `${checkpoint.currentStep}/${checkpoint.steps.length}`
+      : `step ${checkpoint.currentStep}`;
+    logger.info({ component: 'WorkingMemory', taskId: checkpoint.taskId, progress },
+      `💾 Checkpoint saved: ${progress}`);
+  }
+
+  /**
+   * Completează un task
+   * @param {string} userId - User ID
+   * @param {string} summary - Rezumat final
+   */
+  async completeTask(userId, summary = '') {
+    if (!this._activeTask) return;
+    const checkpoint = this._activeTask.get(userId);
+    if (!checkpoint) return;
+
+    checkpoint.status = 'completed';
+    checkpoint.summary = summary;
+    checkpoint.completedAt = new Date().toISOString();
+    checkpoint.updatedAt = new Date().toISOString();
+
+    // Update DB
+    if (this.supabaseAdmin) {
+      await this.supabaseAdmin
+        .from('brain_memory')
+        .update({
+          content: JSON.stringify(checkpoint),
+          metadata: {
+            type: 'task_checkpoint',
+            taskId: checkpoint.taskId,
+            goal: checkpoint.goal,
+            status: 'completed'
+          }
+        })
+        .eq('memory_type', 'context')
+        .like('content', `%${checkpoint.taskId}%`)
+        .catch(() => {});
+    }
+
+    this._activeTask.delete(userId);
+    logger.info({ component: 'WorkingMemory', taskId: checkpoint.taskId },
+      `✅ Task completed: ${checkpoint.goal}`);
+  }
+
+  /**
+   * Găsește task-uri neterminate pentru un user — folosit la reluare
+   * @param {string} userId - User ID
+   * @returns {object[]} Lista de task-uri neterminate cu tot contextul
+   */
+  async getUnfinishedTasks(userId) {
+    if (!this.supabaseAdmin) return [];
+    try {
+      const { data, error } = await this.supabaseAdmin
+        .from('brain_memory')
+        .select('content, metadata, created_at')
+        .eq('user_id', userId)
+        .eq('memory_type', 'context')
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      if (error || !data) return [];
+
+      const unfinished = [];
+      for (const row of data) {
+        try {
+          const cp = typeof row.content === 'string' ? JSON.parse(row.content) : row.content;
+          if (cp.taskId && cp.status === 'in_progress') {
+            unfinished.push(cp);
+          }
+        } catch { /* skip invalid */ }
+      }
+      return unfinished;
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Construiește contextul de reluare — text care se injectează în system prompt
+   * pentru ca K1 să știe unde a rămas
+   * @param {string} userId - User ID
+   * @returns {string} Context text sau '' dacă nu sunt task-uri neterminate
+   */
+  async buildResumeContext(userId) {
+    const tasks = await this.getUnfinishedTasks(userId);
+    if (tasks.length === 0) return '';
+
+    let ctx = '\n\n⚠️ AI TASK-URI NETERMINATE — REIA DE UNDE AI RĂMAS:\n';
+    for (const task of tasks) {
+      ctx += `\n📋 TASK: ${task.goal}\n`;
+      ctx += `   Status: pas ${task.currentStep}/${task.steps.length}\n`;
+
+      // Ce s-a făcut
+      const done = task.steps.filter(s => s.status === 'done');
+      if (done.length > 0) {
+        ctx += `   ✅ Terminat:\n`;
+        for (const s of done) {
+          ctx += `      - ${s.description}: ${s.result || 'ok'}\n`;
+        }
+      }
+
+      // Ce s-a descoperit
+      if (task.findings.length > 0) {
+        ctx += `   🔍 Descoperiri:\n`;
+        for (const f of task.findings.slice(-5)) {
+          ctx += `      - ${f.finding}\n`;
+        }
+      }
+
+      // Ce mai e de făcut
+      const pending = task.steps.filter(s => s.status === 'pending');
+      if (pending.length > 0) {
+        ctx += `   ⏳ Rămâne de făcut:\n`;
+        for (const s of pending) {
+          ctx += `      - ${s.description}\n`;
+        }
+      }
+
+      // Erori întâlnite
+      if (task.errors.length > 0) {
+        ctx += `   ❌ Erori întâlnite:\n`;
+        for (const e of task.errors.slice(-3)) {
+          ctx += `      - ${e.error}\n`;
+        }
+      }
+    }
+    return ctx;
+  }
+
+  // ═══════════════════════════════════════════════════════════
   // SELF-REPAIR ENGINE — Auto-fix when commands fail
   // ═══════════════════════════════════════════════════════════
 

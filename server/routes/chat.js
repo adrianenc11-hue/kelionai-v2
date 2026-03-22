@@ -174,12 +174,22 @@ router.post('/chat', chatLimiter, validate(chatSchema), async (req, res) => {
     // ═══ BRAIN V5: GPT-5.4 + Gemini hybrid — timeout global 30s ═══
     const BRAIN_TIMEOUT_MS = 60000;
 
+    // ── WORKING MEMORY: Injectează context de task-uri neterminate ──
+    let enrichedMessage = message;
+    try {
+      const resumeCtx = await brain.buildResumeContext(user?.id);
+      if (resumeCtx) {
+        enrichedMessage = message + resumeCtx;
+        logger.info({ component: 'WorkingMemory' }, '📋 Resume context injected');
+      }
+    } catch { /* non-blocking */ }
+
     let thought;
     try {
       thought = await Promise.race([
         thinkV5(
           brain,
-          message,
+          enrichedMessage,
           avatar,
           history,
           language,
@@ -288,6 +298,8 @@ router.post('/chat', chatLimiter, validate(chatSchema), async (req, res) => {
         })
         .catch(() => {});
       brain.extractAndSaveFacts(user.id, message, reply).catch(() => {});
+      // ── SELF-LEARNING: Învață din conversația curentă ──
+      brain._learnFromResponse(message, reply, { toolsUsed: thought?.toolsUsed || [] }, user.id).catch(() => {});
       // Save visual memory if image was analyzed
       if (imageBase64 && reply) {
         brain.saveMemory(user.id, 'visual', 'Image analysis: ' + reply.substring(0, 500), { avatar }).catch(() => {});
