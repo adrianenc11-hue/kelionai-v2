@@ -675,6 +675,14 @@ process.on('SIGINT', async () => {
 const { startSelfHealLoop } = require('./self-heal');
 startSelfHealLoop(brain, supabaseAdmin);
 
+// ═══ BRAIN CORTEX v2.0 — Central AI Orchestrator ═══
+// 7 permanent loops: Health(2min), Schema(5min), Learning(10min),
+// ErrorDigest(15min), TestRunner(30min), RepairRouter, PostDeploy
+const { BrainCortex } = require('./brain-cortex');
+const cortex = new BrainCortex(supabaseAdmin, brain);
+cortex.start();
+logger.info({ component: 'Server' }, '🧠 Brain Cortex v2.0 — all AI agents activated');
+
 // ═══ AUTH HELPER ═══
 async function getUserFromToken(req) {
   const h = req.headers.authorization;
@@ -699,6 +707,7 @@ app.locals.supabaseAdmin = supabaseAdmin;
 app.locals.brain = brain;
 
 app.locals.brain = brain;
+app.locals.cortex = cortex;
 
 app.locals.memFallback = memFallback;
 
