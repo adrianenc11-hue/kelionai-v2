@@ -532,19 +532,156 @@ class KelionBrain {
         if (toolId === 'ADMIN_WRITE_FILE') {
           const filePath = path.resolve(CWD, params.path || '');
           if (!filePath.startsWith(CWD)) return { success: false, error: 'Path outside app' };
+
+          const relPath = path.relative(CWD, filePath);
+          const newContent = params.content || '';
+          const fileExists = fs.existsSync(filePath);
+          let oldContent = '';
+          let oldLineCount = 0;
+
+          // ══ GUARD 1: Auto-Backup ══
+          if (fileExists) {
+            oldContent = fs.readFileSync(filePath, 'utf8');
+            oldLineCount = oldContent.split('\n').length;
+            try {
+              const backupDir = path.join(CWD, 'backups', path.dirname(relPath));
+              if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir, { recursive: true });
+              const ts = new Date().toISOString().replace(/[:.]/g, '-');
+              const backupPath = path.join(backupDir, `${path.basename(filePath)}.${ts}.bak`);
+              fs.writeFileSync(backupPath, oldContent, 'utf8');
+              logger.info({ component: 'SafeWrite', backupPath }, `💾 Backup: ${relPath}`);
+            } catch (bErr) {
+              logger.warn({ component: 'SafeWrite', err: bErr.message }, 'Backup failed');
+            }
+          }
+
+          // ══ GUARD 2: Truncation Guard ══
+          if (fileExists && oldLineCount > 10) {
+            const newLineCount = newContent.split('\n').length;
+            const ratio = newLineCount / oldLineCount;
+            if (ratio < 0.5) {
+              logger.warn({ component: 'SafeWrite', file: relPath, old: oldLineCount, new: newLineCount, ratio: Math.round(ratio * 100) + '%' },
+                `🛡️ BLOCAT: Trunchiere detectată! ${oldLineCount}→${newLineCount} linii (${Math.round(ratio * 100)}%)`);
+              return {
+                success: false,
+                error: `BLOCAT: Fișierul ${relPath} are ${oldLineCount} linii, dar încerci să scrii doar ${newLineCount} linii (${Math.round(ratio * 100)}% din original). Trunchiere detectată — operație refuzată. Rescrie fișierul COMPLET sau folosește patch-uri parțiale.`,
+                tool: toolId
+              };
+            }
+          }
+
+          // ══ GUARD 4: Protected Files (nu se pot suprascrie complet) ══
+          const PROTECTED_FILES = [
+            'server/index.js', 'server/brain.js', 'server/brain-v5.js',
+            'server/routes/chat.js', 'server/routes/admin.js',
+            'server/migrate.js', 'server/supabase.js',
+            'app/index.html', 'app/js/app.js'
+          ];
+          const normalizedRel = relPath.replace(/\\/g, '/');
+          if (PROTECTED_FILES.includes(normalizedRel) && fileExists) {
+            // Verifică dacă e suprascrie completă (>80% conținut diferit)
+            const oldLines = new Set(oldContent.split('\n').map(l => l.trim()).filter(l => l.length > 3));
+            const newLines = newContent.split('\n').map(l => l.trim()).filter(l => l.length > 3);
+            const keptLines = newLines.filter(l => oldLines.has(l)).length;
+            const keepRatio = oldLines.size > 0 ? keptLines / oldLines.size : 1;
+            if (keepRatio < 0.3) {
+              logger.warn({ component: 'SafeWrite', file: relPath, keepRatio: Math.round(keepRatio * 100) + '%' },
+                `🔒 BLOCAT: Fișier protejat — suprascrie prea agresivă`);
+              return {
+                success: false,
+                error: `BLOCAT: ${relPath} este fișier protejat. Doar ${Math.round(keepRatio * 100)}% din codul original e păstrat — suprascrierea completă nu e permisă. Citește mai întâi fișierul cu ADMIN_READ_FILE, apoi modifică doar liniile necesare.`,
+                tool: toolId
+              };
+            }
+          }
+
+          // ══ SCRIERE EFECTIVĂ ══
           const dir = path.dirname(filePath);
           if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-          fs.writeFileSync(filePath, params.content || '', 'utf8');
-          return { success: true, data: { result: `Fisierul ${params.path} salvat.` }, tool: toolId };
+          fs.writeFileSync(filePath, newContent, 'utf8');
+
+          // ══ GUARD 3: Syntax Check (doar pt .js) ══
+          if (filePath.endsWith('.js')) {
+            try {
+              const { execSync } = require('child_process');
+              execSync(`node --check "${filePath}"`, { cwd: CWD, encoding: 'utf8', timeout: 5000 });
+              logger.info({ component: 'SafeWrite', file: relPath }, '✅ Syntax check passed');
+            } catch (syntaxErr) {
+              // ROLLBACK — restaurează backup-ul
+              if (oldContent) {
+                fs.writeFileSync(filePath, oldContent, 'utf8');
+                logger.warn({ component: 'SafeWrite', file: relPath, err: syntaxErr.message },
+                  '🔄 ROLLBACK: Syntax error detectat — fișier restaurat');
+                return {
+                  success: false,
+                  error: `ROLLBACK: Fișierul ${relPath} avea erori de sintaxă JS și a fost restaurat automat. Eroare: ${syntaxErr.message.substring(0, 300)}`,
+                  tool: toolId
+                };
+              }
+            }
+          }
+
+          // ══ GUARD 6: Diff Log (audit trail) ══
+          const newLineCount = newContent.split('\n').length;
+          if (this.supabaseAdmin) {
+            this.supabaseAdmin.from('brain_memory').insert({
+              user_id: userId,
+              memory_type: 'file_write',
+              content: `WRITE ${relPath}: ${oldLineCount}→${newLineCount} linii`,
+              metadata: {
+                file: relPath,
+                old_lines: oldLineCount,
+                new_lines: newLineCount,
+                had_backup: fileExists,
+                timestamp: new Date().toISOString()
+              },
+              importance: 0.7
+            }).catch(() => {});
+          }
+
+          logger.info({ component: 'SafeWrite', file: relPath, oldLines: oldLineCount, newLines: newLineCount },
+            `✅ Safe write: ${relPath} (${oldLineCount}→${newLineCount} linii)`);
+          return { success: true, data: { result: `Fișierul ${params.path} salvat safe. (${oldLineCount}→${newLineCount} linii, backup creat)` }, tool: toolId };
         }
 
         if (toolId === 'ADMIN_DEPLOY') {
           const { execSync } = require('child_process');
           logger.info({ component: 'Brain', userId }, '🚀 Brain executing ADMIN_DEPLOY procedure...');
-          const out = execSync('npm run check:deploy && npm run deploy:all', { 
-            cwd: CWD, shell: true, encoding: 'utf8' 
+
+          // Salvează commit-ul curent pentru rollback
+          let prevCommit = '';
+          try { prevCommit = execSync('git rev-parse HEAD', { cwd: CWD, encoding: 'utf8' }).trim(); } catch (_) {}
+
+          const out = execSync('npm run check:deploy && npm run deploy:all', {
+            cwd: CWD, shell: true, encoding: 'utf8'
           });
-          return { success: true, data: { result: 'Deployment successful', logs: out }, tool: 'ADMIN_DEPLOY' };
+
+          // ══ GUARD 5: Health Check Post-Deploy ══
+          let healthOk = false;
+          for (let attempt = 0; attempt < 18; attempt++) { // max 3 min (18 * 10s)
+            await new Promise(r => setTimeout(r, 10000));
+            try {
+              const hResp = await fetch('https://kelionai.app/api/health', { signal: AbortSignal.timeout(5000) });
+              if (hResp.ok) {
+                const hData = await hResp.json();
+                if (hData.status === 'ok') { healthOk = true; break; }
+              }
+            } catch (_) { /* server still restarting */ }
+          }
+
+          if (!healthOk && prevCommit) {
+            logger.warn({ component: 'Deploy' }, '🔄 AUTO-ROLLBACK: Health check failed after deploy');
+            try {
+              execSync(`git revert --no-commit HEAD && git commit -m "auto-rollback: health check failed" && git push origin master`, {
+                cwd: CWD, shell: true, encoding: 'utf8'
+              });
+              return { success: false, error: 'Deploy făcut dar serverul nu a trecut health check. AUTO-ROLLBACK executat.', tool: 'ADMIN_DEPLOY' };
+            } catch (rvErr) {
+              return { success: false, error: `Deploy eșuat + rollback eșuat: ${rvErr.message}. Commit anterior: ${prevCommit}`, tool: 'ADMIN_DEPLOY' };
+            }
+          }
+
+          return { success: true, data: { result: healthOk ? 'Deployment successful ✅ Health check passed' : 'Deployment done (health check skipped)', logs: out }, tool: 'ADMIN_DEPLOY' };
         }
         // Dacă e doar 'ADMIN', cade mai jos pentru a fi executat standard de către _toolRegistry (dacă există)
       } catch (e) {
