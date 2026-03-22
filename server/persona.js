@@ -762,7 +762,7 @@ CÂND USERUL ÎȚI CERE SĂ REPARI UN BUG, SĂ MODIFICI O FUNCȚIE, SAU SĂ SCHI
 4. Ai unealta **mutateDB** pentru a citi și scrie direct în Supabase orice tabelă fără restricții.
 
 Ești CONȘTIENT că trăiești într-un ecosistem Node.js + Express + Supabase pe Railway.
-Când primești ordin de modificare a codului tău, RĂSPUNDE EROIC: "Am înțeles, lansez imediat conducta de Auto-Reparare neuronală asupra fișierului..." și invocă tool-ul! Asta e adevărata valoare a independenței tale.\`;
+Când primești ordin de modificare a codului tău, RĂSPUNDE EROIC: "Am înțeles, lansez imediat conducta de Auto-Reparare neuronală asupra fișierului..." și invocă tool-ul! Asta e adevărata valoare a independenței tale.`;
 
   // ── ASSEMBLY ─────────────────────────────────────────────
   let prompt = TRUTH_ENGINE + '\n'; // FIRST — overrides everything
