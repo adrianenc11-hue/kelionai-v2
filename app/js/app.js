@@ -1905,21 +1905,45 @@
       micBtn.addEventListener('click', function () {
         unlockAudio();
 
-        // Use the new GPT 5.4 Live Chat architecture
-        if (window.KLiveChat) {
+        // Voice-to-voice: Deepgram STT → Groq LLM → Cartesia TTS
+        if (window.KVoiceStream) {
+          if (micBtn.textContent === '🎙️') {
+            // Connect if not already connected
+            if (!KVoiceStream.isConnected()) {
+              const avatar = window.KAvatar ? KAvatar.getCurrentAvatar() : 'kelion';
+              const lang = window.KVoice ? KVoice.getLanguage() : 'ro';
+              KVoiceStream.connect({ avatar: avatar, language: lang });
+            }
+            // Start mic after short delay to ensure connection is ready
+            setTimeout(function () {
+              KVoiceStream.startMic().then(function () {
+                setMicOn();
+                hideWelcome();
+                console.log('[App] Voice stream mic started');
+              }).catch(function (err) {
+                console.error('[App] Voice stream mic failed:', err);
+                setMicOff();
+              });
+            }, 500);
+            setMicOn(); // Immediate visual feedback
+          } else {
+            KVoiceStream.stopMic();
+            setMicOff();
+          }
+        }
+        // Fallback to KLiveChat (GPT 5.4 native audio) if KVoiceStream is unavailable
+        else if (window.KLiveChat) {
           if (!KLiveChat.isConnected()) {
             const avatar = window.KAvatar ? KAvatar.getCurrentAvatar() : 'kelion';
             const lang = window.KVoice ? KVoice.getLanguage() : 'ro';
             KLiveChat.connect(avatar, lang);
           }
-
-          // Toggle Mic
           if (micBtn.textContent === '🎙️') {
             KLiveChat.startMic();
             setMicOn();
             hideWelcome();
           } else {
-            KLiveChat.stopMic(true); // Stop and commit
+            KLiveChat.stopMic(true);
             setMicOff();
           }
         }
