@@ -4,9 +4,9 @@ const { KelionBrain } = require('./server/brain');
 async function testInception() {
   console.log('🧠 Inception Faza 3.5 Test...');
   const brain = new KelionBrain({ geminiKey: 'test', supabase: null });
-  
+
   // Așteptăm să se inițializeze constructorul (Knowledge base)
-  await new Promise(r => setTimeout(r, 2000));
+  await new Promise((r) => setTimeout(r, 2000));
 
   console.log('\n--- 1. Test Knowledge Base ---');
   const kb = brain._readKnowledge();

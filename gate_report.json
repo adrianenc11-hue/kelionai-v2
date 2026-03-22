@@ -1,48 +1,47 @@
 {
   "version": "1.0",
-  "commit": "7e55422f8bb0e091d54666203d3f8b781474e090",
+  "commit": "74518096acf55478fe854ebeffc6b28edceb28b5",
   "branch": "master",
   "preview_url": null,
-  "timestamp": "2026-03-21T19:09:23.523Z",
+  "timestamp": "2026-03-22T09:55:58.617Z",
   "node_version": "v24.14.0",
-  "overall": "FAIL",
+  "overall": "PASS",
   "gates": [
     {
       "name": "Prettier (format check)",
-      "status": "fail",
-      "duration": 15634,
-      "exitCode": 1,
-      "output": "Checking formatting...\n[\u001b[33mwarn\u001b[39m] server/brain.js\n[\u001b[33mwarn\u001b[39m] Code style issues found in the above file. Run Prettier with --write to fix."
+      "status": "pass",
+      "duration": 4027,
+      "output": "Checking formatting...\nAll matched files use Prettier code style!"
     },
     {
       "name": "Lint (ESLint)",
       "status": "pass",
-      "duration": 4003,
-      "output": "ng  'e' is defined but never used. Allowed unused caught errors must match /^_/u  no-unused-vars\n\nC:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\server\\self-heal.js\n  210:12  warning  'e' is defined but never used. Allowed unused caught errors must match /^_/u  no-unused-vars\n  312:17  warning  Empty block statement                                                         no-empty\n\n✖ 35 problems (0 errors, 35 warnings)\n  0 errors and 3 warnings potentially fixable with the `--fix` option."
+      "duration": 3183,
+      "output": "g  'e' is defined but never used. Allowed unused caught errors must match /^_/u  no-unused-vars\n\nC:\\Users\\adria\\.gemini\\antigravity\\scratch\\kelionai-v2\\server\\self-heal.js\n  210:12  warning  'e' is defined but never used. Allowed unused caught errors must match /^_/u  no-unused-vars\n  312:17  warning  Empty block statement                                                         no-empty\n\n✖ 70 problems (0 errors, 70 warnings)\n  0 errors and 31 warnings potentially fixable with the `--fix` option."
     },
     {
       "name": "Typecheck",
       "status": "pass",
-      "duration": 726,
+      "duration": 616,
       "output": "typecheck: N/A"
     },
     {
       "name": "Unit Tests (Jest)",
       "status": "pass",
-      "duration": 33951,
+      "duration": 18403,
       "exitCode": 1,
-      "output": "d to exit gracefully and has been force exited. This is likely caused by tests leaking due to improper teardown. Try running with --detectOpenHandles to find leaks. Active timers can also cause this, ensure that .unref() was called on them.\n\nTest Suites: 1 failed, 9 passed, 10 total\nTests:       205 passed, 205 total\nSnapshots:   0 total\nTime:        31.152 s\nForce exiting Jest: Have you considered using `--detectOpenHandles` to detect async operations that kept running after all tests finished?"
+      "output": "d to exit gracefully and has been force exited. This is likely caused by tests leaking due to improper teardown. Try running with --detectOpenHandles to find leaks. Active timers can also cause this, ensure that .unref() was called on them.\n\nTest Suites: 1 failed, 9 passed, 10 total\nTests:       205 passed, 205 total\nSnapshots:   0 total\nTime:        16.322 s\nForce exiting Jest: Have you considered using `--detectOpenHandles` to detect async operations that kept running after all tests finished?"
     },
     {
       "name": "Build Validation",
       "status": "pass",
-      "duration": 734,
+      "duration": 582,
       "output": ""
     },
     {
       "name": "Security (npm audit)",
       "status": "pass",
-      "duration": 2091,
+      "duration": 1452,
       "output": "found 0 vulnerabilities"
     },
     {

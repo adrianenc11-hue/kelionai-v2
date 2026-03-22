@@ -7,9 +7,9 @@
   'use strict';
 
   const HEALTH_URL = window.location.origin + '/api/health';
-  const POLL_INTERVAL = 3000;   // verifică la fiecare 3s
-  const MAX_WAIT = 300000;      // timeout 5 minute
-  const RESTART_GRACE = 5000;   // așteptare inițială 5s pt restart
+  const POLL_INTERVAL = 3000; // verifică la fiecare 3s
+  const MAX_WAIT = 300000; // timeout 5 minute
+  const RESTART_GRACE = 5000; // așteptare inițială 5s pt restart
 
   let overlay = null;
   let pollTimer = null;
@@ -166,8 +166,7 @@
     overlay.classList.add('deploy-success');
     overlay.querySelector('.deploy-hourglass').textContent = '✅';
     overlay.querySelector('.deploy-title').textContent = 'Deploy finalizat!';
-    overlay.querySelector('.deploy-subtitle').textContent =
-      'Serverul este live • uptime: ' + Math.floor(uptime) + 's';
+    overlay.querySelector('.deploy-subtitle').textContent = 'Serverul este live • uptime: ' + Math.floor(uptime) + 's';
     var progressEl = document.getElementById('deploy-progress');
     if (progressEl) progressEl.style.width = '100%';
     // Auto-close after 3s
@@ -213,7 +212,9 @@
 
     try {
       var ctrl = new AbortController();
-      var timer = setTimeout(function () { ctrl.abort(); }, 5000);
+      var timer = setTimeout(function () {
+        ctrl.abort();
+      }, 5000);
       var r = await fetch(HEALTH_URL, { signal: ctrl.signal });
       clearTimeout(timer);
 

@@ -272,9 +272,12 @@ class KelionBrain {
                     .order('created_at', { ascending: true })
                     .limit(toDelete);
                   if (oldOnes && oldOnes.length > 0) {
-                    const ids = oldOnes.map(m => m.id);
+                    const ids = oldOnes.map((m) => m.id);
                     await this.supabaseAdmin.from('brain_memory').delete().in('id', ids);
-                    logger.info({ component: 'Scheduler', deleted: ids.length }, `🧹 Cleaned ${ids.length} old memories (protected: golden_knowledge, write_lesson)`);
+                    logger.info(
+                      { component: 'Scheduler', deleted: ids.length },
+                      `🧹 Cleaned ${ids.length} old memories (protected: golden_knowledge, write_lesson)`
+                    );
                   }
                 }
               }
@@ -328,7 +331,7 @@ class KelionBrain {
         this._goldenKnowledge.set(item.id, {
           content: item.content,
           metadata: item.metadata || {},
-          accessCount: 0
+          accessCount: 0,
         });
       }
 
@@ -358,7 +361,7 @@ class KelionBrain {
         error: errorMsg,
         resolution: resolution,
         timestamp: new Date().toISOString(),
-        pattern: this._extractErrorPattern(errorMsg)
+        pattern: this._extractErrorPattern(errorMsg),
       };
 
       // Verifică dacă o lecție similară există deja
@@ -388,14 +391,11 @@ class KelionBrain {
             auto_analyzed: true,
             error_pattern: pattern,
             context: context,
-            timestamp: lesson.timestamp
-          }
+            timestamp: lesson.timestamp,
+          },
         });
 
-        logger.info(
-          { component: 'SelfLearn', pattern, context },
-          `🧠 Lecție nouă salvată: ${pattern}`
-        );
+        logger.info({ component: 'SelfLearn', pattern, context }, `🧠 Lecție nouă salvată: ${pattern}`);
       }
 
       // Păstrează în memory log local (max 50)
@@ -441,11 +441,8 @@ class KelionBrain {
 
     try {
       // Verifică dacă conversația e suficient de complexă pentru a extrage lecții
-      const isComplex = (
-        aiResponse.length > 500 ||
-        (metadata.toolsUsed && metadata.toolsUsed.length > 0) ||
-        metadata.hadError
-      );
+      const isComplex =
+        aiResponse.length > 500 || (metadata.toolsUsed && metadata.toolsUsed.length > 0) || metadata.hadError;
 
       if (!isComplex) return; // Nu salvează lecții din conversații simple
 
@@ -464,9 +461,7 @@ class KelionBrain {
       if (existing && existing.length >= 5) return; // Suficiente lecții pe topic
 
       // Extrage esența — ce a funcționat
-      const essence = aiResponse.length > 300
-        ? aiResponse.substring(0, 300) + '...'
-        : aiResponse;
+      const essence = aiResponse.length > 300 ? aiResponse.substring(0, 300) + '...' : aiResponse;
 
       const learned = `[LEARNED:${topic}] Cerere: "${userMessage.substring(0, 100)}". Soluție aplicată: ${essence}`;
 
@@ -479,14 +474,11 @@ class KelionBrain {
           topic: topic,
           tools_used: metadata.toolsUsed || [],
           response_time_ms: metadata.responseTime || 0,
-          learned_at: new Date().toISOString()
-        }
+          learned_at: new Date().toISOString(),
+        },
       });
 
-      logger.info(
-        { component: 'SelfLearn', topic },
-        `📝 Learned from conversation: ${topic}`
-      );
+      logger.info({ component: 'SelfLearn', topic }, `📝 Learned from conversation: ${topic}`);
     } catch (e) {
       // Non-blocking — nu strică conversația
     }
@@ -525,8 +517,8 @@ class KelionBrain {
     for (const [id, item] of this._goldenKnowledge) {
       const content = item.content.toLowerCase();
       // Verifică relevanță bazată pe keywords
-      const keywords = ctx.split(/\s+/).filter(w => w.length > 3);
-      const matches = keywords.filter(kw => content.includes(kw)).length;
+      const keywords = ctx.split(/\s+/).filter((w) => w.length > 3);
+      const matches = keywords.filter((kw) => content.includes(kw)).length;
       if (matches >= 2 || (ctx.includes('scrie') && content.includes('safe_coding'))) {
         relevant.push(item.content);
         item.accessCount++;
@@ -557,7 +549,7 @@ class KelionBrain {
       errors: [],
       status: 'in_progress',
       startedAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
     };
 
     // Salvează în hot memory
@@ -566,23 +558,28 @@ class KelionBrain {
 
     // Persistă în DB
     if (this.supabaseAdmin) {
-      await this.supabaseAdmin.from('brain_memory').insert({
-        user_id: userId,
-        memory_type: 'context',
-        content: JSON.stringify(checkpoint),
-        importance: 0.8,
-        metadata: { type: 'task_checkpoint', taskId, goal: taskGoal, status: 'in_progress' }
-      }).catch(() => {});
+      await this.supabaseAdmin
+        .from('brain_memory')
+        .insert({
+          user_id: userId,
+          memory_type: 'context',
+          content: JSON.stringify(checkpoint),
+          importance: 0.8,
+          metadata: { type: 'task_checkpoint', taskId, goal: taskGoal, status: 'in_progress' },
+        })
+        .catch(() => {});
     }
 
-    logger.info({ component: 'WorkingMemory', taskId, goal: taskGoal, steps: steps.length },
-      `📋 Task started: ${taskGoal}`);
+    logger.info(
+      { component: 'WorkingMemory', taskId, goal: taskGoal, steps: steps.length },
+      `📋 Task started: ${taskGoal}`
+    );
     return taskId;
   }
 
   /**
    * Actualizează checkpoint-ul — salvează progresul curent
-   * @param {string} userId - User ID  
+   * @param {string} userId - User ID
    * @param {object} update - { stepDone, finding, error, note }
    */
   async updateCheckpoint(userId, update = {}) {
@@ -602,7 +599,7 @@ class KelionBrain {
       checkpoint.findings.push({
         step: checkpoint.currentStep,
         finding: update.finding,
-        at: new Date().toISOString()
+        at: new Date().toISOString(),
       });
     }
 
@@ -611,7 +608,7 @@ class KelionBrain {
       checkpoint.errors.push({
         step: checkpoint.currentStep,
         error: update.error,
-        at: new Date().toISOString()
+        at: new Date().toISOString(),
       });
     }
 
@@ -620,7 +617,7 @@ class KelionBrain {
       checkpoint.findings.push({
         step: checkpoint.currentStep,
         finding: `[NOTE] ${update.note}`,
-        at: new Date().toISOString()
+        at: new Date().toISOString(),
       });
     }
 
@@ -640,19 +637,22 @@ class KelionBrain {
             status: 'in_progress',
             currentStep: checkpoint.currentStep,
             totalSteps: checkpoint.steps.length,
-            findings: checkpoint.findings.length
-          }
+            findings: checkpoint.findings.length,
+          },
         })
         .eq('memory_type', 'context')
         .like('content', `%${checkpoint.taskId}%`)
         .catch(() => {});
     }
 
-    const progress = checkpoint.steps.length > 0
-      ? `${checkpoint.currentStep}/${checkpoint.steps.length}`
-      : `step ${checkpoint.currentStep}`;
-    logger.info({ component: 'WorkingMemory', taskId: checkpoint.taskId, progress },
-      `💾 Checkpoint saved: ${progress}`);
+    const progress =
+      checkpoint.steps.length > 0
+        ? `${checkpoint.currentStep}/${checkpoint.steps.length}`
+        : `step ${checkpoint.currentStep}`;
+    logger.info(
+      { component: 'WorkingMemory', taskId: checkpoint.taskId, progress },
+      `💾 Checkpoint saved: ${progress}`
+    );
   }
 
   /**
@@ -680,8 +680,8 @@ class KelionBrain {
             type: 'task_checkpoint',
             taskId: checkpoint.taskId,
             goal: checkpoint.goal,
-            status: 'completed'
-          }
+            status: 'completed',
+          },
         })
         .eq('memory_type', 'context')
         .like('content', `%${checkpoint.taskId}%`)
@@ -689,8 +689,7 @@ class KelionBrain {
     }
 
     this._activeTask.delete(userId);
-    logger.info({ component: 'WorkingMemory', taskId: checkpoint.taskId },
-      `✅ Task completed: ${checkpoint.goal}`);
+    logger.info({ component: 'WorkingMemory', taskId: checkpoint.taskId }, `✅ Task completed: ${checkpoint.goal}`);
   }
 
   /**
@@ -718,7 +717,9 @@ class KelionBrain {
           if (cp.taskId && cp.status === 'in_progress') {
             unfinished.push(cp);
           }
-        } catch { /* skip invalid */ }
+        } catch {
+          /* skip invalid */
+        }
       }
       return unfinished;
     } catch {
@@ -742,7 +743,7 @@ class KelionBrain {
       ctx += `   Status: pas ${task.currentStep}/${task.steps.length}\n`;
 
       // Ce s-a făcut
-      const done = task.steps.filter(s => s.status === 'done');
+      const done = task.steps.filter((s) => s.status === 'done');
       if (done.length > 0) {
         ctx += `   ✅ Terminat:\n`;
         for (const s of done) {
@@ -759,7 +760,7 @@ class KelionBrain {
       }
 
       // Ce mai e de făcut
-      const pending = task.steps.filter(s => s.status === 'pending');
+      const pending = task.steps.filter((s) => s.status === 'pending');
       if (pending.length > 0) {
         ctx += `   ⏳ Rămâne de făcut:\n`;
         for (const s of pending) {
@@ -791,7 +792,9 @@ class KelionBrain {
     try {
       const { execSync } = require('child_process');
       const output = execSync('npx jest --forceExit --bail --silent 2>&1', {
-        cwd: process.cwd(), encoding: 'utf8', timeout: 30000
+        cwd: process.cwd(),
+        encoding: 'utf8',
+        timeout: 30000,
       });
       logger.info({ component: 'AutoTest', file: filePath }, '✅ Tests passed after write');
       return { passed: true, output: output.substring(0, 500) };
@@ -800,10 +803,13 @@ class KelionBrain {
       // Rollback
       if (oldContent) {
         fs.writeFileSync(filePath, oldContent, 'utf8');
-        logger.warn({ component: 'AutoTest', file: filePath },
-          '🔄 ROLLBACK: Tests failed — file restored');
-        await this._selfAnalyze('auto_test', testErr.message,
-          'Rollback automat — testele au picat după scriere', userId);
+        logger.warn({ component: 'AutoTest', file: filePath }, '🔄 ROLLBACK: Tests failed — file restored');
+        await this._selfAnalyze(
+          'auto_test',
+          testErr.message,
+          'Rollback automat — testele au picat după scriere',
+          userId
+        );
       }
       return { passed: false, error: testErr.message?.substring(0, 300) };
     }
@@ -828,11 +834,13 @@ class KelionBrain {
         status: status || '(clean)',
         recentDiff: diff,
         recentCommits: log,
-        safe_to_deploy: !status.includes('server/index.js') || status === ''
+        safe_to_deploy: !status.includes('server/index.js') || status === '',
       };
 
-      logger.info({ component: 'GitAware', branch, changes: report.uncommittedChanges },
-        `📊 Git: ${branch}, ${report.uncommittedChanges} uncommitted`);
+      logger.info(
+        { component: 'GitAware', branch, changes: report.uncommittedChanges },
+        `📊 Git: ${branch}, ${report.uncommittedChanges} uncommitted`
+      );
       return report;
     } catch (e) {
       return { error: e.message, safe_to_deploy: false };
@@ -858,14 +866,14 @@ class KelionBrain {
       if (mod.startsWith('.')) {
         const resolved = path.resolve(path.dirname(filePath), mod);
         const possiblePaths = [resolved, resolved + '.js', resolved + '/index.js'];
-        if (!possiblePaths.some(p => fs.existsSync(p))) {
+        if (!possiblePaths.some((p) => fs.existsSync(p))) {
           issues.push(`⚠️ require('${mod}') — fișierul nu există`);
         }
       }
     }
 
     // Check: console.log rămase (OK pt debug, warn pt producție)
-    const consoleLogs = lines.filter(l => l.includes('console.log') && !l.trim().startsWith('//')).length;
+    const consoleLogs = lines.filter((l) => l.includes('console.log') && !l.trim().startsWith('//')).length;
     if (consoleLogs > 3) {
       issues.push(`⚠️ ${consoleLogs} console.log-uri — consideră înlocuirea cu logger`);
     }
@@ -889,8 +897,10 @@ class KelionBrain {
     }
 
     if (issues.length > 0) {
-      logger.info({ component: 'CodeReview', file: filePath, issues: issues.length },
-        `🔍 Code review: ${issues.length} probleme găsite`);
+      logger.info(
+        { component: 'CodeReview', file: filePath, issues: issues.length },
+        `🔍 Code review: ${issues.length} probleme găsite`
+      );
     }
     return issues;
   }
@@ -906,7 +916,7 @@ class KelionBrain {
       attempts: attempts.map((a, i) => `  ${i + 1}. ${a.fix || a} → ${a.applied ? '✅' : '❌'}`),
       resolution: resolution || 'Nu s-a găsit soluție automată',
       timestamp: new Date().toISOString(),
-      formatted: ''
+      formatted: '',
     };
 
     report.formatted = [
@@ -915,8 +925,10 @@ class KelionBrain {
       `Eroare: ${error}`,
       attempts.length ? `Încercări:\n${report.attempts.join('\n')}` : '',
       `Rezoluție: ${report.resolution}`,
-      `──────────────────`
-    ].filter(Boolean).join('\n');
+      `──────────────────`,
+    ]
+      .filter(Boolean)
+      .join('\n');
 
     return report;
   }
@@ -936,7 +948,7 @@ class KelionBrain {
           controller.signal.addEventListener('abort', () => {
             reject(new Error(`WATCHDOG: ${context} a depășit ${timeoutMs / 1000}s`));
           });
-        })
+        }),
       ]);
       clearTimeout(timer);
       return { success: true, result };
@@ -946,11 +958,10 @@ class KelionBrain {
       if (userId) {
         await this.updateCheckpoint(userId, {
           error: `Timeout ${timeoutMs / 1000}s: ${context}`,
-          note: `Operația a fost oprită automat după ${timeoutMs / 1000}s`
+          note: `Operația a fost oprită automat după ${timeoutMs / 1000}s`,
         });
       }
-      logger.warn({ component: 'Watchdog', context, timeoutMs },
-        `⏰ ${err.message}`);
+      logger.warn({ component: 'Watchdog', context, timeoutMs }, `⏰ ${err.message}`);
       return { success: false, error: err.message, timedOut: true };
     }
   }
@@ -966,14 +977,35 @@ class KelionBrain {
 
     // Pattern-uri de fake/hardcode/placeholder
     const patterns = [
-      { regex: /['"](?:test|fake|dummy|placeholder|sample|example|mock|todo|fixme|xxx|temp)['"](?!\s*[,\]}])/gi, type: 'placeholder', severity: 'high' },
-      { regex: /['"](?:sk-[a-zA-Z0-9]{20,}|pk_test_|sk_test_|AIza[a-zA-Z0-9_-]{35}|ghp_[a-zA-Z0-9]{36})['"](?!\s*[,\]}])/g, type: 'exposed_api_key', severity: 'critical' },
-      { regex: /(?:password|secret|token|api_key)\s*[:=]\s*['"][^'"]{3,}['"]/gi, type: 'hardcoded_secret', severity: 'critical' },
+      {
+        regex: /['"](?:test|fake|dummy|placeholder|sample|example|mock|todo|fixme|xxx|temp)['"](?!\s*[,\]}])/gi,
+        type: 'placeholder',
+        severity: 'high',
+      },
+      {
+        regex:
+          /['"](?:sk-[a-zA-Z0-9]{20,}|pk_test_|sk_test_|AIza[a-zA-Z0-9_-]{35}|ghp_[a-zA-Z0-9]{36})['"](?!\s*[,\]}])/g,
+        type: 'exposed_api_key',
+        severity: 'critical',
+      },
+      {
+        regex: /(?:password|secret|token|api_key)\s*[:=]\s*['"][^'"]{3,}['"]/gi,
+        type: 'hardcoded_secret',
+        severity: 'critical',
+      },
       { regex: /['"](?:127\.0\.0\.1|localhost|0\.0\.0\.0)(?::\d+)?['"]/g, type: 'hardcoded_url', severity: 'medium' },
-      { regex: /['"](?:user@example\.com|test@test\.com|admin@admin\.com)['"]/gi, type: 'fake_email', severity: 'medium' },
+      {
+        regex: /['"](?:user@example\.com|test@test\.com|admin@admin\.com)['"]/gi,
+        type: 'fake_email',
+        severity: 'medium',
+      },
       { regex: /(?:TODO|FIXME|HACK|XXX|TEMP)\b/g, type: 'todo_marker', severity: 'low' },
       { regex: /\bsleep\(\d{4,}\)|setTimeout\([^,]+,\s*\d{5,}\)/g, type: 'suspicious_delay', severity: 'medium' },
-      { regex: /return\s+(?:true|false|null|'ok'|"ok")\s*;?\s*\/\/.*(?:temp|fake|stub|mock)/gi, type: 'stub_return', severity: 'high' }
+      {
+        regex: /return\s+(?:true|false|null|'ok'|"ok")\s*;?\s*\/\/.*(?:temp|fake|stub|mock)/gi,
+        type: 'stub_return',
+        severity: 'high',
+      },
     ];
 
     const lines = content.split('\n');
@@ -991,7 +1023,7 @@ class KelionBrain {
               type: p.type,
               severity: p.severity,
               context: line.trim().substring(0, 100),
-              safeToReplace: this._analyzeReplacementSafety(p.type, match, content, i)
+              safeToReplace: this._analyzeReplacementSafety(p.type, match, content, i),
             });
           }
         }
@@ -999,11 +1031,12 @@ class KelionBrain {
     }
 
     if (findings.length > 0) {
-      const critical = findings.filter(f => f.severity === 'critical').length;
-      const high = findings.filter(f => f.severity === 'high').length;
-      logger.info({ component: 'HardcodeDetector', file: filePath,
-        total: findings.length, critical, high },
-        `🔍 Hardcode scan: ${findings.length} findings (${critical} critical, ${high} high)`);
+      const critical = findings.filter((f) => f.severity === 'critical').length;
+      const high = findings.filter((f) => f.severity === 'high').length;
+      logger.info(
+        { component: 'HardcodeDetector', file: filePath, total: findings.length, critical, high },
+        `🔍 Hardcode scan: ${findings.length} findings (${critical} critical, ${high} high)`
+      );
     }
 
     return findings;
@@ -1036,7 +1069,7 @@ class KelionBrain {
         } else {
           analysis.safe = true;
           analysis.reason = 'URL local hardcodat fără condiție de mediu';
-          analysis.suggestion = 'Înlocuiește cu process.env.API_URL || \'http://localhost:PORT\'';
+          analysis.suggestion = "Înlocuiește cu process.env.API_URL || 'http://localhost:PORT'";
         }
         break;
       case 'fake_email':
@@ -1088,8 +1121,10 @@ class KelionBrain {
 
     // ── Detectează ce capabilități are nevoie task-ul ──
     const needed = this._detectNeededCapabilities(desc);
-    logger.info({ component: 'CapDiscovery', needed: needed.length, task: desc.substring(0, 80) },
-      `🔎 Detected ${needed.length} capabilities needed`);
+    logger.info(
+      { component: 'CapDiscovery', needed: needed.length, task: desc.substring(0, 80) },
+      `🔎 Detected ${needed.length} capabilities needed`
+    );
 
     // ── Pentru fiecare capabilitate necesară, verifică și instalează ──
     for (const cap of needed) {
@@ -1108,21 +1143,27 @@ class KelionBrain {
         }
 
         // Încearcă instalare
-        logger.info({ component: 'CapDiscovery', cap: cap.name, attempt },
-          `📦 Installing: ${cap.name} (attempt ${attempt})`);
+        logger.info(
+          { component: 'CapDiscovery', cap: cap.name, attempt },
+          `📦 Installing: ${cap.name} (attempt ${attempt})`
+        );
 
         try {
           switch (cap.type) {
             case 'npm_package':
               execSync(`npm install ${cap.package} --save`, {
-                cwd: CWD, encoding: 'utf8', timeout: 60000
+                cwd: CWD,
+                encoding: 'utf8',
+                timeout: 60000,
               });
               installed = true;
               break;
 
             case 'npm_dev_package':
               execSync(`npm install ${cap.package} --save-dev`, {
-                cwd: CWD, encoding: 'utf8', timeout: 60000
+                cwd: CWD,
+                encoding: 'utf8',
+                timeout: 60000,
               });
               installed = true;
               break;
@@ -1131,7 +1172,7 @@ class KelionBrain {
               // Nu poate instala comenzi system — raportează
               report.missing.push({
                 name: cap.name,
-                reason: `Comandă sistem lipsă: ${cap.command}. Trebuie instalată manual.`
+                reason: `Comandă sistem lipsă: ${cap.command}. Trebuie instalată manual.`,
               });
               break;
 
@@ -1146,7 +1187,7 @@ class KelionBrain {
               if (!process.env[cap.envVar]) {
                 report.missing.push({
                   name: cap.name,
-                  reason: `Variabilă de mediu lipsă: ${cap.envVar}. Adaugă în .env pe Railway.`
+                  reason: `Variabilă de mediu lipsă: ${cap.envVar}. Adaugă în .env pe Railway.`,
                 });
               }
               break;
@@ -1159,14 +1200,16 @@ class KelionBrain {
                   require(migratePath);
                   installed = true;
                 }
-              } catch { /* migration failed */ }
+              } catch {
+                /* migration failed */
+              }
               break;
 
             case 'file':
               if (!fs.existsSync(cap.filePath)) {
                 report.missing.push({
                   name: cap.name,
-                  reason: `Fișier lipsă: ${cap.filePath}. Trebuie creat.`
+                  reason: `Fișier lipsă: ${cap.filePath}. Trebuie creat.`,
                 });
               }
               break;
@@ -1176,12 +1219,14 @@ class KelionBrain {
             report.installed.push({ name: cap.name, type: cap.type, attempt });
           }
         } catch (installErr) {
-          logger.warn({ component: 'CapDiscovery', cap: cap.name, err: installErr.message },
-            `❌ Install failed: ${cap.name}`);
+          logger.warn(
+            { component: 'CapDiscovery', cap: cap.name, err: installErr.message },
+            `❌ Install failed: ${cap.name}`
+          );
           if (attempt === 3) {
             report.missing.push({
               name: cap.name,
-              reason: installErr.message?.substring(0, 200)
+              reason: installErr.message?.substring(0, 200),
             });
           }
         }
@@ -1192,17 +1237,16 @@ class KelionBrain {
           if (works) {
             report.verified.push({ name: cap.name, type: cap.type, attempt });
             verified = true;
-            logger.info({ component: 'CapDiscovery', cap: cap.name },
-              `✅ Verified: ${cap.name}`);
+            logger.info({ component: 'CapDiscovery', cap: cap.name }, `✅ Verified: ${cap.name}`);
             break;
           }
         }
       }
 
-      if (!verified && !report.missing.find(m => m.name === cap.name)) {
+      if (!verified && !report.missing.find((m) => m.name === cap.name)) {
         report.missing.push({
           name: cap.name,
-          reason: 'Nu s-a putut instala sau verifica după 3 încercări'
+          reason: 'Nu s-a putut instala sau verifica după 3 încercări',
         });
       }
     }
@@ -1211,18 +1255,21 @@ class KelionBrain {
 
     // Salvează lecția dacă am instalat ceva
     if (report.installed.length > 0) {
-      const lesson = `AUTO-PROVISION: Pentru task "${desc.substring(0, 60)}" am instalat: ${report.installed.map(i => i.name).join(', ')}`;
+      const lesson = `AUTO-PROVISION: Pentru task "${desc.substring(0, 60)}" am instalat: ${report.installed.map((i) => i.name).join(', ')}`;
       await this._selfAnalyze('capability_discovery', '', lesson, userId);
     }
 
     // Logghează raportul
-    logger.info({
-      component: 'CapDiscovery',
-      ready: report.ready,
-      installed: report.installed.length,
-      missing: report.missing.length,
-      verified: report.verified.length
-    }, `📊 Capability check: ${report.ready ? 'READY' : 'MISSING ' + report.missing.length}`);
+    logger.info(
+      {
+        component: 'CapDiscovery',
+        ready: report.ready,
+        installed: report.installed.length,
+        missing: report.missing.length,
+        verified: report.verified.length,
+      },
+      `📊 Capability check: ${report.ready ? 'READY' : 'MISSING ' + report.missing.length}`
+    );
 
     return report;
   }
@@ -1295,7 +1342,7 @@ class KelionBrain {
 
     // Dedup by name
     const seen = new Set();
-    return needed.filter(n => {
+    return needed.filter((n) => {
       if (seen.has(n.name)) return false;
       seen.add(n.name);
       return true;
@@ -1370,16 +1417,20 @@ class KelionBrain {
       try {
         const result = await operation();
         if (attempt > 1) {
-          logger.info({ component: 'SelfRepair', context, attempt, repairs: repairs.length },
-            `🔧 Auto-repair reușit la încercarea ${attempt}`);
+          logger.info(
+            { component: 'SelfRepair', context, attempt, repairs: repairs.length },
+            `🔧 Auto-repair reușit la încercarea ${attempt}`
+          );
           // Salvează lecția de succes
-          await this._selfAnalyze(context, lastError, `Fix automat: ${repairs.map(r => r.fix).join(' → ')}`, userId);
+          await this._selfAnalyze(context, lastError, `Fix automat: ${repairs.map((r) => r.fix).join(' → ')}`, userId);
         }
         return { success: true, result, repairs };
       } catch (err) {
         lastError = err.message || String(err);
-        logger.warn({ component: 'SelfRepair', context, attempt, err: lastError },
-          `⚠️ Încercare ${attempt}/${maxRetries} eșuată: ${lastError.substring(0, 150)}`);
+        logger.warn(
+          { component: 'SelfRepair', context, attempt, err: lastError },
+          `⚠️ Încercare ${attempt}/${maxRetries} eșuată: ${lastError.substring(0, 150)}`
+        );
 
         // Încearcă reparare automată
         const fix = await this._selfRepair(lastError, context, userId);
@@ -1395,7 +1446,12 @@ class KelionBrain {
     }
 
     // Toate încercările eșuate
-    await this._selfAnalyze(context, lastError, `EȘUAT după ${maxRetries} încercări. Fix-uri încercate: ${repairs.map(r => r.fix).join(', ') || 'niciun fix găsit'}`, userId);
+    await this._selfAnalyze(
+      context,
+      lastError,
+      `EȘUAT după ${maxRetries} încercări. Fix-uri încercate: ${repairs.map((r) => r.fix).join(', ') || 'niciun fix găsit'}`,
+      userId
+    );
     return { success: false, error: lastError, repairs };
   }
 
@@ -1415,9 +1471,10 @@ class KelionBrain {
     try {
       // ── FIX 1: Comandă/modul lipsă ──
       // "jest: not found", "sh: xyz: not found", "Cannot find module 'xyz'"
-      const cmdNotFound = msg.match(/sh:\s+(\w+):\s+not found/) ||
-                          msg.match(/(\w+):\s+not found/) ||
-                          msg.match(/command not found:\s+(\w+)/);
+      const cmdNotFound =
+        msg.match(/sh:\s+(\w+):\s+not found/) ||
+        msg.match(/(\w+):\s+not found/) ||
+        msg.match(/command not found:\s+(\w+)/);
       if (cmdNotFound) {
         const cmd = cmdNotFound[1];
         logger.info({ component: 'SelfRepair', cmd }, `🔧 Instalez comanda lipsă: ${cmd}`);
@@ -1462,22 +1519,35 @@ class KelionBrain {
       // ── FIX 3: Coloană/tabelă lipsă în DB ──
       // "Could not find the 'xyz' column" / "relation does not exist"
       if (msg.includes('column') && (msg.includes('does not exist') || msg.includes('not find'))) {
-        const colMatch = errorMsg.match(/['"](\w+)['"]\s*column/i) ||
-                         errorMsg.match(/column\s+['"]?(\w+)/i) ||
-                         errorMsg.match(/the\s+'(\w+)'\s+column/i);
+        const colMatch =
+          errorMsg.match(/['"](\w+)['"]\s*column/i) ||
+          errorMsg.match(/column\s+['"]?(\w+)/i) ||
+          errorMsg.match(/the\s+'(\w+)'\s+column/i);
         if (colMatch) {
-          logger.warn({ component: 'SelfRepair', column: colMatch[1] },
-            `🔧 Coloană lipsă detectată: ${colMatch[1]}. Necesită ALTER TABLE manual sau rulare migrate.js pe server.`);
-          return { fix: `Coloană ${colMatch[1]} lipsă — rulează migrația: npm run migrate`, applied: false, type: 'missing_column' };
+          logger.warn(
+            { component: 'SelfRepair', column: colMatch[1] },
+            `🔧 Coloană lipsă detectată: ${colMatch[1]}. Necesită ALTER TABLE manual sau rulare migrate.js pe server.`
+          );
+          return {
+            fix: `Coloană ${colMatch[1]} lipsă — rulează migrația: npm run migrate`,
+            applied: false,
+            type: 'missing_column',
+          };
         }
       }
 
       if (msg.includes('relation') && msg.includes('does not exist')) {
         const tableMatch = errorMsg.match(/relation\s+"?(\w+)"?\s+does not exist/i);
         if (tableMatch) {
-          logger.warn({ component: 'SelfRepair', table: tableMatch[1] },
-            `🔧 Tabelă lipsă: ${tableMatch[1]}. Rulează migrația.`);
-          return { fix: `Tabela ${tableMatch[1]} lipsă — rulează: npm run migrate`, applied: false, type: 'missing_table' };
+          logger.warn(
+            { component: 'SelfRepair', table: tableMatch[1] },
+            `🔧 Tabelă lipsă: ${tableMatch[1]}. Rulează migrația.`
+          );
+          return {
+            fix: `Tabela ${tableMatch[1]} lipsă — rulează: npm run migrate`,
+            applied: false,
+            type: 'missing_table',
+          };
         }
       }
 
@@ -1509,7 +1579,7 @@ class KelionBrain {
       // ── FIX 6: Timeout ──
       if (msg.includes('timeout') || msg.includes('etimedout')) {
         logger.info({ component: 'SelfRepair' }, '🔧 Timeout — voi re-încerca cu delay');
-        await new Promise(r => setTimeout(r, 3000));
+        await new Promise((r) => setTimeout(r, 3000));
         return { fix: 'Așteptat 3s înainte de retry', applied: true, type: 'timeout' };
       }
 
@@ -1521,7 +1591,6 @@ class KelionBrain {
         if (global.gc) global.gc();
         return { fix: 'Cache-uri curățate + GC', applied: true, type: 'memory' };
       }
-
     } catch (repairErr) {
       logger.warn({ component: 'SelfRepair', err: repairErr.message }, 'Self-repair threw error');
     }
@@ -1685,28 +1754,92 @@ class KelionBrain {
       // ── INJECT SUPER-ADMIN TOOLS (LOCAL VISION & CONTROL) ──
       const adminTools = [
         {
-          id: 'ADMIN_DEPLOY', name: 'ADMIN_DEPLOY', category: 'admin', priority: 0, is_active: true,
-          schema: { name: "ADMIN_DEPLOY", description: "ADMIN ONLY: Triggers the deployment script to push the local code to the live production server.", parameters: { type: "object", properties: {}, required: [] } }
+          id: 'ADMIN_DEPLOY',
+          name: 'ADMIN_DEPLOY',
+          category: 'admin',
+          priority: 0,
+          is_active: true,
+          schema: {
+            name: 'ADMIN_DEPLOY',
+            description:
+              'ADMIN ONLY: Triggers the deployment script to push the local code to the live production server.',
+            parameters: { type: 'object', properties: {}, required: [] },
+          },
         },
         {
-          id: 'ADMIN_READ_FILE', name: 'ADMIN_READ_FILE', category: 'admin', priority: 0, is_active: true,
-          schema: { name: "ADMIN_READ_FILE", description: "ADMIN ONLY: Reads the content of a local file on the server. Use this to inspect code, configurations, or logs.", parameters: { type: "object", properties: { path: { type: "string", description: "Relative path to the file from the app root (e.g., 'server/brain.js')" } }, required: ["path"] } }
+          id: 'ADMIN_READ_FILE',
+          name: 'ADMIN_READ_FILE',
+          category: 'admin',
+          priority: 0,
+          is_active: true,
+          schema: {
+            name: 'ADMIN_READ_FILE',
+            description:
+              'ADMIN ONLY: Reads the content of a local file on the server. Use this to inspect code, configurations, or logs.',
+            parameters: {
+              type: 'object',
+              properties: {
+                path: {
+                  type: 'string',
+                  description: "Relative path to the file from the app root (e.g., 'server/brain.js')",
+                },
+              },
+              required: ['path'],
+            },
+          },
         },
         {
-          id: 'ADMIN_LIST_DIR', name: 'ADMIN_LIST_DIR', category: 'admin', priority: 0, is_active: true,
-          schema: { name: "ADMIN_LIST_DIR", description: "ADMIN ONLY: Lists the contents of a local directory on the server. Use this to explore the project structure.", parameters: { type: "object", properties: { path: { type: "string", description: "Relative path to the directory from the app root (e.g., 'server/routes' or '.')" } }, required: ["path"] } }
+          id: 'ADMIN_LIST_DIR',
+          name: 'ADMIN_LIST_DIR',
+          category: 'admin',
+          priority: 0,
+          is_active: true,
+          schema: {
+            name: 'ADMIN_LIST_DIR',
+            description:
+              'ADMIN ONLY: Lists the contents of a local directory on the server. Use this to explore the project structure.',
+            parameters: {
+              type: 'object',
+              properties: {
+                path: {
+                  type: 'string',
+                  description: "Relative path to the directory from the app root (e.g., 'server/routes' or '.')",
+                },
+              },
+              required: ['path'],
+            },
+          },
         },
         {
-          id: 'ADMIN_WRITE_FILE', name: 'ADMIN_WRITE_FILE', category: 'admin', priority: 0, is_active: true,
-          schema: { name: "ADMIN_WRITE_FILE", description: "ADMIN ONLY: Creates or overwrites a local file on the server. Use this to write code, patch files, or refactor.", parameters: { type: "object", properties: { path: { type: "string", description: "Relative path to the file from the app root." }, content: { type: "string", description: "The full text content to write." } }, required: ["path", "content"] } }
-        }
+          id: 'ADMIN_WRITE_FILE',
+          name: 'ADMIN_WRITE_FILE',
+          category: 'admin',
+          priority: 0,
+          is_active: true,
+          schema: {
+            name: 'ADMIN_WRITE_FILE',
+            description:
+              'ADMIN ONLY: Creates or overwrites a local file on the server. Use this to write code, patch files, or refactor.',
+            parameters: {
+              type: 'object',
+              properties: {
+                path: { type: 'string', description: 'Relative path to the file from the app root.' },
+                content: { type: 'string', description: 'The full text content to write.' },
+              },
+              required: ['path', 'content'],
+            },
+          },
+        },
       ];
 
       for (const t of adminTools) {
         this._toolRegistry.set(t.id, t);
       }
 
-      logger.info({ component: 'Brain', tools: this._toolRegistry.size }, `🔧 Loaded ${this._toolRegistry.size} tools from registry (including Admin Omniscience)`);
+      logger.info(
+        { component: 'Brain', tools: this._toolRegistry.size },
+        `🔧 Loaded ${this._toolRegistry.size} tools from registry (including Admin Omniscience)`
+      );
     } catch (e) {
       logger.warn({ component: 'Brain', err: e.message }, 'Tool registry load failed');
     }
@@ -1744,19 +1877,23 @@ class KelionBrain {
         if (!userId) throw new Error('Nu există sesiune activă.');
         const adminEmail = (process.env.ADMIN_EMAIL || '').toLowerCase().trim();
         let isAdmin = false;
-        
+
         if (adminEmail && this.supabaseAdmin) {
           const { data, error } = await this.supabaseAdmin.auth.admin.getUserById(userId);
           if (!error && data?.user?.email?.toLowerCase().trim() === adminEmail) {
             isAdmin = true;
           }
         }
-        
+
         // Dacă e un simplu user oarecare blochează total accesul
         if (!isAdmin) {
-          return { success: false, error: 'SECURITY BREACH: Access Denied. Procedura este strict rezevată administratorului.', tool: toolId };
+          return {
+            success: false,
+            error: 'SECURITY BREACH: Access Denied. Procedura este strict rezevată administratorului.',
+            tool: toolId,
+          };
         }
-        
+
         const fs = require('fs');
         const path = require('path');
         const CWD = process.cwd();
@@ -1765,7 +1902,9 @@ class KelionBrain {
           const dirPath = path.resolve(CWD, params.path || '');
           if (!dirPath.startsWith(CWD)) return { success: false, error: 'Path outside app' };
           if (!fs.existsSync(dirPath)) return { success: false, error: 'Directory does not exist' };
-          const files = fs.readdirSync(dirPath, { withFileTypes: true }).map(f => `${f.isDirectory() ? '[DIR]' : '[FILE]'} ${f.name}`);
+          const files = fs
+            .readdirSync(dirPath, { withFileTypes: true })
+            .map((f) => `${f.isDirectory() ? '[DIR]' : '[FILE]'} ${f.name}`);
           return { success: true, data: { contents: files }, tool: toolId };
         }
 
@@ -1798,11 +1937,15 @@ class KelionBrain {
                 .order('created_at', { ascending: false })
                 .limit(3);
               if (lessons && lessons.length > 0) {
-                const lessonsText = lessons.map(l => l.content).join(' | ');
-                logger.info({ component: 'SafeWrite', file: relPath, lessons: lessons.length },
-                  `📚 ${lessons.length} lecții găsite pentru ${relPath}: ${lessonsText.substring(0, 200)}`);
+                const lessonsText = lessons.map((l) => l.content).join(' | ');
+                logger.info(
+                  { component: 'SafeWrite', file: relPath, lessons: lessons.length },
+                  `📚 ${lessons.length} lecții găsite pentru ${relPath}: ${lessonsText.substring(0, 200)}`
+                );
               }
-            } catch (_) { /* non-blocking */ }
+            } catch (_) {
+              /* non-blocking */
+            }
           }
 
           // ══ GUARD 1: Auto-Backup ══
@@ -1827,55 +1970,98 @@ class KelionBrain {
             const ratio = newLineCount / oldLineCount;
             if (ratio < 0.5) {
               const lesson = `LECȚIE TRUNCHIERE pe ${relPath}: Ai încercat să scrii ${newLineCount} linii peste un fișier de ${oldLineCount} linii (${Math.round(ratio * 100)}%). Soluția corectă: citește ÎNTÂI fișierul complet cu ADMIN_READ_FILE, apoi rescrie-l INTEGRAL cu toate liniile originale + modificările tale. NU trimite doar fragmentul modificat.`;
-              logger.warn({ component: 'SafeWrite', file: relPath, old: oldLineCount, new: newLineCount, ratio: Math.round(ratio * 100) + '%' },
-                `🛡️ BLOCAT + LECȚIE SALVATĂ: ${lesson}`);
+              logger.warn(
+                {
+                  component: 'SafeWrite',
+                  file: relPath,
+                  old: oldLineCount,
+                  new: newLineCount,
+                  ratio: Math.round(ratio * 100) + '%',
+                },
+                `🛡️ BLOCAT + LECȚIE SALVATĂ: ${lesson}`
+              );
               // Salvează lecția în memorie
               if (this.supabaseAdmin) {
-                this.supabaseAdmin.from('brain_memory').insert({
-                  user_id: userId, memory_type: 'write_lesson',
-                  content: lesson,
-                  metadata: { file: relPath, error_type: 'truncation', old_lines: oldLineCount, new_lines: newLineCount, ratio, timestamp: new Date().toISOString() },
-                  importance: 0.95
-                }).catch(() => {});
+                this.supabaseAdmin
+                  .from('brain_memory')
+                  .insert({
+                    user_id: userId,
+                    memory_type: 'write_lesson',
+                    content: lesson,
+                    metadata: {
+                      file: relPath,
+                      error_type: 'truncation',
+                      old_lines: oldLineCount,
+                      new_lines: newLineCount,
+                      ratio,
+                      timestamp: new Date().toISOString(),
+                    },
+                    importance: 0.95,
+                  })
+                  .catch(() => {});
               }
               return {
                 success: false,
                 error: `BLOCAT: ${lesson}`,
-                tool: toolId
+                tool: toolId,
               };
             }
           }
 
           // ══ GUARD 4: Protected Files (nu se pot suprascrie complet) ══
           const PROTECTED_FILES = [
-            'server/index.js', 'server/brain.js', 'server/brain-v5.js',
-            'server/routes/chat.js', 'server/routes/admin.js',
-            'server/migrate.js', 'server/supabase.js',
-            'app/index.html', 'app/js/app.js'
+            'server/index.js',
+            'server/brain.js',
+            'server/brain-v5.js',
+            'server/routes/chat.js',
+            'server/routes/admin.js',
+            'server/migrate.js',
+            'server/supabase.js',
+            'app/index.html',
+            'app/js/app.js',
           ];
           const normalizedRel = relPath.replace(/\\/g, '/');
           if (PROTECTED_FILES.includes(normalizedRel) && fileExists) {
             // Verifică dacă e suprascrie completă (>80% conținut diferit)
-            const oldLines = new Set(oldContent.split('\n').map(l => l.trim()).filter(l => l.length > 3));
-            const newLines = newContent.split('\n').map(l => l.trim()).filter(l => l.length > 3);
-            const keptLines = newLines.filter(l => oldLines.has(l)).length;
+            const oldLines = new Set(
+              oldContent
+                .split('\n')
+                .map((l) => l.trim())
+                .filter((l) => l.length > 3)
+            );
+            const newLines = newContent
+              .split('\n')
+              .map((l) => l.trim())
+              .filter((l) => l.length > 3);
+            const keptLines = newLines.filter((l) => oldLines.has(l)).length;
             const keepRatio = oldLines.size > 0 ? keptLines / oldLines.size : 1;
             if (keepRatio < 0.3) {
               const lesson2 = `LECȚIE FIȘIER PROTEJAT pe ${relPath}: Ai încercat să suprascrii agresiv (doar ${Math.round(keepRatio * 100)}% din cod păstrat). Soluția corectă: (1) ADMIN_READ_FILE pentru a citi conținutul actual, (2) modifică DOAR liniile necesare păstrând restul intact, (3) ADMIN_WRITE_FILE cu conținutul complet.`;
-              logger.warn({ component: 'SafeWrite', file: relPath, keepRatio: Math.round(keepRatio * 100) + '%' },
-                `🔒 BLOCAT + LECȚIE SALVATĂ: ${lesson2}`);
+              logger.warn(
+                { component: 'SafeWrite', file: relPath, keepRatio: Math.round(keepRatio * 100) + '%' },
+                `🔒 BLOCAT + LECȚIE SALVATĂ: ${lesson2}`
+              );
               if (this.supabaseAdmin) {
-                this.supabaseAdmin.from('brain_memory').insert({
-                  user_id: userId, memory_type: 'write_lesson',
-                  content: lesson2,
-                  metadata: { file: relPath, error_type: 'protected_overwrite', keepRatio, timestamp: new Date().toISOString() },
-                  importance: 0.95
-                }).catch(() => {});
+                this.supabaseAdmin
+                  .from('brain_memory')
+                  .insert({
+                    user_id: userId,
+                    memory_type: 'write_lesson',
+                    content: lesson2,
+                    metadata: {
+                      file: relPath,
+                      error_type: 'protected_overwrite',
+                      keepRatio,
+                      timestamp: new Date().toISOString(),
+                    },
+                    importance: 0.95,
+                  })
+                  .catch(() => {});
               }
               return {
                 success: false,
                 error: `BLOCAT: ${lesson2}`,
-                tool: toolId
+                tool: toolId,
               };
             }
           }
@@ -1896,20 +2082,31 @@ class KelionBrain {
               if (oldContent) {
                 fs.writeFileSync(filePath, oldContent, 'utf8');
                 const lesson3 = `LECȚIE SYNTAX ERROR pe ${relPath}: Codul scris avea erori de sintaxă: ${syntaxErr.message.substring(0, 200)}. Fișierul a fost restaurat automat. Soluția: verifică sintaxa JS înainte de a scrie — paranteze, acolade, virgule, template literals.`;
-                logger.warn({ component: 'SafeWrite', file: relPath, err: syntaxErr.message },
-                  `🔄 ROLLBACK + LECȚIE SALVATĂ: ${lesson3}`);
+                logger.warn(
+                  { component: 'SafeWrite', file: relPath, err: syntaxErr.message },
+                  `🔄 ROLLBACK + LECȚIE SALVATĂ: ${lesson3}`
+                );
                 if (this.supabaseAdmin) {
-                  this.supabaseAdmin.from('brain_memory').insert({
-                    user_id: userId, memory_type: 'write_lesson',
-                    content: lesson3,
-                    metadata: { file: relPath, error_type: 'syntax_error', error: syntaxErr.message.substring(0, 500), timestamp: new Date().toISOString() },
-                    importance: 0.95
-                  }).catch(() => {});
+                  this.supabaseAdmin
+                    .from('brain_memory')
+                    .insert({
+                      user_id: userId,
+                      memory_type: 'write_lesson',
+                      content: lesson3,
+                      metadata: {
+                        file: relPath,
+                        error_type: 'syntax_error',
+                        error: syntaxErr.message.substring(0, 500),
+                        timestamp: new Date().toISOString(),
+                      },
+                      importance: 0.95,
+                    })
+                    .catch(() => {});
                 }
                 return {
                   success: false,
                   error: `ROLLBACK: ${lesson3}`,
-                  tool: toolId
+                  tool: toolId,
                 };
               }
             }
@@ -1918,24 +2115,35 @@ class KelionBrain {
           // ══ GUARD 6: Diff Log (audit trail) ══
           const newLineCount = newContent.split('\n').length;
           if (this.supabaseAdmin) {
-            this.supabaseAdmin.from('brain_memory').insert({
-              user_id: userId,
-              memory_type: 'file_write',
-              content: `WRITE ${relPath}: ${oldLineCount}→${newLineCount} linii`,
-              metadata: {
-                file: relPath,
-                old_lines: oldLineCount,
-                new_lines: newLineCount,
-                had_backup: fileExists,
-                timestamp: new Date().toISOString()
-              },
-              importance: 0.7
-            }).catch(() => {});
+            this.supabaseAdmin
+              .from('brain_memory')
+              .insert({
+                user_id: userId,
+                memory_type: 'file_write',
+                content: `WRITE ${relPath}: ${oldLineCount}→${newLineCount} linii`,
+                metadata: {
+                  file: relPath,
+                  old_lines: oldLineCount,
+                  new_lines: newLineCount,
+                  had_backup: fileExists,
+                  timestamp: new Date().toISOString(),
+                },
+                importance: 0.7,
+              })
+              .catch(() => {});
           }
 
-          logger.info({ component: 'SafeWrite', file: relPath, oldLines: oldLineCount, newLines: newLineCount },
-            `✅ Safe write: ${relPath} (${oldLineCount}→${newLineCount} linii)`);
-          return { success: true, data: { result: `Fișierul ${params.path} salvat safe. (${oldLineCount}→${newLineCount} linii, backup creat)` }, tool: toolId };
+          logger.info(
+            { component: 'SafeWrite', file: relPath, oldLines: oldLineCount, newLines: newLineCount },
+            `✅ Safe write: ${relPath} (${oldLineCount}→${newLineCount} linii)`
+          );
+          return {
+            success: true,
+            data: {
+              result: `Fișierul ${params.path} salvat safe. (${oldLineCount}→${newLineCount} linii, backup creat)`,
+            },
+            tool: toolId,
+          };
         }
 
         if (toolId === 'ADMIN_DEPLOY') {
@@ -1944,38 +2152,70 @@ class KelionBrain {
 
           // Salvează commit-ul curent pentru rollback
           let prevCommit = '';
-          try { prevCommit = execSync('git rev-parse HEAD', { cwd: CWD, encoding: 'utf8' }).trim(); } catch (_) {}
+          try {
+            prevCommit = execSync('git rev-parse HEAD', { cwd: CWD, encoding: 'utf8' }).trim();
+          } catch (_) {}
 
           const out = execSync('npm run check:deploy && npm run deploy:all', {
-            cwd: CWD, shell: true, encoding: 'utf8'
+            cwd: CWD,
+            shell: true,
+            encoding: 'utf8',
           });
 
           // ══ GUARD 5: Health Check Post-Deploy ══
           let healthOk = false;
-          for (let attempt = 0; attempt < 18; attempt++) { // max 3 min (18 * 10s)
-            await new Promise(r => setTimeout(r, 10000));
+          for (let attempt = 0; attempt < 18; attempt++) {
+            // max 3 min (18 * 10s)
+            await new Promise((r) => setTimeout(r, 10000));
             try {
               const hResp = await fetch('https://kelionai.app/api/health', { signal: AbortSignal.timeout(5000) });
               if (hResp.ok) {
                 const hData = await hResp.json();
-                if (hData.status === 'ok') { healthOk = true; break; }
+                if (hData.status === 'ok') {
+                  healthOk = true;
+                  break;
+                }
               }
-            } catch (_) { /* server still restarting */ }
+            } catch (_) {
+              /* server still restarting */
+            }
           }
 
           if (!healthOk && prevCommit) {
             logger.warn({ component: 'Deploy' }, '🔄 AUTO-ROLLBACK: Health check failed after deploy');
             try {
-              execSync(`git revert --no-commit HEAD && git commit -m "auto-rollback: health check failed" && git push origin master`, {
-                cwd: CWD, shell: true, encoding: 'utf8'
-              });
-              return { success: false, error: 'Deploy făcut dar serverul nu a trecut health check. AUTO-ROLLBACK executat.', tool: 'ADMIN_DEPLOY' };
+              execSync(
+                `git revert --no-commit HEAD && git commit -m "auto-rollback: health check failed" && git push origin master`,
+                {
+                  cwd: CWD,
+                  shell: true,
+                  encoding: 'utf8',
+                }
+              );
+              return {
+                success: false,
+                error: 'Deploy făcut dar serverul nu a trecut health check. AUTO-ROLLBACK executat.',
+                tool: 'ADMIN_DEPLOY',
+              };
             } catch (rvErr) {
-              return { success: false, error: `Deploy eșuat + rollback eșuat: ${rvErr.message}. Commit anterior: ${prevCommit}`, tool: 'ADMIN_DEPLOY' };
+              return {
+                success: false,
+                error: `Deploy eșuat + rollback eșuat: ${rvErr.message}. Commit anterior: ${prevCommit}`,
+                tool: 'ADMIN_DEPLOY',
+              };
             }
           }
 
-          return { success: true, data: { result: healthOk ? 'Deployment successful ✅ Health check passed' : 'Deployment done (health check skipped)', logs: out }, tool: 'ADMIN_DEPLOY' };
+          return {
+            success: true,
+            data: {
+              result: healthOk
+                ? 'Deployment successful ✅ Health check passed'
+                : 'Deployment done (health check skipped)',
+              logs: out,
+            },
+            tool: 'ADMIN_DEPLOY',
+          };
         }
         // Dacă e doar 'ADMIN', cade mai jos pentru a fi executat standard de către _toolRegistry (dacă există)
       } catch (e) {
@@ -4751,7 +4991,11 @@ Reply STRICTLY with JSON:
           seen.add('projectFile');
         }
         if (analysis.needsProjectFileWrite && !seen.has('projectFileWrite')) {
-          plan.push({ tool: 'projectFileWrite', path: analysis.writeFilePath || '', content: analysis.writeFileContent || '' });
+          plan.push({
+            tool: 'projectFileWrite',
+            path: analysis.writeFilePath || '',
+            content: analysis.writeFileContent || '',
+          });
           seen.add('projectFileWrite');
         }
         if (analysis.needsAdminAutoDeploy && !seen.has('adminAutoDeploy')) {
@@ -5208,10 +5452,14 @@ Reply STRICTLY with JSON:
     if (results.devAPIInfo) ctx += `\n[DEVELOPER API: ${results.devAPIInfo.summary}]`;
     if (results.systemStatus) ctx += `\n[SYSTEM STATUS: ${results.systemStatus.summary}]`;
     // ═══ INCEPTION: Filesystem + Deploy results ═══
-    if (results.projectTree) ctx += `\n[STRUCTURA FIȘIERE — Am executat listarea din sistemul de fișiere al serverului]:\n${typeof results.projectTree === 'string' ? results.projectTree : JSON.stringify(results.projectTree, null, 2)}\nPrezintă structura clar utilizatorului.`;
-    if (results.projectFile) ctx += `\n[COD SURSĂ CITIT — Am citit fișierul de pe disc]:\n${typeof results.projectFile === 'string' ? results.projectFile : JSON.stringify(results.projectFile, null, 2)}\nPrezintă codul utilizatorului cu syntax highlighting.`;
-    if (results.projectFileWrite) ctx += `\n[FIȘIER SCRIS PE DISC]: ${JSON.stringify(results.projectFileWrite)}\nConfirmă utilizatorului că fișierul a fost scris cu succes.`;
-    if (results.adminAutoDeploy) ctx += `\n[AUTO-DEPLOY REZULTAT]: ${JSON.stringify(results.adminAutoDeploy)}\nRaportează statusul deploy-ului.`;
+    if (results.projectTree)
+      ctx += `\n[STRUCTURA FIȘIERE — Am executat listarea din sistemul de fișiere al serverului]:\n${typeof results.projectTree === 'string' ? results.projectTree : JSON.stringify(results.projectTree, null, 2)}\nPrezintă structura clar utilizatorului.`;
+    if (results.projectFile)
+      ctx += `\n[COD SURSĂ CITIT — Am citit fișierul de pe disc]:\n${typeof results.projectFile === 'string' ? results.projectFile : JSON.stringify(results.projectFile, null, 2)}\nPrezintă codul utilizatorului cu syntax highlighting.`;
+    if (results.projectFileWrite)
+      ctx += `\n[FIȘIER SCRIS PE DISC]: ${JSON.stringify(results.projectFileWrite)}\nConfirmă utilizatorului că fișierul a fost scris cu succes.`;
+    if (results.adminAutoDeploy)
+      ctx += `\n[AUTO-DEPLOY REZULTAT]: ${JSON.stringify(results.adminAutoDeploy)}\nRaportează statusul deploy-ului.`;
 
     if (analysis.isEmotional && analysis.emotionalTone !== 'neutral') {
       ctx += `\n[Utilizatorul pare ${analysis.emotionalTone}. Adapteaza tonul empatic.]`;
@@ -7863,7 +8111,7 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
 
       // Blocked paths
       const blocked = ['.env', 'node_modules', '.git', 'secret', 'password', 'token'];
-      if (blocked.some(b => filePath.toLowerCase().includes(b))) {
+      if (blocked.some((b) => filePath.toLowerCase().includes(b))) {
         return { error: `BLOCAT: ${filePath} e un fișier protejat!` };
       }
 
@@ -7911,7 +8159,16 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
         }
       }
 
-      logger.info({ component: 'Inception', file: filePath, bytes: content.length, hash: intendedHash.substring(0, 12), syntaxOk }, `✍️ Kelion a scris ${filePath}`);
+      logger.info(
+        {
+          component: 'Inception',
+          file: filePath,
+          bytes: content.length,
+          hash: intendedHash.substring(0, 12),
+          syntaxOk,
+        },
+        `✍️ Kelion a scris ${filePath}`
+      );
 
       // Track pentru auto-deploy
       if (!this._inceptionWrittenFiles) this._inceptionWrittenFiles = [];
@@ -7924,10 +8181,22 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
             user_id: null,
             memory_type: 'inception_audit',
             content: `[WRITE] ${filePath} | ${content.length}B | hash:${intendedHash.substring(0, 12)} | syntax:${syntaxOk ?? 'n/a'} | verified:${hashMatch}`,
-            context: { action: 'write', file: filePath, bytes: content.length, hash: intendedHash, hashMatch, syntaxOk, syntaxError, hadBackup: !!backup, timestamp: new Date().toISOString() },
+            context: {
+              action: 'write',
+              file: filePath,
+              bytes: content.length,
+              hash: intendedHash,
+              hashMatch,
+              syntaxOk,
+              syntaxError,
+              hadBackup: !!backup,
+              timestamp: new Date().toISOString(),
+            },
             importance: 9,
           });
-        } catch { /* audit log non-blocking */ }
+        } catch {
+          /* audit log non-blocking */
+        }
       }
 
       const result = {
@@ -7975,7 +8244,7 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
     try {
       logger.info({ component: 'Inception' }, `🚀 Deploy via GitHub API: ${commitMessage}`);
 
-      const filesToDeploy = files.length > 0 ? files : (this._inceptionWrittenFiles || []);
+      const filesToDeploy = files.length > 0 ? files : this._inceptionWrittenFiles || [];
       if (filesToDeploy.length === 0) {
         return { success: false, message: 'Nu sunt fișiere de comis. Specifică fișierele!' };
       }
@@ -7995,12 +8264,15 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
         // Get current file SHA from GitHub
         let sha = null;
         try {
-          const getResp = await fetch(
-            `https://api.github.com/repos/${ghRepo}/contents/${relPath}?ref=${ghBranch}`,
-            { headers: { Authorization: `Bearer ${ghToken}`, Accept: 'application/vnd.github.v3+json' } }
-          );
-          if (getResp.ok) { sha = (await getResp.json()).sha; }
-        } catch { /* new file */ }
+          const getResp = await fetch(`https://api.github.com/repos/${ghRepo}/contents/${relPath}?ref=${ghBranch}`, {
+            headers: { Authorization: `Bearer ${ghToken}`, Accept: 'application/vnd.github.v3+json' },
+          });
+          if (getResp.ok) {
+            sha = (await getResp.json()).sha;
+          }
+        } catch {
+          /* new file */
+        }
 
         // Commit via GitHub API
         const body = { message: `${commitMessage} — ${relPath}`, content: contentBase64, branch: ghBranch };
@@ -8008,7 +8280,11 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
 
         const putResp = await fetch(`https://api.github.com/repos/${ghRepo}/contents/${relPath}`, {
           method: 'PUT',
-          headers: { Authorization: `Bearer ${ghToken}`, Accept: 'application/vnd.github.v3+json', 'Content-Type': 'application/json' },
+          headers: {
+            Authorization: `Bearer ${ghToken}`,
+            Accept: 'application/vnd.github.v3+json',
+            'Content-Type': 'application/json',
+          },
           body: JSON.stringify(body),
         });
 
@@ -8028,12 +8304,23 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
           });
           if (vResp.ok) {
             const vData = await vResp.json();
-            const ghHash = crypto.createHash('sha256').update(Buffer.from(vData.content, 'base64').toString('utf8')).digest('hex');
+            const ghHash = crypto
+              .createHash('sha256')
+              .update(Buffer.from(vData.content, 'base64').toString('utf8'))
+              .digest('hex');
             ghVerified = ghHash === localHash;
           }
-        } catch { /* non-blocking */ }
+        } catch {
+          /* non-blocking */
+        }
 
-        results.push({ file: relPath, success: true, commit: commitSha, hash: localHash.substring(0, 12), githubVerified: ghVerified });
+        results.push({
+          file: relPath,
+          success: true,
+          commit: commitSha,
+          hash: localHash.substring(0, 12),
+          githubVerified: ghVerified,
+        });
         if (!ghVerified) logger.warn({ component: 'Inception', file: relPath }, '⚠️ GitHub hash mismatch!');
       }
 
@@ -8044,57 +8331,87 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
       if (this.supabase) {
         try {
           await this.supabase.from('brain_memory').insert({
-            user_id: null, memory_type: 'inception_audit',
-            content: `[DEPLOY] ${commitMessage} | ${results.filter(r => r.success).length}/${results.length} OK`,
+            user_id: null,
+            memory_type: 'inception_audit',
+            content: `[DEPLOY] ${commitMessage} | ${results.filter((r) => r.success).length}/${results.length} OK`,
             context: { action: 'deploy', commitMessage, files: results, timestamp: new Date().toISOString() },
             importance: 10,
           });
-        } catch { /* non-blocking */ }
+        } catch {
+          /* non-blocking */
+        }
       }
 
-      const allSuccess = results.every(r => r.success);
+      const allSuccess = results.every((r) => r.success);
       if (!allSuccess) {
-        return { success: false, message: `Deploy PARȚIAL — ${results.filter(r => r.success).length}/${results.length} fișiere comise.`, files: results };
+        return {
+          success: false,
+          message: `Deploy PARȚIAL — ${results.filter((r) => r.success).length}/${results.length} fișiere comise.`,
+          files: results,
+        };
       }
 
       // Așteaptă 60s pentru Railway
       logger.info({ component: 'Inception' }, '⏳ Aștept 60s pentru Railway build...');
-      await new Promise(r => setTimeout(r, 60000));
+      await new Promise((r) => setTimeout(r, 60000));
 
       // Health check
       const healthBase = appUrl ? (appUrl.startsWith('http') ? appUrl : `https://${appUrl}`) : null;
       if (!healthBase) {
-        return { success: true, missionComplete: true, message: `✅ Commit reușit! ${results.length} fișiere. APP_URL lipsește → skip health check.`, files: results };
+        return {
+          success: true,
+          missionComplete: true,
+          message: `✅ Commit reușit! ${results.length} fișiere. APP_URL lipsește → skip health check.`,
+          files: results,
+        };
       }
       const healthUrl = `${healthBase.replace(/\/$/, '')}/health`;
       let healthy = false;
       for (let i = 0; i < 3; i++) {
         try {
           const resp = await fetch(healthUrl, { signal: AbortSignal.timeout(5000) });
-          if (resp.ok) { healthy = true; break; }
-        } catch { /* retry */ }
-        await new Promise(r => setTimeout(r, 10000));
+          if (resp.ok) {
+            healthy = true;
+            break;
+          }
+        } catch {
+          /* retry */
+        }
+        await new Promise((r) => setTimeout(r, 10000));
       }
 
       // AUDIT health check
       if (this.supabase) {
         try {
           await this.supabase.from('brain_memory').insert({
-            user_id: null, memory_type: 'inception_audit',
+            user_id: null,
+            memory_type: 'inception_audit',
             content: `[HEALTH] ${healthy ? '✅ OK' : '❌ FAILED'} | ${healthUrl}`,
             context: { action: 'health_check', healthy, url: healthUrl, timestamp: new Date().toISOString() },
             importance: healthy ? 7 : 10,
           });
-        } catch { /* non-blocking */ }
+        } catch {
+          /* non-blocking */
+        }
       }
 
       if (healthy) {
         logger.info({ component: 'Inception' }, '✅ MISSION COMPLETE!');
         await this._logVersion('deploy', { message: commitMessage, files: filesToDeploy, healthy: true });
-        return { success: true, missionComplete: true, message: `✅ MISSION COMPLETE! ${results.length} fișiere • Verified pe GitHub • Health OK`, files: results };
+        return {
+          success: true,
+          missionComplete: true,
+          message: `✅ MISSION COMPLETE! ${results.length} fișiere • Verified pe GitHub • Health OK`,
+          files: results,
+        };
       } else {
         logger.warn({ component: 'Inception' }, '❌ MISSION FAILED!');
-        return { success: false, missionFailed: true, message: `❌ MISSION FAILED — commit OK dar health check eșuat!`, files: results };
+        return {
+          success: false,
+          missionFailed: true,
+          message: `❌ MISSION FAILED — commit OK dar health check eșuat!`,
+          files: results,
+        };
       }
     } catch (e) {
       logger.error({ component: 'Inception', err: e.message }, `💥 Deploy eroare: ${e.message}`);
@@ -8110,7 +8427,7 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
 
     if (category === 'all' || category === 'errors') {
       // Ultimele 50 erori RAW
-      result.errors = (this.errorLog || []).slice(-50).map(e => ({
+      result.errors = (this.errorLog || []).slice(-50).map((e) => ({
         tool: e.tool,
         message: e.msg,
         time: new Date(e.time).toISOString(),
@@ -8121,9 +8438,15 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
 
     if (category === 'all' || category === 'alerts') {
       const monitor = this.autonomousMonitor;
-      result.alerts = monitor ? monitor.alerts.filter(a => !a.resolved).map(a => ({
-        type: a.type, message: a.message, timestamp: a.timestamp,
-      })) : [];
+      result.alerts = monitor
+        ? monitor.alerts
+            .filter((a) => !a.resolved)
+            .map((a) => ({
+              type: a.type,
+              message: a.message,
+              timestamp: a.timestamp,
+            }))
+        : [];
     }
 
     if (category === 'all' || category === 'health') {
@@ -8146,7 +8469,8 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
     if (category === 'all' || category === 'versions') {
       // Returnează ultimele versiuni din Supabase (async — cache dacă disponibil)
       result.versions = this._inceptionVersionCache || [];
-      result.versionsNote = 'Istoric versiuni din Supabase. Folosește admin_read_logs cu category=versions pentru refresh.';
+      result.versionsNote =
+        'Istoric versiuni din Supabase. Folosește admin_read_logs cu category=versions pentru refresh.';
       // Refresh async
       this._refreshVersionCache();
     }
@@ -8165,13 +8489,15 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
         .eq('memory_type', 'inception_audit')
         .order('created_at', { ascending: false })
         .limit(30);
-      this._inceptionVersionCache = (data || []).map(d => ({
+      this._inceptionVersionCache = (data || []).map((d) => ({
         action: d.context?.action || 'unknown',
         summary: d.content,
         timestamp: d.created_at,
         details: d.context,
       }));
-    } catch { /* non-blocking */ }
+    } catch {
+      /* non-blocking */
+    }
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -8223,7 +8549,9 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
             context: { action: 'test', suite, passed, failed, total, exitCode, timestamp: new Date().toISOString() },
             importance: failed > 0 ? 9 : 5,
           });
-        } catch { /* non-blocking */ }
+        } catch {
+          /* non-blocking */
+        }
       }
 
       logger.info({ component: 'Inception', passed, failed, total }, `🧪 Tests: ${passed}/${total} passed`);
@@ -8244,7 +8572,7 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
 
     const diagnosis = {
       error: errorMessage,
-      inception_test: "SUPREME_SUCCESS_BY_ANTIGRAVITY",
+      inception_test: 'SUPREME_SUCCESS_BY_ANTIGRAVITY',
       timestamp: new Date().toISOString(),
       analysis: [],
       relevantCode: null,
@@ -8252,11 +8580,13 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
     };
 
     // 1. Caută eroarea în errorLog
-    const matchingErrors = (this.errorLog || []).filter(e =>
-      (e.msg || '').toLowerCase().includes(errorMessage.toLowerCase())
-    ).slice(-5);
-    diagnosis.matchingLogs = matchingErrors.map(e => ({
-      tool: e.tool, message: e.msg, time: new Date(e.time).toISOString(),
+    const matchingErrors = (this.errorLog || [])
+      .filter((e) => (e.msg || '').toLowerCase().includes(errorMessage.toLowerCase()))
+      .slice(-5);
+    diagnosis.matchingLogs = matchingErrors.map((e) => ({
+      tool: e.tool,
+      message: e.msg,
+      time: new Date(e.time).toISOString(),
     }));
     diagnosis.analysis.push(`Găsite ${matchingErrors.length} erori similare în log.`);
 
@@ -8272,8 +8602,10 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
           const errorLower = errorMessage.toLowerCase();
           const matchLines = [];
           lines.forEach((line, i) => {
-            if (line.toLowerCase().includes(errorLower) ||
-                (errorMessage.includes(':') && line.includes(errorMessage.split(':')[0]))) {
+            if (
+              line.toLowerCase().includes(errorLower) ||
+              (errorMessage.includes(':') && line.includes(errorMessage.split(':')[0]))
+            ) {
               matchLines.push({ line: i + 1, content: line.trim() });
             }
           });
@@ -8283,14 +8615,20 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
             totalLines: lines.length,
             matchingLines: matchLines.slice(0, 10),
             // Context: 5 linii înainte/după primul match
-            context: matchLines.length > 0 ? lines.slice(
-              Math.max(0, matchLines[0].line - 6),
-              Math.min(lines.length, matchLines[0].line + 5)
-            ).join('\n') : null,
+            context:
+              matchLines.length > 0
+                ? lines
+                    .slice(Math.max(0, matchLines[0].line - 6), Math.min(lines.length, matchLines[0].line + 5))
+                    .join('\n')
+                : null,
           };
-          diagnosis.analysis.push(`Fișierul ${fileHint} are ${lines.length} linii. ${matchLines.length} linii potrivite.`);
+          diagnosis.analysis.push(
+            `Fișierul ${fileHint} are ${lines.length} linii. ${matchLines.length} linii potrivite.`
+          );
         }
-      } catch { /* non-blocking */ }
+      } catch {
+        /* non-blocking */
+      }
     }
 
     // 3. Check tool errors
@@ -8305,11 +8643,13 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
     // 4. Alertele active
     if (this.autonomousMonitor) {
       diagnosis.activeAlerts = this.autonomousMonitor.alerts
-        .filter(a => !a.resolved)
-        .map(a => ({ type: a.type, message: a.message }));
+        .filter((a) => !a.resolved)
+        .map((a) => ({ type: a.type, message: a.message }));
     }
 
-    diagnosis.analysis.push('⚠️ Fix-ul NU a fost aplicat automat. Revizuiește analiza și confirmă dacă vrei să scriu fix-ul.');
+    diagnosis.analysis.push(
+      '⚠️ Fix-ul NU a fost aplicat automat. Revizuiește analiza și confirmă dacă vrei să scriu fix-ul.'
+    );
     diagnosis.rawData = true;
 
     // AUDIT log
@@ -8319,10 +8659,18 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
           user_id: null,
           memory_type: 'inception_audit',
           content: `[DIAGNOSE] ${errorMessage.substring(0, 100)} | ${diagnosis.analysis.length} findings`,
-          context: { action: 'diagnose', error: errorMessage, fileHint, findings: diagnosis.analysis.length, timestamp: new Date().toISOString() },
+          context: {
+            action: 'diagnose',
+            error: errorMessage,
+            fileHint,
+            findings: diagnosis.analysis.length,
+            timestamp: new Date().toISOString(),
+          },
           importance: 8,
         });
-      } catch { /* non-blocking */ }
+      } catch {
+        /* non-blocking */
+      }
     }
 
     return diagnosis;
@@ -8348,7 +8696,9 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
         importance: 8,
       });
       return version;
-    } catch { return null; }
+    } catch {
+      return null;
+    }
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -8364,7 +8714,7 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
         .eq('memory_type', 'inception_knowledge')
         .limit(1)
         .single();
-      
+
       if (kbData) {
         this._inceptionKnowledge = kbData.context;
         logger.info({ component: 'Inception' }, '📚 Inception Knowledge Base încărcat din Supabase');
@@ -8373,7 +8723,11 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
         this._inceptionKnowledge = {
           architecture: 'Node.js + Express backend, Supabase PostgreSQL, Railway hosting',
           coreFiles: ['server/brain.js', 'server/brain-v4.js', 'server/brain-v5.js'],
-          safetyRules: ['Do not delete .env', 'Never expose secrets to non-admins', 'Always syntax-check before deploy']
+          safetyRules: [
+            'Do not delete .env',
+            'Never expose secrets to non-admins',
+            'Always syntax-check before deploy',
+          ],
         };
         // Auto-initializează în Supabase prima dată
         await this.supabase.from('brain_memory').insert({
@@ -8381,7 +8735,7 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
           memory_type: 'inception_knowledge',
           content: 'Inception Architecture Knowledge Base',
           context: this._inceptionKnowledge,
-          importance: 10
+          importance: 10,
         });
       }
 
@@ -8390,16 +8744,21 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
         .from('brain_memory')
         .select('content, context')
         .eq('memory_type', 'inception_secrets');
-        
+
       if (secretsData) {
-        secretsData.forEach(s => {
+        secretsData.forEach((s) => {
           if (s.context?.key && s.context?.encryptedValue) {
             this._inceptionSecrets.set(s.context.key, s.context.encryptedValue);
           }
         });
-        logger.info({ component: 'Inception', keys: this._inceptionSecrets.size }, '🔐 Inception Secrets Vault încărcat');
+        logger.info(
+          { component: 'Inception', keys: this._inceptionSecrets.size },
+          '🔐 Inception Secrets Vault încărcat'
+        );
       }
-    } catch { /* erroare db ignorată, va folosi fallback in-memory */ }
+    } catch {
+      /* erroare db ignorată, va folosi fallback in-memory */
+    }
   }
 
   _readKnowledge() {
@@ -8407,16 +8766,16 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
       success: true,
       knowledge: this._inceptionKnowledge || 'Knowledge Base indisponibil',
       availableSecrets: Array.from(this._inceptionSecrets.keys()),
-      notice: 'Informațiile de infrastructură și arhitectură sunt structurate aici.'
+      notice: 'Informațiile de infrastructură și arhitectură sunt structurate aici.',
     };
   }
 
   _getSecret(key) {
     if (!key) return { error: 'Cheie nespecificată' };
-    
+
     // Fallback pe process.env
     let val = process.env[key];
-    
+
     if (!val) {
       const encrypted = this._inceptionSecrets.get(key);
       if (!encrypted) return { error: `Secretul '${key}' nu există în Vault sau ENV` };
@@ -8425,15 +8784,24 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
 
     // AUDIT log
     if (this.supabase) {
-      this.supabase.from('brain_memory').insert({
-        user_id: null, memory_type: 'inception_audit',
-        content: `[SECURITY] Secret access granted for key: ${key}`,
-        context: { action: 'read_secret', key, timestamp: new Date().toISOString() },
-        importance: 10
-      }).catch(()=>{});
+      this.supabase
+        .from('brain_memory')
+        .insert({
+          user_id: null,
+          memory_type: 'inception_audit',
+          content: `[SECURITY] Secret access granted for key: ${key}`,
+          context: { action: 'read_secret', key, timestamp: new Date().toISOString() },
+          importance: 10,
+        })
+        .catch(() => {});
     }
 
-    return { success: true, key, value: val, notice: '⚠️ DANGEROUS: NU expune această valoare userului în chat under any circumstances!' };
+    return {
+      success: true,
+      key,
+      value: val,
+      notice: '⚠️ DANGEROUS: NU expune această valoare userului în chat under any circumstances!',
+    };
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -8615,7 +8983,8 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
       general: {
         name: 'General Assistant',
         icon: '🧠',
-        systemPrompt: 'Ești Kelion, un asistent AI general creat de Adrian. Răspunde clar, concis și prietenos. IMPORTANT: Ai capabilități avansate — poți lista fișiere (projectTree), citi cod sursă (projectFile), scrie/edita fișiere (projectFileWrite) și da deploy automat (adminAutoDeploy). Când adminul îți cere să listezi, citești, scrii fișiere sau să dai deploy — CONFIRMĂ că ai executat acțiunea, NU spune că nu poți!',
+        systemPrompt:
+          'Ești Kelion, un asistent AI general creat de Adrian. Răspunde clar, concis și prietenos. IMPORTANT: Ai capabilități avansate — poți lista fișiere (projectTree), citi cod sursă (projectFile), scrie/edita fișiere (projectFileWrite) și da deploy automat (adminAutoDeploy). Când adminul îți cere să listezi, citești, scrii fișiere sau să dai deploy — CONFIRMĂ că ai executat acțiunea, NU spune că nu poți!',
         strengths: ['conversație', 'întrebări generale', 'recomandări'],
       },
       code: {

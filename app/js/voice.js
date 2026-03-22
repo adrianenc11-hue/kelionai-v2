@@ -593,24 +593,35 @@
 
     // 2. Stop voice-stream-client (PCM streaming)
     if (window.KVoiceStream && KVoiceStream.stopPlayback) {
-      try { KVoiceStream.stopPlayback(); } catch(_e) {}
+      try {
+        KVoiceStream.stopPlayback();
+      } catch (_e) {}
     }
 
     // 3. Stop voice-realtime-client if active
     if (window.KVoiceRealtime && KVoiceRealtime.stopPlayback) {
-      try { KVoiceRealtime.stopPlayback(); } catch(_e) {}
+      try {
+        KVoiceRealtime.stopPlayback();
+      } catch (_e) {}
     }
 
     // 4. Stop browser SpeechSynthesis (fallback TTS)
     if (window.speechSynthesis && speechSynthesis.speaking) {
-      try { speechSynthesis.cancel(); } catch(_e) {}
+      try {
+        speechSynthesis.cancel();
+      } catch (_e) {}
     }
 
     // 5. Suspend shared AudioContext briefly to kill any in-flight audio
     if (sharedAudioCtx && sharedAudioCtx.state === 'running') {
-      sharedAudioCtx.suspend().then(() => {
-        setTimeout(() => { if (sharedAudioCtx) sharedAudioCtx.resume(); }, 100);
-      }).catch(() => {});
+      sharedAudioCtx
+        .suspend()
+        .then(() => {
+          setTimeout(() => {
+            if (sharedAudioCtx) sharedAudioCtx.resume();
+          }, 100);
+        })
+        .catch(() => {});
     }
 
     console.log('[Voice] 🛑 GLOBAL STOP: All audio sources stopped');

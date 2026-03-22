@@ -1,4 +1,4 @@
-﻿'use strict';
+'use strict';
 /**
  * BRAIN CHAT — Direct admin-brain conversation route
  * K1 mode: Adrian talks directly to the brain.
@@ -644,9 +644,7 @@ async function autoRepairPipeline(task, filePath) {
   // STEP 4: GPT-5.4 — Executie
   log.push('\n--- STEP 4: GPT-5.4 EXECUTIE ---');
   var execPrompt =
-    'Genereaza EXACT un JSON de editare. Format STRICT:\n{"tool":"editFile","params":{"filePath":"' +
-    filePath +
-    '","target":"TEXT VECHI EXACT","replacement":"TEXT NOU"}}\nUn singur JSON, nimic altceva.';
+    'Genereaza EXACT blocul de editare. Format STRICT (fara JSON):\n<TARGET>\nTEXT VECHI EXACT AICI\n</TARGET>\n<REPLACEMENT>\nTEXT NOU AICI\n</REPLACEMENT>\nCopiaza indentatia si spatiile exact ca in original.';
   var execution = await callAIProvider(
     'gpt54',
     execPrompt,
@@ -663,14 +661,15 @@ async function autoRepairPipeline(task, filePath) {
 
   var editResult = 'Nu s-a executat';
   try {
-    var jsonMatch = (execution || '').match(/\{[\s\S]*?"tool"[\s\S]*?\}/);
-    if (jsonMatch) {
-      var editCmd = JSON.parse(jsonMatch[0]);
+    var tgtMatch = (execution || '').match(/<TARGET>\n?([\s\S]*?)\n?<\/TARGET>/i);
+    var repMatch = (execution || '').match(/<REPLACEMENT>\n?([\s\S]*?)\n?<\/REPLACEMENT>/i);
+    if (tgtMatch && repMatch) {
+      var editCmd = { tool: 'editFile', params: { filePath: filePath, target: tgtMatch[1], replacement: repMatch[1], force: true } };
       var toolResult = processToolCall(editCmd);
       editResult = toolResult.result || toolResult.message || JSON.stringify(toolResult);
       log.push('Executie: ' + editResult);
     } else {
-      log.push('FAIL: Nu am gasit JSON valid');
+      log.push('FAIL: Nu am gasit blocurile TARGET si REPLACEMENT');
     }
   } catch (e) {
     log.push('FAIL: ' + e.message);
@@ -1080,3 +1079,4 @@ router.post('/reject', async (req, res) => {
 });
 
 module.exports = router;
+module.exports.autoRepairPipeline = autoRepairPipeline;

@@ -1117,6 +1117,26 @@ async function thinkV5(
   const executeTool = getExecuteTool();
 
   try {
+    // ═══ DIRECT COMMAND DETECTION — bypass AI tool generation ═══
+    const msgLow = (message || '').toLowerCase();
+    const fileMatch = (message || '').match(/([a-zA-Z0-9_\/\\-]+\.[a-z]{1,4})/i);
+    if (msgLow.includes('autorepair') && fileMatch) {
+      const chatRoute = require('./routes/brain-chat');
+      if (chatRoute.autoRepairPipeline) {
+        const pipelineResult = await chatRoute.autoRepairPipeline(message, fileMatch[1]);
+        return {
+          enrichedMessage: pipelineResult,
+          toolsUsed: [],
+          monitor: { content: null, type: null },
+          analysis: { complexity: 'simple', language: language || 'ro' },
+          thinkTime: Date.now() - startTime,
+          confidence: 1.0,
+          agent: 'AutoRepair-Pipeline',
+          engine: 'AutoRepair-Pipeline'
+        };
+      }
+    }
+
     // ── 1. Quota check ──
     const quota = await brain.checkQuota(userId);
     if (!quota.allowed) {

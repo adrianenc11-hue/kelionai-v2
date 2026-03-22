@@ -543,7 +543,8 @@ const ADMIN_TOOL_DEFINITIONS = [
         category: {
           type: 'string',
           enum: ['all', 'errors', 'alerts', 'health', 'versions'],
-          description: "What to read: 'all' for everything, 'errors' for error log, 'alerts' for active alerts, 'health' for system status, 'versions' for deploy history",
+          description:
+            "What to read: 'all' for everything, 'errors' for error log, 'alerts' for active alerts, 'health' for system status, 'versions' for deploy history",
         },
       },
       required: [],
@@ -781,7 +782,10 @@ async function executeTool(brain, toolName, toolInput, userId) {
       case 'write_project_file':
         return brain._writeProjectFile(toolInput.filepath, toolInput.content);
       case 'admin_auto_deploy':
-        return await brain._adminAutoDeploy(toolInput.commit_message || 'Auto-deploy by Kelion AI', toolInput.files || []);
+        return await brain._adminAutoDeploy(
+          toolInput.commit_message || 'Auto-deploy by Kelion AI',
+          toolInput.files || []
+        );
       // ═══ INCEPTION Faza 3: Autonomie ═══
       case 'admin_read_logs':
         return brain._readLogs(toolInput.category || 'all');

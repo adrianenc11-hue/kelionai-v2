@@ -182,7 +182,9 @@ router.post('/chat', chatLimiter, validate(chatSchema), async (req, res) => {
         enrichedMessage = message + resumeCtx;
         logger.info({ component: 'WorkingMemory' }, '📋 Resume context injected');
       }
-    } catch { /* non-blocking */ }
+    } catch {
+      /* non-blocking */
+    }
 
     let thought;
     try {

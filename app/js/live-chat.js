@@ -171,7 +171,9 @@
       isPlaying = true;
 
       // Trigger the lip sync animation
-      window.dispatchEvent(new CustomEvent('audio-start', { detail: { duration: audioBuf.duration, isRealtime: true } }));
+      window.dispatchEvent(
+        new CustomEvent('audio-start', { detail: { duration: audioBuf.duration, isRealtime: true } })
+      );
     } catch (err) {
       console.error('[LiveChat] Decode audio failed:', err);
     }

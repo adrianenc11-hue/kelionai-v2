@@ -49,7 +49,9 @@
       currentPlaySource = null;
       // Notify voice.js that stream audio ended
       if (window.KVoice) {
-        try { window.KVoice.onStreamEnd && window.KVoice.onStreamEnd(); } catch(_e) {}
+        try {
+          window.KVoice.onStreamEnd && window.KVoice.onStreamEnd();
+        } catch (_e) {}
       }
       return;
     }
@@ -69,7 +71,9 @@
     pcmQueue = []; // clear pending chunks
     isPlaying = false;
     if (currentPlaySource) {
-      try { currentPlaySource.stop(); } catch(_e) {}
+      try {
+        currentPlaySource.stop();
+      } catch (_e) {}
       currentPlaySource = null;
     }
     console.log('[VoiceStream] 🛑 Playback stopped (queue cleared)');
