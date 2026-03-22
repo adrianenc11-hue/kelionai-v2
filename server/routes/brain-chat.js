@@ -498,7 +498,7 @@ function processToolCall(toolCall) {
 }
 
 // ═══ AUTO-REPAIR PIPELINE — 5 AI Models ═══
-async function callAIProvider(provider, system, message) {
+async function callAIProvider(provider, system, message, historyArray = []) {
   var key, url, body, headers;
   switch (provider) {
     case 'groq':
@@ -509,6 +509,7 @@ async function callAIProvider(provider, system, message) {
         model: 'llama-3.3-70b-versatile',
         messages: [
           { role: 'system', content: system },
+          ...historyArray,
           { role: 'user', content: message },
         ],
         max_tokens: 2048,
@@ -523,6 +524,7 @@ async function callAIProvider(provider, system, message) {
         model: 'deepseek-coder',
         messages: [
           { role: 'system', content: system },
+          ...historyArray,
           { role: 'user', content: message },
         ],
         max_tokens: 2048,
@@ -697,11 +699,11 @@ async function autoRepairPipeline(task, filePath) {
 }
 
 // ═══ AI PROVIDERS ═══
-async function callK1(systemPrompt, userMessage) {
+async function callK1(systemPrompt, userMessage, historyArray = []) {
   for (const p of [
-    { name: 'Groq', fn: () => callAIProvider('groq', systemPrompt, userMessage) },
-    { name: 'GPT-5.4', fn: () => callOpenAI(systemPrompt, userMessage) },
-    { name: 'gemini', fn: () => callGemini(systemPrompt, userMessage) },
+    { name: 'Groq', fn: () => callAIProvider('groq', systemPrompt, userMessage, historyArray) },
+    { name: 'GPT-5.4', fn: () => callOpenAI(systemPrompt, userMessage, historyArray) },
+    { name: 'gemini', fn: () => callGemini(systemPrompt, userMessage, historyArray) },
   ]) {
     try {
       const r = await p.fn();
@@ -713,44 +715,51 @@ async function callK1(systemPrompt, userMessage) {
   return { text: 'Eroare: niciun provider AI disponibil.', provider: 'none' };
 }
 
-async function callGemini(system, message) {
+async function callGemini(system, message, historyArray = []) {
   const key = process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
   if (!key) return null;
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${key}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=\${key}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: system }] },
-        contents: [{ parts: [{ text: message }] }],
+        contents: [
+          ...historyArray.map(h => ({
+            role: h.role === 'user' ? 'user' : 'model',
+            parts: [{ text: h.content }]
+          })),
+          { role: 'user', parts: [{ text: message }] }
+        ],
       }),
     }
   );
-  if (!res.ok) throw new Error(`Gemini ${res.status}`);
+  if (!res.ok) throw new Error(`Gemini \${res.status}`);
   const d = await res.json();
   return d.candidates?.[0]?.content?.parts?.[0]?.text || null;
 }
 
-async function callOpenAI(system, message) {
+async function callOpenAI(system, message, historyArray = []) {
   const key = process.env.OPENAI_API_KEY;
   if (!key) return null;
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${key}`,
+      Authorization: `Bearer \${key}`,
     },
     body: JSON.stringify({
       model: 'gpt-5.4',
       messages: [
         { role: 'system', content: system },
+        ...historyArray,
         { role: 'user', content: message },
       ],
       max_completion_tokens: 4096,
     }),
   });
-  if (!res.ok) throw new Error(`OpenAI ${res.status}`);
+  if (!res.ok) throw new Error(`OpenAI \${res.status}`);
   const d = await res.json();
   return d.choices?.[0]?.message?.content || null;
 }
@@ -776,7 +785,12 @@ router.post('/', async (req, res) => {
     const knowledge = loadFileContent('K1_KNOWLEDGE.md');
     const raport = loadFileContent('RAPORT_ONEST.md');
     const history = session.buildHistory(currentSession, 30);
-    let systemPrompt = getK1SystemPrompt(knowledge, raport, history);
+    const historyArray = currentSession.messages.slice(-30).map(m => ({
+      role: m.role === 'user' ? 'user' : 'assistant',
+      content: m.content
+    }));
+    // Trecem istoric gol la sistem pentru a nu dubla memoria (array-ul e trimis nativ către API)
+    let systemPrompt = getK1SystemPrompt(knowledge, raport, '');
 
     // ── WORKING MEMORY: Injectează context de task-uri neterminate + golden knowledge ──
     const brain = req.app?.locals?.brain;
@@ -819,7 +833,7 @@ router.post('/', async (req, res) => {
       return res.json({ reply: response.text, provider: response.provider, sessionId: sid });
     }
 
-    let response = await callK1(systemPrompt, message);
+    let response = await callK1(systemPrompt, message, historyArray);
 
     // === #12 ANTI-GENERIC FILTER ===
     const BANNED = [
@@ -845,7 +859,7 @@ router.post('/', async (req, res) => {
         '\n\nRASPUNSUL ANTERIOR A FOST BLOCAT. EXECUTA DIRECT: "' +
         message +
         '". Foloseste TOOL-URI (readFile, searchCode, listFiles). Raspunde cu FAPTE si COD, nu cu vorbe.';
-      response = await callK1(force, message);
+      response = await callK1(force, message, historyArray);
     }
 
     // #16 MULTIPLE TOOL CALLS — parsează TOATE blocurile json
