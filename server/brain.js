@@ -282,6 +282,139 @@ class KelionBrain {
   }
 
   // ═══════════════════════════════════════════════════════════
+  // DOCUMENT GENERATION — Creates and saves documents to DB
+  // ═══════════════════════════════════════════════════════════
+
+  /**
+   * Generate a document using AI and save it to Supabase.
+   * Used by scheduled tasks (daily_report) and can be called by tools.
+   * @param {string} title - Document title
+   * @param {string} prompt - AI prompt for generating content
+   * @param {string} format - 'markdown' | 'text' | 'html'
+   * @param {string} userId - User ID to associate with document
+   * @returns {object} { success, documentId, content }
+   */
+  async _generateDocument(title, prompt, format = 'markdown', userId = null) {
+    try {
+      let content = '';
+
+      // Try Gemini first (cheaper), fallback to OpenAI
+      const gKey = process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
+      if (gKey) {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 15000);
+        try {
+          const resp = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${gKey}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: [{ role: 'user', parts: [{ text: prompt }] }],
+                systemInstruction: {
+                  parts: [
+                    {
+                      text: `Ești un asistent profesional. Generează documentul în format ${format}. Titlul documentului: "${title}". Scrie conținut complet, structurat, profesional.`,
+                    },
+                  ],
+                },
+                generationConfig: { maxOutputTokens: 4096, temperature: 0.7 },
+              }),
+              signal: ctrl.signal,
+            }
+          ).finally(() => clearTimeout(timer));
+
+          if (resp.ok) {
+            const data = await resp.json();
+            content = (data.candidates?.[0]?.content?.parts || [])
+              .filter((p) => p.text)
+              .map((p) => p.text)
+              .join('');
+          }
+        } catch (_) {
+          /* Gemini failed, try OpenAI below */
+        }
+      }
+
+      // Fallback to OpenAI if Gemini didn't produce content
+      if (!content && this.openaiKey) {
+        try {
+          const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${this.openaiKey}`,
+            },
+            body: JSON.stringify({
+              model: 'gpt-4o-mini',
+              messages: [
+                { role: 'system', content: `Generează un document în format ${format}. Titlu: "${title}".` },
+                { role: 'user', content: prompt },
+              ],
+              max_tokens: 4096,
+              temperature: 0.7,
+            }),
+            signal: AbortSignal.timeout(20000),
+          });
+          if (resp.ok) {
+            const data = await resp.json();
+            content = data.choices?.[0]?.message?.content || '';
+          }
+        } catch (_) {
+          /* OpenAI also failed */
+        }
+      }
+
+      if (!content) {
+        logger.warn({ component: 'DocGen', title }, 'Document generation failed — no AI provider available');
+        return { success: false, error: 'No AI provider available' };
+      }
+
+      // Save to Supabase
+      let documentId = null;
+      if (this.supabaseAdmin) {
+        const { data, error } = await this.supabaseAdmin
+          .from('generated_documents')
+          .insert({
+            user_id: userId,
+            title,
+            content,
+            format,
+            metadata: { generated_by: 'brain', prompt_length: prompt.length },
+          })
+          .select('id')
+          .single();
+
+        if (error) {
+          logger.warn({ component: 'DocGen', err: error.message }, 'Document save to DB failed');
+        } else {
+          documentId = data?.id;
+        }
+      }
+
+      // Also save to disk as backup
+      try {
+        const fs = require('fs');
+        const path = require('path');
+        const docsDir = path.join(process.cwd(), 'generated_docs');
+        if (!fs.existsSync(docsDir)) fs.mkdirSync(docsDir, { recursive: true });
+        const safeName = title.replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 50);
+        const ext = format === 'html' ? '.html' : '.md';
+        const filePath = path.join(docsDir, `${safeName}_${Date.now()}${ext}`);
+        fs.writeFileSync(filePath, content, 'utf8');
+        logger.info({ component: 'DocGen', filePath }, `📄 Document saved: ${title}`);
+      } catch (fsErr) {
+        logger.warn({ component: 'DocGen', err: fsErr.message }, 'Document file save failed');
+      }
+
+      return { success: true, documentId, content, title, format };
+    } catch (e) {
+      logger.error({ component: 'DocGen', err: e.message }, 'Document generation error');
+      return { success: false, error: e.message };
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════
   // TOOL REGISTRY — Central Engine Core
   // ═══════════════════════════════════════════════════════════
 
@@ -6680,6 +6813,7 @@ Be strict. Check for: completeness, accuracy signals, helpfulness, tone appropri
 
     const diagnosis = {
       error: errorMessage,
+      inception_test: "SUPREME_SUCCESS_BY_ANTIGRAVITY",
       timestamp: new Date().toISOString(),
       analysis: [],
       relevantCode: null,

@@ -618,6 +618,104 @@ CREATE TABLE IF NOT EXISTS brain_admin_sessions (
 );
 CREATE INDEX IF NOT EXISTS idx_brain_admin_sessions_updated ON brain_admin_sessions(updated_at DESC);
 
+-- ═══ MISSING COLUMN: messages.source (used by saveConv in chat.js) ═══
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'web';
+
+-- ═══ MISSING COLUMN: page_views.referrer (used by traffic tracking in index.js) ═══
+ALTER TABLE page_views ADD COLUMN IF NOT EXISTS referrer TEXT;
+
+-- ═══ VISITORS (used by /api/track/visit in index.js) ═══
+CREATE TABLE IF NOT EXISTS visitors (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    fingerprint TEXT NOT NULL,
+    ip TEXT,
+    country TEXT,
+    city TEXT,
+    browser TEXT,
+    device TEXT,
+    os TEXT,
+    screen_width INTEGER,
+    screen_height INTEGER,
+    language TEXT,
+    timezone TEXT,
+    referrer TEXT,
+    utm_source TEXT,
+    utm_medium TEXT,
+    utm_campaign TEXT,
+    photo TEXT,
+    pages_visited JSONB DEFAULT '[]'::jsonb,
+    total_visits INTEGER DEFAULT 1,
+    total_time_sec INTEGER DEFAULT 0,
+    status TEXT DEFAULT 'potential',
+    first_seen TIMESTAMPTZ DEFAULT now(),
+    last_seen TIMESTAMPTZ DEFAULT now(),
+    UNIQUE(fingerprint)
+);
+CREATE INDEX IF NOT EXISTS idx_visitors_fingerprint ON visitors(fingerprint);
+CREATE INDEX IF NOT EXISTS idx_visitors_ip ON visitors(ip);
+CREATE INDEX IF NOT EXISTS idx_visitors_last_seen ON visitors(last_seen DESC);
+
+-- Function for incrementing visitor time (used by beacon endpoint)
+CREATE OR REPLACE FUNCTION increment_visitor_time(fp TEXT, secs INTEGER)
+RETURNS void LANGUAGE plpgsql AS $$
+BEGIN
+    UPDATE visitors SET total_time_sec = total_time_sec + secs, last_seen = now() WHERE fingerprint = fp;
+END; $$;
+
+-- ═══ CHAT FEEDBACK (used by /api/chat/feedback in chat.js) ═══
+CREATE TABLE IF NOT EXISTS chat_feedback (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id UUID,
+    conversation_id UUID,
+    message_index INTEGER DEFAULT 0,
+    rating TEXT NOT NULL CHECK (rating IN ('positive', 'negative')),
+    comment TEXT,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_chat_feedback_user ON chat_feedback(user_id);
+CREATE INDEX IF NOT EXISTS idx_chat_feedback_conv ON chat_feedback(conversation_id);
+CREATE INDEX IF NOT EXISTS idx_chat_feedback_date ON chat_feedback(created_at DESC);
+
+-- ═══ USAGE TRACKING (used by checkUsage/incrementUsage in payments.js) ═══
+CREATE TABLE IF NOT EXISTS usage (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    type TEXT NOT NULL DEFAULT 'chat',
+    count INTEGER DEFAULT 0,
+    date TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    UNIQUE(user_id, type, date)
+);
+CREATE INDEX IF NOT EXISTS idx_usage_user ON usage(user_id, type, date);
+
+-- ═══ PAYMENTS (used by /api/admin/revenue in admin.js) ═══
+CREATE TABLE IF NOT EXISTS payments (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id UUID,
+    amount NUMERIC NOT NULL DEFAULT 0,
+    currency TEXT DEFAULT 'usd',
+    plan TEXT DEFAULT 'pro',
+    status TEXT DEFAULT 'completed',
+    stripe_payment_intent_id TEXT,
+    stripe_invoice_id TEXT,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_payments_user ON payments(user_id);
+CREATE INDEX IF NOT EXISTS idx_payments_date ON payments(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_payments_status ON payments(status);
+
+-- ═══ GENERATED DOCUMENTS (used by _generateDocument in brain.js) ═══
+CREATE TABLE IF NOT EXISTS generated_documents (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id TEXT,
+    title TEXT NOT NULL,
+    content TEXT NOT NULL,
+    format TEXT DEFAULT 'markdown',
+    metadata JSONB DEFAULT '{}',
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_generated_docs_user ON generated_documents(user_id, created_at DESC);
+
 `;
 
 async function runMigration() {
@@ -697,6 +795,11 @@ async function runMigration() {
       'autonomous_tasks',
       'tenants',
       'brain_admin_sessions',
+      'visitors',
+      'chat_feedback',
+      'usage',
+      'payments',
+      'generated_documents',
     ];
 
     const healthy = [];
