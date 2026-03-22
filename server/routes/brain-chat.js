@@ -568,6 +568,7 @@ async function autoRepairPipeline(task, filePath) {
 // ═══ AI PROVIDERS ═══
 async function callK1(systemPrompt, userMessage) {
   for (const p of [
+    { name: 'Groq', fn: () => callAIProvider('groq', systemPrompt, userMessage) },
     { name: 'GPT-5.4', fn: () => callOpenAI(systemPrompt, userMessage) },
     { name: 'gemini', fn: () => callGemini(systemPrompt, userMessage) },
   ]) {
