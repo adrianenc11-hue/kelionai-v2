@@ -679,6 +679,16 @@ router.post('/', async (req, res) => {
       } catch { /* non-blocking */ }
     }
 
+    // ═══ DIRECT COMMAND DETECTION — bypass AI tool generation ═══
+    const msgLow = message.toLowerCase();
+    const fileMatch = message.match(/(?:in|din|fisierul?|file)\s+["']?([^\s"']+\.[a-z]{1,4})/i);
+    if (msgLow.includes('autorepair') && fileMatch) {
+      const pipelineResult = await autoRepairPipeline(message, fileMatch[1]);
+      const response = { text: pipelineResult, provider: 'AutoRepair-Pipeline' };
+      await session.addMessage(sid, 'assistant', response.text, response.provider);
+      return res.json({ reply: response.text, provider: response.provider, sessionId: sid });
+    }
+
     let response = await callK1(systemPrompt, message);
 
     // === #12 ANTI-GENERIC FILTER ===
