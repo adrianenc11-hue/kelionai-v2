@@ -24,6 +24,7 @@ FARA APROBARE (executie directa):
 - verifyFile: {"tool":"verifyFile","params":{"filePath":"path"}} - verifica integritate + syntax
 - restoreBackup: {"tool":"restoreBackup","params":{"filePath":"path"}} - restaureaza din backup
 - gitRestore: {"tool":"gitRestore","params":{"filePath":"path"}} - restaureaza din git/backup
+- autoRepair: {"tool":"autoRepair","params":{"task":"reparatia necesara","filePath":"path/to/file.js"}} - activeaza pipeline-ul de auto-reparare cu 5 AI
 - runTests, queryDB, screenshot, browse, webSearch, readUrl, generateImage
 
 CU APROBARE (necesita APPROVE):
