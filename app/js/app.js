@@ -1905,24 +1905,8 @@
       micBtn.addEventListener('click', function () {
         unlockAudio();
 
-        // PRIMARY: GPT 5.4 Live Audio (Socket.IO)
-        if (window.KLiveChat) {
-          if (!KLiveChat.isConnected()) {
-            const avatar = window.KAvatar ? KAvatar.getCurrentAvatar() : 'kelion';
-            const lang = window.KVoice ? KVoice.getLanguage() : 'ro';
-            KLiveChat.connect(avatar, lang);
-          }
-          if (micBtn.textContent === '🎙️') {
-            KLiveChat.startMic();
-            setMicOn();
-            hideWelcome();
-          } else {
-            KLiveChat.stopMic(true);
-            setMicOff();
-          }
-        }
-        // FALLBACK: Voice-to-voice stream (Deepgram STT → Groq LLM → Cartesia TTS)
-        else if (window.KVoiceStream) {
+        // Voice-to-voice: Deepgram STT → Groq LLM → Cartesia TTS
+        if (window.KVoiceStream) {
           if (micBtn.textContent === '🎙️') {
             // Connect if not already connected
             if (!KVoiceStream.isConnected()) {
@@ -1944,6 +1928,22 @@
             setMicOn(); // Immediate visual feedback
           } else {
             KVoiceStream.stopMic();
+            setMicOff();
+          }
+        }
+        // Fallback to KLiveChat (GPT 5.4 native audio) if KVoiceStream is unavailable
+        else if (window.KLiveChat) {
+          if (!KLiveChat.isConnected()) {
+            const avatar = window.KAvatar ? KAvatar.getCurrentAvatar() : 'kelion';
+            const lang = window.KVoice ? KVoice.getLanguage() : 'ro';
+            KLiveChat.connect(avatar, lang);
+          }
+          if (micBtn.textContent === '🎙️') {
+            KLiveChat.startMic();
+            setMicOn();
+            hideWelcome();
+          } else {
+            KLiveChat.stopMic(true);
             setMicOff();
           }
         }
