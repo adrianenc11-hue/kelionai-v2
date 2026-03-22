@@ -533,11 +533,29 @@ class KelionBrain {
           const filePath = path.resolve(CWD, params.path || '');
           if (!filePath.startsWith(CWD)) return { success: false, error: 'Path outside app' };
 
-          const relPath = path.relative(CWD, filePath);
+          const relPath = path.relative(CWD, filePath).replace(/\\/g, '/');
           const newContent = params.content || '';
           const fileExists = fs.existsSync(filePath);
           let oldContent = '';
           let oldLineCount = 0;
+
+          // ══ LEARN: Verifică lecții din greșeli anterioare pe acest fișier ══
+          if (this.supabaseAdmin) {
+            try {
+              const { data: lessons } = await this.supabaseAdmin
+                .from('brain_memory')
+                .select('content, metadata')
+                .eq('memory_type', 'write_lesson')
+                .like('content', `%${relPath}%`)
+                .order('created_at', { ascending: false })
+                .limit(3);
+              if (lessons && lessons.length > 0) {
+                const lessonsText = lessons.map(l => l.content).join(' | ');
+                logger.info({ component: 'SafeWrite', file: relPath, lessons: lessons.length },
+                  `📚 ${lessons.length} lecții găsite pentru ${relPath}: ${lessonsText.substring(0, 200)}`);
+              }
+            } catch (_) { /* non-blocking */ }
+          }
 
           // ══ GUARD 1: Auto-Backup ══
           if (fileExists) {
@@ -560,11 +578,21 @@ class KelionBrain {
             const newLineCount = newContent.split('\n').length;
             const ratio = newLineCount / oldLineCount;
             if (ratio < 0.5) {
+              const lesson = `LECȚIE TRUNCHIERE pe ${relPath}: Ai încercat să scrii ${newLineCount} linii peste un fișier de ${oldLineCount} linii (${Math.round(ratio * 100)}%). Soluția corectă: citește ÎNTÂI fișierul complet cu ADMIN_READ_FILE, apoi rescrie-l INTEGRAL cu toate liniile originale + modificările tale. NU trimite doar fragmentul modificat.`;
               logger.warn({ component: 'SafeWrite', file: relPath, old: oldLineCount, new: newLineCount, ratio: Math.round(ratio * 100) + '%' },
-                `🛡️ BLOCAT: Trunchiere detectată! ${oldLineCount}→${newLineCount} linii (${Math.round(ratio * 100)}%)`);
+                `🛡️ BLOCAT + LECȚIE SALVATĂ: ${lesson}`);
+              // Salvează lecția în memorie
+              if (this.supabaseAdmin) {
+                this.supabaseAdmin.from('brain_memory').insert({
+                  user_id: userId, memory_type: 'write_lesson',
+                  content: lesson,
+                  metadata: { file: relPath, error_type: 'truncation', old_lines: oldLineCount, new_lines: newLineCount, ratio, timestamp: new Date().toISOString() },
+                  importance: 0.95
+                }).catch(() => {});
+              }
               return {
                 success: false,
-                error: `BLOCAT: Fișierul ${relPath} are ${oldLineCount} linii, dar încerci să scrii doar ${newLineCount} linii (${Math.round(ratio * 100)}% din original). Trunchiere detectată — operație refuzată. Rescrie fișierul COMPLET sau folosește patch-uri parțiale.`,
+                error: `BLOCAT: ${lesson}`,
                 tool: toolId
               };
             }
@@ -585,11 +613,20 @@ class KelionBrain {
             const keptLines = newLines.filter(l => oldLines.has(l)).length;
             const keepRatio = oldLines.size > 0 ? keptLines / oldLines.size : 1;
             if (keepRatio < 0.3) {
+              const lesson2 = `LECȚIE FIȘIER PROTEJAT pe ${relPath}: Ai încercat să suprascrii agresiv (doar ${Math.round(keepRatio * 100)}% din cod păstrat). Soluția corectă: (1) ADMIN_READ_FILE pentru a citi conținutul actual, (2) modifică DOAR liniile necesare păstrând restul intact, (3) ADMIN_WRITE_FILE cu conținutul complet.`;
               logger.warn({ component: 'SafeWrite', file: relPath, keepRatio: Math.round(keepRatio * 100) + '%' },
-                `🔒 BLOCAT: Fișier protejat — suprascrie prea agresivă`);
+                `🔒 BLOCAT + LECȚIE SALVATĂ: ${lesson2}`);
+              if (this.supabaseAdmin) {
+                this.supabaseAdmin.from('brain_memory').insert({
+                  user_id: userId, memory_type: 'write_lesson',
+                  content: lesson2,
+                  metadata: { file: relPath, error_type: 'protected_overwrite', keepRatio, timestamp: new Date().toISOString() },
+                  importance: 0.95
+                }).catch(() => {});
+              }
               return {
                 success: false,
-                error: `BLOCAT: ${relPath} este fișier protejat. Doar ${Math.round(keepRatio * 100)}% din codul original e păstrat — suprascrierea completă nu e permisă. Citește mai întâi fișierul cu ADMIN_READ_FILE, apoi modifică doar liniile necesare.`,
+                error: `BLOCAT: ${lesson2}`,
                 tool: toolId
               };
             }
@@ -610,11 +647,20 @@ class KelionBrain {
               // ROLLBACK — restaurează backup-ul
               if (oldContent) {
                 fs.writeFileSync(filePath, oldContent, 'utf8');
+                const lesson3 = `LECȚIE SYNTAX ERROR pe ${relPath}: Codul scris avea erori de sintaxă: ${syntaxErr.message.substring(0, 200)}. Fișierul a fost restaurat automat. Soluția: verifică sintaxa JS înainte de a scrie — paranteze, acolade, virgule, template literals.`;
                 logger.warn({ component: 'SafeWrite', file: relPath, err: syntaxErr.message },
-                  '🔄 ROLLBACK: Syntax error detectat — fișier restaurat');
+                  `🔄 ROLLBACK + LECȚIE SALVATĂ: ${lesson3}`);
+                if (this.supabaseAdmin) {
+                  this.supabaseAdmin.from('brain_memory').insert({
+                    user_id: userId, memory_type: 'write_lesson',
+                    content: lesson3,
+                    metadata: { file: relPath, error_type: 'syntax_error', error: syntaxErr.message.substring(0, 500), timestamp: new Date().toISOString() },
+                    importance: 0.95
+                  }).catch(() => {});
+                }
                 return {
                   success: false,
-                  error: `ROLLBACK: Fișierul ${relPath} avea erori de sintaxă JS și a fost restaurat automat. Eroare: ${syntaxErr.message.substring(0, 300)}`,
+                  error: `ROLLBACK: ${lesson3}`,
                   tool: toolId
                 };
               }
