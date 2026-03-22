@@ -681,7 +681,7 @@ router.post('/', async (req, res) => {
 
     // ═══ DIRECT COMMAND DETECTION — bypass AI tool generation ═══
     const msgLow = message.toLowerCase();
-    const fileMatch = message.match(/(?:in|din|fisierul?|file)\s+["']?([^\s"']+\.[a-z]{1,4})/i);
+    const fileMatch = message.match(/([a-zA-Z0-9_\/\\-]+\.[a-z]{1,4})/i);
     if (msgLow.includes('autorepair') && fileMatch) {
       const pipelineResult = await autoRepairPipeline(message, fileMatch[1]);
       const response = { text: pipelineResult, provider: 'AutoRepair-Pipeline' };
