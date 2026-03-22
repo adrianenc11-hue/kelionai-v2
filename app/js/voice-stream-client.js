@@ -13,6 +13,7 @@
   var isListening = false;
   var pcmQueue = [];
   var isPlaying = false;
+  var currentPlaySource = null; // track current audio source for stop
 
   var API_BASE = window.location.origin;
   var WS_BASE = API_BASE.replace('https://', 'wss://').replace('http://', 'ws://');
@@ -45,6 +46,11 @@
   function drainQueue() {
     if (pcmQueue.length === 0) {
       isPlaying = false;
+      currentPlaySource = null;
+      // Notify voice.js that stream audio ended
+      if (window.KVoice) {
+        try { window.KVoice.onStreamEnd && window.KVoice.onStreamEnd(); } catch(_e) {}
+      }
       return;
     }
     isPlaying = true;
@@ -54,7 +60,19 @@
     source.buffer = buffer;
     source.connect(ctx.destination);
     source.onended = drainQueue;
+    currentPlaySource = source;
     source.start();
+  }
+
+  // ── STOP all playback immediately ──
+  function stopPlayback() {
+    pcmQueue = []; // clear pending chunks
+    isPlaying = false;
+    if (currentPlaySource) {
+      try { currentPlaySource.stop(); } catch(_e) {}
+      currentPlaySource = null;
+    }
+    console.log('[VoiceStream] 🛑 Playback stopped (queue cleared)');
   }
 
   // ── Microphone capture → PCM chunks ────────────────────────
@@ -296,6 +314,7 @@
   window.KVoiceStream = {
     connect: connect,
     disconnect: function () {
+      stopPlayback();
       stopMicCapture();
       if (ws) ws.close();
       ws = null;
@@ -303,12 +322,16 @@
     },
     startMic: startMicCapture,
     stopMic: stopMicCapture,
+    stopPlayback: stopPlayback,
     sendText: sendText,
     isConnected: function () {
       return isConnected;
     },
     isListening: function () {
       return isListening;
+    },
+    isPlaying: function () {
+      return isPlaying;
     },
   };
 
