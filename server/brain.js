@@ -246,14 +246,30 @@ class KelionBrain {
               ).catch(() => {});
               break;
             case 'periodic_cleanup':
-              // Clean old memories (keep last 500)
+              // Clean old memories (keep last 500, NEVER delete golden_knowledge or write_lessons)
               if (this.supabaseAdmin) {
                 const { count } = await this.supabaseAdmin
                   .from('brain_memory')
                   .select('id', { count: 'exact' })
-                  .eq('user_id', task.user_id);
+                  .eq('user_id', task.user_id)
+                  .neq('memory_type', 'golden_knowledge')
+                  .neq('memory_type', 'write_lesson');
                 if (count > 500) {
-                  logger.info({ component: 'Scheduler', count }, `🧹 Cleaning ${count - 500} old memories`);
+                  const toDelete = count - 500;
+                  const { data: oldOnes } = await this.supabaseAdmin
+                    .from('brain_memory')
+                    .select('id')
+                    .eq('user_id', task.user_id)
+                    .neq('memory_type', 'golden_knowledge')
+                    .neq('memory_type', 'write_lesson')
+                    .order('importance', { ascending: true })
+                    .order('created_at', { ascending: true })
+                    .limit(toDelete);
+                  if (oldOnes && oldOnes.length > 0) {
+                    const ids = oldOnes.map(m => m.id);
+                    await this.supabaseAdmin.from('brain_memory').delete().in('id', ids);
+                    logger.info({ component: 'Scheduler', deleted: ids.length }, `🧹 Cleaned ${ids.length} old memories (protected: golden_knowledge, write_lesson)`);
+                  }
                 }
               }
               break;
