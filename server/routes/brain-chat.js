@@ -189,13 +189,17 @@ function processToolCall(toolCall) {
       let occ = 0;
       let editFn;
       if (startLine && endLine) {
-        // #4 LINE-BASED EDITING — mai precis
         const lines = cur.split('\n');
         const s = Math.max(0, startLine - 1);
         const e = Math.min(lines.length, endLine);
         const section = lines.slice(s, e).join('\n');
         occ = target ? section.split(target).length - 1 : 1;
         editFn = () => {
+          // ── SAFE EDIT: Backup ──
+          const backupDir = path.resolve('backups');
+          if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir, { recursive: true });
+          fs.writeFileSync(path.join(backupDir, path.basename(fp) + '.' + Date.now() + '.bak'), cur, 'utf8');
+
           if (target && occ > 0) {
             const newSection = section.replace(target, replacement);
             const newLines = [...lines.slice(0, s), ...newSection.split('\n'), ...lines.slice(e)];
@@ -207,14 +211,39 @@ function processToolCall(toolCall) {
           } else {
             return { success: false, error: 'Text negăsit în range' };
           }
-          return { success: true, file: fp };
+
+          // ── SAFE EDIT: Syntax check + rollback ──
+          if (fp.endsWith('.js')) {
+            try {
+              execSync(`node --check "${path.resolve(fp)}"`, { timeout: 5000 });
+            } catch (syntaxErr) {
+              fs.writeFileSync(path.resolve(fp), cur, 'utf8');
+              return { success: false, error: `Syntax error — ROLLBACK: ${syntaxErr.message.substring(0, 200)}` };
+            }
+          }
+          return { success: true, file: fp, backup: true };
         };
       } else {
         occ = target ? cur.split(target).length - 1 : 0;
         editFn = () => {
           if (!target || occ === 0) return { success: false, error: 'Text negăsit' };
+          // ── SAFE EDIT: Backup ──
+          const backupDir = path.resolve('backups');
+          if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir, { recursive: true });
+          fs.writeFileSync(path.join(backupDir, path.basename(fp) + '.' + Date.now() + '.bak'), cur, 'utf8');
+
           fs.writeFileSync(path.resolve(fp), cur.replace(target, replacement), 'utf8');
-          return { success: true, file: fp };
+
+          // ── SAFE EDIT: Syntax check + rollback ──
+          if (fp.endsWith('.js')) {
+            try {
+              execSync(`node --check "${path.resolve(fp)}"`, { timeout: 5000 });
+            } catch (syntaxErr) {
+              fs.writeFileSync(path.resolve(fp), cur, 'utf8');
+              return { success: false, error: `Syntax error — ROLLBACK: ${syntaxErr.message.substring(0, 200)}` };
+            }
+          }
+          return { success: true, file: fp, backup: true };
         };
       }
       _pendingOps.set(opId, {
@@ -232,9 +261,21 @@ function processToolCall(toolCall) {
       return {
         pendingApproval: true,
         opId,
-        message: `⚠️ APROBARE\nEdit: ${fp}${startLine ? ` (L${startLine}-${endLine})` : ''}\nFind: ${(target || '').slice(0, 200)}\nReplace: ${(replacement || '').slice(0, 200)}\n(${occ} potriviri)`,
+        message: `⚠️ APROBARE\nEdit: ${fp}${startLine ? ` (L${startLine}-${endLine})` : ''}\nFind: ${(target || '').slice(0, 200)}\nReplace: ${(replacement || '').slice(0, 200)}\n(${occ} potriviri)\n💾 Auto-backup activat`,
         preview: _pendingOps.get(opId).preview,
       };
+    }
+    // ── GIT RESTORE — K1 poate restaura fișiere corupte ──
+    case 'gitRestore': {
+      const fp = params.filePath || params.path;
+      if (!fp) return { result: 'Eroare: lipsește filePath' };
+      try {
+        execSync(`git checkout HEAD -- "${fp}"`, { cwd: process.cwd(), timeout: 10000 });
+        const restored = fs.readFileSync(path.resolve(fp), 'utf8');
+        return { result: `✅ Fișier restaurat din git: ${fp} (${restored.length} chars, ${restored.split('\n').length} linii)` };
+      } catch (e) {
+        return { result: `❌ Restaurare eșuată: ${e.message}` };
+      }
     }
     case 'writeFile': {
       const opId = `OP_${++_opCounter}`;
@@ -244,26 +285,64 @@ function processToolCall(toolCall) {
       try {
         cur = fs.readFileSync(path.resolve(fp), 'utf8');
       } catch {
-        /* ignored */
+        /* new file */
       }
+
+      // ── SAFE WRITE GUARD 1: Truncation check ──
+      if (cur.length > 100 && content && content.length < cur.length * 0.5) {
+        return {
+          result: `🛑 BLOCAT: Noul conținut (${content.length} chars) e mai mic de 50% din originalul (${cur.length} chars). Risc de corupție. Folosește editFile pentru modificări parțiale.`
+        };
+      }
+
       _pendingOps.set(opId, {
         type: 'writeFile',
         preview: {
           file: fp,
           curLen: cur.length,
           newLen: (content || '').length,
+          truncationRisk: cur.length > 100 && (content || '').length < cur.length * 0.7,
         },
         execute: () => {
+          // ── SAFE WRITE GUARD 2: Auto-backup ──
+          if (cur.length > 0) {
+            const backupDir = path.resolve('backups');
+            if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir, { recursive: true });
+            const backupName = path.basename(fp) + '.' + Date.now() + '.bak';
+            fs.writeFileSync(path.join(backupDir, backupName), cur, 'utf8');
+            logger.info({ component: 'K1-SafeWrite', file: fp, backup: backupName }, '💾 Backup created');
+          }
+
           const d = path.dirname(path.resolve(fp));
           if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
           fs.writeFileSync(path.resolve(fp), content, 'utf8');
-          return { success: true, file: fp, size: content.length };
+
+          // ── SAFE WRITE GUARD 3: Syntax check (.js files) ──
+          if (fp.endsWith('.js')) {
+            try {
+              execSync(`node --check "${path.resolve(fp)}"`, { timeout: 5000 });
+            } catch (syntaxErr) {
+              // ROLLBACK
+              fs.writeFileSync(path.resolve(fp), cur, 'utf8');
+              logger.warn({ component: 'K1-SafeWrite', file: fp }, '🔄 ROLLBACK: Syntax error detected');
+              return { success: false, error: `Syntax error detected — ROLLBACK applied: ${syntaxErr.message.substring(0, 200)}` };
+            }
+          }
+
+          // ── SAFE WRITE GUARD 4: Verify write ──
+          const written = fs.readFileSync(path.resolve(fp), 'utf8');
+          if (written.length !== content.length) {
+            fs.writeFileSync(path.resolve(fp), cur, 'utf8');
+            return { success: false, error: `Write verification failed (${written.length} vs ${content.length}) — ROLLBACK applied` };
+          }
+
+          return { success: true, file: fp, size: content.length, backup: true };
         },
       });
       return {
         pendingApproval: true,
         opId,
-        message: `⚠️ APROBARE\nScrie: ${fp} (${(content || '').length} chars)`,
+        message: `⚠️ APROBARE\nScrie: ${fp} (${(content || '').length} chars, original: ${cur.length} chars)\n${cur.length > 100 && (content || '').length < cur.length * 0.7 ? '⚠️ ATENȚIE: Fișierul se micșorează semnificativ!' : '✅ Dimensiune OK'}`,
         preview: _pendingOps.get(opId).preview,
       };
     }
