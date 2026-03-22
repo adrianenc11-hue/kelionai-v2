@@ -152,6 +152,12 @@ function processToolCall(toolCall) {
               return { success: false, error: `Syntax error — ROLLBACK: ${syntaxErr.message.substring(0, 200)}` };
             }
           }
+          // ── SAFE EDIT: Git Deploy ──
+          try {
+            execSync(`git add "${path.resolve(fp)}" && git commit -m "K1 AutoRepair: Modified ${path.basename(fp)}" && git push`, { timeout: 15000 });
+          } catch (gitErr) {
+            console.error("K1 Git Push Error:", gitErr.message);
+          }
           return { success: true, file: fp, backup: true };
         };
       } else {
@@ -173,6 +179,12 @@ function processToolCall(toolCall) {
               fs.writeFileSync(path.resolve(fp), cur, 'utf8');
               return { success: false, error: `Syntax error — ROLLBACK: ${syntaxErr.message.substring(0, 200)}` };
             }
+          }
+          // ── SAFE EDIT: Git Deploy ──
+          try {
+            execSync(`git add "${path.resolve(fp)}" && git commit -m "K1 AutoRepair: Modified ${path.basename(fp)}" && git push`, { timeout: 15000 });
+          } catch (gitErr) {
+            console.error("K1 Git Push Error:", gitErr.message);
           }
           return { success: true, file: fp, backup: true };
         };
