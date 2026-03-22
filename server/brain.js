@@ -1068,6 +1068,288 @@ class KelionBrain {
   }
 
   // ═══════════════════════════════════════════════════════════
+  // AUTO-CAPABILITY DISCOVERY — Detectează, Instalează, Verifică
+  // ═══════════════════════════════════════════════════════════
+
+  /**
+   * Înainte de un task, analizează ce capabilități lipsesc,
+   * le instalează automat, verifică, și continuă până totul e gata
+   * @param {string} taskDescription - Ce vrea să facă K1
+   * @param {string} userId - User ID
+   * @returns {object} - { ready, installed[], missing[], verified[] }
+   */
+  async _ensureCapabilities(taskDescription, userId = null) {
+    const { execSync } = require('child_process');
+    const fs = require('fs');
+    const path = require('path');
+    const CWD = process.cwd();
+    const report = { ready: true, installed: [], missing: [], verified: [], attempts: 0 };
+    const desc = (taskDescription || '').toLowerCase();
+
+    // ── Detectează ce capabilități are nevoie task-ul ──
+    const needed = this._detectNeededCapabilities(desc);
+    logger.info({ component: 'CapDiscovery', needed: needed.length, task: desc.substring(0, 80) },
+      `🔎 Detected ${needed.length} capabilities needed`);
+
+    // ── Pentru fiecare capabilitate necesară, verifică și instalează ──
+    for (const cap of needed) {
+      let installed = false;
+      let verified = false;
+
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        report.attempts++;
+
+        // Verifică dacă e deja disponibilă
+        const available = await this._checkCapability(cap, CWD);
+        if (available) {
+          report.verified.push({ name: cap.name, type: cap.type, attempt });
+          verified = true;
+          break;
+        }
+
+        // Încearcă instalare
+        logger.info({ component: 'CapDiscovery', cap: cap.name, attempt },
+          `📦 Installing: ${cap.name} (attempt ${attempt})`);
+
+        try {
+          switch (cap.type) {
+            case 'npm_package':
+              execSync(`npm install ${cap.package} --save`, {
+                cwd: CWD, encoding: 'utf8', timeout: 60000
+              });
+              installed = true;
+              break;
+
+            case 'npm_dev_package':
+              execSync(`npm install ${cap.package} --save-dev`, {
+                cwd: CWD, encoding: 'utf8', timeout: 60000
+              });
+              installed = true;
+              break;
+
+            case 'system_command':
+              // Nu poate instala comenzi system — raportează
+              report.missing.push({
+                name: cap.name,
+                reason: `Comandă sistem lipsă: ${cap.command}. Trebuie instalată manual.`
+              });
+              break;
+
+            case 'directory':
+              if (!fs.existsSync(cap.path)) {
+                fs.mkdirSync(cap.path, { recursive: true });
+                installed = true;
+              }
+              break;
+
+            case 'env_var':
+              if (!process.env[cap.envVar]) {
+                report.missing.push({
+                  name: cap.name,
+                  reason: `Variabilă de mediu lipsă: ${cap.envVar}. Adaugă în .env pe Railway.`
+                });
+              }
+              break;
+
+            case 'db_table':
+              // Încearcă migrația
+              try {
+                const migratePath = path.join(CWD, 'server/migrate.js');
+                if (fs.existsSync(migratePath)) {
+                  require(migratePath);
+                  installed = true;
+                }
+              } catch { /* migration failed */ }
+              break;
+
+            case 'file':
+              if (!fs.existsSync(cap.filePath)) {
+                report.missing.push({
+                  name: cap.name,
+                  reason: `Fișier lipsă: ${cap.filePath}. Trebuie creat.`
+                });
+              }
+              break;
+          }
+
+          if (installed) {
+            report.installed.push({ name: cap.name, type: cap.type, attempt });
+          }
+        } catch (installErr) {
+          logger.warn({ component: 'CapDiscovery', cap: cap.name, err: installErr.message },
+            `❌ Install failed: ${cap.name}`);
+          if (attempt === 3) {
+            report.missing.push({
+              name: cap.name,
+              reason: installErr.message?.substring(0, 200)
+            });
+          }
+        }
+
+        // Verifică după instalare
+        if (installed) {
+          const works = await this._checkCapability(cap, CWD);
+          if (works) {
+            report.verified.push({ name: cap.name, type: cap.type, attempt });
+            verified = true;
+            logger.info({ component: 'CapDiscovery', cap: cap.name },
+              `✅ Verified: ${cap.name}`);
+            break;
+          }
+        }
+      }
+
+      if (!verified && !report.missing.find(m => m.name === cap.name)) {
+        report.missing.push({
+          name: cap.name,
+          reason: 'Nu s-a putut instala sau verifica după 3 încercări'
+        });
+      }
+    }
+
+    report.ready = report.missing.length === 0;
+
+    // Salvează lecția dacă am instalat ceva
+    if (report.installed.length > 0) {
+      const lesson = `AUTO-PROVISION: Pentru task "${desc.substring(0, 60)}" am instalat: ${report.installed.map(i => i.name).join(', ')}`;
+      await this._selfAnalyze('capability_discovery', '', lesson, userId);
+    }
+
+    // Logghează raportul
+    logger.info({
+      component: 'CapDiscovery',
+      ready: report.ready,
+      installed: report.installed.length,
+      missing: report.missing.length,
+      verified: report.verified.length
+    }, `📊 Capability check: ${report.ready ? 'READY' : 'MISSING ' + report.missing.length}`);
+
+    return report;
+  }
+
+  /**
+   * Detectează ce capabilități are nevoie un task pe baza descrierii
+   */
+  _detectNeededCapabilities(taskDesc) {
+    const needed = [];
+    const desc = taskDesc.toLowerCase();
+
+    // Testing
+    if (desc.includes('test') || desc.includes('verifică') || desc.includes('jest')) {
+      needed.push({ name: 'jest', type: 'npm_package', package: 'jest', checkCmd: 'npx jest --version' });
+      needed.push({ name: 'supertest', type: 'npm_package', package: 'supertest', checkRequire: 'supertest' });
+    }
+
+    // Linting
+    if (desc.includes('lint') || desc.includes('eslint') || desc.includes('cod curat')) {
+      needed.push({ name: 'eslint', type: 'npm_package', package: 'eslint', checkCmd: 'npx eslint --version' });
+    }
+
+    // Deploy
+    if (desc.includes('deploy') || desc.includes('push') || desc.includes('producție')) {
+      needed.push({ name: 'git', type: 'system_command', command: 'git', checkCmd: 'git --version' });
+      needed.push({ name: 'backups_dir', type: 'directory', path: 'backups' });
+    }
+
+    // Database
+    if (desc.includes('bază de date') || desc.includes('supabase') || desc.includes('db') || desc.includes('tabel')) {
+      needed.push({ name: 'supabase_url', type: 'env_var', envVar: 'SUPABASE_URL' });
+      needed.push({ name: 'supabase_key', type: 'env_var', envVar: 'SUPABASE_SERVICE_KEY' });
+    }
+
+    // File operations
+    if (desc.includes('fișier') || desc.includes('scrie') || desc.includes('citește') || desc.includes('file')) {
+      needed.push({ name: 'generated_docs', type: 'directory', path: 'generated_docs' });
+      needed.push({ name: 'backups_dir', type: 'directory', path: 'backups' });
+    }
+
+    // AI operations
+    if (desc.includes('ai') || desc.includes('generează') || desc.includes('openai') || desc.includes('gemini')) {
+      needed.push({ name: 'openai_key', type: 'env_var', envVar: 'OPENAI_API_KEY' });
+    }
+
+    // Image/media
+    if (desc.includes('imagine') || desc.includes('image') || desc.includes('sharp')) {
+      needed.push({ name: 'sharp', type: 'npm_package', package: 'sharp', checkRequire: 'sharp' });
+    }
+
+    // PDF
+    if (desc.includes('pdf') || desc.includes('document')) {
+      needed.push({ name: 'pdfkit', type: 'npm_package', package: 'pdfkit', checkRequire: 'pdfkit' });
+    }
+
+    // Email
+    if (desc.includes('email') || desc.includes('mail') || desc.includes('trimite')) {
+      needed.push({ name: 'nodemailer', type: 'npm_package', package: 'nodemailer', checkRequire: 'nodemailer' });
+    }
+
+    // Scraping
+    if (desc.includes('scrape') || desc.includes('crawl') || desc.includes('fetch page')) {
+      needed.push({ name: 'cheerio', type: 'npm_package', package: 'cheerio', checkRequire: 'cheerio' });
+    }
+
+    // CSV/Excel
+    if (desc.includes('csv') || desc.includes('excel') || desc.includes('spreadsheet')) {
+      needed.push({ name: 'papaparse', type: 'npm_package', package: 'papaparse', checkRequire: 'papaparse' });
+    }
+
+    // Dedup by name
+    const seen = new Set();
+    return needed.filter(n => {
+      if (seen.has(n.name)) return false;
+      seen.add(n.name);
+      return true;
+    });
+  }
+
+  /**
+   * Verifică dacă o capabilitate e disponibilă
+   */
+  async _checkCapability(cap, cwd) {
+    const { execSync } = require('child_process');
+    const fs = require('fs');
+
+    try {
+      switch (cap.type) {
+        case 'npm_package':
+        case 'npm_dev_package':
+          if (cap.checkCmd) {
+            execSync(cap.checkCmd, { cwd, encoding: 'utf8', timeout: 10000 });
+            return true;
+          }
+          if (cap.checkRequire) {
+            require.resolve(cap.checkRequire);
+            return true;
+          }
+          // Check in node_modules
+          return fs.existsSync(`${cwd}/node_modules/${cap.package}`);
+
+        case 'system_command':
+          execSync(cap.checkCmd || `${cap.command} --version`, { encoding: 'utf8', timeout: 5000 });
+          return true;
+
+        case 'directory':
+          return fs.existsSync(`${cwd}/${cap.path}`);
+
+        case 'env_var':
+          return !!process.env[cap.envVar];
+
+        case 'file':
+          return fs.existsSync(cap.filePath);
+
+        case 'db_table':
+          // Can't easily check without query
+          return true; // Assume OK after migration
+
+        default:
+          return false;
+      }
+    } catch {
+      return false;
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════
   // SELF-REPAIR ENGINE — Auto-fix when commands fail
   // ═══════════════════════════════════════════════════════════
 
