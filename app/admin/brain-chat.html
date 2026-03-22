@@ -353,7 +353,7 @@
         if (t) h['Authorization'] = 'Bearer ' + t;
         return h;
       }
-      let currentSessionId = localStorage.getItem('k1_session_id') || 'session_' + Date.now();
+      let currentSessionId = 'kira-main-session';
       localStorage.setItem('k1_session_id', currentSessionId);
 
       const chatContainer = document.getElementById('chat-container');
