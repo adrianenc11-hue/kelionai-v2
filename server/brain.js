@@ -779,6 +779,295 @@ class KelionBrain {
   }
 
   // ═══════════════════════════════════════════════════════════
+  // CAPABILITY SUITE — 6 Capabilități Finale pentru Autonomie
+  // ═══════════════════════════════════════════════════════════
+
+  /**
+   * CAPABILITATE 1: Auto-Test după scriere
+   * Rulează unit tests după fiecare write și rollback dacă pică
+   */
+  async _autoTestAfterWrite(filePath, oldContent, userId) {
+    if (!filePath.endsWith('.js')) return { passed: true, skipped: true };
+    try {
+      const { execSync } = require('child_process');
+      const output = execSync('npx jest --forceExit --bail --silent 2>&1', {
+        cwd: process.cwd(), encoding: 'utf8', timeout: 30000
+      });
+      logger.info({ component: 'AutoTest', file: filePath }, '✅ Tests passed after write');
+      return { passed: true, output: output.substring(0, 500) };
+    } catch (testErr) {
+      const fs = require('fs');
+      // Rollback
+      if (oldContent) {
+        fs.writeFileSync(filePath, oldContent, 'utf8');
+        logger.warn({ component: 'AutoTest', file: filePath },
+          '🔄 ROLLBACK: Tests failed — file restored');
+        await this._selfAnalyze('auto_test', testErr.message,
+          'Rollback automat — testele au picat după scriere', userId);
+      }
+      return { passed: false, error: testErr.message?.substring(0, 300) };
+    }
+  }
+
+  /**
+   * CAPABILITATE 2: Git Awareness
+   * Verifică starea git înainte de deploy — ce s-a modificat, ultimele commits
+   */
+  async _gitAwareness() {
+    const { execSync } = require('child_process');
+    const CWD = process.cwd();
+    try {
+      const status = execSync('git status --short', { cwd: CWD, encoding: 'utf8', timeout: 5000 }).trim();
+      const diff = execSync('git diff --stat HEAD~3..HEAD', { cwd: CWD, encoding: 'utf8', timeout: 5000 }).trim();
+      const log = execSync('git log --oneline -5', { cwd: CWD, encoding: 'utf8', timeout: 5000 }).trim();
+      const branch = execSync('git branch --show-current', { cwd: CWD, encoding: 'utf8', timeout: 5000 }).trim();
+
+      const report = {
+        branch,
+        uncommittedChanges: status ? status.split('\n').length : 0,
+        status: status || '(clean)',
+        recentDiff: diff,
+        recentCommits: log,
+        safe_to_deploy: !status.includes('server/index.js') || status === ''
+      };
+
+      logger.info({ component: 'GitAware', branch, changes: report.uncommittedChanges },
+        `📊 Git: ${branch}, ${report.uncommittedChanges} uncommitted`);
+      return report;
+    } catch (e) {
+      return { error: e.message, safe_to_deploy: false };
+    }
+  }
+
+  /**
+   * CAPABILITATE 3: Self Code Review
+   * Verifică codul înainte de a-l scrie — detectează probleme comune
+   */
+  _selfCodeReview(content, filePath) {
+    const issues = [];
+    if (!content || !filePath.endsWith('.js')) return issues;
+
+    const lines = content.split('\n');
+
+    // Check: require-uri la module inexistente
+    const requires = content.match(/require\(['"]([^'"]+)['"]\)/g) || [];
+    const fs = require('fs');
+    const path = require('path');
+    for (const req of requires) {
+      const mod = req.match(/['"]([^'"]+)['"]/)[1];
+      if (mod.startsWith('.')) {
+        const resolved = path.resolve(path.dirname(filePath), mod);
+        const possiblePaths = [resolved, resolved + '.js', resolved + '/index.js'];
+        if (!possiblePaths.some(p => fs.existsSync(p))) {
+          issues.push(`⚠️ require('${mod}') — fișierul nu există`);
+        }
+      }
+    }
+
+    // Check: console.log rămase (OK pt debug, warn pt producție)
+    const consoleLogs = lines.filter(l => l.includes('console.log') && !l.trim().startsWith('//')).length;
+    if (consoleLogs > 3) {
+      issues.push(`⚠️ ${consoleLogs} console.log-uri — consideră înlocuirea cu logger`);
+    }
+
+    // Check: funcții async fără try/catch
+    const asyncFns = content.match(/async\s+\w+\s*\([^)]*\)\s*\{/g) || [];
+    for (const fn of asyncFns) {
+      const fnName = fn.match(/async\s+(\w+)/)?.[1];
+      // Simple heuristic — check if try appears after the function
+      const fnIdx = content.indexOf(fn);
+      const nextChunk = content.substring(fnIdx, fnIdx + 500);
+      if (!nextChunk.includes('try') && !nextChunk.includes('.catch')) {
+        issues.push(`⚠️ async ${fnName}() fără try/catch`);
+      }
+    }
+
+    // Check: variabile nedefinite (basic — doar cele evidente)
+    const undefinedVars = content.match(/\b(?:undefined|NaN)\b/g) || [];
+    if (undefinedVars.length > 2) {
+      issues.push(`⚠️ ${undefinedVars.length} referințe la undefined/NaN`);
+    }
+
+    if (issues.length > 0) {
+      logger.info({ component: 'CodeReview', file: filePath, issues: issues.length },
+        `🔍 Code review: ${issues.length} probleme găsite`);
+    }
+    return issues;
+  }
+
+  /**
+   * CAPABILITATE 4: Raportare Structurată
+   * Generează raport clar la eșec
+   */
+  _structuredReport(context, error, attempts = [], resolution = null) {
+    const report = {
+      summary: `❌ Eșec: ${context}`,
+      error: error,
+      attempts: attempts.map((a, i) => `  ${i + 1}. ${a.fix || a} → ${a.applied ? '✅' : '❌'}`),
+      resolution: resolution || 'Nu s-a găsit soluție automată',
+      timestamp: new Date().toISOString(),
+      formatted: ''
+    };
+
+    report.formatted = [
+      `── RAPORT EROARE ──`,
+      `Context: ${context}`,
+      `Eroare: ${error}`,
+      attempts.length ? `Încercări:\n${report.attempts.join('\n')}` : '',
+      `Rezoluție: ${report.resolution}`,
+      `──────────────────`
+    ].filter(Boolean).join('\n');
+
+    return report;
+  }
+
+  /**
+   * CAPABILITATE 5: Timeout Watchdog
+   * Wrap orice operație cu timeout — salvează checkpoint dacă exprimă
+   */
+  async _withWatchdog(operation, timeoutMs = 60000, context = '', userId = null) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const result = await Promise.race([
+        operation(controller.signal),
+        new Promise((_, reject) => {
+          controller.signal.addEventListener('abort', () => {
+            reject(new Error(`WATCHDOG: ${context} a depășit ${timeoutMs / 1000}s`));
+          });
+        })
+      ]);
+      clearTimeout(timer);
+      return { success: true, result };
+    } catch (err) {
+      clearTimeout(timer);
+      // Salvează checkpoint înainte de timeout
+      if (userId) {
+        await this.updateCheckpoint(userId, {
+          error: `Timeout ${timeoutMs / 1000}s: ${context}`,
+          note: `Operația a fost oprită automat după ${timeoutMs / 1000}s`
+        });
+      }
+      logger.warn({ component: 'Watchdog', context, timeoutMs },
+        `⏰ ${err.message}`);
+      return { success: false, error: err.message, timedOut: true };
+    }
+  }
+
+  /**
+   * CAPABILITATE 6: Detector de Fake/Hardcode
+   * Scanează codul pentru valori hardcodate, fake, placeholder
+   * și analizează dacă pot fi înlocuite safe
+   */
+  _detectHardcode(content, filePath) {
+    if (!content) return [];
+    const findings = [];
+
+    // Pattern-uri de fake/hardcode/placeholder
+    const patterns = [
+      { regex: /['"](?:test|fake|dummy|placeholder|sample|example|mock|todo|fixme|xxx|temp)['"](?!\s*[,\]}])/gi, type: 'placeholder', severity: 'high' },
+      { regex: /['"](?:sk-[a-zA-Z0-9]{20,}|pk_test_|sk_test_|AIza[a-zA-Z0-9_-]{35}|ghp_[a-zA-Z0-9]{36})['"](?!\s*[,\]}])/g, type: 'exposed_api_key', severity: 'critical' },
+      { regex: /(?:password|secret|token|api_key)\s*[:=]\s*['"][^'"]{3,}['"]/gi, type: 'hardcoded_secret', severity: 'critical' },
+      { regex: /['"](?:127\.0\.0\.1|localhost|0\.0\.0\.0)(?::\d+)?['"]/g, type: 'hardcoded_url', severity: 'medium' },
+      { regex: /['"](?:user@example\.com|test@test\.com|admin@admin\.com)['"]/gi, type: 'fake_email', severity: 'medium' },
+      { regex: /(?:TODO|FIXME|HACK|XXX|TEMP)\b/g, type: 'todo_marker', severity: 'low' },
+      { regex: /\bsleep\(\d{4,}\)|setTimeout\([^,]+,\s*\d{5,}\)/g, type: 'suspicious_delay', severity: 'medium' },
+      { regex: /return\s+(?:true|false|null|'ok'|"ok")\s*;?\s*\/\/.*(?:temp|fake|stub|mock)/gi, type: 'stub_return', severity: 'high' }
+    ];
+
+    const lines = content.split('\n');
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      if (line.trim().startsWith('//') || line.trim().startsWith('*')) continue; // Skip comments
+
+      for (const p of patterns) {
+        const matches = line.match(p.regex);
+        if (matches) {
+          for (const match of matches) {
+            findings.push({
+              line: i + 1,
+              match: match.substring(0, 80),
+              type: p.type,
+              severity: p.severity,
+              context: line.trim().substring(0, 100),
+              safeToReplace: this._analyzeReplacementSafety(p.type, match, content, i)
+            });
+          }
+        }
+      }
+    }
+
+    if (findings.length > 0) {
+      const critical = findings.filter(f => f.severity === 'critical').length;
+      const high = findings.filter(f => f.severity === 'high').length;
+      logger.info({ component: 'HardcodeDetector', file: filePath,
+        total: findings.length, critical, high },
+        `🔍 Hardcode scan: ${findings.length} findings (${critical} critical, ${high} high)`);
+    }
+
+    return findings;
+  }
+
+  /**
+   * Helper: Analizează dacă o valoare hardcodată poate fi înlocuită safe
+   */
+  _analyzeReplacementSafety(type, match, content, lineIndex) {
+    const analysis = { safe: false, reason: '', suggestion: '' };
+
+    switch (type) {
+      case 'exposed_api_key':
+        analysis.safe = true;
+        analysis.reason = 'API key expusă în cod — TREBUIE mutată în .env';
+        analysis.suggestion = 'Înlocuiește cu process.env.API_KEY';
+        break;
+      case 'hardcoded_secret':
+        analysis.safe = true;
+        analysis.reason = 'Secret hardcodat — risc de securitate';
+        analysis.suggestion = 'Mută în process.env și referă cu process.env.SECRET_NAME';
+        break;
+      case 'hardcoded_url':
+        // Verifică dacă e folosit în condiții (dev vs prod)
+        const lines = content.split('\n');
+        const surroundingCode = lines.slice(Math.max(0, lineIndex - 2), lineIndex + 3).join('\n');
+        if (surroundingCode.includes('NODE_ENV') || surroundingCode.includes('development')) {
+          analysis.safe = false;
+          analysis.reason = 'URL local folosit în condiție dev/prod — probabil intenționat';
+        } else {
+          analysis.safe = true;
+          analysis.reason = 'URL local hardcodat fără condiție de mediu';
+          analysis.suggestion = 'Înlocuiește cu process.env.API_URL || \'http://localhost:PORT\'';
+        }
+        break;
+      case 'fake_email':
+        analysis.safe = true;
+        analysis.reason = 'Email de test/fake — nu ar trebui să fie în producție';
+        analysis.suggestion = 'Înlocuiește cu process.env.DEFAULT_EMAIL sau elimină';
+        break;
+      case 'placeholder':
+        analysis.safe = false; // Depinde de context — prudent
+        analysis.reason = 'Valoare placeholder — verifică dacă e în test sau producție';
+        analysis.suggestion = 'Dacă e în cod de producție, înlocuiește cu valoarea reală';
+        break;
+      case 'todo_marker':
+        analysis.safe = false;
+        analysis.reason = 'TODO/FIXME marker — necesită atenție umană';
+        analysis.suggestion = 'Rezolvă TODO-ul sau documentează de ce rămâne';
+        break;
+      case 'stub_return':
+        analysis.safe = true;
+        analysis.reason = 'Return stub/fake — funcția nu face ce trebuie';
+        analysis.suggestion = 'Implementează logica reală sau elimină funcția';
+        break;
+      default:
+        analysis.safe = false;
+        analysis.reason = 'Necesită analiză manuală';
+    }
+
+    return analysis;
+  }
+
+  // ═══════════════════════════════════════════════════════════
   // SELF-REPAIR ENGINE — Auto-fix when commands fail
   // ═══════════════════════════════════════════════════════════
 
