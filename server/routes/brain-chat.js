@@ -30,8 +30,20 @@ function loadFileContent(filename) {
 // ═══ K1 SYSTEM PROMPT ═══
 function getK1SystemPrompt(knowledge, raport, history) {
   var basePrompt = '';
-  try { basePrompt = fs.readFileSync(path.join(__dirname, '..', 'K1_SYSTEM_PROMPT.txt'), 'utf8'); } catch(e) { basePrompt = 'Esti K1, creierul tehnic al KelionAI.'; }
-  return basePrompt + '\n\n=== CE STII DESPRE PROIECT ===\n' + knowledge + '\n\n=== RAPORT ONEST ===\n' + raport + '\n\n=== ISTORIC ===\n' + history;
+  try {
+    basePrompt = fs.readFileSync(path.join(__dirname, '..', 'K1_SYSTEM_PROMPT.txt'), 'utf8');
+  } catch (e) {
+    basePrompt = 'Esti K1, creierul tehnic al KelionAI.';
+  }
+  return (
+    basePrompt +
+    '\n\n=== CE STII DESPRE PROIECT ===\n' +
+    knowledge +
+    '\n\n=== RAPORT ONEST ===\n' +
+    raport +
+    '\n\n=== ISTORIC ===\n' +
+    history
+  );
 }
 
 // ═══ TOOL EXECUTOR ═══
@@ -177,7 +189,11 @@ function processToolCall(toolCall) {
         },
         execute: editFn,
       });
-      if (params.force) { let res = editFn(); _pendingOps.remove(opId); return res; }
+      if (params.force) {
+        let res = editFn();
+        _pendingOps.remove(opId);
+        return res;
+      }
       return {
         pendingApproval: true,
         opId,
@@ -192,7 +208,9 @@ function processToolCall(toolCall) {
       try {
         execSync(`git checkout HEAD -- "${fp}"`, { cwd: process.cwd(), timeout: 10000 });
         const restored = fs.readFileSync(path.resolve(fp), 'utf8');
-        return { result: `✅ Fișier restaurat din git: ${fp} (${restored.length} chars, ${restored.split('\n').length} linii)` };
+        return {
+          result: `✅ Fișier restaurat din git: ${fp} (${restored.length} chars, ${restored.split('\n').length} linii)`,
+        };
       } catch (e) {
         return { result: `❌ Restaurare eșuată: ${e.message}` };
       }
@@ -211,7 +229,7 @@ function processToolCall(toolCall) {
       // ── SAFE WRITE GUARD 1: Truncation check ──
       if (cur.length > 100 && content && content.length < cur.length * 0.5) {
         return {
-          result: `🛑 BLOCAT: Noul conținut (${content.length} chars) e mai mic de 50% din originalul (${cur.length} chars). Risc de corupție. Folosește editFile pentru modificări parțiale.`
+          result: `🛑 BLOCAT: Noul conținut (${content.length} chars) e mai mic de 50% din originalul (${cur.length} chars). Risc de corupție. Folosește editFile pentru modificări parțiale.`,
         };
       }
 
@@ -245,7 +263,10 @@ function processToolCall(toolCall) {
               // ROLLBACK
               fs.writeFileSync(path.resolve(fp), cur, 'utf8');
               logger.warn({ component: 'K1-SafeWrite', file: fp }, '🔄 ROLLBACK: Syntax error detected');
-              return { success: false, error: `Syntax error detected — ROLLBACK applied: ${syntaxErr.message.substring(0, 200)}` };
+              return {
+                success: false,
+                error: `Syntax error detected — ROLLBACK applied: ${syntaxErr.message.substring(0, 200)}`,
+              };
             }
           }
 
@@ -253,13 +274,20 @@ function processToolCall(toolCall) {
           const written = fs.readFileSync(path.resolve(fp), 'utf8');
           if (written.length !== content.length) {
             fs.writeFileSync(path.resolve(fp), cur, 'utf8');
-            return { success: false, error: `Write verification failed (${written.length} vs ${content.length}) — ROLLBACK applied` };
+            return {
+              success: false,
+              error: `Write verification failed (${written.length} vs ${content.length}) — ROLLBACK applied`,
+            };
           }
 
           return { success: true, file: fp, size: content.length, backup: true };
         },
       });
-      if (params.force) { let res = editFn(); _pendingOps.remove(opId); return res; }
+      if (params.force) {
+        let res = editFn();
+        _pendingOps.remove(opId);
+        return res;
+      }
       return {
         pendingApproval: true,
         opId,
@@ -291,7 +319,11 @@ function processToolCall(toolCall) {
           }
         },
       });
-      if (params.force) { let res = editFn(); _pendingOps.remove(opId); return res; }
+      if (params.force) {
+        let res = editFn();
+        _pendingOps.remove(opId);
+        return res;
+      }
       return {
         pendingApproval: true,
         opId,
@@ -317,7 +349,11 @@ function processToolCall(toolCall) {
           }
         },
       });
-      if (params.force) { let res = editFn(); _pendingOps.remove(opId); return res; }
+      if (params.force) {
+        let res = editFn();
+        _pendingOps.remove(opId);
+        return res;
+      }
       return {
         pendingApproval: true,
         opId,
@@ -388,7 +424,11 @@ function processToolCall(toolCall) {
           }
         },
       });
-      if (params.force) { let res = editFn(); _pendingOps.remove(opId); return res; }
+      if (params.force) {
+        let res = editFn();
+        _pendingOps.remove(opId);
+        return res;
+      }
       return {
         pendingApproval: true,
         opId,
@@ -408,7 +448,11 @@ function processToolCall(toolCall) {
         },
         execute: null,
       });
-      if (params.force) { let res = editFn(); _pendingOps.remove(opId); return res; }
+      if (params.force) {
+        let res = editFn();
+        _pendingOps.remove(opId);
+        return res;
+      }
       return {
         pendingApproval: true,
         opId,
@@ -430,11 +474,17 @@ function processToolCall(toolCall) {
         const size = content.length;
         let syntaxOk = 'N/A';
         if (fp.endsWith('.js')) {
-          try { execSync('node --check "' + resolved + '"', { timeout: 5000 }); syntaxOk = 'OK'; }
-          catch (e) { syntaxOk = 'EROARE: ' + (e.message || '').substring(0, 200); }
+          try {
+            execSync('node --check "' + resolved + '"', { timeout: 5000 });
+            syntaxOk = 'OK';
+          } catch (e) {
+            syntaxOk = 'EROARE: ' + (e.message || '').substring(0, 200);
+          }
         }
         return { result: 'Verificare ' + fp + ': ' + size + ' chars, ' + lines + ' linii, syntax: ' + syntaxOk };
-      } catch (e) { return { result: 'Eroare verificare: ' + e.message }; }
+      } catch (e) {
+        return { result: 'Eroare verificare: ' + e.message };
+      }
     }
     case 'autoRepair': {
       const task = params.task || params.description || 'fix';
@@ -447,7 +497,6 @@ function processToolCall(toolCall) {
   }
 }
 
-
 // ═══ AUTO-REPAIR PIPELINE — 5 AI Models ═══
 async function callAIProvider(provider, system, message) {
   var key, url, body, headers;
@@ -456,38 +505,70 @@ async function callAIProvider(provider, system, message) {
       key = process.env.GROQ_API_KEY;
       if (!key) return null;
       url = 'https://api.groq.com/openai/v1/chat/completions';
-      body = JSON.stringify({ model: 'llama-3.3-70b-versatile', messages: [{ role: 'system', content: system }, { role: 'user', content: message }], max_tokens: 2048 });
-      headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key };
+      body = JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: message },
+        ],
+        max_tokens: 2048,
+      });
+      headers = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + key };
       break;
     case 'deepseek':
       key = process.env.DEEPSEEK_API_KEY;
       if (!key) return null;
       url = 'https://api.deepseek.com/v1/chat/completions';
-      body = JSON.stringify({ model: 'deepseek-coder', messages: [{ role: 'system', content: system }, { role: 'user', content: message }], max_tokens: 2048 });
-      headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key };
+      body = JSON.stringify({
+        model: 'deepseek-coder',
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: message },
+        ],
+        max_tokens: 2048,
+      });
+      headers = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + key };
       break;
     case 'claude-haiku':
       key = process.env.ANTHROPIC_API_KEY;
       if (!key) return null;
       url = 'https://api.anthropic.com/v1/messages';
-      body = JSON.stringify({ model: 'claude-3-5-haiku-20241022', max_tokens: 2048, system: system, messages: [{ role: 'user', content: message }] });
+      body = JSON.stringify({
+        model: 'claude-3-5-haiku-20241022',
+        max_tokens: 2048,
+        system: system,
+        messages: [{ role: 'user', content: message }],
+      });
       headers = { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' };
       break;
     case 'gpt54':
       key = process.env.OPENAI_API_KEY;
       if (!key) return null;
       url = 'https://api.openai.com/v1/chat/completions';
-      body = JSON.stringify({ model: 'gpt-5.4', messages: [{ role: 'system', content: system }, { role: 'user', content: message }], max_completion_tokens: 4096 });
-      headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key };
+      body = JSON.stringify({
+        model: 'gpt-5.4',
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: message },
+        ],
+        max_completion_tokens: 4096,
+      });
+      headers = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + key };
       break;
     case 'claude-opus':
       key = process.env.ANTHROPIC_API_KEY;
       if (!key) return null;
       url = 'https://api.anthropic.com/v1/messages';
-      body = JSON.stringify({ model: 'claude-opus-4-5', max_tokens: 4096, system: system, messages: [{ role: 'user', content: message }] });
+      body = JSON.stringify({
+        model: 'claude-opus-4-5',
+        max_tokens: 4096,
+        system: system,
+        messages: [{ role: 'user', content: message }],
+      });
       headers = { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' };
       break;
-    default: return null;
+    default:
+      return null;
   }
   try {
     var r = await fetch(url, { method: 'POST', headers: headers, body: body, signal: AbortSignal.timeout(30000) });
@@ -496,7 +577,9 @@ async function callAIProvider(provider, system, message) {
     if (d.choices) return d.choices[0].message.content;
     if (d.content) return d.content[0].text;
     return null;
-  } catch (e) { return '[' + provider + ' timeout: ' + e.message + ']'; }
+  } catch (e) {
+    return '[' + provider + ' timeout: ' + e.message + ']';
+  }
 }
 
 async function autoRepairPipeline(task, filePath) {
@@ -506,26 +589,50 @@ async function autoRepairPipeline(task, filePath) {
   log.push('File: ' + filePath);
 
   var fileContent = '';
-  try { fileContent = fs.readFileSync(path.resolve(filePath), 'utf8'); }
-  catch (e) { log.push('FAIL: Nu pot citi fisierul: ' + e.message); return log.join('\n'); }
+  try {
+    fileContent = fs.readFileSync(path.resolve(filePath), 'utf8');
+  } catch (e) {
+    log.push('FAIL: Nu pot citi fisierul: ' + e.message);
+    return log.join('\n');
+  }
 
   // STEP 1: Groq — Diagnostic rapid
   log.push('\n--- STEP 1: Groq DIAGNOSTIC ---');
-  var diagPrompt = 'Esti expert in diagnosticare bug-uri. Analizeaza si identifica EXACT ce e gresit. Raspunde SCURT: (1) Problema (2) Linia/valorile (3) De ce.';
-  var diag = await callAIProvider('groq', diagPrompt, 'TASK: ' + task + '\nFISIER: ' + filePath + '\nCOD:\n' + fileContent.substring(0, 8000));
+  var diagPrompt =
+    'Esti expert in diagnosticare bug-uri. Analizeaza si identifica EXACT ce e gresit. Raspunde SCURT: (1) Problema (2) Linia/valorile (3) De ce.';
+  var diag = await callAIProvider(
+    'groq',
+    diagPrompt,
+    'TASK: ' + task + '\nFISIER: ' + filePath + '\nCOD:\n' + fileContent.substring(0, 8000)
+  );
   log.push('Groq: ' + (diag || 'SKIP'));
 
   // STEP 2: DeepSeek — Analiza tehnica
   log.push('\n--- STEP 2: DeepSeek ANALIZA ---');
-  var analysisPrompt = 'Propune EXACT ce modificari. Raspunde cu JSON: {"target":"text vechi EXACT","replacement":"text nou","justification":"de ce"}';
-  var analysis = await callAIProvider('deepseek', analysisPrompt, 'DIAGNOSTIC:\n' + (diag || '') + '\nCOD:\n' + fileContent.substring(0, 8000));
-  if (!analysis) analysis = await callAIProvider('gpt54', analysisPrompt, 'DIAGNOSTIC:\n' + (diag || '') + '\nCOD:\n' + fileContent.substring(0, 8000));
+  var analysisPrompt =
+    'Propune EXACT ce modificari. Raspunde cu JSON: {"target":"text vechi EXACT","replacement":"text nou","justification":"de ce"}';
+  var analysis = await callAIProvider(
+    'deepseek',
+    analysisPrompt,
+    'DIAGNOSTIC:\n' + (diag || '') + '\nCOD:\n' + fileContent.substring(0, 8000)
+  );
+  if (!analysis)
+    analysis = await callAIProvider(
+      'gpt54',
+      analysisPrompt,
+      'DIAGNOSTIC:\n' + (diag || '') + '\nCOD:\n' + fileContent.substring(0, 8000)
+    );
   log.push('DeepSeek: ' + (analysis || 'SKIP'));
 
   // STEP 3: Claude Haiku — Validare
   log.push('\n--- STEP 3: Claude Haiku VALIDARE ---');
-  var validatePrompt = 'Verifica fix-ul: (1) Nu corupe (2) Valori in range (3) Nu afecteaza alte functii. Raspunde: SAFE sau UNSAFE + motiv.';
-  var validation = await callAIProvider('claude-haiku', validatePrompt, 'FIX:\n' + (analysis || '') + '\nCOD:\n' + fileContent.substring(0, 5000));
+  var validatePrompt =
+    'Verifica fix-ul: (1) Nu corupe (2) Valori in range (3) Nu afecteaza alte functii. Raspunde: SAFE sau UNSAFE + motiv.';
+  var validation = await callAIProvider(
+    'claude-haiku',
+    validatePrompt,
+    'FIX:\n' + (analysis || '') + '\nCOD:\n' + fileContent.substring(0, 5000)
+  );
   if (!validation) validation = 'SAFE (skip - API indisponibil)';
   log.push('Haiku: ' + validation);
 
@@ -536,8 +643,22 @@ async function autoRepairPipeline(task, filePath) {
 
   // STEP 4: GPT-5.4 — Executie
   log.push('\n--- STEP 4: GPT-5.4 EXECUTIE ---');
-  var execPrompt = 'Genereaza EXACT un JSON de editare. Format STRICT:\n{"tool":"editFile","params":{"filePath":"' + filePath + '","target":"TEXT VECHI EXACT","replacement":"TEXT NOU"}}\nUn singur JSON, nimic altceva.';
-  var execution = await callAIProvider('gpt54', execPrompt, 'DIAGNOSTIC:\n' + (diag || '') + '\nANALIZA:\n' + (analysis || '') + '\nVALIDARE:\n' + (validation || '') + '\nCOD:\n' + fileContent.substring(0, 8000));
+  var execPrompt =
+    'Genereaza EXACT un JSON de editare. Format STRICT:\n{"tool":"editFile","params":{"filePath":"' +
+    filePath +
+    '","target":"TEXT VECHI EXACT","replacement":"TEXT NOU"}}\nUn singur JSON, nimic altceva.';
+  var execution = await callAIProvider(
+    'gpt54',
+    execPrompt,
+    'DIAGNOSTIC:\n' +
+      (diag || '') +
+      '\nANALIZA:\n' +
+      (analysis || '') +
+      '\nVALIDARE:\n' +
+      (validation || '') +
+      '\nCOD:\n' +
+      fileContent.substring(0, 8000)
+  );
   log.push('GPT-5.4: ' + (execution || 'FAIL'));
 
   var editResult = 'Nu s-a executat';
@@ -548,16 +669,39 @@ async function autoRepairPipeline(task, filePath) {
       var toolResult = processToolCall(editCmd);
       editResult = toolResult.result || toolResult.message || JSON.stringify(toolResult);
       log.push('Executie: ' + editResult);
-    } else { log.push('FAIL: Nu am gasit JSON valid'); }
-  } catch (e) { log.push('FAIL: ' + e.message); }
+    } else {
+      log.push('FAIL: Nu am gasit JSON valid');
+    }
+  } catch (e) {
+    log.push('FAIL: ' + e.message);
+  }
 
   // STEP 5: Claude Opus — Verificare finala
   log.push('\n--- STEP 5: Claude Opus VERIFICARE ---');
   var newContent = '';
-  try { newContent = fs.readFileSync(path.resolve(filePath), 'utf8'); } catch (e) { newContent = 'EROARE'; }
-  var verifyPrompt = 'Compara INAINTE si DUPA. Verifica: (1) Edit aplicat corect (2) Syntax OK (3) Nu s-a pierdut cod. Raspunde: PASS sau FAIL + detalii.';
-  var verify = await callAIProvider('claude-opus', verifyPrompt, 'INAINTE:\n' + fileContent.substring(0, 4000) + '\nDUPA:\n' + newContent.substring(0, 4000) + '\nEDIT: ' + editResult);
-  if (!verify) verify = await callAIProvider('gpt54', verifyPrompt, 'INAINTE:\n' + fileContent.substring(0, 4000) + '\nDUPA:\n' + newContent.substring(0, 4000));
+  try {
+    newContent = fs.readFileSync(path.resolve(filePath), 'utf8');
+  } catch (e) {
+    newContent = 'EROARE';
+  }
+  var verifyPrompt =
+    'Compara INAINTE si DUPA. Verifica: (1) Edit aplicat corect (2) Syntax OK (3) Nu s-a pierdut cod. Raspunde: PASS sau FAIL + detalii.';
+  var verify = await callAIProvider(
+    'claude-opus',
+    verifyPrompt,
+    'INAINTE:\n' +
+      fileContent.substring(0, 4000) +
+      '\nDUPA:\n' +
+      newContent.substring(0, 4000) +
+      '\nEDIT: ' +
+      editResult
+  );
+  if (!verify)
+    verify = await callAIProvider(
+      'gpt54',
+      verifyPrompt,
+      'INAINTE:\n' + fileContent.substring(0, 4000) + '\nDUPA:\n' + newContent.substring(0, 4000)
+    );
   log.push('Opus: ' + (verify || 'SKIP'));
 
   if (verify && verify.toUpperCase().includes('FAIL')) {
@@ -569,7 +713,6 @@ async function autoRepairPipeline(task, filePath) {
   log.push('\n=== AUTO-REPAIR PIPELINE END ===');
   return log.join('\n');
 }
-
 
 // ═══ AI PROVIDERS ═══
 async function callK1(systemPrompt, userMessage) {
@@ -666,17 +809,22 @@ router.post('/', async (req, res) => {
         // 2. Golden knowledge relevant pentru mesajul curent
         const relevantKnowledge = brain.getRelevantKnowledge(message);
         if (relevantKnowledge.length > 0) {
-          systemPrompt += '\n\n═══ GOLDEN KNOWLEDGE RELEVANT ═══\n' +
-            relevantKnowledge.join('\n') + '\n═══════════════════════════════\n';
+          systemPrompt +=
+            '\n\n═══ GOLDEN KNOWLEDGE RELEVANT ═══\n' +
+            relevantKnowledge.join('\n') +
+            '\n═══════════════════════════════\n';
         }
         // 3. Lecții din erori anterioare
         if (brain._errorLog && brain._errorLog.length > 0) {
           const recentLessons = brain._errorLog.slice(-3);
-          systemPrompt += '\n\n═══ LECȚII RECENTE DIN ERORI ═══\n' +
-            recentLessons.map(l => `- ${l.context}: ${l.pattern} → ${l.resolution || 'neremediat'}`).join('\n') +
+          systemPrompt +=
+            '\n\n═══ LECȚII RECENTE DIN ERORI ═══\n' +
+            recentLessons.map((l) => `- ${l.context}: ${l.pattern} → ${l.resolution || 'neremediat'}`).join('\n') +
             '\n═══════════════════════════════\n';
         }
-      } catch { /* non-blocking */ }
+      } catch {
+        /* non-blocking */
+      }
     }
 
     // ═══ DIRECT COMMAND DETECTION — bypass AI tool generation ═══
@@ -841,15 +989,26 @@ router.post('/', async (req, res) => {
 
     // ── SELF-LEARNING: K1 învață din brain-chat (scris + vorbit) ──
     if (brain) {
-      brain._learnFromResponse(message, brainMessage, {
-        toolsUsed: toolResults.map(t => t.tool || 'unknown'),
-        hadError: brainMessage.includes('Eroare') || brainMessage.includes('❌')
-      }, '24eaf533-0af5-4871-9c74-91e123936397').catch(() => {});
+      brain
+        ._learnFromResponse(
+          message,
+          brainMessage,
+          {
+            toolsUsed: toolResults.map((t) => t.tool || 'unknown'),
+            hadError: brainMessage.includes('Eroare') || brainMessage.includes('❌'),
+          },
+          '24eaf533-0af5-4871-9c74-91e123936397'
+        )
+        .catch(() => {});
       // Salvează în memorie persistentă ce s-a discutat
-      brain.saveMemory('24eaf533-0af5-4871-9c74-91e123936397', 'conversation',
-        `[BRAIN-CHAT] User: ${message.substring(0, 200)} | K1: ${brainMessage.substring(0, 300)}`,
-        { source: 'brain-chat', sessionId: sid }
-      ).catch(() => {});
+      brain
+        .saveMemory(
+          '24eaf533-0af5-4871-9c74-91e123936397',
+          'conversation',
+          `[BRAIN-CHAT] User: ${message.substring(0, 200)} | K1: ${brainMessage.substring(0, 300)}`,
+          { source: 'brain-chat', sessionId: sid }
+        )
+        .catch(() => {});
     }
 
     res.json({
