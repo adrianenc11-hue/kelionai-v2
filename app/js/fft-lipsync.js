@@ -62,9 +62,9 @@
   var SMOOTH_RELEASE = 0.08; // cinematic: very gentle release
 
   // ── Mouth opening clamp — REALISTIC values for visible movement ──
-  var MAX_MOUTH_OPEN = 0.012; // Severely restricted to prevent gulping
-  var MAX_VISEME_AA = 0.015; // Severely restricted
-  var MAX_VISEME = 0.02; // Severely restricted
+  var MAX_MOUTH_OPEN = 0.04; // 17% further reduced
+  var MAX_VISEME_AA = 0.075; // 17% further reduced
+  var MAX_VISEME = 0.083; // 17% further reduced
 
   // ── TEMP SLIDER: global mouth amplitude multiplier ──
   var _mouthMultiplier = parseFloat(localStorage.getItem('kelion_mouth_mult') || '0.75');
