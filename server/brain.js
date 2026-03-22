@@ -536,6 +536,186 @@ class KelionBrain {
   }
 
   // ═══════════════════════════════════════════════════════════
+  // SELF-REPAIR ENGINE — Auto-fix when commands fail
+  // ═══════════════════════════════════════════════════════════
+
+  /**
+   * Execută o comandă cu auto-reparare: dacă eșuează, analizează eroarea,
+   * aplică fix, și re-încearcă automat (max 3 încercări)
+   * @param {Function} operation - Funcția de executat (async)
+   * @param {string} context - Descrierea operației (pentru logging)
+   * @param {string} userId - User ID
+   * @param {number} maxRetries - Număr maxim de re-încercări
+   * @returns {object} - { success, result, repairs[] }
+   */
+  async _executeWithRepair(operation, context = 'unknown', userId = null, maxRetries = 3) {
+    const repairs = [];
+    let lastError = null;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const result = await operation();
+        if (attempt > 1) {
+          logger.info({ component: 'SelfRepair', context, attempt, repairs: repairs.length },
+            `🔧 Auto-repair reușit la încercarea ${attempt}`);
+          // Salvează lecția de succes
+          await this._selfAnalyze(context, lastError, `Fix automat: ${repairs.map(r => r.fix).join(' → ')}`, userId);
+        }
+        return { success: true, result, repairs };
+      } catch (err) {
+        lastError = err.message || String(err);
+        logger.warn({ component: 'SelfRepair', context, attempt, err: lastError },
+          `⚠️ Încercare ${attempt}/${maxRetries} eșuată: ${lastError.substring(0, 150)}`);
+
+        // Încearcă reparare automată
+        const fix = await this._selfRepair(lastError, context, userId);
+        if (fix) {
+          repairs.push(fix);
+          logger.info({ component: 'SelfRepair', fix: fix.fix }, `🔧 Fix aplicat: ${fix.fix}`);
+          continue; // Re-încearcă cu fix-ul aplicat
+        }
+
+        // Nu am găsit fix — oprește
+        break;
+      }
+    }
+
+    // Toate încercările eșuate
+    await this._selfAnalyze(context, lastError, `EȘUAT după ${maxRetries} încercări. Fix-uri încercate: ${repairs.map(r => r.fix).join(', ') || 'niciun fix găsit'}`, userId);
+    return { success: false, error: lastError, repairs };
+  }
+
+  /**
+   * Analizează o eroare și încearcă fix automat
+   * @param {string} errorMsg - Mesajul erorii
+   * @param {string} context - Contextul operației
+   * @param {string} userId - User ID
+   * @returns {object|null} - { fix, applied } sau null dacă nu găsește fix
+   */
+  async _selfRepair(errorMsg, context = '', userId = null) {
+    if (!errorMsg) return null;
+    const msg = errorMsg.toLowerCase();
+    const { execSync } = require('child_process');
+    const CWD = process.cwd();
+
+    try {
+      // ── FIX 1: Comandă/modul lipsă ──
+      // "jest: not found", "sh: xyz: not found", "Cannot find module 'xyz'"
+      const cmdNotFound = msg.match(/sh:\s+(\w+):\s+not found/) ||
+                          msg.match(/(\w+):\s+not found/) ||
+                          msg.match(/command not found:\s+(\w+)/);
+      if (cmdNotFound) {
+        const cmd = cmdNotFound[1];
+        logger.info({ component: 'SelfRepair', cmd }, `🔧 Instalez comanda lipsă: ${cmd}`);
+        try {
+          execSync(`npm install ${cmd} --save`, { cwd: CWD, encoding: 'utf8', timeout: 30000 });
+          return { fix: `npm install ${cmd}`, applied: true, type: 'missing_command' };
+        } catch {
+          return { fix: `npm install ${cmd} eșuat — încearcă npx ${cmd}`, applied: false, type: 'missing_command' };
+        }
+      }
+
+      const moduleNotFound = msg.match(/cannot find module\s+'([^']+)'/i);
+      if (moduleNotFound) {
+        const mod = moduleNotFound[1].split('/')[0]; // Get package name
+        if (!mod.startsWith('.') && !mod.startsWith('/')) {
+          logger.info({ component: 'SelfRepair', mod }, `🔧 Instalez modulul lipsă: ${mod}`);
+          try {
+            execSync(`npm install ${mod} --save`, { cwd: CWD, encoding: 'utf8', timeout: 30000 });
+            return { fix: `npm install ${mod}`, applied: true, type: 'missing_module' };
+          } catch {
+            return null;
+          }
+        }
+      }
+
+      // ── FIX 2: Director lipsă ──
+      // "ENOENT: no such file or directory"
+      if (msg.includes('enoent') || msg.includes('no such file or directory')) {
+        const pathMatch = errorMsg.match(/['"]([^'"]+)['"]/);
+        if (pathMatch) {
+          const fs = require('fs');
+          const path = require('path');
+          const targetDir = path.dirname(pathMatch[1]);
+          if (!fs.existsSync(targetDir)) {
+            fs.mkdirSync(targetDir, { recursive: true });
+            logger.info({ component: 'SelfRepair', dir: targetDir }, `🔧 Director creat: ${targetDir}`);
+            return { fix: `mkdir -p ${targetDir}`, applied: true, type: 'missing_directory' };
+          }
+        }
+      }
+
+      // ── FIX 3: Coloană/tabelă lipsă în DB ──
+      // "Could not find the 'xyz' column" / "relation does not exist"
+      if (msg.includes('column') && (msg.includes('does not exist') || msg.includes('not find'))) {
+        const colMatch = errorMsg.match(/['"](\w+)['"]\s*column/i) ||
+                         errorMsg.match(/column\s+['"]?(\w+)/i) ||
+                         errorMsg.match(/the\s+'(\w+)'\s+column/i);
+        if (colMatch) {
+          logger.warn({ component: 'SelfRepair', column: colMatch[1] },
+            `🔧 Coloană lipsă detectată: ${colMatch[1]}. Necesită ALTER TABLE manual sau rulare migrate.js pe server.`);
+          return { fix: `Coloană ${colMatch[1]} lipsă — rulează migrația: npm run migrate`, applied: false, type: 'missing_column' };
+        }
+      }
+
+      if (msg.includes('relation') && msg.includes('does not exist')) {
+        const tableMatch = errorMsg.match(/relation\s+"?(\w+)"?\s+does not exist/i);
+        if (tableMatch) {
+          logger.warn({ component: 'SelfRepair', table: tableMatch[1] },
+            `🔧 Tabelă lipsă: ${tableMatch[1]}. Rulează migrația.`);
+          return { fix: `Tabela ${tableMatch[1]} lipsă — rulează: npm run migrate`, applied: false, type: 'missing_table' };
+        }
+      }
+
+      // ── FIX 4: Port ocupat ──
+      if (msg.includes('eaddrinuse') || msg.includes('address already in use')) {
+        const portMatch = errorMsg.match(/port\s*(\d+)/i) || errorMsg.match(/:(\d+)/);
+        if (portMatch) {
+          const port = portMatch[1];
+          logger.info({ component: 'SelfRepair', port }, `🔧 Port ${port} ocupat, încerc eliberare`);
+          try {
+            if (process.platform === 'win32') {
+              execSync(`netstat -ano | findstr :${port}`, { encoding: 'utf8' });
+            } else {
+              execSync(`kill $(lsof -t -i:${port}) 2>/dev/null || true`, { encoding: 'utf8' });
+            }
+            return { fix: `Eliberat portul ${port}`, applied: true, type: 'port_in_use' };
+          } catch {
+            return { fix: `Portul ${port} ocupat — restart manual necesar`, applied: false, type: 'port_in_use' };
+          }
+        }
+      }
+
+      // ── FIX 5: Permisiuni ──
+      if (msg.includes('permission denied') || msg.includes('eacces')) {
+        logger.warn({ component: 'SelfRepair' }, '🔧 Eroare de permisiuni — nu pot repara automat');
+        return { fix: 'Permisiuni insuficiente — verifică ownership și chmod', applied: false, type: 'permission' };
+      }
+
+      // ── FIX 6: Timeout ──
+      if (msg.includes('timeout') || msg.includes('etimedout')) {
+        logger.info({ component: 'SelfRepair' }, '🔧 Timeout — voi re-încerca cu delay');
+        await new Promise(r => setTimeout(r, 3000));
+        return { fix: 'Așteptat 3s înainte de retry', applied: true, type: 'timeout' };
+      }
+
+      // ── FIX 7: Memory ──
+      if (msg.includes('heap') || msg.includes('out of memory') || msg.includes('enomem')) {
+        logger.warn({ component: 'SelfRepair' }, '🔧 Out of memory — curăț cache-urile');
+        this._semanticCache.clear();
+        this._memoryCache.clear();
+        if (global.gc) global.gc();
+        return { fix: 'Cache-uri curățate + GC', applied: true, type: 'memory' };
+      }
+
+    } catch (repairErr) {
+      logger.warn({ component: 'SelfRepair', err: repairErr.message }, 'Self-repair threw error');
+    }
+
+    return null; // Nu am găsit fix automat
+  }
+
+  // ═══════════════════════════════════════════════════════════
   // DOCUMENT GENERATION — Creates and saves documents to DB
   // ═══════════════════════════════════════════════════════════
 
