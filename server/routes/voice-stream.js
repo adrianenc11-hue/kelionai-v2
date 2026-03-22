@@ -434,6 +434,17 @@ function setupVoiceStream(server, appLocals) {
             .catch(() => {});
         }
 
+        // ═══ Direct Supabase save — voice transcript + response ═══
+        if (locals && locals.supabaseAdmin) {
+          locals.supabaseAdmin.from('brain_memory').insert({
+            user_id: userId || 'system',
+            memory_type: 'conversation',
+            content: `[VOICE] User: ${userText.substring(0, 300)} | AI: ${fullReply.substring(0, 500)}`,
+            importance: 6,
+            metadata: { category: 'voice_transcript', avatar, language, emotion, duration_ms: Date.now() - llmStart }
+          }).then(() => {}).catch(() => {});
+        }
+
         const totalTime = Date.now() - llmStart;
         clientWs.send(
           JSON.stringify({

@@ -158,6 +158,17 @@ Answer in ${LANGS[language] || 'English'}.`;
           })
           .catch((e) => logger.warn({ component: 'Vision', err: e.message }, 'brain.saveMemory failed'));
       }
+
+      // ═══ Direct Supabase save — vision analysis ═══
+      if (supabaseAdmin) {
+        supabaseAdmin.from('brain_memory').insert({
+          user_id: user?.id || 'system',
+          memory_type: 'visual_analysis',
+          content: `[VISION] ${description.substring(0, 500)}`,
+          importance: 6,
+          metadata: { category: 'vision_result', avatar, language, engine, emotion }
+        }).then(() => {}).catch(() => {});
+      }
     }
 
     incrementUsage(user?.id, 'vision', supabaseAdmin).catch((e) =>
