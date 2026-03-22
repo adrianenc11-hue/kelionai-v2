@@ -357,84 +357,96 @@ class BrainCortex {
 
   // ═══════════════════════════════════════════════════════════
   // LOOP 3: LEARNING SYNC — Feed Kira knowledge from DB
-  // Loads golden_knowledge + write_lesson + conversation learnings
-  // and injects into brain's hot memory for instant access.
+  // Loads ALL knowledge: golden_knowledge, write_lesson, facts,
+  // error digests, and learned patterns.
+  // Injects into brain's _goldenKnowledge hot memory.
   // ═══════════════════════════════════════════════════════════
   async _learningSync() {
     if (!this.supabase || !this.brain) return;
 
+    // Create _goldenKnowledge Map if brain doesn't have one
+    if (!this.brain._goldenKnowledge) {
+      this.brain._goldenKnowledge = new Map();
+    }
+
     try {
-      // 1. Load golden knowledge
-      const { data: golden, error: gErr } = await this.supabase
+      // 1. Load GOLDEN KNOWLEDGE (seed + programmatic)
+      const { data: golden } = await this.supabase
         .from('brain_memory')
-        .select('id, content, context, importance, created_at')
+        .select('id, content, metadata, importance, created_at')
+        .eq('memory_type', 'golden_knowledge')
+        .order('importance', { ascending: false })
+        .limit(100);
+
+      // 2. Load WRITE LESSONS (self-analysis after errors)
+      const { data: lessons } = await this.supabase
+        .from('brain_memory')
+        .select('id, content, metadata, created_at')
+        .eq('memory_type', 'write_lesson')
+        .order('created_at', { ascending: false })
+        .limit(100);
+
+      // 3. Load HIGH-IMPORTANCE facts/text (from conversations, cortex)
+      const { data: important } = await this.supabase
+        .from('brain_memory')
+        .select('id, content, metadata, importance, created_at')
         .in('memory_type', ['fact', 'text'])
         .gte('importance', 7)
         .order('created_at', { ascending: false })
         .limit(100);
 
-      // 2. Load write lessons (self-analysis results)
-      const { data: lessons, error: lErr } = await this.supabase
+      // 4. Load CORTEX EVENTS (error digests, test results, repair logs)
+      const { data: cortexEvents } = await this.supabase
         .from('brain_memory')
-        .select('id, content, context, created_at')
-        .in('memory_type', ['fact', 'text'])
-        .like('content', '%LECȚIE%')
+        .select('id, content, metadata, created_at')
+        .or('content.like.[ERROR_DIGEST]%,content.like.[TEST_RESULT]%,content.like.[REPAIR_LOG]%,content.like.[DEPLOY_OK]%')
         .order('created_at', { ascending: false })
         .limit(50);
 
-      // 3. Load learned conversation patterns
-      const { data: learned, error: leErr } = await this.supabase
-        .from('brain_memory')
-        .select('id, content, context, created_at')
-        .in('memory_type', ['fact', 'text'])
-        .like('content', '%LEARNED%')
-        .order('created_at', { ascending: false })
-        .limit(50);
-
-      // Combine all knowledge
+      // Combine all knowledge with source tags
       const allKnowledge = [
         ...(golden || []).map(k => ({ ...k, source: 'golden' })),
         ...(lessons || []).map(k => ({ ...k, source: 'lesson' })),
-        ...(learned || []).map(k => ({ ...k, source: 'conversation' })),
+        ...(important || []).map(k => ({ ...k, source: 'fact' })),
+        ...(cortexEvents || []).map(k => ({ ...k, source: 'cortex' })),
       ];
 
       // Inject into brain's golden knowledge cache
-      if (this.brain._goldenKnowledge) {
-        let newCount = 0;
-        for (const item of allKnowledge) {
-          if (!this.brain._goldenKnowledge.has(item.id)) {
-            this.brain._goldenKnowledge.set(item.id, {
-              content: item.content,
-              metadata: item.context || {},
-              accessCount: 0,
-              source: item.source,
-            });
-            newCount++;
-          }
+      let newCount = 0;
+      for (const item of allKnowledge) {
+        if (!this.brain._goldenKnowledge.has(item.id)) {
+          this.brain._goldenKnowledge.set(item.id, {
+            content: item.content,
+            metadata: item.metadata || {},
+            accessCount: 0,
+            source: item.source,
+          });
+          newCount++;
         }
-
-        // Cap at 500 items (remove oldest by accessCount)
-        if (this.brain._goldenKnowledge.size > 500) {
-          const sorted = [...this.brain._goldenKnowledge.entries()]
-            .sort((a, b) => a[1].accessCount - b[1].accessCount);
-          const toRemove = sorted.slice(0, sorted.length - 500);
-          for (const [id] of toRemove) {
-            this.brain._goldenKnowledge.delete(id);
-          }
-        }
-
-        this.learningCache = allKnowledge;
-        this.lastLearningSync = Date.now();
-
-        logger.info({
-          component: 'Cortex-Learning',
-          total: this.brain._goldenKnowledge.size,
-          new: newCount,
-          golden: (golden || []).length,
-          lessons: (lessons || []).length,
-          learned: (learned || []).length,
-        }, `📚 Learning sync: ${this.brain._goldenKnowledge.size} items in Kira's memory (${newCount} new)`);
       }
+
+      // Cap at 500 items (remove least accessed)
+      if (this.brain._goldenKnowledge.size > 500) {
+        const sorted = [...this.brain._goldenKnowledge.entries()]
+          .sort((a, b) => a[1].accessCount - b[1].accessCount);
+        const toRemove = sorted.slice(0, sorted.length - 500);
+        for (const [id] of toRemove) {
+          this.brain._goldenKnowledge.delete(id);
+        }
+      }
+
+      this.learningCache = allKnowledge;
+      this.lastLearningSync = Date.now();
+
+      logger.info({
+        component: 'Cortex-Learning',
+        total: this.brain._goldenKnowledge.size,
+        new: newCount,
+        golden: (golden || []).length,
+        lessons: (lessons || []).length,
+        important: (important || []).length,
+        cortex: (cortexEvents || []).length,
+      }, `📚 Learning sync: ${this.brain._goldenKnowledge.size} items in Kira's memory (${newCount} new)`);
     } catch (e) {
       logger.warn({ component: 'Cortex-Learning', err: e.message }, 'Learning sync failed');
     }
