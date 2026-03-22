@@ -499,7 +499,34 @@ router.post('/', async (req, res) => {
     const knowledge = loadFileContent('K1_KNOWLEDGE.md');
     const raport = loadFileContent('RAPORT_ONEST.md');
     const history = session.buildHistory(currentSession, 30);
-    const systemPrompt = getK1SystemPrompt(knowledge, raport, history);
+    let systemPrompt = getK1SystemPrompt(knowledge, raport, history);
+
+    // ── WORKING MEMORY: Injectează context de task-uri neterminate + golden knowledge ──
+    const brain = req.app?.locals?.brain;
+    if (brain) {
+      try {
+        // 1. Resume context — task-uri neterminate
+        const resumeCtx = await brain.buildResumeContext('24eaf533-0af5-4871-9c74-91e123936397');
+        if (resumeCtx) {
+          systemPrompt += resumeCtx;
+          logger.info({ component: 'K1-WorkingMemory' }, '📋 Resume context injected into K1');
+        }
+        // 2. Golden knowledge relevant pentru mesajul curent
+        const relevantKnowledge = brain.getRelevantKnowledge(message);
+        if (relevantKnowledge.length > 0) {
+          systemPrompt += '\n\n═══ GOLDEN KNOWLEDGE RELEVANT ═══\n' +
+            relevantKnowledge.join('\n') + '\n═══════════════════════════════\n';
+        }
+        // 3. Lecții din erori anterioare
+        if (brain._errorLog && brain._errorLog.length > 0) {
+          const recentLessons = brain._errorLog.slice(-3);
+          systemPrompt += '\n\n═══ LECȚII RECENTE DIN ERORI ═══\n' +
+            recentLessons.map(l => `- ${l.context}: ${l.pattern} → ${l.resolution || 'neremediat'}`).join('\n') +
+            '\n═══════════════════════════════\n';
+        }
+      } catch { /* non-blocking */ }
+    }
+
     let response = await callK1(systemPrompt, message);
 
     // === #12 ANTI-GENERIC FILTER ===
@@ -647,6 +674,20 @@ router.post('/', async (req, res) => {
     if (tw.length > 0) brainMessage += '\n\n---\n' + tw.join('\n');
 
     await session.addMessage(sid, 'brain', brainMessage);
+
+    // ── SELF-LEARNING: K1 învață din brain-chat (scris + vorbit) ──
+    if (brain) {
+      brain._learnFromResponse(message, brainMessage, {
+        toolsUsed: toolResults.map(t => t.tool || 'unknown'),
+        hadError: brainMessage.includes('Eroare') || brainMessage.includes('❌')
+      }, '24eaf533-0af5-4871-9c74-91e123936397').catch(() => {});
+      // Salvează în memorie persistentă ce s-a discutat
+      brain.saveMemory('24eaf533-0af5-4871-9c74-91e123936397', 'conversation',
+        `[BRAIN-CHAT] User: ${message.substring(0, 200)} | K1: ${brainMessage.substring(0, 300)}`,
+        { source: 'brain-chat', sessionId: sid }
+      ).catch(() => {});
+    }
+
     res.json({
       reply: brainMessage,
       provider: response.provider,
