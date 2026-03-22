@@ -492,6 +492,31 @@ const ADMIN_TOOL_DEFINITIONS = [
     description: 'Get AI costs breakdown by provider, daily costs, total today/month. Admin only.',
     input_schema: { type: 'object', properties: {}, required: [] },
   },
+  {
+    name: 'autoRepair',
+    description: 'Trigger the autonomous 5-AI AutoRepair Pipeline to diagnose and securely fix codebase bugs or variable limits. Use this immediately when the user asks you to fix code or repair a system feature.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        task: { type: 'string', description: 'Description of the bug, issue, or feature to fix.' },
+        filePath: { type: 'string', description: 'The relative file path to run the repair on, e.g. app/js/fft-lipsync.js' }
+      },
+      required: ['task', 'filePath']
+    }
+  },
+  {
+    name: 'mutateDB',
+    description: 'Directly interact with the Supabase PostgreSQL database to insert, update, delete, or read data natively.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        operation: { type: 'string', enum: ['select', 'insert', 'update', 'delete'], description: 'Database operation' },
+        table: { type: 'string', description: 'Supabase table name' },
+        data: { type: 'string', description: 'Data object or query parameters as a JSON string' }
+      },
+      required: ['operation', 'table']
+    }
+  },
   // ═══ INCEPTION Faza 2: Write File + Auto-Deploy ═══
   {
     name: 'write_project_file',
@@ -626,6 +651,28 @@ async function executeTool(brain, toolName, toolInput, userId) {
         return brain._readKnowledge();
       case 'admin_get_secret':
         return brain._getSecret(toolInput.key);
+      case 'autoRepair': {
+        const brainChat = require('./routes/brain-chat.js');
+        if (brainChat && typeof brainChat.autoRepairPipeline === 'function') {
+          return await brainChat.autoRepairPipeline(toolInput.task, toolInput.filePath);
+        }
+        return { error: 'Pipeline nu este disponibil' };
+      }
+      case 'mutateDB': {
+        if (!brain.supabase) return { error: 'No database connected' };
+        try {
+          let dataData = toolInput.data ? JSON.parse(toolInput.data) : null;
+          let r;
+          if (toolInput.operation === 'select') r = await brain.supabase.from(toolInput.table).select('*').limit(10);
+          else if (toolInput.operation === 'insert') r = await brain.supabase.from(toolInput.table).insert(dataData).select();
+          else if (toolInput.operation === 'update') return { error: 'Needs ID to update' };
+          else if (toolInput.operation === 'delete') return { error: 'Needs ID to delete' };
+          if (r.error) throw r.error;
+          return { success: true, data: r.data };
+        } catch (e) {
+          return { error: 'DB mutation failed: ' + e.message };
+        }
+      }
 
       case 'search_web':
         return await brain._search(toolInput.query);

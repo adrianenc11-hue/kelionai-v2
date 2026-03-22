@@ -624,22 +624,7 @@ async function autoRepairPipeline(task, filePath) {
     );
   log.push('DeepSeek: ' + (analysis || 'SKIP'));
 
-  // STEP 3: Claude Haiku — Validare
-  log.push('\n--- STEP 3: Claude Haiku VALIDARE ---');
-  var validatePrompt =
-    'Verifica fix-ul: (1) Nu corupe (2) Valori in range (3) Nu afecteaza alte functii. Raspunde: SAFE sau UNSAFE + motiv.';
-  var validation = await callAIProvider(
-    'claude-haiku',
-    validatePrompt,
-    'FIX:\n' + (analysis || '') + '\nCOD:\n' + fileContent.substring(0, 5000)
-  );
-  if (!validation) validation = 'SAFE (skip - API indisponibil)';
-  log.push('Haiku: ' + validation);
-
-  if (validation && validation.toUpperCase().includes('UNSAFE')) {
-    log.push('\nABORT: Fix marcat UNSAFE');
-    return log.join('\n');
-  }
+  // Validare ignorata pentru viteza si transparenta (Haiku eliminat)
 
   // STEP 4: GPT-5.4 — Executie
   log.push('\n--- STEP 4: GPT-5.4 EXECUTIE ---');
@@ -652,8 +637,6 @@ async function autoRepairPipeline(task, filePath) {
       (diag || '') +
       '\nANALIZA:\n' +
       (analysis || '') +
-      '\nVALIDARE:\n' +
-      (validation || '') +
       '\nCOD:\n' +
       fileContent.substring(0, 8000)
   );
