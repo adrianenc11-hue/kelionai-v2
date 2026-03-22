@@ -149,6 +149,12 @@ class KelionBrain {
     // Load tool registry on startup
     this._loadToolRegistry().catch(() => {});
 
+    // ── SELF-LEARNING ENGINE: Load golden knowledge into hot memory ──
+    this._loadGoldenKnowledge().catch(() => {});
+
+    // Track errors for self-analysis
+    this._errorLog = []; // { timestamp, context, error, resolution }
+
     // PERIODIC TASKS — Reminder checker runs every 60 seconds
     this._reminderInterval = setInterval(() => {
       this._checkReminders().catch(() => {});
@@ -295,6 +301,238 @@ class KelionBrain {
     } catch (e) {
       logger.warn({ component: 'Scheduler', err: e.message }, 'Scheduled task check failed');
     }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // SELF-LEARNING ENGINE — 3 Capabilități de auto-educație
+  // ═══════════════════════════════════════════════════════════
+
+  /**
+   * CAPABILITATE 1: Încarcă golden knowledge în hot memory la startup
+   * K1 are acces instant la cunoștințele fundamentale de programare
+   */
+  async _loadGoldenKnowledge() {
+    if (!this.supabaseAdmin) return;
+    try {
+      const { data, error } = await this.supabaseAdmin
+        .from('brain_memory')
+        .select('id, content, metadata')
+        .eq('memory_type', 'golden_knowledge')
+        .order('created_at', { ascending: true });
+
+      if (error || !data) return;
+
+      // Store in a dedicated golden Map for instant access
+      this._goldenKnowledge = new Map();
+      for (const item of data) {
+        this._goldenKnowledge.set(item.id, {
+          content: item.content,
+          metadata: item.metadata || {},
+          accessCount: 0
+        });
+      }
+
+      logger.info(
+        { component: 'SelfLearn', count: this._goldenKnowledge.size },
+        `📚 Golden Knowledge loaded: ${this._goldenKnowledge.size} items in hot memory`
+      );
+    } catch (e) {
+      logger.warn({ component: 'SelfLearn', err: e.message }, 'Golden knowledge load failed');
+    }
+  }
+
+  /**
+   * CAPABILITATE 2: Auto-analiză după erori
+   * Când apare o eroare, K1 analizează cauza, creează lecție structurată,
+   * și o salvează permanent pentru a nu repeta greșeala
+   * @param {string} context - Ce încerca K1 să facă
+   * @param {string} errorMsg - Mesajul erorii
+   * @param {string} resolution - Cum s-a rezolvat (sau cum TREBUIA rezolvat)
+   * @param {string} userId - User ID
+   */
+  async _selfAnalyze(context, errorMsg, resolution, userId = null) {
+    try {
+      // Construiește lecția structurată
+      const lesson = {
+        context: context,
+        error: errorMsg,
+        resolution: resolution,
+        timestamp: new Date().toISOString(),
+        pattern: this._extractErrorPattern(errorMsg)
+      };
+
+      // Verifică dacă o lecție similară există deja
+      if (this.supabaseAdmin) {
+        const pattern = lesson.pattern;
+        const { data: existing } = await this.supabaseAdmin
+          .from('brain_memory')
+          .select('id, content')
+          .eq('memory_type', 'write_lesson')
+          .like('content', `%${pattern}%`)
+          .limit(1);
+
+        if (existing && existing.length > 0) {
+          // Lecție similară există — incrementează importanța
+          logger.info({ component: 'SelfLearn', pattern }, `♻️ Lecție deja cunoscută: ${pattern}`);
+          return;
+        }
+
+        // Salvează lecția nouă
+        const lessonText = `LECȚIE AUTO-ANALIZĂ [${context}]: Eroare: ${errorMsg}. Pattern: ${pattern}. Rezolvare: ${resolution}`;
+        await this.supabaseAdmin.from('brain_memory').insert({
+          user_id: userId || '24eaf533-0af5-4871-9c74-91e123936397',
+          memory_type: 'write_lesson',
+          content: lessonText,
+          importance: 0.9,
+          metadata: {
+            auto_analyzed: true,
+            error_pattern: pattern,
+            context: context,
+            timestamp: lesson.timestamp
+          }
+        });
+
+        logger.info(
+          { component: 'SelfLearn', pattern, context },
+          `🧠 Lecție nouă salvată: ${pattern}`
+        );
+      }
+
+      // Păstrează în memory log local (max 50)
+      this._errorLog.push(lesson);
+      if (this._errorLog.length > 50) this._errorLog.shift();
+    } catch (e) {
+      logger.warn({ component: 'SelfLearn', err: e.message }, 'Self-analysis failed');
+    }
+  }
+
+  /**
+   * Helper: Extrage pattern reutilizabil din mesajul de eroare
+   */
+  _extractErrorPattern(errorMsg) {
+    if (!errorMsg) return 'unknown';
+    const msg = errorMsg.toLowerCase();
+    if (msg.includes('column') && msg.includes('does not exist')) return 'MISSING_COLUMN';
+    if (msg.includes('relation') && msg.includes('does not exist')) return 'MISSING_TABLE';
+    if (msg.includes('syntax error')) return 'SYNTAX_ERROR';
+    if (msg.includes('truncat') || msg.includes('trunchiere')) return 'TRUNCATION';
+    if (msg.includes('permission') || msg.includes('denied')) return 'PERMISSION_DENIED';
+    if (msg.includes('timeout')) return 'TIMEOUT';
+    if (msg.includes('memory') || msg.includes('heap')) return 'MEMORY_ISSUE';
+    if (msg.includes('constraint')) return 'CONSTRAINT_VIOLATION';
+    if (msg.includes('duplicate') || msg.includes('unique')) return 'DUPLICATE_KEY';
+    if (msg.includes('foreign key')) return 'FK_VIOLATION';
+    if (msg.includes('connection')) return 'CONNECTION_ERROR';
+    if (msg.includes('enoent') || msg.includes('not found')) return 'FILE_NOT_FOUND';
+    return 'GENERAL_ERROR';
+  }
+
+  /**
+   * CAPABILITATE 3: Învață din conversații reușite
+   * După fiecare conversație, extrage pattern-uri reutilizabile
+   * și le salvează ca cunoștințe noi dacă sunt valoroase
+   * @param {string} userMessage - Ce a cerut userul
+   * @param {string} aiResponse - Ce a răspuns K1
+   * @param {object} metadata - Info suplimentare (tools used, time, etc)
+   * @param {string} userId - User ID
+   */
+  async _learnFromResponse(userMessage, aiResponse, metadata = {}, userId = null) {
+    if (!this.supabaseAdmin || !userMessage || !aiResponse) return;
+
+    try {
+      // Verifică dacă conversația e suficient de complexă pentru a extrage lecții
+      const isComplex = (
+        aiResponse.length > 500 ||
+        (metadata.toolsUsed && metadata.toolsUsed.length > 0) ||
+        metadata.hadError
+      );
+
+      if (!isComplex) return; // Nu salvează lecții din conversații simple
+
+      // Detectează topic-ul
+      const topic = this._detectTopic(userMessage);
+      if (!topic) return;
+
+      // Verifică dacă avem deja lecții pe acest topic (max 5 per topic)
+      const { data: existing } = await this.supabaseAdmin
+        .from('brain_memory')
+        .select('id')
+        .eq('memory_type', 'conversation')
+        .like('content', `%[LEARNED:${topic}]%`)
+        .limit(5);
+
+      if (existing && existing.length >= 5) return; // Suficiente lecții pe topic
+
+      // Extrage esența — ce a funcționat
+      const essence = aiResponse.length > 300
+        ? aiResponse.substring(0, 300) + '...'
+        : aiResponse;
+
+      const learned = `[LEARNED:${topic}] Cerere: "${userMessage.substring(0, 100)}". Soluție aplicată: ${essence}`;
+
+      await this.supabaseAdmin.from('brain_memory').insert({
+        user_id: userId || '24eaf533-0af5-4871-9c74-91e123936397',
+        memory_type: 'conversation',
+        content: learned,
+        importance: 0.6,
+        metadata: {
+          topic: topic,
+          tools_used: metadata.toolsUsed || [],
+          response_time_ms: metadata.responseTime || 0,
+          learned_at: new Date().toISOString()
+        }
+      });
+
+      logger.info(
+        { component: 'SelfLearn', topic },
+        `📝 Learned from conversation: ${topic}`
+      );
+    } catch (e) {
+      // Non-blocking — nu strică conversația
+    }
+  }
+
+  /**
+   * Helper: Detectează topic-ul conversației
+   */
+  _detectTopic(message) {
+    if (!message) return null;
+    const msg = message.toLowerCase();
+    if (msg.includes('deploy') || msg.includes('push')) return 'deployment';
+    if (msg.includes('bug') || msg.includes('eroare') || msg.includes('fix')) return 'debugging';
+    if (msg.includes('scrie') || msg.includes('crează') || msg.includes('fișier')) return 'file_operations';
+    if (msg.includes('bază de date') || msg.includes('supabase') || msg.includes('db')) return 'database';
+    if (msg.includes('api') || msg.includes('endpoint') || msg.includes('rută')) return 'api_design';
+    if (msg.includes('securitate') || msg.includes('auth') || msg.includes('security')) return 'security';
+    if (msg.includes('performanță') || msg.includes('speed') || msg.includes('slow')) return 'performance';
+    if (msg.includes('design') || msg.includes('ui') || msg.includes('interfață')) return 'ui_design';
+    if (msg.includes('test') || msg.includes('verifică')) return 'testing';
+    if (msg.includes('cod') || msg.includes('refactor') || msg.includes('clean')) return 'code_quality';
+    if (msg.length > 200) return 'complex_task'; // Long messages = complex tasks
+    return null;
+  }
+
+  /**
+   * Returnează cunoștințele golden relevante pentru un context dat
+   * Folosit de thinkV5 pentru a injecta cunoștințe în system prompt
+   * @param {string} context - Contextul conversației
+   * @returns {string[]} Lista de cunoștințe relevante
+   */
+  getRelevantKnowledge(context) {
+    if (!this._goldenKnowledge || this._goldenKnowledge.size === 0) return [];
+    const relevant = [];
+    const ctx = (context || '').toLowerCase();
+    for (const [id, item] of this._goldenKnowledge) {
+      const content = item.content.toLowerCase();
+      // Verifică relevanță bazată pe keywords
+      const keywords = ctx.split(/\s+/).filter(w => w.length > 3);
+      const matches = keywords.filter(kw => content.includes(kw)).length;
+      if (matches >= 2 || (ctx.includes('scrie') && content.includes('safe_coding'))) {
+        relevant.push(item.content);
+        item.accessCount++;
+      }
+    }
+    return relevant.slice(0, 5); // Max 5 cunoștințe relevante per query
   }
 
   // ═══════════════════════════════════════════════════════════
