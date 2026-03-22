@@ -92,7 +92,9 @@ function setupLiveChat(io, appLocals) {
 
         // ── Call GPT 5.4 Chat Completions with Audio Modality ──
         const response = await openai.chat.completions.create({
-          model: MODELS.OPENAI_CHAT, // "gpt-5.4"
+          model: MODELS.GPT_REALTIME || 'gpt-4o-realtime-preview',
+          modalities: ['text', 'audio'],
+          audio: { voice: voice, format: 'wav' },
           messages: conversationHistory,
         });
 
