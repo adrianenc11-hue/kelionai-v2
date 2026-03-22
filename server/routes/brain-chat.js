@@ -191,7 +191,7 @@ function processToolCall(toolCall) {
       });
       if (params.force) {
         let res = editFn();
-        _pendingOps.remove(opId);
+        _pendingOps.delete(opId);
         return res;
       }
       return {
@@ -285,7 +285,7 @@ function processToolCall(toolCall) {
       });
       if (params.force) {
         let res = editFn();
-        _pendingOps.remove(opId);
+        _pendingOps.delete(opId);
         return res;
       }
       return {
@@ -321,7 +321,7 @@ function processToolCall(toolCall) {
       });
       if (params.force) {
         let res = editFn();
-        _pendingOps.remove(opId);
+        _pendingOps.delete(opId);
         return res;
       }
       return {
@@ -351,7 +351,7 @@ function processToolCall(toolCall) {
       });
       if (params.force) {
         let res = editFn();
-        _pendingOps.remove(opId);
+        _pendingOps.delete(opId);
         return res;
       }
       return {
@@ -426,7 +426,7 @@ function processToolCall(toolCall) {
       });
       if (params.force) {
         let res = editFn();
-        _pendingOps.remove(opId);
+        _pendingOps.delete(opId);
         return res;
       }
       return {
@@ -450,7 +450,7 @@ function processToolCall(toolCall) {
       });
       if (params.force) {
         let res = editFn();
-        _pendingOps.remove(opId);
+        _pendingOps.delete(opId);
         return res;
       }
       return {
