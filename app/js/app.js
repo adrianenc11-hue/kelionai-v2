@@ -873,6 +873,9 @@
           } else if (action === 'monitor_clear') {
             if (window.clearMonitor) clearMonitor();
             else if (window.MonitorManager) MonitorManager.clear();
+          } else if (action === 'deploy' || action === 'admin_deploy') {
+            // Afișează clepsidra de deploy și monitorizează server restart
+            if (window.DeployStatus) DeployStatus.start();
           } else if (action === 'save_file') {
             // Salvează ultimul răspuns AI ca fişier text
             var saveBtn = document.getElementById('btn-save-last');
