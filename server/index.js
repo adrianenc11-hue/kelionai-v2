@@ -55,6 +55,7 @@ const {
 const chatRouter = require('./routes/chat');
 const voiceRouter = require('./routes/voice');
 const { setupLiveChat } = require('./routes/live');
+const { setupVoiceStream } = require('./routes/voice-stream');
 const searchRouter = require('./routes/search');
 const weatherRouter = require('./routes/weather');
 const visionRouter = require('./routes/vision');
@@ -713,6 +714,9 @@ app.locals.memFallback = memFallback;
 
 // Initialize Live Chat namespace
 setupLiveChat(io, app.locals);
+
+// Initialize Voice Stream WebSocket (Deepgram STT → Groq LLM → Cartesia TTS)
+setupVoiceStream(server, app.locals);
 
 // ═══ ROUTE MODULES ═══
 app.use('/api/auth', authRouter);
