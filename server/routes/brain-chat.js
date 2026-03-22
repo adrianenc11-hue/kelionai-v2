@@ -65,8 +65,15 @@ CUM RĂSPUNZI:
 Când Adrian cere o acțiune, răspunzi cu JSON între \\\`\\\`\\\`json ... \\\`\\\`\\\`:
 {"tool":"numeToolului","params":{...},"description":"Ce face"}
 
-Fără aprobare: readFile, searchCode, listFiles, gitStatus, gitLog, gitDiff, runTests, queryDB, screenshot, browse, webSearch, readUrl, generateImage
+Fără aprobare: readFile, searchCode, listFiles, gitStatus, gitLog, gitDiff, runTests, queryDB, screenshot, browse, webSearch, readUrl, generateImage, gitRestore, restoreBackup
 Cu aprobare ⚠️: writeFile, editFile, runCommand, deploy, browseWithAuth, mutateDB
+
+Tool-uri de SIGURANȚĂ (fără aprobare):
+- gitRestore: {"tool":"gitRestore","params":{"filePath":"path/to/file.js"}} — restaurează fișier din git sau backup
+- restoreBackup: {"tool":"restoreBackup","params":{"filePath":"path/to/file.js"}} — restaurează din ultimul backup
+
+IMPORTANT: editFile creează BACKUP AUTOMAT. Dacă editarea eșuează, folosește restoreBackup.
+IMPORTANT: writeFile BLOCHEAZĂ scrierea dacă noul fișier e mai mic de 50% din original (anti-corupție).
 
 EXEMPLE CONCRETE — COPIAZĂ FORMATUL EXACT:
 
@@ -265,16 +272,38 @@ function processToolCall(toolCall) {
         preview: _pendingOps.get(opId).preview,
       };
     }
-    // ── GIT RESTORE — K1 poate restaura fișiere corupte ──
-    case 'gitRestore': {
+    // ── GIT RESTORE / BACKUP RESTORE — K1 poate restaura fișiere corupte ──
+    case 'gitRestore':
+    case 'restoreBackup': {
       const fp = params.filePath || params.path;
       if (!fp) return { result: 'Eroare: lipsește filePath' };
+      
+      // Try git first
       try {
         execSync(`git checkout HEAD -- "${fp}"`, { cwd: process.cwd(), timeout: 10000 });
         const restored = fs.readFileSync(path.resolve(fp), 'utf8');
-        return { result: `✅ Fișier restaurat din git: ${fp} (${restored.length} chars, ${restored.split('\n').length} linii)` };
-      } catch (e) {
-        return { result: `❌ Restaurare eșuată: ${e.message}` };
+        return { result: `✅ Restaurat din git: ${fp} (${restored.length} chars, ${restored.split('\n').length} linii)` };
+      } catch {
+        // Fallback: restore from backup directory
+        try {
+          const backupDir = path.resolve('backups');
+          if (fs.existsSync(backupDir)) {
+            const base = path.basename(fp);
+            const backups = fs.readdirSync(backupDir)
+              .filter(f => f.startsWith(base + '.'))
+              .sort()
+              .reverse();
+            if (backups.length > 0) {
+              const latest = backups[0];
+              const content = fs.readFileSync(path.join(backupDir, latest), 'utf8');
+              fs.writeFileSync(path.resolve(fp), content, 'utf8');
+              return { result: `✅ Restaurat din backup: ${latest} (${content.length} chars, ${content.split('\n').length} linii)` };
+            }
+          }
+          return { result: `❌ Niciun backup găsit pentru ${fp}. Backup-uri se creează automat la fiecare editFile/writeFile.` };
+        } catch (e2) {
+          return { result: `❌ Restaurare eșuată: ${e2.message}` };
+        }
       }
     }
     case 'writeFile': {
