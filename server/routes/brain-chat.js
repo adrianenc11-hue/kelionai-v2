@@ -177,6 +177,7 @@ function processToolCall(toolCall) {
         },
         execute: editFn,
       });
+      if (params.force) { let res = editFn(); _pendingOps.remove(opId); return res; }
       return {
         pendingApproval: true,
         opId,
@@ -258,6 +259,7 @@ function processToolCall(toolCall) {
           return { success: true, file: fp, size: content.length, backup: true };
         },
       });
+      if (params.force) { let res = editFn(); _pendingOps.remove(opId); return res; }
       return {
         pendingApproval: true,
         opId,
@@ -289,6 +291,7 @@ function processToolCall(toolCall) {
           }
         },
       });
+      if (params.force) { let res = editFn(); _pendingOps.remove(opId); return res; }
       return {
         pendingApproval: true,
         opId,
@@ -314,6 +317,7 @@ function processToolCall(toolCall) {
           }
         },
       });
+      if (params.force) { let res = editFn(); _pendingOps.remove(opId); return res; }
       return {
         pendingApproval: true,
         opId,
@@ -384,6 +388,7 @@ function processToolCall(toolCall) {
           }
         },
       });
+      if (params.force) { let res = editFn(); _pendingOps.remove(opId); return res; }
       return {
         pendingApproval: true,
         opId,
@@ -403,6 +408,7 @@ function processToolCall(toolCall) {
         },
         execute: null,
       });
+      if (params.force) { let res = editFn(); _pendingOps.remove(opId); return res; }
       return {
         pendingApproval: true,
         opId,
