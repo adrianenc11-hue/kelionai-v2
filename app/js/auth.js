@@ -197,11 +197,6 @@
         roleBtn.style.borderColor = 'rgba(99,102,241,0.4)';
         roleBtn.style.color = '#c7d2fe';
       }
-      // Hide admin-only features
-      const tBtn = document.getElementById('btn-translate-toggle');
-      if (tBtn) tBtn.style.display = 'none';
-      const cloneBtn = document.getElementById('btn-clone-voice');
-      if (cloneBtn) cloneBtn.style.display = 'none';
       // Hide navbar buttons when not logged in
       const existingAdmin = document.getElementById('btn-admin-nav');
       if (existingAdmin) existingAdmin.style.display = 'none';
@@ -233,12 +228,8 @@
     }
 
     // Show/hide admin-only features
-    const tBtn = document.getElementById('btn-translate-toggle');
-    if (tBtn) tBtn.style.display = isAdmin ? '' : 'none';
     const mouthBtn = document.getElementById('btn-mouth-cal');
     if (mouthBtn) mouthBtn.style.display = isAdmin ? '' : 'none';
-    const cloneBtn = document.getElementById('btn-clone-voice');
-    if (cloneBtn) cloneBtn.style.display = currentUser ? '' : 'none';
     const histBtn = document.getElementById('btn-history');
     if (histBtn) histBtn.style.display = currentUser ? '' : 'none';
     const pricingBtn = document.getElementById('btn-pricing');

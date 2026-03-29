@@ -153,12 +153,10 @@ function getAllowedOrigins() {
 // ═══ FEATURE FLAGS ═══
 const FEATURES = {
   PAYMENTS_ENABLED:         envBool('FEATURE_PAYMENTS',         !!process.env.STRIPE_SECRET_KEY),
-  VOICE_CLONE_ENABLED:      envBool('FEATURE_VOICE_CLONE',      !!process.env.ELEVENLABS_API_KEY),
   VISION_ENABLED:           envBool('FEATURE_VISION',           !!(process.env.OPENAI_API_KEY || process.env.GOOGLE_AI_KEY)),
   REALTIME_VOICE_ENABLED:   envBool('FEATURE_REALTIME_VOICE',   !!process.env.OPENAI_API_KEY),
   REFERRAL_ENABLED:         envBool('FEATURE_REFERRAL',         true),
   IDENTITY_ENABLED:         envBool('FEATURE_IDENTITY',         true),
-  TRANSLATE_ENABLED:        envBool('FEATURE_TRANSLATE',        !!(process.env.GOOGLE_AI_KEY || process.env.OPENAI_API_KEY)),
   USAGE_ENFORCEMENT:        !envBool('DISABLE_USAGE_ENFORCEMENT', false),
 };
 

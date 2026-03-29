@@ -1960,11 +1960,6 @@ body {
   display: flex;
 }
 
-/* Translate & Scan buttons — now use ctrl-circle with is-on/is-off toggle */
-#btn-translate-toggle {
-  /* styled via ctrl-circle */
-}
-
 /* Referral modal */
 #referral-modal .modal-content {
   max-width: 480px;

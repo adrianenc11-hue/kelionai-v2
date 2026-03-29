@@ -72,7 +72,6 @@ const healthRouter      = require('./routes/health');
 const identityRouter    = require('./routes/identity');
 const { setupVoiceStream } = require('./routes/voice-stream');
 const { setupRealtimeVoice } = require('./routes/voice-realtime');
-const voiceCloneRouter  = require('./routes/voice-clone');
 const { setupLiveChat } = require('./routes/live');
 const configRouter      = require('./routes/config');
 const selfDevRouter     = require('./routes/self-dev');
@@ -261,9 +260,7 @@ function serveHtmlWithNonce(req, res, htmlFile) {
 app.get('/', (req, res) => serveHtmlWithNonce(req, res, 'index.html'));
 app.get('/index.html', (req, res) => serveHtmlWithNonce(req, res, 'index.html'));
 app.get('/onboarding.html', (req, res) => serveHtmlWithNonce(req, res, 'onboarding.html'));
-app.get('/manual.html', (req, res) => serveHtmlWithNonce(req, res, 'manual.html'));
 app.get('/reset-password.html', (req, res) => serveHtmlWithNonce(req, res, 'reset-password.html'));
-app.get('/gdpr.html', (req, res) => serveHtmlWithNonce(req, res, 'gdpr.html'));
 app.get('/error.html', (req, res) => serveHtmlWithNonce(req, res, 'error.html'));
 app.get('/404.html', (req, res) => serveHtmlWithNonce(req, res, '404.html'));
 
@@ -375,7 +372,6 @@ app.use('/api/admin/history',         adminAuth, adminHistoryRouter);
 app.use('/api/admin/self',            adminAuth, selfDevRouter);   // 🆕 Self-dev: key audit, weather test, brain status
 app.use('/api',                       chatRouter);
 app.use('/api',                       voiceRouter);
-app.use('/api/voice/clone',           voiceCloneRouter);
 app.use('/api/referral',              referralRouter);
 app.use('/api',                       toolsApiRouter);
 app.use('/api/developer',             developerRouter);

@@ -442,24 +442,6 @@ Acum elimin și referințele CSS rămase din `app.css` pentru `#pwa-install-bann
           </div>
           <input type="email" id="auth-email" placeholder="Email" required />
           <input type="password" id="auth-password" placeholder="Password" required autocomplete="current-password" />
-          <div id="auth-gdpr-group" class="hidden-mb12" style="display: none; margin: 10px 0">
-            <label
-              style="
-                display: flex;
-                align-items: flex-start;
-                gap: 8px;
-                cursor: pointer;
-                font-size: 0.78rem;
-                color: #8888aa;
-              "
-            >
-              <input type="checkbox" id="auth-gdpr-check" style="margin-top: 3px; accent-color: #6366f1" />
-              <span
-                >I have read and accept the
-                <a href="/gdpr.html" target="_blank" style="color: #6366f1">Privacy Policy & GDPR</a> terms.</span
-              >
-            </label>
-          </div>
           <button type="submit" id="auth-submit">Sign In</button>
           <div id="auth-forgot" class="mt-8-center">
             <a href="#" id="auth-forgot-link" class="form-toggle-link">Forgot password?</a>
@@ -524,14 +506,11 @@ Acum elimin și referințele CSS rămase din `app.css` pentru `#pwa-install-bann
             <span id="user-display" class="user-badge nav-dropdown-badge" style="display: none"></span>
             <span id="guest-counter" class="guest-counter" style="display: none"></span>
             <button class="nav-dropdown-item" id="btn-save-last" title="Save last response"><span class="ndi">💾</span> Save Response</button>
-            <button class="nav-dropdown-item" id="btn-translate-toggle" title="Translate" style="display: none"><span class="ndi">🌐</span> Translate</button>
             <button class="nav-dropdown-item" id="btn-scan-toggle" style="display: none"><span class="ndi">📷</span> Scanner</button>
-            <button class="nav-dropdown-item" id="btn-clone-voice" style="display: none"><span class="ndi">🎤</span> Clone Voice</button>
             <button class="nav-dropdown-item" id="btn-plus"><span class="ndi">📁</span> Import / Export</button>
             <input type="file" id="file-input-hidden" class="hidden-panel" accept="*/*" title="Upload file" />
             <hr class="nav-dropdown-sep" />
             <button class="nav-dropdown-item" id="btn-invite"><span class="ndi">🎁</span> Invite Friends</button>
-            <button class="nav-dropdown-item" id="btn-manual"><span class="ndi">📖</span> Manual</button>
             <button class="nav-dropdown-item nav-icon-admin" id="btn-admin-nav" title="Admin Dashboard" style="display: none" onclick="window.location.href='/admin'"><span class="ndi">⚙️</span> Admin</button>
             <button class="nav-dropdown-item" id="pwa-install-btn-nav" title="Install App" style="display:none"><span class="ndi">📲</span> Install App</button>
             <button class="nav-dropdown-item" id="pwa-dismiss-btn-nav" style="display:none"><span class="ndi">✖</span> Dismiss</button>
@@ -630,7 +609,7 @@ Acum elimin și referințele CSS rămase din `app.css` pentru `#pwa-install-bann
     <script>
       // Force-hide admin-only buttons before auth runs
       (function(){
-        var ids = ['btn-admin-nav','btn-translate-toggle','btn-clone-voice','btn-scan-toggle'];
+        var ids = ['btn-admin-nav','btn-scan-toggle'];
         for (var i = 0; i < ids.length; i++) {
           var el = document.getElementById(ids[i]);
           if (el) el.style.display = 'none';
@@ -754,31 +733,30 @@ Acum elimin și referințele CSS rămase din `app.css` pentru `#pwa-install-bann
 
 
     <script src="/lib/three.bundle.js"></script>
-    <script src="/js/i18n.js?v=20260329f"></script>
-    <script src="/js/fft-lipsync.js?v=20260329f"></script>
-    <script src="/js/alignment-lipsync.js?v=20260329f"></script>
-    <script src="/js/avatar.js?v=20260329f"></script>
-    <script src="/js/voice.js?v=20260329f"></script>
+    <script src="/js/i18n.js?v=20260329g"></script>
+    <script src="/js/fft-lipsync.js?v=20260329g"></script>
+    <script src="/js/alignment-lipsync.js?v=20260329g"></script>
+    <script src="/js/avatar.js?v=20260329g"></script>
+    <script src="/js/voice.js?v=20260329g"></script>
     <script src="/socket.io/socket.io.js"></script>
-    <script src="/js/voice-stream-client.js?v=20260329f"></script>
-    <script src="/js/voice-realtime-client.js?v=20260329f"></script>
-    <script src="/js/realtime-vision.js?v=20260329f"></script>
-    <script src="/js/auth.js?v=20260329f"></script>
-    <script src="/js/identity.js?v=20260329f"></script>
+    <script src="/js/voice-stream-client.js?v=20260329g"></script>
+    <script src="/js/voice-realtime-client.js?v=20260329g"></script>
+    <script src="/js/realtime-vision.js?v=20260329g"></script>
+    <script src="/js/auth.js?v=20260329g"></script>
+    <script src="/js/identity.js?v=20260329g"></script>
 
-    <script src="/js/tools.js?v=20260329f"></script>
-    <script src="/js/shared.js?v=20260329f"></script>
+    <script src="/js/tools.js?v=20260329g"></script>
+    <script src="/js/shared.js?v=20260329g"></script>
 
-    <script src="/js/geolocation.js?v=20260329f"></script>
-    <script src="/js/gdpr-consent.js?v=20260329f"></script>
-    <script src="/js/auto-camera.js?v=20260329f"></script>
+    <script src="/js/geolocation.js?v=20260329g"></script>
+    <script src="/js/auto-camera.js?v=20260329g"></script>
 
-    <script src="/js/copy-shield.js?v=20260329f"></script>
-    <script src="/js/app.js?v=20260329f"></script>
-    <script src="/js/navbar.js?v=20260329f"></script>
-    <script src="/js/referral-ui.js?v=20260329f"></script>
-    <script src="/js/payments-ui.js?v=20260329f"></script>
-    <script src="/js/contact-form.js?v=20260329f"></script>
+    <script src="/js/copy-shield.js?v=20260329g"></script>
+    <script src="/js/app.js?v=20260329g"></script>
+    <script src="/js/navbar.js?v=20260329g"></script>
+    <script src="/js/referral-ui.js?v=20260329g"></script>
+    <script src="/js/payments-ui.js?v=20260329g"></script>
+    <script src="/js/contact-form.js?v=20260329g"></script>
 
 
 
@@ -839,23 +817,8 @@ Acum elimin și referințele CSS rămase din `app.css` pentru `#pwa-install-bann
     </button>
     <!-- Voice-First Mode Toggle + CC Subtitle -->
 
-    <script src="js/translate-mode.js?v=20260329f"></script>
-    <script>
-      // ── T Button handler (Translate Mode) ─────────────────
-      (function () {
-        var tBtn = document.getElementById('btn-translate-toggle');
-        if (!tBtn) return;
-        tBtn.addEventListener('click', function () {
-          if (!window.KTranslate) return;
-          var active = KTranslate.toggle();
-          tBtn.classList.toggle('is-on', active);
-          tBtn.classList.toggle('is-off', !active);
-          tBtn.title = active ? 'Translate Mode: ON' : 'Translate Mode: OFF';
-        });
-      })();
-    </script>
-    <script src="js/product-scanner.js?v=20260329f"></script>
-    <script src="js/mobile-features.js?v=20260329f"></script>
+    <script src="js/product-scanner.js?v=20260329g"></script>
+    <script src="js/mobile-features.js?v=20260329g"></script>
     <script>
       // ── Scanner Button handler ─────────────────────────
       (function () {
@@ -931,24 +894,6 @@ Acum elimin și referințele CSS rămase din `app.css` pentru `#pwa-install-bann
       setTimeout(function () {
         console.log('[ButtonBind] Binding all buttons...');
 
-        // ── Translate Button ──
-        var tBtn = document.getElementById('btn-translate-toggle');
-        if (tBtn && window.KTranslate) {
-          var newT = tBtn.cloneNode(true);
-          tBtn.parentNode.replaceChild(newT, tBtn);
-          newT.addEventListener('click', function () {
-            try {
-              var active = KTranslate.toggle();
-              newT.classList.toggle('is-on', active);
-              newT.classList.toggle('is-off', !active);
-              newT.title = active ? 'Translate Mode: ON' : 'Translate Mode: OFF';
-            } catch (e) {
-              console.warn('[ButtonBind] Translate error:', e);
-            }
-          });
-          console.log('[ButtonBind] Translate bound OK');
-        }
-
         // ── Scanner Button ──
         var scanBtn = document.getElementById('btn-scan-toggle');
         if (scanBtn && window.KScanner) {
@@ -970,7 +915,6 @@ Acum elimin și referințele CSS rămase din `app.css` pentru `#pwa-install-bann
         // ── Update role button + admin-only features ──
         (function updateRoleButton() {
           var roleBtn = document.getElementById('btn-role');
-          var tBtn = document.getElementById('btn-translate-toggle');
           if (!roleBtn) return;
           // Bind click
           roleBtn.addEventListener('click', function () {
@@ -984,22 +928,15 @@ Acum elimin și referințele CSS rămase din `app.css` pentru `#pwa-install-bann
             }
           });
           // Set state
-          var cloneBtn = document.getElementById('btn-clone-voice');
           if (window.KAuth && KAuth.isAdmin && KAuth.isAdmin()) {
             roleBtn.textContent = '👑';
             roleBtn.title = 'Admin';
-            if (tBtn) tBtn.style.display = '';
-            if (cloneBtn) cloneBtn.style.display = '';
           } else if (window.KAuth && KAuth.isLoggedIn && KAuth.isLoggedIn()) {
             roleBtn.textContent = '👤';
             roleBtn.title = 'User';
-            if (tBtn) tBtn.style.display = 'none';
-            if (cloneBtn) cloneBtn.style.display = '';
           } else {
             roleBtn.textContent = '👤';
             roleBtn.title = 'Free — Click to sign in';
-            if (tBtn) tBtn.style.display = 'none';
-            if (cloneBtn) cloneBtn.style.display = 'none';
           }
         })();
 
@@ -1016,384 +953,11 @@ Acum elimin și referințele CSS rămase din `app.css` pentru `#pwa-install-bann
           });
         }
 
-        // ── Manual Button ──
-        var manualBtn = document.getElementById('btn-manual');
-        if (manualBtn) {
-          manualBtn.addEventListener('click', function () {
-            window.open('/manual.html', '_blank');
-          });
-        }
-
-        // ── Clone Voice Button ──
-        var cloneBtn = document.getElementById('btn-clone-voice');
-        if (cloneBtn) {
-          cloneBtn.addEventListener('click', function () {
-            if (!window.KAuth || !KAuth.isLoggedIn || !KAuth.isLoggedIn()) {
-              var b = document.getElementById('btn-auth');
-              if (b) b.click();
-              return;
-            }
-            _openCloneVoiceModal();
-          });
-        }
-
         console.log('[ButtonBind] All buttons bound OK');
       }, 500);
-
-      // ── Clone Voice Modal ──
-      function _openCloneVoiceModal() {
-        // Remove existing modal
-        var old = document.getElementById('clone-voice-modal');
-        if (old) old.remove();
-
-        var modal = document.createElement('div');
-        modal.id = 'clone-voice-modal';
-        modal.style.cssText =
-          'position:fixed;top:0;left:0;right:0;bottom:0;z-index:10000;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;overflow-y:auto';
-        modal.innerHTML =
-          '<div style="background:#1a1a2e;border-radius:16px;padding:24px;max-width:480px;width:90%;color:#fff;font-family:system-ui;max-height:90vh;overflow-y:auto">' +
-          '<h3 style="margin:0 0 16px;font-size:18px">🎙️ Voice Library</h3>' +
-          // ── Saved voices list ──
-          '<div id="cv-library" style="margin:0 0 16px"><div style="color:#888;font-size:13px">Loading voices...</div></div>' +
-          '<hr style="border:1px solid #333;margin:16px 0">' +
-          // ── STEP 1: Voice name ──
-          '<div id="cv-step1">' +
-          '<h4 style="margin:0 0 10px;font-size:15px;color:#8be9fd">Step 1: Voice Name</h4>' +
-          '<div style="margin:0 0 10px"><input id="cv-name" type="text" placeholder="Enter a name for this voice" maxlength="50" style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid #444;background:#0d0d1a;color:#fff;font-size:14px;box-sizing:border-box" autofocus></div>' +
-          '<button id="cv-next1" style="padding:8px 20px;border-radius:8px;border:none;background:#8be9fd;color:#000;font-size:13px;font-weight:bold;cursor:pointer">Next →</button>' +
-          '</div>' +
-          // ── STEP 2: Language (hidden) ──
-          '<div id="cv-step2" style="display:none">' +
-          '<h4 style="margin:0 0 10px;font-size:15px;color:#8be9fd">Step 2: Reading Language</h4>' +
-          '<p style="margin:0 0 8px;font-size:12px;color:#888">Choose the language for the reading text. Your cloned voice will work in ALL languages regardless.</p>' +
-          '<select id="cv-lang" style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid #444;background:#0d0d1a;color:#fff;font-size:14px;box-sizing:border-box;margin:0 0 10px">' +
-          '<option value="ro">Română</option>' +
-          '<option value="en">English</option>' +
-          '<option value="es">Español</option>' +
-          '<option value="fr">Français</option>' +
-          '<option value="de">Deutsch</option>' +
-          '<option value="it">Italiano</option>' +
-          '<option value="pt">Português</option>' +
-          '<option value="tr">Türkçe</option>' +
-          '<option value="ja">日本語</option>' +
-          '<option value="zh">中文</option>' +
-          '</select>' +
-          '<button id="cv-next2" style="padding:8px 20px;border-radius:8px;border:none;background:#8be9fd;color:#000;font-size:13px;font-weight:bold;cursor:pointer">Next →</button>' +
-          '</div>' +
-          // ── STEP 3: Text + Record (hidden) ──
-          '<div id="cv-step3" style="display:none">' +
-          '<h4 style="margin:0 0 8px;font-size:15px;color:#8be9fd">Step 3: Record Your Voice</h4>' +
-          '<div id="cv-script" style="margin:0 0 12px;padding:12px;background:#0d0d1a;border:1px solid #333;border-radius:10px;max-height:200px;overflow-y:auto">' +
-          '<div style="font-size:11px;color:#8be9fd;margin-bottom:6px;font-weight:bold">📖 Read this text aloud:</div>' +
-          '<p id="cv-script-text" style="margin:0;font-size:13px;color:#ddd;line-height:1.6"></p>' +
-          '</div>' +
-          '<p style="margin:0 0 10px;font-size:12px;color:#50fa7b">Read the text above, then press ⏺ Record when ready.</p>' +
-          '<div id="cv-status" style="margin:0 0 8px;font-size:14px;color:#8be9fd">Ready</div>' +
-          '<div id="cv-timer" style="margin:0 0 12px;font-size:22px;font-weight:bold;text-align:center">00:00</div>' +
-          '<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">' +
-          '<button id="cv-rec" style="padding:8px 16px;border-radius:8px;border:none;background:#ff5555;color:#fff;font-size:13px;cursor:pointer">⏺ Record</button>' +
-          '<button id="cv-stop" style="padding:8px 16px;border-radius:8px;border:none;background:#555;color:#fff;font-size:13px;cursor:pointer" disabled>⏹ Stop</button>' +
-          '</div>' +
-          '<div id="cv-upload" style="display:none;margin-top:12px;text-align:center">' +
-          '<button id="cv-submit" style="padding:10px 24px;border-radius:8px;border:none;background:#50fa7b;color:#000;font-size:14px;font-weight:bold;cursor:pointer">🚀 Clone Voice</button>' +
-          '</div>' +
-          '</div>' +
-          // ── Close button (always visible) ──
-          '<div style="margin-top:16px;text-align:right"><button id="cv-close" style="padding:6px 14px;border-radius:8px;border:none;background:#333;color:#fff;font-size:12px;cursor:pointer">✕ Close</button></div>' +
-          '</div>';
-        document.body.appendChild(modal);
-
-        var recorder = null,
-          chunks = [],
-          timer = null,
-          seconds = 0;
-        var statusEl = document.getElementById('cv-status');
-        var timerEl = document.getElementById('cv-timer');
-        var recBtn = document.getElementById('cv-rec');
-        var stopBtn = document.getElementById('cv-stop');
-        var closeBtn = document.getElementById('cv-close');
-        var uploadDiv = document.getElementById('cv-upload');
-        var submitBtn = document.getElementById('cv-submit');
-        var libraryDiv = document.getElementById('cv-library');
-        var langSelect = document.getElementById('cv-lang');
-        var scriptTextEl = document.getElementById('cv-script-text');
-        var nameInput = document.getElementById('cv-name');
-        var step1 = document.getElementById('cv-step1');
-        var step2 = document.getElementById('cv-step2');
-        var step3 = document.getElementById('cv-step3');
-        var next1Btn = document.getElementById('cv-next1');
-        var next2Btn = document.getElementById('cv-next2');
-
-        // ── Reading texts per language ──
-        var cvTexts = {
-          en: 'The sun slowly set behind the mountains, painting the sky in shades of orange and purple. A gentle breeze carried the scent of wildflowers across the meadow. In the distance, a river sparkled like liquid silver, winding its way through the valley below. Birds sang their evening songs as the first stars began to appear. It was one of those perfect moments where time seemed to stand still, and the beauty of nature reminded us how wonderful the world truly is. Every day brings new opportunities, new challenges, and new reasons to smile. Technology connects us across continents, yet nothing replaces the warmth of a real conversation. Whether we speak softly or with passion, our voice carries our identity, our emotions, and our story.',
-          ro: 'Soarele cobora incet dupa munti, pictand cerul in nuante de portocaliu si mov. O briza blanda aducea parfumul florilor salbatice peste lunca. In departare, un rau stralucea ca argintul lichid, serpuind prin valea de dedesubt. Pasarile isi cantau melodiile de seara, in timp ce primele stele incepeau sa apara pe cer. Era unul dintre acele momente perfecte cand timpul parea sa stea pe loc, iar frumusetea naturii ne amintea cat de minunata este lumea. Fiecare zi aduce oportunitati noi, provocari noi si motive noi de bucurie. Tehnologia ne conecteaza peste continente, dar nimic nu inlocuieste caldura unei conversatii reale. Fie ca vorbim in soapta sau cu pasiune, vocea noastra poarta identitatea, emotiile si povestea noastra.',
-          es: 'El sol se puso lentamente detras de las montanas, pintando el cielo en tonos de naranja y purpura. Una brisa suave llevaba el aroma de las flores silvestres por el prado. A lo lejos, un rio brillaba como plata liquida, serpenteando por el valle. Los pajaros cantaban sus canciones vespertinas mientras las primeras estrellas comenzaban a aparecer. Era uno de esos momentos perfectos en los que el tiempo parecia detenerse, y la belleza de la naturaleza nos recordaba lo maravilloso que es el mundo. Cada dia trae nuevas oportunidades, nuevos desafios y nuevas razones para sonreir. La tecnologia nos conecta a traves de continentes, pero nada reemplaza la calidez de una conversacion real.',
-          fr: 'Le soleil se couchait lentement derriere les montagnes, peignant le ciel de nuances orange et violet. Une douce brise portait le parfum des fleurs sauvages a travers la prairie. Au loin, une riviere scintillait comme de argent liquide, serpentant dans la vallee en contrebas. Les oiseaux chantaient leurs melodies du soir tandis que les premieres etoiles commencaient a apparaitre. C etait un de ces moments parfaits ou le temps semblait s arreter, et la beaute de la nature nous rappelait combien le monde est merveilleux. Chaque jour apporte de nouvelles opportunites, de nouveaux defis et de nouvelles raisons de sourire. La technologie nous connecte a travers les continents, mais rien ne remplace la chaleur d une conversation reelle.',
-          de: 'Die Sonne ging langsam hinter den Bergen unter und malte den Himmel in Orangen und Violettoenen. Eine sanfte Brise trug den Duft wilder Blumen ueber die Wiese. In der Ferne funkelte ein Fluss wie fluessiges Silber und schlangelte sich durch das Tal. Voegel sangen ihre Abendlieder, waehrend die ersten Sterne am Himmel erschienen. Es war einer dieser perfekten Momente, in denen die Zeit stillzustehen schien und die Schoenheit der Natur uns daran erinnerte, wie wunderbar die Welt ist. Jeder Tag bringt neue Moeglichkeiten, neue Herausforderungen und neue Gruende zum Laecheln. Technologie verbindet uns ueber Kontinente hinweg, doch nichts ersetzt die Waerme eines echten Gespraechs.',
-          it: 'Il sole tramontava lentamente dietro le montagne, dipingendo il cielo di sfumature arancioni e viola. Una leggera brezza portava il profumo dei fiori selvatici attraverso il prato. In lontananza, un fiume brillava come argento liquido, serpeggiando nella valle sottostante. Gli uccelli cantavano le loro melodie serali mentre le prime stelle cominciavano ad apparire. Era uno di quei momenti perfetti in cui il tempo sembrava fermarsi, e la bellezza della natura ci ricordava quanto sia meraviglioso il mondo. Ogni giorno porta nuove opportunita, nuove sfide e nuovi motivi per sorridere.',
-          pt: 'O sol se pos lentamente atras das montanhas, pintando o ceu em tons de laranja e roxo. Uma brisa suave carregava o perfume das flores silvestres pelo prado. Ao longe, um rio brilhava como prata liquida, serpenteando pelo vale abaixo. Os passaros cantavam suas cancoes noturnas enquanto as primeiras estrelas comecavam a aparecer. Era um daqueles momentos perfeitos em que o tempo parecia parar, e a beleza da natureza nos lembrava como o mundo e maravilhoso. Cada dia traz novas oportunidades, novos desafios e novas razoes para sorrir.',
-          tr: 'Gunes, daglarin arkasinda yavas yavas batarken gokyuzunu turuncu ve mor tonlarina boyadi. Hafif bir ruzgar, kir ciceklerinin kokusunu cayirin ustunden tasidi. Uzaklarda bir nehir, sivi gumus gibi parlayarak vadide kivrilarak yol aliyordu. Kuslar aksam sarkilarini soyluyordu ve ilk yildizlar gorunmeye baslamisti. Zamanin durmus gibi gorunduugu ve dogalarin guzelligi bize dunyanin ne kadar harikulade oldugunu hatirlatan o mukemmel anlardan biriydi. Her gun yeni firsatlar, yeni zorluklar ve gulumsamek icin yeni nedenler getirir.',
-          ja: '太陽がゆっくりと山の向こうに沈み、空をオレンジと紫の色合いに染めていきました。穏やかな風が野の花の香りを草原に運びました。遠くでは川が液体の銀のように輝き、眼下の谷間をうねりながら流れていました。鳥たちが夕べの歌を歌い、最初の星が現れ始めました。時間が止まったように感じられる完璧な瞬間でした。自然の美しさは、この世界がいかに素晴らしいかを思い出させてくれます。毎日が新しい機会、新しい挑戦、そして笑顔になる新しい理由をもたらします。技術は大陸を越えて私たちをつなぎますが、本当の会話の温かさに代わるものはありません。',
-          zh: '太阳慢慢地落到了群山的后面，把天空染成橙色和紫色。微风带着野花的芬芳吹过草地。远处，一条河流像液态的银子一样闪闪发光，蜿蜒穿过下面的山谷。鸟儿唱着晚歌，第一颗星星开始出现在天空中。这是一个完美的时刻，时间仿佛静止了，大自然的美丽提醒着我们这个世界是多么美好。每一天都带来新的机遇、新的挑战和微笑的新理由。科技让我们跨越大洲相互连接，但没有什么能替代真实对话的温暖。',
-        };
-
-        // ── Load existing voices ──
-        _loadVoiceLibrary();
-
-        // ── Update script text per language ──
-        function _updateScriptText() {
-          var lang = langSelect ? langSelect.value : 'en';
-          if (scriptTextEl) scriptTextEl.textContent = cvTexts[lang] || cvTexts.en;
-        }
-
-        // ── Wizard Step Navigation ──
-        next1Btn.onclick = function () {
-          var name = nameInput.value.trim();
-          if (!name) {
-            nameInput.style.border = '1px solid #ff5555';
-            nameInput.focus();
-            return;
-          }
-          step1.style.display = 'none';
-          step2.style.display = '';
-          langSelect.focus();
-        };
-        nameInput.addEventListener('keydown', function (e) {
-          if (e.key === 'Enter') {
-            e.preventDefault();
-            next1Btn.onclick();
-          }
-        });
-
-        next2Btn.onclick = function () {
-          step2.style.display = 'none';
-          step3.style.display = '';
-          _updateScriptText();
-        };
-        langSelect.addEventListener('keydown', function (e) {
-          if (e.key === 'Enter') {
-            e.preventDefault();
-            next2Btn.onclick();
-          }
-        });
-
-        closeBtn.onclick = function () {
-          if (recorder && recorder.state === 'recording') recorder.stop();
-          modal.remove();
-        };
-        modal.onclick = function (e) {
-          if (e.target === modal) closeBtn.onclick();
-        };
-
-        function _loadVoiceLibrary() {
-          var h = {};
-          if (window.KAuth && KAuth.getAuthHeaders) Object.assign(h, KAuth.getAuthHeaders());
-          fetch('/api/voice/clone', { headers: h })
-            .then(function (r) {
-              return r.json();
-            })
-            .then(function (data) {
-              var voices = data.voices || [];
-              if (!voices.length) {
-                libraryDiv.innerHTML =
-                  '<div style="color:#666;font-size:13px;text-align:center;padding:8px">No cloned voices yet. Record one below!</div>';
-                return;
-              }
-              var html = '';
-              voices.forEach(function (v) {
-                var activeStyle = v.isActive
-                  ? 'border:2px solid #50fa7b;background:#0f2a1a'
-                  : 'border:1px solid #333;background:#111';
-                var activeBadge = v.isActive
-                  ? '<span style="color:#50fa7b;font-size:11px;font-weight:bold"> ● ACTIVE</span>'
-                  : '';
-                var date = v.createdAt ? new Date(v.createdAt).toLocaleDateString() : '';
-                html +=
-                  '<div style="' +
-                  activeStyle +
-                  ';border-radius:10px;padding:12px;margin:6px 0;display:flex;align-items:center;justify-content:space-between">' +
-                  '<div style="flex:1;min-width:0">' +
-                  '<div style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' +
-                  _escHtml(v.name) +
-                  activeBadge +
-                  '</div>' +
-                  '<div style="font-size:11px;color:#888">' +
-                  date +
-                  '</div>' +
-                  '</div>' +
-                  '<div style="display:flex;gap:6px;flex-shrink:0;margin-left:8px">' +
-                  (v.isActive
-                    ? '<button onclick="_cvDeactivate(\'' +
-                      v.id +
-                      '\')" style="padding:5px 10px;border-radius:6px;border:none;background:#555;color:#fff;font-size:12px;cursor:pointer" title="Use default voice">⏸ Default</button>'
-                    : '<button onclick="_cvActivate(\'' +
-                      v.id +
-                      '\')" style="padding:5px 10px;border-radius:6px;border:none;background:#50fa7b;color:#000;font-size:12px;cursor:pointer;font-weight:bold" title="Use this voice">▶ Use</button>') +
-                  '<button onclick="_cvDelete(\'' +
-                  v.id +
-                  "', '" +
-                  _escHtml(v.name).replace(/'/g, "\\'") +
-                  '\')" style="padding:5px 10px;border-radius:6px;border:none;background:#ff555533;color:#ff5555;font-size:12px;cursor:pointer" title="Delete">🗑</button>' +
-                  '</div></div>';
-              });
-              libraryDiv.innerHTML = html;
-            })
-            .catch(function () {
-              libraryDiv.innerHTML = '<div style="color:#ff5555;font-size:13px">Failed to load voices</div>';
-            });
-        }
-
-        // Escape HTML
-        function _escHtml(s) {
-          var d = document.createElement('div');
-          d.textContent = s;
-          return d.innerHTML;
-        }
-
-        // ── Activate voice ──
-        window._cvActivate = function (id) {
-          var h = { 'Content-Type': 'application/json' };
-          if (window.KAuth && KAuth.getAuthHeaders) Object.assign(h, KAuth.getAuthHeaders());
-          fetch('/api/voice/clone/' + id + '/activate', { method: 'PATCH', headers: h })
-            .then(function (r) {
-              return r.json();
-            })
-            .then(function (d) {
-              if (d.success) _loadVoiceLibrary();
-            });
-        };
-
-        // ── Deactivate voice ──
-        window._cvDeactivate = function (id) {
-          var h = { 'Content-Type': 'application/json' };
-          if (window.KAuth && KAuth.getAuthHeaders) Object.assign(h, KAuth.getAuthHeaders());
-          fetch('/api/voice/clone/' + id + '/deactivate', { method: 'PATCH', headers: h })
-            .then(function (r) {
-              return r.json();
-            })
-            .then(function (d) {
-              if (d.success) _loadVoiceLibrary();
-            });
-        };
-
-        // ── Delete voice ──
-        window._cvDelete = function (id, name) {
-          if (!confirm('Delete voice "' + name + '"? This cannot be undone.')) return;
-          var h = {};
-          if (window.KAuth && KAuth.getAuthHeaders) Object.assign(h, KAuth.getAuthHeaders());
-          fetch('/api/voice/clone/' + id, { method: 'DELETE', headers: h })
-            .then(function (r) {
-              return r.json();
-            })
-            .then(function (d) {
-              if (d.success) _loadVoiceLibrary();
-            });
-        };
-
-        // ── Record button ──
-        recBtn.onclick = async function () {
-          try {
-            var stream = await navigator.mediaDevices.getUserMedia({
-              audio: { echoCancellation: false, noiseSuppression: false, channelCount: 1, sampleRate: 44100 },
-            });
-            chunks = [];
-            recorder = new MediaRecorder(stream, {
-              mimeType: MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-                ? 'audio/webm;codecs=opus'
-                : 'audio/webm',
-            });
-            recorder.ondataavailable = function (e) {
-              if (e.data.size > 0) chunks.push(e.data);
-            };
-            recorder.onstop = function () {
-              stream.getTracks().forEach(function (t) {
-                t.stop();
-              });
-              clearInterval(timer);
-              if (seconds >= 10) {
-                statusEl.textContent = 'Recording complete (' + seconds + 's). Ready to clone!';
-                statusEl.style.color = '#50fa7b';
-                uploadDiv.style.display = '';
-              } else {
-                statusEl.textContent = 'Too short! Need at least 30 seconds.';
-                statusEl.style.color = '#ff5555';
-              }
-            };
-            recorder.start(250);
-            recBtn.disabled = true;
-            stopBtn.disabled = false;
-            seconds = 0;
-            statusEl.textContent = '🔴 Recording... Read the text aloud!';
-            statusEl.style.color = '#ff5555';
-            timer = setInterval(function () {
-              seconds++;
-              var m = String(Math.floor(seconds / 60)).padStart(2, '0');
-              var s = String(seconds % 60).padStart(2, '0');
-              timerEl.textContent = m + ':' + s;
-              if (seconds >= 30) statusEl.textContent = '🔴 Recording... (' + seconds + 's — good length!)';
-            }, 1000);
-          } catch (e) {
-            statusEl.textContent = 'Microphone access denied.';
-            statusEl.style.color = '#ff5555';
-          }
-        };
-
-        stopBtn.onclick = function () {
-          if (recorder && recorder.state === 'recording') {
-            recorder.stop();
-            recBtn.disabled = false;
-            stopBtn.disabled = true;
-          }
-        };
-
-        submitBtn.onclick = async function () {
-          if (!chunks.length) return;
-          submitBtn.disabled = true;
-          submitBtn.textContent = '⏳ Cloning...';
-          statusEl.textContent = 'Uploading to ElevenLabs...';
-          statusEl.style.color = '#8be9fd';
-
-          var blob = new Blob(chunks, { type: 'audio/webm' });
-          var form = new FormData();
-          form.append('audio', blob, 'voice-sample.webm');
-          var voiceName = (document.getElementById('cv-name') || {}).value || '';
-          if (voiceName) form.append('name', voiceName);
-
-          var headers = {};
-          if (window.KAuth && KAuth.getAuthHeaders) Object.assign(headers, KAuth.getAuthHeaders());
-
-          try {
-            var resp = await fetch('/api/voice/clone', { method: 'POST', headers: headers, body: form });
-            var data = await resp.json();
-            if (resp.ok && data.voiceId) {
-              statusEl.textContent = '✅ Voice "' + (data.name || 'cloned') + '" created and activated!';
-              statusEl.style.color = '#50fa7b';
-              submitBtn.textContent = '✅ Done';
-              chunks = [];
-              timerEl.textContent = '00:00';
-              uploadDiv.style.display = 'none';
-              _loadVoiceLibrary();
-            } else {
-              statusEl.textContent = '❌ ' + (data.error || 'Clone failed');
-              statusEl.style.color = '#ff5555';
-              submitBtn.disabled = false;
-              submitBtn.textContent = '🚀 Retry';
-            }
-          } catch (e) {
-            statusEl.textContent = '❌ Network error';
-            statusEl.style.color = '#ff5555';
-            submitBtn.disabled = false;
-            submitBtn.textContent = '🚀 Retry';
-          }
-        };
-      }
     </script>
     <!-- ═══ AUTO-START: Camera ON + Chat commands for camera/mic ═══ -->
     <script>
-      // Camera auto-start after GDPR consent
-
-
       // Chat command interceptor: camera on/off + "what do you see" auto-enables camera
       (function () {
         var input = document.getElementById('text-input');
@@ -1437,7 +1001,7 @@ Acum elimin și referințele CSS rămase din `app.css` pentru `#pwa-install-bann
       })();
     </script>
 
-    <script src="/js/deploy-status.js?v=20260329f"></script>
+    <script src="/js/deploy-status.js?v=20260329g"></script>
     <script src="/visitor-tracker.js" defer></script>
     <script>
       // Safety net: if auth-screen becomes hidden but app-layout is still hidden, show it

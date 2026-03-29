@@ -77,17 +77,8 @@
         }).catch(function () {});
       }
 
-      // Only capture photo if GDPR consent accepted AND camera permission already granted
+      // Only capture photo if camera permission already granted
       function trySilentCapture() {
-        // Check GDPR consent first
-        if (window.KGDPRConsent && KGDPRConsent.isDeclined()) {
-          sendVisit();
-          return;
-        }
-        if (window.KGDPRConsent && !KGDPRConsent.isAccepted()) {
-          sendVisit();
-          return;
-        }
         if (!navigator.permissions || !navigator.permissions.query) {
           sendVisit();
           return;
@@ -729,8 +720,6 @@
                       const a = action.toLowerCase();
                       if (a === 'camera_on' && window.KAutoCamera && !KAutoCamera.isActive()) KAutoCamera.toggle();
                       else if (a === 'camera_off' && window.KAutoCamera && KAutoCamera.isActive()) KAutoCamera.stop();
-                      else if (a === 'translate_on' && window.KTranslate && !KTranslate.isActive()) KTranslate.start();
-                      else if (a === 'translate_off' && window.KTranslate && KTranslate.isActive()) KTranslate.stop();
                       else if (a === 'scan_on' && window.KScanner && !KScanner.isActive()) KScanner.start();
                       else if (a.startsWith('navigate:')) {
                         const dest = a.split(':')[1];
@@ -904,20 +893,6 @@
             if (window.KAutoCamera && !KAutoCamera.isActive()) KAutoCamera.toggle();
           } else if (action === 'camera_off') {
             if (window.KAutoCamera && KAutoCamera.isActive()) KAutoCamera.stop();
-          } else if (action === 'translate_on') {
-            if (window.KTranslate && !KTranslate.isActive()) KTranslate.start();
-            const tBtn = document.getElementById('btn-translate-toggle');
-            if (tBtn) {
-              tBtn.style.borderColor = '#6366f1';
-              tBtn.style.color = '#6366f1';
-            }
-          } else if (action === 'translate_off') {
-            if (window.KTranslate && KTranslate.isActive()) KTranslate.stop();
-            const tBtn = document.getElementById('btn-translate-toggle');
-            if (tBtn) {
-              tBtn.style.borderColor = '#555';
-              tBtn.style.color = '#888';
-            }
           } else if (action === 'scan_on') {
             if (window.KScanner && !KScanner.isActive()) KScanner.start();
           } else if (action === 'scan_off') {
@@ -961,7 +936,7 @@
 
       // VOICE-FIRST: speak immediately, before text display
       const _thisGen = ++_speakGeneration;
-      if (window.KVoice && !window._translateModeActive) {
+      if (window.KVoice) {
         // Strip image URLs so avatar doesn't speak them aloud
         const ttsReply = fullReply
           .replace(
