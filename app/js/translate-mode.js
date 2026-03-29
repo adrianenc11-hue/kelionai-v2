@@ -634,12 +634,6 @@
     const overlay = document.getElementById('translate-overlay');
     if (overlay) overlay.remove();
 
-    // Re-activate chat mic
-    const chatMic = document.getElementById('btn-mic');
-    if (chatMic && chatMic.classList.contains('is-off')) {
-      chatMic.click();
-    }
-
     console.log('[Translate] Mode OFF');
   }
 
@@ -659,13 +653,6 @@
     }
     if (window._directSpeech) {
       try { window._directSpeech.stop(); } catch (_e) { /* ignored */ }
-    }
-    const chatMic = document.getElementById('btn-mic');
-    if (chatMic) {
-      chatMic.textContent = 'OFF';
-      chatMic.classList.add('is-off');
-      chatMic.classList.remove('is-on');
-      chatMic.title = 'Microphone OFF (Translate Mode active)';
     }
   }
 

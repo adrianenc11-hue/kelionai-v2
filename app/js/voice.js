@@ -1129,62 +1129,6 @@
     }
   }
 
-  // Auto-start mic monitor on first user interaction
-  let micMonitorStarted = false;
-  function startMicMonitor() {
-    if (micMonitorStarted) return;
-    micMonitorStarted = true;
-    try {
-      navigator.mediaDevices
-        .getUserMedia({ audio: { noiseSuppression: true, echoCancellation: true } })
-        .then(function (stream) {
-          const micCtx = new (window.AudioContext || window.webkitAudioContext)();
-          micCtx.resume();
-          const micSrc = micCtx.createMediaStreamSource(stream);
-          const micAn = micCtx.createAnalyser();
-          micAn.fftSize = 256;
-          micSrc.connect(micAn);
-          const micData = new Uint8Array(micAn.frequencyBinCount);
-          const micEl = document.getElementById('mic-level');
-          if (!micEl) return;
-          const bars = micEl.querySelectorAll('span');
-          function updateMicLevel() {
-            micAn.getByteFrequencyData(micData);
-            let sum = 0;
-            for (let j = 0; j < 32; j++) sum += micData[j];
-            const vol = sum / 32 / 255;
-            if (vol > 0.05) {
-              micEl.classList.add('active');
-              for (let k = 0; k < bars.length; k++) {
-                const h = Math.max(4, Math.min(22, vol * 22 * (1 + Math.random() * 0.3)));
-                bars[k].style.height = h + 'px';
-              }
-            } else {
-              micEl.classList.remove('active');
-              for (let k = 0; k < bars.length; k++) bars[k].style.height = '4px';
-            }
-            requestAnimationFrame(updateMicLevel);
-          }
-          updateMicLevel();
-          console.log('[Voice] Mic monitor started');
-        })
-        .catch(function (e) {
-          console.warn('[Voice] Mic monitor failed:', e.message || e);
-        });
-    } catch (_e) {
-      /* ignored */
-    }
-  }
-
-  // Auto-start mic monitor on first click
-  document.addEventListener(
-    'click',
-    function () {
-      startMicMonitor();
-    },
-    { once: true }
-  );
-
   // ─── Full-Duplex Voice Loop ───────────────────────────────────
   let _voiceLoopActive = false;
   let _voiceLoopRec = null;

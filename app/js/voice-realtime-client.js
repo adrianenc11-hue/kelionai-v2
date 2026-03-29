@@ -22,42 +22,10 @@
   let nextPlayTime = 0;
   const SAMPLE_RATE = 24000; // OpenAI Realtime uses 24kHz PCM16
 
-  // ── CC Subtitle element ──
-  let _ccEl = null;
-  let _ccTimer = null;
-  let _ccBuffer = '';
-
-  function _ensureCCElement() {
-    if (_ccEl && document.body.contains(_ccEl)) return _ccEl;
-    _ccEl = document.createElement('div');
-    _ccEl.id = 'voice-cc-subtitle';
-    _ccEl.className = 'voice-cc-subtitle';
-    _ccEl.setAttribute('aria-live', 'polite');
-    const parent = document.getElementById('avatar-area') || document.querySelector('.left-panel') || document.body;
-    parent.style.position = parent.style.position || 'relative';
-    parent.appendChild(_ccEl);
-    return _ccEl;
-  }
-
-  function _showCC(text) {
-    if (!ccEnabled || !text) return;
-    const el = _ensureCCElement();
-    _ccBuffer += text;
-    // Show speaker if provided
-    const display = _ccBuffer.length > 200 ? '...' + _ccBuffer.slice(-197) : _ccBuffer;
-    el.textContent = display;
-    el.classList.add('visible');
-    if (_ccTimer) clearTimeout(_ccTimer);
-    _ccTimer = setTimeout(function () {
-      el.classList.remove('visible');
-      _ccBuffer = '';
-    }, 4000);
-  }
-
-  function _hideCC() {
-    if (_ccEl) _ccEl.classList.remove('visible');
-    _ccBuffer = '';
-  }
+  // ── CC Subtitle (disabled — buttons removed) ──
+  function _ensureCCElement() { return null; }
+  function _showCC() {}
+  function _hideCC() {}
 
   // ── Audio Context ──
   function getAudioCtx() {
@@ -90,18 +58,6 @@
       })
     );
 
-    // 🗣️ button → amber to signal issue
-    const vfBtn = document.getElementById('btn-voicefirst');
-    if (vfBtn) {
-      vfBtn.style.borderColor = '#f59e0b';
-      vfBtn.style.color = '#f59e0b';
-      vfBtn.style.boxShadow = '0 0 10px rgba(245,158,11,0.4)';
-      vfBtn.title = window.i18n ? i18n.t('voice.realtimeUnavailable') : '\u26a0\ufe0f Realtime unavailable';
-    }
-
-    const ccBtn = document.getElementById('btn-cc-toggle');
-    if (ccBtn) ccBtn.style.display = 'none';
-
     // ── Visible toast so user knows what happened ──
     _showErrorToast('⚠️ Voice-First: ' + reason);
 
@@ -110,14 +66,6 @@
 
   function _clearFallback() {
     _fallbackActive = false;
-    // Reset 🗣️ button to normal
-    const vfBtn = document.getElementById('btn-voicefirst');
-    if (vfBtn) {
-      vfBtn.style.borderColor = '';
-      vfBtn.style.color = '';
-      vfBtn.style.boxShadow = '';
-      vfBtn.title = 'Voice-First Mode';
-    }
   }
 
   // ── Connect via Socket.io ──
@@ -493,38 +441,4 @@
     stopMic: stopMic,
   };
 
-  // ── CC Toggle Button handler ──────────────────────────────
-  document.addEventListener('DOMContentLoaded', function () {
-    const ccBtn = document.getElementById('btn-cc-toggle');
-    if (!ccBtn) return;
-
-    // Initial state: CC ON (active)
-    let ccActive = true;
-    ccBtn.style.borderColor = '#6366f1';
-    ccBtn.style.color = '#6366f1';
-    ccBtn.title = 'CC Subtitles: ON';
-
-    ccBtn.addEventListener('click', function () {
-      ccActive = !ccActive;
-      if (ccActive) {
-        ccBtn.style.borderColor = '#6366f1';
-        ccBtn.style.color = '#6366f1';
-        ccBtn.title = 'CC Subtitles: ON';
-      } else {
-        ccBtn.style.borderColor = '#555';
-        ccBtn.style.color = '#888';
-        ccBtn.title = 'CC Subtitles: OFF';
-        // Ascunde DOAR bara de subtitrare, NU chat-overlay-ul
-        const sub = document.getElementById('speech-subtitle');
-        if (sub) sub.classList.remove('visible');
-        const ccSub = document.getElementById('voice-cc-subtitle');
-        if (ccSub) ccSub.classList.remove('visible');
-      }
-      // Toggle in VoiceFirst (realtime)
-      if (window.KVoiceFirst) KVoiceFirst.setCCEnabled(ccActive);
-      // Toggle in voice.js subtitle
-      window._ccSubtitlesEnabled = ccActive;
-      console.log('[CC] Subtitles', ccActive ? 'ON' : 'OFF');
-    });
-  });
 })();

@@ -318,29 +318,6 @@ test.describe('Voice TTS + STT', () => {
 // SECTION 7 — Microphone & Camera UI (#68-#72)
 // ═══════════════════════════════════════════════════════════════
 test.describe('Microphone & Camera UI', () => {
-  test('#68 mic button toggles recording UI', async ({ page }) => {
-    test.skip(!siteIsUp);
-    await page.addInitScript(() => {
-      localStorage.setItem('kelion_onboarded', 'true');
-    });
-    await page.goto('/');
-    await page.waitForLoadState('networkidle', { timeout: 60000 }).catch(() => {});
-    // Try multiple selectors for mic button (real ID: #btn-mic-toggle)
-    const mic = page
-      .locator(
-        '#btn-mic-toggle, #btn-mic, .mic-btn, [data-action="mic"], button[aria-label*="mic"], button[aria-label*="Mic"], button[aria-label*="Microphone"], .voice-btn, #microphone-btn'
-      )
-      .first();
-    if (!(await mic.isVisible({ timeout: 10000 }).catch(() => false))) {
-      // Mic button not in DOM on this page — skip
-      test.skip();
-      return;
-    }
-    await mic.click();
-    await page.waitForTimeout(500);
-    await page.screenshot({ path: 'test-results/mic-toggle.png' });
-  });
-
   test('#72 POST /api/vision with base64 image', async ({ request }) => {
     test.skip(!siteIsUp);
     // Minimal 1x1 red pixel JPEG in base64

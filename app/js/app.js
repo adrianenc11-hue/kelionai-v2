@@ -945,20 +945,8 @@
           const action = am[1].trim().toLowerCase();
           if (action === 'camera_on') {
             if (window.KAutoCamera && !KAutoCamera.isActive()) KAutoCamera.toggle();
-            const camBtn = document.getElementById('btn-camera-inline');
-            if (camBtn) {
-              camBtn.style.borderColor = '#10B981';
-              camBtn.style.color = '#10B981';
-              camBtn.title = 'Camera ACTIVE';
-            }
           } else if (action === 'camera_off') {
             if (window.KAutoCamera && KAutoCamera.isActive()) KAutoCamera.stop();
-            const camBtn = document.getElementById('btn-camera-inline');
-            if (camBtn) {
-              camBtn.style.borderColor = '#555';
-              camBtn.style.color = '#888';
-              camBtn.title = 'Camera ON/OFF';
-            }
           } else if (action === 'translate_on') {
             if (window.KTranslate && !KTranslate.isActive()) KTranslate.start();
             const tBtn = document.getElementById('btn-translate-toggle');

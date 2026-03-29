@@ -425,17 +425,6 @@ test.describe('Buttons and Links', () => {
     await expect(btnSend).not.toBeDisabled();
   });
 
-  test('mic button is visible', async ({ page }) => {
-    // beforeEach already navigated and dismissed auth screen
-    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-    await page
-      .locator('#auth-screen')
-      .waitFor({ state: 'hidden', timeout: 10000 })
-      .catch(() => {});
-    const btnMic = page.locator('#btn-mic');
-    await expect(btnMic).toBeVisible({ timeout: 15000 });
-  });
-
   test('avatar switcher buttons are clickable', async ({ page }) => {
     await page.goto('/');
     await page.waitForSelector('[data-avatar="kelion"]', { state: 'visible' });
@@ -930,12 +919,6 @@ test.describe('Deep — UI Interactions', () => {
       timeout: 10000,
     });
   });
-  test('microphone button visible', async ({ page }) => {
-    test.skip(!siteIsUp);
-    await expect(page.locator('#btn-mic')).toBeVisible({
-      timeout: 15000,
-    });
-  });
   test('monitor panel default state', async ({ page }) => {
     test.skip(!siteIsUp);
     // #monitor-default is inside #display-content — check it exists in DOM
@@ -967,28 +950,6 @@ test.describe('Deep — UI Interactions', () => {
     // Guest user should NOT see btn-admin
     const btnAdmin = page.locator('#btn-admin').first();
     await expect(btnAdmin).toBeHidden();
-  });
-
-  test('camera button click does not crash', async ({ page }) => {
-    test.skip(!siteIsUp);
-    const btn = page.locator('#btn-camera-inline').first();
-    await expect(btn).toBeAttached({ timeout: 10000 });
-    await btn.evaluate((node) => node.click());
-    // Camera prompt appears or no JS crash — page stays functional
-    await expect(page.locator('#text-input')).toBeVisible({ timeout: 5000 });
-  });
-
-  test('CC toggle changes style on click', async ({ page }) => {
-    test.skip(!siteIsUp);
-    const btn = page.locator('#btn-cc-toggle').first();
-    await expect(btn).toBeAttached({ timeout: 10000 });
-    // Get initial border color
-    const before = await btn.evaluate((el) => el.style.borderColor || getComputedStyle(el).borderColor);
-    await btn.evaluate((node) => node.click());
-    await page.waitForTimeout(500);
-    const after = await btn.evaluate((el) => el.style.borderColor || getComputedStyle(el).borderColor);
-    // Style should have changed (toggled)
-    expect(after).not.toBe(before);
   });
 
   test('translate toggle click activates without crash', async ({ page }) => {
