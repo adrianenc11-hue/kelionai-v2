@@ -1393,7 +1393,6 @@
     }
 
     if (type === 'user') {
-      _updateSubtitle('user', text);
       return;
     }
 

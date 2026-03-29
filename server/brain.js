@@ -574,12 +574,15 @@ ACCESSIBILITY MODE — ALWAYS ACTIVE:
     }
     let fullSystemPrompt = memoryContext ? systemPrompt + '\n' + memoryContext : systemPrompt;
 
-    // ── Live vision context: inject what the camera currently sees ──
+    // ── Live vision context: inject ONLY when danger or user asks about what camera sees ──
     const userFirstName = options?.userName ? options.userName.split(' ')[0] : '';
     if (options?.visionContext && !hasImage) {
       const hasDanger = /⚠️PERICOL|⚠️ATENȚIE/i.test(options.visionContext);
+      // User asks about what camera sees? (vision keywords)
+      const asksAboutVision = /\b(ce vezi|what do you see|ce observi|ce e acolo|ce e in fata|ce ai in fata|uita.te|priveste|look|arata.mi|show me|descrie ce|describe what|ce se vede|what.s there|ce apare|recunoaste|recognize|identifica|identify|ce scrie|what does it say|analizeaza|analyze|ce vad|what.*see|ce e in jur|what.s around|ce e langa|spune.mi ce|tell me what|descrie.mi|describe for me|in fata mea|in front of me|ce camera|ce filmeaza|ce inregistreaza|ce capteaza|ce detecteaza|citeste|read|ce este|what is this|ce persoana|cine e|who is|ce obiect|what object)\b/i.test(message);
+
       if (hasDanger) {
-        // Danger detected — calm, personal alert
+        // Danger detected — calm, personal alert (ALWAYS inject)
         fullSystemPrompt = `SAFETY CONTEXT — The user's camera detected a potential hazard.
 ${userFirstName ? `The user's name is ${userFirstName}. Address them by name.` : ''}
 TONE: Stay CALM and reassuring. Never panic. Speak like a trusted friend gently guiding them.
@@ -589,9 +592,11 @@ If the user asks something unrelated, mention the observation calmly at the end.
 [CAMERA OBSERVATION: ${options.visionContext}]
 
 ` + fullSystemPrompt;
-      } else {
-        fullSystemPrompt += `\n\n[LIVE CAMERA — The user's camera is ON.${userFirstName ? ' User: ' + userFirstName + '.' : ''} Current scene: ${options.visionContext}]`;
+      } else if (asksAboutVision) {
+        // User explicitly asks about what the camera sees — inject context
+        fullSystemPrompt += `\n\n[LIVE CAMERA — The user's camera is ON and they are asking about what you see.${userFirstName ? ' User: ' + userFirstName + '.' : ''} Current scene: ${options.visionContext}]\nDescribe what you observe based on the camera analysis. Be specific and helpful.`;
       }
+      // Otherwise: camera is ON but user didn't ask about it — do NOT mention what you see
     }
 
     // ── Cache ──
