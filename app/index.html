@@ -592,6 +592,7 @@ Acum elimin și referințele CSS rămase din `app.css` pentru `#pwa-install-bann
 
       <!-- Input row — FULL WIDTH at page bottom -->
       <div id="input-row">
+        <button id="btn-camera" title="Camera ON/OFF" aria-label="Toggle camera" class="ctrl-circle">📷 Cam</button>
         <input
           type="text"
           id="text-input"
@@ -939,6 +940,40 @@ Acum elimin și referințele CSS rămase din `app.css` pentru `#pwa-install-bann
 
         console.log('[ButtonBind] All buttons bound OK');
       }, 500);
+    </script>
+    <!-- ═══ CAMERA BUTTON — toggle ON/OFF ═══ -->
+    <script>
+      (function () {
+        var btn = document.getElementById('btn-camera');
+        if (!btn) return;
+
+        function updateBtn(active) {
+          if (active) {
+            btn.classList.add('is-on');
+            btn.classList.remove('is-off');
+            btn.innerHTML = '🔴 Cam';
+            btn.title = 'Camera ON — click to stop';
+          } else {
+            btn.classList.remove('is-on');
+            btn.classList.add('is-off');
+            btn.innerHTML = '📷 Cam';
+            btn.title = 'Camera OFF — click to start';
+          }
+        }
+
+        btn.addEventListener('click', function () {
+          if (!window.KAutoCamera) return;
+          KAutoCamera.toggle();
+        });
+
+        // Listen for state changes from auto-camera.js
+        window.addEventListener('auto-camera-state', function (e) {
+          updateBtn(e.detail && e.detail.active);
+        });
+
+        // Initial state
+        updateBtn(false);
+      })();
     </script>
     <!-- ═══ AUTO-START: Camera ON + Chat commands for camera/mic ═══ -->
     <script>
