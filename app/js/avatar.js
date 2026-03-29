@@ -17,7 +17,7 @@
   let mixer = null;
   let lipSync = null;
   let textLipSync = null;
-  let currentAvatar = 'kelion';
+  let currentAvatar = 'kira';
   let loadPromise = null;
   let initRetryCount = 0;
   const MAX_INIT_RETRIES = 50; // up to 5s total
@@ -265,33 +265,33 @@
 
     // Init texture loader and load initial background
     _bgLoader = new THREE.TextureLoader();
-    _loadAvatarBg('kelion');
+    _loadAvatarBg('kira');
 
     // Lip sync — simple, uses Smile morph
     if (window.SimpleLipSync) lipSync = new SimpleLipSync();
     if (window.TextLipSync) textLipSync = new TextLipSync({ msPerChar: 38 });
 
-    loadAvatar('kelion')
+    loadAvatar('kira')
       .then(function () {
-        console.log('[Avatar] Kelion loaded');
-        // Preload Kira model silently into browser cache
+        console.log('[Avatar] Kira loaded');
+        // Preload Kelion model silently into browser cache
         const preloader = new THREE.GLTFLoader();
         preloader.load(
-          MODELS.kira,
+          MODELS.kelion,
           function () {
-            console.log('[Avatar] Kira model preloaded into cache');
+            console.log('[Avatar] Kelion model preloaded into cache');
             console.log('[Avatar] ✅ Both avatars ready!');
             window.dispatchEvent(new CustomEvent('avatars-ready'));
           },
           null,
           function () {
-            // Even if Kira fails, still signal ready
+            // Even if Kelion fails, still signal ready
             window.dispatchEvent(new CustomEvent('avatars-ready'));
           }
         );
       })
       .catch(function () {
-        // Even if Kelion fails, signal ready after timeout
+        // Even if Kira fails, signal ready after timeout
         setTimeout(function () {
           window.dispatchEvent(new CustomEvent('avatars-ready'));
         }, 3000);
