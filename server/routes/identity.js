@@ -1,0 +1,299 @@
+// ═══════════════════════════════════════════════════════════════
+// KelionAI — Identity Routes (Face Registration + Recognition)
+// Feature 5: Face capture at registration, passive recognition
+// ═══════════════════════════════════════════════════════════════
+'use strict';
+
+const express = require('express');
+const rateLimit = require('express-rate-limit');
+const { rateLimitKey } = require('../rate-limit-key');
+const logger = require('../logger');
+const { MODELS, API_ENDPOINTS } = require('../config/models');
+
+const router = express.Router();
+
+const identityLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  message: { error: 'Too many identity requests.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: rateLimitKey,
+});
+
+// ═══ POST /api/identity/register-face ═══
+// Save face reference for the authenticated user at signup
+router.post('/identity/register-face', identityLimiter, express.json({ limit: '2mb' }), async (req, res) => {
+  try {
+    const { getUserFromToken, supabaseAdmin, brain } = req.app.locals;
+    const user = await getUserFromToken(req);
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { face } = req.body;
+    if (!face) return res.status(400).json({ error: 'face image required' });
+    if (typeof face !== 'string' || !face.startsWith('data:image/')) {
+      return res.status(400).json({ error: 'Invalid image format' });
+    }
+    if (face.length > 500000) {
+      return res.status(400).json({ error: 'Image too large (max 500KB)' });
+    }
+
+    if (supabaseAdmin) {
+      try {
+        await supabaseAdmin.from('profiles').upsert(
+          {
+            id: user.id,
+            face_reference: face.substring(0, 100000), // full face image base64 (320x240 JPEG ~10-30KB)
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'id' }
+        );
+      } catch (e) {
+        logger.warn({ component: 'Identity', err: e.message }, 'Face save failed');
+      }
+    }
+
+    // ═══ BRAIN INTEGRATION — remember face registration ═══
+    if (brain) {
+      brain
+        .saveMemory(user.id, 'identity', 'User a înregistrat referința facială', { source: 'face-register' })
+        .catch(() => {});
+    }
+
+    logger.info({ component: 'Identity', userId: user.id }, 'Face reference registered');
+    res.json({ success: true });
+  } catch (e) {
+    logger.error({ component: 'Identity', err: e.message }, 'register-face error');
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
+
+// ═══ POST /api/identity/check ═══
+// Compare submitted face against registered users using Vision AI
+router.post('/identity/check', identityLimiter, express.json({ limit: '2mb' }), async (req, res) => {
+  try {
+    const { getUserFromToken, supabaseAdmin, brain } = req.app.locals;
+    const { face } = req.body;
+    if (!face) return res.status(400).json({ error: 'face image required' });
+    if (typeof face !== 'string' || !face.startsWith('data:image/')) {
+      return res.status(400).json({ error: 'Invalid image format' });
+    }
+    if (face.length > 500000) {
+      return res.status(400).json({ error: 'Image too large (max 500KB)' });
+    }
+
+    const user = await getUserFromToken(req);
+
+    // Check role from profiles table (auth.users.role is always 'authenticated')
+    let isOwner = false;
+    const adminEmails = (process.env.ADMIN_EMAIL || '')
+      .toLowerCase()
+      .split(',')
+      .map((e) => e.trim())
+      .filter(Boolean);
+    if (user && supabaseAdmin) {
+      if (adminEmails.includes(user.email?.toLowerCase())) {
+        await supabaseAdmin
+          .from('profiles')
+          .upsert(
+            {
+              id: user.id,
+              display_name: user.user_metadata?.display_name || user.email.split('@')[0],
+              role: 'admin',
+              preferred_language: 'ro',
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: 'id' }
+          )
+          .then(() => {})
+          .catch((err) => logger.error({ component: 'Identity', err: err.message }, 'Admin profile upsert failed'));
+        isOwner = true;
+        logger.info({ component: 'Identity', email: user.email }, 'Admin profile auto-ensured');
+      } else {
+        const { data: userProfile } = await supabaseAdmin.from('profiles').select('role').eq('id', user.id).single();
+        isOwner = userProfile?.role === 'admin';
+      }
+      logger.info({ component: 'Identity', userId: user.id, isOwner }, 'Face check: role resolved');
+    }
+
+    // Check if this is the owner by comparing face with stored reference
+    let ownerMatch = false;
+    let matchedUser = null;
+
+    if (supabaseAdmin && face) {
+      try {
+        // Get owner profile (admin role)
+        const { data: ownerProfile } = await supabaseAdmin
+          .from('profiles')
+          .select('id, display_name, face_reference, preferred_language, role')
+          .eq('role', 'admin')
+          .single();
+
+        // Auto-update face_reference if too short (was truncated by old bug)
+        if (
+          ownerProfile &&
+          isOwner &&
+          face.length > 1000 &&
+          (!ownerProfile.face_reference || ownerProfile.face_reference.length < 1000)
+        ) {
+          await supabaseAdmin
+            .from('profiles')
+            .update({
+              face_reference: face.substring(0, 100000),
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', ownerProfile.id);
+          logger.info({ component: 'Identity' }, 'Auto-updated face_reference (was truncated)');
+          // Since we're the authenticated admin, grant access directly
+          ownerMatch = true;
+          matchedUser = {
+            name: ownerProfile.display_name || 'Owner',
+            lang: ownerProfile.preferred_language || 'en',
+          };
+        }
+
+        if (
+          !ownerMatch &&
+          ownerProfile?.face_reference &&
+          ownerProfile.face_reference.length > 1000 &&
+          process.env.OPENAI_API_KEY
+        ) {
+          // Use OpenAI Vision to compare faces
+          const r = await fetch(API_ENDPOINTS.OPENAI + '/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: 'Bearer ' + process.env.OPENAI_API_KEY,
+            },
+            body: JSON.stringify({
+              model: MODELS.OPENAI_VISION,
+              max_tokens: 10,
+              messages: [
+                {
+                  role: 'user',
+                  content: [
+                    {
+                      type: 'text',
+                      text: 'Do these two images show the same person? Reply only YES or NO.',
+                    },
+                    {
+                      type: 'image_url',
+                      image_url: {
+                        url: 'data:image/jpeg;base64,' + ownerProfile.face_reference,
+                        detail: 'low',
+                      },
+                    },
+                    {
+                      type: 'image_url',
+                      image_url: {
+                        url: 'data:image/jpeg;base64,' + face,
+                        detail: 'low',
+                      },
+                    },
+                  ],
+                },
+              ],
+            }),
+          });
+          const d = await r.json();
+          const answer = d.choices?.[0]?.message?.content?.trim().toUpperCase();
+          if (answer === 'YES') {
+            ownerMatch = true;
+            matchedUser = {
+              name: ownerProfile.display_name || 'Owner',
+              lang: ownerProfile.preferred_language || 'en',
+            };
+            // Silent quality upgrade — if new photo is better, update reference quietly
+            if (face.length > (ownerProfile.face_reference?.length || 0) + 500) {
+              supabaseAdmin
+                .from('profiles')
+                .update({
+                  face_reference: face.substring(0, 100000),
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('id', ownerProfile.id)
+                .then(() => {})
+                .catch((err) =>
+                  logger.warn({ component: 'Identity', err: err.message }, 'Face reference update failed')
+                );
+            }
+          }
+        }
+      } catch (e) {
+        logger.warn({ component: 'Identity', err: e.message }, 'Face comparison failed');
+      }
+    }
+
+    // ═══ BRAIN INTEGRATION — remember who was recognized ═══
+    if (brain && user?.id && (ownerMatch || matchedUser)) {
+      brain
+        .saveMemory(user.id, 'context', 'Recunoaștere facială: ' + (matchedUser?.name || 'Owner') + ' identificat', {
+          type: 'identity',
+        })
+        .catch((err) => logger.warn({ component: 'Identity', err: err.message }, 'Brain memory save failed'));
+    }
+
+    const confirmed = ownerMatch || isOwner;
+    const response = {
+      isOwner: confirmed,
+      user:
+        matchedUser ||
+        (user
+          ? {
+              name: user.name || user.email,
+              lang: user.preferred_language || 'en',
+            }
+          : null),
+    };
+    // If owner confirmed, include admin token for auto-auth
+    if (confirmed && process.env.ADMIN_SECRET_KEY) {
+      response.adminToken = process.env.ADMIN_SECRET_KEY;
+    }
+
+    // ═══ FACE LOGIN — Generate Supabase session for auto-login ═══
+    if (confirmed && ownerMatch && supabaseAdmin && !user) {
+      try {
+        // Get owner's email from profiles + auth
+        const { data: ownerProfile } = await supabaseAdmin.from('profiles').select('id').eq('role', 'admin').single();
+        if (ownerProfile) {
+          const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(ownerProfile.id);
+          if (authUser?.user?.email) {
+            // Generate a magic link token for auto-login
+            const { data: linkData } = await supabaseAdmin.auth.admin.generateLink({
+              type: 'magiclink',
+              email: authUser.user.email,
+            });
+            if (linkData?.properties?.hashed_token) {
+              // Verify the OTP to get a real session
+              const { data: sessionData } = await supabaseAdmin.auth.verifyOtp({
+                type: 'magiclink',
+                token_hash: linkData.properties.hashed_token,
+              });
+              if (sessionData?.session) {
+                response.session = sessionData.session;
+                response.faceLoginUser = {
+                  id: authUser.user.id,
+                  email: authUser.user.email,
+                  name: authUser.user.user_metadata?.display_name || authUser.user.email.split('@')[0],
+                };
+                logger.info({ component: 'Identity' }, 'Face login: Supabase session generated');
+              }
+            }
+          }
+        }
+      } catch (e) {
+        logger.warn(
+          { component: 'Identity', err: e.message },
+          'Face login session generation failed — fallback to manual login'
+        );
+      }
+    }
+
+    res.json(response);
+  } catch (e) {
+    logger.error({ component: 'Identity', err: e.message }, 'check error');
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
+
+module.exports = router;

@@ -1,0 +1,15 @@
+{
+  "version": "1.0",
+  "description": "SHA-256 hashes of protected verification tools. DO NOT EDIT MANUALLY.",
+  "updatedAt": "2026-03-23T14:34:17.847Z",
+  "updatedBy": "adria",
+  "hashes": {
+    "scripts/gate.js": "496fc9e6034397f396b605d685021dde03a6b01d1195e84ec9fb4015d5b21a8d",
+    "scripts/pre-start-audit.js": "41ab803293c687ef629e76fa000d5b9e3d76a38d562e5b103483cc64df5df15e",
+    "scripts/smoke.js": "acab6aa261d37bf38ee3f44ffb37c6b5fe2f607725fa056da6ab632905180d41",
+    "scripts/diagnose.js": "9e7b5350eb2e729542347938db13b948145135dba2f41468a17e974173734eb1",
+    "scripts/verify-tools-integrity.js": "1e0e82c6f9944157b3bf303e602cc916d4861909d0e3f9e2f002d74a3342576d",
+    "eslint.config.js": "ca79c90b52651fa88d52abe9ad04ad667159981486a5aa155c912bfed11e0c7c",
+    ".prettierrc.json": "e17cb62cb94d8d89fa7cf162424e6ae69caae3de5e936cc035a7a9a4ca22efac"
+  }
+}

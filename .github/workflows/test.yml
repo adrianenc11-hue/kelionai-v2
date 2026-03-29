@@ -1,0 +1,276 @@
+name: KelionAI CI/CD Pipeline
+
+# DISABLED push trigger — Railway deploys via native integration.
+# Tests can be run manually or on PRs.
+on:
+  # push:
+  #   branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  # ─── STEP 1: Unit Tests ──────────────────────
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      issues: write
+    outputs:
+      test-passed: ${{ steps.unit-tests.outcome }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit tests with coverage
+        id: unit-tests
+        # continue-on-error: true — do not block deploy on coverage failures
+        continue-on-error: true
+        run: npm run test:ci
+        env:
+          NODE_ENV: test
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Verify live site is up
+        id: health-check
+        continue-on-error: true
+        run: |
+          echo "🌐 Checking https://kelionai.app is online..."
+          STATUS=$(curl -sf -o /dev/null -w "%{http_code}" https://kelionai.app/api/health || echo "000")
+          if [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 500 ]; then
+            echo "✅ Site is live (HTTP $STATUS)"
+          else
+            echo "❌ Site returned HTTP $STATUS — E2E tests may fail"
+            exit 1
+          fi
+
+      - name: Install Playwright browsers
+        id: playwright-install
+        continue-on-error: true
+        run: npx playwright install --with-deps chromium
+
+      - name: Run E2E tests
+        id: e2e-tests
+        if: steps.health-check.outcome == 'success' && steps.playwright-install.outcome == 'success'
+        continue-on-error: true
+        run: npx playwright test --config=playwright.config.js tests/e2e-full.spec.js --project=chromium
+        env:
+          BASE_URL: ${{ vars.BASE_URL || 'https://kelionai.app' }}
+
+      - name: Upload test report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 30
+
+      - name: Upload failure screenshots
+        uses: actions/upload-artifact@v4
+        if: steps.e2e-tests.outcome == 'failure'
+        with:
+          name: test-screenshots
+          path: test-results/
+          retention-days: 30
+
+      - name: Create issue on failure
+        if: steps.e2e-tests.outcome == 'failure' && github.event_name != 'pull_request'
+        continue-on-error: true
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const runUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
+            const today = new Date().toISOString().split('T')[0];
+            // Search for ANY open issue with label 'automated' and title containing 'E2E Tests Failed'
+            const { data: searchResult } = await github.rest.search.issuesAndPullRequests({
+              q: `repo:${owner}/${repo} is:issue is:open label:automated "E2E Tests Failed" in:title`,
+              per_page: 5
+            });
+            const openIssue = searchResult.items.find(i => i.title.includes('E2E Tests Failed'));
+            if (openIssue) {
+              console.log(`Open E2E failure issue #${openIssue.number} exists — adding comment`);
+              await github.rest.issues.createComment({
+                owner, repo,
+                issue_number: openIssue.number,
+                body: `### 🔄 New failure on ${today}\n\n**Run:** ${runUrl}\n**Branch:** \`${context.ref}\`\n**Triggered by:** ${context.eventName}`
+              });
+              return;
+            }
+            await github.rest.issues.create({
+              owner, repo,
+              title: `🔴 E2E Tests Failed — ${today}`,
+              body: `## Test Failure Report\n\n**Run:** ${runUrl}\n**Branch:** ${context.ref}\n**Triggered by:** ${context.eventName}\n\nCheck the [test report](${runUrl}) for details.\n\nDownload screenshots from the artifacts.`,
+              labels: ['bug', 'automated']
+            });
+
+      - name: Close stale E2E failure issues
+        if: github.event_name != 'pull_request'
+        continue-on-error: true
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+            const { data: searchResult } = await github.rest.search.issuesAndPullRequests({
+              q: `repo:${owner}/${repo} is:issue is:open label:automated "E2E Tests Failed" in:title created:<${cutoff}`,
+              per_page: 20
+            });
+            for (const issue of searchResult.items) {
+              await github.rest.issues.update({ owner, repo, issue_number: issue.number, state: 'closed' });
+              console.log(`Closed stale issue #${issue.number}: ${issue.title}`);
+            }
+
+      - name: Test summary
+        if: always()
+        run: |
+          echo "## 🧪 Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.unit-tests.outcome }}" == "success" ]; then
+            echo "✅ Unit tests passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Unit tests failed" >> $GITHUB_STEP_SUMMARY
+          fi
+          if [ "${{ steps.health-check.outcome }}" != "success" ]; then
+            echo "⚠️ Live site health check failed — E2E tests were skipped" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ steps.e2e-tests.outcome }}" == "success" ]; then
+            echo "✅ E2E tests passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ E2E tests failed — check artifacts for details" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  # ─── STEP 2: Deploy (always on push to master) ───
+  deploy:
+    needs: test
+    # Always deploy on push to master — does not depend on test outcome
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check Netlify secrets
+        id: check-secrets
+        run: |
+          SKIP=false
+
+          validate_secret() {
+            local name="$1"
+            local value="$2"
+            # Empty check
+            if [ -z "$value" ]; then
+              echo "::warning::${name} is empty. Deploy will be skipped."
+              SKIP=true
+              return
+            fi
+            # Whitespace-only check
+            if [ -z "$(echo "$value" | tr -d '[:space:]')" ]; then
+              echo "::warning::${name} contains only whitespace. Deploy will be skipped."
+              SKIP=true
+              return
+            fi
+            # Newline characters check
+            if printf '%s' "$value" | grep -zqP '[\r\n]'; then
+              echo "::warning::${name} contains newline characters (\\r or \\n) and is not a valid HTTP header value. Deploy will be skipped."
+              SKIP=true
+              return
+            fi
+            # Printable ASCII only (0x20–0x7E)
+            if printf '%s' "$value" | grep -zqP '[^\x20-\x7E]'; then
+              echo "::warning::${name} contains non-printable or non-ASCII characters and is not a valid HTTP header value. Deploy will be skipped."
+              SKIP=true
+              return
+            fi
+          }
+
+          validate_secret "NETLIFY_AUTH_TOKEN" "$NETLIFY_AUTH_TOKEN"
+          validate_secret "NETLIFY_SITE_ID" "$NETLIFY_SITE_ID"
+
+          if [ "$SKIP" = "true" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo ""
+            echo "  To set the secrets, run locally:"
+            echo "    bash scripts/setup-secrets.sh"
+            echo "  or:"
+            echo "    npm run setup:secrets"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+
+      - name: Deploy to Netlify
+        if: steps.check-secrets.outputs.skip == 'false'
+        uses: nwtgck/actions-netlify@v3.0
+        with:
+          publish-dir: './app'
+          production-deploy: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          deploy-message: 'Deploy from GitHub Actions — ${{ github.sha }}'
+          enable-pull-request-comment: false
+          enable-commit-comment: true
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+        timeout-minutes: 10
+
+      - name: Deploy skipped — missing secrets
+        if: steps.check-secrets.outputs.skip == 'true'
+        run: |
+          echo "⏭️  Deploy skipped: NETLIFY_AUTH_TOKEN and/or NETLIFY_SITE_ID are not set or invalid."
+          echo "   Run 'bash scripts/setup-secrets.sh' or 'npm run setup:secrets' to configure them."
+
+      - name: Deploy summary
+        if: steps.check-secrets.outputs.skip == 'false'
+        run: |
+          echo "✅ Deploy completed successfully!"
+          echo "🌐 Site: https://kelionai.app"
+          echo "📦 Commit: ${{ github.sha }}"
+
+  # ─── STEP 3: Notify ──────────────────────────
+  notify:
+    needs: [test, deploy]
+    if: always() && github.event_name == 'push'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Send Sentry release
+        if: needs.deploy.result == 'success'
+        run: |
+          curl -sL https://sentry.io/api/0/organizations/kelion-ai/releases/ \
+            -H "Authorization: Bearer ${{ secrets.KS_SENTRY }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"version\": \"${{ github.sha }}\", \"projects\": [\"kelionai-v2\"]}" || true
+
+      - name: Notify deploy status
+        run: |
+          echo "Deploy status: ${{ needs.deploy.result }}"
+          echo "Tests status: ${{ needs.test.result }}"

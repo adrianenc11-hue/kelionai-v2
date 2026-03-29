@@ -1,0 +1,21 @@
+{"session_id": "sess_1", "turn_id": "turn_1", "event": "vad_start", "ts": 1000}
+{"session_id": "sess_1", "turn_id": "turn_1", "event": "vad_end", "ts": 2000}
+{"session_id": "sess_1", "turn_id": "turn_1", "event": "stt_final", "ts": 2200, "meta": {"text": "salut Kelion", "route_model": "gpt-4o-realtime-preview"}}
+{"session_id": "sess_1", "turn_id": "turn_1", "event": "route_selected", "ts": 2250}
+{"session_id": "sess_1", "turn_id": "turn_1", "event": "llm_start", "ts": 2300}
+{"session_id": "sess_1", "turn_id": "turn_1", "event": "llm_first_token", "ts": 2600}
+{"session_id": "sess_1", "turn_id": "turn_1", "event": "tts_start", "ts": 2650}
+{"session_id": "sess_1", "turn_id": "turn_1", "event": "playback_start", "ts": 2800}
+{"session_id": "sess_1", "turn_id": "turn_2", "event": "vad_start", "ts": 5000}
+{"session_id": "sess_1", "turn_id": "turn_2", "event": "vad_end", "ts": 6000}
+{"session_id": "sess_1", "turn_id": "turn_2", "event": "stt_final", "ts": 6500, "meta": {"text": "error test", "route_model": "llama-3.3-70b-versatile"}}
+{"session_id": "sess_1", "turn_id": "turn_2", "event": "error", "ts": 6800}
+{"session_id": "sess_1", "turn_id": "turn_2", "event": "fallback_triggered", "ts": 6900}
+{"session_id": "sess_1", "turn_id": "turn_2", "event": "llm_start", "ts": 7000}
+{"session_id": "sess_1", "turn_id": "turn_2", "event": "playback_start", "ts": 8500}
+{"session_id": "sess_1", "turn_id": "turn_3", "event": "vad_start", "ts": 10000}
+{"session_id": "sess_1", "turn_id": "turn_3", "event": "stt_partial", "ts": 10300}
+{"session_id": "sess_1", "turn_id": "turn_3", "event": "vad_end", "ts": 12000}
+{"session_id": "sess_1", "turn_id": "turn_3", "event": "stt_final", "ts": 12200, "meta": {"text": "barge-in test", "route_model": "gpt-5.4"}}
+{"session_id": "sess_1", "turn_id": "turn_3", "event": "interrupt_detected", "ts": 14000}
+{"session_id": "sess_1", "turn_id": "turn_3", "event": "playback_stopped", "ts": 14250}

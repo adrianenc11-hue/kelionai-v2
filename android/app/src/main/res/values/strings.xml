@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">KelionAI</string>
+    <string name="title_activity_main">KelionAI</string>
+    <string name="package_name">com.kelionai.app</string>
+    <string name="custom_url_scheme">com.kelionai.app</string>
+</resources>

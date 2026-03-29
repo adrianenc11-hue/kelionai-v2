@@ -1,0 +1,20 @@
+{"level":30,"time":1774637426728,"pid":25776,"hostname":"AE","component":"Supabase","msg":"⚠️ SUPABASE_URL/ANON_KEY/SERVICE_KEY lipsesc — DB disabled"}
+{"level":30,"time":1774637426823,"pid":25776,"hostname":"AE","component":"CodeShield","instanceId":"42964c04c895ad99","files":5,"msg":"🛡️ Code Shield initialized — all files fingerprinted"}
+{"level":30,"time":1774637426875,"pid":25776,"hostname":"AE","component":"EnvCheck","configured":0,"total":14,"msg":"🔑 Dev mode: 0/14 env vars configured"}
+{"level":30,"time":1774637426876,"pid":25776,"hostname":"AE","component":"LiveChat","namespace":"/live","model":"gpt-4o-realtime-preview","msg":"Socket.io live chat ready (Bypass Mode)"}
+{"level":30,"time":1774637426877,"pid":25776,"hostname":"AE","component":"Routes","msg":"Legal page loaded: /privacy/"}
+{"level":30,"time":1774637426877,"pid":25776,"hostname":"AE","component":"Routes","msg":"Legal page loaded: /terms/"}
+{"level":30,"time":1774637426877,"pid":25776,"hostname":"AE","component":"Routes","msg":"Legal page loaded: /gdpr/"}
+{"level":30,"time":1774637426877,"pid":25776,"hostname":"AE","component":"Routes","msg":"Legal page loaded: /cookie-policy/"}
+{"level":30,"time":1774637426877,"pid":25776,"hostname":"AE","component":"Routes","msg":"Legal page loaded: /refund-policy/"}
+{"level":30,"time":1774637426878,"pid":25776,"hostname":"AE","component":"VoiceStream","msg":"WebSocket voice pipeline mounted on /api/voice-stream"}
+{"level":30,"time":1774637426879,"pid":25776,"hostname":"AE","component":"VoiceRealtime","namespace":"/voice-realtime","msg":"Socket.io voice-first namespace ready (Brain-routed)"}
+{"level":30,"time":1774637426879,"pid":25776,"hostname":"AE","component":"VoiceRealtime","msg":"Socket.io voice-first mounted on /voice-realtime namespace"}
+{"level":30,"time":1774637426879,"pid":25776,"hostname":"AE","component":"LiveChat","namespace":"/live","model":"gpt-4o-realtime-preview","msg":"Socket.io live chat ready (Bypass Mode)"}
+{"level":30,"time":1774637426879,"pid":25776,"hostname":"AE","component":"LiveChat","msg":"Socket.io live chat mounted on /live namespace"}
+{"level":30,"time":1774637426879,"pid":25776,"hostname":"AE","component":"Shutdown","msg":"🛡️ Graceful shutdown handlers registered"}
+{"level":30,"time":1774637426879,"pid":25776,"hostname":"AE","component":"Migration","msg":"⚠️ No database connection — skipping migration"}
+{"level":30,"time":1774637426880,"pid":25776,"hostname":"AE","component":"Cache","msg":"📦 Cache: in-memory mode (no REDIS_URL)"}
+{"level":60,"time":1774637426883,"pid":25776,"hostname":"AE","component":"Process","err":"Error: listen EADDRINUSE: address already in use 0.0.0.0:8080\n    at Server.setupListenHandle [as _listen2] (node:net:1948:16)\n    at listenInCluster (node:net:2005:12)\n    at node:net:2214:7\n    at process.processTicksAndRejections (node:internal/process/task_queues:90:21)","msg":"Uncaught Exception: listen EADDRINUSE: address already in use 0.0.0.0:8080"}
+{"level":30,"time":1774637429441,"pid":25776,"hostname":"AE","component":"Shutdown","signal":"SIGINT","msg":"🛑 SIGINT received — shutting down gracefully"}
+{"level":30,"time":1774637429442,"pid":25776,"hostname":"AE","component":"Shutdown","msg":"✅ HTTP server closed"}

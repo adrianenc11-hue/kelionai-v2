@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title data-dynamic="true">Error — {{APP_NAME}}</title>
+    <script src="/js/client-config.js" data-fonts="inter-basic"></script>
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family:
+          'Inter',
+          -apple-system,
+          sans-serif;
+        background: #050510;
+        color: #f0f0ff;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        -webkit-font-smoothing: antialiased;
+        position: relative;
+        overflow: hidden;
+      }
+
+      body::before {
+        content: '';
+        position: fixed;
+        inset: 0;
+        background:
+          radial-gradient(ellipse at 40% 30%, rgba(239, 68, 68, 0.08) 0%, transparent 50%),
+          radial-gradient(ellipse at 60% 70%, rgba(99, 102, 241, 0.06) 0%, transparent 50%);
+        pointer-events: none;
+      }
+
+      .error-container {
+        text-align: center;
+        padding: 48px 32px;
+        position: relative;
+        z-index: 1;
+        max-width: 500px;
+      }
+
+      .error-icon {
+        font-size: 5rem;
+        margin-bottom: 24px;
+        display: block;
+        animation: shake 3s ease-in-out infinite;
+      }
+
+      @keyframes shake {
+        0%,
+        100% {
+          transform: rotate(0deg);
+        }
+        10% {
+          transform: rotate(-5deg);
+        }
+        20% {
+          transform: rotate(5deg);
+        }
+        30% {
+          transform: rotate(0deg);
+        }
+      }
+
+      h1 {
+        font-size: 1.8rem;
+        font-weight: 800;
+        margin-bottom: 12px;
+        background: linear-gradient(135deg, #ef4444, #f59e0b);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+
+      p {
+        color: #9090b0;
+        font-size: 1rem;
+        line-height: 1.6;
+        margin-bottom: 36px;
+      }
+
+      .error-details {
+        background: rgba(15, 15, 40, 0.6);
+        border: 1px solid rgba(239, 68, 68, 0.15);
+        border-radius: 12px;
+        padding: 16px 20px;
+        margin-bottom: 32px;
+        font-size: 0.85rem;
+        color: #9090b0;
+        text-align: left;
+        font-family: 'JetBrains Mono', monospace;
+      }
+
+      .error-actions {
+        display: flex;
+        gap: 12px;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+
+      .btn {
+        padding: 13px 28px;
+        border-radius: 12px;
+        font-family: 'Inter', sans-serif;
+        font-size: 0.95rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.25s;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        border: none;
+      }
+
+      .btn-primary {
+        background: linear-gradient(135deg, #6366f1, #06b6d4);
+        color: #fff;
+      }
+
+      .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 0 30px rgba(99, 102, 241, 0.3);
+      }
+
+      .btn-secondary {
+        background: transparent;
+        color: #9090b0;
+        border: 1px solid rgba(99, 102, 241, 0.15);
+      }
+
+      .btn-secondary:hover {
+        border-color: rgba(99, 102, 241, 0.3);
+        color: #f0f0ff;
+      }
+    </style>
+  
+    <script>
+      // Dynamic branding — replaces {{APP_NAME}} placeholders at runtime
+      (function () {
+        function _applyDynamicBranding(name) {
+          if (!name) return;
+          // Update <title>
+          var titleEl = document.querySelector('title[data-dynamic="true"]');
+          if (titleEl) {
+            titleEl.textContent = titleEl.textContent.replace(/\{\{APP_NAME\}\}/g, name);
+            document.title = titleEl.textContent;
+          }
+          // Update all text nodes containing {{APP_NAME}}
+          var walker = document.createTreeWalker(document.body || document.documentElement, NodeFilter.SHOW_TEXT);
+          var node;
+          while ((node = walker.nextNode())) {
+            if (node.nodeValue && node.nodeValue.includes('{{APP_NAME}}')) {
+              node.nodeValue = node.nodeValue.replace(/\{\{APP_NAME\}\}/g, name);
+            }
+          }
+          // Update element attributes (placeholder, content, value)
+          ['placeholder', 'content', 'value', 'alt', 'aria-label'].forEach(function (attr) {
+            document.querySelectorAll('[' + attr + '*="{{APP_NAME}}"]').forEach(function (el) {
+              el.setAttribute(attr, el.getAttribute(attr).replace(/\{\{APP_NAME\}\}/g, name));
+            });
+          });
+        }
+        function _tryApply() {
+          var name = window.APP_CONFIG && window.APP_CONFIG.appName;
+          if (name) { _applyDynamicBranding(name); return; }
+          window.addEventListener('app-config-loaded', function (e) {
+            _applyDynamicBranding((e && e.detail && e.detail.appName) || '');
+          });
+        }
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', _tryApply);
+        } else {
+          _tryApply();
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div class="error-container">
+      <span class="error-icon">⚠️</span>
+      <h1>Something went wrong</h1>
+      <p>An unexpected error occurred. Our team has been notified and we're working on a fix.</p>
+      <div class="error-details" id="error-details">
+        Error: Service temporarily unavailable<br />
+        Code: 500 · Timestamp: <span id="error-time"></span>
+      </div>
+      <div class="error-actions">
+        <a href="/" class="btn btn-primary">🏠 Home</a>
+        <button class="btn btn-secondary" onclick="window.location.reload()">🔄 Retry</button>
+      </div>
+    </div>
+
+    <script>
+      var timeEl = document.getElementById('error-time');
+      if (timeEl) timeEl.textContent = new Date().toISOString();
+    </script>
+  </body>
+</html>

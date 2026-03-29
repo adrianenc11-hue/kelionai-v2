@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Workspace — KelionAI</title>
+  <link rel="stylesheet" href="/css/main.css">
+  <style>
+    :root {
+      --bg: #0f172a;
+      --surface: #1e293b;
+      --surface2: #0f172a;
+      --border: #334155;
+      --accent: #6366f1;
+      --accent2: #22d3ee;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: system-ui, sans-serif; min-height: 100vh; }
+
+    /* ── Layout ── */
+    .ws-layout { display: flex; min-height: 100vh; }
+    .ws-sidebar {
+      width: 260px; background: var(--surface); border-right: 1px solid var(--border);
+      padding: 24px 16px; display: flex; flex-direction: column; gap: 8px;
+      position: fixed; top: 0; left: 0; height: 100vh; overflow-y: auto; z-index: 10;
+    }
+    .ws-main { margin-left: 260px; flex: 1; padding: 32px; max-width: 1200px; }
+
+    /* ── Sidebar ── */
+    .ws-logo { display: flex; align-items: center; gap: 10px; padding: 8px 12px; margin-bottom: 16px; }
+    .ws-logo-icon { font-size: 1.5rem; }
+    .ws-logo-text { font-size: 1.1rem; font-weight: 700; color: var(--text); }
+    .ws-logo-sub { font-size: 0.7rem; color: var(--muted); }
+
+    .ws-nav-item {
+      display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+      border-radius: 8px; cursor: pointer; transition: all 0.2s; color: var(--muted);
+      font-size: 0.9rem; text-decoration: none; border: none; background: none; width: 100%;
+    }
+    .ws-nav-item:hover { background: rgba(99,102,241,0.1); color: var(--text); }
+    .ws-nav-item.active { background: rgba(99,102,241,0.2); color: var(--accent); font-weight: 600; }
+    .ws-nav-item .icon { font-size: 1.1rem; width: 20px; text-align: center; }
+    .ws-nav-badge {
+      margin-left: auto; background: var(--accent); color: #fff;
+      font-size: 0.65rem; padding: 2px 6px; border-radius: 10px; font-weight: 700;
+    }
+
+    .ws-storage-bar { margin-top: auto; padding: 16px 12px; background: var(--surface2); border-radius: 8px; }
+    .ws-storage-label { font-size: 0.75rem; color: var(--muted); margin-bottom: 8px; display: flex; justify-content: space-between; }
+    .ws-storage-track { background: var(--border); border-radius: 4px; height: 6px; overflow: hidden; }
+    .ws-storage-fill { background: linear-gradient(90deg, var(--accent), var(--accent2)); height: 100%; border-radius: 4px; transition: width 0.5s; }
+
+    /* ── Header ── */
+    .ws-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; }
+    .ws-header h1 { font-size: 1.5rem; font-weight: 700; }
+    .ws-header-actions { display: flex; gap: 10px; }
+
+    /* ── Upload Zone ── */
+    .upload-zone {
+      border: 2px dashed var(--border); border-radius: 12px; padding: 48px 24px;
+      text-align: center; cursor: pointer; transition: all 0.3s; background: var(--surface);
+      margin-bottom: 28px;
+    }
+    .upload-zone:hover, .upload-zone.drag-over {
+      border-color: var(--accent); background: rgba(99,102,241,0.05);
+    }
+    .upload-zone .upload-icon { font-size: 3rem; margin-bottom: 12px; }
+    .upload-zone h3 { font-size: 1.1rem; font-weight: 600; margin-bottom: 8px; }
+    .upload-zone p { color: var(--muted); font-size: 0.85rem; margin-bottom: 16px; }
+    .upload-zone .upload-types {
+      display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 12px;
+    }
+    .upload-type-tag {
+      background: var(--surface2); border: 1px solid var(--border); padding: 3px 8px;
+      border-radius: 12px; font-size: 0.72rem; color: var(--muted);
+    }
+    #file-input { display: none; }
+
+    /* ── Upload Progress ── */
+    .upload-progress {
+      background: var(--surface); border-radius: 12px; padding: 16px;
+      margin-bottom: 20px; display: none;
+    }
+    .upload-progress.visible { display: block; }
+    .upload-progress-item { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+    .upload-progress-item:last-child { margin-bottom: 0; }
+    .upload-progress-name { flex: 1; font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .upload-progress-bar { width: 120px; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+    .upload-progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2)); border-radius: 3px; transition: width 0.3s; }
+    .upload-progress-status { font-size: 0.75rem; color: var(--muted); width: 60px; text-align: right; }
+
+    /* ── Filters ── */
+    .ws-filters { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
+    .ws-filter-btn {
+      padding: 6px 14px; border-radius: 20px; border: 1px solid var(--border);
+      background: transparent; color: var(--muted); cursor: pointer; font-size: 0.82rem;
+      transition: all 0.2s;
+    }
+    .ws-filter-btn:hover { border-color: var(--accent); color: var(--text); }
+    .ws-filter-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+    .ws-search {
+      margin-left: auto; background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; padding: 6px 12px; color: var(--text); font-size: 0.85rem;
+      outline: none; width: 200px;
+    }
+    .ws-search:focus { border-color: var(--accent); }
+
+    /* ── File Grid ── */
+    .files-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
+    .file-card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+      padding: 16px; cursor: pointer; transition: all 0.2s; position: relative;
+    }
+    .file-card:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 4px 20px rgba(99,102,241,0.15); }
+    .file-card-icon { font-size: 2.5rem; margin-bottom: 10px; text-align: center; }
+    .file-card-name { font-size: 0.85rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-bottom: 4px; }
+    .file-card-meta { font-size: 0.72rem; color: var(--muted); margin-bottom: 8px; }
+    .file-card-status {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 0.7rem; padding: 2px 8px; border-radius: 10px; font-weight: 600;
+    }
+    .file-card-status.ready    { background: rgba(34,197,94,0.15);  color: var(--success); }
+    .file-card-status.analyzed { background: rgba(99,102,241,0.15); color: var(--accent); }
+    .file-card-status.analyzing{ background: rgba(245,158,11,0.15); color: var(--warning); }
+    .file-card-actions { display: flex; gap: 6px; margin-top: 10px; }
+    .file-card-btn {
+      flex: 1; padding: 5px 8px; border-radius: 6px; border: 1px solid var(--border);
+      background: transparent; color: var(--muted); cursor: pointer; font-size: 0.72rem;
+      transition: all 0.2s; text-align: center;
+    }
+    .file-card-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .file-card-btn.danger:hover { border-color: var(--danger); color: var(--danger); }
+    .file-card-checkbox {
+      position: absolute; top: 10px; right: 10px; width: 16px; height: 16px;
+      accent-color: var(--accent); cursor: pointer;
+    }
+
+    /* ── Analysis Panel ── */
+    .analysis-panel {
+      position: fixed; right: 0; top: 0; width: 420px; height: 100vh;
+      background: var(--surface); border-left: 1px solid var(--border);
+      z-index: 100; transform: translateX(100%); transition: transform 0.3s;
+      display: flex; flex-direction: column;
+    }
+    .analysis-panel.open { transform: translateX(0); }
+    .analysis-header {
+      padding: 20px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .analysis-header h3 { font-size: 1rem; font-weight: 700; }
+    .analysis-close { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 1.2rem; padding: 4px; }
+    .analysis-close:hover { color: var(--text); }
+    .analysis-body { flex: 1; overflow-y: auto; padding: 20px; }
+    .analysis-file-info { background: var(--surface2); border-radius: 8px; padding: 14px; margin-bottom: 16px; }
+    .analysis-file-icon { font-size: 2rem; text-align: center; margin-bottom: 8px; }
+    .analysis-file-name { font-size: 0.9rem; font-weight: 600; text-align: center; margin-bottom: 4px; }
+    .analysis-file-meta { font-size: 0.75rem; color: var(--muted); text-align: center; }
+    .analysis-prompt-area { margin-bottom: 14px; }
+    .analysis-prompt-area label { font-size: 0.75rem; color: var(--muted); display: block; margin-bottom: 6px; }
+    .analysis-prompt {
+      width: 100%; background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; padding: 10px; color: var(--text); font-size: 0.85rem;
+      resize: vertical; min-height: 60px; outline: none;
+    }
+    .analysis-prompt:focus { border-color: var(--accent); }
+    .analysis-result {
+      background: var(--surface2); border-radius: 8px; padding: 14px;
+      font-size: 0.85rem; line-height: 1.7; color: var(--text); white-space: pre-wrap;
+      max-height: 400px; overflow-y: auto;
+    }
+    .analysis-result.empty { color: var(--muted); font-style: italic; text-align: center; padding: 32px; }
+    .analysis-footer { padding: 16px 20px; border-top: 1px solid var(--border); display: flex; gap: 10px; }
+
+    /* ── Buttons ── */
+    .btn {
+      padding: 8px 18px; border-radius: 8px; border: none; cursor: pointer;
+      font-size: 0.85rem; font-weight: 600; transition: all 0.2s; display: inline-flex;
+      align-items: center; gap: 6px;
+    }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: #4f46e5; }
+    .btn-secondary { background: var(--surface); border: 1px solid var(--border); color: var(--text); }
+    .btn-secondary:hover { border-color: var(--accent); }
+    .btn-danger { background: rgba(239,68,68,0.15); color: var(--danger); border: 1px solid rgba(239,68,68,0.3); }
+    .btn-danger:hover { background: rgba(239,68,68,0.25); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* ── Empty state ── */
+    .ws-empty { text-align: center; padding: 60px 20px; color: var(--muted); }
+    .ws-empty .ws-empty-icon { font-size: 3rem; margin-bottom: 16px; }
+    .ws-empty h3 { font-size: 1.1rem; color: var(--text); margin-bottom: 8px; }
+
+    /* ── Toast ── */
+    .ws-toast {
+      position: fixed; bottom: 24px; right: 24px; background: var(--surface);
+      border: 1px solid var(--border); border-radius: 10px; padding: 12px 18px;
+      font-size: 0.85rem; z-index: 9999; transform: translateY(100px); opacity: 0;
+      transition: all 0.3s; max-width: 320px;
+    }
+    .ws-toast.show { transform: translateY(0); opacity: 1; }
+    .ws-toast.success { border-color: var(--success); }
+    .ws-toast.error   { border-color: var(--danger); }
+
+    /* ── Loading spinner ── */
+    .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Responsive ── */
+    @media (max-width: 768px) {
+      .ws-sidebar { width: 60px; padding: 16px 8px; }
+      .ws-sidebar .ws-logo-text, .ws-sidebar .ws-logo-sub, .ws-nav-item span:not(.icon), .ws-storage-bar { display: none; }
+      .ws-main { margin-left: 60px; padding: 16px; }
+      .analysis-panel { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+<div class="ws-layout">
+
+  <!-- Sidebar -->
+  <aside class="ws-sidebar">
+    <div class="ws-logo">
+      <div class="ws-logo-icon">🗂️</div>
+      <div>
+        <div class="ws-logo-text">Workspace</div>
+        <div class="ws-logo-sub">KelionAI</div>
+      </div>
+    </div>
+
+    <button class="ws-nav-item active" onclick="setFilter('all')" id="nav-all">
+      <span class="icon">📁</span><span>Toate fișierele</span>
+      <span class="ws-nav-badge" id="badge-all">0</span>
+    </button>
+    <button class="ws-nav-item" onclick="setFilter('image')" id="nav-image">
+      <span class="icon">🖼️</span><span>Imagini</span>
+    </button>
+    <button class="ws-nav-item" onclick="setFilter('document')" id="nav-document">
+      <span class="icon">📄</span><span>Documente</span>
+    </button>
+    <button class="ws-nav-item" onclick="setFilter('data')" id="nav-data">
+      <span class="icon">📊</span><span>Date / CSV</span>
+    </button>
+    <button class="ws-nav-item" onclick="setFilter('archive')" id="nav-archive">
+      <span class="icon">📦</span><span>Arhive</span>
+    </button>
+    <button class="ws-nav-item" onclick="setFilter('audio')" id="nav-audio">
+      <span class="icon">🎵</span><span>Audio</span>
+    </button>
+    <button class="ws-nav-item" onclick="setFilter('analyzed')" id="nav-analyzed">
+      <span class="icon">🤖</span><span>Analizate AI</span>
+    </button>
+
+    <hr style="border-color: var(--border); margin: 8px 0;">
+    <a href="/" class="ws-nav-item">
+      <span class="icon">🏠</span><span>Acasă</span>
+    </a>
+
+    <div class="ws-storage-bar">
+      <div class="ws-storage-label">
+        <span>Spațiu utilizat</span>
+        <span id="storage-used-pct">0%</span>
+      </div>
+      <div class="ws-storage-track">
+        <div class="ws-storage-fill" id="storage-fill" style="width:0%"></div>
+      </div>
+      <div style="font-size:0.72rem;color:var(--muted);margin-top:6px" id="storage-detail">0 MB / 500 MB</div>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="ws-main">
+    <div class="ws-header">
+      <div>
+        <h1>📂 Workspace</h1>
+        <p style="color:var(--muted);font-size:0.85rem;margin-top:4px">Încarcă fișiere, poze, arhive — analizează-le cu AI</p>
+      </div>
+      <div class="ws-header-actions">
+        <button class="btn btn-secondary" onclick="refreshFiles()">🔄 Actualizează</button>
+        <button class="btn btn-primary" onclick="document.getElementById('file-input').click()">
+          ⬆️ Încarcă fișiere
+        </button>
+      </div>
+    </div>
+
+    <!-- Upload Zone -->
+    <div class="upload-zone" id="upload-zone"
+         onclick="document.getElementById('file-input').click()"
+         ondragover="handleDragOver(event)"
+         ondragleave="handleDragLeave(event)"
+         ondrop="handleDrop(event)">
+      <div class="upload-icon">📤</div>
+      <h3>Trage fișierele aici sau click pentru a selecta</h3>
+      <p>Suportă imagini, PDF, Word, Excel, CSV, ZIP, audio — max 50MB per fișier, 10 fișiere simultan</p>
+      <div class="upload-types">
+        <span class="upload-type-tag">📷 JPG/PNG/WebP</span>
+        <span class="upload-type-tag">📄 PDF</span>
+        <span class="upload-type-tag">📝 DOCX/TXT</span>
+        <span class="upload-type-tag">📊 XLSX/CSV</span>
+        <span class="upload-type-tag">📦 ZIP/RAR</span>
+        <span class="upload-type-tag">🎵 MP3/WAV</span>
+        <span class="upload-type-tag">🔧 JSON/MD</span>
+      </div>
+    </div>
+    <input type="file" id="file-input" multiple accept="image/*,.pdf,.doc,.docx,.txt,.csv,.json,.md,.xlsx,.xls,.zip,.rar,.tar,.gz,.mp3,.wav,.ogg,.webm,.svg" onchange="handleFileSelect(event)">
+
+    <!-- Upload Progress -->
+    <div class="upload-progress" id="upload-progress"></div>
+
+    <!-- Filters -->
+    <div class="ws-filters">
+      <button class="ws-filter-btn active" onclick="setFilter('all')" data-filter="all">Toate</button>
+      <button class="ws-filter-btn" onclick="setFilter('image')" data-filter="image">🖼️ Imagini</button>
+      <button class="ws-filter-btn" onclick="setFilter('document')" data-filter="document">📄 Documente</button>
+      <button class="ws-filter-btn" onclick="setFilter('data')" data-filter="data">📊 Date</button>
+      <button class="ws-filter-btn" onclick="setFilter('archive')" data-filter="archive">📦 Arhive</button>
+      <button class="ws-filter-btn" onclick="setFilter('analyzed')" data-filter="analyzed">🤖 Analizate</button>
+      <input class="ws-search" type="text" placeholder="🔍 Caută fișiere..." id="search-input" oninput="handleSearch(this.value)">
+    </div>
+
+    <!-- Files Grid -->
+    <div class="files-grid" id="files-grid">
+      <div class="ws-empty" id="files-empty" style="grid-column:1/-1">
+        <div class="ws-empty-icon">📭</div>
+        <h3>Niciun fișier încărcat</h3>
+        <p>Începe prin a trage fișiere în zona de mai sus</p>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Analysis Panel -->
+<div class="analysis-panel" id="analysis-panel">
+  <div class="analysis-header">
+    <h3>🤖 Analiză AI</h3>
+    <button class="analysis-close" onclick="closeAnalysis()">✕</button>
+  </div>
+  <div class="analysis-body">
+    <div class="analysis-file-info" id="analysis-file-info">
+      <div class="analysis-file-icon" id="af-icon">📄</div>
+      <div class="analysis-file-name" id="af-name">—</div>
+      <div class="analysis-file-meta" id="af-meta">—</div>
+    </div>
+    <div class="analysis-prompt-area">
+      <label>Instrucțiuni personalizate (opțional)</label>
+      <textarea class="analysis-prompt" id="analysis-prompt"
+        placeholder="Ex: Rezumă în 3 puncte, Extrage datele numerice, Identifică problemele..."></textarea>
+    </div>
+    <div id="analysis-result-wrap">
+      <div class="analysis-result empty" id="analysis-result">
+        Apasă „Analizează" pentru a obține o analiză AI detaliată a fișierului.
+      </div>
+    </div>
+  </div>
+  <div class="analysis-footer">
+    <button class="btn btn-primary" id="analyze-btn" onclick="runAnalysis()" style="flex:1">
+      🤖 Analizează cu AI
+    </button>
+    <button class="btn btn-secondary" onclick="closeAnalysis()">✕ Închide</button>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="ws-toast" id="ws-toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+// Workspace UI — KelionAI
+// ═══════════════════════════════════════════════════════
+
+let allFiles = [];
+let currentFilter = 'all';
+let currentSearch = '';
+let selectedFileId = null;
+
+const CATEGORY_ICONS = {
+  image: '🖼️', document: '📄', data: '📊',
+  archive: '📦', audio: '🎵', other: '📎',
+};
+
+// ── Auth header ──
+function authHeaders() {
+  const session = JSON.parse(localStorage.getItem('kelion_session') || '{}');
+  const token = session?.access_token || session?.token || '';
+  return { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
+}
+
+function authHeadersNoContent() {
+  const session = JSON.parse(localStorage.getItem('kelion_session') || '{}');
+  const token = session?.access_token || session?.token || '';
+  return { 'Authorization': `Bearer ${token}` };
+}
+
+// ── Toast ──
+function showToast(msg, type = 'info') {
+  const t = document.getElementById('ws-toast');
+  t.textContent = msg;
+  t.className = `ws-toast show ${type}`;
+  setTimeout(() => t.className = 'ws-toast', 3500);
+}
+
+// ── Format bytes ──
+function fmtSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024*1024) return (bytes/1024).toFixed(1) + ' KB';
+  return (bytes/1024/1024).toFixed(2) + ' MB';
+}
+
+// ── Format date ──
+function fmtDate(iso) {
+  return new Date(iso).toLocaleDateString('ro-RO', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+}
+
+// ── Load files ──
+async function loadFiles() {
+  try {
+    const params = new URLSearchParams();
+    if (currentFilter && currentFilter !== 'all' && currentFilter !== 'analyzed') params.set('category', currentFilter);
+    if (currentSearch) params.set('search', currentSearch);
+    params.set('limit', '100');
+
+    const res = await fetch('/api/workspace/files?' + params, { headers: authHeaders() });
+    if (res.status === 401) { window.location.href = '/'; return; }
+    const data = await res.json();
+
+    allFiles = data.files || [];
+
+    // Filter analyzed locally
+    let files = allFiles;
+    if (currentFilter === 'analyzed') files = allFiles.filter(f => f.status === 'analyzed');
+
+    renderFiles(files);
+    document.getElementById('badge-all').textContent = data.total || 0;
+  } catch (e) {
+    showToast('Eroare la încărcarea fișierelor', 'error');
+  }
+}
+
+// ── Load storage info ──
+async function loadStorageInfo() {
+  try {
+    const res = await fetch('/api/workspace/storage-info', { headers: authHeaders() });
+    const data = await res.json();
+    document.getElementById('storage-used-pct').textContent = (data.usedPercent || 0) + '%';
+    document.getElementById('storage-fill').style.width = (data.usedPercent || 0) + '%';
+    document.getElementById('storage-detail').textContent = `${data.totalMB || 0} MB / ${data.limitMB || 500} MB`;
+  } catch (_e) {}
+}
+
+// ── Render files ──
+function renderFiles(files) {
+  const grid = document.getElementById('files-grid');
+  const empty = document.getElementById('files-empty');
+
+  if (!files || files.length === 0) {
+    grid.innerHTML = '';
+    grid.appendChild(empty);
+    empty.style.display = 'block';
+    return;
+  }
+
+  empty.style.display = 'none';
+  grid.innerHTML = files.map(f => `
+    <div class="file-card" id="card-${f.id}" onclick="openAnalysis('${f.id}')">
+      <div class="file-card-icon">${CATEGORY_ICONS[f.category] || '📎'}</div>
+      <div class="file-card-name" title="${f.original_name}">${f.original_name}</div>
+      <div class="file-card-meta">${fmtSize(f.size_bytes)} · ${fmtDate(f.created_at)}</div>
+      <span class="file-card-status ${f.status}">${
+        f.status === 'analyzed' ? '✓ Analizat' :
+        f.status === 'analyzing' ? '⏳ Analizare...' : '● Gata'
+      }</span>
+      <div class="file-card-actions" onclick="event.stopPropagation()">
+        <button class="file-card-btn" onclick="openAnalysis('${f.id}')">🤖 Analizează</button>
+        <button class="file-card-btn danger" onclick="deleteFile('${f.id}', '${f.original_name.replace(/'/g,"\\'")}')">🗑️</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ── Upload ──
+async function uploadFiles(fileList) {
+  if (!fileList || fileList.length === 0) return;
+
+  const progressDiv = document.getElementById('upload-progress');
+  progressDiv.innerHTML = '';
+  progressDiv.classList.add('visible');
+
+  const formData = new FormData();
+  const fileItems = [];
+
+  for (const file of fileList) {
+    formData.append('files', file);
+    const itemId = 'prog-' + Math.random().toString(36).slice(2);
+    fileItems.push({ name: file.name, id: itemId });
+    progressDiv.innerHTML += `
+      <div class="upload-progress-item">
+        <span class="upload-progress-name" title="${file.name}">${file.name}</span>
+        <div class="upload-progress-bar"><div class="upload-progress-fill" id="${itemId}" style="width:0%"></div></div>
+        <span class="upload-progress-status" id="${itemId}-status">0%</span>
+      </div>`;
+  }
+
+  // Animate progress bars
+  let prog = 0;
+  const interval = setInterval(() => {
+    prog = Math.min(prog + Math.random() * 15, 85);
+    fileItems.forEach(item => {
+      const el = document.getElementById(item.id);
+      const st = document.getElementById(item.id + '-status');
+      if (el) el.style.width = prog + '%';
+      if (st) st.textContent = Math.round(prog) + '%';
+    });
+  }, 200);
+
+  try {
+    const session = JSON.parse(localStorage.getItem('kelion_session') || '{}');
+    const token = session?.access_token || session?.token || '';
+
+    const res = await fetch('/api/workspace/upload', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` },
+      body: formData,
+    });
+    const data = await res.json();
+
+    clearInterval(interval);
+    fileItems.forEach(item => {
+      const el = document.getElementById(item.id);
+      const st = document.getElementById(item.id + '-status');
+      if (el) el.style.width = '100%';
+      if (st) st.textContent = data.success ? '✓' : '✗';
+    });
+
+    if (data.success) {
+      showToast(`✅ ${data.count} fișier(e) încărcate cu succes!`, 'success');
+      setTimeout(() => { progressDiv.classList.remove('visible'); loadFiles(); loadStorageInfo(); }, 1500);
+    } else {
+      showToast('❌ ' + (data.error || 'Upload eșuat'), 'error');
+    }
+  } catch (e) {
+    clearInterval(interval);
+    showToast('❌ Eroare la upload: ' + e.message, 'error');
+  }
+}
+
+// ── Drag & Drop ──
+function handleDragOver(e) {
+  e.preventDefault();
+  document.getElementById('upload-zone').classList.add('drag-over');
+}
+function handleDragLeave(e) {
+  document.getElementById('upload-zone').classList.remove('drag-over');
+}
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('upload-zone').classList.remove('drag-over');
+  uploadFiles(e.dataTransfer.files);
+}
+function handleFileSelect(e) {
+  uploadFiles(e.target.files);
+  e.target.value = '';
+}
+
+// ── Filters ──
+function setFilter(filter) {
+  currentFilter = filter;
+  document.querySelectorAll('.ws-filter-btn').forEach(b => b.classList.remove('active'));
+  const btn = document.querySelector(`[data-filter="${filter}"]`);
+  if (btn) btn.classList.add('active');
+  document.querySelectorAll('.ws-nav-item').forEach(b => b.classList.remove('active'));
+  const nav = document.getElementById('nav-' + filter);
+  if (nav) nav.classList.add('active');
+  loadFiles();
+}
+
+function handleSearch(val) {
+  currentSearch = val;
+  clearTimeout(window._searchTimer);
+  window._searchTimer = setTimeout(loadFiles, 400);
+}
+
+// ── Analysis Panel ──
+async function openAnalysis(fileId) {
+  selectedFileId = fileId;
+  const file = allFiles.find(f => f.id === fileId);
+  if (!file) return;
+
+  document.getElementById('af-icon').textContent = CATEGORY_ICONS[file.category] || '📎';
+  document.getElementById('af-name').textContent = file.original_name;
+  document.getElementById('af-meta').textContent = `${fmtSize(file.size_bytes)} · ${file.mime_type} · ${fmtDate(file.created_at)}`;
+  document.getElementById('analysis-prompt').value = '';
+
+  // Show existing analysis if available
+  if (file.status === 'analyzed' && file.ai_analysis) {
+    // Fetch full details
+    try {
+      const res = await fetch(`/api/workspace/files/${fileId}`, { headers: authHeaders() });
+      const full = await res.json();
+      if (full.ai_analysis?.summary) {
+        document.getElementById('analysis-result').textContent = full.ai_analysis.summary;
+        document.getElementById('analysis-result').classList.remove('empty');
+      }
+    } catch (_e) {}
+  } else {
+    document.getElementById('analysis-result').textContent = 'Apasă „Analizează" pentru a obține o analiză AI detaliată a fișierului.';
+    document.getElementById('analysis-result').classList.add('empty');
+  }
+
+  document.getElementById('analysis-panel').classList.add('open');
+}
+
+function closeAnalysis() {
+  document.getElementById('analysis-panel').classList.remove('open');
+  selectedFileId = null;
+}
+
+async function runAnalysis() {
+  if (!selectedFileId) return;
+  const btn = document.getElementById('analyze-btn');
+  const resultEl = document.getElementById('analysis-result');
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Analizare...';
+  resultEl.textContent = '⏳ Avatarul analizează fișierul...';
+  resultEl.classList.remove('empty');
+
+  try {
+    const prompt = document.getElementById('analysis-prompt').value.trim();
+    const res = await fetch(`/api/workspace/analyze/${selectedFileId}`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ prompt }),
+    });
+    const data = await res.json();
+
+    if (data.success && data.analysis) {
+      const a = data.analysis;
+      let text = a.summary || '';
+      if (a.details?.description) text = a.details.description;
+      if (a.insights && a.insights.length > 0) {
+        text += '\n\n📌 Puncte cheie:\n' + a.insights.map(i => '• ' + i).join('\n');
+      }
+      resultEl.textContent = text || 'Analiză completă.';
+      resultEl.classList.remove('empty');
+      showToast('✅ Analiză completă!', 'success');
+
+      // Update file status in local list
+      const idx = allFiles.findIndex(f => f.id === selectedFileId);
+      if (idx >= 0) allFiles[idx].status = 'analyzed';
+      const card = document.getElementById('card-' + selectedFileId);
+      if (card) {
+        const statusEl = card.querySelector('.file-card-status');
+        if (statusEl) { statusEl.className = 'file-card-status analyzed'; statusEl.textContent = '✓ Analizat'; }
+      }
+    } else {
+      resultEl.textContent = '❌ ' + (data.error || 'Analiza a eșuat');
+      showToast('❌ ' + (data.error || 'Analiza a eșuat'), 'error');
+    }
+  } catch (e) {
+    resultEl.textContent = '❌ Eroare: ' + e.message;
+    showToast('❌ Eroare la analiză', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '🤖 Analizează cu AI';
+  }
+}
+
+// ── Delete file ──
+async function deleteFile(fileId, fileName) {
+  if (!confirm(`Ștergi fișierul "${fileName}"?`)) return;
+  try {
+    const res = await fetch(`/api/workspace/files/${fileId}`, { method: 'DELETE', headers: authHeaders() });
+    const data = await res.json();
+    if (data.success) {
+      showToast('🗑️ Fișier șters', 'success');
+      if (selectedFileId === fileId) closeAnalysis();
+      loadFiles();
+      loadStorageInfo();
+    } else {
+      showToast('❌ ' + (data.error || 'Ștergere eșuată'), 'error');
+    }
+  } catch (e) {
+    showToast('❌ Eroare la ștergere', 'error');
+  }
+}
+
+function refreshFiles() { loadFiles(); loadStorageInfo(); }
+
+// ── Keyboard shortcuts ──
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeAnalysis();
+});
+
+// ── Init ──
+document.addEventListener('DOMContentLoaded', () => {
+  loadFiles();
+  loadStorageInfo();
+});
+</script>
+</body>
+</html>

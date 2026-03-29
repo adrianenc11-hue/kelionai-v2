@@ -1,0 +1,49 @@
+{
+  "appId": "com.kelionai.app",
+  "appName": "KelionAI",
+  "webDir": "app",
+  "server": {
+    "url": "https://kelionai-v2-production.up.railway.app",
+    "cleartext": false,
+    "allowNavigation": [
+      "kelionai-v2-production.up.railway.app",
+      "*.supabase.co",
+      "*.stripe.com",
+      "checkout.stripe.com"
+    ]
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 2000,
+      "backgroundColor": "#0A0A0F",
+      "showSpinner": true,
+      "spinnerColor": "#6366f1",
+      "launchAutoHide": true
+    },
+    "StatusBar": {
+      "style": "DARK",
+      "backgroundColor": "#0A0A0F"
+    },
+    "PushNotifications": {
+      "presentationOptions": [
+        "badge",
+        "sound",
+        "alert"
+      ]
+    },
+    "Keyboard": {
+      "resize": "body",
+      "resizeOnFullScreen": true
+    }
+  },
+  "android": {
+    "allowMixedContent": false,
+    "backgroundColor": "#0A0A0F"
+  },
+  "ios": {
+    "backgroundColor": "#0A0A0F",
+    "contentInset": "automatic",
+    "preferredContentMode": "mobile",
+    "scheme": "KelionAI"
+  }
+}

@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Contact — KelionAI</title>
+  <link rel="stylesheet" href="/css/main.css">
+  <style>
+    :root {
+      --bg: #0f172a; --surface: #1e293b; --border: #334155;
+      --accent: #6366f1; --accent2: #22d3ee; --text: #e2e8f0;
+      --muted: #94a3b8; --success: #22c55e; --danger: #ef4444;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: system-ui, sans-serif; min-height: 100vh; }
+
+    .page { max-width: 1100px; margin: 0 auto; padding: 40px 24px; }
+    .page-header { text-align: center; margin-bottom: 48px; }
+    .page-header h1 { font-size: 2.2rem; font-weight: 800; margin-bottom: 12px; }
+    .page-header p { color: var(--muted); font-size: 1rem; }
+
+    .contact-grid { display: grid; grid-template-columns: 1fr 380px; gap: 32px; }
+    @media (max-width: 768px) { .contact-grid { grid-template-columns: 1fr; } }
+
+    /* ── Form Card ── */
+    .contact-form-card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 32px;
+    }
+    .contact-form-card h2 { font-size: 1.2rem; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 8px; }
+
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @media (max-width: 500px) { .form-row { grid-template-columns: 1fr; } }
+
+    .form-group { margin-bottom: 18px; }
+    .form-group label { display: block; font-size: 0.78rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; font-weight: 600; }
+    .form-group input, .form-group select, .form-group textarea {
+      width: 100%; background: #0f172a; border: 1px solid var(--border); border-radius: 8px;
+      padding: 10px 14px; color: var(--text); font-size: 0.9rem; outline: none; transition: border-color 0.2s;
+    }
+    .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: var(--accent); }
+    .form-group textarea { min-height: 120px; resize: vertical; }
+    .form-group select option { background: #1e293b; }
+
+    .priority-selector { display: flex; gap: 8px; }
+    .priority-btn {
+      flex: 1; padding: 8px; border-radius: 8px; border: 1px solid var(--border);
+      background: transparent; color: var(--muted); cursor: pointer; font-size: 0.78rem;
+      transition: all 0.2s; text-align: center;
+    }
+    .priority-btn.active { border-color: var(--accent); background: rgba(99,102,241,0.15); color: var(--accent); font-weight: 600; }
+
+    .btn-send {
+      width: 100%; padding: 14px; background: linear-gradient(135deg, var(--accent), #8b5cf6);
+      color: #fff; border: none; border-radius: 10px; font-size: 1rem; font-weight: 700;
+      cursor: pointer; transition: all 0.3s; display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .btn-send:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(99,102,241,0.4); }
+    .btn-send:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+    /* ── Success State ── */
+    .contact-success {
+      text-align: center; padding: 48px 24px; display: none;
+    }
+    .contact-success.show { display: block; }
+    .success-icon { font-size: 4rem; margin-bottom: 16px; animation: popIn 0.5s ease-out; }
+    @keyframes popIn { from { transform: scale(0); } to { transform: scale(1); } }
+    .success-ref {
+      background: #0f172a; border-radius: 8px; padding: 12px 20px; display: inline-block;
+      font-family: monospace; font-size: 1.1rem; color: var(--accent2); margin: 16px 0; letter-spacing: 2px;
+    }
+
+    /* ── Info Sidebar ── */
+    .contact-info { display: flex; flex-direction: column; gap: 16px; }
+    .info-card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px;
+    }
+    .info-card h3 { font-size: 0.9rem; font-weight: 700; margin-bottom: 12px; color: var(--accent2); }
+    .info-item { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 12px; }
+    .info-item:last-child { margin-bottom: 0; }
+    .info-item .info-icon { font-size: 1.2rem; flex-shrink: 0; margin-top: 2px; }
+    .info-item-text { font-size: 0.85rem; }
+    .info-item-text strong { display: block; color: var(--text); margin-bottom: 2px; }
+    .info-item-text span { color: var(--muted); }
+
+    .dept-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .dept-item {
+      background: #0f172a; border: 1px solid var(--border); border-radius: 8px;
+      padding: 10px; text-align: center; cursor: pointer; transition: all 0.2s;
+    }
+    .dept-item:hover { border-color: var(--accent); }
+    .dept-item .dept-icon { font-size: 1.4rem; margin-bottom: 4px; }
+    .dept-item .dept-name { font-size: 0.72rem; color: var(--muted); }
+
+    .spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .error-msg { color: var(--danger); font-size: 0.82rem; margin-top: 6px; display: none; }
+    .error-msg.show { display: block; }
+  </style>
+</head>
+<body>
+<div class="page">
+  <div class="page-header">
+    <h1>✉️ Contactează-ne</h1>
+    <p>Suntem aici să te ajutăm. Trimite-ne un mesaj și îți răspundem în 24-48 ore.</p>
+  </div>
+
+  <div class="contact-grid">
+    <!-- Form -->
+    <div class="contact-form-card">
+      <h2>📝 Trimite un mesaj</h2>
+
+      <!-- Form -->
+      <div id="contact-form-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Numele tău *</label>
+            <input type="text" id="c-name" placeholder="Ion Popescu" required>
+          </div>
+          <div class="form-group">
+            <label>Email *</label>
+            <input type="email" id="c-email" placeholder="ion@email.com" required>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Telefon (opțional)</label>
+            <input type="tel" id="c-phone" placeholder="+40 7XX XXX XXX">
+          </div>
+          <div class="form-group">
+            <label>Departament *</label>
+            <select id="c-dept">
+              <option value="Support">🛟 Suport General</option>
+              <option value="Technical">🔧 Suport Tehnic</option>
+              <option value="Commercial">💼 Commercial</option>
+              <option value="Billing">💳 Facturare & Plăți</option>
+              <option value="Partnership">🤝 Parteneriate</option>
+              <option value="Other">📌 Altele</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Subiect</label>
+          <input type="text" id="c-subject" placeholder="Descrie pe scurt problema sau cererea ta">
+        </div>
+
+        <div class="form-group">
+          <label>Mesaj *</label>
+          <textarea id="c-message" placeholder="Descrie în detaliu ce ai nevoie sau ce problemă ai întâmpinat..."></textarea>
+        </div>
+
+        <div class="form-group">
+          <label>Prioritate</label>
+          <div class="priority-selector">
+            <button class="priority-btn" data-priority="low" onclick="setPriority('low')">🟢 Scăzută</button>
+            <button class="priority-btn active" data-priority="normal" onclick="setPriority('normal')">🔵 Normală</button>
+            <button class="priority-btn" data-priority="high" onclick="setPriority('high')">🟠 Ridicată</button>
+            <button class="priority-btn" data-priority="urgent" onclick="setPriority('urgent')">🔴 Urgentă</button>
+          </div>
+        </div>
+
+        <div class="error-msg" id="form-error"></div>
+
+        <button class="btn-send" id="send-btn" onclick="sendMessage()">
+          ✉️ Trimite mesajul
+        </button>
+      </div>
+
+      <!-- Success -->
+      <div class="contact-success" id="contact-success">
+        <div class="success-icon">✅</div>
+        <h2>Mesaj trimis cu succes!</h2>
+        <p style="color:var(--muted);margin:8px 0">Numărul tău de referință:</p>
+        <div class="success-ref" id="success-ref">KEL-XXXX</div>
+        <p style="color:var(--muted);font-size:0.85rem;margin-top:8px">
+          Vei primi un email de confirmare. Echipa noastră îți va răspunde în 24-48 ore.
+        </p>
+        <button onclick="resetForm()" style="margin-top:20px;padding:10px 24px;background:var(--accent);color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:600">
+          ✉️ Trimite alt mesaj
+        </button>
+      </div>
+    </div>
+
+    <!-- Info Sidebar -->
+    <div class="contact-info">
+      <div class="info-card">
+        <h3>📞 Informații contact</h3>
+        <div class="info-item">
+          <span class="info-icon">📧</span>
+          <div class="info-item-text">
+            <strong>Email suport</strong>
+            <span>support@kelionai.com</span>
+          </div>
+        </div>
+        <div class="info-item">
+          <span class="info-icon">⏰</span>
+          <div class="info-item-text">
+            <strong>Program de lucru</strong>
+            <span>Luni – Vineri, 9:00 – 18:00 EET</span>
+          </div>
+        </div>
+        <div class="info-item">
+          <span class="info-icon">⚡</span>
+          <div class="info-item-text">
+            <strong>Timp de răspuns</strong>
+            <span>24-48 ore lucrătoare</span>
+          </div>
+        </div>
+        <div class="info-item">
+          <span class="info-icon">🔴</span>
+          <div class="info-item-text">
+            <strong>Urgențe</strong>
+            <span>Marchează prioritatea „Urgentă" pentru răspuns prioritar</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="info-card">
+        <h3>🏢 Departamente</h3>
+        <div class="dept-grid">
+          <div class="dept-item" onclick="document.getElementById('c-dept').value='Technical'">
+            <div class="dept-icon">🔧</div>
+            <div class="dept-name">Tehnic</div>
+          </div>
+          <div class="dept-item" onclick="document.getElementById('c-dept').value='Commercial'">
+            <div class="dept-icon">💼</div>
+            <div class="dept-name">Commercial</div>
+          </div>
+          <div class="dept-item" onclick="document.getElementById('c-dept').value='Billing'">
+            <div class="dept-icon">💳</div>
+            <div class="dept-name">Facturare</div>
+          </div>
+          <div class="dept-item" onclick="document.getElementById('c-dept').value='Partnership'">
+            <div class="dept-icon">🤝</div>
+            <div class="dept-name">Parteneriate</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="info-card">
+        <h3>❓ Întrebări frecvente</h3>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <a href="/refund-policy" style="color:var(--accent);font-size:0.85rem;text-decoration:none">→ Politica de ramburs</a>
+          <a href="/privacy" style="color:var(--accent);font-size:0.85rem;text-decoration:none">→ Politica de confidențialitate</a>
+          <a href="/terms" style="color:var(--accent);font-size:0.85rem;text-decoration:none">→ Termeni și condiții</a>
+          <a href="/manual.html" style="color:var(--accent);font-size:0.85rem;text-decoration:none">→ Manual utilizare</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let selectedPriority = 'normal';
+
+function setPriority(p) {
+  selectedPriority = p;
+  document.querySelectorAll('.priority-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.priority === p);
+  });
+}
+
+function showError(msg) {
+  const el = document.getElementById('form-error');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 4000);
+}
+
+async function sendMessage() {
+  const name    = document.getElementById('c-name').value.trim();
+  const email   = document.getElementById('c-email').value.trim();
+  const dept    = document.getElementById('c-dept').value;
+  const subject = document.getElementById('c-subject').value.trim();
+  const message = document.getElementById('c-message').value.trim();
+  const phone   = document.getElementById('c-phone').value.trim();
+
+  if (!name)    return showError('Te rog completează numele.');
+  if (!email || !email.includes('@')) return showError('Te rog completează un email valid.');
+  if (!message || message.length < 10) return showError('Mesajul trebuie să aibă cel puțin 10 caractere.');
+
+  const btn = document.getElementById('send-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Se trimite...';
+
+  try {
+    const res = await fetch('/api/contact/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, email, subject, message, department: dept, phone, priority: selectedPriority }),
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      document.getElementById('contact-form-body').style.display = 'none';
+      const success = document.getElementById('contact-success');
+      success.classList.add('show');
+      document.getElementById('success-ref').textContent = data.autoReply?.refNumber || 'KEL-XXXX';
+    } else {
+      showError(data.error || 'Eroare la trimitere. Încearcă din nou.');
+    }
+  } catch (e) {
+    showError('Eroare de rețea. Verifică conexiunea.');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '✉️ Trimite mesajul';
+  }
+}
+
+function resetForm() {
+  document.getElementById('contact-form-body').style.display = 'block';
+  document.getElementById('contact-success').classList.remove('show');
+  ['c-name','c-email','c-phone','c-subject','c-message'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  setPriority('normal');
+}
+
+// Auto-fill email din sesiune
+try {
+  const session = JSON.parse(localStorage.getItem('kelion_session') || '{}');
+  if (session.user?.email) document.getElementById('c-email').value = session.user.email;
+  if (session.user?.user_metadata?.full_name) document.getElementById('c-name').value = session.user.user_metadata.full_name;
+} catch (_e) {}
+</script>
+</body>
+</html>

@@ -1,0 +1,60 @@
+name: Auto-Rollback on Site Down
+on:
+  # Run after every deploy (Railway triggers on push)
+  push:
+    branches: [master]
+  # Also run every 5 minutes as health check
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+jobs:
+  health-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 3 # Need previous commits for rollback
+
+      - name: Wait for deploy (60s)
+        if: github.event_name == 'push'
+        run: sleep 60
+
+      - name: Health Check
+        id: health
+        run: |
+          SITE_URL="${{ vars.SITE_URL || 'https://kelionai-v2-production.up.railway.app' }}"
+          echo "Checking $SITE_URL ..."
+
+          # Try 3 times with 10s gap
+          for i in 1 2 3; do
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "$SITE_URL" || echo "000")
+            echo "Attempt $i: HTTP $HTTP_CODE"
+            if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 400 ]; then
+              echo "status=healthy" >> $GITHUB_OUTPUT
+              echo "✅ Site is UP (HTTP $HTTP_CODE)"
+              exit 0
+            fi
+            sleep 10
+          done
+
+          echo "status=down" >> $GITHUB_OUTPUT
+          echo "❌ Site is DOWN after 3 attempts"
+
+      - name: Auto-Rollback
+        if: steps.health.outputs.status == 'down' && github.event_name == 'push'
+        run: |
+          echo "🔄 ROLLING BACK — reverting last commit..."
+          git config user.name "KelionAI Auto-Rollback"
+          git config user.email "rollback@kelionai.com"
+          git revert HEAD --no-edit
+          git push origin master
+          echo "✅ Rollback commit pushed — Railway will auto-deploy previous version"
+
+      - name: Notify (site down on scheduled check)
+        if: steps.health.outputs.status == 'down' && github.event_name == 'schedule'
+        run: |
+          echo "⚠️ ALERT: Site is DOWN during scheduled health check!"
+          echo "Manual intervention may be needed."
+          # Could add Slack/Discord webhook notification here
