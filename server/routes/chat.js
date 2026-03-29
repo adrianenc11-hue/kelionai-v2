@@ -66,7 +66,7 @@ router.post('/chat', chatLimiter, validate(chatSchema), async (req, res) => {
   try {
     const _chatStart = Date.now();
     const { getUserFromToken, supabaseAdmin, brain } = req.app.locals;
-    const { message, avatar = 'kelion', history = [], conversationId, imageBase64, audioBase64, geo, visionContext } = req.body;
+    const { message, avatar = 'kira', history = [], conversationId, imageBase64, audioBase64, geo, visionContext } = req.body;
     let language = req.body.language || 'ro';
     if (!message?.trim()) return res.status(400).json({ error: 'Message is required' });
 
@@ -89,7 +89,7 @@ router.post('/chat', chatLimiter, validate(chatSchema), async (req, res) => {
     if (isK1) {
       try {
         const k1Message = message.replace(/^k1[\s:,]*/i, '').trim();
-        const result = await brain.think(k1Message, 'kelion', history, 'ro', 'admin-k1', conversationId);
+        const result = await brain.think(k1Message, 'kira', history, 'ro', 'admin-k1', conversationId);
         return res.json({
           reply: result.enrichedMessage || 'No response',
           emotion: 'neutral',
@@ -410,7 +410,7 @@ router.post('/chat', chatLimiter, validate(chatSchema), async (req, res) => {
 router.post('/chat/stream', chatLimiter, validate(chatSchema), async (req, res) => {
   try {
     const { getUserFromToken, supabaseAdmin, brain } = req.app.locals;
-    const { message, avatar = 'kelion', history = [], conversationId, imageBase64, audioBase64, geo, visionContext } = req.body;
+    const { message, avatar = 'kira', history = [], conversationId, imageBase64, audioBase64, geo, visionContext } = req.body;
     let language = req.body.language || 'ro';
     if (!message?.trim()) return res.status(400).json({ error: 'Message is required' });
 

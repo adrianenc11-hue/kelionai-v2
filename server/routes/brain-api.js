@@ -205,7 +205,7 @@ router.post('/chat', brainLimiter, async (req, res) => {
 
     const result = await brain.think(
       message.trim(),
-      avatar || 'kelion',
+      avatar || 'kira',
       [],
       language || 'auto',
       userId || 'guest',
