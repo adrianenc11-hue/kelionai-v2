@@ -319,7 +319,7 @@ Answer in ${LANGS[language] || 'English'}.`;
           .from('brain_memory')
           .insert({
             user_id: user.id,
-            memory_type: 'visual_analysis',
+            memory_type: 'visual',
             content: `[VISION] ${description.substring(0, 500)}`,
             importance: 6,
             metadata: { category: 'vision_result', avatar, language, engine, emotion },
