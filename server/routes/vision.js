@@ -157,7 +157,7 @@ Answer in ${LANGS[language] || 'English'}.`;
       }
     }
 
-    // ═══ BRAIN INTEGRATION — save visual memory + parse emotion ═══
+    // ═══ BRAIN INTEGRATION — save visual memory + parse emotion + DANGER LEARNING ═══
     let emotion = 'neutral';
     if (description) {
       // Parse emotion tag from vision response
@@ -165,6 +165,40 @@ Answer in ${LANGS[language] || 'English'}.`;
       if (emotionMatch) {
         emotion = emotionMatch[1].toLowerCase();
         description = description.replace(/\[EMOTION:\w+\]/gi, '').trim();
+      }
+
+      // ═══ DANGER DETECTION & PERMANENT LEARNING ═══
+      const hasDangerImmediate = /⚠️PERICOL/i.test(description);
+      const hasDangerWarning = /⚠️ATENȚIE/i.test(description);
+      let dangerEventId = null;
+      let dangerType = null;
+      let dangerLevel = null;
+      if ((hasDangerImmediate || hasDangerWarning) && supabaseAdmin) {
+        dangerLevel = hasDangerImmediate ? 'immediate' : 'warning';
+        dangerType = classifyDangerType(description);
+        const envMatch = description.match(/(?:mediu|environ|loc|place|zonă)[:\s]*([^.!\n]+)/i);
+        const environment = envMatch ? envMatch[1].trim() : null;
+
+        try {
+          const { data: inserted } = await supabaseAdmin
+            .from('danger_events')
+            .insert({
+              user_id: user?.id || null,
+              danger_level: dangerLevel,
+              danger_type: dangerType,
+              description: description.substring(0, 1000),
+              environment: environment,
+              location_hint: null,
+              action_taken: 'alert_sent',
+              metadata: { avatar, language, engine, emotion, userName: userName || null },
+            })
+            .select('id')
+            .single();
+          dangerEventId = inserted?.id || null;
+          logger.info({ component: 'Vision', dangerLevel, dangerType, dangerEventId, userId: user?.id }, 'Danger event saved to memory');
+        } catch (err) {
+          logger.warn({ component: 'Vision', err: err.message }, 'Danger event save failed');
+        }
       }
 
       // Save to brain memory so brain remembers what it saw
@@ -210,6 +244,68 @@ Answer in ${LANGS[language] || 'English'}.`;
   } catch (e) {
     logger.error({ component: 'Vision', err: e.message }, 'Vision error');
     res.status(500).json({ error: 'Vision error' });
+  }
+});
+
+// ═══ DANGER TYPE CLASSIFIER — categorizes hazards for learning ═══
+const DANGER_CATEGORIES = {
+  vehicle:      /\b(mașină|mașin[aăi]|vehicul|camion|truck|car|bus|autobuz|motociclet|scuter|scooter|biciclet|bike|trotinet|tren|train|ambulanță|tramvai|taxi)\b/i,
+  obstacle:     /\b(obstacol|obstacle|stâlp|pole|gard|fence|barieră|barrier|perete|wall|cutie|box|piatră|stone|copac|tree|ramură|branch|zid|construcție|construction|scaffold|schela)\b/i,
+  stairs:       /\b(scări|stairs|trepte|steps|bordură|curb|rampă|ramp|pantă|slope|denivelare|drop|groapă|hole|canal|deschidere|opening)\b/i,
+  ground:       /\b(alunecos|slippery|ud|wet|gheață|ice|noroi|mud|nisip|sand|pietriș|gravel|crăpătură|crack|pardoseală|floor|trotuar|sidewalk|asfalt|gazon)\b/i,
+  animal:       /\b(câine|dog|pisică|cat|animal|insect|albină|bee|viespe|wasp|șarpe|snake|pasăre|bird)\b/i,
+  person:       /\b(persoană|person|copil|child|om|pieton|pedestrian|mulțime|crowd|grup|group)\b/i,
+  object_fall:  /\b(cade|falling|suspendat|hanging|instabil|unstable|se prăbușește|collapse|desprins|detached|agățat|leaning)\b/i,
+  fire:         /\b(foc|fire|fum|smoke|flacără|flame|incendiu|scânteie|spark|fierbinte|hot|arde|burning)\b/i,
+  water:        /\b(apă|water|inundație|flood|baltă|puddle|piscină|pool|râu|river|lac|lake|adânc|deep)\b/i,
+  electrical:   /\b(electric|curent|cablu|cable|fir|wire|priză|outlet|scurtcircuit|short.circuit|tensiune|voltage|stâlp electric|power line)\b/i,
+  height:       /\b(înălțime|height|balcon|balcony|acoperiș|roof|margine|edge|prăpastie|cliff|mal|schelă|scaffold|etaj|floor|geam|window)\b/i,
+  traffic:      /\b(trafic|traffic|intersecție|intersection|semafor|traffic.light|trecere|crossing|zebră|crosswalk|sens|lane|drum|road|stradă|street|autostradă|highway)\b/i,
+  low_obstacle: /\b(jos|low|la nivelul|ground.level|cablu|cable|fir|wire|prag|threshold|piatră|stone|root|rădăcină|bordură|curb)\b/i,
+  sharp:        /\b(ascuțit|sharp|tăios|sticlă|glass|metal|cuțit|knife|ac|needle|sârmă|wire|ciob|shard)\b/i,
+  overhead:     /\b(deasupra|above|overhead|ramură|branch|bârnă|beam|tavan|ceiling|acoperiș|roof|cablu|cable|semn|sign)\b/i,
+};
+
+function classifyDangerType(description) {
+  if (!description) return 'unknown';
+  for (const [type, pattern] of Object.entries(DANGER_CATEGORIES)) {
+    if (pattern.test(description)) return type;
+  }
+  return 'unknown';
+}
+
+// ═══ POST /api/vision/danger-feedback — user confirms/dismisses danger (learning) ═══
+router.post('/danger-feedback', rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  message: { error: 'Too many feedback requests.' },
+  keyGenerator: rateLimitKey,
+}), async (req, res) => {
+  try {
+    const { supabaseAdmin, getUserFromToken } = req.app.locals;
+    const { eventId, falseAlarm, userResponse } = req.body;
+    if (!eventId) return res.status(400).json({ error: 'eventId required' });
+
+    const user = await getUserFromToken(req);
+    if (!supabaseAdmin) return res.status(503).json({ error: 'Database unavailable' });
+
+    const update = {};
+    if (typeof falseAlarm === 'boolean') update.false_alarm = falseAlarm;
+    if (userResponse) update.user_response = String(userResponse).substring(0, 500);
+
+    const { error } = await supabaseAdmin
+      .from('danger_events')
+      .update(update)
+      .eq('id', eventId)
+      .eq('user_id', user?.id || '');
+
+    if (error) throw error;
+
+    logger.info({ component: 'Vision', eventId, falseAlarm, userId: user?.id }, 'Danger feedback saved');
+    res.json({ ok: true });
+  } catch (e) {
+    logger.warn({ component: 'Vision', err: e.message }, 'Danger feedback failed');
+    res.status(500).json({ error: 'Feedback save failed' });
   }
 });
 

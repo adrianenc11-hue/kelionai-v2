@@ -104,6 +104,141 @@ function railwayLinked() {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// KEY VERIFIERS — test each key against its provider API
+// ═══════════════════════════════════════════════════════════════
+async function httpJson(url, opts = {}) {
+  const res = await fetch(url, { ...opts, signal: AbortSignal.timeout(10000) });
+  return { status: res.status, data: await res.json().catch(() => null) };
+}
+
+const KEY_VERIFIERS = {
+  // ── Supabase ──
+  SUPABASE_ANON_KEY: async (key, all) => {
+    const url = all.SUPABASE_URL;
+    if (!url) return { ok: false, error: 'SUPABASE_URL missing' };
+    const { status } = await httpJson(`${url}/rest/v1/`, {
+      headers: { apikey: key, Authorization: `Bearer ${key}` },
+    });
+    return status === 200 ? { ok: true, info: 'REST API accessible' } : { ok: false, error: `HTTP ${status}` };
+  },
+  SUPABASE_SERVICE_KEY: async (key, all) => {
+    const url = all.SUPABASE_URL;
+    if (!url) return { ok: false, error: 'SUPABASE_URL missing' };
+    const { status } = await httpJson(`${url}/rest/v1/`, {
+      headers: { apikey: key, Authorization: `Bearer ${key}` },
+    });
+    return status === 200 ? { ok: true, info: 'Service role OK' } : { ok: false, error: `HTTP ${status}` };
+  },
+
+  // ── OpenAI ──
+  OPENAI_API_KEY: async (key) => {
+    const { status, data } = await httpJson('https://api.openai.com/v1/models', {
+      headers: { Authorization: `Bearer ${key}` },
+    });
+    if (status === 200) return { ok: true, info: `${data?.data?.length || '?'} models available` };
+    return { ok: false, error: data?.error?.message || `HTTP ${status}` };
+  },
+
+  // ── Anthropic ──
+  ANTHROPIC_API_KEY: async (key) => {
+    const { status, data } = await httpJson('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'claude-3-haiku-20240307', max_tokens: 1, messages: [{ role: 'user', content: 'hi' }] }),
+    });
+    if (status === 200) return { ok: true, info: 'Claude responding' };
+    // 400 = valid key but bad request (still means key works)
+    if (status === 400) return { ok: true, info: 'Key valid (model check)' };
+    return { ok: false, error: data?.error?.message || `HTTP ${status}` };
+  },
+
+  // ── Google AI / Gemini ──
+  GOOGLE_AI_KEY: async (key) => {
+    const { status, data } = await httpJson(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
+    if (status === 200) return { ok: true, info: `${data?.models?.length || '?'} models` };
+    return { ok: false, error: data?.error?.message || `HTTP ${status}` };
+  },
+
+  // ── Groq ──
+  GROQ_API_KEY: async (key) => {
+    const { status, data } = await httpJson('https://api.groq.com/openai/v1/models', {
+      headers: { Authorization: `Bearer ${key}` },
+    });
+    if (status === 200) return { ok: true, info: `${data?.data?.length || '?'} models` };
+    return { ok: false, error: data?.error?.message || `HTTP ${status}` };
+  },
+
+  // ── DeepSeek ──
+  DEEPSEEK_API_KEY: async (key) => {
+    const { status, data } = await httpJson('https://api.deepseek.com/v1/models', {
+      headers: { Authorization: `Bearer ${key}` },
+    });
+    if (status === 200) return { ok: true, info: 'DeepSeek OK' };
+    return { ok: false, error: data?.error?.message || `HTTP ${status}` };
+  },
+
+  // ── ElevenLabs ──
+  ELEVENLABS_API_KEY: async (key) => {
+    const { status, data } = await httpJson('https://api.elevenlabs.io/v1/user', {
+      headers: { 'xi-api-key': key },
+    });
+    if (status === 200) return { ok: true, info: `Credits: ${data?.subscription?.character_count || '?'}/${data?.subscription?.character_limit || '?'}` };
+    return { ok: false, error: `HTTP ${status}` };
+  },
+
+  // ── Deepgram ──
+  DEEPGRAM_API_KEY: async (key) => {
+    const { status, data } = await httpJson('https://api.deepgram.com/v1/projects', {
+      headers: { Authorization: `Token ${key}` },
+    });
+    if (status === 200) return { ok: true, info: `${data?.projects?.length || '?'} project(s)` };
+    return { ok: false, error: `HTTP ${status}` };
+  },
+
+  // ── Cartesia ──
+  CARTESIA_API_KEY: async (key) => {
+    const { status } = await httpJson('https://api.cartesia.ai/voices', {
+      headers: { 'X-API-Key': key, 'Cartesia-Version': '2024-06-10' },
+    });
+    if (status === 200) return { ok: true, info: 'Cartesia OK' };
+    return { ok: false, error: `HTTP ${status}` };
+  },
+
+  // ── Tavily ──
+  TAVILY_API_KEY: async (key) => {
+    const { status, data } = await httpJson('https://api.tavily.com/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ api_key: key, query: 'test', max_results: 1 }),
+    });
+    if (status === 200) return { ok: true, info: `${data?.results?.length || 0} results` };
+    return { ok: false, error: data?.detail || `HTTP ${status}` };
+  },
+
+  // ── Stripe ──
+  STRIPE_SECRET_KEY: async (key) => {
+    const { status, data } = await httpJson('https://api.stripe.com/v1/balance', {
+      headers: { Authorization: `Bearer ${key}` },
+    });
+    if (status === 200) {
+      const mode = key.startsWith('sk_live') ? 'LIVE' : 'TEST';
+      return { ok: true, info: `${mode} mode, balance OK` };
+    }
+    return { ok: false, error: data?.error?.message || `HTTP ${status}` };
+  },
+
+  // ── Sentry ──
+  SENTRY_DSN: async (dsn) => {
+    try {
+      const url = new URL(dsn);
+      return url.hostname.includes('sentry') ? { ok: true, info: `DSN → ${url.hostname}` } : { ok: false, error: 'Not a Sentry URL' };
+    } catch {
+      return { ok: false, error: 'Invalid DSN URL' };
+    }
+  },
+};
+
+// ═══════════════════════════════════════════════════════════════
 // MAIN
 // ═══════════════════════════════════════════════════════════════
 async function main() {
@@ -205,7 +340,50 @@ ${C.BOLD}${C.C}═════════════════════�
     console.log(`${C.DIM}─────────────────────────────────────────${C.RESET}`);
   }
 
-  // ═══ STEP 4: Reminder checklist ═══
+  // ═══ STEP 4: Verify keys actually work ═══
+  console.log(`\n${C.BOLD}${C.M}═══ STEP 4: Verifying Keys ═══${C.RESET}\n`);
+  console.log(`${C.DIM}Testing each key against its provider API...${C.RESET}\n`);
+
+  const verifyResults = { ok: [], fail: [], skip: [] };
+
+  for (const [name, value] of Object.entries(allNewKeys)) {
+    const check = KEY_VERIFIERS[name];
+    if (!check) {
+      verifyResults.skip.push(name);
+      continue;
+    }
+    process.stdout.write(`  ${C.Y}Testing ${name}${C.RESET}... `);
+    try {
+      const result = await check(value, allNewKeys);
+      if (result.ok) {
+        console.log(`${C.G}✅ ${result.info || 'OK'}${C.RESET}`);
+        verifyResults.ok.push(name);
+      } else {
+        console.log(`${C.R}❌ ${result.error || 'Failed'}${C.RESET}`);
+        verifyResults.fail.push({ name, error: result.error });
+      }
+    } catch (e) {
+      console.log(`${C.R}❌ ${e.message}${C.RESET}`);
+      verifyResults.fail.push({ name, error: e.message });
+    }
+  }
+
+  // Print verification summary
+  console.log(`\n${C.BOLD}${C.C}═══ VERIFICATION SUMMARY ═══${C.RESET}\n`);
+  if (verifyResults.ok.length > 0) {
+    console.log(`  ${C.G}✅ ${verifyResults.ok.length} keys verified OK:${C.RESET} ${verifyResults.ok.join(', ')}`);
+  }
+  if (verifyResults.fail.length > 0) {
+    console.log(`  ${C.R}❌ ${verifyResults.fail.length} keys FAILED:${C.RESET}`);
+    for (const f of verifyResults.fail) {
+      console.log(`     ${C.R}• ${f.name}: ${f.error}${C.RESET}`);
+    }
+  }
+  if (verifyResults.skip.length > 0) {
+    console.log(`  ${C.DIM}⏭  ${verifyResults.skip.length} internal/no-test: ${verifyResults.skip.join(', ')}${C.RESET}`);
+  }
+
+  // ═══ STEP 5: Reminder checklist ═══
   console.log(`
 ${C.BOLD}${C.C}═══ POST-ROTATION CHECKLIST ═══${C.RESET}
 
@@ -216,6 +394,9 @@ ${C.BOLD}${C.C}═══ POST-ROTATION CHECKLIST ═══${C.RESET}
   ${C.Y}5.${C.RESET} Test payment (Stripe — use test mode first!)
   ${C.Y}6.${C.RESET} Revoke OLD keys from all provider dashboards
      ${C.R}⚠️  Do this AFTER confirming new keys work!${C.RESET}
+${verifyResults.fail.length > 0 ? `
+  ${C.R}⚠️  ${verifyResults.fail.length} key(s) failed verification! Fix before revoking old keys.${C.RESET}` : `
+  ${C.G}All tested keys passed! Safe to revoke old keys.${C.RESET}`}
 
 ${C.BOLD}${C.G}Done! 🔒${C.RESET}
 `);

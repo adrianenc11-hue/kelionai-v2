@@ -582,13 +582,45 @@ ACCESSIBILITY MODE — ALWAYS ACTIVE:
       const asksAboutVision = /\b(ce vezi|what do you see|ce observi|ce e acolo|ce e in fata|ce ai in fata|uita.te|priveste|look|arata.mi|show me|descrie ce|describe what|ce se vede|what.s there|ce apare|recunoaste|recognize|identifica|identify|ce scrie|what does it say|analizeaza|analyze|ce vad|what.*see|ce e in jur|what.s around|ce e langa|spune.mi ce|tell me what|descrie.mi|describe for me|in fata mea|in front of me|ce camera|ce filmeaza|ce inregistreaza|ce capteaza|ce detecteaza|citeste|read|ce este|what is this|ce persoana|cine e|who is|ce obiect|what object)\b/i.test(message);
 
       if (hasDanger) {
+        // Load danger history for smarter alerts (learned patterns)
+        let dangerHistory = '';
+        if (supabaseAdmin && userId) {
+          try {
+            const { data: pastDangers } = await supabaseAdmin
+              .from('danger_events')
+              .select('danger_type, danger_level, description, false_alarm, created_at')
+              .eq('user_id', userId)
+              .order('created_at', { ascending: false })
+              .limit(10);
+            if (pastDangers?.length > 0) {
+              const falseAlarms = pastDangers.filter(d => d.false_alarm);
+              const realDangers = pastDangers.filter(d => !d.false_alarm);
+              const typeCounts = {};
+              for (const d of realDangers) {
+                typeCounts[d.danger_type] = (typeCounts[d.danger_type] || 0) + 1;
+              }
+              const frequentTypes = Object.entries(typeCounts).sort((a, b) => b[1] - a[1]).slice(0, 3);
+              dangerHistory = '\n\nLEARNED SAFETY PATTERNS:\n';
+              if (frequentTypes.length > 0) {
+                dangerHistory += `- Most common hazards for this user: ${frequentTypes.map(([t, c]) => `${t} (${c}x)`).join(', ')}\n`;
+              }
+              if (falseAlarms.length > 0) {
+                dangerHistory += `- ${falseAlarms.length} past false alarms detected. Be more careful with: ${falseAlarms.map(d => d.danger_type).join(', ')}. Only alert if you are confident.\n`;
+              }
+              dangerHistory += `- Total past danger events: ${pastDangers.length}\n`;
+            }
+          } catch (e) {
+            logger.debug({ component: 'Brain', err: e.message }, 'Danger history load failed');
+          }
+        }
+
         // Danger detected — calm, personal alert (ALWAYS inject)
         fullSystemPrompt = `SAFETY CONTEXT — The user's camera detected a potential hazard.
 ${userFirstName ? `The user's name is ${userFirstName}. Address them by name.` : ''}
 TONE: Stay CALM and reassuring. Never panic. Speak like a trusted friend gently guiding them.
 When mentioning the danger, be brief and helpful: "${userFirstName ? userFirstName + ', ' : ''}am observat [hazard] la [distanță] în [direcție]. Te sfătuiesc să [advice]."
 If the user asks something unrelated, mention the observation calmly at the end.
-
+${dangerHistory}
 [CAMERA OBSERVATION: ${options.visionContext}]
 
 ` + fullSystemPrompt;

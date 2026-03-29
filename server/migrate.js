@@ -897,6 +897,25 @@ CREATE INDEX IF NOT EXISTS idx_alert_logs_unread ON alert_logs(status) WHERE sta
 -- ═══ SUBSCRIPTIONS: add billing_cycle column if missing ═══
 ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS billing_cycle TEXT DEFAULT 'monthly';
 
+-- ═══ DANGER EVENTS (Safety learning — permanent memory of detected hazards) ═══
+CREATE TABLE IF NOT EXISTS danger_events (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id TEXT,
+    danger_level TEXT NOT NULL DEFAULT 'warning' CHECK (danger_level IN ('immediate', 'warning', 'caution')),
+    danger_type TEXT NOT NULL DEFAULT 'unknown',
+    description TEXT NOT NULL,
+    environment TEXT,
+    location_hint TEXT,
+    action_taken TEXT,
+    user_response TEXT,
+    false_alarm BOOLEAN DEFAULT false,
+    metadata JSONB DEFAULT '{}',
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_danger_events_user ON danger_events(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_danger_events_type ON danger_events(danger_type, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_danger_events_level ON danger_events(danger_level);
+
 `;
 
 async function runMigration() {
@@ -1027,6 +1046,7 @@ async function runMigration() {
       'brain_self_log',
       'alert_logs',
       'usage_tracking',
+      'danger_events',
     ];
 
     const healthy = [];
