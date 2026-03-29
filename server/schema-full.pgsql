@@ -162,7 +162,7 @@ CREATE INDEX IF NOT EXISTS idx_brain_memory_date ON brain_memory(created_at DESC
 
 ALTER TABLE brain_memory DROP CONSTRAINT IF EXISTS brain_memory_memory_type_check;
 ALTER TABLE brain_memory ADD CONSTRAINT brain_memory_memory_type_check
-  CHECK (memory_type IN ('general', 'conversation', 'fact', 'preference', 'skill', 'emotion', 'context', 'system', 'golden_knowledge', 'write_lesson', 'file_write', 'scheduled_task'));
+  CHECK (memory_type IN ('general', 'conversation', 'fact', 'preference', 'skill', 'emotion', 'context', 'system', 'golden_knowledge', 'write_lesson', 'file_write', 'scheduled_task', 'text', 'visual', 'audio'));
 
 -- ═══ AUTO-UPDATE updated_at ═══
 CREATE OR REPLACE FUNCTION update_updated_at()
@@ -525,15 +525,18 @@ CREATE INDEX IF NOT EXISTS idx_learned_facts_confidence ON learned_facts(confide
 CREATE TABLE IF NOT EXISTS procedural_memory (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     user_id TEXT,
-    procedure_name TEXT NOT NULL,
-    steps JSONB DEFAULT '[]',
-    last_used TIMESTAMPTZ DEFAULT NOW(),
-    success_rate NUMERIC DEFAULT 0,
-    context JSONB DEFAULT '{}',
+    pattern_type TEXT NOT NULL DEFAULT 'routing_success',
+    trigger_context TEXT,
+    action_taken TEXT,
+    outcome TEXT,
+    tools_used JSONB DEFAULT '[]',
+    success_count INTEGER DEFAULT 0,
+    confidence NUMERIC DEFAULT 0.5,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_procedural_memory_user ON procedural_memory(user_id);
+CREATE INDEX IF NOT EXISTS idx_procedural_memory_pattern ON procedural_memory(pattern_type);
 
 -- ═══ TENANTS (multi-tenancy) ═══
 CREATE TABLE IF NOT EXISTS tenants (
@@ -640,3 +643,34 @@ CREATE POLICY IF NOT EXISTS "users_own_cloned_voices" ON cloned_voices FOR ALL U
 ALTER TABLE brain_learnings
     ADD CONSTRAINT fk_brain_learnings_user
     FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE SET NULL;
+
+-- ═══ DANGER EVENTS (Safety tracking) ═══
+CREATE TABLE IF NOT EXISTS danger_events (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id TEXT,
+    danger_type TEXT NOT NULL,
+    danger_level TEXT DEFAULT 'low',
+    description TEXT,
+    false_alarm BOOLEAN DEFAULT false,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_danger_events_user ON danger_events(user_id);
+CREATE INDEX IF NOT EXISTS idx_danger_events_type ON danger_events(danger_type);
+
+ALTER TABLE danger_events ENABLE ROW LEVEL SECURITY;
+CREATE POLICY IF NOT EXISTS "service_only" ON danger_events FOR ALL USING (false);
+
+-- ═══ BRAIN SELF LOG (Self-improvement tracking) ═══
+CREATE TABLE IF NOT EXISTS brain_self_log (
+    id TEXT DEFAULT gen_random_uuid()::text PRIMARY KEY,
+    type TEXT NOT NULL,
+    data JSONB DEFAULT '{}',
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_brain_self_log_type ON brain_self_log(type);
+
+ALTER TABLE brain_self_log ENABLE ROW LEVEL SECURITY;
+CREATE POLICY IF NOT EXISTS "service_only" ON brain_self_log FOR ALL USING (false);

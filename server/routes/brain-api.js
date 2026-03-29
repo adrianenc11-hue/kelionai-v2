@@ -203,13 +203,15 @@ router.post('/chat', brainLimiter, async (req, res) => {
       if (user) userId = user.id;
     } catch (_) {}
 
-    const result = await brain.process({
-      message:   message.trim(),
-      userId:    userId || 'guest',
-      sessionId: sessionId || ('brain-api-' + Date.now()),
-      language:  language || 'auto',
-      avatar:    avatar || 'kira',
-    });
+    const result = await brain.think(
+      message.trim(),
+      avatar || 'kira',
+      [],
+      language || 'auto',
+      userId || 'guest',
+      null,
+      { sessionId: sessionId || ('brain-api-' + Date.now()) }
+    );
 
     return res.json({
       reply:    result.reply || result.text || result.content || '',
