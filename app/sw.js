@@ -2,15 +2,10 @@
 // KelionAI Service Worker — PWA + Offline Support
 // ═══════════════════════════════════════════════════════════════
 
-const CACHE_NAME = 'kelionai-v5';
+const CACHE_NAME = 'kelionai-v6';
 const STATIC_ASSETS = [
-  '/',
-  '/index.html',
   '/manifest.json',
   '/images/Icon.jpg',
-  '/images/Productivity.jpg',
-  '/css/main.css',
-  '/js/app.js',
 ];
 
 // ── Install: cache static assets ────────────────────────────────
@@ -61,9 +56,21 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // JS, CSS, HTML, GLB → network-first (ensures deploys take effect immediately)
+  // HTML pages → ALWAYS network (nonce changes every request, cache would break CSP)
+  if (request.mode === 'navigate' || /\.html(\?.*)?$/i.test(url.pathname) || url.pathname === '/') {
+    event.respondWith(
+      fetch(request).catch(() =>
+        new Response('<h1>Offline</h1><p>No network connection.</p>', {
+          status: 503, headers: { 'Content-Type': 'text/html' }
+        })
+      )
+    );
+    return;
+  }
+
+  // JS, CSS, GLB → network-first (ensures deploys take effect immediately)
   // Only fall back to cache if network fails (offline)
-  if (/\.(js|css|html|glb)(\?.*)?$/i.test(url.pathname) || url.pathname === '/') {
+  if (/\.(js|css|glb)(\?.*)?$/i.test(url.pathname)) {
     event.respondWith(
       fetch(request).then((response) => {
         if (response && response.status === 200 && response.type === 'basic') {
