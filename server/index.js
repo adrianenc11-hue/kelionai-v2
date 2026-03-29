@@ -230,8 +230,8 @@ app.use((req, res, next) => {
     `object-src 'none'`,
     `base-uri 'self'`,
     `form-action 'self'`,
-    `upgrade-insecure-requests`,
-  ].join('; ');
+    process.env.NODE_ENV === 'production' ? `upgrade-insecure-requests` : null,
+  ].filter(Boolean).join('; ');
 
   res.setHeader('Content-Security-Policy', csp);
   next();

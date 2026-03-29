@@ -24,8 +24,8 @@ function withTimeout(promise, ms = 10000, label = 'operation') {
 
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 20,
-  message: { error: 'Too many API requests. Please wait 15 minutes.' },
+  max: 300,
+  message: { error: 'Too many vision requests. Please wait.' },
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: rateLimitKey,

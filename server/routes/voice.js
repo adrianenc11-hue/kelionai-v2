@@ -26,8 +26,8 @@ const ttsLimiter = rateLimit({
 });
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 20,
-  message: { error: 'Too many API requests. Please wait 15 minutes.' },
+  max: 120,
+  message: { error: 'Too many voice requests. Please wait.' },
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: rateLimitKey,

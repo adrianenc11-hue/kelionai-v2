@@ -58,9 +58,7 @@ const BLOCKED_UA_PATTERNS = [
   /sqlmap/i, /nikto/i, /nmap/i, /masscan/i, /zgrab/i, /dirbuster/i,
   /gobuster/i, /wfuzz/i, /hydra/i, /medusa/i, /burpsuite/i, /zaproxy/i,
   /acunetix/i, /nessus/i, /openvas/i, /w3af/i, /skipfish/i, /arachni/i,
-  /python-requests\/[0-9]/i, /go-http-client\/[0-9]/i, /libwww-perl/i,
-  /curl\/[0-9]/i, /wget\/[0-9]/i, /scrapy/i, /phantomjs/i, /headless/i,
-  /selenium/i, /puppeteer/i, /playwright/i, /mechanize/i, /httpclient/i,
+  /scrapy/i, /phantomjs/i, /mechanize/i,
 ];
 
 // ── Paths care NU trebuie blocate niciodată ──
@@ -246,7 +244,7 @@ function apiProtectionMiddleware(req, res, next) {
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('X-XSS-Protection', '1; mode=block');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(self), payment=()');
+  res.setHeader('Permissions-Policy', 'camera=(self), microphone=(self), geolocation=(self), payment=(self)');
   res.setHeader('X-Powered-By', 'KelionAI');
 
   // ── Whitelist: /api/health always returns 200, skip all rate limiting ──
