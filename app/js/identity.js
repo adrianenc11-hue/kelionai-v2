@@ -143,12 +143,7 @@
 
     if (result.isOwner) {
       _ownerRecognized = true;
-      // Auto-store admin token from face recognition (no password needed)
-      if (result.adminToken) {
-        sessionStorage.setItem('kelion_admin_secret', result.adminToken);
-        console.log('[Identity] Admin auto-authenticated via face recognition');
-        if (window.KAuth && KAuth.updateAdminButtonState) KAuth.updateAdminButtonState();
-      }
+      // Admin access handled via Supabase session only (no token in response)
 
       // ═══ FACE AUTO-LOGIN — use session from server ═══
       if (result.session && result.faceLoginUser && window.KAuth) {

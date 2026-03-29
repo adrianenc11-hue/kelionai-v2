@@ -12,6 +12,7 @@ const logger = require('../logger');
 const { safetyClassifier } = require('../safety-classifier');
 const identityGuard = require('../identity-guard');
 const codeShield = require('../code-shield');
+const { checkUsage, incrementUsage } = require('../payments');
 
 const router = express.Router();
 
@@ -57,27 +58,6 @@ const chatLimiter = rateLimit({
   },
   handler: (req, res) => res.status(429).json({ error: 'Too many messages. Please wait a moment.' }),
 });
-
-// ── Usage quota check ──
-async function checkUsage(userId, type, supabaseAdmin, fingerprint) {
-  if (!supabaseAdmin) return { allowed: true };
-  try {
-    const identifier = userId || fingerprint || 'anonymous';
-    const today = new Date().toISOString().split('T')[0];
-    const { data } = await supabaseAdmin
-      .from('usage_tracking')
-      .select('count')
-      .eq('identifier', identifier)
-      .eq('type', type)
-      .eq('date', today)
-      .single();
-    const count = data?.count || 0;
-    const limits = { chat: 50, search: 20, image: 5, vision: 10, tts: 50 };
-    return { allowed: count < (limits[type] || 50), count, limit: limits[type] || 50 };
-  } catch {
-    return { allowed: true };
-  }
-}
 
 // ═══════════════════════════════════════════════════════════════
 // POST /api/chat
@@ -397,6 +377,9 @@ router.post('/chat', chatLimiter, validate(chatSchema), async (req, res) => {
       thinkTime: thought.thinkTime || (Date.now() - _chatStart),
     };
 
+    // ── Increment usage after successful response ──
+    incrementUsage(user?.id, 'chat', supabaseAdmin, fingerprint).catch(() => {});
+
     // ── Push notification to admin ──
     try {
       const { pushNotification } = req.app.locals;
@@ -487,6 +470,18 @@ router.post('/chat/stream', chatLimiter, validate(chatSchema), async (req, res) 
       'anonymous';
     const memoryUserIdS = user?.id || 'guest_' + (fingerprint || realClientIpS);
 
+    // ── Usage quota (same as regular chat) ──
+    if (!isAdminStream) {
+      const usageResult = await checkUsage(user?.id, 'chat', supabaseAdmin, fingerprint);
+      if (usageResult && !usageResult.allowed) {
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
+        res.write(`data: ${JSON.stringify({ reply: usageResult.message || 'Daily limit reached.', done: true, limitReached: true })}\n\n`);
+        return res.end();
+      }
+    }
+
     // ── SSE headers ──
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
@@ -519,6 +514,9 @@ router.post('/chat/stream', chatLimiter, validate(chatSchema), async (req, res) 
         weatherData: result.weatherData || null,
         done: true,
       })}\n\n`);
+
+      // ── Increment usage after successful stream ──
+      incrementUsage(user?.id, 'chat', supabaseAdmin, fingerprint).catch(() => {});
     } catch (streamErr) {
       logger.error({ component: 'Chat.Stream', err: streamErr.message }, 'Stream brain error');
       const errMsg = language === 'ro'
@@ -532,6 +530,108 @@ router.post('/chat/stream', chatLimiter, validate(chatSchema), async (req, res) 
     logger.error({ component: 'Chat.Stream', err: err.message }, 'POST /chat/stream unhandled');
     if (!res.headersSent) return res.status(500).json({ error: 'Internal server error' });
     res.end();
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// GET /api/conversations — List user's conversations
+// ═══════════════════════════════════════════════════════════════
+router.get('/conversations', async (req, res) => {
+  try {
+    const { getUserFromToken, supabaseAdmin } = req.app.locals;
+    if (!supabaseAdmin) return res.json({ conversations: [] });
+
+    const user = await getUserFromToken(req);
+    if (!user) return res.status(401).json({ error: 'Authentication required' });
+
+    const { data, error } = await supabaseAdmin
+      .from('conversations')
+      .select('id, avatar, title, created_at, updated_at')
+      .eq('user_id', user.id)
+      .order('updated_at', { ascending: false })
+      .limit(50);
+
+    if (error) {
+      logger.warn({ component: 'Chat', err: error.message }, 'Failed to list conversations');
+      return res.json({ conversations: [] });
+    }
+
+    return res.json({ conversations: data || [] });
+  } catch (err) {
+    logger.error({ component: 'Chat', err: err.message }, 'GET /conversations error');
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// GET /api/conversations/:id/messages — Get messages for a conversation
+// ═══════════════════════════════════════════════════════════════
+router.get('/conversations/:id/messages', async (req, res) => {
+  try {
+    const { getUserFromToken, supabaseAdmin } = req.app.locals;
+    if (!supabaseAdmin) return res.json({ messages: [] });
+
+    const user = await getUserFromToken(req);
+    if (!user) return res.status(401).json({ error: 'Authentication required' });
+
+    const convId = req.params.id;
+    if (!convId || convId.length > 100) return res.status(400).json({ error: 'Invalid conversation ID' });
+
+    // Verify conversation belongs to user
+    const { data: conv } = await supabaseAdmin
+      .from('conversations')
+      .select('id')
+      .eq('id', convId)
+      .eq('user_id', user.id)
+      .single();
+
+    if (!conv) return res.status(404).json({ error: 'Conversation not found' });
+
+    const { data, error } = await supabaseAdmin
+      .from('messages')
+      .select('id, role, content, language, created_at')
+      .eq('conversation_id', convId)
+      .order('created_at', { ascending: true })
+      .limit(200);
+
+    if (error) {
+      logger.warn({ component: 'Chat', err: error.message }, 'Failed to get messages');
+      return res.json({ messages: [] });
+    }
+
+    return res.json({ messages: data || [] });
+  } catch (err) {
+    logger.error({ component: 'Chat', err: err.message }, 'GET /conversations/:id/messages error');
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// POST /api/memory — Save a memory item
+// ═══════════════════════════════════════════════════════════════
+router.post('/memory', async (req, res) => {
+  try {
+    const { getUserFromToken, brain } = req.app.locals;
+
+    let userId = null;
+    try {
+      const user = await getUserFromToken(req);
+      if (user) userId = user.id;
+    } catch (_) {}
+
+    const { action, key, value } = req.body || {};
+
+    if (action === 'save' && key && value && brain && userId) {
+      await brain.saveMemory(userId, 'context', String(value).substring(0, 2000), {
+        key: String(key).substring(0, 200),
+        source: 'client',
+      });
+    }
+
+    return res.json({ ok: true });
+  } catch (err) {
+    logger.error({ component: 'Chat', err: err.message }, 'POST /memory error');
+    return res.json({ ok: false });
   }
 });
 

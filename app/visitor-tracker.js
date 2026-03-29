@@ -101,7 +101,7 @@
 
   // Send tracking data
   try {
-    fetch('/api/track/visit', {
+    fetch('/api/visitor/ping', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(visitData),
@@ -119,10 +119,10 @@
     if (duration < 1) return;
     var data = JSON.stringify({ fingerprint: fingerprint, path: window.location.pathname, duration: duration });
     if (navigator.sendBeacon) {
-      navigator.sendBeacon('/api/track/beacon', new Blob([data], { type: 'application/json' }));
+      navigator.sendBeacon('/api/visitor/time', new Blob([data], { type: 'application/json' }));
     } else {
       try {
-        fetch('/api/track/beacon', {
+        fetch('/api/visitor/time', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: data,

@@ -11,7 +11,7 @@ const FormData = require('form-data');
 const logger = require('../logger');
 const { VOICES } = require('../config/voices');
 const { validate, speakSchema, listenSchema } = require('../validation');
-// Removed legacy payments
+const { checkUsage, incrementUsage } = require('../payments');
 const { MODELS, API_ENDPOINTS } = require('../config/models');
 
 const router = express.Router();
@@ -99,6 +99,12 @@ router.post('/speak', ttsLimiter, validate(speakSchema), async (req, res) => {
 
     const user = await getUserFromToken(req);
     const _fingerprint = req.body.fingerprint || req.ip || null;
+
+    // ── Usage quota check ──
+    const usageCheck = await checkUsage(user?.id, 'tts', supabaseAdmin, _fingerprint);
+    if (usageCheck && !usageCheck.allowed) {
+      return res.status(429).json({ error: 'Daily TTS limit reached', upgrade: true });
+    }
 
     let buf = null;
     let alignment = null;
@@ -344,6 +350,10 @@ router.post('/speak', ttsLimiter, validate(speakSchema), async (req, res) => {
     if (alignment) {
       res.set('X-Alignment', Buffer.from(JSON.stringify(alignment)).toString('base64'));
     }
+
+    // ── Increment usage after successful TTS ──
+    incrementUsage(user?.id, 'tts', supabaseAdmin, _fingerprint).catch(() => {});
+
     res.send(buf);
   } catch (err) {
     logger.error({ component: 'Speak', err: err.message }, 'TTS generation failed');
@@ -358,8 +368,9 @@ router.post('/listen', apiLimiter, validate(listenSchema), async (req, res) => {
     const { audio } = req.body;
     if (!audio) return res.status(400).json({ error: 'Audio is required' });
 
-    const { getUserFromToken, brain } = req.app.locals;
+    const { getUserFromToken, supabaseAdmin, brain } = req.app.locals;
     const user = await getUserFromToken(req);
+    const _fingerprint = req.body.fingerprint || req.ip || null;
 
     const sttLanguage = (req.body.language || 'ro').toLowerCase().split('-')[0];
     if (process.env.GROQ_API_KEY) {
@@ -396,6 +407,9 @@ router.post('/listen', apiLimiter, validate(listenSchema), async (req, res) => {
           })
           .catch(() => {});
       }
+
+      // ── Increment usage after successful STT ──
+      incrementUsage(user?.id, 'stt', supabaseAdmin, _fingerprint).catch(() => {});
 
       return res.json({ text: transcript, engine: 'Groq' });
     }

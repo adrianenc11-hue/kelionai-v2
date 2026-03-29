@@ -210,19 +210,8 @@
       return;
     }
 
-    // Check admin status via server-side verification
+    // Check admin status via user role
     let isAdmin = currentUser.role === 'admin' || window._isAdmin === true;
-    if (!isAdmin) {
-      try {
-        const ar = await fetch(API + '/api/admin/auth-token', { headers: getAuthHeaders() });
-        if (ar.ok) {
-          isAdmin = true;
-          window._isAdmin = true;
-        }
-      } catch (_e) {
-        /* not admin */
-      }
-    }
 
     // Update user display: Name (Role)
     const userDisplay = document.getElementById('user-display');
@@ -256,18 +245,7 @@
     const adminSep = document.getElementById('admin-tools-sep');
     if (adminSep) adminSep.style.display = isAdmin || currentUser ? '' : 'none';
 
-    // Fetch admin secret for admin users (so K1 panel works immediately)
-    if (isAdmin && !sessionStorage.getItem('kelion_admin_secret')) {
-      try {
-        const sr = await fetch(API + '/api/admin/auth-token', { headers: getAuthHeaders() });
-        if (sr.ok) {
-          const sd = await sr.json();
-          if (sd.secret) sessionStorage.setItem('kelion_admin_secret', sd.secret);
-        }
-      } catch (_e) {
-        /* non-blocking */
-      }
-    }
+    // Admin secret is managed via /api/admin/verify (not auto-fetched)
 
     // Show/hide navbar Admin and Logout buttons based on login state
     const adminNavBtn = document.getElementById('btn-admin-nav');
@@ -488,15 +466,6 @@
       adminBtn.addEventListener('click', async function () {
         // Admin auto-unlocked -- fetch secret via JWT before navigating
         if (adminBtn.dataset.locked === 'false') {
-          try {
-            const r = await fetch(API + '/api/admin/auth-token', { headers: getAuthHeaders() });
-            if (r.ok) {
-              const d = await r.json();
-              if (d.secret) sessionStorage.setItem('kelion_admin_secret', d.secret);
-            }
-          } catch (_e) {
-            /* navigate anyway, admin-app.js has fallback */
-          }
           window.location.href = '/admin';
         }
       });
@@ -557,16 +526,7 @@
     // Navbar Admin button — navigate to admin panel
     const adminNavBtn = document.getElementById('btn-admin-nav');
     if (adminNavBtn)
-      adminNavBtn.addEventListener('click', async function () {
-        try {
-          const r = await fetch(API + '/api/admin/auth-token', { headers: getAuthHeaders() });
-          if (r.ok) {
-            const d = await r.json();
-            if (d.secret) sessionStorage.setItem('kelion_admin_secret', d.secret);
-          }
-        } catch (_e) {
-          /* navigate anyway */
-        }
+      adminNavBtn.addEventListener('click', function () {
         window.location.href = '/admin';
       });
 

@@ -15,7 +15,7 @@ const router = express.Router();
 // ── Middleware: admin only ──
 // Accepts x-admin-secret (primary) OR x-admin-key (legacy) headers
 function requireAdmin(req, res, next) {
-  const secret = req.headers['x-admin-secret'] || req.headers['x-admin-key'] || req.query.adminKey;
+  const secret = req.headers['x-admin-secret'] || req.headers['x-admin-key'];
   const expected = process.env.ADMIN_SECRET_KEY;
   if (!secret || !expected) {
     return res.status(403).json({ error: 'Admin access required' });

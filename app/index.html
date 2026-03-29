@@ -569,64 +569,20 @@ Acum elimin și referințele CSS rămase din `app.css` pentru `#pwa-install-bann
 
         <!-- Right: Actions -->
         <div class="navbar-actions">
-          <!-- 1. Account / Role -->
-          <button class="nav-icon" id="btn-role" title="Account" aria-label="Account status">👤</button>
-          <span id="user-display" class="user-badge" style="display: none"></span>
-          <span id="guest-counter" class="guest-counter" style="display: none"></span>
-
-          <!-- 2. Utility actions -->
-          <button class="nav-icon" id="btn-copy-last" title="Copy last response" aria-label="Copy last response">📋</button>
-          <button class="nav-icon" id="btn-save-last" title="Save last response" aria-label="Save last response">💾</button>
+          <!-- Essential buttons always visible -->
           <button class="nav-icon" id="btn-history" title="Conversation history" aria-label="Conversation history">📜</button>
-
-          <!-- 3. Auth / Plans -->
+          <button class="nav-icon" id="btn-copy-last" title="Copy last response" aria-label="Copy last response">📋</button>
+          <button class="nav-icon" id="btn-pricing" data-alias="btn-subscriptions" title="Plans" aria-label="Plans" style="display: none">⭐</button>
           <button class="nav-icon" id="btn-auth" title="Sign in" aria-label="Sign in">🔑</button>
-          <button class="nav-icon" id="btn-pricing" data-alias="btn-subscriptions" title="Plans" aria-label="Plans" style="display: none">💎</button>
-
-          <!-- 4. Translate -->
-          <button class="nav-icon nav-icon-label" id="btn-translate-toggle" title="Translate" aria-label="Toggle translation" style="display: none">
-            <span>T</span><span class="nav-icon-text">Translate</span>
-          </button>
-
-          <!-- 5. Admin — visible only for admins -->
-          <button class="nav-icon nav-icon-label nav-icon-admin" id="btn-admin-nav" title="Admin Dashboard" aria-label="Admin Dashboard" style="display: none" onclick="window.location.href='/admin'">
-            <span>⚙️</span><span class="nav-icon-text">Admin</span>
-          </button>
-
-          <!-- 6. PWA Install buttons -->
-          <button id="pwa-install-btn-nav" class="nav-icon nav-icon-label nav-icon-pwa" title="Install App" aria-label="Install App" style="display:none">
-            <span>📲</span><span class="nav-icon-text">Install</span>
-          </button>
-          <button id="pwa-dismiss-btn-nav" class="nav-icon" title="Dismiss install" aria-label="Dismiss install" style="display:none; font-size:0.7rem; opacity:0.5">✕</button>
-
-          <!-- 7. Logout — LAST before hamburger -->
           <button class="nav-icon nav-icon-label nav-icon-logout" id="btn-logout-nav" title="Log out" aria-label="Log out" style="display: none">
-            <span>🚪</span><span class="nav-icon-text">Log out</span>
+            <span>🚪</span>
           </button>
-
-          <!-- 8. More menu trigger -->
-          <button class="nav-icon" id="navbar-hamburger" title="Menu" aria-label="Menu">☰</button>
-        </div>
-
-        <!-- Dropdown menu -->
-        <div id="navbar-mobile-menu" class="nav-dropdown">
-          <button class="nav-dropdown-item" id="btn-clone-voice" style="display: none">
-            <span class="ndi">🎤</span> Clone Voice
-          </button>
-          <button class="nav-dropdown-item" id="btn-scan-toggle" style="display: none">
-            <span class="ndi">📷</span> Scanner
-          </button>
-          <button class="nav-dropdown-item" id="btn-plus"><span class="ndi">📁</span> Import / Export</button>
-          <input type="file" id="file-input-hidden" class="hidden-panel" accept="*/*" title="Upload file" />
-          <hr class="nav-dropdown-sep" />
-          <button class="nav-dropdown-item" id="btn-invite"><span class="ndi">🎁</span> Invite Friends</button>
-          <button class="nav-dropdown-item" id="btn-manual"><span class="ndi">📖</span> Manual</button>
         </div>
       </nav>
 
       <!-- MAIN CONTENT -->
       <div id="main-content">
-        <!-- CONVERSATION HISTORY SIDEBAR -->
+        <!-- SIDEBAR — History + Tools -->
         <div id="history-sidebar" class="hidden">
           <div id="history-header">
             <h3 data-i18n="history.title">Conversations</h3>
@@ -634,6 +590,26 @@ Acum elimin și referințele CSS rămase din `app.css` pentru `#pwa-install-bann
             <button id="btn-close-history" title="Close">X</button>
           </div>
           <div id="history-list"></div>
+
+          <!-- Tools & Actions (moved from hamburger menu) -->
+          <div id="sidebar-tools">
+            <hr class="nav-dropdown-sep" />
+            <button class="nav-dropdown-item" id="btn-role" title="Account"><span class="ndi">👤</span> Account</button>
+            <span id="user-display" class="user-badge nav-dropdown-badge" style="display: none"></span>
+            <span id="guest-counter" class="guest-counter" style="display: none"></span>
+            <button class="nav-dropdown-item" id="btn-save-last" title="Save last response"><span class="ndi">💾</span> Save Response</button>
+            <button class="nav-dropdown-item" id="btn-translate-toggle" title="Translate" style="display: none"><span class="ndi">🌐</span> Translate</button>
+            <button class="nav-dropdown-item" id="btn-scan-toggle" style="display: none"><span class="ndi">📷</span> Scanner</button>
+            <button class="nav-dropdown-item" id="btn-clone-voice" style="display: none"><span class="ndi">🎤</span> Clone Voice</button>
+            <button class="nav-dropdown-item" id="btn-plus"><span class="ndi">📁</span> Import / Export</button>
+            <input type="file" id="file-input-hidden" class="hidden-panel" accept="*/*" title="Upload file" />
+            <hr class="nav-dropdown-sep" />
+            <button class="nav-dropdown-item" id="btn-invite"><span class="ndi">🎁</span> Invite Friends</button>
+            <button class="nav-dropdown-item" id="btn-manual"><span class="ndi">📖</span> Manual</button>
+            <button class="nav-dropdown-item nav-icon-admin" id="btn-admin-nav" title="Admin Dashboard" style="display: none" onclick="window.location.href='/admin'"><span class="ndi">⚙️</span> Admin</button>
+            <button class="nav-dropdown-item" id="pwa-install-btn-nav" title="Install App" style="display:none"><span class="ndi">📲</span> Install App</button>
+            <button id="pwa-dismiss-btn-nav" style="display:none"></button>
+          </div>
         </div>
 
         <div id="left-panel">
@@ -705,17 +681,19 @@ Acum elimin și referințele CSS rămase din `app.css` pentru `#pwa-install-bann
           <div id="display-header">
             <span id="display-title" data-i18n="monitor.title">Monitor</span>
             <div class="display-tabs">
-              <button class="display-tab active" data-tab="brain" onclick="switchDisplayTab('brain')">Brain</button>
+              <button class="display-tab active" data-tab="chat" onclick="switchDisplayTab('chat')">Chat</button>
+              <button class="display-tab" data-tab="brain" onclick="switchDisplayTab('brain')">Brain</button>
             </div>
           </div>
-          <div id="brain-map" class="brain-map-panel">
+          <div id="brain-map" class="brain-map-panel" style="display:none">
             <div class="brain-node">
               <div class="bn-label">Status</div>
               Waiting for conversation...
             </div>
           </div>
+          <div id="chat-messages"></div>
+          <div id="chat-overlay"></div>
           <div id="display-content">
-            <div id="chat-messages"></div>
             <div id="monitor-default" style="padding: 8px; color: #8888aa; font-size: 0.8rem">Ready</div>
             <div id="monitor-image"></div>
             <div id="monitor-map"></div>
@@ -752,33 +730,26 @@ Acum elimin și referințele CSS rămase din `app.css` pentru `#pwa-install-bann
 
       <!-- Input row — FULL WIDTH at page bottom -->
       <div id="input-row">
-        <div class="ctrl-wrapper">
-          <button id="btn-camera-inline" title="Camera OFF" aria-label="Toggle camera" class="ctrl-circle is-off">
-            🎥 Cam
-          </button>
-          <div class="ctrl-icon-floating">🎥</div>
-        </div>
-
+        <button id="btn-camera-inline" title="Camera ON/OFF" aria-label="Toggle camera" class="ctrl-circle" onclick="(async function(btn){if(window.KAutoCamera){var a=await KAutoCamera.toggle();btn.style.borderColor=a?'#10B981':'#555';btn.style.color=a?'#10B981':'#888';btn.title=a?'Camera ACTIVĂ':'Camera ON/OFF'}else{btn.title='Camera se inițializează...'}})(this)">📷</button>
         <div id="mic-level" title="Mic level"><span></span><span></span><span></span><span></span><span></span></div>
-
-        <div class="ctrl-wrapper">
-          <button id="btn-mic" title="Microphone OFF" aria-label="Toggle microphone" class="ctrl-circle is-off">
-            🎙️ Mic
-          </button>
-          <div class="ctrl-icon-floating">🎙️</div>
-        </div>
-
-        <input
-          type="text"
-          id="text-input"
-          data-i18n-placeholder="input.placeholder"
-          placeholder="Type or speak..."
-          autocomplete="off"
-        />
-        <button id="btn-send" title="Send" aria-label="Send message" class="ctrl-circle is-accent">🚀 Send</button>
+        <button id="btn-mic" title="Conversație vocală" aria-label="Toggle microphone" class="ctrl-circle" style="font-size:1.1rem;transition:all 0.2s;">🎙️</button>
+        <button id="btn-voicefirst" title="Voice-First Mode" aria-label="Voice-First Realtime" class="ctrl-circle" style="font-size:1rem;">🗣️</button>
+        <button id="btn-cc-toggle" title="CC Subtitles: ON" aria-label="Toggle subtitles" class="ctrl-circle" style="font-size:0.85rem;">CC</button>
+        <input type="text" id="text-input" data-i18n-placeholder="input.placeholder" placeholder="Type or speak..." autocomplete="off" />
+        <button id="btn-send" title="Send" aria-label="Send message" class="ctrl-action">➤</button>
       </div>
     </div>
     <!-- /#app-layout -->
+    <script>
+      // Force-hide admin-only buttons before auth runs
+      (function(){
+        var ids = ['btn-admin-nav','btn-translate-toggle','btn-clone-voice','btn-scan-toggle'];
+        for (var i = 0; i < ids.length; i++) {
+          var el = document.getElementById(ids[i]);
+          if (el) el.style.display = 'none';
+        }
+      })();
+    </script>
     <script>
       document.addEventListener('DOMContentLoaded', function () {
         var copyBtn = document.getElementById('btn-copy-last');
@@ -976,10 +947,10 @@ Acum elimin și referințele CSS rămase din `app.css` pentru `#pwa-install-bann
         var brainMap = document.getElementById('brain-map');
         var displayContent = document.getElementById('display-content');
         if (tab === 'brain') {
-          brainMap.classList.add('active');
+          if (brainMap) brainMap.style.display = '';
           if (displayContent) displayContent.style.display = 'none';
         } else {
-          brainMap.classList.remove('active');
+          if (brainMap) brainMap.style.display = 'none';
           if (displayContent) displayContent.style.display = '';
         }
       }
@@ -1086,8 +1057,7 @@ Acum elimin și referințele CSS rămase din `app.css` pentru `#pwa-install-bann
         opacity: 1;
       }
 
-      /* Hide chat history from Monitor to keep it clean for presentations */
-      #chat-messages,
+      /* Hide monitor elements to keep it clean for presentations */
       #monitor-text,
       #monitor-default {
         display: none !important;

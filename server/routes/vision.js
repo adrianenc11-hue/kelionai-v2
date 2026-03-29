@@ -9,7 +9,7 @@ const rateLimit = require('express-rate-limit');
 const { rateLimitKey } = require('../rate-limit-key');
 const logger = require('../logger');
 const { validate, visionSchema } = require('../validation');
-// Removed legacy payments
+const { checkUsage, incrementUsage } = require('../payments');
 const { MODELS, API_ENDPOINTS } = require('../config/models');
 
 const router = express.Router();
@@ -40,6 +40,12 @@ router.post('/', apiLimiter, validate(visionSchema), async (req, res) => {
 
     const user = await getUserFromToken(req);
     const _fingerprint = req.body.fingerprint || req.ip || null;
+
+    // ── Usage quota check ──
+    const usageCheck = await checkUsage(user?.id, 'vision', supabaseAdmin, _fingerprint);
+    if (usageCheck && !usageCheck.allowed) {
+      return res.status(429).json({ error: 'Daily vision limit reached', upgrade: true });
+    }
 
     // Brain-aware prompt — accessibility-first pentru persoane cu deficiențe vizuale
     const LANGS = { ro: 'română', en: 'English', es: 'Español', fr: 'Français', de: 'Deutsch', it: 'Italiano' };
@@ -173,6 +179,9 @@ Answer in ${LANGS[language] || 'English'}.`;
     }
 
     logger.info({ component: 'Vision', engine, emotion, userId: user?.id }, 'Vision analysis complete');
+
+    // ── Increment usage after successful vision ──
+    incrementUsage(user?.id, 'vision', supabaseAdmin, _fingerprint).catch(() => {});
 
     res.json({
       description: description || 'Could not analyze.',

@@ -440,7 +440,7 @@
     var resetAll = document.getElementById('btn-reset-all');
     if (resetAll)
       resetAll.addEventListener('click', function () {
-        fetch(API + '/api/admin/reset', {
+        fetch(API + '/api/brain/reset', {
           method: 'POST',
           headers: authHeaders(),
           body: JSON.stringify({ tool: 'all' }),

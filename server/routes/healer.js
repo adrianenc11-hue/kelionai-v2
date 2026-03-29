@@ -20,9 +20,19 @@ const {
 function requireAdmin(req, res, next) {
   // Check session-based admin flag
   if (req.session?.isAdmin) return next();
-  // Check header-based secret key
-  const secret = req.headers['x-admin-key'] || req.query.adminKey;
-  if (secret && secret === process.env.ADMIN_SECRET_KEY) return next();
+  // Check header-based secret key (timing-safe)
+  const secret = req.headers['x-admin-key'];
+  const expected = process.env.ADMIN_SECRET_KEY;
+  if (secret && expected) {
+    try {
+      const crypto = require('crypto');
+      const sBuf = Buffer.from(secret);
+      const eBuf = Buffer.from(expected);
+      if (sBuf.length === eBuf.length && crypto.timingSafeEqual(sBuf, eBuf)) {
+        return next();
+      }
+    } catch (_) {}
+  }
   // Check if user has admin role in session
   if (req.user?.role === 'admin') return next();
   return res.status(403).json({ error: 'Admin access required' });
@@ -89,7 +99,7 @@ router.post('/scan', healerLimiter, async (req, res) => {
 // ─────────────────────────────────────────────────────────────
 // GET /api/admin/healer/status — Quick status (no full scan)
 // ─────────────────────────────────────────────────────────────
-router.get('/status', async (req, res) => {
+router.get('/status', requireAdmin, async (req, res) => {
   try {
     const { supabaseAdmin } = req.app.locals;
     const mem = process.memoryUsage();

@@ -70,7 +70,7 @@
       };
 
       function sendVisit() {
-        fetch(API_BASE + '/api/track/visit', {
+        fetch(API_BASE + '/api/visitor/ping', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(visitPayload),
@@ -153,7 +153,7 @@
           const blob = new Blob([JSON.stringify({ fingerprint: fp, duration: duration })], {
             type: 'application/json',
           });
-          navigator.sendBeacon(API_BASE + '/api/track/beacon', blob);
+          navigator.sendBeacon(API_BASE + '/api/visitor/time', blob);
         }
       });
     } catch (_) {
@@ -174,7 +174,7 @@
       }, 60000);
     try {
       navigator.sendBeacon(
-        API_BASE + '/api/brain/errors',
+        API_BASE + '/api/brain/error',
         JSON.stringify({
           type: type,
           message: String(message).substring(0, 500),
@@ -1384,10 +1384,13 @@
       while (chatMsgs.children.length > 50) chatMsgs.removeChild(chatMsgs.firstChild);
     }
 
-    if (type === 'user') return;
+    if (type === 'user') {
+      _updateSubtitle('user', text);
+      return;
+    }
 
     // ALL text goes ONLY to subtitle under avatar
-    _updateSubtitle(type === 'assistant' ? 'ai' : 'user', text);
+    _updateSubtitle('ai', text);
   }
   function _updateSubtitle(type, text) {
     const el = document.getElementById('live-subtitle');
@@ -1474,7 +1477,7 @@
       );
     if (looksLikeCode) {
       try {
-        const codeResp = await fetch(API_BASE + '/api/admin/verify-code', {
+        const codeResp = await fetch(API_BASE + '/api/admin/verify', {
           method: 'POST',
           headers: authHeaders(),
           body: JSON.stringify({ code: text }),
@@ -2116,41 +2119,7 @@
       if (!un) return;
 
       // Try to auto-fetch admin secret via JWT (matches ADMIN_EMAIL on server)
-      let savedSecret = sessionStorage.getItem('kelion_admin_secret');
-      if (!savedSecret) {
-        try {
-          let t = localStorage.getItem('kelion_token');
-          if (!t) {
-            const keys = Object.keys(localStorage).filter(function (k) {
-              return k.startsWith('sb-') && k.endsWith('-auth-token');
-            });
-            for (let i = 0; i < keys.length; i++) {
-              try {
-                const p = JSON.parse(localStorage.getItem(keys[i]));
-                if (p && p.access_token) {
-                  t = p.access_token;
-                  break;
-                }
-              } catch (_e) {
-                /* ignored */
-              }
-            }
-          }
-          if (t) {
-            const r = await fetch(API_BASE + '/api/admin/auth-token', { headers: { Authorization: 'Bearer ' + t } });
-            if (r.ok) {
-              const d = await r.json();
-              if (d.secret) {
-                savedSecret = d.secret;
-                sessionStorage.setItem('kelion_admin_secret', d.secret);
-                adminSecret = d.secret;
-              }
-            }
-          }
-        } catch (_e) {
-          /* not admin */
-        }
-      }
+      const savedSecret = sessionStorage.getItem('kelion_admin_secret');
 
       if (savedSecret) {
         // Admin detected — btn-admin-nav in navbar handles dashboard access

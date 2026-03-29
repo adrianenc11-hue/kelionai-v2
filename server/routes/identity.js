@@ -245,10 +245,7 @@ router.post('/identity/check', identityLimiter, express.json({ limit: '2mb' }), 
             }
           : null),
     };
-    // If owner confirmed, include admin token for auto-auth
-    if (confirmed && process.env.ADMIN_SECRET_KEY) {
-      response.adminToken = process.env.ADMIN_SECRET_KEY;
-    }
+    // Admin token no longer sent in response — use session-based auth only
 
     // ═══ FACE LOGIN — Generate Supabase session for auto-login ═══
     if (confirmed && ownerMatch && supabaseAdmin && !user) {

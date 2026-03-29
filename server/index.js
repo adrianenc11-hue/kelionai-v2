@@ -90,6 +90,9 @@ const stripeWebhookRouter = require('./routes/stripe-webhook');
 // ── Middleware ──
 const geoSession = require('./middleware/geo-session');
 
+// ── Metrics ──
+const { metricsMiddleware, register: metricsRegister } = require('./metrics');
+
 // ── Migrate ──
 const { runMigration: runMigrations } = require('./migrate');
 
@@ -148,7 +151,7 @@ const allowedOrigins = [
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin) return callback(null, true);
-    if (allowedOrigins.some((o) => origin.startsWith(o))) return callback(null, true);
+    if (allowedOrigins.some((o) => origin === o)) return callback(null, true);
     if (process.env.NODE_ENV !== 'production') return callback(null, true);
     callback(new Error('CORS: origin not allowed'));
   },
@@ -172,6 +175,15 @@ app.use('/api/stripe', stripeWebhookRouter);
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '15mb' }));
 app.use(cookieParser());
+
+// ═══════════════════════════════════════════════════════════════
+// PROMETHEUS METRICS
+// ═══════════════════════════════════════════════════════════════
+app.use(metricsMiddleware);
+app.get('/metrics', async (req, res) => {
+  res.set('Content-Type', metricsRegister.contentType);
+  res.end(await metricsRegister.metrics());
+});
 
 // ═══════════════════════════════════════════════════════════════
 // HEALTH CHECK — ÎNAINTE de orice middleware, returnează 200 mereu
