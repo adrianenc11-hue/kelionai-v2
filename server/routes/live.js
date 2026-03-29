@@ -417,6 +417,7 @@ function setupLiveChat(io, _appLocals) {
                   );
                   openaiWs.send(JSON.stringify({ type: 'response.create' }));
                 });
+            }
             break;
           }
           case 'error': {
