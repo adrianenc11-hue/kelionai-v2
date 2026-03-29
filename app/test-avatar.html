@@ -1,0 +1,65 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Avatar Test</title>
+<style>body{margin:0;background:#111}canvas{width:100vw;height:100vh;display:block}</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script src="/lib/three.bundle.js"></script>
+<script>
+var scene = new THREE.Scene();
+scene.background = new THREE.Color(0x222222);
+var camera = new THREE.PerspectiveCamera(30, window.innerWidth/window.innerHeight, 0.1, 100);
+camera.position.set(0, 0, 3);
+var renderer = new THREE.WebGLRenderer({canvas: document.getElementById('c'), antialias: true});
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+
+// Simple lighting
+scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+var dir = new THREE.DirectionalLight(0xffffff, 1.5);
+dir.position.set(2, 3, 4);
+scene.add(dir);
+
+var loader = new THREE.GLTFLoader();
+loader.load('/models/kira-rpm.glb', function(gltf) {
+  var model = gltf.scene;
+  
+  // Log all meshes and materials
+  model.traverse(function(child) {
+    if (child.isMesh) {
+      var mat = child.material;
+      document.title = 'Mesh: ' + child.name + ' | map: ' + (mat.map ? 'YES' : 'NO') + ' | color: ' + mat.color.getHexString();
+      console.log('MESH:', child.name);
+      console.log('  material:', mat.name, mat.type);
+      console.log('  map:', mat.map);
+      console.log('  map.image:', mat.map ? mat.map.image : 'N/A');
+      console.log('  color:', mat.color.getHexString());
+      console.log('  metalness:', mat.metalness);
+      console.log('  roughness:', mat.roughness);
+    }
+  });
+  
+  // Center
+  var box = new THREE.Box3().setFromObject(model);
+  var center = box.getCenter(new THREE.Vector3());
+  model.position.sub(center);
+  
+  scene.add(model);
+  
+  function animate() {
+    requestAnimationFrame(animate);
+    renderer.render(scene, camera);
+  }
+  animate();
+}, undefined, function(err) {
+  document.title = 'ERROR: ' + err.message;
+  console.error(err);
+});
+</script>
+</body>
+</html>
