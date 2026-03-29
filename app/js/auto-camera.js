@@ -457,7 +457,7 @@
         },
         body: JSON.stringify({
           image: base64,
-          avatar: window.KApp && KApp.getAvatar ? KApp.getAvatar() : 'kira',
+          avatar: window.KAvatar && KAvatar.getCurrentAvatar ? KAvatar.getCurrentAvatar() : 'kira',
           language: window.i18n ? i18n.getLanguage() : 'ro',
         }),
       });
