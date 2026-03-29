@@ -241,7 +241,9 @@
     const cloneBtn = document.getElementById('btn-clone-voice');
     if (cloneBtn) cloneBtn.style.display = currentUser ? '' : 'none';
     const histBtn = document.getElementById('btn-history');
-    if (histBtn) histBtn.style.display = isAdmin ? '' : 'none';
+    if (histBtn) histBtn.style.display = currentUser ? '' : 'none';
+    const pricingBtn = document.getElementById('btn-pricing');
+    if (pricingBtn) pricingBtn.style.display = currentUser ? '' : 'none';
     const adminSep = document.getElementById('admin-tools-sep');
     if (adminSep) adminSep.style.display = isAdmin || currentUser ? '' : 'none';
 
