@@ -102,6 +102,8 @@ body {
   height: 100%;
   min-height: 200px;
   display: block;
+  position: relative;
+  z-index: 1;
 }
 
 /* ── Speech subtitle overlay ── */
@@ -136,22 +138,11 @@ body {
 }
 
 #avatar-label {
-  position: absolute;
-  top: 14px;
-  left: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  z-index: 5;
+  display: none;
 }
 
 #avatar-name {
-  font-size: 1.15rem;
-  font-weight: 700;
-  background: var(--kelion-gradient);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  display: none;
 }
 
 #status-indicator {
@@ -2096,18 +2087,21 @@ body {
 /* Avatar pills inside avatar-area — head level */
 .avatar-pill-left,
 .avatar-pill-right {
-  position: absolute;
-  top: 15%;
-  z-index: 50;
-  pointer-events: auto;
-  font-size: 0.85rem;
-  padding: 8px 18px;
+  position: absolute !important;
+  top: 12%;
+  z-index: 9999 !important;
+  pointer-events: auto !important;
+  font-size: 0.9rem;
+  padding: 10px 20px;
+  display: inline-flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
 }
 .avatar-pill-left {
-  left: 12px;
+  left: 14px;
 }
 .avatar-pill-right {
-  right: 12px;
+  right: 14px;
 }
 
 /* Actions container */

@@ -490,7 +490,15 @@
             console.log('[Avatar] ⚠️ No animation clips in model');
           }
 
-          document.getElementById('avatar-name').textContent = name === 'kira' ? 'Kira' : 'Kelion';
+          var avatarNameEl = document.getElementById('avatar-name');
+          if (avatarNameEl) avatarNameEl.textContent = name === 'kira' ? 'Kira' : 'Kelion';
+          // Update navbar brand
+          var navName = document.getElementById('navbar-avatar-name');
+          if (navName) navName.textContent = name === 'kira' ? 'Kira' : 'Kelion';
+          // Update pill active states
+          document.querySelectorAll('.avatar-pill').forEach(function(p) {
+            p.classList.toggle('active', p.dataset.avatar === name);
+          });
           document.getElementById('status-text').textContent = 'Online';
           console.log(`[Avatar] ${name} loaded — ${morphMeshes.length} morph meshes`);
           renderer.render(scene, camera);
