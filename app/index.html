@@ -466,11 +466,14 @@ Acum elimin și referințele CSS rămase din `app.css` pentru `#pwa-install-bann
           >Pricing</a
         >
 
-        <!-- Left: Brand -->
-        <a href="/" class="navbar-logo">
-          <span class="logo-name"><span id="navbar-avatar-name">Kelion</span><span class="logo-ai">AI</span></span>
-          <span id="app-version" class="logo-version"></span>
-        </a>
+        <!-- Left: Brand + Kelion pill -->
+        <div class="navbar-left">
+          <a href="/" class="navbar-logo">
+            <span class="logo-name"><span id="navbar-avatar-name">Kelion</span><span class="logo-ai">AI</span></span>
+            <span id="app-version" class="logo-version"></span>
+          </a>
+          <button class="avatar-pill active" data-avatar="kelion">Kelion</button>
+        </div>
 
         <!-- Center: Status -->
         <div id="status-indicator" class="status-indicator">
@@ -484,6 +487,7 @@ Acum elimin și referințele CSS rămase din `app.css` pentru `#pwa-install-bann
           <button class="nav-icon" id="btn-pricing" data-alias="btn-subscriptions" title="Plans" aria-label="Plans" style="display: none">💳</button>
           <button class="nav-icon nav-icon-admin" id="btn-admin-nav" title="Admin Dashboard" aria-label="Admin" style="display: none" onclick="window.location.href='/admin'">⚙️</button>
           <button class="nav-icon" id="btn-auth" title="Sign in" aria-label="Sign in">🔑</button>
+          <button class="avatar-pill" data-avatar="kira">Kira</button>
         </div>
       </nav>
 
@@ -494,8 +498,6 @@ Acum elimin și referințele CSS rămase din `app.css` pentru `#pwa-install-bann
         <div id="left-panel">
           <div id="avatar-area">
             <canvas id="avatar-canvas"></canvas>
-            <button class="avatar-pill active avatar-pill-left" data-avatar="kelion">Kelion</button>
-            <button class="avatar-pill avatar-pill-right" data-avatar="kira">Kira</button>
             <div id="avatar-label">
               <span id="avatar-name">Kelion</span>
             </div>
