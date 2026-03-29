@@ -16,7 +16,7 @@
   // ── Config (set by dialog) ──────────────────────────────────
   let _targetLang = 'English';
   let _outputMode = 'both'; // 'audio' | 'text' | 'both'
-  let _avatar = 'kelion';
+  let _avatar = 'kira';
   let _ttsLanguage = null; // resolved dynamically
 
   // ── Language code map for TTS ───────────────────────────────
@@ -39,8 +39,8 @@
   function getCurrentAvatar() {
     if (window.KAvatar && KAvatar.getCurrentAvatar) return KAvatar.getCurrentAvatar();
     const sel = document.getElementById('avatar-select');
-    if (sel) return sel.value || 'kelion';
-    return 'kelion';
+    if (sel) return sel.value || 'kira';
+    return 'kira';
   }
 
   // ── Auth headers ────────────────────────────────────────────

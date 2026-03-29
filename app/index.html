@@ -557,7 +557,7 @@ Acum elimin și referințele CSS rămase din `app.css` pentru `#pwa-install-bann
 
         <!-- Left: Brand -->
         <a href="/" class="navbar-logo">
-          <span class="logo-name"><span id="navbar-avatar-name">Kelion</span><span class="logo-ai">AI</span></span>
+          <span class="logo-name"><span id="navbar-avatar-name">Kira</span><span class="logo-ai">AI</span></span>
           <span id="app-version" class="logo-version"></span>
         </a>
 
@@ -616,11 +616,11 @@ Acum elimin și referințele CSS rămase din `app.css` pentru `#pwa-install-bann
           <div id="avatar-area">
             <canvas id="avatar-canvas"></canvas>
             <div id="avatar-label">
-              <span id="avatar-name" class="hidden-panel">Kelion</span>
+              <span id="avatar-name">Kira</span>
             </div>
             <div id="avatar-switcher">
-              <button class="avatar-pill active" data-avatar="kelion">Kelion</button>
-              <button class="avatar-pill" data-avatar="kira">Kira</button>
+              <button class="avatar-pill" data-avatar="kelion">Kelion</button>
+              <button class="avatar-pill active" data-avatar="kira">Kira</button>
             </div>
             <!-- Live subtitle bar (under avatar) -->
             <div id="live-subtitle">
@@ -1079,7 +1079,7 @@ Acum elimin și referințele CSS rămase din `app.css` pentru `#pwa-install-bann
 
           if (!vfActive) {
             // Activate Voice-First
-            var avatar = window.KAvatar && KAvatar.getCurrentAvatar ? KAvatar.getCurrentAvatar() : 'kelion';
+            var avatar = window.KAvatar && KAvatar.getCurrentAvatar ? KAvatar.getCurrentAvatar() : 'kira';
             var lang = window.KVoice && KVoice.getLanguage ? KVoice.getLanguage() : 'ro';
             KVoiceFirst.connect(avatar, lang);
             vfActive = true;
@@ -1151,7 +1151,7 @@ Acum elimin și referințele CSS rămase din `app.css` pentru `#pwa-install-bann
             return;
           }
           if (window.KVoiceFirst && window.KAvatar && window.KVoice) {
-            var avatar = KAvatar.getCurrentAvatar ? KAvatar.getCurrentAvatar() : 'kelion';
+            var avatar = KAvatar.getCurrentAvatar ? KAvatar.getCurrentAvatar() : 'kira';
             var lang = KVoice.getLanguage ? KVoice.getLanguage() : 'ro';
             KVoiceFirst.connect(avatar, lang);
             // Sync UI — show VoiceFirst active, hide classic mic
@@ -1400,7 +1400,7 @@ Acum elimin și referințele CSS rămase din `app.css` pentru `#pwa-install-bann
             if (window.KVoiceFirst) {
               _usingRealtime = true;
               _micActive = true;
-              var avatar = window.KAvatar && KAvatar.getCurrentAvatar ? KAvatar.getCurrentAvatar() : 'kelion';
+              var avatar = window.KAvatar && KAvatar.getCurrentAvatar ? KAvatar.getCurrentAvatar() : 'kira';
               var lang = window.KVoice && KVoice.getLanguage ? KVoice.getLanguage() : (window.i18n && i18n.getLanguage ? i18n.getLanguage() : 'ro');
               KVoiceFirst.connect(avatar, lang);
               syncMicButton(newMic, true, 'LIVE Voice (OpenAI Realtime + Brain) — click to stop');

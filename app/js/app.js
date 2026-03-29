@@ -1268,7 +1268,7 @@
           escapeHtml(c.title || 'Conversation') +
           '</div>' +
           '<div class="history-item-meta"><span class="history-item-avatar">' +
-          escapeHtml(c.avatar || 'kelion') +
+          escapeHtml(c.avatar || 'kira') +
           '</span> · ' +
           timeAgo +
           '</div>';
@@ -1709,7 +1709,7 @@
               headers: authHeaders(),
               body: JSON.stringify({
                 image: rawB64,
-                avatar: window.KAvatar ? KAvatar.getCurrentAvatar() : 'kelion',
+                avatar: window.KAvatar ? KAvatar.getCurrentAvatar() : 'kira',
                 language: window.i18n ? i18n.getLanguage() : 'en',
               }),
             })

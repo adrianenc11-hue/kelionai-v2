@@ -503,7 +503,7 @@
         headers,
         body: JSON.stringify({
           text: ttsText.substring(0, 2000),
-          avatar: avatar || (window.KAvatar ? KAvatar.getCurrentAvatar() : 'kelion'),
+          avatar: avatar || (window.KAvatar ? KAvatar.getCurrentAvatar() : 'kira'),
           language: detectedLanguage,
           fingerprint: window._kelionFp || localStorage.getItem('k_visitor_fp') || null,
         }),

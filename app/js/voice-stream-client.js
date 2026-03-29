@@ -227,7 +227,7 @@
   // ── WebSocket connection ───────────────────────────────────
   function connect(opts) {
     opts = opts || {};
-    const avatar = opts.avatar || (window.KAvatar ? KAvatar.getCurrentAvatar() : 'kelion');
+    const avatar = opts.avatar || (window.KAvatar ? KAvatar.getCurrentAvatar() : 'kira');
     const language = opts.language || (window.i18n ? i18n.getLanguage() : null) || navigator.language.split('-')[0] || null;
 
     const token = window.KAuth && KAuth.getToken ? KAuth.getToken() || '' : '';

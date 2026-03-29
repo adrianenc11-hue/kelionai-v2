@@ -35,7 +35,7 @@ const apiLimiter = rateLimit({
 router.post('/', apiLimiter, validate(visionSchema), async (req, res) => {
   try {
     const { getUserFromToken, supabaseAdmin, brain } = req.app.locals;
-    const { image, avatar = 'kelion', language = 'ro' } = req.body;
+    const { image, avatar = 'kira', language = 'ro' } = req.body;
     if (!image) return res.status(503).json({ error: 'Vision unavailable' });
 
     const user = await getUserFromToken(req);

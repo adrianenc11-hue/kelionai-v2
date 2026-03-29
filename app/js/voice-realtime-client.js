@@ -68,7 +68,7 @@
 
   // ── Fallback state ──
   let _fallbackActive = false;
-  let _lastAvatar = 'kelion';
+  let _lastAvatar = 'kira';
   let _lastLanguage = null; // resolved dynamically from i18n or browser
 
   function _activateFallback(reason) {
@@ -124,7 +124,7 @@
   function connect(avatar, language) {
     if (socket && socket.connected) return; // already connected
 
-    _lastAvatar = avatar || 'kelion';
+    _lastAvatar = avatar || 'kira';
     _lastLanguage = language || (window.i18n ? i18n.getLanguage() : null) || navigator.language.split('-')[0] || null;
     _clearFallback();
 

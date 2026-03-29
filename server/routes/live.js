@@ -99,7 +99,7 @@ function setupLiveChat(io, _appLocals) {
       logger.info({ component: 'LiveChat', ip }, 'Guest connection allowed: ' + userId);
     }
 
-    const avatar = socket.handshake.query.avatar || 'kelion';
+    const avatar = socket.handshake.query.avatar || 'kira';
     const initialLanguage = socket.handshake.query.language || 'en';
     let currentLanguage = initialLanguage;
 

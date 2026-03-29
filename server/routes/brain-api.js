@@ -208,7 +208,7 @@ router.post('/chat', brainLimiter, async (req, res) => {
       userId:    userId || 'guest',
       sessionId: sessionId || ('brain-api-' + Date.now()),
       language:  language || 'auto',
-      avatar:    avatar || 'kelion',
+      avatar:    avatar || 'kira',
     });
 
     return res.json({
