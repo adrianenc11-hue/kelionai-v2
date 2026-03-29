@@ -31,8 +31,8 @@ const REQUIRED_VISEMES = [
 ];
 
 const AVATARS = [
-  { name: 'Kelion (male)', file: 'k-male.glb' },
-  { name: 'Kira (female)', file: 'k-female.glb' },
+  { name: 'Kelion (male)', file: 'kelion-rpm.glb' },
+  { name: 'Kira (female)', file: 'kira-rpm.glb' },
 ];
 
 let hasErrors = false;

@@ -387,7 +387,7 @@
             }
           });
 
-          // MIRROR FIX for k-female.glb — Blender mirror modifier not applied
+          // MIRROR FIX for kira-rpm.glb — Blender mirror modifier not applied
           // Brows and lashes only have geometry on one side, clone + flip X
           if (name === 'kira') {
             const meshesToMirror = [];

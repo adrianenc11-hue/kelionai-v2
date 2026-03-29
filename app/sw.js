@@ -2,7 +2,7 @@
 // KelionAI Service Worker — PWA + Offline Support
 // ═══════════════════════════════════════════════════════════════
 
-const CACHE_NAME = 'kelionai-v3';
+const CACHE_NAME = 'kelionai-v4';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -61,7 +61,22 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Static assets → cache-first, fallback to network
+  // JS, CSS, HTML, GLB → network-first (ensures deploys take effect immediately)
+  // Only fall back to cache if network fails (offline)
+  if (/\.(js|css|html|glb)(\?.*)?$/i.test(url.pathname) || url.pathname === '/') {
+    event.respondWith(
+      fetch(request).then((response) => {
+        if (response && response.status === 200 && response.type === 'basic') {
+          const cloned = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, cloned));
+        }
+        return response;
+      }).catch(() => caches.match(request))
+    );
+    return;
+  }
+
+  // Other static assets (images, fonts, etc.) → cache-first, fallback to network
   event.respondWith(
     caches.match(request).then((cached) => {
       if (cached) return cached;

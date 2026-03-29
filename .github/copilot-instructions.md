@@ -34,7 +34,7 @@ app/            Frontend (static, served by Express)
   index.html    Single-page app entry point
   js/           Frontend JavaScript modules
   css/          Stylesheets
-  models/       3D GLB models (k-male.glb, k-female.glb)
+  models/       3D GLB models (kelion-rpm.glb, kira-rpm.glb)
 tests/          Playwright end-to-end tests
 ```
 
