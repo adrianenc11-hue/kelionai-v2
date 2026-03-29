@@ -2,7 +2,7 @@
 // KelionAI Service Worker — PWA + Offline Support
 // ═══════════════════════════════════════════════════════════════
 
-const CACHE_NAME = 'kelionai-v4';
+const CACHE_NAME = 'kelionai-v5';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
