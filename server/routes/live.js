@@ -215,7 +215,7 @@ function setupLiveChat(io, _appLocals) {
                 type: 'function',
                 name: 'get_weather',
                 description:
-                  'Gets the current weather for a specific latitude and longitude. Always call get_user_location first if you do not know the coordinates. The weather data will also be shown visually on the user monitor.',
+                  'Gets the current weather for a specific latitude and longitude. Always call get_user_location first if you do not know the coordinates.',
                 parameters: {
                   type: 'object',
                   properties: {
@@ -230,30 +230,13 @@ function setupLiveChat(io, _appLocals) {
                 type: 'function',
                 name: 'web_search',
                 description:
-                  'Search the web for current information. Use when the user asks about news, facts, or anything you need to look up. Results will be shown on the user monitor.',
+                  'Search the web for current information. Use when the user asks about news, facts, or anything you need to look up.',
                 parameters: {
                   type: 'object',
                   properties: {
                     query: { type: 'string', description: 'The search query' },
                   },
                   required: ['query'],
-                },
-              },
-              {
-                type: 'function',
-                name: 'show_on_monitor',
-                description:
-                  'Display visual content on the user monitor panel. Use for showing maps, images, or web pages. Types: map (with lat/lng), image (with url), web (with url).',
-                parameters: {
-                  type: 'object',
-                  properties: {
-                    type: { type: 'string', enum: ['map', 'image', 'web'], description: 'Content type to show' },
-                    url: { type: 'string', description: 'URL of image or web page' },
-                    lat: { type: 'number', description: 'Latitude for map' },
-                    lng: { type: 'number', description: 'Longitude for map' },
-                    label: { type: 'string', description: 'Label/caption for the content' },
-                  },
-                  required: ['type'],
                 },
               },
             ],
@@ -370,17 +353,6 @@ function setupLiveChat(io, _appLocals) {
                 .then((r) => r.json())
                 .then((data) => {
                   const w = data.current_weather || data;
-                  // Show weather visually on monitor
-                  socket.emit('show_monitor', {
-                    type: 'weather',
-                    data: {
-                      city: args.city || `${args.lat.toFixed(2)}, ${args.lng.toFixed(2)}`,
-                      temperature: w.temperature,
-                      wind: w.windspeed,
-                      description: `Wind ${w.windspeed} km/h, code ${w.weathercode}`,
-                      icon: w.temperature > 25 ? '☀️' : w.temperature > 10 ? '🌤️' : '🌧️',
-                    },
-                  });
                   openaiWs.send(
                     JSON.stringify({
                       type: 'conversation.item.create',
@@ -418,10 +390,6 @@ function setupLiveChat(io, _appLocals) {
                     url: t.FirstURL || '',
                     snippet: t.Text || '',
                   }));
-                  // Show on monitor
-                  if (results.length > 0) {
-                    socket.emit('show_monitor', { type: 'search', data: results });
-                  }
                   openaiWs.send(
                     JSON.stringify({
                       type: 'conversation.item.create',
@@ -449,21 +417,6 @@ function setupLiveChat(io, _appLocals) {
                   );
                   openaiWs.send(JSON.stringify({ type: 'response.create' }));
                 });
-            } else if (fnName === 'show_on_monitor') {
-              logger.info({ component: 'LiveChat', monitorType: args.type }, 'Showing content on monitor');
-              socket.emit('show_monitor', { type: args.type, data: args });
-              openaiWs.send(
-                JSON.stringify({
-                  type: 'conversation.item.create',
-                  item: {
-                    type: 'function_call_output',
-                    call_id: callId,
-                    output: JSON.stringify({ success: true, displayed: args.type }),
-                  },
-                })
-              );
-              openaiWs.send(JSON.stringify({ type: 'response.create' }));
-            }
             break;
           }
           case 'error': {

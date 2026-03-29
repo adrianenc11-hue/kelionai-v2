@@ -78,7 +78,6 @@
       '</div>' +
       '</div>';
 
-    if (typeof window.showOnMonitor === 'function') window.showOnMonitor(html, 'html');
     window.open(url, '_blank');
     return html;
   }
@@ -150,8 +149,6 @@
       '</div></div></div>' +
       '<style>@keyframes pulseSos{0%,100%{transform:scale(1)}50%{transform:scale(1.15)}}</style>';
 
-    if (typeof window.showOnMonitor === 'function') window.showOnMonitor(html, 'html');
-
     setTimeout(function () {
       const shareBtn = document.getElementById('sos-share-btn');
       if (shareBtn) {
@@ -211,8 +208,7 @@
           });
         })
         .catch(function () {
-          const errHtml = '<div style="padding:20px;color:#ef4444;text-align:center">Camera unavailable</div>';
-          if (typeof window.showOnMonitor === 'function') window.showOnMonitor(errHtml, 'html');
+          console.warn('[MobileFeatures] Camera unavailable');
         });
       return;
     }
@@ -223,8 +219,6 @@
   function sendReceiptToAI(frame) {
     const loadHtml =
       '<div style="padding:20px;text-align:center"><div style="font-size:2rem">&#x1F9FE;</div><div style="color:#f59e0b;margin-top:8px">Scanning receipt...</div></div>';
-    if (typeof window.showOnMonitor === 'function') window.showOnMonitor(loadHtml, 'html');
-
     fetch(API_BASE + '/api/chat', {
       method: 'POST',
       headers: authHeaders(),
@@ -242,16 +236,6 @@
       })
       .then(function (data) {
         const reply = data.reply || data.text || 'No response';
-        const html =
-          '<div style="padding:16px">' +
-          '<div style="color:#f59e0b;font-weight:700;font-size:1.1rem;margin-bottom:8px">Receipt Analysis</div>' +
-          '<div style="color:#888;font-size:0.75rem;margin-bottom:12px">' +
-          new Date().toLocaleString() +
-          '</div>' +
-          '<div style="color:#ddd;font-size:0.9rem">' +
-          reply +
-          '</div></div>';
-        if (typeof window.showOnMonitor === 'function') window.showOnMonitor(html, 'html');
       })
       .catch(function (e) {
         console.warn('[MobileFeatures] Receipt error:', e);
@@ -330,7 +314,6 @@
           '<div style="color:#666;font-size:0.75rem">' +
           new Date().toLocaleString() +
           '</div></div>';
-        if (typeof window.showOnMonitor === 'function') window.showOnMonitor(html, 'html');
       })
       .catch(function () {});
   }

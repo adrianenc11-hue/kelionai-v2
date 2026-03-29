@@ -309,78 +309,7 @@ Acum elimin și referințele CSS rămase din `app.css` pentru `#pwa-install-bann
         margin-top: 2px;
       }
 
-      /* ─── #53 Brain-map Tab ─── */
-      .brain-map-panel {
-        padding: 16px;
-        display: none;
-        flex-direction: column;
-        gap: 10px;
-        height: 100%;
-        overflow-y: auto;
-      }
 
-      .brain-map-panel.active {
-        display: flex;
-      }
-
-      .brain-node {
-        background: rgba(99, 102, 241, 0.08);
-        border: 1px solid rgba(99, 102, 241, 0.15);
-        border-radius: 10px;
-        padding: 10px 14px;
-        font-size: 0.8rem;
-        color: #c4b5fd;
-        animation: brainFadeIn 0.3s ease;
-      }
-
-      .brain-node .bn-label {
-        font-size: 0.65rem;
-        color: #6366f1;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-        margin-bottom: 4px;
-      }
-
-      @keyframes brainFadeIn {
-        from {
-          opacity: 0;
-          transform: translateY(8px);
-        }
-
-        to {
-          opacity: 1;
-          transform: translateY(0);
-        }
-      }
-
-      .display-tabs {
-        display: flex;
-        gap: 0;
-        margin-left: 12px;
-      }
-
-      .display-tab {
-        padding: 6px 14px;
-        font-size: 0.75rem;
-        font-weight: 600;
-        color: #555577;
-        background: none;
-        border: none;
-        border-bottom: 2px solid transparent;
-        cursor: pointer;
-        transition: all 0.2s;
-        font-family: var(--kelion-font);
-      }
-
-      .display-tab:hover {
-        color: #a5b4fc;
-      }
-
-      .display-tab.active {
-        color: #a5b4fc;
-        border-bottom-color: #6366f1;
-      }
     </style>
     <!-- CDN scripts injected by client-config.js -->
     <script>
@@ -678,48 +607,8 @@ Acum elimin și referințele CSS rămase din `app.css` pentru `#pwa-install-bann
           </div>
         </div>
         <div id="display-panel">
-          <div id="display-header">
-            <span id="display-title" data-i18n="monitor.title">Monitor</span>
-            <div class="display-tabs">
-              <button class="display-tab active" data-tab="chat" onclick="switchDisplayTab('chat')">Chat</button>
-              <button class="display-tab" data-tab="brain" onclick="switchDisplayTab('brain')">Brain</button>
-            </div>
-          </div>
-          <div id="brain-map" class="brain-map-panel" style="display:none">
-            <div class="brain-node">
-              <div class="bn-label">Status</div>
-              Waiting for conversation...
-            </div>
-          </div>
           <div id="chat-messages"></div>
           <div id="chat-overlay"></div>
-          <div id="display-content">
-            <div id="monitor-default" style="padding: 8px; color: #8888aa; font-size: 0.8rem">Ready</div>
-            <div id="monitor-image"></div>
-            <div id="monitor-map"></div>
-            <div id="monitor-text"></div>
-            <div id="monitor-search"></div>
-            <div id="monitor-weather"></div>
-            <div id="monitor-iframe">
-              <iframe
-                id="monitor-iframe-src"
-                src=""
-                allow="autoplay; encrypted-media"
-                allowfullscreen
-                title="Content frame"
-              ></iframe>
-            </div>
-
-            <div id="monitor-video">
-              <iframe
-                id="monitor-video-src"
-                src=""
-                allow="autoplay; encrypted-media; picture-in-picture"
-                allowfullscreen
-                title="Video frame"
-              ></iframe>
-            </div>
-          </div>
           <div id="thinking">
             <div class="thinking-dots"><span></span><span></span><span></span></div>
             <span data-i18n="thinking.text">Thinking...</span>
@@ -756,51 +645,7 @@ Acum elimin și referințele CSS rămase din `app.css` pentru `#pwa-install-bann
         var copyBtn = document.getElementById('btn-copy-last');
         var saveBtn = document.getElementById('btn-save-last');
 
-        // Get the best content from screen: monitor first, then chat
         function getScreenContent() {
-          // Check if monitor has active content
-          var panels = [
-            'monitor-image',
-            'monitor-map',
-            'monitor-text',
-            'monitor-search',
-            'monitor-weather',
-            'monitor-iframe',
-            'monitor-video',
-          ];
-          for (var i = 0; i < panels.length; i++) {
-            var panel = document.getElementById(panels[i]);
-            if (panel && panel.style.display !== 'none' && panel.style.display !== '') {
-              // Image panel — return image URL
-              if (panels[i] === 'monitor-image') {
-                var img = panel.querySelector('img');
-                if (img && img.src) return { type: 'image', url: img.src, text: img.alt || img.src };
-              }
-              // Weather panel — return weather HTML as text
-              if (panels[i] === 'monitor-weather') {
-                return { type: 'text', text: panel.textContent.trim() };
-              }
-              // Search results
-              if (panels[i] === 'monitor-search') {
-                return { type: 'text', text: panel.textContent.trim() };
-              }
-              // Text panel
-              if (panels[i] === 'monitor-text') {
-                return { type: 'html', text: panel.textContent.trim(), html: panel.innerHTML };
-              }
-              // Map — return iframe URL
-              if (panels[i] === 'monitor-map') {
-                var iframe = panel.querySelector('iframe');
-                if (iframe && iframe.src) return { type: 'text', text: iframe.src };
-              }
-              // Iframe
-              if (panels[i] === 'monitor-iframe') {
-                var ifr = panel.querySelector('iframe');
-                if (ifr && ifr.src) return { type: 'text', text: ifr.src };
-              }
-            }
-          }
-          // Fallback: last assistant message
           var msgs = document.querySelectorAll('.msg.assistant');
           if (msgs.length) return { type: 'text', text: msgs[msgs.length - 1].textContent.trim() };
           var overlay = document.getElementById('chat-overlay');
@@ -912,69 +757,33 @@ Acum elimin și referințele CSS rămase din `app.css` pentru `#pwa-install-bann
 
 
     <script src="/lib/three.bundle.js"></script>
-    <script src="/js/i18n.js?v=20260329d"></script>
-    <script src="/js/fft-lipsync.js?v=20260329d"></script>
-    <script src="/js/alignment-lipsync.js?v=20260329d"></script>
-    <script src="/js/avatar.js?v=20260329d"></script>
-    <script src="/js/voice.js?v=20260329d"></script>
+    <script src="/js/i18n.js?v=20260329e"></script>
+    <script src="/js/fft-lipsync.js?v=20260329e"></script>
+    <script src="/js/alignment-lipsync.js?v=20260329e"></script>
+    <script src="/js/avatar.js?v=20260329e"></script>
+    <script src="/js/voice.js?v=20260329e"></script>
     <script src="/socket.io/socket.io.js"></script>
-    <script src="/js/voice-stream-client.js?v=20260329d"></script>
-    <script src="/js/voice-realtime-client.js?v=20260329d"></script>
-    <script src="/js/realtime-vision.js?v=20260329d"></script>
-    <script src="/js/auth.js?v=20260329d"></script>
-    <script src="/js/identity.js?v=20260329d"></script>
-    <script src="/js/monitor.js?v=20260329d"></script>
-    <script src="/js/tools.js?v=20260329d"></script>
-    <script src="/js/shared.js?v=20260329d"></script>
+    <script src="/js/voice-stream-client.js?v=20260329e"></script>
+    <script src="/js/voice-realtime-client.js?v=20260329e"></script>
+    <script src="/js/realtime-vision.js?v=20260329e"></script>
+    <script src="/js/auth.js?v=20260329e"></script>
+    <script src="/js/identity.js?v=20260329e"></script>
 
-    <script src="/js/geolocation.js?v=20260329d"></script>
-    <script src="/js/gdpr-consent.js?v=20260329d"></script>
-    <script src="/js/auto-camera.js?v=20260329d"></script>
+    <script src="/js/tools.js?v=20260329e"></script>
+    <script src="/js/shared.js?v=20260329e"></script>
 
-    <script src="/js/copy-shield.js?v=20260329d"></script>
-    <script src="/js/app.js?v=20260329d"></script>
-    <script src="/js/navbar.js?v=20260329d"></script>
-    <script src="/js/referral-ui.js?v=20260329d"></script>
-    <script src="/js/payments-ui.js?v=20260329d"></script>
-    <script src="/js/contact-form.js?v=20260329d"></script>
+    <script src="/js/geolocation.js?v=20260329e"></script>
+    <script src="/js/gdpr-consent.js?v=20260329e"></script>
+    <script src="/js/auto-camera.js?v=20260329e"></script>
 
-    <!-- #53 Brain-map + #85 Visits refresh JS -->
-    <script>
-      // ─── #53 Brain-map tab switching ───
-      function switchDisplayTab(tab) {
-        document.querySelectorAll('.display-tab').forEach(function (t) {
-          t.classList.toggle('active', t.dataset.tab === tab);
-        });
-        var brainMap = document.getElementById('brain-map');
-        var displayContent = document.getElementById('display-content');
-        if (tab === 'brain') {
-          if (brainMap) brainMap.style.display = '';
-          if (displayContent) displayContent.style.display = 'none';
-        } else {
-          if (brainMap) brainMap.style.display = 'none';
-          if (displayContent) displayContent.style.display = '';
-        }
-      }
+    <script src="/js/copy-shield.js?v=20260329e"></script>
+    <script src="/js/app.js?v=20260329e"></script>
+    <script src="/js/navbar.js?v=20260329e"></script>
+    <script src="/js/referral-ui.js?v=20260329e"></script>
+    <script src="/js/payments-ui.js?v=20260329e"></script>
+    <script src="/js/contact-form.js?v=20260329e"></script>
 
-      // Add a node to brain-map (called from app.js on each AI response)
-      function addBrainNode(label, text) {
-        var panel = document.getElementById('brain-map');
-        if (!panel) return;
-        var _e = function (s) {
-          return String(s || '')
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;');
-        };
-        var node = document.createElement('div');
-        node.className = 'brain-node';
-        node.innerHTML = '<div class=\"bn-label\">' + _e(label) + '</div>' + _e(text);
-        panel.prepend(node);
-        // Keep max 20 nodes
-        while (panel.children.length > 20) panel.removeChild(panel.lastChild);
-      }
-    </script>
+
 
     <a href="/" id="home-btn-fixed" class="home-btn-fixed" title="Home" style="display: none">Home</a>
 
@@ -1032,14 +841,8 @@ Acum elimin și referințele CSS rămase din `app.css` pentru `#pwa-install-bann
       <span id="theme-icon">Theme</span>
     </button>
     <!-- Voice-First Mode Toggle + CC Subtitle -->
-    <style>
-      /* Hide monitor elements to keep it clean for presentations */
-      #monitor-text,
-      #monitor-default {
-        display: none !important;
-      }
-    </style>
-    <script src="js/translate-mode.js?v=20260329d"></script>
+
+    <script src="js/translate-mode.js?v=20260329e"></script>
     <script>
       // ── T Button handler (Translate Mode) ─────────────────
       (function () {
@@ -1054,8 +857,8 @@ Acum elimin și referințele CSS rămase din `app.css` pentru `#pwa-install-bann
         });
       })();
     </script>
-    <script src="js/product-scanner.js?v=20260329d"></script>
-    <script src="js/mobile-features.js?v=20260329d"></script>
+    <script src="js/product-scanner.js?v=20260329e"></script>
+    <script src="js/mobile-features.js?v=20260329e"></script>
     <script>
       // ── Scanner Button handler ─────────────────────────
       (function () {
@@ -1637,7 +1440,7 @@ Acum elimin și referințele CSS rămase din `app.css` pentru `#pwa-install-bann
       })();
     </script>
 
-    <script src="/js/deploy-status.js?v=20260329d"></script>
+    <script src="/js/deploy-status.js?v=20260329e"></script>
     <script src="/visitor-tracker.js" defer></script>
     <script>
       // Safety net: if auth-screen becomes hidden but app-layout is still hidden, show it

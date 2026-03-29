@@ -673,7 +673,6 @@ ${dangerHistory}
     let reply = '';
     let provider = 'unknown';
     let webSources = [];
-    let monitorContent = null;
     let accessibilityData = null;
     let weatherData = null;
 
@@ -707,13 +706,7 @@ ${weatherContext}`;
           if (weatherReply?.content) {
             reply = weatherReply.content;
             provider = `weather-open-meteo+${weatherReply.provider}`;
-            monitorContent = {
-              type: 'weather',
-              city: weatherData.city,
-              temp: weatherData.current?.temperature_2m,
-              provider: weatherData.provider,
-              gpsSource: gpsCoords ? 'browser-gps' : cityFromMsg ? 'city-name' : 'ip-geo',
-            };
+
             trace.steps.push({ agent: 'OpenMeteo+AI', status: 'ok', ms: Date.now() - wStart });
             this._recordProvider('OpenMeteo', Date.now() - wStart, false);
           }
@@ -759,7 +752,7 @@ ${weatherContext}`;
           }
         }
       }
-      if (reply) monitorContent = { type: 'code', language: 'auto' };
+
     }
 
     // ── MATH: DeepSeek Reasoner → GPT-5.4 ──
@@ -776,7 +769,7 @@ ${weatherContext}`;
         const gpt54Result = await callGPT54Orchestrator(mathPrompt, message, history);
         if (gpt54Result?.content) { reply = gpt54Result.content; provider = 'gpt-5.4-math'; }
       }
-      if (reply) monitorContent = { type: 'math' };
+
     }
 
     // ── VISION ACCESSIBILITY: GPT-5.4 Vision ──
@@ -820,7 +813,7 @@ Structure: 1.OVERALL SCENE 2.MAIN SUBJECTS 3.ALL TEXT/LABELS 4.COLORS & LIGHTING
       if (orchResult?.content) {
         reply = orchResult.content;
         provider = orchResult.provider;
-        monitorContent = { type: 'plan', structured: true };
+
         trace.steps.push({ agent: 'GPT-5.4-Orchestrator', status: 'ok', ms: 0 });
         this._recordProvider('GPT-5.4-Orchestrator', 0, false);
       }
@@ -836,7 +829,7 @@ Structure: 1.OVERALL SCENE 2.MAIN SUBJECTS 3.ALL TEXT/LABELS 4.COLORS & LIGHTING
         reply = enhanced?.content || webResult.content;
         provider = `web-${webResult.provider}${enhanced ? '+' + enhanced.provider : ''}`;
         webSources = webResult.citations || [];
-        monitorContent = { type: 'web', sources: webSources, query: message };
+
         trace.steps.push({ agent: 'Perplexity', status: 'ok', ms: Date.now() - wsStart });
         this._recordProvider('Perplexity', Date.now() - wsStart, false);
       }
@@ -945,14 +938,7 @@ Response: "${reply.substring(0, 1000)}"`;
       } catch (e) { /* non-critical */ }
     }
 
-    // ── Monitor decision ──
-    if (!monitorContent && reply) {
-      if (/```[\s\S]+```/.test(reply)) monitorContent = { type: 'code' };
-      else if (webSources.length > 0) monitorContent = { type: 'web', sources: webSources };
-      else if (accessibilityData) monitorContent = { type: 'accessibility', ...accessibilityData };
-      else if (weatherData) monitorContent = { type: 'weather', city: weatherData.city };
-      else if (reply.length > 500) monitorContent = { type: 'text', summary: reply.substring(0, 200) + '...' };
-    }
+
 
     const { emotion, gestures, pose, gaze } = parseEmotionGestures(reply);
     this.conversationCount++;
@@ -972,7 +958,7 @@ Response: "${reply.substring(0, 1000)}"`;
       agent: { name: `brain-v3-${provider}` },
       emotion,
       toolsUsed,
-      monitor: { content: monitorContent },
+
       gestures,
       pose,
       bodyActions: [],

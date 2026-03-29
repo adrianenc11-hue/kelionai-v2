@@ -286,10 +286,6 @@
     }
   }
 
-  function showOnMonitor(content, type) {
-    if (window.MonitorManager) MonitorManager.show(content, type);
-  }
-
   // ─── Vision (client-side camera) ────────────────────────
   // Triggers include both English and Romanian for multilingual support
   const VISION_TRIGGERS = [
@@ -358,23 +354,6 @@
       if (lower.includes(name)) return WEB_SITES[name];
     }
     return null;
-  }
-
-  // ─── Monitor clear commands ──────────────────────────────
-  const CLEAR_TRIGGERS = [
-    'goleste monitorul',
-    'golește monitorul',
-    'sterge monitorul',
-    'șterge monitorul',
-    'clear monitor',
-    'curata monitorul',
-    'curăță monitorul',
-    'inchide monitorul',
-    'închide monitorul',
-  ];
-  function isMonitorClear(t) {
-    const l = t.toLowerCase();
-    return CLEAR_TRIGGERS.some((v) => l.includes(v));
   }
 
   async function triggerVision() {
@@ -573,8 +552,7 @@
   // ── Strip avatar animation tags from display text ──
   function stripAvatarTags(text) {
     return (text || '')
-      .replace(/\[(?:EMOTION|GESTURE|BODY|GAZE|POSE|ACTION|LEARNED|MONITOR):[^\]]*\]/gi, '')
-      .replace(/\[MONITOR(?::[\w]+)?\][\s\S]*?\[\/MONITOR\]/gi, '')
+      .replace(/\[(?:EMOTION|GESTURE|BODY|GAZE|POSE|ACTION|LEARNED):[^\]]*\]/gi, '')
       .replace(/\[SYSTEM INSTRUCTION[^\]]*\][\s\S]*?\[END SYSTEM INSTRUCTION\]\s*/gi, '')
       .replace(/\[AGENT ACTIV[^\]]*\]\s*/gi, '')
       .replace(/\s{2,}/g, ' ')
@@ -591,8 +569,6 @@
     showThinking(true);
     // Stop any ongoing speech BEFORE starting new request
     if (window.KVoice) KVoice.stopSpeaking();
-    // Clear previous monitor content (images, maps, etc.)
-    if (window.MonitorManager) MonitorManager.clear();
     KAvatar.setExpression('thinking', 0.5);
 
     // Capture pending media before clearing
@@ -741,10 +717,6 @@
                     }
                   } else if (evt.type === 'start') {
                     streamEngine = evt.engine || 'Gemini';
-                  } else if (evt.type === 'monitor' && (evt.content || (evt.monitor && evt.monitor.content))) {
-                    const mc = evt.content || evt.monitor.content;
-                    const mt = evt.monitorType || (evt.monitor && evt.monitor.type) || 'html';
-                    showOnMonitor(mc, mt);
                   } else if (evt.type === 'progress' && evt.detail) {
                     // SuperThink pipeline progress — show status to user
                     msgEl.innerHTML =
@@ -760,10 +732,7 @@
                       else if (a === 'translate_on' && window.KTranslate && !KTranslate.isActive()) KTranslate.start();
                       else if (a === 'translate_off' && window.KTranslate && KTranslate.isActive()) KTranslate.stop();
                       else if (a === 'scan_on' && window.KScanner && !KScanner.isActive()) KScanner.start();
-                      else if (a === 'monitor_clear') {
-                        if (window.clearMonitor) clearMonitor();
-                        else if (window.MonitorManager) MonitorManager.show('default');
-                      } else if (a.startsWith('navigate:')) {
+                      else if (a.startsWith('navigate:')) {
                         const dest = a.split(':')[1];
                         if (dest && window.KMobile) KMobile.navigate(dest);
                       }
@@ -800,10 +769,6 @@
                           /* ignored */
                         }
                       }, 3000);
-                    }
-                    // ── Monitor ──
-                    if (evt.monitor && evt.monitor.content && window.showOnMonitor) {
-                      showOnMonitor(evt.monitor.content, evt.monitor.type || 'html');
                     }
                     // ── Guest counter ──
                     if (evt.remaining !== undefined) updateGuestCounter(evt.remaining, evt.limit);
@@ -888,14 +853,6 @@
           }, 3000);
         }
 
-        // Monitor content
-        if (data.monitor && data.monitor.content) {
-          showOnMonitor(data.monitor.content, data.monitor.type || 'html');
-        } else if (data.monitor && data.monitor.search_results) {
-          if (window.MonitorManager) MonitorManager.showSearchResults(data.monitor.search_results);
-        } else if (data.monitor && data.monitor.weather) {
-          if (window.MonitorManager) MonitorManager.showWeather(data.monitor.weather);
-        }
       }
 
       // ═══════════════════════════════════════════════════════
@@ -965,9 +922,6 @@
             if (window.KScanner && !KScanner.isActive()) KScanner.start();
           } else if (action === 'scan_off') {
             if (window.KScanner && KScanner.isActive()) KScanner.stop();
-          } else if (action === 'monitor_clear') {
-            if (window.clearMonitor) clearMonitor();
-            else if (window.MonitorManager) MonitorManager.clear();
           } else if (action === 'deploy' || action === 'admin_deploy') {
             // Afișează clepsidra de deploy și monitorizează server restart
             if (window.DeployStatus) DeployStatus.start();
@@ -988,13 +942,6 @@
             if (dest && window.KMobile) KMobile.navigate(dest);
           }
         });
-        // Process [MONITOR]...[/MONITOR] tags BEFORE stripping
-        const monitorTagMatch = fullReply.match(/\[MONITOR(?::([\w]+))?\]([\s\S]*?)\[\/MONITOR\]/i);
-        if (monitorTagMatch && window.MonitorManager) {
-          const monType = monitorTagMatch[1] || 'html';
-          const monContent = monitorTagMatch[2].trim();
-          if (monContent) showOnMonitor(monContent, monType);
-        }
         // Strip all tags from display
         fullReply = fullReply
           .replace(/\[EMOTION:\s*\w+\]/gi, '')
@@ -1003,7 +950,6 @@
           .replace(/\[GAZE:\s*[\w-]+\]/gi, '')
           .replace(/\[POSE:\s*\w+\]/gi, '')
           .replace(/\[ACTION:[^\]]+\]/gi, '')
-          .replace(/\[MONITOR(?::[\w]+)?\][\s\S]*?\[\/MONITOR\]/gi, '')
           .trim();
       }
 
@@ -1075,28 +1021,7 @@
       const IMG_DETECT =
         /https?:\/\/[^\s<>"']+(?:\.(?:jpg|jpeg|png|gif|webp|svg|bmp)|(?:pollinations\.ai|oaidalleapiprodscus\.blob\.core\.windows\.net|cdn\.openai\.com|dalle\.com|midjourney\.com|stability\.ai|ideogram\.ai)[^\s<>"']*)/i;
       const imgMatch = fullReply.match(IMG_DETECT);
-      if (imgMatch) {
-        showOnMonitor(imgMatch[0], 'image');
-      } else {
-        // Strict coordinate regex: requires either degree symbol or explicit N/S E/W
-        const coordMatch2 =
-          fullReply.match(/(-?\d{1,2}(?:\.\d+)?)[°]\s*([NS])?(?:[,;\s]+)?(-?\d{1,3}(?:\.\d+)?)[°]\s*([EW])?/i) ||
-          fullReply.match(/(-?\d{1,2}\.\d{3,})[\s,]+(-?\d{1,3}\.\d{3,})/i); // also match precise floats tracking (e.g. 44.4325, 26.1039)
-        if (coordMatch2 && coordMatch2[1] && coordMatch2[3]) {
-          const lat2 = parseFloat(coordMatch2[1]);
-          const lng2 = parseFloat(coordMatch2[3]);
-          if (!isNaN(lat2) && !isNaN(lng2) && window.MonitorManager) MonitorManager.showMap(lat2, lng2);
-        } else {
-          // NO text on monitor — text goes ONLY to subtitle under avatar
-          // Monitor is only for visual content (maps, images, charts)
-        }
-      }
-
-      // Brain map
-      if (typeof addBrainNode === 'function') {
-        const now = new Date().toLocaleTimeString();
-        addBrainNode('Response · ' + now, fullReply.substring(0, 80) + (fullReply.length > 80 ? '…' : ''));
-      }
+      // Images detected in reply are displayed inline in chat
 
       // Voice-first: speak() already called above, before text display
     } catch (_e) {
@@ -1503,26 +1428,14 @@
         /* continue normally */
       }
     }
-    // Web command — show on monitor + open in new tab backup
+    // Web command — open in new tab
     const webUrl = tryWebCommand(text);
     if (webUrl) {
       hideWelcome();
       addMessage('user', text);
-      // Show on monitor
-      if (window.MonitorManager) MonitorManager.showWebContent(webUrl);
-      // Also open in new tab (backup for sites that block iframes)
       window.open(webUrl, '_blank');
-      addMessage('assistant', '🌐 Opened ' + webUrl + ' on monitor and in a new tab!');
+      addMessage('assistant', '🌐 Opened ' + webUrl + ' in a new tab!');
       if (window.KVoice) KVoice.speak('Done, I opened it for you!');
-      return;
-    }
-    // Monitor clear command
-    if (isMonitorClear(text)) {
-      hideWelcome();
-      addMessage('user', text);
-      if (window.MonitorManager) MonitorManager.clear();
-      addMessage('assistant', 'Monitor cleared!');
-      if (window.KVoice) KVoice.speak('Done, monitor cleared!');
       return;
     }
     hideWelcome();
@@ -1781,7 +1694,14 @@
         });
         document.getElementById('plus-export').addEventListener('click', function () {
           popup.remove();
-          if (window.MonitorManager) MonitorManager.downloadAsZip();
+          // Export chat as JSON
+          const blob = new Blob([JSON.stringify(chatHistory, null, 2)], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'kelion-export-' + new Date().toISOString().slice(0, 10) + '.json';
+          a.click();
+          setTimeout(function () { URL.revokeObjectURL(url); }, 100);
         });
         document.getElementById('plus-export-chat').addEventListener('click', function () {
           popup.remove();
