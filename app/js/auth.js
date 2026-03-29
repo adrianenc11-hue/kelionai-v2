@@ -186,6 +186,12 @@
     const roleBtn = document.getElementById('btn-role');
 
     if (!currentUser) {
+      // Not logged in — show "Guest (Free)"
+      const userDisplay = document.getElementById('user-display');
+      if (userDisplay) {
+        userDisplay.textContent = 'Guest (Free)';
+        userDisplay.style.display = '';
+      }
       if (roleBtn) {
         roleBtn.style.background = 'rgba(99,102,241,0.15)';
         roleBtn.style.borderColor = 'rgba(99,102,241,0.4)';
@@ -200,6 +206,14 @@
 
     // Check admin status via user role
     let isAdmin = currentUser.role === 'admin' || window._isAdmin === true;
+
+    // Update user display: Name (Role)
+    const userDisplay = document.getElementById('user-display');
+    if (userDisplay && currentUser) {
+      const roleName = isAdmin ? 'Admin' : 'User';
+      userDisplay.textContent = `${currentUser.name || currentUser.email} (${roleName})`;
+      userDisplay.style.display = '';
+    }
 
     if (roleBtn) {
       if (isAdmin) {
