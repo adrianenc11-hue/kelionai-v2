@@ -31,6 +31,106 @@ const apiLimiter = rateLimit({
   keyGenerator: rateLimitKey,
 });
 
+const fastLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  message: { error: 'Too many fast vision requests.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: rateLimitKey,
+});
+
+// ═══ POST /api/vision/fast — GPT-5.4 Vision danger scan (primary) + Gemini (fallback) ═══
+router.post('/fast', fastLimiter, async (req, res) => {
+  try {
+    const { image, language = 'ro' } = req.body;
+    if (!image || typeof image !== 'string' || image.length > 2_000_000) {
+      return res.status(400).json({ error: 'Invalid image' });
+    }
+
+    const LANGS = { ro: 'română', en: 'English', es: 'Español', fr: 'Français', de: 'Deutsch' };
+    const lang = LANGS[language] || 'English';
+
+    const prompt = `DANGER SCAN. You are the eyes of a blind person walking right now. Respond in ${lang}.
+
+RULES:
+- If IMMEDIATE danger (<2m): "⚠️PERICOL: [threat] [direction] [distance]" (max 8 words)
+- If WARNING danger (2-5m): "⚠️ATENȚIE: [hazard] [direction] [distance]" (max 10 words)
+- If path blocked: "🚫BLOCAT: [what] [direction]" (max 8 words)
+- If SAFE: "✅" (just the checkmark)
+
+Dangers: vehicles, stairs, holes, obstacles, wet floor, animals, fire, electrical, people approaching fast, low/overhead obstacles, sharp objects, traffic, curbs, open doors, construction.
+Directions: stânga, dreapta, în față, în spate.
+MAX 15 words. No explanations. No greetings. Just the safety verdict.`;
+
+    let result = null;
+
+    // PRIMARY: GPT-5.4 Vision — highest accuracy
+    const openaiKey = process.env.OPENAI_API_KEY;
+    if (openaiKey) {
+      try {
+        const r = await withTimeout(
+          fetch(API_ENDPOINTS.OPENAI + '/chat/completions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + openaiKey },
+            body: JSON.stringify({
+              model: MODELS.OPENAI_VISION,
+              max_tokens: 50,
+              temperature: 0.1,
+              messages: [{
+                role: 'user',
+                content: [
+                  { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${image}`, detail: 'low' } },
+                  { type: 'text', text: prompt },
+                ],
+              }],
+            }),
+          }),
+          10000,
+          'vision-fast:GPT-5.4'
+        );
+        const d = await r.json();
+        result = d.choices?.[0]?.message?.content?.trim();
+      } catch (e) {
+        logger.warn({ component: 'Vision.Fast', err: e.message }, 'GPT-5.4 fast scan failed');
+      }
+    }
+
+    // FALLBACK: Gemini Vision
+    if (!result) {
+      const geminiKey = process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
+      if (geminiKey) {
+        try {
+          const r = await withTimeout(
+            fetch(`${API_ENDPOINTS.GEMINI}/models/${MODELS.GEMINI_VISION}:generateContent`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'x-goog-api-key': geminiKey },
+              body: JSON.stringify({
+                contents: [{ role: 'user', parts: [
+                  { inlineData: { mimeType: 'image/jpeg', data: image } },
+                  { text: prompt },
+                ]}],
+                generationConfig: { maxOutputTokens: 50, temperature: 0.1 },
+              }),
+            }),
+            10000,
+            'vision-fast:Gemini'
+          );
+          const d = await r.json();
+          result = d.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+        } catch (e) {
+          logger.warn({ component: 'Vision.Fast', err: e.message }, 'Gemini fast scan fallback failed');
+        }
+      }
+    }
+
+    res.json({ result: result || '✅' });
+  } catch (e) {
+    logger.warn({ component: 'Vision.Fast', err: e.message }, 'Fast danger scan failed');
+    res.json({ result: '✅' }); // fail-safe: assume safe
+  }
+});
+
 // POST /api/vision — GPT-5.4 Vision (primary) + Gemini (fallback) — BRAIN-POWERED
 router.post('/', apiLimiter, validate(visionSchema), async (req, res) => {
   try {

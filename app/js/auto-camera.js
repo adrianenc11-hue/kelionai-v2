@@ -356,13 +356,17 @@
   }
 
   // ═══════════════════════════════════════════════════════════
-  // LIVE VISION LOOP — continuous analysis while camera is ON
-  // Brain can access latest context via window.KAutoCamera.getLastVision()
+  // DUAL-TIER LIVE VISION — professional safety system
+  // FAST (1s): GPT-5.4 Vision danger scan → instant TTS alert
+  // DEEP (5s): GPT-5.4 Vision full analysis → brain context
   // ═══════════════════════════════════════════════════════════
-  let _visionInterval = null;
+  let _fastInterval = null;
+  let _deepInterval = null;
   let _lastVision = null;      // { description, timestamp }
-  let _visionBusy = false;
-  const VISION_INTERVAL_MS = 3000; // analyze every 3 seconds
+  let _fastBusy = false;
+  let _deepBusy = false;
+  const FAST_INTERVAL_MS = 1000;  // danger scan every 1 second
+  const DEEP_INTERVAL_MS = 5000;  // full analysis every 5 seconds
   const VISION_LOW_RES_W = 640;
   const VISION_LOW_RES_H = 480;
   const VISION_JPEG_Q = 0.6;
@@ -383,7 +387,7 @@
 
   // ── Danger detection keywords ──
   var DANGER_IMMEDIATE = /⚠️PERICOL/i;
-  var DANGER_WARNING   = /⚠️ATENȚIE/i;
+  var DANGER_WARNING   = /⚠️ATENȚIE|🚫BLOCAT/i;
   var _lastDangerSpoken = 0;
   var DANGER_COOLDOWN_MS = 5000; // don't repeat same danger alert within 5s
 
@@ -442,11 +446,48 @@
     console.warn('[AutoCamera] ⚠️ DANGER (' + level + '):', spokenText);
   }
 
-  async function _analyzeFrame() {
-    if (_visionBusy || !_enabled) return;
+  // ── FAST: Danger-only scan (GPT-5.4, 1s interval) ──
+  async function _fastScan() {
+    if (_fastBusy || !_enabled) return;
     var base64 = _captureLowRes();
     if (!base64) return;
-    _visionBusy = true;
+    _fastBusy = true;
+    try {
+      var token = localStorage.getItem('sb-token') || '';
+      var res = await fetch('/api/vision/fast', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + token,
+        },
+        body: JSON.stringify({
+          image: base64,
+          language: window.i18n ? i18n.getLanguage() : 'ro',
+        }),
+      });
+      if (res.ok) {
+        var data = await res.json();
+        var result = (data.result || '').trim();
+        // Only act on danger results (not ✅)
+        if (result && result !== '✅') {
+          var dangerLevel = _checkDanger(result) || 'warning';
+          _speakDanger(result, dangerLevel);
+          console.warn('[AutoCamera] ⚡ FAST danger:', result);
+        }
+      }
+    } catch (e) {
+      // Silent fail — don't interrupt user
+    } finally {
+      _fastBusy = false;
+    }
+  }
+
+  // ── DEEP: Full analysis (GPT-5.4, 5s interval) ──
+  async function _deepAnalysis() {
+    if (_deepBusy || !_enabled) return;
+    var base64 = _captureLowRes();
+    if (!base64) return;
+    _deepBusy = true;
     try {
       var token = localStorage.getItem('sb-token') || '';
       var res = await fetch('/api/vision', {
@@ -466,37 +507,46 @@
         if (data.description) {
           _lastVision = { description: data.description, timestamp: Date.now() };
           window.dispatchEvent(new CustomEvent('live-vision-update', { detail: _lastVision }));
-          // ── Danger detection — instant TTS alert ──
+          // Deep analysis also checks danger (backup for fast scan)
           var dangerLevel = _checkDanger(data.description);
           if (dangerLevel) {
             _speakDanger(data.description, dangerLevel);
           }
-          console.log('[AutoCamera] Live vision:', data.description.substring(0, 80) + '...');
+          console.log('[AutoCamera] 🔍 Deep vision:', data.description.substring(0, 80) + '...');
         }
       }
     } catch (e) {
-      console.warn('[AutoCamera] Live vision error:', e.message);
+      console.warn('[AutoCamera] Deep vision error:', e.message);
     } finally {
-      _visionBusy = false;
+      _deepBusy = false;
     }
   }
 
   function startLiveVision() {
-    if (_visionInterval) return;
-    _visionInterval = setInterval(_analyzeFrame, VISION_INTERVAL_MS);
-    // Immediate first analysis
-    setTimeout(_analyzeFrame, 500);
-    console.log('[AutoCamera] Live vision started (every ' + (VISION_INTERVAL_MS / 1000) + 's)');
+    if (_fastInterval) return;
+    // FAST tier: danger scan every 1s
+    _fastInterval = setInterval(_fastScan, FAST_INTERVAL_MS);
+    // DEEP tier: full analysis every 5s
+    _deepInterval = setInterval(_deepAnalysis, DEEP_INTERVAL_MS);
+    // Immediate first scans
+    setTimeout(_fastScan, 300);
+    setTimeout(_deepAnalysis, 800);
+    console.log('[AutoCamera] 🛡️ Dual-tier vision started: FAST=' + (FAST_INTERVAL_MS/1000) + 's, DEEP=' + (DEEP_INTERVAL_MS/1000) + 's');
   }
 
   function stopLiveVision() {
-    if (_visionInterval) {
-      clearInterval(_visionInterval);
-      _visionInterval = null;
+    if (_fastInterval) {
+      clearInterval(_fastInterval);
+      _fastInterval = null;
+    }
+    if (_deepInterval) {
+      clearInterval(_deepInterval);
+      _deepInterval = null;
     }
     _lastVision = null;
-    _visionBusy = false;
-    console.log('[AutoCamera] Live vision stopped');
+    _fastBusy = false;
+    _deepBusy = false;
+    console.log('[AutoCamera] Vision stopped');
   }
 
   function getLastVision() {
