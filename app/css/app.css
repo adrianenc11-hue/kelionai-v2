@@ -2085,6 +2085,14 @@ body {
   margin-left: 2px;
 }
 
+/* Left group: logo + Kelion pill */
+.navbar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
 /* Actions container */
 .navbar-actions {
   display: flex;
