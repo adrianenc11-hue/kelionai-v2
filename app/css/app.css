@@ -2098,13 +2098,16 @@ body {
 .avatar-pill-right {
   position: absolute;
   top: 15%;
-  z-index: 10;
+  z-index: 50;
+  pointer-events: auto;
+  font-size: 0.85rem;
+  padding: 8px 18px;
 }
 .avatar-pill-left {
-  left: 10px;
+  left: 12px;
 }
 .avatar-pill-right {
-  right: 10px;
+  right: 12px;
 }
 
 /* Actions container */
