@@ -135,6 +135,14 @@ app.use(helmet({
   contentSecurityPolicy: false, // gestionat manual mai jos
   crossOriginEmbedderPolicy: false,
   crossOriginResourcePolicy: { policy: 'same-site' },
+  permissionsPolicy: {
+    features: {
+      camera: ['self'],
+      microphone: ['self'],
+      geolocation: ['self'],
+      payment: ['self'],
+    },
+  },
 }));
 
 // ═══════════════════════════════════════════════════════════════
@@ -239,6 +247,10 @@ app.use(express.static(path.join(__dirname, '../app'), {
   setHeaders: (res, filePath) => {
     if (filePath.endsWith('.html')) {
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    }
+    // GLB models — short cache + must-revalidate so avatar updates propagate fast
+    if (filePath.endsWith('.glb')) {
+      res.setHeader('Cache-Control', 'public, max-age=3600, must-revalidate');
     }
     if (/\.[0-9a-f]{8,}\.(js|css|woff2?)$/i.test(filePath)) {
       res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
