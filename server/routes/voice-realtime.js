@@ -49,7 +49,7 @@ function setupRealtimeVoice(io, appLocals) {
       else ipConnections.set(ip, c - 1);
     });
 
-    const avatar = socket.handshake.query.avatar || 'kira';
+    const avatar = socket.handshake.query.avatar || 'kelion';
     const language = socket.handshake.query.language || 'ro';
     const token = socket.handshake.query.token || null;
     const startTime = Date.now();

@@ -60,7 +60,7 @@ function createDeepgramSTT(onTranscript, language = 'ro') {
 }
 
 // ─── Groq LLM (Streaming Tokens) ───
-async function* streamGroqChat(messages, avatar = 'kira', language = 'ro', brain = null, userId = null) {
+async function* streamGroqChat(messages, avatar = 'kelion', language = 'ro', brain = null, userId = null) {
   const key = process.env.GROQ_API_KEY;
   if (!key) throw new Error('GROQ_API_KEY not set');
   if (!circuitAllow('groq')) throw new Error('Groq circuit open — provider temporarily unavailable');
@@ -320,7 +320,7 @@ function setupVoiceStream(server, appLocals) {
     clientWs.on('close', _cleanupIp);
     clientWs.on('error', _cleanupIp);
     const url = new URL(req.url, `http://${req.headers.host}`);
-    const avatar = url.searchParams.get('avatar') || 'kira';
+    const avatar = url.searchParams.get('avatar') || 'kelion';
     const language = url.searchParams.get('language') || 'ro';
     const voiceId = getVoiceId(avatar, language);
     const token = url.searchParams.get('token') || null;

@@ -36,7 +36,7 @@
 
   // ── Fallback state ──
   let _fallbackActive = false;
-  let _lastAvatar = 'kira';
+  let _lastAvatar = 'kelion';
   let _lastLanguage = null; // resolved dynamically from i18n or browser
 
   function _activateFallback(reason) {

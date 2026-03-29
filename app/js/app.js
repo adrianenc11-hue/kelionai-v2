@@ -1471,7 +1471,7 @@
               headers: authHeaders(),
               body: JSON.stringify({
                 image: rawB64,
-                avatar: window.KAvatar ? KAvatar.getCurrentAvatar() : 'kira',
+                avatar: window.KAvatar ? KAvatar.getCurrentAvatar() : 'kelion',
                 language: window.i18n ? i18n.getLanguage() : 'en',
               }),
             })
@@ -1506,17 +1506,7 @@
     // Mic toggle — handled by unified IIFE handler below (voice loop pipeline)
     // No separate handler here — prevents duplicate wake-word + voice-stream conflict
 
-    // Sidebar toggle
-    const menuBtn = document.getElementById('btn-menu');
-    if (menuBtn) menuBtn.addEventListener('click', function () {
-      const sp = document.getElementById('sidebar-panel');
-      if (sp) sp.classList.toggle('hidden');
-    });
-    const closeSidebar = document.getElementById('btn-close-sidebar');
-    if (closeSidebar) closeSidebar.addEventListener('click', function () {
-      const sp = document.getElementById('sidebar-panel');
-      if (sp) sp.classList.add('hidden');
-    });
+
 
     // Pricing close
     const pricingClose = document.getElementById('pricing-close');

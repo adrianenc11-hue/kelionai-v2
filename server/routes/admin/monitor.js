@@ -258,7 +258,7 @@ router.get('/health-check', async (req, res) => {
 - Brain status: ${brainStatus}, Erori recente: ${brain.recentErrors || 0}
 Răspunde în maxim 3 recomandări scurte.`;
         const brainResult = await Promise.race([
-          brain.think(diagnosticPrompt, 'kira', [], 'ro'),
+          brain.think(diagnosticPrompt, 'kelion', [], 'ro'),
           new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 5000)),
         ]);
         if (brainResult?.enrichedMessage) {

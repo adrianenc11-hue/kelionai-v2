@@ -48,7 +48,7 @@ router.get('/', async (req, res) => {
       enriched.push({
         id:           c.id,
         user_id:      c.user_id ? c.user_id.substring(0, 8) + '...' : 'Guest',
-        avatar:       c.avatar || 'kira',
+        avatar:       c.avatar || 'kelion',
         message_count: msgCount,
         created_at:   c.created_at,
         updated_at:   c.updated_at,

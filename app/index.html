@@ -480,10 +480,10 @@ Acum elimin și referințele CSS rămase din `app.css` pentru `#pwa-install-bann
 
         <!-- Right: Actions -->
         <div class="navbar-actions">
-          <!-- Essential buttons always visible -->
-          <button class="nav-icon" id="btn-menu" title="Menu" aria-label="Menu">☰</button>
+          <button class="avatar-pill active" data-avatar="kelion">Kelion</button>
+          <button class="avatar-pill" data-avatar="kira">Kira</button>
           <button class="nav-icon" id="btn-save-last" title="Save last response" aria-label="Save last response">💾</button>
-          <button class="nav-icon" id="btn-pricing" data-alias="btn-subscriptions" title="Plans" aria-label="Plans" style="display: none">⭐</button>
+          <button class="nav-icon" id="btn-pricing" data-alias="btn-subscriptions" title="Plans" aria-label="Plans" style="display: none">💳</button>
           <button class="nav-icon nav-icon-admin" id="btn-admin-nav" title="Admin Dashboard" aria-label="Admin" style="display: none" onclick="window.location.href='/admin'">⚙️</button>
           <button class="nav-icon" id="btn-auth" title="Sign in" aria-label="Sign in">🔑</button>
         </div>
@@ -491,39 +491,18 @@ Acum elimin și referințele CSS rămase din `app.css` pentru `#pwa-install-bann
 
       <!-- MAIN CONTENT -->
       <div id="main-content">
-        <!-- SIDEBAR — Menu -->
-        <div id="sidebar-panel" class="hidden">
-          <div id="sidebar-header">
-            <h3>Menu</h3>
-            <button id="btn-close-sidebar" title="Close">X</button>
-          </div>
-
-          <!-- Tools & Actions -->
-          <div id="sidebar-tools">
-            <hr class="nav-dropdown-sep" />
-            <button class="nav-dropdown-item" id="btn-role" title="Account"><span class="ndi">👤</span> Account</button>
-            <span id="user-display" class="user-badge nav-dropdown-badge" style="display: none"></span>
-            <span id="guest-counter" class="guest-counter" style="display: none"></span>
-            <button class="nav-dropdown-item" id="btn-scan-toggle" style="display: none"><span class="ndi">📷</span> Scanner</button>
-            <button class="nav-dropdown-item" id="btn-plus"><span class="ndi">📁</span> Import / Export</button>
-            <input type="file" id="file-input-hidden" class="hidden-panel" accept="*/*" title="Upload file" />
-            <hr class="nav-dropdown-sep" />
-            <button class="nav-dropdown-item" id="btn-invite"><span class="ndi">🎁</span> Invite Friends</button>
-            <button class="nav-dropdown-item" id="pwa-install-btn-nav" title="Install App" style="display:none"><span class="ndi">📲</span> Install App</button>
-            <button class="nav-dropdown-item" id="pwa-dismiss-btn-nav" style="display:none"><span class="ndi">✖</span> Dismiss</button>
-          </div>
-        </div>
+        <!-- Hidden elements needed by JS -->
+        <span id="user-display" class="user-badge nav-dropdown-badge" style="display: none"></span>
+        <span id="guest-counter" class="guest-counter" style="display: none"></span>
+        <input type="file" id="file-input-hidden" class="hidden-panel" accept="*/*" title="Upload file" />
 
         <div id="left-panel">
           <div id="avatar-area">
             <canvas id="avatar-canvas"></canvas>
             <div id="avatar-label">
-              <span id="avatar-name">Kira</span>
+              <span id="avatar-name">Kelion</span>
             </div>
-            <div id="avatar-switcher">
-              <button class="avatar-pill" data-avatar="kelion">Kelion</button>
-              <button class="avatar-pill active" data-avatar="kira">Kira</button>
-            </div>
+
             <!-- Live subtitle bar (under avatar) -->
             <div id="live-subtitle">
               <span id="subtitle-speaker" class="text-cyan-bold"></span>
@@ -607,7 +586,7 @@ Acum elimin și referințele CSS rămase din `app.css` pentru `#pwa-install-bann
     <script>
       // Force-hide admin-only buttons before auth runs
       (function(){
-        var ids = ['btn-admin-nav','btn-scan-toggle'];
+        var ids = ['btn-admin-nav'];
         for (var i = 0; i < ids.length; i++) {
           var el = document.getElementById(ids[i]);
           if (el) el.style.display = 'none';

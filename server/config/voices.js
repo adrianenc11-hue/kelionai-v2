@@ -194,7 +194,7 @@ const LEGACY_VOICES = {
  * @returns {string} ElevenLabs voice ID
  */
 function getVoiceId(avatar, language) {
-  const av = (avatar || 'kira').toLowerCase();
+  const av = (avatar || 'kelion').toLowerCase();
   const lang = (language || 'ro').toLowerCase().split('-')[0]; // 'ro-RO' → 'ro'
 
   // Try language-specific voice first

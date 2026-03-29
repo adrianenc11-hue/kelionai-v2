@@ -511,7 +511,7 @@ CREATE TABLE IF NOT EXISTS tenants (
     logo_url TEXT,
     primary_color TEXT DEFAULT '#6366f1',
     secondary_color TEXT DEFAULT '#06b6d4',
-    default_avatar TEXT DEFAULT 'kira',
+    default_avatar TEXT DEFAULT 'kelion',
     default_language TEXT DEFAULT 'en',
     max_messages_per_day INTEGER DEFAULT 50,
     features JSONB DEFAULT '{}',

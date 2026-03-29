@@ -17,7 +17,7 @@
   let mixer = null;
   let lipSync = null;
   let textLipSync = null;
-  let currentAvatar = 'kira';
+  let currentAvatar = 'kelion';
   let loadPromise = null;
   let initRetryCount = 0;
   const MAX_INIT_RETRIES = 50; // up to 5s total

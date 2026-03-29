@@ -93,7 +93,7 @@ router.get('/voices', (req, res) => {
 router.post('/speak', ttsLimiter, validate(speakSchema), async (req, res) => {
   try {
     const { getUserFromToken, supabaseAdmin } = req.app.locals;
-    const { text, avatar = 'kira', mood = 'neutral' } = req.body;
+    const { text, avatar = 'kelion', mood = 'neutral' } = req.body;
     const language = req.body.language || 'ro';
     if (!text) return res.status(400).json({ error: 'Text is required' });
 

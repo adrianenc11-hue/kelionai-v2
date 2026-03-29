@@ -498,7 +498,7 @@
         },
         body: JSON.stringify({
           image: base64,
-          avatar: window.KAvatar && KAvatar.getCurrentAvatar ? KAvatar.getCurrentAvatar() : 'kira',
+          avatar: window.KAvatar && KAvatar.getCurrentAvatar ? KAvatar.getCurrentAvatar() : 'kelion',
           language: window.i18n ? i18n.getLanguage() : 'ro',
         }),
       });

@@ -161,7 +161,7 @@ router.get('/brain-test', healthAdminAuth, async (req, res) => {
   const steps = [];
   try {
     steps.push('start');
-    const result = await brain.think('Test: what is 2+2?', 'kira', [], 'ro', null, null, {});
+    const result = await brain.think('Test: what is 2+2?', 'kelion', [], 'ro', null, null, {});
     steps.push('think_done');
     const reply = result.enrichedMessage || result.reply || '';
     const failed = reply.includes('Test: what is 2+2') || !reply || reply.length < 5;
