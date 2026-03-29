@@ -80,7 +80,6 @@ body {
   -webkit-backdrop-filter: blur(16px);
   backdrop-filter: blur(16px);
   order: 2;
-  position: relative;
   /* Push to right */
 }
 
