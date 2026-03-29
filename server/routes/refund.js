@@ -19,6 +19,7 @@ const express   = require('express');
 const rateLimit = require('express-rate-limit');
 const logger    = require('../logger');
 const { sendEmail } = require('../mailer');
+const { SUPPORT_EMAIL } = require('../../config/env');
 
 const router = express.Router();
 
@@ -76,7 +77,7 @@ router.get('/policy', (req, res) => {
         processingTime: '3-5 zile lucrătoare pentru aprobare, 5-10 zile pentru procesare Stripe',
       },
     },
-    contact: 'support@kelionai.com',
+    contact: SUPPORT_EMAIL,
     lastUpdated: '2026-01-01',
   });
 });
@@ -461,7 +462,7 @@ function buildUserRefundConfirmEmail(email, eligibility, amount, requestId) {
     <p style="margin:4px 0"><strong>ID cerere:</strong> <code>${requestId}</code></p>
   </div>
   <p>Vei primi un răspuns în <strong>3-5 zile lucrătoare</strong>.</p>
-  <p style="color:#94a3b8;font-size:0.85rem">Dacă ai întrebări: <a href="mailto:support@kelionai.com" style="color:#6366f1">support@kelionai.com</a></p>
+  <p style="color:#94a3b8;font-size:0.85rem">Dacă ai întrebări: <a href="mailto:${SUPPORT_EMAIL}" style="color:#6366f1">${SUPPORT_EMAIL}</a></p>
 </div>`;
 }
 
@@ -485,7 +486,7 @@ function buildUserRefundRejectedEmail(email, adminNote) {
   <h2 style="color:#f87171">❌ Cererea de ramburs a fost respinsă</h2>
   <p>Din păcate, cererea ta de ramburs nu poate fi procesată.</p>
   ${adminNote ? `<div style="background:#0f172a;border-radius:8px;padding:16px;margin:16px 0"><p style="margin:0"><strong>Motiv:</strong> ${adminNote}</p></div>` : ''}
-  <p>Dacă crezi că este o eroare, contactează-ne la <a href="mailto:support@kelionai.com" style="color:#6366f1">support@kelionai.com</a>.</p>
+  <p>Dacă crezi că este o eroare, contactează-ne la <a href="mailto:${SUPPORT_EMAIL}" style="color:#6366f1">${SUPPORT_EMAIL}</a>.</p>
 </div>`;
 }
 

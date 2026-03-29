@@ -14,6 +14,7 @@ const express = require('express');
 const logger  = require('../logger');
 const { applyReferralBonus } = require('../referral');
 const { sendEmail } = require('../mailer');
+const { SUPPORT_EMAIL } = require('../../config/env');
 
 const router = express.Router();
 
@@ -239,7 +240,7 @@ function buildWelcomeEmail(name, plan, billing, periodEnd, hasReferral) {
       </div>
       <p style="color:#94a3b8;font-size:0.85rem">
         Dacă ai întrebări despre abonament sau dorești un ramburs, 
-        contactează-ne la <a href="mailto:support@kelionai.com" style="color:#6366f1">support@kelionai.com</a>.
+        contactează-ne la <a href="mailto:${SUPPORT_EMAIL}" style="color:#6366f1">${SUPPORT_EMAIL}</a>.
       </p>
       <div style="text-align:center;margin-top:24px">
         <a href="${process.env.APP_URL || 'https://kelionai.com'}" 

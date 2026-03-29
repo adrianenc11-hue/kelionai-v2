@@ -20,6 +20,7 @@ const path     = require('path');
 const fs       = require('fs');
 const crypto   = require('crypto');
 const logger   = require('../logger');
+const { MODELS, API_ENDPOINTS } = require('../config/models');
 
 const router = express.Router();
 
@@ -426,7 +427,7 @@ async function _analyzeImage(file, customPrompt) {
       const { OpenAI } = require('openai');
       const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
       const resp = await openai.chat.completions.create({
-        model:    'gpt-4o',
+        model:    MODELS.GPT_VISION,
         messages: [{
           role:    'user',
           content: [
@@ -438,7 +439,7 @@ async function _analyzeImage(file, customPrompt) {
       });
       return {
         description: resp.choices[0].message.content,
-        model:       'gpt-4o',
+        model:       MODELS.GPT_VISION,
         provider:    'openai',
         tokens:      resp.usage?.total_tokens,
       };
@@ -453,7 +454,7 @@ async function _analyzeImage(file, customPrompt) {
       const imageData = fs.readFileSync(file.path);
       const base64    = imageData.toString('base64');
       const resp = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GOOGLE_AI_KEY}`,
+        `${API_ENDPOINTS.GEMINI}/models/${MODELS.GEMINI_VISION}:generateContent?key=${process.env.GOOGLE_AI_KEY}`,
         {
           method:  'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -469,7 +470,7 @@ async function _analyzeImage(file, customPrompt) {
       );
       const data = await resp.json();
       const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-      return { description: text, model: 'gemini-1.5-flash', provider: 'google' };
+      return { description: text, model: MODELS.GEMINI_VISION, provider: 'google' };
     } catch (e) {
       logger.warn({ component: 'Workspace.Vision', err: e.message }, 'Gemini vision failed');
     }
@@ -517,7 +518,7 @@ Răspunde în română, structurat și clar.`;
       const Anthropic = require('@anthropic-ai/sdk');
       const client = new Anthropic.Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
       const msg = await client.messages.create({
-        model:      'claude-3-haiku-20240307',
+        model:      MODELS.CLAUDE_FAST,
         max_tokens: 1500,
         messages:   [{ role: 'user', content: prompt }],
       });
@@ -531,7 +532,7 @@ Răspunde în română, structurat și clar.`;
       const { OpenAI } = require('openai');
       const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
       const resp = await openai.chat.completions.create({
-        model:      'gpt-4o-mini',
+        model:      MODELS.OPENAI_FALLBACK,
         messages:   [{ role: 'user', content: prompt }],
         max_tokens: 1500,
       });
@@ -542,11 +543,11 @@ Răspunde în română, structurat și clar.`;
 
   if (!analysisText && process.env.GROQ_API_KEY) {
     try {
-      const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      const resp = await fetch(`${API_ENDPOINTS.GROQ}/chat/completions`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
         body:    JSON.stringify({
-          model:      'llama-3.3-70b-versatile',
+          model:      MODELS.GROQ_PRIMARY,
           messages:   [{ role: 'user', content: prompt }],
           max_tokens: 1500,
         }),
