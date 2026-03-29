@@ -44,7 +44,7 @@ const fastLimiter = rateLimit({
 router.post('/fast', fastLimiter, async (req, res) => {
   try {
     const { image, language = 'ro' } = req.body;
-    if (!image || typeof image !== 'string' || image.length > 2_000_000) {
+    if (!image || typeof image !== 'string') {
       return res.status(400).json({ error: 'Invalid image' });
     }
 
