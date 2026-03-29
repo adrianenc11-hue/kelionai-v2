@@ -275,6 +275,14 @@ app.get('/404.html', (req, res) => serveHtmlWithNonce(req, res, '404.html'));
   app.get(`/${dir}/index.html`, (req, res) => serveHtmlWithNonce(req, res, `${dir}/index.html`));
 });
 
+// Service Worker — must NEVER be cached by CDN/browser
+app.get('/sw.js', (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.sendFile(path.join(APP_DIR, 'sw.js'));
+});
+
 // Static assets (JS, CSS, images, models, etc.) — no nonce needed
 app.use(express.static(APP_DIR, {
   maxAge: process.env.NODE_ENV === 'production' ? '7d' : '0',
@@ -283,6 +291,10 @@ app.use(express.static(APP_DIR, {
   index: false, // We handle index.html above with nonce injection
   setHeaders: (res, filePath) => {
     if (filePath.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    }
+    // Service Worker must never be cached by CDN/browser
+    if (filePath.endsWith('sw.js')) {
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     }
     // GLB models — short cache + must-revalidate so avatar updates propagate fast
