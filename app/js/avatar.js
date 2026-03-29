@@ -7,8 +7,8 @@
 
   const CACHE_BUST = Date.now();
   const MODELS = {
-    kelion: '/models/kelion-rpm.glb?v=' + CACHE_BUST,
-    kira: '/models/kira-rpm.glb?v=' + CACHE_BUST,
+    kelion: '/models/kira-rpm.glb?v=' + CACHE_BUST,
+    kira: '/models/kelion-rpm.glb?v=' + CACHE_BUST,
   };
 
   let scene, camera, renderer, clock;
