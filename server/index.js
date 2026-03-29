@@ -239,10 +239,48 @@ app.use((req, res, next) => {
 // ═══════════════════════════════════════════════════════════════
 // STATIC FILES
 // ═══════════════════════════════════════════════════════════════
-app.use(express.static(path.join(__dirname, '../app'), {
+
+// Serve HTML files with CSP nonce injection
+const fs = require('fs');
+const APP_DIR = path.join(__dirname, '../app');
+
+function serveHtmlWithNonce(req, res, htmlFile) {
+  const filePath = path.join(APP_DIR, htmlFile);
+  fs.readFile(filePath, 'utf8', (err, html) => {
+    if (err) return res.status(404).sendFile(path.join(APP_DIR, '404.html'));
+    const nonce = res.locals.cspNonce || '';
+    // Add nonce to all inline <script> tags (not ones with src=)
+    const patched = html.replace(/<script(?![^>]*\bsrc\b)([^>]*)>/gi, `<script nonce="${nonce}"$1>`);
+    res.setHeader('Content-Type', 'text/html; charset=UTF-8');
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.send(patched);
+  });
+}
+
+// Route HTML pages through nonce injection
+app.get('/', (req, res) => serveHtmlWithNonce(req, res, 'index.html'));
+app.get('/index.html', (req, res) => serveHtmlWithNonce(req, res, 'index.html'));
+app.get('/onboarding.html', (req, res) => serveHtmlWithNonce(req, res, 'onboarding.html'));
+app.get('/manual.html', (req, res) => serveHtmlWithNonce(req, res, 'manual.html'));
+app.get('/reset-password.html', (req, res) => serveHtmlWithNonce(req, res, 'reset-password.html'));
+app.get('/gdpr.html', (req, res) => serveHtmlWithNonce(req, res, 'gdpr.html'));
+app.get('/error.html', (req, res) => serveHtmlWithNonce(req, res, 'error.html'));
+app.get('/404.html', (req, res) => serveHtmlWithNonce(req, res, '404.html'));
+
+// Sub-directory index pages
+['admin', 'dashboard', 'settings', 'workspace', 'pricing', 'contact',
+ 'privacy', 'terms', 'gdpr', 'cookie-policy', 'refund-policy'].forEach(dir => {
+  app.get(`/${dir}`, (req, res) => serveHtmlWithNonce(req, res, `${dir}/index.html`));
+  app.get(`/${dir}/`, (req, res) => serveHtmlWithNonce(req, res, `${dir}/index.html`));
+  app.get(`/${dir}/index.html`, (req, res) => serveHtmlWithNonce(req, res, `${dir}/index.html`));
+});
+
+// Static assets (JS, CSS, images, models, etc.) — no nonce needed
+app.use(express.static(APP_DIR, {
   maxAge: process.env.NODE_ENV === 'production' ? '7d' : '0',
   etag: true,
   lastModified: true,
+  index: false, // We handle index.html above with nonce injection
   setHeaders: (res, filePath) => {
     if (filePath.endsWith('.html')) {
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');

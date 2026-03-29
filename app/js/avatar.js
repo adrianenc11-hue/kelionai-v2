@@ -352,7 +352,24 @@
             if (child.isMesh) {
               child.visible = true;
               child.frustumCulled = false;
-              if (child.material) child.material.needsUpdate = true;
+
+              // ── Material fix: ensure textures decode to sRGB and have valid base color ──
+              if (child.material) {
+                const mat = child.material;
+                // Force proper color space on texture maps
+                if (mat.map) {
+                  mat.map.colorSpace = THREE.SRGBColorSpace;
+                  mat.map.needsUpdate = true;
+                }
+                // If no diffuse texture loaded, set a skin-tone base color so avatar isn't white
+                if (!mat.map) {
+                  mat.color = mat.color || new THREE.Color(0xd4a574); // warm skin fallback
+                }
+                // Ensure metalness/roughness are sane for skin (not mirror-like)
+                if (mat.metalness === undefined || mat.metalness > 0.3) mat.metalness = 0.0;
+                if (mat.roughness === undefined || mat.roughness < 0.3) mat.roughness = 0.6;
+                mat.needsUpdate = true;
+              }
 
               // Morph targets — traverse ALL meshes regardless of name
               if (child.isMesh && child.morphTargetDictionary) {
@@ -425,10 +442,15 @@
               mirrorMat.transparent = true;
               mirrorMat.opacity = 1.0;
               let mirrorMesh;
-              if (origMesh.isSkinnedMesh && origMesh.skeleton) {
-                mirrorMesh = new THREE.SkinnedMesh(mirrorGeo, mirrorMat);
-                mirrorMesh.bind(origMesh.skeleton, origMesh.bindMatrix);
-              } else {
+              try {
+                if (origMesh.isSkinnedMesh && origMesh.skeleton) {
+                  mirrorMesh = new THREE.SkinnedMesh(mirrorGeo, mirrorMat);
+                  mirrorMesh.bind(origMesh.skeleton, origMesh.bindMatrix);
+                } else {
+                  mirrorMesh = new THREE.Mesh(mirrorGeo, mirrorMat);
+                }
+              } catch (mirrorErr) {
+                console.warn('[Avatar] Mirror bind failed for', origMesh.name, mirrorErr.message);
                 mirrorMesh = new THREE.Mesh(mirrorGeo, mirrorMat);
               }
               mirrorMesh.renderOrder = 2;
@@ -1433,16 +1455,21 @@
     renderer.render(scene, camera);
   }
 
+  let _resizeTimer = null;
   function onResize() {
-    const canvas = document.getElementById('avatar-canvas');
-    if (!canvas || !renderer) return;
-    const container = canvas.parentElement;
-    const w = container.clientWidth;
-    const h = container.clientHeight;
-    if (w === 0 || h === 0) return;
-    camera.aspect = w / h;
-    camera.updateProjectionMatrix();
-    renderer.setSize(w, h);
+    if (_resizeTimer) return; // debounce — max once per 100ms
+    _resizeTimer = setTimeout(function () {
+      _resizeTimer = null;
+      const canvas = document.getElementById('avatar-canvas');
+      if (!canvas || !renderer) return;
+      const container = canvas.parentElement;
+      const w = container.clientWidth;
+      const h = container.clientHeight;
+      if (w === 0 || h === 0) return;
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h);
+    }, 100);
   }
 
   // ── Finger Pose System ─────────────────────────────────────
