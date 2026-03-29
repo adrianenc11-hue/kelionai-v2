@@ -445,8 +445,11 @@ PERSONA: You are ${avatar === 'kira' ? 'Kira' : 'Kelion'} by ${require('../confi
               clearTimeout(_aiSpeakingTimer);
               _aiSpeakingTimer = null;
             }
+            // Sanitize error — never expose API keys to client
+            const errMsg = (event.error?.message || 'Unknown error')
+              .replace(/sk-[a-zA-Z0-9_-]+/g, 'sk-***');
             socket.emit('error_msg', {
-              error: event.error?.message || 'Unknown error',
+              error: errMsg,
             });
             break;
           }

@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Avatar Preview — Original Models</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #111; color: #fff; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; }
+    h1 { margin: 20px 0 10px; font-size: 1.5rem; }
+    .controls { margin: 10px 0 20px; display: flex; gap: 12px; }
+    .controls button { padding: 10px 24px; border: 2px solid #6366f1; background: transparent; color: #fff; border-radius: 8px; cursor: pointer; font-size: 1rem; }
+    .controls button.active { background: #6366f1; }
+    #canvas { width: 600px; height: 700px; display: block; }
+    .info { margin-top: 10px; color: #888; font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+  <h1>Avatar Preview — Original GLB Models</h1>
+  <div class="controls">
+    <button id="btn-kelion" class="active" onclick="loadModel('kelion')">Kelion (kelion-rpm.glb)</button>
+    <button id="btn-kira" onclick="loadModel('kira')">Kira (kira-rpm.glb)</button>
+    <button id="btn-k-male" onclick="loadModel('k-male')">K-Male (k-male.glb)</button>
+    <button id="btn-k-female" onclick="loadModel('k-female')">K-Female (k-female.glb)</button>
+  </div>
+  <canvas id="canvas"></canvas>
+  <div class="info" id="info">Loading Three.js...</div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+  <script type="module">
+    import * as THREE from 'three';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    const canvas = document.getElementById('canvas');
+    const info = document.getElementById('info');
+
+    const MODELS = {
+      'kelion': '/models/kelion-rpm.glb',
+      'kira': '/models/kira-rpm.glb',
+      'k-male': '/models/k-male.glb',
+      'k-female': '/models/k-female.glb',
+    };
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x222222);
+
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    renderer.setSize(600, 700);
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.2;
+
+    const camera = new THREE.PerspectiveCamera(30, 600 / 700, 0.1, 100);
+    camera.position.set(0, 1, 3);
+
+    const controls = new OrbitControls(camera, canvas);
+    controls.target.set(0, 0.9, 0);
+    controls.update();
+
+    // Lighting
+    scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+    const key = new THREE.DirectionalLight(0xffffff, 1.5);
+    key.position.set(2, 3, 4);
+    scene.add(key);
+    const fill = new THREE.DirectionalLight(0x8888ff, 0.5);
+    fill.position.set(-2, 1, 2);
+    scene.add(fill);
+    const rim = new THREE.DirectionalLight(0xff8844, 0.4);
+    rim.position.set(0, 2, -3);
+    scene.add(rim);
+
+    const loader = new GLTFLoader();
+    let currentModel = null;
+
+    window.loadModel = function(name) {
+      document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+      document.getElementById('btn-' + name).classList.add('active');
+
+      if (currentModel) {
+        scene.remove(currentModel);
+        currentModel.traverse(child => {
+          if (child.isMesh) {
+            child.geometry?.dispose();
+            if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
+            else child.material?.dispose();
+          }
+        });
+      }
+
+      info.textContent = 'Loading ' + name + '...';
+
+      loader.load(MODELS[name], (gltf) => {
+        currentModel = gltf.scene;
+        const box = new THREE.Box3().setFromObject(currentModel);
+        const center = box.getCenter(new THREE.Vector3());
+        const size = box.getSize(new THREE.Vector3());
+        currentModel.position.sub(center);
+        currentModel.position.y = 0;
+
+        // Log material info
+        let meshCount = 0, texturedCount = 0;
+        currentModel.traverse(child => {
+          if (child.isMesh) {
+            meshCount++;
+            const mat = child.material;
+            if (mat && mat.map) {
+              texturedCount++;
+              info.textContent = name + ': ' + meshCount + ' meshes, ' + texturedCount + ' textured | ' + child.name + ' has texture ' + (mat.map.image ? mat.map.image.width + 'x' + mat.map.image.height : 'embedded');
+            } else {
+              console.log('[Preview] Mesh:', child.name, 'Material:', mat?.name, 'Color:', mat?.color?.getHexString(), 'Map:', mat?.map);
+            }
+          }
+        });
+
+        if (texturedCount === 0) {
+          info.textContent = name + ': ' + meshCount + ' meshes — NO TEXTURES (model appears grey)';
+        } else {
+          info.textContent = name + ': ' + meshCount + ' meshes, ' + texturedCount + ' with textures';
+        }
+
+        scene.add(currentModel);
+      }, undefined, (err) => {
+        info.textContent = 'ERROR loading ' + name + ': ' + err.message;
+      });
+    };
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    // Load kelion by default
+    loadModel('kelion');
+    info.textContent = 'Three.js ready — loading Kelion...';
+  </script>
+</body>
+</html>

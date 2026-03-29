@@ -240,7 +240,6 @@
     
     // Corectare culori pentru fallback pe librarii < r152
     renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.outputEncoding = 3001; // THREE.sRGBEncoding (manual injection)
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.2;
 
@@ -353,23 +352,7 @@
               child.visible = true;
               child.frustumCulled = false;
 
-              // ── Material fix: ensure textures decode to sRGB and have valid base color ──
-              if (child.material) {
-                const mat = child.material;
-                // Force proper color space on texture maps
-                if (mat.map) {
-                  mat.map.colorSpace = THREE.SRGBColorSpace;
-                  mat.map.needsUpdate = true;
-                }
-                // If no diffuse texture loaded, set a skin-tone base color so avatar isn't white
-                if (!mat.map) {
-                  mat.color = mat.color || new THREE.Color(0xd4a574); // warm skin fallback
-                }
-                // Ensure metalness/roughness are sane for skin (not mirror-like)
-                if (mat.metalness === undefined || mat.metalness > 0.3) mat.metalness = 0.0;
-                if (mat.roughness === undefined || mat.roughness < 0.3) mat.roughness = 0.6;
-                mat.needsUpdate = true;
-              }
+              if (child.material) child.material.needsUpdate = true;
 
               // Morph targets — traverse ALL meshes regardless of name
               if (child.isMesh && child.morphTargetDictionary) {
