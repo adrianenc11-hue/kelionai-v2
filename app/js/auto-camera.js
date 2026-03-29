@@ -381,6 +381,47 @@
     } catch (_e) { return null; }
   }
 
+  // ── Danger detection keywords ──
+  var DANGER_IMMEDIATE = /⚠️PERICOL/i;
+  var DANGER_WARNING   = /⚠️ATENȚIE/i;
+  var _lastDangerSpoken = 0;
+  var DANGER_COOLDOWN_MS = 5000; // don't repeat same danger alert within 5s
+
+  function _checkDanger(desc) {
+    if (!desc) return null;
+    if (DANGER_IMMEDIATE.test(desc)) return 'immediate';
+    if (DANGER_WARNING.test(desc)) return 'warning';
+    return null;
+  }
+
+  function _speakDanger(desc, level) {
+    var now = Date.now();
+    if (now - _lastDangerSpoken < DANGER_COOLDOWN_MS) return;
+    _lastDangerSpoken = now;
+    // Extract just the danger line
+    var lines = desc.split(/[.!\n]/);
+    var dangerLine = '';
+    for (var i = 0; i < lines.length; i++) {
+      if (/⚠️/.test(lines[i])) { dangerLine = lines[i].trim(); break; }
+    }
+    if (!dangerLine) dangerLine = desc.substring(0, 80);
+    // Dispatch danger event for brain/UI
+    window.dispatchEvent(new CustomEvent('live-vision-danger', {
+      detail: { level: level, message: dangerLine, timestamp: now }
+    }));
+    // Immediate TTS — use browser speech as fast fallback
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel(); // interrupt anything playing
+      var utter = new SpeechSynthesisUtterance(dangerLine);
+      utter.rate = 1.3; // slightly faster for urgency
+      utter.pitch = level === 'immediate' ? 1.4 : 1.1;
+      utter.volume = 1;
+      utter.lang = (window.i18n && i18n.getLanguage) ? i18n.getLanguage() : 'ro';
+      window.speechSynthesis.speak(utter);
+    }
+    console.warn('[AutoCamera] ⚠️ DANGER (' + level + '):', dangerLine);
+  }
+
   async function _analyzeFrame() {
     if (_visionBusy || !_enabled) return;
     var base64 = _captureLowRes();
@@ -405,6 +446,11 @@
         if (data.description) {
           _lastVision = { description: data.description, timestamp: Date.now() };
           window.dispatchEvent(new CustomEvent('live-vision-update', { detail: _lastVision }));
+          // ── Danger detection — instant TTS alert ──
+          var dangerLevel = _checkDanger(data.description);
+          if (dangerLevel) {
+            _speakDanger(data.description, dangerLevel);
+          }
           console.log('[AutoCamera] Live vision:', data.description.substring(0, 80) + '...');
         }
       }

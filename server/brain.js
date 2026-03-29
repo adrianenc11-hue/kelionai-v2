@@ -576,7 +576,17 @@ ACCESSIBILITY MODE — ALWAYS ACTIVE:
 
     // ── Live vision context: inject what the camera currently sees ──
     if (options?.visionContext && !hasImage) {
-      fullSystemPrompt += `\n\n[LIVE CAMERA — The user's camera is currently ON. Here is what you can see right now: ${options.visionContext}]`;
+      const hasDanger = /⚠️PERICOL|⚠️ATENȚIE/i.test(options.visionContext);
+      if (hasDanger) {
+        // Danger detected — prepend urgent context so brain prioritizes safety
+        fullSystemPrompt = `⚠️ SAFETY ALERT — The user's camera detected a DANGER. You MUST acknowledge it FIRST before anything else. If the user asks "ce vezi?" respond with the danger description. If they ask something unrelated, still mention the danger briefly first.
+
+[LIVE CAMERA DANGER: ${options.visionContext}]
+
+` + fullSystemPrompt;
+      } else {
+        fullSystemPrompt += `\n\n[LIVE CAMERA — The user's camera is ON. Current scene: ${options.visionContext}]`;
+      }
     }
 
     // ── Cache ──
