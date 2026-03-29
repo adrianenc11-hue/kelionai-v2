@@ -2085,12 +2085,26 @@ body {
   margin-left: 2px;
 }
 
-/* Left group: logo + Kelion pill */
+/* Left group: logo */
 .navbar-left {
   display: flex;
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
+}
+
+/* Avatar pills inside avatar-area — head level */
+.avatar-pill-left,
+.avatar-pill-right {
+  position: absolute;
+  top: 15%;
+  z-index: 10;
+}
+.avatar-pill-left {
+  left: 10px;
+}
+.avatar-pill-right {
+  right: 10px;
 }
 
 /* Actions container */
