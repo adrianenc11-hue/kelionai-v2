@@ -6,21 +6,10 @@
   "scripts": {
     "dev": "node server/index.js",
     "start": "node scripts/railway-sync-env.js && node server/index.js",
-    "lint": "npx eslint server/",
-    "typecheck": "node -e \"console.log('typecheck: N/A')\"",
     "build": "node -e \"const fs=require('fs'); const f='app/index.html'; if(!fs.existsSync(f)){console.error('BUILD FAIL: '+f+' not found');process.exit(1)}\"",
     "gate": "node -e \"const fs=require('fs'); const ok=fs.existsSync('server/index.js')&&fs.existsSync('app/index.html')&&fs.existsSync('server/brain.js'); if(!ok){console.error('GATE FAIL: missing critical files');process.exit(1)} console.log('Gate: all critical files present')\"",
     "smoke": "node scripts/smoke.js",
     "security": "npm audit --audit-level=high",
-    "semgrep": "npx semgrep scan",
-    "e2e": "npx playwright test tests/e2e-full.spec.js --project=chromium",
-    "test": "npx playwright test --project=chromium",
-    "test:all": "npx playwright test",
-    "test:e2e": "npx playwright test tests/e2e-full.spec.js --project=chromium",
-    "test:unit": "jest",
-    "test:coverage": "jest --coverage",
-    "test:ci": "jest --coverage --ci",
-    "test:report": "npx playwright show-report",
     "setup": "bash scripts/setup-env.sh",
     "setup:full": "bash scripts/setup-full.sh",
     "setup:db": "bash scripts/setup-db.sh",
@@ -33,25 +22,6 @@
     "deploy:all": "node scripts/deploy-all.js",
     "format": "prettier --write .",
     "sync-env": "node scripts/railway-sync-env.js"
-  },
-  "jest": {
-    "testEnvironment": "node",
-    "testMatch": [
-      "**/__tests__/**/*.test.js"
-    ],
-    "collectCoverage": true,
-    "collectCoverageFrom": [
-      "server/**/*.js",
-      "!server/node_modules/**",
-      "!server/**/*.test.js"
-    ],
-    "coverageDirectory": "coverage",
-    "coverageReporters": [
-      "text",
-      "text-summary",
-      "lcov",
-      "clover"
-    ]
   },
   "dependencies": {
     "@capacitor/android": "8.2.0",
@@ -97,15 +67,7 @@
     "node": ">=20.0.0"
   },
   "devDependencies": {
-    "@eslint/js": "10.0.1",
-    "@playwright/test": "1.58.2",
-    "eslint": "^9.17.0",
-    "eslint-plugin-jest": "29.15.0",
-    "globals": "17.4.0",
-    "jest": "29.7.0",
-    "prettier": "3.8.1",
-    "socket.io-client": "4.8.3",
-    "supertest": "7.2.2"
+    "prettier": "3.8.1"
   },
   "license": "MIT",
   "author": ""

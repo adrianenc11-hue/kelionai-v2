@@ -9,8 +9,7 @@
   let chatHistory = [],
     audioUnlocked = false;
   const storedFiles = [];
-  let currentConversationId = null,
-    historyOpen = false;
+  let currentConversationId = null;
   let adminSecret = null; // stored when admin mode is active
 
   // ── VISITOR TRACKING — fingerprint + device info ──
@@ -904,10 +903,6 @@
             // Salvează ultimul răspuns AI ca fişier text
             const saveBtn = document.getElementById('btn-save-last');
             if (saveBtn) saveBtn.click();
-          } else if (action === 'copy_response') {
-            // Copiază ultimul răspuns AI
-            const copyBtn2 = document.getElementById('btn-copy-last');
-            if (copyBtn2) copyBtn2.click();
           } else if (action === 'upload_file') {
             // Deschide dialogul de upload fişier
             const fi = document.getElementById('file-input-hidden');
@@ -1118,115 +1113,6 @@
         localStorage.setItem(guestKey, JSON.stringify(guest));
       }
     }
-  }
-
-  // ═══════════════════════════════════════════════════════════
-  // CONVERSATION HISTORY UI
-  // ═══════════════════════════════════════════════════════════
-  async function loadConversations() {
-    const list = document.getElementById('history-list');
-    if (!list) return;
-    // Guest users cannot access conversation history
-    const session = { access_token: localStorage.getItem('kelion_token') };
-    if (!session.access_token) {
-      list.innerHTML = '<div class="history-empty">🔒 Login to view conversation history.</div>';
-      return;
-    }
-    list.innerHTML = '<div class="history-empty">Loading...</div>';
-
-    try {
-      const r = await fetch(API_BASE + '/api/conversations', { headers: authHeaders() });
-      if (!r.ok) throw new Error('Error');
-      const data = await r.json();
-      const convs = data.conversations || data || [];
-
-      if (convs.length === 0) {
-        list.innerHTML = '<div class="history-empty">No conversations yet.<br>Start chatting!</div>';
-        return;
-      }
-
-      list.innerHTML = '';
-      for (const c of convs) {
-        const item = document.createElement('div');
-        item.className = 'history-item' + (c.id === currentConversationId ? ' active' : '');
-        const date = new Date(c.updated_at || c.created_at);
-        const timeAgo = formatTimeAgo(date);
-        item.innerHTML =
-          '<div class="history-item-title">' +
-          escapeHtml(c.title || 'Conversation') +
-          '</div>' +
-          '<div class="history-item-meta"><span class="history-item-avatar">' +
-          escapeHtml(c.avatar || 'kira') +
-          '</span> · ' +
-          timeAgo +
-          '</div>';
-        item.addEventListener('click', () => resumeConversation(c.id, c.avatar));
-        list.appendChild(item);
-      }
-    } catch (_e) {
-      list.innerHTML = '<div class="history-empty">Unable to load history.<br>Check authentication.</div>';
-    }
-  }
-
-  async function resumeConversation(convId, avatar) {
-    try {
-      if (avatar && avatar !== KAvatar.getCurrentAvatar()) switchAvatar(avatar);
-      persistConvId(convId);
-
-      const r = await fetch(API_BASE + '/api/conversations/' + convId + '/messages', { headers: authHeaders() });
-      if (!r.ok) throw new Error('Error');
-      const data = await r.json();
-      const msgs = data.messages || data || [];
-
-      chatHistory = [];
-      const overlay = document.getElementById('chat-overlay');
-      if (overlay) overlay.innerHTML = '';
-
-      for (const m of msgs) {
-        const role = m.role === 'assistant' ? 'assistant' : 'user';
-        addMessage(role, m.content);
-        chatHistory.push({ role: role, content: m.content });
-      }
-
-      document.querySelectorAll('.history-item').forEach(function (el) {
-        el.classList.remove('active');
-      });
-      if (window.innerWidth < 768) toggleHistory(false);
-    } catch (_e) {
-      addMessage('assistant', 'Failed to load conversation.');
-    }
-  }
-
-  function startNewChat() {
-    persistConvId(null);
-    chatHistory = [];
-    const overlay = document.getElementById('chat-overlay');
-    if (overlay) overlay.innerHTML = '';
-    document.querySelectorAll('.history-item').forEach(function (el) {
-      el.classList.remove('active');
-    });
-    if (window.innerWidth < 768) toggleHistory(false);
-  }
-
-  function toggleHistory(forceState) {
-    const sidebar = document.getElementById('history-sidebar');
-    if (!sidebar) return;
-    historyOpen = forceState !== undefined ? forceState : !historyOpen;
-    sidebar.classList.toggle('hidden', !historyOpen);
-    if (historyOpen) loadConversations();
-  }
-
-  function formatTimeAgo(date) {
-    const now = new Date(),
-      diff = now - date;
-    const mins = Math.floor(diff / 60000);
-    if (mins < 1) return 'just now';
-    if (mins < 60) return mins + ' min';
-    const hours = Math.floor(mins / 60);
-    if (hours < 24) return hours + 'h';
-    const days = Math.floor(hours / 24);
-    if (days < 7) return days + 'd';
-    return date.toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
   }
 
   function escapeHtml(t) {
@@ -1620,19 +1506,17 @@
     // Mic toggle — handled by unified IIFE handler below (voice loop pipeline)
     // No separate handler here — prevents duplicate wake-word + voice-stream conflict
 
-    // History buttons
-    const histBtn = document.getElementById('btn-history');
-    if (histBtn)
-      histBtn.addEventListener('click', function () {
-        toggleHistory();
-      });
-    const closeHist = document.getElementById('btn-close-history');
-    if (closeHist)
-      closeHist.addEventListener('click', function () {
-        toggleHistory(false);
-      });
-    const newChat = document.getElementById('btn-new-chat');
-    if (newChat) newChat.addEventListener('click', startNewChat);
+    // Sidebar toggle
+    const menuBtn = document.getElementById('btn-menu');
+    if (menuBtn) menuBtn.addEventListener('click', function () {
+      const sp = document.getElementById('sidebar-panel');
+      if (sp) sp.classList.toggle('hidden');
+    });
+    const closeSidebar = document.getElementById('btn-close-sidebar');
+    if (closeSidebar) closeSidebar.addEventListener('click', function () {
+      const sp = document.getElementById('sidebar-panel');
+      if (sp) sp.classList.add('hidden');
+    });
 
     // Pricing close
     const pricingClose = document.getElementById('pricing-close');
@@ -2104,7 +1988,7 @@
     })();
   }
 
-  window.KApp = { loadConversations: loadConversations, toggleHistory: toggleHistory, startNewChat: startNewChat };
+  window.KApp = {};
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
 })();

@@ -1,4 +1,0 @@
-Buttons Extended > #28 subscription modal opens
-Media Extended > #142 GET /api/news/public returns articles or empty
-Conversation History > #165 message appears in history sidebar
-AI Simulations — Role-Based > #184 Search-first: thinkTime > 0 on role request

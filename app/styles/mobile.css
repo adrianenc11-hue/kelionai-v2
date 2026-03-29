@@ -30,10 +30,8 @@
     height: 32px;
     font-size: 0.9rem;
   }
-  /* Hide less-used icons on mobile, they're in the ☰ dropdown */
-  #btn-copy-last,
-  #btn-save-last,
-  #btn-history {
+  /* Hide save on mobile, it's in the ☰ dropdown */
+  #btn-save-last {
     display: none;
   }
 

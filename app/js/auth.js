@@ -230,8 +230,7 @@
     // Show/hide admin-only features
     const mouthBtn = document.getElementById('btn-mouth-cal');
     if (mouthBtn) mouthBtn.style.display = isAdmin ? '' : 'none';
-    const histBtn = document.getElementById('btn-history');
-    if (histBtn) histBtn.style.display = currentUser ? '' : 'none';
+
     const pricingBtn = document.getElementById('btn-pricing');
     if (pricingBtn) pricingBtn.style.display = currentUser ? '' : 'none';
     const adminSep = document.getElementById('admin-tools-sep');
@@ -377,7 +376,6 @@
             if (window.KAvatar) KAvatar.onResize();
             updateUI();
             if (window.KGuestTimer) KGuestTimer.stop();
-            if (window.KApp) KApp.loadConversations();
             // Push state so Back goes to auth screen (not away from site)
             try {
               history.pushState({ kelionView: 'app' }, '', '/');
@@ -489,7 +487,6 @@
         if (currentUser) {
           await logout();
           updateUI();
-          if (window.KApp) KApp.startNewChat();
           scr.classList.remove('hidden');
           document.getElementById('app-layout').classList.add('hidden');
         } else {
@@ -596,7 +593,6 @@
       document.getElementById('auth-screen')?.classList.add('hidden');
       document.getElementById('app-layout')?.classList.remove('hidden');
       updateUI();
-      if (window.KApp) KApp.loadConversations();
     } else {
       // Returning visitors (already onboarded): auto-enter immediately as guest
       // New visitors see auth screen (they go through onboarding first anyway)

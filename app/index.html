@@ -481,8 +481,7 @@ Acum elimin și referințele CSS rămase din `app.css` pentru `#pwa-install-bann
         <!-- Right: Actions -->
         <div class="navbar-actions">
           <!-- Essential buttons always visible -->
-          <button class="nav-icon" id="btn-history" title="Conversation history" aria-label="Conversation history">📜</button>
-          <button class="nav-icon" id="btn-copy-last" title="Copy last response" aria-label="Copy last response">📋</button>
+          <button class="nav-icon" id="btn-menu" title="Menu" aria-label="Menu">☰</button>
           <button class="nav-icon" id="btn-save-last" title="Save last response" aria-label="Save last response">💾</button>
           <button class="nav-icon" id="btn-pricing" data-alias="btn-subscriptions" title="Plans" aria-label="Plans" style="display: none">⭐</button>
           <button class="nav-icon nav-icon-admin" id="btn-admin-nav" title="Admin Dashboard" aria-label="Admin" style="display: none" onclick="window.location.href='/admin'">⚙️</button>
@@ -492,16 +491,14 @@ Acum elimin și referințele CSS rămase din `app.css` pentru `#pwa-install-bann
 
       <!-- MAIN CONTENT -->
       <div id="main-content">
-        <!-- SIDEBAR — History + Tools -->
-        <div id="history-sidebar" class="hidden">
-          <div id="history-header">
-            <h3 data-i18n="history.title">Conversations</h3>
-            <button id="btn-new-chat" title="New conversation">New</button>
-            <button id="btn-close-history" title="Close">X</button>
+        <!-- SIDEBAR — Menu -->
+        <div id="sidebar-panel" class="hidden">
+          <div id="sidebar-header">
+            <h3>Menu</h3>
+            <button id="btn-close-sidebar" title="Close">X</button>
           </div>
-          <div id="history-list"></div>
 
-          <!-- Tools & Actions (moved from hamburger menu) -->
+          <!-- Tools & Actions -->
           <div id="sidebar-tools">
             <hr class="nav-dropdown-sep" />
             <button class="nav-dropdown-item" id="btn-role" title="Account"><span class="ndi">👤</span> Account</button>
@@ -618,7 +615,6 @@ Acum elimin și referințele CSS rămase din `app.css` pentru `#pwa-install-bann
     </script>
     <script>
       document.addEventListener('DOMContentLoaded', function () {
-        var copyBtn = document.getElementById('btn-copy-last');
         var saveBtn = document.getElementById('btn-save-last');
 
         function getScreenContent() {
@@ -629,24 +625,12 @@ Acum elimin și referințele CSS rămase din `app.css` pentru `#pwa-install-bann
           return null;
         }
 
-        if (copyBtn)
-          copyBtn.addEventListener('click', function () {
-            var content = getScreenContent();
-            if (!content) return;
-            navigator.clipboard.writeText(content.text).then(function () {
-              copyBtn.textContent = 'OK';
-              setTimeout(function () {
-                copyBtn.textContent = 'Copy';
-              }, 1500);
-            });
-          });
         if (saveBtn)
           saveBtn.addEventListener('click', function () {
             var content = getScreenContent();
             if (!content) return;
             var ts = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
             if (content.type === 'image' && content.url) {
-              // Download image
               fetch(content.url)
                 .then(function (r) {
                   return r.blob();
@@ -733,30 +717,30 @@ Acum elimin și referințele CSS rămase din `app.css` pentru `#pwa-install-bann
 
 
     <script src="/lib/three.bundle.js"></script>
-    <script src="/js/i18n.js?v=20260329h"></script>
-    <script src="/js/fft-lipsync.js?v=20260329h"></script>
-    <script src="/js/alignment-lipsync.js?v=20260329h"></script>
-    <script src="/js/avatar.js?v=20260329h"></script>
-    <script src="/js/voice.js?v=20260329h"></script>
+    <script src="/js/i18n.js?v=20260329i"></script>
+    <script src="/js/fft-lipsync.js?v=20260329i"></script>
+    <script src="/js/alignment-lipsync.js?v=20260329i"></script>
+    <script src="/js/avatar.js?v=20260329i"></script>
+    <script src="/js/voice.js?v=20260329i"></script>
     <script src="/socket.io/socket.io.js"></script>
-    <script src="/js/voice-stream-client.js?v=20260329h"></script>
-    <script src="/js/voice-realtime-client.js?v=20260329h"></script>
-    <script src="/js/realtime-vision.js?v=20260329h"></script>
-    <script src="/js/auth.js?v=20260329h"></script>
-    <script src="/js/identity.js?v=20260329h"></script>
+    <script src="/js/voice-stream-client.js?v=20260329i"></script>
+    <script src="/js/voice-realtime-client.js?v=20260329i"></script>
+    <script src="/js/realtime-vision.js?v=20260329i"></script>
+    <script src="/js/auth.js?v=20260329i"></script>
+    <script src="/js/identity.js?v=20260329i"></script>
 
-    <script src="/js/tools.js?v=20260329h"></script>
-    <script src="/js/shared.js?v=20260329h"></script>
+    <script src="/js/tools.js?v=20260329i"></script>
+    <script src="/js/shared.js?v=20260329i"></script>
 
-    <script src="/js/geolocation.js?v=20260329h"></script>
-    <script src="/js/auto-camera.js?v=20260329h"></script>
+    <script src="/js/geolocation.js?v=20260329i"></script>
+    <script src="/js/auto-camera.js?v=20260329i"></script>
 
-    <script src="/js/copy-shield.js?v=20260329h"></script>
-    <script src="/js/app.js?v=20260329h"></script>
-    <script src="/js/navbar.js?v=20260329h"></script>
-    <script src="/js/referral-ui.js?v=20260329h"></script>
-    <script src="/js/payments-ui.js?v=20260329h"></script>
-    <script src="/js/contact-form.js?v=20260329h"></script>
+    <script src="/js/copy-shield.js?v=20260329i"></script>
+    <script src="/js/app.js?v=20260329i"></script>
+    <script src="/js/navbar.js?v=20260329i"></script>
+    <script src="/js/referral-ui.js?v=20260329i"></script>
+    <script src="/js/payments-ui.js?v=20260329i"></script>
+    <script src="/js/contact-form.js?v=20260329i"></script>
 
 
 
@@ -817,8 +801,8 @@ Acum elimin și referințele CSS rămase din `app.css` pentru `#pwa-install-bann
     </button>
     <!-- Voice-First Mode Toggle + CC Subtitle -->
 
-    <script src="js/product-scanner.js?v=20260329h"></script>
-    <script src="js/mobile-features.js?v=20260329h"></script>
+    <script src="js/product-scanner.js?v=20260329i"></script>
+    <script src="js/mobile-features.js?v=20260329i"></script>
     <script>
       // ── Scanner Button handler ─────────────────────────
       (function () {
@@ -1001,7 +985,7 @@ Acum elimin și referințele CSS rămase din `app.css` pentru `#pwa-install-bann
       })();
     </script>
 
-    <script src="/js/deploy-status.js?v=20260329h"></script>
+    <script src="/js/deploy-status.js?v=20260329i"></script>
     <script src="/visitor-tracker.js" defer></script>
     <script>
       // Safety net: if auth-screen becomes hidden but app-layout is still hidden, show it
