@@ -642,6 +642,14 @@
         }
       }
 
+      // Inject live vision context if camera is analyzing
+      if (window.KAutoCamera && KAutoCamera.getLastVision) {
+        const lv = KAutoCamera.getLastVision();
+        if (lv && lv.description && (Date.now() - lv.timestamp < 10000)) {
+          payload.visionContext = lv.description;
+        }
+      }
+
       // ═══════════════════════════════════════════════════════
       // SSE STREAMING — word-by-word display (FAST!)
       // ═══════════════════════════════════════════════════════

@@ -572,7 +572,12 @@ ACCESSIBILITY MODE — ALWAYS ACTIVE:
         logger.warn({ component: 'Brain', err: e.message }, 'Memory load failed');
       }
     }
-    const fullSystemPrompt = memoryContext ? systemPrompt + '\n' + memoryContext : systemPrompt;
+    let fullSystemPrompt = memoryContext ? systemPrompt + '\n' + memoryContext : systemPrompt;
+
+    // ── Live vision context: inject what the camera currently sees ──
+    if (options?.visionContext && !hasImage) {
+      fullSystemPrompt += `\n\n[LIVE CAMERA — The user's camera is currently ON. Here is what you can see right now: ${options.visionContext}]`;
+    }
 
     // ── Cache ──
     const cacheable = !hasImage && message && message.length >= 5;

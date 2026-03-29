@@ -66,7 +66,7 @@ router.post('/chat', chatLimiter, validate(chatSchema), async (req, res) => {
   try {
     const _chatStart = Date.now();
     const { getUserFromToken, supabaseAdmin, brain } = req.app.locals;
-    const { message, avatar = 'kelion', history = [], conversationId, imageBase64, audioBase64, geo } = req.body;
+    const { message, avatar = 'kelion', history = [], conversationId, imageBase64, audioBase64, geo, visionContext } = req.body;
     let language = req.body.language || 'ro';
     if (!message?.trim()) return res.status(400).json({ error: 'Message is required' });
 
@@ -312,6 +312,7 @@ router.post('/chat', chatLimiter, validate(chatSchema), async (req, res) => {
               audioBase64,
               geo,
               isAutoCamera: req.body.isAutoCamera || false,
+              visionContext: visionContext || null,
               clientIp: realClientIp,
             },
             isAdmin
@@ -406,7 +407,7 @@ router.post('/chat', chatLimiter, validate(chatSchema), async (req, res) => {
 router.post('/chat/stream', chatLimiter, validate(chatSchema), async (req, res) => {
   try {
     const { getUserFromToken, supabaseAdmin, brain } = req.app.locals;
-    const { message, avatar = 'kelion', history = [], conversationId, imageBase64, audioBase64, geo } = req.body;
+    const { message, avatar = 'kelion', history = [], conversationId, imageBase64, audioBase64, geo, visionContext } = req.body;
     let language = req.body.language || 'ro';
     if (!message?.trim()) return res.status(400).json({ error: 'Message is required' });
 
@@ -498,7 +499,7 @@ router.post('/chat/stream', chatLimiter, validate(chatSchema), async (req, res) 
         language,
         memoryUserIdS,
         null,
-        { imageBase64, audioBase64, geo, clientIp: realClientIpS },
+        { imageBase64, audioBase64, geo, visionContext: visionContext || null, clientIp: realClientIpS },
         isAdminStream
       );
 

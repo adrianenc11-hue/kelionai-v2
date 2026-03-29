@@ -127,6 +127,9 @@
       // Start face tracking loop
       startFaceTracking();
 
+      // Start live vision analysis
+      startLiveVision();
+
       emitState();
 
       return true;
@@ -268,6 +271,7 @@
    */
   function stop() {
     stopFaceTracking();
+    stopLiveVision();
     if (_stream) {
       _stream.getTracks().forEach((t) => {
         t.stop();
@@ -351,6 +355,88 @@
     }
   }
 
+  // ═══════════════════════════════════════════════════════════
+  // LIVE VISION LOOP — continuous analysis while camera is ON
+  // Brain can access latest context via window.KAutoCamera.getLastVision()
+  // ═══════════════════════════════════════════════════════════
+  let _visionInterval = null;
+  let _lastVision = null;      // { description, timestamp }
+  let _visionBusy = false;
+  const VISION_INTERVAL_MS = 3000; // analyze every 3 seconds
+  const VISION_LOW_RES_W = 640;
+  const VISION_LOW_RES_H = 480;
+  const VISION_JPEG_Q = 0.6;
+
+  function _captureLowRes() {
+    if (!_enabled || !_stream || !_video) return null;
+    if (_video.readyState < 2) return null;
+    try {
+      var c = document.createElement('canvas');
+      c.width = VISION_LOW_RES_W;
+      c.height = VISION_LOW_RES_H;
+      var ctx = c.getContext('2d');
+      ctx.drawImage(_video, 0, 0, VISION_LOW_RES_W, VISION_LOW_RES_H);
+      var url = c.toDataURL('image/jpeg', VISION_JPEG_Q);
+      return url.split(',')[1];
+    } catch (_e) { return null; }
+  }
+
+  async function _analyzeFrame() {
+    if (_visionBusy || !_enabled) return;
+    var base64 = _captureLowRes();
+    if (!base64) return;
+    _visionBusy = true;
+    try {
+      var token = localStorage.getItem('sb-token') || '';
+      var res = await fetch('/api/vision', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + token,
+        },
+        body: JSON.stringify({
+          image: base64,
+          avatar: window.KApp && KApp.getAvatar ? KApp.getAvatar() : 'kelion',
+          language: window.i18n ? i18n.getLanguage() : 'ro',
+        }),
+      });
+      if (res.ok) {
+        var data = await res.json();
+        if (data.description) {
+          _lastVision = { description: data.description, timestamp: Date.now() };
+          window.dispatchEvent(new CustomEvent('live-vision-update', { detail: _lastVision }));
+          console.log('[AutoCamera] Live vision:', data.description.substring(0, 80) + '...');
+        }
+      }
+    } catch (e) {
+      console.warn('[AutoCamera] Live vision error:', e.message);
+    } finally {
+      _visionBusy = false;
+    }
+  }
+
+  function startLiveVision() {
+    if (_visionInterval) return;
+    _visionInterval = setInterval(_analyzeFrame, VISION_INTERVAL_MS);
+    // Immediate first analysis
+    setTimeout(_analyzeFrame, 500);
+    console.log('[AutoCamera] Live vision started (every ' + (VISION_INTERVAL_MS / 1000) + 's)');
+  }
+
+  function stopLiveVision() {
+    if (_visionInterval) {
+      clearInterval(_visionInterval);
+      _visionInterval = null;
+    }
+    _lastVision = null;
+    _visionBusy = false;
+    console.log('[AutoCamera] Live vision stopped');
+  }
+
+  function getLastVision() {
+    return _lastVision;
+  }
+
   // Expose globally
   window.KAutoCamera = {
     requestPermission,
@@ -361,6 +447,7 @@
     isActive,
     isStarting,
     switchCamera,
+    getLastVision,
     getFacingMode: function () {
       return _facingMode;
     },
