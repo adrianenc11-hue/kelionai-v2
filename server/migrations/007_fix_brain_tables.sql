@@ -40,7 +40,7 @@ CREATE INDEX IF NOT EXISTS idx_danger_events_type ON danger_events(danger_type);
 ALTER TABLE danger_events ENABLE ROW LEVEL SECURITY;
 CREATE POLICY IF NOT EXISTS "service_only" ON danger_events FOR ALL USING (false);
 
--- 4. Create brain_self_log table
+-- 4. Create brain_self_log table (or fix columns if exists with old schema)
 CREATE TABLE IF NOT EXISTS brain_self_log (
     id TEXT DEFAULT gen_random_uuid()::text PRIMARY KEY,
     type TEXT NOT NULL,
@@ -48,6 +48,12 @@ CREATE TABLE IF NOT EXISTS brain_self_log (
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Fix brain_self_log columns if created with old schema (action/provider/details/success)
+ALTER TABLE brain_self_log ADD COLUMN IF NOT EXISTS type TEXT;
+ALTER TABLE brain_self_log ADD COLUMN IF NOT EXISTS data JSONB DEFAULT '{}';
+ALTER TABLE brain_self_log ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE brain_self_log ALTER COLUMN id TYPE TEXT USING id::text;
 
 CREATE INDEX IF NOT EXISTS idx_brain_self_log_type ON brain_self_log(type);
 

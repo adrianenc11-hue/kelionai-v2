@@ -858,15 +858,44 @@ CREATE INDEX IF NOT EXISTS idx_workspace_files_hash ON workspace_files(file_hash
 
 -- ═══ BRAIN SELF LOG (Self-development engine log) ═══
 CREATE TABLE IF NOT EXISTS brain_self_log (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    action TEXT NOT NULL,
-    provider TEXT,
-    details JSONB DEFAULT '{}',
-    success BOOLEAN DEFAULT true,
+    id TEXT DEFAULT gen_random_uuid()::text PRIMARY KEY,
+    type TEXT NOT NULL,
+    data JSONB DEFAULT '{}',
+    updated_at TIMESTAMPTZ DEFAULT now(),
     created_at TIMESTAMPTZ DEFAULT now()
 );
-CREATE INDEX IF NOT EXISTS idx_brain_self_log_date ON brain_self_log(created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_brain_self_log_action ON brain_self_log(action);
+CREATE INDEX IF NOT EXISTS idx_brain_self_log_type ON brain_self_log(type);
+
+-- Fix brain_self_log columns if created with old schema
+ALTER TABLE brain_self_log ADD COLUMN IF NOT EXISTS type TEXT;
+ALTER TABLE brain_self_log ADD COLUMN IF NOT EXISTS data JSONB DEFAULT '{}';
+ALTER TABLE brain_self_log ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT now();
+ALTER TABLE brain_self_log ALTER COLUMN id TYPE TEXT USING id::text;
+
+-- ═══ PROCEDURAL MEMORY (Brain learned patterns) ═══
+CREATE TABLE IF NOT EXISTS procedural_memory (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id TEXT,
+    pattern_type TEXT NOT NULL DEFAULT 'routing_success',
+    trigger_context TEXT,
+    action_taken TEXT,
+    outcome TEXT,
+    tools_used JSONB DEFAULT '[]',
+    success_count INTEGER DEFAULT 0,
+    confidence NUMERIC DEFAULT 0.5,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_procedural_memory_user ON procedural_memory(user_id);
+CREATE INDEX IF NOT EXISTS idx_procedural_memory_pattern ON procedural_memory(pattern_type);
+
+-- Fix procedural_memory columns if created with old schema
+ALTER TABLE procedural_memory ADD COLUMN IF NOT EXISTS pattern_type TEXT DEFAULT 'routing_success';
+ALTER TABLE procedural_memory ADD COLUMN IF NOT EXISTS trigger_context TEXT;
+ALTER TABLE procedural_memory ADD COLUMN IF NOT EXISTS action_taken TEXT;
+ALTER TABLE procedural_memory ADD COLUMN IF NOT EXISTS outcome TEXT;
+ALTER TABLE procedural_memory ADD COLUMN IF NOT EXISTS tools_used JSONB DEFAULT '[]';
+ALTER TABLE procedural_memory ADD COLUMN IF NOT EXISTS success_count INTEGER DEFAULT 0;
+ALTER TABLE procedural_memory ADD COLUMN IF NOT EXISTS confidence NUMERIC DEFAULT 0.5;
 
 -- ═══ ALERT LOGS (toate alertele trimise de sistem) ═══
 CREATE TABLE IF NOT EXISTS alert_logs (
