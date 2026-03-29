@@ -223,7 +223,7 @@ app.use((req, res, next) => {
     `font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net`,
     `img-src 'self' data: blob: https: http:`,
     `media-src 'self' blob: https:`,
-    `connect-src 'self' https://api.openai.com https://api.anthropic.com https://api.groq.com https://generativelanguage.googleapis.com https://api.elevenlabs.io wss://api.elevenlabs.io https://api.perplexity.ai https://api.deepseek.com https://api.tavily.com https://api.open-meteo.com https://geocoding-api.open-meteo.com https://ipapi.co https://ip-api.com https://freeipapi.com https://wttr.in https://js.stripe.com`,
+    `connect-src 'self' blob: https://api.openai.com https://api.anthropic.com https://api.groq.com https://generativelanguage.googleapis.com https://api.elevenlabs.io wss://api.elevenlabs.io https://api.perplexity.ai https://api.deepseek.com https://api.tavily.com https://api.open-meteo.com https://geocoding-api.open-meteo.com https://ipapi.co https://ip-api.com https://freeipapi.com https://wttr.in https://js.stripe.com`,
     `frame-src 'self' https://js.stripe.com https://hooks.stripe.com`,
     `worker-src 'self' blob:`,
     `object-src 'none'`,

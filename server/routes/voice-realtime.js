@@ -445,11 +445,12 @@ PERSONA: You are ${avatar === 'kira' ? 'Kira' : 'Kelion'} by ${require('../confi
               clearTimeout(_aiSpeakingTimer);
               _aiSpeakingTimer = null;
             }
-            // Sanitize error — never expose API keys to client
-            const errMsg = (event.error?.message || 'Unknown error')
-              .replace(/sk-[a-zA-Z0-9_-]+/g, 'sk-***');
+            // Sanitize error — never expose API keys or internal details to client
+            const rawMsg = event.error?.message || 'Unknown error';
+            const isApiKeyError = /api.key|unauthorized|authentication/i.test(rawMsg);
+            const safeMsg = isApiKeyError ? 'Voice service temporarily unavailable' : rawMsg.replace(/sk-[^\s"']+/g, 'sk-***');
             socket.emit('error_msg', {
-              error: errMsg,
+              error: safeMsg,
             });
             break;
           }
