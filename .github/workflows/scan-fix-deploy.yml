@@ -50,11 +50,21 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq jq openssl
 
-      - name: Make scripts executable
+      - name: Verify pipeline scripts exist
         run: |
-          chmod +x scripts/scan-and-fix-live.sh \
-                   scripts/auto-fix.sh \
-                   scripts/scan-fix-deploy.sh
+          MISSING=false
+          for script in scripts/scan-and-fix-live.sh scripts/auto-fix.sh scripts/scan-fix-deploy.sh; do
+            if [ ! -f "$script" ]; then
+              echo "⚠️ Missing script: $script"
+              MISSING=true
+            else
+              chmod +x "$script"
+            fi
+          done
+          if [ "$MISSING" = "true" ]; then
+            echo "❌ Some pipeline scripts are missing. Run deploy-and-verify.sh instead."
+            exit 1
+          fi
 
       - name: Run scan-fix-deploy pipeline
         env:

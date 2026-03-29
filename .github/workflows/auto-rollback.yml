@@ -24,7 +24,7 @@ jobs:
       - name: Health Check
         id: health
         run: |
-          SITE_URL="${{ vars.SITE_URL || 'https://kelionai-v2-production.up.railway.app' }}"
+          SITE_URL="${{ vars.SITE_URL || 'https://kelionai.app' }}"
           echo "Checking $SITE_URL ..."
 
           # Try 3 times with 10s gap

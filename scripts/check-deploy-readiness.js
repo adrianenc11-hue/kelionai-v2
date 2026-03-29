@@ -20,7 +20,8 @@ const ROOT = path.resolve(__dirname, '..');
 const ENV_FILE = path.join(ROOT, '.env');
 const _ENV_EXAMPLE = path.join(ROOT, '.env.example');
 
-const REQUIRED_RAILWAY_KEYS = ['GOOGLE_AI_KEY', 'SUPABASE_URL', 'SUPABASE_ANON_KEY', 'SUPABASE_SERVICE_KEY'];
+const REQUIRED_RAILWAY_KEYS = ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'SUPABASE_SERVICE_KEY'];
+const AI_KEYS = ['GOOGLE_AI_KEY', 'GEMINI_API_KEY', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY'];
 
 function log(title, msg) {
   process.stdout.write(`[${title}] ${msg}\n`);
@@ -93,8 +94,17 @@ function checkRailway() {
       missing.push(key);
     }
   }
+  // Check at least one AI key is present
+  const hasAnyAI = AI_KEYS.some(k => {
+    const v = envLocal.get(k);
+    return v && v.trim() && !v.endsWith('xxx');
+  });
+  if (!hasAnyAI) {
+    missing.push('(cel puțin una din: ' + AI_KEYS.join(', ') + ')');
+  }
+
   if (missing.length === 0) {
-    log('RAILWAY', '✅ Cheile critice pentru Railway există în .env (GOOGLE_AI_KEY + SUPABASE_*)');
+    log('RAILWAY', '✅ Cheile critice pentru Railway există în .env (AI key + SUPABASE_*)');
   } else {
     log('RAILWAY', `⚠️  Lipsesc sau sunt placeholder în .env: ${missing.join(', ')}. Rulează: npm run railway:setup`);
   }

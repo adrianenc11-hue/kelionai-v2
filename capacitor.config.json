@@ -3,9 +3,10 @@
   "appName": "KelionAI",
   "webDir": "app",
   "server": {
-    "url": "https://kelionai-v2-production.up.railway.app",
+    "url": "https://kelionai.app",
     "cleartext": false,
     "allowNavigation": [
+      "kelionai.app",
       "kelionai-v2-production.up.railway.app",
       "*.supabase.co",
       "*.stripe.com",

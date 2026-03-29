@@ -1,7 +1,7 @@
 module.exports = {
   ci: {
     collect: {
-      url: [process.env.APP_URL || process.env.BASE_URL || '/'],
+      url: [process.env.APP_URL || process.env.BASE_URL || 'https://kelionai.app'],
       numberOfRuns: 3,
     },
     assert: {

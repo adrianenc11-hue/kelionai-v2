@@ -1,8 +1,6 @@
 name: Push Vars to Railway
 
 on:
-  push:
-    branches: [master]
   workflow_dispatch:
 
 jobs:
@@ -19,6 +17,14 @@ jobs:
       - name: Push all variables to Railway via GraphQL API
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_PROJECT_ID: ${{ vars.RAILWAY_PROJECT_ID }}
+          RAILWAY_SERVICE_ID: ${{ vars.RAILWAY_SERVICE_ID }}
+          RAILWAY_ENVIRONMENT_ID: ${{ vars.RAILWAY_ENVIRONMENT_ID }}
         run: |
+          if [ ! -f scripts/push-vars-to-railway.js ]; then
+            echo "⚠️ Script scripts/push-vars-to-railway.js not found."
+            echo "Set variables manually in Railway dashboard."
+            exit 0
+          fi
           node scripts/push-vars-to-railway.js
           echo "✅ Variables pushed to Railway!"

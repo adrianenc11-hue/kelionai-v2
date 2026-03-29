@@ -93,7 +93,8 @@ fi
 
 # ─── 4. Așteaptă deploy ───────────────────────────────────────
 step "Așteptare finalizare deploy"
-info "Aștept ca deploy-ul să fie disponibil (maxim 3 minute)..."
+APP_URL="${APP_URL:-https://kelionai.app}"
+info "Aștept ca deploy-ul să fie disponibil pe ${APP_URL} (maxim 3 minute)..."
 MAX_WAIT=180
 INTERVAL=10
 ELAPSED=0
@@ -104,7 +105,7 @@ while [ $ELAPSED -lt $MAX_WAIT ]; do
     ELAPSED=$((ELAPSED + INTERVAL))
     echo -ne "${CYAN}  ⏳ ${ELAPSED}s / ${MAX_WAIT}s...${NC}\r"
 
-    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 "https://kelionai.app/api/health" 2>/dev/null || echo "000")
+    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 "${APP_URL}/api/health" 2>/dev/null || echo "000")
     if [ "$HTTP_CODE" = "200" ]; then
         echo ""
         ok "Aplicația răspunde după ${ELAPSED}s!"
@@ -115,7 +116,7 @@ done
 
 echo ""
 if [ "$DEPLOY_OK" = false ]; then
-    warn "Timeout — aplicația nu răspunde încă pe kelionai.app"
+    warn "Timeout — aplicația nu răspunde încă pe ${APP_URL}"
     warn "Verifică starea în: https://railway.app/dashboard"
 fi
 
@@ -135,6 +136,6 @@ else
     echo -e "${BOLD}${YELLOW}══════════════════════════════════════════════════${NC}"
 fi
 echo ""
-echo -e "  🌐 ${CYAN}https://kelionai.app${NC}"
+echo -e "  🌐 ${CYAN}${APP_URL}${NC}"
 echo -e "  📊 ${CYAN}https://railway.app/dashboard${NC}"
 echo ""
