@@ -403,7 +403,7 @@ Acum elimin și referințele CSS rămase din `app.css` pentru `#pwa-install-bann
     <script>
       if ("serviceWorker" in navigator) {
         window.addEventListener("load", function() {
-          navigator.serviceWorker.register("/sw.js")
+          navigator.serviceWorker.register("/sw.js?v=7")
             .then(function(reg) { console.log("[KelionAI] SW registered:", reg.scope); })
             .catch(function(err) { console.warn("[KelionAI] SW failed:", err); });
         });
