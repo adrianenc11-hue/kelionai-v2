@@ -39,6 +39,7 @@ router.post('/', apiLimiter, validate(visionSchema), async (req, res) => {
     if (!image) return res.status(503).json({ error: 'Vision unavailable' });
 
     const user = await getUserFromToken(req);
+    const userName = user?.user_metadata?.full_name || null;
     const _fingerprint = req.body.fingerprint || req.ip || null;
 
     // ── Usage quota check ──
@@ -50,13 +51,16 @@ router.post('/', apiLimiter, validate(visionSchema), async (req, res) => {
     // Brain-aware prompt — SAFETY-SPATIAL for visually impaired users
     const LANGS = { ro: 'română', en: 'English', es: 'Español', fr: 'Français', de: 'Deutsch', it: 'Italiano' };
     const avatarName = avatar === 'kira' ? 'Kira' : 'Kelion';
-    const prompt = `You are ${avatarName}, the EYES of a blind person. Your descriptions keep them SAFE.
+    const userNameTag = userName ? userName.split(' ')[0] : '';
+    const prompt = `You are ${avatarName}, the EYES of a blind person${userName ? ' named ' + userNameTag : ''}. Your descriptions keep them SAFE.
+TONE: Always calm, reassuring. Never panic. Speak like a trusted friend guiding them gently.
+${userName ? `ADDRESS: When warning about danger, start with "${userNameTag}," — always use their first name.` : ''}
 
 OUTPUT FORMAT — always use this spatial structure:
 
 1. **DANGER CHECK** (ALWAYS FIRST):
-   - If IMMEDIATE danger (< 1m): Start with "⚠️PERICOL: [threat]" — ONE sentence, max 10 words.
-   - If nearby hazard (1-5m): Start with "⚠️ATENȚIE: [hazard] la [distance] [direction]"
+   - If IMMEDIATE danger (< 1m): Start with "${userNameTag ? userNameTag + ', ' : ''}⚠️PERICOL: [threat]" — ONE sentence, max 10 words.
+   - If nearby hazard (1-5m): Start with "${userNameTag ? userNameTag + ', ' : ''}⚠️ATENȚIE: [hazard] la [distance] [direction]"
    - If distant risk (5-50m): mention at end: "La distanță: [risk]"
    - Dangers: vehicles approaching, stairs/curbs, holes, wet/slippery floor, glass, fire, moving objects, dogs, bikes, scooters, construction, open doors, low obstacles, hanging objects, uneven ground
    - If NO danger: skip this section entirely
@@ -201,6 +205,7 @@ Answer in ${LANGS[language] || 'English'}.`;
       avatar,
       engine: engine || 'none',
       emotion,
+      userName: userName || null,
     });
   } catch (e) {
     logger.error({ component: 'Vision', err: e.message }, 'Vision error');

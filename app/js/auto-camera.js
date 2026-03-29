@@ -394,6 +394,17 @@
     return null;
   }
 
+  function _getUserFirstName() {
+    try {
+      var raw = localStorage.getItem('kelion_user');
+      if (raw) {
+        var u = JSON.parse(raw);
+        if (u && u.name) return u.name.split(' ')[0];
+      }
+    } catch (_e) { /* ignore */ }
+    return '';
+  }
+
   function _speakDanger(desc, level) {
     var now = Date.now();
     if (now - _lastDangerSpoken < DANGER_COOLDOWN_MS) return;
@@ -405,21 +416,30 @@
       if (/⚠️/.test(lines[i])) { dangerLine = lines[i].trim(); break; }
     }
     if (!dangerLine) dangerLine = desc.substring(0, 80);
+    // Clean up emoji markers for speech
+    var spokenText = dangerLine.replace(/⚠️PERICOL:\s*/i, '').replace(/⚠️ATENȚIE:\s*/i, '').trim();
+    var firstName = _getUserFirstName();
+    // Build calm, personal alert: "Adrian, atenție, obstacol în stânga la 2 metri"
+    if (level === 'immediate') {
+      spokenText = (firstName ? firstName + ', ' : '') + 'atenție, ' + spokenText;
+    } else {
+      spokenText = (firstName ? firstName + ', ' : '') + 'am observat, ' + spokenText;
+    }
     // Dispatch danger event for brain/UI
     window.dispatchEvent(new CustomEvent('live-vision-danger', {
-      detail: { level: level, message: dangerLine, timestamp: now }
+      detail: { level: level, message: dangerLine, spokenText: spokenText, timestamp: now }
     }));
-    // Immediate TTS — use browser speech as fast fallback
+    // Immediate TTS — calm voice, not rushed
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel(); // interrupt anything playing
-      var utter = new SpeechSynthesisUtterance(dangerLine);
-      utter.rate = 1.3; // slightly faster for urgency
-      utter.pitch = level === 'immediate' ? 1.4 : 1.1;
+      var utter = new SpeechSynthesisUtterance(spokenText);
+      utter.rate = 1.0; // calm speed, not rushed
+      utter.pitch = 1.0; // normal pitch, reassuring
       utter.volume = 1;
       utter.lang = (window.i18n && i18n.getLanguage) ? i18n.getLanguage() : 'ro';
       window.speechSynthesis.speak(utter);
     }
-    console.warn('[AutoCamera] ⚠️ DANGER (' + level + '):', dangerLine);
+    console.warn('[AutoCamera] ⚠️ DANGER (' + level + '):', spokenText);
   }
 
   async function _analyzeFrame() {

@@ -294,6 +294,8 @@ router.post('/chat', chatLimiter, validate(chatSchema), async (req, res) => {
       logger.debug({ component: 'WorkingMemory', err: err.message }, 'Resume context build failed');
     }
 
+    const userName = user?.user_metadata?.full_name || null;
+
     let thought;
     let _brainTimer;
     try {
@@ -314,6 +316,7 @@ router.post('/chat', chatLimiter, validate(chatSchema), async (req, res) => {
               isAutoCamera: req.body.isAutoCamera || false,
               visionContext: visionContext || null,
               clientIp: realClientIp,
+              userName: userName || null,
             },
             isAdmin
           )
@@ -490,6 +493,8 @@ router.post('/chat/stream', chatLimiter, validate(chatSchema), async (req, res) 
     res.setHeader('X-Accel-Buffering', 'no');
     res.flushHeaders?.();
 
+    const userNameS = user?.user_metadata?.full_name || null;
+
     // ── Brain think ──
     try {
       const result = await brain.think(
@@ -499,7 +504,7 @@ router.post('/chat/stream', chatLimiter, validate(chatSchema), async (req, res) 
         language,
         memoryUserIdS,
         null,
-        { imageBase64, audioBase64, geo, visionContext: visionContext || null, clientIp: realClientIpS },
+        { imageBase64, audioBase64, geo, visionContext: visionContext || null, clientIp: realClientIpS, userName: userNameS || null },
         isAdminStream
       );
 

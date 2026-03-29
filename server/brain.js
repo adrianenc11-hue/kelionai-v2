@@ -575,17 +575,22 @@ ACCESSIBILITY MODE — ALWAYS ACTIVE:
     let fullSystemPrompt = memoryContext ? systemPrompt + '\n' + memoryContext : systemPrompt;
 
     // ── Live vision context: inject what the camera currently sees ──
+    const userFirstName = options?.userName ? options.userName.split(' ')[0] : '';
     if (options?.visionContext && !hasImage) {
       const hasDanger = /⚠️PERICOL|⚠️ATENȚIE/i.test(options.visionContext);
       if (hasDanger) {
-        // Danger detected — prepend urgent context so brain prioritizes safety
-        fullSystemPrompt = `⚠️ SAFETY ALERT — The user's camera detected a DANGER. You MUST acknowledge it FIRST before anything else. If the user asks "ce vezi?" respond with the danger description. If they ask something unrelated, still mention the danger briefly first.
+        // Danger detected — calm, personal alert
+        fullSystemPrompt = `SAFETY CONTEXT — The user's camera detected a potential hazard.
+${userFirstName ? `The user's name is ${userFirstName}. Address them by name.` : ''}
+TONE: Stay CALM and reassuring. Never panic. Speak like a trusted friend gently guiding them.
+When mentioning the danger, be brief and helpful: "${userFirstName ? userFirstName + ', ' : ''}am observat [hazard] la [distanță] în [direcție]. Te sfătuiesc să [advice]."
+If the user asks something unrelated, mention the observation calmly at the end.
 
-[LIVE CAMERA DANGER: ${options.visionContext}]
+[CAMERA OBSERVATION: ${options.visionContext}]
 
 ` + fullSystemPrompt;
       } else {
-        fullSystemPrompt += `\n\n[LIVE CAMERA — The user's camera is ON. Current scene: ${options.visionContext}]`;
+        fullSystemPrompt += `\n\n[LIVE CAMERA — The user's camera is ON.${userFirstName ? ' User: ' + userFirstName + '.' : ''} Current scene: ${options.visionContext}]`;
       }
     }
 
