@@ -205,8 +205,7 @@
       // Hide navbar buttons when not logged in
       const existingAdmin = document.getElementById('btn-admin-nav');
       if (existingAdmin) existingAdmin.style.display = 'none';
-      const existingLogout = document.getElementById('btn-logout-nav');
-      if (existingLogout) existingLogout.style.display = 'none';
+
       return;
     }
 
@@ -252,8 +251,7 @@
     // Show/hide navbar Admin and Logout buttons based on login state
     const adminNavBtn = document.getElementById('btn-admin-nav');
     if (adminNavBtn) adminNavBtn.style.display = isAdmin ? '' : 'none';
-    const logoutNavBtn = document.getElementById('btn-logout-nav');
-    if (logoutNavBtn) logoutNavBtn.style.display = currentUser ? '' : 'none';
+
   }
 
   async function updateUI() {
@@ -514,16 +512,7 @@
         }
       });
 
-    // Navbar Logout button — same behavior as btn-auth when logged in
-    const logoutNavBtn = document.getElementById('btn-logout-nav');
-    if (logoutNavBtn)
-      logoutNavBtn.addEventListener('click', async () => {
-        await logout();
-        updateUI();
-        if (window.KApp) KApp.startNewChat();
-        scr.classList.remove('hidden');
-        document.getElementById('app-layout').classList.add('hidden');
-      });
+
 
     // Navbar Admin button — navigate to admin panel
     const adminNavBtn = document.getElementById('btn-admin-nav');

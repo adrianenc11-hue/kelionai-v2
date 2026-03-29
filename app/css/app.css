@@ -1798,18 +1798,7 @@ body {
   color: #fff;
 }
 
-/* Logout nav button — red accent */
-.nav-icon-logout {
-  border-color: rgba(239, 68, 68, 0.3);
-  background: rgba(239, 68, 68, 0.08);
-  color: #fca5a5;
-}
 
-.nav-icon-logout:hover {
-  background: rgba(239, 68, 68, 0.2);
-  border-color: rgba(239, 68, 68, 0.55);
-  color: #fff;
-}
 
 .guest-counter {
   font-size: 0.7rem;
