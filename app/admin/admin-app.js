@@ -77,7 +77,6 @@ function openSection(id) {
     history:  '📜 Conversation History',
     logs:     '📋 Admin Logs',
     contact:  '✉️ Contact Inbox',
-    healer:   '🔧 Self-Healing Engine',
     refunds:  '💸 Refund Requests',
   };
   document.getElementById('section-title').textContent = titles[id] || id;
@@ -122,9 +121,6 @@ function openSection(id) {
       break;
     case 'contact':
       loaderFn = loadContactSection;
-      break;
-    case 'healer':
-      loadHealerSection();
       break;
     case 'refunds':
       loaderFn = loadRefundsSection;
@@ -2039,15 +2035,6 @@ async function loadStats() {
         var total  = d.total  || (d.messages || []).length || 0;
         var el = document.getElementById('preview-contact');
         if (el) el.textContent = unread > 0 ? unread + ' unread' : total + ' msgs';
-      })
-      .catch(function () {});
-
-    // Healer preview
-    fetch('/api/admin/healer/status', { headers: hdrs() })
-      .then(function (r) { if (r.ok) return r.json(); throw new Error('403'); })
-      .then(function (d) {
-        var el = document.getElementById('preview-healer');
-        if (el) el.textContent = d.lastScore != null ? 'Score: ' + d.lastScore : 'Ready';
       })
       .catch(function () {});
 

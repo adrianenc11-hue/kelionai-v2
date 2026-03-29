@@ -235,112 +235,6 @@ async function alertAIStatus({ provider, status, errorRate, lastError, affectedU
 }
 
 // ─────────────────────────────────────────────────────────────
-// 3. SELF-HEALING ALERT — raport după scanare automată
-// ─────────────────────────────────────────────────────────────
-async function alertHealingReport({ scanResult, aiAnalysis, healed = [], failed = [], triggeredBy = 'scheduler', pool }) {
-  const score      = scanResult?.score ?? 100;
-  const issues     = scanResult?.stats?.totalIssues ?? 0;
-  const critical   = scanResult?.stats?.critical ?? 0;
-  const dedupeKey  = `healing:${triggeredBy}:${Math.floor(Date.now() / (4 * 60 * 60 * 1000))}`; // max 1 la 4h
-
-  // Trimite alert doar dacă există probleme
-  if (issues === 0 && healed.length === 0) {
-    logger.debug({ component: 'Alerts' }, 'Healing report: no issues — alert skipped');
-    return { ok: false, reason: 'no_issues' };
-  }
-
-  const scoreColor = score >= 80 ? '#22c55e' : score >= 60 ? '#f59e0b' : '#ef4444';
-  const subject    = critical > 0
-    ? `🚨 [${APP_NAME}] Self-Healing: ${critical} probleme CRITICE detectate (scor ${score}/100)`
-    : `🔧 [${APP_NAME}] Self-Healing Report: ${issues} probleme, ${healed.length} reparate`;
-
-  const headerColor = critical > 0
-    ? 'linear-gradient(135deg,#dc2626,#b91c1c)'
-    : score < 70
-      ? 'linear-gradient(135deg,#d97706,#b45309)'
-      : 'linear-gradient(135deg,#0891b2,#0e7490)';
-
-  const issuesList = (scanResult?.issues || []).slice(0, 10).map(iss => `
-    <tr style="border-bottom:1px solid #1e293b">
-      <td style="padding:8px;color:${iss.severity === 'critical' ? '#f87171' : iss.severity === 'high' ? '#fbbf24' : '#94a3b8'};font-size:0.8rem;font-weight:600;text-transform:uppercase;white-space:nowrap">${iss.severity}</td>
-      <td style="padding:8px;color:#e2e8f0;font-size:0.85rem">${iss.message || iss.description || ''}</td>
-      <td style="padding:8px;color:#64748b;font-size:0.78rem">${iss.component || iss.section || ''}</td>
-    </tr>`).join('');
-
-  const healedList = healed.length > 0
-    ? `<div style="margin-top:16px">
-        <p style="color:#22c55e;font-weight:600;margin:0 0 8px">✅ Reparate automat (${healed.length}):</p>
-        <ul style="margin:0;padding-left:20px;color:#86efac">
-          ${healed.map(h => `<li style="margin:4px 0;font-size:0.85rem">${h}</li>`).join('')}
-        </ul>
-      </div>`
-    : '';
-
-  const failedList = failed.length > 0
-    ? `<div style="margin-top:12px">
-        <p style="color:#f87171;font-weight:600;margin:0 0 8px">❌ Necesită intervenție manuală (${failed.length}):</p>
-        <ul style="margin:0;padding-left:20px;color:#fca5a5">
-          ${failed.map(f => `<li style="margin:4px 0;font-size:0.85rem">${f}</li>`).join('')}
-        </ul>
-      </div>`
-    : '';
-
-  const aiSection = aiAnalysis
-    ? `<div style="margin-top:20px;padding:16px;background:#0f172a;border-radius:8px;border:1px solid #334155">
-        <p style="margin:0 0 8px;color:#a5b4fc;font-weight:600;font-size:0.9rem">🤖 Analiză AI:</p>
-        <p style="margin:0;color:#cbd5e1;font-size:0.85rem;line-height:1.6">${(aiAnalysis.summary || aiAnalysis).toString().slice(0, 500)}${(aiAnalysis.summary || aiAnalysis).toString().length > 500 ? '...' : ''}</p>
-      </div>`
-    : '';
-
-  const html = _wrap(
-    `🔧 Self-Healing Report — Scor: <span style="color:${scoreColor}">${score}/100</span>`,
-    headerColor,
-    `<table style="width:100%;border-collapse:collapse;margin-bottom:16px">
-      <tr>
-        <td style="padding:8px 0;color:#94a3b8;width:160px">Scor sistem</td>
-        <td style="color:${scoreColor};font-weight:700;font-size:1.2rem">${score}/100</td>
-      </tr>
-      <tr><td style="padding:8px 0;color:#94a3b8">Total probleme</td><td style="color:#e2e8f0">${issues}</td></tr>
-      <tr><td style="padding:8px 0;color:#94a3b8">Critice</td><td style="color:${critical > 0 ? '#f87171' : '#22c55e'};font-weight:600">${critical}</td></tr>
-      <tr><td style="padding:8px 0;color:#94a3b8">Reparate auto</td><td style="color:#22c55e;font-weight:600">${healed.length}</td></tr>
-      <tr><td style="padding:8px 0;color:#94a3b8">Declanșat de</td><td style="color:#64748b">${triggeredBy}</td></tr>
-    </table>
-
-    ${issuesList ? `<div style="overflow-x:auto;margin-bottom:16px">
-      <table style="width:100%;border-collapse:collapse;background:#0f172a;border-radius:8px;overflow:hidden">
-        <thead>
-          <tr style="background:#1e293b">
-            <th style="padding:10px 8px;text-align:left;color:#94a3b8;font-size:0.78rem;text-transform:uppercase">Severitate</th>
-            <th style="padding:10px 8px;text-align:left;color:#94a3b8;font-size:0.78rem;text-transform:uppercase">Problemă</th>
-            <th style="padding:10px 8px;text-align:left;color:#94a3b8;font-size:0.78rem;text-transform:uppercase">Componentă</th>
-          </tr>
-        </thead>
-        <tbody>${issuesList}</tbody>
-      </table>
-      ${(scanResult?.issues || []).length > 10 ? `<p style="color:#64748b;font-size:0.8rem;margin:8px 0 0">... și ${(scanResult?.issues || []).length - 10} alte probleme</p>` : ''}
-    </div>` : ''}
-
-    ${healedList}
-    ${failedList}
-    ${aiSection}
-
-    <div style="margin-top:20px;text-align:center">
-      <a href="${APP_URL}/admin/healer" 
-         style="background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;padding:10px 24px;border-radius:6px;text-decoration:none;font-weight:600;font-size:0.9rem;display:inline-block">
-        Deschide Self-Healing Dashboard →
-      </a>
-    </div>`
-  );
-
-  const text = `${subject}\n\nScor: ${score}/100\nProbleme: ${issues} (${critical} critice)\nReparate: ${healed.length}\n\nAdmin: ${APP_URL}/admin/healer`;
-  return _sendToAdmins({
-    subject, html, text, dedupeKey, pool,
-    alertType: critical > 0 ? 'healing_critical' : 'healing_report',
-    metadata: { score, issues, critical, healed: healed.length, failed: failed.length, triggeredBy },
-  });
-}
-
-// ─────────────────────────────────────────────────────────────
 // 4. CRITICAL ERROR ALERT — eroare fatală server
 // ─────────────────────────────────────────────────────────────
 async function alertCriticalError({ component, error, stack, context = {}, pool }) {
@@ -453,7 +347,6 @@ async function alertPayment({ userId, email, amount, currency = 'USD', plan, sta
 module.exports = {
   alertCreditLow,
   alertAIStatus,
-  alertHealingReport,
   alertCriticalError,
   alertNewUser,
   alertPayment,

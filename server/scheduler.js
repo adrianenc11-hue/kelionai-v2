@@ -1,20 +1,14 @@
 // ═══════════════════════════════════════════════════════════════
 // KelionAI — Scheduler
-// Periodic tasks: self-healing scan, API key audit, credit checks
+// Periodic tasks: credit checks, AI health
 // ═══════════════════════════════════════════════════════════════
 'use strict';
 
 const logger = require('./logger');
 
 // Lazy imports to avoid circular deps at startup
-let _healerModule   = null;
 let _alertsModule   = null;
 let _supabaseAdmin  = null;
-
-function _getHealer() {
-  if (!_healerModule) _healerModule = require('./brain-healer');
-  return _healerModule;
-}
 
 function _getAlerts() {
   if (!_alertsModule) _alertsModule = require('./alerts');
@@ -24,81 +18,6 @@ function _getAlerts() {
 // ── Scheduler state ──
 const _timers   = new Map();
 let   _started  = false;
-
-// ─────────────────────────────────────────────────────────────
-// TASK: Self-Healing Auto-Scan
-// Runs every 6 hours, sends email alert if issues found
-// ─────────────────────────────────────────────────────────────
-async function runHealingScan(triggeredBy = 'scheduler') {
-  const healer  = _getHealer();
-  const alerts  = _getAlerts();
-
-  try {
-    logger.info({ component: 'Scheduler', task: 'healing-scan', triggeredBy }, 'Starting auto healing scan...');
-
-    const scanResult = await healer.scanSystem(_supabaseAdmin);
-    const score      = scanResult?.score ?? 100;
-    const issues     = scanResult?.stats?.totalIssues ?? 0;
-    const critical   = scanResult?.stats?.critical ?? 0;
-
-    logger.info({ component: 'Scheduler', score, issues, critical }, 'Auto scan complete');
-
-    // Auto-heal non-critical issues
-    const healed  = [];
-    const failed  = [];
-
-    if (issues > 0 && scanResult?.issues?.length > 0) {
-      const autoHealable = scanResult.issues.filter(
-        iss => iss.severity !== 'critical' && iss.action && iss.autoHeal !== false
-      );
-
-      for (const issue of autoHealable.slice(0, 5)) { // max 5 auto-heals per scan
-        try {
-          await healer.healIssue(issue, _supabaseAdmin, { silent: true });
-          healed.push(issue.message || issue.description || issue.action);
-          logger.info({ component: 'Scheduler', issue: issue.action }, 'Auto-healed issue');
-        } catch (e) {
-          failed.push(issue.message || issue.action);
-          logger.warn({ component: 'Scheduler', issue: issue.action, err: e.message }, 'Auto-heal failed');
-        }
-      }
-    }
-
-    // Generate AI analysis for critical issues
-    let aiAnalysis = null;
-    if (critical > 0 || score < 60) {
-      try {
-        aiAnalysis = await healer.generateAIReport(scanResult);
-      } catch (_e) { /* non-fatal */ }
-    }
-
-    // Save report to DB
-    try {
-      await healer.saveScanReport(scanResult, aiAnalysis, _supabaseAdmin);
-    } catch (_e) { /* non-fatal */ }
-
-    // Send email alert if there are issues
-    await alerts.alertHealingReport({
-      scanResult,
-      aiAnalysis,
-      healed,
-      failed,
-      triggeredBy,
-    });
-
-    return { score, issues, critical, healed: healed.length, failed: failed.length };
-  } catch (e) {
-    logger.error({ component: 'Scheduler', task: 'healing-scan', err: e.message }, 'Auto scan failed');
-    try {
-      await _getAlerts().alertCriticalError({
-        component: 'Scheduler.HealingScan',
-        error: e.message,
-        stack: e.stack,
-      });
-    } catch (_e) { /* non-fatal */ }
-    return null;
-  }
-}
 
 // ─────────────────────────────────────────────────────────────
 // TASK: Credit Check
@@ -189,12 +108,6 @@ function start(supabaseAdmin) {
 
   logger.info({ component: 'Scheduler' }, '⏰ Scheduler starting...');
 
-  // ── Self-Healing: every 6 hours ──
-  const HEALING_INTERVAL = parseInt(process.env.HEALING_INTERVAL_MS || String(6 * 60 * 60 * 1000));
-  const healingTimer = setInterval(() => runHealingScan('scheduler'), HEALING_INTERVAL);
-  healingTimer.unref(); // Don't block process exit
-  _timers.set('healing', healingTimer);
-
   // ── Credit Check: every 30 minutes ──
   const CREDIT_INTERVAL = parseInt(process.env.CREDIT_CHECK_INTERVAL_MS || String(30 * 60 * 1000));
   const creditTimer = setInterval(() => runCreditCheck(), CREDIT_INTERVAL);
@@ -207,14 +120,8 @@ function start(supabaseAdmin) {
   aiTimer.unref();
   _timers.set('ai-health', aiTimer);
 
-  // ── Initial scan after 2 minutes (let server warm up) ──
-  const initialTimer = setTimeout(() => runHealingScan('startup'), 2 * 60 * 1000);
-  initialTimer.unref();
-  _timers.set('initial', initialTimer);
-
   logger.info({
     component: 'Scheduler',
-    healingEvery:  `${HEALING_INTERVAL / 3600000}h`,
     creditEvery:   `${CREDIT_INTERVAL / 60000}min`,
     aiHealthEvery: `${AI_HEALTH_INTERVAL / 60000}min`,
   }, '✅ Scheduler started');
@@ -240,12 +147,8 @@ function getStatus() {
 }
 
 // ── Manual trigger (for admin API) ──
-async function triggerHealingScan() {
-  return runHealingScan('manual');
-}
-
 async function triggerCreditCheck() {
   return runCreditCheck();
 }
 
-module.exports = { start, stop, getStatus, triggerHealingScan, triggerCreditCheck };
+module.exports = { start, stop, getStatus, triggerCreditCheck };
