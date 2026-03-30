@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title data-dynamic="true">Admin Panel</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <script src="/js/client-config.js" data-fonts="inter-light"></script>
+    <link rel="stylesheet" href="/admin/admin.css?v=20260320b" />
+  
+    <script>
+      // Dynamic branding — replaces {{APP_NAME}} placeholders at runtime
+      (function () {
+        function _applyDynamicBranding(name) {
+          if (!name) return;
+          // Update <title>
+          var titleEl = document.querySelector('title[data-dynamic="true"]');
+          if (titleEl) {
+            titleEl.textContent = titleEl.textContent.replace(/\{\{APP_NAME\}\}/g, name);
+            document.title = titleEl.textContent;
+          }
+          // Update all text nodes containing {{APP_NAME}}
+          var walker = document.createTreeWalker(document.body || document.documentElement, NodeFilter.SHOW_TEXT);
+          var node;
+          while ((node = walker.nextNode())) {
+            if (node.nodeValue && node.nodeValue.includes('{{APP_NAME}}')) {
+              node.nodeValue = node.nodeValue.replace(/\{\{APP_NAME\}\}/g, name);
+            }
+          }
+          // Update element attributes (placeholder, content, value)
+          ['placeholder', 'content', 'value', 'alt', 'aria-label'].forEach(function (attr) {
+            document.querySelectorAll('[' + attr + '*="{{APP_NAME}}"]').forEach(function (el) {
+              el.setAttribute(attr, el.getAttribute(attr).replace(/\{\{APP_NAME\}\}/g, name));
+            });
+          });
+        }
+        function _tryApply() {
+          var name = window.APP_CONFIG && window.APP_CONFIG.appName;
+          if (name) { _applyDynamicBranding(name); return; }
+          window.addEventListener('app-config-loaded', function (e) {
+            _applyDynamicBranding((e && e.detail && e.detail.appName) || '');
+          });
+        }
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', _tryApply);
+        } else {
+          _tryApply();
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div class="admin-container">
+      <!-- HEADER -->
+      <header class="admin-header">
+        <div class="header-left">
+          <a href="/" class="back-link" id="btn-back">← Back</a>
+          <span class="admin-logo">🛡️ <span id="admin-app-name">KelionAI</span></span>
+          <span class="admin-badge">ADMIN</span>
+        </div>
+        <div class="header-right">
+          <span id="admin-uptime" class="admin-uptime">—</span>
+          <button class="admin-btn" onclick="location.reload()">🔄 Refresh</button>
+          <button class="admin-btn" id="theme-toggle" onclick="toggleTheme()">🌙</button>
+        </div>
+      </header>
+
+      <!-- STATS BAR (real data from API) -->
+      <div class="stats-bar" id="stats-bar">
+        <div class="stat-card">
+          <div class="stat-icon">👥</div>
+          <div class="stat-value" id="val-users">—</div>
+          <div class="stat-label">Users</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">👁️</div>
+          <div class="stat-value" id="val-views">—</div>
+          <div class="stat-label">Total Visits</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">💰</div>
+          <div class="stat-value" id="val-cost-today">—</div>
+          <div class="stat-label">Cost Today</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">💳</div>
+          <div class="stat-value" id="val-cost-month">—</div>
+          <div class="stat-label">Monthly Cost</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">🟢</div>
+          <div class="stat-value" id="val-active">—</div>
+          <div class="stat-label">Online Now</div>
+        </div>
+      </div>
+
+      <!-- MAIN VIEW: 7 BUTTONS -->
+      <div id="view-buttons" class="buttons-grid">
+        <button class="nav-banner" onclick="openSection('ai')" style="--accent: #7c3aed; --accent2: #a78bfa">
+          <div class="banner-icon">🤖</div>
+          <div class="banner-text">
+            <div class="banner-title">AI Credits & Costs</div>
+            <div class="banner-sub">Providers, usage, credits</div>
+          </div>
+          <div class="banner-stat" id="preview-ai">—</div>
+          <div class="banner-arrow">›</div>
+        </button>
+
+        <button class="nav-banner" onclick="openSection('brain')" style="--accent: #10b981; --accent2: #34d399">
+          <div class="banner-icon">🧠</div>
+          <div class="banner-text">
+            <div class="banner-title">Brain & Health</div>
+            <div class="banner-sub">Status, tools, providers, errors</div>
+          </div>
+          <div class="banner-stat" id="preview-brain">—</div>
+          <div class="banner-arrow">›</div>
+        </button>
+
+        <button class="nav-banner" onclick="openSection('traffic')" style="--accent: #06b6d4; --accent2: #22d3ee">
+          <div class="banner-icon">🌐</div>
+          <div class="banner-text">
+            <div class="banner-title">Traffic</div>
+            <div class="banner-sub">Visits, IP, browser, country, referrer</div>
+          </div>
+          <div class="banner-stat" id="preview-traffic">—</div>
+          <div class="banner-arrow">›</div>
+        </button>
+
+        <button class="nav-banner" onclick="openSection('live')" style="--accent: #22c55e; --accent2: #4ade80">
+          <div class="banner-icon">👥</div>
+          <div class="banner-text">
+            <div class="banner-title">Live — Currently Online</div>
+            <div class="banner-sub">Active sessions in real-time</div>
+          </div>
+          <div class="banner-stat" id="preview-live">—</div>
+          <div class="banner-arrow">›</div>
+        </button>
+
+        <button class="nav-banner" onclick="openSection('users')" style="--accent: #f59e0b; --accent2: #fbbf24">
+          <div class="banner-icon">👤</div>
+          <div class="banner-text">
+            <div class="banner-title">Users & Revenue</div>
+            <div class="banner-sub">Users, subscriptions, payments</div>
+          </div>
+          <div class="banner-stat" id="preview-users">—</div>
+          <div class="banner-arrow">›</div>
+        </button>
+
+        <button class="nav-banner" onclick="openSection('memories')" style="--accent: #ec4899; --accent2: #f472b6">
+          <div class="banner-icon">💾</div>
+          <div class="banner-text">
+            <div class="banner-title">Memories</div>
+            <div class="banner-sub">What K1 has learned</div>
+          </div>
+          <div class="banner-stat" id="preview-memories">—</div>
+          <div class="banner-arrow">›</div>
+        </button>
+
+        <button class="nav-banner" onclick="openSection('history')" style="--accent: #64748b; --accent2: #94a3b8">
+          <div class="banner-icon">📜</div>
+          <div class="banner-text">
+            <div class="banner-title">Conversation History</div>
+            <div class="banner-sub">All user conversations</div>
+          </div>
+          <div class="banner-stat" id="preview-history">—</div>
+          <div class="banner-arrow">›</div>
+        </button>
+
+        <button class="nav-banner" onclick="openSection('visitors')" style="--accent: #0ea5e9; --accent2: #38bdf8">
+          <div class="banner-icon">👁️</div>
+          <div class="banner-text">
+            <div class="banner-title">Visitors — Potential Leads</div>
+            <div class="banner-sub">Fingerprint, geo, device, status</div>
+          </div>
+          <div class="banner-stat" id="preview-visitors">—</div>
+          <div class="banner-arrow">›</div>
+        </button>
+
+        <button class="nav-banner" onclick="openSection('contact')" style="--accent: #8b5cf6; --accent2: #a78bfa">
+          <div class="banner-icon">✉️</div>
+          <div class="banner-text">
+            <div class="banner-title">Contact Inbox</div>
+            <div class="banner-sub">Mesaje primite, răspunsuri, departamente</div>
+          </div>
+          <div class="banner-stat" id="preview-contact">—</div>
+          <div class="banner-arrow">›</div>
+        </button>
+
+        <button class="nav-banner" onclick="openSection('refunds')" style="--accent: #f59e0b; --accent2: #fbbf24">
+          <div class="banner-icon">💸</div>
+          <div class="banner-text">
+            <div class="banner-title">Refund Requests</div>
+            <div class="banner-sub">Cereri ramburs, aprobare, Stripe</div>
+          </div>
+          <div class="banner-stat" id="preview-refunds">—</div>
+          <div class="banner-arrow">›</div>
+        </button>
+
+        <button class="nav-banner" onclick="openSection('alerts')" style="--accent: #e11d48; --accent2: #fb7185">
+          <div class="banner-icon">🔔</div>
+          <div class="banner-text">
+            <div class="banner-title">Alerts & Notifications</div>
+            <div class="banner-sub">Credite, utilizatori noi, erori, AI status</div>
+          </div>
+          <div class="banner-stat" id="preview-alerts">—</div>
+          <div class="banner-arrow">›</div>
+        </button>
+
+        <button class="nav-banner" onclick="openSection('logs')" style="--accent: #475569; --accent2: #64748b">
+          <div class="banner-icon">📋</div>
+          <div class="banner-text">
+            <div class="banner-title">Admin Logs</div>
+            <div class="banner-sub">System events, errors, actions</div>
+          </div>
+          <div class="banner-stat" id="preview-logs">—</div>
+          <div class="banner-arrow">›</div>
+        </button>
+      </div>
+
+      <!-- SUB-PAGE CONTENT AREA (hidden by default) -->
+      <div id="view-section" class="section-view" style="display: none">
+        <button class="back-section-btn" onclick="closeSection()">← Back to menu</button>
+        <h2 id="section-title"></h2>
+        <div id="section-content"></div>
+      </div>
+    </div>
+
+    <script>
+      /* Theme Toggle */
+      function toggleTheme() {
+        document.body.classList.toggle('light-theme');
+        const isLight = document.body.classList.contains('light-theme');
+        localStorage.setItem('admin-theme', isLight ? 'light' : 'dark');
+        document.getElementById('theme-toggle').textContent = isLight ? '☀️' : '🌙';
+      }
+      if (localStorage.getItem('admin-theme') === 'light') {
+        document.body.classList.add('light-theme');
+        document.getElementById('theme-toggle').textContent = '☀️';
+      }
+
+      /* Back button - always go to main site */
+      document.getElementById('btn-back').addEventListener('click', function (e) {
+        e.preventDefault();
+        location.href = '/';
+      });
+    </script>
+    <script src="/admin/admin-app.js?v=20260321a"></script>
+  <script id="admin-app-name-init">
+  fetch('/api/config').then(res=>res.json()).then(cfg=>{
+    const el=document.getElementById('admin-app-name');
+    if(el && cfg.appName) el.textContent=cfg.appName;
+  }).catch(()=>{});
+</script>
+</body>
+</html>

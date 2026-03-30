@@ -1,0 +1,542 @@
+﻿// ═══════════════════════════════════════════════════════════════
+// App — Monitor Manager
+// Controls the right-side display panel content
+// ═══════════════════════════════════════════════════════════════
+const _MonitorManager = (function () {
+  'use strict';
+
+  const PANELS = [
+    'monitor-image',
+    'monitor-map',
+    'monitor-text',
+    'monitor-search',
+    'monitor-weather',
+    'monitor-iframe',
+    'monitor-video',
+    'monitor-default',
+  ];
+  let _lastContentHash = ''; // Dedup: prevent same content showing twice
+  let _lastContentTime = 0; // Timestamp for dedup window
+
+  // Display type per panel — match what CSS expects
+  const PANEL_DISPLAY = {
+    'monitor-image': 'flex',
+    'monitor-map': 'flex',
+    'monitor-text': 'flex',
+    'monitor-default': 'flex',
+  };
+
+  function showPanel(id) {
+    console.log('[MonitorManager] showPanel called for:', id);
+    PANELS.forEach(function (pid) {
+      const el = document.getElementById(pid);
+      if (el) el.style.setProperty('display', 'none', 'important');
+    });
+    // Chat removed from monitor — text goes only to subtitle under avatar
+    const dispContent = document.getElementById('display-content');
+    if (id !== 'monitor-default') {
+      if (dispContent) dispContent.style.setProperty('display', 'flex', 'important');
+    }
+    // Pe mobile, display-panel e ascuns cu transform:translateY(100%) — il aratam
+    const displayPanel = document.getElementById('display-panel');
+    if (displayPanel) {
+      if (id !== 'monitor-default') {
+        displayPanel.classList.add('mobile-visible');
+      } else {
+        displayPanel.classList.remove('mobile-visible');
+      }
+    }
+    const el = document.getElementById(id);
+    if (el) {
+      const displayVal = PANEL_DISPLAY[id] || 'block';
+      el.style.setProperty('display', displayVal, 'important');
+      console.log('[MonitorManager] Set', id, 'display to:', displayVal);
+    }
+  }
+
+  function showImage(url, caption) {
+    console.log('[MonitorManager] showImage called with:', url?.substring(0, 80));
+    const el = document.getElementById('monitor-image');
+    if (!el) {
+      console.warn('[MonitorManager] #monitor-image not found!');
+      return;
+    }
+    const safeUrl = String(url).replace(/"/g, '&quot;');
+    const safeCaption = caption ? String(caption).replace(/</g, '&lt;').replace(/>/g, '&gt;') : '';
+    el.innerHTML =
+      '<img src="' +
+      safeUrl +
+      '" alt="' +
+      safeCaption +
+      '">' +
+      (safeCaption ? '<p class="monitor-caption">' + safeCaption + '</p>' : '');
+    // Nuclear fix: do ALL visibility directly, don't rely only on showPanel
+    showPanel('monitor-image');
+    // Force display:flex explicitly (CSS has display:none rule that may override)
+    el.style.setProperty('display', 'flex', 'important');
+    console.log('[MonitorManager] monitor-image display set to:', el.style.display);
+    if (window.KAvatar) KAvatar.setPresenting(true);
+  }
+
+  function showMap(lat, lng, label) {
+    const el = document.getElementById('monitor-map');
+    if (!el) return;
+    const safeLabel = label ? String(label).replace(/"/g, '&quot;') : 'Map';
+    const bbox = lng - 0.05 + '%2C' + (lat - 0.05) + '%2C' + (lng + 0.05) + '%2C' + (lat + 0.05);
+    const osmBase = (window.KELION_URLS && KELION_URLS.OSM_EMBED) || 'https://www.openstreetmap.org/export/embed.html';
+    const url = osmBase + '?bbox=' + bbox + '&layer=mapnik&marker=' + lat + '%2C' + lng;
+    el.innerHTML =
+      '<iframe src="' +
+      url +
+      '" title="' +
+      safeLabel +
+      '"></iframe>' +
+      (label
+        ? '<p class="monitor-caption">📍 ' + String(label).replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</p>'
+        : '');
+    showPanel('monitor-map');
+    if (window.KAvatar) KAvatar.setPresenting(true);
+  }
+
+  function showWebContent(url) {
+    const el = document.getElementById('monitor-map');
+    if (!el) return;
+    const rawUrl = String(url).trim();
+    if (!/^https?:\/\//i.test(rawUrl)) {
+      console.warn('[MonitorManager] Blocked non-HTTP URL:', rawUrl.substring(0, 50));
+      return;
+    }
+    const safeUrl = rawUrl.replace(/"/g, '&quot;');
+    el.innerHTML =
+      '<div class="monitor-browser">' +
+      '<div class="browser-bar">' +
+      '<input type="text" id="browser-url" value="' +
+      safeUrl +
+      '" placeholder="Enter URL..." style="flex:1;background:#1a1a2e;color:#e0e0ff;border:1px solid #333;border-radius:6px;padding:5px 10px;font-size:0.75rem;">' +
+      '<button id="browser-go" style="background:#6366F1;color:#fff;border:none;border-radius:6px;padding:5px 12px;cursor:pointer;margin-left:4px;font-size:0.75rem;">Go</button>' +
+      '<button id="browser-close" style="background:#333;color:#aaa;border:none;border-radius:6px;padding:5px 8px;cursor:pointer;margin-left:4px;font-size:0.75rem;">✕</button>' +
+      '</div>' +
+      '<div class="browser-quick" style="display:flex;gap:6px;margin:4px 0;flex-wrap:wrap;">' +
+      '<button class="qlink" data-url="' +
+      (window.KELION_URLS && KELION_URLS.YOUTUBE_EMBED) +
+      '/jfKfPfyJRdk" style="font-size:0.65rem;">▶ YouTube Live</button>' +
+
+      '<button class="qlink" data-url="' +
+      (window.KELION_URLS && KELION_URLS.SPOTIFY_EMBED) +
+      '/playlist/37i9dQZF1DXcBWIGoYBM5M" style="font-size:0.65rem;">🎵 Spotify</button>' +
+      '<button class="qlink-new" data-url="' +
+      (window.KELION_URLS && KELION_URLS.NETFLIX) +
+      '" style="font-size:0.65rem;">🎬 Netflix ↗</button>' +
+      '<button class="qlink-new" data-url="' +
+      (window.KELION_URLS && KELION_URLS.TWITCH) +
+      '" style="font-size:0.65rem;">🎮 Twitch ↗</button>' +
+      '</div>' +
+      '<iframe src="' +
+      safeUrl +
+      '" title="Web browser" style="width:100%;flex:1;border:none;border-radius:8px;background:#000;"></iframe>' +
+      '</div>';
+    showPanel('monitor-map');
+    if (window.KAvatar) KAvatar.setPresenting(true);
+    // Wire up browser controls
+    setTimeout(function () {
+      const goBtn = document.getElementById('browser-go');
+      const urlInput = document.getElementById('browser-url');
+      const closeBtn = document.getElementById('browser-close');
+      if (goBtn && urlInput) {
+        goBtn.addEventListener('click', function () {
+          let u = urlInput.value.trim();
+          if (u && !u.startsWith('http')) u = 'https://' + u;
+          if (u) showWebContent(u);
+        });
+        urlInput.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter') goBtn.click();
+        });
+      }
+      if (closeBtn) closeBtn.addEventListener('click', clear);
+      document.querySelectorAll('.qlink').forEach(function (b) {
+        b.addEventListener('click', function () {
+          showWebContent(b.dataset.url);
+        });
+      });
+      document.querySelectorAll('.qlink-new').forEach(function (b) {
+        b.addEventListener('click', function () {
+          window.open(b.dataset.url, '_blank');
+        });
+      });
+    }, 50);
+  }
+
+  function showMarkdown(text) {
+    const el = document.getElementById('monitor-text');
+    if (!el || !text) return;
+    // Simple markdown-to-html: code blocks, inline code, bold, headers
+    let html = String(text)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/```(\w*)?\n([\s\S]*?)```/g, function(_, lang, code) {
+        return '<pre><code class="lang-' + (lang||'') + '">' + code.trim() + '</code></pre>';
+      })
+      .replace(/`([^`]+)`/g, '<code>$1</code>')
+      .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+      .replace(/^### (.+)$/gm, '<h4 style="color:#a5b4fc;font-size:0.82rem;margin:8px 0 4px;">$1</h4>')
+      .replace(/^## (.+)$/gm, '<h3 style="color:#c4b5fd;font-size:0.9rem;margin:10px 0 5px;">$1</h3>')
+      .replace(/^# (.+)$/gm, '<h2 style="color:#e0d7ff;font-size:1rem;margin:12px 0 6px;">$1</h2>')
+      .replace(/\n/g, '<br>');
+    el.innerHTML = html;
+    showPanel('monitor-text');
+    el.style.setProperty('display', 'flex', 'important');
+  }
+
+  function showSearchResults(results) {
+    const el = document.getElementById('monitor-search');
+    if (!el) return;
+    if (!results || !results.length) {
+      clear();
+      return;
+    }
+    let html = '<div class="monitor-search-list">';
+    for (let i = 0; i < results.length; i++) {
+      const r = results[i];
+      const title = String(r.title || '')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+      const url = String(r.url || r.link || '#').replace(/"/g, '&quot;');
+      const snippet = String(r.snippet || r.description || '')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+      // Extract short domain for display (avoid duplicating full URL)
+      let domain = '';
+      try {
+        domain = new URL(url).hostname.replace(/^www\./, '');
+      } catch (_e) {
+        domain = '';
+      }
+      html +=
+        '<div class="monitor-search-item">' +
+        '<a href="' +
+        url +
+        '" target="_blank" rel="noopener">' +
+        '<div class="search-title">' +
+        title +
+        '</div>' +
+        (domain ? '<div class="search-url">' + domain + '</div>' : '') +
+        '<div class="search-snippet">' +
+        snippet +
+        '</div>' +
+        '</a></div>';
+    }
+    html += '</div>';
+    el.innerHTML = html;
+    showPanel('monitor-search');
+    if (window.KAvatar) KAvatar.setPresenting(true);
+  }
+
+  function showWeather(data) {
+    const el = document.getElementById('monitor-weather');
+    if (!el) return;
+    const icon = data.icon || '🌤️';
+    const city = String(data.city || data.location || '')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+    const temp = data.temperature !== undefined ? data.temperature : data.temp !== undefined ? data.temp : '';
+    const desc = String(data.description || data.condition || '')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+    const html =
+      '<div class="weather-card">' +
+      '<div class="weather-city">' +
+      city +
+      '</div>' +
+      '<div class="weather-main">' +
+      '<span class="weather-icon">' +
+      icon +
+      '</span>' +
+      '<span class="weather-temp">' +
+      temp +
+      '°C</span>' +
+      '</div>' +
+      '<div class="weather-desc">' +
+      desc +
+      '</div>' +
+      '<div class="weather-details">' +
+      (data.humidity ? '<span>💧 ' + data.humidity + '%</span>' : '') +
+      (data.wind ? '<span>💨 ' + data.wind + ' km/h</span>' : '') +
+      '</div>' +
+      '</div>';
+    el.innerHTML = html;
+    showPanel('monitor-weather');
+    if (window.KAvatar) KAvatar.setPresenting(true);
+  }
+
+  function show(content, type) {
+    console.log(
+      '[MonitorManager] show() called with type:',
+      type,
+      'content length:',
+      String(content).length,
+      'content start:',
+      String(content).substring(0, 60)
+    );
+    // Dedup: skip if EXACT same content in rapid succession (<500ms)
+    const hash = String(content).substring(0, 300) + '|' + (type || '');
+    const now = Date.now();
+    if (hash === _lastContentHash && now - (_lastContentTime || 0) < 500) {
+      console.log('[MonitorManager] DEDUP: skipping rapid duplicate');
+      return;
+    }
+    _lastContentHash = hash;
+    _lastContentTime = now;
+
+    if (type === 'image') {
+      showImage(content);
+    } else if (type === 'map') {
+      const el = document.getElementById('monitor-map');
+      if (!el) return;
+      const mapUrl = String(content).trim();
+      if (!/^https?:\/\//i.test(mapUrl)) return;
+      const safeMapIframe = document.createElement('iframe');
+      safeMapIframe.src = mapUrl;
+      safeMapIframe.title = 'Map';
+      safeMapIframe.setAttribute('sandbox', 'allow-scripts allow-forms allow-popups');
+      safeMapIframe.setAttribute('referrerpolicy', 'no-referrer');
+      el.innerHTML = '';
+      el.appendChild(safeMapIframe);
+      showPanel('monitor-map');
+      if (window.KAvatar) KAvatar.setPresenting(true);
+    } else if (type === 'html') {
+      // HTML (harti, grafice) — afisam in display-panel (monitor)
+      // BLOCK plain text — only actual HTML goes on monitor
+      const contentStr = String(content).trim();
+      if (!/<[a-z][\s\S]*>/i.test(contentStr)) {
+        console.log('[MonitorManager] BLOCKED plain text from monitor (type=html, no tags found)');
+        return;
+      }
+      const dp = document.getElementById('display-content') || document.getElementById('display-panel');
+      if (!dp) return;
+      PANELS.forEach(function (pid) {
+        const pel = document.getElementById(pid);
+        if (pel) pel.style.setProperty('display', 'none', 'important');
+      });
+      let box = document.getElementById('_kelion_html_box');
+      if (!box) {
+        box = document.createElement('div');
+        box.id = '_kelion_html_box';
+        box.style.cssText = 'width:100%;height:100%;position:relative;';
+        dp.appendChild(box);
+      }
+      box.style.display = 'block';
+      // If content is an iframe (Maps, etc.) — insert directly (no sandbox)
+      if (String(content).trim().startsWith('<iframe')) {
+        // Rebuild iframe safely with sandbox
+        const srcMatch = String(content).match(/src="([^"]+)"/i);
+        if (srcMatch && srcMatch[1] && /^https?:\/\//i.test(srcMatch[1])) {
+          const safeIframe = document.createElement('iframe');
+          safeIframe.src = srcMatch[1];
+          safeIframe.style.cssText = 'width:100%;height:100%;min-height:500px;border:none;border-radius:8px;';
+          safeIframe.setAttribute('sandbox', 'allow-scripts allow-forms allow-popups');
+          safeIframe.setAttribute('referrerpolicy', 'no-referrer');
+          box.innerHTML = '';
+          box.appendChild(safeIframe);
+        }
+      } else {
+        // Complex HTML (charts, tables) — use srcdoc with sandbox
+        const iframe = document.createElement('iframe');
+        iframe.style.cssText =
+          'width:100%;height:100%;min-height:500px;border:none;border-radius:8px;display:block;background:#0a0a1e;';
+        iframe.setAttribute('sandbox', 'allow-scripts allow-forms allow-popups');
+        iframe.srcdoc = content;
+        box.innerHTML = '';
+        box.appendChild(iframe);
+      }
+      if (window.KAvatar) KAvatar.setPresenting(true);
+    } else if (type === 'weather' && typeof content === 'object') {
+      showWeather(content);
+    } else if (type === 'web') {
+      showWebContent(content);
+    } else if (type === 'iframe') {
+      showIframe(content);
+    } else if (type === 'video') {
+      showVideo(content);
+    } else if (type === 'markdown' || type === 'text' || type === 'code') {
+      showMarkdown(String(content));
+    } else {
+      // Fallback: incearca sa afiseze ca text
+      if (content && String(content).trim()) {
+        showMarkdown(String(content));
+      }
+    }
+  }
+
+  // ── IFRAME (URL/Web Navigation) ──
+  function showIframe(url, title) {
+    const iframe = document.getElementById('monitor-iframe-src');
+    if (!iframe) return;
+    iframe.src = String(url);
+    const titleEl = document.getElementById('display-title');
+    if (titleEl && title) titleEl.textContent = title;
+    showPanel('monitor-iframe');
+    if (window.KAvatar) KAvatar.setPresenting(true);
+  }
+
+
+
+  // ── VIDEO (YouTube / Netflix / Embed) ──
+  function showVideo(embedUrl, title) {
+    const iframe = document.getElementById('monitor-video-src');
+    if (!iframe) return;
+    iframe.src = String(embedUrl);
+    const titleEl = document.getElementById('display-title');
+    if (titleEl) titleEl.textContent = 'Video: ' + (title || 'Video');
+    showPanel('monitor-video');
+    if (window.KAvatar) KAvatar.setPresenting(true);
+  }
+
+  function clear() {
+    // Ascunde HTML box si reseteaza monitorul
+    const box = document.getElementById('_kelion_html_box');
+    if (box) box.style.display = 'none';
+    PANELS.forEach(function (pid) {
+      const el = document.getElementById(pid);
+      if (el) el.style.display = 'none';
+    });
+    const def = document.getElementById('monitor-default');
+    if (def) def.style.display = '';
+    if (window.KAvatar) KAvatar.setPresenting(false);
+  }
+
+  function downloadContent() {
+    const imgEl = document.getElementById('monitor-image');
+    const mapEl = document.getElementById('monitor-map');
+    const textEl = document.getElementById('monitor-text');
+    const img = imgEl && imgEl.style.display !== 'none' ? imgEl.querySelector('img') : null;
+    const iframe = mapEl && mapEl.style.display !== 'none' ? mapEl.querySelector('iframe') : null;
+    const text = textEl && textEl.style.display !== 'none' ? textEl : null;
+
+    if (img && img.src) {
+      fetch(img.src)
+        .then(function (r) {
+          return r.blob();
+        })
+        .then(function (blob) {
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'monitor-image.png';
+          a.click();
+          setTimeout(function () {
+            URL.revokeObjectURL(url);
+          }, 100);
+        })
+        .catch(function () {
+          const a = document.createElement('a');
+          a.href = img.src;
+          a.download = 'monitor-image.png';
+          a.target = '_blank';
+          a.click();
+        });
+    } else if (iframe && iframe.src) {
+      const a = document.createElement('a');
+      const blob = new Blob([iframe.src], { type: 'text/plain' });
+      const iframeUrl = URL.createObjectURL(blob);
+      a.href = iframeUrl;
+      a.download = 'monitor-url.txt';
+      a.click();
+      setTimeout(function () {
+        URL.revokeObjectURL(iframeUrl);
+      }, 100);
+    } else if (text) {
+      const blob2 = new Blob([text.innerHTML], { type: 'text/html' });
+      const textUrl = URL.createObjectURL(blob2);
+      const a2 = document.createElement('a');
+      a2.href = textUrl;
+      a2.download = 'monitor-content.html';
+      a2.click();
+      setTimeout(function () {
+        URL.revokeObjectURL(textUrl);
+      }, 100);
+    }
+  }
+
+  // Requires JSZip library to be loaded before monitor.js for ZIP export to work.
+  // Falls back to downloadContent() if JSZip is unavailable.
+  function downloadAsZip() {
+    if (window.JSZip) {
+      const zip = new JSZip();
+      const imgEl = document.getElementById('monitor-image');
+      const textEl = document.getElementById('monitor-text');
+      const img = imgEl && imgEl.style.display !== 'none' ? imgEl.querySelector('img') : null;
+      const text = textEl && textEl.style.display !== 'none' ? textEl : null;
+      const tasks = [];
+      if (img && img.src) {
+        tasks.push(
+          fetch(img.src)
+            .then(function (r) {
+              return r.blob();
+            })
+            .then(function (b) {
+              zip.file('image.png', b);
+            })
+            .catch(function () {})
+        );
+      }
+      if (text) {
+        zip.file('content.html', text.innerHTML);
+      }
+      Promise.all(tasks)
+        .then(function () {
+          zip
+            .generateAsync({ type: 'blob' })
+            .then(function (blob) {
+              const zipUrl = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = zipUrl;
+              a.download = 'monitor-export.zip';
+              a.click();
+              setTimeout(function () {
+                URL.revokeObjectURL(zipUrl);
+              }, 100);
+            })
+            .catch(function (err) {
+              console.error('[Monitor] ZIP generation failed:', err);
+            });
+        })
+        .catch(function (err) {
+          console.error('[Monitor] Export tasks failed:', err);
+        });
+    } else {
+      downloadContent();
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    const dlBtn = document.getElementById('btn-monitor-download');
+    const zipBtn = document.getElementById('btn-monitor-zip');
+    const webBtn = document.getElementById('btn-monitor-web');
+    if (dlBtn) dlBtn.addEventListener('click', downloadContent);
+    if (zipBtn) zipBtn.addEventListener('click', downloadAsZip);
+    if (webBtn)
+      webBtn.addEventListener('click', function () {
+        showWebContent('about:blank');
+      });
+  });
+
+  return {
+    showImage: showImage,
+    showMap: showMap,
+    showWebContent: showWebContent,
+    showMarkdown: showMarkdown,
+    showSearchResults: showSearchResults,
+    showWeather: showWeather,
+    showIframe: showIframe,
+    showVideo: showVideo,
+    show: show,
+    clear: clear,
+    downloadContent: downloadContent,
+    downloadAsZip: downloadAsZip,
+  };
+})();
+
+// ── Expune global pentru ca orice modul sa poata controla monitorul ──
+window.MonitorManager = _MonitorManager;
+window.showOnMonitor = function (content, type) {
+  if (_MonitorManager) _MonitorManager.show(content, type);
+};

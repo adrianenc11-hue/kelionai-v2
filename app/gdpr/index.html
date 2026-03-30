@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title data-dynamic="true">GDPR — Your Data Rights — {{APP_NAME}}</title>
+    <meta
+      name="description"
+      content="{{APP_NAME}} GDPR compliance. Learn about your data rights including access, export, and deletion."
+    />
+    <script src="/js/client-config.js" data-fonts="inter-full"></script>
+    <link rel="stylesheet" href="/styles/design-system.css" />
+    <link rel="stylesheet" href="/styles/mobile.css" />
+    <style>
+      body {
+        background: var(--kelion-bg, #050510);
+        color: var(--kelion-text, #f0f0ff);
+        font-family: 'Inter', system-ui, sans-serif;
+        margin: 0;
+        min-height: 100vh;
+      }
+
+      .legal-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 20px 40px;
+        border-bottom: 1px solid rgba(99, 102, 241, 0.1);
+      }
+
+      .legal-logo {
+        text-decoration: none;
+        font-size: 1.4rem;
+        font-weight: 800;
+        color: #f0f0ff;
+      }
+
+      .legal-logo span {
+        background: linear-gradient(135deg, #6366f1, #06b6d4);
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+
+      .legal-nav {
+        display: flex;
+        gap: 24px;
+      }
+
+      .legal-nav a {
+        color: #8888aa;
+        text-decoration: none;
+        font-size: 0.9rem;
+        transition: color 0.2s;
+      }
+
+      .legal-nav a:hover {
+        color: #f0f0ff;
+      }
+
+      .legal-main {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 60px 24px 80px;
+      }
+
+      .legal-main h1 {
+        font-size: 2.2rem;
+        font-weight: 800;
+        margin-bottom: 8px;
+        background: linear-gradient(135deg, #6366f1, #06b6d4);
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+
+      .legal-meta {
+        color: #555577;
+        font-size: 0.85rem;
+        margin-bottom: 40px;
+      }
+
+      .legal-section {
+        margin-bottom: 32px;
+      }
+
+      .legal-section h2 {
+        font-size: 1.15rem;
+        font-weight: 700;
+        color: #a5b4fc;
+        margin-bottom: 12px;
+      }
+
+      .legal-section p {
+        color: #b0b0cc;
+        line-height: 1.7;
+        font-size: 0.95rem;
+      }
+
+      .rights-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 16px;
+        margin: 24px 0 40px;
+      }
+
+      .right-card {
+        background: rgba(99, 102, 241, 0.06);
+        border: 1px solid rgba(99, 102, 241, 0.15);
+        border-radius: 12px;
+        padding: 20px;
+      }
+
+      .right-card .icon {
+        font-size: 1.8rem;
+        margin-bottom: 8px;
+      }
+
+      .right-card h3 {
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: #a5b4fc;
+        margin-bottom: 6px;
+      }
+
+      .right-card p {
+        color: #8888aa;
+        font-size: 0.85rem;
+        line-height: 1.6;
+      }
+
+      .gdpr-contact {
+        background: rgba(99, 102, 241, 0.06);
+        border: 1px solid rgba(99, 102, 241, 0.15);
+        border-radius: 12px;
+        padding: 24px;
+        margin-top: 32px;
+        text-align: center;
+      }
+
+      .gdpr-contact a {
+        color: #6366f1;
+        text-decoration: none;
+        font-weight: 600;
+      }
+
+      .gdpr-contact a:hover {
+        text-decoration: underline;
+      }
+
+      .legal-footer {
+        text-align: center;
+        padding: 32px;
+        border-top: 1px solid rgba(99, 102, 241, 0.1);
+        color: #555577;
+        font-size: 0.82rem;
+      }
+
+      .legal-footer a {
+        color: #6366f1;
+        text-decoration: none;
+        margin: 0 8px;
+      }
+
+      .legal-footer a:hover {
+        text-decoration: underline;
+      }
+
+      @media (max-width: 600px) {
+        .legal-header {
+          padding: 16px 20px;
+        }
+
+        .legal-main {
+          padding: 32px 16px 60px;
+        }
+
+        .legal-main h1 {
+          font-size: 1.6rem;
+        }
+      }
+    </style>
+  
+    <script>
+      // Dynamic branding — replaces {{APP_NAME}} placeholders at runtime
+      (function () {
+        function _applyDynamicBranding(name) {
+          if (!name) return;
+          // Update <title>
+          var titleEl = document.querySelector('title[data-dynamic="true"]');
+          if (titleEl) {
+            titleEl.textContent = titleEl.textContent.replace(/\{\{APP_NAME\}\}/g, name);
+            document.title = titleEl.textContent;
+          }
+          // Update all text nodes containing {{APP_NAME}}
+          var walker = document.createTreeWalker(document.body || document.documentElement, NodeFilter.SHOW_TEXT);
+          var node;
+          while ((node = walker.nextNode())) {
+            if (node.nodeValue && node.nodeValue.includes('{{APP_NAME}}')) {
+              node.nodeValue = node.nodeValue.replace(/\{\{APP_NAME\}\}/g, name);
+            }
+          }
+          // Update element attributes (placeholder, content, value)
+          ['placeholder', 'content', 'value', 'alt', 'aria-label'].forEach(function (attr) {
+            document.querySelectorAll('[' + attr + '*="{{APP_NAME}}"]').forEach(function (el) {
+              el.setAttribute(attr, el.getAttribute(attr).replace(/\{\{APP_NAME\}\}/g, name));
+            });
+          });
+        }
+        function _tryApply() {
+          var name = window.APP_CONFIG && window.APP_CONFIG.appName;
+          if (name) { _applyDynamicBranding(name); return; }
+          window.addEventListener('app-config-loaded', function (e) {
+            _applyDynamicBranding((e && e.detail && e.detail.appName) || '');
+          });
+        }
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', _tryApply);
+        } else {
+          _tryApply();
+        }
+      })();
+    </script>
+  </head>
+
+  <body>
+    <header class="legal-header">
+      <a href="/" class="legal-logo">Kelion<span>AI</span></a>
+      <nav class="legal-nav">
+        <a href="/">Home</a>
+        <a href="/pricing/">Pricing</a>
+        <a href="/terms/">Terms</a>
+        <a href="/privacy/">Privacy</a>
+      </nav>
+    </header>
+
+    <main class="legal-main">
+      <h1>GDPR — Your Data Rights</h1>
+      <p class="legal-meta">
+        {{APP_NAME}} is committed to protecting your personal data in compliance with the EU General Data Protection
+        Regulation (GDPR).
+      </p>
+
+      <div class="legal-section">
+        <h2>Your Rights Under GDPR</h2>
+        <p>As a user of {{APP_NAME}}, you have the following rights regarding your personal data:</p>
+      </div>
+
+      <div class="rights-grid">
+        <div class="right-card">
+          <div class="icon">📋</div>
+          <h3>Right of Access</h3>
+          <p>Request a copy of all personal data we hold about you at any time.</p>
+        </div>
+        <div class="right-card">
+          <div class="icon">✏️</div>
+          <h3>Right to Rectification</h3>
+          <p>Request correction of any inaccurate or incomplete personal data.</p>
+        </div>
+        <div class="right-card">
+          <div class="icon">🗑️</div>
+          <h3>Right to Erasure</h3>
+          <p>Request deletion of your personal data ("right to be forgotten").</p>
+        </div>
+        <div class="right-card">
+          <div class="icon">📦</div>
+          <h3>Right to Portability</h3>
+          <p>Export your data in a machine-readable format (JSON).</p>
+        </div>
+        <div class="right-card">
+          <div class="icon">🚫</div>
+          <h3>Right to Restrict</h3>
+          <p>Request restriction of processing of your personal data.</p>
+        </div>
+        <div class="right-card">
+          <div class="icon">✋</div>
+          <h3>Right to Object</h3>
+          <p>Object to the processing of your personal data for certain purposes.</p>
+        </div>
+      </div>
+
+      <div class="legal-section">
+        <h2>How to Exercise Your Rights</h2>
+        <p>{{APP_NAME}} provides built-in tools to exercise your GDPR rights directly from the application:</p>
+      </div>
+
+      <div class="legal-section">
+        <h2>Data Export</h2>
+        <p>
+          You can export all your personal data (conversations, preferences, subscription info, usage data, and
+          referrals) at any time by making an authenticated request to the GDPR export endpoint. The data is provided in
+          JSON format.
+        </p>
+      </div>
+
+      <div class="legal-section">
+        <h2>Data Deletion</h2>
+        <p>
+          You can request complete deletion of all your personal data. This action is irreversible and includes
+          cancellation of any active subscriptions, deletion of all conversations and messages, removal of preferences
+          and usage data, and deletion of referral codes. To confirm deletion, you must explicitly send a confirmation
+          request.
+        </p>
+      </div>
+
+      <div class="legal-section">
+        <h2>Consent Management</h2>
+        <p>
+          You can manage your consent preferences for memory (AI learning), analytics, and marketing at any time.
+          {{APP_NAME}} only uses essential cookies for authentication — no tracking or advertising cookies are used.
+        </p>
+      </div>
+
+      <div class="legal-section">
+        <h2>Data Controller</h2>
+        <p>
+          {{APP_NAME}} acts as the data controller for your personal information. Data is stored on Supabase (EU servers)
+          and Railway infrastructure. All data is encrypted in transit (TLS) and at rest. Payment processing is handled
+          exclusively by Stripe — we never store your payment card details.
+        </p>
+      </div>
+
+      <div class="gdpr-contact">
+        <p style="color: #f0f0ff; font-weight: 600; margin-bottom: 8px">Have a GDPR question or request?</p>
+        <p style="color: #8888aa; font-size: 0.9rem">
+          Contact our Data Protection team at <a href="mailto:contact@local">contact@local</a>
+        </p>
+      </div>
+    </main>
+
+    <footer class="legal-footer">
+      <p>
+        <script>
+          document.write(new Date().getFullYear());
+        </script>
+        {{APP_NAME}}. <a href="/terms/">Terms of Service</a> · <a href="/privacy/">Privacy Policy</a> ·
+        <a href="/gdpr/">GDPR</a>
+      </p>
+    </footer>
+    <a href="/" id="home-btn-fixed" class="home-btn-fixed" title="Home">🏠</a>
+  </body>
+</html>

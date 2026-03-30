@@ -1,0 +1,45 @@
+{
+  "name": "KelionAI",
+  "short_name": "KelionAI",
+  "description": "Your personal AI assistant — smart, fast, multilingual.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0A0A0F",
+  "theme_color": "#0A0A0F",
+  "orientation": "portrait-primary",
+  "lang": "en",
+  "categories": ["productivity", "utilities"],
+  "icons": [
+    {
+      "src": "/images/Icon.jpg",
+      "sizes": "192x192",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/images/Productivity.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Chat with Kelion",
+      "short_name": "Chat",
+      "description": "Start a new conversation",
+      "url": "/?action=chat",
+      "icons": [{ "src": "/images/Icon.jpg", "sizes": "192x192" }]
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/images/Productivity.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "form_factor": "narrow",
+      "label": "KelionAI Chat Interface"
+    }
+  ]
+}

@@ -1,0 +1,340 @@
+/* ═══════════════════════════════════════════
+   KelionAI v3 — Premium Global Components
+   ═══════════════════════════════════════════ */
+
+/* ── Butoane ── */
+.btn-primary {
+  background: var(--kelion-gradient);
+  color: white;
+  border: none;
+  border-radius: var(--kelion-radius);
+  padding: 12px 24px;
+  font-family: var(--kelion-font);
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: var(--kelion-transition);
+  box-shadow: 0 2px 12px rgba(99, 102, 241, 0.25);
+  position: relative;
+  overflow: hidden;
+}
+.btn-primary::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.15), transparent);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 24px rgba(99, 102, 241, 0.4);
+}
+.btn-primary:hover::before {
+  opacity: 1;
+}
+.btn-primary:active {
+  transform: translateY(0);
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--kelion-text-secondary);
+  border: 1px solid var(--kelion-border);
+  border-radius: var(--kelion-radius);
+  padding: 12px 24px;
+  font-family: var(--kelion-font);
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: var(--kelion-transition);
+}
+.btn-secondary:hover {
+  background: var(--kelion-surface-hover);
+  border-color: var(--kelion-border-hover);
+  color: var(--kelion-text);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--kelion-text-secondary);
+  border: none;
+  border-radius: var(--kelion-radius-sm);
+  padding: 8px 16px;
+  font-family: var(--kelion-font);
+  font-weight: 500;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: var(--kelion-transition);
+}
+.btn-ghost:hover {
+  background: rgba(99, 102, 241, 0.08);
+  color: var(--kelion-text);
+}
+
+.btn-danger {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--kelion-danger);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: var(--kelion-radius);
+  padding: 12px 24px;
+  font-family: var(--kelion-font);
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: var(--kelion-transition);
+}
+.btn-danger:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.4);
+}
+
+/* ── Cards ── */
+.card {
+  background: var(--kelion-glass);
+  backdrop-filter: var(--kelion-glass-blur);
+  -webkit-backdrop-filter: var(--kelion-glass-blur);
+  border: 1px solid var(--kelion-glass-border);
+  border-radius: var(--kelion-radius-lg);
+  padding: 24px;
+  transition: var(--kelion-transition-slow);
+}
+.card:hover {
+  border-color: var(--kelion-border-hover);
+  box-shadow: var(--kelion-glow);
+}
+
+.card-solid {
+  background: var(--kelion-surface-solid);
+  border: 1px solid var(--kelion-border);
+  border-radius: var(--kelion-radius-lg);
+  padding: 24px;
+  transition: var(--kelion-transition);
+}
+
+/* ── Inputs ── */
+.input-field {
+  background: rgba(10, 10, 30, 0.6);
+  border: 1px solid var(--kelion-border);
+  border-radius: var(--kelion-radius);
+  color: var(--kelion-text);
+  font-family: var(--kelion-font);
+  padding: 12px 16px;
+  width: 100%;
+  transition: var(--kelion-transition);
+  outline: none;
+  font-size: 0.9rem;
+}
+.input-field:focus {
+  border-color: var(--kelion-primary);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+}
+.input-field::placeholder {
+  color: var(--kelion-text-muted);
+}
+
+/* ── Navbar ── */
+.navbar {
+  background: rgba(5, 5, 16, 0.8);
+  backdrop-filter: blur(24px) saturate(1.2);
+  -webkit-backdrop-filter: blur(24px) saturate(1.2);
+  border-bottom: 1px solid rgba(99, 102, 241, 0.08);
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+  padding: 0 20px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.navbar-logo {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--kelion-text);
+  text-decoration: none;
+  letter-spacing: -0.5px;
+  display: flex;
+  flex-direction: column;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.logo-name {
+  display: flex;
+  align-items: baseline;
+}
+.logo-ai {
+  background: var(--kelion-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.logo-version {
+  font-size: 0.5rem;
+  color: #555;
+  letter-spacing: 0.5px;
+  font-weight: 400;
+}
+
+.navbar-logo span {
+  background: var(--kelion-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Navbar actions row */
+.navbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+/* Icon-only navbar buttons */
+.nav-icon {
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 1rem;
+  color: #8888aa;
+  transition: all 0.2s ease;
+  padding: 0;
+  flex-shrink: 0;
+}
+.nav-icon:hover {
+  background: rgba(99, 102, 241, 0.08);
+  border-color: rgba(99, 102, 241, 0.15);
+  color: #c7d2fe;
+}
+.nav-icon--accent {
+  background: rgba(99, 102, 241, 0.1);
+  border-color: rgba(99, 102, 241, 0.25);
+  color: #a5b4fc;
+}
+.nav-icon--accent:hover {
+  background: rgba(99, 102, 241, 0.18);
+  border-color: rgba(99, 102, 241, 0.4);
+  color: #c7d2fe;
+}
+
+/* Dropdown menu */
+.nav-dropdown {
+  display: none;
+  position: absolute;
+  top: 52px;
+  right: 16px;
+  min-width: 200px;
+  background: rgba(12, 12, 28, 0.96);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(99, 102, 241, 0.12);
+  border-radius: 12px;
+  padding: 6px;
+  z-index: calc(var(--z-sticky) + 1);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  flex-direction: column;
+}
+.nav-dropdown.open {
+  display: flex;
+}
+.nav-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border: none;
+  background: none;
+  color: #b0b0cc;
+  font-size: 0.85rem;
+  font-family: var(--kelion-font);
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: all 0.15s ease;
+  text-align: left;
+  width: 100%;
+}
+.nav-dropdown-item:hover {
+  background: rgba(99, 102, 241, 0.1);
+  color: #e0e0ff;
+}
+.ndi {
+  font-size: 1.05rem;
+  width: 20px;
+  text-align: center;
+  flex-shrink: 0;
+}
+.nav-dropdown-sep {
+  border: none;
+  border-top: 1px solid rgba(99, 102, 241, 0.08);
+  margin: 4px 8px;
+}
+
+/* ── Animații ── */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+@keyframes shimmer {
+  0% {
+    background-position: -200% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.4s ease forwards;
+}
+.animate-fade-in-scale {
+  animation: fadeInScale 0.3s ease forwards;
+}
+.animate-pulse {
+  animation: pulse 2s infinite;
+}
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  .navbar-links,
+  .navbar-right .btn-primary {
+    display: none;
+  }
+  .navbar-hamburger {
+    display: flex;
+  }
+}

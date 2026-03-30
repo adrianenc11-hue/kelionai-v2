@@ -1,0 +1,440 @@
+/* ═══════════════════════════════════════════════════════════════
+   KelionAI v3 — Stiluri Pagină Setări Premium
+   ═══════════════════════════════════════════════════════════════ */
+/* Fonts loaded via /js/client-config.js */
+
+:root {
+  --bg: #050510;
+  --surface: rgba(15, 15, 40, 0.65);
+  --surface-hover: rgba(25, 25, 60, 0.7);
+  --border: rgba(99, 102, 241, 0.12);
+  --border-hover: rgba(99, 102, 241, 0.25);
+  --primary: #6366f1;
+  --secondary: #06b6d4;
+  --gradient: linear-gradient(135deg, #6366f1, #06b6d4);
+  --success: #10b981;
+  --text: #f0f0ff;
+  --text-sec: #9090b0;
+  --text-muted: #555577;
+  --radius: 12px;
+  --radius-lg: 16px;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family:
+    'Inter',
+    -apple-system,
+    sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  position: relative;
+  overflow-x: hidden;
+}
+
+a {
+  color: var(--secondary);
+  text-decoration: none;
+}
+a:hover {
+  color: var(--text);
+}
+
+.gradient-text {
+  background: var(--gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Orb-uri ── */
+.orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  pointer-events: none;
+}
+.orb-indigo {
+  background: rgba(99, 102, 241, 0.1);
+  animation: orbF 15s ease-in-out infinite;
+}
+.orb-cyan {
+  background: rgba(6, 182, 212, 0.07);
+  animation: orbF 18s ease-in-out infinite reverse;
+}
+@keyframes orbF {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(-20px, -30px);
+  }
+}
+
+/* ─── Header ─── */
+.settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 40px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(5, 5, 16, 0.8);
+  backdrop-filter: blur(20px);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.settings-logo {
+  font-size: 1.4rem;
+  font-weight: 800;
+  text-decoration: none;
+}
+.settings-nav {
+  display: flex;
+  gap: 24px;
+}
+.nav-link {
+  color: var(--text-sec);
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+.nav-link:hover {
+  color: var(--text);
+}
+
+/* ─── Main ─── */
+.settings-main {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 48px 32px 80px;
+  position: relative;
+  z-index: 1;
+}
+
+.settings-title {
+  font-size: 2rem;
+  font-weight: 800;
+  margin-bottom: 6px;
+}
+.settings-subtitle {
+  color: var(--text-sec);
+  font-size: 1rem;
+  margin-bottom: 40px;
+}
+
+/* ─── Secțiuni ─── */
+.settings-section {
+  background: var(--surface);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 24px 28px;
+  margin-bottom: 20px;
+  transition: border-color 0.3s;
+}
+
+.settings-section:hover {
+  border-color: var(--border-hover);
+}
+
+.settings-section-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-sec);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 18px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* ─── Rânduri ─── */
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 0;
+  gap: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.settings-row:last-child {
+  border-bottom: none;
+}
+
+.settings-row-info {
+  flex: 1;
+  min-width: 0;
+}
+.settings-row-label {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--text);
+  margin-bottom: 2px;
+}
+.settings-row-desc {
+  font-size: 0.8rem;
+  color: var(--text-sec);
+}
+
+/* ─── Select Limbă ─── */
+.lang-select {
+  padding: 10px 16px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: rgba(10, 10, 27, 0.8);
+  color: var(--text);
+  font-family: 'Inter', sans-serif;
+  font-size: 0.88rem;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.2s;
+  -webkit-appearance: none;
+}
+
+.lang-select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+}
+
+/* ─── Opțiuni Temă ─── */
+.theme-options {
+  display: flex;
+  gap: 8px;
+}
+
+.theme-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-sec);
+  font-family: 'Inter', sans-serif;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.theme-option:hover:not(.disabled) {
+  border-color: var(--border-hover);
+  color: var(--text);
+}
+
+.theme-option.active {
+  background: rgba(99, 102, 241, 0.1);
+  border-color: var(--primary);
+  color: var(--text);
+}
+
+.theme-option.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.theme-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+}
+
+.theme-option.dark .theme-dot {
+  background: #1a1a2e;
+  border: 2px solid var(--text-sec);
+}
+.theme-option.light .theme-dot {
+  background: #f0f0ff;
+  border: 2px solid #ccc;
+}
+
+.tooltip-disabled {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  background: rgba(15, 15, 40, 0.95);
+  color: var(--text-sec);
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 0.72rem;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s;
+  border: 1px solid var(--border);
+}
+
+.theme-option.disabled:hover .tooltip-disabled {
+  opacity: 1;
+}
+
+/* ─── Toggle ─── */
+.toggle {
+  position: relative;
+  display: inline-block;
+  width: 48px;
+  height: 26px;
+  flex-shrink: 0;
+}
+
+.toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  inset: 0;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 26px;
+  transition: all 0.3s;
+  border: 1px solid var(--border);
+}
+
+.toggle-slider::before {
+  content: '';
+  position: absolute;
+  height: 20px;
+  width: 20px;
+  left: 2px;
+  bottom: 2px;
+  background: var(--text-sec);
+  border-radius: 50%;
+  transition: all 0.3s;
+}
+
+.toggle input:checked + .toggle-slider {
+  background: rgba(99, 102, 241, 0.2);
+  border-color: var(--primary);
+}
+
+.toggle input:checked + .toggle-slider::before {
+  transform: translateX(22px);
+  background: var(--primary);
+  box-shadow: 0 0 8px rgba(99, 102, 241, 0.4);
+}
+
+/* ─── Badge Plan ─── */
+.plan-status-badge {
+  display: inline-block;
+  padding: 4px 14px;
+  border-radius: 9999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.plan-status-badge.free {
+  background: rgba(6, 182, 212, 0.12);
+  color: var(--secondary);
+}
+.plan-status-badge.pro {
+  background: rgba(99, 102, 241, 0.15);
+  color: var(--primary);
+}
+.plan-status-badge.premium {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+}
+
+/* ─── Butoane ─── */
+.btn-upgrade {
+  padding: 8px 20px;
+  border-radius: var(--radius);
+  background: var(--gradient);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.25s;
+  display: inline-flex;
+  align-items: center;
+}
+
+.btn-upgrade:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 20px rgba(99, 102, 241, 0.3);
+  color: #fff;
+}
+
+.btn-link {
+  color: var(--secondary);
+  font-size: 0.88rem;
+  font-weight: 500;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: 'Inter', sans-serif;
+  transition: color 0.2s;
+  text-decoration: none;
+}
+
+.btn-link:hover {
+  color: var(--text);
+}
+
+/* ─── Feedback Salvare ─── */
+.save-feedback {
+  color: var(--success);
+  font-size: 0.82rem;
+  font-weight: 500;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.save-feedback.visible {
+  opacity: 1;
+}
+
+/* ─── Footer ─── */
+.settings-footer {
+  text-align: center;
+  padding: 28px;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+  position: relative;
+  z-index: 1;
+}
+
+.settings-footer a {
+  color: var(--text-sec);
+}
+.settings-footer a:hover {
+  color: var(--text);
+}
+
+/* ─── Responsive ─── */
+@media (max-width: 600px) {
+  .settings-header {
+    padding: 14px 20px;
+  }
+  .settings-main {
+    padding: 32px 16px;
+  }
+  .settings-title {
+    font-size: 1.5rem;
+  }
+  .settings-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+}

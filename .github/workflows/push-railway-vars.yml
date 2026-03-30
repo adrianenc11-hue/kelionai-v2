@@ -1,0 +1,30 @@
+name: Push Vars to Railway
+
+on:
+  workflow_dispatch:
+
+jobs:
+  push-vars:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Push all variables to Railway via GraphQL API
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_PROJECT_ID: ${{ vars.RAILWAY_PROJECT_ID }}
+          RAILWAY_SERVICE_ID: ${{ vars.RAILWAY_SERVICE_ID }}
+          RAILWAY_ENVIRONMENT_ID: ${{ vars.RAILWAY_ENVIRONMENT_ID }}
+        run: |
+          if [ ! -f scripts/push-vars-to-railway.js ]; then
+            echo "⚠️ Script scripts/push-vars-to-railway.js not found."
+            echo "Set variables manually in Railway dashboard."
+            exit 0
+          fi
+          node scripts/push-vars-to-railway.js
+          echo "✅ Variables pushed to Railway!"

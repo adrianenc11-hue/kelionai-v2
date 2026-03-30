@@ -1,0 +1,1117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KelionAI — Plans & Pricing</title>
+  <meta name="description" content="Choose the right KelionAI plan for you. Free, Pro, and Premium options available." />
+  <link rel="icon" href="/images/favicon.ico" />
+  <link rel="stylesheet" href="/css/app.css" />
+  <style>
+    /* ── Pricing Page Specific Styles ── */
+    :root {
+      --kelion-primary: #6366f1;
+      --kelion-secondary: #06b6d4;
+      --kelion-success: #10b981;
+      --kelion-warning: #f59e0b;
+      --kelion-danger: #ef4444;
+      --kelion-bg: #05050f;
+      --kelion-bg-card: rgba(10, 10, 30, 0.7);
+      --kelion-border: rgba(255,255,255,0.07);
+      --kelion-border-hover: rgba(99,102,241,0.35);
+      --kelion-text: #e2e8f0;
+      --kelion-text-secondary: #94a3b8;
+      --kelion-text-muted: #475569;
+      --kelion-gradient: linear-gradient(135deg, #6366f1, #06b6d4);
+      --kelion-radius-sm: 8px;
+      --kelion-radius-lg: 16px;
+      --kelion-font: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --kelion-transition: all 0.2s ease;
+      --kelion-transition-slow: all 0.35s ease;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--kelion-bg);
+      color: var(--kelion-text);
+      font-family: var(--kelion-font);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Background glow ── */
+    body::before {
+      content: '';
+      position: fixed;
+      top: -30%;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 900px;
+      height: 600px;
+      background: radial-gradient(ellipse, rgba(99,102,241,0.08) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── Navbar ── */
+    .pricing-navbar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 32px;
+      background: rgba(5,5,15,0.85);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--kelion-border);
+    }
+
+    .pricing-navbar-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      color: var(--kelion-text);
+      font-weight: 700;
+      font-size: 1.1rem;
+    }
+
+    .pricing-navbar-logo img {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+    }
+
+    .pricing-navbar-back {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      border-radius: var(--kelion-radius-sm);
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--kelion-border);
+      color: var(--kelion-text-secondary);
+      font-size: 0.85rem;
+      cursor: pointer;
+      text-decoration: none;
+      transition: var(--kelion-transition);
+    }
+
+    .pricing-navbar-back:hover {
+      background: rgba(255,255,255,0.09);
+      color: var(--kelion-text);
+      border-color: var(--kelion-border-hover);
+    }
+
+    /* ── Page Layout ── */
+    .pricing-page {
+      position: relative;
+      z-index: 1;
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 60px 24px 80px;
+    }
+
+    /* ── Hero Header ── */
+    .pricing-hero {
+      text-align: center;
+      margin-bottom: 56px;
+    }
+
+    .pricing-hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 14px;
+      border-radius: 100px;
+      background: rgba(99,102,241,0.12);
+      border: 1px solid rgba(99,102,241,0.2);
+      color: var(--kelion-primary);
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      margin-bottom: 20px;
+    }
+
+    .pricing-hero h1 {
+      font-size: clamp(2rem, 5vw, 3.2rem);
+      font-weight: 800;
+      line-height: 1.15;
+      margin-bottom: 16px;
+      background: linear-gradient(135deg, #e2e8f0 0%, #94a3b8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .pricing-hero h1 span {
+      background: var(--kelion-gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .pricing-hero p {
+      color: var(--kelion-text-secondary);
+      font-size: 1.05rem;
+      max-width: 520px;
+      margin: 0 auto 28px;
+      line-height: 1.6;
+    }
+
+    /* ── Billing Toggle ── */
+    .billing-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--kelion-border);
+      border-radius: 100px;
+      padding: 4px 6px;
+      font-size: 0.85rem;
+    }
+
+    .billing-toggle-btn {
+      padding: 7px 20px;
+      border-radius: 100px;
+      border: none;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+      font-family: var(--kelion-font);
+      transition: var(--kelion-transition);
+      background: transparent;
+      color: var(--kelion-text-muted);
+    }
+
+    .billing-toggle-btn.active {
+      background: var(--kelion-gradient);
+      color: #fff;
+    }
+
+    .billing-save-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 100px;
+      background: rgba(16,185,129,0.15);
+      color: var(--kelion-success);
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+
+    /* ── Current Plan Banner ── */
+    #current-plan-banner {
+      display: none;
+      text-align: center;
+      margin-bottom: 28px;
+    }
+
+    .current-plan-banner-inner {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 22px;
+      border-radius: 100px;
+      background: rgba(16,185,129,0.08);
+      border: 1px solid rgba(16,185,129,0.2);
+      color: var(--kelion-success);
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    /* ── Plans Grid ── */
+    .plans-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 24px;
+      margin-bottom: 48px;
+    }
+
+    /* ── Plan Card ── */
+    .plan-card {
+      position: relative;
+      background: var(--kelion-bg-card);
+      border: 1px solid var(--kelion-border);
+      border-radius: 20px;
+      padding: 32px 28px;
+      display: flex;
+      flex-direction: column;
+      transition: var(--kelion-transition-slow);
+      overflow: hidden;
+    }
+
+    .plan-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 20px;
+      opacity: 0;
+      transition: opacity 0.35s ease;
+      pointer-events: none;
+    }
+
+    .plan-card:hover {
+      transform: translateY(-4px);
+      border-color: var(--kelion-border-hover);
+    }
+
+    .plan-card:hover::before {
+      opacity: 1;
+    }
+
+    .plan-card.plan-free::before {
+      background: radial-gradient(ellipse at top, rgba(6,182,212,0.04) 0%, transparent 70%);
+    }
+
+    .plan-card.plan-pro {
+      border-color: rgba(99,102,241,0.25);
+    }
+
+    .plan-card.plan-pro::before {
+      background: radial-gradient(ellipse at top, rgba(99,102,241,0.06) 0%, transparent 70%);
+    }
+
+    .plan-card.plan-premium {
+      border-color: rgba(245,158,11,0.2);
+    }
+
+    .plan-card.plan-premium::before {
+      background: radial-gradient(ellipse at top, rgba(245,158,11,0.05) 0%, transparent 70%);
+    }
+
+    .plan-card.plan-current {
+      border-color: rgba(16,185,129,0.3) !important;
+    }
+
+    /* ── Featured Badge ── */
+    .plan-featured-badge {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 4px 18px;
+      background: var(--kelion-gradient);
+      color: #fff;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      border-radius: 0 0 10px 10px;
+    }
+
+    /* ── Plan Header ── */
+    .plan-icon {
+      font-size: 2rem;
+      margin-bottom: 12px;
+      display: block;
+    }
+
+    .plan-name {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--kelion-text);
+      margin-bottom: 6px;
+    }
+
+    .plan-tagline {
+      font-size: 0.8rem;
+      color: var(--kelion-text-muted);
+      margin-bottom: 20px;
+      min-height: 36px;
+    }
+
+    /* ── Plan Price ── */
+    .plan-price-block {
+      margin-bottom: 24px;
+    }
+
+    .plan-price-amount {
+      font-size: 2.4rem;
+      font-weight: 800;
+      color: var(--kelion-text);
+      line-height: 1;
+    }
+
+    .plan-price-amount.free-price {
+      color: var(--kelion-secondary);
+    }
+
+    .plan-price-amount.pro-price {
+      background: var(--kelion-gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .plan-price-amount.premium-price {
+      color: var(--kelion-warning);
+    }
+
+    .plan-price-period {
+      font-size: 0.8rem;
+      color: var(--kelion-text-muted);
+      margin-top: 4px;
+    }
+
+    .plan-price-annual-note {
+      font-size: 0.75rem;
+      color: var(--kelion-success);
+      margin-top: 3px;
+    }
+
+    /* ── Plan Features ── */
+    .plan-features {
+      list-style: none;
+      padding: 0;
+      margin: 0 0 28px 0;
+      flex: 1;
+    }
+
+    .plan-features li {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 6px 0;
+      font-size: 0.82rem;
+      color: var(--kelion-text-secondary);
+      border-bottom: 1px solid rgba(255,255,255,0.03);
+    }
+
+    .plan-features li:last-child {
+      border-bottom: none;
+    }
+
+    .plan-features li .feat-icon {
+      flex-shrink: 0;
+      font-size: 0.85rem;
+      margin-top: 1px;
+    }
+
+    .plan-features li .feat-icon.check { color: var(--kelion-success); }
+    .plan-features li .feat-icon.cross { color: var(--kelion-text-muted); opacity: 0.5; }
+    .plan-features li .feat-icon.star  { color: var(--kelion-warning); }
+
+    /* ── Plan CTA Button ── */
+    .plan-cta {
+      display: block;
+      width: 100%;
+      padding: 12px 20px;
+      border-radius: var(--kelion-radius-sm);
+      border: none;
+      font-size: 0.9rem;
+      font-weight: 700;
+      font-family: var(--kelion-font);
+      cursor: pointer;
+      text-align: center;
+      text-decoration: none;
+      transition: var(--kelion-transition);
+    }
+
+    .plan-cta.cta-current {
+      background: rgba(16,185,129,0.1);
+      color: var(--kelion-success);
+      border: 1px solid rgba(16,185,129,0.2);
+      cursor: default;
+    }
+
+    .plan-cta.cta-free {
+      background: rgba(6,182,212,0.08);
+      color: var(--kelion-secondary);
+      border: 1px solid rgba(6,182,212,0.15);
+    }
+
+    .plan-cta.cta-free:hover {
+      background: rgba(6,182,212,0.14);
+    }
+
+    .plan-cta.cta-upgrade {
+      background: var(--kelion-gradient);
+      color: #fff;
+      box-shadow: 0 4px 20px rgba(99,102,241,0.25);
+    }
+
+    .plan-cta.cta-upgrade:hover {
+      transform: scale(1.02);
+      box-shadow: 0 6px 28px rgba(99,102,241,0.35);
+    }
+
+    .plan-cta.cta-premium {
+      background: linear-gradient(135deg, #f59e0b, #ef4444);
+      color: #fff;
+      box-shadow: 0 4px 20px rgba(245,158,11,0.2);
+    }
+
+    .plan-cta.cta-premium:hover {
+      transform: scale(1.02);
+      box-shadow: 0 6px 28px rgba(245,158,11,0.3);
+    }
+
+    .plan-cta.cta-manage {
+      background: rgba(99,102,241,0.08);
+      color: var(--kelion-text-secondary);
+      border: 1px solid rgba(99,102,241,0.15);
+    }
+
+    .plan-cta.cta-manage:hover {
+      background: rgba(99,102,241,0.14);
+      color: var(--kelion-text);
+    }
+
+    .plan-cta:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+
+    /* ── Limits Table ── */
+    .plan-limits {
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px solid var(--kelion-border);
+    }
+
+    .plan-limits-title {
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: var(--kelion-text-muted);
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+
+    .plan-limit-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 3px 0;
+      font-size: 0.75rem;
+    }
+
+    .plan-limit-label { color: var(--kelion-text-muted); }
+    .plan-limit-value { color: var(--kelion-text-secondary); font-weight: 600; }
+    .plan-limit-value.unlimited { color: var(--kelion-success); }
+
+    /* ── FAQ Section ── */
+    .pricing-faq {
+      max-width: 720px;
+      margin: 0 auto 60px;
+    }
+
+    .pricing-faq h2 {
+      text-align: center;
+      font-size: 1.6rem;
+      font-weight: 700;
+      margin-bottom: 32px;
+      color: var(--kelion-text);
+    }
+
+    .faq-item {
+      border: 1px solid var(--kelion-border);
+      border-radius: var(--kelion-radius-sm);
+      margin-bottom: 10px;
+      overflow: hidden;
+    }
+
+    .faq-question {
+      width: 100%;
+      padding: 16px 20px;
+      background: rgba(255,255,255,0.02);
+      border: none;
+      color: var(--kelion-text);
+      font-size: 0.9rem;
+      font-weight: 600;
+      font-family: var(--kelion-font);
+      text-align: left;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: var(--kelion-transition);
+    }
+
+    .faq-question:hover {
+      background: rgba(255,255,255,0.04);
+    }
+
+    .faq-icon {
+      font-size: 1.1rem;
+      transition: transform 0.25s ease;
+      color: var(--kelion-text-muted);
+    }
+
+    .faq-item.open .faq-icon {
+      transform: rotate(45deg);
+    }
+
+    .faq-answer {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease;
+    }
+
+    .faq-item.open .faq-answer {
+      max-height: 200px;
+    }
+
+    .faq-answer p {
+      padding: 0 20px 16px;
+      color: var(--kelion-text-secondary);
+      font-size: 0.85rem;
+      line-height: 1.65;
+    }
+
+    /* ── CTA Bottom ── */
+    .pricing-bottom-cta {
+      text-align: center;
+      padding: 48px 24px;
+      border-radius: 20px;
+      background: rgba(99,102,241,0.05);
+      border: 1px solid rgba(99,102,241,0.12);
+    }
+
+    .pricing-bottom-cta h3 {
+      font-size: 1.4rem;
+      font-weight: 700;
+      margin-bottom: 10px;
+      color: var(--kelion-text);
+    }
+
+    .pricing-bottom-cta p {
+      color: var(--kelion-text-secondary);
+      margin-bottom: 22px;
+      font-size: 0.9rem;
+    }
+
+    .pricing-bottom-cta a {
+      display: inline-block;
+      padding: 12px 32px;
+      background: var(--kelion-gradient);
+      color: #fff;
+      border-radius: var(--kelion-radius-sm);
+      font-weight: 700;
+      text-decoration: none;
+      font-size: 0.95rem;
+      transition: var(--kelion-transition);
+    }
+
+    .pricing-bottom-cta a:hover {
+      transform: scale(1.03);
+      box-shadow: 0 6px 28px rgba(99,102,241,0.3);
+    }
+
+    /* ── Loading / Error ── */
+    .pricing-loading {
+      text-align: center;
+      padding: 80px 20px;
+      color: var(--kelion-text-muted);
+    }
+
+    .pricing-spinner {
+      width: 36px;
+      height: 36px;
+      border: 3px solid rgba(99,102,241,0.15);
+      border-top-color: var(--kelion-primary);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 16px;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Toast ── */
+    .pricing-toast {
+      position: fixed;
+      bottom: 28px;
+      left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: rgba(10,10,30,0.95);
+      border: 1px solid var(--kelion-border);
+      border-radius: var(--kelion-radius-sm);
+      padding: 12px 24px;
+      color: var(--kelion-text);
+      font-size: 0.85rem;
+      z-index: 9999;
+      transition: transform 0.3s ease;
+      backdrop-filter: blur(12px);
+      max-width: 380px;
+      text-align: center;
+    }
+
+    .pricing-toast.show {
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .pricing-toast.success { border-color: rgba(16,185,129,0.3); color: var(--kelion-success); }
+    .pricing-toast.error   { border-color: rgba(239,68,68,0.3); color: #f87171; }
+
+    /* ── Responsive ── */
+    @media (max-width: 768px) {
+      .pricing-navbar { padding: 12px 16px; }
+      .pricing-page { padding: 40px 16px 60px; }
+      .plans-grid { grid-template-columns: 1fr; gap: 16px; }
+      .plan-card { padding: 24px 20px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Navbar -->
+  <nav class="pricing-navbar">
+    <a href="/" class="pricing-navbar-logo">
+      <img src="/images/kelion-logo.png" onerror="this.style.display='none'" alt="KelionAI" />
+      KelionAI
+    </a>
+    <a href="/" class="pricing-navbar-back">
+      ← Back to App
+    </a>
+  </nav>
+
+  <!-- Main Content -->
+  <main class="pricing-page">
+
+    <!-- Hero -->
+    <div class="pricing-hero">
+      <div class="pricing-hero-badge">💎 Plans & Pricing</div>
+      <h1>Choose your <span>KelionAI</span> plan</h1>
+      <p>Start free, upgrade when you're ready. All plans include access to Kelion & Kira AI assistants.</p>
+
+      <!-- Billing Toggle -->
+      <div class="billing-toggle">
+        <button class="billing-toggle-btn active" id="btn-monthly" onclick="setBilling('monthly')">Monthly</button>
+        <button class="billing-toggle-btn" id="btn-annual" onclick="setBilling('annual')">
+          Annual <span class="billing-save-badge">Save 28%</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Current Plan Banner -->
+    <div id="current-plan-banner">
+      <div class="current-plan-banner-inner">
+        <span>✓</span>
+        <span id="current-plan-text">You are on the Free plan</span>
+      </div>
+    </div>
+
+    <!-- Plans Grid -->
+    <div class="plans-grid" id="plans-grid">
+      <div class="pricing-loading">
+        <div class="pricing-spinner"></div>
+        <p>Loading plans...</p>
+      </div>
+    </div>
+
+    <!-- FAQ -->
+    <div class="pricing-faq">
+      <h2>Frequently Asked Questions</h2>
+
+      <div class="faq-item">
+        <button class="faq-question" onclick="toggleFaq(this)">
+          Can I cancel my subscription anytime?
+          <span class="faq-icon">+</span>
+        </button>
+        <div class="faq-answer">
+          <p>Yes, you can cancel your subscription at any time. Your plan will remain active until the end of the current billing period, and you won't be charged again.</p>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-question" onclick="toggleFaq(this)">
+          What happens when I reach my daily limits?
+          <span class="faq-icon">+</span>
+        </button>
+        <div class="faq-answer">
+          <p>Daily limits reset at midnight UTC. When you reach your limit, you'll be notified and can upgrade your plan for higher limits or wait for the reset.</p>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-question" onclick="toggleFaq(this)">
+          Is there a free trial for Pro or Premium?
+          <span class="faq-icon">+</span>
+        </button>
+        <div class="faq-answer">
+          <p>You can start with the Free plan to explore KelionAI's core features. Invite friends using referral codes to earn bonus days on paid plans.</p>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-question" onclick="toggleFaq(this)">
+          What payment methods are accepted?
+          <span class="faq-icon">+</span>
+        </button>
+        <div class="faq-answer">
+          <p>We accept all major credit and debit cards (Visa, Mastercard, Amex) via Stripe. All transactions are secured and encrypted.</p>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-question" onclick="toggleFaq(this)">
+          Can I switch between plans?
+          <span class="faq-icon">+</span>
+        </button>
+        <div class="faq-answer">
+          <p>Yes! You can upgrade or downgrade your plan at any time. Upgrades take effect immediately; downgrades apply at the next billing cycle.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom CTA -->
+    <div class="pricing-bottom-cta">
+      <h3>Still have questions?</h3>
+      <p>Our team is here to help you choose the right plan.</p>
+      <a href="/contact/">Contact Support</a>
+    </div>
+
+  </main>
+
+  <!-- Toast -->
+  <div class="pricing-toast" id="pricing-toast"></div>
+
+  <script>
+  (function () {
+    'use strict';
+
+    // ── State ──
+    let billing = 'monthly';
+    let currentPlan = null;
+    let plansData = [];
+    let isAuthenticated = false;
+
+    // ── Plan definitions (fallback if API fails) ──
+    const PLAN_DEFAULTS = [
+      {
+        id: 'free',
+        name: 'Free',
+        price: 0,
+        price_monthly: 0,
+        price_annual: 0,
+        currency: 'EUR',
+        icon: '🌱',
+        tagline: 'Perfect for getting started',
+        limits: { chat: 10, search: 3, image: 1, vision: 3, tts: 10 },
+        features: [
+          { text: '10 AI chats / day', ok: true },
+          { text: '3 web searches / day', ok: true },
+          { text: '1 image generation / day', ok: true },
+          { text: 'Kelion & Kira avatars', ok: true },
+          { text: 'Voice mode (basic)', ok: true },
+          { text: 'Voice cloning', ok: false },
+          { text: 'Priority support', ok: false },
+        ],
+      },
+      {
+        id: 'pro',
+        name: 'Pro',
+        price_monthly: 29,
+        price_annual: 250,
+        currency: 'EUR',
+        icon: '⚡',
+        tagline: 'For power users & professionals',
+        featured: true,
+        limits: { chat: 100, search: 30, image: 10, vision: 20, tts: 100 },
+        features: [
+          { text: '100 AI chats / day', ok: true },
+          { text: '30 web searches / day', ok: true },
+          { text: '10 image generations / day', ok: true },
+          { text: '20 vision analyses / day', ok: true },
+          { text: 'Voice cloning (ElevenLabs)', ok: true },
+          { text: 'Translate mode', ok: true },
+          { text: 'Priority support', ok: false },
+        ],
+      },
+      {
+        id: 'premium',
+        name: 'Premium',
+        price_monthly: 0,
+        price_annual: 0,
+        currency: 'EUR',
+        icon: '👑',
+        tagline: 'Unlimited access, everything included',
+        limits: { chat: -1, search: -1, image: -1, vision: -1, tts: -1 },
+        features: [
+          { text: 'Unlimited AI chats', ok: true, star: true },
+          { text: 'Unlimited web searches', ok: true, star: true },
+          { text: 'Unlimited image generation', ok: true, star: true },
+          { text: 'Unlimited vision & TTS', ok: true, star: true },
+          { text: 'Voice cloning (ElevenLabs)', ok: true },
+          { text: 'Priority support 24/7', ok: true },
+          { text: 'Early access to new features', ok: true },
+        ],
+      },
+    ];
+
+    // ── Token helpers ──
+    function getToken() {
+      return localStorage.getItem('kelion_token') || sessionStorage.getItem('kelion_token') || null;
+    }
+
+    // ── Billing toggle ──
+    window.setBilling = function (mode) {
+      billing = mode;
+      document.getElementById('btn-monthly').classList.toggle('active', mode === 'monthly');
+      document.getElementById('btn-annual').classList.toggle('active', mode === 'annual');
+      renderPlans();
+    };
+
+    // ── FAQ toggle ──
+    window.toggleFaq = function (btn) {
+      const item = btn.closest('.faq-item');
+      item.classList.toggle('open');
+    };
+
+    // ── Toast ──
+    function showToast(msg, type) {
+      const t = document.getElementById('pricing-toast');
+      t.textContent = msg;
+      t.className = 'pricing-toast ' + (type || '');
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 3500);
+    }
+
+    // ── Format price ──
+    function formatPrice(plan) {
+      if (plan.id === 'free') return '<span class="plan-price-amount free-price">€0</span><div class="plan-price-period">forever free</div>';
+
+      const monthly = plan.price_monthly || 0;
+      const annual  = plan.price_annual  || 0;
+
+      if (plan.id === 'premium' && monthly === 0) {
+        return '<span class="plan-price-amount premium-price">Contact us</span><div class="plan-price-period">custom pricing</div>';
+      }
+
+      if (billing === 'annual' && annual > 0) {
+        const perMonth = (annual / 12).toFixed(0);
+        return `<span class="plan-price-amount ${plan.id}-price">€${perMonth}</span><div class="plan-price-period">per month, billed annually</div><div class="plan-price-annual-note">€${annual}/year — save €${(monthly * 12 - annual).toFixed(0)}</div>`;
+      }
+
+      return `<span class="plan-price-amount ${plan.id}-price">€${monthly}</span><div class="plan-price-period">per month</div>`;
+    }
+
+    // ── Format limit ──
+    function fmtLimit(val) {
+      if (val === -1 || val === null || val === undefined) return '<span class="plan-limit-value unlimited">∞ Unlimited</span>';
+      return `<span class="plan-limit-value">${val}/day</span>`;
+    }
+
+    // ── Render CTA button ──
+    function renderCTA(plan) {
+      const isCurrent = currentPlan === plan.id;
+
+      if (isCurrent) {
+        return `<button class="plan-cta cta-current" disabled>✓ Current Plan</button>`;
+      }
+
+      if (plan.id === 'free') {
+        if (!isAuthenticated) {
+          return `<a href="/" class="plan-cta cta-free">Get Started Free</a>`;
+        }
+        return `<button class="plan-cta cta-free" onclick="downgradeFree()">Switch to Free</button>`;
+      }
+
+      if (plan.id === 'premium') {
+        return `<a href="/contact/" class="plan-cta cta-premium">Contact Sales</a>`;
+      }
+
+      if (!isAuthenticated) {
+        return `<a href="/" class="plan-cta cta-upgrade">Get Started</a>`;
+      }
+
+      return `<button class="plan-cta cta-upgrade" onclick="startCheckout('${plan.id}')">Upgrade to ${plan.name}</button>`;
+    }
+
+    // ── Render features list ──
+    function renderFeatures(features) {
+      if (!features || !features.length) return '';
+      return features.map(f => {
+        if (typeof f === 'string') {
+          return `<li><span class="feat-icon check">✓</span> ${f}</li>`;
+        }
+        const icon = f.star ? '★' : (f.ok ? '✓' : '✗');
+        const cls  = f.star ? 'star' : (f.ok ? 'check' : 'cross');
+        return `<li><span class="feat-icon ${cls}">${icon}</span> ${f.text}</li>`;
+      }).join('');
+    }
+
+    // ── Render limits ──
+    function renderLimits(limits) {
+      if (!limits) return '';
+      const rows = [
+        { label: 'AI Chats',   key: 'chat' },
+        { label: 'Searches',   key: 'search' },
+        { label: 'Images',     key: 'image' },
+        { label: 'Vision',     key: 'vision' },
+        { label: 'TTS',        key: 'tts' },
+      ];
+      return `
+        <div class="plan-limits">
+          <div class="plan-limits-title">Daily Limits</div>
+          ${rows.map(r => `
+            <div class="plan-limit-row">
+              <span class="plan-limit-label">${r.label}</span>
+              ${fmtLimit(limits[r.key])}
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    // ── Render all plans ──
+    function renderPlans() {
+      const grid = document.getElementById('plans-grid');
+      if (!plansData.length) {
+        grid.innerHTML = '<div class="pricing-loading"><p>No plans available.</p></div>';
+        return;
+      }
+
+      grid.innerHTML = plansData.map(plan => {
+        const isCurrent = currentPlan === plan.id;
+        const classes = ['plan-card', 'plan-' + plan.id, isCurrent ? 'plan-current' : ''].filter(Boolean).join(' ');
+
+        return `
+          <div class="${classes}">
+            ${plan.featured ? '<div class="plan-featured-badge">MOST POPULAR</div>' : ''}
+            <span class="plan-icon">${plan.icon || '💡'}</span>
+            <div class="plan-name">${plan.name}</div>
+            <div class="plan-tagline">${plan.tagline || ''}</div>
+            <div class="plan-price-block">${formatPrice(plan)}</div>
+            <ul class="plan-features">${renderFeatures(plan.features)}</ul>
+            ${renderCTA(plan)}
+            ${renderLimits(plan.limits)}
+          </div>
+        `;
+      }).join('');
+    }
+
+    // ── Checkout ──
+    window.startCheckout = async function (planId) {
+      const token = getToken();
+      if (!token) {
+        showToast('Please log in to upgrade your plan.', 'error');
+        setTimeout(() => window.location.href = '/', 1500);
+        return;
+      }
+
+      const btn = document.querySelector(`[onclick="startCheckout('${planId}')"]`);
+      if (btn) { btn.disabled = true; btn.textContent = 'Redirecting...'; }
+
+      try {
+        const res = await fetch('/api/payments/checkout', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token,
+          },
+          body: JSON.stringify({ plan: planId, billing }),
+        });
+
+        const data = await res.json();
+
+        if (data.url) {
+          window.location.href = data.url;
+        } else if (data.error === 'Payments not configured') {
+          showToast('Payment system is being set up. Please contact support.', 'error');
+          if (btn) { btn.disabled = false; btn.textContent = 'Upgrade to ' + planId; }
+        } else {
+          showToast(data.error || 'Failed to start checkout.', 'error');
+          if (btn) { btn.disabled = false; btn.textContent = 'Upgrade to ' + planId; }
+        }
+      } catch (err) {
+        showToast('Network error. Please try again.', 'error');
+        if (btn) { btn.disabled = false; btn.textContent = 'Upgrade to ' + planId; }
+      }
+    };
+
+    // ── Manage subscription ──
+    window.manageSubscription = async function () {
+      const token = getToken();
+      if (!token) return;
+
+      try {
+        const res = await fetch('/api/payments/portal', {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + token },
+        });
+        const data = await res.json();
+        if (data.url) window.location.href = data.url;
+        else showToast(data.error || 'Could not open billing portal.', 'error');
+      } catch (err) {
+        showToast('Network error.', 'error');
+      }
+    };
+
+    // ── Downgrade to free ──
+    window.downgradeFree = function () {
+      showToast('To downgrade, please contact support.', '');
+    };
+
+    // ── Load plans from API ──
+    async function loadPlans() {
+      try {
+        const res = await fetch('/api/payments/plans');
+        if (!res.ok) throw new Error('API error');
+        const data = await res.json();
+
+        if (data.plans && data.plans.length) {
+          // Merge API data with local defaults (for icons, taglines, features)
+          plansData = data.plans.map(apiPlan => {
+            const def = PLAN_DEFAULTS.find(d => d.id === apiPlan.id) || {};
+            return Object.assign({}, def, apiPlan, {
+              icon: def.icon,
+              tagline: def.tagline,
+              featured: def.featured,
+              features: apiPlan.features && apiPlan.features.length ? apiPlan.features.map(f => ({ text: f, ok: true })) : def.features,
+              limits: apiPlan.limits || def.limits,
+            });
+          }).filter(p => p.id !== 'guest');
+        } else {
+          plansData = PLAN_DEFAULTS;
+        }
+      } catch (e) {
+        plansData = PLAN_DEFAULTS;
+      }
+    }
+
+    // ── Load current user plan ──
+    async function loadUserStatus() {
+      const token = getToken();
+      if (!token) {
+        isAuthenticated = false;
+        return;
+      }
+
+      isAuthenticated = true;
+
+      try {
+        const res = await fetch('/api/payments/status', {
+          headers: { 'Authorization': 'Bearer ' + token },
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        currentPlan = data.plan || 'free';
+
+        // Show current plan banner
+        const banner = document.getElementById('current-plan-banner');
+        const bannerText = document.getElementById('current-plan-text');
+        if (banner && bannerText) {
+          const planName = currentPlan.charAt(0).toUpperCase() + currentPlan.slice(1);
+          bannerText.textContent = `You are currently on the ${planName} plan`;
+          banner.style.display = 'block';
+        }
+      } catch (e) {
+        currentPlan = 'free';
+      }
+    }
+
+    // ── Init ──
+    async function init() {
+      await Promise.all([loadPlans(), loadUserStatus()]);
+      renderPlans();
+    }
+
+    init();
+  })();
+  </script>
+</body>
+</html>

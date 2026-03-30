@@ -1,0 +1,259 @@
+/* ═══════════════════════════════════════════
+   KelionAI v3 — Premium Design System
+   ═══════════════════════════════════════════ */
+
+:root {
+  /* Culori principale */
+  --kelion-primary: #6366f1;
+  --kelion-primary-hover: #5558e8;
+  --kelion-secondary: #06b6d4;
+  --kelion-accent: #8b5cf6;
+  --kelion-success: #10b981;
+  --kelion-warning: #f59e0b;
+  --kelion-danger: #ef4444;
+
+  /* Backgrounds */
+  --kelion-bg: #050510;
+  --kelion-bg-secondary: #0a0a1b;
+  --kelion-surface: rgba(15, 15, 40, 0.7);
+  --kelion-surface-hover: rgba(25, 25, 55, 0.8);
+  --kelion-surface-solid: #0e0e24;
+  --kelion-border: rgba(99, 102, 241, 0.12);
+  --kelion-border-hover: rgba(99, 102, 241, 0.3);
+
+  /* Text */
+  --kelion-text: #f0f0ff;
+  --kelion-text-secondary: #8888aa;
+  --kelion-text-muted: #555577;
+
+  /* Typography */
+  --kelion-font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --kelion-font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+
+  /* Spacing */
+  --kelion-radius: 12px;
+  --kelion-radius-sm: 8px;
+  --kelion-radius-lg: 20px;
+  --kelion-radius-xl: 28px;
+
+  /* Shadows & Glow */
+  --kelion-glow: 0 0 30px rgba(99, 102, 241, 0.25);
+  --kelion-glow-cyan: 0 0 30px rgba(6, 182, 212, 0.25);
+  --kelion-glow-accent: 0 0 30px rgba(139, 92, 246, 0.25);
+  --kelion-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+  --kelion-shadow-lg: 0 8px 48px rgba(0, 0, 0, 0.6);
+
+  /* Gradients */
+  --kelion-gradient: linear-gradient(135deg, #6366f1, #06b6d4);
+  --kelion-gradient-accent: linear-gradient(135deg, #8b5cf6, #6366f1);
+  --kelion-gradient-warm: linear-gradient(135deg, #f59e0b, #ef4444);
+  --kelion-gradient-surface: linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(6, 182, 212, 0.05));
+  --kelion-gradient-bg: linear-gradient(180deg, #050510 0%, #0a0a1b 50%, #050510 100%);
+
+  /* Glass */
+  --kelion-glass: rgba(10, 10, 30, 0.6);
+  --kelion-glass-border: rgba(99, 102, 241, 0.15);
+  --kelion-glass-blur: blur(20px);
+
+  /* Transitions */
+  --kelion-transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  --kelion-transition-slow: 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  --kelion-transition-spring: 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* Z-index layers */
+  --z-base: 1;
+  --z-dropdown: 50;
+  --z-sticky: 80;
+  --z-overlay: 100;
+  --z-modal: 200;
+  --z-toast: 300;
+  --z-tooltip: 400;
+}
+
+/* ── Light Theme Override ── */
+[data-theme='light'] {
+  --kelion-primary: #4f46e5;
+  --kelion-primary-hover: #4338ca;
+  --kelion-secondary: #0891b2;
+  --kelion-accent: #7c3aed;
+  --kelion-success: #059669;
+  --kelion-warning: #d97706;
+  --kelion-danger: #dc2626;
+
+  --kelion-bg: #f8f9fc;
+  --kelion-bg-secondary: #eeeef5;
+  --kelion-surface: rgba(255, 255, 255, 0.85);
+  --kelion-surface-hover: rgba(240, 240, 250, 0.95);
+  --kelion-surface-solid: #ffffff;
+  --kelion-border: rgba(79, 70, 229, 0.12);
+  --kelion-border-hover: rgba(79, 70, 229, 0.25);
+
+  --kelion-text: #1a1a2e;
+  --kelion-text-secondary: #64648a;
+  --kelion-text-muted: #9999b5;
+
+  --kelion-glow: 0 0 20px rgba(79, 70, 229, 0.12);
+  --kelion-glow-cyan: 0 0 20px rgba(8, 145, 178, 0.12);
+  --kelion-glow-accent: 0 0 20px rgba(124, 58, 237, 0.12);
+  --kelion-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+  --kelion-shadow-lg: 0 8px 48px rgba(0, 0, 0, 0.12);
+
+  --kelion-gradient-surface: linear-gradient(135deg, rgba(79, 70, 229, 0.05), rgba(8, 145, 178, 0.03));
+  --kelion-gradient-bg: linear-gradient(180deg, #f8f9fc 0%, #eeeef5 50%, #f8f9fc 100%);
+
+  --kelion-glass: rgba(255, 255, 255, 0.7);
+  --kelion-glass-border: rgba(79, 70, 229, 0.1);
+}
+
+[data-theme='light'] body {
+  background: var(--kelion-bg);
+  color: var(--kelion-text);
+}
+[data-theme='light'] ::-webkit-scrollbar-thumb {
+  background: rgba(79, 70, 229, 0.15);
+}
+[data-theme='light'] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(79, 70, 229, 0.3);
+}
+
+/* ── Theme Toggle Button ── */
+.theme-toggle {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--kelion-glass);
+  -webkit-backdrop-filter: var(--kelion-glass-blur);
+  backdrop-filter: var(--kelion-glass-blur);
+  border: 1px solid var(--kelion-glass-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  cursor: pointer;
+  z-index: 1000;
+  transition: all var(--kelion-transition);
+  box-shadow: var(--kelion-shadow);
+  color: var(--kelion-text);
+}
+.theme-toggle:hover {
+  transform: translateY(-2px) scale(1.05);
+  box-shadow: var(--kelion-glow);
+  border-color: var(--kelion-border-hover);
+}
+
+/* ── Glow pulse animation ── */
+@keyframes kelion-glow-pulse {
+  0%,
+  100% {
+    box-shadow: var(--kelion-glow);
+  }
+  50% {
+    box-shadow: 0 0 50px rgba(99, 102, 241, 0.4);
+  }
+}
+
+/* ── Gradient text ── */
+.gradient-text {
+  background: var(--kelion-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.gradient-text-accent {
+  background: var(--kelion-gradient-accent);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Glass effect ── */
+.glass {
+  background: var(--kelion-glass);
+  -webkit-backdrop-filter: var(--kelion-glass-blur);
+  backdrop-filter: var(--kelion-glass-blur);
+  border: 1px solid var(--kelion-glass-border);
+}
+
+/* ── Badge helpers ── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  border-radius: 100px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.badge-primary {
+  background: rgba(99, 102, 241, 0.15);
+  color: var(--kelion-primary);
+  border: 1px solid rgba(99, 102, 241, 0.25);
+}
+
+.badge-warning {
+  background: rgba(245, 158, 11, 0.12);
+  color: var(--kelion-warning);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+.badge-success {
+  background: rgba(16, 185, 129, 0.12);
+  color: var(--kelion-success);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.badge-danger {
+  background: rgba(239, 68, 68, 0.12);
+  color: var(--kelion-danger);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(99, 102, 241, 0.2);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(99, 102, 241, 0.4);
+}
+
+/* ═══ Home button fixed ═══ */
+.home-btn-fixed {
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(5, 5, 16, 0.8);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(99, 102, 241, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  text-decoration: none;
+  z-index: 1000;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+.home-btn-fixed:hover {
+  background: rgba(99, 102, 241, 0.15);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+}

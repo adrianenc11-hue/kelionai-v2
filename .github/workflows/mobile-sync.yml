@@ -1,0 +1,36 @@
+name: 📱 Mobile Auto-Sync
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'app/**'
+      - 'public/**'
+      - 'capacitor.config.json'
+
+jobs:
+  sync-mobile:
+    runs-on: ubuntu-latest
+    name: Sync web → Android + iOS
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Capacitor Sync
+        run: npx cap sync
+
+      - name: Commit synced assets
+        run: |
+          git config user.name "KelionAI Bot"
+          git config user.email "bot@kelionai.com"
+          git add android/ ios/
+          git diff --staged --quiet || git commit -m "🤖 auto-sync: mobile assets updated [skip ci]"
+          git push

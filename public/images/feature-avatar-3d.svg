@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="576" viewBox="0 0 1024 576">
+  <rect width="1024" height="576" fill="#050510"/>
+  <!-- Holographic avatar head outline -->
+  <ellipse cx="512" cy="240" rx="120" ry="150" fill="none" stroke="url(#avatarGrad)" stroke-width="2" opacity="0.8"/>
+  <ellipse cx="512" cy="240" rx="100" ry="130" fill="none" stroke="url(#avatarGrad)" stroke-width="1" opacity="0.4"/>
+  <!-- Face features -->
+  <ellipse cx="480" cy="210" rx="14" ry="10" fill="#06B6D4" opacity="0.7"/>
+  <ellipse cx="544" cy="210" rx="14" ry="10" fill="#06B6D4" opacity="0.7"/>
+  <path d="M490 265 Q512 282 534 265" fill="none" stroke="#6366F1" stroke-width="2" opacity="0.8"/>
+  <!-- Glowing particles -->
+  <circle cx="400" cy="150" r="3" fill="#06B6D4" opacity="0.9"/>
+  <circle cx="620" cy="160" r="2" fill="#6366F1" opacity="0.8"/>
+  <circle cx="380" cy="310" r="2" fill="#06B6D4" opacity="0.7"/>
+  <circle cx="640" cy="300" r="3" fill="#6366F1" opacity="0.8"/>
+  <circle cx="440" cy="100" r="2" fill="#06B6D4" opacity="0.6"/>
+  <circle cx="580" cy="90" r="3" fill="#6366F1" opacity="0.7"/>
+  <circle cx="350" cy="240" r="2" fill="#06B6D4" opacity="0.6"/>
+  <circle cx="670" cy="230" r="2" fill="#6366F1" opacity="0.7"/>
+  <circle cx="460" cy="380" r="3" fill="#06B6D4" opacity="0.7"/>
+  <circle cx="560" cy="390" r="2" fill="#6366F1" opacity="0.6"/>
+  <!-- Scan lines -->
+  <line x1="380" y1="140" x2="640" y2="140" stroke="#6366F1" stroke-width="0.5" opacity="0.3"/>
+  <line x1="370" y1="180" x2="650" y2="180" stroke="#06B6D4" stroke-width="0.5" opacity="0.3"/>
+  <line x1="370" y1="240" x2="650" y2="240" stroke="#6366F1" stroke-width="0.5" opacity="0.3"/>
+  <line x1="380" y1="300" x2="640" y2="300" stroke="#06B6D4" stroke-width="0.5" opacity="0.3"/>
+  <line x1="390" y1="340" x2="630" y2="340" stroke="#6366F1" stroke-width="0.5" opacity="0.3"/>
+  <!-- Outer ring -->
+  <circle cx="512" cy="240" r="180" fill="none" stroke="url(#avatarGrad)" stroke-width="1" opacity="0.3" stroke-dasharray="8 4"/>
+  <defs>
+    <linearGradient id="avatarGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6366F1"/>
+      <stop offset="100%" stop-color="#06B6D4"/>
+    </linearGradient>
+    <linearGradient id="textGrad2" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#6366F1"/>
+      <stop offset="100%" stop-color="#06B6D4"/>
+    </linearGradient>
+  </defs>
+  <!-- Label -->
+  <text x="512" y="490" font-family="Inter, system-ui, sans-serif" font-size="18" font-weight="600" fill="url(#textGrad2)" text-anchor="middle" opacity="0.9">3D Avatar</text>
+  <text x="512" y="514" font-family="Inter, system-ui, sans-serif" font-size="12" fill="#8888AA" text-anchor="middle">feature-avatar-3d</text>
+</svg>

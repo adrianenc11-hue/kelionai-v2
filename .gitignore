@@ -1,0 +1,56 @@
+node_modules/
+
+# ═══ SECRETS — NEVER COMMIT ═══
+.env
+.env.*
+!.env.example
+.env.local
+.env.production
+.env.backup*
+.env.railway*
+*.railway.json
+
+# Test artifacts
+test-results/
+playwright-report/
+blob-report/
+coverage/
+test-output.json
+tests/e2e-report*.json
+tests/e2e-results*.txt
+tests/inline-styles.txt
+
+# Build / temp
+*.webp
+logs/
+conflicts/
+reports/*.json
+reports/*.md
+auto-merge-report.md
+tmp-*
+
+# Debug / one-off scripts & output (never commit)
+_*.js
+cleanup-*.ps1
+cleanup-*.js
+*-stderr.txt
+*-stdout.txt
+audit-input.txt
+dump-project-output.txt
+e2e-*.txt
+e2e-*.json
+jest_results.json
+
+# Large binaries / JDK
+oracleJdk-26/
+
+# Snapshots
+.snapshots/
+
+# Dev SSL cert (self-signed, local only)
+server/dev-cert/
+
+# Temp scripts & output
+check-endpoints.js
+run-pw.js
+pw-*.txt

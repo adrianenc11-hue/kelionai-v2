@@ -1,0 +1,46 @@
+# Secrets — NEVER include in Docker images
+.env
+.env.*
+!.env.example
+.env.backup*
+.env.local
+.env.production
+
+# Git history
+.git
+.gitignore
+
+# Development/test artifacts
+node_modules
+coverage
+test-results
+playwright-report
+blob-report
+__tests__
+tests
+testcomplet
+
+# IDE / Editor
+.vscode
+.idea
+*.swp
+*.swo
+
+# Temp/debug files
+tmp-*
+file_err.txt
+test_payload.json
+test_tts.json
+test-output.*
+test-results-summary.txt
+test-trading-audit.js
+validate-keys.js
+
+# Documentation (not needed in production image)
+docs
+*.md
+!README.md
+
+# Agents config
+.agents
+.github

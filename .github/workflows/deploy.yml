@@ -1,0 +1,21 @@
+name: Deploy to Production
+
+# DISABLED: Railway auto-deploys via native GitHub integration.
+# This workflow is kept for manual fallback only.
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Deploy to Railway
+        run: railway up --detach
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_PROJECT_ID: 25bd0ac1-73d3-4880-bd21-57b46c8eedfe
