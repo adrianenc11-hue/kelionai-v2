@@ -619,23 +619,8 @@
       // ═══════════════════════════════════════════════════════
       // SSE STREAMING — word-by-word display (FAST!)
       // ═══════════════════════════════════════════════════════
-      // Prepare UI for streaming
-      const overlay = document.getElementById('chat-overlay');
-      if (overlay) {
-        overlay.innerHTML = '';
-        const actionBar = document.createElement('div');
-        actionBar.className = 'msg-actions';
-        actionBar.style.display = 'none'; // Moved to input bar
-        actionBar.innerHTML =
-          '<button class="msg-action-btn" id="btn-copy-msg" title="Copy text">📋</button>' +
-          '<button class="msg-action-btn" id="btn-save-msg" title="Save as file">💾</button>';
-        overlay.appendChild(actionBar);
-        const msgEl = document.createElement('div');
-        msgEl.className = 'msg assistant';
-        msgEl.style.userSelect = 'text';
-        msgEl.innerHTML = '<span style="color:#6366f1;opacity:0.6">⏳</span>';
-        overlay.appendChild(msgEl);
-      }
+      // Show user message under avatar
+      _updateSubtitle('user', message);
 
       let fullReply = '';
       let streamEngine = 'Gemini';
@@ -701,18 +686,14 @@
                     // Progressive display — show text as it arrives (stripped of avatar tags)
                     const displayText = stripAvatarTags(fullReply);
                     if (displayText) {
-                      msgEl.innerHTML = parseMarkdown(displayText);
-                      overlay.scrollTop = overlay.scrollHeight;
                       _updateSubtitle('ai', displayText);
                     }
                   } else if (evt.type === 'start') {
                     streamEngine = evt.engine || 'Gemini';
                   } else if (evt.type === 'progress' && evt.detail) {
-                    // SuperThink pipeline progress — show status to user
-                    msgEl.innerHTML =
-                      '<span style="color:#6366f1;opacity:0.7">🧠 ' + escapeHtml(evt.detail) + '</span>';
+                    _updateSubtitle('ai', '🧠 ' + evt.detail);
                   } else if (evt.type === 'thinking') {
-                    msgEl.innerHTML = '<span style="color:#6366f1;opacity:0.6">🧠 Thinking...</span>';
+                    _updateSubtitle('ai', '🧠 Thinking...');
                   } else if (evt.type === 'actions' && evt.actions) {
                     // AI controlează funcțiile aplicației
                     evt.actions.forEach(function (action) {
@@ -947,47 +928,10 @@
       chatHistory.push({ role: 'assistant', content: fullReply });
       saveChatHistoryLocal();
 
-      // Final display (clean text without tags)
-      msgEl.innerHTML = parseMarkdown(fullReply);
-      overlay.scrollTop = overlay.scrollHeight;
-      // Update subtitle under avatar with final clean AI response
+      // Final display under avatar
       _updateSubtitle('ai', fullReply);
-
-      // Wire copy/save buttons
-      const copyBtn = actionBar.querySelector('#btn-copy-msg');
-      const saveBtn = actionBar.querySelector('#btn-save-msg');
-      if (copyBtn)
-        copyBtn.onclick = function () {
-          navigator.clipboard
-            .writeText(fullReply)
-            .then(function () {
-              copyBtn.textContent = 'OK';
-              setTimeout(function () {
-                copyBtn.textContent = 'Copy';
-              }, 1500);
-            })
-            .catch(function () {
-              const ta = document.createElement('textarea');
-              ta.value = fullReply;
-              document.body.appendChild(ta);
-              ta.select();
-              document.execCommand('copy');
-              document.body.removeChild(ta);
-              copyBtn.textContent = 'OK';
-              setTimeout(function () {
-                copyBtn.textContent = 'Copy';
-              }, 1500);
-            });
-        };
-      if (saveBtn)
-        saveBtn.onclick = function () {
-          const blob = new Blob([fullReply], { type: 'text/plain;charset=utf-8' });
-          const a = document.createElement('a');
-          a.href = URL.createObjectURL(blob);
-          a.download = 'kelion-response-' + new Date().toISOString().slice(0, 19).replace(/:/g, '-') + '.txt';
-          a.click();
-          URL.revokeObjectURL(a.href);
-        };
+      // Persist in hidden #chat-messages for history export
+      addMessage('assistant', fullReply);
 
       // Image/map detection — PRIORITATE MAXIMĂ, înainte de auto-display
       const IMG_DETECT =
@@ -1863,6 +1807,7 @@
         const text = e.detail.text.trim();
         if (!text) return;
         _voiceInitiated = true;
+        hideWelcome();
         if (window.KAvatar && KAvatar.setAttentive) KAvatar.setAttentive(true);
         addMessage('user', text);
         chatHistory.push({ role: 'user', content: text });

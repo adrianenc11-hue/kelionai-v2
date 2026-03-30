@@ -40,6 +40,8 @@
     const buffer = ctx.createBuffer(1, samples.length, 24000);
     buffer.getChannelData(0).set(samples);
 
+    // Cap queue to prevent OOM if TTS streams faster than playback
+    if (pcmQueue.length >= 100) pcmQueue.shift();
     pcmQueue.push(buffer);
     if (!isPlaying) drainQueue();
   }
@@ -236,8 +238,7 @@
       '/api/voice-stream?avatar=' +
       avatar +
       '&language=' +
-      language +
-      (token ? '&token=' + encodeURIComponent(token) : '');
+      language;
     console.log('[VoiceStream] Connecting to', url);
 
     ws = new WebSocket(url);
@@ -246,6 +247,8 @@
     ws.onopen = function () {
       isConnected = true;
       console.log('[VoiceStream] ✅ Connected');
+      // Send auth token as first message (not in URL — OWASP security)
+      if (token) ws.send(JSON.stringify({ type: 'auth', token: token }));
     };
 
     ws.onmessage = function (event) {
@@ -385,6 +388,8 @@
       if (ws) ws.close();
       ws = null;
       isConnected = false;
+      // Release AudioContext resources (thread + ~30MB RAM)
+      if (audioCtx) { try { audioCtx.close(); } catch (_e) {} audioCtx = null; }
     },
     startMic: startMicCapture,
     stopMic: stopMicCapture,

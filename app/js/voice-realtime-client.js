@@ -395,6 +395,7 @@
     _hideCC();
     isConnected = false;
     isPlaying = false;
+    nextPlayTime = 0;
     if (socket) {
       try {
         socket.disconnect();
@@ -403,6 +404,8 @@
       }
       socket = null;
     }
+    // Release AudioContext resources (thread + ~30MB RAM)
+    if (audioCtx) { try { audioCtx.close(); } catch (_e) {} audioCtx = null; }
     if (window.KAvatar) {
       KAvatar.setExpression('neutral');
       KAvatar.setPresenting(false);

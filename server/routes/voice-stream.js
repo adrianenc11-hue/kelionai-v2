@@ -9,6 +9,7 @@ const logger = require('../logger');
 const { getVoiceId } = require('../config/voices');
 const { MODELS, PERSONAS, API_ENDPOINTS } = require('../config/models');
 const { circuitAllow, circuitSuccess, circuitFailure } = require('../scalability');
+const { incrementUsage } = require('../payments');
 
 // ─── Deepgram STT (WebSocket Streaming) ───
 function createDeepgramSTT(onTranscript, language = 'ro') {
@@ -280,7 +281,8 @@ function createElevenLabsTTS(onAudio, voiceId) {
 // MAIN: Setup WebSocket voice pipeline on the HTTP server
 // ═══════════════════════════════════════════════════════════════
 function setupVoiceStream(server, appLocals) {
-  const wss = new WebSocket.Server({ noServer: true, perMessageDeflate: true });
+  // perMessageDeflate off: PCM audio compresses poorly, adds latency + CPU overhead
+  const wss = new WebSocket.Server({ noServer: true, perMessageDeflate: false });
   const brain = appLocals?.brain || null;
 
   // ── Per-IP connection rate limiting ──
@@ -323,20 +325,20 @@ function setupVoiceStream(server, appLocals) {
     const avatar = url.searchParams.get('avatar') || 'kelion';
     const language = url.searchParams.get('language') || 'ro';
     const voiceId = getVoiceId(avatar, language);
-    const token = url.searchParams.get('token') || null;
+    // Token accepted via URL (legacy) or first WS message (preferred, OWASP-safe)
+    let token = url.searchParams.get('token') || null;
 
     // Resolve userId from token (non-blocking — auth optional)
     let userId = null;
-    if (token && appLocals?.supabaseAdmin) {
-      try {
-        const {
-          data: { user },
-        } = await appLocals.supabaseAdmin.auth.getUser(token);
-        if (user?.id) userId = user.id;
-      } catch (_e) {
-        /* token invalid — continue as anonymous */
+    async function _resolveUser(authToken) {
+      if (authToken && appLocals?.supabaseAdmin) {
+        try {
+          const { data: { user } } = await appLocals.supabaseAdmin.auth.getUser(authToken);
+          if (user?.id) userId = user.id;
+        } catch (_e) { /* token invalid — continue as anonymous */ }
       }
     }
+    if (token) await _resolveUser(token);
 
     logger.info(
       { component: 'VoiceStream', avatar, language, userId: userId || 'anon' },
@@ -490,6 +492,11 @@ function setupVoiceStream(server, appLocals) {
           brain.extractAndSaveFacts(userId, userText, fullReply).catch(() => {});
         }
 
+        // Increment usage for voice-stream turn
+        if (userId && appLocals?.supabaseAdmin) {
+          incrementUsage(userId, 'voice', appLocals.supabaseAdmin).catch(() => {});
+        }
+
         const totalTime = Date.now() - llmStart;
         clientWs.send(
           JSON.stringify({
@@ -522,7 +529,7 @@ function setupVoiceStream(server, appLocals) {
     }
 
     // Handle incoming messages from client
-    clientWs.on('message', (data) => {
+    clientWs.on('message', async (data) => {
       try {
         // Binary data = audio chunk from microphone
         if (Buffer.isBuffer(data) || data instanceof ArrayBuffer) {
@@ -534,6 +541,13 @@ function setupVoiceStream(server, appLocals) {
 
         // Text data = control messages
         const msg = JSON.parse(data.toString());
+
+        // Handle auth message (token sent post-handshake for security)
+        if (msg.type === 'auth' && msg.token && !userId) {
+          await _resolveUser(msg.token);
+          logger.info({ component: 'VoiceStream', userId }, 'Authenticated via WS message');
+          return;
+        }
 
         if (msg.type === 'text_input') {
           // Client sends text directly (fallback when no Deepgram)

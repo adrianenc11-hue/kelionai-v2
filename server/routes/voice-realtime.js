@@ -8,6 +8,7 @@
 const WebSocket = require('ws');
 const logger = require('../logger');
 const { MODELS, API_ENDPOINTS } = require('../config/models');
+const { incrementUsage } = require('../payments');
 
 // ── OpenAI Realtime API config ──
 const REALTIME_URL = API_ENDPOINTS.OPENAI_REALTIME;
@@ -205,14 +206,14 @@ PERSONA: You are ${avatar === 'kira' ? 'Kira' : 'Kelion'} by ${require('../confi
           // But if it somehow does, just let it be (it will be empty/silent).
           case 'response.created': {
             _aiSpeaking = true;
-            // Safety: auto-reset after 20s in case response.done never fires
+            // Safety: auto-reset after 60s in case response.done never fires
             if (_aiSpeakingTimer) clearTimeout(_aiSpeakingTimer);
             _aiSpeakingTimer = setTimeout(() => {
               if (_aiSpeaking) {
-                logger.warn({ component: 'VoiceRealtime' }, '_aiSpeaking stuck — auto-reset after 20s');
+                logger.warn({ component: 'VoiceRealtime' }, '_aiSpeaking stuck — auto-reset after 60s');
                 _aiSpeaking = false;
               }
-            }, 20000);
+            }, 60000);
             break;
           }
 
@@ -368,6 +369,11 @@ PERSONA: You are ${avatar === 'kira' ? 'Kira' : 'Kelion'} by ${require('../confi
               _aiSpeakingTimer = null;
             }
             socket.emit('turn_complete', { usage: usage || null });
+
+            // Increment usage for voice-realtime turn
+            if (supabaseAdmin && userId && !userId.startsWith('guest_')) {
+              incrementUsage(userId, 'voice', supabaseAdmin).catch(() => {});
+            }
 
             // ── Brain learning: save memory + extract facts (capture before async clear) ──
             const _userText = pendingUserTranscript;

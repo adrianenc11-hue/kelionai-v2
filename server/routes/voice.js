@@ -299,8 +299,12 @@ router.post('/speak', ttsLimiter, validate(speakSchema), async (req, res) => {
 
     if (!buf && (process.env.NODE_ENV !== 'production' || process.env.KELION_DEV_MODE === 'true')) {
       try {
-        // Return a larger silent MP3 (at least 100 bytes) for tests
-        buf = Buffer.alloc(200, 0);
+        // Minimal valid silent MP3 frame (MPEG1 Layer3, 128kbps, 44100Hz, ~26ms silence)
+        buf = Buffer.from(
+          'fffbe0000000000000000000000000000000000000000000000000000000000000000000' +
+          '0000000000000000000000000000000000000000000000000000000000000000000000000' +
+          '000000000000000000000000000000000000000000000000000000000000000', 'hex'
+        );
         ttsEngine = 'Dummy';
         logger.info({ component: 'Speak' }, 'Using Dummy TTS fallback for dev/test');
       } catch (e) {

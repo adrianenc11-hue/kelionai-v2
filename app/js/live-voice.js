@@ -270,6 +270,18 @@
     if (_cameraInterval) { clearInterval(_cameraInterval); _cameraInterval = null; }
   }
 
+  // Show text under avatar (subtitle bar)
+  function _updateSubtitle(type, text) {
+    var el = document.getElementById('live-subtitle');
+    var speaker = document.getElementById('subtitle-speaker');
+    var txt = document.getElementById('subtitle-text');
+    if (!el || !speaker || !txt) return;
+    el.classList.add('visible');
+    speaker.textContent = type === 'user' ? '🗣️' : '🤖';
+    txt.textContent = text || '';
+    el.scrollTop = el.scrollHeight;
+  }
+
   // ══════════════════════════════════════════════════════════
   // STATE
   // ══════════════════════════════════════════════════════════
@@ -293,14 +305,15 @@
     if (window.KAuth && KAuth.getToken) token = KAuth.getToken() || '';
 
     var url = WS_BASE + '/api/voice-live?avatar=' + encodeURIComponent(avatar) +
-      '&language=' + encodeURIComponent(language) +
-      (token ? '&token=' + encodeURIComponent(token) : '');
+      '&language=' + encodeURIComponent(language);
 
     ws = new WebSocket(url);
     ws.binaryType = 'arraybuffer';
 
     ws.onopen = function () {
       console.log('[LiveVoice] ✅ WebSocket connected');
+      // Send auth token as first message (not in URL — OWASP security)
+      if (token) ws.send(JSON.stringify({ type: 'auth', token: token }));
     };
 
     ws.onmessage = function (event) {
@@ -368,20 +381,15 @@
       case 'cc':
         // Background text extraction — show as subtitle
         if (msg.role === 'user') {
-          var overlay = document.getElementById('chat-overlay');
-          if (overlay) { overlay.textContent = '🎤 ' + msg.text; overlay.style.display = 'block'; }
+          _updateSubtitle('user', msg.text);
         }
-        if (msg.role === 'assistant' && window.KVoice && KVoice.showSubtitle) {
-          KVoice.showSubtitle(msg.text);
+        if (msg.role === 'assistant') {
+          _updateSubtitle('ai', msg.text);
         }
         window.dispatchEvent(new CustomEvent('live-voice-cc', { detail: msg }));
         break;
 
       case 'cc_done':
-        if (msg.role === 'user') {
-          var overlay2 = document.getElementById('chat-overlay');
-          if (overlay2) setTimeout(function () { overlay2.style.display = 'none'; }, 2000);
-        }
         console.log('[LiveVoice] ' + (msg.role === 'user' ? 'YOU' : 'AI') + ': ' + (msg.text || '').substring(0, 80));
         break;
 
@@ -430,6 +438,8 @@
     stopMic();
     stopCameraSync();
     if (ws) { try { ws.close(); } catch (_e) {} ws = null; }
+    // Release AudioContext resources (thread + ~30MB RAM)
+    if (audioCtx) { try { audioCtx.close(); } catch (_e) {} audioCtx = null; }
     if (window.KAvatar) {
       try { KAvatar.setExpression('neutral'); } catch (_e) {}
       try { KAvatar.setPresenting(false); } catch (_e) {}

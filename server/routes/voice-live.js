@@ -11,6 +11,7 @@ const WebSocket = require('ws');
 const logger = require('../logger');
 const { MODELS, API_ENDPOINTS } = require('../config/models');
 const { NAME: APP_NAME, STUDIO_NAME } = require('../config/app');
+const { incrementUsage } = require('../payments');
 
 // OpenAI Realtime
 const REALTIME_URL = API_ENDPOINTS.OPENAI_REALTIME;
@@ -98,7 +99,8 @@ async function fastDangerScan(imageBase64, language) {
 }
 
 function setupVoiceLive(server, appLocals) {
-  const wss = new WebSocket.Server({ noServer: true, perMessageDeflate: true });
+  // perMessageDeflate off: PCM audio compresses poorly, adds latency + CPU overhead
+  const wss = new WebSocket.Server({ noServer: true, perMessageDeflate: false });
   const brain = appLocals?.brain || null;
 
   // Per-IP rate limiting
@@ -139,23 +141,31 @@ function setupVoiceLive(server, appLocals) {
     const url = new URL(req.url, `http://${req.headers.host}`);
     const avatar = url.searchParams.get('avatar') || 'kira';
     const language = url.searchParams.get('language') || 'ro';
-    const token = url.searchParams.get('token') || null;
+    // Token accepted via URL (legacy) or first WS message (preferred, OWASP-safe)
+    let token = url.searchParams.get('token') || null;
     const startTime = Date.now();
 
-    // Resolve user
+    // Resolve user (may be re-resolved after auth message)
     const supabaseAdmin = appLocals?.supabaseAdmin || null;
     let userId = null;
     let userName = null;
-    if (token && supabaseAdmin) {
-      try {
-        const { data: { user } } = await supabaseAdmin.auth.getUser(token);
-        if (user?.id) {
-          userId = user.id;
-          userName = user.user_metadata?.full_name || null;
-        }
-      } catch (_e) { /* anonymous */ }
+
+    async function _resolveUser(authToken) {
+      if (authToken && supabaseAdmin) {
+        try {
+          const { data: { user } } = await supabaseAdmin.auth.getUser(authToken);
+          if (user?.id) {
+            userId = user.id;
+            userName = user.user_metadata?.full_name || null;
+          }
+        } catch (_e) { /* anonymous */ }
+      }
+      if (!userId) userId = 'guest_' + Date.now();
     }
-    if (!userId) userId = 'guest_' + Date.now();
+
+    // If token was in URL (legacy clients), resolve immediately
+    if (token) await _resolveUser(token);
+    else userId = 'guest_' + Date.now();
 
     logger.info({ component: 'VoiceLive', avatar, language, userId, userName }, 'Client connected');
 
@@ -367,6 +377,11 @@ ${userName ? `The user's name is ${userName}. Use their first name naturally.` :
             pendingUserTranscript = '';
             pendingAITranscript = '';
 
+            // Increment usage for voice-live turn (prevents unlimited free usage)
+            if (supabaseAdmin && userId && !userId.startsWith('guest_')) {
+              incrementUsage(userId, 'voice', supabaseAdmin).catch(() => {});
+            }
+
             if (brain && userId && _uText && _aText) {
               brain.saveMemory(userId, 'audio',
                 `Voice Live: "${_uText.substring(0, 500)}" → "${_aText.substring(0, 800)}"`,
@@ -436,7 +451,7 @@ ${userName ? `The user's name is ${userName}. Use their first name naturally.` :
     });
 
     // ═══ CLIENT → OPENAI: forward audio + control messages ═══
-    clientWs.on('message', (data) => {
+    clientWs.on('message', async (data) => {
       try {
         // Binary = raw PCM audio from mic → forward to OpenAI
         if (Buffer.isBuffer(data) || data instanceof ArrayBuffer) {
@@ -450,6 +465,13 @@ ${userName ? `The user's name is ${userName}. Use their first name naturally.` :
         }
 
         const msg = JSON.parse(data.toString());
+
+        // Handle auth message (token sent post-handshake for security)
+        if (msg.type === 'auth' && msg.token && userId.startsWith('guest_')) {
+          await _resolveUser(msg.token);
+          logger.info({ component: 'VoiceLive', userId, userName }, 'Authenticated via WS message');
+          return;
+        }
 
         if (msg.type === 'camera_frame' && msg.image && typeof msg.image === 'string' && msg.image.length < 500000) {
           latestCameraFrame = msg.image;
