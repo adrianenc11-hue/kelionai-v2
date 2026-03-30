@@ -621,16 +621,18 @@
       // ═══════════════════════════════════════════════════════
       // Prepare UI for streaming
       const overlay = document.getElementById('chat-overlay');
+      let actionBar = null;
+      let msgEl = null;
       if (overlay) {
         overlay.innerHTML = '';
-        const actionBar = document.createElement('div');
+        actionBar = document.createElement('div');
         actionBar.className = 'msg-actions';
         actionBar.style.display = 'none'; // Moved to input bar
         actionBar.innerHTML =
           '<button class="msg-action-btn" id="btn-copy-msg" title="Copy text">📋</button>' +
           '<button class="msg-action-btn" id="btn-save-msg" title="Save as file">💾</button>';
         overlay.appendChild(actionBar);
-        const msgEl = document.createElement('div');
+        msgEl = document.createElement('div');
         msgEl.className = 'msg assistant';
         msgEl.style.userSelect = 'text';
         msgEl.innerHTML = '<span style="color:#6366f1;opacity:0.6">⏳</span>';
@@ -701,19 +703,19 @@
                     // Progressive display — show text as it arrives (stripped of avatar tags)
                     const displayText = stripAvatarTags(fullReply);
                     if (displayText) {
-                      msgEl.innerHTML = parseMarkdown(displayText);
-                      overlay.scrollTop = overlay.scrollHeight;
+                      if (msgEl) msgEl.innerHTML = parseMarkdown(displayText);
+                      if (overlay) overlay.scrollTop = overlay.scrollHeight;
                       _updateSubtitle('ai', displayText);
                     }
                   } else if (evt.type === 'start') {
                     streamEngine = evt.engine || 'Gemini';
                   } else if (evt.type === 'progress' && evt.detail) {
                     // SuperThink pipeline progress — show status to user
-                    msgEl.innerHTML =
+                    if (msgEl) msgEl.innerHTML =
                       '<span style="color:#6366f1;opacity:0.7">🧠 ' + escapeHtml(evt.detail) + '</span>';
                     _updateSubtitle('ai', '🧠 ' + evt.detail);
                   } else if (evt.type === 'thinking') {
-                    msgEl.innerHTML = '<span style="color:#6366f1;opacity:0.6">🧠 Thinking...</span>';
+                    if (msgEl) msgEl.innerHTML = '<span style="color:#6366f1;opacity:0.6">🧠 Thinking...</span>';
                     _updateSubtitle('ai', '🧠 Thinking...');
                   } else if (evt.type === 'actions' && evt.actions) {
                     // AI controlează funcțiile aplicației
@@ -950,14 +952,14 @@
       saveChatHistoryLocal();
 
       // Final display (clean text without tags)
-      msgEl.innerHTML = parseMarkdown(fullReply);
-      overlay.scrollTop = overlay.scrollHeight;
+      if (msgEl) msgEl.innerHTML = parseMarkdown(fullReply);
+      if (overlay) overlay.scrollTop = overlay.scrollHeight;
       // Update subtitle under avatar with final clean text
       _updateSubtitle('ai', fullReply);
 
       // Wire copy/save buttons
-      const copyBtn = actionBar.querySelector('#btn-copy-msg');
-      const saveBtn = actionBar.querySelector('#btn-save-msg');
+      const copyBtn = actionBar ? actionBar.querySelector('#btn-copy-msg') : null;
+      const saveBtn = actionBar ? actionBar.querySelector('#btn-save-msg') : null;
       if (copyBtn)
         copyBtn.onclick = function () {
           navigator.clipboard
