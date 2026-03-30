@@ -22,6 +22,81 @@ const AVATAR_VOICES = {
   kira: 'shimmer',
 };
 
+// ═══ FAST DANGER SCAN — lightweight, runs on every camera frame ═══
+const DANGER_PROMPT_CACHE = {};
+function getDangerPrompt(lang) {
+  if (DANGER_PROMPT_CACHE[lang]) return DANGER_PROMPT_CACHE[lang];
+  const LANGS = { ro: 'română', en: 'English', es: 'Español', fr: 'Français', de: 'Deutsch' };
+  const l = LANGS[lang] || 'English';
+  const p = `DANGER SCAN. You are the eyes of a blind person walking right now. Respond in ${l}.
+RULES:
+- If IMMEDIATE danger (<2m): "⚠️PERICOL: [threat] [direction] [distance]" (max 8 words)
+- If WARNING danger (2-5m): "⚠️ATENȚIE: [hazard] [direction] [distance]" (max 10 words)
+- If path blocked: "🚫BLOCAT: [what] [direction]" (max 8 words)
+- If SAFE: "✅" (just the checkmark)
+Dangers: vehicles, stairs, holes, obstacles, wet floor, animals, fire, electrical, people approaching fast, low/overhead obstacles, sharp objects, traffic, curbs, open doors, construction.
+Directions: stânga, dreapta, în față, în spate.
+MAX 15 words. No explanations. No greetings. Just the safety verdict.`;
+  DANGER_PROMPT_CACHE[lang] = p;
+  return p;
+}
+
+async function fastDangerScan(imageBase64, language) {
+  const prompt = getDangerPrompt(language);
+  const openaiKey = process.env.OPENAI_API_KEY;
+  const geminiKey = process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
+
+  // PRIMARY: GPT Vision — fast, detail:low for speed
+  if (openaiKey) {
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 6000);
+      const r = await fetch(API_ENDPOINTS.OPENAI + '/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + openaiKey },
+        body: JSON.stringify({
+          model: MODELS.OPENAI_VISION,
+          max_tokens: 50,
+          temperature: 0.1,
+          messages: [{ role: 'user', content: [
+            { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${imageBase64}`, detail: 'low' } },
+            { type: 'text', text: prompt },
+          ]}],
+        }),
+        signal: ctrl.signal,
+      });
+      clearTimeout(timer);
+      const d = await r.json();
+      const result = d.choices?.[0]?.message?.content?.trim();
+      if (result) return result;
+    } catch (_e) { /* fallback */ }
+  }
+
+  // FALLBACK: Gemini Vision
+  if (geminiKey) {
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 6000);
+      const r = await fetch(`${API_ENDPOINTS.GEMINI}/models/${MODELS.GEMINI_VISION}:generateContent`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': geminiKey },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [
+            { inlineData: { mimeType: 'image/jpeg', data: imageBase64 } },
+            { text: prompt },
+          ]}],
+          generationConfig: { maxOutputTokens: 50, temperature: 0.1 },
+        }),
+        signal: ctrl.signal,
+      });
+      clearTimeout(timer);
+      const d = await r.json();
+      return d.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '✅';
+    } catch (_e) { /* safe */ }
+  }
+  return '✅';
+}
+
 function setupVoiceLive(server, appLocals) {
   const wss = new WebSocket.Server({ noServer: true, perMessageDeflate: true });
   const brain = appLocals?.brain || null;
@@ -102,6 +177,8 @@ function setupVoiceLive(server, appLocals) {
     let voiceConvId = null;
     let latestCameraFrame = null;
     let _lastCameraSaveTs = 0;
+    let _dangerScanBusy = false;
+    let _lastDangerAlertTs = 0;
 
     // ═══ CONNECT TO OPENAI REALTIME API ═══
     try {
@@ -376,11 +453,67 @@ ${userName ? `The user's name is ${userName}. Use their first name naturally.` :
 
         if (msg.type === 'camera_frame' && msg.image && typeof msg.image === 'string' && msg.image.length < 500000) {
           latestCameraFrame = msg.image;
-          // Throttle brain_memory save to max once per 60s (avoid DB flooding)
+
+          // Throttle brain_memory save to max once per 60s
           const now = Date.now();
           if (brain && userId && now - _lastCameraSaveTs > 60000) {
             _lastCameraSaveTs = now;
             brain.saveMemory(userId, 'visual', 'Camera frame activ din Voice Live', { avatar, source: 'voice-live', hasImage: true }).catch(() => {});
+          }
+
+          // ═══ REAL-TIME DANGER SCAN — every frame, async ═══
+          // Run danger check on EVERY frame. If danger → alert vocally IMMEDIATELY.
+          if (!_dangerScanBusy) {
+            _dangerScanBusy = true;
+            fastDangerScan(msg.image, language).then((scanResult) => {
+              _dangerScanBusy = false;
+              if (!scanResult || scanResult === '✅') return; // safe
+
+              const isDanger = /⚠️PERICOL|⚠️ATENȚIE|🚫BLOCAT/i.test(scanResult);
+              if (!isDanger) return;
+
+              // Throttle voice alerts to max 1 per 3s (avoid repetitive alerts)
+              const alertNow = Date.now();
+              if (alertNow - _lastDangerAlertTs < 3000) return;
+              _lastDangerAlertTs = alertNow;
+
+              logger.warn({ component: 'VoiceLive', scan: scanResult }, '🚨 DANGER detected — voice alert');
+
+              // Store latest vision context for brain
+              latestCameraFrame = msg.image;
+
+              // ═══ INSTANT VOICE ALERT — inject directly into OpenAI Realtime ═══
+              if (connected && openaiWs.readyState === WebSocket.OPEN) {
+                const isImmediate = /⚠️PERICOL/i.test(scanResult);
+                const userNameTag = userName ? userName.split(' ')[0] + ', ' : '';
+                const alertText = isImmediate
+                  ? `${userNameTag}ATENȚIE! ${scanResult.replace(/⚠️PERICOL:\s*/i, '')}. Oprește-te imediat!`
+                  : `${userNameTag}${scanResult.replace(/⚠️ATENȚIE:\s*/i, 'Ai grijă, ').replace(/🚫BLOCAT:\s*/i, 'Calea e blocată: ')}`;
+
+                // Cancel any current response to interrupt with danger alert
+                if (_aiSpeaking) {
+                  openaiWs.send(JSON.stringify({ type: 'response.cancel' }));
+                  _aiSpeaking = false;
+                }
+
+                openaiWs.send(JSON.stringify({
+                  type: 'conversation.item.create',
+                  item: {
+                    type: 'message',
+                    role: 'user',
+                    content: [{ type: 'input_text', text: `[URGENT SAFETY ALERT — SPEAK THIS IMMEDIATELY, do NOT add anything else]: ${alertText}` }],
+                  },
+                }));
+                openaiWs.send(JSON.stringify({ type: 'response.create' }));
+
+                // Notify client about danger
+                _send({ type: 'cc', text: alertText, role: 'assistant' });
+                _send({ type: 'danger', level: isImmediate ? 'immediate' : 'warning', text: scanResult });
+              }
+            }).catch((err) => {
+              _dangerScanBusy = false;
+              logger.debug({ component: 'VoiceLive', err: err.message }, 'Danger scan error');
+            });
           }
         }
 

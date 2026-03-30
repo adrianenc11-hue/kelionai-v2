@@ -255,6 +255,7 @@
   // ══════════════════════════════════════════════════════════
   function startCameraSync() {
     if (_cameraInterval) return;
+    // 1s interval — critical for blind user safety (danger detection every second)
     _cameraInterval = setInterval(function () {
       if (!ws || ws.readyState !== WebSocket.OPEN) return;
       if (!window.KAutoCamera || !KAutoCamera.isActive()) return;
@@ -262,7 +263,7 @@
       if (frame && frame.base64) {
         ws.send(JSON.stringify({ type: 'camera_frame', image: frame.base64 }));
       }
-    }, 3000);
+    }, 1000);
   }
 
   function stopCameraSync() {
@@ -396,6 +397,21 @@
 
       case 'turn_complete':
         emitState('listening');
+        break;
+
+      case 'danger':
+        // Real-time danger alert from server — haptic + visual feedback
+        console.warn('[LiveVoice] 🚨 DANGER:', msg.level, msg.text);
+        if (window.KAvatar) {
+          try { KAvatar.setExpression('concerned', 0.8); } catch (_e) {}
+        }
+        // Haptic vibration for blind users (short urgent pattern)
+        if (navigator.vibrate) {
+          navigator.vibrate(msg.level === 'immediate' ? [200, 100, 200, 100, 400] : [150, 100, 150]);
+        }
+        // Dispatch for any UI handler
+        window.dispatchEvent(new CustomEvent('live-voice-danger', { detail: msg }));
+        emitState('danger');
         break;
 
       case 'error':
