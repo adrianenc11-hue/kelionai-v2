@@ -1835,6 +1835,16 @@ body {
   color: #c7d2fe;
   box-shadow: 0 0 16px rgba(99, 102, 241, 0.3);
 }
+.ctrl-circle.is-connecting {
+  background: rgba(234, 179, 8, 0.15);
+  border-color: rgba(234, 179, 8, 0.5);
+  color: #fbbf24;
+  animation: pulse-connecting 1.2s ease-in-out infinite;
+}
+@keyframes pulse-connecting {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
+}
 
 /* Text input override */
 #text-input {

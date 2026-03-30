@@ -71,6 +71,7 @@ const referralRouter    = require('./routes/referral');
 const healthRouter      = require('./routes/health');
 const identityRouter    = require('./routes/identity');
 const { setupVoiceStream } = require('./routes/voice-stream');
+const { setupVoiceLive } = require('./routes/voice-live');
 const { setupRealtimeVoice } = require('./routes/voice-realtime');
 const { setupLiveChat } = require('./routes/live');
 const configRouter      = require('./routes/config');
@@ -620,6 +621,12 @@ async function start() {
   if (typeof setupVoiceStream === 'function') {
     setupVoiceStream(server, app.locals);
     logger.info({ component: 'Server' }, '🎤 Voice Stream WebSocket attached (/api/voice/stream)');
+  }
+
+  // ── VoiceLive: Brain-powered audio-to-audio chat ──
+  if (typeof setupVoiceLive === 'function') {
+    setupVoiceLive(server, app.locals);
+    logger.info({ component: 'Server' }, '🎙️ Voice Live WebSocket attached (/api/voice-live)');
   }
 
   // ── Start scheduler (self-healing, credit checks, AI health) ──

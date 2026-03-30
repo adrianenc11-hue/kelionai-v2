@@ -572,6 +572,7 @@ Acum elimin și referințele CSS rămase din `app.css` pentru `#pwa-install-bann
       <!-- Input row — FULL WIDTH at page bottom -->
       <div id="input-row">
         <button id="btn-camera" title="Camera ON/OFF" aria-label="Toggle camera" class="ctrl-circle">📷 Cam</button>
+        <button id="btn-live-voice" title="Live Voice Chat" aria-label="Toggle live voice chat" class="ctrl-circle">🎙️ Live</button>
         <input
           type="text"
           id="text-input"
@@ -714,6 +715,7 @@ Acum elimin și referințele CSS rămase din `app.css` pentru `#pwa-install-bann
 
     <script src="/js/geolocation.js?v=20260329i"></script>
     <script src="/js/auto-camera.js?v=20260329i"></script>
+    <script src="/js/live-voice.js?v=20260330a"></script>
 
     <script src="/js/copy-shield.js?v=20260329i"></script>
     <script src="/js/app.js?v=20260329i"></script>
@@ -952,6 +954,53 @@ Acum elimin și referințele CSS rămase din `app.css` pentru `#pwa-install-bann
 
         // Initial state
         updateBtn(false);
+      })();
+    </script>
+    <!-- ═══ LIVE VOICE BUTTON — toggle ON/OFF ═══ -->
+    <script>
+      (function () {
+        var btn = document.getElementById('btn-live-voice');
+        if (!btn) return;
+
+        function updateBtn(detail) {
+          var active = detail && detail.active;
+          var connecting = detail && detail.connecting;
+          var status = detail && detail.status;
+
+          if (connecting) {
+            btn.classList.remove('is-on', 'is-off');
+            btn.classList.add('is-connecting');
+            btn.innerHTML = '⏳ Live';
+            btn.title = 'Connecting live voice...';
+          } else if (active) {
+            btn.classList.add('is-on');
+            btn.classList.remove('is-off', 'is-connecting');
+            if (status === 'thinking') {
+              btn.innerHTML = '🧠 Live';
+            } else if (status === 'speaking') {
+              btn.innerHTML = '🔊 Live';
+            } else {
+              btn.innerHTML = '🔴 Live';
+            }
+            btn.title = 'Live Voice ON — click to stop';
+          } else {
+            btn.classList.remove('is-on', 'is-connecting');
+            btn.classList.add('is-off');
+            btn.innerHTML = '🎙️ Live';
+            btn.title = 'Start live voice chat';
+          }
+        }
+
+        btn.addEventListener('click', function () {
+          if (!window.KLiveVoice) return;
+          KLiveVoice.toggle();
+        });
+
+        window.addEventListener('live-voice-state', function (e) {
+          updateBtn(e.detail);
+        });
+
+        updateBtn(null);
       })();
     </script>
     <!-- ═══ AUTO-START: Camera ON + Chat commands for camera/mic ═══ -->
