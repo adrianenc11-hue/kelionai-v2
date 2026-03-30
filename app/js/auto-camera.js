@@ -27,6 +27,14 @@
   const JPEG_QUALITY = 0.8;
   const FACE_TRACK_MS = 150; // face tracking interval (ms)
 
+  // Live vision presets
+  const FAST_CAPTURE_W = 640;
+  const FAST_CAPTURE_H = 360;
+  const FAST_CAPTURE_Q = 0.62;
+  const DEEP_CAPTURE_W = 1280;
+  const DEEP_CAPTURE_H = 720;
+  const DEEP_CAPTURE_Q = 0.82;
+
   function emitState(error) {
     window.dispatchEvent(
       new CustomEvent('auto-camera-state', {
@@ -366,23 +374,37 @@
   let _fastBusy = false;
   let _deepBusy = false;
   const FAST_INTERVAL_MS = 1000;  // danger scan every 1 second
-  const DEEP_INTERVAL_MS = 5000;  // full analysis every 5 seconds
-  const VISION_LOW_RES_W = 640;
-  const VISION_LOW_RES_H = 480;
-  const VISION_JPEG_Q = 0.6;
+  const DEEP_INTERVAL_MS = 2500;  // full analysis every 2.5 seconds
 
-  function _captureLowRes() {
+  function _captureForVision(width, height, quality) {
     if (!_enabled || !_stream || !_video) return null;
     if (_video.readyState < 2) return null;
     try {
       var c = document.createElement('canvas');
-      c.width = VISION_LOW_RES_W;
-      c.height = VISION_LOW_RES_H;
+      c.width = width;
+      c.height = height;
       var ctx = c.getContext('2d');
-      ctx.drawImage(_video, 0, 0, VISION_LOW_RES_W, VISION_LOW_RES_H);
-      var url = c.toDataURL('image/jpeg', VISION_JPEG_Q);
+      ctx.drawImage(_video, 0, 0, width, height);
+      var url = c.toDataURL('image/jpeg', quality);
       return url.split(',')[1];
     } catch (_e) { return null; }
+  }
+
+  function _visionHeaders() {
+    var headers = { 'Content-Type': 'application/json' };
+    try {
+      if (window.KAuth && KAuth.getAuthHeaders) {
+        var auth = KAuth.getAuthHeaders();
+        if (auth && auth.Authorization) headers.Authorization = auth.Authorization;
+      }
+    } catch (_e) {
+      /* fallback below */
+    }
+    if (!headers.Authorization) {
+      var token = localStorage.getItem('kelion_token') || localStorage.getItem('sb-token') || '';
+      if (token) headers.Authorization = 'Bearer ' + token;
+    }
+    return headers;
   }
 
   // ── Danger detection keywords ──
@@ -420,15 +442,38 @@
       if (/⚠️/.test(lines[i])) { dangerLine = lines[i].trim(); break; }
     }
     if (!dangerLine) dangerLine = desc.substring(0, 80);
-    // Clean up emoji markers for speech
-    var spokenText = dangerLine.replace(/⚠️PERICOL:\s*/i, '').replace(/⚠️ATENȚIE:\s*/i, '').trim();
-    var firstName = _getUserFirstName();
-    // Build calm, personal alert: "Adrian, atenție, obstacol în stânga la 2 metri"
+    // Build short safety-first phrase: "Atenție, scaun stânga" / "Scări în față"
+    var clean = dangerLine
+      .replace(/⚠️PERICOL:\s*/i, '')
+      .replace(/⚠️ATENȚIE:\s*/i, '')
+      .replace(/🚫BLOCAT:\s*/i, '')
+      .trim();
+
+    // Try to extract hazard + direction + short distance from free text
+    var cleanLow = clean.toLowerCase();
+    var dir = '';
+    if (/\b(st[âa]nga|stinga)\b/.test(cleanLow)) dir = 'stânga';
+    else if (/\b(dreapta)\b/.test(cleanLow)) dir = 'dreapta';
+    else if (/\b([îi]n\s+fa[țt]a|in\s+fata|fa[țt][ăa])\b/.test(cleanLow)) dir = 'în față';
+    else if (/\b([îi]n\s+spate|in\s+spate)\b/.test(cleanLow)) dir = 'în spate';
+
+    var hazardMatch = cleanLow.match(/\b(sc[ăa]ri|treapt[ăa]|bordur[ăa]|ma[șs]in[ăa]|autobuz|camion|biciclet[ăa]|trotinet[ăa]|persoan[ăa]|om|c[âa]ine|u[șs][ăa]|obstacol|st[âa]lp|groap[ăa]|gaur[ăa]|cablu|foc|sticl[ăa]|scaun|mas[ăa]|zid|perete)\b/);
+    var hazard = hazardMatch ? hazardMatch[1] : 'obstacol';
+
+    var distMatch = cleanLow.match(/\b(la\s*~?\s*\d+\s*(m|metri?)|la\s+un\s+pas|chiar\s+l[âa]ng[ăa]\s+tine)\b/);
+    var dist = distMatch ? distMatch[1].replace(/\s+/g, ' ').trim() : '';
+
+    var phrase = '';
     if (level === 'immediate') {
-      spokenText = (firstName ? firstName + ', ' : '') + 'atenție, ' + spokenText;
+      phrase = 'Atenție, ' + hazard;
     } else {
-      spokenText = (firstName ? firstName + ', ' : '') + 'am observat, ' + spokenText;
+      phrase = hazard.charAt(0).toUpperCase() + hazard.slice(1);
     }
+    if (dir) phrase += ' ' + dir;
+    if (dist) phrase += ', ' + dist;
+
+    var firstName = _getUserFirstName();
+    var spokenText = (firstName ? firstName + ', ' : '') + phrase;
     // Dispatch danger event for brain/UI
     window.dispatchEvent(new CustomEvent('live-vision-danger', {
       detail: { level: level, message: dangerLine, spokenText: spokenText, timestamp: now }
@@ -449,17 +494,13 @@
   // ── FAST: Danger-only scan (GPT-5.4, 1s interval) ──
   async function _fastScan() {
     if (_fastBusy || !_enabled) return;
-    var base64 = _captureLowRes();
+    var base64 = _captureForVision(FAST_CAPTURE_W, FAST_CAPTURE_H, FAST_CAPTURE_Q);
     if (!base64) return;
     _fastBusy = true;
     try {
-      var token = localStorage.getItem('sb-token') || '';
       var res = await fetch('/api/vision/fast', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + token,
-        },
+        headers: _visionHeaders(),
         body: JSON.stringify({
           image: base64,
           language: window.i18n ? i18n.getLanguage() : 'ro',
@@ -485,21 +526,18 @@
   // ── DEEP: Full analysis (GPT-5.4, 5s interval) ──
   async function _deepAnalysis() {
     if (_deepBusy || !_enabled) return;
-    var base64 = _captureLowRes();
+    var base64 = _captureForVision(DEEP_CAPTURE_W, DEEP_CAPTURE_H, DEEP_CAPTURE_Q);
     if (!base64) return;
     _deepBusy = true;
     try {
-      var token = localStorage.getItem('sb-token') || '';
       var res = await fetch('/api/vision', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + token,
-        },
+        headers: _visionHeaders(),
         body: JSON.stringify({
           image: base64,
           avatar: window.KAvatar && KAvatar.getCurrentAvatar ? KAvatar.getCurrentAvatar() : 'kelion',
           language: window.i18n ? i18n.getLanguage() : 'ro',
+          fingerprint: window._visitorFP || null,
         }),
       });
       if (res.ok) {
