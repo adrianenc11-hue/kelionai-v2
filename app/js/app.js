@@ -950,6 +950,8 @@
       // Final display (clean text without tags)
       msgEl.innerHTML = parseMarkdown(fullReply);
       overlay.scrollTop = overlay.scrollHeight;
+      // Update subtitle under avatar with final clean AI response
+      _updateSubtitle('ai', fullReply);
 
       // Wire copy/save buttons
       const copyBtn = actionBar.querySelector('#btn-copy-msg');
@@ -1168,6 +1170,8 @@
     }
 
     if (type === 'user') {
+      // Show user message under avatar (will be replaced by AI response)
+      _updateSubtitle('user', text);
       return;
     }
 
@@ -1182,14 +1186,16 @@
     // Show subtitle with CSS fade-in
     el.classList.add('visible');
     speaker.textContent = type === 'user' ? '🗣️' : '🤖';
-    const display = text.length > 150 ? text.slice(0, 150) + '…' : text;
-    txt.textContent = display;
-    // Auto-hide after 8 seconds
-    // Auto-hide after 15 seconds (was 8s, extended for long AI responses)
+    // Full text — markdown for AI, plain for user
+    if (type === 'user') {
+      txt.textContent = text;
+    } else {
+      txt.innerHTML = parseMarkdown(text);
+    }
+    // Scroll to bottom if content overflows
+    el.scrollTop = el.scrollHeight;
+    // No auto-hide — stays until next message replaces it
     if (window._subtitleTimer) clearTimeout(window._subtitleTimer);
-    window._subtitleTimer = setTimeout(function () {
-      el.classList.remove('visible');
-    }, 15000);
   }
   function showThinking(v) {
     document.getElementById('thinking').classList.toggle('active', v);
