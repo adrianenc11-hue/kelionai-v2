@@ -6,10 +6,10 @@
 //   CODE     → Claude Code (Sonnet 4) — PRIMAR pe toți avatarii
 //   MATH     → DeepSeek Reasoner
 //   WEB      → Perplexity Sonar Pro
-//   VISION   → GPT-5.4 Vision
+//   VISION   → GPT-4o Vision
 //   WEATHER  → Open-Meteo (GPS live din browser, IP fallback)
 //   CHAT     → Groq Scout / GPT-4.1
-//   ORCHESTR → GPT-5.4 Orchestrator
+//   ORCHESTR → GPT-4o Orchestrator
 // Layer 2: QA (Gemini Flash)
 // Layer 3: Memory + Learning (Supabase)
 // Layer 4: Accessibility — audio description
@@ -121,7 +121,7 @@ Category:`;
   return null;
 }
 
-// ── GPT-5.4 Vision ──
+// ── GPT-4o Vision ──
 async function callGPT54Vision(systemPrompt, message, history, imageBase64) {
   const openaiKey = process.env.OPENAI_API_KEY;
   if (!openaiKey || !circuitAllow('openai')) return null;
@@ -146,7 +146,7 @@ async function callGPT54Vision(systemPrompt, message, history, imageBase64) {
     if (resp.ok) {
       circuitSuccess('openai');
       const data = await resp.json();
-      return { content: data.choices?.[0]?.message?.content || '', provider: 'gpt-5.4-vision' };
+      return { content: data.choices?.[0]?.message?.content || '', provider: 'gpt-4o-vision' };
     } else {
       circuitFailure('openai');
     }
@@ -156,7 +156,7 @@ async function callGPT54Vision(systemPrompt, message, history, imageBase64) {
   return null;
 }
 
-// ── GPT-5.4 Orchestrator ──
+// ── GPT-4o Orchestrator ──
 async function callGPT54Orchestrator(systemPrompt, message, history) {
   const openaiKey = process.env.OPENAI_API_KEY;
   if (!openaiKey || !circuitAllow('openai')) return null;
@@ -178,7 +178,7 @@ async function callGPT54Orchestrator(systemPrompt, message, history) {
     if (resp.ok) {
       circuitSuccess('openai');
       const data = await resp.json();
-      return { content: data.choices?.[0]?.message?.content || '', provider: 'gpt-5.4-orchestrator' };
+      return { content: data.choices?.[0]?.message?.content || '', provider: 'gpt-4o-orchestrator' };
     } else {
       circuitFailure('openai');
     }
@@ -716,7 +716,7 @@ ${weatherContext}`;
       }
     }
 
-    // ── CODE: Claude Code (PRIMAR pe toți avatarii) → DeepSeek → GPT-5.4 ──
+    // ── CODE: Claude Code (PRIMAR pe toți avatarii) → DeepSeek → GPT-4o ──
     if (!reply && intent === INTENT.CODE) {
       const claudeCodePrompt = buildClaudeCodePrompt(avatar, language, memoryContext);
       const codeStart = Date.now();
@@ -742,20 +742,20 @@ ${weatherContext}`;
           provider = dsResult.provider;
           trace.steps.push({ agent: 'DeepSeek-Coder', status: 'ok', ms: Date.now() - dsStart });
         } else {
-          // Fallback: GPT-5.4 Orchestrator
+          // Fallback: GPT-4o Orchestrator
           const gpt54Start = Date.now();
           const gpt54Result = await callGPT54Orchestrator(fullSystemPrompt + '\nCODING MODE: Write complete, production-ready code.', message, history);
           if (gpt54Result?.content) {
             reply = gpt54Result.content;
-            provider = 'gpt-5.4-code';
-            trace.steps.push({ agent: 'GPT-5.4-Code', status: 'ok', ms: Date.now() - gpt54Start });
+            provider = 'gpt-4o-code';
+            trace.steps.push({ agent: 'GPT-4o-Code', status: 'ok', ms: Date.now() - gpt54Start });
           }
         }
       }
 
     }
 
-    // ── MATH: DeepSeek Reasoner → GPT-5.4 ──
+    // ── MATH: DeepSeek Reasoner → GPT-4o ──
     if (!reply && intent === INTENT.MATH) {
       const mathPrompt = fullSystemPrompt + `\nMATH MODE: Show step-by-step reasoning, use LaTeX ($formula$), verify calculations.`;
       const dsStart = Date.now();
@@ -767,12 +767,12 @@ ${weatherContext}`;
         this._recordProvider('DeepSeek-Reasoner', Date.now() - dsStart, false);
       } else {
         const gpt54Result = await callGPT54Orchestrator(mathPrompt, message, history);
-        if (gpt54Result?.content) { reply = gpt54Result.content; provider = 'gpt-5.4-math'; }
+        if (gpt54Result?.content) { reply = gpt54Result.content; provider = 'gpt-4o-math'; }
       }
 
     }
 
-    // ── VISION ACCESSIBILITY: GPT-5.4 Vision ──
+    // ── VISION ACCESSIBILITY: GPT-4o Vision ──
     if (!reply && intent === INTENT.VISION_ACCESS) {
       const accessPrompt = fullSystemPrompt + `\nVISUAL ACCESSIBILITY: Describe this image in maximum detail for a visually impaired person.
 Structure: 1.OVERALL SCENE 2.MAIN SUBJECTS 3.ALL TEXT/LABELS 4.COLORS & LIGHTING 5.BACKGROUND 6.EMOTIONAL TONE`;
@@ -781,21 +781,21 @@ Structure: 1.OVERALL SCENE 2.MAIN SUBJECTS 3.ALL TEXT/LABELS 4.COLORS & LIGHTING
         reply = vaResult.content;
         provider = vaResult.provider;
         accessibilityData = { type: 'vision_access', detailedDescription: true };
-        trace.steps.push({ agent: 'GPT-5.4-VisionAccess', status: 'ok', ms: 0 });
+        trace.steps.push({ agent: 'GPT-4o-VisionAccess', status: 'ok', ms: 0 });
       } else {
         const gemResult = await callGeminiPro(accessPrompt, message, history, options?.imageBase64);
         if (gemResult?.content) { reply = gemResult.content; provider = 'gemini-pro-vision-access'; accessibilityData = { type: 'vision_access' }; }
       }
     }
 
-    // ── VISION: GPT-5.4 → GPT-4.1 → Gemini Pro ──
+    // ── VISION: GPT-4o → GPT-4.1 → Gemini Pro ──
     if (!reply && (intent === INTENT.VISION || (hasImage && intent !== INTENT.VISION_ACCESS))) {
       const v54Result = await callGPT54Vision(fullSystemPrompt, message, history, options?.imageBase64);
       if (v54Result?.content) {
         reply = v54Result.content;
         provider = v54Result.provider;
-        trace.steps.push({ agent: 'GPT-5.4-Vision', status: 'ok', ms: 0 });
-        this._recordProvider('GPT-5.4-Vision', 0, false);
+        trace.steps.push({ agent: 'GPT-4o-Vision', status: 'ok', ms: 0 });
+        this._recordProvider('GPT-4o-Vision', 0, false);
       } else {
         const gpt41Result = await callGPT(fullSystemPrompt, message, history, options?.imageBase64);
         if (gpt41Result?.content) { reply = gpt41Result.content; provider = 'gpt-4.1-vision'; }
@@ -806,7 +806,7 @@ Structure: 1.OVERALL SCENE 2.MAIN SUBJECTS 3.ALL TEXT/LABELS 4.COLORS & LIGHTING
       }
     }
 
-    // ── ORCHESTRATE: GPT-5.4 ──
+    // ── ORCHESTRATE: GPT-4o ──
     if (!reply && intent === INTENT.ORCHESTRATE) {
       const orchPrompt = fullSystemPrompt + `\nSTRATEGIC ORCHESTRATION: Break down complex tasks, provide complete actionable plans, execute immediately.`;
       const orchResult = await callGPT54Orchestrator(orchPrompt, message, history);
@@ -814,8 +814,8 @@ Structure: 1.OVERALL SCENE 2.MAIN SUBJECTS 3.ALL TEXT/LABELS 4.COLORS & LIGHTING
         reply = orchResult.content;
         provider = orchResult.provider;
 
-        trace.steps.push({ agent: 'GPT-5.4-Orchestrator', status: 'ok', ms: 0 });
-        this._recordProvider('GPT-5.4-Orchestrator', 0, false);
+        trace.steps.push({ agent: 'GPT-4o-Orchestrator', status: 'ok', ms: 0 });
+        this._recordProvider('GPT-4o-Orchestrator', 0, false);
       }
     }
 
@@ -1187,8 +1187,8 @@ Assistant: ${reply.substring(0, 500).replace(/</g, '&lt;').replace(/>/g, '&gt;')
       intents: Object.values(INTENT),
       features: [
         'claude-code-all-avatars',
-        'gpt-5.4-vision-premium',
-        'gpt-5.4-orchestrator',
+        'gpt-4o-vision-premium',
+        'gpt-4o-orchestrator',
         'weather-open-meteo-free-no-key',
         'gps-browser-live',
         'ip-geo-fallback-3-providers',

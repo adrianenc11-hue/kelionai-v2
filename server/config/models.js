@@ -30,7 +30,7 @@ const MODELS = {
 
   // ── CLAUDE ──
   CLAUDE:           process.env.MODEL_CLAUDE           || 'claude-sonnet-4-5',
-  CLAUDE_FAST:      process.env.MODEL_CLAUDE_FAST      || 'claude-haiku-4-5-20251001',
+  CLAUDE_FAST:      process.env.MODEL_CLAUDE_FAST      || 'claude-haiku-3-5-20241022',
 
   // ── STT ──
   OPENAI_WHISPER:   process.env.MODEL_OPENAI_WHISPER   || 'whisper-1',
@@ -180,7 +180,7 @@ const ORCHESTRATION_AGENTS = {
     allowed_for: ['fallback_execution', 'chat_general', 'non_critical_secondary_tasks'],
   },
   orchestrator_gpt54: {
-    model:          process.env.MODEL_ORCHESTRATOR || 'gpt-5.4',
+    model:          process.env.MODEL_ORCHESTRATOR || 'gpt-4o',
     provider:       'OpenAI',
     role:           'strategic_orchestrator',
     mandatory_usage: true,
@@ -231,7 +231,7 @@ const ORCHESTRATION_AGENTS = {
     allowed_for:    ['web_search'],
   },
   vision_gpt54: {
-    model:       process.env.MODEL_VISION_GPT || 'gpt-5.4',
+    model:       process.env.MODEL_VISION_GPT || 'gpt-4o',
     provider:    'OpenAI',
     role:        'vision_agent',
     skills:      ['image_analysis', 'complex_visual_reasoning', 'visual_extraction'],
