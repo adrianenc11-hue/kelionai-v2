@@ -264,21 +264,21 @@
 
     // Init texture loader and load initial background
     _bgLoader = new THREE.TextureLoader();
-    _loadAvatarBg('kira');
+    _loadAvatarBg('kelion');
 
     // Lip sync — simple, uses Smile morph
     if (window.SimpleLipSync) lipSync = new SimpleLipSync();
     if (window.TextLipSync) textLipSync = new TextLipSync({ msPerChar: 38 });
 
-    loadAvatar('kira')
+    loadAvatar('kelion')
       .then(function () {
-        console.log('[Avatar] Kira loaded');
-        // Preload Kelion model silently into browser cache
+        console.log('[Avatar] Kelion loaded');
+        // Preload Kira model silently into browser cache
         const preloader = new THREE.GLTFLoader();
         preloader.load(
-          MODELS.kelion,
+          MODELS.kira,
           function () {
-            console.log('[Avatar] Kelion model preloaded into cache');
+            console.log('[Avatar] Kira model preloaded into cache');
             console.log('[Avatar] ✅ Both avatars ready!');
             window.dispatchEvent(new CustomEvent('avatars-ready'));
           },
@@ -290,7 +290,7 @@
         );
       })
       .catch(function () {
-        // Even if Kira fails, signal ready after timeout
+        // Even if Kelion fails, signal ready after timeout
         setTimeout(function () {
           window.dispatchEvent(new CustomEvent('avatars-ready'));
         }, 3000);
