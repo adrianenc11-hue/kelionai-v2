@@ -63,10 +63,11 @@
       if (!photo) return false;
 
       const authHeaders = window.KAuth ? KAuth.getAuthHeaders() : {};
+      const faceDataUrl = 'data:image/jpeg;base64,' + photo;
       const r = await fetch(API_BASE + '/api/identity/register-face', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders },
-        body: JSON.stringify({ face: photo, userId }),
+        body: JSON.stringify({ face: faceDataUrl, userId }),
       });
       const d = await r.json();
       if (d.success) {
@@ -88,10 +89,11 @@
       if (!photo) return null;
 
       const authHeaders = window.KAuth ? KAuth.getAuthHeaders() : {};
+      const faceDataUrl = 'data:image/jpeg;base64,' + photo;
       const r = await fetch(API_BASE + '/api/identity/check', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders },
-        body: JSON.stringify({ face: photo }),
+        body: JSON.stringify({ face: faceDataUrl }),
       });
       if (!r.ok) return null;
       const d = await r.json();

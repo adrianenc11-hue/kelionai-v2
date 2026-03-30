@@ -421,7 +421,9 @@ Answer in ${LANGS[language] || 'English'}.`;
       }
 
       // Save to brain memory so brain remembers what it saw
-      if (brain && user?.id) {
+      // Skip trivial safe descriptions to avoid DB flooding
+      const isTrivial = /calea e liber|mediu lini[sș]tit|nimic de semnalat|no danger|path.*clear/i.test(description);
+      if (brain && user?.id && !isTrivial) {
         brain
           .saveMemory(user.id, 'visual', 'Am văzut: ' + description.substring(0, 500), {
             avatar,
@@ -430,21 +432,6 @@ Answer in ${LANGS[language] || 'English'}.`;
             emotion,
           })
           .catch((e) => logger.warn({ component: 'Vision', err: e.message }, 'brain.saveMemory failed'));
-      }
-
-      // ═══ Direct Supabase save — vision analysis ═══
-      if (supabaseAdmin && user?.id) {
-        supabaseAdmin
-          .from('brain_memory')
-          .insert({
-            user_id: user.id,
-            memory_type: 'visual',
-            content: `[VISION] ${description.substring(0, 500)}`,
-            importance: 6,
-            metadata: { category: 'vision_result', avatar, language, engine, emotion },
-          })
-          .then(() => {})
-          .catch((err) => logger.error({ component: 'Vision', err: err.message }, 'Memory insert failed'));
       }
     }
 

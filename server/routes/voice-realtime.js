@@ -372,7 +372,15 @@ PERSONA: You are ${avatar === 'kira' ? 'Kira' : 'Kelion'} by ${require('../confi
             // ── Brain learning: save memory + extract facts (capture before async clear) ──
             const _userText = pendingUserTranscript;
             const _aiText = pendingAITranscript;
+            // Reset immediately to avoid race condition with next transcript
+            pendingUserTranscript = '';
+            pendingAITranscript = '';
+
             if (brain && userId && _userText && _aiText) {
+              brain.saveMemory(userId, 'audio',
+                `Voice Realtime: "${_userText.substring(0, 500)}" → "${_aiText.substring(0, 800)}"`,
+                { avatar, language, source: 'voice-realtime' }
+              ).catch(() => {});
               brain
                 .learnFromConversation(userId, _userText, _aiText)
                 .catch((e) => logger.debug({ err: e.message }, 'learnFromConversation err'));
@@ -382,33 +390,33 @@ PERSONA: You are ${avatar === 'kira' ? 'Kira' : 'Kelion'} by ${require('../confi
             }
 
             // ── Flush transcripts to Supabase ──
-            if (supabaseAdmin && (pendingUserTranscript || pendingAITranscript)) {
+            if (supabaseAdmin && (_userText || _aiText)) {
               (async () => {
                 try {
                   if (!voiceConvId) {
-                    const title = (pendingUserTranscript || 'Voice conversation').substring(0, 80);
+                    const title = (_userText || 'Voice conversation').substring(0, 80);
                     const { data, error } = await supabaseAdmin
                       .from('conversations')
-                      .insert({ user_id: userId || null, avatar, title })
+                      .insert({ user_id: userId || null, avatar, title, language })
                       .select('id')
                       .single();
                     if (!error && data) voiceConvId = data.id;
                   }
                   if (voiceConvId) {
                     const rows = [];
-                    if (pendingUserTranscript)
+                    if (_userText)
                       rows.push({
                         conversation_id: voiceConvId,
                         role: 'user',
-                        content: pendingUserTranscript,
+                        content: _userText,
                         language,
                         source: 'voice-realtime',
                       });
-                    if (pendingAITranscript)
+                    if (_aiText)
                       rows.push({
                         conversation_id: voiceConvId,
                         role: 'assistant',
-                        content: pendingAITranscript,
+                        content: _aiText,
                         language,
                         source: 'voice-realtime',
                       });
@@ -419,8 +427,6 @@ PERSONA: You are ${avatar === 'kira' ? 'Kira' : 'Kelion'} by ${require('../confi
                 } catch (e) {
                   logger.warn({ component: 'VoiceRealtime', err: e.message }, 'Transcript save error');
                 }
-                pendingUserTranscript = '';
-                pendingAITranscript = '';
               })();
             }
 

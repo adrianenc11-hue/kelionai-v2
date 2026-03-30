@@ -101,6 +101,7 @@ function setupVoiceLive(server, appLocals) {
     let pendingAITranscript = '';
     let voiceConvId = null;
     let latestCameraFrame = null;
+    let _lastCameraSaveTs = 0;
 
     // ═══ CONNECT TO OPENAI REALTIME API ═══
     try {
@@ -375,9 +376,11 @@ ${userName ? `The user's name is ${userName}. Use their first name naturally.` :
 
         if (msg.type === 'camera_frame' && msg.image && typeof msg.image === 'string' && msg.image.length < 500000) {
           latestCameraFrame = msg.image;
-          // Save camera frame to brain_memory as visual
-          if (brain && userId) {
-            brain.saveMemory(userId, 'visual', 'Camera frame din Voice Live', { avatar, source: 'voice-live', hasImage: true }).catch(() => {});
+          // Throttle brain_memory save to max once per 60s (avoid DB flooding)
+          const now = Date.now();
+          if (brain && userId && now - _lastCameraSaveTs > 60000) {
+            _lastCameraSaveTs = now;
+            brain.saveMemory(userId, 'visual', 'Camera frame activ din Voice Live', { avatar, source: 'voice-live', hasImage: true }).catch(() => {});
           }
         }
 
