@@ -19,14 +19,14 @@ const router = express.Router();
 // ── Validation schema ──
 const chatSchema = [
   body('message').isString().trim().isLength({ min: 1, max: 4000 }).withMessage('Message required (1-4000 chars)'),
-  body('avatar').optional().isIn(['kelion', 'kira']),
-  body('language').optional().isString().isLength({ max: 10 }),
-  body('history').optional().isArray({ max: 50 }),
-  body('conversationId').optional().isString().isLength({ max: 100 }),
-  body('imageBase64').optional().isString().isLength({ max: 10_000_000 }),
-  body('audioBase64').optional().isString().isLength({ max: 5_000_000 }),
-  body('fingerprint').optional().isString().isLength({ max: 200 }),
-  body('geo').optional().isObject(),
+  body('avatar').optional({ values: 'falsy' }).isIn(['kelion', 'kira']),
+  body('language').optional({ values: 'falsy' }).isString().isLength({ max: 10 }),
+  body('history').optional({ values: 'falsy' }).isArray({ max: 50 }),
+  body('conversationId').optional({ values: 'falsy' }).isString().isLength({ max: 100 }),
+  body('imageBase64').optional({ values: 'falsy' }).isString().isLength({ max: 10_000_000 }),
+  body('audioBase64').optional({ values: 'falsy' }).isString().isLength({ max: 5_000_000 }),
+  body('fingerprint').optional({ values: 'falsy' }).isString().isLength({ max: 200 }),
+  body('geo').optional({ values: 'falsy' }).isObject(),
 ];
 
 function validate(schema) {

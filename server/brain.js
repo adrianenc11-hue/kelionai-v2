@@ -1132,9 +1132,11 @@ Assistant: ${reply.substring(0, 500).replace(/</g, '&lt;').replace(/>/g, '&gt;')
       let facts;
       try { facts = JSON.parse(match[0]); } catch (err) { return; }
       if (!Array.isArray(facts) || facts.length === 0) return;
+      const VALID_CATEGORIES = ['preference', 'personal', 'knowledge', 'skill', 'relationship'];
       const toSave = facts.slice(0, 5).filter((f) => f.fact && typeof f.fact === 'string');
       for (const f of toSave) {
-        await supabaseAdmin.from('learned_facts').insert({ user_id: userId, fact: f.fact.substring(0, 500), category: f.category || 'general', source: 'conversation', confidence: 0.7 });
+        const cat = VALID_CATEGORIES.includes(f.category) ? f.category : 'knowledge';
+        await supabaseAdmin.from('learned_facts').insert({ user_id: userId, fact: f.fact.substring(0, 500), category: cat, source: 'conversation', confidence: 0.7 });
       }
       if (toSave.length > 0) this._invalidateCache(userId);
     } catch (e) {

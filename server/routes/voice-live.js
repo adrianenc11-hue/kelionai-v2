@@ -285,6 +285,9 @@ ${userName ? `The user's name is ${userName}. Use their first name naturally.` :
             // ── Background: save transcripts to DB ──
             const _uText = pendingUserTranscript;
             const _aText = pendingAITranscript;
+            // Reset immediately to avoid race condition with next transcript
+            pendingUserTranscript = '';
+            pendingAITranscript = '';
 
             if (brain && userId && _uText && _aText) {
               brain.saveMemory(userId, 'audio',
@@ -302,7 +305,7 @@ ${userName ? `The user's name is ${userName}. Use their first name naturally.` :
                     const title = (_uText || 'Voice Live').substring(0, 80);
                     const { data } = await supabaseAdmin
                       .from('conversations')
-                      .insert({ user_id: userId.startsWith('guest_') ? null : userId, avatar, title })
+                      .insert({ user_id: userId.startsWith('guest_') ? null : userId, avatar, title, language })
                       .select('id').single();
                     if (data) voiceConvId = data.id;
                   }
@@ -315,12 +318,7 @@ ${userName ? `The user's name is ${userName}. Use their first name naturally.` :
                 } catch (e) {
                   logger.warn({ component: 'VoiceLive', err: e.message }, 'Transcript save error');
                 }
-                pendingUserTranscript = '';
-                pendingAITranscript = '';
               })();
-            } else {
-              pendingUserTranscript = '';
-              pendingAITranscript = '';
             }
             break;
           }
@@ -377,6 +375,10 @@ ${userName ? `The user's name is ${userName}. Use their first name naturally.` :
 
         if (msg.type === 'camera_frame' && msg.image && typeof msg.image === 'string' && msg.image.length < 500000) {
           latestCameraFrame = msg.image;
+          // Save camera frame to brain_memory as visual
+          if (brain && userId) {
+            brain.saveMemory(userId, 'visual', 'Camera frame din Voice Live', { avatar, source: 'voice-live', hasImage: true }).catch(() => {});
+          }
         }
 
         if (msg.type === 'commit' && connected && openaiWs.readyState === WebSocket.OPEN) {
