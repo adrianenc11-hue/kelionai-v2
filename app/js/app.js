@@ -1001,6 +1001,7 @@
 
       // Voice-first: speak() already called above, before text display
     } catch (_e) {
+      console.error('[App] sendToAI_Regular CATCH:', _e);
       showThinking(false);
       addMessage('assistant', i18n.t('app.connectionError'));
       if (window.KVoice) KVoice.resumeWakeDetection();
