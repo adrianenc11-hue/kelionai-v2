@@ -1,7 +1,8 @@
 services:
   - type: web
     name: kelionai-backend
-    env: node
+    runtime: node
+    plan: free
     buildCommand: npm install
     startCommand: node server/index.js
     envVars:
