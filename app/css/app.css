@@ -66,21 +66,20 @@ body {
   /* Chat left (display-panel), Avatar right (left-panel) */
 }
 
-/* ─── RIGHT PANEL: Avatar (35%) ── */
+/* ─── Avatar Panel — FULL WIDTH (chat panel hidden) ── */
 #left-panel {
-  width: 45%;
-  min-width: 280px;
-  max-width: 560px;
-  flex-shrink: 0;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  flex: 1;
   height: 100%;
   display: flex;
   flex-direction: column;
-  border-left: 1px solid rgba(99, 102, 241, 0.12);
+  border-left: none;
   background: rgba(8, 8, 24, 0.7);
   -webkit-backdrop-filter: blur(16px);
   backdrop-filter: blur(16px);
-  order: 2;
-  /* Push to right */
+  order: 1;
 }
 
 /* ── Avatar Area (full height, subtitle-style) ── */
@@ -233,21 +232,25 @@ body {
   left: 50%;
   transform: translateX(-50%);
   max-width: 92%;
-  width: auto;
-  padding: 10px 20px;
-  background: rgba(0, 0, 0, 0.7);
+  width: 92%;
+  max-height: 40%;
+  overflow-y: auto;
+  padding: 14px 20px;
+  background: rgba(0, 0, 0, 0.75);
   -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
   border-radius: 12px;
   border: 1px solid rgba(99, 102, 241, 0.2);
   color: #f0f0ff;
   font-size: 0.9rem;
-  line-height: 1.5;
-  text-align: center;
+  line-height: 1.6;
+  text-align: left;
   z-index: 10;
   opacity: 0;
   transition: opacity 0.4s ease;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(99,102,241,0.4) transparent;
 }
 
 #live-subtitle.visible {
@@ -257,6 +260,26 @@ body {
 #subtitle-speaker {
   font-weight: 700;
   margin-right: 6px;
+}
+
+#subtitle-text code {
+  background: rgba(99,102,241,0.2);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 0.85em;
+}
+
+#subtitle-text pre {
+  background: rgba(0,0,0,0.4);
+  padding: 8px 12px;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin: 6px 0;
+}
+
+#subtitle-text a {
+  color: #818cf8;
+  text-decoration: underline;
 }
 
 #live-subtitle.hidden-important {
@@ -691,17 +714,9 @@ body {
   }
 }
 
-/* ─── LEFT: Chat Zone (65%) ──────────────── */
+/* ─── LEFT: Chat Zone — HIDDEN, all text goes under avatar ──────────────── */
 #display-panel {
-  flex: 1;
-  width: auto;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  background: rgba(10, 10, 26, 0.95);
-  order: 1;
-  /* Left side */
-  position: relative;
+  display: none !important;
 }
 
 #chat-messages {
@@ -767,19 +782,11 @@ body {
   }
 
   #display-panel {
-    width: 100%;
-    height: 50vh;
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    z-index: 50;
-    transform: translateY(100%);
-    transition: transform 0.3s ease;
+    display: none !important;
   }
 
   #display-panel.mobile-visible {
-    transform: translateY(0);
+    display: none !important;
   }
 
   #chat-area {
