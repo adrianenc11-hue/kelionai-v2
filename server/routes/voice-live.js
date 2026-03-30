@@ -1,159 +1,27 @@
 // ═══════════════════════════════════════════════════════════════
-// KelionAI — Voice Live: Brain-Powered Audio-to-Audio Chat
-// Pipeline: Mic → Noise Filter → Deepgram Nova-3 STT → Brain.think()
-//           (+ visual context from camera) → ElevenLabs TTS → Speaker
+// KelionAI — Voice Live: True Audio-to-Audio via OpenAI Realtime
+// Pipeline: Mic PCM → OpenAI Realtime (audio-native) → PCM Speaker
+//   Brain routes the response, text extracted on background + saved
+//   Visual context from camera injected into conversation
+// WebSocket nativ (nu Socket.io) — /api/voice-live
 // ═══════════════════════════════════════════════════════════════
 'use strict';
 
 const WebSocket = require('ws');
 const logger = require('../logger');
-const { getVoiceId } = require('../config/voices');
 const { MODELS, API_ENDPOINTS } = require('../config/models');
-const { circuitAllow, circuitSuccess, circuitFailure } = require('../scalability');
+const { NAME: APP_NAME, STUDIO_NAME } = require('../config/app');
 
-// ─── Deepgram Nova-3 Streaming STT (best quality + language detection) ───
-function createDeepgramLiveSTT(onTranscript, language = 'multi') {
-  const key = process.env.DEEPGRAM_API_KEY;
-  if (!key) return null;
-  if (!circuitAllow('deepgram')) return null;
+// OpenAI Realtime
+const REALTIME_URL = API_ENDPOINTS.OPENAI_REALTIME;
+const REALTIME_MODEL = MODELS.GPT_REALTIME || 'gpt-4o-realtime-preview-2024-12-17';
 
-  // Multi-language mode for auto-detection, or specific language
-  const langParam = language === 'multi' ? 'multi' : language;
-  const ws = new WebSocket(
-    `${API_ENDPOINTS.DEEPGRAM}/listen?model=nova-3&language=${langParam}&detect_language=true&smart_format=true&endpointing=300&utterance_end_ms=1200&interim_results=true&punctuate=true&diarize=false&filler_words=false`,
-    { headers: { Authorization: `Token ${key}` } }
-  );
+// Avatar voices (OpenAI Realtime native)
+const AVATAR_VOICES = {
+  kelion: 'echo',
+  kira: 'shimmer',
+};
 
-  ws.on('open', () => {
-    circuitSuccess('deepgram');
-    logger.info({ component: 'VoiceLive.STT' }, 'Deepgram Nova-3 connected (lang detection ON)');
-  });
-
-  ws.on('message', (raw) => {
-    try {
-      const msg = JSON.parse(raw);
-      if (msg.type === 'Results') {
-        const alt = msg.channel?.alternatives?.[0];
-        if (alt?.transcript) {
-          const detectedLang = msg.channel?.detected_language || language;
-          onTranscript({
-            text: alt.transcript,
-            isFinal: msg.is_final,
-            speechFinal: msg.speech_final,
-            confidence: alt.confidence || 0,
-            language: detectedLang,
-          });
-        }
-      }
-    } catch (e) {
-      logger.warn({ component: 'VoiceLive.STT', err: e.message }, 'parse error');
-    }
-  });
-
-  ws.on('error', (e) => {
-    circuitFailure('deepgram');
-    logger.error({ component: 'VoiceLive.STT', err: e.message }, 'WS error');
-  });
-
-  return {
-    send: (audioChunk) => {
-      if (ws.readyState === WebSocket.OPEN) ws.send(audioChunk);
-    },
-    close: () => {
-      if (ws.readyState === WebSocket.OPEN) {
-        circuitSuccess('deepgram');
-        ws.send(JSON.stringify({ type: 'CloseStream' }));
-        ws.close();
-      }
-    },
-    ws,
-  };
-}
-
-// ─── ElevenLabs Conversational TTS (WebSocket streaming) ───
-function createElevenLabsLiveTTS(onAudio, voiceId) {
-  const key = process.env.ELEVENLABS_API_KEY;
-  if (!key) return null;
-  if (!circuitAllow('elevenlabs')) return null;
-
-  const ws = new WebSocket(
-    `${API_ENDPOINTS.ELEVENLABS_WS}/text-to-speech/${voiceId}/stream-input?model_id=${MODELS.ELEVENLABS_FLASH}&optimize_streaming_latency=4&output_format=pcm_24000`
-  );
-
-  let ready = false;
-
-  ws.on('open', () => {
-    ready = true;
-    circuitSuccess('elevenlabs');
-    // Initialize stream with natural voice settings
-    ws.send(JSON.stringify({
-      text: ' ',
-      voice_settings: {
-        stability: 0.55,
-        similarity_boost: 0.80,
-        style: 0.15,
-        use_speaker_boost: true,
-      },
-      xi_api_key: key,
-    }));
-    logger.info({ component: 'VoiceLive.TTS', voiceId }, 'ElevenLabs TTS connected');
-  });
-
-  ws.on('message', (raw) => {
-    try {
-      const msg = JSON.parse(raw);
-      if (msg.audio) {
-        const audioBuf = Buffer.from(msg.audio, 'base64');
-        onAudio(audioBuf);
-      }
-      if (msg.isFinal) {
-        onAudio(null); // signal end
-      }
-      if (msg.alignment) {
-        // Forward alignment data for lip sync
-        onAudio({ alignment: msg.alignment });
-      }
-    } catch (e) {
-      logger.warn({ component: 'VoiceLive.TTS', err: e.message }, 'parse error');
-    }
-  });
-
-  ws.on('error', (e) => {
-    circuitFailure('elevenlabs');
-    logger.error({ component: 'VoiceLive.TTS', err: e.message }, 'WS error');
-  });
-
-  ws.on('close', () => {
-    ready = false;
-  });
-
-  return {
-    speak: (text, more = false) => {
-      if (!ready || ws.readyState !== WebSocket.OPEN) return;
-      ws.send(JSON.stringify({
-        text: text,
-        try_trigger_generation: true,
-        flush: !more,
-      }));
-    },
-    flush: () => {
-      if (!ready || ws.readyState !== WebSocket.OPEN) return;
-      ws.send(JSON.stringify({ text: '' }));
-    },
-    close: () => {
-      if (ws.readyState === WebSocket.OPEN) {
-        try { ws.send(JSON.stringify({ text: '' })); } catch (_e) { /* */ }
-        ws.close();
-      }
-    },
-    ws,
-    isReady: () => ready && ws.readyState === WebSocket.OPEN,
-  };
-}
-
-// ═══════════════════════════════════════════════════════════════
-// MAIN: Setup WebSocket voice-live pipeline
-// ═══════════════════════════════════════════════════════════════
 function setupVoiceLive(server, appLocals) {
   const wss = new WebSocket.Server({ noServer: true, perMessageDeflate: true });
   const brain = appLocals?.brain || null;
@@ -164,7 +32,7 @@ function setupVoiceLive(server, appLocals) {
 
   server.on('upgrade', (request, socket, head) => {
     const url = new URL(request.url, `http://${request.headers.host}`);
-    if (url.pathname !== '/api/voice-live') return; // let other handlers process
+    if (url.pathname !== '/api/voice-live') return;
 
     const ip = request.headers['x-forwarded-for']?.split(',')[0]?.trim() || request.socket?.remoteAddress;
     const current = ipConnections.get(ip) || 0;
@@ -195,292 +63,366 @@ function setupVoiceLive(server, appLocals) {
 
     const url = new URL(req.url, `http://${req.headers.host}`);
     const avatar = url.searchParams.get('avatar') || 'kira';
-    let language = url.searchParams.get('language') || 'multi';
-    const voiceId = getVoiceId(avatar, language === 'multi' ? 'ro' : language);
+    const language = url.searchParams.get('language') || 'ro';
     const token = url.searchParams.get('token') || null;
+    const startTime = Date.now();
 
-    // Resolve user from token
+    // Resolve user
+    const supabaseAdmin = appLocals?.supabaseAdmin || null;
     let userId = null;
     let userName = null;
-    if (token && appLocals?.supabaseAdmin) {
+    if (token && supabaseAdmin) {
       try {
-        const { data: { user } } = await appLocals.supabaseAdmin.auth.getUser(token);
+        const { data: { user } } = await supabaseAdmin.auth.getUser(token);
         if (user?.id) {
           userId = user.id;
           userName = user.user_metadata?.full_name || null;
         }
       } catch (_e) { /* anonymous */ }
     }
+    if (!userId) userId = 'guest_' + Date.now();
 
-    logger.info({ component: 'VoiceLive', avatar, language, userId: userId || 'anon', userName }, 'Client connected');
+    logger.info({ component: 'VoiceLive', avatar, language, userId, userName }, 'Client connected');
 
-    let sttHandler = null;
-    let ttsHandler = null;
-    let currentVisualContext = null; // latest camera frame description
-    let currentVisualRaw = null;    // latest raw base64 image (for brain)
-    let detectedLanguage = language === 'multi' ? 'ro' : language;
-    const conversationHistory = [];
-    const startTime = Date.now();
-    let _processing = false;
-
-    // ── Brain-powered response generation ──
-    async function processUserMessage(userText, lang) {
-      if (_processing) return;
-      _processing = true;
-
-      const turnStart = Date.now();
-      detectedLanguage = lang || detectedLanguage;
-
-      // Update voice ID if language changed
-      const currentVoiceId = getVoiceId(avatar, detectedLanguage);
-
-      try {
-        // Close previous TTS to prevent leaks
-        if (ttsHandler) {
-          try { ttsHandler.close(); } catch (_e) { /* */ }
-        }
-
-        // Create new TTS handler with correct voice
-        const onAudioChunk = (chunk) => {
-          if (clientWs.readyState !== WebSocket.OPEN) return;
-          if (chunk === null) {
-            clientWs.send(JSON.stringify({ type: 'audio_end' }));
-          } else if (chunk.alignment) {
-            clientWs.send(JSON.stringify({ type: 'alignment', data: chunk.alignment }));
-          } else {
-            clientWs.send(chunk); // raw PCM
-          }
-        };
-
-        ttsHandler = createElevenLabsLiveTTS(onAudioChunk, currentVoiceId);
-        if (!ttsHandler) {
-          clientWs.send(JSON.stringify({ type: 'error', error: 'TTS unavailable' }));
-          _processing = false;
-          return;
-        }
-
-        // Wait for TTS ready
-        await new Promise((resolve) => {
-          if (ttsHandler.isReady()) return resolve();
-          ttsHandler.ws.on('open', () => setTimeout(resolve, 100));
-          setTimeout(resolve, 4000);
-        });
-
-        // ═══ BRAIN INTEGRATION — full context thinking ═══
-        conversationHistory.push({ role: 'user', content: userText });
-        if (conversationHistory.length > 20) {
-          conversationHistory.splice(0, conversationHistory.length - 20);
-        }
-
-        clientWs.send(JSON.stringify({ type: 'thinking', text: userText }));
-
-        let fullReply = '';
-        let emotion = 'neutral';
-
-        if (brain) {
-          // Build visual context string for brain
-          let visualNote = '';
-          if (currentVisualContext) {
-            visualNote = `\n[VISUAL CONTEXT — what camera sees right now]: ${currentVisualContext}`;
-          }
-
-          // Use brain.think() for full reasoning + memory + tools
-          const brainOptions = {
-            visualContext: currentVisualContext || null,
-            visualImage: currentVisualRaw || null,
-            voiceMode: true,
-            conversationHistory,
-          };
-
-          const result = await brain.think(
-            userText + visualNote,
-            avatar,
-            conversationHistory.slice(-10),
-            detectedLanguage,
-            userId,
-            null,
-            brainOptions
-          );
-
-          fullReply = result?.reply || result?.text || result || '';
-
-          // Parse emotion
-          const emotionMatch = fullReply.match(/\[EMOTION:\s*(\w+)\]/i);
-          if (emotionMatch) {
-            emotion = emotionMatch[1].toLowerCase();
-            fullReply = fullReply.replace(/\[EMOTION:\s*\w+\]/gi, '').trim();
-          }
-          // Remove gesture tags
-          fullReply = fullReply.replace(/\[GESTURE:\s*\w+\]/gi, '').trim();
-          // Remove markdown
-          fullReply = fullReply
-            .replace(/```[\s\S]*?```/g, '')
-            .replace(/`[^`]+`/g, '')
-            .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-            .replace(/https?:\/\/\S+/g, '')
-            .replace(/[*_~#>]+/g, '')
-            .replace(/\n{2,}/g, '. ')
-            .replace(/\s{2,}/g, ' ')
-            .trim();
-        } else {
-          fullReply = 'Brain unavailable.';
-        }
-
-        // ── Stream reply text to TTS in natural sentence chunks ──
-        if (fullReply && ttsHandler.isReady()) {
-          const sentences = fullReply.match(/[^.!?;]+[.!?;]?\s*/g) || [fullReply];
-          for (let i = 0; i < sentences.length; i++) {
-            const sentence = sentences[i].trim();
-            if (!sentence) continue;
-            ttsHandler.speak(sentence, i < sentences.length - 1);
-          }
-          ttsHandler.flush();
-        }
-
-        // Send text + emotion to client
-        conversationHistory.push({ role: 'assistant', content: fullReply });
-
-        clientWs.send(JSON.stringify({
-          type: 'reply',
-          text: fullReply,
-          emotion,
-          language: detectedLanguage,
-          avatar,
-          duration: Date.now() - turnStart,
-        }));
-
-        // Send emotion for avatar
-        if (emotion !== 'neutral') {
-          clientWs.send(JSON.stringify({ type: 'emotion', emotion }));
-        }
-
-        // ── Save to brain memory ──
-        if (brain && userId) {
-          brain.saveMemory(userId, 'audio',
-            `Voice Live: "${userText.substring(0, 200)}" → "${fullReply.substring(0, 300)}"`,
-            { avatar, language: detectedLanguage, emotion, source: 'voice-live' }
-          ).catch(() => {});
-          brain.learnFromConversation(userId, userText, fullReply).catch(() => {});
-          brain.extractAndSaveFacts(userId, userText, fullReply).catch(() => {});
-        }
-
-        logger.info({
-          component: 'VoiceLive',
-          duration: Date.now() - turnStart,
-          replyLen: fullReply.length,
-          emotion,
-          lang: detectedLanguage,
-        }, `Voice turn: ${Date.now() - turnStart}ms`);
-      } catch (e) {
-        logger.error({ component: 'VoiceLive', err: e.message }, 'Voice turn error');
-        clientWs.send(JSON.stringify({ type: 'error', error: e.message }));
-      } finally {
-        _processing = false;
-      }
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      clientWs.send(JSON.stringify({ type: 'error', error: 'API key not configured' }));
+      clientWs.close();
+      return;
     }
 
-    // ── STT: Deepgram Nova-3 with language detection ──
-    const onTranscript = (result) => {
-      if (!result.speechFinal && !result.isFinal) {
-        // Interim → show live subtitle
-        if (clientWs.readyState === WebSocket.OPEN) {
-          clientWs.send(JSON.stringify({
-            type: 'transcript',
-            text: result.text,
-            interim: true,
-            confidence: result.confidence,
-            language: result.language,
-          }));
-        }
-        return;
-      }
+    // ═══ STATE ═══
+    let openaiWs = null;
+    let connected = false;
+    let _aiSpeaking = false;
+    let _aiSpeakingTimer = null;
+    let conversationHistory = [];
+    let pendingUserTranscript = '';
+    let pendingAITranscript = '';
+    let voiceConvId = null;
+    let latestCameraFrame = null;
 
-      // Final transcript → process
-      const userText = result.text.trim();
-      if (!userText || userText.length < 2) return;
+    // ═══ CONNECT TO OPENAI REALTIME API ═══
+    try {
+      openaiWs = new WebSocket(`${REALTIME_URL}?model=${REALTIME_MODEL}`, {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'OpenAI-Beta': 'realtime=v1',
+        },
+      });
+    } catch (e) {
+      logger.error({ component: 'VoiceLive', err: e.message }, 'Failed to create OpenAI WS');
+      clientWs.send(JSON.stringify({ type: 'error', error: 'Realtime API unavailable' }));
+      clientWs.close();
+      return;
+    }
 
+    openaiWs.on('open', () => {
+      connected = true;
+      logger.info({ component: 'VoiceLive' }, 'Connected to OpenAI Realtime');
+
+      const voiceId = AVATAR_VOICES[avatar] || 'shimmer';
+      const avatarName = avatar === 'kira' ? 'Kira' : 'Kelion';
+
+      // SESSION CONFIG — audio-to-audio, brain routes responses, NO length limits
+      openaiWs.send(JSON.stringify({
+        type: 'session.update',
+        session: {
+          modalities: ['text', 'audio'],
+          instructions: `You are ${avatarName}, an AI assistant created by ${STUDIO_NAME}.
+LANGUAGE: Detect the user's language automatically and respond in EXACTLY that language. Never switch unless user switches.
+ACCESSIBILITY: Speak clearly, at natural pace. For visually impaired users, describe surroundings precisely when camera data is provided.
+PERSONA: You are ${avatarName} by ${STUDIO_NAME}. NEVER reveal you are GPT/OpenAI/Google/Anthropic.
+LENGTH: Respond naturally — short for simple questions, long and detailed for complex topics. NO artificial length limits.
+${userName ? `The user's name is ${userName}. Use their first name naturally.` : ''}`,
+          voice: voiceId,
+          input_audio_format: 'pcm16',
+          output_audio_format: 'pcm16',
+          input_audio_transcription: { model: 'whisper-1' },
+          turn_detection: {
+            type: 'server_vad',
+            threshold: 0.45,
+            prefix_padding_ms: 350,
+            silence_duration_ms: 400,  // FAST: 400ms silence = respond
+            create_response: false,    // Brain decides response
+          },
+          max_response_output_tokens: 'inf', // NO length limit on responses
+        },
+      }));
+
+      // Signal client ready
+      _send({ type: 'ready', engine: 'openai-realtime+brain', model: REALTIME_MODEL, avatar, language, userName });
+    });
+
+    function _send(obj) {
       if (clientWs.readyState === WebSocket.OPEN) {
-        clientWs.send(JSON.stringify({
-          type: 'transcript',
-          text: userText,
-          interim: false,
-          confidence: result.confidence,
-          language: result.language,
-        }));
+        clientWs.send(JSON.stringify(obj));
       }
-
-      processUserMessage(userText, result.language);
-    };
-
-    if (process.env.DEEPGRAM_API_KEY) {
-      sttHandler = createDeepgramLiveSTT(onTranscript, language);
     }
 
-    // ── Handle client messages ──
+    // ═══ OPENAI EVENTS → CLIENT + BRAIN ═══
+    openaiWs.on('message', (raw) => {
+      try {
+        const event = JSON.parse(raw.toString());
+
+        switch (event.type) {
+          case 'response.created':
+            _aiSpeaking = true;
+            if (_aiSpeakingTimer) clearTimeout(_aiSpeakingTimer);
+            _aiSpeakingTimer = setTimeout(() => {
+              if (_aiSpeaking) { _aiSpeaking = false; logger.warn({ component: 'VoiceLive' }, '_aiSpeaking stuck — reset'); }
+            }, 60000); // 60s safety (no limit on speech length)
+            break;
+
+          // ── AUDIO response chunks → forward raw to client ──
+          case 'response.audio.delta':
+            if (event.delta && clientWs.readyState === WebSocket.OPEN) {
+              _send({ type: 'audio', data: event.delta });
+            }
+            break;
+
+          case 'response.audio.done':
+            _send({ type: 'audio_end' });
+            break;
+
+          // ── AI transcript (background extraction) ──
+          case 'response.audio_transcript.delta':
+            if (event.delta) {
+              _send({ type: 'cc', text: event.delta, role: 'assistant' });
+            }
+            break;
+
+          case 'response.audio_transcript.done':
+            if (event.transcript) {
+              pendingAITranscript += (pendingAITranscript ? ' ' : '') + event.transcript;
+              _send({ type: 'cc_done', text: event.transcript, role: 'assistant' });
+            }
+            break;
+
+          // ═══ USER SPEECH TRANSCRIPT → BRAIN ROUTING ═══
+          case 'conversation.item.input_audio_transcription.completed':
+            if (event.transcript) {
+              const userText = event.transcript.trim();
+              if (!userText || userText.length < 2) break;
+              if (_aiSpeaking) {
+                logger.info({ component: 'VoiceLive' }, 'Ignoring transcript while AI speaks');
+                break;
+              }
+
+              _send({ type: 'cc', text: userText, role: 'user' });
+              pendingUserTranscript += (pendingUserTranscript ? ' ' : '') + userText;
+
+              conversationHistory.push({ role: 'user', content: userText });
+              if (conversationHistory.length > 20) conversationHistory = conversationHistory.slice(-20);
+
+              // ═══ BRAIN THINKS → inject text → OpenAI speaks it as audio ═══
+              if (brain) {
+                logger.info({ component: 'VoiceLive', text: userText.substring(0, 80) }, '🧠 Brain thinking...');
+
+                brain.think(
+                  userText, avatar,
+                  conversationHistory.slice(-10),
+                  'auto', userId, null,
+                  { imageBase64: latestCameraFrame || null, isAutoCamera: !!latestCameraFrame },
+                  false
+                ).then((result) => {
+                  let brainReply = result?.reply || result?.enrichedMessage || result?.text || '';
+                  // Clean markdown/tags for voice
+                  brainReply = brainReply
+                    .replace(/\[EMOTION:\s*\w+\]/gi, '')
+                    .replace(/\[GESTURE:\s*\w+\]/gi, '')
+                    .replace(/```[\s\S]*?```/g, '')
+                    .replace(/`[^`]+`/g, '')
+                    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+                    .replace(/https?:\/\/\S+/g, '')
+                    .replace(/[*_~#>]+/g, '')
+                    .replace(/\n{2,}/g, '. ')
+                    .replace(/\s{2,}/g, ' ')
+                    .trim();
+
+                  if (!brainReply) brainReply = 'Nu am înțeles.';
+
+                  conversationHistory.push({ role: 'assistant', content: brainReply });
+
+                  logger.info({ component: 'VoiceLive', replyLen: brainReply.length }, '🧠 Brain replied → Realtime TTS');
+
+                  // Inject brain text → OpenAI speaks it natively as audio (no length limit)
+                  if (connected && openaiWs.readyState === WebSocket.OPEN) {
+                    openaiWs.send(JSON.stringify({
+                      type: 'conversation.item.create',
+                      item: {
+                        type: 'message',
+                        role: 'user',
+                        content: [{ type: 'input_text', text: `[SPEAK THIS EXACTLY — do not add anything]: ${brainReply}` }],
+                      },
+                    }));
+                    openaiWs.send(JSON.stringify({ type: 'response.create' }));
+                  }
+                }).catch((err) => {
+                  logger.error({ component: 'VoiceLive', err: err.message }, '🧠 Brain error — fallback');
+                  if (connected && openaiWs.readyState === WebSocket.OPEN) {
+                    openaiWs.send(JSON.stringify({ type: 'response.create' }));
+                  }
+                });
+              }
+            }
+            break;
+
+          case 'input_audio_buffer.speech_started':
+            _send({ type: 'speech_started' });
+            break;
+
+          case 'input_audio_buffer.speech_stopped':
+            _send({ type: 'speech_stopped' });
+            break;
+
+          // ═══ TURN COMPLETE → background save ═══
+          case 'response.done': {
+            _aiSpeaking = false;
+            if (_aiSpeakingTimer) { clearTimeout(_aiSpeakingTimer); _aiSpeakingTimer = null; }
+            _send({ type: 'turn_complete', usage: event.response?.usage || null });
+
+            // ── Background: save transcripts to DB ──
+            const _uText = pendingUserTranscript;
+            const _aText = pendingAITranscript;
+
+            if (brain && userId && _uText && _aText) {
+              brain.saveMemory(userId, 'audio',
+                `Voice Live: "${_uText.substring(0, 500)}" → "${_aText.substring(0, 800)}"`,
+                { avatar, language, source: 'voice-live' }
+              ).catch(() => {});
+              brain.learnFromConversation(userId, _uText, _aText).catch(() => {});
+              brain.extractAndSaveFacts(userId, _uText, _aText).catch(() => {});
+            }
+
+            if (supabaseAdmin && (_uText || _aText)) {
+              (async () => {
+                try {
+                  if (!voiceConvId) {
+                    const title = (_uText || 'Voice Live').substring(0, 80);
+                    const { data } = await supabaseAdmin
+                      .from('conversations')
+                      .insert({ user_id: userId.startsWith('guest_') ? null : userId, avatar, title })
+                      .select('id').single();
+                    if (data) voiceConvId = data.id;
+                  }
+                  if (voiceConvId) {
+                    const rows = [];
+                    if (_uText) rows.push({ conversation_id: voiceConvId, role: 'user', content: _uText, language, source: 'voice-live' });
+                    if (_aText) rows.push({ conversation_id: voiceConvId, role: 'assistant', content: _aText, language, source: 'voice-live' });
+                    if (rows.length) await supabaseAdmin.from('messages').insert(rows);
+                  }
+                } catch (e) {
+                  logger.warn({ component: 'VoiceLive', err: e.message }, 'Transcript save error');
+                }
+                pendingUserTranscript = '';
+                pendingAITranscript = '';
+              })();
+            } else {
+              pendingUserTranscript = '';
+              pendingAITranscript = '';
+            }
+            break;
+          }
+
+          case 'error': {
+            logger.error({ component: 'VoiceLive', error: event.error }, 'OpenAI Realtime error');
+            _aiSpeaking = false;
+            if (_aiSpeakingTimer) { clearTimeout(_aiSpeakingTimer); _aiSpeakingTimer = null; }
+            const rawMsg = event.error?.message || 'Unknown error';
+            const safeMsg = /api.key|unauthorized|authentication/i.test(rawMsg)
+              ? 'Voice service temporarily unavailable'
+              : rawMsg.replace(/sk-[^\s"']+/g, 'sk-***');
+            _send({ type: 'error', error: safeMsg });
+            break;
+          }
+
+          case 'rate_limits.updated':
+            logger.debug({ component: 'VoiceLive', limits: event.rate_limits }, 'Rate limits');
+            break;
+        }
+      } catch (e) {
+        logger.warn({ component: 'VoiceLive', err: e.message }, 'Event parse error');
+      }
+    });
+
+    openaiWs.on('error', (e) => {
+      logger.error({ component: 'VoiceLive', err: e.message }, 'OpenAI WS error');
+      _aiSpeaking = false;
+      _send({ type: 'error', error: 'Connection error' });
+    });
+
+    openaiWs.on('close', () => {
+      connected = false;
+      _aiSpeaking = false;
+      if (_aiSpeakingTimer) { clearTimeout(_aiSpeakingTimer); _aiSpeakingTimer = null; }
+      if (clientWs.readyState === WebSocket.OPEN) clientWs.close();
+    });
+
+    // ═══ CLIENT → OPENAI: forward audio + control messages ═══
     clientWs.on('message', (data) => {
       try {
-        // Binary = audio PCM from mic
+        // Binary = raw PCM audio from mic → forward to OpenAI
         if (Buffer.isBuffer(data) || data instanceof ArrayBuffer) {
-          if (sttHandler) sttHandler.send(data);
+          if (!connected || openaiWs.readyState !== WebSocket.OPEN) return;
+          const buf = Buffer.isBuffer(data) ? data : Buffer.from(data);
+          openaiWs.send(JSON.stringify({
+            type: 'input_audio_buffer.append',
+            audio: buf.toString('base64'),
+          }));
           return;
         }
 
         const msg = JSON.parse(data.toString());
 
-        // Visual context update from camera
-        if (msg.type === 'visual_context') {
-          currentVisualContext = msg.description || null;
-          currentVisualRaw = msg.image || null;
+        if (msg.type === 'camera_frame' && msg.image && typeof msg.image === 'string' && msg.image.length < 500000) {
+          latestCameraFrame = msg.image;
         }
 
-        // Text fallback (when no Deepgram)
-        if (msg.type === 'text_input') {
-          onTranscript({
-            text: msg.text,
-            isFinal: true,
-            speechFinal: true,
-            confidence: 1,
-            language: msg.language || detectedLanguage,
+        if (msg.type === 'commit' && connected && openaiWs.readyState === WebSocket.OPEN) {
+          openaiWs.send(JSON.stringify({ type: 'input_audio_buffer.commit' }));
+        }
+
+        if (msg.type === 'cancel' && connected && openaiWs.readyState === WebSocket.OPEN) {
+          openaiWs.send(JSON.stringify({ type: 'response.cancel' }));
+        }
+
+        if (msg.type === 'text_input' && msg.text && brain) {
+          conversationHistory.push({ role: 'user', content: msg.text });
+          if (conversationHistory.length > 20) conversationHistory = conversationHistory.slice(-20);
+
+          brain.think(msg.text, avatar, conversationHistory.slice(-10), language, userId, null,
+            { imageBase64: latestCameraFrame || null, isAutoCamera: !!latestCameraFrame }, false
+          ).then((result) => {
+            const reply = result?.reply || result?.enrichedMessage || 'Nu am înțeles.';
+            conversationHistory.push({ role: 'assistant', content: reply });
+            if (connected && openaiWs.readyState === WebSocket.OPEN) {
+              openaiWs.send(JSON.stringify({
+                type: 'conversation.item.create',
+                item: { type: 'message', role: 'user', content: [{ type: 'input_text', text: `[SPEAK THIS EXACTLY]: ${reply}` }] },
+              }));
+              openaiWs.send(JSON.stringify({ type: 'response.create' }));
+            }
+          }).catch(() => {
+            if (connected && openaiWs.readyState === WebSocket.OPEN) {
+              openaiWs.send(JSON.stringify({ type: 'response.create' }));
+            }
           });
         }
-
-        // Config update
-        if (msg.type === 'config') {
-          if (msg.language) {
-            detectedLanguage = msg.language;
-            language = msg.language;
-          }
-          logger.info({ component: 'VoiceLive', config: msg }, 'Config update');
-        }
       } catch (e) {
-        logger.warn({ component: 'VoiceLive', err: e.message }, 'Message parse error');
+        logger.warn({ component: 'VoiceLive', err: e.message }, 'Client message error');
       }
     });
 
-    // ── Cleanup ──
     clientWs.on('close', () => {
       logger.info({ component: 'VoiceLive', duration: Date.now() - startTime }, 'Client disconnected');
-      if (sttHandler) try { sttHandler.close(); } catch (_e) { /* */ }
-      if (ttsHandler) try { ttsHandler.close(); } catch (_e) { /* */ }
+      if (openaiWs && openaiWs.readyState === WebSocket.OPEN) openaiWs.close();
     });
 
     clientWs.on('error', (err) => {
       logger.error({ component: 'VoiceLive', err: err.message }, 'Client WS error');
-      if (sttHandler) try { sttHandler.close(); } catch (_e) { /* */ }
-      if (ttsHandler) try { ttsHandler.close(); } catch (_e) { /* */ }
+      if (openaiWs && openaiWs.readyState === WebSocket.OPEN) openaiWs.close();
     });
-
-    // ── Ready signal ──
-    clientWs.send(JSON.stringify({
-      type: 'ready',
-      stt: process.env.DEEPGRAM_API_KEY ? 'deepgram-nova-3' : 'browser',
-      tts: 'elevenlabs',
-      llm: 'brain',
-      avatar,
-      language,
-      voiceId,
-      userName: userName || null,
-    }));
   });
 }
 
