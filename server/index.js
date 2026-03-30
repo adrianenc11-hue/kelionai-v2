@@ -283,7 +283,7 @@ app.get('/sw.js', (req, res) => {
 
 // Static assets (JS, CSS, images, models, etc.) — no nonce needed
 app.use(express.static(APP_DIR, {
-  maxAge: process.env.NODE_ENV === 'production' ? '7d' : '0',
+  maxAge: '0',
   etag: true,
   lastModified: true,
   index: false, // We handle index.html above with nonce injection
@@ -291,9 +291,17 @@ app.use(express.static(APP_DIR, {
     if (filePath.endsWith('.html')) {
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     }
+    // CSS/JS — short cache so updates propagate fast through CDN
+    if (filePath.endsWith('.css') || filePath.endsWith('.js')) {
+      res.setHeader('Cache-Control', 'public, max-age=300, must-revalidate');
+    }
     // Service Worker must never be cached by CDN/browser
     if (filePath.endsWith('sw.js')) {
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    }
+    // Images — longer cache
+    if (/\.(png|jpg|jpeg|gif|svg|webp|ico)$/.test(filePath)) {
+      res.setHeader('Cache-Control', 'public, max-age=86400');
     }
     // GLB models — short cache + must-revalidate so avatar updates propagate fast
     if (filePath.endsWith('.glb')) {
