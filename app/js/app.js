@@ -621,18 +621,16 @@
       // ═══════════════════════════════════════════════════════
       // Prepare UI for streaming
       const overlay = document.getElementById('chat-overlay');
-      let actionBar = null;
-      let msgEl = null;
       if (overlay) {
         overlay.innerHTML = '';
-        actionBar = document.createElement('div');
+        const actionBar = document.createElement('div');
         actionBar.className = 'msg-actions';
         actionBar.style.display = 'none'; // Moved to input bar
         actionBar.innerHTML =
           '<button class="msg-action-btn" id="btn-copy-msg" title="Copy text">📋</button>' +
           '<button class="msg-action-btn" id="btn-save-msg" title="Save as file">💾</button>';
         overlay.appendChild(actionBar);
-        msgEl = document.createElement('div');
+        const msgEl = document.createElement('div');
         msgEl.className = 'msg assistant';
         msgEl.style.userSelect = 'text';
         msgEl.innerHTML = '<span style="color:#6366f1;opacity:0.6">⏳</span>';
@@ -703,20 +701,18 @@
                     // Progressive display — show text as it arrives (stripped of avatar tags)
                     const displayText = stripAvatarTags(fullReply);
                     if (displayText) {
-                      if (msgEl) msgEl.innerHTML = parseMarkdown(displayText);
-                      if (overlay) overlay.scrollTop = overlay.scrollHeight;
+                      msgEl.innerHTML = parseMarkdown(displayText);
+                      overlay.scrollTop = overlay.scrollHeight;
                       _updateSubtitle('ai', displayText);
                     }
                   } else if (evt.type === 'start') {
                     streamEngine = evt.engine || 'Gemini';
                   } else if (evt.type === 'progress' && evt.detail) {
                     // SuperThink pipeline progress — show status to user
-                    if (msgEl) msgEl.innerHTML =
+                    msgEl.innerHTML =
                       '<span style="color:#6366f1;opacity:0.7">🧠 ' + escapeHtml(evt.detail) + '</span>';
-                    _updateSubtitle('ai', '🧠 ' + evt.detail);
                   } else if (evt.type === 'thinking') {
-                    if (msgEl) msgEl.innerHTML = '<span style="color:#6366f1;opacity:0.6">🧠 Thinking...</span>';
-                    _updateSubtitle('ai', '🧠 Thinking...');
+                    msgEl.innerHTML = '<span style="color:#6366f1;opacity:0.6">🧠 Thinking...</span>';
                   } else if (evt.type === 'actions' && evt.actions) {
                     // AI controlează funcțiile aplicației
                     evt.actions.forEach(function (action) {
@@ -952,14 +948,12 @@
       saveChatHistoryLocal();
 
       // Final display (clean text without tags)
-      if (msgEl) msgEl.innerHTML = parseMarkdown(fullReply);
-      if (overlay) overlay.scrollTop = overlay.scrollHeight;
-      // Update subtitle under avatar with final clean text
-      _updateSubtitle('ai', fullReply);
+      msgEl.innerHTML = parseMarkdown(fullReply);
+      overlay.scrollTop = overlay.scrollHeight;
 
       // Wire copy/save buttons
-      const copyBtn = actionBar ? actionBar.querySelector('#btn-copy-msg') : null;
-      const saveBtn = actionBar ? actionBar.querySelector('#btn-save-msg') : null;
+      const copyBtn = actionBar.querySelector('#btn-copy-msg');
+      const saveBtn = actionBar.querySelector('#btn-save-msg');
       if (copyBtn)
         copyBtn.onclick = function () {
           navigator.clipboard
@@ -1173,30 +1167,29 @@
       while (chatMsgs.children.length > 50) chatMsgs.removeChild(chatMsgs.firstChild);
     }
 
-    // Show ALL messages under avatar (user message shown, then replaced by AI response)
-    _updateSubtitle(type === 'user' ? 'user' : 'ai', text);
+    if (type === 'user') {
+      return;
+    }
+
+    // ALL text goes ONLY to subtitle under avatar
+    _updateSubtitle('ai', text);
   }
   function _updateSubtitle(type, text) {
     const el = document.getElementById('live-subtitle');
     const speaker = document.getElementById('subtitle-speaker');
     const txt = document.getElementById('subtitle-text');
     if (!el || !speaker || !txt) return;
-    // Hide speech-subtitle to avoid overlap
-    var speechSub = document.getElementById('speech-subtitle');
-    if (speechSub) speechSub.classList.remove('visible');
     // Show subtitle with CSS fade-in
     el.classList.add('visible');
     speaker.textContent = type === 'user' ? '🗣️' : '🤖';
-    // Full text display — markdown for AI, plain for user
-    if (type === 'user') {
-      txt.textContent = text;
-    } else {
-      txt.innerHTML = parseMarkdown(text);
-    }
-    // Scroll to bottom if content overflows
-    el.scrollTop = el.scrollHeight;
-    // No auto-hide — stays until next message replaces it
+    const display = text.length > 150 ? text.slice(0, 150) + '…' : text;
+    txt.textContent = display;
+    // Auto-hide after 8 seconds
+    // Auto-hide after 15 seconds (was 8s, extended for long AI responses)
     if (window._subtitleTimer) clearTimeout(window._subtitleTimer);
+    window._subtitleTimer = setTimeout(function () {
+      el.classList.remove('visible');
+    }, 15000);
   }
   function showThinking(v) {
     document.getElementById('thinking').classList.toggle('active', v);
@@ -1325,7 +1318,7 @@
 
   // ─── Drag & Drop ─────────────────────────────────────────
   function setupDragDrop() {
-    const dp = document.getElementById('left-panel') || document.getElementById('display-panel'),
+    const dp = document.getElementById('display-panel'),
       dz = document.getElementById('drop-zone');
     if (!dp || !dz) return;
     dp.addEventListener('dragover', function (e) {
@@ -1392,13 +1385,14 @@
         const statusDot = document.getElementById('status-dot');
         if (statusText) statusText.textContent = 'Online' + (d.brain !== 'healthy' ? ' ⚠️' : '');
         if (statusDot) statusDot.style.background = d.brain === 'healthy' ? '#00ff88' : '#ffaa00';
-        if (d.services && !d.services.ai_gemini) console.warn('[App] Gemini unavailable');
+        if (d.services && !d.services.ai_gemini) useStreaming = false;
       }
     } catch (_e) {
       const statusText = document.getElementById('status-text');
       const statusDot = document.getElementById('status-dot');
       if (statusText) statusText.textContent = 'Offline';
       if (statusDot) statusDot.style.background = '#ff4444';
+      useStreaming = false;
     }
   }
 

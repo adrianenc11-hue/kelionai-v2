@@ -88,7 +88,7 @@
     <link rel="stylesheet" href="/styles/design-system.css" />
     <link rel="stylesheet" href="/styles/components.css" />
     <link rel="stylesheet" href="/styles/animations.css" />
-    <link rel="stylesheet" href="/css/app.css?v=20260330a" />
+    <link rel="stylesheet" href="/css/app.css" />
     <link rel="stylesheet" href="/styles/mobile.css" />
     <style>
       /* ─── Splash Screen Premium ─── */
@@ -508,11 +508,6 @@ Acum elimin și referințele CSS rămase din `app.css` pentru `#pwa-install-bann
               <span id="subtitle-speaker" class="text-cyan-bold"></span>
               <span id="subtitle-text"></span>
             </div>
-            <!-- Thinking indicator -->
-            <div id="thinking">
-              <div class="thinking-dots"><span></span><span></span><span></span></div>
-              <span data-i18n="thinking.text">Thinking...</span>
-            </div>
             <img
               src="/assets/aestudio-logo.png"
               alt="AEstudio"
@@ -566,6 +561,10 @@ Acum elimin și referințele CSS rămase din `app.css` pentru `#pwa-install-bann
         <div id="display-panel">
           <div id="chat-messages"></div>
           <div id="chat-overlay"></div>
+          <div id="thinking">
+            <div class="thinking-dots"><span></span><span></span><span></span></div>
+            <span data-i18n="thinking.text">Thinking...</span>
+          </div>
         </div>
       </div>
       <!-- /#main-content -->
@@ -699,31 +698,31 @@ Acum elimin și referințele CSS rămase din `app.css` pentru `#pwa-install-bann
 
 
     <script src="/lib/three.bundle.js"></script>
-    <script src="/js/i18n.js?v=20260330a"></script>
-    <script src="/js/fft-lipsync.js?v=20260330a"></script>
-    <script src="/js/alignment-lipsync.js?v=20260330a"></script>
+    <script src="/js/i18n.js?v=20260329i"></script>
+    <script src="/js/fft-lipsync.js?v=20260329i"></script>
+    <script src="/js/alignment-lipsync.js?v=20260329i"></script>
     <script src="/js/avatar.js?v=20260330a"></script>
-    <script src="/js/voice.js?v=20260330a"></script>
+    <script src="/js/voice.js?v=20260329i"></script>
     <script src="/socket.io/socket.io.js"></script>
-    <script src="/js/voice-stream-client.js?v=20260330a"></script>
-    <script src="/js/voice-realtime-client.js?v=20260330a"></script>
-    <script src="/js/realtime-vision.js?v=20260330a"></script>
-    <script src="/js/auth.js?v=20260330a"></script>
-    <script src="/js/identity.js?v=20260330a"></script>
+    <script src="/js/voice-stream-client.js?v=20260329i"></script>
+    <script src="/js/voice-realtime-client.js?v=20260329i"></script>
+    <script src="/js/realtime-vision.js?v=20260329i"></script>
+    <script src="/js/auth.js?v=20260329i"></script>
+    <script src="/js/identity.js?v=20260329i"></script>
 
-    <script src="/js/tools.js?v=20260330a"></script>
-    <script src="/js/shared.js?v=20260330a"></script>
+    <script src="/js/tools.js?v=20260329i"></script>
+    <script src="/js/shared.js?v=20260329i"></script>
 
-    <script src="/js/geolocation.js?v=20260330a"></script>
-    <script src="/js/auto-camera.js?v=20260330a"></script>
+    <script src="/js/geolocation.js?v=20260329i"></script>
+    <script src="/js/auto-camera.js?v=20260329i"></script>
     <script src="/js/live-voice.js?v=20260330a"></script>
 
-    <script src="/js/copy-shield.js?v=20260330a"></script>
-    <script src="/js/app.js?v=20260330a"></script>
-    <script src="/js/navbar.js?v=20260330a"></script>
-    <script src="/js/referral-ui.js?v=20260330a"></script>
-    <script src="/js/payments-ui.js?v=20260330a"></script>
-    <script src="/js/contact-form.js?v=20260330a"></script>
+    <script src="/js/copy-shield.js?v=20260329i"></script>
+    <script src="/js/app.js?v=20260329i"></script>
+    <script src="/js/navbar.js?v=20260329i"></script>
+    <script src="/js/referral-ui.js?v=20260329i"></script>
+    <script src="/js/payments-ui.js?v=20260329i"></script>
+    <script src="/js/contact-form.js?v=20260329i"></script>
 
 
 
@@ -784,8 +783,8 @@ Acum elimin și referințele CSS rămase din `app.css` pentru `#pwa-install-bann
     </button>
     <!-- Voice-First Mode Toggle + CC Subtitle -->
 
-    <script src="js/product-scanner.js?v=20260330a"></script>
-    <script src="js/mobile-features.js?v=20260330a"></script>
+    <script src="js/product-scanner.js?v=20260329i"></script>
+    <script src="js/mobile-features.js?v=20260329i"></script>
     <script>
       // ── Scanner Button handler ─────────────────────────
       (function () {
@@ -1049,7 +1048,7 @@ Acum elimin și referințele CSS rămase din `app.css` pentru `#pwa-install-bann
       })();
     </script>
 
-    <script src="/js/deploy-status.js?v=20260330a"></script>
+    <script src="/js/deploy-status.js?v=20260329i"></script>
     <script src="/visitor-tracker.js" defer></script>
     <script>
       // Safety net: if auth-screen becomes hidden but app-layout is still hidden, show it

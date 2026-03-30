@@ -2,7 +2,7 @@
 // KelionAI Service Worker — PWA + Offline Support
 // ═══════════════════════════════════════════════════════════════
 
-const CACHE_NAME = 'kelionai-v9';
+const CACHE_NAME = 'kelionai-v8';
 const STATIC_ASSETS = [
   '/manifest.json',
   '/images/Icon.jpg',
