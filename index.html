@@ -1,0 +1,1313 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="KelionAI" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="theme-color" content="#0A0A0F" />
+    <link rel="apple-touch-icon" href="/models/kelion-reference.png" />
+    <meta name="sentry-dsn" content="" />
+
+    <meta
+      name="description"
+      content="Your intelligent AI assistant with real-time voice, 3D avatar, and powerful brain."
+    />
+    <meta property="og:title" content="" id="meta-og-title" />
+    <meta
+      property="og:description"
+      content="Your intelligent AI assistant with real-time voice, 3D avatar, and powerful brain."
+    />
+    <meta property="og:image" content="/models/kelion-reference.png" />
+    <meta property="og:url" content="" />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="" id="meta-twitter-title" />
+    <meta
+      name="twitter:description"
+      content="Your intelligent AI assistant with real-time voice, 3D avatar, and powerful brain."
+    />
+    <meta name="twitter:image" content="/models/kelion-reference.png" />
+    <link rel="manifest" href="/manifest.json" />
+    <title id="page-title">AI Assistant</title>
+    <script>
+      // Dynamic meta tags — updated after APP_CONFIG is loaded
+      (function () {
+        function _updateMetaTags(name) {
+          if (!name) return;
+          document.title = name;
+          var ogTitle = document.getElementById('meta-og-title');
+          var twTitle = document.getElementById('meta-twitter-title');
+          var pageTitle = document.getElementById('page-title');
+          if (ogTitle) ogTitle.setAttribute('content', name);
+          if (twTitle) twTitle.setAttribute('content', name);
+          if (pageTitle) pageTitle.textContent = name;
+        }
+        // Try immediately if APP_CONFIG already set
+        if (window.APP_CONFIG && window.APP_CONFIG.appName) {
+          _updateMetaTags(window.APP_CONFIG.appName);
+        }
+        // Also listen for config loaded event
+        window.addEventListener('app-config-loaded', function (e) {
+          var cfg = (e && e.detail) || window.APP_CONFIG || {};
+          _updateMetaTags(cfg.appName);
+        });
+      })();
+    </script>
+    <script>
+      // ─── Onboarding redirect (first visit) ───────────────────
+      try {
+        if (!localStorage.getItem('kelion_onboarded')) {
+          window.location.replace('/onboarding.html');
+          throw new Error('redirect');
+        }
+      } catch (e) {
+        if (e.message === 'redirect') throw e;
+      }
+    </script>
+    <script>
+      // ─── Theme: apply before paint (anti-flash) ──────────────
+      try {
+        var savedTheme = localStorage.getItem('kelion_theme') || 'dark';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+        if (savedTheme === 'light') document.querySelector('meta[name="theme-color"]').content = '#F8F9FC';
+      } catch (e) {}
+    </script>
+    <script>
+      // ─── Production logging guard ────────────────────────────
+      // Suppress console.log in production to prevent leaking user
+      // data (names, coordinates) and reduce console noise.
+      // console.warn and console.error are preserved.
+      if (!/localhost|127\.0\.0\.1/.test(location.hostname)) {
+        console.log = function () {};
+      }
+    </script>
+    <script src="/js/client-config.js" data-fonts="inter-full" data-cdn="tensorflow,cocossd,sentry,logrocket"></script>
+    <link rel="stylesheet" href="/styles/design-system.css" />
+    <link rel="stylesheet" href="/styles/components.css" />
+    <link rel="stylesheet" href="/styles/animations.css" />
+    <link rel="stylesheet" href="/css/app.css" />
+    <link rel="stylesheet" href="/styles/mobile.css" />
+    <style>
+      /* ─── Splash Screen Premium ─── */
+      .splash {
+        position: fixed;
+        inset: 0;
+        background: #050510;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        transition:
+          opacity 0.6s ease,
+          visibility 0.6s;
+      }
+
+      .splash.hidden {
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+      }
+
+      .splash-logo {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+
+      .splash .animate-glow {
+        animation: splashGlow 2.5s ease-in-out infinite alternate;
+      }
+
+      @keyframes splashGlow {
+        from {
+          filter: drop-shadow(0 0 12px rgba(99, 102, 241, 0.4));
+        }
+
+        to {
+          filter: drop-shadow(0 0 32px rgba(6, 182, 212, 0.5));
+        }
+      }
+
+      .splash .typing-indicator {
+        margin-top: 28px;
+      }
+
+      .splash .typing-indicator span {
+        width: 8px;
+        height: 8px;
+        background: var(--kelion-primary, #6366f1);
+      }
+
+      /* ─── PWA Install — navbar button ─── */
+      .nav-icon-pwa {
+        background: linear-gradient(135deg, rgba(99,102,241,0.25), rgba(6,182,212,0.2));
+        border: 1px solid rgba(99,102,241,0.35) !important;
+        color: #a5b4fc !important;
+        animation: pwaPulse 2s ease-in-out infinite;
+      }
+      .nav-icon-pwa:hover {
+        background: linear-gradient(135deg, rgba(99,102,241,0.45), rgba(6,182,212,0.35)) !important;
+        color: #fff !important;
+      }
+      @keyframes pwaPulse {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(99,102,241,0); }
+        50% { box-shadow: 0 0 0 4px rgba(99,102,241,0.2); }
+      }
+
+      /* ─── Landing Page (Auth Screen) ─── */
+      .welcome-text {
+        font-size: 1.6rem;
+        font-weight: 700;
+        color: #f0f0ff;
+        margin-bottom: 4px;
+      }
+
+      .welcome-subtitle {
+        font-size: 0.9rem;
+        color: #8888aa;
+        margin-bottom: 28px;
+      }
+
+      .avatars-row {
+        display: flex;
+        justify-content: center;
+        gap: 40px;
+        margin-bottom: 28px;
+      }
+
+      .avatar-card {
+        text-align: center;
+        padding: 16px 24px;
+      }
+
+      .avatar-card .avatar-emoji {
+        font-size: 4rem;
+        display: block;
+        margin-bottom: 8px;
+      }
+
+      .avatar-card .avatar-label {
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: #f0f0ff;
+      }
+
+      #start-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 18px 64px;
+        font-size: 1.3rem;
+        font-weight: 700;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        color: #fff;
+        background: linear-gradient(135deg, #6366f1, #06b6d4);
+        border: none;
+        border-radius: 50px;
+        cursor: pointer;
+        transition: all 0.25s;
+        box-shadow: 0 8px 32px rgba(99, 102, 241, 0.35);
+        font-family: Inter, sans-serif;
+      }
+
+      #start-btn:hover {
+        transform: translateY(-3px);
+        box-shadow:
+          0 0 30px rgba(99, 102, 241, 0.3),
+          0 0 30px rgba(6, 182, 212, 0.3);
+      }
+
+      /* ─── #65 Hourglass Premium Animation ─── */
+      @keyframes hourglassFlip {
+        0% {
+          transform: rotate(0deg);
+        }
+
+        25% {
+          transform: rotate(180deg);
+        }
+
+        50% {
+          transform: rotate(180deg);
+        }
+
+        75% {
+          transform: rotate(360deg);
+        }
+
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+
+      #loading-icon {
+        animation: hourglassFlip 2s ease-in-out infinite !important;
+      }
+
+      /* ─── #64 Showcase Features ─── */
+      .showcase-grid {
+        display: none;
+        /* Hidden — AI brain controls visibility */
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        padding: 12px;
+        max-height: 220px;
+        overflow-y: auto;
+      }
+
+      .showcase-card {
+        background: rgba(99, 102, 241, 0.06);
+        border: 1px solid rgba(99, 102, 241, 0.12);
+        border-radius: 12px;
+        padding: 12px 10px;
+        text-align: center;
+        transition: all 0.25s;
+        cursor: default;
+      }
+
+      .showcase-card:hover {
+        background: rgba(99, 102, 241, 0.12);
+        border-color: rgba(99, 102, 241, 0.25);
+        transform: translateY(-2px);
+      }
+
+      .showcase-card .sc-icon {
+        font-size: 1.4rem;
+        display: block;
+        margin-bottom: 4px;
+      }
+
+      .showcase-card .sc-label {
+        font-size: 0.7rem;
+        color: #a5b4fc;
+        font-weight: 600;
+      }
+
+      .showcase-card .sc-desc {
+        font-size: 0.6rem;
+        color: #555577;
+        margin-top: 2px;
+      }
+
+
+    </style>
+    <!-- CDN scripts injected by client-config.js -->
+    <script>
+      if (typeof LogRocket === 'undefined') {
+        window.LogRocket = {
+          init: function () {},
+          identify: function () {},
+          track: function () {},
+          getSessionURL: function () {},
+        };
+      }
+      LogRocket.init(
+        (window.APP_CONFIG && window.APP_CONFIG.logRocketId)
+          ? window.APP_CONFIG.logRocketId
+          : ((window.APP_CONFIG && window.APP_CONFIG.appSlug) || 'app') + '-default/app'
+      );
+    </script>
+
+    <!-- PWA Service Worker Registration -->
+    <script>
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", function() {
+          navigator.serviceWorker.register("/sw.js?v=7")
+            .then(function(reg) { console.log("[KelionAI] SW registered:", reg.scope); })
+            .catch(function(err) { console.warn("[KelionAI] SW failed:", err); });
+        });
+      }
+    </script>
+  </head>
+
+  <body>
+    <!-- SPLASH SCREEN -->
+    <div id="splash-screen" class="splash">
+      <div class="splash-logo animate-glow">
+        <span class="splash-brand">Kelion</span>
+        <span class="gradient-text splash-brand-ai">AI</span>
+      </div>
+      <div class="typing-indicator splash-typing"><span></span><span></span><span></span></div>
+      <p class="splash-tagline">YOUR INTELLIGENT ASSISTANT</p>
+    </div>
+
+    <!-- AUTH SCREEN — Premium Landing -->
+    <div id="auth-screen">
+      <div id="auth-container" class="auth-container-landing">
+        <div id="auth-logo">
+          <div class="auth-avatar-icon animate-float auth-avatar-large">K</div>
+          <h1 class="auth-title-large">Kelion<span class="gradient-text">AI</span></h1>
+          <p class="auth-subtitle auth-subtitle-muted">Your intelligent AI assistant</p>
+        </div>
+        <div class="auth-features-row">
+          <div class="auth-feature-item">
+            <span class="auth-feature-icon" style="font-size: 1.2rem; font-weight: 700">AI</span>
+            <span class="auth-feature-label">Smart Chat</span>
+          </div>
+          <div class="auth-feature-item">
+            <span class="auth-feature-icon" style="font-size: 1.2rem; font-weight: 700">Voice</span>
+            <span class="auth-feature-label">Real-time</span>
+          </div>
+          <div class="auth-feature-item">
+            <span class="auth-feature-icon" style="font-size: 1.2rem; font-weight: 700">Web</span>
+            <span class="auth-feature-label">Search</span>
+          </div>
+          <div class="auth-feature-item">
+            <span class="auth-feature-icon" style="font-size: 1.2rem; font-weight: 700">Vision</span>
+            <span class="auth-feature-label">Images</span>
+          </div>
+        </div>
+        <p class="auth-tagline">Multilingual • 3D Avatars • Voice Chat • Web Search • AI-Powered</p>
+        <button id="start-btn">
+          <span id="loading-icon" class="loading-spinner">...</span>
+          Loading...
+        </button>
+        <style>
+          @keyframes spin {
+            0% {
+              transform: rotate(0deg);
+            }
+
+            50% {
+              transform: rotate(180deg);
+            }
+
+            100% {
+              transform: rotate(360deg);
+            }
+          }
+        </style>
+        <div class="auth-links-col">
+          <span
+            id="auth-guest"
+            class="auth-guest-link"
+            onclick="
+              var s = document.getElementById('auth-screen');
+              if (s) s.classList.add('hidden');
+              var a = document.getElementById('app-layout');
+              if (a) a.classList.remove('hidden');
+            "
+            >Continue without account</span
+          >
+          <span
+            id="auth-admin-link"
+            class="auth-guest-link"
+            style="font-size: 0.75rem; opacity: 0.45; margin-top: 4px; cursor: pointer"
+            onclick="
+              document.getElementById('auth-form').style.display = '';
+              document.getElementById('start-btn').style.display = 'none';
+              document.getElementById('auth-guest').style.display = 'none';
+              document.getElementById('auth-back').style.display = '';
+              document.getElementById('auth-admin-link').style.display = 'none';
+            "
+            >Admin login</span
+          >
+        </div>
+        <!-- Login form (hidden by default, toggled by btn-auth) -->
+        <button
+          id="auth-back"
+          class="auth-back-btn"
+          onclick="
+            document.getElementById('auth-form').style.display = 'none';
+            document.getElementById('auth-back').style.display = 'none';
+            document.getElementById('start-btn').style.display = '';
+            document.getElementById('auth-guest').style.display = '';
+          "
+        >
+          ← Back
+        </button>
+        <form id="auth-form" class="hidden-mt24-left">
+          <div id="auth-name-group" class="hidden-mb12">
+            <input type="text" id="auth-name" placeholder="Name" />
+          </div>
+          <input type="email" id="auth-email" placeholder="Email" required />
+          <input type="password" id="auth-password" placeholder="Password" required autocomplete="current-password" />
+          <button type="submit" id="auth-submit">Sign In</button>
+          <div id="auth-forgot" class="mt-8-center">
+            <a href="#" id="auth-forgot-link" class="form-toggle-link">Forgot password?</a>
+          </div>
+          <p id="auth-error" class="form-error"></p>
+          <div class="text-center-mt-12">
+            <a href="#" id="auth-toggle" class="form-subtext">No account → Create</a>
+          </div>
+          <h3 id="auth-title" class="hidden-panel">Sign In</h3>
+        </form>
+      </div>
+    </div>
+
+    <!-- MAIN APP -->
+    <div id="app-layout" class="hidden">
+      <!-- NAVBAR -->
+      <nav class="navbar" id="app-navbar">
+        <a
+          id="navbar-pricing-link"
+          href="/pricing/"
+          style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0)"
+          >Pricing</a
+        >
+
+        <!-- Left: Brand -->
+        <a href="/" class="navbar-logo">
+          <span class="logo-name"><span id="navbar-avatar-name">Kelion</span><span class="logo-ai">AI</span></span>
+          <span id="app-version" class="logo-version"></span>
+        </a>
+
+        <!-- Center: Status -->
+        <div id="status-indicator" class="status-indicator">
+          <div id="status-dot" class="status-dot"></div>
+          <span id="status-text">Online</span>
+        </div>
+
+        <!-- Right: Actions -->
+        <div class="navbar-actions">
+          <button class="avatar-pill active" data-avatar="kelion">Kelion</button>
+          <button class="avatar-pill" data-avatar="kira">Kira</button>
+          <button class="nav-icon" id="btn-save-last" title="Save last response" aria-label="Save last response">💾</button>
+          <button class="nav-icon" id="btn-pricing" data-alias="btn-subscriptions" title="Plans" aria-label="Plans" style="display: none">💳</button>
+          <button class="nav-icon nav-icon-admin" id="btn-admin-nav" title="Admin Dashboard" aria-label="Admin" style="display: none" onclick="window.location.href='/admin'">⚙️</button>
+          <button class="nav-icon" id="btn-auth" title="Sign in" aria-label="Sign in">🔑</button>
+        </div>
+      </nav>
+
+      <!-- MAIN CONTENT -->
+      <div id="main-content">
+        <!-- Hidden elements needed by JS -->
+        <span id="user-display" class="user-badge nav-dropdown-badge" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)"></span>
+        <span id="guest-counter" class="guest-counter" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)"></span>
+        <input type="file" id="file-input-hidden" class="hidden-panel" accept="*/*" title="Upload file" />
+
+        <div id="left-panel">
+          <div id="avatar-area">
+            <canvas id="avatar-canvas"></canvas>
+            <div id="avatar-label">
+              <span id="avatar-name">Kelion</span>
+            </div>
+
+            <!-- Thinking indicator (under avatar, above subtitle) -->
+            <div id="thinking">
+              <div class="thinking-dots"><span></span><span></span><span></span></div>
+            </div>
+
+            <!-- Live subtitle bar (under avatar) -->
+            <div id="live-subtitle">
+              <span id="subtitle-speaker" class="text-cyan-bold"></span>
+              <span id="subtitle-text"></span>
+            </div>
+            <img
+              src="/assets/aestudio-logo.png"
+              alt="AEstudio"
+              id="aestudio-logo"
+              style="
+                position: absolute;
+                bottom: 8px;
+                right: 8px;
+                width: 80px;
+                height: auto;
+                opacity: 0.7;
+                pointer-events: none;
+                z-index: 5;
+              "
+            />
+          </div>
+        </div>
+
+        <!-- #64 SHOWCASE — hidden by default, AI brain shows when relevant -->
+        <div id="showcase-panel" class="showcase-grid">
+          <div class="showcase-card">
+            <span class="sc-icon" style="font-size: 0.9rem; font-weight: 700; color: #a5b4fc">Brain</span
+            ><span class="sc-label">AI Brain</span><span class="sc-desc">Multi-model intelligence</span>
+          </div>
+          <div class="showcase-card">
+            <span class="sc-icon" style="font-size: 0.9rem; font-weight: 700; color: #a5b4fc">Voice</span
+            ><span class="sc-label">Voice</span><span class="sc-desc">Real-time conversation</span>
+          </div>
+          <div class="showcase-card">
+            <span class="sc-icon" style="font-size: 0.9rem; font-weight: 700; color: #a5b4fc">Vision</span
+            ><span class="sc-label">Vision</span><span class="sc-desc">Image understanding</span>
+          </div>
+          <div class="showcase-card">
+            <span class="sc-icon" style="font-size: 0.9rem; font-weight: 700; color: #a5b4fc">Search</span
+            ><span class="sc-label">Search</span><span class="sc-desc">Live web results</span>
+          </div>
+          <div class="showcase-card">
+            <span class="sc-icon" style="font-size: 0.9rem; font-weight: 700; color: #a5b4fc">Create</span
+            ><span class="sc-label">Create</span><span class="sc-desc">AI image generation</span>
+          </div>
+
+          <div class="showcase-card">
+            <span class="sc-icon" style="font-size: 0.9rem; font-weight: 700; color: #a5b4fc">Lang</span
+            ><span class="sc-label">Languages</span><span class="sc-desc">6 languages</span>
+          </div>
+          <div class="showcase-card">
+            <span class="sc-icon" style="font-size: 0.9rem; font-weight: 700; color: #a5b4fc">Safe</span
+            ><span class="sc-label">Security</span><span class="sc-desc">GDPR compliant</span>
+          </div>
+        </div>
+        <!-- Chat messages hidden — only for JS history/export, not visible -->
+        <div id="chat-messages" style="display:none;"></div>
+        <div id="chat-overlay" style="display:none;"></div>
+
+        <div id="display-panel">
+          <div id="display-header">
+            <span id="display-title">Monitor</span>
+            <span id="display-subtitle" style="font-size:0.65rem;color:#666;margin-left:8px;"></span>
+          </div>
+          <div id="display-content">
+            <!-- Default: welcome screen -->
+            <div id="monitor-default">
+              <div class="monitor-welcome-icon">🎯</div>
+              <p class="monitor-welcome-title">Monitor de prezentare</p>
+              <small class="monitor-welcome-sub">Cere o hartă, imagine, vreme, căutare sau cod</small>
+            </div>
+            <!-- Image panel -->
+            <div id="monitor-image" style="display:none;flex-direction:column;align-items:center;width:100%;gap:12px;"></div>
+            <!-- Map / iframe panel -->
+            <div id="monitor-map" style="display:none;flex-direction:column;width:100%;height:100%;"></div>
+            <!-- Text / code / markdown panel -->
+            <div id="monitor-text" style="display:none;flex-direction:column;width:100%;padding:8px;overflow-y:auto;"></div>
+            <!-- Search results panel -->
+            <div id="monitor-search" style="display:none;flex-direction:column;width:100%;overflow-y:auto;"></div>
+            <!-- Weather panel -->
+            <div id="monitor-weather" style="display:none;flex-direction:column;align-items:center;width:100%;justify-content:center;"></div>
+            <!-- Video panel -->
+            <div id="monitor-video" style="display:none;flex-direction:column;width:100%;height:100%;"></div>
+            <!-- iframe panel -->
+            <div id="monitor-iframe" style="display:none;flex-direction:column;width:100%;height:100%;"></div>
+          </div>
+        </div>
+      </div>
+      <!-- /#main-content -->
+
+      <!-- Input row — FULL WIDTH at page bottom -->
+      <div id="input-row">
+        <button id="btn-camera" title="Camera ON/OFF" aria-label="Toggle camera" class="ctrl-circle">📷 Cam</button>
+        <button id="btn-mic" title="Microfon OFF — click pentru Live Chat" aria-label="Toggle microphone" class="ctrl-circle is-off">🎤 Mic</button>
+        <input
+          type="text"
+          id="text-input"
+          data-i18n-placeholder="input.placeholder"
+          placeholder="Type or speak..."
+          autocomplete="off"
+        />
+        <button id="btn-send" title="Send" aria-label="Send message" class="ctrl-circle is-accent">🚀 Send</button>
+      </div>
+    </div>
+    <!-- /#app-layout -->
+    <script>
+      // Force-hide admin-only buttons before auth runs
+      (function(){
+        var ids = ['btn-admin-nav'];
+        for (var i = 0; i < ids.length; i++) {
+          var el = document.getElementById(ids[i]);
+          if (el) el.style.display = 'none';
+        }
+      })();
+    </script>
+    <script>
+      document.addEventListener('DOMContentLoaded', function () {
+        var saveBtn = document.getElementById('btn-save-last');
+
+        function getScreenContent() {
+          var msgs = document.querySelectorAll('.msg.assistant');
+          if (msgs.length) return { type: 'text', text: msgs[msgs.length - 1].textContent.trim() };
+          var overlay = document.getElementById('chat-overlay');
+          if (overlay && overlay.textContent.trim()) return { type: 'text', text: overlay.textContent.trim() };
+          return null;
+        }
+
+        if (saveBtn)
+          saveBtn.addEventListener('click', function () {
+            var content = getScreenContent();
+            if (!content) return;
+            var ts = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+            if (content.type === 'image' && content.url) {
+              fetch(content.url)
+                .then(function (r) {
+                  return r.blob();
+                })
+                .then(function (blob) {
+                  var url = URL.createObjectURL(blob);
+                  var a = document.createElement('a');
+                  a.href = url;
+                  a.download = 'kelion-image-' + ts + '.png';
+                  a.click();
+                  URL.revokeObjectURL(url);
+                })
+                .catch(function () {
+                  var a = document.createElement('a');
+                  a.href = content.url;
+                  a.download = 'kelion-image-' + ts + '.png';
+                  a.target = '_blank';
+                  a.click();
+                });
+            } else {
+              var blob = new Blob([content.text], { type: 'text/plain' });
+              var a = document.createElement('a');
+              a.href = URL.createObjectURL(blob);
+              a.download = 'kelion-response-' + ts + '.txt';
+              a.click();
+              URL.revokeObjectURL(a.href);
+            }
+          });
+      });
+    </script>
+
+    <!-- GUEST TIMER BAR — removed (server-side limits apply) -->
+
+    <!-- GUEST EXPIRED OVERLAY — removed (server-side limits apply) -->
+
+    <div id="drop-zone" class="hidden">
+      <div class="drop-zone-content">
+        <div class="drop-icon animate-float">Drop</div>
+        <p data-i18n="drop.text">Drop file here</p>
+      </div>
+    </div>
+
+    <!-- PRICING MODAL -->
+    <div id="pricing-modal" class="modal-overlay hidden">
+      <div class="modal-content pricing-modal">
+        <button class="modal-close" id="pricing-close">&times;</button>
+        <h2 class="pricing-title" data-i18n="pricing.modal.title">Choose your plan</h2>
+        <div id="current-plan-info" class="current-plan-info"></div>
+        <div class="pricing-grid" id="pricing-grid"></div>
+        <div id="pricing-referral" class="pricing-referral"></div>
+      </div>
+    </div>
+
+    <!-- REFERRAL/INVITE MODAL -->
+    <div id="referral-modal" class="modal-overlay hidden">
+      <div class="modal-content">
+        <button class="modal-close" id="referral-close">&times;</button>
+        <h2 class="referral-title">Invite Friends</h2>
+        <p class="referral-desc">Generate an invite code and share it with a friend. You both get bonus days!</p>
+
+        <div id="referral-code-section">
+          <label class="referral-label">Your invite code</label>
+          <div class="referral-row">
+            <input type="text" id="referral-code-display" readonly placeholder="Click Generate..." />
+            <button id="btn-copy-code" title="Copy">Copy</button>
+          </div>
+          <div id="referral-expiry"></div>
+          <div id="referral-remaining"></div>
+        </div>
+
+        <button id="btn-generate-code">Generate invite code</button>
+
+        <div class="referral-divider">
+          <label class="referral-label">Send invite via email</label>
+          <div class="referral-row">
+            <input type="email" id="referral-email" placeholder="friend@email.com" />
+            <button id="btn-send-invite">Send</button>
+          </div>
+          <p id="referral-status"></p>
+        </div>
+      </div>
+    </div>
+
+
+
+    <script src="/lib/three.bundle.js"></script>
+    <script src="/js/i18n.js?v=20260330b"></script>
+    <script src="/js/fft-lipsync.js?v=20260330b"></script>
+    <script src="/js/alignment-lipsync.js?v=20260330b"></script>
+    <script src="/js/avatar.js?v=20260330b"></script>
+    <script src="/js/voice.js?v=20260330b"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/js/live-voice.js?v=20260330b"></script>
+    <script src="/js/voice-stream-client.js?v=20260330b"></script>
+    <script src="/js/voice-realtime-client.js?v=20260330b"></script>
+    <script src="/js/realtime-vision.js?v=20260330b"></script>
+    <script src="/js/auth.js?v=20260330b"></script>
+    <script src="/js/identity.js?v=20260330b"></script>
+
+    <script src="/js/tools.js?v=20260330b"></script>
+    <script src="/js/shared.js?v=20260330b"></script>
+
+    <script src="/js/geolocation.js?v=20260330b"></script>
+    <script src="/js/auto-camera.js?v=20260330b"></script>
+
+    <script src="/js/copy-shield.js?v=20260330b"></script>
+    <script src="/js/app.js?v=20260330b"></script>
+    <script src="/js/navbar.js?v=20260330b"></script>
+    <script src="/js/referral-ui.js?v=20260330b"></script>
+    <script src="/js/payments-ui.js?v=20260330b"></script>
+    <script src="/js/contact-form.js?v=20260330b"></script>
+
+
+
+    <a href="/" id="home-btn-fixed" class="home-btn-fixed" title="Home" style="display: none">Home</a>
+
+    <!-- PWA INSTALL — butoane mutate în navbar, bannerul eliminat -->
+    <script>
+      // ─── PWA Install — navbar buttons ────────────────────────────
+      var deferredInstallPrompt = null;
+      window.addEventListener('beforeinstallprompt', function (e) {
+        e.preventDefault();
+        deferredInstallPrompt = e;
+        try {
+          var dismissed = localStorage.getItem('pwa_dismissed');
+          if (dismissed && Date.now() - Number(dismissed) < 7 * 24 * 60 * 60 * 1000) return;
+        } catch (e2) {}
+        var btnInstall = document.getElementById('pwa-install-btn-nav');
+        var btnDismiss = document.getElementById('pwa-dismiss-btn-nav');
+        if (btnInstall) btnInstall.style.display = '';
+        if (btnDismiss) btnDismiss.style.display = '';
+      });
+
+      document.addEventListener('DOMContentLoaded', function () {
+        var btnInstall = document.getElementById('pwa-install-btn-nav');
+        var btnDismiss = document.getElementById('pwa-dismiss-btn-nav');
+
+        if (btnInstall) {
+          btnInstall.addEventListener('click', function () {
+            btnInstall.style.display = 'none';
+            if (btnDismiss) btnDismiss.style.display = 'none';
+            if (deferredInstallPrompt) {
+              deferredInstallPrompt.prompt();
+              deferredInstallPrompt.userChoice.then(function () {
+                deferredInstallPrompt = null;
+              });
+            }
+          });
+        }
+
+        if (btnDismiss) {
+          btnDismiss.addEventListener('click', function () {
+            btnDismiss.style.display = 'none';
+            if (btnInstall) btnInstall.style.display = 'none';
+            try { localStorage.setItem('pwa_dismissed', Date.now()); } catch (e) {}
+          });
+        }
+      });
+    </script>
+    <!-- Theme Toggle (hidden — replaced by camera) -->
+    <button
+      class="theme-toggle"
+      id="theme-toggle"
+      title="Toggle dark/light theme"
+      aria-hidden="true"
+      style="display: none"
+    >
+      <span id="theme-icon">Theme</span>
+    </button>
+    <!-- Voice-First Mode Toggle + CC Subtitle -->
+
+    <script src="js/product-scanner.js?v=20260330b"></script>
+    <script src="js/mobile-features.js?v=20260330b"></script>
+    <script>
+      // ── Scanner Button handler ─────────────────────────
+      (function () {
+        var scanBtn = document.getElementById('btn-scan-toggle');
+        if (!scanBtn) return;
+        scanBtn.addEventListener('click', function () {
+          if (!window.KScanner) return;
+          var active = KScanner.toggle();
+          scanBtn.classList.toggle('is-on', active);
+          scanBtn.classList.toggle('is-off', !active);
+          scanBtn.title = active ? 'Scanner: ON' : 'Product Scanner';
+        });
+      })();
+
+      // ── Chat command interceptor: start/stop scan produse ──
+      (function () {
+        var origSubmit = null;
+        var input = document.getElementById('text-input') || document.getElementById('msg-input');
+        if (!input) return;
+        input.addEventListener(
+          'keydown',
+          function (e) {
+            if (e.key !== 'Enter') return;
+            var val = (input.value || '').trim().toLowerCase();
+            if (!val) return;
+            // Start scan
+            if (
+              val.match(
+                /^(start|porneste|deschide|activeaza)\s*(scan|scanner|scaneaz[aă])\s*(produse|produs|barcode)?$/i
+              )
+            ) {
+              e.preventDefault();
+              e.stopPropagation();
+              input.value = '';
+              if (window.KScanner) {
+                KScanner.start();
+                var scanBtn = document.getElementById('btn-scan-toggle');
+                if (scanBtn) {
+                  scanBtn.classList.add('is-on');
+                  scanBtn.classList.remove('is-off');
+                }
+              }
+              return false;
+            }
+            // Stop scan
+            if (
+              val.match(
+                /^(stop|opreste|inchide|dezactiveaz[aă])\s*(scan|scanner|scaneaz[aă])\s*(produse|produs|barcode)?$/i
+              )
+            ) {
+              e.preventDefault();
+              e.stopPropagation();
+              input.value = '';
+              if (window.KScanner) {
+                KScanner.stop();
+                var scanBtn2 = document.getElementById('btn-scan-toggle');
+                if (scanBtn2) {
+                  scanBtn2.classList.add('is-off');
+                  scanBtn2.classList.remove('is-on');
+                }
+              }
+              return false;
+            }
+          },
+          true
+        );
+      })();
+    </script>
+
+    <!-- ═══ CONSOLIDATED BUTTON BINDING (SAFETY NET) ═══ -->
+    <script>
+      // Re-bind ALL buttons after everything is loaded — fixes timing issues
+      setTimeout(function () {
+        console.log('[ButtonBind] Binding all buttons...');
+
+        // ── Scanner Button ──
+        var scanBtn = document.getElementById('btn-scan-toggle');
+        if (scanBtn && window.KScanner) {
+          var newScan = scanBtn.cloneNode(true);
+          scanBtn.parentNode.replaceChild(newScan, scanBtn);
+          newScan.addEventListener('click', function () {
+            try {
+              var active = KScanner.toggle();
+              newScan.classList.toggle('is-on', active);
+              newScan.classList.toggle('is-off', !active);
+              newScan.title = active ? 'Scanner ON' : 'Product Scanner';
+            } catch (e) {
+              console.warn('[ButtonBind] Scanner error:', e);
+            }
+          });
+          console.log('[ButtonBind] Scanner bound OK');
+        }
+
+        // ── Update role button + admin-only features ──
+        (function updateRoleButton() {
+          var roleBtn = document.getElementById('btn-role');
+          if (!roleBtn) return;
+          // Bind click
+          roleBtn.addEventListener('click', function () {
+            if (window.KAuth && KAuth.isAdmin && KAuth.isAdmin()) {
+              window.location.href = '/admin';
+            } else if (window.KAuth && KAuth.isLoggedIn && KAuth.isLoggedIn()) {
+              window.location.href = '/settings';
+            } else {
+              var b = document.getElementById('btn-auth');
+              if (b) b.click();
+            }
+          });
+          // Set state
+          if (window.KAuth && KAuth.isAdmin && KAuth.isAdmin()) {
+            roleBtn.textContent = '👑';
+            roleBtn.title = 'Admin';
+          } else if (window.KAuth && KAuth.isLoggedIn && KAuth.isLoggedIn()) {
+            roleBtn.textContent = '👤';
+            roleBtn.title = 'User';
+          } else {
+            roleBtn.textContent = '👤';
+            roleBtn.title = 'Free — Click to sign in';
+          }
+        })();
+
+        // ── Pricing Button ──
+        var pricingBtn = document.getElementById('btn-pricing');
+        if (pricingBtn) {
+          pricingBtn.addEventListener('click', function () {
+            if (window.KAuth && KAuth.isLoggedIn && KAuth.isLoggedIn()) {
+              window.location.href = '/pricing/';
+            } else {
+              var b = document.getElementById('btn-auth');
+              if (b) b.click();
+            }
+          });
+        }
+
+        console.log('[ButtonBind] All buttons bound OK');
+      }, 500);
+    </script>
+    <!-- ═══ CAMERA BUTTON — toggle ON/OFF ═══ -->
+    <script>
+      (function () {
+        var btn = document.getElementById('btn-camera');
+        if (!btn) return;
+
+        function updateBtn(active) {
+          if (active) {
+            btn.classList.add('is-on');
+            btn.classList.remove('is-off');
+            btn.innerHTML = '🔴 Cam';
+            btn.title = 'Camera ON — click to stop';
+          } else {
+            btn.classList.remove('is-on');
+            btn.classList.add('is-off');
+            btn.innerHTML = '📷 Cam';
+            btn.title = 'Camera OFF — click to start';
+          }
+        }
+
+        btn.addEventListener('click', function () {
+          if (!window.KAutoCamera) return;
+          KAutoCamera.toggle();
+        });
+
+        // Listen for state changes from auto-camera.js
+        window.addEventListener('auto-camera-state', function (e) {
+          updateBtn(e.detail && e.detail.active);
+        });
+
+        // Initial state
+        updateBtn(false);
+      })();
+    </script>
+
+    <!-- ═══ MIC BUTTON — Live Voice toggle ═══ -->
+    <script>
+      (function () {
+        var btn = document.getElementById('btn-mic');
+        if (!btn) return;
+
+        var _state = 'inactive'; // inactive | connecting | listening | speaking | thinking
+
+        function updateBtn(status) {
+          _state = status;
+          if (status === 'inactive') {
+            btn.classList.remove('is-on');
+            btn.classList.add('is-off');
+            btn.innerHTML = '🎤 Mic';
+            btn.title = 'Microfon OFF — click pentru Live Chat';
+          } else if (status === 'connecting') {
+            btn.classList.add('is-on');
+            btn.classList.remove('is-off');
+            btn.innerHTML = '⏳ Mic';
+            btn.title = 'Se conectează...';
+          } else if (status === 'listening') {
+            btn.classList.add('is-on');
+            btn.classList.remove('is-off');
+            btn.innerHTML = '🎤 Live';
+            btn.title = 'Live Chat activ — click pentru a opri';
+          } else if (status === 'speaking') {
+            btn.classList.add('is-on');
+            btn.classList.remove('is-off');
+            btn.innerHTML = '🔊 Vorbesc';
+            btn.title = 'Avatar vorbește...';
+          } else if (status === 'thinking') {
+            btn.classList.add('is-on');
+            btn.classList.remove('is-off');
+            btn.innerHTML = '💭 Gândesc';
+            btn.title = 'Procesez...';
+          } else if (status === 'user_speaking') {
+            btn.classList.add('is-on');
+            btn.classList.remove('is-off');
+            btn.innerHTML = '🎙 Ascult';
+            btn.title = 'Te ascult...';
+          } else if (status === 'mic_error') {
+            btn.classList.remove('is-on');
+            btn.classList.add('is-off');
+            btn.innerHTML = '❌ Mic';
+            btn.title = 'Eroare microfon';
+          }
+        }
+
+        // Click toggle
+        btn.addEventListener('click', function () {
+          if (!window.KLiveVoice) {
+            console.warn('[MicBtn] KLiveVoice not loaded');
+            return;
+          }
+          KLiveVoice.toggle();
+        });
+
+        // Asculta starea de la live-voice.js
+        window.addEventListener('live-voice-state', function (e) {
+          if (!e.detail) return;
+          updateBtn(e.detail.status || (e.detail.active ? 'listening' : 'inactive'));
+        });
+
+        // Initial state
+        updateBtn('inactive');
+      })();
+    </script>
+    <!-- ═══ AUTO-START: Camera ON + Chat commands for camera/mic ═══ -->
+    <script>
+      // Chat command interceptor: camera on/off + "what do you see" auto-enables camera
+      (function () {
+        var input = document.getElementById('text-input');
+        if (!input) return;
+        input.addEventListener(
+          'keydown',
+          function (e) {
+            if (e.key !== 'Enter') return;
+            var val = (input.value || '').trim().toLowerCase();
+            if (!val) return;
+
+            // Camera OFF commands
+            if (/^(stop|opreste|inchide|off|dezactiveaz[a\u0103])\s*(camera|cam|kamera)$/i.test(val)) {
+              e.preventDefault();
+              e.stopPropagation();
+              input.value = '';
+              if (window.KAutoCamera && KAutoCamera.stop) KAutoCamera.stop();
+              console.log('[ChatCmd] Camera stopped');
+              return false;
+            }
+            // Camera ON commands
+            if (/^(start|porneste|deschide|on|activeaz[a\u0103])\s*(camera|cam|kamera)$/i.test(val)) {
+              e.preventDefault();
+              e.stopPropagation();
+              input.value = '';
+              if (window.KAutoCamera && KAutoCamera.start) KAutoCamera.start();
+              console.log('[ChatCmd] Camera started');
+              return false;
+            }
+            // "What do you see" / "Ce vezi" — auto-enable camera, then send to AI
+            if (/ce\s*vez|what.*see|look\s*at|uita.*te|priveste|arata.*mi/i.test(val)) {
+              if (window.KAutoCamera && KAutoCamera.start && !KAutoCamera.isActive()) {
+                KAutoCamera.start();
+                console.log('[ChatCmd] Camera auto-enabled for vision query');
+              }
+              // Let the message pass through to AI normally
+            }
+          },
+          true
+        );
+      })();
+    </script>
+
+    <script src="/js/deploy-status.js?v=20260330b"></script>
+    <script src="/visitor-tracker.js" defer></script>
+    <script>
+      // Safety net: if auth-screen becomes hidden but app-layout is still hidden, show it
+      (function () {
+        var obs2 = new MutationObserver(function () {
+          var auth = document.getElementById('auth-screen');
+          var app = document.getElementById('app-layout');
+          if (!auth || !app) return;
+          var authHidden = auth.classList.contains('hidden') || auth.style.display === 'none';
+          var appHidden = app.classList.contains('hidden');
+          if (authHidden && appHidden) {
+            app.classList.remove('hidden');
+            app.style.visibility = '';
+            app.style.pointerEvents = '';
+            app.style.zIndex = '';
+          }
+        });
+        obs2.observe(document.body, { attributes: true, subtree: true, childList: true });
+      })();
+    </script>
+
+    <!-- Guest Expiry Overlay -->
+    <div
+      id="guest-expiry-overlay"
+      style="
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 99999;
+        background: rgba(0, 0, 0, 0.75);
+        backdrop-filter: blur(6px);
+        align-items: center;
+        justify-content: center;
+      "
+    >
+      <div
+        style="
+          background: #1a1a2e;
+          border: 1px solid #333;
+          border-radius: 16px;
+          padding: 32px 28px;
+          max-width: 400px;
+          text-align: center;
+          color: #fff;
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        "
+      >
+        <div style="font-size: 2.5rem; margin-bottom: 12px">⏰</div>
+        <h2 id="expiry-title" style="margin: 0 0 8px; font-size: 1.2rem; color: #f59e0b">Free period expired</h2>
+        <p id="expiry-message" style="color: #aaa; font-size: 0.9rem; margin: 0 0 24px">
+          Your daily free messages have been used. Create an account or subscribe to continue.
+        </p>
+        <div style="display: flex; flex-direction: column; gap: 10px">
+          <button
+            onclick="
+              document.getElementById('guest-expiry-overlay').style.display = 'none';
+              if (window.KAuth) KAuth.showLogin();
+            "
+            style="
+              padding: 12px;
+              border: none;
+              border-radius: 8px;
+              background: #6366f1;
+              color: #fff;
+              font-size: 1rem;
+              cursor: pointer;
+              font-weight: 600;
+            "
+          >
+            🔑 Login / Create Account
+          </button>
+          <button
+            onclick="
+              document.getElementById('guest-expiry-overlay').style.display = 'none';
+              window.location.href = '/pricing/';
+            "
+            style="
+              padding: 12px;
+              border: none;
+              border-radius: 8px;
+              background: #10b981;
+              color: #fff;
+              font-size: 1rem;
+              cursor: pointer;
+              font-weight: 600;
+            "
+          >
+            ⭐ View Plans
+          </button>
+          <button
+            onclick="document.getElementById('guest-expiry-overlay').style.display = 'none'"
+            style="
+              padding: 8px;
+              border: none;
+              border-radius: 8px;
+              background: transparent;
+              color: #666;
+              font-size: 0.85rem;
+              cursor: pointer;
+            "
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MOUTH AMPLITUDE SLIDER (admin-only, auto-shown) -->
+    <div
+      id="mouth-slider-bar"
+      style="
+        display: none;
+        position: fixed;
+        bottom: 80px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 9998;
+        background: rgba(0, 0, 0, 0.92);
+        border: 1px solid #a78bfa;
+        border-radius: 14px;
+        padding: 10px 20px;
+        align-items: center;
+        gap: 10px;
+        font-family: var(--kelion-font);
+        color: #fff;
+        min-width: 300px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+      "
+    >
+      <span style="font-size: 0.8rem; font-weight: 700; color: #a78bfa; white-space: nowrap">👄 Gură</span>
+      <input
+        type="range"
+        id="mouth-amp-slider"
+        min="5"
+        max="200"
+        value="100"
+        style="flex: 1; accent-color: #a78bfa; height: 18px; cursor: pointer"
+      />
+      <span
+        id="mouth-amp-val"
+        style="font-size: 0.95rem; font-weight: 700; color: #a78bfa; width: 45px; text-align: right"
+        >100%</span
+      >
+      <button
+        id="mouth-cal-test"
+        style="
+          padding: 4px 12px;
+          background: #a78bfa;
+          border: none;
+          border-radius: 8px;
+          color: #fff;
+          cursor: pointer;
+          font-size: 0.8rem;
+          font-weight: 700;
+        "
+      >
+        🔊 Test
+      </button>
+      <button
+        id="mouth-cal-ok"
+        style="
+          padding: 4px 12px;
+          background: #22c55e;
+          border: none;
+          border-radius: 8px;
+          color: #fff;
+          cursor: pointer;
+          font-size: 0.8rem;
+          font-weight: 700;
+        "
+      >
+        OK
+      </button>
+    </div>
+    <script>
+      // Show mouth slider for admin after page fully loads
+      (function () {
+        var _mouthReady = false;
+        function _showMouthSlider() {
+          if (_mouthReady) return;
+          var bar = document.getElementById('mouth-slider-bar');
+          if (!bar) return;
+          // Check admin
+          if (!window.KAuth || !KAuth.isAdmin || !KAuth.isAdmin()) return;
+          _mouthReady = true;
+          // Read current value
+          var cur = parseFloat(localStorage.getItem('kelion_mouth_mult') || '0.6');
+          var slider = document.getElementById('mouth-amp-slider');
+          var valEl = document.getElementById('mouth-amp-val');
+          if (slider) slider.value = Math.round(cur * 100);
+          if (valEl) valEl.textContent = Math.round(cur * 100) + '%';
+          bar.style.display = 'flex';
+          // Live update
+          slider.addEventListener('input', function () {
+            var v = parseInt(this.value) / 100;
+            localStorage.setItem('kelion_mouth_mult', String(v));
+            valEl.textContent = this.value + '%';
+          });
+          // OK = close
+          document.getElementById('mouth-cal-ok').addEventListener('click', function () {
+            bar.style.display = 'none';
+          });
+          // Test = speak a 30-word phrase for mouth calibration
+          document.getElementById('mouth-cal-test').addEventListener('click', function () {
+            if (window.KVoice && KVoice.speak) {
+              KVoice.speak(
+                'Hello! I am Kelion, your intelligent assistant. I am now speaking a longer sentence so you can calibrate my mouth animation properly. Adjust the slider until my lips look natural and synchronized with the audio you hear.'
+              );
+            }
+          });
+        }
+        // Try after delays (KAuth loads async)
+        setTimeout(_showMouthSlider, 3000);
+        setTimeout(_showMouthSlider, 5000);
+        setTimeout(_showMouthSlider, 8000);
+      })();
+    </script>
+  <script id="pwa-install-title-init">
+  (function(){
+    var el=document.getElementById('pwa-install-title');
+    if(!el) return;
+    var name=(window.APP_CONFIG && window.APP_CONFIG.appName)||'KelionAI';
+    el.textContent='Install '+name;
+  })();
+</script>
+</body>
+</html>

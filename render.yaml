@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: kelionai-backend
+    env: node
+    buildCommand: npm install
+    startCommand: node server/index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
