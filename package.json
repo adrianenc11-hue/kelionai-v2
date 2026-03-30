@@ -1,7 +1,7 @@
 {
   "name": "kelionai-v2",
   "version": "2.5.1",
-  "description": "KelionAI \u2014 Asistent AI accesibil cu avatari 3D",
+  "description": "KelionAI — Asistent AI accesibil cu avatari 3D",
   "main": "server/index.js",
   "scripts": {
     "dev": "node server/index.js",
@@ -37,6 +37,7 @@
     "@capacitor/share": "8.0.1",
     "@capacitor/splash-screen": "8.0.1",
     "@capacitor/status-bar": "8.0.1",
+    "@railway/cli": "4.35.1",
     "@sentry/node": "^8.40.0",
     "@supabase/supabase-js": "^2.45.0",
     "compression": "1.8.1",
