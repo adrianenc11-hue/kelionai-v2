@@ -366,10 +366,18 @@
         break;
 
       case 'cc':
-        // Background text extraction — show as subtitle
-        if (msg.role === 'user') {
-          var overlay = document.getElementById('chat-overlay');
-          if (overlay) { overlay.textContent = '🎤 ' + msg.text; overlay.style.display = 'block'; }
+        // Show CC text under avatar via subtitle system
+        if (msg.role === 'user' && window.addMessage) {
+          window.addMessage('user', '🎤 ' + msg.text);
+        } else if (msg.role === 'user') {
+          var subEl = document.getElementById('live-subtitle');
+          var subTxt = document.getElementById('subtitle-text');
+          var subSp = document.getElementById('subtitle-speaker');
+          if (subEl && subTxt) {
+            subEl.classList.add('visible');
+            if (subSp) subSp.textContent = '🗣️';
+            subTxt.textContent = '🎤 ' + msg.text;
+          }
         }
         if (msg.role === 'assistant' && window.KVoice && KVoice.showSubtitle) {
           KVoice.showSubtitle(msg.text);
@@ -378,10 +386,7 @@
         break;
 
       case 'cc_done':
-        if (msg.role === 'user') {
-          var overlay2 = document.getElementById('chat-overlay');
-          if (overlay2) setTimeout(function () { overlay2.style.display = 'none'; }, 2000);
-        }
+        // CC done — subtitle stays until next message replaces it
         console.log('[LiveVoice] ' + (msg.role === 'user' ? 'YOU' : 'AI') + ': ' + (msg.text || '').substring(0, 80));
         break;
 

@@ -640,7 +640,7 @@
       }
 
       let fullReply = '';
-      const _streamEngine = 'Gemini';
+      let streamEngine = 'Gemini';
       let streamSuccess = false;
 
       // Try SSE streaming first (if no media — stream doesn't support images)
@@ -1066,6 +1066,7 @@
     }
 
     // ═══ GUEST TIME LIMITS: 15min/day, 7-day trial ═══
+    const guestKey = 'kelion_guest_usage';
     const session = { access_token: localStorage.getItem('kelion_token') };
     const _isAdmin = window.KAuth && KAuth.isAdmin && KAuth.isAdmin();
     if (!session.access_token && !_isAdmin) {
@@ -1111,7 +1112,6 @@
 
     // Update guest usage time after response
     if (!session.access_token) {
-      const guestKey = 'kelion_guest_usage';
       const guest = JSON.parse(localStorage.getItem(guestKey) || '{}');
       if (guest._msgStart) {
         guest.usedMs = (guest.usedMs || 0) + (Date.now() - guest._msgStart);
@@ -1180,6 +1180,9 @@
     const speaker = document.getElementById('subtitle-speaker');
     const txt = document.getElementById('subtitle-text');
     if (!el || !speaker || !txt) return;
+    // Hide speech-subtitle to avoid overlap
+    var speechSub = document.getElementById('speech-subtitle');
+    if (speechSub) speechSub.classList.remove('visible');
     // Show subtitle with CSS fade-in
     el.classList.add('visible');
     speaker.textContent = type === 'user' ? '🗣️' : '🤖';
@@ -1388,14 +1391,13 @@
         const statusDot = document.getElementById('status-dot');
         if (statusText) statusText.textContent = 'Online' + (d.brain !== 'healthy' ? ' ⚠️' : '');
         if (statusDot) statusDot.style.background = d.brain === 'healthy' ? '#00ff88' : '#ffaa00';
-        if (d.services && !d.services.ai_gemini) useStreaming = false;
+        if (d.services && !d.services.ai_gemini) console.warn('[App] Gemini unavailable');
       }
     } catch (_e) {
       const statusText = document.getElementById('status-text');
       const statusDot = document.getElementById('status-dot');
       if (statusText) statusText.textContent = 'Offline';
       if (statusDot) statusDot.style.background = '#ff4444';
-      useStreaming = false;
     }
   }
 

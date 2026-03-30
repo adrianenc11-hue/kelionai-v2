@@ -202,6 +202,9 @@
       clearTimeout(_subtitleTimer);
       _subtitleTimer = null;
     }
+    // Hide #live-subtitle to avoid overlap
+    var liveSubEl = document.getElementById('live-subtitle');
+    if (liveSubEl) liveSubEl.classList.remove('visible');
     const el = _ensureSubtitleEl();
     // Truncate to ~120 chars for single line
     const display = text.length > 120 ? text.substring(0, 117) + '...' : text;
