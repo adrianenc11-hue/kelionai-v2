@@ -1142,7 +1142,9 @@
     if (window._subtitleTimer) clearTimeout(window._subtitleTimer);
   }
   function showThinking(v) {
-    document.getElementById('thinking').classList.toggle('active', v);
+    if (v) {
+      _updateSubtitle('ai', '🧠 Se gândește...');
+    }
   }
   function hideWelcome() {
     const w = document.getElementById('welcome');

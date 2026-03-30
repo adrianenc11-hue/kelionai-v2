@@ -66,21 +66,20 @@ body {
   /* Chat left (display-panel), Avatar right (left-panel) */
 }
 
-/* ─── RIGHT PANEL: Avatar (35%) ── */
+/* ─── FULL PANEL: Avatar (100%) ── */
 #left-panel {
-  width: 45%;
-  min-width: 280px;
-  max-width: 560px;
-  flex-shrink: 0;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  flex: 1;
   height: 100%;
   display: flex;
   flex-direction: column;
-  border-left: 1px solid rgba(99, 102, 241, 0.12);
+  border-left: none;
   background: rgba(8, 8, 24, 0.7);
   -webkit-backdrop-filter: blur(16px);
   backdrop-filter: blur(16px);
-  order: 2;
-  /* Push to right */
+  order: 1;
 }
 
 /* ── Avatar Area (full height, subtitle-style) ── */
@@ -715,17 +714,9 @@ body {
   }
 }
 
-/* ─── LEFT: Chat Zone (65%) ──────────────── */
+/* ─── Chat Zone — HIDDEN (all text goes to subtitle under avatar) ── */
 #display-panel {
-  flex: 1;
-  width: auto;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  background: rgba(10, 10, 26, 0.95);
-  order: 1;
-  /* Left side */
-  position: relative;
+  display: none !important;
 }
 
 #chat-messages {
@@ -779,36 +770,14 @@ body {
 
   #left-panel {
     width: 100%;
-    height: auto;
+    height: 100%;
     border-right: none;
   }
 
   #avatar-area {
-    height: 45vh;
-    max-height: 380px;
+    flex: 1;
+    max-height: none;
     min-height: 220px;
-    flex: none;
-  }
-
-  #display-panel {
-    width: 100%;
-    height: 50vh;
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    z-index: 50;
-    transform: translateY(100%);
-    transition: transform 0.3s ease;
-  }
-
-  #display-panel.mobile-visible {
-    transform: translateY(0);
-  }
-
-  #chat-area {
-    height: 140px;
-    min-height: 120px;
   }
 
   #input-row {
