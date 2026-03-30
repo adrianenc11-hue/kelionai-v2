@@ -40,13 +40,111 @@ const fastLimiter = rateLimit({
   keyGenerator: rateLimitKey,
 });
 
+async function saveDangerEvent(supabaseAdmin, payload) {
+  if (!supabaseAdmin) return null;
+
+  const now = Date.now();
+  const metadata = payload.metadata || {};
+
+  try {
+    if (payload.user_id) {
+      const { data: recent } = await supabaseAdmin
+        .from('danger_events')
+        .select('id, description, created_at')
+        .eq('user_id', payload.user_id)
+        .eq('danger_type', payload.danger_type)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (recent) {
+        const ageMs = now - new Date(recent.created_at).getTime();
+        if (ageMs < 10000 && recent.description === payload.description) {
+          return recent.id;
+        }
+      }
+    }
+
+    const { data: inserted } = await supabaseAdmin
+      .from('danger_events')
+      .insert({
+        user_id: payload.user_id || null,
+        danger_level: payload.danger_level,
+        danger_type: payload.danger_type || 'unknown',
+        description: String(payload.description || '').substring(0, 1000),
+        environment: payload.environment || null,
+        location_hint: payload.location_hint || null,
+        action_taken: payload.action_taken || 'alert_sent',
+        metadata,
+      })
+      .select('id')
+      .single();
+
+    return inserted?.id || null;
+  } catch (err) {
+    logger.warn({ component: 'Vision', err: err.message }, 'Danger event save failed');
+    return null;
+  }
+}
+
+async function buildRiskProfile(supabaseAdmin, userId) {
+  if (!supabaseAdmin || !userId) return null;
+
+  try {
+    const { data: events } = await supabaseAdmin
+      .from('danger_events')
+      .select('danger_type, danger_level, false_alarm, created_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(50);
+
+    if (!events || events.length === 0) {
+      return {
+        topHazards: [],
+        falseAlarmRate: 0,
+        recentEvents: 0,
+        immediateEvents: 0,
+      };
+    }
+
+    const counts = {};
+    let falseAlarms = 0;
+    let immediateEvents = 0;
+
+    for (const event of events) {
+      counts[event.danger_type] = (counts[event.danger_type] || 0) + 1;
+      if (event.false_alarm) falseAlarms++;
+      if (event.danger_level === 'immediate') immediateEvents++;
+    }
+
+    const topHazards = Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([type, count]) => ({ type, count }));
+
+    return {
+      topHazards,
+      falseAlarmRate: Number((falseAlarms / events.length).toFixed(2)),
+      recentEvents: events.length,
+      immediateEvents,
+    };
+  } catch (err) {
+    logger.warn({ component: 'Vision', err: err.message }, 'Risk profile build failed');
+    return null;
+  }
+}
+
 // ═══ POST /api/vision/fast — GPT-5.4 Vision danger scan (primary) + Gemini (fallback) ═══
 router.post('/fast', fastLimiter, async (req, res) => {
   try {
-    const { image, language = 'ro' } = req.body;
+    const { getUserFromToken, supabaseAdmin } = req.app.locals;
+    const { image, language = 'ro', fingerprint = null } = req.body;
     if (!image || typeof image !== 'string') {
       return res.status(400).json({ error: 'Invalid image' });
     }
+
+    const user = await getUserFromToken(req).catch(() => null);
+    const requestFingerprint = fingerprint || req.ip || null;
 
     const LANGS = { ro: 'română', en: 'English', es: 'Español', fr: 'Français', de: 'Deutsch' };
     const lang = LANGS[language] || 'English';
@@ -124,7 +222,28 @@ MAX 15 words. No explanations. No greetings. Just the safety verdict.`;
       }
     }
 
-    res.json({ result: result || '✅' });
+    let eventId = null;
+    let riskProfile = null;
+
+    if (result && result !== '✅' && supabaseAdmin) {
+      const dangerLevel = /⚠️PERICOL/i.test(result) ? 'immediate' : 'warning';
+      const dangerType = classifyDangerType(result);
+      eventId = await saveDangerEvent(supabaseAdmin, {
+        user_id: user?.id || null,
+        danger_level: dangerLevel,
+        danger_type: dangerType,
+        description: result,
+        action_taken: 'fast_alert_sent',
+        metadata: {
+          source: 'fast',
+          language,
+          fingerprint: requestFingerprint,
+        },
+      });
+      riskProfile = await buildRiskProfile(supabaseAdmin, user?.id || null);
+    }
+
+    res.json({ result: result || '✅', eventId, riskProfile });
   } catch (e) {
     logger.warn({ component: 'Vision.Fast', err: e.message }, 'Fast danger scan failed');
     res.json({ result: '✅' }); // fail-safe: assume safe
@@ -279,25 +398,25 @@ Answer in ${LANGS[language] || 'English'}.`;
         const envMatch = description.match(/(?:mediu|environ|loc|place|zonă)[:\s]*([^.!\n]+)/i);
         const environment = envMatch ? envMatch[1].trim() : null;
 
-        try {
-          const { data: inserted } = await supabaseAdmin
-            .from('danger_events')
-            .insert({
-              user_id: user?.id || null,
-              danger_level: dangerLevel,
-              danger_type: dangerType,
-              description: description.substring(0, 1000),
-              environment: environment,
-              location_hint: null,
-              action_taken: 'alert_sent',
-              metadata: { avatar, language, engine, emotion, userName: userName || null },
-            })
-            .select('id')
-            .single();
-          dangerEventId = inserted?.id || null;
+        dangerEventId = await saveDangerEvent(supabaseAdmin, {
+          user_id: user?.id || null,
+          danger_level: dangerLevel,
+          danger_type: dangerType,
+          description: description.substring(0, 1000),
+          environment,
+          action_taken: 'deep_alert_sent',
+          metadata: {
+            avatar,
+            language,
+            engine,
+            emotion,
+            userName: userName || null,
+            fingerprint: _fingerprint,
+            source: 'deep',
+          },
+        });
+        if (dangerEventId) {
           logger.info({ component: 'Vision', dangerLevel, dangerType, dangerEventId, userId: user?.id }, 'Danger event saved to memory');
-        } catch (err) {
-          logger.warn({ component: 'Vision', err: err.message }, 'Danger event save failed');
         }
       }
 
@@ -334,12 +453,16 @@ Answer in ${LANGS[language] || 'English'}.`;
     // ── Increment usage after successful vision ──
     incrementUsage(user?.id, 'vision', supabaseAdmin, _fingerprint).catch(() => {});
 
+    const riskProfile = await buildRiskProfile(supabaseAdmin, user?.id || null);
+
     res.json({
       description: description || 'Could not analyze.',
       avatar,
       engine: engine || 'none',
       emotion,
       userName: userName || null,
+      eventId: dangerEventId,
+      riskProfile,
     });
   } catch (e) {
     logger.error({ component: 'Vision', err: e.message }, 'Vision error');
@@ -383,7 +506,7 @@ router.post('/danger-feedback', rateLimit({
 }), async (req, res) => {
   try {
     const { supabaseAdmin, getUserFromToken } = req.app.locals;
-    const { eventId, falseAlarm, userResponse } = req.body;
+    const { eventId, falseAlarm, userResponse, fingerprint } = req.body;
     if (!eventId) return res.status(400).json({ error: 'eventId required' });
 
     const user = await getUserFromToken(req);
@@ -393,11 +516,16 @@ router.post('/danger-feedback', rateLimit({
     if (typeof falseAlarm === 'boolean') update.false_alarm = falseAlarm;
     if (userResponse) update.user_response = String(userResponse).substring(0, 500);
 
-    const { error } = await supabaseAdmin
-      .from('danger_events')
-      .update(update)
-      .eq('id', eventId)
-      .eq('user_id', user?.id || '');
+    let query = supabaseAdmin.from('danger_events').update(update).eq('id', eventId);
+    if (user?.id) {
+      query = query.eq('user_id', user.id);
+    } else if (fingerprint) {
+      query = query.contains('metadata', { fingerprint: String(fingerprint) });
+    } else {
+      return res.status(401).json({ error: 'Feedback requires user or fingerprint' });
+    }
+
+    const { error } = await query;
 
     if (error) throw error;
 

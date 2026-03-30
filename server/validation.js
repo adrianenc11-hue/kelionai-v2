@@ -76,6 +76,7 @@ const visionSchema = z.object({
   image: z.string().min(1),
   avatar: z.enum(['kelion', 'kira']).optional(),
   language: z.string().min(2).max(10).optional(),
+  fingerprint: z.string().max(200).optional(),
 });
 
 const searchSchema = z.object({

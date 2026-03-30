@@ -374,7 +374,9 @@
   let _fastBusy = false;
   let _deepBusy = false;
   const FAST_INTERVAL_MS = 1000;  // danger scan every 1 second
-  const DEEP_INTERVAL_MS = 2500;  // full analysis every 2.5 seconds
+  const DEEP_INTERVAL_MS = 5000;  // full analysis every 5 seconds
+  const VISION_BACKOFF_MS = 30000; // temporary slowdown after 429/overload
+  let _visionBackoffUntil = 0;
 
   function _captureForVision(width, height, quality) {
     if (!_enabled || !_stream || !_video) return null;
@@ -407,11 +409,25 @@
     return headers;
   }
 
+  function _isVisionBackoffActive() {
+    return Date.now() < _visionBackoffUntil;
+  }
+
+  function _applyVisionBackoff(ms) {
+    var until = Date.now() + (ms || VISION_BACKOFF_MS);
+    if (until > _visionBackoffUntil) {
+      _visionBackoffUntil = until;
+      console.warn('[AutoCamera] Vision backoff active for', Math.round((_visionBackoffUntil - Date.now()) / 1000), 's');
+    }
+  }
+
   // ── Danger detection keywords ──
   var DANGER_IMMEDIATE = /⚠️PERICOL/i;
   var DANGER_WARNING   = /⚠️ATENȚIE|🚫BLOCAT/i;
   var _lastDangerSpoken = 0;
   var DANGER_COOLDOWN_MS = 5000; // don't repeat same danger alert within 5s
+  var _feedbackEl = null;
+  var _feedbackHideTimer = null;
 
   function _checkDanger(desc) {
     if (!desc) return null;
@@ -431,7 +447,69 @@
     return '';
   }
 
-  function _speakDanger(desc, level) {
+  function _ensureFeedbackUi() {
+    if (_feedbackEl && document.body.contains(_feedbackEl)) return _feedbackEl;
+    _feedbackEl = document.createElement('div');
+    _feedbackEl.id = 'live-vision-feedback';
+    _feedbackEl.style.cssText = 'position:fixed;left:50%;bottom:110px;transform:translateX(-50%);z-index:10001;background:rgba(5,10,20,0.96);border:1px solid rgba(255,255,255,0.14);border-radius:14px;padding:10px 12px;box-shadow:0 8px 30px rgba(0,0,0,0.35);display:none;min-width:240px;max-width:90vw;color:#fff;font-family:inherit;';
+    _feedbackEl.innerHTML = '' +
+      '<div id="live-vision-feedback-text" style="font-size:0.9rem;font-weight:600;margin-bottom:8px">Alertă cameră</div>' +
+      '<div style="display:flex;gap:8px">' +
+      '<button id="live-vision-feedback-ok" style="flex:1;background:#124d2f;border:1px solid rgba(110,231,183,0.35);color:#d1fae5;border-radius:10px;padding:8px 10px;cursor:pointer">Corect</button>' +
+      '<button id="live-vision-feedback-false" style="flex:1;background:#5b1d1d;border:1px solid rgba(248,113,113,0.35);color:#fee2e2;border-radius:10px;padding:8px 10px;cursor:pointer">Alarmă falsă</button>' +
+      '</div>';
+    document.body.appendChild(_feedbackEl);
+    return _feedbackEl;
+  }
+
+  function _hideDangerFeedback() {
+    if (_feedbackHideTimer) {
+      clearTimeout(_feedbackHideTimer);
+      _feedbackHideTimer = null;
+    }
+    if (_feedbackEl) _feedbackEl.style.display = 'none';
+  }
+
+  async function _sendDangerFeedback(eventId, falseAlarm, userResponse) {
+    if (!eventId) return;
+    try {
+      await fetch('/api/vision/danger-feedback', {
+        method: 'POST',
+        headers: _visionHeaders(),
+        body: JSON.stringify({
+          eventId: eventId,
+          falseAlarm: !!falseAlarm,
+          userResponse: userResponse || '',
+          fingerprint: window._visitorFP || null,
+        }),
+      });
+    } catch (_e) {
+      /* non-blocking */
+    }
+  }
+
+  function _showDangerFeedback(eventId, spokenText) {
+    if (!eventId) return;
+    var panel = _ensureFeedbackUi();
+    var text = panel.querySelector('#live-vision-feedback-text');
+    var btnOk = panel.querySelector('#live-vision-feedback-ok');
+    var btnFalse = panel.querySelector('#live-vision-feedback-false');
+    if (!text || !btnOk || !btnFalse) return;
+    text.textContent = spokenText || 'Alertă cameră';
+    btnOk.onclick = function () {
+      _sendDangerFeedback(eventId, false, 'confirmed_correct');
+      _hideDangerFeedback();
+    };
+    btnFalse.onclick = function () {
+      _sendDangerFeedback(eventId, true, 'false_alarm');
+      _hideDangerFeedback();
+    };
+    panel.style.display = 'block';
+    if (_feedbackHideTimer) clearTimeout(_feedbackHideTimer);
+    _feedbackHideTimer = setTimeout(_hideDangerFeedback, 12000);
+  }
+
+  function _speakDanger(desc, level, eventId, riskProfile) {
     var now = Date.now();
     if (now - _lastDangerSpoken < DANGER_COOLDOWN_MS) return;
     _lastDangerSpoken = now;
@@ -463,12 +541,7 @@
     var distMatch = cleanLow.match(/\b(la\s*~?\s*\d+\s*(m|metri?)|la\s+un\s+pas|chiar\s+l[âa]ng[ăa]\s+tine)\b/);
     var dist = distMatch ? distMatch[1].replace(/\s+/g, ' ').trim() : '';
 
-    var phrase = '';
-    if (level === 'immediate') {
-      phrase = 'Atenție, ' + hazard;
-    } else {
-      phrase = hazard.charAt(0).toUpperCase() + hazard.slice(1);
-    }
+    var phrase = 'Atenție, ' + hazard;
     if (dir) phrase += ' ' + dir;
     if (dist) phrase += ', ' + dist;
 
@@ -476,8 +549,9 @@
     var spokenText = (firstName ? firstName + ', ' : '') + phrase;
     // Dispatch danger event for brain/UI
     window.dispatchEvent(new CustomEvent('live-vision-danger', {
-      detail: { level: level, message: dangerLine, spokenText: spokenText, timestamp: now }
+      detail: { level: level, message: dangerLine, spokenText: spokenText, timestamp: now, eventId: eventId || null, riskProfile: riskProfile || null }
     }));
+    _showDangerFeedback(eventId, spokenText);
     // Immediate TTS — calm voice, not rushed
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel(); // interrupt anything playing
@@ -494,6 +568,7 @@
   // ── FAST: Danger-only scan (GPT-5.4, 1s interval) ──
   async function _fastScan() {
     if (_fastBusy || !_enabled) return;
+    if (_isVisionBackoffActive()) return;
     var base64 = _captureForVision(FAST_CAPTURE_W, FAST_CAPTURE_H, FAST_CAPTURE_Q);
     if (!base64) return;
     _fastBusy = true;
@@ -506,13 +581,17 @@
           language: window.i18n ? i18n.getLanguage() : 'ro',
         }),
       });
+      if (res.status === 429) {
+        _applyVisionBackoff();
+        return;
+      }
       if (res.ok) {
         var data = await res.json();
         var result = (data.result || '').trim();
         // Only act on danger results (not ✅)
         if (result && result !== '✅') {
           var dangerLevel = _checkDanger(result) || 'warning';
-          _speakDanger(result, dangerLevel);
+          _speakDanger(result, dangerLevel, data.eventId, data.riskProfile);
           console.warn('[AutoCamera] ⚡ FAST danger:', result);
         }
       }
@@ -526,6 +605,7 @@
   // ── DEEP: Full analysis (GPT-5.4, 5s interval) ──
   async function _deepAnalysis() {
     if (_deepBusy || !_enabled) return;
+    if (_isVisionBackoffActive()) return;
     var base64 = _captureForVision(DEEP_CAPTURE_W, DEEP_CAPTURE_H, DEEP_CAPTURE_Q);
     if (!base64) return;
     _deepBusy = true;
@@ -540,15 +620,19 @@
           fingerprint: window._visitorFP || null,
         }),
       });
+      if (res.status === 429) {
+        _applyVisionBackoff();
+        return;
+      }
       if (res.ok) {
         var data = await res.json();
         if (data.description) {
-          _lastVision = { description: data.description, timestamp: Date.now() };
+          _lastVision = { description: data.description, timestamp: Date.now(), eventId: data.eventId || null, riskProfile: data.riskProfile || null };
           window.dispatchEvent(new CustomEvent('live-vision-update', { detail: _lastVision }));
           // Deep analysis also checks danger (backup for fast scan)
           var dangerLevel = _checkDanger(data.description);
           if (dangerLevel) {
-            _speakDanger(data.description, dangerLevel);
+            _speakDanger(data.description, dangerLevel, data.eventId, data.riskProfile);
           }
           console.log('[AutoCamera] 🔍 Deep vision:', data.description.substring(0, 80) + '...');
         }
