@@ -665,11 +665,11 @@ export default function Chat() {
         </div>
 
         {/* RIGHT: Avatar (top) + Chat messages (bottom) */}
-        <div className="w-[38%] min-w-[320px] max-w-[520px] shrink-0 flex flex-col" style={{
+        <div className="w-[55%] min-w-[400px] max-w-[700px] shrink-0 flex flex-col" style={{
           borderLeft: "1px solid rgba(255,255,255,0.05)",
         }}>
           {/* Avatar area */}
-          <div className="relative flex-1 min-h-[40%] overflow-hidden" style={{
+          <div className="relative flex-1 min-h-[55%] overflow-hidden" style={{
             backgroundImage: `url(${CITY_BOKEH_BG})`,
             backgroundSize: "cover",
             backgroundPosition: "center",
@@ -691,7 +691,7 @@ export default function Chat() {
           </div>
 
           {/* Chat messages - BELOW avatar */}
-          <div className="h-[45%] min-h-[180px] overflow-y-auto px-3 py-2 space-y-2" style={{
+          <div className="h-[35%] min-h-[150px] overflow-y-auto px-3 py-2 space-y-2" style={{
             background: "rgba(0,0,0,0.4)",
             borderTop: "1px solid rgba(255,255,255,0.05)",
           }}>

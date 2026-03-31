@@ -42,7 +42,7 @@ export function getSessionCookieOptions(
   const secure = isSecureRequest(req);
   // For standalone (same-origin), use 'lax' which works without HTTPS in dev
   // For Manus cross-origin, use 'none' + secure
-  const isStandalone = !process.env.OAUTH_SERVER_URL;
+  const isStandalone = true; // Always standalone
   
   return {
     httpOnly: true,

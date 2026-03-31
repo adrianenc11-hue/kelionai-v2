@@ -27,8 +27,8 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
   throw new Error(`No available port found starting from ${startPort}`);
 }
 
-// Detect if we're running standalone (no Manus OAuth configured)
-const isStandalone = !process.env.OAUTH_SERVER_URL;
+// Always use standalone auth (email/password)
+const isStandalone = true;
 
 async function startServer() {
   const app = express();

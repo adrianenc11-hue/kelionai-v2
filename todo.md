@@ -248,3 +248,4 @@
 - [ ] Chat page should be single page without scroll
 - [ ] User adrianenc11@gmail.com needs to be admin (UPDATE failed - 0 rows)
 - [ ] SECURITY FIX: Default role for new users must be 'user' not 'admin'
+- [ ] FIX: Railway shows Manus OAuth login instead of standalone email/password - need to force standalone auth mode
