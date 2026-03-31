@@ -665,34 +665,36 @@ export default function Chat() {
         </div>
 
         {/* RIGHT: Avatar FULL HEIGHT with chat overlay at bottom */}
-        <div className="w-[55%] min-w-[400px] max-w-[700px] shrink-0 flex flex-col relative" style={{
+        <div className="w-[55%] min-w-[400px] max-w-[700px] shrink-0 relative" style={{
           borderLeft: "1px solid rgba(255,255,255,0.05)",
         }}>
-          {/* Avatar area - FULL HEIGHT of right panel */}
-          <div className="absolute inset-0 overflow-hidden" style={{
+          {/* Background image layer */}
+          <div className="absolute inset-0" style={{
             backgroundImage: `url(${CITY_BOKEH_BG})`,
             backgroundSize: "cover",
             backgroundPosition: "center",
-          }}>
-            <div className="absolute top-3 left-4 z-10">
-              <span className="text-cyan-400 font-semibold text-base" style={{ textShadow: "0 1px 8px rgba(0,0,0,0.8)" }}>
-                {selectedAvatar === "kelion" ? "Kelion" : "Kira"}
-              </span>
-            </div>
-            <div className="w-full h-full">
-              <Avatar3D
-                character={selectedAvatar}
-                isAnimating={isLoading}
-                emotion={isLoading ? "thinking" : "neutral"}
-                mouthOpen={mouthOpen}
-              />
-              <style>{`.avatar-container canvas { background: transparent !important; }`}</style>
-            </div>
+            zIndex: 0,
+          }} />
+          {/* Avatar name */}
+          <div className="absolute top-3 left-4" style={{ zIndex: 10 }}>
+            <span className="text-cyan-400 font-semibold text-base" style={{ textShadow: "0 1px 8px rgba(0,0,0,0.8)" }}>
+              {selectedAvatar === "kelion" ? "Kelion" : "Kira"}
+            </span>
+          </div>
+          {/* Avatar 3D - full size */}
+          <div className="absolute inset-0" style={{ zIndex: 1 }}>
+            <Avatar3D
+              character={selectedAvatar}
+              isAnimating={isLoading}
+              emotion={isLoading ? "thinking" : "neutral"}
+              mouthOpen={mouthOpen}
+            />
           </div>
 
           {/* Chat messages - OVERLAY at bottom of avatar */}
-          <div className="absolute bottom-0 left-0 right-0 max-h-[40%] overflow-y-auto px-3 py-2 space-y-2 z-20" style={{
+          <div className="absolute bottom-0 left-0 right-0 max-h-[40%] overflow-y-auto px-3 py-2 space-y-2" style={{
             background: "linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.4) 70%, transparent 100%)",
+            zIndex: 20,
           }}>
             {messages.length === 0 && !isLoading && (
               <div className="flex items-center justify-center h-full">
