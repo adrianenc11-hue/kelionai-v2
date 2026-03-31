@@ -1,130 +1,108 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, boolean, decimal, json } from "drizzle-orm/mysql-core";
+import { integer, pgEnum, pgTable, text, timestamp, varchar, boolean, numeric, json, serial } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
-/**
- * Core user table backing auth flow.
- * Extend this file with additional tables as your product grows.
- * Columns use camelCase to match both database fields and generated types.
- */
-export const users = mysqlTable("users", {
-  /**
-   * Surrogate primary key. Auto-incremented numeric value managed by the database.
-   * Use this for relations between tables.
-   */
-  id: int("id").autoincrement().primaryKey(),
-  /** Manus OAuth identifier (openId) returned from the OAuth callback. Unique per user. */
-  openId: varchar("openId", { length: 64 }).notNull().unique(),
+export const roleEnum = pgEnum("role", ["user", "admin"]);
+export const subscriptionTierEnum = pgEnum("subscription_tier", ["free", "pro", "enterprise"]);
+export const subscriptionStatusEnum = pgEnum("subscription_status", ["active", "cancelled", "past_due", "trialing"]);
+export const messageRoleEnum = pgEnum("message_role", ["user", "assistant", "system"]);
+export const aiProviderEnum = pgEnum("ai_provider", ["openai", "google", "groq", "anthropic", "deepseek"]);
+
+export const users = pgTable("users", {
+  id: serial("id").primaryKey(),
+  openId: varchar("open_id", { length: 64 }).notNull().unique(),
   name: text("name"),
   email: varchar("email", { length: 320 }),
-  passwordHash: text("passwordHash"),
-  loginMethod: varchar("loginMethod", { length: 64 }),
-  role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
-  avatarUrl: text("avatarUrl"),
-  stripeCustomerId: varchar("stripeCustomerId", { length: 255 }),
-  stripeSubscriptionId: varchar("stripeSubscriptionId", { length: 255 }),
-  subscriptionTier: mysqlEnum("subscriptionTier", ["free", "pro", "enterprise"]).default("free").notNull(),
-  subscriptionStatus: mysqlEnum("subscriptionStatus", ["active", "cancelled", "past_due", "trialing"]).default("active"),
+  passwordHash: text("password_hash"),
+  loginMethod: varchar("login_method", { length: 64 }),
+  role: roleEnum("role").default("user").notNull(),
+  avatarUrl: text("avatar_url"),
+  stripeCustomerId: varchar("stripe_customer_id", { length: 255 }),
+  stripeSubscriptionId: varchar("stripe_subscription_id", { length: 255 }),
+  subscriptionTier: subscriptionTierEnum("subscription_tier").default("free").notNull(),
+  subscriptionStatus: subscriptionStatusEnum("subscription_status").default("active"),
   language: varchar("language", { length: 10 }).default("en"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-  lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  lastSignedIn: timestamp("last_signed_in").defaultNow().notNull(),
 });
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
-/**
- * Conversations table for storing chat sessions
- */
-export const conversations = mysqlTable("conversations", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull(),
+export const conversations = pgTable("conversations", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
   title: text("title"),
   description: text("description"),
-  primaryAiModel: varchar("primaryAiModel", { length: 50 }).default("gpt-4"),
-  isArchived: boolean("isArchived").default(false),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  primaryAiModel: varchar("primary_ai_model", { length: 50 }).default("gpt-4"),
+  isArchived: boolean("is_archived").default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 export type Conversation = typeof conversations.$inferSelect;
 export type InsertConversation = typeof conversations.$inferInsert;
 
-/**
- * Messages table for storing individual messages in conversations
- */
-export const messages = mysqlTable("messages", {
-  id: int("id").autoincrement().primaryKey(),
-  conversationId: int("conversationId").notNull(),
-  role: mysqlEnum("role", ["user", "assistant", "system"]).notNull(),
+export const messages = pgTable("messages", {
+  id: serial("id").primaryKey(),
+  conversationId: integer("conversation_id").notNull(),
+  role: messageRoleEnum("role").notNull(),
   content: text("content"),
-  aiModel: varchar("aiModel", { length: 50 }),
-  tokens: int("tokens"),
+  aiModel: varchar("ai_model", { length: 50 }),
+  tokens: integer("tokens"),
   metadata: json("metadata"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 export type Message = typeof messages.$inferSelect;
 export type InsertMessage = typeof messages.$inferInsert;
 
-/**
- * Subscription plans table
- */
-export const subscriptionPlans = mysqlTable("subscriptionPlans", {
-  id: int("id").autoincrement().primaryKey(),
+export const subscriptionPlans = pgTable("subscription_plans", {
+  id: serial("id").primaryKey(),
   name: varchar("name", { length: 100 }).notNull(),
-  tier: mysqlEnum("tier", ["free", "pro", "enterprise"]).notNull(),
-  stripePriceId: varchar("stripePriceId", { length: 255 }).notNull(),
-  monthlyPrice: decimal("monthlyPrice", { precision: 10, scale: 2 }),
-  yearlyPrice: decimal("yearlyPrice", { precision: 10, scale: 2 }),
-  messagesPerMonth: int("messagesPerMonth"),
-  voiceMinutesPerMonth: int("voiceMinutesPerMonth"),
+  tier: subscriptionTierEnum("tier").notNull(),
+  stripePriceId: varchar("stripe_price_id", { length: 255 }).notNull(),
+  monthlyPrice: numeric("monthly_price", { precision: 10, scale: 2 }),
+  yearlyPrice: numeric("yearly_price", { precision: 10, scale: 2 }),
+  messagesPerMonth: integer("messages_per_month"),
+  voiceMinutesPerMonth: integer("voice_minutes_per_month"),
   features: json("features"),
-  isActive: boolean("isActive").default(true),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 export type SubscriptionPlan = typeof subscriptionPlans.$inferSelect;
 export type InsertSubscriptionPlan = typeof subscriptionPlans.$inferInsert;
 
-/**
- * User usage tracking for rate limiting and analytics
- */
-export const userUsage = mysqlTable("userUsage", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull(),
-  messagesThisMonth: int("messagesThisMonth").default(0),
-  voiceMinutesThisMonth: int("voiceMinutesThisMonth").default(0),
-  lastResetDate: timestamp("lastResetDate").defaultNow(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+export const userUsage = pgTable("user_usage", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  messagesThisMonth: integer("messages_this_month").default(0),
+  voiceMinutesThisMonth: integer("voice_minutes_this_month").default(0),
+  lastResetDate: timestamp("last_reset_date").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 export type UserUsage = typeof userUsage.$inferSelect;
 export type InsertUserUsage = typeof userUsage.$inferInsert;
 
-/**
- * AI provider configuration for multi-model routing
- */
-export const aiProviders = mysqlTable("aiProviders", {
-  id: int("id").autoincrement().primaryKey(),
+export const aiProviders = pgTable("ai_providers", {
+  id: serial("id").primaryKey(),
   name: varchar("name", { length: 50 }).notNull(),
-  provider: mysqlEnum("provider", ["openai", "google", "groq", "anthropic", "deepseek"]).notNull(),
+  provider: aiProviderEnum("provider").notNull(),
   model: varchar("model", { length: 100 }).notNull(),
-  isActive: boolean("isActive").default(true),
-  priority: int("priority").default(0),
+  isActive: boolean("is_active").default(true),
+  priority: integer("priority").default(0),
   metadata: json("metadata"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 export type AiProvider = typeof aiProviders.$inferSelect;
 export type InsertAiProvider = typeof aiProviders.$inferInsert;
 
-/**
- * Relations
- */
 export const usersRelations = relations(users, ({ many }) => ({
   conversations: many(conversations),
   usage: many(userUsage),

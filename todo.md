@@ -220,3 +220,19 @@
 - [ ] Remove message cursor/sidebar from chat, add only a "Chat History" button
 - [ ] Fix Railway build (pnpm lockfile + Dockerfile)
 - [ ] Switch database from MySQL to PostgreSQL (Supabase)
+
+## Critical Fix - Railway Production (kelionai.app)
+- [ ] Fix "Database not available" error on Railway - app cannot connect to database
+- [ ] Verify database connection works on Railway (check DATABASE_URL env var)
+- [ ] Test register flow on kelionai.app
+- [ ] Test login flow on kelionai.app
+- [ ] Test chat send message and AI response on kelionai.app
+- [ ] Test voice recording (MIC) on kelionai.app
+- [ ] Test camera capture (CAM) on kelionai.app
+- [ ] Test avatar display (Kelion/Kira) on kelionai.app
+- [ ] Test pricing page on kelionai.app
+- [ ] Test subscription/payment flow on kelionai.app
+- [ ] Test profile page on kelionai.app
+- [ ] Test admin dashboard on kelionai.app
+- [ ] Test conversation history on kelionai.app
+- [ ] Test logout on kelionai.app

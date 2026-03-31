@@ -52,7 +52,7 @@ export const chatRouter = router({
       if (!conversationId) {
         const title = input.message.slice(0, 50) + (input.message.length > 50 ? "..." : "");
         const result = await createConversation(ctx.user.id, title);
-        conversationId = (result as any)[0]?.insertId || (result as any).insertId;
+        conversationId = (result as any)?.id || (result as any)[0]?.id;
         if (!conversationId) throw new Error("Failed to create conversation");
       }
 
