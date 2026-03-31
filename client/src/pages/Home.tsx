@@ -95,25 +95,25 @@ export default function Home() {
           </div>
 
           {/* Right: Live Avatar */}
-          <div className="relative h-[300px] sm:h-[350px] lg:h-[420px]">
-            {/* Avatar selector pills */}
-            <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 flex gap-2 bg-slate-900/80 backdrop-blur rounded-full p-1">
+          <div className="flex flex-col items-center gap-3">
+            {/* Avatar selector - LEFT and RIGHT buttons */}
+            <div className="flex items-center gap-4 w-full">
               <button
                 onClick={() => setActiveAvatar("kelion")}
-                className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
+                className={`flex-1 px-4 py-2 rounded-xl text-sm font-medium transition-all border ${
                   activeAvatar === "kelion"
-                    ? "bg-blue-600 text-white"
-                    : "text-slate-400 hover:text-white"
+                    ? "bg-blue-600 text-white border-blue-500"
+                    : "bg-slate-900/80 text-slate-400 hover:text-white border-slate-700/50"
                 }`}
               >
                 Kelion
               </button>
               <button
                 onClick={() => setActiveAvatar("kira")}
-                className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
+                className={`flex-1 px-4 py-2 rounded-xl text-sm font-medium transition-all border ${
                   activeAvatar === "kira"
-                    ? "bg-purple-600 text-white"
-                    : "text-slate-400 hover:text-white"
+                    ? "bg-purple-600 text-white border-purple-500"
+                    : "bg-slate-900/80 text-slate-400 hover:text-white border-slate-700/50"
                 }`}
               >
                 Kira
@@ -121,20 +121,19 @@ export default function Home() {
             </div>
 
             {/* 3D Avatar */}
-            <div className="w-full h-full rounded-2xl overflow-hidden bg-gradient-to-b from-slate-900 to-slate-950 border border-slate-800/50">
+            <div className="relative w-full h-[280px] sm:h-[320px] lg:h-[380px] rounded-2xl overflow-hidden bg-gradient-to-b from-slate-900 to-slate-950 border border-slate-800/50">
               <Avatar3D
                 character={activeAvatar}
                 emotion="happy"
                 isAnimating={true}
               />
-            </div>
-
-            {/* Status badge */}
-            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-slate-900/90 backdrop-blur px-3 py-1.5 rounded-full flex items-center gap-2 border border-slate-700/50">
-              <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-              <span className="text-xs text-slate-300">
-                {activeAvatar === "kelion" ? "Kelion" : "Kira"} is online
-              </span>
+              {/* Status badge */}
+              <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-slate-900/90 backdrop-blur px-3 py-1.5 rounded-full flex items-center gap-2 border border-slate-700/50">
+                <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+                <span className="text-xs text-slate-300">
+                  {activeAvatar === "kelion" ? "Kelion" : "Kira"} is online
+                </span>
+              </div>
             </div>
           </div>
         </div>

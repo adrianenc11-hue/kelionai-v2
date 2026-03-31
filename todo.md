@@ -270,3 +270,6 @@
 - [x] Payment confirmation flow: Stripe webhook confirms payment, update user status
 - [x] Pricing page: add annual/monthly toggle + referral code input field
 - [x] Subscription management: add refund request button with policy info
+- [ ] Voice calls integrated in chat - not separate buttons, call directly from chat
+- [ ] Remove excessive buttons, keep UI clean
+- [ ] BUG: Landing page avatar - Kelion/Kira buttons cover the face, camera too high
