@@ -8,6 +8,8 @@ import {
   createMessage,
   getUserUsage,
   updateUserUsage,
+  getTrialStatus,
+  incrementDailyUsage,
 } from "../db";
 import { processBrainMessage, processVoiceCloningStep, BrainMessage } from "../brain-v4";
 import { CharacterName } from "../characters";
@@ -62,13 +64,10 @@ export const chatRouter = router({
         throw new Error("Conversation not found or access denied");
       }
 
-      // Check usage limits
-      const usage = await getUserUsage(ctx.user.id);
-      const tier = ctx.user.subscriptionTier || "free";
-      const limits: Record<string, number> = { free: 50, pro: 500, enterprise: 10000 };
-      const messagesThisMonth = usage?.messagesThisMonth || 0;
-      if (messagesThisMonth >= (limits[tier] || 50)) {
-        throw new Error(`Message limit reached for ${tier} plan. Please upgrade.`);
+      // Check trial/usage limits for free users
+      const trialStatus = await getTrialStatus(ctx.user.id);
+      if (!trialStatus.canUse) {
+        throw new Error(trialStatus.reason || "Usage limit reached. Please upgrade.");
       }
 
       // Store user message
@@ -94,8 +93,10 @@ export const chatRouter = router({
       // Store AI response
       await createMessage(conversationId, "assistant", brainResult.content, "brain-v4");
 
-      // Update usage
-      await updateUserUsage(ctx.user.id, messagesThisMonth + 2, usage?.voiceMinutesThisMonth || 0);
+      // Update daily usage (estimate ~1 min per message exchange for free users)
+      if (trialStatus.isTrialUser) {
+        await incrementDailyUsage(ctx.user.id, 1, 2);
+      }
 
       return {
         success: true,

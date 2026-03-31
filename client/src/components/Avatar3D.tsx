@@ -137,18 +137,20 @@ const Avatar3D: React.FC<Avatar3DProps> = ({
       (gltf: any) => {
         const model = gltf.scene;
 
-        // Bust view: position model at origin, camera targets upper body
+        // Center model in scene
         const box = new THREE.Box3().setFromObject(model);
         const center = box.getCenter(new THREE.Vector3());
         const size = box.getSize(new THREE.Vector3());
-        // Center horizontally and depth, keep vertical grounded
+        // Center model on all axes except Y (keep feet grounded)
         model.position.x = -center.x;
         model.position.z = -center.z;
-        model.position.y = 0; // feet at y=0
-        // No scaling needed - use natural RPM model size (~1.7m)
-        // Camera targets chest/neck area - bust view
-        camera.position.set(0, 1.5, 2.4);
-        camera.lookAt(0, 1.35, 0);
+        model.position.y = -box.min.y; // feet at y=0
+
+        // Camera: centered on model, bust view
+        const modelHeight = size.y;
+        const chestY = modelHeight * 0.72; // ~72% up = chest/neck
+        camera.position.set(0, chestY, 2.2);
+        camera.lookAt(0, chestY - 0.1, 0);
         camera.updateProjectionMatrix();
 
         model.castShadow = true;

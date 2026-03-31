@@ -251,3 +251,10 @@
 - [ ] FIX: Railway shows Manus OAuth login instead of standalone email/password - need to force standalone auth mode
 - [ ] FIX: Avatar 3D model not visible on live site - only city bokeh background shows, no avatar
 - [ ] FIX: Layout broken on live - Presentation Monitor missing, avatar area takes full width
+
+- [ ] Free trial: add trial_start_date to users schema + daily_usage table
+- [ ] Free trial: DB helpers for daily usage tracking
+- [ ] Free trial: enforce 7-day trial + 10 min/day in chat + voice routers
+- [ ] Free trial: trial status endpoint + UI countdown
+- [ ] Free trial: upgrade prompt when limit reached
+- [ ] Fix avatar centering in right panel

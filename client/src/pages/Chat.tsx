@@ -57,6 +57,9 @@ export default function Chat() {
   const analyserRef = useRef<AnalyserNode | null>(null);
   const sourceRef = useRef<MediaElementAudioSourceNode | null>(null);
 
+  // Trial status
+  const { data: trialStatus } = trpc.trial.getStatus.useQuery(undefined, { enabled: !!user });
+
   const utils = trpc.useUtils();
   const conversationIdForQuery = useMemo(() => activeConversationId || 0, [activeConversationId]);
   const { data: conversationData } = trpc.chat.getConversation.useQuery(
@@ -741,6 +744,31 @@ export default function Chat() {
           </div>
         </div>
       </div>
+
+      {/* ===== TRIAL STATUS BAR ===== */}
+      {trialStatus?.isTrialUser && (
+        <div className="px-4 py-1.5 shrink-0 flex items-center justify-between text-xs" style={{ background: trialStatus.canUse ? 'rgba(8,145,178,0.1)' : 'rgba(239,68,68,0.15)', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+          <div className="flex items-center gap-3">
+            {trialStatus.canUse ? (
+              <>
+                <span className="text-cyan-400">Free Trial</span>
+                <span className="text-slate-400">{trialStatus.trialDaysLeft} days left</span>
+                <span className="text-slate-500">|</span>
+                <span className="text-slate-400">{trialStatus.dailyMinutesUsed}/{trialStatus.dailyMinutesLimit} min today</span>
+              </>
+            ) : (
+              <span className="text-red-400">{trialStatus.reason}</span>
+            )}
+          </div>
+          <button
+            onClick={() => navigate('/pricing')}
+            className="px-3 py-1 rounded-full text-xs font-medium text-white transition-all hover:scale-105"
+            style={{ background: 'linear-gradient(135deg, #8b5cf6, #db2777)' }}
+          >
+            Upgrade
+          </button>
+        </div>
+      )}
 
       {/* ===== BOTTOM BAR: CAM | MIC | Input | SEND ===== */}
       <div className="px-4 py-2.5 shrink-0 flex items-center gap-2" style={{ background: "#0c0e1a", borderTop: "1px solid rgba(255,255,255,0.05)" }}>

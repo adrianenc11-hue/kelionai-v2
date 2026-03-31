@@ -21,6 +21,8 @@ export const users = pgTable("users", {
   subscriptionTier: subscriptionTierEnum("subscription_tier").default("free").notNull(),
   subscriptionStatus: subscriptionStatusEnum("subscription_status").default("active"),
   language: varchar("language", { length: 10 }).default("en"),
+  trialStartDate: timestamp("trial_start_date").defaultNow(),
+  trialExpired: boolean("trial_expired").default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   lastSignedIn: timestamp("last_signed_in").defaultNow().notNull(),
@@ -123,9 +125,29 @@ export const messagesRelations = relations(messages, ({ one }) => ({
   }),
 }));
 
+export const dailyUsage = pgTable("daily_usage", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  date: varchar("date", { length: 10 }).notNull(), // YYYY-MM-DD
+  minutesUsed: integer("minutes_used").default(0).notNull(),
+  messagesCount: integer("messages_count").default(0).notNull(),
+  lastActivityAt: timestamp("last_activity_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type DailyUsage = typeof dailyUsage.$inferSelect;
+export type InsertDailyUsage = typeof dailyUsage.$inferInsert;
+
 export const userUsageRelations = relations(userUsage, ({ one }) => ({
   user: one(users, {
     fields: [userUsage.userId],
+    references: [users.id],
+  }),
+}));
+
+export const dailyUsageRelations = relations(dailyUsage, ({ one }) => ({
+  user: one(users, {
+    fields: [dailyUsage.userId],
     references: [users.id],
   }),
 }));

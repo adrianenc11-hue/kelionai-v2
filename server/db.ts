@@ -1,7 +1,7 @@
-import { eq, desc, asc } from "drizzle-orm";
+import { eq, desc, asc, and } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { InsertUser, users, conversations, messages, subscriptionPlans, userUsage } from "../drizzle/schema";
+import { InsertUser, users, conversations, messages, subscriptionPlans, userUsage, dailyUsage } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -159,4 +159,94 @@ export async function updateUserUsage(userId: number, messagesThisMonth: number,
   } else {
     await db.insert(userUsage).values({ userId, messagesThisMonth, voiceMinutesThisMonth });
   }
+}
+
+// ============ TRIAL & DAILY USAGE ============
+
+function getTodayDate(): string {
+  return new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+}
+
+export async function getDailyUsage(userId: number, date?: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const d = date || getTodayDate();
+  const result = await db.select().from(dailyUsage).where(and(eq(dailyUsage.userId, userId), eq(dailyUsage.date, d))).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function incrementDailyUsage(userId: number, addMinutes: number = 0, addMessages: number = 1) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const today = getTodayDate();
+  const existing = await getDailyUsage(userId, today);
+  if (existing) {
+    await db.update(dailyUsage).set({
+      minutesUsed: (existing.minutesUsed || 0) + addMinutes,
+      messagesCount: (existing.messagesCount || 0) + addMessages,
+      lastActivityAt: new Date(),
+    }).where(eq(dailyUsage.id, existing.id));
+  } else {
+    await db.insert(dailyUsage).values({
+      userId,
+      date: today,
+      minutesUsed: addMinutes,
+      messagesCount: addMessages,
+      lastActivityAt: new Date(),
+    });
+  }
+}
+
+export interface TrialStatus {
+  isTrialUser: boolean;
+  trialExpired: boolean;
+  trialDaysLeft: number;
+  dailyMinutesUsed: number;
+  dailyMinutesLimit: number;
+  dailyMessagesCount: number;
+  canUse: boolean;
+  reason?: string;
+}
+
+export async function getTrialStatus(userId: number): Promise<TrialStatus> {
+  const db = await getDb();
+  if (!db) return { isTrialUser: false, trialExpired: true, trialDaysLeft: 0, dailyMinutesUsed: 0, dailyMinutesLimit: 10, dailyMessagesCount: 0, canUse: false, reason: "Database not available" };
+
+  const userResult = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  if (!userResult.length) return { isTrialUser: false, trialExpired: true, trialDaysLeft: 0, dailyMinutesUsed: 0, dailyMinutesLimit: 10, dailyMessagesCount: 0, canUse: false, reason: "User not found" };
+
+  const user = userResult[0];
+
+  // Paid users (pro/enterprise) have no limits
+  if (user.subscriptionTier !== 'free') {
+    return { isTrialUser: false, trialExpired: false, trialDaysLeft: 999, dailyMinutesUsed: 0, dailyMinutesLimit: 999, dailyMessagesCount: 0, canUse: true };
+  }
+
+  // Admin has no limits
+  if (user.role === 'admin') {
+    return { isTrialUser: false, trialExpired: false, trialDaysLeft: 999, dailyMinutesUsed: 0, dailyMinutesLimit: 999, dailyMessagesCount: 0, canUse: true };
+  }
+
+  // Free user - check trial
+  const trialStart = user.trialStartDate || user.createdAt;
+  const now = new Date();
+  const diffMs = now.getTime() - trialStart.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const trialDaysLeft = Math.max(0, 7 - diffDays);
+
+  // Trial expired after 7 days
+  if (trialDaysLeft <= 0) {
+    return { isTrialUser: true, trialExpired: true, trialDaysLeft: 0, dailyMinutesUsed: 0, dailyMinutesLimit: 10, dailyMessagesCount: 0, canUse: false, reason: "Trial expired. Upgrade to continue." };
+  }
+
+  // Check daily usage
+  const todayUsage = await getDailyUsage(userId);
+  const minutesUsed = todayUsage?.minutesUsed || 0;
+  const messagesCount = todayUsage?.messagesCount || 0;
+
+  if (minutesUsed >= 10) {
+    return { isTrialUser: true, trialExpired: false, trialDaysLeft, dailyMinutesUsed: minutesUsed, dailyMinutesLimit: 10, dailyMessagesCount: messagesCount, canUse: false, reason: "Daily 10-minute limit reached. Come back tomorrow!" };
+  }
+
+  return { isTrialUser: true, trialExpired: false, trialDaysLeft, dailyMinutesUsed: minutesUsed, dailyMinutesLimit: 10, dailyMessagesCount: messagesCount, canUse: true };
 }

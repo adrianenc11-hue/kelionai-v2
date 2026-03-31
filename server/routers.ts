@@ -1,12 +1,13 @@
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
-import { publicProcedure, router } from "./_core/trpc";
+import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { chatRouter } from "./routers/chat";
 import { subscriptionRouter } from "./routers/subscription";
 import { adminRouter } from "./routers/admin";
 import { voiceRouter } from "./routers/voice";
 import { contactRouter } from "./routers/contact";
+import { getTrialStatus } from "./db";
 
 export const appRouter = router({
   // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
@@ -27,6 +28,12 @@ export const appRouter = router({
   admin: adminRouter,
   voice: voiceRouter,
   contact: contactRouter,
+
+  trial: router({
+    getStatus: protectedProcedure.query(async ({ ctx }) => {
+      return await getTrialStatus(ctx.user.id);
+    }),
+  }),
 });
 
 export type AppRouter = typeof appRouter;

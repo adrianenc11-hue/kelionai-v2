@@ -1,26 +1,12 @@
 {
   "version": "7",
-  "dialect": "mysql",
+  "dialect": "postgresql",
   "entries": [
     {
       "idx": 0,
-      "version": "5",
-      "when": 1774936355644,
-      "tag": "0000_awesome_firebrand",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "5",
-      "when": 1774936468598,
-      "tag": "0001_lively_ender_wiggin",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "5",
-      "when": 1774971790189,
-      "tag": "0002_giant_cannonball",
+      "version": "7",
+      "when": 1774991939083,
+      "tag": "0000_opposite_quasar",
       "breakpoints": true
     }
   ]
