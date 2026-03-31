@@ -51,6 +51,8 @@ export const voiceRouter = router({
         text: z.string().min(1).max(5000),
         avatar: z.enum(["kelion", "kira"]).default("kelion"),
         useClonedVoice: z.boolean().default(false),
+        quality: z.enum(["standard", "high", "ultra"]).default("high"),
+        language: z.string().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -83,6 +85,8 @@ export const voiceRouter = router({
         text: input.text,
         avatar: input.avatar,
         voiceId: customVoiceId,
+        quality: input.quality,
+        language: input.language,
       });
 
       // Update usage

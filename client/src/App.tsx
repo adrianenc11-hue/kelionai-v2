@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
@@ -6,14 +7,27 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { useAuth } from "./_core/hooks/useAuth";
 import { Loader2 } from "lucide-react";
-import Home from "./pages/Home";
-import Chat from "./pages/Chat";
-import Pricing from "./pages/Pricing";
-import PaymentHistory from "./pages/PaymentHistory";
-import AdminDashboard from "./pages/AdminDashboard";
-import SubscriptionManagement from "./pages/SubscriptionManagement";
-import Profile from "./pages/Profile";
-import Contact from "./pages/Contact";
+
+// Lazy load all pages for better bundle splitting
+const Home = lazy(() => import("./pages/Home"));
+const Chat = lazy(() => import("./pages/Chat"));
+const Pricing = lazy(() => import("./pages/Pricing"));
+const PaymentHistory = lazy(() => import("./pages/PaymentHistory"));
+const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
+const SubscriptionManagement = lazy(() => import("./pages/SubscriptionManagement"));
+const Profile = lazy(() => import("./pages/Profile"));
+const Contact = lazy(() => import("./pages/Contact"));
+
+function PageLoader() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="flex flex-col items-center gap-3">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-400" />
+        <p className="text-sm text-slate-500">Loading...</p>
+      </div>
+    </div>
+  );
+}
 
 /**
  * Auth guard component - redirects to home if not authenticated
@@ -21,18 +35,8 @@ import Contact from "./pages/Contact";
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { isAuthenticated, loading } = useAuth();
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-400" />
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return <Redirect to="/" />;
-  }
-
+  if (loading) return <PageLoader />;
+  if (!isAuthenticated) return <Redirect to="/" />;
   return <Component />;
 }
 
@@ -42,59 +46,48 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
 function AdminRoute({ component: Component }: { component: React.ComponentType }) {
   const { isAuthenticated, loading, user } = useAuth();
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-400" />
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return <Redirect to="/" />;
-  }
-
-  if (user?.role !== "admin") {
-    return <Redirect to="/chat" />;
-  }
-
+  if (loading) return <PageLoader />;
+  if (!isAuthenticated) return <Redirect to="/" />;
+  if (user?.role !== "admin") return <Redirect to="/chat" />;
   return <Component />;
 }
 
 function Router() {
   return (
-    <Switch>
-      {/* Public routes */}
-      <Route path={"/"} component={Home} />
-      <Route path={"/pricing"} component={Pricing} />
-      <Route path={"/contact"} component={Contact} />
+    <Suspense fallback={<PageLoader />}>
+      <Switch>
+        {/* Public routes */}
+        <Route path={"/"} component={Home} />
+        <Route path={"/pricing"} component={Pricing} />
+        <Route path={"/contact"} component={Contact} />
 
-      {/* Protected routes - require authentication */}
-      <Route path={"/chat"}>
-        <ProtectedRoute component={Chat} />
-      </Route>
-      <Route path={"/chat/:conversationId"}>
-        <ProtectedRoute component={Chat} />
-      </Route>
-      <Route path={"/payments"}>
-        <ProtectedRoute component={PaymentHistory} />
-      </Route>
-      <Route path={"/subscription"}>
-        <ProtectedRoute component={SubscriptionManagement} />
-      </Route>
-      <Route path={"/profile"}>
-        <ProtectedRoute component={Profile} />
-      </Route>
+        {/* Protected routes - require authentication */}
+        <Route path={"/chat"}>
+          <ProtectedRoute component={Chat} />
+        </Route>
+        <Route path={"/chat/:conversationId"}>
+          <ProtectedRoute component={Chat} />
+        </Route>
+        <Route path={"/payments"}>
+          <ProtectedRoute component={PaymentHistory} />
+        </Route>
+        <Route path={"/subscription"}>
+          <ProtectedRoute component={SubscriptionManagement} />
+        </Route>
+        <Route path={"/profile"}>
+          <ProtectedRoute component={Profile} />
+        </Route>
 
-      {/* Admin routes - require admin role */}
-      <Route path={"/admin"}>
-        <AdminRoute component={AdminDashboard} />
-      </Route>
+        {/* Admin routes - require admin role */}
+        <Route path={"/admin"}>
+          <AdminRoute component={AdminDashboard} />
+        </Route>
 
-      <Route path={"/404"} component={NotFound} />
-      {/* Final fallback route */}
-      <Route component={NotFound} />
-    </Switch>
+        <Route path={"/404"} component={NotFound} />
+        {/* Final fallback route */}
+        <Route component={NotFound} />
+      </Switch>
+    </Suspense>
   );
 }
 

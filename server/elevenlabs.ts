@@ -22,8 +22,10 @@ export async function generateSpeech(params: {
   text: string;
   avatar: "kelion" | "kira";
   voiceId?: string; // custom cloned voice overrides avatar default
+  quality?: "standard" | "high" | "ultra";
+  language?: string;
 }): Promise<{ audioUrl: string; duration: number }> {
-  const { text, avatar, voiceId } = params;
+  const { text, avatar, voiceId, quality = "high", language } = params;
 
   // Use custom cloned voice if provided, otherwise use avatar default
   const resolvedVoiceId =
@@ -41,13 +43,14 @@ export async function generateSpeech(params: {
       headers: getHeaders(),
       body: JSON.stringify({
         text: text.slice(0, 5000), // ElevenLabs limit
-        model_id: "eleven_multilingual_v2",
+        model_id: quality === "ultra" ? "eleven_multilingual_v2" : quality === "high" ? "eleven_multilingual_v2" : "eleven_turbo_v2_5",
         voice_settings: {
-          stability: 0.5,
-          similarity_boost: 0.75,
-          style: 0.3,
-          use_speaker_boost: true,
+          stability: quality === "ultra" ? 0.7 : 0.5,
+          similarity_boost: quality === "ultra" ? 0.9 : 0.75,
+          style: quality === "ultra" ? 0.5 : 0.3,
+          use_speaker_boost: quality !== "standard",
         },
+        ...(language ? { language_code: language } : {}),
       }),
     }
   );
