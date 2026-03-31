@@ -8,7 +8,7 @@ import { Loader2, Send, Plus, MessageSquare } from "lucide-react";
 import { Streamdown } from "streamdown";
 import { useRoute } from "wouter";
 import { VoiceRecorder, VoicePlayer } from "@/components/VoiceRecorder";
-import { Avatar3D } from "@/components/Avatar3D";
+import Avatar3D from "@/components/Avatar3D";
 
 interface Message {
   id: number;
