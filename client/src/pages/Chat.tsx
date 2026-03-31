@@ -669,7 +669,7 @@ export default function Chat() {
           borderLeft: "1px solid rgba(255,255,255,0.05)",
         }}>
           {/* Avatar area */}
-          <div className="relative flex-1 min-h-[40%]" style={{
+          <div className="relative flex-1 min-h-[40%] overflow-hidden" style={{
             backgroundImage: `url(${CITY_BOKEH_BG})`,
             backgroundSize: "cover",
             backgroundPosition: "center",

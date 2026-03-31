@@ -101,7 +101,8 @@ const Avatar3D: React.FC<Avatar3DProps> = ({
       0.1,
       100
     );
-    camera.position.set(0, 0.05, 2.8);
+    camera.position.set(0, 0.4, 2.5);
+    camera.lookAt(0, 0.3, 0);
     cameraRef.current = camera;
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -135,13 +136,17 @@ const Avatar3D: React.FC<Avatar3DProps> = ({
       (gltf: any) => {
         const model = gltf.scene;
 
+        // Center model and scale to fit
         const box = new THREE.Box3().setFromObject(model);
         const center = box.getCenter(new THREE.Vector3());
         const size = box.getSize(new THREE.Vector3());
         model.position.sub(center);
         const maxDim = Math.max(size.x, size.y, size.z);
-        if (maxDim > 0) model.scale.setScalar(1.3 / maxDim);
-        model.position.y = -0.5;
+        if (maxDim > 0) model.scale.setScalar(2.0 / maxDim);
+        // Position model so head is in upper portion of view
+        model.position.y = -0.6;
+        // Point camera at head area (top 25% of model)
+        camera.lookAt(0, 0.35, 0);
 
         model.castShadow = true;
         model.receiveShadow = true;
