@@ -252,9 +252,21 @@
 - [ ] FIX: Avatar 3D model not visible on live site - only city bokeh background shows, no avatar
 - [ ] FIX: Layout broken on live - Presentation Monitor missing, avatar area takes full width
 
-- [ ] Free trial: add trial_start_date to users schema + daily_usage table
-- [ ] Free trial: DB helpers for daily usage tracking
-- [ ] Free trial: enforce 7-day trial + 10 min/day in chat + voice routers
-- [ ] Free trial: trial status endpoint + UI countdown
-- [ ] Free trial: upgrade prompt when limit reached
-- [ ] Fix avatar centering in right panel
+- [x] Free trial: add trial_start_date to users schema + daily_usage table
+- [x] Free trial: DB helpers for daily usage tracking
+- [x] Free trial: enforce 7-day trial + 10 min/day in chat router
+- [x] Free trial: trial status endpoint + UI countdown
+- [x] Free trial: upgrade prompt when limit reached
+- [x] Fix avatar centering in right panel
+
+- [x] Referral system: DB table for referral_codes (code, sender_user_id, recipient_email, expires_at, used_by, used_at)
+- [x] Referral system: generate unique code + send via email to potential client (valid 1 week)
+- [x] Referral system: validate referral code at checkout, apply after payment confirmed
+- [x] Referral system: after new user pays, referrer gets +5 days subscription extension
+- [x] Annual subscription plans: add yearly billing option to Stripe products + checkout
+- [x] Refund policy: monthly = no refund
+- [x] Refund policy: annual = stop current month + refund 11 months if <3 months elapsed, else no refund with message
+- [x] Refund request endpoint + UI in subscription management
+- [x] Payment confirmation flow: Stripe webhook confirms payment, update user status
+- [x] Pricing page: add annual/monthly toggle + referral code input field
+- [x] Subscription management: add refund request button with policy info

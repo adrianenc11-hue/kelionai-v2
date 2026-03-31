@@ -26,6 +26,7 @@ export const subscriptionRouter = router({
       z.object({
         planId: z.string(),
         billingCycle: z.enum(["monthly", "yearly"]),
+        referralCode: z.string().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -44,14 +45,27 @@ export const subscriptionRouter = router({
           customerId = customer.id;
         }
 
-        // Determine price ID based on billing cycle
-        const priceId = input.billingCycle === "yearly" ? `${input.planId}_yearly` : input.planId;
+        // Price mapping - use Stripe price IDs
+        // These should match your Stripe dashboard products
+        const priceMap: Record<string, Record<string, string>> = {
+          pro: {
+            monthly: process.env.STRIPE_PRO_MONTHLY_PRICE_ID || "price_pro_monthly",
+            yearly: process.env.STRIPE_PRO_YEARLY_PRICE_ID || "price_pro_yearly",
+          },
+          enterprise: {
+            monthly: process.env.STRIPE_ENTERPRISE_MONTHLY_PRICE_ID || "price_enterprise_monthly",
+            yearly: process.env.STRIPE_ENTERPRISE_YEARLY_PRICE_ID || "price_enterprise_yearly",
+          },
+        };
+
+        const priceId = priceMap[input.planId]?.[input.billingCycle] || input.planId;
 
         // Create checkout session
         const session = await stripe.checkout.sessions.create({
           customer: customerId,
           mode: "subscription",
           payment_method_types: ["card"],
+          allow_promotion_codes: true,
           line_items: [
             {
               price: priceId,
@@ -59,12 +73,16 @@ export const subscriptionRouter = router({
             },
           ],
           success_url: `${ctx.req.headers.origin || "https://kelionai.app"}/subscription/success?session_id={CHECKOUT_SESSION_ID}`,
-          cancel_url: `${ctx.req.headers.origin || "https://kelionai.app"}/subscription/cancel`,
+          cancel_url: `${ctx.req.headers.origin || "https://kelionai.app"}/pricing`,
           client_reference_id: ctx.user.id.toString(),
+          customer_email: !customerId ? (ctx.user.email || undefined) : undefined,
           metadata: {
             userId: ctx.user.id.toString(),
             planId: input.planId,
             billingCycle: input.billingCycle,
+            referralCode: input.referralCode || "",
+            customerEmail: ctx.user.email || "",
+            customerName: ctx.user.name || "",
           },
         });
 

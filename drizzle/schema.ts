@@ -125,6 +125,41 @@ export const messagesRelations = relations(messages, ({ one }) => ({
   }),
 }));
 
+export const referralCodes = pgTable("referral_codes", {
+  id: serial("id").primaryKey(),
+  code: varchar("code", { length: 20 }).notNull().unique(),
+  senderUserId: integer("sender_user_id").notNull(),
+  recipientEmail: varchar("recipient_email", { length: 320 }).notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  usedBy: integer("used_by"),
+  usedAt: timestamp("used_at"),
+  bonusApplied: boolean("bonus_applied").default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type ReferralCode = typeof referralCodes.$inferSelect;
+export type InsertReferralCode = typeof referralCodes.$inferInsert;
+
+export const refundStatusEnum = pgEnum("refund_status", ["pending", "approved", "denied", "completed"]);
+
+export const refundRequests = pgTable("refund_requests", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  stripeSubscriptionId: varchar("stripe_subscription_id", { length: 255 }),
+  billingCycle: varchar("billing_cycle", { length: 10 }).notNull(), // monthly or yearly
+  subscriptionStartDate: timestamp("subscription_start_date"),
+  monthsElapsed: integer("months_elapsed").default(0),
+  refundAmount: numeric("refund_amount", { precision: 10, scale: 2 }),
+  status: refundStatusEnum("status").default("pending").notNull(),
+  reason: text("reason"),
+  adminNote: text("admin_note"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  resolvedAt: timestamp("resolved_at"),
+});
+
+export type RefundRequest = typeof refundRequests.$inferSelect;
+export type InsertRefundRequest = typeof refundRequests.$inferInsert;
+
 export const dailyUsage = pgTable("daily_usage", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull(),

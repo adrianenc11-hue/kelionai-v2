@@ -7,6 +7,8 @@ import { subscriptionRouter } from "./routers/subscription";
 import { adminRouter } from "./routers/admin";
 import { voiceRouter } from "./routers/voice";
 import { contactRouter } from "./routers/contact";
+import { referralRouter } from "./routers/referral";
+import { refundRouter } from "./routers/refund";
 import { getTrialStatus } from "./db";
 
 export const appRouter = router({
@@ -28,6 +30,8 @@ export const appRouter = router({
   admin: adminRouter,
   voice: voiceRouter,
   contact: contactRouter,
+  referral: referralRouter,
+  refund: refundRouter,
 
   trial: router({
     getStatus: protectedProcedure.query(async ({ ctx }) => {

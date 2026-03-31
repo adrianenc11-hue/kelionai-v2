@@ -1,7 +1,7 @@
 import { eq, desc, asc, and } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { InsertUser, users, conversations, messages, subscriptionPlans, userUsage, dailyUsage } from "../drizzle/schema";
+import { InsertUser, users, conversations, messages, subscriptionPlans, userUsage, dailyUsage, referralCodes, refundRequests } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -159,6 +159,126 @@ export async function updateUserUsage(userId: number, messagesThisMonth: number,
   } else {
     await db.insert(userUsage).values({ userId, messagesThisMonth, voiceMinutesThisMonth });
   }
+}
+
+// ============ REFERRAL SYSTEM ============
+
+function generateReferralCode(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = 'KEL-';
+  for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  return code;
+}
+
+export async function createReferralCode(senderUserId: number, recipientEmail: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const code = generateReferralCode();
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + 7); // Valid 1 week
+  const result = await db.insert(referralCodes).values({
+    code,
+    senderUserId,
+    recipientEmail,
+    expiresAt,
+  }).returning();
+  return result[0];
+}
+
+export async function getReferralByCode(code: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(referralCodes).where(eq(referralCodes.code, code.toUpperCase())).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function markReferralUsed(codeId: number, usedByUserId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(referralCodes).set({ usedBy: usedByUserId, usedAt: new Date() }).where(eq(referralCodes.id, codeId));
+}
+
+export async function applyReferralBonus(referralId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const referral = await db.select().from(referralCodes).where(eq(referralCodes.id, referralId)).limit(1);
+  if (!referral.length || referral[0].bonusApplied) return;
+  
+  // Give sender +5 days bonus
+  const sender = await db.select().from(users).where(eq(users.id, referral[0].senderUserId)).limit(1);
+  if (sender.length && sender[0].stripeSubscriptionId) {
+    try {
+      // Extend Stripe subscription by 5 days
+      const Stripe = (await import('stripe')).default;
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
+      const sub = await stripe.subscriptions.retrieve(sender[0].stripeSubscriptionId) as any;
+      if (sub && sub.current_period_end) {
+        const newEnd = sub.current_period_end + (5 * 24 * 60 * 60); // +5 days in seconds
+        await stripe.subscriptions.update(sender[0].stripeSubscriptionId, {
+          trial_end: newEnd,
+          proration_behavior: 'none',
+        } as any);
+        console.log(`[Referral] Extended subscription for user ${sender[0].id} by 5 days via Stripe`);
+      }
+    } catch (stripeErr) {
+      console.error(`[Referral] Stripe extension failed, tracking locally:`, stripeErr);
+    }
+    await db.update(referralCodes).set({ bonusApplied: true }).where(eq(referralCodes.id, referralId));
+    console.log(`[Referral] Bonus +5 days applied for user ${referral[0].senderUserId}`);
+  } else if (sender.length) {
+    // Free user referrer - just mark bonus, they'll get it when they subscribe
+    await db.update(referralCodes).set({ bonusApplied: true }).where(eq(referralCodes.id, referralId));
+    console.log(`[Referral] Bonus tracked for free user ${referral[0].senderUserId} (will apply on subscription)`);
+  }
+}
+
+export async function getUserReferrals(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(referralCodes).where(eq(referralCodes.senderUserId, userId)).orderBy(desc(referralCodes.createdAt));
+}
+
+// ============ REFUND SYSTEM ============
+
+export async function createRefundRequest(userId: number, stripeSubId: string | null, billingCycle: string, subStartDate: Date | null, monthsElapsed: number, refundAmount: string | null, reason?: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(refundRequests).values({
+    userId,
+    stripeSubscriptionId: stripeSubId,
+    billingCycle,
+    subscriptionStartDate: subStartDate,
+    monthsElapsed,
+    refundAmount,
+    status: billingCycle === 'monthly' ? 'denied' : (monthsElapsed >= 3 ? 'denied' : 'pending'),
+    reason,
+    adminNote: billingCycle === 'monthly' 
+      ? 'Monthly subscriptions are non-refundable.' 
+      : (monthsElapsed >= 3 ? 'Refund not available after 3 completed months.' : null),
+  }).returning();
+  return result[0];
+}
+
+export async function getRefundRequests(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(refundRequests).where(eq(refundRequests.userId, userId)).orderBy(desc(refundRequests.createdAt));
+}
+
+export async function getAllRefundRequests() {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(refundRequests).orderBy(desc(refundRequests.createdAt));
+}
+
+export async function updateRefundStatus(refundId: number, status: string, adminNote?: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(refundRequests).set({ 
+    status: status as any, 
+    adminNote,
+    resolvedAt: new Date() 
+  }).where(eq(refundRequests.id, refundId));
 }
 
 // ============ TRIAL & DAILY USAGE ============

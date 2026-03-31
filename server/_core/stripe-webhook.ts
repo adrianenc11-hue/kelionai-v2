@@ -1,6 +1,6 @@
 import Stripe from "stripe";
 import { Request, Response } from "express";
-import { getDb } from "../db";
+import { getDb, getReferralByCode, markReferralUsed, applyReferralBonus } from "../db";
 import { users } from "../../drizzle/schema";
 import { eq } from "drizzle-orm";
 
@@ -41,8 +41,9 @@ export async function handleStripeWebhook(req: Request, res: Response) {
           const userId = parseInt(session.client_reference_id);
           const customerId = session.customer as string;
           const subscriptionId = session.subscription as string;
+          const billingCycle = session.metadata?.billingCycle || "monthly";
 
-          // Update user with Stripe IDs
+          // Update user with Stripe IDs + billing info
           await db
             .update(users)
             .set({
@@ -50,10 +51,26 @@ export async function handleStripeWebhook(req: Request, res: Response) {
               stripeSubscriptionId: subscriptionId,
               subscriptionTier: (session.metadata?.planId || "pro") as "free" | "pro" | "enterprise",
               subscriptionStatus: "active",
+              trialExpired: true, // No longer on trial
             })
             .where(eq(users.id, userId));
 
-          console.log("[Stripe Webhook] User subscription updated:", userId);
+          console.log("[Stripe Webhook] User subscription updated:", userId, "billing:", billingCycle);
+
+          // Handle referral code bonus
+          const referralCode = session.metadata?.referralCode;
+          if (referralCode) {
+            try {
+              const referral = await getReferralByCode(referralCode);
+              if (referral && !referral.usedBy && referral.senderUserId !== userId) {
+                await markReferralUsed(referral.id, userId);
+                await applyReferralBonus(referral.id);
+                console.log(`[Stripe Webhook] Referral ${referralCode} applied, bonus given to user ${referral.senderUserId}`);
+              }
+            } catch (refErr) {
+              console.error("[Stripe Webhook] Referral processing error:", refErr);
+            }
+          }
         }
         break;
       }
