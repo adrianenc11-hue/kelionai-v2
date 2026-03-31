@@ -15,6 +15,13 @@
       "when": 1774936468598,
       "tag": "0001_lively_ender_wiggin",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1774971790189,
+      "tag": "0002_giant_cannonball",
+      "breakpoints": true
     }
   ]
 }

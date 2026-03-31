@@ -1,6 +1,8 @@
 import type { CreateExpressContextOptions } from "@trpc/server/adapters/express";
 import type { User } from "../../drizzle/schema";
-import { sdk } from "./sdk";
+
+// Detect if we're running standalone (no Manus OAuth configured)
+const isStandalone = !process.env.OAUTH_SERVER_URL;
 
 export type TrpcContext = {
   req: CreateExpressContextOptions["req"];
@@ -14,7 +16,13 @@ export async function createContext(
   let user: User | null = null;
 
   try {
-    user = await sdk.authenticateRequest(opts.req);
+    if (isStandalone) {
+      const { authenticateRequestStandalone } = await import("../standalone-auth");
+      user = await authenticateRequestStandalone(opts.req);
+    } else {
+      const { sdk } = await import("./sdk");
+      user = await sdk.authenticateRequest(opts.req);
+    }
   } catch (error) {
     // Authentication is optional for public procedures.
     user = null;

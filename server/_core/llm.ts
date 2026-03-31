@@ -209,15 +209,40 @@ const normalizeToolChoice = (
   return toolChoice;
 };
 
-const resolveApiUrl = () =>
-  ENV.forgeApiUrl && ENV.forgeApiUrl.trim().length > 0
-    ? `${ENV.forgeApiUrl.replace(/\/$/, "")}/v1/chat/completions`
-    : "https://forge.manus.im/v1/chat/completions";
-
-const assertApiKey = () => {
-  if (!ENV.forgeApiKey) {
-    throw new Error("OPENAI_API_KEY is not configured");
+/**
+ * Resolve API URL: 
+ * 1. If BUILT_IN_FORGE_API_URL is set (Manus hosting), use Forge API
+ * 2. If OPENAI_API_KEY is set (standalone), use OpenAI API directly
+ */
+const resolveApiUrl = () => {
+  if (ENV.forgeApiUrl && ENV.forgeApiUrl.trim().length > 0) {
+    return `${ENV.forgeApiUrl.replace(/\/$/, "")}/v1/chat/completions`;
   }
+  // Standalone: use OpenAI API directly
+  return "https://api.openai.com/v1/chat/completions";
+};
+
+/**
+ * Get the API key - Forge key or OpenAI key
+ */
+const getApiKey = () => {
+  if (ENV.forgeApiKey && ENV.forgeApiKey.trim().length > 0) {
+    return ENV.forgeApiKey;
+  }
+  if (ENV.openaiApiKey && ENV.openaiApiKey.trim().length > 0) {
+    return ENV.openaiApiKey;
+  }
+  throw new Error("No API key configured. Set OPENAI_API_KEY or BUILT_IN_FORGE_API_KEY.");
+};
+
+/**
+ * Get the model name based on available API
+ */
+const getModelName = () => {
+  if (ENV.forgeApiUrl && ENV.forgeApiUrl.trim().length > 0) {
+    return "gemini-2.5-flash"; // Manus Forge
+  }
+  return "gpt-4o"; // OpenAI direct
 };
 
 const normalizeResponseFormat = ({
@@ -266,7 +291,7 @@ const normalizeResponseFormat = ({
 };
 
 export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
-  assertApiKey();
+  const apiKey = getApiKey();
 
   const {
     messages,
@@ -280,7 +305,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   } = params;
 
   const payload: Record<string, unknown> = {
-    model: "gemini-2.5-flash",
+    model: getModelName(),
     messages: messages.map(normalizeMessage),
   };
 
@@ -296,9 +321,13 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     payload.tool_choice = normalizedToolChoice;
   }
 
-  payload.max_tokens = 32768
-  payload.thinking = {
-    "budget_tokens": 128
+  payload.max_tokens = 32768;
+  
+  // Only add thinking for Forge API (Gemini)
+  if (ENV.forgeApiUrl && ENV.forgeApiUrl.trim().length > 0) {
+    payload.thinking = {
+      "budget_tokens": 128
+    };
   }
 
   const normalizedResponseFormat = normalizeResponseFormat({
@@ -316,7 +345,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      authorization: `Bearer ${ENV.forgeApiKey}`,
+      authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify(payload),
   });

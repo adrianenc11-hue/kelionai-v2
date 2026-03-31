@@ -1,14 +1,17 @@
 export { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 
-// Generate login URL at runtime so redirect URI reflects the current origin.
+/**
+ * Generate login URL at runtime.
+ * If Manus OAuth is configured, use it.
+ * Otherwise, redirect to the standalone /login page.
+ */
 export const getLoginUrl = () => {
   const oauthPortalUrl = import.meta.env.VITE_OAUTH_PORTAL_URL;
   const appId = import.meta.env.VITE_APP_ID;
 
-  // If Manus OAuth env vars are not set (e.g. Railway deploy), return # to avoid crash
+  // If Manus OAuth env vars are not set (e.g. Railway deploy), use standalone login
   if (!oauthPortalUrl || !appId) {
-    console.warn("OAuth env vars not configured (VITE_OAUTH_PORTAL_URL, VITE_APP_ID)");
-    return "#";
+    return "/login";
   }
 
   const redirectUri = `${window.location.origin}/api/oauth/callback`;
@@ -22,7 +25,6 @@ export const getLoginUrl = () => {
     url.searchParams.set("type", "signIn");
     return url.toString();
   } catch {
-    console.warn("Failed to construct OAuth URL");
-    return "#";
+    return "/login";
   }
 };

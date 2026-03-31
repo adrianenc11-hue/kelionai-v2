@@ -1,21 +1,35 @@
-// Preconfigured storage helpers for Manus WebDev templates
-// Uses the Biz-provided storage proxy (Authorization: Bearer <token>)
-
+/**
+ * Storage helpers - supports both Manus proxy and standalone S3
+ * When running standalone (Railway), uses AWS S3 directly if configured,
+ * otherwise falls back to local file storage with public URL serving
+ */
 import { ENV } from './_core/env';
+import path from 'path';
+import fs from 'fs';
 
-type StorageConfig = { baseUrl: string; apiKey: string };
+type StorageConfig = { baseUrl: string; apiKey: string } | null;
 
-function getStorageConfig(): StorageConfig {
+function getManusStorageConfig(): StorageConfig {
   const baseUrl = ENV.forgeApiUrl;
   const apiKey = ENV.forgeApiKey;
 
   if (!baseUrl || !apiKey) {
-    throw new Error(
-      "Storage proxy credentials missing: set BUILT_IN_FORGE_API_URL and BUILT_IN_FORGE_API_KEY"
-    );
+    return null; // Not on Manus, use fallback
   }
 
   return { baseUrl: baseUrl.replace(/\/+$/, ""), apiKey };
+}
+
+function ensureTrailingSlash(value: string): string {
+  return value.endsWith("/") ? value : `${value}/`;
+}
+
+function normalizeKey(relKey: string): string {
+  return relKey.replace(/^\/+/, "");
+}
+
+function buildAuthHeaders(apiKey: string): HeadersInit {
+  return { Authorization: `Bearer ${apiKey}` };
 }
 
 function buildUploadUrl(baseUrl: string, relKey: string): URL {
@@ -41,14 +55,6 @@ async function buildDownloadUrl(
   return (await response.json()).url;
 }
 
-function ensureTrailingSlash(value: string): string {
-  return value.endsWith("/") ? value : `${value}/`;
-}
-
-function normalizeKey(relKey: string): string {
-  return relKey.replace(/^\/+/, "");
-}
-
 function toFormData(
   data: Buffer | Uint8Array | string,
   contentType: string,
@@ -63,8 +69,13 @@ function toFormData(
   return form;
 }
 
-function buildAuthHeaders(apiKey: string): HeadersInit {
-  return { Authorization: `Bearer ${apiKey}` };
+// Local storage fallback directory
+const LOCAL_STORAGE_DIR = path.resolve(process.cwd(), 'uploads');
+
+function ensureLocalStorageDir() {
+  if (!fs.existsSync(LOCAL_STORAGE_DIR)) {
+    fs.mkdirSync(LOCAL_STORAGE_DIR, { recursive: true });
+  }
 }
 
 export async function storagePut(
@@ -72,31 +83,100 @@ export async function storagePut(
   data: Buffer | Uint8Array | string,
   contentType = "application/octet-stream"
 ): Promise<{ key: string; url: string }> {
-  const { baseUrl, apiKey } = getStorageConfig();
-  const key = normalizeKey(relKey);
-  const uploadUrl = buildUploadUrl(baseUrl, key);
-  const formData = toFormData(data, contentType, key.split("/").pop() ?? key);
-  const response = await fetch(uploadUrl, {
-    method: "POST",
-    headers: buildAuthHeaders(apiKey),
-    body: formData,
-  });
+  const manusConfig = getManusStorageConfig();
+  
+  if (manusConfig) {
+    // Manus proxy storage
+    const key = normalizeKey(relKey);
+    const uploadUrl = buildUploadUrl(manusConfig.baseUrl, key);
+    const formData = toFormData(data, contentType, key.split("/").pop() ?? key);
+    const response = await fetch(uploadUrl, {
+      method: "POST",
+      headers: buildAuthHeaders(manusConfig.apiKey),
+      body: formData,
+    });
 
-  if (!response.ok) {
-    const message = await response.text().catch(() => response.statusText);
-    throw new Error(
-      `Storage upload failed (${response.status} ${response.statusText}): ${message}`
-    );
+    if (!response.ok) {
+      const message = await response.text().catch(() => response.statusText);
+      throw new Error(
+        `Storage upload failed (${response.status} ${response.statusText}): ${message}`
+      );
+    }
+    const url = (await response.json()).url;
+    return { key, url };
   }
-  const url = (await response.json()).url;
+  
+  // Check for AWS S3 config
+  const s3Bucket = process.env.S3_BUCKET;
+  const s3Region = process.env.S3_REGION || 'us-east-1';
+  const awsAccessKey = process.env.AWS_ACCESS_KEY_ID;
+  const awsSecretKey = process.env.AWS_SECRET_ACCESS_KEY;
+  
+  if (s3Bucket && awsAccessKey && awsSecretKey) {
+    // Use AWS S3 directly
+    const key = normalizeKey(relKey);
+    const { S3Client, PutObjectCommand } = await import('@aws-sdk/client-s3');
+    const s3 = new S3Client({
+      region: s3Region,
+      credentials: { accessKeyId: awsAccessKey, secretAccessKey: awsSecretKey },
+    });
+    
+    const buffer = typeof data === 'string' ? Buffer.from(data) : Buffer.from(data);
+    await s3.send(new PutObjectCommand({
+      Bucket: s3Bucket,
+      Key: key,
+      Body: buffer,
+      ContentType: contentType,
+    }));
+    
+    const url = `https://${s3Bucket}.s3.${s3Region}.amazonaws.com/${key}`;
+    return { key, url };
+  }
+  
+  // Fallback: local file storage
+  ensureLocalStorageDir();
+  const key = normalizeKey(relKey);
+  const filePath = path.join(LOCAL_STORAGE_DIR, key);
+  const dir = path.dirname(filePath);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  
+  const buffer = typeof data === 'string' ? Buffer.from(data) : Buffer.from(data);
+  fs.writeFileSync(filePath, buffer);
+  
+  // Return a URL that the Express server will serve
+  const url = `/uploads/${key}`;
   return { key, url };
 }
 
 export async function storageGet(relKey: string): Promise<{ key: string; url: string; }> {
-  const { baseUrl, apiKey } = getStorageConfig();
+  const manusConfig = getManusStorageConfig();
+  
+  if (manusConfig) {
+    const key = normalizeKey(relKey);
+    return {
+      key,
+      url: await buildDownloadUrl(manusConfig.baseUrl, key, manusConfig.apiKey),
+    };
+  }
+  
+  // Check for AWS S3
+  const s3Bucket = process.env.S3_BUCKET;
+  const s3Region = process.env.S3_REGION || 'us-east-1';
+  
+  if (s3Bucket) {
+    const key = normalizeKey(relKey);
+    return {
+      key,
+      url: `https://${s3Bucket}.s3.${s3Region}.amazonaws.com/${key}`,
+    };
+  }
+  
+  // Fallback: local
   const key = normalizeKey(relKey);
   return {
     key,
-    url: await buildDownloadUrl(baseUrl, key, apiKey),
+    url: `/uploads/${key}`,
   };
 }

@@ -203,3 +203,11 @@
 
 ## Admin User
 - [x] Set adrianenc11@gmail.com as admin role in database (already admin)
+
+## Standalone Railway Deployment (No Manus Dependencies)
+- [x] Replace Manus OAuth with email/password auth (bcrypt + JWT)
+- [x] Create login/register pages in frontend
+- [x] Make all Manus dependencies optional with standalone fallbacks
+- [x] Make app work independently on Railway with own DB
+- [ ] Single-screen homepage (no scroll) with back button (pending user feedback)
+- [x] Push standalone version to GitHub master

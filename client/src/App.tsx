@@ -17,6 +17,7 @@ const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
 const SubscriptionManagement = lazy(() => import("./pages/SubscriptionManagement"));
 const Profile = lazy(() => import("./pages/Profile"));
 const Contact = lazy(() => import("./pages/Contact"));
+const Login = lazy(() => import("./pages/Login"));
 
 function PageLoader() {
   return (
@@ -36,7 +37,7 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
   const { isAuthenticated, loading } = useAuth();
 
   if (loading) return <PageLoader />;
-  if (!isAuthenticated) return <Redirect to="/" />;
+  if (!isAuthenticated) return <Redirect to="/login" />;
   return <Component />;
 }
 
@@ -47,7 +48,7 @@ function AdminRoute({ component: Component }: { component: React.ComponentType }
   const { isAuthenticated, loading, user } = useAuth();
 
   if (loading) return <PageLoader />;
-  if (!isAuthenticated) return <Redirect to="/" />;
+  if (!isAuthenticated) return <Redirect to="/login" />;
   if (user?.role !== "admin") return <Redirect to="/chat" />;
   return <Component />;
 }
@@ -60,6 +61,7 @@ function Router() {
         <Route path={"/"} component={Home} />
         <Route path={"/pricing"} component={Pricing} />
         <Route path={"/contact"} component={Contact} />
+        <Route path={"/login"} component={Login} />
 
         {/* Protected routes - require authentication */}
         <Route path={"/chat"}>
