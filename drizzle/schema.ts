@@ -23,6 +23,8 @@ export const users = pgTable("users", {
   language: varchar("language", { length: 10 }).default("en"),
   trialStartDate: timestamp("trial_start_date").defaultNow(),
   trialExpired: boolean("trial_expired").default(false),
+  accountClosed: boolean("account_closed").default(false),
+  accountClosedAt: timestamp("account_closed_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   lastSignedIn: timestamp("last_signed_in").defaultNow().notNull(),

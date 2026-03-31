@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
-import { createRefundRequest, getRefundRequests, getAllRefundRequests, updateRefundStatus } from "../db";
+import { createRefundRequest, getRefundRequests, getAllRefundRequests, updateRefundStatus, closeUserAccount } from "../db";
 import Stripe from "stripe";
 import { TRPCError } from "@trpc/server";
 
@@ -91,15 +91,16 @@ export const refundRouter = router({
           input.reason
         );
 
-        // Cancel subscription at period end (stop current month)
-        await stripe.subscriptions.update(ctx.user.stripeSubscriptionId, {
-          cancel_at_period_end: true,
-        });
+        // Cancel subscription immediately
+        await stripe.subscriptions.cancel(ctx.user.stripeSubscriptionId);
+
+        // Close the account automatically
+        await closeUserAccount(ctx.user.id);
 
         return {
           success: true,
           status: "pending",
-          message: `Refund request submitted. Your current month will complete, and $${refundAmount} (11 months) will be refunded within 15 business days. Your subscription will be cancelled at the end of the current period.`,
+          message: `Refund request submitted. Your account has been closed and $${refundAmount} (11 months) will be refunded within 15 business days.`,
           refundAmount,
           refundId: refund.id,
         };
@@ -140,21 +141,7 @@ export const refundRouter = router({
         throw new TRPCError({ code: "FORBIDDEN" });
       }
 
-      // If approving, execute the actual Stripe refund
-      if (input.action === "approved") {
-        try {
-          // Get the refund request details
-          const refunds = await getRefundRequests(0); // We need to get by ID
-          // For now, update status and admin will process manually via Stripe dashboard
-          // In production, integrate stripe.refunds.create() here
-          await updateRefundStatus(input.refundId, "approved", input.adminNote || "Refund approved. Processing within 15 business days.");
-        } catch (err) {
-          console.error("[Refund] Stripe refund execution failed:", err);
-          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to process Stripe refund" });
-        }
-      } else {
-        await updateRefundStatus(input.refundId, input.action, input.adminNote);
-      }
+      await updateRefundStatus(input.refundId, input.action, input.adminNote);
 
       return { success: true, message: `Refund ${input.action}.` };
     }),

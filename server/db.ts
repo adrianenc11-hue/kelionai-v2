@@ -370,3 +370,18 @@ export async function getTrialStatus(userId: number): Promise<TrialStatus> {
 
   return { isTrialUser: true, trialExpired: false, trialDaysLeft, dailyMinutesUsed: minutesUsed, dailyMinutesLimit: 10, dailyMessagesCount: messagesCount, canUse: true };
 }
+
+// ============ ACCOUNT CLOSURE ============
+
+export async function closeUserAccount(userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(users).set({
+    accountClosed: true,
+    accountClosedAt: new Date(),
+    subscriptionTier: "free" as any,
+    subscriptionStatus: "cancelled" as any,
+    stripeSubscriptionId: null,
+  }).where(eq(users.id, userId));
+  console.log(`[Account] User ${userId} account closed after refund`);
+}
