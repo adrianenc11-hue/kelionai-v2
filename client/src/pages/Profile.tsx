@@ -136,13 +136,13 @@ export default function Profile() {
               <label className="block text-sm font-medium text-slate-400 mb-1.5">Login Method</label>
               <Input
                 type="text"
-                value="Manus OAuth"
+                value="Email & Password"
                 disabled
                 className="bg-slate-800/60 border-slate-700"
                 aria-label="Login method"
               />
             </div>
-            <p className="text-xs text-slate-500">Profile information is managed through Manus OAuth. Contact admin to update.</p>
+            <p className="text-xs text-slate-500">Profile information is managed through your account settings.</p>
           </div>
         </Card>
 

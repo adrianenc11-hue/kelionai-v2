@@ -227,7 +227,7 @@ export default function Home() {
             <div>
               <div className="w-14 h-14 rounded-full bg-blue-600/20 flex items-center justify-center mx-auto mb-4 text-2xl font-bold text-blue-400">1</div>
               <h3 className="font-semibold mb-2">Sign In</h3>
-              <p className="text-sm text-slate-400">One click with Manus OAuth. No forms, no passwords to remember.</p>
+              <p className="text-sm text-slate-400">Create an account in seconds. Quick and easy.</p>
             </div>
             <div>
               <div className="w-14 h-14 rounded-full bg-purple-600/20 flex items-center justify-center mx-auto mb-4 text-2xl font-bold text-purple-400">2</div>

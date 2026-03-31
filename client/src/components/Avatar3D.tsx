@@ -101,8 +101,9 @@ const Avatar3D: React.FC<Avatar3DProps> = ({
       0.1,
       100
     );
-    camera.position.set(0, 0.4, 2.5);
-    camera.lookAt(0, 0.3, 0);
+    // Bust view: camera positioned to show head + shoulders + chest only
+    camera.position.set(0, 1.55, 0.65);
+    camera.lookAt(0, 1.45, 0);
     cameraRef.current = camera;
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -136,17 +137,19 @@ const Avatar3D: React.FC<Avatar3DProps> = ({
       (gltf: any) => {
         const model = gltf.scene;
 
-        // Center model and scale to fit
+        // Bust view: position model at origin, camera targets upper body
         const box = new THREE.Box3().setFromObject(model);
         const center = box.getCenter(new THREE.Vector3());
         const size = box.getSize(new THREE.Vector3());
-        model.position.sub(center);
-        const maxDim = Math.max(size.x, size.y, size.z);
-        if (maxDim > 0) model.scale.setScalar(2.0 / maxDim);
-        // Position model so head is in upper portion of view
-        model.position.y = -0.6;
-        // Point camera at head area (top 25% of model)
-        camera.lookAt(0, 0.35, 0);
+        // Center horizontally and depth, keep vertical grounded
+        model.position.x = -center.x;
+        model.position.z = -center.z;
+        model.position.y = 0; // feet at y=0
+        // No scaling needed - use natural RPM model size (~1.7m)
+        // Camera targets chest/neck area
+        camera.position.set(0, 1.55, 0.65);
+        camera.lookAt(0, 1.45, 0);
+        camera.updateProjectionMatrix();
 
         model.castShadow = true;
         model.receiveShadow = true;
