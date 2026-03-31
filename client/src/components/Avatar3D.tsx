@@ -21,6 +21,7 @@ const Avatar3D: React.FC<Avatar3DProps> = ({
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const modelRef = useRef<THREE.Group | null>(null);
   const mixerRef = useRef<THREE.AnimationMixer | null>(null);
+  const headBoneRef = useRef<THREE.Bone | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const modelUrls: Record<string, string> = {
@@ -45,6 +46,7 @@ const Avatar3D: React.FC<Avatar3DProps> = ({
       1000
     );
     camera.position.z = 3;
+    camera.position.y = 0.5;
     cameraRef.current = camera;
 
     // Initialize renderer
@@ -55,14 +57,15 @@ const Avatar3D: React.FC<Avatar3DProps> = ({
     rendererRef.current = renderer;
 
     // Add lighting
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
     scene.add(ambientLight);
 
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.9);
     directionalLight.position.set(5, 5, 5);
+    directionalLight.castShadow = true;
     scene.add(directionalLight);
 
-    const pointLight = new THREE.PointLight(0x8b5cf6, 0.5);
+    const pointLight = new THREE.PointLight(0x8b5cf6, 0.6);
     pointLight.position.set(-5, 3, 3);
     scene.add(pointLight);
 
@@ -73,9 +76,18 @@ const Avatar3D: React.FC<Avatar3DProps> = ({
       (gltf: any) => {
         const model = gltf.scene;
         model.scale.set(1.5, 1.5, 1.5);
-        model.position.y = -0.5;
+        model.position.y = -0.3;
+        model.castShadow = true;
+        model.receiveShadow = true;
         scene.add(model);
         modelRef.current = model;
+
+        // Find head bone for tracking
+        model.traverse((child: any) => {
+          if (child.isBone && (child.name.toLowerCase().includes("head") || child.name.toLowerCase().includes("neck"))) {
+            headBoneRef.current = child;
+          }
+        });
 
         // Setup animations
         if (gltf.animations.length > 0) {
@@ -84,6 +96,7 @@ const Avatar3D: React.FC<Avatar3DProps> = ({
 
           // Play idle animation
           const idleAction = mixer.clipAction(gltf.animations[0]);
+          idleAction.clampWhenFinished = true;
           idleAction.play();
         }
 
@@ -108,9 +121,19 @@ const Avatar3D: React.FC<Avatar3DProps> = ({
         mixerRef.current.update(clock.getDelta());
       }
 
-      // Subtle rotation for visual interest
-      if (modelRef.current && !isAnimating) {
-        modelRef.current.rotation.y += 0.005;
+      // Head tracking - look at user (camera position)
+      if (headBoneRef.current && modelRef.current) {
+        const headWorldPos = new THREE.Vector3();
+        headBoneRef.current.getWorldPosition(headWorldPos);
+
+        // User is at camera position
+        const userPos = new THREE.Vector3(0, 0, 3);
+        const direction = userPos.clone().sub(headWorldPos).normalize();
+
+        // Smooth head rotation
+        const targetQuaternion = new THREE.Quaternion();
+        targetQuaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction);
+        headBoneRef.current.quaternion.slerp(targetQuaternion, 0.05);
       }
 
       renderer.render(scene, camera);
@@ -146,18 +169,19 @@ const Avatar3D: React.FC<Avatar3DProps> = ({
 
     const emotionTransforms = {
       neutral: { rotationX: 0, rotationY: 0, scale: 1 },
-      happy: { rotationX: 0.1, rotationY: 0, scale: 1.05 },
-      sad: { rotationX: -0.1, rotationY: 0, scale: 0.95 },
-      thinking: { rotationX: 0.05, rotationY: 0.2, scale: 1 },
-      excited: { rotationX: 0.15, rotationY: 0.1, scale: 1.1 },
-      confused: { rotationX: 0.1, rotationY: -0.1, scale: 1 },
+      happy: { rotationX: 0.05, rotationY: 0, scale: 1.02 },
+      sad: { rotationX: -0.08, rotationY: 0, scale: 0.98 },
+      thinking: { rotationX: 0.1, rotationY: 0, scale: 1 },
+      excited: { rotationX: 0.1, rotationY: 0, scale: 1.05 },
+      confused: { rotationX: 0.08, rotationY: 0, scale: 1 },
     };
 
     const transform = emotionTransforms[emotion];
     if (transform) {
-      modelRef.current.rotation.x = transform.rotationX;
-      modelRef.current.rotation.y = transform.rotationY;
-      modelRef.current.scale.set(transform.scale, transform.scale, transform.scale);
+      // Only rotate head, not entire body
+      if (headBoneRef.current) {
+        headBoneRef.current.rotation.x = transform.rotationX;
+      }
     }
   }, [emotion]);
 
