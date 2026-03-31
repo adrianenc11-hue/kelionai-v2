@@ -7,6 +7,8 @@ import { Card } from "@/components/ui/card";
 import { Loader2, Send, Plus, MessageSquare } from "lucide-react";
 import { Streamdown } from "streamdown";
 import { useRoute } from "wouter";
+import { VoiceRecorder, VoicePlayer } from "@/components/VoiceRecorder";
+import { Avatar3D } from "@/components/Avatar3D";
 
 interface Message {
   id: number;
@@ -25,6 +27,8 @@ export default function Chat() {
   const [inputValue, setInputValue] = useState("");
   const [selectedAI, setSelectedAI] = useState<"gpt-4" | "gemini" | "groq" | "claude" | "deepseek">("gpt-4");
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedAvatar, setSelectedAvatar] = useState<"kelion" | "kira">("kelion");
+  const [showAvatar, setShowAvatar] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const utils = trpc.useUtils();
@@ -122,6 +126,29 @@ export default function Chat() {
           New Chat
         </Button>
 
+        {/* Avatar Selection */}
+        <div className="mb-4 p-3 bg-purple-900/20 rounded-lg">
+          <p className="text-xs text-gray-400 mb-2">Avatar</p>
+          <div className="flex gap-2">
+            <Button
+              onClick={() => setSelectedAvatar("kelion")}
+              size="sm"
+              variant={selectedAvatar === "kelion" ? "default" : "outline"}
+              className="flex-1 text-xs"
+            >
+              Kelion
+            </Button>
+            <Button
+              onClick={() => setSelectedAvatar("kira")}
+              size="sm"
+              variant={selectedAvatar === "kira" ? "default" : "outline"}
+              className="flex-1 text-xs"
+            >
+              Kira
+            </Button>
+          </div>
+        </div>
+
         <div className="flex-1 overflow-y-auto space-y-2">
           {conversations?.map((conv) => (
             <a
@@ -144,8 +171,19 @@ export default function Chat() {
       <div className="flex-1 flex flex-col">
         {/* Header */}
         <div className="border-b border-border bg-card p-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold">KelionAI Chat</h1>
+          <div>
+            <h1 className="text-2xl font-bold">KelionAI Chat</h1>
+            <p className="text-xs text-gray-400">Chat with {selectedAI.toUpperCase()}</p>
+          </div>
           <div className="flex gap-2">
+            <Button
+              onClick={() => setShowAvatar(!showAvatar)}
+              variant="outline"
+              size="sm"
+              className="text-xs"
+            >
+              {showAvatar ? "Hide" : "Show"} Avatar
+            </Button>
             <select
               value={selectedAI}
               onChange={(e) => setSelectedAI(e.target.value as any)}
@@ -159,6 +197,13 @@ export default function Chat() {
             </select>
           </div>
         </div>
+
+        {/* Avatar Display */}
+        {showAvatar && (
+          <div className="border-b border-border bg-card p-4 flex justify-center">
+            <Avatar3D character={selectedAvatar} isAnimating={isLoading} emotion={isLoading ? "thinking" : "neutral"} />
+          </div>
+        )}
 
         {/* Messages Area */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -201,7 +246,7 @@ export default function Chat() {
         </div>
 
         {/* Input Area */}
-        <div className="border-t border-border bg-card p-4">
+        <div className="border-t border-border bg-card p-4 space-y-3">
           <div className="flex gap-2">
             <Input
               value={inputValue}
@@ -218,6 +263,15 @@ export default function Chat() {
             >
               {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
             </Button>
+          </div>
+          <div className="flex gap-2">
+            <VoiceRecorder
+              onRecordingComplete={(audioUrl) => {
+                console.log("Recording complete:", audioUrl);
+                // TODO: Implement voice transcription and sending
+              }}
+              isLoading={isLoading}
+            />
           </div>
         </div>
       </div>

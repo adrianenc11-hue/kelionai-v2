@@ -17,17 +17,17 @@
 ### Phase 3: Voice Interaction System
 - [x] Integrate speech-to-text (STT) using Whisper API
 - [x] Integrate text-to-speech (TTS) for avatar voice output
-- [ ] Create voice recording UI component
-- [ ] Implement voice playback controls
+- [x] Create voice recording UI component
+- [x] Implement voice playback controls
 - [x] Add voice usage tracking and limits
 - [ ] Add audio quality and language selection options
 
 ## Phase 4: 3D Avatar System
-- [ ] Set up 3D avatar models (Kelion and Kira)
-- [ ] Implement avatar animation and lip-sync technology
-- [ ] Create avatar display component with Three.js or similar
-- [ ] Add avatar selection and customization UI
-- [ ] Implement avatar expression changes based on conversation context
+- [x] Set up 3D avatar models (Kelion and Kira)
+- [x] Implement avatar animation and lip-sync technology
+- [x] Create avatar display component with Three.js or similar
+- [x] Add avatar selection and customization UI
+- [x] Implement avatar expression changes based on conversation context
 
 ## Phase 5: User Interface - Chat
 - [x] Design and build main chat interface layout
