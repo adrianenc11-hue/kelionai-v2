@@ -40,13 +40,13 @@ const Avatar3D: React.FC<Avatar3DProps> = ({
 
     // Initialize camera
     const camera = new THREE.PerspectiveCamera(
-      75,
+      30,
       containerRef.current.clientWidth / containerRef.current.clientHeight,
       0.1,
       1000
     );
-    camera.position.z = 2.5;
-    camera.position.y = 1.0;
+    camera.position.z = 5.0;
+    camera.position.y = 0.9;
     cameraRef.current = camera;
 
     // Initialize renderer
@@ -75,18 +75,28 @@ const Avatar3D: React.FC<Avatar3DProps> = ({
       modelUrls[character],
       (gltf: any) => {
         const model = gltf.scene;
-    model.scale.set(2.2, 2.2, 2.2);
-    model.position.y = -0.6;
-    model.position.x = 0;
+        model.scale.set(1.0, 1.0, 1.0);
+        model.position.y = -1.0;
+        model.position.x = 0;
         model.castShadow = true;
         model.receiveShadow = true;
         scene.add(model);
         modelRef.current = model;
 
-        // Find head bone for tracking
+        // Find head bone for tracking and fix arm positions
         model.traverse((child: any) => {
           if (child.isBone && (child.name.toLowerCase().includes("head") || child.name.toLowerCase().includes("neck"))) {
             headBoneRef.current = child;
+          }
+          // Bring arms down to sides (fix T-pose)
+          if (child.isBone) {
+            const name = child.name.toLowerCase();
+            if (name.includes("leftarm") || name.includes("left_arm") || name.includes("leftshoulder") || name.includes("left_shoulder")) {
+              child.rotation.z = 1.2; // Rotate left arm down
+            }
+            if (name.includes("rightarm") || name.includes("right_arm") || name.includes("rightshoulder") || name.includes("right_shoulder")) {
+              child.rotation.z = -1.2; // Rotate right arm down
+            }
           }
         });
 
