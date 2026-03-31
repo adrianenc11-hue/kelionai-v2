@@ -236,3 +236,14 @@
 - [ ] Test admin dashboard on kelionai.app
 - [ ] Test conversation history on kelionai.app
 - [ ] Test logout on kelionai.app
+
+## Critical Issues Reported by User (Latest)
+- [ ] Login not working properly on kelionai.app
+- [ ] New user registration not working on kelionai.app
+- [ ] Payments/subscriptions not working on kelionai.app
+- [ ] Subscription expiration not handled
+- [ ] Free plan expiration not handled
+- [ ] Avatar caseta too small / badly framed on homepage
+- [ ] Camera video should be hidden (not shown to user, only sent to AI)
+- [ ] Chat page should be single page without scroll
+- [ ] User adrianenc11@gmail.com needs to be admin (UPDATE failed - 0 rows)

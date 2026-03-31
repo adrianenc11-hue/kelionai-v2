@@ -58,8 +58,8 @@ export const subscriptionRouter = router({
               quantity: 1,
             },
           ],
-          success_url: `${process.env.VITE_FRONTEND_URL || "http://localhost:5173"}/subscription/success?session_id={CHECKOUT_SESSION_ID}`,
-          cancel_url: `${process.env.VITE_FRONTEND_URL || "http://localhost:5173"}/subscription/cancel`,
+          success_url: `${ctx.req.headers.origin || "https://kelionai.app"}/subscription/success?session_id={CHECKOUT_SESSION_ID}`,
+          cancel_url: `${ctx.req.headers.origin || "https://kelionai.app"}/subscription/cancel`,
           client_reference_id: ctx.user.id.toString(),
           metadata: {
             userId: ctx.user.id.toString(),

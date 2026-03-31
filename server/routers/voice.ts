@@ -101,7 +101,7 @@ export const voiceRouter = router({
         const db = await getDb();
         if (db) {
           const rows = await db.execute(
-            sql`SELECT voice_id FROM user_cloned_voices WHERE user_id = ${ctx.user.id} AND is_active = 1 LIMIT 1`
+            sql`SELECT voice_id FROM user_cloned_voices WHERE user_id = ${ctx.user.id} AND is_active = true LIMIT 1`
           );
           const result = rows as any;
           if (result?.[0]?.voice_id) {
@@ -162,13 +162,13 @@ export const voiceRouter = router({
       if (db) {
         // Deactivate previous cloned voices
         await db.execute(
-          sql`UPDATE user_cloned_voices SET is_active = 0 WHERE user_id = ${ctx.user.id}`
+          sql`UPDATE user_cloned_voices SET is_active = false WHERE user_id = ${ctx.user.id}`
         );
 
         // Insert new cloned voice
         await db.execute(
           sql`INSERT INTO user_cloned_voices (user_id, voice_id, voice_name, is_active, created_at)
-              VALUES (${ctx.user.id}, ${voiceId}, ${name}, 1, NOW())`
+              VALUES (${ctx.user.id}, ${voiceId}, ${name}, true, NOW())`
         );
       }
 
@@ -188,7 +188,7 @@ export const voiceRouter = router({
     if (!db) return { hasClonedVoice: false, voiceName: null, voiceId: null };
 
     const rows = await db.execute(
-      sql`SELECT voice_id, voice_name, created_at FROM user_cloned_voices WHERE user_id = ${ctx.user.id} AND is_active = 1 LIMIT 1`
+      sql`SELECT voice_id, voice_name, created_at FROM user_cloned_voices WHERE user_id = ${ctx.user.id} AND is_active = true LIMIT 1`
     );
     const result = rows as any;
     if (result?.[0]) {
@@ -210,7 +210,7 @@ export const voiceRouter = router({
     if (!db) throw new Error("Database not available");
 
     const rows = await db.execute(
-      sql`SELECT voice_id FROM user_cloned_voices WHERE user_id = ${ctx.user.id} AND is_active = 1`
+      sql`SELECT voice_id FROM user_cloned_voices WHERE user_id = ${ctx.user.id} AND is_active = true`
     );
     const result = rows as any;
     if (result?.[0]?.voice_id) {
@@ -218,7 +218,7 @@ export const voiceRouter = router({
       await deleteClonedVoice(result[0].voice_id);
       // Deactivate in DB
       await db.execute(
-        sql`UPDATE user_cloned_voices SET is_active = 0 WHERE user_id = ${ctx.user.id}`
+        sql`UPDATE user_cloned_voices SET is_active = false WHERE user_id = ${ctx.user.id}`
       );
     }
 
