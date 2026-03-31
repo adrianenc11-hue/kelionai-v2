@@ -96,14 +96,14 @@ const Avatar3D: React.FC<Avatar3DProps> = ({
     sceneRef.current = scene;
 
     const camera = new THREE.PerspectiveCamera(
-      24,
+      30,
       containerRef.current.clientWidth / containerRef.current.clientHeight,
       0.1,
       100
     );
-    // Bust view: camera positioned to show head + shoulders + chest only
-    camera.position.set(0, 1.55, 2.0);
-    camera.lookAt(0, 1.4, 0);
+    // Bust view: camera positioned to show head + shoulders + chest
+    camera.position.set(0, 1.5, 2.4);
+    camera.lookAt(0, 1.35, 0);
     cameraRef.current = camera;
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -147,8 +147,8 @@ const Avatar3D: React.FC<Avatar3DProps> = ({
         model.position.y = 0; // feet at y=0
         // No scaling needed - use natural RPM model size (~1.7m)
         // Camera targets chest/neck area - bust view
-        camera.position.set(0, 1.55, 2.0);
-        camera.lookAt(0, 1.4, 0);
+        camera.position.set(0, 1.5, 2.4);
+        camera.lookAt(0, 1.35, 0);
         camera.updateProjectionMatrix();
 
         model.castShadow = true;
