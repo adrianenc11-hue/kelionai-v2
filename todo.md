@@ -211,3 +211,6 @@
 - [x] Make app work independently on Railway with own DB
 - [ ] Single-screen homepage (no scroll) with back button (pending user feedback)
 - [x] Push standalone version to GitHub master
+
+## Railway Build Fix
+- [ ] Fix pnpm install --frozen-lockfile failure on Railway

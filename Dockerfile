@@ -1,5 +1,5 @@
 FROM node:22-slim AS base
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN npm install -g pnpm@10.4.1
 WORKDIR /app
 
 # Install dependencies
@@ -9,11 +9,11 @@ RUN pnpm install --frozen-lockfile
 # Copy source
 COPY . .
 
-# Build frontend
+# Build frontend + server
 RUN pnpm run build
 
 # Production
 ENV NODE_ENV=production
 EXPOSE 3000
 
-CMD ["node", "dist/server/index.js"]
+CMD ["node", "dist/index.js"]
