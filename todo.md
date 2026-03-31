@@ -112,3 +112,6 @@
 - [ ] Load testing and performance optimization
 - [ ] Final QA and bug fixes
 - [ ] Deploy to production
+
+## UI Fixes
+- [ ] Mouth control bar: hidden by default, appears on click on "Gură" button, controls avatar mouth opening

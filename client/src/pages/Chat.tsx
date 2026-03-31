@@ -31,6 +31,7 @@ export default function Chat() {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedAvatar, setSelectedAvatar] = useState<"kelion" | "kira">("kelion");
   const [voiceVolume, setVoiceVolume] = useState(60);
+  const [showMouthControl, setShowMouthControl] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const utils = trpc.useUtils();
@@ -235,40 +236,42 @@ export default function Chat() {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Voice Control Slider */}
-          <div className="border-t border-slate-800 px-6 py-4 bg-slate-950/50">
-            <div className="flex items-center gap-4 bg-slate-800/50 border border-slate-700 rounded-full px-4 py-3">
-              <div className="flex items-center gap-2">
-                <svg className="w-4 h-4 text-red-500" fill="currentColor" viewBox="0 0 24 24">
-                  <circle cx="12" cy="12" r="10" />
-                </svg>
-                <span className="text-sm text-slate-400">Gură</span>
+          {/* Mouth Control Slider - hidden by default, toggle on click */}
+          {showMouthControl && (
+            <div className="border-t border-slate-800 px-6 py-3 bg-slate-950/50">
+              <div className="flex items-center gap-4 bg-slate-800/50 border border-slate-700 rounded-full px-4 py-3">
+                <div className="flex items-center gap-2">
+                  <svg className="w-4 h-4 text-red-500" fill="currentColor" viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="10" />
+                  </svg>
+                  <span className="text-sm text-slate-400">Gură</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={voiceVolume}
+                  onChange={(e) => setVoiceVolume(parseInt(e.target.value))}
+                  className="flex-1 h-1 bg-slate-700 rounded-full appearance-none cursor-pointer"
+                />
+                <span className="text-sm font-medium text-slate-300 min-w-12">{voiceVolume}%</span>
+                <Button size="sm" variant="outline" className="px-3">
+                  Test
+                </Button>
+                <Button size="sm" className="px-3 bg-green-600 hover:bg-green-700">
+                  OK
+                </Button>
               </div>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                value={voiceVolume}
-                onChange={(e) => setVoiceVolume(parseInt(e.target.value))}
-                className="flex-1 h-1 bg-slate-700 rounded-full appearance-none cursor-pointer"
-              />
-              <span className="text-sm font-medium text-slate-300 min-w-12">{voiceVolume}%</span>
-              <Button size="sm" variant="outline" className="px-3">
-                Test
-              </Button>
-              <Button size="sm" className="px-3 bg-green-600 hover:bg-green-700">
-                OK
-              </Button>
             </div>
-          </div>
+          )}
 
-          {/* Input Area */}
-          <div className="border-t border-slate-800 px-6 py-4 bg-slate-950/50 space-y-3">
-            <div className="flex gap-2">
+          {/* Input Area - CAM, MIC, input, SEND all on one line */}
+          <div className="border-t border-slate-800 px-6 py-4 bg-slate-950/50">
+            <div className="flex items-center gap-2">
               <Button
                 variant="outline"
                 size="sm"
-                className="gap-2"
+                className="gap-1 shrink-0"
               >
                 <Video className="w-4 h-4" />
                 CAM
@@ -276,13 +279,22 @@ export default function Chat() {
               <Button
                 variant="outline"
                 size="sm"
-                className="gap-2"
+                className="gap-1 shrink-0"
               >
                 <Mic className="w-4 h-4" />
                 MIC
               </Button>
-            </div>
-            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1 shrink-0"
+                onClick={() => setShowMouthControl(!showMouthControl)}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11.5V14m0 0a3.5 3.5 0 007 0m-7 0h7M12 3c4.97 0 9 4.03 9 9s-4.03 9-9 9-9-4.03-9-9 4.03-9 9-9z" />
+                </svg>
+                Gură
+              </Button>
               <Input
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
@@ -294,7 +306,7 @@ export default function Chat() {
               <Button
                 onClick={handleSendMessage}
                 disabled={isLoading || !inputValue.trim() || !conversationId}
-                className="bg-blue-600 hover:bg-blue-700 gap-2"
+                className="bg-blue-600 hover:bg-blue-700 gap-1 shrink-0"
               >
                 <Send className="w-4 h-4" />
                 SEND
