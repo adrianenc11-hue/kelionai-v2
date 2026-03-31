@@ -6,6 +6,10 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
 import Chat from "./pages/Chat";
+import Pricing from "./pages/Pricing";
+import PaymentHistory from "./pages/PaymentHistory";
+import AdminDashboard from "./pages/AdminDashboard";
+import SubscriptionManagement from "./pages/SubscriptionManagement";
 
 function Router() {
   // make sure to consider if you need authentication for certain routes
@@ -14,6 +18,10 @@ function Router() {
       <Route path={"/"} component={Home} />
       <Route path={"/chat"} component={Chat} />
       <Route path={"/chat/:conversationId"} component={Chat} />
+      <Route path={"/pricing"} component={Pricing} />
+      <Route path={"/payments"} component={PaymentHistory} />
+      <Route path={"/admin"} component={AdminDashboard} />
+      <Route path={"/subscription"} component={SubscriptionManagement} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />

@@ -14,11 +14,12 @@
 - [ ] Add message streaming support for real-time responses
 - [x] Create error handling and fallback logic for AI providers
 
-## Phase 3: Voice Interaction System
-- [ ] Integrate speech-to-text (STT) using Whisper API
-- [ ] Integrate text-to-speech (TTS) for avatar voice output
-- [ ] Create audio recording and playback UI components
-- [ ] Implement voice input/output toggle and settings
+### Phase 3: Voice Interaction System
+- [x] Integrate speech-to-text (STT) using Whisper API
+- [x] Integrate text-to-speech (TTS) for avatar voice output
+- [ ] Create voice recording UI component
+- [ ] Implement voice playback controls
+- [x] Add voice usage tracking and limits
 - [ ] Add audio quality and language selection options
 
 ## Phase 4: 3D Avatar System
@@ -38,6 +39,13 @@
 - [ ] Add message editing and deletion functionality
 - [x] Create empty state and loading states
 
+## Phase 5b: Pricing & Payments UI
+- [x] Create pricing page with subscription tiers
+- [x] Build payment history and invoice display page
+- [x] Implement checkout flow UI
+- [x] Add subscription management UI
+- [x] Create subscription management page with upgrade/downgrade/cancel
+
 ## Phase 6: User Authentication & Profile
 - [ ] Build user registration and login pages
 - [ ] Implement user profile management page
@@ -47,7 +55,7 @@
 - [ ] Build protected routes for authenticated users
 
 ## Phase 7: Admin Dashboard
-- [ ] Create admin layout with sidebar navigation
+- [x] Create admin layout with sidebar navigation
 - [x] Build user management section (view, edit, delete users)
 - [x] Implement user analytics dashboard (active users, chat count, etc.)
 - [x] Create system monitoring page (API health, usage statistics)
@@ -55,8 +63,8 @@
 - [x] Implement admin-only access controls
 
 ## Phase 8: Subscription & Payments
-- [ ] Add Stripe integration and webhook handling
-- [ ] Create subscription plans display page
+- [x] Add Stripe integration and webhook handling
+- [x] Create subscription plans display page
 - [x] Build checkout flow with Stripe
 - [x] Implement subscription management (upgrade, downgrade, cancel)
 - [x] Create payment history and invoice display
@@ -79,7 +87,7 @@
 - [ ] Ensure avatar display works on mobile
 
 ## Phase 11: Security & Performance
-- [ ] Implement rate limiting on API endpoints
+- [x] Implement rate limiting on API endpoints (via subscription tiers)
 - [ ] Add Content Security Policy (CSP) headers
 - [ ] Implement input validation and sanitization
 - [ ] Add CORS configuration
