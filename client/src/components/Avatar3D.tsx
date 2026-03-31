@@ -45,8 +45,8 @@ const Avatar3D: React.FC<Avatar3DProps> = ({
       0.1,
       1000
     );
-    camera.position.z = 3;
-    camera.position.y = 0.5;
+    camera.position.z = 2.2;
+    camera.position.y = 0.8;
     cameraRef.current = camera;
 
     // Initialize renderer
@@ -75,8 +75,8 @@ const Avatar3D: React.FC<Avatar3DProps> = ({
       modelUrls[character],
       (gltf: any) => {
         const model = gltf.scene;
-        model.scale.set(1.5, 1.5, 1.5);
-        model.position.y = -0.3;
+        model.scale.set(2.2, 2.2, 2.2);
+        model.position.y = -0.5;
         model.castShadow = true;
         model.receiveShadow = true;
         scene.add(model);
