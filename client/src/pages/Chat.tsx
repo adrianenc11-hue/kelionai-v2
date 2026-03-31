@@ -9,6 +9,7 @@ import { Streamdown } from "streamdown";
 import { useRoute } from "wouter";
 import { VoiceRecorder, VoicePlayer } from "@/components/VoiceRecorder";
 import Avatar3D from "@/components/Avatar3D";
+import WebcamFeed from "@/components/WebcamFeed";
 
 interface Message {
   id: number;
@@ -29,6 +30,7 @@ export default function Chat() {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedAvatar, setSelectedAvatar] = useState<"kelion" | "kira">("kelion");
   const [showAvatar, setShowAvatar] = useState(true);
+  const [showCamera, setShowCamera] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const utils = trpc.useUtils();
@@ -184,6 +186,14 @@ export default function Chat() {
             >
               {showAvatar ? "Hide" : "Show"} Avatar
             </Button>
+            <Button
+              onClick={() => setShowCamera(!showCamera)}
+              variant="outline"
+              size="sm"
+              className="text-xs"
+            >
+              {showCamera ? "Hide" : "Show"} Camera
+            </Button>
             <select
               value={selectedAI}
               onChange={(e) => setSelectedAI(e.target.value as any)}
@@ -198,12 +208,21 @@ export default function Chat() {
           </div>
         </div>
 
-        {/* Avatar Display */}
-        {showAvatar && (
-          <div className="border-b border-border bg-card p-4 flex justify-center">
-            <Avatar3D character={selectedAvatar} isAnimating={isLoading} emotion={isLoading ? "thinking" : "neutral"} />
-          </div>
-        )}
+        {/* Avatar and Camera Display */}
+        <div className="border-b border-border bg-card p-4 grid grid-cols-2 gap-4">
+          {showAvatar && (
+            <div>
+              <Avatar3D character={selectedAvatar} isAnimating={isLoading} emotion={isLoading ? "thinking" : "neutral"} />
+            </div>
+          )}
+          {showCamera && (
+            <div>
+              <WebcamFeed onFrameCapture={(canvas) => {
+                // TODO: Send frame to vision system for analysis
+              }} />
+            </div>
+          )}
+        </div>
 
         {/* Messages Area */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
