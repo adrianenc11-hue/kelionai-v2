@@ -114,7 +114,7 @@
 - [ ] Deploy to production
 
 ## UI Fixes
-- [ ] Mouth control bar: hidden by default, appears on click on "Gură" button, controls avatar mouth opening
+- [x] Mouth control bar: hidden by default, appears on click on Settings button, controls avatar mouth opening
 
 ## Bug Fixes - Laptop/Desktop
 - [x] Fix app not working when downloaded - ensure it works as web app in browser
@@ -175,8 +175,8 @@
 
 ## Implementation Gaps to Address
 - [x] Add auth-guarded route wrapper for /chat, /profile, /admin (redirect if not logged in)
-- [ ] Verify Chat + Avatar on mobile breakpoints
-- [ ] Add contact page with AI auto-response bot (DONE - /contact route)
+- [x] Verify Chat + Avatar on mobile breakpoints (responsive sidebar, mobile menu)
+- [x] Add contact page with AI auto-response bot (/contact route)
 - [x] Home page with live avatars (Kelion/Kira switching)
 - [x] Contact page with AI auto-response (/contact)
 - [x] Profile page with account info (/profile)

@@ -1,10 +1,10 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { Loader2, Send, Plus, MessageSquare, Video, Mic, MicOff, Volume2 } from "lucide-react";
+import { Loader2, Send, Plus, MessageSquare, Mic, MicOff, Volume2, VolumeX, Settings, Menu, X, Home, User, Phone } from "lucide-react";
 import { Streamdown } from "streamdown";
 import { useRoute, useLocation } from "wouter";
 import Avatar3D from "@/components/Avatar3D";
@@ -43,19 +43,22 @@ export default function Chat() {
   const [activeConversationId, setActiveConversationId] = useState<number | null>(conversationId);
   const [voiceCloning, setVoiceCloning] = useState<VoiceCloningState>({ active: false, step: 0, recording: false, audioChunks: [] });
   const [autoPlayAudio, setAutoPlayAudio] = useState(true);
+  const [mouthOpen, setMouthOpen] = useState(0);
+  const [showMouthControl, setShowMouthControl] = useState(false);
+  const [mobileSidebar, setMobileSidebar] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
 
   const utils = trpc.useUtils();
   const { data: conversations } = trpc.chat.listConversations.useQuery();
+  const conversationIdForQuery = useMemo(() => activeConversationId || 0, [activeConversationId]);
   const { data: conversationData } = trpc.chat.getConversation.useQuery(
-    { conversationId: activeConversationId || 0 },
+    { conversationId: conversationIdForQuery },
     { enabled: !!activeConversationId }
   );
 
   const sendMessageMutation = trpc.chat.sendMessage.useMutation({
     onSuccess: (data) => {
-      // Update active conversation if auto-created
       if (data.conversationId && !activeConversationId) {
         setActiveConversationId(data.conversationId);
         navigate(`/chat/${data.conversationId}`);
@@ -126,6 +129,36 @@ export default function Chat() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // Animate mouth when audio is playing
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    let animFrame: number;
+    const animateMouth = () => {
+      if (audio.paused || audio.ended) {
+        setMouthOpen(0);
+        return;
+      }
+      // Simple sine-wave mouth animation synced to time
+      const t = audio.currentTime * 8;
+      const val = Math.abs(Math.sin(t)) * 0.6 + Math.random() * 0.15;
+      setMouthOpen(Math.min(1, val));
+      animFrame = requestAnimationFrame(animateMouth);
+    };
+    const onPlay = () => { animateMouth(); };
+    const onPause = () => { setMouthOpen(0); cancelAnimationFrame(animFrame); };
+    const onEnd = () => { setMouthOpen(0); cancelAnimationFrame(animFrame); };
+    audio.addEventListener("play", onPlay);
+    audio.addEventListener("pause", onPause);
+    audio.addEventListener("ended", onEnd);
+    return () => {
+      audio.removeEventListener("play", onPlay);
+      audio.removeEventListener("pause", onPause);
+      audio.removeEventListener("ended", onEnd);
+      cancelAnimationFrame(animFrame);
+    };
+  }, []);
+
   const handleSendMessage = async () => {
     if (!inputValue.trim() || isLoading) return;
 
@@ -142,9 +175,10 @@ export default function Chat() {
     const msgText = inputValue;
     setInputValue("");
 
-    // Simulate progress steps
-    setTimeout(() => setLoadingStep("Analyzing your message..."), 800);
-    setTimeout(() => setLoadingStep("Processing with Brain v4..."), 2000);
+    // Progress steps
+    setTimeout(() => { if (isLoading) setLoadingStep("Analyzing your message..."); }, 800);
+    setTimeout(() => { if (isLoading) setLoadingStep("Processing with Brain v4..."); }, 2000);
+    setTimeout(() => { if (isLoading) setLoadingStep("Generating response..."); }, 4000);
 
     await sendMessageMutation.mutateAsync({
       conversationId: activeConversationId || undefined,
@@ -156,6 +190,7 @@ export default function Chat() {
   const handleNewConversation = () => {
     setActiveConversationId(null);
     setMessages([]);
+    setMobileSidebar(false);
     navigate("/chat");
   };
 
@@ -172,8 +207,6 @@ export default function Chat() {
         reader.onloadend = async () => {
           const base64 = (reader.result as string).split(",")[1];
           setVoiceCloning((prev) => ({ ...prev, step: 3, recording: false }));
-
-          // Process cloning
           try {
             const result = await voiceCloningMutation.mutateAsync({ step: 4, audioBase64: base64 });
             setVoiceCloning((prev) => ({
@@ -189,7 +222,7 @@ export default function Chat() {
                 createdAt: new Date(),
               }]);
             }
-          } catch (err) {
+          } catch {
             setMessages((prev) => [...prev, {
               id: Date.now(),
               role: "assistant",
@@ -257,45 +290,89 @@ export default function Chat() {
       <audio ref={audioRef} className="hidden" />
 
       {/* Header */}
-      <header className="border-b border-slate-800 bg-slate-950/80 backdrop-blur px-4 md:px-6 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <h1 className="text-xl md:text-2xl font-bold text-blue-400">KelionAI</h1>
-          <span className="text-xs text-slate-500">v4.0</span>
-          <div className="flex items-center gap-1.5 ml-2">
+      <header className="border-b border-slate-800 bg-slate-950/80 backdrop-blur px-3 md:px-6 py-2.5 flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-2 md:gap-3">
+          {/* Mobile menu button */}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="md:hidden text-slate-400 p-1"
+            onClick={() => setMobileSidebar(!mobileSidebar)}
+            aria-label="Toggle conversations menu"
+          >
+            <Menu className="w-5 h-5" />
+          </Button>
+          <h1 className="text-lg md:text-2xl font-bold text-blue-400">KelionAI</h1>
+          <span className="text-xs text-slate-500 hidden sm:inline">v4.0</span>
+          <div className="flex items-center gap-1.5 ml-1">
             <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" aria-hidden="true" />
-            <span className="text-xs text-slate-400">Online</span>
+            <span className="text-xs text-slate-400 hidden sm:inline">Online</span>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 md:gap-2">
+          {/* Navigation links */}
+          <Button variant="ghost" size="sm" onClick={() => navigate("/")} className="text-slate-400 hover:text-white p-1.5" aria-label="Home">
+            <Home className="w-4 h-4" />
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => navigate("/profile")} className="text-slate-400 hover:text-white p-1.5" aria-label="Profile">
+            <User className="w-4 h-4" />
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => navigate("/contact")} className="text-slate-400 hover:text-white p-1.5" aria-label="Contact">
+            <Phone className="w-4 h-4" />
+          </Button>
           <Button
             variant="ghost"
             size="sm"
             onClick={() => setAutoPlayAudio(!autoPlayAudio)}
-            className={autoPlayAudio ? "text-blue-400" : "text-slate-500"}
+            className={`p-1.5 ${autoPlayAudio ? "text-blue-400" : "text-slate-500"}`}
             aria-label={autoPlayAudio ? "Disable auto-play audio" : "Enable auto-play audio"}
           >
-            <Volume2 className="w-4 h-4" />
+            {autoPlayAudio ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
           </Button>
-          <Button onClick={handleLogout} variant="ghost" size="sm" className="text-slate-400 hover:text-white">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowMouthControl(!showMouthControl)}
+            className={`p-1.5 ${showMouthControl ? "text-purple-400" : "text-slate-500"}`}
+            aria-label="Toggle mouth control"
+          >
+            <Settings className="w-4 h-4" />
+          </Button>
+          <Button onClick={handleLogout} variant="ghost" size="sm" className="text-slate-400 hover:text-white text-xs md:text-sm">
             Logout
           </Button>
         </div>
       </header>
 
       {/* Main Content */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden relative">
+        {/* Mobile Sidebar Overlay */}
+        {mobileSidebar && (
+          <div className="fixed inset-0 bg-black/60 z-40 md:hidden" onClick={() => setMobileSidebar(false)} />
+        )}
+
         {/* Sidebar - Conversations */}
-        <aside className="w-64 bg-slate-950 border-r border-slate-800 flex flex-col hidden md:flex" aria-label="Conversations">
-          <div className="p-3">
-            <Button onClick={handleNewConversation} className="w-full bg-blue-600 hover:bg-blue-700 gap-2" size="sm">
+        <aside
+          className={`${
+            mobileSidebar ? "fixed inset-y-0 left-0 z-50 w-72" : "hidden md:flex w-56 lg:w-64"
+          } bg-slate-950 border-r border-slate-800 flex flex-col`}
+          aria-label="Conversations"
+        >
+          <div className="p-3 flex items-center gap-2">
+            <Button onClick={handleNewConversation} className="flex-1 bg-blue-600 hover:bg-blue-700 gap-2 text-sm">
               <Plus className="w-4 h-4" /> New Chat
             </Button>
+            {mobileSidebar && (
+              <Button variant="ghost" size="sm" onClick={() => setMobileSidebar(false)} className="text-slate-400 md:hidden p-1">
+                <X className="w-5 h-5" />
+              </Button>
+            )}
           </div>
           <nav className="flex-1 overflow-y-auto px-2 space-y-1" aria-label="Chat history">
             {conversations?.map((conv) => (
               <button
                 key={conv.id}
-                onClick={() => { setActiveConversationId(conv.id); navigate(`/chat/${conv.id}`); }}
+                onClick={() => { setActiveConversationId(conv.id); navigate(`/chat/${conv.id}`); setMobileSidebar(false); }}
                 className={`w-full text-left px-3 py-2.5 rounded-lg text-sm transition-colors flex items-center gap-2 ${
                   activeConversationId === conv.id
                     ? "bg-blue-600/20 text-blue-400 border border-blue-500/30"
@@ -314,15 +391,35 @@ export default function Chat() {
         </aside>
 
         {/* Chat Area */}
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col min-w-0">
+          {/* Avatar selector - top of chat */}
+          <div className="flex items-center justify-center gap-3 px-4 py-2 border-b border-slate-800/50">
+            <Button
+              onClick={() => setSelectedAvatar("kelion")}
+              variant={selectedAvatar === "kelion" ? "default" : "outline"}
+              size="sm"
+              className={selectedAvatar === "kelion" ? "bg-blue-600" : "border-slate-700 text-slate-400"}
+            >
+              Kelion
+            </Button>
+            <Button
+              onClick={() => setSelectedAvatar("kira")}
+              variant={selectedAvatar === "kira" ? "default" : "outline"}
+              size="sm"
+              className={selectedAvatar === "kira" ? "bg-pink-600" : "border-slate-700 text-slate-400"}
+            >
+              Kira
+            </Button>
+          </div>
+
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4" role="log" aria-label="Chat messages" aria-live="polite">
+          <div className="flex-1 overflow-y-auto p-3 md:p-6 space-y-3 md:space-y-4" role="log" aria-label="Chat messages" aria-live="polite">
             {messages.length === 0 ? (
               <div className="h-full flex items-center justify-center">
-                <div className="text-center max-w-md">
-                  <div className="text-6xl mb-4" aria-hidden="true">💬</div>
-                  <h2 className="text-xl font-semibold text-slate-300 mb-3">Welcome to KelionAI</h2>
-                  <p className="text-slate-500 mb-6 text-base">I can help you with anything. Just type or speak!</p>
+                <div className="text-center max-w-md px-4">
+                  <div className="text-5xl md:text-6xl mb-4" aria-hidden="true">💬</div>
+                  <h2 className="text-lg md:text-xl font-semibold text-slate-300 mb-3">Welcome to KelionAI</h2>
+                  <p className="text-slate-500 mb-6 text-sm md:text-base">I can help you with anything. Just type or speak!</p>
                   <div className="grid grid-cols-2 gap-2">
                     {["What's the weather?", "Teach me something", "Write Python code", "Clone my voice"].map((suggestion) => (
                       <Button
@@ -341,16 +438,16 @@ export default function Chat() {
             ) : (
               messages.map((msg) => (
                 <div key={msg.id} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                  <div className={`max-w-[80%] lg:max-w-[60%] ${msg.role === "user" ? "" : ""}`}>
+                  <div className={`max-w-[90%] md:max-w-[80%] lg:max-w-[60%]`}>
                     <Card
-                      className={`p-4 ${
+                      className={`p-3 md:p-4 ${
                         msg.role === "user"
                           ? "bg-blue-600 text-white border-0"
                           : "bg-slate-800/80 text-slate-100 border-slate-700/50"
                       }`}
                     >
                       {msg.role === "assistant" && (
-                        <div className="flex items-center gap-2 mb-2">
+                        <div className="flex items-center gap-2 mb-2 flex-wrap">
                           <span className="text-xs text-slate-500">{selectedAvatar === "kelion" ? "Kelion" : "Kira"}</span>
                           <ConfidenceBadge level={msg.confidence} />
                           {msg.toolsUsed && msg.toolsUsed.length > 0 && (
@@ -381,7 +478,7 @@ export default function Chat() {
             {/* Working indicator - hourglass */}
             {isLoading && (
               <div className="flex justify-start" role="status" aria-label="AI is working">
-                <Card className="bg-slate-800/80 border-slate-700/50 p-4">
+                <Card className="bg-slate-800/80 border-slate-700/50 p-3 md:p-4">
                   <div className="flex items-center gap-3">
                     <div className="relative">
                       <Loader2 className="w-5 h-5 animate-spin text-blue-400" />
@@ -398,14 +495,14 @@ export default function Chat() {
             {/* Voice Cloning UI */}
             {voiceCloning.active && (
               <div className="flex justify-start">
-                <Card className="bg-gradient-to-br from-purple-900/30 to-blue-900/30 border-purple-500/30 p-5 max-w-lg">
-                  <h3 className="text-lg font-bold text-purple-400 mb-2">
+                <Card className="bg-gradient-to-br from-purple-900/30 to-blue-900/30 border-purple-500/30 p-4 md:p-5 max-w-lg">
+                  <h3 className="text-base md:text-lg font-bold text-purple-400 mb-2">
                     🎙️ Voice Cloning - Step {voiceCloning.step}/5
                   </h3>
                   {voiceCloning.step === 1 && (
                     <div>
                       <p className="text-sm text-slate-300 mb-3">Read the text below out loud in a quiet place:</p>
-                      <div className="bg-slate-800 rounded-lg p-4 mb-3 text-sm text-slate-200 leading-relaxed border border-slate-700">
+                      <div className="bg-slate-800 rounded-lg p-3 md:p-4 mb-3 text-sm text-slate-200 leading-relaxed border border-slate-700">
                         {voiceCloning.sampleText}
                       </div>
                       <Button onClick={() => { setVoiceCloning((prev) => ({ ...prev, step: 2 })); }} className="bg-purple-600 hover:bg-purple-700">
@@ -444,7 +541,7 @@ export default function Chat() {
                         <Button onClick={() => { setVoiceCloning((prev) => ({ ...prev, step: 5 })); }} className="bg-green-600 hover:bg-green-700">
                           Save Voice
                         </Button>
-                        <Button onClick={() => { setVoiceCloning({ active: false, step: 0, recording: false, audioChunks: [] }); }} variant="outline">
+                        <Button onClick={() => { setVoiceCloning({ active: false, step: 0, recording: false, audioChunks: [] }); }} variant="outline" className="border-slate-600 text-slate-400">
                           Cancel
                         </Button>
                       </div>
@@ -453,7 +550,7 @@ export default function Chat() {
                   {voiceCloning.step === 5 && (
                     <div>
                       <p className="text-sm text-green-400">✅ Voice saved! The AI will now respond using your voice.</p>
-                      <Button onClick={() => { setVoiceCloning({ active: false, step: 0, recording: false, audioChunks: [] }); }} variant="outline" size="sm" className="mt-2">
+                      <Button onClick={() => { setVoiceCloning({ active: false, step: 0, recording: false, audioChunks: [] }); }} variant="outline" size="sm" className="mt-2 border-slate-600 text-slate-400">
                         Close
                       </Button>
                     </div>
@@ -466,7 +563,7 @@ export default function Chat() {
           </div>
 
           {/* Input Area */}
-          <div className="border-t border-slate-800 px-4 md:px-6 py-3 bg-slate-950/80 backdrop-blur">
+          <div className="border-t border-slate-800 px-3 md:px-6 py-2.5 bg-slate-950/80 backdrop-blur shrink-0">
             <div className="flex items-center gap-2 max-w-4xl mx-auto">
               <Input
                 value={inputValue}
@@ -474,7 +571,7 @@ export default function Chat() {
                 onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSendMessage()}
                 placeholder="Type your message... (or say 'clone my voice')"
                 disabled={isLoading}
-                className="flex-1 bg-slate-800 border-slate-700 text-white placeholder:text-slate-500 text-base py-5"
+                className="flex-1 bg-slate-800 border-slate-700 text-white placeholder:text-slate-500 text-sm md:text-base py-5"
                 aria-label="Message input"
               />
               <Button
@@ -490,28 +587,31 @@ export default function Chat() {
         </div>
 
         {/* Right Side - Avatar */}
-        <aside className="w-72 lg:w-80 bg-gradient-to-b from-slate-900 via-slate-950 to-slate-900 border-l border-slate-800 flex-col items-center hidden lg:flex" aria-label="AI Avatar">
-          <div className="absolute top-16 left-0 right-0 flex items-center justify-center gap-3 px-4 z-10 py-3">
-            <Button
-              onClick={() => setSelectedAvatar("kelion")}
-              variant={selectedAvatar === "kelion" ? "default" : "outline"}
-              size="sm"
-              className={selectedAvatar === "kelion" ? "bg-blue-600" : ""}
-            >
-              Kelion
-            </Button>
-            <Button
-              onClick={() => setSelectedAvatar("kira")}
-              variant={selectedAvatar === "kira" ? "default" : "outline"}
-              size="sm"
-              className={selectedAvatar === "kira" ? "bg-pink-600" : ""}
-            >
-              Kira
-            </Button>
+        <aside className="w-64 lg:w-80 bg-gradient-to-b from-slate-900 via-slate-950 to-slate-900 border-l border-slate-800 flex-col items-center hidden lg:flex" aria-label="AI Avatar">
+          <div className="w-full h-full relative">
+            <Avatar3D
+              character={selectedAvatar}
+              isAnimating={isLoading}
+              emotion={isLoading ? "thinking" : "neutral"}
+              mouthOpen={mouthOpen}
+            />
           </div>
-          <div className="w-full h-full relative mt-12">
-            <Avatar3D character={selectedAvatar} isAnimating={isLoading} emotion={isLoading ? "thinking" : "neutral"} />
-          </div>
+          {/* Mouth Control Slider */}
+          {showMouthControl && (
+            <div className="absolute bottom-4 left-4 right-4 bg-slate-900/90 backdrop-blur rounded-lg p-3 border border-slate-700">
+              <label className="text-xs text-slate-400 block mb-1">Mouth Control</label>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={Math.round(mouthOpen * 100)}
+                onChange={(e) => setMouthOpen(parseInt(e.target.value) / 100)}
+                className="w-full accent-purple-500"
+                aria-label="Mouth open amount"
+              />
+              <p className="text-xs text-slate-500 mt-1 text-center">{Math.round(mouthOpen * 100)}%</p>
+            </div>
+          )}
         </aside>
       </div>
     </div>

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
@@ -6,6 +6,7 @@ interface Avatar3DProps {
   character: "kelion" | "kira";
   emotion?: "neutral" | "happy" | "sad" | "thinking" | "excited" | "confused";
   isAnimating?: boolean;
+  mouthOpen?: number; // 0-1 range for mouth control
   onReady?: () => void;
 }
 
@@ -13,6 +14,7 @@ const Avatar3D: React.FC<Avatar3DProps> = ({
   character,
   emotion = "neutral",
   isAnimating = false,
+  mouthOpen = 0,
   onReady,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -22,9 +24,11 @@ const Avatar3D: React.FC<Avatar3DProps> = ({
   const modelRef = useRef<THREE.Group | null>(null);
   const mixerRef = useRef<THREE.AnimationMixer | null>(null);
   const headBoneRef = useRef<THREE.Bone | null>(null);
+  const meshesWithMorphRef = useRef<THREE.Mesh[]>([]);
+  const mouthOpenRef = useRef(0);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Arm bone refs and rest quaternions (from original avatar.js)
+  // Arm bone refs and rest quaternions
   const armBonesRef = useRef<{
     leftArm: THREE.Bone | null;
     rightArm: THREE.Bone | null;
@@ -34,11 +38,55 @@ const Avatar3D: React.FC<Avatar3DProps> = ({
   const armRestLeftRef = useRef<THREE.Quaternion | null>(null);
   const armRestRightRef = useRef<THREE.Quaternion | null>(null);
 
+  // Keep mouthOpen ref in sync
+  useEffect(() => {
+    mouthOpenRef.current = mouthOpen;
+  }, [mouthOpen]);
+
   const modelUrls: Record<string, string> = {
-    kelion:
-      "https://d2xsxph8kpxj0f.cloudfront.net/310519663494239902/fTDgTXExTnteU8v7gTpoiu/kelion-rpm_e27cb94d.glb",
+    kelion: "https://d2xsxph8kpxj0f.cloudfront.net/310519663494239902/fTDgTXExTnteU8v7gTpoiu/kelion-rpm_e27cb94d.glb",
     kira: "https://d2xsxph8kpxj0f.cloudfront.net/310519663494239902/fTDgTXExTnteU8v7gTpoiu/kira-rpm_54d82b66.glb",
   };
+
+  // Apply relaxed pose
+  const applyRelaxedPose = useCallback(() => {
+    const { leftArm, rightArm } = armBonesRef.current;
+    const restLeft = armRestLeftRef.current;
+    const restRight = armRestRightRef.current;
+
+    if (!leftArm || !rightArm || !restLeft || !restRight) return;
+
+    const armLX = 27, armLY = -9, armLZ = -4;
+    const armRX = 27, armRY = -9, armRZ = -4;
+
+    const rxL = (armLX * Math.PI) / 180;
+    const ryL = (armLY * Math.PI) / 180;
+    const rzL = (armLZ * Math.PI) / 180;
+    const deltaL = new THREE.Quaternion().setFromEuler(new THREE.Euler(rxL, -ryL, -rzL, "XYZ"));
+    leftArm.quaternion.copy(restLeft).multiply(deltaL);
+
+    const rxR = (armRX * Math.PI) / 180;
+    const ryR = (armRY * Math.PI) / 180;
+    const rzR = (armRZ * Math.PI) / 180;
+    const deltaR = new THREE.Quaternion().setFromEuler(new THREE.Euler(rxR, ryR, rzR, "XYZ"));
+    rightArm.quaternion.copy(restRight).multiply(deltaR);
+  }, []);
+
+  // Apply mouth morph targets
+  const applyMouthMorph = useCallback(() => {
+    const val = mouthOpenRef.current;
+    for (const mesh of meshesWithMorphRef.current) {
+      if (!mesh.morphTargetDictionary || !mesh.morphTargetInfluences) continue;
+      // Try common morph target names for jaw/mouth open
+      const jawNames = ["jawOpen", "mouthOpen", "jaw_open", "viseme_aa", "viseme_O", "A"];
+      for (const name of jawNames) {
+        const idx = mesh.morphTargetDictionary[name];
+        if (idx !== undefined) {
+          mesh.morphTargetInfluences[idx] = val;
+        }
+      }
+    }
+  }, []);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -47,7 +95,6 @@ const Avatar3D: React.FC<Avatar3DProps> = ({
     scene.background = new THREE.Color(0x1a1a2e);
     sceneRef.current = scene;
 
-    // Camera settings from original: FOV 24, position (0, 0, 2.8)
     const camera = new THREE.PerspectiveCamera(
       24,
       containerRef.current.clientWidth / containerRef.current.clientHeight,
@@ -66,21 +113,17 @@ const Avatar3D: React.FC<Avatar3DProps> = ({
     containerRef.current.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
-    // Premium studio lighting (from original)
+    // Premium studio lighting
     scene.add(new THREE.AmbientLight(0x404060, 0.4));
-
     const keyLight = new THREE.DirectionalLight(0xffffff, 1.25);
     keyLight.position.set(2, 3, 4);
     scene.add(keyLight);
-
     const fillLight = new THREE.DirectionalLight(0x8888ff, 0.5);
     fillLight.position.set(-2, 1, 2);
     scene.add(fillLight);
-
     const rimLight = new THREE.DirectionalLight(0x00ccff, 0.8);
     rimLight.position.set(0, 2, -3);
     scene.add(rimLight);
-
     const bottomLight = new THREE.DirectionalLight(0x8855ff, 0.3);
     bottomLight.position.set(0, -2, 1);
     scene.add(bottomLight);
@@ -92,14 +135,12 @@ const Avatar3D: React.FC<Avatar3DProps> = ({
       (gltf: any) => {
         const model = gltf.scene;
 
-        // From original: center model and scale to 1.2/maxDim
         const box = new THREE.Box3().setFromObject(model);
         const center = box.getCenter(new THREE.Vector3());
         const size = box.getSize(new THREE.Vector3());
         model.position.sub(center);
         const maxDim = Math.max(size.x, size.y, size.z);
         if (maxDim > 0) model.scale.setScalar(1.2 / maxDim);
-        // Override Y with user-calibrated value from original
         model.position.y = -0.6;
 
         model.castShadow = true;
@@ -107,21 +148,24 @@ const Avatar3D: React.FC<Avatar3DProps> = ({
         scene.add(model);
         modelRef.current = model;
 
-        // Find bones (from original findArmBones + _findEyeAndSpineBones)
+        // Find bones
         const allBones: THREE.Bone[] = [];
+        const morphMeshes: THREE.Mesh[] = [];
         model.traverse((child: any) => {
           if (child.isBone) allBones.push(child);
+          if (child.isMesh && child.morphTargetDictionary && child.morphTargetInfluences) {
+            morphMeshes.push(child);
+          }
         });
+        meshesWithMorphRef.current = morphMeshes;
 
         function findBone(patterns: string[]): THREE.Bone | null {
-          // Exact match first
           for (const p of patterns) {
             for (const b of allBones) {
               if (b.name === p) return b;
             }
           }
-          // Case-insensitive fallback
-          const lowerPatterns = patterns.map(p => p.toLowerCase());
+          const lowerPatterns = patterns.map((p) => p.toLowerCase());
           for (const lp of lowerPatterns) {
             for (const b of allBones) {
               if (b.name.toLowerCase() === lp) return b;
@@ -130,10 +174,8 @@ const Avatar3D: React.FC<Avatar3DProps> = ({
           return null;
         }
 
-        // Head bone
         headBoneRef.current = findBone(["Head", "head"]);
 
-        // Arm bones
         const leftArm = findBone(["LeftArm", "LeftArm1", "Left_Arm", "upperarm_l", "upper_arm.L"]);
         const rightArm = findBone(["RightArm", "RightArm1", "Right_Arm", "upperarm_r", "upper_arm.R"]);
         const leftForeArm = findBone(["LeftForeArm", "LeftForeArm1", "Left_ForeArm", "lowerarm_l", "forearm.L"]);
@@ -141,15 +183,11 @@ const Avatar3D: React.FC<Avatar3DProps> = ({
 
         armBonesRef.current = { leftArm, rightArm, leftForeArm, rightForeArm };
 
-        // Capture rest-pose quaternions ONCE (before applying pose)
         if (leftArm) armRestLeftRef.current = leftArm.quaternion.clone();
         if (rightArm) armRestRightRef.current = rightArm.quaternion.clone();
 
-        // Apply relaxed arm pose (from original: _armL = {x:27, y:-9, z:-4})
-        // This rotates arms from A-pose down to natural hanging position
         applyRelaxedPose();
 
-        // Setup animations
         if (gltf.animations.length > 0) {
           const mixer = new THREE.AnimationMixer(model);
           mixerRef.current = mixer;
@@ -170,18 +208,13 @@ const Avatar3D: React.FC<Avatar3DProps> = ({
 
     // Animation loop
     const clock = new THREE.Clock();
+    let animFrameId: number;
     const animate = () => {
-      requestAnimationFrame(animate);
-
+      animFrameId = requestAnimationFrame(animate);
       const delta = clock.getDelta();
-
-      if (mixerRef.current) {
-        mixerRef.current.update(delta);
-      }
-
-      // Re-enforce arm pose every frame (animations may override it)
+      if (mixerRef.current) mixerRef.current.update(delta);
       applyRelaxedPose();
-
+      applyMouthMorph();
       renderer.render(scene, camera);
     };
     animate();
@@ -199,39 +232,13 @@ const Avatar3D: React.FC<Avatar3DProps> = ({
 
     return () => {
       window.removeEventListener("resize", handleResize);
+      cancelAnimationFrame(animFrameId);
       if (containerRef.current && renderer.domElement.parentElement === containerRef.current) {
         containerRef.current.removeChild(renderer.domElement);
       }
       renderer.dispose();
     };
-  }, [character, onReady]);
-
-  // Apply relaxed pose from original code: _armL = {x:27, y:-9, z:-4}
-  function applyRelaxedPose() {
-    const { leftArm, rightArm } = armBonesRef.current;
-    const restLeft = armRestLeftRef.current;
-    const restRight = armRestRightRef.current;
-
-    if (!leftArm || !rightArm || !restLeft || !restRight) return;
-
-    // Original values: _armL = { x: 27, y: -9, z: -4 }
-    const armLX = 27, armLY = -9, armLZ = -4;
-    const armRX = 27, armRY = -9, armRZ = -4;
-
-    // Left arm (from original _enforcePose)
-    const rxL = (armLX * Math.PI) / 180;
-    const ryL = (armLY * Math.PI) / 180;
-    const rzL = (armLZ * Math.PI) / 180;
-    const deltaL = new THREE.Quaternion().setFromEuler(new THREE.Euler(rxL, -ryL, -rzL, "XYZ"));
-    leftArm.quaternion.copy(restLeft).multiply(deltaL);
-
-    // Right arm (from original _enforcePose)
-    const rxR = (armRX * Math.PI) / 180;
-    const ryR = (armRY * Math.PI) / 180;
-    const rzR = (armRZ * Math.PI) / 180;
-    const deltaR = new THREE.Quaternion().setFromEuler(new THREE.Euler(rxR, ryR, rzR, "XYZ"));
-    rightArm.quaternion.copy(restRight).multiply(deltaR);
-  }
+  }, [character, onReady, applyRelaxedPose, applyMouthMorph]);
 
   // Apply emotion-based transformations
   useEffect(() => {
