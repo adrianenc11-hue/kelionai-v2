@@ -45,8 +45,8 @@ const Avatar3D: React.FC<Avatar3DProps> = ({
       0.1,
       1000
     );
-    camera.position.z = 2.2;
-    camera.position.y = 0.8;
+    camera.position.z = 2.5;
+    camera.position.y = 1.0;
     cameraRef.current = camera;
 
     // Initialize renderer
@@ -75,17 +75,22 @@ const Avatar3D: React.FC<Avatar3DProps> = ({
       modelUrls[character],
       (gltf: any) => {
         const model = gltf.scene;
-        model.scale.set(2.2, 2.2, 2.2);
-        model.position.y = -0.5;
+        model.scale.set(2.0, 2.0, 2.0);
+        model.position.y = -0.8;
+        model.position.x = 0;
         model.castShadow = true;
         model.receiveShadow = true;
         scene.add(model);
         modelRef.current = model;
 
-        // Find head bone for tracking
+        // Find head bone for tracking and reset arm positions
         model.traverse((child: any) => {
           if (child.isBone && (child.name.toLowerCase().includes("head") || child.name.toLowerCase().includes("neck"))) {
             headBoneRef.current = child;
+          }
+          // Reset arm bones to neutral position
+          if (child.isBone && (child.name.toLowerCase().includes("arm") || child.name.toLowerCase().includes("shoulder"))) {
+            child.rotation.set(0, 0, 0);
           }
         });
 
