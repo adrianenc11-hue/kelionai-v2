@@ -99,7 +99,7 @@ export default function Home() {
             {/* Right: Live Avatars */}
             <div className="relative h-[400px] lg:h-[500px]" aria-label={`${activeAvatar === "kelion" ? "Kelion" : "Kira"} AI avatar`}>
               {/* Avatar selector pills */}
-              <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 flex gap-2 bg-slate-900/80 backdrop-blur rounded-full p-1">
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex gap-2 bg-slate-900/80 backdrop-blur rounded-full p-1">
                 <button
                   onClick={() => setActiveAvatar("kelion")}
                   className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
